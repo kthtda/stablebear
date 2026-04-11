@@ -77,6 +77,26 @@ def set_cuda_threshold(n: int):
     cpp.set_cuda_threshold(n)
 
 
+def set_parallel_eval_threshold(n: int):
+    """Set the minimum tensor size for parallel tensor evaluation.
+
+    When a tensor has at least *n* elements, ``tensor_eval`` distributes
+    the work across threads. Below this threshold evaluation is sequential.
+    The default is 500.
+
+    Parameters
+    ----------
+    n : int
+      Minimum number of elements to trigger parallel evaluation.
+    """
+    cpp.set_parallel_eval_threshold(n)
+
+
+def get_parallel_eval_threshold() -> int:
+    """Return the current parallel evaluation threshold."""
+    return cpp.get_parallel_eval_threshold()
+
+
 def set_device_verbose(on: bool):
     """Enable verbose device output. In this mode, when operations that may occur on GPU are invoked, a message is logged stating whether the operation will be performed on CPU or GPU.
 

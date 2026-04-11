@@ -17,6 +17,9 @@
 
 #include "../tensor.hpp"
 #include "../concepts.hpp"
+#include "../executor.hpp"
+#include "../settings.hpp"
+#include "../walk.hpp"
 
 #include <algorithm>
 #include <numeric>
@@ -31,9 +34,14 @@ namespace mpcf
   requires Evaluable<typename TElemTensor::value_type, DomainT, CodomainT>
   void tensor_eval(const TElemTensor& elems, DomainT x, TOutTensor& out)
   {
-    walk(elems, [&](const std::vector<size_t>& idx) {
+    auto eval = [&](const std::vector<size_t>& idx) {
       out(idx) = elems(idx).evaluate(x);
-    });
+    };
+
+    if (elems.size() >= settings().parallelEvalThreshold)
+      parallel_walk(elems, eval, default_executor());
+    else
+      walk(elems, eval);
   }
 
   // Evaluate every element of a tensor at a tensor of domain points, writing results into out.
@@ -65,13 +73,13 @@ namespace mpcf
     for (size_t i = 0; i < n; ++i)
       sorted_domain(std::vector<size_t>{i}) = domain_values[order[i]];
 
-    // Walk element tensor; evaluate each with the linear-scan overload, then unsort
-    Tensor<CodomainT> sorted_result(std::vector<size_t>{n});
-    std::vector<size_t> combined_idx;
-    walk(elems, [&](const std::vector<size_t>& elem_idx) {
+    // Evaluate each element with the linear-scan overload, then unsort.
+    // Each element gets its own sorted_result buffer for thread safety.
+    auto eval_elem = [&](const std::vector<size_t>& elem_idx) {
+      Tensor<CodomainT> sorted_result(std::vector<size_t>{n});
       elems(elem_idx).evaluate(sorted_domain, sorted_result, n);
 
-      combined_idx = elem_idx;
+      auto combined_idx = elem_idx;
       combined_idx.resize(elem_idx.size() + domain_indices[0].size());
 
       for (size_t i = 0; i < n; ++i) {
@@ -79,7 +87,12 @@ namespace mpcf
         std::copy(d_idx.begin(), d_idx.end(), combined_idx.begin() + elem_idx.size());
         out(combined_idx) = sorted_result(std::vector<size_t>{i});
       }
-    });
+    };
+
+    if (elems.size() * n >= settings().parallelEvalThreshold)
+      parallel_walk(elems, eval_elem, default_executor());
+    else
+      walk(elems, eval_elem);
   }
 
 } // namespace mpcf

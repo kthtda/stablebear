@@ -151,6 +151,8 @@ PYBIND11_MODULE(MPCF_MODULE_NAME, m) {
 
   m.def("force_cpu", [](bool on){ mpcf::settings().forceCpu = on; });
   m.def("set_cuda_threshold", [](size_t n){ mpcf::settings().cudaThreshold = n; });
+  m.def("set_parallel_eval_threshold", [](size_t n){ mpcf::settings().parallelEvalThreshold = n; });
+  m.def("get_parallel_eval_threshold", [](){ return mpcf::settings().parallelEvalThreshold; });
   m.def("set_device_verbose", [](bool on){ mpcf::settings().deviceVerbose = on; });
   m.def("set_block_dim", [](unsigned int x, unsigned int y) {
     mpcf::settings().blockDimX = x;
