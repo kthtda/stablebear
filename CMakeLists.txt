@@ -375,12 +375,66 @@ set(MPCF_X86_64_LEVEL "${_MPCF_X86_64_DEFAULT}" CACHE STRING
     "x86-64 microarchitecture baseline for CPU code (native, v1, v2, v3, v4)")
 set_property(CACHE MPCF_X86_64_LEVEL PROPERTY STRINGS native v1 v2 v3 v4)
 
+# MSVC has no -march=native. For MPCF_X86_64_LEVEL=native we probe the
+# host CPU at configure time via CPUID and pick the best /arch: flag —
+# this matters because a user doing `pip install .` precisely because
+# the shipped AVX2 wheel doesn't work on their CPU must NOT end up with
+# /arch:AVX2. Result is cached so the probe runs only once per build
+# tree. Produces "/arch:AVX512", "/arch:AVX2", "/arch:AVX", or "" (no
+# flag — MSVC default, SSE2-baseline, works on any x86-64 CPU).
+function(mpcf_detect_msvc_native_arch out_var)
+  if (DEFINED _MPCF_MSVC_NATIVE_ARCH_CACHE)
+    set(${out_var} "${_MPCF_MSVC_NATIVE_ARCH_CACHE}" PARENT_SCOPE)
+    return()
+  endif ()
+
+  set(_probe "${CMAKE_BINARY_DIR}/_mpcf_cpuid_probe.cpp")
+  file(WRITE "${_probe}" [=[
+#include <intrin.h>
+#include <stdio.h>
+int main() {
+    int info[4];
+    __cpuid(info, 0);
+    int max_leaf = info[0];
+    int ecx1 = 0;
+    if (max_leaf >= 1) { __cpuid(info, 1); ecx1 = info[2]; }
+    int ebx7 = 0;
+    if (max_leaf >= 7) { __cpuidex(info, 7, 0); ebx7 = info[1]; }
+    if (ebx7 & (1 << 16)) { printf("AVX512"); return 0; }
+    if (ebx7 & (1 <<  5)) { printf("AVX2");   return 0; }
+    if (ecx1 & (1 << 28)) { printf("AVX");    return 0; }
+    printf("NONE");
+    return 0;
+}
+]=])
+  try_run(_run_result _compile_result
+      "${CMAKE_BINARY_DIR}/_mpcf_cpuid_probe_build"
+      "${_probe}"
+      RUN_OUTPUT_VARIABLE _probe_output)
+  set(_flag "")
+  if (_compile_result AND _run_result EQUAL 0)
+    if (_probe_output STREQUAL "AVX512")
+      set(_flag "/arch:AVX512")
+    elseif (_probe_output STREQUAL "AVX2")
+      set(_flag "/arch:AVX2")
+    elseif (_probe_output STREQUAL "AVX")
+      set(_flag "/arch:AVX")
+    endif ()
+  endif ()
+  set(_MPCF_MSVC_NATIVE_ARCH_CACHE "${_flag}" CACHE INTERNAL "")
+  message(STATUS "!!! MSVC native CPU probe: '${_probe_output}' -> '${_flag}'")
+  set(${out_var} "${_flag}" PARENT_SCOPE)
+endfunction()
+
 function(mpcf_apply_cpu_arch_flags tgt)
   if (MSVC)
-    # MSVC has no direct -march=native equivalent. Treat "native" as v3
-    # (/arch:AVX2) which covers the common case; users targeting AVX-512
-    # can set MPCF_X86_64_LEVEL=v4 explicitly.
-    if (MPCF_X86_64_LEVEL STREQUAL "v3" OR MPCF_X86_64_LEVEL STREQUAL "native")
+    if (MPCF_X86_64_LEVEL STREQUAL "native")
+      mpcf_detect_msvc_native_arch(_native_flag)
+      if (_native_flag)
+        target_compile_options(${tgt} PRIVATE
+            $<$<COMPILE_LANGUAGE:CXX>:${_native_flag}>)
+      endif ()
+    elseif (MPCF_X86_64_LEVEL STREQUAL "v3")
       target_compile_options(${tgt} PRIVATE
           $<$<COMPILE_LANGUAGE:CXX>:/arch:AVX2>)
     elseif (MPCF_X86_64_LEVEL STREQUAL "v4")

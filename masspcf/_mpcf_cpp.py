@@ -132,9 +132,10 @@ def _check_x86_64_baseline():
         f"masspcf was built for x86-64-{_BUILD_CPU_ARCH_LEVEL} CPUs but this "
         f"CPU is missing required instruction set extensions: "
         f"{', '.join(missing)}. "
-        "To run on this CPU, rebuild from source with a lower baseline, e.g.:\n"
-        "    pip install --no-binary=masspcf masspcf "
-        '--config-settings=cmake.args="-DMPCF_X86_64_LEVEL=v2"\n'
+        "To run on this CPU, rebuild from source — this defaults to "
+        "-march=native (or a CPUID-probed /arch: on MSVC) and will tune to "
+        "whatever features your CPU does have:\n"
+        "    pip install --no-binary=masspcf masspcf\n"
         "Set MPCF_SKIP_CPU_CHECK=1 to bypass this check (not recommended)."
     )
 
