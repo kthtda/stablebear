@@ -28,10 +28,18 @@ import sys
 
 from .gpu import has_nvidia_gpu as _has_nvidia_gpu
 
-# The compiled backend is built for x86-64-v3 by default (AVX2, FMA, BMI1/2,
-# F16C). Validate the running CPU before attempting to import it, otherwise
-# dlopen() would fail with SIGILL and no useful error message.
-_REQUIRED_X86_64_FEATURES = ("avx2", "fma")
+try:
+    from ._build_info import CPU_ARCH_LEVEL as _BUILD_CPU_ARCH_LEVEL
+except ImportError:
+    # Older build or corrupted install — assume the distribution-wheel default.
+    _BUILD_CPU_ARCH_LEVEL = "v3"
+
+# Features required by each x86-64 microarchitecture level. "native" builds
+# are tuned to the CPU they were compiled on, so no runtime check is needed.
+_X86_64_REQUIRED_FEATURES = {
+    "v3": ("avx2", "fma"),
+    "v4": ("avx2", "fma", "avx512f"),
+}
 
 
 def _detect_x86_cpu_flags():
@@ -71,6 +79,7 @@ def _detect_x86_cpu_flags():
             PF_SSE4_2_INSTRUCTIONS_AVAILABLE = 38
             PF_AVX_INSTRUCTIONS_AVAILABLE = 39
             PF_AVX2_INSTRUCTIONS_AVAILABLE = 40
+            PF_AVX512F_INSTRUCTIONS_AVAILABLE = 41
             flags = set()
             if kernel32.IsProcessorFeaturePresent(PF_SSE4_2_INSTRUCTIONS_AVAILABLE):
                 flags.add("sse4_2")
@@ -79,6 +88,8 @@ def _detect_x86_cpu_flags():
             if kernel32.IsProcessorFeaturePresent(PF_AVX2_INSTRUCTIONS_AVAILABLE):
                 # Any x86 CPU with AVX2 in the consumer market also has FMA3.
                 flags.update(("avx2", "fma"))
+            if kernel32.IsProcessorFeaturePresent(PF_AVX512F_INSTRUCTIONS_AVAILABLE):
+                flags.add("avx512f")
             return flags
         except OSError:
             return set()
@@ -88,12 +99,20 @@ def _detect_x86_cpu_flags():
 
 def _check_x86_64_baseline():
     """Raise ImportError with a clear message if the CPU lacks the required
-    x86-64-v3 extensions the extension modules were compiled against.
+    x86-64 extensions the extension modules were compiled against.
 
-    On non-x86-64 hosts this is a no-op. Set MPCF_SKIP_CPU_CHECK=1 to bypass
-    (useful for debugging detection problems; the extension will still SIGILL
-    on a genuinely unsupported CPU)."""
+    The check is driven by CPU_ARCH_LEVEL recorded in _build_info.py at
+    build time: "native", "v1", and "v2" builds need no check, "v3" and
+    "v4" builds verify the matching feature set. On non-x86-64 hosts this
+    is always a no-op. Set MPCF_SKIP_CPU_CHECK=1 to bypass (useful for
+    debugging detection problems; the extension will still SIGILL on a
+    genuinely unsupported CPU)."""
     if os.environ.get("MPCF_SKIP_CPU_CHECK", "0") != "0":
+        return
+
+    required = _X86_64_REQUIRED_FEATURES.get(_BUILD_CPU_ARCH_LEVEL)
+    if required is None:
+        # "native", "v1", "v2", or an unknown value — nothing to check.
         return
 
     machine = platform.machine().lower()
@@ -105,14 +124,14 @@ def _check_x86_64_baseline():
         # Detection failed; don't block loading on a false negative.
         return
 
-    missing = [f for f in _REQUIRED_X86_64_FEATURES if f not in flags]
+    missing = [f for f in required if f not in flags]
     if not missing:
         return
 
     raise ImportError(
-        "masspcf was built for x86-64-v3 CPUs (Haswell / Excavator / Zen 1+, "
-        "2013+), but this CPU is missing required instruction set "
-        f"extensions: {', '.join(missing)}. "
+        f"masspcf was built for x86-64-{_BUILD_CPU_ARCH_LEVEL} CPUs but this "
+        f"CPU is missing required instruction set extensions: "
+        f"{', '.join(missing)}. "
         "To run on this CPU, rebuild from source with a lower baseline, e.g.:\n"
         "    pip install --no-binary=masspcf masspcf "
         '--config-settings=cmake.args="-DMPCF_X86_64_LEVEL=v2"\n'
