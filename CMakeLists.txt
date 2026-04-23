@@ -346,6 +346,57 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 enable_language(CXX)
 
+# ============================================================
+# x86-64 microarchitecture baseline
+# ============================================================
+# Default target is x86-64-v3: AVX, AVX2, FMA, BMI1/2, F16C, LZCNT, MOVBE.
+# This covers essentially all x86-64 laptops and workstations from 2013+
+# (Haswell / Excavator / Zen 1+). Notable exceptions are Atom-derived
+# chips (Celeron N / Pentium Silver / Jasper Lake, pre-2022). A Python
+# runtime check in masspcf/_mpcf_cpp.py raises a clear ImportError on
+# CPUs that lack the required extensions.
+#
+# Override with -DMPCF_X86_64_LEVEL=v2 (or v1) at configure time to
+# build for older CPUs. v4 (AVX-512) is accepted but rarely useful.
+set(MPCF_X86_64_LEVEL "v3" CACHE STRING
+    "x86-64 microarchitecture baseline for CPU code (v1, v2, v3, v4)")
+set_property(CACHE MPCF_X86_64_LEVEL PROPERTY STRINGS v1 v2 v3 v4)
+
+function(mpcf_apply_cpu_arch_flags tgt)
+  if (MSVC)
+    if (MPCF_X86_64_LEVEL STREQUAL "v3")
+      target_compile_options(${tgt} PRIVATE
+          $<$<COMPILE_LANGUAGE:CXX>:/arch:AVX2>)
+    elseif (MPCF_X86_64_LEVEL STREQUAL "v4")
+      target_compile_options(${tgt} PRIVATE
+          $<$<COMPILE_LANGUAGE:CXX>:/arch:AVX512>)
+    endif ()
+    # v1/v2 have no direct MSVC /arch: flag (default is SSE2; SSE4.2
+    # intrinsics are header-gated and work at runtime on capable CPUs).
+    return()
+  endif ()
+
+  if (MPCF_X86_64_LEVEL STREQUAL "v1")
+    return()
+  endif ()
+
+  set(_arch_flag "-march=x86-64-${MPCF_X86_64_LEVEL}")
+
+  if (APPLE)
+    # On macOS (including universal2 builds), -Xarch_x86_64 applies the
+    # following flag only when producing the x86_64 slice, so arm64 slices
+    # are unaffected.
+    target_compile_options(${tgt} PRIVATE
+        $<$<COMPILE_LANGUAGE:CXX>:-Xarch_x86_64>
+        $<$<COMPILE_LANGUAGE:CXX>:${_arch_flag}>)
+  elseif (CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64|x64)$")
+    target_compile_options(${tgt} PRIVATE
+        $<$<COMPILE_LANGUAGE:CXX>:${_arch_flag}>)
+  endif ()
+endfunction()
+
+message(STATUS "!!! x86-64 baseline: ${MPCF_X86_64_LEVEL}")
+
 if (WIN32)
   if (MSVC)
     set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /bigobj")
@@ -593,7 +644,13 @@ foreach(MOD_NAME IN LISTS CPP_MODULE_NAMES)
   target_include_directories(${MOD_NAME} PUBLIC ${MPCF_PUBLIC_INCLUDES})
   target_link_libraries(${MOD_NAME} PRIVATE pybind11::headers)
   target_compile_definitions(${MOD_NAME} PRIVATE VERSION_INFO=${PROJECT_VERSION_FULL})
+  mpcf_apply_cpu_arch_flags(${MOD_NAME})
 endforeach()
+
+# NOTE: _gpu_detect is intentionally built without x86-64-vN flags so it
+# remains loadable on CPUs that lack AVX2. The Python runtime check in
+# _mpcf_cpp.py uses a stdlib-only path (independent of _gpu_detect) and
+# reports a clear error before attempting to import the main backend.
 
 # Convenience target so CLion (and plain cmake --build) can build all Python modules at once
 add_custom_target(_mpcf DEPENDS ${CPP_MODULE_NAMES})
@@ -741,6 +798,8 @@ if (BUILD_TESTER)
   else ()
     add_library(mpcf_nopy STATIC ${MPCF_LIB_SOURCES} ${MPCF_VERSION_SOURCE})
   endif ()
+  mpcf_apply_cpu_arch_flags(mpcf_nopy)
+  mpcf_apply_cpu_arch_flags(mpcf_test)
   target_include_directories(mpcf_nopy PRIVATE ${MPCF_PRIVATE_INCLUDES})
   target_include_directories(mpcf_nopy PUBLIC ${MPCF_PUBLIC_INCLUDES})
   if (BUILD_WITH_CUDA)

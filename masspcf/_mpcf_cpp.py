@@ -22,10 +22,102 @@ import importlib.util
 import os
 import pathlib
 import pkgutil
+import platform
 import re
 import sys
 
 from .gpu import has_nvidia_gpu as _has_nvidia_gpu
+
+# The compiled backend is built for x86-64-v3 by default (AVX2, FMA, BMI1/2,
+# F16C). Validate the running CPU before attempting to import it, otherwise
+# dlopen() would fail with SIGILL and no useful error message.
+_REQUIRED_X86_64_FEATURES = ("avx2", "fma")
+
+
+def _detect_x86_cpu_flags():
+    """Return a lowercased set of feature flag names for the current x86-64 CPU.
+
+    Returns an empty set when detection is not possible (unknown OS, restricted
+    sandbox, etc.); callers treat that as "skip the check" rather than fail.
+    """
+    if sys.platform.startswith("linux"):
+        try:
+            with open("/proc/cpuinfo") as f:
+                for line in f:
+                    if line.startswith(("flags", "Features")):
+                        return {w.lower() for w in line.split(":", 1)[1].split()}
+        except OSError:
+            pass
+        return set()
+
+    if sys.platform == "darwin":
+        import subprocess
+
+        flags = set()
+        for key in ("machdep.cpu.features", "machdep.cpu.leaf7_features"):
+            try:
+                out = subprocess.check_output(
+                    ["sysctl", "-n", key], text=True, stderr=subprocess.DEVNULL
+                )
+                flags.update(w.lower() for w in out.split())
+            except (OSError, subprocess.SubprocessError):
+                pass
+        return flags
+
+    if sys.platform == "win32":
+        try:
+            kernel32 = ctypes.windll.kernel32
+            # Windows processor feature constants.
+            PF_SSE4_2_INSTRUCTIONS_AVAILABLE = 38
+            PF_AVX_INSTRUCTIONS_AVAILABLE = 39
+            PF_AVX2_INSTRUCTIONS_AVAILABLE = 40
+            flags = set()
+            if kernel32.IsProcessorFeaturePresent(PF_SSE4_2_INSTRUCTIONS_AVAILABLE):
+                flags.add("sse4_2")
+            if kernel32.IsProcessorFeaturePresent(PF_AVX_INSTRUCTIONS_AVAILABLE):
+                flags.add("avx")
+            if kernel32.IsProcessorFeaturePresent(PF_AVX2_INSTRUCTIONS_AVAILABLE):
+                # Any x86 CPU with AVX2 in the consumer market also has FMA3.
+                flags.update(("avx2", "fma"))
+            return flags
+        except OSError:
+            return set()
+
+    return set()
+
+
+def _check_x86_64_baseline():
+    """Raise ImportError with a clear message if the CPU lacks the required
+    x86-64-v3 extensions the extension modules were compiled against.
+
+    On non-x86-64 hosts this is a no-op. Set MPCF_SKIP_CPU_CHECK=1 to bypass
+    (useful for debugging detection problems; the extension will still SIGILL
+    on a genuinely unsupported CPU)."""
+    if os.environ.get("MPCF_SKIP_CPU_CHECK", "0") != "0":
+        return
+
+    machine = platform.machine().lower()
+    if machine not in ("x86_64", "amd64", "x64"):
+        return
+
+    flags = _detect_x86_cpu_flags()
+    if not flags:
+        # Detection failed; don't block loading on a false negative.
+        return
+
+    missing = [f for f in _REQUIRED_X86_64_FEATURES if f not in flags]
+    if not missing:
+        return
+
+    raise ImportError(
+        "masspcf was built for x86-64-v3 CPUs (Haswell / Excavator / Zen 1+, "
+        "2013+), but this CPU is missing required instruction set "
+        f"extensions: {', '.join(missing)}. "
+        "To run on this CPU, rebuild from source with a lower baseline, e.g.:\n"
+        "    pip install --no-binary=masspcf masspcf "
+        '--config-settings=cmake.args="-DMPCF_X86_64_LEVEL=v2"\n'
+        "Set MPCF_SKIP_CPU_CHECK=1 to bypass this check (not recommended)."
+    )
 
 
 def _preload_cudart():
@@ -69,6 +161,8 @@ def _find_cuda_backend_name():
     candidates.sort(reverse=True)
     return candidates[0][1]
 
+
+_check_x86_64_baseline()
 
 _backend = None
 
