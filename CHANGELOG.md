@@ -1,3 +1,26 @@
+## 0.4.1
+
+### Performance
+
+* **x86-64 baseline raised to v3** — distribution wheels are now compiled with AVX2, FMA, BMI1/2, F16C, LZCNT, and MOVBE enabled (Haswell / Excavator / Zen 1 and newer, 2013+). This covers essentially all x86-64 laptops and workstations from the last decade. The main exceptions are pre-2022 Atom-derived chips such as Celeron N, Pentium Silver, and Jasper Lake.
+* **Parallel tensor evaluation** — `tensor_eval` now dispatches across threads when the total work exceeds a tunable threshold (500 elements by default). Configurable via `masspcf.system.set_parallel_eval_threshold(n)`. Speedups of 3–6x observed on 6-core CPUs at 500+ elements.
+
+#### Runtime CPU check
+
+masspcf now verifies at import time that the CPU supports the instruction set the wheel was built against, and raises a clear `ImportError` with rebuild instructions if it does not — instead of letting the extension crash with an illegal-instruction signal. Set `MPCF_SKIP_CPU_CHECK=1` to bypass the check.
+
+#### Building from source
+
+If the distribution wheel does not run on your CPU — or you simply want a build tuned to your exact hardware — install from source:
+
+```bash
+pip install --no-binary=masspcf masspcf
+```
+
+Source builds default to `-march=native` on Linux and macOS, and to a CPUID-probed `/arch:` flag on MSVC, so the resulting extension targets whatever features your CPU actually has (including AVX-512 where available). The baseline can also be pinned explicitly at configure time with `-DMPCF_X86_64_LEVEL=v1|v2|v3|v4|native`.
+
+The plain-cmake developer build (without `SKBUILD`) still defaults to `v3`.
+
 ## 0.4.0
 
 Major rewrite of the core data structures and significant expansion of the API.
