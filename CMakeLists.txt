@@ -16,11 +16,23 @@ cmake_minimum_required(VERSION 3.19)
 
 include(FetchContent)
 
+# Force MSVC release CRT (/MD) for wheel builds. Must be set before project() so it applies to all targets.
+# CMP0091 NEW (default since cmake_minimum_required 3.15) makes this honor CMAKE_MSVC_RUNTIME_LIBRARY.
+# Without this, conda compiler-activation env vars (vs2017_win-64 pulled in by cuda-compiler) can leak
+# debug CRT into the link, producing wheels that bundle non-redistributable
+# msvcp140d/vcruntime140d/ucrtbased. Local non-SKBUILD builds keep CMake default behavior.
+if (WIN32 AND SKBUILD)
+  set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreadedDLL" CACHE STRING "MSVC runtime library")
+endif ()
+
 if (SKBUILD)
   message(STATUS "!!! Not Minimal module build (SKBUILD ON) !!!")
 else ()
   message(STATUS "!!! Minimal module build (SKBUILD OFF) !!!")
 endif ()
+
+message(STATUS "!!! CMAKE_BUILD_TYPE: ${CMAKE_BUILD_TYPE}")
+message(STATUS "!!! CMAKE_MSVC_RUNTIME_LIBRARY: ${CMAKE_MSVC_RUNTIME_LIBRARY}")
 
 if (DEFINED ENV{BUILD_WITH_CUDA})
   if ($ENV{BUILD_WITH_CUDA} MATCHES "0")
