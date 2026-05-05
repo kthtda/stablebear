@@ -1,0 +1,38 @@
+==1508== Memcheck, a memory error detector
+==1508== Copyright (C) 2002-2022, and GNU GPL'd, by Julian Seward et al.
+==1508== Using Valgrind-3.22.0 and LibVEX; rerun with -h for copyright info
+==1508== Command: python -m pytest . -vv -s
+==1508== Parent PID: 1507
+==1508== 
+==1510== 
+==1510== HEAP SUMMARY:
+==1510==     in use at exit: 21,944,093 bytes in 170,694 blocks
+==1510==   total heap usage: 803,486 allocs, 632,792 frees, 138,103,228 bytes allocated
+==1510== 
+==1510== LEAK SUMMARY:
+==1510==    definitely lost: 0 bytes in 0 blocks
+==1510==    indirectly lost: 0 bytes in 0 blocks
+==1510==      possibly lost: 17,468,577 bytes in 134,477 blocks
+==1510==    still reachable: 3,422,430 bytes in 27,584 blocks
+==1510==         suppressed: 1,053,086 bytes in 8,633 blocks
+==1510== Rerun with --leak-check=full to see details of leaked memory
+==1510== 
+==1510== For lists of detected and suppressed errors, rerun with: -s
+==1510== ERROR SUMMARY: 0 errors from 0 contexts (suppressed: 0 from 0)
+==1508== 
+==1508== HEAP SUMMARY:
+==1508==     in use at exit: 7,777,836 bytes in 91,540 blocks
+==1508==   total heap usage: 6,755,288 allocs, 6,663,748 frees, 824,949,106 bytes allocated
+==1508== 
+==1508== LEAK SUMMARY:
+==1508==    definitely lost: 3,266,863 bytes in 57,395 blocks
+==1508==    indirectly lost: 59,523 bytes in 845 blocks
+==1508==      possibly lost: 2,215,788 bytes in 17,917 blocks
+==1508==    still reachable: 576,051 bytes in 2,447 blocks
+==1508==                       of which reachable via heuristic:
+==1508==                         stdstring          : 511 bytes in 7 blocks
+==1508==         suppressed: 1,659,611 bytes in 12,936 blocks
+==1508== Rerun with --leak-check=full to see details of leaked memory
+==1508== 
+==1508== For lists of detected and suppressed errors, rerun with: -s
+==1508== ERROR SUMMARY: 0 errors from 0 contexts (suppressed: 0 from 0)

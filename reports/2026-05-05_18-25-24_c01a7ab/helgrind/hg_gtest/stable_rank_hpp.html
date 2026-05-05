@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>/home/runner/actions-runner/_work/masspcf/masspcf/include/mpcf/persistence/stable_rank.hpp</title>
+    <link href='valgrind.css' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+    <script src="https://code.jquery.com/jquery-3.4.1.js"></script>
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.0.0/styles/default.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.0.0/highlight.min.js"></script>
+    <script src="valgrind.js"></script>
+</head>
+
+<body>
+    <div class="global">
+        <div class="header">
+            <h1>/home/runner/actions-runner/_work/masspcf/masspcf/include/mpcf/persistence/stable_rank.hpp</h1>
+            <p><b>2</b> errors</p>
+            <button class="next_error">Goto First Error</button>
+        </div>
+        <div class="listing">
+            <pre class="code">
+<code class="c++"><span class="line_number">1</span>// Copyright 2024-2026 Bjorn Wehlin
+<span class="line_number">2</span>//
+<span class="line_number">3</span>// Licensed under the Apache License, Version 2.0 (the &#34;License&#34;);
+<span class="line_number">4</span>// you may not use this file except in compliance with the License.
+<span class="line_number">5</span>// You may obtain a copy of the License at
+<span class="line_number">6</span>//
+<span class="line_number">7</span>//    http://www.apache.org/licenses/LICENSE-2.0
+<span class="line_number">8</span>//
+<span class="line_number">9</span>// Unless required by applicable law or agreed to in writing, software
+<span class="line_number">10</span>// distributed under the License is distributed on an &#34;AS IS&#34; BASIS,
+<span class="line_number">11</span>// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+<span class="line_number">12</span>// See the License for the specific language governing permissions and
+<span class="line_number">13</span>// limitations under the License.
+<span class="line_number">14</span>
+<span class="line_number">15</span>#ifndef MASSPCF_STABLE_RANK_H
+<span class="line_number">16</span>#define MASSPCF_STABLE_RANK_H
+<span class="line_number">17</span>
+<span class="line_number">18</span>#include &#34;../functional/pcf.hpp&#34;
+<span class="line_number">19</span>#include &#34;barcode.hpp&#34;
+<span class="line_number">20</span>#include &#34;barcode_summary.hpp&#34;
+<span class="line_number">21</span>
+<span class="line_number">22</span>namespace mpcf::ph
+<span class="line_number">23</span>{
+<span class="line_number">24</span>  /**
+<span class="line_number">25</span>   * Converts a single barcode to a stable rank PCF. See Chachólski, W., &amp; Riihimäki, H. (2020). Metrics and stabilization in one parameter persistence. SIAM Journal on Applied Algebra and Geometry, 4(1), 69-98.
+<span class="line_number">26</span>   * @tparam T Data type of the bar birth/death values. The same type will be used for the PCF time and value types.
+<span class="line_number">27</span>   * @param barcode The barcode to convert to a stable rank function.
+<span class="line_number">28</span>   * @return The stable rank function corresponding to the supplied barcode.
+<span class="line_number">29</span>   */
+<span class="line_number">30</span>  template &lt;typename T&gt;
+<span class="line_number">31</span>  Pcf&lt;T, T&gt; barcode_to_stable_rank(const Barcode&lt;T&gt;&amp; barcode)
+<span class="line_number">32</span>  {
+<span class="line_number">33</span>    if (barcode.bars().empty())
+<span class="line_number">34</span>    {
+<span class="line_number">35</span>      return Pcf&lt;T, T&gt;();
+<span class="line_number">36</span>    }
+<span class="line_number">37</span>
+<span class="line_number">38</span>    std::vector&lt;T&gt; lifetimes;
+<span class="line_number">39</span>    lifetimes.reserve(barcode.bars().size());
+<span class="line_number">40</span>
+<span class="line_number">41</span>    std::transform(barcode.bars().begin(), barcode.bars().end(), std::back_inserter(lifetimes), [](const PersistencePair&lt;T&gt;&amp; pp) -&gt; T {
+</code></pre>
+            <div class="issue">
+                <div>
+                    <span class="what">Possible data race during read of size 4 at 0x4E9D214 by thread #21</span>
+                    <div class="navigation">
+                        <button class="next_error">Next</button>
+                        <button class="prev_error">Previous</button>
+                    </div>
+                </div>
+                <div>
+                    <table class="call_stack">
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/stl_algo.h:4309<br>
+                                    <code class="cpp">std::back_insert_iterator&lt;std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt; std::transform&lt;__gnu_cxx::__normal_iterator&lt;mpcf::ph::PersistencePair&lt;float&gt; const*, std::vector&lt;mpcf::ph::PersistencePair&lt;float&gt;, std::allocator&lt;mpcf::ph::PersistencePair&lt;float&gt; &gt; &gt; &gt;, std::back_insert_iterator&lt;std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, mpcf::ph::barcode_to_stable_rank&lt;float&gt;(mpcf::ph::Barcode&lt;float&gt; const&amp;)::{lambda(mpcf::ph::PersistencePair&lt;float&gt; const&amp;)#1}&gt;(__gnu_cxx::__normal_iterator&lt;mpcf::ph::PersistencePair&lt;float&gt; const*, std::vector&lt;mpcf::ph::PersistencePair&lt;float&gt;, std::allocator&lt;mpcf::ph::PersistencePair&lt;float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::ph::PersistencePair&lt;float&gt; const*, std::vector&lt;mpcf::ph::PersistencePair&lt;float&gt;, std::allocator&lt;mpcf::ph::PersistencePair&lt;float&gt; &gt; &gt; &gt;, std::back_insert_iterator&lt;std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, mpcf::ph::barcode_to_stable_rank&lt;float&gt;(mpcf::ph::Barcode&lt;float&gt; const&amp;)::{lambda(mpcf::ph::PersistencePair&lt;float&gt; const&amp;)#1})</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">4306</span>      __glibcxx_requires_valid_range(__first, __last);
+<span class="line_number">4307</span>
+<span class="line_number">4308</span>      for (; __first != __last; ++__first, (void)++__result)
+<span class="line_number">4309</span><span class="error">	*__result = __unary_op(*__first);
+</span><span class="line_number">4310</span>      return __result;
+<span class="line_number">4311</span>    }
+<span class="line_number">4312</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/actions-runner/_work/masspcf/masspcf/include/mpcf/persistence/stable_rank.hpp:41<br>
+                                    <code class="cpp">mpcf::Pcf&lt;float, float&gt; mpcf::ph::barcode_to_stable_rank&lt;float&gt;(mpcf::ph::Barcode&lt;float&gt; const&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">38</span>    std::vector&lt;T&gt; lifetimes;
+<span class="line_number">39</span>    lifetimes.reserve(barcode.bars().size());
+<span class="line_number">40</span>
+<span class="line_number">41</span><span class="error">    std::transform(barcode.bars().begin(), barcode.bars().end(), std::back_inserter(lifetimes), [](const PersistencePair&lt;T&gt;&amp; pp) -&gt; T {
+</span><span class="line_number">42</span>      if (pp.death == std::numeric_limits&lt;T&gt;::max())
+<span class="line_number">43</span>      {
+<span class="line_number">44</span>        return std::numeric_limits&lt;T&gt;::max();
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/actions-runner/_work/masspcf/masspcf/include/mpcf/persistence/barcode_summary.hpp:55<br>
+                                    <code class="cpp">mpcf::ph::BarcodeSummaryTask&lt;float, mpcf::Pcf&lt;float, float&gt; (*)(mpcf::ph::Barcode&lt;float&gt; const&amp;)&gt;::run_async(mpcf::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}::operator()(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;) const::{lambda()#1}::operator()() const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">52</span>
+<span class="line_number">53</span>      mpcf::walk(m_barcodes, [this, &amp;flow](const std::vector&lt;size_t&gt;&amp; index) {
+<span class="line_number">54</span>        flow.emplace([this, index] {
+<span class="line_number">55</span><span class="error">          m_ret(index) = m_func(m_barcodes(index));
+</span><span class="line_number">56</span>          add_progress(1);
+<span class="line_number">57</span>        });
+<span class="line_number">58</span>      });
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:61<br>
+                                    <code class="cpp">void std::__invoke_impl&lt;void, mpcf::ph::BarcodeSummaryTask&lt;float, mpcf::Pcf&lt;float, float&gt; (*)(mpcf::ph::Barcode&lt;float&gt; const&amp;)&gt;::run_async(mpcf::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}::operator()(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;) const::{lambda()#1}&amp;&gt;(std::__invoke_other, mpcf::ph::BarcodeSummaryTask&lt;float, mpcf::Pcf&lt;float, float&gt; (*)(mpcf::ph::Barcode&lt;float&gt; const&amp;)&gt;::run_async(mpcf::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}::operator()(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;) const::{lambda()#1}&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">58</span>  template&lt;typename _Res, typename _Fn, typename... _Args&gt;
+<span class="line_number">59</span>    constexpr _Res
+<span class="line_number">60</span>    __invoke_impl(__invoke_other, _Fn&amp;&amp; __f, _Args&amp;&amp;... __args)
+<span class="line_number">61</span><span class="error">    { return std::forward&lt;_Fn&gt;(__f)(std::forward&lt;_Args&gt;(__args)...); }
+</span><span class="line_number">62</span>
+<span class="line_number">63</span>  template&lt;typename _Res, typename _MemFun, typename _Tp, typename... _Args&gt;
+<span class="line_number">64</span>    constexpr _Res
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:111<br>
+                                    <code class="cpp">std::enable_if&lt;is_invocable_r_v&lt;void, mpcf::ph::BarcodeSummaryTask&lt;float, mpcf::Pcf&lt;float, float&gt; (*)(mpcf::ph::Barcode&lt;float&gt; const&amp;)&gt;::run_async(mpcf::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}::operator()(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;) const::{lambda()#1}&amp;&gt;, void&gt;::type std::__invoke_r&lt;void, mpcf::ph::BarcodeSummaryTask&lt;float, mpcf::Pcf&lt;float, float&gt; (*)(mpcf::ph::Barcode&lt;float&gt; const&amp;)&gt;::run_async(mpcf::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}::operator()(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;) const::{lambda()#1}&amp;&gt;(mpcf::ph::BarcodeSummaryTask&lt;float, mpcf::Pcf&lt;float, float&gt; (*)(mpcf::ph::Barcode&lt;float&gt; const&amp;)&gt;::run_async(mpcf::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}::operator()(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;) const::{lambda()#1}&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">108</span>      using __type = typename __result::type;
+<span class="line_number">109</span>      using __tag = typename __result::__invoke_type;
+<span class="line_number">110</span>      if constexpr (is_void_v&lt;_Res&gt;)
+<span class="line_number">111</span><span class="error">	std::__invoke_impl&lt;__type&gt;(__tag{}, std::forward&lt;_Callable&gt;(__fn),
+</span><span class="line_number">112</span>					std::forward&lt;_Args&gt;(__args)...);
+<span class="line_number">113</span>      else
+<span class="line_number">114</span>	return std::__invoke_impl&lt;__type&gt;(__tag{},
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/std_function.h:290<br>
+                                    <code class="cpp">std::_Function_handler&lt;void (), mpcf::ph::BarcodeSummaryTask&lt;float, mpcf::Pcf&lt;float, float&gt; (*)(mpcf::ph::Barcode&lt;float&gt; const&amp;)&gt;::run_async(mpcf::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}::operator()(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;) const::{lambda()#1}&gt;::_M_invoke(std::_Any_data const&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">287</span>      static _Res
+<span class="line_number">288</span>      _M_invoke(const _Any_data&amp; __functor, _ArgTypes&amp;&amp;... __args)
+<span class="line_number">289</span>      {
+<span class="line_number">290</span><span class="error">	return std::__invoke_r&lt;_Res&gt;(*_Base::_M_get_pointer(__functor),
+</span><span class="line_number">291</span>				     std::forward&lt;_ArgTypes&gt;(__args)...);
+<span class="line_number">292</span>      }
+<span class="line_number">293</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/std_function.h:591<br>
+                                    <code class="cpp">std::function&lt;void ()&gt;::operator()() const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">588</span>      {
+<span class="line_number">589</span>	if (_M_empty())
+<span class="line_number">590</span>	  __throw_bad_function_call();
+<span class="line_number">591</span><span class="error">	return _M_invoker(_M_functor, std::forward&lt;_ArgTypes&gt;(__args)...);
+</span><span class="line_number">592</span>      }
+<span class="line_number">593</span>
+<span class="line_number">594</span>#if __cpp_rtti
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/actions-runner/_work/masspcf/masspcf/3rd/taskflow/taskflow/core/executor.hpp:1887<br>
+                                    <code class="cpp">tf::Executor::_invoke_static_task(tf::Worker&amp;, tf::Node*)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1884</span>// Procedure: _invoke_static_task
+<span class="line_number">1885</span>inline void Executor::_invoke_static_task(Worker&amp; worker, Node* node) {
+<span class="line_number">1886</span>  _observer_prologue(worker, node);
+<span class="line_number">1887</span><span class="error">  TF_EXECUTOR_EXCEPTION_HANDLER(worker, node, {
+</span><span class="line_number">1888</span>    std::get_if&lt;Node::Static&gt;(&amp;node-&gt;_handle)-&gt;work();
+<span class="line_number">1889</span>  });
+<span class="line_number">1890</span>  _observer_epilogue(worker, node);
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/actions-runner/_work/masspcf/masspcf/3rd/taskflow/taskflow/core/executor.hpp:1662<br>
+                                    <code class="cpp">tf::Executor::_invoke(tf::Worker&amp;, tf::Node*)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1659</span>  switch(node-&gt;_handle.index()) {
+<span class="line_number">1660</span>    // static task
+<span class="line_number">1661</span>    case Node::STATIC:{
+<span class="line_number">1662</span><span class="error">      _invoke_static_task(worker, node);
+</span><span class="line_number">1663</span>    }
+<span class="line_number">1664</span>    break;
+<span class="line_number">1665</span>    
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/actions-runner/_work/masspcf/masspcf/3rd/taskflow/taskflow/core/executor.hpp:1424<br>
+                                    <code class="cpp">tf::Executor::_exploit_task(tf::Worker&amp;, tf::Node*&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1421</span>// Procedure: _exploit_task
+<span class="line_number">1422</span>inline void Executor::_exploit_task(Worker&amp; w, Node*&amp; t) {
+<span class="line_number">1423</span>  while(t) {
+<span class="line_number">1424</span><span class="error">    _invoke(w, t);
+</span><span class="line_number">1425</span>    t = w._wsq.pop();
+<span class="line_number">1426</span>  }
+<span class="line_number">1427</span>}
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/actions-runner/_work/masspcf/masspcf/3rd/taskflow/taskflow/core/executor.hpp:1327<br>
+                                    <code class="cpp">tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}::operator()() const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1324</span>        while(1) {
+<span class="line_number">1325</span>
+<span class="line_number">1326</span>          // drains out the local queue first
+<span class="line_number">1327</span><span class="error">          _exploit_task(worker, t);
+</span><span class="line_number">1328</span>
+<span class="line_number">1329</span>          // steals and waits for tasks
+<span class="line_number">1330</span>          if(_wait_for_task(worker, t) == false) {
+</code></pre>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            <pre class="code">
+<code class="c++"><span class="line_number">42</span><span class="error">      if (pp.death == std::numeric_limits&lt;T&gt;::max())</span>
+<span class="line_number">43</span>      {
+<span class="line_number">44</span>        return std::numeric_limits&lt;T&gt;::max();
+<span class="line_number">45</span>      }
+<span class="line_number">46</span>
+</code></pre>
+            <div class="issue">
+                <div>
+                    <span class="what">Possible data race during read of size 4 at 0x4E9D210 by thread #21</span>
+                    <div class="navigation">
+                        <button class="next_error">Next</button>
+                        <button class="prev_error">Previous</button>
+                    </div>
+                </div>
+                <div>
+                    <table class="call_stack">
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/stl_algo.h:4309<br>
+                                    <code class="cpp">std::back_insert_iterator&lt;std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt; std::transform&lt;__gnu_cxx::__normal_iterator&lt;mpcf::ph::PersistencePair&lt;float&gt; const*, std::vector&lt;mpcf::ph::PersistencePair&lt;float&gt;, std::allocator&lt;mpcf::ph::PersistencePair&lt;float&gt; &gt; &gt; &gt;, std::back_insert_iterator&lt;std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, mpcf::ph::barcode_to_stable_rank&lt;float&gt;(mpcf::ph::Barcode&lt;float&gt; const&amp;)::{lambda(mpcf::ph::PersistencePair&lt;float&gt; const&amp;)#1}&gt;(__gnu_cxx::__normal_iterator&lt;mpcf::ph::PersistencePair&lt;float&gt; const*, std::vector&lt;mpcf::ph::PersistencePair&lt;float&gt;, std::allocator&lt;mpcf::ph::PersistencePair&lt;float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::ph::PersistencePair&lt;float&gt; const*, std::vector&lt;mpcf::ph::PersistencePair&lt;float&gt;, std::allocator&lt;mpcf::ph::PersistencePair&lt;float&gt; &gt; &gt; &gt;, std::back_insert_iterator&lt;std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, mpcf::ph::barcode_to_stable_rank&lt;float&gt;(mpcf::ph::Barcode&lt;float&gt; const&amp;)::{lambda(mpcf::ph::PersistencePair&lt;float&gt; const&amp;)#1})</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">4306</span>      __glibcxx_requires_valid_range(__first, __last);
+<span class="line_number">4307</span>
+<span class="line_number">4308</span>      for (; __first != __last; ++__first, (void)++__result)
+<span class="line_number">4309</span><span class="error">	*__result = __unary_op(*__first);
+</span><span class="line_number">4310</span>      return __result;
+<span class="line_number">4311</span>    }
+<span class="line_number">4312</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/actions-runner/_work/masspcf/masspcf/include/mpcf/persistence/stable_rank.hpp:41<br>
+                                    <code class="cpp">mpcf::Pcf&lt;float, float&gt; mpcf::ph::barcode_to_stable_rank&lt;float&gt;(mpcf::ph::Barcode&lt;float&gt; const&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">38</span>    std::vector&lt;T&gt; lifetimes;
+<span class="line_number">39</span>    lifetimes.reserve(barcode.bars().size());
+<span class="line_number">40</span>
+<span class="line_number">41</span><span class="error">    std::transform(barcode.bars().begin(), barcode.bars().end(), std::back_inserter(lifetimes), [](const PersistencePair&lt;T&gt;&amp; pp) -&gt; T {
+</span><span class="line_number">42</span>      if (pp.death == std::numeric_limits&lt;T&gt;::max())
+<span class="line_number">43</span>      {
+<span class="line_number">44</span>        return std::numeric_limits&lt;T&gt;::max();
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/actions-runner/_work/masspcf/masspcf/include/mpcf/persistence/barcode_summary.hpp:55<br>
+                                    <code class="cpp">mpcf::ph::BarcodeSummaryTask&lt;float, mpcf::Pcf&lt;float, float&gt; (*)(mpcf::ph::Barcode&lt;float&gt; const&amp;)&gt;::run_async(mpcf::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}::operator()(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;) const::{lambda()#1}::operator()() const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">52</span>
+<span class="line_number">53</span>      mpcf::walk(m_barcodes, [this, &amp;flow](const std::vector&lt;size_t&gt;&amp; index) {
+<span class="line_number">54</span>        flow.emplace([this, index] {
+<span class="line_number">55</span><span class="error">          m_ret(index) = m_func(m_barcodes(index));
+</span><span class="line_number">56</span>          add_progress(1);
+<span class="line_number">57</span>        });
+<span class="line_number">58</span>      });
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:61<br>
+                                    <code class="cpp">void std::__invoke_impl&lt;void, mpcf::ph::BarcodeSummaryTask&lt;float, mpcf::Pcf&lt;float, float&gt; (*)(mpcf::ph::Barcode&lt;float&gt; const&amp;)&gt;::run_async(mpcf::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}::operator()(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;) const::{lambda()#1}&amp;&gt;(std::__invoke_other, mpcf::ph::BarcodeSummaryTask&lt;float, mpcf::Pcf&lt;float, float&gt; (*)(mpcf::ph::Barcode&lt;float&gt; const&amp;)&gt;::run_async(mpcf::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}::operator()(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;) const::{lambda()#1}&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">58</span>  template&lt;typename _Res, typename _Fn, typename... _Args&gt;
+<span class="line_number">59</span>    constexpr _Res
+<span class="line_number">60</span>    __invoke_impl(__invoke_other, _Fn&amp;&amp; __f, _Args&amp;&amp;... __args)
+<span class="line_number">61</span><span class="error">    { return std::forward&lt;_Fn&gt;(__f)(std::forward&lt;_Args&gt;(__args)...); }
+</span><span class="line_number">62</span>
+<span class="line_number">63</span>  template&lt;typename _Res, typename _MemFun, typename _Tp, typename... _Args&gt;
+<span class="line_number">64</span>    constexpr _Res
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:111<br>
+                                    <code class="cpp">std::enable_if&lt;is_invocable_r_v&lt;void, mpcf::ph::BarcodeSummaryTask&lt;float, mpcf::Pcf&lt;float, float&gt; (*)(mpcf::ph::Barcode&lt;float&gt; const&amp;)&gt;::run_async(mpcf::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}::operator()(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;) const::{lambda()#1}&amp;&gt;, void&gt;::type std::__invoke_r&lt;void, mpcf::ph::BarcodeSummaryTask&lt;float, mpcf::Pcf&lt;float, float&gt; (*)(mpcf::ph::Barcode&lt;float&gt; const&amp;)&gt;::run_async(mpcf::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}::operator()(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;) const::{lambda()#1}&amp;&gt;(mpcf::ph::BarcodeSummaryTask&lt;float, mpcf::Pcf&lt;float, float&gt; (*)(mpcf::ph::Barcode&lt;float&gt; const&amp;)&gt;::run_async(mpcf::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}::operator()(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;) const::{lambda()#1}&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">108</span>      using __type = typename __result::type;
+<span class="line_number">109</span>      using __tag = typename __result::__invoke_type;
+<span class="line_number">110</span>      if constexpr (is_void_v&lt;_Res&gt;)
+<span class="line_number">111</span><span class="error">	std::__invoke_impl&lt;__type&gt;(__tag{}, std::forward&lt;_Callable&gt;(__fn),
+</span><span class="line_number">112</span>					std::forward&lt;_Args&gt;(__args)...);
+<span class="line_number">113</span>      else
+<span class="line_number">114</span>	return std::__invoke_impl&lt;__type&gt;(__tag{},
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/std_function.h:290<br>
+                                    <code class="cpp">std::_Function_handler&lt;void (), mpcf::ph::BarcodeSummaryTask&lt;float, mpcf::Pcf&lt;float, float&gt; (*)(mpcf::ph::Barcode&lt;float&gt; const&amp;)&gt;::run_async(mpcf::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}::operator()(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;) const::{lambda()#1}&gt;::_M_invoke(std::_Any_data const&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">287</span>      static _Res
+<span class="line_number">288</span>      _M_invoke(const _Any_data&amp; __functor, _ArgTypes&amp;&amp;... __args)
+<span class="line_number">289</span>      {
+<span class="line_number">290</span><span class="error">	return std::__invoke_r&lt;_Res&gt;(*_Base::_M_get_pointer(__functor),
+</span><span class="line_number">291</span>				     std::forward&lt;_ArgTypes&gt;(__args)...);
+<span class="line_number">292</span>      }
+<span class="line_number">293</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/std_function.h:591<br>
+                                    <code class="cpp">std::function&lt;void ()&gt;::operator()() const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">588</span>      {
+<span class="line_number">589</span>	if (_M_empty())
+<span class="line_number">590</span>	  __throw_bad_function_call();
+<span class="line_number">591</span><span class="error">	return _M_invoker(_M_functor, std::forward&lt;_ArgTypes&gt;(__args)...);
+</span><span class="line_number">592</span>      }
+<span class="line_number">593</span>
+<span class="line_number">594</span>#if __cpp_rtti
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/actions-runner/_work/masspcf/masspcf/3rd/taskflow/taskflow/core/executor.hpp:1887<br>
+                                    <code class="cpp">tf::Executor::_invoke_static_task(tf::Worker&amp;, tf::Node*)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1884</span>// Procedure: _invoke_static_task
+<span class="line_number">1885</span>inline void Executor::_invoke_static_task(Worker&amp; worker, Node* node) {
+<span class="line_number">1886</span>  _observer_prologue(worker, node);
+<span class="line_number">1887</span><span class="error">  TF_EXECUTOR_EXCEPTION_HANDLER(worker, node, {
+</span><span class="line_number">1888</span>    std::get_if&lt;Node::Static&gt;(&amp;node-&gt;_handle)-&gt;work();
+<span class="line_number">1889</span>  });
+<span class="line_number">1890</span>  _observer_epilogue(worker, node);
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/actions-runner/_work/masspcf/masspcf/3rd/taskflow/taskflow/core/executor.hpp:1662<br>
+                                    <code class="cpp">tf::Executor::_invoke(tf::Worker&amp;, tf::Node*)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1659</span>  switch(node-&gt;_handle.index()) {
+<span class="line_number">1660</span>    // static task
+<span class="line_number">1661</span>    case Node::STATIC:{
+<span class="line_number">1662</span><span class="error">      _invoke_static_task(worker, node);
+</span><span class="line_number">1663</span>    }
+<span class="line_number">1664</span>    break;
+<span class="line_number">1665</span>    
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/actions-runner/_work/masspcf/masspcf/3rd/taskflow/taskflow/core/executor.hpp:1424<br>
+                                    <code class="cpp">tf::Executor::_exploit_task(tf::Worker&amp;, tf::Node*&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1421</span>// Procedure: _exploit_task
+<span class="line_number">1422</span>inline void Executor::_exploit_task(Worker&amp; w, Node*&amp; t) {
+<span class="line_number">1423</span>  while(t) {
+<span class="line_number">1424</span><span class="error">    _invoke(w, t);
+</span><span class="line_number">1425</span>    t = w._wsq.pop();
+<span class="line_number">1426</span>  }
+<span class="line_number">1427</span>}
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/actions-runner/_work/masspcf/masspcf/3rd/taskflow/taskflow/core/executor.hpp:1327<br>
+                                    <code class="cpp">tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}::operator()() const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1324</span>        while(1) {
+<span class="line_number">1325</span>
+<span class="line_number">1326</span>          // drains out the local queue first
+<span class="line_number">1327</span><span class="error">          _exploit_task(worker, t);
+</span><span class="line_number">1328</span>
+<span class="line_number">1329</span>          // steals and waits for tasks
+<span class="line_number">1330</span>          if(_wait_for_task(worker, t) == false) {
+</code></pre>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            <pre class="code">
+<code class="c++"><span class="line_number">47</span><span class="error">      return pp.death - pp.birth;</span>
+<span class="line_number">48</span>    });
+<span class="line_number">49</span>
+<span class="line_number">50</span>    std::sort(lifetimes.begin(), lifetimes.end());
+<span class="line_number">51</span>
+<span class="line_number">52</span>    using PcfT = Pcf&lt;T, T&gt;;
+<span class="line_number">53</span>    using PcfPointT = typename PcfT::point_type;
+<span class="line_number">54</span>
+<span class="line_number">55</span>    std::vector&lt;PcfPointT&gt; pcfPoints;
+<span class="line_number">56</span>
+<span class="line_number">57</span>    T nAlive = static_cast&lt;T&gt;(lifetimes.size());
+<span class="line_number">58</span>
+<span class="line_number">59</span>    pcfPoints.emplace_back(static_cast&lt;T&gt;(0.), nAlive);
+<span class="line_number">60</span>
+<span class="line_number">61</span>    T lastLifetime = lifetimes.front();
+<span class="line_number">62</span>    for (auto const &amp; lifetime : lifetimes)
+<span class="line_number">63</span>    {
+<span class="line_number">64</span>      if (Barcode&lt;T&gt;::is_infinite(lastLifetime))
+<span class="line_number">65</span>      {
+<span class="line_number">66</span>        break;
+<span class="line_number">67</span>      }
+<span class="line_number">68</span>
+<span class="line_number">69</span>      if (lifetime != lastLifetime)
+<span class="line_number">70</span>      {
+<span class="line_number">71</span>        pcfPoints.emplace_back(lastLifetime, nAlive);
+<span class="line_number">72</span>        lastLifetime = lifetime;
+<span class="line_number">73</span>      }
+<span class="line_number">74</span>      --nAlive;
+<span class="line_number">75</span>    }
+<span class="line_number">76</span>
+<span class="line_number">77</span>    if (!Barcode&lt;T&gt;::is_infinite(lastLifetime))
+<span class="line_number">78</span>    {
+<span class="line_number">79</span>      pcfPoints.emplace_back(lastLifetime, nAlive);
+<span class="line_number">80</span>    }
+<span class="line_number">81</span>
+<span class="line_number">82</span>    return Pcf&lt;T, T&gt;(std::move(pcfPoints));
+<span class="line_number">83</span>  }
+<span class="line_number">84</span>
+<span class="line_number">85</span>  template &lt;typename T&gt;
+<span class="line_number">86</span>  auto make_stable_rank_task(const Tensor&lt;Barcode&lt;T&gt;&gt;&amp; barcodes, Tensor&lt;Pcf&lt;T, T&gt;&gt;&amp; out)
+<span class="line_number">87</span>  {
+<span class="line_number">88</span>    return std::make_unique&lt;BarcodeSummaryTask&lt;T, decltype(&amp;barcode_to_stable_rank&lt;T&gt;)&gt;&gt;(
+<span class="line_number">89</span>        barcodes, out, barcode_to_stable_rank&lt;T&gt;,
+<span class="line_number">90</span>        &#34;Converting barcodes to stable rank functions&#34;);
+<span class="line_number">91</span>  }
+<span class="line_number">92</span>}
+<span class="line_number">93</span>
+<span class="line_number">94</span>#endif //MASSPCF_STABLE_RANK_H
+</code>
+            </pre>
+        </div>
+    </div>
+</body>
+
+</html>
