@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>/home/runner/actions-runner/_work/masspcf/masspcf/include/mpcf/functional/pcf.hpp</title>
+    <link href='valgrind.css' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+    <script src="https://code.jquery.com/jquery-3.4.1.js"></script>
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.0.0/styles/default.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.0.0/highlight.min.js"></script>
+    <script src="valgrind.js"></script>
+</head>
+
+<body>
+    <div class="global">
+        <div class="header">
+            <h1>/home/runner/actions-runner/_work/masspcf/masspcf/include/mpcf/functional/pcf.hpp</h1>
+            <p><b>2</b> errors</p>
+            <button class="next_error">Goto First Error</button>
+        </div>
+        <div class="listing">
+            <pre class="code">
+<code class="c++"><span class="line_number">1</span>/*
+<span class="line_number">2</span>* Copyright 2024-2026 Bjorn Wehlin
+<span class="line_number">3</span>*
+<span class="line_number">4</span>* Licensed under the Apache License, Version 2.0 (the &#34;License&#34;);
+<span class="line_number">5</span>* you may not use this file except in compliance with the License.
+<span class="line_number">6</span>* You may obtain a copy of the License at
+<span class="line_number">7</span>*
+<span class="line_number">8</span>*    http://www.apache.org/licenses/LICENSE-2.0
+<span class="line_number">9</span>*
+<span class="line_number">10</span>* Unless required by applicable law or agreed to in writing, software
+<span class="line_number">11</span>* distributed under the License is distributed on an &#34;AS IS&#34; BASIS,
+<span class="line_number">12</span>* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+<span class="line_number">13</span>* See the License for the specific language governing permissions and
+<span class="line_number">14</span>* limitations under the License.
+<span class="line_number">15</span>*/
+<span class="line_number">16</span>
+<span class="line_number">17</span>#ifndef MPCF_PCF_H
+<span class="line_number">18</span>#define MPCF_PCF_H
+<span class="line_number">19</span>
+<span class="line_number">20</span>#include &#34;piecewise_function.hpp&#34;
+<span class="line_number">21</span>#include &#34;rectangle.hpp&#34;
+<span class="line_number">22</span>#include &#34;../algorithms/functional/reduce.hpp&#34;
+<span class="line_number">23</span>
+<span class="line_number">24</span>#include &lt;vector&gt;
+<span class="line_number">25</span>#include &lt;iostream&gt;
+<span class="line_number">26</span>#include &lt;ostream&gt;
+<span class="line_number">27</span>#include &lt;cmath&gt;
+<span class="line_number">28</span>
+<span class="line_number">29</span>namespace mpcf
+<span class="line_number">30</span>{
+<span class="line_number">31</span>  template &lt;typename Tt, typename Tv = Tt&gt;
+<span class="line_number">32</span>  class Pcf
+<span class="line_number">33</span>  {
+<span class="line_number">34</span>  public:
+<span class="line_number">35</span>    using point_type = TimePoint&lt;Tt, Tv&gt;;
+<span class="line_number">36</span>    using time_type = typename point_type::time_type;
+<span class="line_number">37</span>    using value_type = typename point_type::value_type;
+<span class="line_number">38</span>
+<span class="line_number">39</span>    using reduction_functional_type = value_type(time_type, time_type, value_type, value_type);
+<span class="line_number">40</span>    using rectangle_type = Rectangle&lt;Tt, Tv&gt;;
+<span class="line_number">41</span>    using segment_type = Segment&lt;Tt, Tv&gt;;
+<span class="line_number">42</span>
+<span class="line_number">43</span>    Pcf()
+<span class="line_number">44</span>    {
+<span class="line_number">45</span>      m_points.emplace_back(static_cast&lt;Tt&gt;(0), static_cast&lt;Tv&gt;(0));
+<span class="line_number">46</span>    }
+<span class="line_number">47</span>
+<span class="line_number">48</span>    explicit Pcf(value_type v)
+<span class="line_number">49</span>    {
+<span class="line_number">50</span>      m_points.emplace_back(static_cast&lt;Tt&gt;(0), static_cast&lt;Tv&gt;(v));
+<span class="line_number">51</span>    }
+<span class="line_number">52</span>
+<span class="line_number">53</span>    explicit Pcf(std::vector&lt;TimePoint&lt;Tt, Tv&gt;&gt;&amp;&amp; pts)
+<span class="line_number">54</span>      : m_points(std::move(pts))
+<span class="line_number">55</span>    {
+<span class="line_number">56</span>
+<span class="line_number">57</span>    }
+<span class="line_number">58</span>
+<span class="line_number">59</span>    /// Converting constructor: convert from a Pcf with different precision.
+<span class="line_number">60</span>    template &lt;typename Ut, typename Uv&gt;
+<span class="line_number">61</span>    explicit Pcf(const Pcf&lt;Ut, Uv&gt;&amp; other)
+<span class="line_number">62</span>    {
+<span class="line_number">63</span>      m_points.reserve(other.size());
+<span class="line_number">64</span>      for (size_t i = 0; i &lt; other.size(); ++i)
+<span class="line_number">65</span>        m_points.emplace_back(static_cast&lt;Tt&gt;(other.points()[i].t),
+<span class="line_number">66</span>                              static_cast&lt;Tv&gt;(other.points()[i].v));
+<span class="line_number">67</span>    }
+<span class="line_number">68</span>
+<span class="line_number">69</span>    Pcf(std::initializer_list&lt;std::pair&lt;Tt, Tv&gt;&gt; pts)
+<span class="line_number">70</span>      requires (!FloatType&lt;Tt&gt; || !FloatType&lt;Tv&gt;)
+<span class="line_number">71</span>    {
+<span class="line_number">72</span>      // We can&#39;t have this constructor if we work with floating point types because of the overloads below, but we
+<span class="line_number">73</span>      // still want to be able to construct from pairs if we are using non-float types.
+<span class="line_number">74</span>      initFromPairs(pts);
+<span class="line_number">75</span>    }
+<span class="line_number">76</span>
+<span class="line_number">77</span>    Pcf(std::initializer_list&lt;std::pair&lt;float64_t, float64_t&gt;&gt; pts)
+<span class="line_number">78</span>      requires (std::is_same_v&lt;Tt, float64_t&gt; &amp;&amp; std::is_same_v&lt;Tv, float64_t&gt;)
+<span class="line_number">79</span>    {
+<span class="line_number">80</span>      initFromPairs(pts);
+<span class="line_number">81</span>    }
+<span class="line_number">82</span>
+<span class="line_number">83</span>    Pcf(std::initializer_list&lt;std::pair&lt;float32_t, float32_t&gt;&gt; pts)
+<span class="line_number">84</span>      requires (std::is_same_v&lt;Tt, float32_t&gt; &amp;&amp; std::is_same_v&lt;Tv, float32_t&gt;)
+<span class="line_number">85</span>    {
+<span class="line_number">86</span>      initFromPairs(pts);
+<span class="line_number">87</span>    }
+<span class="line_number">88</span>
+<span class="line_number">89</span>    std::string to_string() const
+<span class="line_number">90</span>    {
+<span class="line_number">91</span>      std::stringstream ss;
+<span class="line_number">92</span>      for (auto i = 0ul; i &lt; m_points.size(); ++i)
+<span class="line_number">93</span>      {
+<span class="line_number">94</span>        if (i != 0ul)
+<span class="line_number">95</span>        {
+<span class="line_number">96</span>          ss &lt;&lt; &#34;, &#34;;
+<span class="line_number">97</span>        }
+<span class="line_number">98</span>        ss &lt;&lt; &#34;f(&#34; &lt;&lt; m_points[i].t &lt;&lt; &#34;) = &#34; &lt;&lt; m_points[i].v;
+<span class="line_number">99</span>      }
+<span class="line_number">100</span>      return ss.str();
+<span class="line_number">101</span>    }
+<span class="line_number">102</span>    
+<span class="line_number">103</span>    void debug_print() const
+<span class="line_number">104</span>    {
+<span class="line_number">105</span>      std::cout &lt;&lt; to_string() &lt;&lt; std::endl;
+<span class="line_number">106</span>    }
+<span class="line_number">107</span>
+<span class="line_number">108</span>    Pcf&amp; operator+=(const Pcf&amp; rhs)
+<span class="line_number">109</span>    {
+<span class="line_number">110</span>      *this = combine(*this, rhs, [](const typename Pcf&lt;Tt, Tv&gt;::rectangle_type&amp; rect) {
+<span class="line_number">111</span>        return rect.f_value + rect.g_value;
+<span class="line_number">112</span>        });
+<span class="line_number">113</span>      return *this;
+<span class="line_number">114</span>    }
+<span class="line_number">115</span>
+<span class="line_number">116</span>    Pcf&amp; operator-=(const Pcf&amp; rhs)
+<span class="line_number">117</span>    {
+<span class="line_number">118</span>      *this = combine(*this, rhs, [](const typename Pcf&lt;Tt, Tv&gt;::rectangle_type&amp; rect) {
+<span class="line_number">119</span>        return rect.f_value - rect.g_value;
+<span class="line_number">120</span>        });
+<span class="line_number">121</span>      return *this;
+<span class="line_number">122</span>    }
+<span class="line_number">123</span>
+<span class="line_number">124</span>    Pcf&amp; operator*=(const Pcf&amp; rhs)
+<span class="line_number">125</span>    {
+<span class="line_number">126</span>      *this = combine(*this, rhs, [](const typename Pcf&lt;Tt, Tv&gt;::rectangle_type&amp; rect) {
+<span class="line_number">127</span>        return rect.f_value * rect.g_value;
+<span class="line_number">128</span>        });
+<span class="line_number">129</span>      return *this;
+<span class="line_number">130</span>    }
+<span class="line_number">131</span>
+<span class="line_number">132</span>    Pcf&amp; operator/=(const Pcf&amp; rhs)
+<span class="line_number">133</span>    {
+<span class="line_number">134</span>      *this = combine(*this, rhs, [](const typename Pcf&lt;Tt, Tv&gt;::rectangle_type&amp; rect) {
+<span class="line_number">135</span>        return rect.f_value / rect.g_value;
+<span class="line_number">136</span>        });
+<span class="line_number">137</span>      return *this;
+<span class="line_number">138</span>    }
+<span class="line_number">139</span>
+<span class="line_number">140</span>    template &lt;Arithmetic T&gt;
+<span class="line_number">141</span>    Pcf&amp; operator+=(T v)
+<span class="line_number">142</span>    {
+<span class="line_number">143</span>      for (auto &amp; pt : m_points)
+<span class="line_number">144</span>      {
+<span class="line_number">145</span>        pt.v += v;
+<span class="line_number">146</span>      }
+<span class="line_number">147</span>      return *this;
+<span class="line_number">148</span>    }
+<span class="line_number">149</span>
+<span class="line_number">150</span>    template &lt;Arithmetic T&gt;
+<span class="line_number">151</span>    Pcf&amp; operator-=(T v)
+<span class="line_number">152</span>    {
+<span class="line_number">153</span>      for (auto &amp; pt : m_points)
+<span class="line_number">154</span>      {
+<span class="line_number">155</span>        pt.v -= v;
+<span class="line_number">156</span>      }
+<span class="line_number">157</span>      return *this;
+<span class="line_number">158</span>    }
+<span class="line_number">159</span>
+<span class="line_number">160</span>    template &lt;Arithmetic T&gt;
+<span class="line_number">161</span>    Pcf&amp; operator/=(T v)
+<span class="line_number">162</span>    {
+<span class="line_number">163</span>      for (auto &amp; pt : m_points)
+<span class="line_number">164</span>      {
+<span class="line_number">165</span>        pt.v /= v;
+<span class="line_number">166</span>      }
+<span class="line_number">167</span>      return *this;
+<span class="line_number">168</span>    }
+<span class="line_number">169</span>
+<span class="line_number">170</span>    template &lt;Arithmetic T&gt;
+<span class="line_number">171</span>    Pcf&amp; operator*=(T v)
+<span class="line_number">172</span>    {
+<span class="line_number">173</span>      for (auto &amp; pt : m_points)
+<span class="line_number">174</span>      {
+<span class="line_number">175</span>        pt.v *= v;
+<span class="line_number">176</span>      }
+<span class="line_number">177</span>      return *this;
+<span class="line_number">178</span>    }
+<span class="line_number">179</span>    
+<span class="line_number">180</span>    [[nodiscard]] Pcf operator-() const
+<span class="line_number">181</span>    {
+<span class="line_number">182</span>      Pcf ret = *this;
+<span class="line_number">183</span>      for (auto&amp; pt : ret.m_points)
+<span class="line_number">184</span>      {
+<span class="line_number">185</span>        pt.v = -pt.v;
+<span class="line_number">186</span>      }
+<span class="line_number">187</span>      return ret;
+<span class="line_number">188</span>    }
+<span class="line_number">189</span>
+<span class="line_number">190</span>    bool operator==(const Pcf&amp; rhs) const
+<span class="line_number">191</span>    {
+<span class="line_number">192</span>      return m_points == rhs.m_points;
+<span class="line_number">193</span>    }
+<span class="line_number">194</span>    
+<span class="line_number">195</span>    bool operator!=(const Pcf&amp; rhs) const
+<span class="line_number">196</span>    {
+<span class="line_number">197</span>      return m_points != rhs.m_points;
+<span class="line_number">198</span>    }
+<span class="line_number">199</span>
+<span class="line_number">200</span>    [[nodiscard]] value_type evaluate(time_type t) const
+<span class="line_number">201</span>    {
+<span class="line_number">202</span>      auto it = std::upper_bound(m_points.begin(), m_points.end(), t,
+<span class="line_number">203</span>        [](time_type time, const point_type&amp; pt) { return time &lt; pt.t; });
+<span class="line_number">204</span>
+<span class="line_number">205</span>      if (it == m_points.begin())
+<span class="line_number">206</span>      {
+<span class="line_number">207</span>        throw std::domain_error(&#34;Cannot evaluate PCF before time 0.&#34;);
+<span class="line_number">208</span>      }
+<span class="line_number">209</span>
+<span class="line_number">210</span>      --it;
+<span class="line_number">211</span>      return it-&gt;v;
+<span class="line_number">212</span>    }
+<span class="line_number">213</span>
+<span class="line_number">214</span>    template &lt;typename TIn, typename TOut&gt;
+<span class="line_number">215</span>    void evaluate(const TIn&amp; sorted_times, TOut&amp; out, size_t n) const
+<span class="line_number">216</span>    {
+<span class="line_number">217</span>      auto it = m_points.begin();
+<span class="line_number">218</span>      auto end = m_points.end();
+<span class="line_number">219</span>
+<span class="line_number">220</span>      for (size_t i = 0; i &lt; n; ++i)
+<span class="line_number">221</span>      {
+<span class="line_number">222</span>        auto t = sorted_times(i);
+<span class="line_number">223</span>
+<span class="line_number">224</span>        if (t &lt; m_points.front().t)
+<span class="line_number">225</span>        {
+<span class="line_number">226</span>          throw std::domain_error(&#34;Cannot evaluate PCF before time 0.&#34;);
+<span class="line_number">227</span>        }
+<span class="line_number">228</span>
+<span class="line_number">229</span>        while (std::next(it) != end &amp;&amp; std::next(it)-&gt;t &lt;= t)
+<span class="line_number">230</span>        {
+<span class="line_number">231</span>          ++it;
+<span class="line_number">232</span>        }
+<span class="line_number">233</span>
+<span class="line_number">234</span>        out(i) = it-&gt;v;
+<span class="line_number">235</span>      }
+<span class="line_number">236</span>    }
+<span class="line_number">237</span>
+<span class="line_number">238</span>    /**
+<span class="line_number">239</span>     * Raise every value of the PCF to a power.
+<span class="line_number">240</span>     *
+<span class="line_number">241</span>     * Returns a new PCF whose value at every breakpoint is raised to
+<span class="line_number">242</span>     * `exponent`. The domain (time coordinates) is unchanged.
+<span class="line_number">243</span>     * Squaring (exponent == 2) avoids `std::pow` for performance.
+<span class="line_number">244</span>     *
+<span class="line_number">245</span>     * @param exponent the exponent to raise each value to
+<span class="line_number">246</span>     * @return a new PCF with transformed values
+<span class="line_number">247</span>     */
+<span class="line_number">248</span>    template &lt;Arithmetic T&gt;
+<span class="line_number">249</span>    [[nodiscard]] Pcf pow(T exponent) const
+<span class="line_number">250</span>    {
+<span class="line_number">251</span>      auto pts = m_points;
+<span class="line_number">252</span>      if (exponent == 2)
+<span class="line_number">253</span>      {
+<span class="line_number">254</span>        for (auto&amp; pt : pts)
+<span class="line_number">255</span>        {
+<span class="line_number">256</span>          pt.v = pt.v * pt.v;
+<span class="line_number">257</span>        }
+<span class="line_number">258</span>      }
+<span class="line_number">259</span>      else
+<span class="line_number">260</span>      {
+<span class="line_number">261</span>        for (auto&amp; pt : pts)
+<span class="line_number">262</span>        {
+<span class="line_number">263</span>          pt.v = static_cast&lt;Tv&gt;(std::pow(pt.v, exponent));
+<span class="line_number">264</span>        }
+<span class="line_number">265</span>      }
+<span class="line_number">266</span>      return Pcf(std::move(pts));
+<span class="line_number">267</span>    }
+<span class="line_number">268</span>
+<span class="line_number">269</span>    [[nodiscard]] const std::vector&lt;point_type&gt;&amp; points() const { return m_points; }
+<span class="line_number">270</span>    [[nodiscard]] size_t size() const noexcept { return m_points.size(); }
+<span class="line_number">271</span>    
+<span class="line_number">272</span>    void swap(Pcf&amp; other) noexcept
+<span class="line_number">273</span>    {
+<span class="line_number">274</span>      m_points.swap(other.m_points);
+<span class="line_number">275</span>    }
+<span class="line_number">276</span>    
+<span class="line_number">277</span>    template &lt;typename Ut, typename Uv&gt;
+<span class="line_number">278</span>    friend void PrintTo(const Pcf&amp; f, std::ostream* os);
+<span class="line_number">279</span>
+<span class="line_number">280</span>  private:
+<span class="line_number">281</span>    template &lt;typename T1, typename T2&gt;
+<span class="line_number">282</span>    void initFromPairs(std::initializer_list&lt;std::pair&lt;T1, T2&gt;&gt; pts)
+<span class="line_number">283</span>    {
+<span class="line_number">284</span>      m_points.reserve(pts.size());
+<span class="line_number">285</span>      for (auto const&amp; pt : pts)
+<span class="line_number">286</span>      {
+<span class="line_number">287</span>        m_points.emplace_back(static_cast&lt;Tt&gt;(pt.first), static_cast&lt;Tv&gt;(pt.second));
+<span class="line_number">288</span>      }
+<span class="line_number">289</span>    }
+<span class="line_number">290</span>
+<span class="line_number">291</span>    std::vector&lt;point_type&gt; m_points;
+<span class="line_number">292</span>  };
+<span class="line_number">293</span>  
+<span class="line_number">294</span>  using Pcf_f32 = Pcf&lt;float32_t, float32_t&gt;;
+<span class="line_number">295</span>  using Pcf_f64 = Pcf&lt;float64_t, float64_t&gt;;
+<span class="line_number">296</span>  using Pcf_i32 = Pcf&lt;int32_t, int32_t&gt;;
+<span class="line_number">297</span>  using Pcf_i64 = Pcf&lt;int64_t, int64_t&gt;;
+<span class="line_number">298</span>  
+<span class="line_number">299</span>  template &lt;typename Tt, typename Tv&gt;
+</code></pre>
+            <div class="issue">
+                <div>
+                    <span class="what">Possible data race during write of size 8 at 0x1FFEFFE9B8 by thread #1</span>
+                    <div class="navigation">
+                        <button class="next_error">Next</button>
+                        <button class="prev_error">Previous</button>
+                    </div>
+                </div>
+                <div>
+                    <table class="call_stack">
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/actions-runner/_work/masspcf/masspcf/test/test_parallel_reduce.cpp:34<br>
+                                    <code class="cpp">ParallelReduce_AddThreeFunctions_Test::TestBody()</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">31</span>    return rect.f_value + rect.g_value;
+<span class="line_number">32</span>    });
+<span class="line_number">33</span>
+<span class="line_number">34</span><span class="error">  EXPECT_EQ(res, (pcfs[0] + pcfs[1] + pcfs[2]));
+</span><span class="line_number">35</span>}
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/actions-runner/_work/masspcf/masspcf/3rd/googletest/googletest/src/gtest.cc:2664<br>
+                                    <code class="cpp">void testing::internal::HandleSehExceptionsInMethodIfSupported&lt;testing::Test, void&gt;(testing::Test*, void (testing::Test::*)(), char const*)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">2661</span>  }
+<span class="line_number">2662</span>#else
+<span class="line_number">2663</span>  (void)location;
+<span class="line_number">2664</span><span class="error">  return (object-&gt;*method)();
+</span><span class="line_number">2665</span>#endif  // GTEST_HAS_SEH
+<span class="line_number">2666</span>}
+<span class="line_number">2667</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/actions-runner/_work/masspcf/masspcf/3rd/googletest/googletest/src/gtest.cc:2700<br>
+                                    <code class="cpp">void testing::internal::HandleExceptionsInMethodIfSupported&lt;testing::Test, void&gt;(testing::Test*, void (testing::Test::*)(), char const*)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">2697</span>  if (internal::GetUnitTestImpl()-&gt;catch_exceptions()) {
+<span class="line_number">2698</span>#if GTEST_HAS_EXCEPTIONS
+<span class="line_number">2699</span>    try {
+<span class="line_number">2700</span><span class="error">      return HandleSehExceptionsInMethodIfSupported(object, method, location);
+</span><span class="line_number">2701</span>    } catch (const AssertionException&amp;) {  // NOLINT
+<span class="line_number">2702</span>      // This failure was reported already.
+<span class="line_number">2703</span>    } catch (const internal::GoogleTestFailureException&amp;) {  // NOLINT
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/actions-runner/_work/masspcf/masspcf/3rd/googletest/googletest/src/gtest.cc:2739<br>
+                                    <code class="cpp">testing::Test::Run()</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">2736</span>  // GTEST_SKIP().
+<span class="line_number">2737</span>  if (!HasFatalFailure() &amp;&amp; !IsSkipped()) {
+<span class="line_number">2738</span>    impl-&gt;os_stack_trace_getter()-&gt;UponLeavingGTest();
+<span class="line_number">2739</span><span class="error">    internal::HandleExceptionsInMethodIfSupported(this, &amp;Test::TestBody,
+</span><span class="line_number">2740</span>                                                  &#34;the test body&#34;);
+<span class="line_number">2741</span>  }
+<span class="line_number">2742</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/actions-runner/_work/masspcf/masspcf/3rd/googletest/googletest/src/gtest.cc:2885<br>
+                                    <code class="cpp">testing::TestInfo::Run()</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">2882</span>  if (!Test::HasFatalFailure() &amp;&amp; !Test::IsSkipped()) {
+<span class="line_number">2883</span>    // This doesn&#39;t throw as all user code that can throw are wrapped into
+<span class="line_number">2884</span>    // exception handling code.
+<span class="line_number">2885</span><span class="error">    test-&gt;Run();
+</span><span class="line_number">2886</span>  }
+<span class="line_number">2887</span>
+<span class="line_number">2888</span>  if (test != nullptr) {
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/actions-runner/_work/masspcf/masspcf/3rd/googletest/googletest/src/gtest.cc:3063<br>
+                                    <code class="cpp">testing::TestSuite::Run()</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">3060</span>    if (skip_all) {
+<span class="line_number">3061</span>      GetMutableTestInfo(i)-&gt;Skip();
+<span class="line_number">3062</span>    } else {
+<span class="line_number">3063</span><span class="error">      GetMutableTestInfo(i)-&gt;Run();
+</span><span class="line_number">3064</span>    }
+<span class="line_number">3065</span>    if (GTEST_FLAG_GET(fail_fast) &amp;&amp;
+<span class="line_number">3066</span>        GetMutableTestInfo(i)-&gt;result()-&gt;Failed()) {
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/actions-runner/_work/masspcf/masspcf/3rd/googletest/googletest/src/gtest.cc:6054<br>
+                                    <code class="cpp">testing::internal::UnitTestImpl::RunAllTests()</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">6051</span>      } else if (!Test::HasFatalFailure()) {
+<span class="line_number">6052</span>        for (int test_index = 0; test_index &lt; total_test_suite_count();
+<span class="line_number">6053</span>             test_index++) {
+<span class="line_number">6054</span><span class="error">          GetMutableSuiteCase(test_index)-&gt;Run();
+</span><span class="line_number">6055</span>          if (GTEST_FLAG_GET(fail_fast) &amp;&amp;
+<span class="line_number">6056</span>              GetMutableSuiteCase(test_index)-&gt;Failed()) {
+<span class="line_number">6057</span>            for (int j = test_index + 1; j &lt; total_test_suite_count(); j++) {
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/actions-runner/_work/masspcf/masspcf/3rd/googletest/googletest/src/gtest.cc:2664<br>
+                                    <code class="cpp">bool testing::internal::HandleSehExceptionsInMethodIfSupported&lt;testing::internal::UnitTestImpl, bool&gt;(testing::internal::UnitTestImpl*, bool (testing::internal::UnitTestImpl::*)(), char const*)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">2661</span>  }
+<span class="line_number">2662</span>#else
+<span class="line_number">2663</span>  (void)location;
+<span class="line_number">2664</span><span class="error">  return (object-&gt;*method)();
+</span><span class="line_number">2665</span>#endif  // GTEST_HAS_SEH
+<span class="line_number">2666</span>}
+<span class="line_number">2667</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/actions-runner/_work/masspcf/masspcf/3rd/googletest/googletest/src/gtest.cc:2700<br>
+                                    <code class="cpp">bool testing::internal::HandleExceptionsInMethodIfSupported&lt;testing::internal::UnitTestImpl, bool&gt;(testing::internal::UnitTestImpl*, bool (testing::internal::UnitTestImpl::*)(), char const*)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">2697</span>  if (internal::GetUnitTestImpl()-&gt;catch_exceptions()) {
+<span class="line_number">2698</span>#if GTEST_HAS_EXCEPTIONS
+<span class="line_number">2699</span>    try {
+<span class="line_number">2700</span><span class="error">      return HandleSehExceptionsInMethodIfSupported(object, method, location);
+</span><span class="line_number">2701</span>    } catch (const AssertionException&amp;) {  // NOLINT
+<span class="line_number">2702</span>      // This failure was reported already.
+<span class="line_number">2703</span>    } catch (const internal::GoogleTestFailureException&amp;) {  // NOLINT
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/actions-runner/_work/masspcf/masspcf/3rd/googletest/googletest/src/gtest.cc:5594<br>
+                                    <code class="cpp">testing::UnitTest::Run()</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">5591</span>  (void)in_death_test_child_process;  // Needed inside the #if block above
+<span class="line_number">5592</span>#endif  // GTEST_OS_WINDOWS
+<span class="line_number">5593</span>
+<span class="line_number">5594</span><span class="error">  return internal::HandleExceptionsInMethodIfSupported(
+</span><span class="line_number">5595</span>             impl(), &amp;internal::UnitTestImpl::RunAllTests,
+<span class="line_number">5596</span>             &#34;auxiliary test code (environments or event listeners)&#34;)
+<span class="line_number">5597</span>             ? 0
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/actions-runner/_work/masspcf/masspcf/3rd/googletest/googletest/include/gtest/gtest.h:2334<br>
+                                    <code class="cpp">RUN_ALL_TESTS()</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">2331</span>// namespace and has an all-caps name.
+<span class="line_number">2332</span>[[nodiscard]] int RUN_ALL_TESTS();
+<span class="line_number">2333</span>
+<span class="line_number">2334</span><span class="error">inline int RUN_ALL_TESTS() { return ::testing::UnitTest::GetInstance()-&gt;Run(); }
+</span><span class="line_number">2335</span>
+<span class="line_number">2336</span>GTEST_DISABLE_MSC_WARNINGS_POP_()  //  4251
+<span class="line_number">2337</span>
+</code></pre>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            <pre class="code">
+<code class="c++"><span class="line_number">300</span><span class="error">  [[nodiscard]] Pcf&lt;Tt, Tv&gt; operator+(const Pcf&lt;Tt, Tv&gt;&amp; f, const Pcf&lt;Tt, Tv&gt;&amp; g)</span>
+<span class="line_number">301</span>  {
+<span class="line_number">302</span>    return combine(f, g, [](const typename Pcf&lt;Tt, Tv&gt;::rectangle_type&amp; rect){
+<span class="line_number">303</span>      return rect.f_value + rect.g_value;
+<span class="line_number">304</span>    });
+</code></pre>
+            <div class="issue">
+                <div>
+                    <span class="what">Possible data race during read of size 8 at 0x1FFEFFE9B8 by thread #1</span>
+                    <div class="navigation">
+                        <button class="next_error">Next</button>
+                        <button class="prev_error">Previous</button>
+                    </div>
+                </div>
+                <div>
+                    <table class="call_stack">
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/actions-runner/_work/masspcf/masspcf/test/test_parallel_reduce.cpp:34<br>
+                                    <code class="cpp">ParallelReduce_AddThreeFunctions_Test::TestBody()</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">31</span>    return rect.f_value + rect.g_value;
+<span class="line_number">32</span>    });
+<span class="line_number">33</span>
+<span class="line_number">34</span><span class="error">  EXPECT_EQ(res, (pcfs[0] + pcfs[1] + pcfs[2]));
+</span><span class="line_number">35</span>}
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/actions-runner/_work/masspcf/masspcf/3rd/googletest/googletest/src/gtest.cc:2664<br>
+                                    <code class="cpp">void testing::internal::HandleSehExceptionsInMethodIfSupported&lt;testing::Test, void&gt;(testing::Test*, void (testing::Test::*)(), char const*)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">2661</span>  }
+<span class="line_number">2662</span>#else
+<span class="line_number">2663</span>  (void)location;
+<span class="line_number">2664</span><span class="error">  return (object-&gt;*method)();
+</span><span class="line_number">2665</span>#endif  // GTEST_HAS_SEH
+<span class="line_number">2666</span>}
+<span class="line_number">2667</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/actions-runner/_work/masspcf/masspcf/3rd/googletest/googletest/src/gtest.cc:2700<br>
+                                    <code class="cpp">void testing::internal::HandleExceptionsInMethodIfSupported&lt;testing::Test, void&gt;(testing::Test*, void (testing::Test::*)(), char const*)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">2697</span>  if (internal::GetUnitTestImpl()-&gt;catch_exceptions()) {
+<span class="line_number">2698</span>#if GTEST_HAS_EXCEPTIONS
+<span class="line_number">2699</span>    try {
+<span class="line_number">2700</span><span class="error">      return HandleSehExceptionsInMethodIfSupported(object, method, location);
+</span><span class="line_number">2701</span>    } catch (const AssertionException&amp;) {  // NOLINT
+<span class="line_number">2702</span>      // This failure was reported already.
+<span class="line_number">2703</span>    } catch (const internal::GoogleTestFailureException&amp;) {  // NOLINT
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/actions-runner/_work/masspcf/masspcf/3rd/googletest/googletest/src/gtest.cc:2739<br>
+                                    <code class="cpp">testing::Test::Run()</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">2736</span>  // GTEST_SKIP().
+<span class="line_number">2737</span>  if (!HasFatalFailure() &amp;&amp; !IsSkipped()) {
+<span class="line_number">2738</span>    impl-&gt;os_stack_trace_getter()-&gt;UponLeavingGTest();
+<span class="line_number">2739</span><span class="error">    internal::HandleExceptionsInMethodIfSupported(this, &amp;Test::TestBody,
+</span><span class="line_number">2740</span>                                                  &#34;the test body&#34;);
+<span class="line_number">2741</span>  }
+<span class="line_number">2742</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/actions-runner/_work/masspcf/masspcf/3rd/googletest/googletest/src/gtest.cc:2885<br>
+                                    <code class="cpp">testing::TestInfo::Run()</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">2882</span>  if (!Test::HasFatalFailure() &amp;&amp; !Test::IsSkipped()) {
+<span class="line_number">2883</span>    // This doesn&#39;t throw as all user code that can throw are wrapped into
+<span class="line_number">2884</span>    // exception handling code.
+<span class="line_number">2885</span><span class="error">    test-&gt;Run();
+</span><span class="line_number">2886</span>  }
+<span class="line_number">2887</span>
+<span class="line_number">2888</span>  if (test != nullptr) {
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/actions-runner/_work/masspcf/masspcf/3rd/googletest/googletest/src/gtest.cc:3063<br>
+                                    <code class="cpp">testing::TestSuite::Run()</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">3060</span>    if (skip_all) {
+<span class="line_number">3061</span>      GetMutableTestInfo(i)-&gt;Skip();
+<span class="line_number">3062</span>    } else {
+<span class="line_number">3063</span><span class="error">      GetMutableTestInfo(i)-&gt;Run();
+</span><span class="line_number">3064</span>    }
+<span class="line_number">3065</span>    if (GTEST_FLAG_GET(fail_fast) &amp;&amp;
+<span class="line_number">3066</span>        GetMutableTestInfo(i)-&gt;result()-&gt;Failed()) {
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/actions-runner/_work/masspcf/masspcf/3rd/googletest/googletest/src/gtest.cc:6054<br>
+                                    <code class="cpp">testing::internal::UnitTestImpl::RunAllTests()</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">6051</span>      } else if (!Test::HasFatalFailure()) {
+<span class="line_number">6052</span>        for (int test_index = 0; test_index &lt; total_test_suite_count();
+<span class="line_number">6053</span>             test_index++) {
+<span class="line_number">6054</span><span class="error">          GetMutableSuiteCase(test_index)-&gt;Run();
+</span><span class="line_number">6055</span>          if (GTEST_FLAG_GET(fail_fast) &amp;&amp;
+<span class="line_number">6056</span>              GetMutableSuiteCase(test_index)-&gt;Failed()) {
+<span class="line_number">6057</span>            for (int j = test_index + 1; j &lt; total_test_suite_count(); j++) {
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/actions-runner/_work/masspcf/masspcf/3rd/googletest/googletest/src/gtest.cc:2664<br>
+                                    <code class="cpp">bool testing::internal::HandleSehExceptionsInMethodIfSupported&lt;testing::internal::UnitTestImpl, bool&gt;(testing::internal::UnitTestImpl*, bool (testing::internal::UnitTestImpl::*)(), char const*)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">2661</span>  }
+<span class="line_number">2662</span>#else
+<span class="line_number">2663</span>  (void)location;
+<span class="line_number">2664</span><span class="error">  return (object-&gt;*method)();
+</span><span class="line_number">2665</span>#endif  // GTEST_HAS_SEH
+<span class="line_number">2666</span>}
+<span class="line_number">2667</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/actions-runner/_work/masspcf/masspcf/3rd/googletest/googletest/src/gtest.cc:2700<br>
+                                    <code class="cpp">bool testing::internal::HandleExceptionsInMethodIfSupported&lt;testing::internal::UnitTestImpl, bool&gt;(testing::internal::UnitTestImpl*, bool (testing::internal::UnitTestImpl::*)(), char const*)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">2697</span>  if (internal::GetUnitTestImpl()-&gt;catch_exceptions()) {
+<span class="line_number">2698</span>#if GTEST_HAS_EXCEPTIONS
+<span class="line_number">2699</span>    try {
+<span class="line_number">2700</span><span class="error">      return HandleSehExceptionsInMethodIfSupported(object, method, location);
+</span><span class="line_number">2701</span>    } catch (const AssertionException&amp;) {  // NOLINT
+<span class="line_number">2702</span>      // This failure was reported already.
+<span class="line_number">2703</span>    } catch (const internal::GoogleTestFailureException&amp;) {  // NOLINT
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/actions-runner/_work/masspcf/masspcf/3rd/googletest/googletest/src/gtest.cc:5594<br>
+                                    <code class="cpp">testing::UnitTest::Run()</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">5591</span>  (void)in_death_test_child_process;  // Needed inside the #if block above
+<span class="line_number">5592</span>#endif  // GTEST_OS_WINDOWS
+<span class="line_number">5593</span>
+<span class="line_number">5594</span><span class="error">  return internal::HandleExceptionsInMethodIfSupported(
+</span><span class="line_number">5595</span>             impl(), &amp;internal::UnitTestImpl::RunAllTests,
+<span class="line_number">5596</span>             &#34;auxiliary test code (environments or event listeners)&#34;)
+<span class="line_number">5597</span>             ? 0
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/actions-runner/_work/masspcf/masspcf/3rd/googletest/googletest/include/gtest/gtest.h:2334<br>
+                                    <code class="cpp">RUN_ALL_TESTS()</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">2331</span>// namespace and has an all-caps name.
+<span class="line_number">2332</span>[[nodiscard]] int RUN_ALL_TESTS();
+<span class="line_number">2333</span>
+<span class="line_number">2334</span><span class="error">inline int RUN_ALL_TESTS() { return ::testing::UnitTest::GetInstance()-&gt;Run(); }
+</span><span class="line_number">2335</span>
+<span class="line_number">2336</span>GTEST_DISABLE_MSC_WARNINGS_POP_()  //  4251
+<span class="line_number">2337</span>
+</code></pre>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            <pre class="code">
+<code class="c++"><span class="line_number">305</span><span class="error">  }</span>
+<span class="line_number">306</span>
+<span class="line_number">307</span>  template &lt;typename Tt, typename Tv&gt;
+<span class="line_number">308</span>  [[nodiscard]] Pcf&lt;Tt, Tv&gt; operator-(const Pcf&lt;Tt, Tv&gt;&amp; f, const Pcf&lt;Tt, Tv&gt;&amp; g)
+<span class="line_number">309</span>  {
+<span class="line_number">310</span>    Pcf&lt;Tt, Tv&gt; ret = f;
+<span class="line_number">311</span>    ret -= g;
+<span class="line_number">312</span>    return ret;
+<span class="line_number">313</span>  }
+<span class="line_number">314</span>
+<span class="line_number">315</span>  template &lt;typename Tt, typename Tv&gt;
+<span class="line_number">316</span>  [[nodiscard]] Pcf&lt;Tt, Tv&gt; operator*(const Pcf&lt;Tt, Tv&gt;&amp; f, const Pcf&lt;Tt, Tv&gt;&amp; g)
+<span class="line_number">317</span>  {
+<span class="line_number">318</span>    return combine(f, g, [](const typename Pcf&lt;Tt, Tv&gt;::rectangle_type&amp; rect){
+<span class="line_number">319</span>      return rect.f_value * rect.g_value;
+<span class="line_number">320</span>    });
+<span class="line_number">321</span>  }
+<span class="line_number">322</span>
+<span class="line_number">323</span>  template &lt;typename Tt, typename Tv&gt;
+<span class="line_number">324</span>  [[nodiscard]] Pcf&lt;Tt, Tv&gt; operator/(const Pcf&lt;Tt, Tv&gt;&amp; f, const Pcf&lt;Tt, Tv&gt;&amp; g)
+<span class="line_number">325</span>  {
+<span class="line_number">326</span>    return combine(f, g, [](const typename Pcf&lt;Tt, Tv&gt;::rectangle_type&amp; rect){
+<span class="line_number">327</span>      return rect.f_value / rect.g_value;
+<span class="line_number">328</span>    });
+<span class="line_number">329</span>  }
+<span class="line_number">330</span>
+<span class="line_number">331</span>  template &lt;typename Tt, typename Tv&gt;
+<span class="line_number">332</span>  [[nodiscard]] Pcf&lt;Tt, Tv&gt; average(const std::vector&lt;Pcf&lt;Tt, Tv&gt;&gt;&amp; fs, size_t chunksz = 2ul)
+<span class="line_number">333</span>  {
+<span class="line_number">334</span>    auto f = parallel_reduce(fs.begin(), fs.end(), [](const typename Pcf&lt;Tt, Tv&gt;::rectangle_type&amp; rect) {
+<span class="line_number">335</span>      return rect.f_value + rect.g_value;
+<span class="line_number">336</span>    }, chunksz);
+<span class="line_number">337</span>    return f / static_cast&lt;Tv&gt;(fs.size());
+<span class="line_number">338</span>  }
+<span class="line_number">339</span>
+<span class="line_number">340</span>  template &lt;typename Tt, typename Tv&gt;
+<span class="line_number">341</span>  void PrintTo(const Pcf&lt;Tt, Tv&gt;&amp; f, std::ostream* os)
+<span class="line_number">342</span>  {
+<span class="line_number">343</span>    *os &lt;&lt; f.to_string();
+<span class="line_number">344</span>  }
+<span class="line_number">345</span>
+<span class="line_number">346</span>  template &lt;typename F&gt;
+<span class="line_number">347</span>  concept PcfLike = PiecewiseFunctionLike&lt;F&gt; &amp;&amp; requires
+<span class="line_number">348</span>  {
+<span class="line_number">349</span>    typename F::rectangle_type;
+<span class="line_number">350</span>    typename F::segment_type;
+<span class="line_number">351</span>  };
+<span class="line_number">352</span>}
+<span class="line_number">353</span>
+<span class="line_number">354</span>#endif
+</code>
+            </pre>
+        </div>
+    </div>
+</body>
+
+</html>

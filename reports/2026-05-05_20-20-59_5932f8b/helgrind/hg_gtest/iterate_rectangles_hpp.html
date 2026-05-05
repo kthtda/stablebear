@@ -1,0 +1,968 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>/home/runner/actions-runner/_work/masspcf/masspcf/include/mpcf/functional/../algorithms/functional/iterate_rectangles.hpp</title>
+    <link href='valgrind.css' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+    <script src="https://code.jquery.com/jquery-3.4.1.js"></script>
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.0.0/styles/default.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.0.0/highlight.min.js"></script>
+    <script src="valgrind.js"></script>
+</head>
+
+<body>
+    <div class="global">
+        <div class="header">
+            <h1>/home/runner/actions-runner/_work/masspcf/masspcf/include/mpcf/functional/../algorithms/functional/iterate_rectangles.hpp</h1>
+            <p><b>4</b> errors</p>
+            <button class="next_error">Goto First Error</button>
+        </div>
+        <div class="listing">
+            <pre class="code">
+<code class="c++"><span class="line_number">1</span>/*
+<span class="line_number">2</span>* Copyright 2024-2026 Bjorn Wehlin
+<span class="line_number">3</span>*
+<span class="line_number">4</span>* Licensed under the Apache License, Version 2.0 (the &#34;License&#34;);
+<span class="line_number">5</span>* you may not use this file except in compliance with the License.
+<span class="line_number">6</span>* You may obtain a copy of the License at
+<span class="line_number">7</span>*
+<span class="line_number">8</span>*    http://www.apache.org/licenses/LICENSE-2.0
+<span class="line_number">9</span>*
+<span class="line_number">10</span>* Unless required by applicable law or agreed to in writing, software
+<span class="line_number">11</span>* distributed under the License is distributed on an &#34;AS IS&#34; BASIS,
+<span class="line_number">12</span>* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+<span class="line_number">13</span>* See the License for the specific language governing permissions and
+<span class="line_number">14</span>* limitations under the License.
+<span class="line_number">15</span>*/
+<span class="line_number">16</span>
+<span class="line_number">17</span>#ifndef MPCF_ALGORITHM_ITERATE_RECTANGLES_H
+<span class="line_number">18</span>#define MPCF_ALGORITHM_ITERATE_RECTANGLES_H
+<span class="line_number">19</span>
+<span class="line_number">20</span>#include &lt;algorithm&gt;
+<span class="line_number">21</span>#include &lt;limits&gt;
+<span class="line_number">22</span>#include &lt;vector&gt;
+<span class="line_number">23</span>#include &#34;../../functional/rectangle.hpp&#34;
+<span class="line_number">24</span>
+<span class="line_number">25</span>namespace mpcf
+<span class="line_number">26</span>{
+<span class="line_number">27</span>  template &lt;typename PcfT&gt;
+<span class="line_number">28</span>  constexpr typename PcfT::value_type infinite_value()
+<span class="line_number">29</span>  {
+<span class="line_number">30</span>    return infinity&lt;typename PcfT::value_type&gt;();
+<span class="line_number">31</span>  }
+<span class="line_number">32</span>
+<span class="line_number">33</span>  template &lt;typename PcfT&gt;
+<span class="line_number">34</span>  constexpr typename PcfT::time_type infinite_time()
+<span class="line_number">35</span>  {
+<span class="line_number">36</span>    return infinity&lt;typename PcfT::time_type&gt;();
+<span class="line_number">37</span>  }
+<span class="line_number">38</span>
+<span class="line_number">39</span>  template &lt;typename PointBiDirIterator&gt;
+<span class="line_number">40</span>  PointBiDirIterator max_time_iterator_prior_to(PointBiDirIterator begin, PointBiDirIterator end,
+<span class="line_number">41</span>    typename std::iterator_traits&lt;PointBiDirIterator&gt;::value_type::time_type t)
+<span class="line_number">42</span>  {
+<span class="line_number">43</span>    using TPoint = typename std::iterator_traits&lt;PointBiDirIterator&gt;::value_type;
+<span class="line_number">44</span>    using TTime = typename TPoint::time_type;
+</code></pre>
+            <div class="issue">
+                <div>
+                    <span class="what">Possible data race during read of size 4 at 0x4E9D218 by thread #25</span>
+                    <div class="navigation">
+                        <button class="next_error">Next</button>
+                        <button class="prev_error">Previous</button>
+                    </div>
+                </div>
+                <div>
+                    <table class="call_stack">
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/predefined_ops.h:240<br>
+                                    <code class="cpp">bool __gnu_cxx::__ops::_Val_comp_iter&lt;mpcf::max_time_iterator_prior_to&lt;__gnu_cxx::__normal_iterator&lt;mpcf::TimePoint&lt;float, float&gt; const*, std::vector&lt;mpcf::TimePoint&lt;float, float&gt;, std::allocator&lt;mpcf::TimePoint&lt;float, float&gt; &gt; &gt; &gt; &gt;(__gnu_cxx::__normal_iterator&lt;mpcf::TimePoint&lt;float, float&gt; const*, std::vector&lt;mpcf::TimePoint&lt;float, float&gt;, std::allocator&lt;mpcf::TimePoint&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::TimePoint&lt;float, float&gt; const*, std::vector&lt;mpcf::TimePoint&lt;float, float&gt;, std::allocator&lt;mpcf::TimePoint&lt;float, float&gt; &gt; &gt; &gt;, std::iterator_traits&lt;__gnu_cxx::__normal_iterator&lt;mpcf::TimePoint&lt;float, float&gt; const*, std::vector&lt;mpcf::TimePoint&lt;float, float&gt;, std::allocator&lt;mpcf::TimePoint&lt;float, float&gt; &gt; &gt; &gt; &gt;::value_type::time_type)::{lambda(float, mpcf::TimePoint&lt;float, float&gt; const&amp;)#1}&gt;::operator()&lt;float const, __gnu_cxx::__normal_iterator&lt;mpcf::TimePoint&lt;float, float&gt; const*, std::vector&lt;mpcf::TimePoint&lt;float, float&gt;, std::allocator&lt;mpcf::TimePoint&lt;float, float&gt; &gt; &gt; &gt; &gt;(float const&amp;, __gnu_cxx::__normal_iterator&lt;mpcf::TimePoint&lt;float, float&gt; const*, std::vector&lt;mpcf::TimePoint&lt;float, float&gt;, std::allocator&lt;mpcf::TimePoint&lt;float, float&gt; &gt; &gt; &gt;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">237</span>	_GLIBCXX20_CONSTEXPR
+<span class="line_number">238</span>	bool
+<span class="line_number">239</span>	operator()(_Value&amp; __val, _Iterator __it)
+<span class="line_number">240</span><span class="error">	{ return bool(_M_comp(__val, *__it)); }
+</span><span class="line_number">241</span>    };
+<span class="line_number">242</span>
+<span class="line_number">243</span>  template&lt;typename _Compare&gt;
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/stl_algo.h:2035<br>
+                                    <code class="cpp">__gnu_cxx::__normal_iterator&lt;mpcf::TimePoint&lt;float, float&gt; const*, std::vector&lt;mpcf::TimePoint&lt;float, float&gt;, std::allocator&lt;mpcf::TimePoint&lt;float, float&gt; &gt; &gt; &gt; std::__upper_bound&lt;__gnu_cxx::__normal_iterator&lt;mpcf::TimePoint&lt;float, float&gt; const*, std::vector&lt;mpcf::TimePoint&lt;float, float&gt;, std::allocator&lt;mpcf::TimePoint&lt;float, float&gt; &gt; &gt; &gt;, float, __gnu_cxx::__ops::_Val_comp_iter&lt;mpcf::max_time_iterator_prior_to&lt;__gnu_cxx::__normal_iterator&lt;mpcf::TimePoint&lt;float, float&gt; const*, std::vector&lt;mpcf::TimePoint&lt;float, float&gt;, std::allocator&lt;mpcf::TimePoint&lt;float, float&gt; &gt; &gt; &gt; &gt;(__gnu_cxx::__normal_iterator&lt;mpcf::TimePoint&lt;float, float&gt; const*, std::vector&lt;mpcf::TimePoint&lt;float, float&gt;, std::allocator&lt;mpcf::TimePoint&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::TimePoint&lt;float, float&gt; const*, std::vector&lt;mpcf::TimePoint&lt;float, float&gt;, std::allocator&lt;mpcf::TimePoint&lt;float, float&gt; &gt; &gt; &gt;, std::iterator_traits&lt;__gnu_cxx::__normal_iterator&lt;mpcf::TimePoint&lt;float, float&gt; const*, std::vector&lt;mpcf::TimePoint&lt;float, float&gt;, std::allocator&lt;mpcf::TimePoint&lt;float, float&gt; &gt; &gt; &gt; &gt;::value_type::time_type)::{lambda(float, mpcf::TimePoint&lt;float, float&gt; const&amp;)#1}&gt; &gt;(__gnu_cxx::__normal_iterator&lt;mpcf::TimePoint&lt;float, float&gt; const*, std::vector&lt;mpcf::TimePoint&lt;float, float&gt;, std::allocator&lt;mpcf::TimePoint&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::TimePoint&lt;float, float&gt; const*, std::vector&lt;mpcf::TimePoint&lt;float, float&gt;, std::allocator&lt;mpcf::TimePoint&lt;float, float&gt; &gt; &gt; &gt;, float const&amp;, __gnu_cxx::__ops::_Val_comp_iter&lt;mpcf::max_time_iterator_prior_to&lt;__gnu_cxx::__normal_iterator&lt;mpcf::TimePoint&lt;float, float&gt; const*, std::vector&lt;mpcf::TimePoint&lt;float, float&gt;, std::allocator&lt;mpcf::TimePoint&lt;float, float&gt; &gt; &gt; &gt; &gt;(__gnu_cxx::__normal_iterator&lt;mpcf::TimePoint&lt;float, float&gt; const*, std::vector&lt;mpcf::TimePoint&lt;float, float&gt;, std::allocator&lt;mpcf::TimePoint&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::TimePoint&lt;float, float&gt; const*, std::vector&lt;mpcf::TimePoint&lt;float, float&gt;, std::allocator&lt;mpcf::TimePoint&lt;float, float&gt; &gt; &gt; &gt;, std::iterator_traits&lt;__gnu_cxx::__normal_iterator&lt;mpcf::TimePoint&lt;float, float&gt; const*, std::vector&lt;mpcf::TimePoint&lt;float, float&gt;, std::allocator&lt;mpcf::TimePoint&lt;float, float&gt; &gt; &gt; &gt; &gt;::value_type::time_type)::{lambda(float, mpcf::TimePoint&lt;float, float&gt; const&amp;)#1}&gt;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">2032</span>	  _DistanceType __half = __len &gt;&gt; 1;
+<span class="line_number">2033</span>	  _ForwardIterator __middle = __first;
+<span class="line_number">2034</span>	  std::advance(__middle, __half);
+<span class="line_number">2035</span><span class="error">	  if (__comp(__val, __middle))
+</span><span class="line_number">2036</span>	    __len = __half;
+<span class="line_number">2037</span>	  else
+<span class="line_number">2038</span>	    {
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/stl_algo.h:2102<br>
+                                    <code class="cpp">__gnu_cxx::__normal_iterator&lt;mpcf::TimePoint&lt;float, float&gt; const*, std::vector&lt;mpcf::TimePoint&lt;float, float&gt;, std::allocator&lt;mpcf::TimePoint&lt;float, float&gt; &gt; &gt; &gt; std::upper_bound&lt;__gnu_cxx::__normal_iterator&lt;mpcf::TimePoint&lt;float, float&gt; const*, std::vector&lt;mpcf::TimePoint&lt;float, float&gt;, std::allocator&lt;mpcf::TimePoint&lt;float, float&gt; &gt; &gt; &gt;, float, mpcf::max_time_iterator_prior_to&lt;__gnu_cxx::__normal_iterator&lt;mpcf::TimePoint&lt;float, float&gt; const*, std::vector&lt;mpcf::TimePoint&lt;float, float&gt;, std::allocator&lt;mpcf::TimePoint&lt;float, float&gt; &gt; &gt; &gt; &gt;(__gnu_cxx::__normal_iterator&lt;mpcf::TimePoint&lt;float, float&gt; const*, std::vector&lt;mpcf::TimePoint&lt;float, float&gt;, std::allocator&lt;mpcf::TimePoint&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::TimePoint&lt;float, float&gt; const*, std::vector&lt;mpcf::TimePoint&lt;float, float&gt;, std::allocator&lt;mpcf::TimePoint&lt;float, float&gt; &gt; &gt; &gt;, std::iterator_traits&lt;__gnu_cxx::__normal_iterator&lt;mpcf::TimePoint&lt;float, float&gt; const*, std::vector&lt;mpcf::TimePoint&lt;float, float&gt;, std::allocator&lt;mpcf::TimePoint&lt;float, float&gt; &gt; &gt; &gt; &gt;::value_type::time_type)::{lambda(float, mpcf::TimePoint&lt;float, float&gt; const&amp;)#1}&gt;(__gnu_cxx::__normal_iterator&lt;mpcf::TimePoint&lt;float, float&gt; const*, std::vector&lt;mpcf::TimePoint&lt;float, float&gt;, std::allocator&lt;mpcf::TimePoint&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::TimePoint&lt;float, float&gt; const*, std::vector&lt;mpcf::TimePoint&lt;float, float&gt;, std::allocator&lt;mpcf::TimePoint&lt;float, float&gt; &gt; &gt; &gt;, float const&amp;, mpcf::max_time_iterator_prior_to&lt;__gnu_cxx::__normal_iterator&lt;mpcf::TimePoint&lt;float, float&gt; const*, std::vector&lt;mpcf::TimePoint&lt;float, float&gt;, std::allocator&lt;mpcf::TimePoint&lt;float, float&gt; &gt; &gt; &gt; &gt;(__gnu_cxx::__normal_iterator&lt;mpcf::TimePoint&lt;float, float&gt; const*, std::vector&lt;mpcf::TimePoint&lt;float, float&gt;, std::allocator&lt;mpcf::TimePoint&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::TimePoint&lt;float, float&gt; const*, std::vector&lt;mpcf::TimePoint&lt;float, float&gt;, std::allocator&lt;mpcf::TimePoint&lt;float, float&gt; &gt; &gt; &gt;, std::iterator_traits&lt;__gnu_cxx::__normal_iterator&lt;mpcf::TimePoint&lt;float, float&gt; const*, std::vector&lt;mpcf::TimePoint&lt;float, float&gt;, std::allocator&lt;mpcf::TimePoint&lt;float, float&gt; &gt; &gt; &gt; &gt;::value_type::time_type)::{lambda(float, mpcf::TimePoint&lt;float, float&gt; const&amp;)#1})</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">2099</span>      __glibcxx_requires_partitioned_upper_pred(__first, __last,
+<span class="line_number">2100</span>						__val, __comp);
+<span class="line_number">2101</span>
+<span class="line_number">2102</span><span class="error">      return std::__upper_bound(__first, __last, __val,
+</span><span class="line_number">2103</span>				__gnu_cxx::__ops::__val_comp_iter(__comp));
+<span class="line_number">2104</span>    }
+<span class="line_number">2105</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/actions-runner/_work/masspcf/masspcf/include/mpcf/functional/../algorithms/functional/iterate_rectangles.hpp:45<br>
+                                    <code class="cpp">__gnu_cxx::__normal_iterator&lt;mpcf::TimePoint&lt;float, float&gt; const*, std::vector&lt;mpcf::TimePoint&lt;float, float&gt;, std::allocator&lt;mpcf::TimePoint&lt;float, float&gt; &gt; &gt; &gt; mpcf::max_time_iterator_prior_to&lt;__gnu_cxx::__normal_iterator&lt;mpcf::TimePoint&lt;float, float&gt; const*, std::vector&lt;mpcf::TimePoint&lt;float, float&gt;, std::allocator&lt;mpcf::TimePoint&lt;float, float&gt; &gt; &gt; &gt; &gt;(__gnu_cxx::__normal_iterator&lt;mpcf::TimePoint&lt;float, float&gt; const*, std::vector&lt;mpcf::TimePoint&lt;float, float&gt;, std::allocator&lt;mpcf::TimePoint&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::TimePoint&lt;float, float&gt; const*, std::vector&lt;mpcf::TimePoint&lt;float, float&gt;, std::allocator&lt;mpcf::TimePoint&lt;float, float&gt; &gt; &gt; &gt;, std::iterator_traits&lt;__gnu_cxx::__normal_iterator&lt;mpcf::TimePoint&lt;float, float&gt; const*, std::vector&lt;mpcf::TimePoint&lt;float, float&gt;, std::allocator&lt;mpcf::TimePoint&lt;float, float&gt; &gt; &gt; &gt; &gt;::value_type::time_type)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">42</span>  {
+<span class="line_number">43</span>    using TPoint = typename std::iterator_traits&lt;PointBiDirIterator&gt;::value_type;
+<span class="line_number">44</span>    using TTime = typename TPoint::time_type;
+<span class="line_number">45</span><span class="error">    auto it = std::upper_bound(begin, end, t, [](TTime val, const TPoint&amp; p) { return val &lt; p.t; });
+</span><span class="line_number">46</span>    if (it == begin)
+<span class="line_number">47</span>    {
+<span class="line_number">48</span>      return begin;
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/actions-runner/_work/masspcf/masspcf/include/mpcf/functional/../algorithms/functional/iterate_rectangles.hpp:61<br>
+                                    <code class="cpp">void mpcf::iterate_rectangles&lt;mpcf::TimePoint&lt;float, float&gt;, mpcf::Accumulator&lt;mpcf::Pcf&lt;float, float&gt; &gt;::combine_with_(std::vector&lt;mpcf::TimePoint&lt;float, float&gt;, std::allocator&lt;mpcf::TimePoint&lt;float, float&gt; &gt; &gt; const&amp;)::{lambda(mpcf::Rectangle&lt;float, float&gt; const&amp;)#1}&gt;(std::vector&lt;mpcf::TimePoint&lt;float, float&gt;, std::allocator&lt;mpcf::TimePoint&lt;float, float&gt; &gt; &gt; const&amp;, std::vector&lt;mpcf::TimePoint&lt;float, float&gt;, std::allocator&lt;mpcf::TimePoint&lt;float, float&gt; &gt; &gt; const&amp;, mpcf::Accumulator&lt;mpcf::Pcf&lt;float, float&gt; &gt;::combine_with_(std::vector&lt;mpcf::TimePoint&lt;float, float&gt;, std::allocator&lt;mpcf::TimePoint&lt;float, float&gt; &gt; &gt; const&amp;)::{lambda(mpcf::Rectangle&lt;float, float&gt; const&amp;)#1}, mpcf::TimePoint&lt;float, float&gt;::time_type, mpcf::TimePoint&lt;float, float&gt;::time_type)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">58</span>    using TVal = typename TimePointT::value_type;
+<span class="line_number">59</span>
+<span class="line_number">60</span>    auto fi = max_time_iterator_prior_to(fpts.begin(), fpts.end(), a);
+<span class="line_number">61</span><span class="error">    auto gi = max_time_iterator_prior_to(gpts.begin(), gpts.end(), a);
+</span><span class="line_number">62</span>
+<span class="line_number">63</span>    TTime t = a;
+<span class="line_number">64</span>    TTime tprev = a;
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/actions-runner/_work/masspcf/masspcf/include/mpcf/functional/../algorithms/functional/reduce.hpp:171<br>
+                                    <code class="cpp">mpcf::Accumulator&lt;mpcf::Pcf&lt;float, float&gt; &gt;::combine_with_(std::vector&lt;mpcf::TimePoint&lt;float, float&gt;, std::allocator&lt;mpcf::TimePoint&lt;float, float&gt; &gt; &gt; const&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">168</span>
+<span class="line_number">169</span>      value_type vLast = 0;
+<span class="line_number">170</span>
+<span class="line_number">171</span><span class="error">      iterate_rectangles(m_pts, other, [&amp;i, &amp;vLast, this](const rectangle_type&amp; rect){
+</span><span class="line_number">172</span>
+<span class="line_number">173</span>        auto t = rect.left;
+<span class="line_number">174</span>        auto v = m_op(rect);
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/actions-runner/_work/masspcf/masspcf/include/mpcf/functional/../algorithms/functional/reduce.hpp:108<br>
+                                    <code class="cpp">mpcf::Accumulator&lt;mpcf::Pcf&lt;float, float&gt; &gt;::operator+=(mpcf::Pcf&lt;float, float&gt; const&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">105</span>        m_pts = f.points();
+<span class="line_number">106</span>        return *this;
+<span class="line_number">107</span>      }
+<span class="line_number">108</span><span class="error">      combine_with_(f.points());
+</span><span class="line_number">109</span>      return *this;
+<span class="line_number">110</span>    }
+<span class="line_number">111</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/actions-runner/_work/masspcf/masspcf/include/mpcf/functional/../algorithms/functional/reduce.hpp:228<br>
+                                    <code class="cpp">mpcf::parallel_reduce&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt; const*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt; &gt;(__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt; const*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt; const*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, std::function&lt;std::iterator_traits&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt; const*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt; &gt;::value_type::value_type (std::iterator_traits&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt; const*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt; &gt;::value_type::rectangle_type const&amp;)&gt;, unsigned long, mpcf::Executor&amp;)::{lambda()#1}::operator()() const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">225</span>      topLevelTasks[iBlock].task = taskflow.emplace([iBlock, block, &amp;accumulators, begin](){
+<span class="line_number">226</span>        for (auto i = block.first; i &lt;= block.second; ++i)
+<span class="line_number">227</span>        {
+<span class="line_number">228</span><span class="error">          accumulators[iBlock] += *(begin + i); // TODO: FwdIt
+</span><span class="line_number">229</span>        }
+<span class="line_number">230</span>      });
+<span class="line_number">231</span>    }
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:61<br>
+                                    <code class="cpp">void std::__invoke_impl&lt;void, mpcf::parallel_reduce&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt; const*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt; &gt;(__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt; const*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt; const*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, std::function&lt;std::iterator_traits&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt; const*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt; &gt;::value_type::value_type (std::iterator_traits&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt; const*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt; &gt;::value_type::rectangle_type const&amp;)&gt;, unsigned long, mpcf::Executor&amp;)::{lambda()#1}&amp;&gt;(std::__invoke_other, mpcf::parallel_reduce&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt; const*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt; &gt;(__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt; const*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt; const*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, std::function&lt;std::iterator_traits&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt; const*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt; &gt;::value_type::value_type (std::iterator_traits&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt; const*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt; &gt;::value_type::rectangle_type const&amp;)&gt;, unsigned long, mpcf::Executor&amp;)::{lambda()#1}&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">58</span>  template&lt;typename _Res, typename _Fn, typename... _Args&gt;
+<span class="line_number">59</span>    constexpr _Res
+<span class="line_number">60</span>    __invoke_impl(__invoke_other, _Fn&amp;&amp; __f, _Args&amp;&amp;... __args)
+<span class="line_number">61</span><span class="error">    { return std::forward&lt;_Fn&gt;(__f)(std::forward&lt;_Args&gt;(__args)...); }
+</span><span class="line_number">62</span>
+<span class="line_number">63</span>  template&lt;typename _Res, typename _MemFun, typename _Tp, typename... _Args&gt;
+<span class="line_number">64</span>    constexpr _Res
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:111<br>
+                                    <code class="cpp">std::enable_if&lt;is_invocable_r_v&lt;void, mpcf::parallel_reduce&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt; const*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt; &gt;(__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt; const*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt; const*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, std::function&lt;std::iterator_traits&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt; const*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt; &gt;::value_type::value_type (std::iterator_traits&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt; const*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt; &gt;::value_type::rectangle_type const&amp;)&gt;, unsigned long, mpcf::Executor&amp;)::{lambda()#1}&amp;&gt;, void&gt;::type std::__invoke_r&lt;void, mpcf::parallel_reduce&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt; const*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt; &gt;(__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt; const*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt; const*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, std::function&lt;std::iterator_traits&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt; const*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt; &gt;::value_type::value_type (std::iterator_traits&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt; const*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt; &gt;::value_type::rectangle_type const&amp;)&gt;, unsigned long, mpcf::Executor&amp;)::{lambda()#1}&amp;&gt;(mpcf::parallel_reduce&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt; const*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt; &gt;(__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt; const*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt; const*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, std::function&lt;std::iterator_traits&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt; const*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt; &gt;::value_type::value_type (std::iterator_traits&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt; const*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt; &gt;::value_type::rectangle_type const&amp;)&gt;, unsigned long, mpcf::Executor&amp;)::{lambda()#1}&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">108</span>      using __type = typename __result::type;
+<span class="line_number">109</span>      using __tag = typename __result::__invoke_type;
+<span class="line_number">110</span>      if constexpr (is_void_v&lt;_Res&gt;)
+<span class="line_number">111</span><span class="error">	std::__invoke_impl&lt;__type&gt;(__tag{}, std::forward&lt;_Callable&gt;(__fn),
+</span><span class="line_number">112</span>					std::forward&lt;_Args&gt;(__args)...);
+<span class="line_number">113</span>      else
+<span class="line_number">114</span>	return std::__invoke_impl&lt;__type&gt;(__tag{},
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/std_function.h:290<br>
+                                    <code class="cpp">std::_Function_handler&lt;void (), mpcf::parallel_reduce&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt; const*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt; &gt;(__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt; const*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt; const*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, std::function&lt;std::iterator_traits&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt; const*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt; &gt;::value_type::value_type (std::iterator_traits&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt; const*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt; &gt;::value_type::rectangle_type const&amp;)&gt;, unsigned long, mpcf::Executor&amp;)::{lambda()#1}&gt;::_M_invoke(std::_Any_data const&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">287</span>      static _Res
+<span class="line_number">288</span>      _M_invoke(const _Any_data&amp; __functor, _ArgTypes&amp;&amp;... __args)
+<span class="line_number">289</span>      {
+<span class="line_number">290</span><span class="error">	return std::__invoke_r&lt;_Res&gt;(*_Base::_M_get_pointer(__functor),
+</span><span class="line_number">291</span>				     std::forward&lt;_ArgTypes&gt;(__args)...);
+<span class="line_number">292</span>      }
+<span class="line_number">293</span>
+</code></pre>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            <pre class="code">
+<code class="c++"><span class="line_number">45</span><span class="error">    auto it = std::upper_bound(begin, end, t, [](TTime val, const TPoint&amp; p) { return val &lt; p.t; });</span>
+<span class="line_number">46</span>    if (it == begin)
+<span class="line_number">47</span>    {
+<span class="line_number">48</span>      return begin;
+<span class="line_number">49</span>    }
+<span class="line_number">50</span>    return std::prev(it);
+<span class="line_number">51</span>  }
+<span class="line_number">52</span>
+<span class="line_number">53</span>  template &lt;typename TimePointT, typename FCb&gt;
+<span class="line_number">54</span>  void iterate_rectangles(const std::vector&lt;TimePointT&gt;&amp; fpts, const std::vector&lt;TimePointT&gt;&amp; gpts, FCb cb,
+<span class="line_number">55</span>    typename TimePointT::time_type a = TimePointT::zero_time(), typename TimePointT::time_type b = TimePointT::infinite_time())
+<span class="line_number">56</span>  {
+<span class="line_number">57</span>    using TTime = typename TimePointT::time_type;
+<span class="line_number">58</span>    using TVal = typename TimePointT::value_type;
+<span class="line_number">59</span>
+<span class="line_number">60</span>    auto fi = max_time_iterator_prior_to(fpts.begin(), fpts.end(), a);
+<span class="line_number">61</span>    auto gi = max_time_iterator_prior_to(gpts.begin(), gpts.end(), a);
+<span class="line_number">62</span>
+<span class="line_number">63</span>    TTime t = a;
+<span class="line_number">64</span>    TTime tprev = a;
+<span class="line_number">65</span>    TVal fv = 0;
+<span class="line_number">66</span>    TVal gv = 0;
+<span class="line_number">67</span>
+<span class="line_number">68</span>    Rectangle&lt;TTime, TVal&gt; rect;
+<span class="line_number">69</span>
+<span class="line_number">70</span>    while (t &lt; b)
+<span class="line_number">71</span>    {
+<span class="line_number">72</span>      tprev = t;
+<span class="line_number">73</span>      fv = fi-&gt;v;
+</code></pre>
+            <div class="issue">
+                <div>
+                    <span class="what">Possible data race during read of size 4 at 0x4E9D214 by thread #25</span>
+                    <div class="navigation">
+                        <button class="next_error">Next</button>
+                        <button class="prev_error">Previous</button>
+                    </div>
+                </div>
+                <div>
+                    <table class="call_stack">
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/actions-runner/_work/masspcf/masspcf/include/mpcf/functional/../algorithms/functional/reduce.hpp:171<br>
+                                    <code class="cpp">mpcf::Accumulator&lt;mpcf::Pcf&lt;float, float&gt; &gt;::combine_with_(std::vector&lt;mpcf::TimePoint&lt;float, float&gt;, std::allocator&lt;mpcf::TimePoint&lt;float, float&gt; &gt; &gt; const&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">168</span>
+<span class="line_number">169</span>      value_type vLast = 0;
+<span class="line_number">170</span>
+<span class="line_number">171</span><span class="error">      iterate_rectangles(m_pts, other, [&amp;i, &amp;vLast, this](const rectangle_type&amp; rect){
+</span><span class="line_number">172</span>
+<span class="line_number">173</span>        auto t = rect.left;
+<span class="line_number">174</span>        auto v = m_op(rect);
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/actions-runner/_work/masspcf/masspcf/include/mpcf/functional/../algorithms/functional/reduce.hpp:108<br>
+                                    <code class="cpp">mpcf::Accumulator&lt;mpcf::Pcf&lt;float, float&gt; &gt;::operator+=(mpcf::Pcf&lt;float, float&gt; const&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">105</span>        m_pts = f.points();
+<span class="line_number">106</span>        return *this;
+<span class="line_number">107</span>      }
+<span class="line_number">108</span><span class="error">      combine_with_(f.points());
+</span><span class="line_number">109</span>      return *this;
+<span class="line_number">110</span>    }
+<span class="line_number">111</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/actions-runner/_work/masspcf/masspcf/include/mpcf/functional/../algorithms/functional/reduce.hpp:228<br>
+                                    <code class="cpp">mpcf::parallel_reduce&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt; const*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt; &gt;(__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt; const*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt; const*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, std::function&lt;std::iterator_traits&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt; const*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt; &gt;::value_type::value_type (std::iterator_traits&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt; const*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt; &gt;::value_type::rectangle_type const&amp;)&gt;, unsigned long, mpcf::Executor&amp;)::{lambda()#1}::operator()() const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">225</span>      topLevelTasks[iBlock].task = taskflow.emplace([iBlock, block, &amp;accumulators, begin](){
+<span class="line_number">226</span>        for (auto i = block.first; i &lt;= block.second; ++i)
+<span class="line_number">227</span>        {
+<span class="line_number">228</span><span class="error">          accumulators[iBlock] += *(begin + i); // TODO: FwdIt
+</span><span class="line_number">229</span>        }
+<span class="line_number">230</span>      });
+<span class="line_number">231</span>    }
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:61<br>
+                                    <code class="cpp">void std::__invoke_impl&lt;void, mpcf::parallel_reduce&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt; const*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt; &gt;(__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt; const*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt; const*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, std::function&lt;std::iterator_traits&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt; const*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt; &gt;::value_type::value_type (std::iterator_traits&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt; const*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt; &gt;::value_type::rectangle_type const&amp;)&gt;, unsigned long, mpcf::Executor&amp;)::{lambda()#1}&amp;&gt;(std::__invoke_other, mpcf::parallel_reduce&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt; const*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt; &gt;(__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt; const*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt; const*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, std::function&lt;std::iterator_traits&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt; const*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt; &gt;::value_type::value_type (std::iterator_traits&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt; const*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt; &gt;::value_type::rectangle_type const&amp;)&gt;, unsigned long, mpcf::Executor&amp;)::{lambda()#1}&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">58</span>  template&lt;typename _Res, typename _Fn, typename... _Args&gt;
+<span class="line_number">59</span>    constexpr _Res
+<span class="line_number">60</span>    __invoke_impl(__invoke_other, _Fn&amp;&amp; __f, _Args&amp;&amp;... __args)
+<span class="line_number">61</span><span class="error">    { return std::forward&lt;_Fn&gt;(__f)(std::forward&lt;_Args&gt;(__args)...); }
+</span><span class="line_number">62</span>
+<span class="line_number">63</span>  template&lt;typename _Res, typename _MemFun, typename _Tp, typename... _Args&gt;
+<span class="line_number">64</span>    constexpr _Res
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:111<br>
+                                    <code class="cpp">std::enable_if&lt;is_invocable_r_v&lt;void, mpcf::parallel_reduce&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt; const*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt; &gt;(__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt; const*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt; const*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, std::function&lt;std::iterator_traits&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt; const*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt; &gt;::value_type::value_type (std::iterator_traits&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt; const*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt; &gt;::value_type::rectangle_type const&amp;)&gt;, unsigned long, mpcf::Executor&amp;)::{lambda()#1}&amp;&gt;, void&gt;::type std::__invoke_r&lt;void, mpcf::parallel_reduce&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt; const*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt; &gt;(__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt; const*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt; const*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, std::function&lt;std::iterator_traits&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt; const*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt; &gt;::value_type::value_type (std::iterator_traits&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt; const*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt; &gt;::value_type::rectangle_type const&amp;)&gt;, unsigned long, mpcf::Executor&amp;)::{lambda()#1}&amp;&gt;(mpcf::parallel_reduce&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt; const*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt; &gt;(__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt; const*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt; const*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, std::function&lt;std::iterator_traits&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt; const*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt; &gt;::value_type::value_type (std::iterator_traits&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt; const*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt; &gt;::value_type::rectangle_type const&amp;)&gt;, unsigned long, mpcf::Executor&amp;)::{lambda()#1}&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">108</span>      using __type = typename __result::type;
+<span class="line_number">109</span>      using __tag = typename __result::__invoke_type;
+<span class="line_number">110</span>      if constexpr (is_void_v&lt;_Res&gt;)
+<span class="line_number">111</span><span class="error">	std::__invoke_impl&lt;__type&gt;(__tag{}, std::forward&lt;_Callable&gt;(__fn),
+</span><span class="line_number">112</span>					std::forward&lt;_Args&gt;(__args)...);
+<span class="line_number">113</span>      else
+<span class="line_number">114</span>	return std::__invoke_impl&lt;__type&gt;(__tag{},
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/std_function.h:290<br>
+                                    <code class="cpp">std::_Function_handler&lt;void (), mpcf::parallel_reduce&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt; const*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt; &gt;(__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt; const*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt; const*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, std::function&lt;std::iterator_traits&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt; const*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt; &gt;::value_type::value_type (std::iterator_traits&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt; const*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt; &gt;::value_type::rectangle_type const&amp;)&gt;, unsigned long, mpcf::Executor&amp;)::{lambda()#1}&gt;::_M_invoke(std::_Any_data const&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">287</span>      static _Res
+<span class="line_number">288</span>      _M_invoke(const _Any_data&amp; __functor, _ArgTypes&amp;&amp;... __args)
+<span class="line_number">289</span>      {
+<span class="line_number">290</span><span class="error">	return std::__invoke_r&lt;_Res&gt;(*_Base::_M_get_pointer(__functor),
+</span><span class="line_number">291</span>				     std::forward&lt;_ArgTypes&gt;(__args)...);
+<span class="line_number">292</span>      }
+<span class="line_number">293</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/std_function.h:591<br>
+                                    <code class="cpp">std::function&lt;void ()&gt;::operator()() const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">588</span>      {
+<span class="line_number">589</span>	if (_M_empty())
+<span class="line_number">590</span>	  __throw_bad_function_call();
+<span class="line_number">591</span><span class="error">	return _M_invoker(_M_functor, std::forward&lt;_ArgTypes&gt;(__args)...);
+</span><span class="line_number">592</span>      }
+<span class="line_number">593</span>
+<span class="line_number">594</span>#if __cpp_rtti
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/actions-runner/_work/masspcf/masspcf/3rd/taskflow/taskflow/core/executor.hpp:1887<br>
+                                    <code class="cpp">tf::Executor::_invoke_static_task(tf::Worker&amp;, tf::Node*)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1884</span>// Procedure: _invoke_static_task
+<span class="line_number">1885</span>inline void Executor::_invoke_static_task(Worker&amp; worker, Node* node) {
+<span class="line_number">1886</span>  _observer_prologue(worker, node);
+<span class="line_number">1887</span><span class="error">  TF_EXECUTOR_EXCEPTION_HANDLER(worker, node, {
+</span><span class="line_number">1888</span>    std::get_if&lt;Node::Static&gt;(&amp;node-&gt;_handle)-&gt;work();
+<span class="line_number">1889</span>  });
+<span class="line_number">1890</span>  _observer_epilogue(worker, node);
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/actions-runner/_work/masspcf/masspcf/3rd/taskflow/taskflow/core/executor.hpp:1662<br>
+                                    <code class="cpp">tf::Executor::_invoke(tf::Worker&amp;, tf::Node*)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1659</span>  switch(node-&gt;_handle.index()) {
+<span class="line_number">1660</span>    // static task
+<span class="line_number">1661</span>    case Node::STATIC:{
+<span class="line_number">1662</span><span class="error">      _invoke_static_task(worker, node);
+</span><span class="line_number">1663</span>    }
+<span class="line_number">1664</span>    break;
+<span class="line_number">1665</span>    
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/actions-runner/_work/masspcf/masspcf/3rd/taskflow/taskflow/core/executor.hpp:1424<br>
+                                    <code class="cpp">tf::Executor::_exploit_task(tf::Worker&amp;, tf::Node*&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1421</span>// Procedure: _exploit_task
+<span class="line_number">1422</span>inline void Executor::_exploit_task(Worker&amp; w, Node*&amp; t) {
+<span class="line_number">1423</span>  while(t) {
+<span class="line_number">1424</span><span class="error">    _invoke(w, t);
+</span><span class="line_number">1425</span>    t = w._wsq.pop();
+<span class="line_number">1426</span>  }
+<span class="line_number">1427</span>}
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/actions-runner/_work/masspcf/masspcf/3rd/taskflow/taskflow/core/executor.hpp:1327<br>
+                                    <code class="cpp">tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}::operator()() const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1324</span>        while(1) {
+<span class="line_number">1325</span>
+<span class="line_number">1326</span>          // drains out the local queue first
+<span class="line_number">1327</span><span class="error">          _exploit_task(worker, t);
+</span><span class="line_number">1328</span>
+<span class="line_number">1329</span>          // steals and waits for tasks
+<span class="line_number">1330</span>          if(_wait_for_task(worker, t) == false) {
+</code></pre>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            <pre class="code">
+<code class="c++"><span class="line_number">74</span><span class="error">      gv = gi-&gt;v;</span>
+<span class="line_number">75</span>
+<span class="line_number">76</span>      auto fi_next = std::next(fi);
+<span class="line_number">77</span>      auto gi_next = std::next(gi);
+<span class="line_number">78</span>
+<span class="line_number">79</span>      if (fi_next != fpts.end() &amp;&amp; gi_next != gpts.end())
+<span class="line_number">80</span>      {
+<span class="line_number">81</span>        auto delta = fi_next-&gt;t - gi_next-&gt;t;
+<span class="line_number">82</span>        if (delta &lt;= 0)
+<span class="line_number">83</span>        {
+<span class="line_number">84</span>          fi = fi_next;
+<span class="line_number">85</span>        }
+<span class="line_number">86</span>        if (delta &gt;= 0)
+<span class="line_number">87</span>        {
+<span class="line_number">88</span>          gi = gi_next;
+<span class="line_number">89</span>        }
+<span class="line_number">90</span>      }
+<span class="line_number">91</span>      else if (fi_next != fpts.end())
+<span class="line_number">92</span>      {
+<span class="line_number">93</span>        fi = fi_next;
+<span class="line_number">94</span>      }
+<span class="line_number">95</span>      else if (gi_next != gpts.end())
+<span class="line_number">96</span>      {
+<span class="line_number">97</span>        gi = gi_next;
+<span class="line_number">98</span>      }
+<span class="line_number">99</span>      else
+<span class="line_number">100</span>      {
+<span class="line_number">101</span>        rect.left = tprev;
+<span class="line_number">102</span>        rect.right = b;
+<span class="line_number">103</span>        rect.f_value = fv;
+<span class="line_number">104</span>        rect.g_value = gv;
+<span class="line_number">105</span>
+<span class="line_number">106</span>        cb(rect);
+<span class="line_number">107</span>
+<span class="line_number">108</span>        return;
+<span class="line_number">109</span>      }
+<span class="line_number">110</span>
+<span class="line_number">111</span>      t = std::min(std::max(fi-&gt;t, gi-&gt;t), b);
+<span class="line_number">112</span>
+<span class="line_number">113</span>      rect.left = tprev;
+<span class="line_number">114</span>      rect.right = t;
+<span class="line_number">115</span>      rect.f_value = fv;
+<span class="line_number">116</span>      rect.g_value = gv;
+<span class="line_number">117</span>
+<span class="line_number">118</span>      cb(rect);
+<span class="line_number">119</span>    }
+<span class="line_number">120</span>  }
+<span class="line_number">121</span>
+<span class="line_number">122</span>  template &lt;typename PointBiDirIterator, typename FCb&gt;
+<span class="line_number">123</span>  inline void iterate_segments(PointBiDirIterator beginPoints, PointBiDirIterator endPoints,
+<span class="line_number">124</span>    typename std::iterator_traits&lt;PointBiDirIterator&gt;::value_type::time_type a,
+<span class="line_number">125</span>    typename std::iterator_traits&lt;PointBiDirIterator&gt;::value_type::time_type b,
+<span class="line_number">126</span>    FCb cb)
+<span class="line_number">127</span>  {
+<span class="line_number">128</span>    using TPoint = typename std::iterator_traits&lt;PointBiDirIterator&gt;::value_type;
+<span class="line_number">129</span>    using TTime = typename TPoint::time_type;
+<span class="line_number">130</span>    using TVal = typename TPoint::value_type;
+<span class="line_number">131</span>
+<span class="line_number">132</span>    if (beginPoints == endPoints)
+<span class="line_number">133</span>    {
+<span class="line_number">134</span>      return;
+<span class="line_number">135</span>    }
+<span class="line_number">136</span>
+<span class="line_number">137</span>    // float32_t (0 * inf) does not produce 0, so cap b at max instead of using infinity
+<span class="line_number">138</span>    b = std::min(b, (std::numeric_limits&lt;TTime&gt;::max)());
+<span class="line_number">139</span>
+<span class="line_number">140</span>    // Find k = max{i : ti &lt;= a}
+<span class="line_number">141</span>    auto prev = max_time_iterator_prior_to(beginPoints, endPoints, a);
+<span class="line_number">142</span>    auto it = std::next(prev);
+<span class="line_number">143</span>
+<span class="line_number">144</span>    TTime tprev = a;
+</code></pre>
+            <div class="issue">
+                <div>
+                    <span class="what">Possible data race during read of size 4 at 0x4E9D2B4 by thread #25</span>
+                    <div class="navigation">
+                        <button class="next_error">Next</button>
+                        <button class="prev_error">Previous</button>
+                    </div>
+                </div>
+                <div>
+                    <table class="call_stack">
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/actions-runner/_work/masspcf/masspcf/include/mpcf/algorithms/functional/apply_functional.hpp:84<br>
+                                    <code class="cpp">mpcf::Pcf&lt;float, float&gt;::value_type mpcf::l1_norm&lt;mpcf::Pcf&lt;float, float&gt; &gt;(mpcf::Pcf&lt;float, float&gt; const&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">81</span>  {
+<span class="line_number">82</span>    typename F::value_type out{ 0 };
+<span class="line_number">83</span>
+<span class="line_number">84</span><span class="error">    iterate_segments(f.points().cbegin(), f.points().cend(), typename F::time_type{ 0 }, infinite_time&lt;F&gt;(), [&amp;out](const typename F::segment_type&amp; seg) {
+</span><span class="line_number">85</span>      out += (seg.right - seg.left) * std::abs(seg.value);
+<span class="line_number">86</span>      });
+<span class="line_number">87</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/actions-runner/_work/masspcf/masspcf/test/test_pcf_algebra_and_norms.cpp:150<br>
+                                    <code class="cpp">(anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}::operator()(mpcf::Pcf&lt;float, float&gt; const&amp;) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">147</span>    std::vector&lt;T&gt; output(fs.size());
+<span class="line_number">148</span>
+<span class="line_number">149</span>    mpcf::apply_functional(fs.begin(), fs.end(), output.begin(), [](const PcfT&amp; f) {
+<span class="line_number">150</span><span class="error">      return mpcf::l1_norm(f);
+</span><span class="line_number">151</span>    });
+<span class="line_number">152</span>
+<span class="line_number">153</span>    EXPECT_EQ(output[0], static_cast&lt;T&gt;(0));
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/actions-runner/_work/masspcf/masspcf/include/mpcf/algorithms/functional/apply_functional.hpp:71<br>
+                                    <code class="cpp">mpcf::apply_functional&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}&gt;(__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}, mpcf::Executor&amp;)::{lambda(mpcf::Pcf&lt;float, float&gt;&amp;)#1}::operator()(mpcf::Pcf&lt;float, float&gt;&amp;) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">68</span>
+<span class="line_number">69</span>    tf::Taskflow flow;
+<span class="line_number">70</span>    flow.transform(begin, end, beginOut, [&amp;functional](const PcfT&amp; pcf) {
+<span class="line_number">71</span><span class="error">      return functional(pcf);
+</span><span class="line_number">72</span>      });
+<span class="line_number">73</span>
+<span class="line_number">74</span>    exec.cpu()-&gt;run(std::move(flow)).wait();
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/actions-runner/_work/masspcf/masspcf/3rd/taskflow/taskflow/algorithm/transform.hpp:66<br>
+                                    <code class="cpp">tf::make_transform_task&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, mpcf::apply_functional&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}&gt;(__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}, mpcf::Executor&amp;)::{lambda(mpcf::Pcf&lt;float, float&gt;&amp;)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;, (void*)0&gt;(__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, mpcf::apply_functional&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}&gt;(__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}, mpcf::Executor&amp;)::{lambda(mpcf::Pcf&lt;float, float&gt;&amp;)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}::operator()()::{lambda(unsigned long, unsigned long)#1}::operator()(unsigned long, unsigned long)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">63</span>            std::advance(beg, part_b - prev_e);
+<span class="line_number">64</span>            std::advance(d_beg, part_b - prev_e);
+<span class="line_number">65</span>            for(size_t x = part_b; x&lt;part_e; x++) {
+<span class="line_number">66</span><span class="error">              *d_beg++ = c(*beg++);
+</span><span class="line_number">67</span>            }
+<span class="line_number">68</span>            prev_e = part_e;
+<span class="line_number">69</span>          }); 
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/actions-runner/_work/masspcf/masspcf/3rd/taskflow/taskflow/core/../algorithm/partitioner.hpp:316<br>
+                                    <code class="cpp">void tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;::loop&lt;tf::make_transform_task&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, mpcf::apply_functional&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}&gt;(__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}, mpcf::Executor&amp;)::{lambda(mpcf::Pcf&lt;float, float&gt;&amp;)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;, (void*)0&gt;(__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, mpcf::apply_functional&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}&gt;(__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}, mpcf::Executor&amp;)::{lambda(mpcf::Pcf&lt;float, float&gt;&amp;)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}::operator()()::{lambda(unsigned long, unsigned long)#1}, (void*)0&gt;(unsigned long, unsigned long, std::atomic&lt;unsigned long&gt;&amp;, tf::make_transform_task&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, mpcf::apply_functional&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}&gt;(__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}, mpcf::Executor&amp;)::{lambda(mpcf::Pcf&lt;float, float&gt;&amp;)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;, (void*)0&gt;(__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, mpcf::apply_functional&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}&gt;(__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}, mpcf::Executor&amp;)::{lambda(mpcf::Pcf&lt;float, float&gt;&amp;)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}::operator()()::{lambda(unsigned long, unsigned long)#1}&amp;&amp;) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">313</span>          if(curr_b &gt;= N) {
+<span class="line_number">314</span>            return;
+<span class="line_number">315</span>          }
+<span class="line_number">316</span><span class="error">          func(curr_b, (std::min)(curr_b + chunk_size, N));
+</span><span class="line_number">317</span>        }
+<span class="line_number">318</span>        break;
+<span class="line_number">319</span>      }
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/actions-runner/_work/masspcf/masspcf/3rd/taskflow/taskflow/algorithm/transform.hpp:62<br>
+                                    <code class="cpp">tf::make_transform_task&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, mpcf::apply_functional&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}&gt;(__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}, mpcf::Executor&amp;)::{lambda(mpcf::Pcf&lt;float, float&gt;&amp;)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;, (void*)0&gt;(__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, mpcf::apply_functional&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}&gt;(__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}, mpcf::Executor&amp;)::{lambda(mpcf::Pcf&lt;float, float&gt;&amp;)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}::operator()()</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">59</span>      auto next = std::make_shared&lt;std::atomic&lt;size_t&gt;&gt;(0);
+<span class="line_number">60</span>      for(size_t w=0; w&lt;W;) {
+<span class="line_number">61</span>        auto task = part([=] () mutable {
+<span class="line_number">62</span><span class="error">          part.loop(N, W, *next, [=, prev_e=size_t{0}](size_t part_b, size_t part_e) mutable {
+</span><span class="line_number">63</span>            std::advance(beg, part_b - prev_e);
+<span class="line_number">64</span>            std::advance(d_beg, part_b - prev_e);
+<span class="line_number">65</span>            for(size_t x = part_b; x&lt;part_e; x++) {
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/actions-runner/_work/masspcf/masspcf/3rd/taskflow/taskflow/algorithm/transform.hpp:71<br>
+                                    <code class="cpp">tf::make_transform_task&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, mpcf::apply_functional&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}&gt;(__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}, mpcf::Executor&amp;)::{lambda(mpcf::Pcf&lt;float, float&gt;&amp;)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;, (void*)0&gt;(__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, mpcf::apply_functional&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}&gt;(__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}, mpcf::Executor&amp;)::{lambda(mpcf::Pcf&lt;float, float&gt;&amp;)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">68</span>            prev_e = part_e;
+<span class="line_number">69</span>          }); 
+<span class="line_number">70</span>        });
+<span class="line_number">71</span><span class="error">        (++w == W) ? task() : rt.silent_async(task);
+</span><span class="line_number">72</span>      }
+<span class="line_number">73</span>    }
+<span class="line_number">74</span>  };
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:61<br>
+                                    <code class="cpp">void std::__invoke_impl&lt;void, tf::make_transform_task&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, mpcf::apply_functional&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}&gt;(__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}, mpcf::Executor&amp;)::{lambda(mpcf::Pcf&lt;float, float&gt;&amp;)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;, (void*)0&gt;(__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, mpcf::apply_functional&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}&gt;(__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}, mpcf::Executor&amp;)::{lambda(mpcf::Pcf&lt;float, float&gt;&amp;)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}&amp;, tf::Runtime&amp;&gt;(std::__invoke_other, tf::make_transform_task&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, mpcf::apply_functional&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}&gt;(__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}, mpcf::Executor&amp;)::{lambda(mpcf::Pcf&lt;float, float&gt;&amp;)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;, (void*)0&gt;(__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, mpcf::apply_functional&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}&gt;(__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}, mpcf::Executor&amp;)::{lambda(mpcf::Pcf&lt;float, float&gt;&amp;)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}&amp;, tf::Runtime&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">58</span>  template&lt;typename _Res, typename _Fn, typename... _Args&gt;
+<span class="line_number">59</span>    constexpr _Res
+<span class="line_number">60</span>    __invoke_impl(__invoke_other, _Fn&amp;&amp; __f, _Args&amp;&amp;... __args)
+<span class="line_number">61</span><span class="error">    { return std::forward&lt;_Fn&gt;(__f)(std::forward&lt;_Args&gt;(__args)...); }
+</span><span class="line_number">62</span>
+<span class="line_number">63</span>  template&lt;typename _Res, typename _MemFun, typename _Tp, typename... _Args&gt;
+<span class="line_number">64</span>    constexpr _Res
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:111<br>
+                                    <code class="cpp">std::enable_if&lt;is_invocable_r_v&lt;void, tf::make_transform_task&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, mpcf::apply_functional&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}&gt;(__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}, mpcf::Executor&amp;)::{lambda(mpcf::Pcf&lt;float, float&gt;&amp;)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;, (void*)0&gt;(__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, mpcf::apply_functional&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}&gt;(__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}, mpcf::Executor&amp;)::{lambda(mpcf::Pcf&lt;float, float&gt;&amp;)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}&amp;, tf::Runtime&amp;&gt;, void&gt;::type std::__invoke_r&lt;void, tf::make_transform_task&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, mpcf::apply_functional&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}&gt;(__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}, mpcf::Executor&amp;)::{lambda(mpcf::Pcf&lt;float, float&gt;&amp;)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;, (void*)0&gt;(__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, mpcf::apply_functional&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}&gt;(__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}, mpcf::Executor&amp;)::{lambda(mpcf::Pcf&lt;float, float&gt;&amp;)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}&amp;, tf::Runtime&amp;&gt;(tf::make_transform_task&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, mpcf::apply_functional&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}&gt;(__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}, mpcf::Executor&amp;)::{lambda(mpcf::Pcf&lt;float, float&gt;&amp;)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;, (void*)0&gt;(__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, mpcf::apply_functional&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}&gt;(__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}, mpcf::Executor&amp;)::{lambda(mpcf::Pcf&lt;float, float&gt;&amp;)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}&amp;, tf::Runtime&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">108</span>      using __type = typename __result::type;
+<span class="line_number">109</span>      using __tag = typename __result::__invoke_type;
+<span class="line_number">110</span>      if constexpr (is_void_v&lt;_Res&gt;)
+<span class="line_number">111</span><span class="error">	std::__invoke_impl&lt;__type&gt;(__tag{}, std::forward&lt;_Callable&gt;(__fn),
+</span><span class="line_number">112</span>					std::forward&lt;_Args&gt;(__args)...);
+<span class="line_number">113</span>      else
+<span class="line_number">114</span>	return std::__invoke_impl&lt;__type&gt;(__tag{},
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/std_function.h:290<br>
+                                    <code class="cpp">std::_Function_handler&lt;void (tf::Runtime&amp;), tf::make_transform_task&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, mpcf::apply_functional&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}&gt;(__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}, mpcf::Executor&amp;)::{lambda(mpcf::Pcf&lt;float, float&gt;&amp;)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;, (void*)0&gt;(__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, mpcf::apply_functional&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}&gt;(__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}, mpcf::Executor&amp;)::{lambda(mpcf::Pcf&lt;float, float&gt;&amp;)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}&gt;::_M_invoke(std::_Any_data const&amp;, tf::Runtime&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">287</span>      static _Res
+<span class="line_number">288</span>      _M_invoke(const _Any_data&amp; __functor, _ArgTypes&amp;&amp;... __args)
+<span class="line_number">289</span>      {
+<span class="line_number">290</span><span class="error">	return std::__invoke_r&lt;_Res&gt;(*_Base::_M_get_pointer(__functor),
+</span><span class="line_number">291</span>				     std::forward&lt;_ArgTypes&gt;(__args)...);
+<span class="line_number">292</span>      }
+<span class="line_number">293</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/std_function.h:591<br>
+                                    <code class="cpp">std::function&lt;void (tf::Runtime&amp;)&gt;::operator()(tf::Runtime&amp;) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">588</span>      {
+<span class="line_number">589</span>	if (_M_empty())
+<span class="line_number">590</span>	  __throw_bad_function_call();
+<span class="line_number">591</span><span class="error">	return _M_invoker(_M_functor, std::forward&lt;_ArgTypes&gt;(__args)...);
+</span><span class="line_number">592</span>      }
+<span class="line_number">593</span>
+<span class="line_number">594</span>#if __cpp_rtti
+</code></pre>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            <pre class="code">
+<code class="c++"><span class="line_number">145</span><span class="error">    TVal vprev = prev-&gt;v;</span>
+<span class="line_number">146</span>
+<span class="line_number">147</span>    Segment&lt;TTime, TVal&gt; seg;
+<span class="line_number">148</span>    for (; it != endPoints; ++it)
+<span class="line_number">149</span>    {
+<span class="line_number">150</span>      TTime tnext = std::min(it-&gt;t, b);
+<span class="line_number">151</span>      seg.left = tprev;
+<span class="line_number">152</span>      seg.right = tnext;
+<span class="line_number">153</span>      seg.value = vprev;
+<span class="line_number">154</span>
+<span class="line_number">155</span>      cb(seg);
+<span class="line_number">156</span>
+<span class="line_number">157</span>      if (tnext &gt;= b)
+<span class="line_number">158</span>      {
+<span class="line_number">159</span>        return;
+<span class="line_number">160</span>      }
+<span class="line_number">161</span>
+<span class="line_number">162</span>      tprev = it-&gt;t;
+</code></pre>
+            <div class="issue">
+                <div>
+                    <span class="what">Possible data race during read of size 4 at 0x4E9D30C by thread #25</span>
+                    <div class="navigation">
+                        <button class="next_error">Next</button>
+                        <button class="prev_error">Previous</button>
+                    </div>
+                </div>
+                <div>
+                    <table class="call_stack">
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/actions-runner/_work/masspcf/masspcf/include/mpcf/algorithms/functional/apply_functional.hpp:84<br>
+                                    <code class="cpp">mpcf::Pcf&lt;float, float&gt;::value_type mpcf::l1_norm&lt;mpcf::Pcf&lt;float, float&gt; &gt;(mpcf::Pcf&lt;float, float&gt; const&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">81</span>  {
+<span class="line_number">82</span>    typename F::value_type out{ 0 };
+<span class="line_number">83</span>
+<span class="line_number">84</span><span class="error">    iterate_segments(f.points().cbegin(), f.points().cend(), typename F::time_type{ 0 }, infinite_time&lt;F&gt;(), [&amp;out](const typename F::segment_type&amp; seg) {
+</span><span class="line_number">85</span>      out += (seg.right - seg.left) * std::abs(seg.value);
+<span class="line_number">86</span>      });
+<span class="line_number">87</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/actions-runner/_work/masspcf/masspcf/test/test_pcf_algebra_and_norms.cpp:150<br>
+                                    <code class="cpp">(anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}::operator()(mpcf::Pcf&lt;float, float&gt; const&amp;) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">147</span>    std::vector&lt;T&gt; output(fs.size());
+<span class="line_number">148</span>
+<span class="line_number">149</span>    mpcf::apply_functional(fs.begin(), fs.end(), output.begin(), [](const PcfT&amp; f) {
+<span class="line_number">150</span><span class="error">      return mpcf::l1_norm(f);
+</span><span class="line_number">151</span>    });
+<span class="line_number">152</span>
+<span class="line_number">153</span>    EXPECT_EQ(output[0], static_cast&lt;T&gt;(0));
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/actions-runner/_work/masspcf/masspcf/include/mpcf/algorithms/functional/apply_functional.hpp:71<br>
+                                    <code class="cpp">mpcf::apply_functional&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}&gt;(__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}, mpcf::Executor&amp;)::{lambda(mpcf::Pcf&lt;float, float&gt;&amp;)#1}::operator()(mpcf::Pcf&lt;float, float&gt;&amp;) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">68</span>
+<span class="line_number">69</span>    tf::Taskflow flow;
+<span class="line_number">70</span>    flow.transform(begin, end, beginOut, [&amp;functional](const PcfT&amp; pcf) {
+<span class="line_number">71</span><span class="error">      return functional(pcf);
+</span><span class="line_number">72</span>      });
+<span class="line_number">73</span>
+<span class="line_number">74</span>    exec.cpu()-&gt;run(std::move(flow)).wait();
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/actions-runner/_work/masspcf/masspcf/3rd/taskflow/taskflow/algorithm/transform.hpp:66<br>
+                                    <code class="cpp">tf::make_transform_task&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, mpcf::apply_functional&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}&gt;(__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}, mpcf::Executor&amp;)::{lambda(mpcf::Pcf&lt;float, float&gt;&amp;)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;, (void*)0&gt;(__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, mpcf::apply_functional&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}&gt;(__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}, mpcf::Executor&amp;)::{lambda(mpcf::Pcf&lt;float, float&gt;&amp;)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}::operator()()::{lambda(unsigned long, unsigned long)#1}::operator()(unsigned long, unsigned long)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">63</span>            std::advance(beg, part_b - prev_e);
+<span class="line_number">64</span>            std::advance(d_beg, part_b - prev_e);
+<span class="line_number">65</span>            for(size_t x = part_b; x&lt;part_e; x++) {
+<span class="line_number">66</span><span class="error">              *d_beg++ = c(*beg++);
+</span><span class="line_number">67</span>            }
+<span class="line_number">68</span>            prev_e = part_e;
+<span class="line_number">69</span>          }); 
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/actions-runner/_work/masspcf/masspcf/3rd/taskflow/taskflow/core/../algorithm/partitioner.hpp:316<br>
+                                    <code class="cpp">void tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;::loop&lt;tf::make_transform_task&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, mpcf::apply_functional&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}&gt;(__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}, mpcf::Executor&amp;)::{lambda(mpcf::Pcf&lt;float, float&gt;&amp;)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;, (void*)0&gt;(__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, mpcf::apply_functional&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}&gt;(__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}, mpcf::Executor&amp;)::{lambda(mpcf::Pcf&lt;float, float&gt;&amp;)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}::operator()()::{lambda(unsigned long, unsigned long)#1}, (void*)0&gt;(unsigned long, unsigned long, std::atomic&lt;unsigned long&gt;&amp;, tf::make_transform_task&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, mpcf::apply_functional&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}&gt;(__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}, mpcf::Executor&amp;)::{lambda(mpcf::Pcf&lt;float, float&gt;&amp;)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;, (void*)0&gt;(__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, mpcf::apply_functional&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}&gt;(__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}, mpcf::Executor&amp;)::{lambda(mpcf::Pcf&lt;float, float&gt;&amp;)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}::operator()()::{lambda(unsigned long, unsigned long)#1}&amp;&amp;) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">313</span>          if(curr_b &gt;= N) {
+<span class="line_number">314</span>            return;
+<span class="line_number">315</span>          }
+<span class="line_number">316</span><span class="error">          func(curr_b, (std::min)(curr_b + chunk_size, N));
+</span><span class="line_number">317</span>        }
+<span class="line_number">318</span>        break;
+<span class="line_number">319</span>      }
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/actions-runner/_work/masspcf/masspcf/3rd/taskflow/taskflow/algorithm/transform.hpp:62<br>
+                                    <code class="cpp">tf::make_transform_task&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, mpcf::apply_functional&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}&gt;(__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}, mpcf::Executor&amp;)::{lambda(mpcf::Pcf&lt;float, float&gt;&amp;)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;, (void*)0&gt;(__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, mpcf::apply_functional&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}&gt;(__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}, mpcf::Executor&amp;)::{lambda(mpcf::Pcf&lt;float, float&gt;&amp;)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}::operator()()</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">59</span>      auto next = std::make_shared&lt;std::atomic&lt;size_t&gt;&gt;(0);
+<span class="line_number">60</span>      for(size_t w=0; w&lt;W;) {
+<span class="line_number">61</span>        auto task = part([=] () mutable {
+<span class="line_number">62</span><span class="error">          part.loop(N, W, *next, [=, prev_e=size_t{0}](size_t part_b, size_t part_e) mutable {
+</span><span class="line_number">63</span>            std::advance(beg, part_b - prev_e);
+<span class="line_number">64</span>            std::advance(d_beg, part_b - prev_e);
+<span class="line_number">65</span>            for(size_t x = part_b; x&lt;part_e; x++) {
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/actions-runner/_work/masspcf/masspcf/3rd/taskflow/taskflow/algorithm/transform.hpp:71<br>
+                                    <code class="cpp">tf::make_transform_task&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, mpcf::apply_functional&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}&gt;(__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}, mpcf::Executor&amp;)::{lambda(mpcf::Pcf&lt;float, float&gt;&amp;)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;, (void*)0&gt;(__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, mpcf::apply_functional&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}&gt;(__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}, mpcf::Executor&amp;)::{lambda(mpcf::Pcf&lt;float, float&gt;&amp;)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">68</span>            prev_e = part_e;
+<span class="line_number">69</span>          }); 
+<span class="line_number">70</span>        });
+<span class="line_number">71</span><span class="error">        (++w == W) ? task() : rt.silent_async(task);
+</span><span class="line_number">72</span>      }
+<span class="line_number">73</span>    }
+<span class="line_number">74</span>  };
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:61<br>
+                                    <code class="cpp">void std::__invoke_impl&lt;void, tf::make_transform_task&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, mpcf::apply_functional&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}&gt;(__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}, mpcf::Executor&amp;)::{lambda(mpcf::Pcf&lt;float, float&gt;&amp;)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;, (void*)0&gt;(__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, mpcf::apply_functional&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}&gt;(__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}, mpcf::Executor&amp;)::{lambda(mpcf::Pcf&lt;float, float&gt;&amp;)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}&amp;, tf::Runtime&amp;&gt;(std::__invoke_other, tf::make_transform_task&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, mpcf::apply_functional&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}&gt;(__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}, mpcf::Executor&amp;)::{lambda(mpcf::Pcf&lt;float, float&gt;&amp;)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;, (void*)0&gt;(__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, mpcf::apply_functional&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}&gt;(__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}, mpcf::Executor&amp;)::{lambda(mpcf::Pcf&lt;float, float&gt;&amp;)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}&amp;, tf::Runtime&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">58</span>  template&lt;typename _Res, typename _Fn, typename... _Args&gt;
+<span class="line_number">59</span>    constexpr _Res
+<span class="line_number">60</span>    __invoke_impl(__invoke_other, _Fn&amp;&amp; __f, _Args&amp;&amp;... __args)
+<span class="line_number">61</span><span class="error">    { return std::forward&lt;_Fn&gt;(__f)(std::forward&lt;_Args&gt;(__args)...); }
+</span><span class="line_number">62</span>
+<span class="line_number">63</span>  template&lt;typename _Res, typename _MemFun, typename _Tp, typename... _Args&gt;
+<span class="line_number">64</span>    constexpr _Res
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:111<br>
+                                    <code class="cpp">std::enable_if&lt;is_invocable_r_v&lt;void, tf::make_transform_task&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, mpcf::apply_functional&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}&gt;(__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}, mpcf::Executor&amp;)::{lambda(mpcf::Pcf&lt;float, float&gt;&amp;)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;, (void*)0&gt;(__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, mpcf::apply_functional&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}&gt;(__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}, mpcf::Executor&amp;)::{lambda(mpcf::Pcf&lt;float, float&gt;&amp;)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}&amp;, tf::Runtime&amp;&gt;, void&gt;::type std::__invoke_r&lt;void, tf::make_transform_task&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, mpcf::apply_functional&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}&gt;(__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}, mpcf::Executor&amp;)::{lambda(mpcf::Pcf&lt;float, float&gt;&amp;)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;, (void*)0&gt;(__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, mpcf::apply_functional&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}&gt;(__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}, mpcf::Executor&amp;)::{lambda(mpcf::Pcf&lt;float, float&gt;&amp;)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}&amp;, tf::Runtime&amp;&gt;(tf::make_transform_task&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, mpcf::apply_functional&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}&gt;(__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}, mpcf::Executor&amp;)::{lambda(mpcf::Pcf&lt;float, float&gt;&amp;)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;, (void*)0&gt;(__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, mpcf::apply_functional&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}&gt;(__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}, mpcf::Executor&amp;)::{lambda(mpcf::Pcf&lt;float, float&gt;&amp;)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}&amp;, tf::Runtime&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">108</span>      using __type = typename __result::type;
+<span class="line_number">109</span>      using __tag = typename __result::__invoke_type;
+<span class="line_number">110</span>      if constexpr (is_void_v&lt;_Res&gt;)
+<span class="line_number">111</span><span class="error">	std::__invoke_impl&lt;__type&gt;(__tag{}, std::forward&lt;_Callable&gt;(__fn),
+</span><span class="line_number">112</span>					std::forward&lt;_Args&gt;(__args)...);
+<span class="line_number">113</span>      else
+<span class="line_number">114</span>	return std::__invoke_impl&lt;__type&gt;(__tag{},
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/std_function.h:290<br>
+                                    <code class="cpp">std::_Function_handler&lt;void (tf::Runtime&amp;), tf::make_transform_task&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, mpcf::apply_functional&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}&gt;(__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}, mpcf::Executor&amp;)::{lambda(mpcf::Pcf&lt;float, float&gt;&amp;)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;, (void*)0&gt;(__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, mpcf::apply_functional&lt;__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}&gt;(__gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::Pcf&lt;float, float&gt;*, std::vector&lt;mpcf::Pcf&lt;float, float&gt;, std::allocator&lt;mpcf::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;float*, std::vector&lt;float, std::allocator&lt;float&gt; &gt; &gt;, (anonymous namespace)::PcfAlgebraAndNormsTest_ApplyFunctionalWithL1NormMultiplePcfs_Test&lt;mpcf::Pcf&lt;float, float&gt; &gt;::TestBody()::{lambda(mpcf::Pcf&lt;float, float&gt; const&amp;)#1}, mpcf::Executor&amp;)::{lambda(mpcf::Pcf&lt;float, float&gt;&amp;)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}&gt;::_M_invoke(std::_Any_data const&amp;, tf::Runtime&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">287</span>      static _Res
+<span class="line_number">288</span>      _M_invoke(const _Any_data&amp; __functor, _ArgTypes&amp;&amp;... __args)
+<span class="line_number">289</span>      {
+<span class="line_number">290</span><span class="error">	return std::__invoke_r&lt;_Res&gt;(*_Base::_M_get_pointer(__functor),
+</span><span class="line_number">291</span>				     std::forward&lt;_ArgTypes&gt;(__args)...);
+<span class="line_number">292</span>      }
+<span class="line_number">293</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/std_function.h:591<br>
+                                    <code class="cpp">std::function&lt;void (tf::Runtime&amp;)&gt;::operator()(tf::Runtime&amp;) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">588</span>      {
+<span class="line_number">589</span>	if (_M_empty())
+<span class="line_number">590</span>	  __throw_bad_function_call();
+<span class="line_number">591</span><span class="error">	return _M_invoker(_M_functor, std::forward&lt;_ArgTypes&gt;(__args)...);
+</span><span class="line_number">592</span>      }
+<span class="line_number">593</span>
+<span class="line_number">594</span>#if __cpp_rtti
+</code></pre>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            <pre class="code">
+<code class="c++"><span class="line_number">163</span><span class="error">      vprev = it-&gt;v;</span>
+<span class="line_number">164</span>    }
+<span class="line_number">165</span>
+<span class="line_number">166</span>    seg.left = tprev;
+<span class="line_number">167</span>    seg.right = b;
+<span class="line_number">168</span>    seg.value = vprev;
+<span class="line_number">169</span>
+<span class="line_number">170</span>    cb(seg);
+<span class="line_number">171</span>  }
+<span class="line_number">172</span>}
+<span class="line_number">173</span>
+<span class="line_number">174</span>#endif
+</code>
+            </pre>
+        </div>
+    </div>
+</body>
+
+</html>

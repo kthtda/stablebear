@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>/home/runner/actions-runner/_work/masspcf/masspcf/include/mpcf/io/../functional/time_point.hpp</title>
+    <link href='valgrind.css' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+    <script src="https://code.jquery.com/jquery-3.4.1.js"></script>
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.0.0/styles/default.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.0.0/highlight.min.js"></script>
+    <script src="valgrind.js"></script>
+</head>
+
+<body>
+    <div class="global">
+        <div class="header">
+            <h1>/home/runner/actions-runner/_work/masspcf/masspcf/include/mpcf/io/../functional/time_point.hpp</h1>
+            <p><b>1</b> errors</p>
+            <button class="next_error">Goto First Error</button>
+        </div>
+        <div class="listing">
+            <pre class="code">
+<code class="c++"><span class="line_number">1</span>/*
+<span class="line_number">2</span>* Copyright 2024-2026 Bjorn Wehlin
+<span class="line_number">3</span>*
+<span class="line_number">4</span>* Licensed under the Apache License, Version 2.0 (the &#34;License&#34;);
+<span class="line_number">5</span>* you may not use this file except in compliance with the License.
+<span class="line_number">6</span>* You may obtain a copy of the License at
+<span class="line_number">7</span>*
+<span class="line_number">8</span>*    http://www.apache.org/licenses/LICENSE-2.0
+<span class="line_number">9</span>*
+<span class="line_number">10</span>* Unless required by applicable law or agreed to in writing, software
+<span class="line_number">11</span>* distributed under the License is distributed on an &#34;AS IS&#34; BASIS,
+<span class="line_number">12</span>* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+<span class="line_number">13</span>* See the License for the specific language governing permissions and
+<span class="line_number">14</span>* limitations under the License.
+<span class="line_number">15</span>*/
+<span class="line_number">16</span>
+<span class="line_number">17</span>#ifndef MPCF_TIME_POINT_H
+<span class="line_number">18</span>#define MPCF_TIME_POINT_H
+<span class="line_number">19</span>
+<span class="line_number">20</span>#include &#34;../config.hpp&#34;
+<span class="line_number">21</span>
+<span class="line_number">22</span>#include &lt;limits&gt;
+<span class="line_number">23</span>
+<span class="line_number">24</span>namespace mpcf
+<span class="line_number">25</span>{
+<span class="line_number">26</span>  template &lt;typename T&gt;
+<span class="line_number">27</span>  constexpr T infinity()
+<span class="line_number">28</span>  {
+<span class="line_number">29</span>    return (std::numeric_limits&lt;T&gt;::max)();
+<span class="line_number">30</span>  }
+<span class="line_number">31</span>  
+<span class="line_number">32</span>  template &lt;typename Tt, typename Tv&gt;
+<span class="line_number">33</span>  struct TimePoint
+<span class="line_number">34</span>  {
+<span class="line_number">35</span>    using time_type = Tt;
+<span class="line_number">36</span>    using value_type = Tv;
+<span class="line_number">37</span>    
+<span class="line_number">38</span>    constexpr static time_type zero_time()
+<span class="line_number">39</span>    {
+<span class="line_number">40</span>      return Tt(0);
+<span class="line_number">41</span>    }
+<span class="line_number">42</span>    
+<span class="line_number">43</span>    constexpr static time_type infinite_time()
+<span class="line_number">44</span>    {
+<span class="line_number">45</span>      return infinity&lt;time_type&gt;();
+<span class="line_number">46</span>    }
+<span class="line_number">47</span>
+<span class="line_number">48</span>    Tt t = static_cast&lt;Tt&gt;(0.); // time
+<span class="line_number">49</span>    Tv v = static_cast&lt;Tv&gt;(0.); // value
+<span class="line_number">50</span>
+<span class="line_number">51</span>    TimePoint() = default;
+<span class="line_number">52</span>    TimePoint(Tt it, Tv iv)
+<span class="line_number">53</span>      : t(it), v(iv) { }
+<span class="line_number">54</span>
+<span class="line_number">55</span>    template &lt;typename T1, typename T2&gt;
+<span class="line_number">56</span>    TimePoint(T1 it, T2 iv)
+<span class="line_number">57</span>      : t(static_cast&lt;Tt&gt;(it)), v(static_cast&lt;Tv&gt;(iv)) { }
+<span class="line_number">58</span>
+<span class="line_number">59</span>    
+<span class="line_number">60</span>    bool operator==(const TimePoint&amp; rhs) const
+<span class="line_number">61</span>    {
+</code></pre>
+            <div class="issue">
+                <div>
+                    <span class="what">Possible data race during read of size 4 at 0x4E9DFA0 by thread #1</span>
+                    <div class="navigation">
+                        <button class="next_error">Next</button>
+                        <button class="prev_error">Previous</button>
+                    </div>
+                </div>
+                <div>
+                    <table class="call_stack">
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/stl_algobase.h:1170<br>
+                                    <code class="cpp">bool std::__equal&lt;false&gt;::equal&lt;mpcf::TimePoint&lt;float, float&gt; const*, mpcf::TimePoint&lt;float, float&gt; const*&gt;(mpcf::TimePoint&lt;float, float&gt; const*, mpcf::TimePoint&lt;float, float&gt; const*, mpcf::TimePoint&lt;float, float&gt; const*)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1167</span>	equal(_II1 __first1, _II1 __last1, _II2 __first2)
+<span class="line_number">1168</span>	{
+<span class="line_number">1169</span>	  for (; __first1 != __last1; ++__first1, (void) ++__first2)
+<span class="line_number">1170</span><span class="error">	    if (!(*__first1 == *__first2))
+</span><span class="line_number">1171</span>	      return false;
+<span class="line_number">1172</span>	  return true;
+<span class="line_number">1173</span>	}
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/stl_algobase.h:1219<br>
+                                    <code class="cpp">bool std::__equal_aux1&lt;mpcf::TimePoint&lt;float, float&gt; const*, mpcf::TimePoint&lt;float, float&gt; const*&gt;(mpcf::TimePoint&lt;float, float&gt; const*, mpcf::TimePoint&lt;float, float&gt; const*, mpcf::TimePoint&lt;float, float&gt; const*)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1216</span>      const bool __simple = ((__is_integer&lt;_ValueType1&gt;::__value
+<span class="line_number">1217</span>			      || __is_pointer&lt;_ValueType1&gt;::__value)
+<span class="line_number">1218</span>			     &amp;&amp; __memcmpable&lt;_II1, _II2&gt;::__value);
+<span class="line_number">1219</span><span class="error">      return std::__equal&lt;__simple&gt;::equal(__first1, __last1, __first2);
+</span><span class="line_number">1220</span>    }
+<span class="line_number">1221</span>
+<span class="line_number">1222</span>  template&lt;typename _II1, typename _II2&gt;
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/stl_algobase.h:1227<br>
+                                    <code class="cpp">bool std::__equal_aux&lt;__gnu_cxx::__normal_iterator&lt;mpcf::TimePoint&lt;float, float&gt; const*, std::vector&lt;mpcf::TimePoint&lt;float, float&gt;, std::allocator&lt;mpcf::TimePoint&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::TimePoint&lt;float, float&gt; const*, std::vector&lt;mpcf::TimePoint&lt;float, float&gt;, std::allocator&lt;mpcf::TimePoint&lt;float, float&gt; &gt; &gt; &gt; &gt;(__gnu_cxx::__normal_iterator&lt;mpcf::TimePoint&lt;float, float&gt; const*, std::vector&lt;mpcf::TimePoint&lt;float, float&gt;, std::allocator&lt;mpcf::TimePoint&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::TimePoint&lt;float, float&gt; const*, std::vector&lt;mpcf::TimePoint&lt;float, float&gt;, std::allocator&lt;mpcf::TimePoint&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::TimePoint&lt;float, float&gt; const*, std::vector&lt;mpcf::TimePoint&lt;float, float&gt;, std::allocator&lt;mpcf::TimePoint&lt;float, float&gt; &gt; &gt; &gt;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1224</span>    inline bool
+<span class="line_number">1225</span>    __equal_aux(_II1 __first1, _II1 __last1, _II2 __first2)
+<span class="line_number">1226</span>    {
+<span class="line_number">1227</span><span class="error">      return std::__equal_aux1(std::__niter_base(__first1),
+</span><span class="line_number">1228</span>			       std::__niter_base(__last1),
+<span class="line_number">1229</span>			       std::__niter_base(__first2));
+<span class="line_number">1230</span>    }
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/stl_algobase.h:1557<br>
+                                    <code class="cpp">bool std::equal&lt;__gnu_cxx::__normal_iterator&lt;mpcf::TimePoint&lt;float, float&gt; const*, std::vector&lt;mpcf::TimePoint&lt;float, float&gt;, std::allocator&lt;mpcf::TimePoint&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::TimePoint&lt;float, float&gt; const*, std::vector&lt;mpcf::TimePoint&lt;float, float&gt;, std::allocator&lt;mpcf::TimePoint&lt;float, float&gt; &gt; &gt; &gt; &gt;(__gnu_cxx::__normal_iterator&lt;mpcf::TimePoint&lt;float, float&gt; const*, std::vector&lt;mpcf::TimePoint&lt;float, float&gt;, std::allocator&lt;mpcf::TimePoint&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::TimePoint&lt;float, float&gt; const*, std::vector&lt;mpcf::TimePoint&lt;float, float&gt;, std::allocator&lt;mpcf::TimePoint&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;mpcf::TimePoint&lt;float, float&gt; const*, std::vector&lt;mpcf::TimePoint&lt;float, float&gt;, std::allocator&lt;mpcf::TimePoint&lt;float, float&gt; &gt; &gt; &gt;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1554</span>	    typename iterator_traits&lt;_II2&gt;::value_type&gt;)
+<span class="line_number">1555</span>      __glibcxx_requires_can_increment_range(__first1, __last1, __first2);
+<span class="line_number">1556</span>
+<span class="line_number">1557</span><span class="error">      return std::__equal_aux(__first1, __last1, __first2);
+</span><span class="line_number">1558</span>    }
+<span class="line_number">1559</span>
+<span class="line_number">1560</span>  /**
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/stl_vector.h:2042<br>
+                                    <code class="cpp">bool std::operator==&lt;mpcf::TimePoint&lt;float, float&gt;, std::allocator&lt;mpcf::TimePoint&lt;float, float&gt; &gt; &gt;(std::vector&lt;mpcf::TimePoint&lt;float, float&gt;, std::allocator&lt;mpcf::TimePoint&lt;float, float&gt; &gt; &gt; const&amp;, std::vector&lt;mpcf::TimePoint&lt;float, float&gt;, std::allocator&lt;mpcf::TimePoint&lt;float, float&gt; &gt; &gt; const&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">2039</span>    inline bool
+<span class="line_number">2040</span>    operator==(const vector&lt;_Tp, _Alloc&gt;&amp; __x, const vector&lt;_Tp, _Alloc&gt;&amp; __y)
+<span class="line_number">2041</span>    { return (__x.size() == __y.size()
+<span class="line_number">2042</span><span class="error">	      &amp;&amp; std::equal(__x.begin(), __x.end(), __y.begin())); }
+</span><span class="line_number">2043</span>
+<span class="line_number">2044</span>#if __cpp_lib_three_way_comparison
+<span class="line_number">2045</span>  /**
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/actions-runner/_work/masspcf/masspcf/include/mpcf/functional/pcf.hpp:192<br>
+                                    <code class="cpp">mpcf::Pcf&lt;float, float&gt;::operator==(mpcf::Pcf&lt;float, float&gt; const&amp;) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">189</span>
+<span class="line_number">190</span>    bool operator==(const Pcf&amp; rhs) const
+<span class="line_number">191</span>    {
+<span class="line_number">192</span><span class="error">      return m_points == rhs.m_points;
+</span><span class="line_number">193</span>    }
+<span class="line_number">194</span>    
+<span class="line_number">195</span>    bool operator!=(const Pcf&amp; rhs) const
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/actions-runner/_work/masspcf/masspcf/3rd/googletest/googletest/include/gtest/gtest.h:1394<br>
+                                    <code class="cpp">testing::AssertionResult testing::internal::CmpHelperEQ&lt;mpcf::Pcf&lt;float, float&gt;, mpcf::Pcf&lt;float, float&gt; &gt;(char const*, char const*, mpcf::Pcf&lt;float, float&gt; const&amp;, mpcf::Pcf&lt;float, float&gt; const&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1391</span>AssertionResult CmpHelperEQ(const char* lhs_expression,
+<span class="line_number">1392</span>                            const char* rhs_expression, const T1&amp; lhs,
+<span class="line_number">1393</span>                            const T2&amp; rhs) {
+<span class="line_number">1394</span><span class="error">  if (lhs == rhs) {
+</span><span class="line_number">1395</span>    return AssertionSuccess();
+<span class="line_number">1396</span>  }
+<span class="line_number">1397</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/actions-runner/_work/masspcf/masspcf/3rd/googletest/googletest/include/gtest/gtest.h:1413<br>
+                                    <code class="cpp">testing::AssertionResult testing::internal::EqHelper::Compare&lt;mpcf::Pcf&lt;float, float&gt;, mpcf::Pcf&lt;float, float&gt;, (void*)0&gt;(char const*, char const*, mpcf::Pcf&lt;float, float&gt; const&amp;, mpcf::Pcf&lt;float, float&gt; const&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1410</span>  static AssertionResult Compare(const char* lhs_expression,
+<span class="line_number">1411</span>                                 const char* rhs_expression, const T1&amp; lhs,
+<span class="line_number">1412</span>                                 const T2&amp; rhs) {
+<span class="line_number">1413</span><span class="error">    return CmpHelperEQ(lhs_expression, rhs_expression, lhs, rhs);
+</span><span class="line_number">1414</span>  }
+<span class="line_number">1415</span>
+<span class="line_number">1416</span>  // With this overloaded version, we allow anonymous enums to be used
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/actions-runner/_work/masspcf/masspcf/test/test_barcode_and_stable_rank.cpp:160<br>
+                                    <code class="cpp">(anonymous namespace)::BarcodeAndStableRankTest_BarcodeToStableRankTaskMatchesDirectConversion_Test&lt;float&gt;::TestBody()</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">157</span>    auto f0 = mpcf::ph::barcode_to_stable_rank(barcodes(0));
+<span class="line_number">158</span>    auto f1 = mpcf::ph::barcode_to_stable_rank(barcodes(1));
+<span class="line_number">159</span>
+<span class="line_number">160</span><span class="error">    EXPECT_EQ(out(0), f0);
+</span><span class="line_number">161</span>    EXPECT_EQ(out(1), f1);
+<span class="line_number">162</span>  }
+<span class="line_number">163</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/actions-runner/_work/masspcf/masspcf/3rd/googletest/googletest/src/gtest.cc:2664<br>
+                                    <code class="cpp">void testing::internal::HandleSehExceptionsInMethodIfSupported&lt;testing::Test, void&gt;(testing::Test*, void (testing::Test::*)(), char const*)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">2661</span>  }
+<span class="line_number">2662</span>#else
+<span class="line_number">2663</span>  (void)location;
+<span class="line_number">2664</span><span class="error">  return (object-&gt;*method)();
+</span><span class="line_number">2665</span>#endif  // GTEST_HAS_SEH
+<span class="line_number">2666</span>}
+<span class="line_number">2667</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/actions-runner/_work/masspcf/masspcf/3rd/googletest/googletest/src/gtest.cc:2700<br>
+                                    <code class="cpp">void testing::internal::HandleExceptionsInMethodIfSupported&lt;testing::Test, void&gt;(testing::Test*, void (testing::Test::*)(), char const*)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">2697</span>  if (internal::GetUnitTestImpl()-&gt;catch_exceptions()) {
+<span class="line_number">2698</span>#if GTEST_HAS_EXCEPTIONS
+<span class="line_number">2699</span>    try {
+<span class="line_number">2700</span><span class="error">      return HandleSehExceptionsInMethodIfSupported(object, method, location);
+</span><span class="line_number">2701</span>    } catch (const AssertionException&amp;) {  // NOLINT
+<span class="line_number">2702</span>      // This failure was reported already.
+<span class="line_number">2703</span>    } catch (const internal::GoogleTestFailureException&amp;) {  // NOLINT
+</code></pre>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            <pre class="code">
+<code class="c++"><span class="line_number">62</span><span class="error">      return t == rhs.t &amp;&amp; v == rhs.v;</span>
+<span class="line_number">63</span>    }
+<span class="line_number">64</span>    
+<span class="line_number">65</span>    bool operator!=(const TimePoint&amp; rhs) const
+<span class="line_number">66</span>    {
+<span class="line_number">67</span>      return t != rhs.t || v != rhs.v;
+<span class="line_number">68</span>    }
+<span class="line_number">69</span>  };
+<span class="line_number">70</span>
+<span class="line_number">71</span>  template &lt;typename Tt, typename Tv&gt;
+<span class="line_number">72</span>  struct OrderByTimeAscending
+<span class="line_number">73</span>  {
+<span class="line_number">74</span>    [[nodiscard]] bool operator()(const mpcf::TimePoint&lt;Tt, Tv&gt;&amp; a, const mpcf::TimePoint&lt;Tt, Tv&gt;&amp; b) const noexcept
+<span class="line_number">75</span>    {
+<span class="line_number">76</span>      return a.t &lt; b.t;
+<span class="line_number">77</span>    }
+<span class="line_number">78</span>  };
+<span class="line_number">79</span>  
+<span class="line_number">80</span>  using TimePoint_f32 = TimePoint&lt;float32_t, float32_t&gt;;
+<span class="line_number">81</span>  using TimePoint_f64 = TimePoint&lt;float64_t, float64_t&gt;;
+<span class="line_number">82</span>  using TimePoint_i32 = TimePoint&lt;int32_t, int32_t&gt;;
+<span class="line_number">83</span>  using TimePoint_i64 = TimePoint&lt;int64_t, int64_t&gt;;
+<span class="line_number">84</span>
+<span class="line_number">85</span>  template &lt;typename P&gt;
+<span class="line_number">86</span>  concept TimePointLike = requires(P p)
+<span class="line_number">87</span>  {
+<span class="line_number">88</span>    typename P::time_type;
+<span class="line_number">89</span>    typename P::value_type;
+<span class="line_number">90</span>
+<span class="line_number">91</span>    { p.t } -&gt; std::convertible_to&lt;typename P::time_type&gt;;
+<span class="line_number">92</span>    { p.v } -&gt; std::convertible_to&lt;typename P::value_type&gt;;
+<span class="line_number">93</span>
+<span class="line_number">94</span>    { p == p } -&gt; std::convertible_to&lt;bool&gt;;
+<span class="line_number">95</span>    { p != p } -&gt; std::convertible_to&lt;bool&gt;;
+<span class="line_number">96</span>  };
+<span class="line_number">97</span>}
+<span class="line_number">98</span>
+<span class="line_number">99</span>#endif
+</code>
+            </pre>
+        </div>
+    </div>
+</body>
+
+</html>
