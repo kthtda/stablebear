@@ -141,7 +141,7 @@ jobs:
             CMAKE_BUILD_PARALLEL_LEVEL=$CMAKE_BUILD_PARALLEL_LEVEL
             CMAKE_UNITY_BUILD=ON
             CMAKE_UNITY_BUILD_BATCH_SIZE=4
-            CMAKE_ARGS=${{ matrix.cuda == 1 && '"-G Ninja -DCUDAToolkit_ROOT=${CUDA_PATH} -DCMAKE_CUDA_COMPILER=${CUDA_PATH}/bin/nvcc.exe"' || '' }}
+            CMAKE_ARGS=${{ matrix.cuda == 1 && '"-G Ninja -DCMAKE_BUILD_TYPE=Release -DCUDAToolkit_ROOT=${CUDA_PATH} -DCMAKE_CUDA_COMPILER=${CUDA_PATH}/bin/nvcc.exe"' || '"-DCMAKE_BUILD_TYPE=Release"' }}
       - uses: actions/upload-artifact@v6
         if: matrix.cuda == 1
         with:
