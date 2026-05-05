@@ -15,6 +15,13 @@ IGNORE_GLOBS = [
     "*/sboms/auditwheel.cdx.json",  # auditwheel metadata, varies by platform
     "masspcf.libs/libgcc*.so*",  # bundled gcc library
     "masspcf.libs/libstdc++*.so*",  # bundled stdc++ library
+    "masspcf.libs/*.dll",  # delvewheel-bundled DLLs (hash-mangled, vary per wheel)
+]
+
+BUNDLED_LIB_GLOBS = [
+    "masspcf.libs/*.so*",
+    "masspcf.libs/*.dll",
+    "masspcf.libs/*.dylib",
 ]
 
 
@@ -119,6 +126,21 @@ def main(input_path, verbose=False):
             if verbose:
                 dump_contents(name, raw[name])
         print()
+
+    # Bundled vendored libraries per wheel (license audit surface).
+    print("Bundled libraries (audit licensing before publishing):")
+    for name in names:
+        bundled = sorted(
+            f for f in raw[name]
+            if any(fnmatch(f, g) for g in BUNDLED_LIB_GLOBS)
+        )
+        if not bundled:
+            print(f"  {name}: (none)")
+            continue
+        print(f"  {name}:")
+        for f in bundled:
+            print(f"    {f}")
+    print()
 
     # Verify CUDA wheels contain both CUDA 12 and CUDA 13 modules
     CUDA_PLATFORMS = ("manylinux_*_x86_64", "win_amd64")

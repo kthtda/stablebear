@@ -120,6 +120,9 @@ jobs:
             ln -sfn "$CUDA_DIR" /usr/local/cuda'
           CIBW_REPAIR_WHEEL_COMMAND_LINUX: >-
             auditwheel repair --exclude 'libcudart*' -w {dest_dir} {wheel}
+          CIBW_BEFORE_BUILD_WINDOWS: pip install delvewheel
+          CIBW_REPAIR_WHEEL_COMMAND_WINDOWS: >-
+            delvewheel repair --exclude "*cuda*.dll" -w {dest_dir} {wheel}
           CIBW_ENVIRONMENT_LINUX: >-
             BUILD_WITH_CUDA=${{ matrix.cuda }}
             PATH=/usr/local/cuda/bin:$PATH
