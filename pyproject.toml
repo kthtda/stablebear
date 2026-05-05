@@ -30,6 +30,7 @@ dependencies = [ "numpy>=2.0", "tqdm", "matplotlib" ]
 
 [tool.scikit-build]
 minimum-version = "build-system.requires"
+cmake.build-type = "Release"
 wheel.packages = ["masspcf"]
 sdist.exclude = [
     ".*",
