@@ -25,6 +25,7 @@ import pkgutil
 import re
 import sys
 
+from . import _debug_load as _dbg
 from .gpu import has_nvidia_gpu as _has_nvidia_gpu
 
 
@@ -71,6 +72,10 @@ def _find_cuda_backend_name():
 
 
 _backend = None
+_cuda_backend = None
+
+if _dbg.is_debug_enabled():
+    _dbg.diagnose("_mpcf_cpu")
 
 if os.environ.get("MPCF_FORCE_CPU", "0") == "0" and _has_nvidia_gpu():
     try:
@@ -80,6 +85,7 @@ if os.environ.get("MPCF_FORCE_CPU", "0") == "0" and _has_nvidia_gpu():
             raise ImportError("No _mpcf_cuda* backend found")
         _backend = importlib.import_module(f".{_cuda_backend}", package="masspcf")
     except Exception as _e:
+        _dbg.diagnose(_cuda_backend or "_mpcf_cudaXX", _e)
         import warnings
 
         warnings.warn(
@@ -90,7 +96,11 @@ if os.environ.get("MPCF_FORCE_CPU", "0") == "0" and _has_nvidia_gpu():
         )
 
 if _backend is None:
-    _backend = importlib.import_module("._mpcf_cpu", package="masspcf")
+    try:
+        _backend = importlib.import_module("._mpcf_cpu", package="masspcf")
+    except ImportError as _e:
+        _dbg.diagnose("_mpcf_cpu", _e)
+        raise
 
 # Populate this module's namespace with everything from the backend
 _this = sys.modules[__name__]
