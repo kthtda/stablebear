@@ -104,10 +104,46 @@ class SymmetricMatrix:
         return i, j
 
     def __getitem__(self, ij):
+        """Return the entry at ``(i, j)``.
+
+        Access is symmetric (``m[i, j] == m[j, i]``). Negative indices count
+        from the end, as in NumPy.
+
+        Parameters
+        ----------
+        ij : tuple of int
+            A ``(row, column)`` pair.
+
+        Returns
+        -------
+        float
+            The stored value at ``(i, j)``.
+
+        Raises
+        ------
+        IndexError
+            If ``i`` or ``j`` is out of range for the matrix size.
+        """
         i, j = self._resolve_ij(ij)
         return self._data[i, j]
 
     def __setitem__(self, ij, value):
+        """Set the entry at ``(i, j)`` (and, symmetrically, ``(j, i)``).
+
+        Negative indices count from the end, as in NumPy.
+
+        Parameters
+        ----------
+        ij : tuple of int
+            A ``(row, column)`` pair.
+        value : float
+            The value to store.
+
+        Raises
+        ------
+        IndexError
+            If ``i`` or ``j`` is out of range for the matrix size.
+        """
         i, j = self._resolve_ij(ij)
         self._data[i, j] = value
 

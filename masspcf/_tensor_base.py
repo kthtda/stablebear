@@ -285,6 +285,46 @@ class Tensor(ABC):
         return resolved
 
     def __getitem__(self, slices):
+        """Index the tensor NumPy-style, returning an element or a sub-tensor.
+
+        Supports the common NumPy index objects, in any combination via a tuple:
+
+        * integers, including negative integers (which count from the end);
+        * slices, including negative bounds and negative steps;
+        * ``Ellipsis`` (``...``) and ``None`` / ``np.newaxis``;
+        * integer arrays (``numpy.ndarray``, a Python ``list``, or an
+          ``IntTensor``) for gather-style "advanced" indexing;
+        * boolean masks (``BoolTensor`` or a boolean ``ndarray``), either
+          full-shape, per-axis, or matching the leading axes.
+
+        A full-integer index returns a single element — a Python scalar for
+        numeric tensors, or the element wrapper (e.g. ``Pcf``) otherwise.
+        Anything else returns a tensor. Basic (int/slice) indexing returns a
+        view that shares storage with the original; advanced (array/mask)
+        indexing returns a copy.
+
+        When two or more advanced indices appear together they use outer
+        (``numpy.ix_``-style) semantics rather than NumPy's vectorized
+        broadcasting; see the "Indexing and Masking" guide for details.
+
+        Parameters
+        ----------
+        slices : int, slice, Ellipsis, None, tuple, array-like, or BoolTensor
+            The index. A tuple combines per-axis indices.
+
+        Returns
+        -------
+        element or Tensor
+            A single element for a full-integer index, otherwise a tensor.
+
+        Raises
+        ------
+        IndexError
+            If an integer index is out of range, too many indices are given,
+            or a non-index object (such as a float) is used as an index.
+        ValueError
+            If a slice step is zero.
+        """
         entries, inserts = self._normalize_index(slices)
         result = self._getitem_entries(entries, allow_scalar=not inserts)
         for pos, length in inserts:
@@ -413,6 +453,35 @@ class Tensor(ABC):
         return val
 
     def __setitem__(self, slices, val):
+        """Assign into the tensor using NumPy-style indexing.
+
+        Accepts the same index objects as ``__getitem__``. The right-hand side
+        may be:
+
+        * a scalar or element, broadcast across the whole selected region; or
+        * a tensor, broadcast to the selected shape. A numeric tensor whose
+          dtype differs from this tensor's is cast (e.g. int to float).
+
+        Basic-slice and single-integer targets are views, so the assignment
+        writes through to the original tensor.
+
+        Parameters
+        ----------
+        slices : int, slice, Ellipsis, None, tuple, array-like, or BoolTensor
+            The index identifying the region to assign to (see ``__getitem__``).
+        val : scalar, element, or Tensor
+            The value(s) to assign.
+
+        Raises
+        ------
+        IndexError
+            If an integer index is out of range or too many indices are given.
+        ValueError
+            If a slice step is zero, or the right-hand side is not
+            broadcast-compatible with the selected region.
+        TypeError
+            If ``val`` has a type that cannot be assigned to this tensor.
+        """
         entries, inserts = self._normalize_index(slices)
         # A scalar-boolean ``False`` (or any zero-length newaxis) selects nothing.
         if any(length == 0 for _, length in inserts):
