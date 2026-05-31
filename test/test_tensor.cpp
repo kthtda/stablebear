@@ -285,15 +285,58 @@ namespace
     EXPECT_EQ(view.shape(0), 4u);
   }
 
-  TYPED_TEST(TensorTppTyped, SliceRangeStartNegativeClampsToZero)
+  TYPED_TEST(TensorTppTyped, SliceRangeNegativeStartResolvesAgainstSize)
   {
     using T = TypeParam;
-    auto t = make_sequential<T>({ 5 });
-    auto view = t[std::vector<mpcf::Slice>{ mpcf::range(-10, 3, std::nullopt) }];
+    auto t = make_sequential<T>({ 5 });  // [0, 1, 2, 3, 4]
+
+    // An in-range negative start is resolved against the dimension size
+    // (NumPy slice.indices): -2 -> 3, so [3, 4].
+    auto view = t[std::vector<mpcf::Slice>{ mpcf::range(-2, std::nullopt, std::nullopt) }];
+    EXPECT_EQ(view.shape(0), 2u);
+    EXPECT_EQ(view({ 0 }), T(3));
+    EXPECT_EQ(view({ 1 }), T(4));
+
+    // A start more negative than the size clamps to 0 (not an error).
+    auto clamped = t[std::vector<mpcf::Slice>{ mpcf::range(-10, 3, std::nullopt) }];
+    EXPECT_EQ(clamped.shape(0), 3u);
+    EXPECT_EQ(clamped({ 0 }), T(0));
+    EXPECT_EQ(clamped({ 1 }), T(1));
+    EXPECT_EQ(clamped({ 2 }), T(2));
+  }
+
+  TYPED_TEST(TensorTppTyped, SliceRangeNegativeStopResolvesAgainstSize)
+  {
+    using T = TypeParam;
+    auto t = make_sequential<T>({ 5 });  // [0, 1, 2, 3, 4]
+    // a[-4:-1] -> [1, 2, 3]
+    auto view = t[std::vector<mpcf::Slice>{ mpcf::range(-4, -1, std::nullopt) }];
     EXPECT_EQ(view.shape(0), 3u);
-    EXPECT_EQ(view({ 0 }), T(0));
-    EXPECT_EQ(view({ 1 }), T(1));
-    EXPECT_EQ(view({ 2 }), T(2));
+    EXPECT_EQ(view({ 0 }), T(1));
+    EXPECT_EQ(view({ 1 }), T(2));
+    EXPECT_EQ(view({ 2 }), T(3));
+  }
+
+  TYPED_TEST(TensorTppTyped, SliceIndexNegativeResolvesAgainstSize)
+  {
+    using T = TypeParam;
+    auto t = make_sequential<T>({ 4, 5 });
+    // Row -1 is the last row.
+    auto view = t[std::vector<mpcf::Slice>{ mpcf::index(-1), mpcf::all() }];
+    EXPECT_EQ(view.shape().size(), 1u);
+    EXPECT_EQ(view.shape(0), 5u);
+    for (size_t j = 0; j < 5; ++j)
+      EXPECT_EQ(view({ j }), T(3 * 5 + j));
+  }
+
+  TYPED_TEST(TensorTppTyped, SliceIndexOutOfBoundsThrows)
+  {
+    using T = TypeParam;
+    auto t = make_sequential<T>({ 4, 5 });
+    std::vector<mpcf::Slice> too_large{ mpcf::index(4), mpcf::all() };
+    std::vector<mpcf::Slice> too_negative{ mpcf::index(-5), mpcf::all() };
+    EXPECT_THROW((void)t[too_large], std::out_of_range);
+    EXPECT_THROW((void)t[too_negative], std::out_of_range);
   }
 
   TYPED_TEST(TensorTppTyped, SliceRangeStopLessThanStartGivesZeroSize)
@@ -304,12 +347,13 @@ namespace
     EXPECT_EQ(view.shape(0), 0u);
   }
 
-  TYPED_TEST(TensorTppTyped, SliceRangeZeroStepGivesZeroSize)
+  TYPED_TEST(TensorTppTyped, SliceRangeZeroStepThrows)
   {
     using T = TypeParam;
     auto t = make_sequential<T>({ 5 });
-    auto view = t[std::vector<mpcf::Slice>{ mpcf::range(0, 5, 0) }];
-    EXPECT_EQ(view.shape(0), 0u);
+    // A zero step is invalid (NumPy: "slice step cannot be zero").
+    EXPECT_THROW((void)t[std::vector<mpcf::Slice>{ mpcf::range(0, 5, 0) }],
+                 std::invalid_argument);
   }
 
   TYPED_TEST(TensorTppTyped, SliceRangeNegativeStep)

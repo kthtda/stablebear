@@ -91,12 +91,24 @@ class DistanceMatrix:
     def storage_count(self) -> int:
         return self._data.storage_count
 
-    def __getitem__(self, ij):
+    def _resolve_ij(self, ij):
         i, j = ij
+        n = self._data.size
+        if i < 0:
+            i += n
+        if j < 0:
+            j += n
+        if not (0 <= i < n and 0 <= j < n):
+            raise IndexError(
+                f"index ({ij[0]}, {ij[1]}) is out of bounds for a {n}x{n} matrix")
+        return i, j
+
+    def __getitem__(self, ij):
+        i, j = self._resolve_ij(ij)
         return self._data[i, j]
 
     def __setitem__(self, ij, value):
-        i, j = ij
+        i, j = self._resolve_ij(ij)
         self._data[i, j] = value
 
     def to_dense(self) -> np.ndarray:

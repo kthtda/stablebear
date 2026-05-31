@@ -14,6 +14,7 @@
 
 from __future__ import annotations
 
+import operator
 from abc import ABC, abstractmethod
 from typing import Union
 
@@ -104,13 +105,34 @@ def _tensor_from_nested(data, elem_to_tensor, default_ctor=None):
     return t
 
 
-def _pyslice_to_slice(s):
-    if isinstance(s, int):
-        return cpp.slice_index(s)
-    elif isinstance(s, slice):
-        return cpp.slice_range(s.start, s.stop, s.step)
+def _slice_to_cpp(s):
+    """Convert a Python ``slice`` to a C++ ``SliceRange`` (negatives resolved in C++)."""
+    return cpp.slice_range(s.start, s.stop, s.step)
 
-    raise TypeError("Unhandled slice type")
+
+def _is_bool_scalar(obj):
+    """True for Python ``bool`` and 0-d numpy booleans (treated as scalar-bool indices)."""
+    import numpy as np
+    return isinstance(obj, (bool, np.bool_))
+
+
+def _as_int_index(obj):
+    """Return ``obj`` as a Python ``int`` if it is integer-like (via ``__index__``).
+
+    Returns ``None`` for booleans (handled separately) and non-integer objects.
+    Covers Python ``int`` and numpy integer scalars (``np.int64`` etc.).
+    """
+    if _is_bool_scalar(obj):
+        return None
+    try:
+        return operator.index(obj)
+    except TypeError:
+        return None
+
+
+def _is_full_slice(s):
+    """True for ``slice(None, None, None)`` (a bare ``:``)."""
+    return isinstance(s, slice) and s.start is None and s.stop is None and s.step is None
 
 
 def _resolve_negative_indices(index_tensor, axis_size):
@@ -138,71 +160,234 @@ class Tensor(ABC):
         )
 
     @staticmethod
-    def _coerce_index_arrays(slices):
-        """Convert numpy bool/int arrays in an index tuple to BoolTensor/IntTensor."""
+    def _coerce_ndarray_index(arr):
+        """Classify a numpy index array into a normalized index entry.
+
+        Returns ``('int', v)`` for a 0-d integer array, ``('adv', tensor)`` for
+        an integer (->IntTensor) or boolean (->BoolTensor) array. Raises an
+        ``IndexError`` (matching NumPy) for non-integer/boolean arrays.
+        """
         import numpy as np
         from .tensor import BoolTensor, IntTensor
-        if not isinstance(slices, tuple):
-            slices = (slices,)
-        result = []
-        for s in slices:
-            if isinstance(s, np.ndarray):
-                if s.dtype == np.bool_:
-                    result.append(BoolTensor(s))
-                elif np.issubdtype(s.dtype, np.integer):
-                    result.append(IntTensor(s))
-                else:
-                    result.append(s)
-            else:
-                result.append(s)
-        return tuple(result)
+        if arr.dtype == np.bool_:
+            return ('adv', BoolTensor(arr))
+        if np.issubdtype(arr.dtype, np.integer):
+            if arr.ndim == 0:
+                return ('int', int(arr))
+            return ('adv', IntTensor(arr))
+        raise IndexError(
+            "arrays used as indices must be of integer (or boolean) type")
 
-    def __getitem__(self, slices):
+    def _normalize_index(self, raw):
+        """Normalize an arbitrary NumPy-style index into axis entries + inserts.
+
+        Returns ``(entries, inserts)`` where:
+
+        * ``entries`` is a list of axis-consuming index objects — Python ``int``,
+          ``slice``, ``IntTensor`` or ``BoolTensor`` — with a single Ellipsis
+          expanded and trailing axes padded with full slices.
+        * ``inserts`` is a list of ``(output_position, length)`` describing
+          ``None``/``np.newaxis`` (length 1) and scalar-boolean (length 1 for
+          ``True``, 0 for ``False``) axes to insert after the core indexing.
+        """
+        import numpy as np
         from .tensor import BoolTensor, IntTensor
 
-        slices = self._coerce_index_arrays(slices)
+        ndim = self.ndim
 
-        # Collect advanced index positions (BoolTensor or IntTensor)
-        advanced = [(i, s) for i, s in enumerate(slices) if isinstance(s, (BoolTensor, IntTensor))]
+        items = list(raw) if isinstance(raw, tuple) else [raw]
+
+        # Pass 1: classify every item into a tagged, coerced form.
+        coerced = []
+        n_ellipsis = 0
+        for s in items:
+            if s is Ellipsis:
+                coerced.append(('ellipsis',))
+                n_ellipsis += 1
+            elif s is None:
+                coerced.append(('newaxis', 1))
+            elif _is_bool_scalar(s):
+                coerced.append(('newaxis', 1 if bool(s) else 0))
+            elif isinstance(s, slice):
+                coerced.append(('slice', s))
+            elif isinstance(s, (BoolTensor, IntTensor)):
+                coerced.append(('adv', s))
+            elif isinstance(s, np.ndarray):
+                coerced.append(self._coerce_ndarray_index(s))
+            elif isinstance(s, list):
+                coerced.append(self._coerce_ndarray_index(np.asarray(s)))
+            else:
+                iv = _as_int_index(s)
+                if iv is not None:
+                    coerced.append(('int', iv))
+                else:
+                    raise IndexError(
+                        "only integers, slices (`:`), ellipsis (`...`), "
+                        "numpy.newaxis (`None`) and integer or boolean arrays "
+                        f"are valid indices, not {type(s).__name__}")
+
+        if n_ellipsis > 1:
+            raise IndexError("an index can only have a single ellipsis ('...')")
+
+        def _consumes(c):
+            tag = c[0]
+            if tag in ('int', 'slice'):
+                return 1
+            if tag == 'adv':
+                return c[1].ndim if isinstance(c[1], BoolTensor) else 1
+            return 0  # newaxis / ellipsis consume no input axis
+
+        n_consume = sum(_consumes(c) for c in coerced if c[0] != 'ellipsis')
+
+        if n_consume > ndim:
+            raise IndexError(
+                f"too many indices for tensor: tensor is {ndim}-dimensional, "
+                f"but {n_consume} were indexed")
+
+        # Pass 2: expand a single Ellipsis into the right number of full slices.
+        expanded = []
+        for c in coerced:
+            if c[0] == 'ellipsis':
+                expanded.extend([('slice', slice(None))] * max(0, ndim - n_consume))
+            else:
+                expanded.append(c)
+
+        # Pad trailing axes with full slices when there is no Ellipsis.
+        if n_ellipsis == 0 and n_consume < ndim:
+            expanded.extend([('slice', slice(None))] * (ndim - n_consume))
+
+        # Pass 3: split into axis-consuming entries and newaxis/scalar-bool inserts.
+        entries = []
+        inserts = []
+        out_pos = 0
+        for c in expanded:
+            tag = c[0]
+            if tag == 'newaxis':
+                inserts.append((out_pos, c[1]))
+                out_pos += 1
+            elif tag == 'int':
+                entries.append(c[1])
+            elif tag == 'slice':
+                entries.append(c[1])
+                out_pos += 1
+            else:  # 'adv'
+                entries.append(c[1])
+                out_pos += 1
+        return entries, inserts
+
+    def _resolve_axis_int(self, idx, axis):
+        """Resolve a (possibly negative) integer against ``self.shape[axis]``."""
+        n = self.shape[axis]
+        resolved = idx + n if idx < 0 else idx
+        if resolved < 0 or resolved >= n:
+            raise IndexError(
+                f"index {idx} is out of bounds for axis {axis} with size {n}")
+        return resolved
+
+    def __getitem__(self, slices):
+        entries, inserts = self._normalize_index(slices)
+        result = self._getitem_entries(entries, allow_scalar=not inserts)
+        for pos, length in inserts:
+            result = result.expand_dims(pos)
+            if length == 0:
+                result = self._zero_len_axis(result, pos)
+        return result
+
+    @staticmethod
+    def _zero_len_axis(t, pos):
+        """Return a view of ``t`` with axis ``pos`` truncated to length 0."""
+        cpp_slices = [cpp.slice_range(None, None, None) for _ in range(t.ndim)]
+        cpp_slices[pos] = cpp.slice_range(0, 0, None)
+        return t._to_py_tensor(t._data[cpp_slices])
+
+    def _getitem_entries(self, entries, allow_scalar=True):
+        """Index using normalized entries (int/slice/IntTensor/BoolTensor)."""
+        from .tensor import BoolTensor, IntTensor
+
+        advanced = [(i, s) for i, s in enumerate(entries)
+                    if isinstance(s, (BoolTensor, IntTensor))]
+
+        # A single boolean mask spanning the leading axes (or the full shape),
+        # with no other non-trivial index, collapses those axes (NumPy parity).
+        if (len(advanced) == 1 and isinstance(advanced[0][1], BoolTensor)
+                and advanced[0][0] == 0
+                and all(_is_full_slice(e) for i, e in enumerate(entries) if i != 0)):
+            return self._bool_mask_getitem(advanced[0][1])
 
         if not advanced:
-            return self._getitem_slices(slices)
+            return self._basic_getitem(entries, allow_scalar)
 
-        # Single full-shape BoolTensor: flat masked select
-        if len(slices) == 1 and isinstance(slices[0], BoolTensor):
-            return self._to_py_tensor(self._data.masked_select(slices[0]._data))  # type: ignore[arg-type]
-
-        # Apply plain slices first, leaving advanced index axes as slice(None)
-        slice_parts = tuple(slice(None) if isinstance(s, (BoolTensor, IntTensor)) else s for s in slices)
-        result = self._getitem_slices(slice_parts)
-
-        # Apply each advanced index sequentially (outer indexing)
+        # Mixed/multiple advanced indices: apply slices first, then each advanced
+        # index sequentially (outer / np.ix_-style semantics).
+        basic = [slice(None) if isinstance(s, (BoolTensor, IntTensor)) else s
+                 for s in entries]
+        result = self._basic_getitem(basic, allow_scalar=False)
         for orig_pos, idx in advanced:
-            dims_dropped = sum(1 for j in range(orig_pos) if isinstance(slices[j], int))
+            dims_dropped = sum(1 for j in range(orig_pos) if isinstance(entries[j], int))
             axis = orig_pos - dims_dropped
             if isinstance(idx, BoolTensor):
                 result = self._to_py_tensor(result._data.axis_select(axis, idx._data))  # type: ignore[arg-type]
             else:
-                resolved = _resolve_negative_indices(idx, result.shape[axis])
-                result = self._to_py_tensor(result._data.index_select(axis, resolved._data))
-
+                result = self._index_select_nd(result, axis, idx)
         return result
 
-    def _getitem_slices(self, slices):
-        """Handle indexing with only int/slice components (no BoolTensor)."""
-        if len(slices) == 1 and isinstance(slices[0], int):
-            if len(self.shape) == 1:
-                return self._represent_element(self._data._get_element(slices[0]))
-            # Multi-dim: single int selects along axis 0 → return a sub-tensor
-            idx = slices[0]
-            s = _pyslice_to_slice(slice(idx, idx + 1 if idx != -1 else None))
-            return self._to_py_tensor(self._data[[s]]).squeeze(0)
-        if len(slices) == 1 and isinstance(slices[0], slice):
-            return self._to_py_tensor(self._data[[_pyslice_to_slice(slices[0])]])
-        if all(isinstance(s, int) for s in slices):
-            return self._represent_element(self._data._get_element(slices))
-        real_slices = [_pyslice_to_slice(s) for s in slices]
-        return self._to_py_tensor(self._data[real_slices])
+    def _basic_getitem(self, entries, allow_scalar=True):
+        """Index using only ints and slices (negatives resolved, bounds checked)."""
+        if (allow_scalar and len(entries) == self.ndim
+                and all(isinstance(s, int) for s in entries)):
+            idx = [self._resolve_axis_int(v, k) for k, v in enumerate(entries)]
+            return self._represent_element(self._data._get_element(idx))
+
+        cpp_slices = []
+        for k, s in enumerate(entries):
+            if isinstance(s, int):
+                cpp_slices.append(cpp.slice_index(self._resolve_axis_int(s, k)))
+            else:
+                cpp_slices.append(_slice_to_cpp(s))
+        return self._to_py_tensor(self._data[cpp_slices])
+
+    def _bool_mask_getitem(self, mask):
+        """Select with a boolean mask matching the full shape or leading axes."""
+        import numpy as np
+        from .tensor import IntTensor
+
+        tshape = tuple(self.shape[i] for i in range(self.ndim))
+        mshape = tuple(mask.shape[i] for i in range(mask.ndim))
+
+        if mshape == tshape:
+            return self._to_py_tensor(self._data.masked_select(mask._data))  # type: ignore[arg-type]
+
+        if mask.ndim <= self.ndim and mshape == tshape[:mask.ndim]:
+            trailing = list(tshape[mask.ndim:])
+            true_idx = np.flatnonzero(np.asarray(mask).reshape(-1)).astype(np.int64)
+            collapsed = self._data.reshape([-1] + trailing)
+            return self._to_py_tensor(collapsed.index_select(0, IntTensor(true_idx)._data))
+
+        raise ValueError(
+            f"boolean index of shape {mshape} does not match the indexed "
+            f"tensor of shape {tshape} along the leading axes")
+
+    def _index_select_nd(self, result, axis, idx):
+        """Gather along ``axis`` using an integer index array of any rank."""
+        import numpy as np
+        from .tensor import IntTensor
+
+        axis_size = result.shape[axis]
+        arr = np.asarray(idx).astype(np.int64)
+        resolved = arr.copy()
+        resolved[resolved < 0] += axis_size
+        if np.any((resolved < 0) | (resolved >= axis_size)):
+            raise IndexError(
+                f"index out of bounds for axis {axis} with size {axis_size}")
+
+        if arr.ndim <= 1:
+            return self._to_py_tensor(
+                result._data.index_select(axis, IntTensor(resolved)._data))
+
+        selected = result._data.index_select(axis, IntTensor(resolved.reshape(-1))._data)
+        rshape = [result.shape[i] for i in range(result.ndim)]
+        new_shape = rshape[:axis] + list(arr.shape) + rshape[axis + 1:]
+        return self._to_py_tensor(selected.reshape(new_shape))
 
     @abstractmethod
     def _get_valid_setitem_dtypes(self):
@@ -215,74 +400,111 @@ class Tensor(ABC):
                 f"Tried to set an item of a tensor of type {type(self)} to a value of type {type(val)}. Only {valid_dtypes} are accepted."
             )
 
+    def _coerce_rhs(self, val):
+        """Cast a tensor RHS to ``self``'s dtype on assignment (NumPy-style).
+
+        Only numeric tensors are cross-cast (e.g. int -> float); other tensor
+        families are returned unchanged.
+        """
+        from .tensor import NumericTensor
+        if (isinstance(self, NumericTensor) and isinstance(val, NumericTensor)
+                and getattr(val, "dtype", None) is not getattr(self, "dtype", None)):
+            return val.astype(self.dtype)
+        return val
+
     def __setitem__(self, slices, val):
+        entries, inserts = self._normalize_index(slices)
+        # A scalar-boolean ``False`` (or any zero-length newaxis) selects nothing.
+        if any(length == 0 for _, length in inserts):
+            return
+        self._validate_setitem_dtype(val)
+        self._setitem_entries(entries, val)
+
+    def _setitem_entries(self, entries, val):
+        """Assign using normalized entries (int/slice/IntTensor/BoolTensor)."""
         from .tensor import BoolTensor, IntTensor
 
-        slices = self._coerce_index_arrays(slices)
+        # Single full-shape boolean mask: flat masked assign/fill.
+        if len(entries) == 1 and isinstance(entries[0], BoolTensor):
+            if isinstance(val, Tensor):
+                self._data.masked_assign(entries[0]._data, self._coerce_rhs(val)._data)  # type: ignore[arg-type]
+            else:
+                self._data.masked_fill(entries[0]._data, self._decay_value(val))  # type: ignore[arg-type]
+            return
 
-        advanced = [(i, s) for i, s in enumerate(slices) if isinstance(s, (BoolTensor, IntTensor))]
-
-        self._validate_setitem_dtype(val)
+        advanced = [(i, s) for i, s in enumerate(entries)
+                    if isinstance(s, (BoolTensor, IntTensor))]
 
         if not advanced:
-            self._setitem_slices(slices, val)
+            self._basic_setitem(entries, val)
             return
 
-        # Single full-shape BoolTensor: flat masked assign/fill
-        if len(slices) == 1 and isinstance(slices[0], BoolTensor):
-            if isinstance(val, Tensor):
-                self._data.masked_assign(slices[0]._data, val._data)  # type: ignore[arg-type]
-            else:
-                self._data.masked_fill(slices[0]._data, self._decay_value(val))  # type: ignore[arg-type]
-            return
+        basic = [slice(None) if isinstance(s, (BoolTensor, IntTensor)) else s
+                 for s in entries]
+        view = self._basic_getitem(basic, allow_scalar=False)
 
-        # Apply plain slices first to get a mutable view
-        slice_parts = tuple(slice(None) if isinstance(s, (BoolTensor, IntTensor)) else s for s in slices)
-        view = self._getitem_slices(slice_parts)
-
-        # Build selectors for outer indexing
         selectors = []
         for orig_pos, idx in advanced:
-            dims_dropped = sum(1 for j in range(orig_pos) if isinstance(slices[j], int))
+            dims_dropped = sum(1 for j in range(orig_pos) if isinstance(entries[j], int))
             axis = orig_pos - dims_dropped
             if isinstance(idx, BoolTensor):
-                selectors.append((axis, idx._data))
+                selectors.append((axis, idx._data, True))
             else:
                 resolved = _resolve_negative_indices(idx, view.shape[axis])
-                selectors.append((axis, resolved._data))
+                selectors.append((axis, resolved._data, False))
 
         if len(selectors) == 1:
-            axis, sel_data = selectors[0]
-            if isinstance(slices[advanced[0][0]], BoolTensor):
+            axis, sel_data, is_bool = selectors[0]
+            if is_bool:
                 if isinstance(val, Tensor):
-                    view._data.axis_assign(axis, sel_data, val._data)  # type: ignore[arg-type]
+                    view._data.axis_assign(axis, sel_data, self._coerce_rhs(val)._data)  # type: ignore[arg-type]
                 else:
                     view._data.axis_fill(axis, sel_data, self._decay_value(val))  # type: ignore[arg-type]
             else:
                 if isinstance(val, Tensor):
-                    view._data.index_assign(axis, sel_data, val._data)  # type: ignore[arg-type]
+                    view._data.index_assign(axis, sel_data, self._coerce_rhs(val)._data)  # type: ignore[arg-type]
                 else:
                     view._data.index_fill(axis, sel_data, self._decay_value(val))  # type: ignore[arg-type]
         else:
+            sel_pairs = [(axis, data) for axis, data, _ in selectors]
             if isinstance(val, Tensor):
-                view._data.outer_assign(selectors, val._data)  # type: ignore[arg-type]
+                view._data.outer_assign(sel_pairs, self._coerce_rhs(val)._data)  # type: ignore[arg-type]
             else:
-                view._data.outer_fill(selectors, self._decay_value(val))  # type: ignore[arg-type]
+                view._data.outer_fill(sel_pairs, self._decay_value(val))  # type: ignore[arg-type]
 
-    def _setitem_slices(self, slices, val):
-        """Handle setitem with only int/slice components (no BoolTensor)."""
-        if len(slices) == 1 and isinstance(slices[0], int):
-            self._data._set_element([slices[0]], self._decay_value(val))
-        elif len(slices) == 1 and isinstance(slices[0], slice):
-            real_slices = [_pyslice_to_slice(slices[0])]
-            self._data[real_slices] = val._data
-        elif all(isinstance(s, int) for s in slices):
-            self._data._set_element(slices, self._decay_value(val))
+    def _basic_setitem(self, entries, val):
+        """Assign using only ints and slices (negatives resolved, bounds checked)."""
+        import numpy as np
+        from .tensor import NumericTensor
+
+        if (len(entries) == self.ndim
+                and all(isinstance(s, int) for s in entries)):
+            idx = [self._resolve_axis_int(v, k) for k, v in enumerate(entries)]
+            self._data._set_element(idx, self._decay_value(val))
+            return
+
+        cpp_slices = []
+        for k, s in enumerate(entries):
+            if isinstance(s, int):
+                cpp_slices.append(cpp.slice_index(self._resolve_axis_int(s, k)))
+            else:
+                cpp_slices.append(_slice_to_cpp(s))
+
+        if isinstance(val, Tensor):
+            self._data[cpp_slices] = self._coerce_rhs(val)._data
+        elif isinstance(val, np.ndarray) and isinstance(self, NumericTensor):
+            # Element-wise array RHS: wrap as a same-dtype tensor and broadcast.
+            self._data[cpp_slices] = self._coerce_rhs(type(self)(val))._data
         else:
-            real_slices = [_pyslice_to_slice(s) for s in slices]
-            self._data[real_slices] = val._data
+            # Scalar (or single-element) RHS: broadcast-fill the selected view.
+            view = self._to_py_tensor(self._data[cpp_slices])
+            shp = [view.shape[i] for i in range(view.ndim)] if view.ndim > 0 else [1]
+            filler = type(self._data)(cpp.Shape(shp), self._decay_value(val))
+            self._data[cpp_slices] = filler
 
     def __iter__(self):
+        if self.ndim == 0:
+            raise TypeError("iteration over a 0-d tensor")
         for i in range(self.shape[0]):
             yield self[i]
 
@@ -473,6 +695,8 @@ class Tensor(ABC):
         return result
 
     def __len__(self) -> int:
+        if self.ndim == 0:
+            raise TypeError("len() of unsized object")
         return self._data.shape[0]
 
     @property

@@ -14,6 +14,15 @@ Indexing with all integers returns the element at that position::
 
 For a ``PcfTensor``, the returned element is a :py:class:`~masspcf.Pcf`. For a ``FloatTensor``, it is a Python float. For a ``PointCloudTensor``, it is a ``FloatTensor`` (representing the point cloud as a numeric array).
 
+Negative integers count from the end, as in NumPy, and an out-of-range
+integer raises ``IndexError``::
+
+   X[-1, -1]   # last element
+   X[-1]       # last row (shape (5,))
+
+A NumPy integer scalar (e.g. ``np.int64(3)``) is accepted anywhere a Python
+``int`` is.
+
 Slicing
 -------
 
@@ -32,7 +41,35 @@ Negative steps are supported for reversing or striding backwards::
    Y[::-2]       # [5, 3, 1]
    Y[3:0:-1]     # [4, 3, 2]
 
+Negative slice bounds are resolved against the axis size following Python's
+``slice.indices`` rules (the same as NumPy)::
+
+   Y[-3:-1]      # [3, 4]
+   Y[-2:]        # [4, 5]
+   Y[:-1]        # [1, 2, 3, 4]
+
+A zero step raises ``ValueError`` (``slice step cannot be zero``).
+
 Views share the underlying data with the original tensor, so no data is copied.
+
+Ellipsis and newaxis
+--------------------
+
+``...`` (``Ellipsis``) expands to as many full slices as needed so that the
+remaining axes are indexed in full, and ``None`` / ``np.newaxis`` inserts a new
+length-1 axis::
+
+   X = mpcf.zeros((4, 6))
+
+   X[...]          # the whole tensor
+   X[..., 0]       # shape (4,)   — last axis indexed, leading axes full
+   X[0, ...]       # shape (6,)
+   X[None]         # shape (1, 4, 6)
+   X[:, None]      # shape (4, 1, 6)
+
+At most one ``Ellipsis`` may appear in an index. A partial integer/slice index
+(fewer entries than the rank) leaves the trailing axes in full, and supplying
+more indices than the rank raises ``IndexError``.
 
 Assignment
 ----------
@@ -87,6 +124,25 @@ Assignment with a full-shape mask is also supported::
 
    X[mask] = 0.0          # scalar fill: set masked positions to 0
    X[mask] = some_tensor   # tensor assign: must have the right number of elements
+
+Leading-axes masking
+--------------------
+
+A ``BoolTensor`` whose shape matches the *leading* axes of the tensor selects
+along those axes, collapsing them into one and keeping the trailing axes::
+
+   X = mpcf.FloatTensor(np.arange(24, dtype=np.float32).reshape(4, 6))
+
+   row_mask = mpcf.BoolTensor(np.array([True, False, True, False]))
+   X[row_mask]          # shape (2, 6) — rows where the mask is True
+
+   Y = mpcf.FloatTensor(np.arange(24, dtype=np.float32).reshape(2, 3, 4))
+   mask = mpcf.BoolTensor(np.array([[True, False, True],
+                                    [False, True, False]]))  # shape (2, 3)
+   Y[mask]              # shape (3, 4)
+
+This matches NumPy, where a ``k``-dimensional boolean mask applied to the first
+``k`` axes yields a result of shape ``(n_true, *shape[k:])``.
 
 Axis masking
 ------------
@@ -186,6 +242,15 @@ negative indices are supported::
    X[np.array([2, 0, 4])]    # [30, 10, 50]
    X[np.array([1, 1, 2, 0])] # [20, 20, 30, 10]  — duplicates allowed
    X[np.array([-1, -2])]     # [50, 40]           — negative indices
+
+A plain Python list is treated as an integer (or boolean) array, exactly like
+the equivalent ``np.array``::
+
+   X[[2, 0, 4]]              # [30, 10, 50]
+
+A multi-dimensional integer index array is also supported: its shape is adopted
+into the result, e.g. indexing a ``(4, 6)`` tensor with a ``(2, 2)`` index array
+gives shape ``(2, 2, 6)``.
 
 For multi-dimensional tensors, one axis can use an integer array while the
 others use slices::

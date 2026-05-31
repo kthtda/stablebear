@@ -734,6 +734,18 @@ namespace mpcf
   {
     auto infos = detail::prepare_axis_masks(axis_masks, dst.shape());
 
+    // Validate the values shape against the selected (outer) shape before the
+    // assignment walk, so a mismatch raises rather than writing out of bounds.
+    auto expected_shape = dst.shape();
+    for (const auto& info : infos)
+      expected_shape[info.axis] = info.true_indices.size();
+    if (values.shape() != expected_shape)
+    {
+      throw std::invalid_argument(
+        "multi_axis_assign: values shape " + shape_to_string(values.shape()) +
+        " does not match expected shape " + shape_to_string(expected_shape));
+    }
+
     walk(values, [&](const std::vector<size_t>& val_idx) {
       auto dst_idx = val_idx;
       for (const auto& info : infos)
@@ -781,9 +793,20 @@ namespace mpcf
           }
           else
           {
+            const auto axis_size = static_cast<ptrdiff_t>(shape[axis]);
             rs.indices.reserve(idx_tensor.shape()[0]);
             for (size_t i = 0; i < idx_tensor.shape()[0]; ++i)
-              rs.indices.push_back(static_cast<size_t>(idx_tensor({i})));
+            {
+              // Resolve negatives against the axis size and bounds-check so
+              // the C++ entry point is memory-safe regardless of caller.
+              auto v = static_cast<ptrdiff_t>(idx_tensor({i}));
+              if (v < 0) v += axis_size;
+              if (v < 0 || v >= axis_size)
+                throw std::out_of_range(
+                  "index " + std::to_string(static_cast<ptrdiff_t>(idx_tensor({i}))) +
+                  " is out of bounds for axis with size " + std::to_string(axis_size));
+              rs.indices.push_back(static_cast<size_t>(v));
+            }
           }
         }, sel);
         result.push_back(std::move(rs));
@@ -845,6 +868,18 @@ namespace mpcf
     const Tensor<T>& values)
   {
     auto resolved = detail::resolve_selectors(selectors, dst.shape());
+
+    // Validate the values shape against the selected (outer) shape before the
+    // assignment walk, so a mismatch raises rather than writing out of bounds.
+    auto expected_shape = dst.shape();
+    for (const auto& rs : resolved)
+      expected_shape[rs.axis] = rs.indices.size();
+    if (values.shape() != expected_shape)
+    {
+      throw std::invalid_argument(
+        "outer_assign: values shape " + shape_to_string(values.shape()) +
+        " does not match expected shape " + shape_to_string(expected_shape));
+    }
 
     walk(values, [&](const std::vector<size_t>& val_idx) {
       auto dst_idx = val_idx;
@@ -1453,8 +1488,22 @@ namespace mpcf
         using argT = std::decay_t<decltype(arg)>;
         if constexpr (std::is_same_v<argT, SliceIndex>)
         {
+          // Resolve a (possibly negative) single integer index against the
+          // dimension size and bounds-check it, mirroring NumPy semantics.
+          // Throwing here (rather than computing an out-of-buffer offset)
+          // turns silent OOB reads / SIGSEGV-on-write into a clean IndexError.
+          auto dim_size = static_cast<ptrdiff_t>(ret.m_shape[i]);
+          auto ix = arg.index;
+          if (ix < 0) ix += dim_size;
+          if (ix < 0 || ix >= dim_size)
+          {
+            throw std::out_of_range(
+              "index " + std::to_string(arg.index) +
+              " is out of bounds for axis " + std::to_string(i) +
+              " with size " + std::to_string(dim_size));
+          }
           ret.m_shape[i] = 1;
-          ret.m_offset += arg.index * ret.m_strides[i];
+          ret.m_offset += ix * ret.m_strides[i];
           dimsToDrop.emplace_back(i);
         }
         else if constexpr (std::is_same_v<argT, SliceRange>)
@@ -1465,54 +1514,70 @@ namespace mpcf
           }
 
           auto step = *arg.step;
+          if (step == 0)
+          {
+            throw std::invalid_argument("slice step cannot be zero");
+          }
+
           auto dim_size = static_cast<ptrdiff_t>(ret.m_shape[i]);
 
-          if (step > 0)
+          // Mirror Python's slice.indices(n): resolve negative bounds by
+          // adding dim_size, then clamp into the valid range. For a positive
+          // step the range is [0, n]; for a negative step it is [-1, n-1].
+          const ptrdiff_t lower = (step < 0) ? -1_z : 0_z;
+          const ptrdiff_t upper = (step < 0) ? dim_size - 1_z : dim_size;
+
+          ptrdiff_t start;
+          if (!arg.start)
           {
-            auto start = arg.start.value_or(0_z);
-            auto stop = arg.stop.value_or(dim_size);
-
-            if (start < 0_z) start = 0;
-            if (stop > dim_size) stop = dim_size;
-
-            if (stop <= start)
-            {
-              ret.m_shape[i] = 0;
-            }
-            else
-            {
-              ret.m_shape[i] = (stop - start + step - 1_z) / step;
-            }
-
-            ret.m_offset += start * ret.m_strides[i];
-          }
-          else if (step < 0)
-          {
-            auto start = arg.start.value_or(dim_size - 1_z);
-            auto stop = arg.stop.value_or(-dim_size - 1_z);
-
-            if (start >= dim_size) start = dim_size - 1;
-            if (start < 0_z) start = 0;
-            if (stop < -1_z) stop = -1;
-
-            if (start <= stop)
-            {
-              ret.m_shape[i] = 0;
-            }
-            else
-            {
-              ret.m_shape[i] = (start - stop + (-step) - 1_z) / (-step);
-            }
-
-            ret.m_offset += start * ret.m_strides[i];
+            start = (step < 0) ? upper : lower;
           }
           else
           {
-            ret.m_shape[i] = 0; // step == 0
+            start = *arg.start;
+            if (start < 0)
+            {
+              start += dim_size;
+              if (start < lower) start = lower;
+            }
+            else if (start > upper)
+            {
+              start = upper;
+            }
           }
 
-          ret.m_strides[i] *= step;
+          ptrdiff_t stop;
+          if (!arg.stop)
+          {
+            stop = (step < 0) ? lower : upper;
+          }
+          else
+          {
+            stop = *arg.stop;
+            if (stop < 0)
+            {
+              stop += dim_size;
+              if (stop < lower) stop = lower;
+            }
+            else if (stop > upper)
+            {
+              stop = upper;
+            }
+          }
 
+          ptrdiff_t len;
+          if (step > 0)
+          {
+            len = (start < stop) ? (stop - start - 1_z) / step + 1_z : 0_z;
+          }
+          else
+          {
+            len = (start > stop) ? (start - stop - 1_z) / (-step) + 1_z : 0_z;
+          }
+
+          ret.m_shape[i] = static_cast<size_t>(len);
+          ret.m_offset += start * ret.m_strides[i];
+          ret.m_strides[i] *= step;
         }
         // For SliceAll, don't modify shape
       }, slice);
