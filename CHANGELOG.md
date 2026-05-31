@@ -21,6 +21,20 @@ Source builds default to `-march=native` on Linux and macOS, and to a CPUID-prob
 
 The plain-cmake developer build (without `SKBUILD`) still defaults to `v3`.
 
+### Indexing
+
+Tensor indexing is now much closer to NumPy. These changes apply to every tensor type, since they share one indexing implementation.
+
+* **Negative indices and slice bounds** — `t[-1]`, `t[-1, -1]`, `t[-3:-1]`, `t[:, -2:]`, and negative bounds with a negative step now resolve against the axis size like NumPy (previously they crashed, returned garbage, or gave the wrong shape). An out-of-range integer index raises `IndexError`, and `t[::0]` raises `ValueError`.
+* **Ellipsis and newaxis** — `t[...]`, `t[..., 0]`, `t[None]`, and `t[:, None]` / `t[:, np.newaxis]` are now supported.
+* **More index objects** — Python lists (`t[[0, 2]]`), NumPy integer scalars (`t[np.int64(1)]`), scalar booleans (`t[True]` / `t[False]`), multi-dimensional integer index arrays, the empty tuple `t[()]`, and partial integer tuples (fewer indices than the rank) all behave as in NumPy. Invalid indices (e.g. floats) now raise `IndexError`.
+* **Leading-axes boolean masks** — a boolean mask matching the leading axes of a tensor (e.g. a row mask `t[mask]`) selects along those axes instead of raising.
+* **Assignment** — assigning a scalar into a slice (`t[1:3] = 5.0`), assigning into a single row of an N-D tensor (`t[1] = row`), and assigning a cross-dtype tensor (int → float) now work.
+* **`DistanceMatrix` / `SymmetricMatrix`** — negative `(i, j)` indices are resolved, and out-of-range access raises `IndexError`.
+* **Memory safety** — out-of-shape values in multi-axis (outer / `np.ix_`-style) assignment now raise instead of writing out of bounds.
+
+Multiple advanced indices keep their outer (`np.ix_`-style) semantics, as documented in [Indexing and Masking](https://github.com/bwehlin/masspcf/blob/main/docs/indexing.rst).
+
 ## 0.4.0
 
 Major rewrite of the core data structures and significant expansion of the API.
