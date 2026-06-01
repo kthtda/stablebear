@@ -1,0 +1,69 @@
+name: CI
+
+# CPU-only mirror of BuildAndPublishPyPI: build the sdist + CPU wheels on every
+# platform, compare them, and generate coverage + memory reports (no CUDA, no
+# PyPI publish). Coverage/valgrind reports are still pushed to the gh-pages
+# report site via the reusable analysis workflow.
+#
+# The heavy lifting is delegated to the same reusable workflows the release
+# pipeline uses, toggled into their CPU/GitHub-runner modes:
+#   - sdist.yaml      with use_github_runners: true
+#   - wheels.yaml     with cpu_only: true
+#   - analysis.yaml   with use_github_runners: true  (skips the cuda_test job)
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+# Cancel superseded runs on the same ref (e.g. new pushes to an open PR).
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  sdist:
+    uses: ./.github/workflows/sdist.yaml
+    with:
+      use_github_runners: true
+
+  build:
+    uses: ./.github/workflows/wheels.yaml
+    with:
+      cpu_only: true
+
+  merge_all:
+    runs-on: ubuntu-latest
+    needs: [sdist, build]
+    steps:
+      - name: Merge wheels and sdist
+        uses: actions/upload-artifact/merge@v4
+        with:
+          name: dist
+          pattern: "{wheels,sdist}"
+          retention-days: 2
+
+  compare:
+    runs-on: ubuntu-latest
+    needs: merge_all
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Download dist
+        uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist/
+
+      - name: Compare wheels
+        run: |
+          set -o pipefail
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          python -u .github/scripts/compare_wheels.py -v --cpu-only dist/ | tee -a $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+  analysis:
+    permissions:
+      contents: write
+    uses: ./.github/workflows/analysis.yaml
+    with:
+      use_github_runners: true

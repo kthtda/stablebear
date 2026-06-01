@@ -2,42 +2,48 @@ name: BuildWheels
 
 on:
   workflow_dispatch:
+    inputs:
+      cpu_only:
+        description: 'Build CPU-only wheels on every platform (no CUDA)'
+        type: boolean
+        default: false
   workflow_call:
+    inputs:
+      cpu_only:
+        description: 'Build CPU-only wheels on every platform (no CUDA)'
+        type: boolean
+        default: false
 
 jobs:
+  # Emit the build matrix as JSON so a single workflow serves both the full
+  # release build (CUDA + CPU) and a CPU-only build (cpu_only=true, used by
+  # ci.yaml) across every platform. The CUDA-specific steps below are all
+  # gated on `matrix.cuda == 1`, so they no-op for CPU-only rows.
+  setup:
+    name: Resolve build matrix
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set.outputs.matrix }}
+    steps:
+      - id: set
+        shell: bash
+        run: |
+          if [ "${{ inputs.cpu_only }}" == "true" ]; then
+            MATRIX='{"include":[{"os":"ubuntu-24.04","cuda":0,"artifact_suffix":"-cpu"},{"os":"ubuntu-22.04-arm","cuda":0,"artifact_suffix":"-cpu"},{"os":"macos-26","cuda":0,"artifact_suffix":"-cpu"},{"os":"windows-2025","cuda":0,"artifact_suffix":"-cpu"}]}'
+          else
+            MATRIX='{"include":[{"os":"ubuntu-24.04","cuda":1,"cuda_tag":"12-8","cuda_major":12,"artifact_suffix":"-cuda12"},{"os":"ubuntu-24.04","cuda":1,"cuda_tag":"13-1","cuda_major":13,"artifact_suffix":"-cuda13"},{"os":"ubuntu-22.04-arm","cuda":0,"artifact_suffix":"-cpu"},{"os":"macos-26","cuda":0,"artifact_suffix":"-cpu"},{"os":"windows-2025","cuda":1,"cuda_version":"12.6","cuda_major":12,"artifact_suffix":"-cuda12"},{"os":"windows-2025","cuda":1,"cuda_version":"13.1","cuda_major":13,"artifact_suffix":"-cuda13"}]}'
+          fi
+          echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
+
   build_wheels:
     name: Build ${{ matrix.cuda == 1 && format('CUDA{0}+CPU', matrix.cuda_major) || 'CPU' }} wheels on ${{ matrix.os }}
+    needs: setup
     runs-on: ${{ matrix.os }}
 
     strategy:
-      matrix:
-        include:
-          - os: ubuntu-24.04
-            cuda: 1
-            cuda_tag: 12-8
-            cuda_major: 12
-            artifact_suffix: "-cuda12"
-          - os: ubuntu-24.04
-            cuda: 1
-            cuda_tag: 13-1
-            cuda_major: 13
-            artifact_suffix: "-cuda13"
-          - os: ubuntu-22.04-arm
-            cuda: 0
-            artifact_suffix: "-cpu"
-          - os: macos-26
-            cuda: 0
-            artifact_suffix: "-cpu"
-          - os: windows-2025
-            cuda: 1
-            cuda_version: 12.6
-            cuda_major: 12
-            artifact_suffix: "-cuda12"
-          - os: windows-2025
-            cuda: 1
-            cuda_version: 13.1
-            cuda_major: 13
-            artifact_suffix: "-cuda13"
+      # Don't let one platform's failure cancel the others.
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.setup.outputs.matrix) }}
 
     steps:
 
@@ -157,6 +163,8 @@ jobs:
           retention-days: 1
 
   merge_cuda_wheels:
+    # No CUDA wheels exist to merge in CPU-only mode.
+    if: ${{ !inputs.cpu_only }}
     runs-on: ubuntu-latest
     needs: build_wheels
     strategy:
@@ -196,8 +204,12 @@ jobs:
           retention-days: 1
 
   merge_wheel_artifacts:
-    runs-on: ubuntu-latest
+    # Merge once the wheels are built. An explicit condition is required so a
+    # skipped merge_cuda_wheels (CPU-only mode) doesn't skip this job too;
+    # for the CUDA build it still requires merge_cuda_wheels not to have failed.
     needs: [build_wheels, merge_cuda_wheels]
+    if: ${{ !cancelled() && needs.build_wheels.result == 'success' && needs.merge_cuda_wheels.result != 'failure' }}
+    runs-on: ubuntu-latest
     steps:
       - name: Merge wheel artifacts
         uses: actions/upload-artifact/merge@v4

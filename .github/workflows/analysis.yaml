@@ -408,6 +408,18 @@ jobs:
     name: Publish reports to GitHub Pages
     runs-on: ubuntu-24.04
     needs: [coverage_report, memory_check, cuda_test]
+    # An explicit condition is required so cuda_test being skipped (CPU-only /
+    # use_github_runners runs) doesn't skip publishing too. For the CUDA release
+    # flow cuda_test runs normally, so `!= 'failure'` keeps the prior behavior
+    # (publish only when it succeeds). The last clause avoids attempting a
+    # gh-pages push from fork pull requests, whose GITHUB_TOKEN is read-only.
+    if: >-
+      ${{ !cancelled()
+          && needs.coverage_report.result == 'success'
+          && needs.memory_check.result == 'success'
+          && needs.cuda_test.result != 'failure'
+          && (github.event_name != 'pull_request'
+              || github.event.pull_request.head.repo.full_name == github.repository) }}
     steps:
       - uses: actions/checkout@v6
 

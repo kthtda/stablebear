@@ -83,7 +83,7 @@ def dump_sdist(path):
         print()
 
 
-def main(input_path, verbose=False):
+def main(input_path, verbose=False, cpu_only=False):
     path = Path(input_path)
     if path.is_dir():
         wheels, raw = get_wheels_from_dir(path)
@@ -143,8 +143,12 @@ def main(input_path, verbose=False):
             print(f"    {f}")
     print()
 
-    # Verify CUDA wheels contain both CUDA 12 and CUDA 13 modules
+    # Verify CUDA wheels contain both CUDA 12 and CUDA 13 modules.
+    # Skipped for CPU-only builds (ci.yaml), which ship no CUDA modules.
     CUDA_PLATFORMS = ("manylinux_*_x86_64", "win_amd64")
+    if cpu_only:
+        print("CUDA module check: skipped (--cpu-only)\n")
+        return 1 if failed else 0
     print("CUDA module check:")
     for name in names:
         if not any(fnmatch(name, f"*{p}*") for p in CUDA_PLATFORMS):
@@ -171,10 +175,14 @@ def main(input_path, verbose=False):
 if __name__ == "__main__":
     args = sys.argv[1:]
     verbose = "--verbose" in args or "-v" in args
+    cpu_only = "--cpu-only" in args
     paths = [a for a in args if not a.startswith("-")]
 
     if len(paths) != 1:
-        print("Usage: python compare_wheels.py [-v|--verbose] <wheels.zip|wheels_dir/>")
+        print(
+            "Usage: python compare_wheels.py [-v|--verbose] [--cpu-only] "
+            "<wheels.zip|wheels_dir/>"
+        )
         sys.exit(1)
 
-    sys.exit(main(paths[0], verbose=verbose))
+    sys.exit(main(paths[0], verbose=verbose, cpu_only=cpu_only))

@@ -2,22 +2,49 @@ name: BuildSdist
 
 on:
   workflow_dispatch:
+    inputs:
+      use_github_runners:
+        description: 'Use GitHub-hosted runners instead of self-hosted'
+        type: boolean
+        default: false
   workflow_call:
+    inputs:
+      use_github_runners:
+        type: boolean
+        default: false
 
 jobs:
   build_sdist:
     name: Build & test source distribution
-    runs-on: [self-hosted, gpu, cuda12]
-    timeout-minutes: 10
+    runs-on: ${{ inputs.use_github_runners && 'ubuntu-24.04' || fromJSON('["self-hosted", "gpu", "cuda12"]') }}
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v6
         with:
           submodules: 'recursive'
 
-      - name: Set up Python
+      - name: Set up Python (GitHub runner)
+        if: inputs.use_github_runners
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+
+      - name: Set up Python (self-hosted)
+        if: ${{ !inputs.use_github_runners }}
         run: |
           python3 -m venv --system-site-packages ${{github.workspace}}/.venv
           echo "${{github.workspace}}/.venv/bin" >> $GITHUB_PATH
+
+      # The self-hosted runner provides build/pytest/scipy via system
+      # site-packages; GitHub-hosted runners need them installed, plus
+      # parallel + unity build so the from-sdist compile finishes in time.
+      - name: Install build tooling (GitHub runner)
+        if: inputs.use_github_runners
+        run: |
+          pip install build
+          echo "CMAKE_BUILD_PARALLEL_LEVEL=$(nproc)" >> $GITHUB_ENV
+          echo "CMAKE_UNITY_BUILD=ON" >> $GITHUB_ENV
+          echo "CMAKE_UNITY_BUILD_BATCH_SIZE=4" >> $GITHUB_ENV
 
       - name: Build sdist
         run: python3 -m build --sdist
@@ -26,6 +53,10 @@ jobs:
         run: python3 -m pip install dist/masspcf-*.tar.gz --force-reinstall
         env:
           BUILD_WITH_CUDA: "0"
+
+      - name: Install test dependencies (GitHub runner)
+        if: inputs.use_github_runners
+        run: pip install pytest scipy
 
       - name: Test sdist install
         working-directory: test
