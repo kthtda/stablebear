@@ -2,12 +2,12 @@
 
 ### Performance
 
-* **x86-64 baseline raised to v3** — distribution wheels are now compiled with AVX2, FMA, BMI1/2, F16C, LZCNT, and MOVBE enabled (Haswell / Excavator / Zen 1 and newer, 2013+). This covers essentially all x86-64 laptops and workstations from the last decade. The main exceptions are pre-2022 Atom-derived chips such as Celeron N, Pentium Silver, and Jasper Lake.
-* **Parallel tensor evaluation** — `tensor_eval` now dispatches across threads when the total work exceeds a tunable threshold (500 elements by default). Configurable via `masspcf.system.set_parallel_eval_threshold(n)`. Speedups of 3–6x observed on 6-core CPUs at 500+ elements.
+* **x86-64 baseline raised to v3** — distribution wheels now target the x86-64-v3 microarchitecture level (Haswell / Excavator / Zen 1 and newer, 2013+). On Linux and macOS this is `-march=x86-64-v3` (AVX2, FMA, BMI1/2, F16C, LZCNT, MOVBE); on Windows it is the equivalent `/arch:AVX2` baseline. This covers essentially all x86-64 laptops and workstations from the last decade. The main exceptions are pre-2022 Atom-derived chips such as Celeron N, Pentium Silver, and Jasper Lake.
+* **Parallel tensor evaluation** — `tensor_eval` now dispatches across threads when the total work reaches a tunable threshold (500 by default). "Total work" is the element count for scalar evaluation, and the element count times the number of query points for the batch (array-of-times) overload. Set the threshold with `masspcf.system.set_parallel_eval_threshold(n)` and read it back with `masspcf.system.get_parallel_eval_threshold()`. On multi-core CPUs this gives a several-fold speedup on large tensors.
 
 #### Runtime CPU check
 
-masspcf now verifies at import time that the CPU supports the instruction set the wheel was built against, and raises a clear `ImportError` with rebuild instructions if it does not — instead of letting the extension crash with an illegal-instruction signal. Set `MPCF_SKIP_CPU_CHECK=1` to bypass the check.
+masspcf now verifies at import time that the CPU supports the instruction set the wheel was built against, and raises a clear `ImportError` with rebuild instructions if it does not — instead of letting the extension crash with an illegal-instruction signal. Set `MPCF_SKIP_CPU_CHECK` to any value other than `0` to bypass the check.
 
 #### Building from source
 
@@ -27,13 +27,18 @@ Tensor indexing is now much closer to NumPy. These changes apply to every tensor
 
 * **Negative indices and slice bounds** — `t[-1]`, `t[-1, -1]`, `t[-3:-1]`, `t[:, -2:]`, and negative bounds with a negative step now resolve against the axis size like NumPy (previously they crashed, returned garbage, or gave the wrong shape). An out-of-range integer index raises `IndexError`, and `t[::0]` raises `ValueError`.
 * **Ellipsis and newaxis** — `t[...]`, `t[..., 0]`, `t[None]`, and `t[:, None]` / `t[:, np.newaxis]` are now supported.
-* **More index objects** — Python lists (`t[[0, 2]]`), NumPy integer scalars (`t[np.int64(1)]`), scalar booleans (`t[True]` / `t[False]`), multi-dimensional integer index arrays, the empty tuple `t[()]`, and partial integer tuples (fewer indices than the rank) all behave as in NumPy. Invalid indices (e.g. floats) now raise `IndexError`.
+* **More index objects** — Python lists (`t[[0, 2]]`), NumPy integer scalars (`t[np.int64(1)]`), scalar booleans (`t[True]` / `t[False]`), multi-dimensional integer index arrays, the empty tuple `t[()]`, and partial integer tuples (fewer indices than the rank) all behave as in NumPy. A multi-dimensional integer index array adopts its own shape into the result (e.g. a `(4, 6)` tensor indexed by a `(2, 2)` array yields `(2, 2, 6)`). Invalid indices (e.g. floats) now raise `IndexError`.
+* **0-d tensors** — iterating over or calling `len()` on a 0-d tensor now raises `TypeError`, matching NumPy.
 * **Leading-axes boolean masks** — a boolean mask matching the leading axes of a tensor (e.g. a row mask `t[mask]`) selects along those axes instead of raising.
 * **Assignment** — assigning a scalar into a slice (`t[1:3] = 5.0`), assigning into a single row of an N-D tensor (`t[1] = row`), and assigning a cross-dtype tensor (int → float) now work.
 * **`DistanceMatrix` / `SymmetricMatrix`** — negative `(i, j)` indices are resolved, and out-of-range access raises `IndexError`.
-* **Memory safety** — out-of-shape values in multi-axis (outer / `np.ix_`-style) assignment now raise instead of writing out of bounds.
+* **Memory safety** — out-of-shape values in multi-axis (outer / `np.ix_`-style) assignment now raise instead of writing out of bounds, and out-of-bounds selectors in a multi-axis read now raise `IndexError`.
 
 Multiple advanced indices keep their outer (`np.ix_`-style) semantics, as documented in [Indexing and Masking](https://github.com/bwehlin/masspcf/blob/main/docs/indexing.rst).
+
+### Packaging
+
+* **Self-contained Windows wheels** — binary wheels for Windows now bundle the Microsoft Visual C++ runtime (e.g. `msvcp140.dll`, `msvcp140_atomic_wait.dll`) via [delvewheel](https://github.com/adang1345/delvewheel), so they import on machines without a separately installed Visual C++ Redistributable. This fixes the `DLL load failed` / `ImportError` on `_mpcf_cpu` that affected stock Windows installs in prior releases.
 
 ## 0.4.0
 
