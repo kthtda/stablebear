@@ -1,0 +1,35 @@
+{
+  "line_percent": 100.0,
+  "lines_total": 50,
+  "lines_covered": 50,
+  "function_percent": 100.0,
+  "functions_total": 8,
+  "functions_covered": 8,
+  "branch_percent": 94.4,
+  "branches_total": 18,
+  "branches_covered": 17,
+  "files": {
+    "/home/runner/actions-runner/_work/masspcf/masspcf/include/mpcf/cuda/cuda_pcf_kernel.cuh": {
+      "lines_total": 44,
+      "lines_covered": 44,
+      "line_percent": 100.0,
+      "functions_total": 2,
+      "functions_covered": 2,
+      "function_percent": 100.0,
+      "branches_total": 18,
+      "branches_covered": 17,
+      "branch_percent": 94.4
+    },
+    "/home/runner/actions-runner/_work/masspcf/masspcf/include/mpcf/functional/operations.cuh": {
+      "lines_total": 6,
+      "lines_covered": 6,
+      "line_percent": 100.0,
+      "functions_total": 6,
+      "functions_covered": 6,
+      "function_percent": 100.0,
+      "branches_total": 0,
+      "branches_covered": 0,
+      "branch_percent": 0.0
+    }
+  }
+}
