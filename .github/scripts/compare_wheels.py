@@ -16,6 +16,7 @@ IGNORE_GLOBS = [
     "masspcf.libs/libgcc*.so*",  # bundled gcc library
     "masspcf.libs/libstdc++*.so*",  # bundled stdc++ library
     "masspcf.libs/*.dll",  # delvewheel-bundled DLLs (hash-mangled, vary per wheel)
+    "*.dist-info/DELVEWHEEL",  # delvewheel marker file, Windows wheels only
 ]
 
 BUNDLED_LIB_GLOBS = [
