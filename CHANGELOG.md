@@ -1,5 +1,9 @@
 ## 0.4.1
 
+### Persistence
+
+* **`Barcode.is_isomorphic_to` tolerates floating-point noise** — bar endpoints are now compared with a numerical tolerance (`atol=1e-8`, `rtol=1e-5` by default; `abs(a - b) <= atol + rtol * abs(b)`, with infinite endpoints matched exactly). This makes barcodes computed via different but mathematically equivalent routes — for example, from a point cloud versus a precomputed distance matrix — compare equal despite low-order rounding differences. Pass `atol=0, rtol=0` for the previous bitwise comparison.
+
 ### Performance
 
 * **x86-64 baseline raised to v3** — distribution wheels now target the x86-64-v3 microarchitecture level (Haswell / Excavator / Zen 1 and newer, 2013+). On Linux this is `-march=x86-64-v3` (AVX2, FMA, BMI1/2, F16C, LZCNT, MOVBE); on Windows it is the equivalent `/arch:AVX2` baseline. This covers essentially all x86-64 laptops and workstations from the last decade. The main exceptions are pre-2022 Atom-derived chips such as Celeron N, Pentium Silver, and Jasper Lake. macOS x86_64 wheels are the exception: they use the SSE4.2 (`x86-64-v2`) baseline instead of AVX2, so they run under Rosetta 2 and on every Intel Mac (Apple Silicon wheels are native `arm64` and unaffected).
