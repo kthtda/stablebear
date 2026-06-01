@@ -33,7 +33,7 @@ RUN useradd -m -s /bin/bash runner \
 
 WORKDIR /home/runner/actions-runner
 
-ARG RUNNER_VERSION=2.332.0
+ARG RUNNER_VERSION=2.334.0
 RUN curl -fsSL -o runner.tar.gz \
       "https://github.com/actions/runner/releases/download/v${RUNNER_VERSION}/actions-runner-linux-x64-${RUNNER_VERSION}.tar.gz" \
     && tar xzf runner.tar.gz \
