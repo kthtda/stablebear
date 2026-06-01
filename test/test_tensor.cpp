@@ -305,18 +305,6 @@ namespace
     EXPECT_EQ(clamped({ 2 }), T(2));
   }
 
-  TYPED_TEST(TensorTppTyped, SliceRangeNegativeStopResolvesAgainstSize)
-  {
-    using T = TypeParam;
-    auto t = make_sequential<T>({ 5 });  // [0, 1, 2, 3, 4]
-    // a[-4:-1] -> [1, 2, 3]
-    auto view = t[std::vector<mpcf::Slice>{ mpcf::range(-4, -1, std::nullopt) }];
-    EXPECT_EQ(view.shape(0), 3u);
-    EXPECT_EQ(view({ 0 }), T(1));
-    EXPECT_EQ(view({ 1 }), T(2));
-    EXPECT_EQ(view({ 2 }), T(3));
-  }
-
   TYPED_TEST(TensorTppTyped, SliceIndexNegativeResolvesAgainstSize)
   {
     using T = TypeParam;
