@@ -107,6 +107,13 @@ namespace mpcf::ph
       std::sort(thisBars.begin(), thisBars.end());
       std::sort(rhsBars.begin(), rhsBars.end());
 
+      // Exact comparison: a single contiguous compare of the sorted bars,
+      // avoiding the per-endpoint tolerance branches below.
+      if (atol == 0.0 && rtol == 0.0)
+      {
+        return thisBars == rhsBars;
+      }
+
       auto endpointsClose = [atol, rtol](T a, T b) {
         bool aInf = is_infinite(a);
         bool bInf = is_infinite(b);
