@@ -14,81 +14,10 @@
 
 """Helpers for the tensor-indexing parity tests.
 
-Some indexing operations currently dereference an invalid (negative or
-out-of-buffer) data offset. Reading such a view returns garbage and writing
-to it corrupts memory or raises SIGSEGV, which would abort the whole pytest
-session. To keep the suite runnable while still *asserting on the result*
-(not merely executing the expression), those cases run in an isolated
-subprocess: the snippet performs the correctness check internally and the
-parent test asserts the subprocess exited cleanly.
-
-These tests assert the correct NumPy-parity behavior, so they fail (or the
-subprocess crashes / exits non-zero) until the underlying bugs are fixed,
-at which point they pass.
+NumPy is the oracle: the masspcf result must match what NumPy produces for the
+same index expression on the same array.
 """
 
-import subprocess
-import sys
-import textwrap
-
-# Reference arrays + a fresh-tensor factory available to every isolated snippet.
-PRELUDE = textwrap.dedent(
-    """
-    import sys
-    import numpy as np
-    from masspcf.tensor import FloatTensor, IntTensor, BoolTensor
-
-    a = np.arange(24., dtype=np.float64).reshape(4, 6)
-    v = np.arange(6., dtype=np.float64)
-    b = np.arange(24., dtype=np.float64).reshape(2, 3, 4)
-
-    def F(x=None):
-        '''Fresh FloatTensor over a copy of `a` (or `x`).'''
-        return FloatTensor((a if x is None else x).copy())
-    """
-)
-
-
-def run_isolated(body: str, timeout: float = 60.0) -> subprocess.CompletedProcess:
-    """Run ``PRELUDE + body`` in a fresh interpreter and return the result.
-
-    The snippet is expected to perform its own assertions and exit 0 on
-    success. A return code of 0 means the correct behavior held; a negative
-    return code means the child was killed by a signal (e.g. -11 == SIGSEGV);
-    a positive return code means a Python exception / assertion failure.
-    """
-    code = PRELUDE + "\n" + textwrap.dedent(body)
-    return subprocess.run(
-        [sys.executable, "-c", code],
-        capture_output=True,
-        text=True,
-        timeout=timeout,
-    )
-
-
-def assert_isolated_ok(body: str) -> None:
-    """Assert that an isolated snippet exercising correct behavior exits cleanly.
-
-    Fails with the child's stdout/stderr (or the killing signal) attached, so a
-    SIGSEGV or a failed in-child assertion produces a readable test failure
-    rather than aborting the pytest session.
-    """
-    result = run_isolated(body)
-    if result.returncode != 0:
-        if result.returncode < 0:
-            reason = f"child killed by signal {-result.returncode} (e.g. -11 == SIGSEGV)"
-        else:
-            reason = f"child exited with code {result.returncode}"
-        raise AssertionError(
-            f"{reason}\n--- stdout ---\n{result.stdout}\n--- stderr ---\n{result.stderr}"
-        )
-
-
-# --- In-process NumPy-oracle helpers --------------------------------------
-# NumPy is the oracle: the masspcf result must match what NumPy produces for
-# the same index expression on the same array. Used for the cases that raise
-# or return a wrong value in-process (i.e. do NOT dereference an invalid
-# offset); the memory-unsafe cases use the isolated-subprocess helpers above.
 
 def ref_array():
     """A reusable (4, 6) float64 reference array (a fresh copy each call)."""
