@@ -36,6 +36,7 @@ sdist.exclude = [
     ".*",
     "3rd/cuda",
     "3rd/gcc-runtime",
+    "3rd/msvc-runtime",
     "3rd/googletest",
     "3rd/pybind11/docs",
     "3rd/pybind11/tests",

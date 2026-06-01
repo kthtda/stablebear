@@ -56,6 +56,14 @@ PLATFORM_NOTICES = [
         "with GCC runtime libraries covered by the GCC Runtime Library Exception 3.1.",
     ),
     (
+        "Microsoft Visual C++ runtime libraries",
+        "3rd/msvc-runtime/LICENSE",
+        "https://visualstudio.microsoft.com/license-terms/",
+        "On Windows, the binary wheels ship with Microsoft Visual C++ "
+        "Redistributable runtime libraries, redistributed under the Microsoft "
+        "Visual Studio license terms.",
+    ),
+    (
         "NVIDIA CUDA",
         "3rd/cuda/LICENSE",
         "https://docs.nvidia.com/cuda/eula/index.html",

@@ -1,0 +1,6 @@
+For the Microsoft Visual C++ Runtime libraries (e.g. msvcp140.dll,
+msvcp140_atomic_wait.dll), see the Microsoft Visual Studio license terms at
+https://visualstudio.microsoft.com/license-terms/.
+
+These files are redistributable components ("Distributable Code") of the
+Microsoft Visual C++ Redistributable and are redistributed under those terms.
