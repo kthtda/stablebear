@@ -1,10 +1,8 @@
-## Unreleased
+## 0.4.1
 
 ### Persistence
 
 * **`Barcode.is_isomorphic_to` tolerates floating-point noise** — bar endpoints are now compared with a numerical tolerance (`atol=1e-8`, `rtol=1e-5` by default; `abs(a - b) <= atol + rtol * abs(b)`, with infinite endpoints matched exactly). This makes barcodes computed via different but mathematically equivalent routes — for example, from a point cloud versus a precomputed distance matrix — compare equal despite low-order rounding differences. Pass `atol=0, rtol=0` for the previous bitwise comparison.
-
-## 0.4.1
 
 ### Performance
 
