@@ -2,7 +2,7 @@
 
 ### Performance
 
-* **x86-64 baseline raised to v3** — distribution wheels now target the x86-64-v3 microarchitecture level (Haswell / Excavator / Zen 1 and newer, 2013+). On Linux and macOS this is `-march=x86-64-v3` (AVX2, FMA, BMI1/2, F16C, LZCNT, MOVBE); on Windows it is the equivalent `/arch:AVX2` baseline. This covers essentially all x86-64 laptops and workstations from the last decade. The main exceptions are pre-2022 Atom-derived chips such as Celeron N, Pentium Silver, and Jasper Lake.
+* **x86-64 baseline raised to v3** — distribution wheels now target the x86-64-v3 microarchitecture level (Haswell / Excavator / Zen 1 and newer, 2013+). On Linux this is `-march=x86-64-v3` (AVX2, FMA, BMI1/2, F16C, LZCNT, MOVBE); on Windows it is the equivalent `/arch:AVX2` baseline. This covers essentially all x86-64 laptops and workstations from the last decade. The main exceptions are pre-2022 Atom-derived chips such as Celeron N, Pentium Silver, and Jasper Lake. macOS x86_64 wheels are the exception: they use the SSE4.2 (`x86-64-v2`) baseline instead of AVX2, so they run under Rosetta 2 and on every Intel Mac (Apple Silicon wheels are native `arm64` and unaffected).
 * **Parallel tensor evaluation** — `tensor_eval` now dispatches across threads when the total work reaches a tunable threshold (500 by default). "Total work" is the element count for scalar evaluation, and the element count times the number of query points for the batch (array-of-times) overload. Set the threshold with `masspcf.system.set_parallel_eval_threshold(n)` and read it back with `masspcf.system.get_parallel_eval_threshold()`. On multi-core CPUs this gives a several-fold speedup on large tensors.
 
 #### Runtime CPU check

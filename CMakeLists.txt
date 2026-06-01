@@ -353,6 +353,13 @@ enable_language(CXX)
 #   * A local source build (SKBUILD on, CIBUILDWHEEL not set) — i.e. the
 #     user doing "pip install ." or "pip install --no-binary masspcf" —
 #     defaults to "native" so the extension is tuned for this exact CPU.
+#   * macOS x86_64 (any non-native build) defaults to "v2": SSE3/SSSE3/
+#     SSE4.1/SSE4.2/POPCNT, no AVX. The x86_64 distribution wheel is built
+#     and tested on an Apple Silicon CI runner under Rosetta 2, which does
+#     not implement AVX/AVX2/FMA — so an AVX wheel could neither be tested
+#     there nor (once the last Intel CI runner is retired in 2027) built on
+#     real Intel hardware. v2 is supported by Rosetta and by every Intel
+#     Mac, at the cost of AVX2/FMA autovectorization on x86_64 Macs.
 #   * All other builds (cibuildwheel-produced distribution wheels, and
 #     the minimal plain-cmake developer build) default to "v3":
 #     AVX, AVX2, FMA, BMI1/2, F16C, LZCNT, MOVBE. This covers essentially
@@ -368,6 +375,8 @@ enable_language(CXX)
 # build for older CPUs. v4 (AVX-512) is accepted but rarely useful.
 if (SKBUILD AND NOT "$ENV{CIBUILDWHEEL}" STREQUAL "1")
   set(_MPCF_X86_64_DEFAULT "native")
+elseif (APPLE)
+  set(_MPCF_X86_64_DEFAULT "v2")
 else ()
   set(_MPCF_X86_64_DEFAULT "v3")
 endif ()

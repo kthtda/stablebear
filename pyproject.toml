@@ -115,9 +115,13 @@ skip = ["*-win32", "*-manylinux_i686", "*-musllinux*",
     #"cp*t-win_amd64"  # Skip Windows free-threaded until we can figure out build issues on GH Actions
 ]
 
-# Build `universal2` and `arm64` wheels on an Intel runner.
-# Note that the `arm64` wheel and the `arm64` part of the `universal2`
-# wheel cannot be tested in this configuration.
+# Build both `x86_64` and `arm64` wheels on a single (Apple Silicon) CI
+# runner. The `arm64` wheel is tested natively; the `x86_64` wheel is
+# tested under Rosetta 2. Rosetta does not implement AVX/AVX2/FMA, so the
+# macOS x86_64 slice is built at the SSE4.2 (`v2`) baseline — see the
+# MPCF_X86_64_LEVEL block in CMakeLists.txt — which Rosetta and every
+# Intel Mac support. This keeps x86_64 testing on Apple Silicon without
+# depending on the Intel CI runner that GitHub retires in 2027.
 [tool.cibuildwheel.macos]
 archs = ["x86_64", "arm64"]
 
