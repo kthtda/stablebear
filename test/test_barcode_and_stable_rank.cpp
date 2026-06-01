@@ -60,6 +60,30 @@ namespace
     EXPECT_FALSE(b1.is_isomorphic_to(b3));
   }
 
+  TYPED_TEST(BarcodeAndStableRankTest, IsomorphicWithinTolerance)
+  {
+    using T = TypeParam;
+    using Pair = mpcf::ph::PersistencePair<T>;
+    using Barcode = mpcf::ph::Barcode<T>;
+
+    // Endpoints differing by a tiny amount (as can happen when the same
+    // barcode is computed from a point cloud versus a distance matrix).
+    auto eps = static_cast<T>(1e-6);
+    Barcode a(std::vector<Pair>{ Pair(T(0), T(0.678862)), Pair(T(0), T(0.880222)) });
+    Barcode b(std::vector<Pair>{ Pair(T(0), T(0.678862) + eps), Pair(T(0), T(0.880222) - eps) });
+
+    // Tolerant by default.
+    EXPECT_TRUE(a.is_isomorphic_to(b));
+
+    // Bitwise comparison rejects the same tiny difference.
+    EXPECT_FALSE(a.is_isomorphic_to(b, 0.0, 0.0));
+
+    // Infinite endpoints must match exactly, even with generous tolerance.
+    Barcode inf(std::vector<Pair>{ Pair(T(0), std::numeric_limits<T>::infinity()) });
+    Barcode fin(std::vector<Pair>{ Pair(T(0), T(1e12)) });
+    EXPECT_FALSE(inf.is_isomorphic_to(fin, 1.0, 1.0));
+  }
+
   // ============================================================================
   // is_infinite and streaming with infinities
   // ============================================================================

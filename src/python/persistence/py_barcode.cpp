@@ -94,7 +94,8 @@ namespace
           return PyPersistenceBarcodeBindings<T>::dunder_repr(self);
         })
 
-        .def("is_isomorphic_to", &BcT::is_isomorphic_to)
+        .def("is_isomorphic_to", &BcT::is_isomorphic_to,
+             py::arg("other"), py::arg("atol") = 1e-8, py::arg("rtol") = 1e-5)
       ;
     }
   };

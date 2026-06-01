@@ -19,6 +19,9 @@
 
 #include <iosfwd>
 #include <algorithm>
+#include <cmath>
+#include <cstddef>
+#include <limits>
 
 namespace mpcf::ph
 {
@@ -77,7 +80,21 @@ namespace mpcf::ph
       return m_bars == rhs.m_bars;
     }
 
-    [[nodiscard]] bool is_isomorphic_to(const Barcode& rhs) const
+    /**
+     * Tests whether two barcodes are isomorphic, i.e. whether their bars agree
+     * as multisets (order independent). Endpoints are compared with a numerical
+     * tolerance so that barcodes computed via different (but mathematically
+     * equivalent) routes — e.g. from a point cloud versus a precomputed distance
+     * matrix — still compare equal despite floating-point rounding. Two endpoints
+     * `a` and `b` are considered equal when `|a - b| <= atol + rtol * |b|`, with
+     * infinite endpoints matched exactly. Pass `atol = rtol = 0` for a bitwise
+     * comparison.
+     * @param rhs The `Barcode` to compare against.
+     * @param atol Absolute tolerance for endpoint comparison.
+     * @param rtol Relative tolerance for endpoint comparison.
+     * @return `true` if the barcodes are isomorphic within tolerance.
+     */
+    [[nodiscard]] bool is_isomorphic_to(const Barcode& rhs, double atol = 1e-8, double rtol = 1e-5) const
     {
       if (m_bars.size() != rhs.m_bars.size())
       {
@@ -90,7 +107,26 @@ namespace mpcf::ph
       std::sort(thisBars.begin(), thisBars.end());
       std::sort(rhsBars.begin(), rhsBars.end());
 
-      return thisBars == rhsBars;
+      auto endpointsClose = [atol, rtol](T a, T b) {
+        bool aInf = is_infinite(a);
+        bool bInf = is_infinite(b);
+        if (aInf || bInf)
+          return aInf && bInf; // infinities must match exactly
+        auto da = static_cast<double>(a);
+        auto db = static_cast<double>(b);
+        return std::abs(da - db) <= atol + rtol * std::abs(db);
+      };
+
+      for (std::size_t i = 0; i < thisBars.size(); ++i)
+      {
+        if (!endpointsClose(thisBars[i].birth, rhsBars[i].birth) ||
+            !endpointsClose(thisBars[i].death, rhsBars[i].death))
+        {
+          return false;
+        }
+      }
+
+      return true;
     }
 
     [[nodiscard]] const std::vector<mpcf::ph::PersistencePair<T>>& bars() const { return m_bars; }

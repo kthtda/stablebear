@@ -89,6 +89,24 @@ class Barcode:
         _save_object(self, buf)
         return _unpickle_object, (buf.getvalue(),)
 
-    def is_isomorphic_to(self, bc: Barcode):
-        """Check whether two barcodes are isomorphic (same multiset of bars)."""
-        return self._data.is_isomorphic_to(bc._data)
+    def is_isomorphic_to(self, bc: Barcode, atol: float = 1e-8, rtol: float = 1e-5):
+        """Check whether two barcodes are isomorphic (same multiset of bars).
+
+        Bar endpoints are compared with a numerical tolerance so that barcodes
+        computed via different but mathematically equivalent routes (for example,
+        from a point cloud versus a precomputed distance matrix) still compare
+        equal despite floating-point rounding. Two endpoints ``a`` and ``b`` are
+        considered equal when ``abs(a - b) <= atol + rtol * abs(b)``; infinite
+        endpoints must match exactly.
+
+        Parameters
+        ----------
+        bc : Barcode
+            The barcode to compare against.
+        atol : float, optional
+            Absolute tolerance for endpoint comparison, by default ``1e-8``.
+        rtol : float, optional
+            Relative tolerance for endpoint comparison, by default ``1e-5``.
+            Pass ``atol=0, rtol=0`` for a bitwise comparison.
+        """
+        return self._data.is_isomorphic_to(bc._data, atol, rtol)
