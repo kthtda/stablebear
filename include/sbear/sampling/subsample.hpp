@@ -49,6 +49,8 @@ namespace sb::sampling
   {
     T operator()(const PointCloud<T>& X, size_t i, const PointCloud<T>& R, size_t r) const
     {
+      if (X.dim() != R.dim())
+        throw std::invalid_argument("query and reference points must have the same dimension");
       T acc = T(0);
       for (size_t k = 0; k < X.dim(); ++k)
       {
