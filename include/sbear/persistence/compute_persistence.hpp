@@ -149,9 +149,9 @@ namespace sb::ph
                                  shape_to_string(points.shape()) + " (should be (m, n))");
       }
 
-      // n_points()/dim()/coord() read through any indexing transparently, so an
+      // n_points()/dim()/operator()(i, j) read through any indexing transparently, so an
       // indexed subsample (sharing a source cloud) needs no special handling.
-      run_euclidean_ripser([&points](size_t i, size_t j) { return points.coord(i, j); },
+      run_euclidean_ripser([&points](size_t i, size_t j) { return points(i, j); },
                            points.n_points(), points.dim(), ret, maxDim, index, reducedHomology);
     }
 

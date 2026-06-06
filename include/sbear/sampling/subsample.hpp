@@ -52,7 +52,7 @@ namespace sb::sampling
       T acc = T(0);
       for (size_t k = 0; k < X.dim(); ++k)
       {
-        T d = X.coord(i, k) - R.coord(r, k);
+        T d = X(i, k) - R(r, k);
         acc += d * d;
       }
       return std::sqrt(acc);

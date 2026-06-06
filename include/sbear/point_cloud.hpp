@@ -32,7 +32,7 @@ namespace sb
   ///
   /// A PointCloud either owns its coordinates (like any Tensor<T>) or is an
   /// indexed view: it shares another cloud's coordinate buffer and selects rows
-  /// through an attached index set. Access via n_points()/dim()/coord() is
+  /// through an attached index set. Access via n_points()/dim()/operator()(i, j) is
   /// transparent to which mode it is in, so consumers (e.g. Ripser) need no
   /// special case. This lets a tensor of subsamples store one shared source plus
   /// small index arrays instead of re-storing every (possibly high-dimensional)
@@ -43,6 +43,7 @@ namespace sb
   public:
     using Tensor<T>::Tensor;
     using Tensor<T>::operator=;
+    using Tensor<T>::operator();  // keep base subscripts visible alongside the (i, j) overload below
 
     PointCloud() = default;
     PointCloud(const Tensor<T>& coords) : Tensor<T>(coords) { }
@@ -62,7 +63,7 @@ namespace sb
     size_t dim() const { return this->shape(1); }
 
     /// Coordinate @p j of point @p i, transparent to indexing.
-    T coord(size_t i, size_t j) const
+    const T& operator()(size_t i, size_t j) const
     {
       size_t row = is_indexed() ? static_cast<size_t>(m_indices({i})) : i;
       return (*this)({row, j});
