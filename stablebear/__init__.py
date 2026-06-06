@@ -33,6 +33,7 @@ from .tensor import (
     IntPcfTensor,
     IntTensor,
     PcfTensor,
+    PointCloud,
     PointCloudTensor,
 )
 from .tensor_create import array_split, concatenate, split, stack, zeros

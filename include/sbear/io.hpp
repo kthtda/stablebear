@@ -263,8 +263,12 @@ namespace sb
     else if (format == io::detail::tensorFormat<Pcf<int32_t, int32_t>>()) { return io::detail::read_tensor<Pcf<int32_t, int32_t>>(is); }
     else if (format == io::detail::tensorFormat<Pcf<int64_t, int64_t>>()) { return io::detail::read_tensor<Pcf<int64_t, int64_t>>(is); }
 
-    else if (format == io::detail::tensorFormat<PointCloud<float32_t>>()) { return io::detail::read_tensor<PointCloud<float32_t>>(is); }
-    else if (format == io::detail::tensorFormat<PointCloud<float64_t>>()) { return io::detail::read_tensor<PointCloud<float64_t>>(is); }
+    // Legacy point cloud format (every element a full nested tensor) — read as materialized clouds.
+    else if (format == io::detail::TensorFormat{1000, 32}) { return io::detail::read_tensor<PointCloud<float32_t>>(is); }
+    else if (format == io::detail::TensorFormat{1000, 64}) { return io::detail::read_tensor<PointCloud<float64_t>>(is); }
+    // Current point cloud format (shared-source dedup).
+    else if (format == io::detail::tensorFormat<PointCloud<float32_t>>()) { return io::detail::read_indexed_point_cloud_tensor<float32_t>(is); }
+    else if (format == io::detail::tensorFormat<PointCloud<float64_t>>()) { return io::detail::read_indexed_point_cloud_tensor<float64_t>(is); }
 
     else if (format == io::detail::tensorFormat<SymmetricMatrix<float32_t>>()) { return io::detail::read_tensor<SymmetricMatrix<float32_t>>(is); }
     else if (format == io::detail::tensorFormat<SymmetricMatrix<float64_t>>()) { return io::detail::read_tensor<SymmetricMatrix<float64_t>>(is); }

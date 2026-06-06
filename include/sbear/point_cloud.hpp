@@ -20,10 +20,95 @@
 #define STABLEBEAR_POINT_CLOUD_H
 
 #include "tensor.hpp"
+
+#include <cstdint>
+#include <type_traits>
 #include <vector>
 
 namespace sb
 {
+
+  /// A point cloud of shape (n_points, dim).
+  ///
+  /// A PointCloud either owns its coordinates (like any Tensor<T>) or is an
+  /// indexed view: it shares another cloud's coordinate buffer and selects rows
+  /// through an attached index set. Access via n_points()/dim()/coord() is
+  /// transparent to which mode it is in, so consumers (e.g. Ripser) need no
+  /// special case. This lets a tensor of subsamples store one shared source plus
+  /// small index arrays instead of re-storing every (possibly high-dimensional)
+  /// point.
+  template <ArithmeticType T>
+  class PointCloud : public Tensor<T>
+  {
+  public:
+    using Tensor<T>::Tensor;
+    using Tensor<T>::operator=;
+
+    PointCloud() = default;
+    PointCloud(const Tensor<T>& coords) : Tensor<T>(coords) { }
+    PointCloud(Tensor<T>&& coords) : Tensor<T>(std::move(coords)) { }
+
+    /// Indexed view: shares @p source's coordinates and selects rows via @p indices.
+    PointCloud(const Tensor<T>& source, Tensor<uint64_t> indices)
+      : Tensor<T>(source), m_indices(std::move(indices)) { }
+
+    /// Whether this is an indexed view (rather than owning its coordinates).
+    bool is_indexed() const { return m_indices.rank() == 1; }
+
+    /// Number of points: selected rows when indexed, otherwise stored rows.
+    size_t n_points() const { return is_indexed() ? m_indices.shape(0) : this->shape(0); }
+
+    /// Point dimension.
+    size_t dim() const { return this->shape(1); }
+
+    /// Coordinate @p j of point @p i, transparent to indexing.
+    T coord(size_t i, size_t j) const
+    {
+      size_t row = is_indexed() ? static_cast<size_t>(m_indices({i})) : i;
+      return (*this)({row, j});
+    }
+
+    /// The attached indices (rank-1 when indexed, empty otherwise).
+    const Tensor<uint64_t>& indices() const { return m_indices; }
+
+    /// Materialize the selected points into a contiguous coordinate tensor.
+    /// Returns the coordinates as-is when not indexed.
+    Tensor<T> materialize() const
+    {
+      if (!is_indexed())
+      {
+        return *this;
+      }
+
+      Tensor<T> out({n_points(), dim()});
+      for (size_t i = 0; i < n_points(); ++i)
+      {
+        for (size_t j = 0; j < dim(); ++j)
+        {
+          out({i, j}) = coord(i, j);
+        }
+      }
+      return out;
+    }
+
+  private:
+    Tensor<uint64_t> m_indices;  // rank-1 when an indexed view, empty otherwise
+  };
+
+  /**
+   * Cast a tensor of point clouds (Tensor<PointCloud<U>>) to a different precision
+   * (Tensor<PointCloud<T>>), converting each point cloud's coordinates.
+   */
+  template <typename T, typename U>
+  requires std::is_constructible_v<T, U>
+  [[nodiscard]] Tensor<PointCloud<T>> pcloud_cast(const Tensor<PointCloud<U>>& src)
+  {
+    Tensor<PointCloud<T>> result(src.shape());
+    walk(src, [&](const std::vector<size_t>& idx) {
+      result(idx) = PointCloud<T>(tensor_cast<T>(src(idx).materialize()));
+    });
+    return result;
+  }
 
 }
 

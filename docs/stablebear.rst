@@ -7,3 +7,4 @@ Python API reference
    api_base
    api_point_process
    api_persistence
+   api_sampling

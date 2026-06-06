@@ -16,6 +16,7 @@
 #define STABLEBEAR_COMPUTE_PERSISTENCE_H
 
 #include "../tensor.hpp"
+#include "../point_cloud.hpp"
 #include "../distance_matrix.hpp"
 #include "../executor.hpp"
 #include "../task.hpp"
@@ -102,6 +103,30 @@ namespace sb::ph
       }
     }
 
+    /// Build a Euclidean distance matrix from @p nPoints points of dimension
+    /// @p dim (coordinates read via @p coord(i, j)) and run Ripser into @p ret.
+    template <typename T, typename CoordFn>
+    void run_euclidean_ripser(CoordFn coord, size_t nPoints, size_t dim, Tensor<Barcode<T>>& ret,
+                              size_t maxDim, const std::vector<size_t>& index, bool reducedHomology)
+    {
+      std::vector<std::vector<rips::value_t>> rpoints;
+      rpoints.reserve(nPoints);
+
+      for (auto i = 0_uz; i < nPoints; ++i)
+      {
+        rpoints.emplace_back();
+        auto & curRPoint = rpoints.back();
+        curRPoint.resize(dim);
+        for (auto j = 0_uz; j < dim; ++j)
+        {
+          curRPoint[j] = coord(i, j);
+        }
+      }
+
+      rips::euclidean_distance_matrix distanceMatrix(std::move(rpoints));
+      run_ripser(distanceMatrix, nPoints, ret, maxDim, index, reducedHomology);
+    }
+
     template <typename T>
     void compute_persistence_euclidean_single_impl(const Tensor<PointCloud<T>>& pclouds, Tensor<Barcode<T>>& ret, size_t maxDim, const std::vector<size_t>& index, bool reducedHomology = false)
     {
@@ -124,22 +149,10 @@ namespace sb::ph
                                  shape_to_string(points.shape()) + " (should be (m, n))");
       }
 
-      std::vector<std::vector<rips::value_t>> rpoints;
-      rpoints.reserve(points.shape(0));
-
-      for (auto i = 0_uz; i < points.shape(0); ++i)
-      {
-        rpoints.emplace_back();
-        auto & curRPoint = rpoints.back();
-        curRPoint.resize(points.shape(1));
-        for (auto j = 0_uz; j < points.shape(1); ++j)
-        {
-          curRPoint[j] = points({i, j});
-        }
-      }
-
-      rips::euclidean_distance_matrix distanceMatrix(std::move(rpoints));
-      run_ripser(distanceMatrix, points.shape(0), ret, maxDim, index, reducedHomology);
+      // n_points()/dim()/coord() read through any indexing transparently, so an
+      // indexed subsample (sharing a source cloud) needs no special handling.
+      run_euclidean_ripser([&points](size_t i, size_t j) { return points.coord(i, j); },
+                           points.n_points(), points.dim(), ret, maxDim, index, reducedHomology);
     }
 
     template <typename T>

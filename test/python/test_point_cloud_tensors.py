@@ -13,6 +13,7 @@
 #  limitations under the License.
 
 import numpy as np
+import pytest
 
 import stablebear as sb
 
@@ -34,11 +35,17 @@ def test_can_create_point_clouds():
     assert isinstance(Y, sb.PointCloudTensor)
     assert Y.dtype == sb.pcloud32
 
-    Y[0, 0] = np.random.randn(30, 2, 20)
-    Y[1, 1] = np.random.randn(40, 15, 10)
+    Y[0, 0] = np.random.randn(30, 2)
+    Y[1, 1] = np.random.randn(40, 15)
 
-    assert Y[0, 0].shape == (30, 2, 20)
-    assert Y[1, 1].shape == (40, 15, 10)
+    assert Y[0, 0].shape == (30, 2)
+    assert Y[1, 1].shape == (40, 15)
+
+
+def test_point_clouds_must_be_rank_2():
+    X = sb.zeros((2,), dtype=sb.pcloud64)
+    with pytest.raises(ValueError):
+        X[0] = np.random.randn(30, 2, 20)
 
 
 def test_stored_is_same_as_numpy():

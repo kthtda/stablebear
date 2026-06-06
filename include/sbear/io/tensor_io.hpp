@@ -19,8 +19,12 @@
 #include "barcode_io.hpp"
 #include "compressed_matrix_io.hpp"
 #include "../tensor.hpp"
+#include "../point_cloud.hpp"
 #include "../functional/pcf.hpp"
 #include "../persistence/barcode.hpp"
+
+#include <unordered_map>
+#include <vector>
 
 namespace sb::io::detail
 {
@@ -44,6 +48,15 @@ namespace sb::io::detail
 
   template <typename T>
   inline constexpr bool is_compressed_matrix_v = is_compressed_matrix<T>::value;
+
+  template <typename T>
+  struct is_point_cloud : std::false_type {};
+
+  template <typename T>
+  struct is_point_cloud<PointCloud<T>> : std::true_type { using scalar_type = T; };
+
+  template <typename T>
+  inline constexpr bool is_point_cloud_v = is_point_cloud<T>::value;
 
   using StreamableTensor = std::variant<
       Tensor<float32_t>,
@@ -128,8 +141,11 @@ namespace sb::io::detail
     else if constexpr (std::is_same_v<T, Pcf<int32_t, int32_t>>) { return TensorFormat{ .baseFormat = 101, .subFormat = 32 }; }
     else if constexpr (std::is_same_v<T, Pcf<int64_t, int64_t>>) { return TensorFormat{ .baseFormat = 101, .subFormat = 64 }; }
 
-    else if constexpr (std::is_same_v<T, PointCloud<float32_t>>) { return TensorFormat{ .baseFormat = 1000, .subFormat = 32 }; }
-    else if constexpr (std::is_same_v<T, PointCloud<float64_t>>) { return TensorFormat{ .baseFormat = 1000, .subFormat = 64 }; }
+    // baseFormat 1000 is the legacy point cloud format (every element stored as a
+    // full nested tensor); 1001 is the current format that stores each distinct
+    // source coordinate buffer once plus per-element (source id, indices).
+    else if constexpr (std::is_same_v<T, PointCloud<float32_t>>) { return TensorFormat{ .baseFormat = 1001, .subFormat = 32 }; }
+    else if constexpr (std::is_same_v<T, PointCloud<float64_t>>) { return TensorFormat{ .baseFormat = 1001, .subFormat = 64 }; }
 
     else if constexpr (std::is_same_v<T, SymmetricMatrix<float32_t>>) { return TensorFormat{ .baseFormat = 1100, .subFormat = 32 }; }
     else if constexpr (std::is_same_v<T, SymmetricMatrix<float64_t>>) { return TensorFormat{ .baseFormat = 1100, .subFormat = 64 }; }
@@ -184,6 +200,43 @@ namespace sb::io::detail
     return io::detail::read_tensor<typename TensorT::value_type>(is);
   }
 
+  // Serialize the elements of a tensor of point clouds by storing each distinct
+  // source coordinate buffer once (point clouds that share a source — e.g. the
+  // indexed subsamples from stablebear.sampling — are deduplicated), followed by
+  // every element as a source id plus, for indexed views, its index array.
+  template <typename ScalarT>
+  void write_point_cloud_elements(std::ostream& os, const Tensor<PointCloud<ScalarT>>& tensor)
+  {
+    std::unordered_map<const void*, uint64_t> idOf;
+    std::vector<const PointCloud<ScalarT>*> sources;
+
+    auto sz = tensor.size();
+    const auto* data = tensor.data();
+    std::vector<uint64_t> sourceId(sz);
+    for (auto k = 0_uz; k < sz; ++k)
+    {
+      const PointCloud<ScalarT>& elem = data[k];
+      const void* key = static_cast<const void*>(elem.data());
+      auto [it, inserted] = idOf.try_emplace(key, static_cast<uint64_t>(sources.size()));
+      if (inserted)
+        sources.push_back(&elem);
+      sourceId[k] = it->second;
+    }
+
+    write_bytes<uint64_t>(os, static_cast<uint64_t>(sources.size()));
+    for (const PointCloud<ScalarT>* src : sources)
+      write_tensor(os, static_cast<const Tensor<ScalarT>&>(*src));
+
+    for (auto k = 0_uz; k < sz; ++k)
+    {
+      write_bytes<uint64_t>(os, sourceId[k]);
+      const PointCloud<ScalarT>& elem = data[k];
+      write_bytes<uint8_t>(os, elem.is_indexed() ? uint8_t{1} : uint8_t{0});
+      if (elem.is_indexed())
+        write_tensor(os, elem.indices());
+    }
+  }
+
   template <IsTensor TensorT>
     void write_contiguous_tensor(std::ostream& os, const TensorT& tensor)
   {
@@ -199,10 +252,16 @@ namespace sb::io::detail
       write_bytes<std::uint64_t>(os, static_cast<uint64_t>(tensor.strides()[i]));
     }
 
+    using value_type = typename TensorT::value_type;
+    if constexpr (is_point_cloud_v<value_type>)
+    {
+      write_point_cloud_elements<typename is_point_cloud<value_type>::scalar_type>(os, tensor);
+      return;
+    }
+
     auto sz = tensor.size();
     for (auto const * elem = tensor.data(); elem != tensor.data() + sz; ++elem)
     {
-      //using value_type = typename TensorT::value_type;
       write_element(os, *elem);
     }
   }
@@ -253,6 +312,47 @@ namespace sb::io::detail
         *elem = read_compressed_matrix<T>(is);
       else
         *elem = read_element<T>(is);
+    }
+
+    return ret;
+  }
+
+  // Read the current (baseFormat 1001) point cloud tensor format: distinct source
+  // coordinate buffers stored once, then per-element (source id, optional indices).
+  // Elements that reference the same source share its coordinate buffer.
+  template <typename ScalarT>
+  Tensor<PointCloud<ScalarT>> read_indexed_point_cloud_tensor(std::istream& is)
+  {
+    auto shapeSz = read_bytes<std::uint64_t>(is);
+    std::vector<size_t> shape(shapeSz);
+    std::vector<ptrdiff_t> strides(shapeSz);
+    for (auto i = 0_uz; i < shapeSz; ++i)
+    {
+      shape[i] = read_bytes<std::uint64_t>(is);
+      strides[i] = static_cast<ptrdiff_t>(read_bytes<std::uint64_t>(is));
+    }
+
+    Tensor<PointCloud<ScalarT>> ret(shape);
+    if (ret.strides() != strides)
+    {
+      throw std::runtime_error("Incorrect strides in saved data (expected " + index_to_string(ret.strides()) + " but got " + index_to_string(strides) + ")");
+    }
+
+    auto numSources = read_bytes<std::uint64_t>(is);
+    std::vector<Tensor<ScalarT>> sources;
+    sources.reserve(numSources);
+    for (auto i = 0_uz; i < numSources; ++i)
+      sources.push_back(read_element<Tensor<ScalarT>>(is));
+
+    auto sz = ret.size();
+    for (auto * elem = ret.data(); elem != ret.data() + sz; ++elem)
+    {
+      auto id = read_bytes<std::uint64_t>(is);
+      auto indexed = read_bytes<std::uint8_t>(is);
+      if (indexed)
+        *elem = PointCloud<ScalarT>(sources[id], read_element<Tensor<uint64_t>>(is));
+      else
+        *elem = PointCloud<ScalarT>(sources[id]);
     }
 
     return ret;

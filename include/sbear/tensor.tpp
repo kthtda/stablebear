@@ -904,17 +904,6 @@ namespace sb
     return result;
   }
 
-  template <typename T, typename U>
-  requires std::is_constructible_v<T, U>
-  Tensor<Tensor<T>> pcloud_cast(const Tensor<Tensor<U>>& src)
-  {
-    Tensor<Tensor<T>> result(src.shape());
-    walk(src, [&](const std::vector<size_t>& idx) {
-      result(idx) = tensor_cast<T>(src(idx));
-    });
-    return result;
-  }
-
   // ============================================================================
   // Joining operations
   // ============================================================================

@@ -12,6 +12,11 @@
 ### Performance
 
 * **Reductions read input slices in place** — `mean` and `max_time` no longer deep-copy every PCF into a temporary vector before reducing; they iterate each slice in place via the value iterator, cutting allocation on large reductions.
+### Sampling
+
+* **New `stablebear.sampling` subpackage** — implements the front end of the relative-approach pipeline of Agerberg, Chacholski & Ramanujam (2023). `stablebear.sampling.subsample(reference, query, sample_size=..., n_instances=...)` draws, for each query point, `n_instances` subsamples of `sample_size` points from a reference point cloud, with per-query-point sampling probabilities formed by applying a *filter* to each (query point, reference point) pair and passing the result through a *distribution*. The built-in `"distance"` filter (Euclidean) and the `Gaussian` / `Identity` distributions run entirely in parallel C++; arbitrary Python callables are also accepted for both. The result is a `(n_query, n_instances)` `PointCloudTensor` that feeds directly into `compute_persistent_homology` → `barcode_to_stable_rank` → `mean` to obtain a relative stable rank per query point.
+* **Indexed point clouds** — subsamples are returned as *indexed views* that share the reference cloud's coordinates and store only the chosen row indices, rather than re-storing every (possibly high-dimensional) point. A single `PointCloud` element exposes `.is_indexed`, `.indices`, `.shape`, and `.materialize()`; its coordinates are only copied when it is converted to NumPy. Persistent homology consumes indexed subsamples directly, so the full sampling → persistence pipeline never materializes all subsamples at once. Point clouds are now first-class (rank-2 `(n_points, dim)`) objects backed by `sb::PointCloud`.
+* **Point cloud serialization** — `save`/`load` of a point cloud tensor now stores each distinct source coordinate buffer once, followed by each element as a source id plus (for indexed views) its index array, so a tensor of shared-source subsamples no longer duplicates coordinates on disk. Point cloud files written by earlier versions remain readable (they load as materialized clouds).
 
 ### Persistence
 

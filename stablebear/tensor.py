@@ -17,7 +17,7 @@ from __future__ import annotations
 import numpy as np
 
 from . import _sb_cpp as cpp
-from ._tensor_base import ArithmeticTensorMixin, FunctionTensorMixin, Tensor, _tensor_from_nested
+from ._tensor_base import ArithmeticTensorMixin, FunctionTensorMixin, Shape, Tensor, _tensor_from_nested
 from .functional.pcf import Pcf
 from .typing import (
     _NP_TO_SB,
@@ -271,6 +271,54 @@ class IntPcfTensor(_PcfTensorBase):
         return IntPcfTensor(data)
 
 
+class PointCloud:
+    """A single (rank-2) point cloud, of shape ``(n_points, dim)``.
+
+    May be an *indexed view* that shares another cloud's coordinates and selects
+    rows through an index array (the memory-frugal output of
+    :func:`stablebear.sampling.subsample`). All operations work directly on the view;
+    the coordinates are only copied when the cloud is converted to NumPy.
+    """
+
+    def __init__(self, data):
+        self._data = data
+        self.dtype = float64 if isinstance(data, cpp.Float64Tensor) else float32
+
+    @property
+    def shape(self):
+        return Shape([self._data.n_points, self._data.n_dims])
+
+    @property
+    def is_indexed(self):
+        """Whether this cloud is an indexed view rather than owning its coordinates."""
+        return self._data.is_indexed
+
+    @property
+    def indices(self):
+        """The selected source-row indices, or ``None`` when not an indexed view."""
+        return IntTensor(self._data.indices) if self._data.is_indexed else None
+
+    def materialize(self) -> FloatTensor:
+        """Return a contiguous ``FloatTensor`` of the (selected) coordinates."""
+        return FloatTensor(self._data.materialize())
+
+    def to_numpy(self):
+        return np.asarray(self._data.materialize())
+
+    def __array__(self, dtype=None):
+        arr = self.to_numpy()
+        return arr if dtype is None else arr.astype(dtype)
+
+    def array_equal(self, other) -> bool:
+        return np.array_equal(self.to_numpy(), np.asarray(other))
+
+    def __repr__(self):
+        return self.to_numpy().__repr__()
+
+    def __str__(self):
+        return self.to_numpy().__str__()
+
+
 class PointCloudTensor(Tensor):
     def __init__(self, data: cpp.PointCloud32Tensor | cpp.PointCloud64Tensor):
         super().__init__()
@@ -285,11 +333,15 @@ class PointCloudTensor(Tensor):
         return PointCloudTensor(data)
 
     def _represent_element(self, element):
-        return FloatTensor(element)
+        return PointCloud(element)
 
     def _decay_value(self, val):
         float_dtype = _PCLOUD_TO_FLOAT_DTYPE[self.dtype]
         t = FloatTensor(val, dtype=float_dtype)
+        if t.ndim != 2:
+            raise ValueError(
+                f"A point cloud must be 2-D (n_points, dim); got shape {tuple(t.shape)}."
+            )
         return t._data
 
     def _get_valid_setitem_dtypes(self):

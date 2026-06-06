@@ -17,6 +17,7 @@
 #include "py_tensor.hpp"
 
 #include <sbear/tensor.hpp>
+#include <sbear/point_cloud.hpp>
 #include <sbear/functional/pcf.hpp>
 
 #include <sstream>
@@ -132,6 +133,22 @@ namespace
 
   }
 
+  // The element type of a PointCloud tensor. Registered as a subclass of the
+  // scalar Tensor<T> so it can be returned to Python; an element may be an indexed
+  // view sharing a source cloud (materialized lazily — see stablebear.tensor.PointCloud).
+  template <typename T>
+  void register_point_cloud_element(py::module_& m, const std::string& suffix)
+  {
+    using PC = sb::PointCloud<T>;
+    py::class_<PC, sb::Tensor<T>>(m, ("PointCloud" + suffix + "_inner").c_str())
+        .def(py::init<const sb::Tensor<T>&>())
+        .def_property_readonly("n_points", &PC::n_points)
+        .def_property_readonly("n_dims", &PC::dim)
+        .def_property_readonly("is_indexed", &PC::is_indexed)
+        .def_property_readonly("indices", &PC::indices)
+        .def("materialize", &PC::materialize);
+  }
+
 }
 
 namespace sb_py
@@ -157,5 +174,8 @@ namespace sb_py
 
     register_typed_tensor_bindings<sb::PointCloud<sb::float32_t>>(m, "PointCloud32", "");
     register_typed_tensor_bindings<sb::PointCloud<sb::float64_t>>(m, "PointCloud64", "");
+
+    register_point_cloud_element<sb::float32_t>(m, "32");
+    register_point_cloud_element<sb::float64_t>(m, "64");
   }
 }
