@@ -80,12 +80,15 @@ namespace sb
         return *this;
       }
 
-      Tensor<T> out({n_points(), dim()});
-      for (size_t i = 0; i < n_points(); ++i)
+      const size_t n = n_points();
+      const size_t d = dim();
+      Tensor<T> out({n, d});
+      for (size_t i = 0; i < n; ++i)
       {
-        for (size_t j = 0; j < dim(); ++j)
+        const size_t row = static_cast<size_t>(m_indices({i}));
+        for (size_t j = 0; j < d; ++j)
         {
-          out({i, j}) = coord(i, j);
+          out({i, j}) = (*this)({row, j});
         }
       }
       return out;
