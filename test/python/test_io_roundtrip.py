@@ -17,6 +17,7 @@ import io
 import numpy as np
 
 import stablebear as sb
+from stablebear.sampling import Gaussian, subsample
 
 
 def _roundtrip(tensor):
@@ -118,3 +119,25 @@ def test_barcode64_tensor_roundtrip():
 
 def test_barcode32_tensor_empty():
     _assert_roundtrip(sb.zeros((3,), dtype=sb.barcode32))
+
+
+# --- Indexed point clouds (subsamples) ---
+
+
+def test_indexed_subsamples_roundtrip():
+    R = np.random.default_rng(0).standard_normal((150, 6))
+    X = np.random.default_rng(1).standard_normal((3, 6))
+    subs = subsample(R, X, sample_size=12, n_instances=7,
+                     distribution=Gaussian(0.0, 1.0), generator=sb.random.Generator(0))
+
+    before = [[np.asarray(subs[i, j]) for j in range(7)] for i in range(3)]
+
+    loaded = _roundtrip(subs)
+
+    assert isinstance(loaded, sb.PointCloudTensor)
+    assert loaded.shape == (3, 7)
+    # Indexed structure survives the round trip (sources shared, not re-stored).
+    assert loaded[0, 0].is_indexed
+    for i in range(3):
+        for j in range(7):
+            assert np.array_equal(np.asarray(loaded[i, j]), before[i][j])

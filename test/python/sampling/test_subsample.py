@@ -218,27 +218,6 @@ def test_subsamples_are_indexed_views():
     assert np.array_equal(el.to_numpy(), R[idx])
 
 
-def test_indexed_subsamples_roundtrip_io(tmp_path):
-    R = np.random.default_rng(0).standard_normal((150, 6))
-    X = np.random.default_rng(1).standard_normal((3, 6))
-    subs = subsample(R, X, sample_size=12, n_instances=7,
-                     distribution=Gaussian(0.0, 1.0), generator=sb.random.Generator(0))
-
-    before = [[np.asarray(subs[i, j]) for j in range(7)] for i in range(3)]
-
-    path = str(tmp_path / "subs.sb")
-    sb.save(subs, path)
-    loaded = sb.load(path)
-
-    assert isinstance(loaded, sb.PointCloudTensor)
-    assert loaded.shape == (3, 7)
-    # Indexed structure survives the round trip (sources shared, not re-stored).
-    assert loaded[0, 0].is_indexed
-    for i in range(3):
-        for j in range(7):
-            assert np.array_equal(np.asarray(loaded[i, j]), before[i][j])
-
-
 def test_pipeline_to_relative_stable_rank():
     R = np.random.default_rng(0).standard_normal((200, 2))
     X = np.random.default_rng(1).standard_normal((4, 2))
