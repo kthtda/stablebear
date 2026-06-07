@@ -1,0 +1,47 @@
+{
+  "name": "masspcf-cpu",
+
+  // Reuses the shared Dockerfile with a plain Ubuntu base (no CUDA). Works on
+  // any host -- including macOS (Apple Silicon arm64 or Intel) -- since there's
+  // no GPU passthrough and the base image is multi-arch. With no nvcc present,
+  // the build auto-disables CUDA; BUILD_WITH_CUDA=0 makes that explicit.
+  "build": {
+    "dockerfile": "../Dockerfile",
+    "context": "../..",
+    "args": {
+      "BASE_IMAGE": "ubuntu:22.04"
+    }
+  },
+
+  "containerEnv": {
+    "BUILD_WITH_CUDA": "0"
+  },
+
+  "remoteUser": "ubuntu",
+
+  "mounts": [
+    // Persist Claude Code auth/config across rebuilds.
+    "source=${localEnv:HOME}/.claude,target=/home/ubuntu/.claude,type=bind,consistency=cached",
+    "source=${localEnv:HOME}/.claude.json,target=/home/ubuntu/.claude.json,type=bind,consistency=cached",
+    // Container-private build dir (shadows the host's host-path CMakeCache.txt).
+    "source=masspcf-cpu-build,target=${containerWorkspaceFolder}/cmake-build-debug,type=volume"
+  ],
+
+  // Init submodules, then build + install the CPU extension (_mpcf_cpu) via cmake.
+  // `cmake --install` symlinks it into masspcf/. Python deps are already installed
+  // at image-build time (see Dockerfile). The chown gives the ubuntu user ownership
+  // of the freshly-created (root-owned) build volume.
+  "postCreateCommand": "sudo chown ubuntu:ubuntu cmake-build-debug && git submodule update --init --recursive && cmake --preset debug-nocuda && cmake --build --preset debug-nocuda && cmake --install cmake-build-debug",
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-vscode.cpptools",
+        "ms-vscode.cmake-tools",
+        "llvm-vs-code-extensions.vscode-clangd",
+        "anthropic.claude-code"
+      ]
+    }
+  }
+}
