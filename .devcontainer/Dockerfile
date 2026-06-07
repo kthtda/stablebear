@@ -26,6 +26,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         ninja-build \
         git \
         git-lfs \
+        openssh-client \
         curl \
         pkg-config \
         python3 \
@@ -41,11 +42,25 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && update-alternatives --install /usr/bin/cc cc /usr/bin/gcc-13 100 \
     && update-alternatives --install /usr/bin/c++ c++ /usr/bin/g++-13 100
 
+# Pre-trust GitHub's host keys so SSH git operations don't hang on an interactive
+# host-key prompt. The SSH client itself is openssh-client (installed above); VS
+# Code forwards the host SSH agent into the container (SSH_AUTH_SOCK), so keys are
+# already available -- only the client + known_hosts were missing.
+RUN ssh-keyscan -t rsa,ecdsa,ed25519 github.com >> /etc/ssh/ssh_known_hosts 2>/dev/null || true
+
 # Node.js 20 LTS via NodeSource (for @anthropic-ai/claude-code).
 RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && apt-get install -y --no-install-recommends nodejs \
     && rm -rf /var/lib/apt/lists/* \
     && npm install -g @anthropic-ai/claude-code
+
+# Claude Code is installed npm-global as root (npm prefix is /usr), so the
+# non-root 'ubuntu' runtime user can't write to /usr/lib/node_modules and its
+# background auto-updater fails with "no write permission to npm prefix". The
+# image pins the version, so disable the background updater; bump Claude Code by
+# rebuilding the image (or switch to the native installer, which installs into a
+# user-writable ~/.local and self-updates, if in-container updates are wanted).
+ENV DISABLE_AUTOUPDATER=1
 
 # Make CUDA discoverable system-wide, not just in env-inheriting shells. The base
 # nvidia/cuda image exports /usr/local/cuda/bin on PATH via docker ENV, which
