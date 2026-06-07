@@ -110,7 +110,7 @@ def barcode_to_betti_curve(
 def barcode_to_accumulated_persistence(
     bc: Barcode | BarcodeTensor,
     max_death: float = float("inf"),
-    verbose: bool = True,
+    verbose: bool = False,
 ):
     r"""Convert barcodes to accumulated persistence functions.
 
