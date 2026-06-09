@@ -2,16 +2,16 @@
 Point Processes
 ===============
 
-The :py:mod:`masspcf.point_process` module provides samplers for spatial point
-processes, returning :py:class:`~masspcf.tensor.PointCloudTensor` objects. All
-samplers support deterministic seeding via :py:class:`~masspcf.random.Generator`
+The :py:mod:`stablebear.point_process` module provides samplers for spatial point
+processes, returning :py:class:`~stablebear.tensor.PointCloudTensor` objects. All
+samplers support deterministic seeding via :py:class:`~stablebear.random.Generator`
 (see :doc:`random`).
 
 
 Poisson point process
 =====================
 
-:py:func:`~masspcf.point_process.sample_poisson` generates point clouds from a
+:py:func:`~stablebear.point_process.sample_poisson` generates point clouds from a
 homogeneous spatial Poisson process. Each element of the output tensor is a
 point cloud with a random number of points:
 
@@ -40,14 +40,14 @@ the sampling region. Points are placed uniformly in the region.
 
 Basic usage::
 
-   from masspcf.point_process import sample_poisson
+   from stablebear.point_process import sample_poisson
 
    # 100 point clouds in R^2, rate 50, in the unit square
    X = sample_poisson((100,), dim=2, rate=50.0)
 
    # 3-D point clouds in a custom box, seeded for reproducibility
-   import masspcf as mpcf
-   gen = mpcf.random.Generator(seed=42)
+   import stablebear as sb
+   gen = sb.random.Generator(seed=42)
 
    X = sample_poisson(
        (10, 20),

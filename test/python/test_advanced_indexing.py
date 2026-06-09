@@ -15,43 +15,43 @@
 import numpy as np
 import pytest
 
-import masspcf as mpcf
-from masspcf.tensor import FloatTensor, IntTensor
+import stablebear as sb
+from stablebear.tensor import FloatTensor, IntTensor
 
 
-def _mpcf(arr):
+def _sb(arr):
     """Convert a float32 numpy array to a FloatTensor."""
     return FloatTensor(np.asarray(arr, dtype=np.float32))
 
 
 def _assert_advanced_select(arr, index):
-    """Assert that mpcf advanced indexing matches NumPy."""
+    """Assert that stablebear advanced indexing matches NumPy."""
     arr = np.asarray(arr, dtype=np.float32)
-    result = np.asarray(_mpcf(arr)[index])
+    result = np.asarray(_sb(arr)[index])
     expected = arr[index]
     np.testing.assert_array_equal(result, expected)
     assert result.shape == expected.shape
 
 
 def _assert_advanced_fill(arr, index, fill_value):
-    """Assert that mpcf advanced scalar fill matches NumPy."""
+    """Assert that stablebear advanced scalar fill matches NumPy."""
     arr = np.asarray(arr, dtype=np.float32)
     np_arr = arr.copy()
     np_arr[index] = fill_value
-    t = _mpcf(arr.copy())
+    t = _sb(arr.copy())
     t[index] = fill_value
     np.testing.assert_array_equal(np.asarray(t), np_arr)
     assert t.shape == np_arr.shape
 
 
 def _assert_advanced_assign(arr, index, values):
-    """Assert that mpcf advanced tensor assign matches NumPy."""
+    """Assert that stablebear advanced tensor assign matches NumPy."""
     arr = np.asarray(arr, dtype=np.float32)
     values = np.asarray(values, dtype=np.float32)
     np_arr = arr.copy()
     np_arr[index] = values
-    t = _mpcf(arr.copy())
-    t[index] = _mpcf(values)
+    t = _sb(arr.copy())
+    t[index] = _sb(values)
     np.testing.assert_array_equal(np.asarray(t), np_arr)
     assert t.shape == np_arr.shape
 
@@ -95,12 +95,12 @@ class TestAdvancedGetitem:
         _assert_advanced_select([10, 20, 30, 40], np.array([3, 2, 1, 0]))
 
     def test_out_of_bounds_positive(self):
-        t = _mpcf([10, 20, 30])
+        t = _sb([10, 20, 30])
         with pytest.raises(IndexError):
             _ = t[np.array([3])]
 
     def test_out_of_bounds_negative(self):
-        t = _mpcf([10, 20, 30])
+        t = _sb([10, 20, 30])
         with pytest.raises(IndexError):
             _ = t[np.array([-4])]
 
@@ -150,7 +150,7 @@ class TestMixedIntSliceGetitem:
     def test_slice_then_int_index(self):
         arr = np.array([[1, 2, 3], [4, 5, 6], [7, 8, 9]], dtype=np.float32)
         idx = (slice(1, 3), np.array([0, 2]))
-        result = np.asarray(_mpcf(arr)[idx])
+        result = np.asarray(_sb(arr)[idx])
         expected = arr[1:3][:, [0, 2]]
         np.testing.assert_array_equal(result, expected)
         assert result.shape == expected.shape
@@ -158,7 +158,7 @@ class TestMixedIntSliceGetitem:
     def test_int_index_after_scalar(self):
         arr = np.array([[1, 2, 3, 4], [5, 6, 7, 8]], dtype=np.float32)
         idx = (0, np.array([0, 3]))
-        result = np.asarray(_mpcf(arr)[idx])
+        result = np.asarray(_sb(arr)[idx])
         expected = arr[0, [0, 3]]
         np.testing.assert_array_equal(result, expected)
         assert result.shape == expected.shape
@@ -171,7 +171,7 @@ class TestMixedIntSliceGetitem:
 
 class TestIntTensorAsIndex:
     def test_int_tensor_selects(self):
-        t = _mpcf([10, 20, 30, 40, 50])
+        t = _sb([10, 20, 30, 40, 50])
         idx = IntTensor(np.array([4, 1, 0]))
         result = np.asarray(t[idx])
         expected = np.array([50, 20, 10], dtype=np.float32)
@@ -193,9 +193,9 @@ class TestIntTensorAsIndex:
 
 
 def _assert_outer_index(arr, index):
-    """Assert that mpcf multi-index with outer semantics matches np.ix_."""
+    """Assert that stablebear multi-index with outer semantics matches np.ix_."""
     arr = np.asarray(arr, dtype=np.float32)
-    t = _mpcf(arr)
+    t = _sb(arr)
     result = np.asarray(t[index])
     # Build np.ix_ equivalent: convert slices to full ranges, pass bool/int arrays through
     ix_args = []
@@ -245,9 +245,9 @@ class TestMixedBoolIntIndices:
 
 
 def _assert_outer_setitem_scalar(arr, index, fill_value):
-    """Assert that mpcf outer setitem with scalar matches np.ix_."""
+    """Assert that stablebear outer setitem with scalar matches np.ix_."""
     arr = np.asarray(arr, dtype=np.float32)
-    t = _mpcf(arr.copy())
+    t = _sb(arr.copy())
     np_arr = arr.copy()
     t[index] = fill_value
     ix_args = []

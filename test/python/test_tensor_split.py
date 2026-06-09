@@ -1,26 +1,26 @@
 import numpy as np
 import pytest
 
-import masspcf as mpcf
+import stablebear as sb
 
 
 _NUMERIC_TYPES = [
-    pytest.param(mpcf.FloatTensor, np.float64, id="float64"),
-    pytest.param(mpcf.FloatTensor, np.float32, id="float32"),
-    pytest.param(mpcf.IntTensor, np.int32, id="int32"),
-    pytest.param(mpcf.IntTensor, np.int64, id="int64"),
+    pytest.param(sb.FloatTensor, np.float64, id="float64"),
+    pytest.param(sb.FloatTensor, np.float32, id="float32"),
+    pytest.param(sb.IntTensor, np.int32, id="int32"),
+    pytest.param(sb.IntTensor, np.int64, id="int64"),
 ]
 
 
 def _assert_split(np_arr, indices_or_sections, axis, TensorType):
-    """Assert that mpcf.split matches np.split."""
+    """Assert that sb.split matches np.split."""
     t = TensorType(np_arr)
-    mpcf_parts = mpcf.split(t, indices_or_sections, axis=axis)
+    sb_parts = sb.split(t, indices_or_sections, axis=axis)
     np_parts = np.split(np_arr, indices_or_sections, axis=axis)
-    assert len(mpcf_parts) == len(np_parts)
-    for mpcf_part, np_part in zip(mpcf_parts, np_parts):
-        np.testing.assert_array_equal(np.asarray(mpcf_part), np_part)
-        assert mpcf_part.shape == tuple(np_part.shape)
+    assert len(sb_parts) == len(np_parts)
+    for sb_part, np_part in zip(sb_parts, np_parts):
+        np.testing.assert_array_equal(np.asarray(sb_part), np_part)
+        assert sb_part.shape == tuple(np_part.shape)
 
 
 @pytest.mark.parametrize("TensorType, np_dtype", _NUMERIC_TYPES)
@@ -40,7 +40,7 @@ class TestSplitEqual:
     def test_uneven_raises(self, TensorType, np_dtype):
         t = TensorType(np.arange(7, dtype=np_dtype))
         with pytest.raises((ValueError, RuntimeError)):
-            mpcf.split(t, 3, axis=0)
+            sb.split(t, 3, axis=0)
 
 
 @pytest.mark.parametrize("TensorType, np_dtype", _NUMERIC_TYPES)
@@ -61,20 +61,20 @@ class TestSplitIndices:
     def test_is_view(self, TensorType, np_dtype):
         np_arr = np.arange(6, dtype=np_dtype)
         t = TensorType(np_arr)
-        parts = mpcf.split(t, [3], axis=0)
+        parts = sb.split(t, [3], axis=0)
         parts[0][0] = 99
         assert t[0] == 99
 
 
 def _assert_array_split(np_arr, n_sections, axis, TensorType):
-    """Assert that mpcf.array_split matches np.array_split."""
+    """Assert that sb.array_split matches np.array_split."""
     t = TensorType(np_arr)
-    mpcf_parts = mpcf.array_split(t, n_sections, axis=axis)
+    sb_parts = sb.array_split(t, n_sections, axis=axis)
     np_parts = np.array_split(np_arr, n_sections, axis=axis)
-    assert len(mpcf_parts) == len(np_parts)
-    for mpcf_part, np_part in zip(mpcf_parts, np_parts):
-        np.testing.assert_array_equal(np.asarray(mpcf_part), np_part)
-        assert mpcf_part.shape == tuple(np_part.shape)
+    assert len(sb_parts) == len(np_parts)
+    for sb_part, np_part in zip(sb_parts, np_parts):
+        np.testing.assert_array_equal(np.asarray(sb_part), np_part)
+        assert sb_part.shape == tuple(np_part.shape)
 
 
 @pytest.mark.parametrize("TensorType, np_dtype", _NUMERIC_TYPES)

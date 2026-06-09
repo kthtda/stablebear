@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "../include/mpcf/io/io_stream.hpp"
+#include "../include/sbear/io/io_stream.hpp"
 
 #include <iostream>
 #include <stdexcept>

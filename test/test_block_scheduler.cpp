@@ -16,17 +16,17 @@
 
 #include <gtest/gtest.h>
 
-#include <mpcf/cuda/cuda_block_scheduler.hpp>
+#include <sbear/cuda/cuda_block_scheduler.hpp>
 
 #include <set>
 #include <utility>
 
 namespace
 {
-  void verify_block_coverage(const mpcf::CudaBlockScheduler::Config& config,
+  void verify_block_coverage(const sb::CudaBlockScheduler::Config& config,
                               bool checkBudget = true)
   {
-    mpcf::CudaBlockScheduler scheduler(config);
+    sb::CudaBlockScheduler scheduler(config);
     auto const& blocks = scheduler.blocks();
 
     std::set<std::pair<size_t, size_t>> covered;
@@ -43,7 +43,7 @@ namespace
       {
         for (size_t j = block.colStart; j < block.colStart + block.colWidth; ++j)
         {
-          if (config.triangleMode == mpcf::BlockTriangleMode::LowerTriangle && i < j)
+          if (config.triangleMode == sb::BlockTriangleMode::LowerTriangle && i < j)
           {
             continue;
           }
@@ -54,7 +54,7 @@ namespace
       }
     }
 
-    size_t expected = (config.triangleMode == mpcf::BlockTriangleMode::LowerTriangle)
+    size_t expected = (config.triangleMode == sb::BlockTriangleMode::LowerTriangle)
       ? config.nRows * (config.nRows + 1) / 2
       : config.nRows * config.nCols;
 
@@ -64,11 +64,11 @@ namespace
 
 TEST(CudaBlockScheduler, EmptyMatrix)
 {
-  mpcf::CudaBlockScheduler scheduler({
+  sb::CudaBlockScheduler scheduler({
     .nRows = 0, .nCols = 0,
     .maxOutputElements = 1000,
     .nSplitsHint = 1,
-    .triangleMode = mpcf::BlockTriangleMode::LowerTriangle
+    .triangleMode = sb::BlockTriangleMode::LowerTriangle
   });
 
   EXPECT_TRUE(scheduler.blocks().empty());
@@ -76,11 +76,11 @@ TEST(CudaBlockScheduler, EmptyMatrix)
 
 TEST(CudaBlockScheduler, SingleElement)
 {
-  mpcf::CudaBlockScheduler scheduler({
+  sb::CudaBlockScheduler scheduler({
     .nRows = 1, .nCols = 1,
     .maxOutputElements = 1000,
     .nSplitsHint = 1,
-    .triangleMode = mpcf::BlockTriangleMode::LowerTriangle
+    .triangleMode = sb::BlockTriangleMode::LowerTriangle
   });
 
   auto const& blocks = scheduler.blocks();
@@ -97,7 +97,7 @@ TEST(CudaBlockScheduler, SmallMatrix_LowerTriangle)
     .nRows = 4, .nCols = 4,
     .maxOutputElements = 4,
     .nSplitsHint = 1,
-    .triangleMode = mpcf::BlockTriangleMode::LowerTriangle
+    .triangleMode = sb::BlockTriangleMode::LowerTriangle
   });
 }
 
@@ -107,24 +107,24 @@ TEST(CudaBlockScheduler, SmallMatrix_Full)
     .nRows = 4, .nCols = 4,
     .maxOutputElements = 4,
     .nSplitsHint = 1,
-    .triangleMode = mpcf::BlockTriangleMode::Full
+    .triangleMode = sb::BlockTriangleMode::Full
   });
 }
 
 TEST(CudaBlockScheduler, LowerTriangleHasFewerBlocks)
 {
-  mpcf::CudaBlockScheduler lower({
+  sb::CudaBlockScheduler lower({
     .nRows = 10, .nCols = 10,
     .maxOutputElements = 25,
     .nSplitsHint = 1,
-    .triangleMode = mpcf::BlockTriangleMode::LowerTriangle
+    .triangleMode = sb::BlockTriangleMode::LowerTriangle
   });
 
-  mpcf::CudaBlockScheduler full({
+  sb::CudaBlockScheduler full({
     .nRows = 10, .nCols = 10,
     .maxOutputElements = 25,
     .nSplitsHint = 1,
-    .triangleMode = mpcf::BlockTriangleMode::Full
+    .triangleMode = sb::BlockTriangleMode::Full
   });
 
   EXPECT_LT(lower.blocks().size(), full.blocks().size());
@@ -132,14 +132,14 @@ TEST(CudaBlockScheduler, LowerTriangleHasFewerBlocks)
 
 TEST(CudaBlockScheduler, LargeMatrixSmallBlocks)
 {
-  mpcf::CudaBlockScheduler::Config config = {
+  sb::CudaBlockScheduler::Config config = {
     .nRows = 100, .nCols = 100,
     .maxOutputElements = 100,
     .nSplitsHint = 4,
-    .triangleMode = mpcf::BlockTriangleMode::LowerTriangle
+    .triangleMode = sb::BlockTriangleMode::LowerTriangle
   };
 
-  mpcf::CudaBlockScheduler scheduler(config);
+  sb::CudaBlockScheduler scheduler(config);
   EXPECT_GT(scheduler.blocks().size(), 1);
 
   verify_block_coverage(config);
@@ -147,11 +147,11 @@ TEST(CudaBlockScheduler, LargeMatrixSmallBlocks)
 
 TEST(CudaBlockScheduler, MaxRowHeightAndColWidth)
 {
-  mpcf::CudaBlockScheduler scheduler({
+  sb::CudaBlockScheduler scheduler({
     .nRows = 10, .nCols = 10,
     .maxOutputElements = 10000,
     .nSplitsHint = 1,
-    .triangleMode = mpcf::BlockTriangleMode::Full
+    .triangleMode = sb::BlockTriangleMode::Full
   });
 
   // With budget=10000 and nPcfs=10, one block should cover everything
@@ -162,11 +162,11 @@ TEST(CudaBlockScheduler, MaxRowHeightAndColWidth)
 
 TEST(CudaBlockScheduler, SortedByDescendingWork)
 {
-  mpcf::CudaBlockScheduler scheduler({
+  sb::CudaBlockScheduler scheduler({
     .nRows = 20, .nCols = 20,
     .maxOutputElements = 100,
     .nSplitsHint = 1,
-    .triangleMode = mpcf::BlockTriangleMode::LowerTriangle
+    .triangleMode = sb::BlockTriangleMode::LowerTriangle
   });
 
   auto const& blocks = scheduler.blocks();
@@ -183,20 +183,20 @@ TEST(CudaBlockScheduler, RectangularMatrix_Full)
     .nRows = 3, .nCols = 5,
     .maxOutputElements = 100,
     .nSplitsHint = 1,
-    .triangleMode = mpcf::BlockTriangleMode::Full
+    .triangleMode = sb::BlockTriangleMode::Full
   });
 }
 
 TEST(CudaBlockScheduler, RectangularMatrix_ManyBlocks)
 {
-  mpcf::CudaBlockScheduler::Config config = {
+  sb::CudaBlockScheduler::Config config = {
     .nRows = 7, .nCols = 13,
     .maxOutputElements = 10,
     .nSplitsHint = 1,
-    .triangleMode = mpcf::BlockTriangleMode::Full
+    .triangleMode = sb::BlockTriangleMode::Full
   };
 
-  mpcf::CudaBlockScheduler scheduler(config);
+  sb::CudaBlockScheduler scheduler(config);
   EXPECT_GT(scheduler.blocks().size(), 1);
 
   verify_block_coverage(config);
@@ -206,18 +206,18 @@ TEST(CudaBlockScheduler, RectangularMatrix_ManyBlocks)
 
 TEST(CudaBlockScheduler, SplitsHint_ProducesMoreBlocks)
 {
-  mpcf::CudaBlockScheduler hint1({
+  sb::CudaBlockScheduler hint1({
     .nRows = 20, .nCols = 20,
     .maxOutputElements = 400,
     .nSplitsHint = 1,
-    .triangleMode = mpcf::BlockTriangleMode::Full
+    .triangleMode = sb::BlockTriangleMode::Full
   });
 
-  mpcf::CudaBlockScheduler hint4({
+  sb::CudaBlockScheduler hint4({
     .nRows = 20, .nCols = 20,
     .maxOutputElements = 400,
     .nSplitsHint = 4,
-    .triangleMode = mpcf::BlockTriangleMode::Full
+    .triangleMode = sb::BlockTriangleMode::Full
   });
 
   // More splits -> smaller blocks -> more blocks
@@ -226,18 +226,18 @@ TEST(CudaBlockScheduler, SplitsHint_ProducesMoreBlocks)
 
 TEST(CudaBlockScheduler, SplitsHint_SmallerMaxDimensions)
 {
-  mpcf::CudaBlockScheduler hint1({
+  sb::CudaBlockScheduler hint1({
     .nRows = 20, .nCols = 20,
     .maxOutputElements = 400,
     .nSplitsHint = 1,
-    .triangleMode = mpcf::BlockTriangleMode::Full
+    .triangleMode = sb::BlockTriangleMode::Full
   });
 
-  mpcf::CudaBlockScheduler hint4({
+  sb::CudaBlockScheduler hint4({
     .nRows = 20, .nCols = 20,
     .maxOutputElements = 400,
     .nSplitsHint = 4,
-    .triangleMode = mpcf::BlockTriangleMode::Full
+    .triangleMode = sb::BlockTriangleMode::Full
   });
 
   // Higher hint should produce smaller block dimensions
@@ -253,7 +253,7 @@ TEST(CudaBlockScheduler, SplitsHint_FullCoverage)
       .nRows = 15, .nCols = 15,
       .maxOutputElements = 225,
       .nSplitsHint = nSplits,
-      .triangleMode = mpcf::BlockTriangleMode::LowerTriangle
+      .triangleMode = sb::BlockTriangleMode::LowerTriangle
     });
   }
 }
@@ -266,7 +266,7 @@ TEST(CudaBlockScheduler, SplitsHint_FullMatrix_Coverage)
       .nRows = 10, .nCols = 10,
       .maxOutputElements = 100,
       .nSplitsHint = nSplits,
-      .triangleMode = mpcf::BlockTriangleMode::Full
+      .triangleMode = sb::BlockTriangleMode::Full
     });
   }
 }
@@ -277,17 +277,17 @@ TEST(CudaBlockScheduler, SplitsHint_Rectangular_Coverage)
     .nRows = 5, .nCols = 20,
     .maxOutputElements = 100,
     .nSplitsHint = 4,
-    .triangleMode = mpcf::BlockTriangleMode::Full
+    .triangleMode = sb::BlockTriangleMode::Full
   });
 }
 
 TEST(CudaBlockScheduler, SplitsHint_StillSorted)
 {
-  mpcf::CudaBlockScheduler scheduler({
+  sb::CudaBlockScheduler scheduler({
     .nRows = 20, .nCols = 20,
     .maxOutputElements = 100,
     .nSplitsHint = 4,
-    .triangleMode = mpcf::BlockTriangleMode::LowerTriangle
+    .triangleMode = sb::BlockTriangleMode::LowerTriangle
   });
 
   auto const& blocks = scheduler.blocks();
@@ -304,20 +304,20 @@ TEST(CudaBlockScheduler, SplitsHint_StillSorted)
 TEST(CudaBlockScheduler, MinBlockSide_EnforcesFloor)
 {
   // Without floor: maxOutputElements=10000, nSplitsHint=100 -> elementsPerBlock=100, side=10
-  mpcf::CudaBlockScheduler noFloor({
+  sb::CudaBlockScheduler noFloor({
     .nRows = 500, .nCols = 500,
     .maxOutputElements = 10000,
     .nSplitsHint = 100,
-    .triangleMode = mpcf::BlockTriangleMode::Full,
+    .triangleMode = sb::BlockTriangleMode::Full,
     .minBlockSide = 0
   });
 
   // With floor of 50: side should be raised from 10 to 50
-  mpcf::CudaBlockScheduler withFloor({
+  sb::CudaBlockScheduler withFloor({
     .nRows = 500, .nCols = 500,
     .maxOutputElements = 10000,
     .nSplitsHint = 100,
-    .triangleMode = mpcf::BlockTriangleMode::Full,
+    .triangleMode = sb::BlockTriangleMode::Full,
     .minBlockSide = 50
   });
 
@@ -332,11 +332,11 @@ TEST(CudaBlockScheduler, MinBlockSide_EnforcesFloor)
 TEST(CudaBlockScheduler, MinBlockSide_ClampedByMatrixSize)
 {
   // minBlockSide=200 but the matrix is only 30x30 -- should clamp to 30
-  mpcf::CudaBlockScheduler scheduler({
+  sb::CudaBlockScheduler scheduler({
     .nRows = 30, .nCols = 30,
     .maxOutputElements = 100,
     .nSplitsHint = 10,
-    .triangleMode = mpcf::BlockTriangleMode::Full,
+    .triangleMode = sb::BlockTriangleMode::Full,
     .minBlockSide = 200
   });
 
@@ -353,22 +353,22 @@ TEST(CudaBlockScheduler, MinBlockSide_FullCoverage)
     .nRows = 100, .nCols = 100,
     .maxOutputElements = 1000,
     .nSplitsHint = 100,
-    .triangleMode = mpcf::BlockTriangleMode::LowerTriangle,
+    .triangleMode = sb::BlockTriangleMode::LowerTriangle,
     .minBlockSide = 40
   }, /*checkBudget=*/false);
 }
 
 TEST(CudaBlockScheduler, MinBlockSide_Rectangular_FullCoverage)
 {
-  mpcf::CudaBlockScheduler::Config config = {
+  sb::CudaBlockScheduler::Config config = {
     .nRows = 50, .nCols = 200,
     .maxOutputElements = 1000,
     .nSplitsHint = 50,
-    .triangleMode = mpcf::BlockTriangleMode::Full,
+    .triangleMode = sb::BlockTriangleMode::Full,
     .minBlockSide = 30
   };
 
-  mpcf::CudaBlockScheduler scheduler(config);
+  sb::CudaBlockScheduler scheduler(config);
 
   // Blocks should respect the floor (up to maxDim clamping)
   EXPECT_GE(scheduler.max_row_height(), 30);
@@ -380,19 +380,19 @@ TEST(CudaBlockScheduler, MinBlockSide_Rectangular_FullCoverage)
 TEST(CudaBlockScheduler, MinBlockSide_Zero_HasNoEffect)
 {
   // minBlockSide=0 should behave identically to omitting it
-  mpcf::CudaBlockScheduler withZero({
+  sb::CudaBlockScheduler withZero({
     .nRows = 20, .nCols = 20,
     .maxOutputElements = 400,
     .nSplitsHint = 4,
-    .triangleMode = mpcf::BlockTriangleMode::Full,
+    .triangleMode = sb::BlockTriangleMode::Full,
     .minBlockSide = 0
   });
 
-  mpcf::CudaBlockScheduler withoutField({
+  sb::CudaBlockScheduler withoutField({
     .nRows = 20, .nCols = 20,
     .maxOutputElements = 400,
     .nSplitsHint = 4,
-    .triangleMode = mpcf::BlockTriangleMode::Full
+    .triangleMode = sb::BlockTriangleMode::Full
   });
 
   EXPECT_EQ(withZero.blocks().size(), withoutField.blocks().size());

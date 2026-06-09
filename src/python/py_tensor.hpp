@@ -16,23 +16,23 @@
 
 #pragma once
 
-#ifndef MASSPCF_PY_TENSOR_H
-#define MASSPCF_PY_TENSOR_H
+#ifndef STABLEBEAR_PY_TENSOR_H
+#define STABLEBEAR_PY_TENSOR_H
 
 #include "pybind.hpp"
 #include "py_np_support.hpp"
 #include <pybind11/stl.h>
 #include <pybind11/numpy.h>
 
-#include <mpcf/tensor.hpp>
-#include <mpcf/concepts.hpp>
-#include <mpcf/functional/pcf.hpp>
+#include <sbear/tensor.hpp>
+#include <sbear/concepts.hpp>
+#include <sbear/functional/pcf.hpp>
 #include "functional/py_pcf_tensor_eval.hpp"
 
 #include <algorithm>
 #include <numeric>
 
-namespace mpcf_py
+namespace sb_py
 {
   void register_tensor_bindings(pybind11::module_& m);
 
@@ -151,7 +151,7 @@ namespace mpcf_py
   template <typename T>
   void register_typed_tensor_bindings(pybind11::module_& m, const std::string& prefix, const std::string& suffix)
   {
-    using TTensor = mpcf::Tensor<T>;
+    using TTensor = sb::Tensor<T>;
 
     pybind11::class_<TTensor> cls = [&m, &prefix, &suffix]
     {
@@ -207,19 +207,19 @@ namespace mpcf_py
       .def_property_readonly("strides", [](const TTensor& self){ return self.strides(); })
       .def_property_readonly("offset", [](const TTensor& self){ return self.offset(); })
 
-      .def("__getitem__", [](const TTensor& self, const std::vector<mpcf::Slice>& slices) {
+      .def("__getitem__", [](const TTensor& self, const std::vector<sb::Slice>& slices) {
           return self[slices];
         })
 
-      .def("__setitem__", [](TTensor& self, const std::vector<mpcf::Slice>& slices, const TTensor& vals) {
+      .def("__setitem__", [](TTensor& self, const std::vector<sb::Slice>& slices, const TTensor& vals) {
           self[slices].assign_from(vals);
         })
 
       .def("__eq__", [](const TTensor& self, const TTensor& rhs){
-          return mpcf::elementwise_eq(self, rhs);
+          return sb::elementwise_eq(self, rhs);
         })
       .def("__ne__", [](const TTensor& self, const TTensor& rhs){
-          return mpcf::elementwise_ne(self, rhs);
+          return sb::elementwise_ne(self, rhs);
         })
       .def("array_equal", [](const TTensor& self, const TTensor& rhs){
           return self == rhs;
@@ -249,49 +249,49 @@ namespace mpcf_py
       .def("squeeze", [](const TTensor& self, size_t axis) { return self.squeeze(axis); }, pybind11::arg("axis"))
       .def("expand_dims", &TTensor::expand_dims, pybind11::arg("axis"))
       .def_static("concatenate", [](const std::vector<TTensor>& tensors, size_t axis) {
-        return mpcf::concatenate(tensors, axis);
+        return sb::concatenate(tensors, axis);
       }, pybind11::arg("tensors"), pybind11::arg("axis") = 0)
       .def_static("stack", [](const std::vector<TTensor>& tensors, ptrdiff_t axis) {
-        return mpcf::stack(tensors, axis);
+        return sb::stack(tensors, axis);
       }, pybind11::arg("tensors"), pybind11::arg("axis") = 0)
       .def_static("split_sections", [](const TTensor& tensor, size_t n_sections, size_t axis) {
-        return mpcf::split(tensor, n_sections, axis);
+        return sb::split(tensor, n_sections, axis);
       }, pybind11::arg("tensor"), pybind11::arg("n_sections"), pybind11::arg("axis") = 0)
       .def_static("split_indices", [](const TTensor& tensor, const std::vector<size_t>& indices, size_t axis) {
-        return mpcf::split(tensor, indices, axis);
+        return sb::split(tensor, indices, axis);
       }, pybind11::arg("tensor"), pybind11::arg("indices"), pybind11::arg("axis") = 0)
       .def_static("array_split", [](const TTensor& tensor, size_t n_sections, size_t axis) {
-        return mpcf::array_split(tensor, n_sections, axis);
+        return sb::array_split(tensor, n_sections, axis);
       }, pybind11::arg("tensor"), pybind11::arg("n_sections"), pybind11::arg("axis") = 0)
       .def("is_contiguous", &TTensor::is_contiguous)
     ;
 
     // Unary negation
-    if constexpr (mpcf::CanNegate<T>)
+    if constexpr (sb::CanNegate<T>)
     {
       cls.def("__neg__", [](const TTensor& self){ return -self; });
     }
 
-    if constexpr (mpcf::FloatType<T>)
+    if constexpr (sb::FloatType<T>)
     {
       cls.def("allclose", [](const TTensor& self, const TTensor& rhs, double atol, double rtol){
-        return mpcf::allclose(self, rhs, T(atol), T(rtol));
+        return sb::allclose(self, rhs, T(atol), T(rtol));
       }, py::arg("other"), py::arg("atol") = 1e-8, py::arg("rtol") = 1e-5);
     }
 
     // Ordered comparisons (broadcasting, returns BoolTensor)
-    if constexpr (mpcf::CanOrder<T>)
+    if constexpr (sb::CanOrder<T>)
     {
       cls
-        .def("__lt__", [](const TTensor& self, const TTensor& rhs){ return mpcf::elementwise_lt(self, rhs); })
-        .def("__le__", [](const TTensor& self, const TTensor& rhs){ return mpcf::elementwise_le(self, rhs); })
-        .def("__gt__", [](const TTensor& self, const TTensor& rhs){ return mpcf::elementwise_gt(self, rhs); })
-        .def("__ge__", [](const TTensor& self, const TTensor& rhs){ return mpcf::elementwise_ge(self, rhs); })
+        .def("__lt__", [](const TTensor& self, const TTensor& rhs){ return sb::elementwise_lt(self, rhs); })
+        .def("__le__", [](const TTensor& self, const TTensor& rhs){ return sb::elementwise_le(self, rhs); })
+        .def("__gt__", [](const TTensor& self, const TTensor& rhs){ return sb::elementwise_gt(self, rhs); })
+        .def("__ge__", [](const TTensor& self, const TTensor& rhs){ return sb::elementwise_ge(self, rhs); })
       ;
     }
 
     // Tensor-Tensor arithmetic (broadcasting)
-    if constexpr (mpcf::CanAddTo<T, T, T>)
+    if constexpr (sb::CanAddTo<T, T, T>)
     {
       cls
         .def("__add__", [](const TTensor& self, const TTensor& rhs){ return self + rhs; })
@@ -299,7 +299,7 @@ namespace mpcf_py
       ;
     }
 
-    if constexpr (mpcf::CanSubtractTo<T, T, T>)
+    if constexpr (sb::CanSubtractTo<T, T, T>)
     {
       cls
         .def("__sub__", [](const TTensor& self, const TTensor& rhs){ return self - rhs; })
@@ -307,7 +307,7 @@ namespace mpcf_py
       ;
     }
 
-    if constexpr (mpcf::CanMultiplyTo<T, T, T>)
+    if constexpr (sb::CanMultiplyTo<T, T, T>)
     {
       cls
         .def("__mul__", [](const TTensor& self, const TTensor& rhs){ return self * rhs; })
@@ -315,7 +315,7 @@ namespace mpcf_py
       ;
     }
 
-    if constexpr (mpcf::CanDivideTo<T, T, T>)
+    if constexpr (sb::CanDivideTo<T, T, T>)
     {
       cls
         .def("__truediv__", [](const TTensor& self, const TTensor& rhs){ return self / rhs; })
@@ -326,59 +326,59 @@ namespace mpcf_py
     cls.def("broadcast_to", [](const TTensor& self, const std::vector<size_t>& shape){ return self.broadcast_to(shape); });
 
     // Masked operations
-    cls.def("masked_select", [](const TTensor& self, const mpcf::Tensor<bool>& mask) {
-      return mpcf::masked_select(self, mask);
+    cls.def("masked_select", [](const TTensor& self, const sb::Tensor<bool>& mask) {
+      return sb::masked_select(self, mask);
     });
-    cls.def("masked_assign", [](TTensor& self, const mpcf::Tensor<bool>& mask, const TTensor& values) {
-      mpcf::masked_assign(self, mask, values);
+    cls.def("masked_assign", [](TTensor& self, const sb::Tensor<bool>& mask, const TTensor& values) {
+      sb::masked_assign(self, mask, values);
     });
-    cls.def("masked_fill", [](TTensor& self, const mpcf::Tensor<bool>& mask, const T& value) {
-      mpcf::masked_fill(self, mask, value);
+    cls.def("masked_fill", [](TTensor& self, const sb::Tensor<bool>& mask, const T& value) {
+      sb::masked_fill(self, mask, value);
     });
-    cls.def("axis_select", [](const TTensor& self, size_t axis, const mpcf::Tensor<bool>& mask) {
-      return mpcf::axis_select(self, axis, mask);
+    cls.def("axis_select", [](const TTensor& self, size_t axis, const sb::Tensor<bool>& mask) {
+      return sb::axis_select(self, axis, mask);
     });
-    cls.def("axis_assign", [](TTensor& self, size_t axis, const mpcf::Tensor<bool>& mask, const TTensor& values) {
-      mpcf::axis_assign(self, axis, mask, values);
+    cls.def("axis_assign", [](TTensor& self, size_t axis, const sb::Tensor<bool>& mask, const TTensor& values) {
+      sb::axis_assign(self, axis, mask, values);
     });
-    cls.def("axis_fill", [](TTensor& self, size_t axis, const mpcf::Tensor<bool>& mask, const T& value) {
-      mpcf::axis_fill(self, axis, mask, value);
+    cls.def("axis_fill", [](TTensor& self, size_t axis, const sb::Tensor<bool>& mask, const T& value) {
+      sb::axis_fill(self, axis, mask, value);
     });
-    cls.def("multi_axis_select", [](const TTensor& self, const std::vector<std::pair<size_t, mpcf::Tensor<bool>>>& axis_masks) {
-      return mpcf::multi_axis_select(self, axis_masks);
+    cls.def("multi_axis_select", [](const TTensor& self, const std::vector<std::pair<size_t, sb::Tensor<bool>>>& axis_masks) {
+      return sb::multi_axis_select(self, axis_masks);
     });
-    cls.def("multi_axis_assign", [](TTensor& self, const std::vector<std::pair<size_t, mpcf::Tensor<bool>>>& axis_masks, const TTensor& values) {
-      mpcf::multi_axis_assign(self, axis_masks, values);
+    cls.def("multi_axis_assign", [](TTensor& self, const std::vector<std::pair<size_t, sb::Tensor<bool>>>& axis_masks, const TTensor& values) {
+      sb::multi_axis_assign(self, axis_masks, values);
     });
-    cls.def("multi_axis_fill", [](TTensor& self, const std::vector<std::pair<size_t, mpcf::Tensor<bool>>>& axis_masks, const T& value) {
-      mpcf::multi_axis_fill(self, axis_masks, value);
+    cls.def("multi_axis_fill", [](TTensor& self, const std::vector<std::pair<size_t, sb::Tensor<bool>>>& axis_masks, const T& value) {
+      sb::multi_axis_fill(self, axis_masks, value);
     });
 
-    cls.def("outer_select", [](const TTensor& self, const std::vector<std::pair<size_t, mpcf::AxisSelector>>& selectors) {
-      return mpcf::outer_select(self, selectors);
+    cls.def("outer_select", [](const TTensor& self, const std::vector<std::pair<size_t, sb::AxisSelector>>& selectors) {
+      return sb::outer_select(self, selectors);
     });
-    cls.def("outer_assign", [](TTensor& self, const std::vector<std::pair<size_t, mpcf::AxisSelector>>& selectors, const TTensor& values) {
-      mpcf::outer_assign(self, selectors, values);
+    cls.def("outer_assign", [](TTensor& self, const std::vector<std::pair<size_t, sb::AxisSelector>>& selectors, const TTensor& values) {
+      sb::outer_assign(self, selectors, values);
     });
-    cls.def("outer_fill", [](TTensor& self, const std::vector<std::pair<size_t, mpcf::AxisSelector>>& selectors, const T& value) {
-      mpcf::outer_fill(self, selectors, value);
+    cls.def("outer_fill", [](TTensor& self, const std::vector<std::pair<size_t, sb::AxisSelector>>& selectors, const T& value) {
+      sb::outer_fill(self, selectors, value);
     });
 
     // Index-based gather/scatter (always use int64 as index type)
-    cls.def("index_select", [](const TTensor& self, size_t axis, const mpcf::Tensor<mpcf::int64_t>& indices) {
-      return mpcf::index_select(self, axis, indices);
+    cls.def("index_select", [](const TTensor& self, size_t axis, const sb::Tensor<sb::int64_t>& indices) {
+      return sb::index_select(self, axis, indices);
     });
-    cls.def("index_assign", [](TTensor& self, size_t axis, const mpcf::Tensor<mpcf::int64_t>& indices, const TTensor& values) {
-      mpcf::index_assign(self, axis, indices, values);
+    cls.def("index_assign", [](TTensor& self, size_t axis, const sb::Tensor<sb::int64_t>& indices, const TTensor& values) {
+      sb::index_assign(self, axis, indices, values);
     });
-    cls.def("index_fill", [](TTensor& self, size_t axis, const mpcf::Tensor<mpcf::int64_t>& indices, const T& value) {
-      mpcf::index_fill(self, axis, indices, value);
+    cls.def("index_fill", [](TTensor& self, size_t axis, const sb::Tensor<sb::int64_t>& indices, const T& value) {
+      sb::index_fill(self, axis, indices, value);
     });
 
     using Tv = scalar_of_t<T>;
     using Tt = time_of_t<T>;
 
-    if constexpr (mpcf::CanAddTo<T, T, T>)
+    if constexpr (sb::CanAddTo<T, T, T>)
     {
       cls
         .def("__add__", [](const TTensor& self, const T& rhs){ return self + rhs; })
@@ -387,7 +387,7 @@ namespace mpcf_py
       ;
     }
 
-    if constexpr (mpcf::CanAddTo<T, T, Tv>)
+    if constexpr (sb::CanAddTo<T, T, Tv>)
     {
       cls
         .def("__add__", [](const TTensor& self, Tv rhs){ return self + rhs; })
@@ -395,12 +395,12 @@ namespace mpcf_py
       ;
     }
 
-    if constexpr (mpcf::CanAddTo<T, Tv, T>)
+    if constexpr (sb::CanAddTo<T, Tv, T>)
     {
       cls.def("__radd__", [](const TTensor& self, Tv lhs){ return lhs + self; });
     }
 
-    if constexpr (mpcf::CanSubtractTo<T, T, T>)
+    if constexpr (sb::CanSubtractTo<T, T, T>)
     {
       cls
         .def("__sub__", [](const TTensor& self, const T& rhs){ return self - rhs; })
@@ -409,7 +409,7 @@ namespace mpcf_py
       ;
     }
 
-    if constexpr (mpcf::CanSubtractTo<T, T, Tv>)
+    if constexpr (sb::CanSubtractTo<T, T, Tv>)
     {
       cls
         .def("__sub__", [](const TTensor& self, Tv rhs){ return self - rhs; })
@@ -417,12 +417,12 @@ namespace mpcf_py
       ;
     }
 
-    if constexpr (mpcf::CanSubtractTo<T, Tv, T>)
+    if constexpr (sb::CanSubtractTo<T, Tv, T>)
     {
       cls.def("__rsub__", [](const TTensor& self, Tv lhs){ return lhs - self; });
     }
 
-    if constexpr (mpcf::CanMultiplyTo<T, T, Tv>)
+    if constexpr (sb::CanMultiplyTo<T, T, Tv>)
     {
       cls
         .def("__mul__", [](const TTensor& self, Tv rhs){ return self * rhs; })
@@ -430,12 +430,12 @@ namespace mpcf_py
       ;
     }
 
-    if constexpr (mpcf::CanMultiplyTo<T, Tv, T>)
+    if constexpr (sb::CanMultiplyTo<T, Tv, T>)
     {
       cls.def("__rmul__", [](const TTensor& self, Tv lhs){ return lhs * self; });
     }
 
-    if constexpr (mpcf::CanDivideTo<T, T, Tv>)
+    if constexpr (sb::CanDivideTo<T, T, Tv>)
     {
       cls
         .def("__truediv__", [](const TTensor& self, Tv rhs){ return self / rhs; })
@@ -443,17 +443,17 @@ namespace mpcf_py
       ;
     }
 
-    if constexpr (mpcf::CanDivideTo<T, Tv, T>)
+    if constexpr (sb::CanDivideTo<T, Tv, T>)
     {
       cls.def("__rtruediv__", [](const TTensor& self, Tv lhs){ return lhs / self; });
     }
 
-    if constexpr (mpcf::CanPow<T, Tv>)
+    if constexpr (sb::CanPow<T, Tv>)
     {
       cls.def("__pow__", [](const TTensor& self, Tv exponent) {
-        auto result = mpcf::pow(self, exponent);
+        auto result = sb::pow(self, exponent);
         bool warned = result.any_of([](const T& elem) {
-          if constexpr (mpcf::PcfLike<T>)
+          if constexpr (sb::PcfLike<T>)
             return std::ranges::any_of(elem.points(), [](const auto& pt) {
               return std::isnan(pt.v) || std::isinf(pt.v);
             });
@@ -469,30 +469,30 @@ namespace mpcf_py
       });
 
       cls.def("__ipow__", [](TTensor& self, Tv exponent) -> TTensor& {
-        mpcf::ipow(self, exponent);
+        sb::ipow(self, exponent);
         return self;
       });
     }
 
-    if constexpr (mpcf::PcfLike<T>)
+    if constexpr (sb::PcfLike<T>)
     {
       cls.def("__call__", [](const TTensor& self, Tt t) {
-        return mpcf_py::pcf_tensor_eval_scalar<Tt, Tv>(self, t);
+        return sb_py::pcf_tensor_eval_scalar<Tt, Tv>(self, t);
       });
 
       cls.def("__call__", [](const TTensor& self, py::array_t<Tt> times) {
         NumpyTensor<Tt> t_in(times);
-        auto sh = mpcf_py::eval_out_shape(self, t_in);
+        auto sh = sb_py::eval_out_shape(self, t_in);
         std::vector<py::ssize_t> out_shape(sh.begin(), sh.end());
         py::array_t<Tv> result(out_shape);
         NumpyTensor<Tv> out(result);
-        mpcf::tensor_eval<Tt, Tv>(self, t_in, out);
+        sb::tensor_eval<Tt, Tv>(self, t_in, out);
         return result;
       });
 
-      cls.def("__call__", [](const TTensor& self, const mpcf::Tensor<Tt>& times) {
-        mpcf::Tensor<Tv> out(mpcf_py::eval_out_shape(self, times));
-        mpcf::tensor_eval<Tt, Tv>(self, times, out);
+      cls.def("__call__", [](const TTensor& self, const sb::Tensor<Tt>& times) {
+        sb::Tensor<Tv> out(sb_py::eval_out_shape(self, times));
+        sb::tensor_eval<Tt, Tv>(self, times, out);
         return out;
       });
     }
@@ -500,4 +500,4 @@ namespace mpcf_py
   }
 }
 
-#endif //MASSPCF_PY_TENSOR_H
+#endif //STABLEBEAR_PY_TENSOR_H

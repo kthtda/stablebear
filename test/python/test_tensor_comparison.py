@@ -16,16 +16,16 @@ import numpy as np
 import numpy.testing as npt
 import pytest
 
-import masspcf as mpcf
+import stablebear as sb
 
 
 # --- BoolTensor basics ---
 
 
 def test_bool_tensor_zeros():
-    bt = mpcf.zeros((3,), dtype=mpcf.boolean)
+    bt = sb.zeros((3,), dtype=sb.boolean)
     expected = np.zeros((3,), dtype=bool)
-    assert isinstance(bt, mpcf.BoolTensor)
+    assert isinstance(bt, sb.BoolTensor)
     assert bt.shape == expected.shape
     npt.assert_array_equal(np.asarray(bt), expected)
 
@@ -35,9 +35,9 @@ def test_bool_tensor_bool_single_element():
     np_b = np.array([1.0])
     np_c = np.array([2.0])
 
-    a = mpcf.FloatTensor(np_a)
-    b = mpcf.FloatTensor(np_b)
-    c = mpcf.FloatTensor(np_c)
+    a = sb.FloatTensor(np_a)
+    b = sb.FloatTensor(np_b)
+    c = sb.FloatTensor(np_c)
 
     assert a.shape == np_a.shape
 
@@ -49,12 +49,12 @@ def test_bool_tensor_bool_multi_element_raises():
     np_a = np.array([1.0, 2.0])
     np_b = np.array([1.0, 2.0])
 
-    # NumPy raises on bool() of multi-element array; mpcf should too
+    # NumPy raises on bool() of multi-element array; stablebear should too
     with pytest.raises(ValueError):
         bool(np_a == np_b)
 
-    a = mpcf.FloatTensor(np_a)
-    b = mpcf.FloatTensor(np_b)
+    a = sb.FloatTensor(np_a)
+    b = sb.FloatTensor(np_b)
     with pytest.raises(ValueError, match="more than one element"):
         bool(a == b)
 
@@ -63,18 +63,18 @@ def test_bool_tensor_bool_multi_element_raises():
 
 
 _NUMERIC_TYPES = [
-    pytest.param(mpcf.FloatTensor, np.float64, id="float64"),
-    pytest.param(mpcf.FloatTensor, np.float32, id="float32"),
-    pytest.param(mpcf.IntTensor, np.int32, id="int32"),
-    pytest.param(mpcf.IntTensor, np.int64, id="int64"),
+    pytest.param(sb.FloatTensor, np.float64, id="float64"),
+    pytest.param(sb.FloatTensor, np.float32, id="float32"),
+    pytest.param(sb.IntTensor, np.int32, id="int32"),
+    pytest.param(sb.IntTensor, np.int64, id="int64"),
 ]
 
 
-def _assert_comparison(np_a, np_b, op, TensorType=mpcf.FloatTensor):
+def _assert_comparison(np_a, np_b, op, TensorType=sb.FloatTensor):
     """Assert that a comparison op on tensors matches numpy."""
     result = op(TensorType(np_a), TensorType(np_b))
     expected = op(np_a, np_b)
-    assert isinstance(result, mpcf.BoolTensor)
+    assert isinstance(result, sb.BoolTensor)
     npt.assert_array_equal(np.asarray(result), expected)
 
 
@@ -116,9 +116,9 @@ class TestElementwiseComparison:
 
 def _assert_broadcast_comparison(np_a, np_b, op):
     """Assert that a broadcasting comparison on FloatTensors matches numpy."""
-    result = op(mpcf.FloatTensor(np_a), mpcf.FloatTensor(np_b))
+    result = op(sb.FloatTensor(np_a), sb.FloatTensor(np_b))
     expected = op(np_a, np_b)
-    assert isinstance(result, mpcf.BoolTensor)
+    assert isinstance(result, sb.BoolTensor)
     assert result.shape == expected.shape
     npt.assert_array_equal(np.asarray(result), expected)
 
@@ -146,7 +146,7 @@ def test_ge_broadcast_scalar_tensor():
 
 def test_array_equal_true():
     np_a = np.array([1.0, 2.0, 3.0])
-    a = mpcf.FloatTensor(np_a)
+    a = sb.FloatTensor(np_a)
     assert a.array_equal(a) == np.array_equal(np_a, np_a)
     assert a.array_equal(a.copy()) == np.array_equal(np_a, np_a.copy())
 
@@ -154,23 +154,23 @@ def test_array_equal_true():
 def test_array_equal_false():
     np_a = np.array([1.0, 2.0, 3.0])
     np_b = np.array([1.0, 9.0, 3.0])
-    a = mpcf.FloatTensor(np_a)
-    b = mpcf.FloatTensor(np_b)
+    a = sb.FloatTensor(np_a)
+    b = sb.FloatTensor(np_b)
     assert a.array_equal(b) == np.array_equal(np_a, np_b)
 
 
 def test_array_equal_different_shape():
     np_a = np.array([1.0, 2.0])
     np_b = np.array([1.0, 2.0, 3.0])
-    a = mpcf.FloatTensor(np_a)
-    b = mpcf.FloatTensor(np_b)
+    a = sb.FloatTensor(np_a)
+    b = sb.FloatTensor(np_b)
     assert a.array_equal(b) == np.array_equal(np_a, np_b)
 
 
 def test_array_equal_numpy():
     np_a = np.array([1.0, 2.0, 3.0])
     np_b = np.array([1.0, 9.0, 3.0])
-    a = mpcf.FloatTensor(np_a)
+    a = sb.FloatTensor(np_a)
     assert a.array_equal(np_a) == np.array_equal(np_a, np_a)
     assert a.array_equal(np_b) == np.array_equal(np_a, np_b)
 
@@ -179,14 +179,14 @@ def test_array_equal_numpy():
 
 
 def test_pcf_tensor_eq():
-    a = mpcf.random.noisy_sin((3,))
+    a = sb.random.noisy_sin((3,))
     b = a.copy()
     result = a == b
-    assert isinstance(result, mpcf.BoolTensor)
+    assert isinstance(result, sb.BoolTensor)
     npt.assert_array_equal(np.asarray(result), np.array([True, True, True]))
 
 
 def test_pcf_tensor_array_equal():
-    a = mpcf.random.noisy_sin((3,))
+    a = sb.random.noisy_sin((3,))
     b = a.copy()
     assert a.array_equal(b)

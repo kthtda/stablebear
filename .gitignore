@@ -192,11 +192,11 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 
-masspcf/py.typed
-masspcf/*.pyi
-masspcf/_mpcf_cpp
-masspcf/_mpcf_cpu
-masspcf/_mpcf_cuda*
+stablebear/py.typed
+stablebear/*.pyi
+stablebear/_sb_cpp
+stablebear/_sb_cpu
+stablebear/_sb_cuda*
 collected_sources.txt
 dump*.txt
 covreport
@@ -204,6 +204,6 @@ sources.txt
 
 gpucov/docs/_build
 test/vgout.txt
-masspcf/_mpcf_cpp_cuda
-masspcf/_mpcf_cpp_cpu
+stablebear/_sb_cpp_cuda
+stablebear/_sb_cpp_cpu
 test/run_vg_pytest.sh

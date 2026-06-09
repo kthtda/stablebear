@@ -21,7 +21,7 @@
 
 namespace py = pybind11;
 
-namespace mpcf_py
+namespace sb_py
 {
   void register_module_persistence(py::module_ &m)
   {

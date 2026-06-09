@@ -1,15 +1,15 @@
-masspcf.persistence
-====================
+stablebear.persistence
+======================
 
 Persistent homology, barcodes, and stable rank functions.
 
-.. automodule:: masspcf.persistence
+.. automodule:: stablebear.persistence
    :no-members:
 
 barcode
 -------
 
-.. automodule:: masspcf.persistence.barcode
+.. automodule:: stablebear.persistence.barcode
    :members:
    :undoc-members:
    :show-inheritance:
@@ -17,7 +17,7 @@ barcode
 ph_tensor
 ---------
 
-.. automodule:: masspcf.persistence.ph_tensor
+.. automodule:: stablebear.persistence.ph_tensor
    :members:
    :undoc-members:
    :show-inheritance:
@@ -25,7 +25,7 @@ ph_tensor
 homology
 --------
 
-.. automodule:: masspcf.persistence.homology
+.. automodule:: stablebear.persistence.homology
    :members:
    :undoc-members:
    :show-inheritance:
@@ -33,7 +33,7 @@ homology
 barcode_summary
 ----------------
 
-.. automodule:: masspcf.persistence.barcode_summary
+.. automodule:: stablebear.persistence.barcode_summary
    :members:
    :undoc-members:
    :show-inheritance:

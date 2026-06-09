@@ -14,65 +14,65 @@
 
 import numpy as np
 
-import masspcf as mpcf
-import masspcf.persistence as mpers
+import stablebear as sb
+import stablebear.persistence as pers
 
 
 def test_persistence_ripser_compute_euclidean_barcode_from_pcloud_returns_correct_dtype_and_shape():
     Xnp = np.random.randn(10, 2).astype(np.float64)
-    X = mpcf.FloatTensor(Xnp)
+    X = sb.FloatTensor(Xnp)
 
-    bcs = mpers.compute_persistent_homology(
+    bcs = pers.compute_persistent_homology(
         X,
         max_dim=3,
-        complex_type=mpers.ComplexType.VietorisRips,
-        distance_type=mpers.DistanceType.Euclidean,
+        complex_type=pers.ComplexType.VietorisRips,
+        distance_type=pers.DistanceType.Euclidean,
     )
 
-    assert isinstance(bcs, mpers.BarcodeTensor)
-    assert bcs.dtype == mpcf.barcode64
+    assert isinstance(bcs, pers.BarcodeTensor)
+    assert bcs.dtype == sb.barcode64
     assert bcs.shape == (4,)
 
     Xnp = np.random.randn(10, 2).astype(np.float32)
-    X = mpcf.FloatTensor(Xnp)
+    X = sb.FloatTensor(Xnp)
 
-    bcs = mpers.compute_persistent_homology(
+    bcs = pers.compute_persistent_homology(
         X,
         max_dim=3,
-        complex_type=mpers.ComplexType.VietorisRips,
-        distance_type=mpers.DistanceType.Euclidean,
+        complex_type=pers.ComplexType.VietorisRips,
+        distance_type=pers.DistanceType.Euclidean,
     )
 
-    assert isinstance(bcs, mpers.BarcodeTensor)
-    assert bcs.dtype == mpcf.barcode32
+    assert isinstance(bcs, pers.BarcodeTensor)
+    assert bcs.dtype == sb.barcode32
     assert bcs.shape == (4,)
 
 
 def test_persistence_ripser_compute_euclidean_barcode_from_pcloud_tensor_returns_correct_dtype_and_shape():
-    X = mpcf.zeros((3, 2, 7), dtype=mpcf.pcloud64)
+    X = sb.zeros((3, 2, 7), dtype=sb.pcloud64)
 
-    bcs = mpers.compute_persistent_homology(
+    bcs = pers.compute_persistent_homology(
         X,
         max_dim=3,
-        complex_type=mpers.ComplexType.VietorisRips,
-        distance_type=mpers.DistanceType.Euclidean,
+        complex_type=pers.ComplexType.VietorisRips,
+        distance_type=pers.DistanceType.Euclidean,
     )
 
-    assert isinstance(bcs, mpers.BarcodeTensor)
-    assert bcs.dtype == mpcf.barcode64
+    assert isinstance(bcs, pers.BarcodeTensor)
+    assert bcs.dtype == sb.barcode64
     assert bcs.shape == (3, 2, 7, 4)
 
-    X = mpcf.zeros((3, 2, 7), dtype=mpcf.pcloud32)
+    X = sb.zeros((3, 2, 7), dtype=sb.pcloud32)
 
-    bcs = mpers.compute_persistent_homology(
+    bcs = pers.compute_persistent_homology(
         X,
         max_dim=3,
-        complex_type=mpers.ComplexType.VietorisRips,
-        distance_type=mpers.DistanceType.Euclidean,
+        complex_type=pers.ComplexType.VietorisRips,
+        distance_type=pers.DistanceType.Euclidean,
     )
 
-    assert isinstance(bcs, mpers.BarcodeTensor)
-    assert bcs.dtype == mpcf.barcode32
+    assert isinstance(bcs, pers.BarcodeTensor)
+    assert bcs.dtype == sb.barcode32
     assert bcs.shape == (3, 2, 7, 4)
 
 
@@ -89,22 +89,22 @@ def _make_rectangle_point_cloud():
 def test_persistence_ripser_unreduced_homology():
     X = _make_rectangle_point_cloud()
 
-    bcs = mpers.compute_persistent_homology(
+    bcs = pers.compute_persistent_homology(
         X,
         max_dim=2,
-        complex_type=mpers.ComplexType.VietorisRips,
-        distance_type=mpers.DistanceType.Euclidean,
+        complex_type=pers.ComplexType.VietorisRips,
+        distance_type=pers.DistanceType.Euclidean,
     )
 
     h0 = bcs[0]
     h1 = bcs[1]
     h2 = bcs[2]
 
-    expected_h0 = mpers.Barcode(np.array([
+    expected_h0 = pers.Barcode(np.array([
         [0.0, np.inf], [0.0, 3.0], [0.0, 3.0], [0.0, 4.0],
     ]))
-    expected_h1 = mpers.Barcode(np.array([[4.0, 5.0]]))
-    expected_h2 = mpers.Barcode(np.zeros((0, 2)))
+    expected_h1 = pers.Barcode(np.array([[4.0, 5.0]]))
+    expected_h2 = pers.Barcode(np.zeros((0, 2)))
 
     assert expected_h0.is_isomorphic_to(h0)
     assert expected_h1.is_isomorphic_to(h1)
@@ -114,21 +114,21 @@ def test_persistence_ripser_unreduced_homology():
 def test_persistence_ripser_reduced_homology():
     X = _make_rectangle_point_cloud()
 
-    bcs = mpers.compute_persistent_homology(
+    bcs = pers.compute_persistent_homology(
         X,
         max_dim=2,
         reduced=True,
-        complex_type=mpers.ComplexType.VietorisRips,
-        distance_type=mpers.DistanceType.Euclidean,
+        complex_type=pers.ComplexType.VietorisRips,
+        distance_type=pers.DistanceType.Euclidean,
     )
 
     h0 = bcs[0]
     h1 = bcs[1]
     h2 = bcs[2]
 
-    expected_h0 = mpers.Barcode(np.array([[0.0, 3.0], [0.0, 3.0], [0.0, 4.0]]))
-    expected_h1 = mpers.Barcode(np.array([[4.0, 5.0]]))
-    expected_h2 = mpers.Barcode(np.zeros((0, 2)))
+    expected_h0 = pers.Barcode(np.array([[0.0, 3.0], [0.0, 3.0], [0.0, 4.0]]))
+    expected_h1 = pers.Barcode(np.array([[4.0, 5.0]]))
+    expected_h2 = pers.Barcode(np.zeros((0, 2)))
 
     assert expected_h0.is_isomorphic_to(h0)
     assert expected_h1.is_isomorphic_to(h1)
@@ -136,28 +136,28 @@ def test_persistence_ripser_reduced_homology():
 
 
 def test_persistence_ripser_compute_euclidean_barcode_on_tensor():
-    X = mpcf.zeros((3, 4, 5), dtype=mpcf.pcloud64)
+    X = sb.zeros((3, 4, 5), dtype=sb.pcloud64)
 
     for i in range(3):
         for j in range(4):
             for k in range(5):
                 X[i, j, k] = np.random.randn(10, 5)
 
-    Y = mpers.compute_persistent_homology(
+    Y = pers.compute_persistent_homology(
         X,
         max_dim=1,
-        complex_type=mpers.ComplexType.VietorisRips,
-        distance_type=mpers.DistanceType.Euclidean,
+        complex_type=pers.ComplexType.VietorisRips,
+        distance_type=pers.DistanceType.Euclidean,
     )
 
     for i in range(3):
         for j in range(4):
             for k in range(5):
-                xbc = mpers.compute_persistent_homology(
+                xbc = pers.compute_persistent_homology(
                     X[i, j, k],
                     max_dim=1,
-                    complex_type=mpers.ComplexType.VietorisRips,
-                    distance_type=mpers.DistanceType.Euclidean,
+                    complex_type=pers.ComplexType.VietorisRips,
+                    distance_type=pers.DistanceType.Euclidean,
                 )
 
                 assert Y[i, j, k, 0].is_isomorphic_to(xbc[0])

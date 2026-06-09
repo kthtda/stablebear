@@ -14,7 +14,7 @@
 
 """Helpers for the tensor-indexing parity tests.
 
-NumPy is the oracle: the masspcf result must match what NumPy produces for the
+NumPy is the oracle: the stablebear result must match what NumPy produces for the
 same index expression on the same array.
 """
 
@@ -32,7 +32,7 @@ def assert_getitem_matches(arr, index):
     a legal NumPy index (int, slice, tuple, Ellipsis, None, list, ndarray, ...).
     """
     import numpy as np
-    from masspcf.tensor import FloatTensor
+    from stablebear.tensor import FloatTensor
 
     a = np.asarray(arr, dtype=np.float64)
     expected = a[index]
@@ -45,10 +45,10 @@ def assert_setitem_matches(arr, index, value):
     """``FloatTensor(arr)[index] = value`` must mutate like ``arr[index] = value``.
 
     ``value`` may be a scalar or an ndarray; an ndarray is wrapped in a
-    ``FloatTensor`` for the masspcf side (its RHS contract).
+    ``FloatTensor`` for the stablebear side (its RHS contract).
     """
     import numpy as np
-    from masspcf.tensor import FloatTensor
+    from stablebear.tensor import FloatTensor
 
     a = np.asarray(arr, dtype=np.float64)
     expected = a.copy()

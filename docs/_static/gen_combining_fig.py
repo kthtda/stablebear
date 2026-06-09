@@ -7,15 +7,15 @@ from pathlib import Path
 HERE = Path(__file__).parent
 
 # -- docs snippet start --
-import masspcf as mpcf
-from masspcf.random import noisy_sin, noisy_cos
-from masspcf.plotting import plot as plotpcf
+import stablebear as sb
+from stablebear.random import noisy_sin, noisy_cos
+from stablebear.plotting import plot as plotpcf
 import matplotlib.pyplot as plt
 
 
 def plot_combining_example(sin_color="b", cos_color="r"):
     M = 10
-    A = mpcf.zeros((2, M))
+    A = sb.zeros((2, M))
 
     A[0, :] = noisy_sin((M,), n_points=100)
     A[1, :] = noisy_cos((M,), n_points=15)
@@ -27,7 +27,7 @@ def plot_combining_example(sin_color="b", cos_color="r"):
     plotpcf(A[1, :], ax=ax, color=cos_color, linewidth=0.5, alpha=0.4)
 
     # Compute and plot means
-    Aavg = mpcf.mean(A, dim=1)
+    Aavg = sb.mean(A, dim=1)
     plotpcf(Aavg[0], ax=ax, color=sin_color, linewidth=2, label="sin")
     plotpcf(Aavg[1], ax=ax, color=cos_color, linewidth=2, label="cos")
 

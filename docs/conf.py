@@ -18,7 +18,7 @@ pyproj_toml = tomllib.load(open("../pyproject.toml", "rb"))
 
 year = datetime.now().year
 
-project = "masspcf"
+project = "stablebear"
 copyright = f"2024-{year}, Björn H. Wehlin"
 author = "Björn H. Wehlin"
 release = pyproj_toml["project"]["version"]
@@ -50,9 +50,9 @@ if gen_cpp_docs:
     extensions.append("breathe")
     extensions.append("exhale")
 
-    breathe_projects = {"masspcf_internals": "./_build_doxygen/xml"}
+    breathe_projects = {"stablebear_internals": "./_build_doxygen/xml"}
 
-    breathe_default_project = "masspcf_internals"
+    breathe_default_project = "stablebear_internals"
 
     import textwrap
 
@@ -62,7 +62,7 @@ if gen_cpp_docs:
         "rootFileName": "library_root.rst",
         "doxygenStripFromPath": "..",
         # Heavily encouraged optional argument (see docs)
-        "rootFileTitle": "masspcf C++ API reference",
+        "rootFileTitle": "stablebear C++ API reference",
         # Suggested optional arguments
         "createTreeView": True,
         # TIP: if using the sphinx-bootstrap-theme, you need
@@ -91,7 +91,7 @@ html_static_path = ["_static"]
 html_css_files = ["lightbox.css"]
 html_js_files = ["lightbox.js"]
 
-# --- Create a temporary bundle of 'masspcf' with a stub C++ backend from the Python source in ../masspcf. This is only for documentation purposes (so that we don't have to keep reinstalling, including recompiling, masspcf everytime we want to update the docs). The setup has been tested on Linux and should probably work on OSX. It is unclear if it'll work on Windows.
+# --- Create a temporary bundle of 'stablebear' with a stub C++ backend from the Python source in ../stablebear. This is only for documentation purposes (so that we don't have to keep reinstalling, including recompiling, stablebear everytime we want to update the docs). The setup has been tested on Linux and should probably work on OSX. It is unclear if it'll work on Windows.
 
 import os
 import platform
@@ -108,20 +108,20 @@ os.makedirs(temp_mod_dir, exist_ok=True)
 print(f"Will remove {temp_mod_dir}")
 
 shutil.rmtree(temp_mod_dir, ignore_errors=True)
-os.makedirs(os.path.join(temp_mod_dir, "masspcf"))
+os.makedirs(os.path.join(temp_mod_dir, "stablebear"))
 
-masspcf_temp_dir = os.path.join(os.path.abspath("modules"), "masspcf")
+stablebear_temp_dir = os.path.join(os.path.abspath("modules"), "stablebear")
 
-files = glob(os.path.abspath("../masspcf/*"))
+files = glob(os.path.abspath("../stablebear/*"))
 for file in files:
     basename = os.path.basename(file)
     if "__pycache__" in file:
         continue
-    # Skip the real _mpcf_cpp.py -- we replace it with the stub below
-    if basename == "_mpcf_cpp.py":
+    # Skip the real _sb_cpp.py -- we replace it with the stub below
+    if basename == "_sb_cpp.py":
         continue
 
-    target = os.path.join(masspcf_temp_dir, basename)
+    target = os.path.join(stablebear_temp_dir, basename)
 
     if is_windows:
         if os.path.isdir(file):
@@ -131,10 +131,10 @@ for file in files:
     else:
         os.symlink(file, target)
 
-# Symlink the stub _mpcf_cpp package (docs/_mpcf_cpp/) so that autodoc can
-# import masspcf without the compiled C++ extension.
-cpp_src = os.path.abspath("./_mpcf_cpp")
-cpp_dest = os.path.join(masspcf_temp_dir, "_mpcf_cpp")
+# Symlink the stub _sb_cpp package (docs/_sb_cpp/) so that autodoc can
+# import stablebear without the compiled C++ extension.
+cpp_src = os.path.abspath("./_sb_cpp")
+cpp_dest = os.path.join(stablebear_temp_dir, "_sb_cpp")
 
 if is_windows:
     shutil.copytree(cpp_src, cpp_dest)

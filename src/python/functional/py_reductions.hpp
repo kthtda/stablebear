@@ -14,15 +14,15 @@
 * limitations under the License.
 */
 
-#ifndef MASSPCF_PY_REDUCTIONS_H
-#define MASSPCF_PY_REDUCTIONS_H
+#ifndef STABLEBEAR_PY_REDUCTIONS_H
+#define STABLEBEAR_PY_REDUCTIONS_H
 
 #include "../pybind.hpp"
 
-namespace mpcf_py
+namespace sb_py
 {
   void register_reductions(pybind11::module_& m);
 }
 
 
-#endif //MASSPCF_PY_REDUCTIONS_H
+#endif //STABLEBEAR_PY_REDUCTIONS_H

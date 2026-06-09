@@ -14,14 +14,14 @@
 * limitations under the License.
 */
 
-#ifndef MASSPCF_PY_RANDOM_H
-#define MASSPCF_PY_RANDOM_H
+#ifndef STABLEBEAR_PY_RANDOM_H
+#define STABLEBEAR_PY_RANDOM_H
 
 #include "../pybind.hpp"
 
-namespace mpcf_py
+namespace sb_py
 {
   void register_random(pybind11::module_& m);
 }
 
-#endif //MASSPCF_PY_RANDOM_H
+#endif //STABLEBEAR_PY_RANDOM_H

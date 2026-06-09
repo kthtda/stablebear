@@ -31,19 +31,19 @@ namespace
   class PyNormsBindings
   {
   public:
-    using PcfT = mpcf::Pcf<Tt, Tv>;
-    using TensorT = mpcf::Tensor<PcfT>;
-    using OutTensorT = mpcf::Tensor<Tv>;
+    using PcfT = sb::Pcf<Tt, Tv>;
+    using TensorT = sb::Tensor<PcfT>;
+    using OutTensorT = sb::Tensor<Tv>;
 
     static py::tuple lpnorm_l1(TensorT inTensor)
     {
       auto outTensor = OutTensorT(inTensor.shape(), Tv(0));
 
       auto f = [](const PcfT& v) {
-        return mpcf::l1_norm(v);
+        return sb::l1_norm(v);
       };
 
-      std::unique_ptr<mpcf::StoppableTask<void>> task = mpcf_py::execute_stoppable_task<mpcf::ApplyFunctional<TensorT, OutTensorT, decltype(f)>>(inTensor, outTensor, f);
+      std::unique_ptr<sb::StoppableTask<void>> task = sb_py::execute_stoppable_task<sb::ApplyFunctional<TensorT, OutTensorT, decltype(f)>>(inTensor, outTensor, f);
       return py::make_tuple(std::move(task), outTensor);
     }
 
@@ -52,10 +52,10 @@ namespace
       auto outTensor = OutTensorT(inTensor.shape(), Tv(0));
 
       auto f = [p](const PcfT& v) {
-        return mpcf::lp_norm(v, p);
+        return sb::lp_norm(v, p);
       };
 
-      std::unique_ptr<mpcf::StoppableTask<void>> task = mpcf_py::execute_stoppable_task<mpcf::ApplyFunctional<TensorT, OutTensorT, decltype(f)>>(inTensor, outTensor, f);
+      std::unique_ptr<sb::StoppableTask<void>> task = sb_py::execute_stoppable_task<sb::ApplyFunctional<TensorT, OutTensorT, decltype(f)>>(inTensor, outTensor, f);
       return py::make_tuple(std::move(task), outTensor);
     }
 
@@ -73,13 +73,13 @@ namespace
 
 }
 
-namespace mpcf_py
+namespace sb_py
 {
 
   void register_norms(py::module_& m)
   {
-    PyNormsBindings<mpcf::float32_t, mpcf::float32_t>::register_bindings(m, "_f32_f32");
-    PyNormsBindings<mpcf::float64_t, mpcf::float64_t>::register_bindings(m, "_f64_f64");
+    PyNormsBindings<sb::float32_t, sb::float32_t>::register_bindings(m, "_f32_f32");
+    PyNormsBindings<sb::float64_t, sb::float64_t>::register_bindings(m, "_f64_f64");
   }
 
 }

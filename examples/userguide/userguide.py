@@ -1,9 +1,9 @@
 import numpy as np
 
-import masspcf as mpcf
+import stablebear as sb
 
 TV = np.array([[0, 4], [2, 3], [3, 1], [5, 0]])
-f = mpcf.Pcf(TV)
+f = sb.Pcf(TV)
 
 print(f)
 
@@ -16,7 +16,7 @@ print(fMatrix)
 
 import matplotlib.pyplot as plt
 
-from masspcf.plotting import plot as plotpcf
+from stablebear.plotting import plot as plotpcf
 
 plotpcf(f)
 
@@ -27,7 +27,7 @@ plt.savefig("ugfig_plot_single.png")
 
 ############# Multidimensional arrays #############
 
-Z = mpcf.zeros((10, 5, 4))
+Z = sb.zeros((10, 5, 4))
 print(Z.shape)
 
 ######
@@ -39,10 +39,10 @@ Z[2:9:3, 1:, 2]  # shape = (3,4), indices [2,5,8] x [1,...,4] x [2]
 
 print("Here")
 
-from masspcf.random import noisy_cos, noisy_sin
+from stablebear.random import noisy_cos, noisy_sin
 
 M = 10  # Number of PCFs for each case
-A = mpcf.zeros((2, M))
+A = sb.zeros((2, M))
 
 # Generate 'M' noisy sin/cos functions @ 100 resp. 15 time points each.
 # Assign the sin(x) functions into the first row of 'A' and cos(x)
@@ -56,14 +56,14 @@ print("3")
 fig, ax = plt.subplots(1, 1, figsize=(6, 2))
 
 # Plot individual noisy sin/cos functions
-# masspcf can plot one-dimensional arrays (views) of PCFs in a single line
+# stablebear can plot one-dimensional arrays (views) of PCFs in a single line
 plotpcf(A[0, :], ax=ax, color="b", linewidth=0.5, alpha=0.4)
 plotpcf(A[1, :], ax=ax, color="r", linewidth=0.5, alpha=0.4)
 
 plt.show()
 
 # Means across first axis of 'A'
-Aavg = mpcf.mean(A, dim=1)
+Aavg = sb.mean(A, dim=1)
 
 # Plot means
 plotpcf(Aavg[0], ax=ax, color="b", linewidth=2, label="sin")
@@ -76,14 +76,14 @@ fig.savefig("ugfig_noisy_means.png")
 
 ############# Matrix computations #############
 
-f1 = mpcf.Pcf(np.array([[0.0, 5.0], [2.0, 3.0], [5.0, 0.0]]))
-f2 = mpcf.Pcf(np.array([[0.0, 2.0], [4.0, 7.0], [8.0, 1.0], [9.0, 0.0]]))
-f3 = mpcf.Pcf(np.array([[0, 4], [2, 3], [3, 1], [5, 0]]))
-f4 = mpcf.Pcf(np.array([[0, 2], [6, 1], [7, 0]]))
+f1 = sb.Pcf(np.array([[0.0, 5.0], [2.0, 3.0], [5.0, 0.0]]))
+f2 = sb.Pcf(np.array([[0.0, 2.0], [4.0, 7.0], [8.0, 1.0], [9.0, 0.0]]))
+f3 = sb.Pcf(np.array([[0, 4], [2, 3], [3, 1], [5, 0]]))
+f4 = sb.Pcf(np.array([[0, 2], [6, 1], [7, 0]]))
 
-X = mpcf.Array([f1, f2, f3, f4])
+X = sb.Array([f1, f2, f3, f4])
 
-print(mpcf.pdist(X))
-print(mpcf.pdist(X, p=3.5))
+print(sb.pdist(X))
+print(sb.pdist(X, p=3.5))
 
-print(mpcf.l2_kernel(X))
+print(sb.l2_kernel(X))

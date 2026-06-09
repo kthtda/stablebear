@@ -10,4 +10,4 @@ Checks: >
 
 WarningsAsErrors: ''
 
-HeaderFilterRegex: 'include/mpcf/.*'
+HeaderFilterRegex: 'include/sbear/.*'

@@ -12,14 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef MASSPCF_PY_PERSISTENCE_PAIR_H
-#define MASSPCF_PY_PERSISTENCE_PAIR_H
+#ifndef STABLEBEAR_PY_PERSISTENCE_PAIR_H
+#define STABLEBEAR_PY_PERSISTENCE_PAIR_H
 
 #include "../pybind.hpp"
 
-namespace mpcf_py
+namespace sb_py
 {
   void register_persistence_persistence_pair(pybind11::module_& m);
 }
 
-#endif //MASSPCF_PY_PERSISTENCE_PAIR_H
+#endif //STABLEBEAR_PY_PERSISTENCE_PAIR_H

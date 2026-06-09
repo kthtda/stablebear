@@ -2,9 +2,9 @@
 Deterministic random generation
 ====================================
 
-masspcf's random generation system produces reproducible results regardless of thread count or execution order. This is achieved by deriving a unique, deterministic seed for each tensor element from a master seed and the element's position, so that parallel threads never share or depend on each other's random state.
+stablebear's random generation system produces reproducible results regardless of thread count or execution order. This is achieved by deriving a unique, deterministic seed for each tensor element from a master seed and the element's position, so that parallel threads never share or depend on each other's random state.
 
-This mechanism underpins all random operations in masspcf -- generating noisy PCFs, sampling Poisson point processes, and any future operation that needs per-element randomness.
+This mechanism underpins all random operations in stablebear -- generating noisy PCFs, sampling Poisson point processes, and any future operation that needs per-element randomness.
 
 
 Design goal
@@ -136,7 +136,7 @@ This is the only entry point for deterministic randomness. A consumer function d
 .. code-block:: cpp
 
    // Example: sample_poisson uses parallel_walk with a generator
-   mpcf::parallel_walk(out, gen,
+   sb::parallel_walk(out, gen,
      [&](const std::vector<size_t>& idx, auto& engine) {
        std::poisson_distribution<size_t> countDist(lambda);
        auto nPoints = countDist(engine);
@@ -192,7 +192,7 @@ Global and explicit generators
 
 The system supports two usage patterns:
 
-- **Global generator** -- ``mpcf::seed(42)`` sets the seed on a process-wide ``DefaultRandomGenerator`` (``default_generator()``). Some functions use this by default when no generator is passed explicitly.
+- **Global generator** -- ``sb::seed(42)`` sets the seed on a process-wide ``DefaultRandomGenerator`` (``default_generator()``). Some functions use this by default when no generator is passed explicitly.
 - **Explicit generator** -- ``RandomGenerator gen(42)`` creates an independent generator that can be passed to functions, allowing multiple independent random streams.
 
 

@@ -8,11 +8,11 @@ usage() {
   cat << EOF
 Usage: $(basename "$0") [OPTIONS]
 
-Run valgrind or helgrind on the masspcf test suite and open an HTML report.
+Run valgrind or helgrind on the stablebear test suite and open an HTML report.
 
 Options:
   -r, --root    <dir>            Project root directory (default: $ROOT)
-  -b, --build   <dir>            Build directory containing mpcf_test
+  -b, --build   <dir>            Build directory containing sb_test
                                  (default: <root>/../cmake-build-debug)
   -o, --output  <dir>            Output directory for the HTML report
                                  (default: \$TMPDIR/<tool>_<suite>_report)
@@ -63,9 +63,9 @@ fi
 BUILD=${BUILD:-$(realpath "${ROOT}/cmake-build-debug")}
 OUT_DIR=${OUT_DIR:-"${TMPDIR:-/tmp}/${TOOL}_${SUITE}_report"}
 
-MPCF_TEST="${BUILD}/mpcf_test"
-if [ ! -x "$MPCF_TEST" ]; then
-  echo "Error: $MPCF_TEST not found or not executable." >&2
+SB_TEST="${BUILD}/sb_test"
+if [ ! -x "$SB_TEST" ]; then
+  echo "Error: $SB_TEST not found or not executable." >&2
   exit 1
 fi
 
@@ -83,7 +83,7 @@ echo "XML file: ${XML}"
 if [ "$SUITE" = "pytest" ]; then
   PYTHONMALLOC=malloc "${VALGRIND_CMD[@]}" python -m pytest "${ROOT}/test/" -x -q || true
 else
-  "${VALGRIND_CMD[@]}" "$MPCF_TEST" || true
+  "${VALGRIND_CMD[@]}" "$SB_TEST" || true
 fi
 
 valgrind-ci "$XML" --output-dir="$OUT_DIR" --source-dir="${ROOT}" --summary

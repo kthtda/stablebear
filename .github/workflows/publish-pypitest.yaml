@@ -58,7 +58,7 @@ jobs:
     if: github.actor == 'bwehlin'
     environment:
       name: pypi-test
-      url: https://test.pypi.org/p/masspcf
+      url: https://test.pypi.org/p/stablebear
     permissions:
       id-token: write
 

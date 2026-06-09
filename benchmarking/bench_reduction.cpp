@@ -27,7 +27,7 @@ BenchmarkReduction::init(const boost::program_options::variables_map& vm)
   for (auto & pcf : m_pcfs32)
   {
     auto nTimePoints = nTimePointDist(gen);
-    std::vector<mpcf::TimePoint_f32> pts;
+    std::vector<sb::TimePoint_f32> pts;
     pts.resize(nTimePoints);
     
     for (auto & pt : pts)
@@ -35,8 +35,8 @@ BenchmarkReduction::init(const boost::program_options::variables_map& vm)
       pt.t = timeDist(gen);
       pt.v = valDist(gen);
     }
-    std::sort(pts.begin(), pts.end(), [](const mpcf::TimePoint_f32& a, const mpcf::TimePoint_f32& b){ return a.t < b.t; });
-    pcf = mpcf::Pcf_f32(std::move(pts));
+    std::sort(pts.begin(), pts.end(), [](const sb::TimePoint_f32& a, const sb::TimePoint_f32& b){ return a.t < b.t; });
+    pcf = sb::Pcf_f32(std::move(pts));
   }
   
 }
@@ -44,5 +44,5 @@ BenchmarkReduction::init(const boost::program_options::variables_map& vm)
 void
 BenchmarkReduction::run()
 {
-  mpcf::mem_average(m_pcfs32, m_chunksz);
+  sb::mem_average(m_pcfs32, m_chunksz);
 }

@@ -1,6 +1,6 @@
-"""Shared helpers for test files that produce plots viewable via MPCF_SHOW_PLOTS.
+"""Shared helpers for test files that produce plots viewable via SB_SHOW_PLOTS.
 
-When MPCF_SHOW_PLOTS is not set, all fixtures are no-ops and matplotlib is
+When SB_SHOW_PLOTS is not set, all fixtures are no-ops and matplotlib is
 never imported.
 """
 
@@ -11,7 +11,7 @@ import numpy as np
 import pytest
 
 
-SHOW = bool(os.environ.get("MPCF_SHOW_PLOTS"))
+SHOW = bool(os.environ.get("SB_SHOW_PLOTS"))
 
 
 def _get_plt():
@@ -157,7 +157,7 @@ def rect_plot_fixture(gallery):
     """Create a ``rect_plot`` fixture for visualizing rectangle iteration.
 
     Call ``rect_plot(f, g, rects)`` from a test to register data for plotting.
-    When MPCF_SHOW_PLOTS is not set, the call is a no-op.
+    When SB_SHOW_PLOTS is not set, the call is a no-op.
     """
     @pytest.fixture
     def rect_plot(request):
@@ -182,7 +182,7 @@ def rect_plot_fixture(gallery):
         max_time = data["max_time"]
 
         plt_ = _get_plt()
-        from masspcf.plotting import plot as plot_pcf
+        from stablebear.plotting import plot as plot_pcf
 
         fig, ax = plt_.subplots(figsize=(10, 5))
         fig.suptitle(request.node.name)

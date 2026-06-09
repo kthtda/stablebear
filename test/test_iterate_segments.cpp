@@ -16,8 +16,8 @@
 
 #include <gtest/gtest.h>
 
-#include <mpcf/functional/pcf.hpp>
-#include <mpcf/algorithms/functional/iterate_rectangles.hpp>
+#include <sbear/functional/pcf.hpp>
+#include <sbear/algorithms/functional/iterate_rectangles.hpp>
 
 #include <limits>
 #include <vector>
@@ -25,8 +25,8 @@
 class IterateSegmentsFixture : public ::testing::Test
 {
 protected:
-  using Segment = mpcf::Segment<double, double>;
-  using Point = typename mpcf::Pcf_f64::point_type;
+  using Segment = sb::Segment<double, double>;
+  using Point = typename sb::Pcf_f64::point_type;
 
   void SetUp() override
   {
@@ -44,7 +44,7 @@ protected:
 
 TEST_F(IterateSegmentsFixture, Full)
 {
-  mpcf::iterate_segments(pts.begin(), pts.end(), 0., Point::infinite_time(), collectSegment);
+  sb::iterate_segments(pts.begin(), pts.end(), 0., Point::infinite_time(), collectSegment);
 
   ASSERT_EQ(segments.size(), 4u);
 
@@ -56,7 +56,7 @@ TEST_F(IterateSegmentsFixture, Full)
 
 TEST_F(IterateSegmentsFixture, StartLate)
 {
-  mpcf::iterate_segments(pts.begin(), pts.end(), 2., Point::infinite_time(), collectSegment);
+  sb::iterate_segments(pts.begin(), pts.end(), 2., Point::infinite_time(), collectSegment);
 
   ASSERT_EQ(segments.size(), 3u);
 
@@ -67,7 +67,7 @@ TEST_F(IterateSegmentsFixture, StartLate)
 
 TEST_F(IterateSegmentsFixture, EndEarly)
 {
-  mpcf::iterate_segments(pts.begin(), pts.end(), 0., 5., collectSegment);
+  sb::iterate_segments(pts.begin(), pts.end(), 0., 5., collectSegment);
 
   ASSERT_EQ(segments.size(), 3u);
 
@@ -78,7 +78,7 @@ TEST_F(IterateSegmentsFixture, EndEarly)
 
 TEST_F(IterateSegmentsFixture, StartLateAndEndEarly)
 {
-  mpcf::iterate_segments(pts.begin(), pts.end(), 2., 5., collectSegment);
+  sb::iterate_segments(pts.begin(), pts.end(), 2., 5., collectSegment);
 
   ASSERT_EQ(segments.size(), 2u);
 
@@ -88,7 +88,7 @@ TEST_F(IterateSegmentsFixture, StartLateAndEndEarly)
 
 TEST_F(IterateSegmentsFixture, StartAfterEverything)
 {
-  mpcf::iterate_segments(pts.begin(), pts.end(), 10., Point::infinite_time(), collectSegment);
+  sb::iterate_segments(pts.begin(), pts.end(), 10., Point::infinite_time(), collectSegment);
 
   ASSERT_EQ(segments.size(), 1u);
 
@@ -98,7 +98,7 @@ TEST_F(IterateSegmentsFixture, StartAfterEverything)
 TEST_F(IterateSegmentsFixture, StartOnPoint)
 {
   // Starting exactly on a breakpoint should use that point's value
-  mpcf::iterate_segments(pts.begin(), pts.end(), 4., Point::infinite_time(), collectSegment);
+  sb::iterate_segments(pts.begin(), pts.end(), 4., Point::infinite_time(), collectSegment);
 
   ASSERT_EQ(segments.size(), 2u);
 
@@ -109,7 +109,7 @@ TEST_F(IterateSegmentsFixture, StartOnPoint)
 TEST_F(IterateSegmentsFixture, StartBeforeFirst)
 {
   // Starting before the first breakpoint: value should be taken from the first point
-  mpcf::iterate_segments(pts.begin(), pts.end(), -1., 2., collectSegment);
+  sb::iterate_segments(pts.begin(), pts.end(), -1., 2., collectSegment);
 
   ASSERT_EQ(segments.size(), 2u);
 
@@ -120,7 +120,7 @@ TEST_F(IterateSegmentsFixture, StartBeforeFirst)
 TEST_F(IterateSegmentsFixture, SinglePoint)
 {
   std::vector<Point> single = { {0., 7.} };
-  mpcf::iterate_segments(single.begin(), single.end(), 0., Point::infinite_time(), collectSegment);
+  sb::iterate_segments(single.begin(), single.end(), 0., Point::infinite_time(), collectSegment);
 
   ASSERT_EQ(segments.size(), 1u);
 
@@ -130,7 +130,7 @@ TEST_F(IterateSegmentsFixture, SinglePoint)
 TEST_F(IterateSegmentsFixture, Empty)
 {
   std::vector<Point> empty;
-  mpcf::iterate_segments(empty.begin(), empty.end(), 0., Point::infinite_time(), collectSegment);
+  sb::iterate_segments(empty.begin(), empty.end(), 0., Point::infinite_time(), collectSegment);
 
   EXPECT_EQ(segments.size(), 0u);
 }

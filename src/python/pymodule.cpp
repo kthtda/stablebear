@@ -16,8 +16,8 @@
 
 #include "pybind.hpp"
 
-#include <mpcf/executor.hpp>
-#include <mpcf/task.hpp>
+#include <sbear/executor.hpp>
+#include <sbear/task.hpp>
 
 #include "py_future.hpp"
 #include "functional/py_pcf.hpp"
@@ -38,10 +38,10 @@
 
 #ifdef BUILD_WITH_CUDA
 #include <cuda_runtime.h>
-#include <mpcf/cuda/cuda_matrix_integrate_api.hpp>
+#include <sbear/cuda/cuda_matrix_integrate_api.hpp>
 #endif
 
-#include <mpcf/settings.hpp>
+#include <sbear/settings.hpp>
 
 namespace py = pybind11;
 
@@ -52,7 +52,7 @@ namespace
   // Used to verify the GIL is released during wait_for: if it isn't, the
   // thread calling wait_for holds the GIL, Python can never call advance(),
   // and the test deadlocks.
-  class GatedTask : public mpcf::StoppableTask<void>
+  class GatedTask : public sb::StoppableTask<void>
   {
   public:
     explicit GatedTask(size_t n_steps) : m_remaining(n_steps) { }
@@ -68,7 +68,7 @@ namespace
     }
 
   private:
-    tf::Future<void> run_async(mpcf::Executor& exec) override
+    tf::Future<void> run_async(sb::Executor& exec) override
     {
       next_step(m_remaining, "Waiting for gate", "step");
       m_flow.emplace([this]() {
@@ -100,41 +100,41 @@ namespace
     }
     return deviceCount;
 #else
-    throw std::runtime_error("This version of masspcf is compiled without GPU support.");
+    throw std::runtime_error("This version of stablebear is compiled without GPU support.");
 #endif
   }
 
   template <typename RetT>
   static void register_bindings_stoppable_task(py::handle m, const std::string& suffix)
   {
-    py::class_<mpcf::StoppableTask<RetT>> cls(m, ("StoppableTask" + suffix).c_str());
+    py::class_<sb::StoppableTask<RetT>> cls(m, ("StoppableTask" + suffix).c_str());
 
     cls
-        .def("request_stop", &mpcf::StoppableTask<RetT>::request_stop)
-        .def("wait_for", [](mpcf::StoppableTask<RetT>& self, int ms) { return self.wait_for(std::chrono::milliseconds(ms)); },
+        .def("request_stop", &sb::StoppableTask<RetT>::request_stop)
+        .def("wait_for", [](sb::StoppableTask<RetT>& self, int ms) { return self.wait_for(std::chrono::milliseconds(ms)); },
              py::call_guard<py::gil_scoped_release>())
-        .def("work_total", &mpcf::StoppableTask<RetT>::work_total)
-        .def("work_completed", &mpcf::StoppableTask<RetT>::work_completed)
-        .def("work_step", &mpcf::StoppableTask<RetT>::work_step)
-        .def("work_step_desc", &mpcf::StoppableTask<RetT>::work_step_desc)
-        .def("work_step_unit", &mpcf::StoppableTask<RetT>::work_step_unit)
+        .def("work_total", &sb::StoppableTask<RetT>::work_total)
+        .def("work_completed", &sb::StoppableTask<RetT>::work_completed)
+        .def("work_step", &sb::StoppableTask<RetT>::work_step)
+        .def("work_step_desc", &sb::StoppableTask<RetT>::work_step_desc)
+        .def("work_step_unit", &sb::StoppableTask<RetT>::work_step_unit)
     ;
   }
 
 }
 
-PYBIND11_MODULE(MPCF_MODULE_NAME, m) {
-  mpcf_py::register_pcf(m);
+PYBIND11_MODULE(SB_MODULE_NAME, m) {
+  sb_py::register_pcf(m);
 
   register_bindings_stoppable_task<void>(m, "_void");
 
-  py::class_<GatedTask, mpcf::StoppableTask<void>>(m, "_GatedTask")
+  py::class_<GatedTask, sb::StoppableTask<void>>(m, "_GatedTask")
     .def(py::init<size_t>())
     .def("advance", &GatedTask::advance);
 
   m.def("_create_gated_task", [](size_t n_steps) {
     auto task = std::make_unique<GatedTask>(n_steps);
-    task->start_async(mpcf::default_executor());
+    task->start_async(sb::default_executor());
     return task;
   });
 
@@ -144,27 +144,27 @@ PYBIND11_MODULE(MPCF_MODULE_NAME, m) {
     .value("timeout", std::future_status::timeout)
     .export_values();
 
-  py::class_<mpcf_py::Future<void>>(m, "Future_void")
+  py::class_<sb_py::Future<void>>(m, "Future_void")
     .def(py::init<>())
-    .def("wait_for", &mpcf_py::Future<void>::wait_for,
+    .def("wait_for", &sb_py::Future<void>::wait_for,
          py::call_guard<py::gil_scoped_release>());
 
-  m.def("force_cpu", [](bool on){ mpcf::settings().forceCpu = on; });
-  m.def("set_cuda_threshold", [](size_t n){ mpcf::settings().cudaThreshold = n; });
-  m.def("set_parallel_eval_threshold", [](size_t n){ mpcf::settings().parallelEvalThreshold = n; });
-  m.def("get_parallel_eval_threshold", [](){ return mpcf::settings().parallelEvalThreshold; });
-  m.def("set_device_verbose", [](bool on){ mpcf::settings().deviceVerbose = on; });
+  m.def("force_cpu", [](bool on){ sb::settings().forceCpu = on; });
+  m.def("set_cuda_threshold", [](size_t n){ sb::settings().cudaThreshold = n; });
+  m.def("set_parallel_eval_threshold", [](size_t n){ sb::settings().parallelEvalThreshold = n; });
+  m.def("get_parallel_eval_threshold", [](){ return sb::settings().parallelEvalThreshold; });
+  m.def("set_device_verbose", [](bool on){ sb::settings().deviceVerbose = on; });
   m.def("set_block_dim", [](unsigned int x, unsigned int y) {
-    mpcf::settings().blockDimX = x;
-    mpcf::settings().blockDimY = y;
+    sb::settings().blockDimX = x;
+    sb::settings().blockDimY = y;
   });
-  m.def("set_min_block_side", [](size_t n){ mpcf::settings().minBlockSide = n; });
+  m.def("set_min_block_side", [](size_t n){ sb::settings().minBlockSide = n; });
 #ifdef BUILD_WITH_CUDA
-  m.def("limit_gpus", [](size_t n){ mpcf::default_executor().limit_cuda_workers(n); });
+  m.def("limit_gpus", [](size_t n){ sb::default_executor().limit_cuda_workers(n); });
 #endif
   m.def("get_ngpus", &getNumGpus);
 
-  m.def("limit_cpus", [](size_t n){ mpcf::default_executor().limit_cpu_workers(n); });
+  m.def("limit_cpus", [](size_t n){ sb::default_executor().limit_cpu_workers(n); });
 
   m.def("_build_type", [] {
 #ifdef BUILD_WITH_CUDA
@@ -174,22 +174,22 @@ PYBIND11_MODULE(MPCF_MODULE_NAME, m) {
 #endif
   });
 
-  mpcf_py::register_random(m);
+  sb_py::register_random(m);
 
-  mpcf_py::register_io(m);
+  sb_py::register_io(m);
 
-  mpcf_py::register_tensor_bindings(m);
-  mpcf_py::register_np_conversions(m);
+  sb_py::register_tensor_bindings(m);
+  sb_py::register_np_conversions(m);
 
-  mpcf_py::register_make_from_serial_content(m);
+  sb_py::register_make_from_serial_content(m);
 
-  mpcf_py::register_reductions(m);
-  mpcf_py::register_distance(m);
-  mpcf_py::register_inner_product(m);
-  mpcf_py::register_norms(m);
-  mpcf_py::register_symmetric_matrix(m);
-  mpcf_py::register_distance_matrix(m);
+  sb_py::register_reductions(m);
+  sb_py::register_distance(m);
+  sb_py::register_inner_product(m);
+  sb_py::register_norms(m);
+  sb_py::register_symmetric_matrix(m);
+  sb_py::register_distance_matrix(m);
 
-  mpcf_py::register_module_persistence(m);
-  mpcf_py::register_module_point_process(m);
+  sb_py::register_module_persistence(m);
+  sb_py::register_module_point_process(m);
 }

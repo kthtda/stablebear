@@ -14,19 +14,19 @@
 
 #include <gtest/gtest.h>
 
-#include <mpcf/tensor.hpp>
-#include <mpcf/functional/pcf.hpp>
-#include <mpcf/persistence/barcode.hpp>
-#include <mpcf/persistence/persistence_pair.hpp>
-#include <mpcf/persistence/stable_rank.hpp>
-#include <mpcf/task.hpp>
-#include <mpcf/executor.hpp>
+#include <sbear/tensor.hpp>
+#include <sbear/functional/pcf.hpp>
+#include <sbear/persistence/barcode.hpp>
+#include <sbear/persistence/persistence_pair.hpp>
+#include <sbear/persistence/stable_rank.hpp>
+#include <sbear/task.hpp>
+#include <sbear/executor.hpp>
 
 #include <sstream>
 
 namespace
 {
-  using ScalarTypes = ::testing::Types<mpcf::float32_t, mpcf::float64_t>;
+  using ScalarTypes = ::testing::Types<sb::float32_t, sb::float64_t>;
 
   template<typename T>
   class BarcodeAndStableRankTest : public ::testing::Test
@@ -42,8 +42,8 @@ namespace
   TYPED_TEST(BarcodeAndStableRankTest, EqualityVsIsomorphic)
   {
     using T = TypeParam;
-    using Pair = mpcf::ph::PersistencePair<T>;
-    using Barcode = mpcf::ph::Barcode<T>;
+    using Pair = sb::ph::PersistencePair<T>;
+    using Barcode = sb::ph::Barcode<T>;
 
     std::vector<Pair> bars1{ Pair(T(0), T(1)), Pair(T(2), T(3)) };
     std::vector<Pair> bars2{ Pair(T(2), T(3)), Pair(T(0), T(1)) }; // permuted
@@ -63,8 +63,8 @@ namespace
   TYPED_TEST(BarcodeAndStableRankTest, IsomorphicWithinTolerance)
   {
     using T = TypeParam;
-    using Pair = mpcf::ph::PersistencePair<T>;
-    using Barcode = mpcf::ph::Barcode<T>;
+    using Pair = sb::ph::PersistencePair<T>;
+    using Barcode = sb::ph::Barcode<T>;
 
     // Endpoints differing by a tiny amount (as can happen when the same
     // barcode is computed from a point cloud versus a distance matrix).
@@ -91,8 +91,8 @@ namespace
   TYPED_TEST(BarcodeAndStableRankTest, IsInfiniteAndStreamFormatting)
   {
     using T = TypeParam;
-    using Pair = mpcf::ph::PersistencePair<T>;
-    using Barcode = mpcf::ph::Barcode<T>;
+    using Pair = sb::ph::PersistencePair<T>;
+    using Barcode = sb::ph::Barcode<T>;
 
     EXPECT_TRUE(Barcode::is_infinite(std::numeric_limits<T>::infinity()));
     EXPECT_TRUE(Barcode::is_infinite(std::numeric_limits<T>::max()));
@@ -119,12 +119,12 @@ namespace
   TYPED_TEST(BarcodeAndStableRankTest, EmptyBarcodeGivesZeroPcf)
   {
     using T = TypeParam;
-    using Barcode = mpcf::ph::Barcode<T>;
-    using PcfT = mpcf::Pcf<T, T>;
+    using Barcode = sb::ph::Barcode<T>;
+    using PcfT = sb::Pcf<T, T>;
     using Pt = typename PcfT::point_type;
 
     Barcode empty;
-    auto f = mpcf::ph::barcode_to_stable_rank(empty);
+    auto f = sb::ph::barcode_to_stable_rank(empty);
 
     ASSERT_EQ(f.points().size(), 1u);
     EXPECT_EQ(f.points()[0], Pt(static_cast<T>(0), static_cast<T>(0)));
@@ -133,16 +133,16 @@ namespace
   TYPED_TEST(BarcodeAndStableRankTest, FiniteBarsStableRank)
   {
     using T = TypeParam;
-    using Pair = mpcf::ph::PersistencePair<T>;
-    using Barcode = mpcf::ph::Barcode<T>;
-    using PcfT = mpcf::Pcf<T, T>;
+    using Pair = sb::ph::PersistencePair<T>;
+    using Barcode = sb::ph::Barcode<T>;
+    using PcfT = sb::Pcf<T, T>;
     using Pt = typename PcfT::point_type;
 
     // Two finite bars: lifetimes 1 and 2
     std::vector<Pair> bars{ Pair(T(0), T(1)), Pair(T(0), T(2)) };
     Barcode bc(std::move(bars));
 
-    auto f = mpcf::ph::barcode_to_stable_rank(bc);
+    auto f = sb::ph::barcode_to_stable_rank(bc);
 
     ASSERT_EQ(f.points().size(), 3u);
     EXPECT_EQ(f.points()[0], Pt(static_cast<T>(0), static_cast<T>(2))); // both alive at t=0
@@ -157,29 +157,29 @@ namespace
   TYPED_TEST(BarcodeAndStableRankTest, BarcodeToStableRankTaskMatchesDirectConversion)
   {
     using T = TypeParam;
-    using Barcode = mpcf::ph::Barcode<T>;
-    using PcfT = mpcf::Pcf<T, T>;
+    using Barcode = sb::ph::Barcode<T>;
+    using PcfT = sb::Pcf<T, T>;
 
-    mpcf::Tensor<Barcode> barcodes({ 2 });
+    sb::Tensor<Barcode> barcodes({ 2 });
 
-    std::vector<mpcf::ph::PersistencePair<T>> bars0;
+    std::vector<sb::ph::PersistencePair<T>> bars0;
     bars0.emplace_back(static_cast<T>(0), static_cast<T>(1));
-    std::vector<mpcf::ph::PersistencePair<T>> bars1;
+    std::vector<sb::ph::PersistencePair<T>> bars1;
     bars1.emplace_back(static_cast<T>(0), static_cast<T>(2));
 
     barcodes(0) = Barcode(bars0);
     barcodes(1) = Barcode(bars1);
 
-    mpcf::Tensor<PcfT> out;
+    sb::Tensor<PcfT> out;
 
-    auto task = mpcf::ph::make_stable_rank_task(barcodes, out);
-    task->start_async(mpcf::default_executor()).future().wait();
+    auto task = sb::ph::make_stable_rank_task(barcodes, out);
+    task->start_async(sb::default_executor()).future().wait();
 
     ASSERT_EQ(out.shape().size(), 1u);
     ASSERT_EQ(out.shape(0), 2u);
 
-    auto f0 = mpcf::ph::barcode_to_stable_rank(barcodes(0));
-    auto f1 = mpcf::ph::barcode_to_stable_rank(barcodes(1));
+    auto f0 = sb::ph::barcode_to_stable_rank(barcodes(0));
+    auto f1 = sb::ph::barcode_to_stable_rank(barcodes(1));
 
     EXPECT_EQ(out(0), f0);
     EXPECT_EQ(out(1), f1);

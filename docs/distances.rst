@@ -2,7 +2,7 @@
 Distances and Norms
 ======================
 
-masspcf provides GPU-accelerated computation of pairwise distance matrices and norms for collections of piecewise constant functions. These are key building blocks for downstream machine learning tasks such as clustering, classification, and dimensionality reduction.
+stablebear provides GPU-accelerated computation of pairwise distance matrices and norms for collections of piecewise constant functions. These are key building blocks for downstream machine learning tasks such as clustering, classification, and dimensionality reduction.
 
 
 Mathematical background
@@ -20,68 +20,68 @@ The :math:`L_p` norm of a single PCF :math:`f` is
 
    \| f \|_p = \left( \int_0^\infty |f(t)|^p \, dt \right)^{1/p}.
 
-For piecewise constant functions, these integrals reduce to finite sums over the breakpoint intervals, which masspcf evaluates exactly.
+For piecewise constant functions, these integrals reduce to finite sums over the breakpoint intervals, which stablebear evaluates exactly.
 
 
 Distance between two PCFs
 =========================
 
-:py:func:`~masspcf.lp_distance` computes the :math:`L_p` distance between two individual PCFs, returning a scalar.
+:py:func:`~stablebear.lp_distance` computes the :math:`L_p` distance between two individual PCFs, returning a scalar.
 
 ::
 
-   import masspcf as mpcf
+   import stablebear as sb
 
-   f = mpcf.Pcf([[0.0, 3.0], [1.0, 0.0]])
-   g = mpcf.Pcf([[0.0, 1.0], [2.0, 0.0]])
+   f = sb.Pcf([[0.0, 3.0], [1.0, 0.0]])
+   g = sb.Pcf([[0.0, 1.0], [2.0, 0.0]])
 
-   d = mpcf.lp_distance(f, g)        # L1 distance (default)
-   d2 = mpcf.lp_distance(f, g, p=2)  # L2 distance
+   d = sb.lp_distance(f, g)        # L1 distance (default)
+   d2 = sb.lp_distance(f, g, p=2)  # L2 distance
 
-This is the simplest distance API and is useful for quick comparisons or unit testing. For computing distances between all pairs in a collection, use :py:func:`~masspcf.pdist` or :py:func:`~masspcf.cdist` instead.
+This is the simplest distance API and is useful for quick comparisons or unit testing. For computing distances between all pairs in a collection, use :py:func:`~stablebear.pdist` or :py:func:`~stablebear.cdist` instead.
 
 
 Pairwise distances
 ==================
 
-:py:func:`~masspcf.pdist` computes the full pairwise :math:`L_p` distance matrix for a 1-D tensor of PCFs. The result is a :py:class:`~masspcf.DistanceMatrix` — a compressed symmetric matrix where entry :math:`(i, j)` is the :math:`L_p` distance between the :math:`i`-th and :math:`j`-th PCF.
+:py:func:`~stablebear.pdist` computes the full pairwise :math:`L_p` distance matrix for a 1-D tensor of PCFs. The result is a :py:class:`~stablebear.DistanceMatrix` — a compressed symmetric matrix where entry :math:`(i, j)` is the :math:`L_p` distance between the :math:`i`-th and :math:`j`-th PCF.
 
 Basic usage
 -----------
 
 ::
 
-   import masspcf as mpcf
-   from masspcf.random import noisy_sin
+   import stablebear as sb
+   from stablebear.random import noisy_sin
 
    X = noisy_sin((50,), n_points=100)
 
    # L1 distance matrix (default)
-   D = mpcf.pdist(X)
+   D = sb.pdist(X)
    # D.size is 50, D[i, j] gives the distance between X[i] and X[j]
 
 The ``p`` parameter controls which :math:`L_p` distance is computed::
 
-   D1 = mpcf.pdist(X, p=1)   # L1 distance
-   D2 = mpcf.pdist(X, p=2)   # L2 distance
+   D1 = sb.pdist(X, p=1)   # L1 distance
+   D2 = sb.pdist(X, p=2)   # L2 distance
 
 Progress output
 ---------------
 
 By default, progress output is suppressed. To show a progress bar during computation, pass ``verbose=True``::
 
-   D = mpcf.pdist(X, verbose=True)
+   D = sb.pdist(X, verbose=True)
 
 Input requirements
 ------------------
 
 ``pdist`` requires a **1-D** PCF tensor. If your data is in a higher-dimensional tensor, slice out the dimension you want first::
 
-   A = mpcf.zeros((2, 50))
+   A = sb.zeros((2, 50))
    # ... fill A ...
 
    # Distances between the 50 PCFs in the first row
-   D = mpcf.pdist(A[0, :])
+   D = sb.pdist(A[0, :])
 
 GPU acceleration
 -----------------
@@ -92,31 +92,31 @@ For large collections of PCFs, ``pdist`` automatically offloads the computation 
 Cross-distances
 ================
 
-:py:func:`~masspcf.cdist` computes the pairwise :math:`L_p` distances between two tensors of PCFs. Unlike ``pdist``, the two input tensors can differ in shape and size. The result is a :py:class:`~masspcf.FloatTensor` whose shape is the concatenation of the two input shapes.
+:py:func:`~stablebear.cdist` computes the pairwise :math:`L_p` distances between two tensors of PCFs. Unlike ``pdist``, the two input tensors can differ in shape and size. The result is a :py:class:`~stablebear.FloatTensor` whose shape is the concatenation of the two input shapes.
 
 ::
 
-   import masspcf as mpcf
-   from masspcf.random import noisy_sin, noisy_cos
+   import stablebear as sb
+   from stablebear.random import noisy_sin, noisy_cos
 
    X = noisy_sin((30,), n_points=100)
    Y = noisy_cos((20,), n_points=100)
 
-   D = mpcf.cdist(X, Y)          # shape (30, 20)
-   D2 = mpcf.cdist(X, Y, p=2)   # L2 cross-distances
+   D = sb.cdist(X, Y)          # shape (30, 20)
+   D2 = sb.cdist(X, Y, p=2)   # L2 cross-distances
 
 Higher-dimensional tensors are supported -- the output shape is ``(*X.shape, *Y.shape)``::
 
    A = noisy_sin((5, 10), n_points=50)
    B = noisy_cos((8,), n_points=50)
 
-   D = mpcf.cdist(A, B)   # shape (5, 10, 8)
+   D = sb.cdist(A, B)   # shape (5, 10, 8)
 
 
 L2 kernel matrices
 ===================
 
-:py:func:`~masspcf.l2_kernel` computes the pairwise :math:`L_2` inner-product (kernel) matrix for a 1-D tensor of PCFs. The result is a :py:class:`~masspcf.SymmetricMatrix` where entry :math:`(i, j)` is
+:py:func:`~stablebear.l2_kernel` computes the pairwise :math:`L_2` inner-product (kernel) matrix for a 1-D tensor of PCFs. The result is a :py:class:`~stablebear.SymmetricMatrix` where entry :math:`(i, j)` is
 
 .. math::
 
@@ -125,23 +125,23 @@ L2 kernel matrices
 
 ::
 
-   K = mpcf.l2_kernel(X)
+   K = sb.l2_kernel(X)
    # K[i, j] gives the L2 inner product between X[i] and X[j]
 
 The kernel matrix is symmetric and includes diagonal entries (self inner products). To use it with scikit-learn, convert to a dense NumPy array::
 
-   K_dense = mpcf.l2_kernel(X, verbose=False).to_dense()
+   K_dense = sb.l2_kernel(X, verbose=False).to_dense()
 
 
 Distance matrices
 ==================
 
-:py:class:`~masspcf.DistanceMatrix` provides a compressed storage format for distance matrices. Since a distance matrix is symmetric with zeros on the diagonal, it stores only the strict lower triangle — :math:`n(n-1)/2` elements instead of :math:`n^2`. Entries are enforced to be nonnegative, and writes to the diagonal are rejected unless the value is zero.
+:py:class:`~stablebear.DistanceMatrix` provides a compressed storage format for distance matrices. Since a distance matrix is symmetric with zeros on the diagonal, it stores only the strict lower triangle — :math:`n(n-1)/2` elements instead of :math:`n^2`. Entries are enforced to be nonnegative, and writes to the diagonal are rejected unless the value is zero.
 
 ::
 
-   from masspcf import DistanceMatrix
-   from masspcf.typing import float32
+   from stablebear import DistanceMatrix
+   from stablebear.typing import float32
 
    m = DistanceMatrix(100, dtype=float32)
    m[3, 7] = 2.5
@@ -158,13 +158,13 @@ Tensors of distance matrices
 Distance matrices can be stored in tensors just like PCFs or point clouds.
 Use the ``distmat32`` or ``distmat64`` dtypes::
 
-   import masspcf as mpcf
+   import stablebear as sb
 
    # A 1-D tensor holding 10 distance matrices
-   T = mpcf.zeros((10,), dtype=mpcf.distmat64)
+   T = sb.zeros((10,), dtype=sb.distmat64)
 
    # Assign a matrix into the tensor
-   m = mpcf.DistanceMatrix(5, dtype=mpcf.float64)
+   m = sb.DistanceMatrix(5, dtype=sb.float64)
    m[0, 1] = 3.14
    T[0] = m
 
@@ -184,12 +184,12 @@ tensor types::
 Symmetric matrices
 ===================
 
-:py:class:`~masspcf.SymmetricMatrix` provides a more general compressed storage format for symmetric matrices without the distance matrix constraints. It stores the lower triangle including the diagonal — :math:`n(n+1)/2` elements instead of :math:`n^2`.
+:py:class:`~stablebear.SymmetricMatrix` provides a more general compressed storage format for symmetric matrices without the distance matrix constraints. It stores the lower triangle including the diagonal — :math:`n(n+1)/2` elements instead of :math:`n^2`.
 
 ::
 
-   from masspcf import SymmetricMatrix
-   from masspcf.typing import float32
+   from stablebear import SymmetricMatrix
+   from stablebear.typing import float32
 
    m = SymmetricMatrix(100, dtype=float32)
    m[3, 7] = 2.5
@@ -201,38 +201,38 @@ To convert to a full NumPy array::
 
 Tensors of symmetric matrices use the ``symmat32`` or ``symmat64`` dtypes::
 
-   T = mpcf.zeros((10,), dtype=mpcf.symmat64)
+   T = sb.zeros((10,), dtype=sb.symmat64)
 
 
 Norms
 =====
 
-:py:func:`~masspcf.lp_norm` computes the :math:`L_p` norm of every PCF in a tensor, returning a NumPy array of the same shape.
+:py:func:`~stablebear.lp_norm` computes the :math:`L_p` norm of every PCF in a tensor, returning a NumPy array of the same shape.
 
 ::
 
-   import masspcf as mpcf
-   from masspcf.random import noisy_sin
+   import stablebear as sb
+   from stablebear.random import noisy_sin
 
    X = noisy_sin((50,), n_points=100)
 
    # L1 norms of all 50 PCFs
-   norms = mpcf.lp_norm(X, p=1)
+   norms = sb.lp_norm(X, p=1)
    # norms.shape is (50,)
 
 For higher-dimensional tensors, the output shape matches the input::
 
-   A = mpcf.zeros((3, 10))
+   A = sb.zeros((3, 10))
    # ... fill A ...
 
-   norms = mpcf.lp_norm(A, p=1)
+   norms = sb.lp_norm(A, p=1)
    # norms.shape is (3, 10)
 
 
 Using distances in machine learning
 =====================================
 
-``pdist`` returns a :py:class:`~masspcf.DistanceMatrix`. Call :py:meth:`~masspcf.DistanceMatrix.to_dense` to obtain a standard NumPy array for use with scikit-learn and other libraries.
+``pdist`` returns a :py:class:`~stablebear.DistanceMatrix`. Call :py:meth:`~stablebear.DistanceMatrix.to_dense` to obtain a standard NumPy array for use with scikit-learn and other libraries.
 
 Clustering
 ----------
@@ -241,7 +241,7 @@ Clustering
 
    from sklearn.cluster import AgglomerativeClustering
 
-   D = mpcf.pdist(X, verbose=False).to_dense()
+   D = sb.pdist(X, verbose=False).to_dense()
 
    clustering = AgglomerativeClustering(
        n_clusters=3,
@@ -257,7 +257,7 @@ Multidimensional scaling
 
    from sklearn.manifold import MDS
 
-   D = mpcf.pdist(X, verbose=False).to_dense()
+   D = sb.pdist(X, verbose=False).to_dense()
 
    mds = MDS(n_components=2, dissimilarity='precomputed')
    coords = mds.fit_transform(D)
@@ -276,7 +276,7 @@ A common approach is to convert a distance matrix into a kernel matrix and use i
    import numpy as np
    from sklearn.svm import SVC
 
-   D = mpcf.pdist(X, verbose=False).to_dense()
+   D = sb.pdist(X, verbose=False).to_dense()
    sigma = np.median(D[D > 0])
    K = np.exp(-D**2 / (2 * sigma**2))
 

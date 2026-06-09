@@ -14,12 +14,12 @@
 * limitations under the License.
 */
 
-#ifndef MASSPCF_PY_POISSON_H
-#define MASSPCF_PY_POISSON_H
+#ifndef STABLEBEAR_PY_POISSON_H
+#define STABLEBEAR_PY_POISSON_H
 
 #include <pybind11/pybind11.h>
 
-namespace mpcf_py
+namespace sb_py
 {
   void register_point_process_poisson(pybind11::module_& m);
 }

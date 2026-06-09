@@ -266,7 +266,7 @@ else ()
   SET(LANG_CUDA)
 endif ()
 
-set(PROJ_NAME masspcf)
+set(PROJ_NAME stablebear)
 
 # Read version info out of pyproject.toml
 file(READ "${CMAKE_CURRENT_SOURCE_DIR}/pyproject.toml" TOML_CONTENT)
@@ -322,12 +322,12 @@ if (BUILD_WITH_CUDA)
   find_package(CUDAToolkit REQUIRED)
   set(CMAKE_CUDA_RUNTIME_LIBRARY Shared)
 
-  set(MPCF_CUDA_INCLUDE_DIRS ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES} ${CUDAToolkit_INCLUDE_DIRS})
+  set(SB_CUDA_INCLUDE_DIRS ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES} ${CUDAToolkit_INCLUDE_DIRS})
   if (CUDAToolkit_ROOT AND EXISTS "${CUDAToolkit_ROOT}/include/cuda_runtime.h")
-    list(APPEND MPCF_CUDA_INCLUDE_DIRS "${CUDAToolkit_ROOT}/include")
+    list(APPEND SB_CUDA_INCLUDE_DIRS "${CUDAToolkit_ROOT}/include")
   endif ()
-  list(REMOVE_DUPLICATES MPCF_CUDA_INCLUDE_DIRS)
-  include_directories(${MPCF_CUDA_INCLUDE_DIRS})
+  list(REMOVE_DUPLICATES SB_CUDA_INCLUDE_DIRS)
+  include_directories(${SB_CUDA_INCLUDE_DIRS})
 endif ()
 
 if ((DEFINED ENV{ENABLE_COVERAGE}) AND (NOT $ENV{ENABLE_COVERAGE} MATCHES "0"))
@@ -351,7 +351,7 @@ message(STATUS "!!! PROJECT_NAME: ${PROJECT_NAME}, PROJECT_VERSION: ${PROJECT_VE
 
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
-set(CPP_MODULE_NAME_CPU "_mpcf_cpu")
+set(CPP_MODULE_NAME_CPU "_sb_cpu")
 set(CPP_MODULE_NAMES ${CPP_MODULE_NAME_CPU})
 
 if (BUILD_WITH_CUDA)
@@ -363,9 +363,9 @@ if (BUILD_WITH_CUDA)
   endif ()
 
   if (_CUDA_MOD_SUFFIX)
-    set(CPP_MODULE_NAME_CUDA "_mpcf_cuda${_CUDA_MOD_SUFFIX}")
+    set(CPP_MODULE_NAME_CUDA "_sb_cuda${_CUDA_MOD_SUFFIX}")
   else ()
-    set(CPP_MODULE_NAME_CUDA "_mpcf_cuda")
+    set(CPP_MODULE_NAME_CUDA "_sb_cuda")
   endif ()
   list(APPEND CPP_MODULE_NAMES ${CPP_MODULE_NAME_CUDA})
 endif ()
@@ -380,7 +380,7 @@ enable_language(CXX)
 # ============================================================
 # Default depends on the build context:
 #   * A local source build (SKBUILD on, CIBUILDWHEEL not set) — i.e. the
-#     user doing "pip install ." or "pip install --no-binary masspcf" —
+#     user doing "pip install ." or "pip install --no-binary stablebear" —
 #     defaults to "native" so the extension is tuned for this exact CPU.
 #   * macOS x86_64 (any non-native build) defaults to "v2": SSE3/SSSE3/
 #     SSE4.1/SSE4.2/POPCNT, no AVX. The x86_64 distribution wheel is built
@@ -396,37 +396,37 @@ enable_language(CXX)
 #     / Zen 1+). Notable exceptions are Atom-derived chips (Celeron N /
 #     Pentium Silver / Jasper Lake, pre-2022).
 #
-# A Python runtime check in masspcf/_mpcf_cpp.py raises a clear
+# A Python runtime check in stablebear/_sb_cpp.py raises a clear
 # ImportError on CPUs that lack the required extensions. The check is
 # skipped for "native" / v1 / v2 builds (recorded in _build_info.py).
 #
-# Override with -DMPCF_X86_64_LEVEL=v2 (or v1) at configure time to
+# Override with -DSB_X86_64_LEVEL=v2 (or v1) at configure time to
 # build for older CPUs. v4 (AVX-512) is accepted but rarely useful.
 if (SKBUILD AND NOT "$ENV{CIBUILDWHEEL}" STREQUAL "1")
-  set(_MPCF_X86_64_DEFAULT "native")
+  set(_SB_X86_64_DEFAULT "native")
 elseif (APPLE)
-  set(_MPCF_X86_64_DEFAULT "v2")
+  set(_SB_X86_64_DEFAULT "v2")
 else ()
-  set(_MPCF_X86_64_DEFAULT "v3")
+  set(_SB_X86_64_DEFAULT "v3")
 endif ()
-set(MPCF_X86_64_LEVEL "${_MPCF_X86_64_DEFAULT}" CACHE STRING
+set(SB_X86_64_LEVEL "${_SB_X86_64_DEFAULT}" CACHE STRING
     "x86-64 microarchitecture baseline for CPU code (native, v1, v2, v3, v4)")
-set_property(CACHE MPCF_X86_64_LEVEL PROPERTY STRINGS native v1 v2 v3 v4)
+set_property(CACHE SB_X86_64_LEVEL PROPERTY STRINGS native v1 v2 v3 v4)
 
-# MSVC has no -march=native. For MPCF_X86_64_LEVEL=native we probe the
+# MSVC has no -march=native. For SB_X86_64_LEVEL=native we probe the
 # host CPU at configure time via CPUID and pick the best /arch: flag —
 # this matters because a user doing `pip install .` precisely because
 # the shipped AVX2 wheel doesn't work on their CPU must NOT end up with
 # /arch:AVX2. Result is cached so the probe runs only once per build
 # tree. Produces "/arch:AVX512", "/arch:AVX2", "/arch:AVX", or "" (no
 # flag — MSVC default, SSE2-baseline, works on any x86-64 CPU).
-function(mpcf_detect_msvc_native_arch out_var)
-  if (DEFINED _MPCF_MSVC_NATIVE_ARCH_CACHE)
-    set(${out_var} "${_MPCF_MSVC_NATIVE_ARCH_CACHE}" PARENT_SCOPE)
+function(sb_detect_msvc_native_arch out_var)
+  if (DEFINED _SB_MSVC_NATIVE_ARCH_CACHE)
+    set(${out_var} "${_SB_MSVC_NATIVE_ARCH_CACHE}" PARENT_SCOPE)
     return()
   endif ()
 
-  set(_probe "${CMAKE_BINARY_DIR}/_mpcf_cpuid_probe.cpp")
+  set(_probe "${CMAKE_BINARY_DIR}/_sb_cpuid_probe.cpp")
   file(WRITE "${_probe}" [=[
 #include <intrin.h>
 #include <stdio.h>
@@ -446,7 +446,7 @@ int main() {
 }
 ]=])
   try_run(_run_result _compile_result
-      "${CMAKE_BINARY_DIR}/_mpcf_cpuid_probe_build"
+      "${CMAKE_BINARY_DIR}/_sb_cpuid_probe_build"
       "${_probe}"
       RUN_OUTPUT_VARIABLE _probe_output)
   set(_flag "")
@@ -459,23 +459,23 @@ int main() {
       set(_flag "/arch:AVX")
     endif ()
   endif ()
-  set(_MPCF_MSVC_NATIVE_ARCH_CACHE "${_flag}" CACHE INTERNAL "")
+  set(_SB_MSVC_NATIVE_ARCH_CACHE "${_flag}" CACHE INTERNAL "")
   message(STATUS "!!! MSVC native CPU probe: '${_probe_output}' -> '${_flag}'")
   set(${out_var} "${_flag}" PARENT_SCOPE)
 endfunction()
 
-function(mpcf_apply_cpu_arch_flags tgt)
+function(sb_apply_cpu_arch_flags tgt)
   if (MSVC)
-    if (MPCF_X86_64_LEVEL STREQUAL "native")
-      mpcf_detect_msvc_native_arch(_native_flag)
+    if (SB_X86_64_LEVEL STREQUAL "native")
+      sb_detect_msvc_native_arch(_native_flag)
       if (_native_flag)
         target_compile_options(${tgt} PRIVATE
             $<$<COMPILE_LANGUAGE:CXX>:${_native_flag}>)
       endif ()
-    elseif (MPCF_X86_64_LEVEL STREQUAL "v3")
+    elseif (SB_X86_64_LEVEL STREQUAL "v3")
       target_compile_options(${tgt} PRIVATE
           $<$<COMPILE_LANGUAGE:CXX>:/arch:AVX2>)
-    elseif (MPCF_X86_64_LEVEL STREQUAL "v4")
+    elseif (SB_X86_64_LEVEL STREQUAL "v4")
       target_compile_options(${tgt} PRIVATE
           $<$<COMPILE_LANGUAGE:CXX>:/arch:AVX512>)
     endif ()
@@ -484,14 +484,14 @@ function(mpcf_apply_cpu_arch_flags tgt)
     return()
   endif ()
 
-  if (MPCF_X86_64_LEVEL STREQUAL "v1")
+  if (SB_X86_64_LEVEL STREQUAL "v1")
     return()
   endif ()
 
-  if (MPCF_X86_64_LEVEL STREQUAL "native")
+  if (SB_X86_64_LEVEL STREQUAL "native")
     set(_arch_flag "-march=native")
   else ()
-    set(_arch_flag "-march=x86-64-${MPCF_X86_64_LEVEL}")
+    set(_arch_flag "-march=x86-64-${SB_X86_64_LEVEL}")
   endif ()
 
   if (APPLE)
@@ -507,14 +507,14 @@ function(mpcf_apply_cpu_arch_flags tgt)
   endif ()
 endfunction()
 
-message(STATUS "!!! x86-64 baseline: ${MPCF_X86_64_LEVEL}")
+message(STATUS "!!! x86-64 baseline: ${SB_X86_64_LEVEL}")
 
-# Record the build-time CPU arch level so _mpcf_cpp.py knows whether a
+# Record the build-time CPU arch level so _sb_cpp.py knows whether a
 # runtime check for AVX2/FMA is needed.
-set(_MPCF_BUILD_INFO_PY "${CMAKE_CURRENT_BINARY_DIR}/_build_info.py")
-file(WRITE "${_MPCF_BUILD_INFO_PY}"
+set(_SB_BUILD_INFO_PY "${CMAKE_CURRENT_BINARY_DIR}/_build_info.py")
+file(WRITE "${_SB_BUILD_INFO_PY}"
     "# Auto-generated by CMake; do not edit.\n"
-    "CPU_ARCH_LEVEL = \"${MPCF_X86_64_LEVEL}\"\n")
+    "CPU_ARCH_LEVEL = \"${SB_X86_64_LEVEL}\"\n")
 
 if (WIN32)
   if (MSVC)
@@ -535,21 +535,21 @@ string(TIMESTAMP TODAY "%d/%m/%Y")
 set(PROJECT_BUILD_DATE ${TODAY})
 configure_file(version.cpp.in ${CMAKE_CURRENT_BINARY_DIR}/version.cpp @ONLY)
 
-SET(MPCF_LIB_SOURCES_CUDA
-    include/mpcf/cuda/cuda_block_executor.cuh
-    include/mpcf/cuda/cuda_device_array.cuh
-    include/mpcf/cuda/cuda_functional_support.cuh
-    include/mpcf/cuda/cuda_matrix_integrate.cuh
-    include/mpcf/cuda/cuda_matrix_integrate_structs.cuh
-    include/mpcf/cuda/cuda_offset_data_manager.cuh
-    include/mpcf/cuda/cuda_pcf_data_manager.cuh
-    include/mpcf/cuda/cuda_pcf_kernel.cuh
-    include/mpcf/cuda/cuda_util.cuh
-    include/mpcf/cuda/pcf_block_op.cuh
-    include/mpcf/cuda/triangle_skip_mode.hpp
+SET(SB_LIB_SOURCES_CUDA
+    include/sbear/cuda/cuda_block_executor.cuh
+    include/sbear/cuda/cuda_device_array.cuh
+    include/sbear/cuda/cuda_functional_support.cuh
+    include/sbear/cuda/cuda_matrix_integrate.cuh
+    include/sbear/cuda/cuda_matrix_integrate_structs.cuh
+    include/sbear/cuda/cuda_offset_data_manager.cuh
+    include/sbear/cuda/cuda_pcf_data_manager.cuh
+    include/sbear/cuda/cuda_pcf_kernel.cuh
+    include/sbear/cuda/cuda_util.cuh
+    include/sbear/cuda/pcf_block_op.cuh
+    include/sbear/cuda/triangle_skip_mode.hpp
 )
 
-SET(MPCF_HEADER_FILES
+SET(SB_HEADER_FILES
     config.hpp
     concepts.hpp
     version.hpp
@@ -589,19 +589,19 @@ SET(MPCF_HEADER_FILES
     persistence/ripser/ripser.hpp
     settings.hpp)
 
-SET(MPCF_SRC_FILES
+SET(SB_SRC_FILES
     executor.cpp
     io_stream.cpp)
 
-list(TRANSFORM MPCF_HEADER_FILES PREPEND "include/mpcf/")
-list(TRANSFORM MPCF_SRC_FILES PREPEND "src/")
+list(TRANSFORM SB_HEADER_FILES PREPEND "include/sbear/")
+list(TRANSFORM SB_SRC_FILES PREPEND "src/")
 
-SET(MPCF_LIB_SOURCES
-    ${MPCF_HEADER_FILES}
-    ${MPCF_SRC_FILES}
+SET(SB_LIB_SOURCES
+    ${SB_HEADER_FILES}
+    ${SB_SRC_FILES}
 )
 
-SET(MPCF_PY_PERSISTENCE_SOURCES
+SET(SB_PY_PERSISTENCE_SOURCES
     py_barcode.hpp py_barcode.cpp
     py_barcode_summary.hpp py_barcode_summary.cpp
     py_persistence_pair.hpp py_persistence_pair.cpp
@@ -609,16 +609,16 @@ SET(MPCF_PY_PERSISTENCE_SOURCES
     pymodule_persistence.hpp pymodule_persistence.cpp
 )
 
-list(TRANSFORM MPCF_PY_PERSISTENCE_SOURCES PREPEND "persistence/")
+list(TRANSFORM SB_PY_PERSISTENCE_SOURCES PREPEND "persistence/")
 
-SET(MPCF_PY_POINT_PROCESS_SOURCES
+SET(SB_PY_POINT_PROCESS_SOURCES
     py_poisson.hpp py_poisson.cpp
     pymodule_point_process.hpp pymodule_point_process.cpp
 )
 
-list(TRANSFORM MPCF_PY_POINT_PROCESS_SOURCES PREPEND "point_process/")
+list(TRANSFORM SB_PY_POINT_PROCESS_SOURCES PREPEND "point_process/")
 
-SET(MPCF_PY_SOURCES
+SET(SB_PY_SOURCES
     pybind.hpp
     pymodule.cpp
     functional/py_random.hpp functional/py_random.cpp
@@ -636,30 +636,30 @@ SET(MPCF_PY_SOURCES
     py_io.hpp py_io.cpp
     py_symmetric_matrix.hpp py_symmetric_matrix.cpp
     py_distance_matrix.hpp py_distance_matrix.cpp
-    ${MPCF_PY_PERSISTENCE_SOURCES}
-    ${MPCF_PY_POINT_PROCESS_SOURCES}
+    ${SB_PY_PERSISTENCE_SOURCES}
+    ${SB_PY_POINT_PROCESS_SOURCES}
 )
 
-list(TRANSFORM MPCF_PY_SOURCES PREPEND "src/python/")
+list(TRANSFORM SB_PY_SOURCES PREPEND "src/python/")
 
-SET(MPCF_VERSION_SOURCE ${CMAKE_CURRENT_BINARY_DIR}/version.cpp)
+SET(SB_VERSION_SOURCE ${CMAKE_CURRENT_BINARY_DIR}/version.cpp)
 
 # ============================================================
 # IDE source groups — group by functional area, not language
 # ============================================================
-source_group("Functional"               REGULAR_EXPRESSION "include/mpcf/functional/.*")
+source_group("Functional"               REGULAR_EXPRESSION "include/sbear/functional/.*")
 source_group("Functional/Bindings"      REGULAR_EXPRESSION "src/python/functional/.*")
-source_group("Algorithms"               REGULAR_EXPRESSION "include/mpcf/algorithms/.*")
-source_group("IO"                       REGULAR_EXPRESSION "(include/mpcf/io[./].*|src/io_stream\\.cpp)")
+source_group("Algorithms"               REGULAR_EXPRESSION "include/sbear/algorithms/.*")
+source_group("IO"                       REGULAR_EXPRESSION "(include/sbear/io[./].*|src/io_stream\\.cpp)")
 source_group("IO/Bindings"             REGULAR_EXPRESSION "src/python/py_io\\.(h|cpp)")
-source_group("Persistence"             REGULAR_EXPRESSION "include/mpcf/persistence/.*")
+source_group("Persistence"             REGULAR_EXPRESSION "include/sbear/persistence/.*")
 source_group("Persistence/Bindings"    REGULAR_EXPRESSION "src/python/persistence/.*")
-source_group("PointProcess"            REGULAR_EXPRESSION "include/mpcf/point_process/.*")
+source_group("PointProcess"            REGULAR_EXPRESSION "include/sbear/point_process/.*")
 source_group("PointProcess/Bindings"   REGULAR_EXPRESSION "src/python/point_process/.*")
-source_group("CUDA"                    REGULAR_EXPRESSION "(include/mpcf/cuda/.*|src/cuda/.*)")
-source_group("Tensor"                  REGULAR_EXPRESSION "include/mpcf/tensor[^/]*")
+source_group("CUDA"                    REGULAR_EXPRESSION "(include/sbear/cuda/.*|src/cuda/.*)")
+source_group("Tensor"                  REGULAR_EXPRESSION "include/sbear/tensor[^/]*")
 source_group("Tensor/Bindings"         REGULAR_EXPRESSION "src/python/py_(np_tensor_convert|tensor)\\.(h|cpp)")
-source_group("Core"                    REGULAR_EXPRESSION "include/mpcf/(config|concepts|version|platform|executor|task|point_cloud|special_tensors|random|block_matrix_support|algorithm|tensor_to_string)\\.")
+source_group("Core"                    REGULAR_EXPRESSION "include/sbear/(config|concepts|version|platform|executor|task|point_cloud|special_tensors|random|block_matrix_support|algorithm|tensor_to_string)\\.")
 source_group("Core/Bindings"          REGULAR_EXPRESSION "src/python/(pybind|pymodule|py_np_support|pypcf_support|py_future)\\.(h|cpp)")
 source_group("Core Sources"           REGULAR_EXPRESSION "src/[^/]+\\.cpp")
 source_group("IO" FILES src/io_stream.cpp)
@@ -673,32 +673,32 @@ elseif (WIN32)
   target_link_libraries(_gpu_detect PRIVATE dxgi)
 endif ()
 
-set(MPCF_PRIVATE_INCLUDES "include/mpcf")
-set(MPCF_PUBLIC_INCLUDES "include/")
+set(SB_PRIVATE_INCLUDES "include/sbear")
+set(SB_PUBLIC_INCLUDES "include/")
 if (BUILD_WITH_CUDA)
-  list(APPEND MPCF_PRIVATE_INCLUDES ${MPCF_CUDA_INCLUDE_DIRS})
+  list(APPEND SB_PRIVATE_INCLUDES ${SB_CUDA_INCLUDE_DIRS})
 endif ()
 
 if (BUILD_WITH_CUDA)
   # Build only the .cu files with NVCC, in a separate static library.
   # Everything else stays compiled by the host C++ compiler.
-  add_library(mpcf_cuda STATIC
+  add_library(sb_cuda STATIC
       src/cuda/cuda_matrix_integrate.cu
   )
-  target_include_directories(mpcf_cuda PRIVATE ${MPCF_PRIVATE_INCLUDES})
-  target_include_directories(mpcf_cuda PUBLIC ${MPCF_PUBLIC_INCLUDES})
-  target_include_directories(mpcf_cuda PRIVATE "3rd/taskflow")
-  target_include_directories(mpcf_cuda PRIVATE ${MPCF_CUDA_INCLUDE_DIRS})
-  target_compile_definitions(mpcf_cuda PRIVATE BUILD_WITH_CUDA=1)
+  target_include_directories(sb_cuda PRIVATE ${SB_PRIVATE_INCLUDES})
+  target_include_directories(sb_cuda PUBLIC ${SB_PUBLIC_INCLUDES})
+  target_include_directories(sb_cuda PRIVATE "3rd/taskflow")
+  target_include_directories(sb_cuda PRIVATE ${SB_CUDA_INCLUDE_DIRS})
+  target_compile_definitions(sb_cuda PRIVATE BUILD_WITH_CUDA=1)
 
-  set_target_properties(mpcf_cuda PROPERTIES
+  set_target_properties(sb_cuda PROPERTIES
       CUDA_RUNTIME_LIBRARY Shared
       CUDA_SEPARABLE_COMPILATION ON
       CUDA_RESOLVE_DEVICE_SYMBOLS ON
       POSITION_INDEPENDENT_CODE ON
   )
 
-  target_compile_options(mpcf_cuda PRIVATE
+  target_compile_options(sb_cuda PRIVATE
       --expt-relaxed-constexpr
       -Xcudafe=--diag_suppress=partial_override
       -Xcudafe=--diag_suppress=virtual_function_decl_hidden
@@ -708,18 +708,18 @@ if (BUILD_WITH_CUDA)
   if (GPUCOV_FOUND)
     # Collect all .cuh files from the CUDA and header source lists
     set(_GPUCOV_FILES)
-    foreach(_src IN LISTS MPCF_LIB_SOURCES_CUDA)
+    foreach(_src IN LISTS SB_LIB_SOURCES_CUDA)
       if (_src MATCHES "\\.cuh$")
         list(APPEND _GPUCOV_FILES ${_src})
       endif ()
     endforeach()
-    foreach(_src IN LISTS MPCF_HEADER_FILES)
+    foreach(_src IN LISTS SB_HEADER_FILES)
       if (_src MATCHES "\\.cuh$")
         list(APPEND _GPUCOV_FILES ${_src})
       endif ()
     endforeach()
-    # Add the .cu sources from the mpcf_cuda target
-    get_target_property(_CUDA_SRCS mpcf_cuda SOURCES)
+    # Add the .cu sources from the sb_cuda target
+    get_target_property(_CUDA_SRCS sb_cuda SOURCES)
     foreach(_src IN LISTS _CUDA_SRCS)
       if (_src MATCHES "\\.cu$")
         list(APPEND _GPUCOV_FILES ${_src})
@@ -727,7 +727,7 @@ if (BUILD_WITH_CUDA)
     endforeach()
     list(REMOVE_DUPLICATES _GPUCOV_FILES)
 
-    gpucov_instrument_target(mpcf_cuda
+    gpucov_instrument_target(sb_cuda
         FILES
             ${_GPUCOV_FILES}
         INCLUDE_PATHS
@@ -740,48 +740,48 @@ if (BUILD_WITH_CUDA)
 endif ()
 
 # Create both CPU and (optionally) CUDA Python modules
-pybind11_add_module(${CPP_MODULE_NAME_CPU} MODULE ${MPCF_LIB_SOURCES} ${MPCF_PY_SOURCES} ${MPCF_VERSION_SOURCE})
+pybind11_add_module(${CPP_MODULE_NAME_CPU} MODULE ${SB_LIB_SOURCES} ${SB_PY_SOURCES} ${SB_VERSION_SOURCE})
 # Do NOT define BUILD_WITH_CUDA for the CPU module: code uses #ifdef BUILD_WITH_CUDA,
 # so a value of 0 would still enable CUDA code paths.
 
 if (BUILD_WITH_CUDA)
-  pybind11_add_module(${CPP_MODULE_NAME_CUDA} MODULE ${MPCF_LIB_SOURCES} ${MPCF_LIB_SOURCES_CUDA} ${MPCF_PY_SOURCES} ${MPCF_VERSION_SOURCE})
+  pybind11_add_module(${CPP_MODULE_NAME_CUDA} MODULE ${SB_LIB_SOURCES} ${SB_LIB_SOURCES_CUDA} ${SB_PY_SOURCES} ${SB_VERSION_SOURCE})
   target_compile_definitions(${CPP_MODULE_NAME_CUDA} PRIVATE BUILD_WITH_CUDA=1)
-  target_include_directories(${CPP_MODULE_NAME_CUDA} PRIVATE ${MPCF_CUDA_INCLUDE_DIRS})
+  target_include_directories(${CPP_MODULE_NAME_CUDA} PRIVATE ${SB_CUDA_INCLUDE_DIRS})
   if (CUDAToolkit_ROOT AND EXISTS "${CUDAToolkit_ROOT}/include/cuda_runtime.h")
     target_compile_options(${CPP_MODULE_NAME_CUDA} PRIVATE
       $<$<CXX_COMPILER_ID:MSVC>:/I${CUDAToolkit_ROOT}/include>
       $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-I${CUDAToolkit_ROOT}/include>
     )
   endif ()
-  target_link_libraries(${CPP_MODULE_NAME_CUDA} PRIVATE mpcf_cuda ${CUDAToolkit_CUDART_LIBRARY})
+  target_link_libraries(${CPP_MODULE_NAME_CUDA} PRIVATE sb_cuda ${CUDAToolkit_CUDART_LIBRARY})
 endif ()
 
 foreach(MOD_NAME IN LISTS CPP_MODULE_NAMES)
-  target_compile_definitions(${MOD_NAME} PRIVATE MPCF_MODULE_NAME=${MOD_NAME})
-  target_include_directories(${MOD_NAME} PRIVATE ${MPCF_PRIVATE_INCLUDES})
-  target_include_directories(${MOD_NAME} PUBLIC ${MPCF_PUBLIC_INCLUDES})
+  target_compile_definitions(${MOD_NAME} PRIVATE SB_MODULE_NAME=${MOD_NAME})
+  target_include_directories(${MOD_NAME} PRIVATE ${SB_PRIVATE_INCLUDES})
+  target_include_directories(${MOD_NAME} PUBLIC ${SB_PUBLIC_INCLUDES})
   target_link_libraries(${MOD_NAME} PRIVATE pybind11::headers)
   target_compile_definitions(${MOD_NAME} PRIVATE VERSION_INFO=${PROJECT_VERSION_FULL})
-  mpcf_apply_cpu_arch_flags(${MOD_NAME})
+  sb_apply_cpu_arch_flags(${MOD_NAME})
 endforeach()
 
 # NOTE: _gpu_detect is intentionally built without x86-64-vN flags so it
 # remains loadable on CPUs that lack AVX2. The Python runtime check in
-# _mpcf_cpp.py uses a stdlib-only path (independent of _gpu_detect) and
+# _sb_cpp.py uses a stdlib-only path (independent of _gpu_detect) and
 # reports a clear error before attempting to import the main backend.
 
 # Convenience target so CLion (and plain cmake --build) can build all Python modules at once
-add_custom_target(_mpcf DEPENDS ${CPP_MODULE_NAMES})
+add_custom_target(_sb DEPENDS ${CPP_MODULE_NAMES})
 
 # IDE target folders
 set_target_properties(_gpu_detect PROPERTIES FOLDER "Python Modules")
-set_target_properties(_mpcf PROPERTIES FOLDER "Python Modules")
+set_target_properties(_sb PROPERTIES FOLDER "Python Modules")
 foreach(MOD_NAME IN LISTS CPP_MODULE_NAMES)
   set_target_properties(${MOD_NAME} PROPERTIES FOLDER "Python Modules")
 endforeach()
 if (BUILD_WITH_CUDA)
-  set_target_properties(mpcf_cuda PROPERTIES FOLDER "CUDA")
+  set_target_properties(sb_cuda PROPERTIES FOLDER "CUDA")
 endif ()
 
 if (MSVC)
@@ -866,7 +866,7 @@ if (BUILD_TESTER)
 
   enable_testing()
 
-  set(MPCF_TEST_SOURCES_COMMON
+  set(SB_TEST_SOURCES_COMMON
       test/test_iterate_rectangles.cpp
       test/test_iterate_segments.cpp
       test/test_parallel_reduce.cpp
@@ -888,22 +888,22 @@ if (BUILD_TESTER)
   )
 
   if (BUILD_CUDA_TESTER)
-    add_executable(mpcf_test
+    add_executable(sb_test
         test/test_block_matrix_support.cu
         test/test_l1_dist.cu
         test/test_block_integrate.cu
         test/test_norms.cu
-        ${MPCF_TEST_SOURCES_COMMON}
+        ${SB_TEST_SOURCES_COMMON}
     )
   else ()
-    add_executable(mpcf_test ${MPCF_TEST_SOURCES_COMMON})
+    add_executable(sb_test ${SB_TEST_SOURCES_COMMON})
   endif ()
 
-  target_include_directories(mpcf_test PRIVATE "include/")
+  target_include_directories(sb_test PRIVATE "include/")
   if (BUILD_WITH_CUDA)
-    target_include_directories(mpcf_test PRIVATE ${MPCF_CUDA_INCLUDE_DIRS})
+    target_include_directories(sb_test PRIVATE ${SB_CUDA_INCLUDE_DIRS})
     if (CUDAToolkit_ROOT AND EXISTS "${CUDAToolkit_ROOT}/include/cuda_runtime.h")
-      target_compile_options(mpcf_test PRIVATE
+      target_compile_options(sb_test PRIVATE
         $<$<CXX_COMPILER_ID:MSVC>:/I${CUDAToolkit_ROOT}/include>
         $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-I${CUDAToolkit_ROOT}/include>
       )
@@ -911,20 +911,20 @@ if (BUILD_TESTER)
   endif ()
 
   if (BUILD_CUDA_TESTER)
-    add_library(mpcf_nopy STATIC ${MPCF_LIB_SOURCES} ${MPCF_LIB_SOURCES_CUDA} ${MPCF_VERSION_SOURCE})
-    target_compile_definitions(mpcf_nopy PUBLIC BUILD_WITH_CUDA=1)
-    target_link_libraries(mpcf_nopy PRIVATE mpcf_cuda)
+    add_library(sb_nopy STATIC ${SB_LIB_SOURCES} ${SB_LIB_SOURCES_CUDA} ${SB_VERSION_SOURCE})
+    target_compile_definitions(sb_nopy PUBLIC BUILD_WITH_CUDA=1)
+    target_link_libraries(sb_nopy PRIVATE sb_cuda)
   else ()
-    add_library(mpcf_nopy STATIC ${MPCF_LIB_SOURCES} ${MPCF_VERSION_SOURCE})
+    add_library(sb_nopy STATIC ${SB_LIB_SOURCES} ${SB_VERSION_SOURCE})
   endif ()
-  mpcf_apply_cpu_arch_flags(mpcf_nopy)
-  mpcf_apply_cpu_arch_flags(mpcf_test)
-  target_include_directories(mpcf_nopy PRIVATE ${MPCF_PRIVATE_INCLUDES})
-  target_include_directories(mpcf_nopy PUBLIC ${MPCF_PUBLIC_INCLUDES})
+  sb_apply_cpu_arch_flags(sb_nopy)
+  sb_apply_cpu_arch_flags(sb_test)
+  target_include_directories(sb_nopy PRIVATE ${SB_PRIVATE_INCLUDES})
+  target_include_directories(sb_nopy PUBLIC ${SB_PUBLIC_INCLUDES})
   if (BUILD_WITH_CUDA)
-    target_include_directories(mpcf_nopy PRIVATE ${MPCF_CUDA_INCLUDE_DIRS})
+    target_include_directories(sb_nopy PRIVATE ${SB_CUDA_INCLUDE_DIRS})
     if (CUDAToolkit_ROOT AND EXISTS "${CUDAToolkit_ROOT}/include/cuda_runtime.h")
-      target_compile_options(mpcf_nopy PRIVATE
+      target_compile_options(sb_nopy PRIVATE
         $<$<CXX_COMPILER_ID:MSVC>:/I${CUDAToolkit_ROOT}/include>
         $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-I${CUDAToolkit_ROOT}/include>
       )
@@ -932,26 +932,26 @@ if (BUILD_TESTER)
   endif ()
 
   if (BUILD_CUDA_TESTER)
-    set_target_properties(mpcf_nopy PROPERTIES
+    set_target_properties(sb_nopy PROPERTIES
         CUDA_RUNTIME_LIBRARY Shared  # Must match the Python module's runtime
     )
-    set_target_properties(mpcf_test PROPERTIES
+    set_target_properties(sb_test PROPERTIES
         CUDA_RUNTIME_LIBRARY Static
     )
   endif ()
 
-  set_target_properties(mpcf_test PROPERTIES FOLDER "Testing")
-  set_target_properties(mpcf_nopy PROPERTIES FOLDER "Testing")
+  set_target_properties(sb_test PROPERTIES FOLDER "Testing")
+  set_target_properties(sb_nopy PROPERTIES FOLDER "Testing")
 
-  target_link_libraries(mpcf_test PUBLIC GTest::gtest_main mpcf_nopy)
+  target_link_libraries(sb_test PUBLIC GTest::gtest_main sb_nopy)
 
   if (BUILD_CUDA_TESTER)
-    target_link_libraries(mpcf_test PUBLIC mpcf_cuda CUDA::cudart_static)
+    target_link_libraries(sb_test PUBLIC sb_cuda CUDA::cudart_static)
   endif ()
 
   if (ENABLE_COVERAGE)
-    target_link_libraries(mpcf_nopy PRIVATE coverage_flags)
-    target_link_libraries(mpcf_test PRIVATE coverage_flags)
+    target_link_libraries(sb_nopy PRIVATE coverage_flags)
+    target_link_libraries(sb_test PRIVATE coverage_flags)
     foreach(MOD_NAME IN LISTS CPP_MODULE_NAMES)
       target_link_libraries(${MOD_NAME} PRIVATE coverage_flags)
     endforeach()
@@ -959,7 +959,7 @@ if (BUILD_TESTER)
 
   if (WIN32)
     get_filename_component(python_dir "${Python_EXECUTABLE}" DIRECTORY)
-    set_target_properties(mpcf_test PROPERTIES VS_DEBUGGER_ENVIRONMENT "PATH=${python_dir}")
+    set_target_properties(sb_test PROPERTIES VS_DEBUGGER_ENVIRONMENT "PATH=${python_dir}")
   endif ()
 
 
@@ -972,20 +972,20 @@ if (BUILD_BENCHMARKS)
   find_package(Boost COMPONENTS program_options system REQUIRED)
   find_package(Threads REQUIRED)
 
-  add_executable(mpcf_bench
+  add_executable(sb_bench
       benchmarking/bench.cpp
       benchmarking/benchmark.hpp
       benchmarking/bench_reduction.hpp benchmarking/bench_reduction.cpp
   )
 
-  set_target_properties(mpcf_bench PROPERTIES
+  set_target_properties(sb_bench PROPERTIES
       CUDA_RUNTIME_LIBRARY Static
   )
 
-  target_link_libraries(mpcf_bench PUBLIC ${CPP_MODULE_NAME_CPU} ${Boost_LIBRARIES} Threads::Threads)
+  target_link_libraries(sb_bench PUBLIC ${CPP_MODULE_NAME_CPU} ${Boost_LIBRARIES} Threads::Threads)
 
   if (BUILD_WITH_CUDA)
-    target_link_libraries(mpcf_bench PUBLIC ${CPP_MODULE_NAME_CUDA} CUDA::cudart_static)
+    target_link_libraries(sb_bench PUBLIC ${CPP_MODULE_NAME_CUDA} CUDA::cudart_static)
   endif ()
 endif ()
 
@@ -1016,16 +1016,16 @@ if (NOT SKBUILD)
 
   file(TO_CMAKE_PATH "${PYTHON_SITE_PRE}" PYTHON_SITE)
 
-  SET(SITE_PKG_MASSPCF ${PYTHON_SITE}/masspcf)
-  set(INSTALL_TARGET ${SITE_PKG_MASSPCF})
+  SET(SITE_PKG_STABLEBEAR ${PYTHON_SITE}/stablebear)
+  set(INSTALL_TARGET ${SITE_PKG_STABLEBEAR})
 
-  message(STATUS "Minimal module will be installed into ${SITE_PKG_MASSPCF}")
+  message(STATUS "Minimal module will be installed into ${SITE_PKG_STABLEBEAR}")
 else ()
-  set(INSTALL_TARGET masspcf)
+  set(INSTALL_TARGET stablebear)
 endif ()
 
 install(TARGETS ${CPP_MODULE_NAMES} _gpu_detect DESTINATION ${INSTALL_TARGET})
-install(FILES "${_MPCF_BUILD_INFO_PY}" DESTINATION ${INSTALL_TARGET})
+install(FILES "${_SB_BUILD_INFO_PY}" DESTINATION ${INSTALL_TARGET})
 
 if ((LINUX OR (NOT SKBUILD)) AND (NOT SKIP_STUBGEN)) # Stubgen does not seem happy on CI
   foreach(MOD_NAME IN LISTS CPP_MODULE_NAMES)
@@ -1061,7 +1061,7 @@ endif ()
 if (SKBUILD)
   # Install Python source files alongside compiled module
   install(
-      DIRECTORY masspcf/
+      DIRECTORY stablebear/
       DESTINATION ${INSTALL_TARGET}
       FILES_MATCHING PATTERN "*.py"
       PATTERN "__pycache__" EXCLUDE
@@ -1070,16 +1070,16 @@ if (SKBUILD)
 elseif (NOT SKBUILD)
 
 
-  file(GLOB PY_PKG_FILES "masspcf/*.py")
+  file(GLOB PY_PKG_FILES "stablebear/*.py")
   #message(STATUS ${PY_PKG_FILES})
   install(
-      DIRECTORY masspcf
+      DIRECTORY stablebear
       DESTINATION ${PYTHON_SITE}
 
       # Allow symlinking in CPP module for completions in IDE during development (__pycache__ should never be installed)
-      # Note: _mpcf.py is the backend dispatcher and must be installed; .so files are excluded via \.so$ already
-      # Exclude stub symlink dirs (_mpcf_cpu/_mpcf_cuda*) to avoid clashing with installed stubs/extensions.
-      REGEX "(__pycache__|\\.so$|\\.pyi$|py\\.typed|/_mpcf_[^./]+$)" EXCLUDE
+      # Note: _sb_cpp.py is the backend dispatcher and must be installed; .so files are excluded via \.so$ already
+      # Exclude stub symlink dirs (_sb_cpu/_sb_cuda*) to avoid clashing with installed stubs/extensions.
+      REGEX "(__pycache__|\\.so$|\\.pyi$|py\\.typed|/_sb_[^./]+$)" EXCLUDE
   )
 
 
@@ -1092,37 +1092,37 @@ elseif (NOT SKBUILD)
       SET(LINK_TYPE create_symlink)
     endif ()
 
-    # Remove stale files from the old single-module layout (_mpcf without cpu/cuda suffix)
+    # Remove stale files from the old single-module layout (_sb without cpu/cuda suffix)
     install(CODE "
-      # Helper: remove all _mpcf.cpython-*.so from a directory (whether symlink or real file)
-      macro(remove_old_mpcf_so _dir)
-        file(GLOB _OLD_SO_FILES \"\${_dir}/_mpcf.cpython-*.so\")
+      # Helper: remove all _sb.cpython-*.so from a directory (whether symlink or real file)
+      macro(remove_old_sb_so _dir)
+        file(GLOB _OLD_SO_FILES \"\${_dir}/_sb.cpython-*.so\")
         foreach(_F IN LISTS _OLD_SO_FILES)
           message(STATUS \"Removing stale old-layout module: \${_F}\")
           file(REMOVE \"\${_F}\")
         endforeach()
       endmacro()
 
-      set(SRC_DIR \"${CMAKE_CURRENT_SOURCE_DIR}/masspcf\")
+      set(SRC_DIR \"${CMAKE_CURRENT_SOURCE_DIR}/stablebear\")
 
-      # Remove old _mpcf stub-dir symlink from source tree
-      set(_OLD_STUB_LINK \"\${SRC_DIR}/_mpcf\")
+      # Remove old _sb stub-dir symlink from source tree
+      set(_OLD_STUB_LINK \"\${SRC_DIR}/_sb\")
       if(IS_SYMLINK \"\${_OLD_STUB_LINK}\")
         message(STATUS \"Removing stale symlink \${_OLD_STUB_LINK}\")
         file(REMOVE \"\${_OLD_STUB_LINK}\")
       endif()
 
-      # Remove old _mpcf.cpython-*.so from source tree and from site-packages
-      # (the .so shadows the _mpcf.py dispatcher because Python prefers extension modules)
-      remove_old_mpcf_so(\"\${SRC_DIR}\")
-      remove_old_mpcf_so(\"${SITE_PKG_MASSPCF}\")
+      # Remove old _sb.cpython-*.so from source tree and from site-packages
+      # (the .so shadows the _sb.py dispatcher because Python prefers extension modules)
+      remove_old_sb_so(\"\${SRC_DIR}\")
+      remove_old_sb_so(\"${SITE_PKG_STABLEBEAR}\")
     ")
 
     foreach(MOD_NAME IN LISTS CPP_MODULE_NAMES)
       install(CODE "
       message(STATUS \"Syncing built extension ${MOD_NAME} back to source directory\")
 
-      set(SRC_DIR \"${CMAKE_CURRENT_SOURCE_DIR}/masspcf\")
+      set(SRC_DIR \"${CMAKE_CURRENT_SOURCE_DIR}/stablebear\")
 
       # Extension file
       set(EXT_FILE \"$<TARGET_FILE:${MOD_NAME}>\")
@@ -1178,16 +1178,16 @@ elseif (NOT SKBUILD)
 endif ()
 
 # ============================================================
-# clean_masspcf — remove symlinks from source tree and all
-#                 masspcf content from site-packages
+# clean_stablebear — remove symlinks from source tree and all
+#                 stablebear content from site-packages
 # ============================================================
 if (NOT SKBUILD)
-  add_custom_target(clean_masspcf
+  add_custom_target(clean_stablebear
     COMMAND ${CMAKE_COMMAND}
-      -DSRC_DIR=${CMAKE_CURRENT_SOURCE_DIR}/masspcf
-      -DSITE_DIR=${SITE_PKG_MASSPCF}
-      -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/clean_masspcf.cmake
-    COMMENT "Cleaning masspcf symlinks and site-packages content"
+      -DSRC_DIR=${CMAKE_CURRENT_SOURCE_DIR}/stablebear
+      -DSITE_DIR=${SITE_PKG_STABLEBEAR}
+      -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/clean_stablebear.cmake
+    COMMENT "Cleaning stablebear symlinks and site-packages content"
   )
 endif ()
 
@@ -1214,8 +1214,8 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND BUILD_TESTER)
     endif()
   endif()
 
-  target_link_libraries(mpcf_nopy PRIVATE valgrind_flags)
-  target_link_libraries(mpcf_test PRIVATE valgrind_flags)
+  target_link_libraries(sb_nopy PRIVATE valgrind_flags)
+  target_link_libraries(sb_test PRIVATE valgrind_flags)
 endif()
 
 message(STATUS "!!! Stub file:          ${STUB_FILE}")

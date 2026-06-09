@@ -16,16 +16,16 @@ import numpy as np
 import numpy.testing as npt
 import pytest
 
-import masspcf as mpcf
+import stablebear as sb
 
 
 # PCF: f(t) = 1.0 on [0, 1), 2.0 on [1, 3), 0.5 on [3, inf)
 def make_f32():
-    return mpcf.Pcf(np.array([[0.0, 1.0], [1.0, 2.0], [3.0, 0.5]], dtype=np.float32))
+    return sb.Pcf(np.array([[0.0, 1.0], [1.0, 2.0], [3.0, 0.5]], dtype=np.float32))
 
 
 def make_f64():
-    return mpcf.Pcf(np.array([[0.0, 1.0], [1.0, 2.0], [3.0, 0.5]], dtype=np.float64))
+    return sb.Pcf(np.array([[0.0, 1.0], [1.0, 2.0], [3.0, 0.5]], dtype=np.float64))
 
 
 class TestScalarEval:
@@ -110,16 +110,16 @@ class TestListEval:
 class TestTensorEval:
     def test_float32_tensor(self):
         f = make_f32()
-        t = mpcf.FloatTensor(np.array([0.0, 1.5, 5.0], dtype=np.float32))
+        t = sb.FloatTensor(np.array([0.0, 1.5, 5.0], dtype=np.float32))
         result = f(t)
-        assert isinstance(result, mpcf.FloatTensor)
-        assert result.dtype == mpcf.float32
+        assert isinstance(result, sb.FloatTensor)
+        assert result.dtype == sb.float32
         npt.assert_array_almost_equal(np.asarray(result), [1.0, 2.0, 0.5])
 
     def test_float64_tensor(self):
         f = make_f64()
-        t = mpcf.FloatTensor(np.array([0.0, 1.5, 5.0], dtype=np.float64))
+        t = sb.FloatTensor(np.array([0.0, 1.5, 5.0], dtype=np.float64))
         result = f(t)
-        assert isinstance(result, mpcf.FloatTensor)
-        assert result.dtype == mpcf.float64
+        assert isinstance(result, sb.FloatTensor)
+        assert result.dtype == sb.float64
         npt.assert_array_almost_equal(np.asarray(result), [1.0, 2.0, 0.5])

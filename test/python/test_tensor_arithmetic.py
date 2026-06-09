@@ -4,25 +4,25 @@ import numpy as np
 import numpy.testing as npt
 import pytest
 
-import masspcf as mpcf
+import stablebear as sb
 
 
 def _make_pcf32(vals):
-    return mpcf.Pcf(np.array(vals, dtype=np.float32))
+    return sb.Pcf(np.array(vals, dtype=np.float32))
 
 
 def _make_pcf64(vals):
-    return mpcf.Pcf(np.array(vals, dtype=np.float64))
+    return sb.Pcf(np.array(vals, dtype=np.float64))
 
 
-def _assert_scalar_op(np_arr, scalar, op, TensorType=mpcf.FloatTensor):
+def _assert_scalar_op(np_arr, scalar, op, TensorType=sb.FloatTensor):
     """Assert that a scalar op on a tensor matches numpy."""
     result = np.asarray(op(TensorType(np_arr), scalar))
     expected = op(np_arr, scalar)
     npt.assert_array_equal(result, expected)
 
 
-def _assert_scalar_iop(np_arr, scalar, iop, TensorType=mpcf.FloatTensor):
+def _assert_scalar_iop(np_arr, scalar, iop, TensorType=sb.FloatTensor):
     """Assert that an in-place scalar op on a tensor matches numpy."""
     np_copy = np_arr.copy()
     iop(np_copy, scalar)
@@ -35,10 +35,10 @@ def _assert_scalar_iop(np_arr, scalar, iop, TensorType=mpcf.FloatTensor):
 
 
 _NUMERIC_TYPES = [
-    pytest.param(mpcf.FloatTensor, np.float64, id="float64"),
-    pytest.param(mpcf.FloatTensor, np.float32, id="float32"),
-    pytest.param(mpcf.IntTensor, np.int32, id="int32"),
-    pytest.param(mpcf.IntTensor, np.int64, id="int64"),
+    pytest.param(sb.FloatTensor, np.float64, id="float64"),
+    pytest.param(sb.FloatTensor, np.float32, id="float32"),
+    pytest.param(sb.IntTensor, np.int32, id="int32"),
+    pytest.param(sb.IntTensor, np.int64, id="int64"),
 ]
 
 
@@ -138,8 +138,8 @@ class TestFloatDivision:
 
 
 _FLOAT_TYPES = [
-    pytest.param(mpcf.FloatTensor, np.float64, id="float64"),
-    pytest.param(mpcf.FloatTensor, np.float32, id="float32"),
+    pytest.param(sb.FloatTensor, np.float64, id="float64"),
+    pytest.param(sb.FloatTensor, np.float32, id="float32"),
 ]
 
 
@@ -172,21 +172,21 @@ class TestFloatFloorDiv:
 
 
 _PCF_DTYPES = [
-    pytest.param(mpcf.pcf32, np.float32, mpcf.PcfTensor, id="pcf32"),
-    pytest.param(mpcf.pcf64, np.float64, mpcf.PcfTensor, id="pcf64"),
-    pytest.param(mpcf.pcf32i, np.int32, mpcf.IntPcfTensor, id="pcf32i"),
-    pytest.param(mpcf.pcf64i, np.int64, mpcf.IntPcfTensor, id="pcf64i"),
+    pytest.param(sb.pcf32, np.float32, sb.PcfTensor, id="pcf32"),
+    pytest.param(sb.pcf64, np.float64, sb.PcfTensor, id="pcf64"),
+    pytest.param(sb.pcf32i, np.int32, sb.IntPcfTensor, id="pcf32i"),
+    pytest.param(sb.pcf64i, np.int64, sb.IntPcfTensor, id="pcf64i"),
 ]
 
 
 def _make_pcf(np_dtype, vals):
-    return mpcf.Pcf(np.array(vals, dtype=np_dtype))
+    return sb.Pcf(np.array(vals, dtype=np_dtype))
 
 
 @pytest.mark.parametrize("pcf_dtype, np_dtype, tensor_cls", _PCF_DTYPES)
 class TestPcfTensorArithmetic:
     def _make_tensor(self, pcf_dtype, np_dtype):
-        X = mpcf.zeros((2,), dtype=pcf_dtype)
+        X = sb.zeros((2,), dtype=pcf_dtype)
         X[0] = _make_pcf(np_dtype, [[0, 1], [2, 3]])
         X[1] = _make_pcf(np_dtype, [[0, 10], [2, 20]])
         return X
@@ -269,7 +269,7 @@ class TestPcfTensorArithmetic:
         assert X[0].to_numpy()[0, 1] == np_dtype(2)
 
     def test_truediv_scalar(self, pcf_dtype, np_dtype, tensor_cls):
-        X = mpcf.zeros((2,), dtype=pcf_dtype)
+        X = sb.zeros((2,), dtype=pcf_dtype)
         X[0] = _make_pcf(np_dtype, [[0, 4], [2, 8]])
         X[1] = _make_pcf(np_dtype, [[0, 10], [2, 20]])
         Y = X / np_dtype(2)
@@ -278,7 +278,7 @@ class TestPcfTensorArithmetic:
         assert Y[1].to_numpy()[0, 1] == np_dtype(5)
 
     def test_rtruediv_scalar(self, pcf_dtype, np_dtype, tensor_cls):
-        X = mpcf.zeros((2,), dtype=pcf_dtype)
+        X = sb.zeros((2,), dtype=pcf_dtype)
         X[0] = _make_pcf(np_dtype, [[0, 2], [2, 4]])
         X[1] = _make_pcf(np_dtype, [[0, 5], [2, 10]])
         Y = np_dtype(20) / X
@@ -287,7 +287,7 @@ class TestPcfTensorArithmetic:
         assert Y[1].to_numpy()[0, 1] == np_dtype(4)
 
     def test_itruediv_scalar(self, pcf_dtype, np_dtype, tensor_cls):
-        X = mpcf.zeros((2,), dtype=pcf_dtype)
+        X = sb.zeros((2,), dtype=pcf_dtype)
         X[0] = _make_pcf(np_dtype, [[0, 4], [2, 8]])
         X[1] = _make_pcf(np_dtype, [[0, 10], [2, 20]])
         X /= np_dtype(2)
@@ -322,10 +322,10 @@ class TestPcfTensorArithmetic:
 @pytest.mark.parametrize("pcf_dtype, np_dtype, tensor_cls", _PCF_DTYPES)
 class TestPcfTensorMulDiv:
     def test_mul_tensor_tensor(self, pcf_dtype, np_dtype, tensor_cls):
-        X = mpcf.zeros((2,), dtype=pcf_dtype)
+        X = sb.zeros((2,), dtype=pcf_dtype)
         X[0] = _make_pcf(np_dtype, [[0, 2], [2, 4]])
         X[1] = _make_pcf(np_dtype, [[0, 10], [2, 20]])
-        Y = mpcf.zeros((2,), dtype=pcf_dtype)
+        Y = sb.zeros((2,), dtype=pcf_dtype)
         Y[0] = _make_pcf(np_dtype, [[0, 3], [2, 5]])
         Y[1] = _make_pcf(np_dtype, [[0, 2], [2, 10]])
         Z = X * Y
@@ -334,20 +334,20 @@ class TestPcfTensorMulDiv:
         assert Z[1].to_numpy()[0, 1] == np_dtype(20)
 
     def test_imul_tensor_tensor(self, pcf_dtype, np_dtype, tensor_cls):
-        X = mpcf.zeros((2,), dtype=pcf_dtype)
+        X = sb.zeros((2,), dtype=pcf_dtype)
         X[0] = _make_pcf(np_dtype, [[0, 2], [2, 4]])
         X[1] = _make_pcf(np_dtype, [[0, 10], [2, 20]])
-        Y = mpcf.zeros((2,), dtype=pcf_dtype)
+        Y = sb.zeros((2,), dtype=pcf_dtype)
         Y[0] = _make_pcf(np_dtype, [[0, 3], [2, 5]])
         Y[1] = _make_pcf(np_dtype, [[0, 2], [2, 10]])
         X *= Y
         assert X[0].to_numpy()[0, 1] == np_dtype(6)
 
     def test_truediv_tensor_tensor(self, pcf_dtype, np_dtype, tensor_cls):
-        X = mpcf.zeros((2,), dtype=pcf_dtype)
+        X = sb.zeros((2,), dtype=pcf_dtype)
         X[0] = _make_pcf(np_dtype, [[0, 6], [2, 8]])
         X[1] = _make_pcf(np_dtype, [[0, 10], [2, 20]])
-        Y = mpcf.zeros((2,), dtype=pcf_dtype)
+        Y = sb.zeros((2,), dtype=pcf_dtype)
         Y[0] = _make_pcf(np_dtype, [[0, 2], [2, 2]])
         Y[1] = _make_pcf(np_dtype, [[0, 5], [2, 4]])
         Z = X / Y
@@ -356,10 +356,10 @@ class TestPcfTensorMulDiv:
         assert Z[1].to_numpy()[0, 1] == np_dtype(2)
 
     def test_itruediv_tensor_tensor(self, pcf_dtype, np_dtype, tensor_cls):
-        X = mpcf.zeros((2,), dtype=pcf_dtype)
+        X = sb.zeros((2,), dtype=pcf_dtype)
         X[0] = _make_pcf(np_dtype, [[0, 6], [2, 8]])
         X[1] = _make_pcf(np_dtype, [[0, 10], [2, 20]])
-        Y = mpcf.zeros((2,), dtype=pcf_dtype)
+        Y = sb.zeros((2,), dtype=pcf_dtype)
         Y[0] = _make_pcf(np_dtype, [[0, 2], [2, 2]])
         Y[1] = _make_pcf(np_dtype, [[0, 5], [2, 4]])
         X /= Y
@@ -369,8 +369,8 @@ class TestPcfTensorMulDiv:
 # --- Float tensor broadcasting ---
 
 
-def _check_broadcast_op(np_a, np_b, op, TensorType=mpcf.FloatTensor):
-    """Apply op to both numpy arrays and mpcf tensors, assert results match."""
+def _check_broadcast_op(np_a, np_b, op, TensorType=sb.FloatTensor):
+    """Apply op to both numpy arrays and stablebear tensors, assert results match."""
     X = TensorType(np_a)
     Y = TensorType(np_b)
     expected = op(np_a, np_b)
@@ -414,29 +414,29 @@ class TestFloat64TensorBroadcast:
     def test_iadd_broadcast(self):
         a = np.array([[1.0, 2.0], [3.0, 4.0]])
         b = np.array([10.0, 20.0])
-        X = mpcf.FloatTensor(a.copy())
-        Y = mpcf.FloatTensor(b)
+        X = sb.FloatTensor(a.copy())
+        Y = sb.FloatTensor(b)
         X += Y
         expected = a + b
         npt.assert_array_equal(np.asarray(X), expected)
 
     def test_iadd_incompatible_raises(self):
-        X = mpcf.FloatTensor(np.array([1.0, 2.0]))
-        Y = mpcf.FloatTensor(np.array([[1.0, 2.0], [3.0, 4.0]]))
+        X = sb.FloatTensor(np.array([1.0, 2.0]))
+        Y = sb.FloatTensor(np.array([[1.0, 2.0], [3.0, 4.0]]))
         with pytest.raises(ValueError):
             X += Y
 
     def test_incompatible_shapes_raise(self):
-        X = mpcf.FloatTensor(np.array([1.0, 2.0, 3.0]))
-        Y = mpcf.FloatTensor(np.array([1.0, 2.0]))
+        X = sb.FloatTensor(np.array([1.0, 2.0, 3.0]))
+        Y = sb.FloatTensor(np.array([1.0, 2.0]))
         with pytest.raises(ValueError):
             _ = X + Y
 
     def test_add_does_not_modify_originals(self):
         a = np.array([1.0, 2.0, 3.0])
         b = np.array([10.0, 20.0, 30.0])
-        X = mpcf.FloatTensor(a)
-        Y = mpcf.FloatTensor(b)
+        X = sb.FloatTensor(a)
+        Y = sb.FloatTensor(b)
         _ = X + Y
         npt.assert_array_equal(np.asarray(X), a)
         npt.assert_array_equal(np.asarray(Y), b)
@@ -444,8 +444,8 @@ class TestFloat64TensorBroadcast:
 
 class TestNumericTensorPow:
     @pytest.fixture(params=[
-        pytest.param((mpcf.FloatTensor, np.float32), id="float32"),
-        pytest.param((mpcf.FloatTensor, np.float64), id="float64"),
+        pytest.param((sb.FloatTensor, np.float32), id="float32"),
+        pytest.param((sb.FloatTensor, np.float64), id="float64"),
     ])
     def tensor_info(self, request):
         return request.param
@@ -502,17 +502,17 @@ class TestNumericTensorPow:
 
 class TestPcfTensorPow:
     @pytest.fixture(params=[
-        pytest.param((mpcf.pcf32, np.float32), id="pcf32"),
-        pytest.param((mpcf.pcf64, np.float64), id="pcf64"),
+        pytest.param((sb.pcf32, np.float32), id="pcf32"),
+        pytest.param((sb.pcf64, np.float64), id="pcf64"),
     ])
     def pcf_info(self, request):
         return request.param
 
     def _make_tensor(self, pcf_info, vals_list):
         pcf_dtype, np_dtype = pcf_info
-        tensor = mpcf.zeros((len(vals_list),), dtype=pcf_dtype)
+        tensor = sb.zeros((len(vals_list),), dtype=pcf_dtype)
         for i, vals in enumerate(vals_list):
-            tensor[i] = mpcf.Pcf(np.array(vals, dtype=np_dtype))
+            tensor[i] = sb.Pcf(np.array(vals, dtype=np_dtype))
         return tensor, np_dtype
 
     def test_pow_2(self, pcf_info):
@@ -521,8 +521,8 @@ class TestPcfTensorPow:
             [[0.0, 4.0], [1.0, 5.0]],
         ])
         R = T ** 2
-        expected_0 = mpcf.Pcf(np.array([[0.0, 4.0], [1.0, 9.0]], dtype=np_dtype))
-        expected_1 = mpcf.Pcf(np.array([[0.0, 16.0], [1.0, 25.0]], dtype=np_dtype))
+        expected_0 = sb.Pcf(np.array([[0.0, 4.0], [1.0, 9.0]], dtype=np_dtype))
+        expected_1 = sb.Pcf(np.array([[0.0, 16.0], [1.0, 25.0]], dtype=np_dtype))
         assert R[0] == expected_0
         assert R[1] == expected_1
 
@@ -540,8 +540,8 @@ class TestPcfTensorPow:
             [[0.0, 4.0], [1.0, 5.0]],
         ])
         T **= 2
-        expected_0 = mpcf.Pcf(np.array([[0.0, 4.0], [1.0, 9.0]], dtype=np_dtype))
-        expected_1 = mpcf.Pcf(np.array([[0.0, 16.0], [1.0, 25.0]], dtype=np_dtype))
+        expected_0 = sb.Pcf(np.array([[0.0, 4.0], [1.0, 9.0]], dtype=np_dtype))
+        expected_1 = sb.Pcf(np.array([[0.0, 16.0], [1.0, 25.0]], dtype=np_dtype))
         assert T[0] == expected_0
         assert T[1] == expected_1
 
@@ -557,4 +557,4 @@ class TestFloat32TensorBroadcast:
     def test_add_broadcast(self):
         a = np.array([[1.0, 2.0], [3.0, 4.0]], dtype=np.float32)
         b = np.array([10.0, 20.0], dtype=np.float32)
-        _check_broadcast_op(a, b, lambda x, y: x + y, mpcf.FloatTensor)
+        _check_broadcast_op(a, b, lambda x, y: x + y, sb.FloatTensor)

@@ -1,4 +1,4 @@
 #!/bin/bash
 SITE_PKG=$(python3 -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')
 
-cp -v masspcf/*.py "$SITE_PKG/masspcf/"
+cp -v stablebear/*.py "$SITE_PKG/stablebear/"

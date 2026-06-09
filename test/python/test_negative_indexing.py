@@ -31,7 +31,7 @@ test_indexing_memory_safety.py instead.
 import numpy as np
 import pytest
 
-from masspcf.tensor import FloatTensor
+from stablebear.tensor import FloatTensor
 from _indexing_support import assert_getitem_matches, assert_setitem_matches, ref_array
 
 
@@ -146,7 +146,7 @@ class TestStepZero:
 class TestOutOfBoundsInt:
     """NumPy raises IndexError for an out-of-range single int on any axis.
 
-    Covers review finding oob-single-int-wrong-exception: masspcf currently
+    Covers review finding oob-single-int-wrong-exception: stablebear currently
     raises ValueError (from squeeze) for an N-D out-of-bounds row and TypeError
     for an out-of-range negative on a 1-D tensor.
     """

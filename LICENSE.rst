@@ -3,13 +3,13 @@
 License
 =======
 
-masspcf is Copyright 2024-2026 Bjorn H. Wehlin and is distributed under the Apache License, Version 2.0.
+stablebear is Copyright 2024-2026 Bjorn H. Wehlin and is distributed under the Apache License, Version 2.0.
 
-In addition, the masspcf repository and source distributions bundle several third-party libraries under compatible licenses, listed below.
+In addition, the stablebear repository and source distributions bundle several third-party libraries under compatible licenses, listed below.
 
 
-masspcf license (Apache-2.0)
-----------------------------
+stablebear license (Apache-2.0)
+-------------------------------
 
 ::
 
@@ -407,7 +407,7 @@ Platform-specific notices
 GCC runtime libraries (3rd/gcc-runtime/LICENSE)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-On platforms where masspcf is compiled with GCC, the binary may ship with GCC runtime libraries covered by the GCC Runtime Library Exception 3.1. (see https://www.gnu.org/licenses/gcc-exception-3.1.html).
+On platforms where stablebear is compiled with GCC, the binary may ship with GCC runtime libraries covered by the GCC Runtime Library Exception 3.1. (see https://www.gnu.org/licenses/gcc-exception-3.1.html).
 
 ::
 

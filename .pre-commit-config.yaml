@@ -4,9 +4,9 @@ repos:
     hooks:
       - id: ruff
         args: [--fix]
-        files: ^masspcf/
+        files: ^stablebear/
       - id: ruff-format
-        files: ^masspcf/
+        files: ^stablebear/
 
   - repo: https://github.com/pocc/pre-commit-hooks
     rev: v1.3.5

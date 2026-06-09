@@ -1,9 +1,9 @@
 """
 import pytest
-import masspcf as mpcf
+import stablebear as sb
 
 def test_zeros():
-    Z = mpcf.zeros((1, 2, 3))
+    Z = sb.zeros((1, 2, 3))
 
     assert len(Z.shape) == 3
     assert Z.shape[0] == 1
@@ -12,8 +12,8 @@ def test_zeros():
 
 @pytest.mark.parametrize("gpu", [True, False])
 def test_pdist_zeros(gpu):
-    Z = mpcf.zeros((2,))
-    D = mpcf.pdist(Z)
+    Z = sb.zeros((2,))
+    D = sb.pdist(Z)
 
     assert D.shape == (2, 2)
     assert D[0][0] == 0.

@@ -50,7 +50,7 @@ jobs:
         run: python3 -m build --sdist
 
       - name: Install from sdist
-        run: python3 -m pip install dist/masspcf-*.tar.gz --force-reinstall
+        run: python3 -m pip install dist/stablebear-*.tar.gz --force-reinstall
         env:
           BUILD_WITH_CUDA: "0"
 

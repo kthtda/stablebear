@@ -17,12 +17,12 @@
 // This file is compiled by NVCC. It provides concrete (non-template)
 // factory functions for the block-based CUDA integration pipeline.
 
-#include <mpcf/cuda/cuda_matrix_integrate_api.hpp>
-#include <mpcf/cuda/pcf_block_op.cuh>
-#include <mpcf/cuda/cuda_result_writer.hpp>
-#include <mpcf/functional/operations.cuh>
+#include <sbear/cuda/cuda_matrix_integrate_api.hpp>
+#include <sbear/cuda/pcf_block_op.cuh>
+#include <sbear/cuda/cuda_result_writer.hpp>
+#include <sbear/functional/operations.cuh>
 
-namespace mpcf
+namespace sb
 {
   // Helper for pdist/l2_kernel factories
   template <typename Tv, typename OpT, typename WriterT>

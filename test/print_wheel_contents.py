@@ -39,10 +39,10 @@ def list_package(pkgname):
             found = True
 
     if not found:
-        print("Cannot find masspcf in site-packages")
+        print("Cannot find stablebear in site-packages")
 
 
-list_package("masspcf")
-list_package("masspcf_cpu")
-list_package("_mpcf_cpp")
-list_package("masspcf-cpu")
+list_package("stablebear")
+list_package("stablebear_cpu")
+list_package("_sb_cpp")
+list_package("stablebear-cpu")

@@ -14,15 +14,15 @@
 
 import numpy as np
 
-import masspcf as mpcf
-import masspcf._mpcf_cpp as mcpp
+import stablebear as sb
+import stablebear._sb_cpp as cpp
 
 
 def test_numpy_tensor_create_gives_correct_cpp_type():
     Xnp = np.zeros((10, 20), dtype=np.float32)
-    X = mpcf.FloatTensor(Xnp)
-    assert isinstance(X._data, mcpp.Float32Tensor)
+    X = sb.FloatTensor(Xnp)
+    assert isinstance(X._data, cpp.Float32Tensor)
 
     Xnp = np.zeros((10, 20), dtype=np.float64)
-    X = mpcf.FloatTensor(Xnp)
-    assert isinstance(X._data, mcpp.Float64Tensor)
+    X = sb.FloatTensor(Xnp)
+    assert isinstance(X._data, cpp.Float64Tensor)

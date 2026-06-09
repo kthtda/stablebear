@@ -1,8 +1,8 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-from masspcf import Pcf, l1_norm
-from masspcf.plotting import plot as plotpcf
+from stablebear import Pcf, l1_norm
+from stablebear.plotting import plot as plotpcf
 
 # Construct three PCFs of increasing complexity
 f0 = Pcf(np.array([[0.0], [0.0]]))
@@ -15,6 +15,6 @@ plotpcf(f1, label="f1")
 plotpcf(f2, label="f2")
 plt.legend()
 
-# masspcf supports l1 norm for lists of PCFs and single PCFs
+# stablebear supports l1 norm for lists of PCFs and single PCFs
 print(l1_norm([f0, f1, f2]))
 print(l1_norm(f1))

@@ -16,44 +16,44 @@ import numpy as np
 import numpy.testing as npt
 import pytest
 
-import masspcf as mpcf
+import stablebear as sb
 
 
 def test_add_f32():
-    a = mpcf.Pcf(np.array([[0.0, 1.0], [2.0, 3.0]], dtype=np.float32))
-    b = mpcf.Pcf(np.array([[0.0, 4.0], [2.0, 5.0]], dtype=np.float32))
+    a = sb.Pcf(np.array([[0.0, 1.0], [2.0, 3.0]], dtype=np.float32))
+    b = sb.Pcf(np.array([[0.0, 4.0], [2.0, 5.0]], dtype=np.float32))
 
     c = a + b
 
-    assert isinstance(c, mpcf.Pcf)
+    assert isinstance(c, sb.Pcf)
     result = c.to_numpy()
     assert result[0, 1] == pytest.approx(5.0, abs=1e-5)
     assert result[1, 1] == pytest.approx(8.0, abs=1e-5)
 
 
 def test_add_f64():
-    a = mpcf.Pcf(np.array([[0.0, 1.0], [2.0, 3.0]], dtype=np.float64))
-    b = mpcf.Pcf(np.array([[0.0, 4.0], [2.0, 5.0]], dtype=np.float64))
+    a = sb.Pcf(np.array([[0.0, 1.0], [2.0, 3.0]], dtype=np.float64))
+    b = sb.Pcf(np.array([[0.0, 4.0], [2.0, 5.0]], dtype=np.float64))
 
     c = a + b
 
-    assert isinstance(c, mpcf.Pcf)
+    assert isinstance(c, sb.Pcf)
     result = c.to_numpy()
     assert result[0, 1] == pytest.approx(5.0, abs=1e-10)
     assert result[1, 1] == pytest.approx(8.0, abs=1e-10)
 
 
 def test_add_mismatched_types_raises():
-    a = mpcf.Pcf(np.array([[0.0, 1.0]], dtype=np.float32))
-    b = mpcf.Pcf(np.array([[0.0, 1.0]], dtype=np.float64))
+    a = sb.Pcf(np.array([[0.0, 1.0]], dtype=np.float32))
+    b = sb.Pcf(np.array([[0.0, 1.0]], dtype=np.float64))
 
     with pytest.raises(TypeError, match="Mismatched PCF types"):
         a + b
 
 
 def test_add_does_not_modify_operands():
-    a = mpcf.Pcf(np.array([[0.0, 1.0], [2.0, 3.0]], dtype=np.float32))
-    b = mpcf.Pcf(np.array([[0.0, 4.0], [2.0, 5.0]], dtype=np.float32))
+    a = sb.Pcf(np.array([[0.0, 1.0], [2.0, 3.0]], dtype=np.float32))
+    b = sb.Pcf(np.array([[0.0, 4.0], [2.0, 5.0]], dtype=np.float32))
 
     a_orig = a.to_numpy().copy()
     b_orig = b.to_numpy().copy()

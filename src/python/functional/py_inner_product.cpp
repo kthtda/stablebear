@@ -20,13 +20,13 @@
 #include "functional/operations.cuh"
 #include "algorithms/functional/matrix_integrate.hpp"
 #include "../py_async_support.hpp"
-#include <mpcf/settings.hpp>
+#include <sbear/settings.hpp>
 
 #ifdef BUILD_WITH_CUDA
-#include <mpcf/cuda/cuda_matrix_integrate_api.hpp>
+#include <sbear/cuda/cuda_matrix_integrate_api.hpp>
 #endif
 
-#include <mpcf/symmetric_matrix.hpp>
+#include <sbear/symmetric_matrix.hpp>
 
 #include <memory>
 
@@ -39,46 +39,46 @@ namespace
   class PyInnerProductBindings
   {
   public:
-    using PcfT = mpcf::Pcf<Tt, Tv>;
-    using TensorT = mpcf::Tensor<PcfT>;
+    using PcfT = sb::Pcf<Tt, Tv>;
+    using TensorT = sb::Tensor<PcfT>;
 
     static py::tuple l2(TensorT fs)
     {
-      auto op = mpcf::OperationL2InnerProduct<Tt, Tv>();
+      auto op = sb::OperationL2InnerProduct<Tt, Tv>();
       auto n = static_cast<size_t>(fs.shape(0));
 
-      auto symmat = mpcf::SymmetricMatrix<Tv>(n);
+      auto symmat = sb::SymmetricMatrix<Tv>(n);
 
       if (n == 0)
       {
-        std::unique_ptr<mpcf::StoppableTask<void>> empty_task = mpcf_py::execute_empty_task();
+        std::unique_ptr<sb::StoppableTask<void>> empty_task = sb_py::execute_empty_task();
         return py::make_tuple(std::move(empty_task), symmat);
       }
 
-      auto begin = mpcf::begin1dValues(fs);
-      auto end = mpcf::end1dValues(fs);
+      auto begin = sb::begin1dValues(fs);
+      auto end = sb::end1dValues(fs);
 
 #ifdef BUILD_WITH_CUDA
-      if (!mpcf::settings().forceCpu && static_cast<size_t>(std::distance(begin, end)) >= mpcf::settings().cudaThreshold)
+      if (!sb::settings().forceCpu && static_cast<size_t>(std::distance(begin, end)) >= sb::settings().cudaThreshold)
       {
-        if (mpcf::settings().deviceVerbose)
+        if (sb::settings().deviceVerbose)
         {
           std::cout << "Kernel computation on CUDA device(s)" << std::endl;
         }
 
         std::vector<PcfT> pcfs(begin, end);
-        auto task = mpcf::create_cuda_block_integrate_l2_kernel_task(symmat, pcfs, Tv(0), std::numeric_limits<Tv>::max());
-        task->start_async(mpcf::default_executor());
+        auto task = sb::create_cuda_block_integrate_l2_kernel_task(symmat, pcfs, Tv(0), std::numeric_limits<Tv>::max());
+        task->start_async(sb::default_executor());
         return py::make_tuple(std::move(task), symmat);
       }
 #endif
 
-      if (mpcf::settings().deviceVerbose)
+      if (sb::settings().deviceVerbose)
       {
         std::cout << "Kernel computation on CPU(s)" << std::endl;
       }
 
-      std::unique_ptr<mpcf::StoppableTask<void>> task = mpcf_py::execute_stoppable_task<mpcf::CpuPairwiseIntegrationTask<decltype(op), decltype(begin), mpcf::SymmetricMatrix<Tv>, true>>(symmat, begin, end, op);
+      std::unique_ptr<sb::StoppableTask<void>> task = sb_py::execute_stoppable_task<sb::CpuPairwiseIntegrationTask<decltype(op), decltype(begin), sb::SymmetricMatrix<Tv>, true>>(symmat, begin, end, op);
       return py::make_tuple(std::move(task), symmat);
     }
 
@@ -94,13 +94,13 @@ namespace
 
 }
 
-namespace mpcf_py
+namespace sb_py
 {
 
   void register_inner_product(py::module_& m)
   {
-    PyInnerProductBindings<mpcf::float32_t, mpcf::float32_t>::register_bindings(m, "_f32_f32");
-    PyInnerProductBindings<mpcf::float64_t, mpcf::float64_t>::register_bindings(m, "_f64_f64");
+    PyInnerProductBindings<sb::float32_t, sb::float32_t>::register_bindings(m, "_f32_f32");
+    PyInnerProductBindings<sb::float64_t, sb::float64_t>::register_bindings(m, "_f64_f64");
   }
 
 }

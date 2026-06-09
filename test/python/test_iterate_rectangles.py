@@ -9,7 +9,7 @@ import pytest
 
 from plot_helpers import FigureGallery, gallery_fixture, rect_plot_fixture, SHOW
 
-import masspcf as mpcf
+import stablebear as sb
 
 _gallery = FigureGallery()
 _show_gallery = gallery_fixture(_gallery)
@@ -17,7 +17,7 @@ rect_plot = rect_plot_fixture(_gallery)
 
 
 def _pcf(points, dtype):
-    return mpcf.Pcf(np.array(points), dtype=dtype)
+    return sb.Pcf(np.array(points), dtype=dtype)
 
 
 def _assert_rect(rect, *, l, r, fv, gv):
@@ -44,7 +44,7 @@ def test_full_iteration(pcf_dtype, rect_plot):
     f = _pcf([[0, 3], [1, 2], [4, 5], [6, 0]], pcf_dtype)
     g = _pcf([[0, 2], [3, 4], [4, 2], [5, 1], [8, 3]], pcf_dtype)
 
-    rects = mpcf.iterate_rectangles(f, g)
+    rects = sb.iterate_rectangles(f, g)
     rect_plot(f, g, rects, max_time=10)
 
     assert len(rects) == 7
@@ -64,7 +64,7 @@ def test_g_shorter_than_f(pcf_dtype, rect_plot):
     f = _pcf([[0, 1], [2, 3], [4, 5], [6, 0]], pcf_dtype)
     g = _pcf([[0, 10], [1, 0]], pcf_dtype)
 
-    rects = mpcf.iterate_rectangles(f, g)
+    rects = sb.iterate_rectangles(f, g)
     rect_plot(f, g, rects, max_time=8)
 
     assert len(rects) == 5
@@ -82,7 +82,7 @@ def test_simultaneous_changes(pcf_dtype, rect_plot):
     f = _pcf([[0, 1], [2, 3], [4, 0]], pcf_dtype)
     g = _pcf([[0, 10], [2, 20], [4, 0]], pcf_dtype)
 
-    rects = mpcf.iterate_rectangles(f, g)
+    rects = sb.iterate_rectangles(f, g)
     rect_plot(f, g, rects, max_time=6)
 
     assert len(rects) == 3
@@ -97,7 +97,7 @@ def test_identical_pcfs(pcf_dtype):
     f = _pcf([[0, 5], [1, 3], [3, 0]], pcf_dtype)
     g = _pcf([[0, 5], [1, 3], [3, 0]], pcf_dtype)
 
-    rects = mpcf.iterate_rectangles(f, g)
+    rects = sb.iterate_rectangles(f, g)
 
     for r in rects:
         assert r.f_value == pytest.approx(r.g_value)
@@ -109,7 +109,7 @@ def test_single_point_pcfs(pcf_dtype):
     f = _pcf([[0, 7]], pcf_dtype)
     g = _pcf([[0, 3]], pcf_dtype)
 
-    rects = mpcf.iterate_rectangles(f, g)
+    rects = sb.iterate_rectangles(f, g)
 
     assert len(rects) == 1
     _assert_rect_inf(rects[0], l=0, fv=7, gv=3)
@@ -121,7 +121,7 @@ def test_b_on_changepoint(pcf_dtype):
     f = _pcf([[0, 3], [1, 2], [4, 5], [6, 0]], pcf_dtype)
     g = _pcf([[0, 2], [3, 4], [4, 2], [5, 1], [8, 3]], pcf_dtype)
 
-    rects = mpcf.iterate_rectangles(f, g, b=4.0)
+    rects = sb.iterate_rectangles(f, g, b=4.0)
 
     assert len(rects) == 3
     _assert_rect(rects[0], l=0, r=1, fv=3, gv=2)
@@ -135,7 +135,7 @@ def test_a_equals_b(pcf_dtype):
     f = _pcf([[0, 3], [1, 2]], pcf_dtype)
     g = _pcf([[0, 1], [2, 0]], pcf_dtype)
 
-    rects = mpcf.iterate_rectangles(f, g, a=1.0, b=1.0)
+    rects = sb.iterate_rectangles(f, g, a=1.0, b=1.0)
 
     assert len(rects) == 0
 
@@ -146,8 +146,8 @@ def test_swapped_args(pcf_dtype):
     f = _pcf([[0, 3], [1, 2], [4, 5], [6, 0]], pcf_dtype)
     g = _pcf([[0, 2], [3, 4], [4, 2], [5, 1], [8, 3]], pcf_dtype)
 
-    rects_fg = mpcf.iterate_rectangles(f, g, b=6.0)
-    rects_gf = mpcf.iterate_rectangles(g, f, b=6.0)
+    rects_fg = sb.iterate_rectangles(f, g, b=6.0)
+    rects_gf = sb.iterate_rectangles(g, f, b=6.0)
 
     assert len(rects_fg) == len(rects_gf)
     for r1, r2 in zip(rects_fg, rects_gf):
@@ -164,7 +164,7 @@ def test_non_overlapping(pcf_dtype, rect_plot):
     f = _pcf([[0, 4], [2, 0]], pcf_dtype)
     g = _pcf([[0, 0], [5, 3], [7, 0]], pcf_dtype)
 
-    rects = mpcf.iterate_rectangles(f, g, b=10.0)
+    rects = sb.iterate_rectangles(f, g, b=10.0)
     rect_plot(f, g, rects, max_time=10)
 
     for r in rects:
@@ -177,7 +177,7 @@ def test_start_and_end_bounds(pcf_dtype, rect_plot):
     f = _pcf([[0, 3], [1, 2], [4, 5], [6, 0]], pcf_dtype)
     g = _pcf([[0, 2], [3, 4], [4, 2], [5, 1], [8, 3]], pcf_dtype)
 
-    rects = mpcf.iterate_rectangles(f, g, a=2.0, b=4.5)
+    rects = sb.iterate_rectangles(f, g, a=2.0, b=4.5)
     rect_plot(f, g, rects, max_time=9)
 
     assert len(rects) == 3
@@ -187,7 +187,7 @@ def test_start_and_end_bounds(pcf_dtype, rect_plot):
 
 
 if __name__ == "__main__":
-    if not os.environ.get("MPCF_SHOW_PLOTS"):
-        os.environ["MPCF_SHOW_PLOTS"] = "1"
+    if not os.environ.get("SB_SHOW_PLOTS"):
+        os.environ["SB_SHOW_PLOTS"] = "1"
         os.execv(sys.executable, [sys.executable, "-m", "pytest", __file__, "-v"] + sys.argv[1:])
     sys.exit(pytest.main([__file__, "-v"] + sys.argv[1:]))

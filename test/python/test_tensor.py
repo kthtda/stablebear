@@ -1,11 +1,11 @@
 import pytest
 
-import masspcf as mpcf
-import masspcf._mpcf_cpp as mcpp
+import stablebear as sb
+import stablebear._sb_cpp as cpp
 
 
 def test_shape_dunder():
-    shp = mpcf.Shape((2, 3, 5))
+    shp = sb.Shape((2, 3, 5))
 
     str_ = str(shp)
     repr_ = repr(shp)
@@ -23,10 +23,10 @@ def test_shape_dunder():
 
 
 def test_basic_shape_strides():
-    X = mpcf.zeros((7, 3, 5, 6), dtype=mpcf.float64)
+    X = sb.zeros((7, 3, 5, 6), dtype=sb.float64)
 
-    assert X.shape == mpcf.Shape((7, 3, 5, 6))
-    assert X.shape != mpcf.Shape((1, 2, 3))
+    assert X.shape == sb.Shape((7, 3, 5, 6))
+    assert X.shape != sb.Shape((1, 2, 3))
 
     assert X.strides[0] == 3 * 5 * 6 * 1  # 90
     assert X.strides[1] == 5 * 6 * 1  # 30
@@ -35,30 +35,30 @@ def test_basic_shape_strides():
 
 
 def test_construct_1d_tensor():
-    s = mpcf.Shape(10)
-    X = mpcf.zeros(s)
+    s = sb.Shape(10)
+    X = sb.zeros(s)
 
     assert X.shape == s
 
 
 def test_dtype_results_in_correct_type():
-    X32 = mpcf.zeros((3, 2), dtype=mpcf.pcf32)
-    assert isinstance(X32, mpcf.PcfTensor)
-    assert X32.dtype == mpcf.pcf32
+    X32 = sb.zeros((3, 2), dtype=sb.pcf32)
+    assert isinstance(X32, sb.PcfTensor)
+    assert X32.dtype == sb.pcf32
 
-    assert isinstance(X32[0, 0], mpcf.Pcf)
-    assert isinstance(X32[0, 0]._data, mcpp.Pcf_f32_f32)
+    assert isinstance(X32[0, 0], sb.Pcf)
+    assert isinstance(X32[0, 0]._data, cpp.Pcf_f32_f32)
 
-    X64 = mpcf.zeros((3, 2), dtype=mpcf.pcf64)
-    assert isinstance(X64, mpcf.PcfTensor)
-    assert X64.dtype == mpcf.pcf64
+    X64 = sb.zeros((3, 2), dtype=sb.pcf64)
+    assert isinstance(X64, sb.PcfTensor)
+    assert X64.dtype == sb.pcf64
 
-    assert isinstance(X64[0, 0], mpcf.Pcf)
-    assert isinstance(X64[0, 0]._data, mcpp.Pcf_f64_f64)
+    assert isinstance(X64[0, 0], sb.Pcf)
+    assert isinstance(X64[0, 0]._data, cpp.Pcf_f64_f64)
 
 
 def test_tensor_copy_does_not_modify_original():
-    X = mpcf.zeros((10, 10), dtype=mpcf.float64)
+    X = sb.zeros((10, 10), dtype=sb.float64)
 
     X[2, 3] = 1.5
 
@@ -74,20 +74,20 @@ def test_tensor_copy_does_not_modify_original():
 
 
 ALL_DTYPES = [
-    mpcf.pcf32, mpcf.pcf64,
-    mpcf.pcf32i, mpcf.pcf64i,
-    mpcf.float32, mpcf.float64,
-    mpcf.boolean,
-    mpcf.pcloud32, mpcf.pcloud64,
-    mpcf.barcode32, mpcf.barcode64,
-    mpcf.distmat32, mpcf.distmat64,
-    mpcf.symmat32, mpcf.symmat64,
+    sb.pcf32, sb.pcf64,
+    sb.pcf32i, sb.pcf64i,
+    sb.float32, sb.float64,
+    sb.boolean,
+    sb.pcloud32, sb.pcloud64,
+    sb.barcode32, sb.barcode64,
+    sb.distmat32, sb.distmat64,
+    sb.symmat32, sb.symmat64,
 ]
 
 
 @pytest.mark.parametrize("dtype", ALL_DTYPES, ids=[d.__name__ for d in ALL_DTYPES])
 def test_copy_preserves_dtype(dtype):
-    X = mpcf.zeros((3,), dtype=dtype)
+    X = sb.zeros((3,), dtype=dtype)
     Y = X.copy()
     assert type(Y) is type(X)
     assert Y.dtype == X.dtype
@@ -96,7 +96,7 @@ def test_copy_preserves_dtype(dtype):
 
 @pytest.mark.parametrize("dtype", ALL_DTYPES, ids=[d.__name__ for d in ALL_DTYPES])
 def test_slice_preserves_dtype(dtype):
-    X = mpcf.zeros((5,), dtype=dtype)
+    X = sb.zeros((5,), dtype=dtype)
     Y = X[1:4]
     assert type(Y) is type(X)
     assert Y.dtype == X.dtype
@@ -104,7 +104,7 @@ def test_slice_preserves_dtype(dtype):
 
 @pytest.mark.parametrize("dtype", ALL_DTYPES, ids=[d.__name__ for d in ALL_DTYPES])
 def test_flatten_preserves_dtype(dtype):
-    X = mpcf.zeros((2, 3), dtype=dtype)
+    X = sb.zeros((2, 3), dtype=dtype)
     Y = X.flatten()
     assert type(Y) is type(X)
     assert Y.dtype == X.dtype
@@ -113,7 +113,7 @@ def test_flatten_preserves_dtype(dtype):
 
 @pytest.mark.parametrize("dtype", ALL_DTYPES, ids=[d.__name__ for d in ALL_DTYPES])
 def test_broadcast_to_preserves_dtype(dtype):
-    X = mpcf.zeros((1,), dtype=dtype)
+    X = sb.zeros((1,), dtype=dtype)
     Y = X.broadcast_to((5,))
     assert type(Y) is type(X)
     assert Y.dtype == X.dtype
@@ -121,12 +121,12 @@ def test_broadcast_to_preserves_dtype(dtype):
 
 
 import numpy as np
-from masspcf.tensor import BoolTensor
+from stablebear.tensor import BoolTensor
 
 
 @pytest.mark.parametrize("dtype", ALL_DTYPES, ids=[d.__name__ for d in ALL_DTYPES])
 def test_masked_select_preserves_dtype(dtype):
-    X = mpcf.zeros((3,), dtype=dtype)
+    X = sb.zeros((3,), dtype=dtype)
     mask = BoolTensor(np.array([True, False, True]))
     Y = X[mask]
     assert type(Y) is type(X)
@@ -136,15 +136,15 @@ def test_masked_select_preserves_dtype(dtype):
 
 # Arithmetic ops only apply to numeric and PCF tensors.
 ARITHMETIC_DTYPES = [
-    mpcf.pcf32, mpcf.pcf64,
-    mpcf.pcf32i, mpcf.pcf64i,
-    mpcf.float32, mpcf.float64,
+    sb.pcf32, sb.pcf64,
+    sb.pcf32i, sb.pcf64i,
+    sb.float32, sb.float64,
 ]
 
 
 @pytest.mark.parametrize("dtype", ARITHMETIC_DTYPES, ids=[d.__name__ for d in ARITHMETIC_DTYPES])
 def test_arithmetic_preserves_dtype(dtype):
-    X = mpcf.zeros((3,), dtype=dtype)
+    X = sb.zeros((3,), dtype=dtype)
     Y = X + X
     assert type(Y) is type(X)
     assert Y.dtype == X.dtype

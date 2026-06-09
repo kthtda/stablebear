@@ -12,59 +12,59 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import masspcf as mpcf
+import stablebear as sb
 
 
 def test_noisy_trig():
-    X = mpcf.random.noisy_sin((10, 20))
+    X = sb.random.noisy_sin((10, 20))
     assert X.shape == (10, 20)
 
 
 def test_global_seed_determinism():
-    mpcf.random.seed(42)
-    A = mpcf.random.noisy_sin((5, 10))
+    sb.random.seed(42)
+    A = sb.random.noisy_sin((5, 10))
 
-    mpcf.random.seed(42)
-    B = mpcf.random.noisy_sin((5, 10))
+    sb.random.seed(42)
+    B = sb.random.noisy_sin((5, 10))
 
     assert A.array_equal(B)
 
 
 def test_global_seed_different_seeds_differ():
-    mpcf.random.seed(42)
-    A = mpcf.random.noisy_sin((5, 10))
+    sb.random.seed(42)
+    A = sb.random.noisy_sin((5, 10))
 
-    mpcf.random.seed(99)
-    B = mpcf.random.noisy_sin((5, 10))
+    sb.random.seed(99)
+    B = sb.random.noisy_sin((5, 10))
 
     assert not A.array_equal(B)
 
 
 def test_generator_determinism():
-    gen = mpcf.random.Generator(seed=123)
-    A = mpcf.random.noisy_sin((5, 10), generator=gen)
+    gen = sb.random.Generator(seed=123)
+    A = sb.random.noisy_sin((5, 10), generator=gen)
 
-    gen2 = mpcf.random.Generator(seed=123)
-    B = mpcf.random.noisy_sin((5, 10), generator=gen2)
+    gen2 = sb.random.Generator(seed=123)
+    B = sb.random.noisy_sin((5, 10), generator=gen2)
 
     assert A.array_equal(B)
 
 
 def test_generator_noisy_cos():
-    gen = mpcf.random.Generator(seed=77)
-    A = mpcf.random.noisy_cos((3, 4), generator=gen)
+    gen = sb.random.Generator(seed=77)
+    A = sb.random.noisy_cos((3, 4), generator=gen)
 
-    gen2 = mpcf.random.Generator(seed=77)
-    B = mpcf.random.noisy_cos((3, 4), generator=gen2)
+    gen2 = sb.random.Generator(seed=77)
+    B = sb.random.noisy_cos((3, 4), generator=gen2)
 
     assert A.array_equal(B)
 
 
 def test_determinism_pcf64():
-    gen = mpcf.random.Generator(seed=42)
-    A = mpcf.random.noisy_sin((3, 4), dtype=mpcf.pcf64, generator=gen)
+    gen = sb.random.Generator(seed=42)
+    A = sb.random.noisy_sin((3, 4), dtype=sb.pcf64, generator=gen)
 
-    gen2 = mpcf.random.Generator(seed=42)
-    B = mpcf.random.noisy_sin((3, 4), dtype=mpcf.pcf64, generator=gen2)
+    gen2 = sb.random.Generator(seed=42)
+    B = sb.random.noisy_sin((3, 4), dtype=sb.pcf64, generator=gen2)
 
     assert A.array_equal(B)

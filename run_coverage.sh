@@ -48,7 +48,7 @@ done
 CPP_OUT="$OUT_DIR/cpp"
 PY_OUT="$OUT_DIR/python"
 
-echo "=== masspcf local coverage ==="
+echo "=== stablebear local coverage ==="
 echo "Repo:      $REPO_ROOT"
 echo "Build dir: $BUILD_DIR"
 echo "Out dir:   $OUT_DIR"
@@ -80,7 +80,7 @@ fi
 # ── C++ tests ─────────────────────────────────────────────────────────────────
 if [[ $SKIP_CPP -eq 0 ]]; then
   echo "--- C++ tests ---"
-  (cd "$REPO_ROOT/test" && "$BUILD_DIR/mpcf_test") || echo "(some C++ tests failed — coverage data still collected)"
+  (cd "$REPO_ROOT/test" && "$BUILD_DIR/sb_test") || echo "(some C++ tests failed — coverage data still collected)"
   echo
 fi
 
@@ -89,7 +89,7 @@ if [[ $SKIP_PYTHON -eq 0 ]]; then
   echo "--- Python tests ---"
   mkdir -p "$PY_OUT"
   (cd "$REPO_ROOT/test" && python -m pytest . \
-    --cov=masspcf \
+    --cov=stablebear \
     --cov-config="$REPO_ROOT/pyproject.toml" \
     --cov-report="html:$PY_OUT" \
     --cov-report="json:$PY_OUT/coverage.json" \
@@ -145,11 +145,11 @@ def fmt_cpp(data):
             pct = f.get('line_percent')
             cov = f.get('line_covered', '?')
             tot = f.get('line_total', '?')
-            name = f.get('filename', '').replace('/home/runner/work/masspcf/masspcf/', '')
+            name = f.get('filename', '').replace('/home/runner/work/stablebear/stablebear/', '')
             # strip local absolute prefix too
             for prefix in [os.path.expanduser('~'), '/NOBACKUP']:
                 if name.startswith(prefix):
-                    idx = name.find('masspcf/')
+                    idx = name.find('stablebear/')
                     if idx != -1:
                         name = name[idx:]
             pct_str = f"{pct:.1f}%" if pct is not None else "?"
@@ -172,7 +172,7 @@ def fmt_py(data):
         display = path
         for prefix in [os.path.expanduser('~'), '/NOBACKUP']:
             if display.startswith(prefix):
-                idx = display.find('masspcf/')
+                idx = display.find('stablebear/')
                 if idx != -1:
                     display = display[idx:]
         lines.append(f"  {display}: {pct_str} ({summary.get('covered_lines',0)}/{summary.get('num_statements',0)} stmts)")
@@ -181,7 +181,7 @@ def fmt_py(data):
             lines.append(f"    missing lines: {', '.join(str(x) for x in missing)}")
     return "\n".join(lines)
 
-out = [f"# masspcf coverage report", f"SHA: {sha}", f"Branch: {branch}", ""]
+out = [f"# stablebear coverage report", f"SHA: {sha}", f"Branch: {branch}", ""]
 
 try:
     with open(cpp_path) as f:

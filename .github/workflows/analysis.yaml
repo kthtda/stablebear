@@ -83,7 +83,7 @@ jobs:
         run: |
           mkdir -p covreport/profiles
           cd test
-          ../build/mpcf_test || true
+          ../build/sb_test || true
 
       - name: Run Python test suite (coverage + LLVM profiles)
         env:
@@ -92,7 +92,7 @@ jobs:
           mkdir -p covreport/python
           cd test
           python -m pytest . \
-            --cov=masspcf \
+            --cov=stablebear \
             --cov-config=../pyproject.toml \
             --cov-report=html:../covreport/python \
             --cov-report=json:../covreport/python/coverage.json \
@@ -112,8 +112,8 @@ jobs:
           # Merge all .profraw into a single .profdata
           llvm-profdata merge -sparse -o covreport/cpp/default.profdata covreport/profiles/*.profraw
           # Discover the test exe + Python extension module built by CMake
-          FIRST_OBJ="$(find build -type f \( -name 'mpcf_test' -o -name '_mpcf*.so' \) | head -1)"
-          EXTRA_OBJS="$(find build -type f \( -name 'mpcf_test' -o -name '_mpcf*.so' \) | tail -n +2 | sed 's/^/-object /' | tr '\n' ' ')"
+          FIRST_OBJ="$(find build -type f \( -name 'sb_test' -o -name '_sb*.so' \) | head -1)"
+          EXTRA_OBJS="$(find build -type f \( -name 'sb_test' -o -name '_sb*.so' \) | tail -n +2 | sed 's/^/-object /' | tr '\n' ' ')"
           echo "Objects for llvm-cov: $FIRST_OBJ $EXTRA_OBJS"
           INSTR_PROFILE="-instr-profile=covreport/cpp/default.profdata"
           IGNORE="-ignore-filename-regex=(3rd/|/usr/include/|.*/site-packages/|.*/pybind11/|test/)"
@@ -222,7 +222,7 @@ jobs:
             --suppressions=${{github.workspace}}/test/reports/vg_cpython.supp \
             --suppressions=${{github.workspace}}/3rd/pybind11/tests/valgrind-python.supp \
             --suppressions=${{github.workspace}}/3rd/pybind11/tests/valgrind-numpy-scipy.supp \
-            ../build/mpcf_test 2>&1 | tee ./reports/vg-gtest.log || true
+            ../build/sb_test 2>&1 | tee ./reports/vg-gtest.log || true
 
       - name: Run helgrind on Pytest
         run: |
@@ -236,7 +236,7 @@ jobs:
           cd test
           valgrind --tool=helgrind --xml=yes --xml-file=./reports/hg-gtest.xml \
             --suppressions=${{github.workspace}}/test/reports/vg_cpython.supp \
-            ../build/mpcf_test 2>&1 | tee ./reports/hg-gtest.log || true
+            ../build/sb_test 2>&1 | tee ./reports/hg-gtest.log || true
 
       - name: Generate suppressions (text mode, no XML)
         run: |
@@ -254,7 +254,7 @@ jobs:
             --suppressions=${{github.workspace}}/test/reports/vg_cpython.supp \
             --suppressions=${{github.workspace}}/3rd/pybind11/tests/valgrind-python.supp \
             --suppressions=${{github.workspace}}/3rd/pybind11/tests/valgrind-numpy-scipy.supp \
-            ../build/mpcf_test || true
+            ../build/sb_test || true
           valgrind --tool=helgrind --gen-suppressions=all \
             --log-file=./reports/hg-pytest-supp.log \
             --suppressions=${{github.workspace}}/test/reports/vg_cpython.supp \
@@ -262,7 +262,7 @@ jobs:
           valgrind --tool=helgrind --gen-suppressions=all \
             --log-file=./reports/hg-gtest-supp.log \
             --suppressions=${{github.workspace}}/test/reports/vg_cpython.supp \
-            ../build/mpcf_test || true
+            ../build/sb_test || true
           # Extract suppression blocks from logs
           for log in ./reports/vg-pytest-supp.log ./reports/vg-gtest-supp.log \
                      ./reports/hg-pytest-supp.log ./reports/hg-gtest-supp.log; do
@@ -367,7 +367,7 @@ jobs:
       - name: Verify CUDA backend loaded
         run: |
           cd test
-          python3 -c "import masspcf._mpcf_cpp as m; print('Backend:', m.__name__)"
+          python3 -c "import stablebear._sb_cpp as m; print('Backend:', m.__name__)"
 
       - name: Clear previous CUDA coverage data
         run: gpucov zerocounters --dump "covreport/cuda/cuda_*.bin"
@@ -375,11 +375,11 @@ jobs:
       - name: Run C++ tests
         run: |
           cd test
-          ../build/mpcf_test
+          ../build/sb_test
 
       - name: Run Python tests
         env:
-          MPCF_REQUIRE_CUDA: 1
+          SB_REQUIRE_CUDA: 1
         run: |
           cd test
           python3 -m pytest . -vv
@@ -388,7 +388,7 @@ jobs:
         run: |
           gpucov collect \
             --dump "covreport/cuda/cuda_*.bin" \
-            --mapping build/_gpucov_mpcf_cuda/mapping.json \
+            --mapping build/_gpucov_sb_cuda/mapping.json \
             --lcov covreport/cuda/cuda.info \
             --summary covreport/cuda/coverage-summary.json
           genhtml covreport/cuda/cuda.info \

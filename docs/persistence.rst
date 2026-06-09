@@ -2,7 +2,7 @@
 Persistent Homology
 =======================
 
-This guide covers the persistent homology pipeline in masspcf: going from point cloud data to persistence barcodes to stable rank functions, and using those functions for downstream analysis.
+This guide covers the persistent homology pipeline in stablebear: going from point cloud data to persistence barcodes to stable rank functions, and using those functions for downstream analysis.
 
 
 Background
@@ -12,19 +12,19 @@ Background
 
 The output is a **persistence barcode**: a collection of intervals :math:`[b_i, d_i)`, where each interval records the birth :math:`b_i` and death :math:`d_i` of a topological feature. Features that persist over a wide range of scales are considered significant, while short-lived features are often regarded as noise.
 
-masspcf provides three functional summaries of persistence barcodes, all of which are piecewise constant functions:
+stablebear provides three functional summaries of persistence barcodes, all of which are piecewise constant functions:
 
 - The (1d) **stable rank** counts, for each threshold :math:`t`, how many bars have length at least :math:`t` :footcite:`Chacholski2020,Gafvert2017,Scolamiero2017`.
 - The **Betti curve** counts, for each filtration value :math:`t`, how many bars are alive at :math:`t` (see, e.g., :footcite:`Umeda2017,Chazal2021`).
 - The **accumulated persistence function** (APF) sums, for each mean age :math:`m`, the lifetimes of all bars whose midpoint is at most :math:`m` :footcite:`Biscio2019`.
 
-Because these summaries are PCFs, they fit naturally into masspcf's tensor framework, enabling efficient computation of distances and means over collections of barcodes.
+Because these summaries are PCFs, they fit naturally into stablebear's tensor framework, enabling efficient computation of distances and means over collections of barcodes.
 
 
 The pipeline
 ============
 
-A typical TDA workflow in masspcf follows three steps:
+A typical TDA workflow in stablebear follows three steps:
 
 1. **Point clouds** -- Organize your data into a tensor of point clouds
 2. **Barcodes** -- Compute persistent homology to get persistence barcodes
@@ -46,11 +46,11 @@ Point clouds are stored in ``PointCloudTensor``. Each element of the tensor is a
 
 Create a tensor and assign point clouds as NumPy arrays::
 
-   import masspcf as mpcf
+   import stablebear as sb
    import numpy as np
 
    # A tensor that will hold 5 point clouds
-   pclouds = mpcf.zeros((5,), dtype=mpcf.pcloud64)
+   pclouds = sb.zeros((5,), dtype=sb.pcloud64)
 
    # Assign random point clouds (varying number of points, 3-dimensional)
    for i in range(5):
@@ -62,17 +62,17 @@ Point clouds in the same tensor can have different numbers of points and, in pri
 Higher-dimensional tensors work as well::
 
    # A 10 x 20 grid of point clouds
-   pclouds = mpcf.zeros((10, 20), dtype=mpcf.pcloud64)
+   pclouds = sb.zeros((10, 20), dtype=sb.pcloud64)
 
 
 Step 2: Computing persistent homology
 =======================================
 
-:py:func:`~masspcf.persistence.compute_persistent_homology` takes a tensor of point clouds and returns a tensor of persistence barcodes. Barcode computation is performed using Ripser :footcite:`Bauer2021` under the hood::
+:py:func:`~stablebear.persistence.compute_persistent_homology` takes a tensor of point clouds and returns a tensor of persistence barcodes. Barcode computation is performed using Ripser :footcite:`Bauer2021` under the hood::
 
-   from masspcf import persistence as mpers
+   from stablebear import persistence
 
-   bcs = mpers.compute_persistent_homology(pclouds, max_dim=1)
+   bcs = persistence.compute_persistent_homology(pclouds, max_dim=1)
 
 The ``max_dim`` parameter controls the highest homology dimension computed. With ``max_dim=1``, the function computes :math:`H_0` (connected components) and :math:`H_1` (loops).
 
@@ -86,7 +86,7 @@ To access the :math:`H_n` barcode for a specific point cloud, index with the poi
    bc_H0 = bcs[3, 0]   # H0 barcode of point cloud 3
    bc_H1 = bcs[3, 1]   # H1 barcode of point cloud 3
 
-Each element is a :py:class:`~masspcf.persistence.Barcode` object.
+Each element is a :py:class:`~stablebear.persistence.Barcode` object.
 
 Input flexibility
 -----------------
@@ -102,24 +102,24 @@ Input flexibility
 
    # From a NumPy array directly
    points = np.random.randn(50, 3)
-   bcs = mpers.compute_persistent_homology(points, max_dim=1)
+   bcs = persistence.compute_persistent_homology(points, max_dim=1)
 
 When the input is a distance matrix, the ``distance_type`` parameter is
 ignored because distances are already provided::
 
    from scipy.spatial.distance import pdist, squareform
-   import masspcf as mpcf
-   from masspcf import persistence as mpers
+   import stablebear as sb
+   from stablebear import persistence
 
    points = np.random.randn(50, 3)
    D = squareform(pdist(points))
 
-   dm = mpcf.DistanceMatrix(50, dtype=mpcf.float64)
+   dm = sb.DistanceMatrix(50, dtype=sb.float64)
    for i in range(50):
        for j in range(i):
            dm[i, j] = D[i, j]
 
-   bcs = mpers.compute_persistent_homology(dm, max_dim=1)
+   bcs = persistence.compute_persistent_homology(dm, max_dim=1)
 
 Options
 -------
@@ -137,17 +137,17 @@ Step 3: Functional summaries
 
 Persistence barcodes can be converted to piecewise constant functions for
 downstream analysis. Because the results are PCFs, they fit naturally into
-masspcf's tensor framework, enabling distances, means, and norms.
+stablebear's tensor framework, enabling distances, means, and norms.
 
 Stable ranks
 -------------
 
-:py:func:`~masspcf.persistence.barcode_to_stable_rank` converts barcodes into
+:py:func:`~stablebear.persistence.barcode_to_stable_rank` converts barcodes into
 stable rank PCFs. The stable rank counts, for each threshold :math:`t`, the
 number of bars with length (death minus birth) strictly greater than :math:`t`
 :footcite:`Chacholski2020`::
 
-   sranks = mpers.barcode_to_stable_rank(bcs)
+   sranks = persistence.barcode_to_stable_rank(bcs)
 
 The output tensor has the same shape as the input.
 
@@ -170,12 +170,12 @@ The output tensor has the same shape as the input.
 Betti curves
 -------------
 
-:py:func:`~masspcf.persistence.barcode_to_betti_curve` converts barcodes into
+:py:func:`~stablebear.persistence.barcode_to_betti_curve` converts barcodes into
 Betti curves. The Betti curve counts, for each filtration value :math:`t`, the
 number of bars alive at :math:`t` (i.e., bars with birth :math:`\leq t <`
 death)::
 
-   bettis = mpers.barcode_to_betti_curve(bcs)
+   bettis = persistence.barcode_to_betti_curve(bcs)
 
 The output tensor has the same shape as the input.
 
@@ -198,7 +198,7 @@ The output tensor has the same shape as the input.
 Accumulated persistence functions
 ----------------------------------
 
-:py:func:`~masspcf.persistence.barcode_to_accumulated_persistence` converts
+:py:func:`~stablebear.persistence.barcode_to_accumulated_persistence` converts
 barcodes into accumulated persistence functions (APFs) :footcite:`Biscio2019`. For each mean
 age :math:`m`, the APF sums the lifetimes of all bars whose midpoint is at
 most :math:`m`:
@@ -213,9 +213,9 @@ lifetime, :math:`m_i = (b_i + d_i)/2` is the midpoint of bar :math:`i`, and
 
 ::
 
-   from masspcf import persistence as mpers
+   from stablebear import persistence
 
-   apfs = mpers.barcode_to_accumulated_persistence(bcs)
+   apfs = persistence.barcode_to_accumulated_persistence(bcs)
 
 .. image:: _static/gallery_apf_light.png
    :width: 100%
@@ -238,7 +238,7 @@ a given threshold. This corresponds to Equation (2) in :footcite:`Biscio2019`, w
 filtration cutoff :math:`T` limits the computation to bars with
 :math:`d_i \leq T`::
 
-   apfs = mpers.barcode_to_accumulated_persistence(bcs, max_death=25.0)
+   apfs = persistence.barcode_to_accumulated_persistence(bcs, max_death=25.0)
 
 .. image:: _static/gallery_apf_max_death_light.png
    :width: 100%
@@ -260,10 +260,10 @@ Using functional summaries
 ---------------------------
 
 Since stable ranks and Betti curves are PCFs, they are stored in PCF tensors
-and support all of masspcf's standard operations::
+and support all of stablebear's standard operations::
 
-   import masspcf as mpcf
-   from masspcf.plotting import plot as plotpcf
+   import stablebear as sb
+   from stablebear.plotting import plot as plotpcf
    import matplotlib.pyplot as plt
 
    # Plot the H1 stable ranks
@@ -272,10 +272,10 @@ and support all of masspcf's standard operations::
    plt.show()
 
    # Compute distances between H1 stable ranks
-   D = mpcf.pdist(sranks[:, 1], verbose=False)
+   D = sb.pdist(sranks[:, 1], verbose=False)
 
    # Compute the mean H1 stable rank
-   avg = mpcf.mean(sranks[:, 1], dim=0)
+   avg = sb.mean(sranks[:, 1], dim=0)
 
 
 Complete example
@@ -283,9 +283,9 @@ Complete example
 
 The following example creates a multidimensional tensor of random point clouds, computes persistent homology, converts to stable ranks, and visualizes the result::
 
-   import masspcf as mpcf
-   from masspcf import persistence as mpers
-   from masspcf.plotting import plot as plotpcf
+   import stablebear as sb
+   from stablebear import persistence
+   from stablebear.plotting import plot as plotpcf
    import numpy as np
    import matplotlib.pyplot as plt
 
@@ -293,18 +293,18 @@ The following example creates a multidimensional tensor of random point clouds, 
    pcloud_dim = 4
 
    # Create and fill point cloud tensor
-   pclouds = mpcf.zeros(shape, dtype=mpcf.pcloud64)
+   pclouds = sb.zeros(shape, dtype=sb.pcloud64)
    for i in range(shape[0]):
        for j in range(shape[1]):
            n_points = np.random.randint(20, 100)
            pclouds[i, j] = np.random.randn(n_points, pcloud_dim)
 
    # Compute persistent homology (H0 and H1)
-   bcs = mpers.compute_persistent_homology(pclouds, max_dim=1)
+   bcs = persistence.compute_persistent_homology(pclouds, max_dim=1)
    print(bcs.shape)   # (10, 20, 2)
 
    # Convert to stable ranks
-   sranks = mpers.barcode_to_stable_rank(bcs)
+   sranks = persistence.barcode_to_stable_rank(bcs)
    print(sranks.shape) # (10, 20, 2)
 
    # Plot H1 stable ranks for the first row of point clouds
@@ -313,15 +313,15 @@ The following example creates a multidimensional tensor of random point clouds, 
    plt.show()
 
    # Distance matrix between H1 stable ranks in the first row
-   D = mpcf.pdist(sranks[0, :, 1], verbose=False)
+   D = sb.pdist(sranks[0, :, 1], verbose=False)
 
 
 The Barcode class
 =================
 
-Individual barcodes are represented by :py:class:`~masspcf.persistence.Barcode`. A barcode can be constructed from an :math:`n \times 2` NumPy array of ``(birth, death)`` pairs::
+Individual barcodes are represented by :py:class:`~stablebear.persistence.Barcode`. A barcode can be constructed from an :math:`n \times 2` NumPy array of ``(birth, death)`` pairs::
 
-   from masspcf.persistence import Barcode
+   from stablebear.persistence import Barcode
 
    bc = Barcode(np.array([[0.0, 1.5],
                            [0.2, 3.0],
@@ -329,7 +329,7 @@ Individual barcodes are represented by :py:class:`~masspcf.persistence.Barcode`.
 
 You can also convert a single barcode to a stable rank::
 
-   from masspcf.persistence import barcode_to_stable_rank
+   from stablebear.persistence import barcode_to_stable_rank
 
    sr = barcode_to_stable_rank(bc)
    # sr is a Pcf

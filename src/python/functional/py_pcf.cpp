@@ -20,12 +20,12 @@
 #include <pybind11/numpy.h>
 #include <pybind11/stl.h>
 
-#include <mpcf/functional/pcf.hpp>
+#include <sbear/functional/pcf.hpp>
 #include "../pypcf_support.hpp"
-#include <mpcf/algorithm.hpp>
-#include <mpcf/algorithms/functional/iterate_rectangles.hpp>
-#include <mpcf/executor.hpp>
-#include <mpcf/task.hpp>
+#include <sbear/algorithm.hpp>
+#include <sbear/algorithms/functional/iterate_rectangles.hpp>
+#include <sbear/executor.hpp>
+#include <sbear/task.hpp>
 
 #include "../py_np_support.hpp"
 
@@ -57,59 +57,59 @@ namespace
   class Backend
   {
   public:
-    static mpcf::Pcf<Tt, Tv> add(const mpcf::Pcf<Tt, Tv>& f, const mpcf::Pcf<Tt, Tv>& g)
+    static sb::Pcf<Tt, Tv> add(const sb::Pcf<Tt, Tv>& f, const sb::Pcf<Tt, Tv>& g)
     {
       return f + g;
     }
 
-    static mpcf::Pcf<Tt, Tv> combine(const mpcf::Pcf<Tt, Tv>& f, const mpcf::Pcf<Tt, Tv>& g, unsigned long long cb)
+    static sb::Pcf<Tt, Tv> combine(const sb::Pcf<Tt, Tv>& f, const sb::Pcf<Tt, Tv>& g, unsigned long long cb)
     {
       ReductionWrapper<Tt, Tv> reduction(cb);
-      return mpcf::combine(f, g,
-        [&reduction](const mpcf::Rectangle<Tt, Tv>& rect) -> Tt {
+      return sb::combine(f, g,
+        [&reduction](const sb::Rectangle<Tt, Tv>& rect) -> Tt {
           return reduction(rect.left, rect.right, rect.f_value, rect.g_value);
         });
     }
 
-    static mpcf::Pcf<Tt, Tv> average(const std::vector<mpcf::Pcf<Tt, Tv>>& fs)
+    static sb::Pcf<Tt, Tv> average(const std::vector<sb::Pcf<Tt, Tv>>& fs)
     {
-      return mpcf::average(fs);
+      return sb::average(fs);
     }
 
-    static mpcf::Pcf<Tt, Tv> parallel_reduce(const std::vector<mpcf::Pcf<Tt, Tv>>& fs, unsigned long long cb){ \
+    static sb::Pcf<Tt, Tv> parallel_reduce(const std::vector<sb::Pcf<Tt, Tv>>& fs, unsigned long long cb){ \
       ReductionWrapper<Tt, Tv> reduction(cb);
-      return mpcf::parallel_reduce(fs.begin(), fs.end(),
-        [&reduction](const mpcf::Rectangle<Tt, Tv>& rect) -> Tt
+      return sb::parallel_reduce(fs.begin(), fs.end(),
+        [&reduction](const sb::Rectangle<Tt, Tv>& rect) -> Tt
         {
           return reduction(rect.left, rect.right, rect.f_value, rect.g_value);
         });
     }
 
-    static Tv single_l1_norm(const mpcf::Pcf<Tt, Tv>& f)
+    static Tv single_l1_norm(const sb::Pcf<Tt, Tv>& f)
     {
-      return mpcf::l1_norm(f);
+      return sb::l1_norm(f);
     }
 
-    static Tv single_l2_norm(const mpcf::Pcf<Tt, Tv>& f)
+    static Tv single_l2_norm(const sb::Pcf<Tt, Tv>& f)
     {
-      return mpcf::l2_norm(f);
+      return sb::l2_norm(f);
     }
 
-    static Tv single_lp_norm(const mpcf::Pcf<Tt, Tv>& f, /* let's stick with float64_t here to make life a bit easier */ mpcf::float64_t p)
+    static Tv single_lp_norm(const sb::Pcf<Tt, Tv>& f, /* let's stick with float64_t here to make life a bit easier */ sb::float64_t p)
     {
-      return mpcf::lp_norm(f, Tv(p));
+      return sb::lp_norm(f, Tv(p));
     }
 
-    static Tv single_linfinity_norm(const mpcf::Pcf<Tt, Tv>& f)
+    static Tv single_linfinity_norm(const sb::Pcf<Tt, Tv>& f)
     {
-      return mpcf::linfinity_norm(f);
+      return sb::linfinity_norm(f);
     }
 
-    static std::vector<mpcf::Rectangle<Tt, Tv>> iterate_rectangles(const mpcf::Pcf<Tt, Tv>& f, const mpcf::Pcf<Tt, Tv>& g, Tt a, Tt b)
+    static std::vector<sb::Rectangle<Tt, Tv>> iterate_rectangles(const sb::Pcf<Tt, Tv>& f, const sb::Pcf<Tt, Tv>& g, Tt a, Tt b)
     {
-      std::vector<mpcf::Rectangle<Tt, Tv>> result;
-      mpcf::iterate_rectangles(f.points(), g.points(),
-        [&result](const mpcf::Rectangle<Tt, Tv>& rect) {
+      std::vector<sb::Rectangle<Tt, Tv>> result;
+      sb::iterate_rectangles(f.points(), g.points(),
+        [&result](const sb::Rectangle<Tt, Tv>& rect) {
           result.push_back(rect);
         }, a, b);
       return result;
@@ -123,16 +123,16 @@ namespace
   public:
     static void register_bindings(py::module_& m, const std::string& suffix)
     {
-      using TPcf = mpcf::Pcf<Tt, Tv>;
+      using TPcf = sb::Pcf<Tt, Tv>;
       using point_type = typename TPcf::point_type;
 
-      py::class_<mpcf::Pcf<Tt, Tv>>(m, ("Pcf" + suffix).c_str(), py::buffer_protocol())
+      py::class_<sb::Pcf<Tt, Tv>>(m, ("Pcf" + suffix).c_str(), py::buffer_protocol())
         .def(py::init<>())
-        .def(py::init<>([](py::array_t<Tt> arr){ return mpcf::detail::construct_pcf<Tt, Tv>(arr); }))
+        .def(py::init<>([](py::array_t<Tt> arr){ return sb::detail::construct_pcf<Tt, Tv>(arr); }))
         .def("get_time_type", [](TPcf& /* self */) -> std::string { return STRINGIFY(Tt); })
         .def("get_value_type", [](TPcf& /* self */) -> std::string { return STRINGIFY(Tv); })
         .def("debug_print", &TPcf::debug_print) \
-        .def_buffer([](TPcf& self) { return mpcf::detail::to_numpy<mpcf::Pcf<Tt, Tv>>(self); })
+        .def_buffer([](TPcf& self) { return sb::detail::to_numpy<sb::Pcf<Tt, Tv>>(self); })
         .def("size", [](const TPcf& self){ return self.points().size(); })
         .def("copy", [](const TPcf& self){ return TPcf(self); })
         .def("__add__", [](const TPcf& self, const TPcf& rhs) -> TPcf { return self + rhs; })
@@ -149,7 +149,7 @@ namespace
         .def("__rtruediv__", [](const TPcf& self, Tv c) -> TPcf { return c / self; })
         .def("__neg__", [](const TPcf& self) -> TPcf { return -self; })
         .def("__pow__", [](const TPcf& self, Tv c) -> TPcf {
-          auto result = mpcf::pow(self, c);
+          auto result = sb::pow(self, c);
           for (const auto& pt : result.points())
           {
             if (std::isnan(pt.v) || std::isinf(pt.v))
@@ -201,7 +201,7 @@ namespace
 
         ;
 
-      using RectT = mpcf::Rectangle<Tt, Tv>;
+      using RectT = sb::Rectangle<Tt, Tv>;
       py::class_<RectT>(m, ("Rectangle" + suffix).c_str())
         .def(py::init<>())
         .def(py::init<Tt, Tt, Tv, Tv>(), py::arg("left"), py::arg("right"), py::arg("f_value"), py::arg("g_value"))
@@ -237,16 +237,16 @@ namespace
           py::arg("b") = point_type::infinite_time())
         ;
 
-      mpcf_py::register_bindings_future<TPcf>(m, suffix);
+      sb_py::register_bindings_future<TPcf>(m, suffix);
     }
   };
 
 }
 
-void mpcf_py::register_pcf(pybind11::module_& m)
+void sb_py::register_pcf(pybind11::module_& m)
 {
-  PyBindings<mpcf::float32_t, mpcf::float32_t>::register_bindings(m, "_f32_f32");
-  PyBindings<mpcf::float64_t, mpcf::float64_t>::register_bindings(m, "_f64_f64");
-  PyBindings<mpcf::int32_t, mpcf::int32_t>::register_bindings(m, "_i32_i32");
-  PyBindings<mpcf::int64_t, mpcf::int64_t>::register_bindings(m, "_i64_i64");
+  PyBindings<sb::float32_t, sb::float32_t>::register_bindings(m, "_f32_f32");
+  PyBindings<sb::float64_t, sb::float64_t>::register_bindings(m, "_f64_f64");
+  PyBindings<sb::int32_t, sb::int32_t>::register_bindings(m, "_i32_i32");
+  PyBindings<sb::int64_t, sb::int64_t>::register_bindings(m, "_i64_i64");
 }

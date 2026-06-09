@@ -1,8 +1,8 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-import masspcf as mpcf
-from masspcf.plotting import plot as plotpcf
+import stablebear as sb
+from stablebear.plotting import plot as plotpcf
 
 content = [
     [0, 2.5],
@@ -24,6 +24,6 @@ enumeration = np.array(enumeration)
 print(content.shape)
 print(enumeration.shape)
 
-F = mpcf.from_serial_content(content, enumeration)
+F = sb.from_serial_content(content, enumeration)
 plotpcf(F)
 plt.show()

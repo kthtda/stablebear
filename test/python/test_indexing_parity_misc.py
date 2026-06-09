@@ -22,8 +22,8 @@ scalar-result-python-float, crosstype-uniform-shared-path.
 import numpy as np
 import pytest
 
-import masspcf as mpcf
-from masspcf.tensor import BoolTensor, FloatTensor, IntTensor
+import stablebear as sb
+from stablebear.tensor import BoolTensor, FloatTensor, IntTensor
 from _indexing_support import assert_getitem_matches, assert_setitem_matches, ref_array
 
 
@@ -124,21 +124,21 @@ class TestMatrixWrapperNegativeIndexing:
     negative indices are not resolved (they currently raise TypeError).
     """
 
-    @pytest.mark.parametrize("Ctor", [mpcf.DistanceMatrix, mpcf.SymmetricMatrix],
+    @pytest.mark.parametrize("Ctor", [sb.DistanceMatrix, sb.SymmetricMatrix],
                              ids=["distance", "symmetric"])
     def test_negative_row_resolves(self, Ctor):
         m = Ctor(4)
         m[3, 0] = 5.0
         assert m[-1, 0] == 5.0
 
-    @pytest.mark.parametrize("Ctor", [mpcf.DistanceMatrix, mpcf.SymmetricMatrix],
+    @pytest.mark.parametrize("Ctor", [sb.DistanceMatrix, sb.SymmetricMatrix],
                              ids=["distance", "symmetric"])
     def test_negative_col_resolves(self, Ctor):
         m = Ctor(4)
         m[3, 0] = 5.0
         assert m[0, -1] == 5.0
 
-    @pytest.mark.parametrize("Ctor", [mpcf.DistanceMatrix, mpcf.SymmetricMatrix],
+    @pytest.mark.parametrize("Ctor", [sb.DistanceMatrix, sb.SymmetricMatrix],
                              ids=["distance", "symmetric"])
     def test_out_of_bounds_raises_indexerror(self, Ctor):
         m = Ctor(4)

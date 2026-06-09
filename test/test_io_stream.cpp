@@ -14,21 +14,21 @@
 
 #include <gtest/gtest.h>
 
-#include <../include/mpcf/io/io_stream.hpp>
-#include <mpcf/io.hpp>
-#include <mpcf/tensor.hpp>
-#include <mpcf/walk.hpp>
+#include <../include/sbear/io/io_stream.hpp>
+#include <sbear/io.hpp>
+#include <sbear/tensor.hpp>
+#include <sbear/walk.hpp>
 
 #include <sstream>
 #include <iostream>
 
-namespace mpcf
+namespace sb
 {
   template<typename T>
-  void PrintTo(const mpcf::Tensor<T>& tensor, std::ostream* os)
+  void PrintTo(const sb::Tensor<T>& tensor, std::ostream* os)
   {
     *os << "Tensor[\n";
-    mpcf::walk(tensor, [&tensor, os](const std::vector<size_t>& index)
+    sb::walk(tensor, [&tensor, os](const std::vector<size_t>& index)
     {
 
       *os << "  " << index_to_string(index) << ": ";
@@ -81,9 +81,9 @@ TEST(IoStream, GoAroundHasCorrectDataTypes)
 {
   std::stringstream ss("", std::ios::out | std::ios::binary);
 
-  mpcf::Tensor<mpcf::float64_t> dblTensor;
+  sb::Tensor<sb::float64_t> dblTensor;
 
-  mpcf::write(dblTensor, ss);
+  sb::write(dblTensor, ss);
 
   //ASSERT_TRUE(false) << to_printable(ss.str());
 
@@ -92,7 +92,7 @@ TEST(IoStream, GoAroundHasCorrectDataTypes)
   //std::string data = ss.str();
   //std::istringstream iss(data, std::ios::in | std::ios::binary);
 
-  //mpcf::IStream is(iss);
+  //sb::IStream is(iss);
 
 
 
@@ -104,55 +104,55 @@ class IoStreamTest : public ::testing::Test {};
 
 namespace
 {
-  using FloatTypes = ::testing::Types<mpcf::float32_t, mpcf::float64_t>;
+  using FloatTypes = ::testing::Types<sb::float32_t, sb::float64_t>;
   TYPED_TEST_SUITE(IoStreamTest, FloatTypes);
 
   TYPED_TEST(IoStreamTest, TestPointRoundtrip)
   {
-    using PointT = mpcf::TimePoint<TypeParam, TypeParam>;
+    using PointT = sb::TimePoint<TypeParam, TypeParam>;
     PointT pt(0.5, 2.5);
 
     std::stringstream ss;
-    mpcf::io::detail::write_element(ss, pt);
+    sb::io::detail::write_element(ss, pt);
 
     std::istringstream iss(ss.str());
-    auto retPt = mpcf::io::detail::read_element<PointT>(iss);
+    auto retPt = sb::io::detail::read_element<PointT>(iss);
 
     EXPECT_EQ(pt, retPt);
   }
 
   TYPED_TEST(IoStreamTest, TestPcfRoundtrip)
   {
-    using PcfT = mpcf::Pcf<TypeParam, TypeParam>;
+    using PcfT = sb::Pcf<TypeParam, TypeParam>;
 
     std::vector<typename PcfT::point_type> pts({ { 0., 10. }, { 1., 20. }, { 2., 30. } });
     PcfT pcf(std::move(pts));
 
     std::stringstream ss;
-    mpcf::io::detail::write_element(ss, pcf);
+    sb::io::detail::write_element(ss, pcf);
 
     std::istringstream iss(ss.str());
-    auto retPcf = mpcf::io::detail::read_element<PcfT>(iss);
+    auto retPcf = sb::io::detail::read_element<PcfT>(iss);
 
     EXPECT_EQ(pcf, retPcf);
   }
 
   TYPED_TEST(IoStreamTest, TestFloatTensorRoundtrip)
   {
-    using TensorT = mpcf::Tensor<TypeParam>;
+    using TensorT = sb::Tensor<TypeParam>;
 
     TensorT tensor({ 2, 3, 4 });
 
-    mpcf::walk(tensor, [&tensor](const std::vector<size_t>& idx) {
+    sb::walk(tensor, [&tensor](const std::vector<size_t>& idx) {
       tensor(idx) = 100 * idx[0] + 10 * idx[1] + idx[2];
     });
 
     std::stringstream ss;
-    mpcf::io::detail::write_tensor(ss, tensor);
+    sb::io::detail::write_tensor(ss, tensor);
 
     std::istringstream iss(ss.str());
-    ASSERT_EQ(mpcf::io::detail::read_tensor_format(iss), mpcf::io::detail::tensorFormat<TypeParam>());
-    TensorT retTensor = mpcf::io::detail::read_tensor<TypeParam>(iss);
+    ASSERT_EQ(sb::io::detail::read_tensor_format(iss), sb::io::detail::tensorFormat<TypeParam>());
+    TensorT retTensor = sb::io::detail::read_tensor<TypeParam>(iss);
 
     EXPECT_EQ(tensor, retTensor);
   }
@@ -161,10 +161,10 @@ namespace
   {
     TypeParam value = static_cast<TypeParam>(3.14);
     std::stringstream ss;
-    mpcf::io::detail::write_bytes(ss, value);
+    sb::io::detail::write_bytes(ss, value);
 
     std::istringstream iss(ss.str());
-    auto result = mpcf::io::detail::read_bytes<TypeParam>(iss);
+    auto result = sb::io::detail::read_bytes<TypeParam>(iss);
 
     EXPECT_EQ(value, result);
   }
@@ -173,10 +173,10 @@ namespace
   {
     TypeParam value = static_cast<TypeParam>(0);
     std::stringstream ss;
-    mpcf::io::detail::write_bytes(ss, value);
+    sb::io::detail::write_bytes(ss, value);
 
     std::istringstream iss(ss.str());
-    auto result = mpcf::io::detail::read_bytes<TypeParam>(iss);
+    auto result = sb::io::detail::read_bytes<TypeParam>(iss);
 
     EXPECT_EQ(value, result);
   }
@@ -185,10 +185,10 @@ namespace
   {
     TypeParam value = static_cast<TypeParam>(-42.5);
     std::stringstream ss;
-    mpcf::io::detail::write_bytes(ss, value);
+    sb::io::detail::write_bytes(ss, value);
 
     std::istringstream iss(ss.str());
-    auto result = mpcf::io::detail::read_bytes<TypeParam>(iss);
+    auto result = sb::io::detail::read_bytes<TypeParam>(iss);
 
     EXPECT_EQ(value, result);
   }
@@ -201,7 +201,7 @@ namespace
   {
     // Write only 1 byte but try to read sizeof(TypeParam) bytes
     std::istringstream iss("x");
-    EXPECT_THROW(mpcf::io::detail::read_bytes<TypeParam>(iss), std::runtime_error);
+    EXPECT_THROW(sb::io::detail::read_bytes<TypeParam>(iss), std::runtime_error);
   }
 
   // ============================================================================
@@ -210,8 +210,8 @@ namespace
 
   TYPED_TEST(IoStreamTest, PcfTensorRoundtrip)
   {
-    using PcfT = mpcf::Pcf<TypeParam, TypeParam>;
-    using TensorT = mpcf::Tensor<PcfT>;
+    using PcfT = sb::Pcf<TypeParam, TypeParam>;
+    using TensorT = sb::Tensor<PcfT>;
 
     TensorT tensor({ 2 });
 
@@ -225,53 +225,53 @@ namespace
     tensor(1) = PcfT(std::move(pts1));
 
     std::stringstream ss;
-    mpcf::io::detail::write_tensor(ss, tensor);
+    sb::io::detail::write_tensor(ss, tensor);
 
     std::istringstream iss(ss.str());
-    ASSERT_EQ(mpcf::io::detail::read_tensor_format(iss), mpcf::io::detail::tensorFormat<typename decltype(tensor)::value_type>());
-    auto retTensor = mpcf::io::detail::read_tensor<PcfT>(iss);
+    ASSERT_EQ(sb::io::detail::read_tensor_format(iss), sb::io::detail::tensorFormat<typename decltype(tensor)::value_type>());
+    auto retTensor = sb::io::detail::read_tensor<PcfT>(iss);
 
     EXPECT_EQ(tensor, retTensor);
   }
 
   TYPED_TEST(IoStreamTest, PcfTensorRoundtrip2d)
   {
-    using PcfT = mpcf::Pcf<TypeParam, TypeParam>;
-    using TensorT = mpcf::Tensor<PcfT>;
+    using PcfT = sb::Pcf<TypeParam, TypeParam>;
+    using TensorT = sb::Tensor<PcfT>;
 
     TensorT tensor({ 2, 3 });
 
-    mpcf::walk(tensor, [&tensor](const std::vector<size_t>& idx) {
+    sb::walk(tensor, [&tensor](const std::vector<size_t>& idx) {
       std::vector<typename PcfT::point_type> pts;
       pts.emplace_back(TypeParam(0), static_cast<TypeParam>(idx[0] * 10 + idx[1]));
       tensor(idx) = PcfT(std::move(pts));
     });
 
     std::stringstream ss;
-    mpcf::io::detail::write_tensor(ss, tensor);
+    sb::io::detail::write_tensor(ss, tensor);
 
     std::istringstream iss(ss.str());
-    ASSERT_EQ(mpcf::io::detail::read_tensor_format(iss), mpcf::io::detail::tensorFormat<typename decltype(tensor)::value_type>());
-    auto retTensor = mpcf::io::detail::read_tensor<PcfT>(iss);
+    ASSERT_EQ(sb::io::detail::read_tensor_format(iss), sb::io::detail::tensorFormat<typename decltype(tensor)::value_type>());
+    auto retTensor = sb::io::detail::read_tensor<PcfT>(iss);
 
     EXPECT_EQ(tensor, retTensor);
   }
 
   // ============================================================================
-  // Full mpcf::write roundtrip (with header)
+  // Full sb::write roundtrip (with header)
   // ============================================================================
 
   TYPED_TEST(IoStreamTest, WriteReadFloatTensorWithHeader)
   {
-    using TensorT = mpcf::Tensor<TypeParam>;
+    using TensorT = sb::Tensor<TypeParam>;
 
     TensorT tensor({ 3, 4 });
-    mpcf::walk(tensor, [&tensor](const std::vector<size_t>& idx) {
+    sb::walk(tensor, [&tensor](const std::vector<size_t>& idx) {
       tensor(idx) = static_cast<TypeParam>(idx[0] * 10 + idx[1]);
     });
 
     std::stringstream ss;
-    mpcf::write(tensor, ss);
+    sb::write(tensor, ss);
 
     // We can at least verify the stream is non-empty and starts with the magic bytes
     auto data = ss.str();
@@ -288,15 +288,15 @@ namespace
 
   TYPED_TEST(IoStreamTest, EmptyPcfRoundtrip)
   {
-    using PcfT = mpcf::Pcf<TypeParam, TypeParam>;
+    using PcfT = sb::Pcf<TypeParam, TypeParam>;
 
     PcfT pcf;  // default: single point at (0,0)
 
     std::stringstream ss;
-    mpcf::io::detail::write_element(ss, pcf);
+    sb::io::detail::write_element(ss, pcf);
 
     std::istringstream iss(ss.str());
-    auto retPcf = mpcf::io::detail::read_element<PcfT>(iss);
+    auto retPcf = sb::io::detail::read_element<PcfT>(iss);
 
     EXPECT_EQ(pcf, retPcf);
   }
@@ -307,15 +307,15 @@ namespace
 
   TYPED_TEST(IoStreamTest, SinglePointPcfRoundtrip)
   {
-    using PcfT = mpcf::Pcf<TypeParam, TypeParam>;
+    using PcfT = sb::Pcf<TypeParam, TypeParam>;
 
     PcfT pcf(TypeParam(7));
 
     std::stringstream ss;
-    mpcf::io::detail::write_element(ss, pcf);
+    sb::io::detail::write_element(ss, pcf);
 
     std::istringstream iss(ss.str());
-    auto retPcf = mpcf::io::detail::read_element<PcfT>(iss);
+    auto retPcf = sb::io::detail::read_element<PcfT>(iss);
 
     EXPECT_EQ(pcf, retPcf);
   }
@@ -326,24 +326,24 @@ namespace
 
   TYPED_TEST(IoStreamTest, NonContiguousTensorRoundtrip)
   {
-    using TensorT = mpcf::Tensor<TypeParam>;
+    using TensorT = sb::Tensor<TypeParam>;
 
     // Create a 4x4 tensor and take a slice to get a non-contiguous view
     TensorT tensor({ 4, 4 });
-    mpcf::walk(tensor, [&tensor](const std::vector<size_t>& idx) {
+    sb::walk(tensor, [&tensor](const std::vector<size_t>& idx) {
       tensor(idx) = static_cast<TypeParam>(idx[0] * 10 + idx[1]);
     });
 
     // Slice rows 1..2 to get a non-contiguous view
-    auto sliced = tensor[std::vector<mpcf::Slice>{ mpcf::range(1, 3, std::nullopt), mpcf::all() }];
+    auto sliced = tensor[std::vector<sb::Slice>{ sb::range(1, 3, std::nullopt), sb::all() }];
     EXPECT_FALSE(sliced.is_contiguous());
 
     std::stringstream ss;
-    mpcf::io::detail::write_tensor(ss, sliced);
+    sb::io::detail::write_tensor(ss, sliced);
 
     std::istringstream iss(ss.str());
-    ASSERT_EQ(mpcf::io::detail::read_tensor_format(iss), mpcf::io::detail::tensorFormat<typename decltype(tensor)::value_type>());
-    auto retTensor = mpcf::io::detail::read_tensor<TypeParam>(iss);
+    ASSERT_EQ(sb::io::detail::read_tensor_format(iss), sb::io::detail::tensorFormat<typename decltype(tensor)::value_type>());
+    auto retTensor = sb::io::detail::read_tensor<TypeParam>(iss);
 
     // The returned tensor should be contiguous and contain the sliced values
     EXPECT_TRUE(retTensor.is_contiguous());
@@ -364,13 +364,13 @@ namespace
   {
     std::stringstream ss;
     ss.setstate(std::ios::badbit);
-    EXPECT_THROW(mpcf::io::detail::assert_not_bad(ss), std::runtime_error);
+    EXPECT_THROW(sb::io::detail::assert_not_bad(ss), std::runtime_error);
   }
   
   TEST(IoStreamBase, AssertNotBadDoesNotThrowOnGoodStream)
   {
     std::stringstream ss;
-    EXPECT_NO_THROW(mpcf::io::detail::assert_not_bad(ss));
+    EXPECT_NO_THROW(sb::io::detail::assert_not_bad(ss));
   }
   
   // ============================================================================
@@ -380,11 +380,11 @@ namespace
   TEST(IoStreamBase, WriteStringRoundtrip)
   {
     std::stringstream ss;
-    mpcf::io::detail::write_string(ss, "hello");
+    sb::io::detail::write_string(ss, "hello");
   
     // Read back: first 8 bytes are uint64 length, then the string chars
     std::istringstream iss(ss.str());
-    auto len = mpcf::io::detail::read_bytes<uint64_t>(iss);
+    auto len = sb::io::detail::read_bytes<uint64_t>(iss);
     ASSERT_EQ(len, 5u);
   
     std::string result(len, '\0');
@@ -395,10 +395,10 @@ namespace
   TEST(IoStreamBase, WriteStringEmptyRoundtrip)
   {
     std::stringstream ss;
-    mpcf::io::detail::write_string(ss, "");
+    sb::io::detail::write_string(ss, "");
   
     std::istringstream iss(ss.str());
-    auto len = mpcf::io::detail::read_bytes<uint64_t>(iss);
+    auto len = sb::io::detail::read_bytes<uint64_t>(iss);
     EXPECT_EQ(len, 0u);
   }
   
@@ -410,10 +410,10 @@ namespace
   {
     std::vector<int> v = {1, 2, 3, 4, 5};
     std::stringstream ss;
-    mpcf::io::detail::write_length(ss, v.begin(), v.end());
+    sb::io::detail::write_length(ss, v.begin(), v.end());
   
     std::istringstream iss(ss.str());
-    auto len = mpcf::io::detail::read_bytes<mpcf::uint64_t>(iss);
+    auto len = sb::io::detail::read_bytes<sb::uint64_t>(iss);
     EXPECT_EQ(len, 5u);
   }
   
@@ -421,10 +421,10 @@ namespace
   {
     std::vector<int> v;
     std::stringstream ss;
-    mpcf::io::detail::write_length(ss, v.begin(), v.end());
+    sb::io::detail::write_length(ss, v.begin(), v.end());
   
     std::istringstream iss(ss.str());
-    auto len = mpcf::io::detail::read_bytes<mpcf::uint64_t>(iss);
+    auto len = sb::io::detail::read_bytes<sb::uint64_t>(iss);
     EXPECT_EQ(len, 0u);
   }
   
@@ -434,18 +434,18 @@ namespace
   
   TYPED_TEST(IoStreamTest, PcfTensorWithDefaultPcfs)
   {
-    using PcfT = mpcf::Pcf<TypeParam, TypeParam>;
-    using TensorT = mpcf::Tensor<PcfT>;
+    using PcfT = sb::Pcf<TypeParam, TypeParam>;
+    using TensorT = sb::Tensor<PcfT>;
   
     TensorT tensor({ 3 });
     // All elements are default-constructed Pcfs
   
     std::stringstream ss;
-    mpcf::io::detail::write_tensor(ss, tensor);
+    sb::io::detail::write_tensor(ss, tensor);
   
     std::istringstream iss(ss.str());
-    ASSERT_EQ(mpcf::io::detail::read_tensor_format(iss), mpcf::io::detail::tensorFormat<typename decltype(tensor)::value_type>());
-    auto retTensor = mpcf::io::detail::read_tensor<PcfT>(iss);
+    ASSERT_EQ(sb::io::detail::read_tensor_format(iss), sb::io::detail::tensorFormat<typename decltype(tensor)::value_type>());
+    auto retTensor = sb::io::detail::read_tensor<PcfT>(iss);
   
     EXPECT_EQ(tensor, retTensor);
   }

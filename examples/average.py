@@ -1,5 +1,5 @@
 import numpy as np
-from mpcf.pcf import Pcf, average, force_cpu, matrix_l1_dist
+from stablebear.pcf import Pcf, average, force_cpu, matrix_l1_dist
 
 m = 10000  # Number of PCFs
 n = 100  # Number of time points in each PCF

@@ -16,8 +16,8 @@ import timeit
 
 import numpy as np
 
-import masspcf as mpcf
-from masspcf.random import noisy_sin
+import stablebear as sb
+from stablebear.random import noisy_sin
 
 
 def bench_eval(X, t, n_repeat=5):
@@ -32,18 +32,18 @@ def run_benchmark(sizes, n_points_list, n_times, n_repeat):
     for n_points in n_points_list:
         print(f"--- {n_points} breakpoints per PCF ---")
         for n in sizes:
-            X = noisy_sin((n,), n_points=n_points, dtype=mpcf.pcf64)
+            X = noisy_sin((n,), n_points=n_points, dtype=sb.pcf64)
             t_scalar = np.float64(0.5)
             t_array = np.linspace(0, 1, n_times, dtype=np.float64)
 
             for label, t in [("scalar", t_scalar),
                               (f"array({n_times})", t_array)]:
                 # Sequential (threshold set very high)
-                mpcf.system.set_parallel_eval_threshold(10**9)
+                sb.system.set_parallel_eval_threshold(10**9)
                 t_seq = bench_eval(X, t, n_repeat)
 
                 # Parallel (threshold set to 1)
-                mpcf.system.set_parallel_eval_threshold(1)
+                sb.system.set_parallel_eval_threshold(1)
                 t_par = bench_eval(X, t, n_repeat)
 
                 speedup = t_seq / t_par if t_par > 0 else float("inf")
@@ -64,7 +64,7 @@ def run_benchmark(sizes, n_points_list, n_times, n_repeat):
         print()
 
     # Restore default
-    mpcf.system.set_parallel_eval_threshold(500)
+    sb.system.set_parallel_eval_threshold(500)
     return results
 
 
@@ -125,7 +125,7 @@ if __name__ == "__main__":
         help="Plot results with matplotlib")
     args = parser.parse_args()
 
-    mpcf.system.limit_cpus(args.n_cpus)
+    sb.system.limit_cpus(args.n_cpus)
 
     print(f"CPUs: {args.n_cpus}, breakpoints: {args.n_points}, "
           f"query times: {args.n_times}, repeats: {args.n_repeat}")

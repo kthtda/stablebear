@@ -1,0 +1,87 @@
+/*
+* Copyright 2024-2026 Bjorn Wehlin
+*
+* Licensed under the Apache License, Version 2.0 (the "License");
+* you may not use this file except in compliance with the License.
+* You may obtain a copy of the License at
+*
+*    http://www.apache.org/licenses/LICENSE-2.0
+*
+* Unless required by applicable law or agreed to in writing, software
+* distributed under the License is distributed on an "AS IS" BASIS,
+* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+* See the License for the specific language governing permissions and
+* limitations under the License.
+*/
+
+#ifndef SB_POINT_PROCESS_POISSON_H
+#define SB_POINT_PROCESS_POISSON_H
+
+#include "../tensor.hpp"
+#include "../walk.hpp"
+
+#include <random>
+#include <stdexcept>
+#include <vector>
+
+namespace sb::pp
+{
+
+  /// Generate a tensor of point clouds from a homogeneous spatial Poisson process.
+  ///
+  /// Each element of @p out is filled with a point cloud of shape (N, dim) where
+  /// N ~ Poisson(rate * volume) and points are drawn uniformly in [lo, hi].
+  template <typename T, typename EngineT>
+  void sample_poisson(
+      Tensor<PointCloud<T>>& out,
+      size_t dim,
+      T rate,
+      const std::vector<T>& lo,
+      const std::vector<T>& hi,
+      const RandomGenerator<EngineT>& gen,
+      Executor& exec)
+  {
+    if (lo.size() != dim || hi.size() != dim)
+    {
+      throw std::invalid_argument("lo and hi must have length equal to dim");
+    }
+
+    for (size_t i = 0; i < dim; ++i)
+    {
+      if (lo[i] > hi[i])
+      {
+        throw std::invalid_argument("lo must be <= hi in every dimension");
+      }
+    }
+
+    T volume = static_cast<T>(1);
+    for (size_t i = 0; i < dim; ++i)
+    {
+      volume *= (hi[i] - lo[i]);
+    }
+
+    T lambda = rate * volume;
+
+    sb::parallel_walk(out, gen, [dim, lambda, &lo, &hi, &out](const std::vector<size_t>& idx, auto& engine) {
+
+      std::poisson_distribution<size_t> countDist(static_cast<double>(lambda));
+      auto nPoints = countDist(engine);
+
+      PointCloud<T> pc({nPoints, dim});
+
+      for (size_t i = 0; i < nPoints; ++i)
+      {
+        for (size_t j = 0; j < dim; ++j)
+        {
+          std::uniform_real_distribution<T> coordDist(lo[j], hi[j]);
+          pc({i, j}) = coordDist(engine);
+        }
+      }
+
+      out(idx) = std::move(pc);
+    }, exec);
+  }
+
+}
+
+#endif

@@ -14,15 +14,15 @@
 
 #include <gtest/gtest.h>
 
-#include <mpcf/functional/pcf.hpp>
-#include <mpcf/algorithms/functional/apply_functional.hpp>
+#include <sbear/functional/pcf.hpp>
+#include <sbear/algorithms/functional/apply_functional.hpp>
 
 #include <vector>
 
 namespace
 {
 
-  using PcfFloatTypes = ::testing::Types<mpcf::Pcf_f32, mpcf::Pcf_f64>;
+  using PcfFloatTypes = ::testing::Types<sb::Pcf_f32, sb::Pcf_f64>;
 
   template<typename PcfT>
   class PcfAlgebraAndNormsTest : public ::testing::Test
@@ -89,7 +89,7 @@ namespace
 
     std::vector<PcfT> pcfs{ f1, f2 };
 
-    auto avg = mpcf::average(pcfs);
+    auto avg = sb::average(pcfs);
 
     // Average should correspond to (f1+f2)/2
     PcfT manual = (f1 + f2) / static_cast<T>(2);
@@ -111,10 +111,10 @@ namespace
              { static_cast<T>(1), static_cast<T>(2) },
              { static_cast<T>(2), static_cast<T>(0) } });
 
-    auto l1 = mpcf::l1_norm(f);
-    auto l2 = mpcf::l2_norm(f);
-    auto lp = mpcf::lp_norm(f, static_cast<T>(2));
-    auto linf = mpcf::linfinity_norm(f);
+    auto l1 = sb::l1_norm(f);
+    auto l2 = sb::l2_norm(f);
+    auto lp = sb::lp_norm(f, static_cast<T>(2));
+    auto linf = sb::linfinity_norm(f);
 
     T expectedL1 = static_cast<T>(1) * static_cast<T>(1) +
                    static_cast<T>(1) * static_cast<T>(2); // 3
@@ -146,8 +146,8 @@ namespace
     std::vector<PcfT> fs{ f0, f1, f2 };
     std::vector<T> output(fs.size());
 
-    mpcf::apply_functional(fs.begin(), fs.end(), output.begin(), [](const PcfT& f) {
-      return mpcf::l1_norm(f);
+    sb::apply_functional(fs.begin(), fs.end(), output.begin(), [](const PcfT& f) {
+      return sb::l1_norm(f);
     });
 
     EXPECT_EQ(output[0], static_cast<T>(0));

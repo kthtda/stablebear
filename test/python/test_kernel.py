@@ -1,39 +1,39 @@
 import numpy as np
 import pytest
 
-import masspcf as mpcf
-from masspcf.symmetric_matrix import SymmetricMatrix
+import stablebear as sb
+from stablebear.symmetric_matrix import SymmetricMatrix
 
 
 def test_l2_kernel_requires_1d_tensor():
-    X = mpcf.zeros((10, 20))
+    X = sb.zeros((10, 20))
 
     with pytest.raises(ValueError):
-        mpcf.l2_kernel(X)
+        sb.l2_kernel(X)
 
-    mpcf.l2_kernel(X[:, 2])
+    sb.l2_kernel(X[:, 2])
 
 
 def test_l2_kernel_returns_symmetric_matrix():
-    X = mpcf.zeros((3,))
-    K = mpcf.l2_kernel(X)
+    X = sb.zeros((3,))
+    K = sb.l2_kernel(X)
     assert isinstance(K, SymmetricMatrix)
 
 
 def test_l2_kernel_of_empty():
-    X = mpcf.zeros((0,))
-    K = mpcf.l2_kernel(X)
+    X = sb.zeros((0,))
+    K = sb.l2_kernel(X)
 
     assert isinstance(K, SymmetricMatrix)
     assert K.size == 0
 
 
 def test_l2_kernel_of_one(pcf_dtype, device):
-    np_dtype = np.float32 if pcf_dtype == mpcf.pcf32 else np.float64
-    X = mpcf.zeros((1,), dtype=pcf_dtype)
-    X[0] = mpcf.Pcf(np.array([[0.0, 3.0], [2.0, 0.0]], dtype=np_dtype))
+    np_dtype = np.float32 if pcf_dtype == sb.pcf32 else np.float64
+    X = sb.zeros((1,), dtype=pcf_dtype)
+    X[0] = sb.Pcf(np.array([[0.0, 3.0], [2.0, 0.0]], dtype=np_dtype))
 
-    K = mpcf.l2_kernel(X)
+    K = sb.l2_kernel(X)
 
     assert K.size == 1
     # <f, f> = integral of f(t)^2 = 3^2 * 2 = 18
@@ -41,15 +41,15 @@ def test_l2_kernel_of_one(pcf_dtype, device):
 
 
 def test_l2_kernel_of_two(pcf_dtype, device):
-    np_dtype = np.float32 if pcf_dtype == mpcf.pcf32 else np.float64
-    X = mpcf.zeros((2,), dtype=pcf_dtype)
+    np_dtype = np.float32 if pcf_dtype == sb.pcf32 else np.float64
+    X = sb.zeros((2,), dtype=pcf_dtype)
 
     # f(t) = 4 on [0, 3)
-    X[0] = mpcf.Pcf(np.array([[0.0, 4.0], [3.0, 0.0]], dtype=np_dtype))
+    X[0] = sb.Pcf(np.array([[0.0, 4.0], [3.0, 0.0]], dtype=np_dtype))
     # g(t) = 2 on [0, 3)
-    X[1] = mpcf.Pcf(np.array([[0.0, 2.0], [3.0, 0.0]], dtype=np_dtype))
+    X[1] = sb.Pcf(np.array([[0.0, 2.0], [3.0, 0.0]], dtype=np_dtype))
 
-    K = mpcf.l2_kernel(X)
+    K = sb.l2_kernel(X)
 
     assert K.size == 2
 
@@ -63,13 +63,13 @@ def test_l2_kernel_of_two(pcf_dtype, device):
 
 
 def test_l2_kernel_to_dense(pcf_dtype, device):
-    np_dtype = np.float32 if pcf_dtype == mpcf.pcf32 else np.float64
-    X = mpcf.zeros((2,), dtype=pcf_dtype)
+    np_dtype = np.float32 if pcf_dtype == sb.pcf32 else np.float64
+    X = sb.zeros((2,), dtype=pcf_dtype)
 
-    X[0] = mpcf.Pcf(np.array([[0.0, 4.0], [3.0, 0.0]], dtype=np_dtype))
-    X[1] = mpcf.Pcf(np.array([[0.0, 2.0], [3.0, 0.0]], dtype=np_dtype))
+    X[0] = sb.Pcf(np.array([[0.0, 4.0], [3.0, 0.0]], dtype=np_dtype))
+    X[1] = sb.Pcf(np.array([[0.0, 2.0], [3.0, 0.0]], dtype=np_dtype))
 
-    K = mpcf.l2_kernel(X)
+    K = sb.l2_kernel(X)
     dense = K.to_dense()
 
     assert isinstance(dense, np.ndarray)

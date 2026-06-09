@@ -14,12 +14,12 @@
 * limitations under the License.
 */
 
-#ifndef MASSPCF_PY_MODULE_POINT_PROCESS_H
-#define MASSPCF_PY_MODULE_POINT_PROCESS_H
+#ifndef STABLEBEAR_PY_MODULE_POINT_PROCESS_H
+#define STABLEBEAR_PY_MODULE_POINT_PROCESS_H
 
 #include <pybind11/pybind11.h>
 
-namespace mpcf_py
+namespace sb_py
 {
   void register_module_point_process(pybind11::module_& m);
 }

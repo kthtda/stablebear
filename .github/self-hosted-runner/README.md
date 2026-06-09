@@ -16,10 +16,10 @@ Each job gets a fresh container that is destroyed after completion.
 ./build.sh
 
 # 2. Start runners (runs in foreground, Ctrl-C to stop)
-REPO=owner/masspcf ./run.sh
+REPO=owner/stablebear ./run.sh
 
 # Or run only one CUDA version
-REPO=owner/masspcf ./run.sh cuda12
+REPO=owner/stablebear ./run.sh cuda12
 ```
 
 ## Workflow usage

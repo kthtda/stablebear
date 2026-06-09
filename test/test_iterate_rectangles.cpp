@@ -16,26 +16,26 @@
 
 #include <gtest/gtest.h>
 
-#include <mpcf/functional/pcf.hpp>
-#include <mpcf/algorithms/functional/iterate_rectangles.hpp>
+#include <sbear/functional/pcf.hpp>
+#include <sbear/algorithms/functional/iterate_rectangles.hpp>
 
 #include <vector>
 
 class IterateRectanglesFixture : public ::testing::Test
 {
 protected:
-  using Rectangle = typename mpcf::Pcf_f64::rectangle_type;
-  using Point = typename mpcf::Pcf_f64::point_type;
+  using Rectangle = typename sb::Pcf_f64::rectangle_type;
+  using Point = typename sb::Pcf_f64::point_type;
   
   void SetUp() override
   {
     collectRectangle = [this](const Rectangle& rect){ rectangles.emplace_back(rect); };
     
-    pcfs.emplace_back(mpcf::Pcf_f64{{0., 3.}, {1., 2.}, {4., 5.}, {6., 0.}});
-    pcfs.emplace_back(mpcf::Pcf_f64{{0., 2.}, {3., 4.}, {4., 2.}, {5., 1.}, {8., 3.}});
+    pcfs.emplace_back(sb::Pcf_f64{{0., 3.}, {1., 2.}, {4., 5.}, {6., 0.}});
+    pcfs.emplace_back(sb::Pcf_f64{{0., 2.}, {3., 4.}, {4., 2.}, {5., 1.}, {8., 3.}});
   }
   
-  std::vector<mpcf::Pcf_f64> pcfs;
+  std::vector<sb::Pcf_f64> pcfs;
   std::vector<Rectangle> rectangles;
   
   std::function<void(const Rectangle&)> collectRectangle;
@@ -43,7 +43,7 @@ protected:
 
 TEST_F(IterateRectanglesFixture, Full)
 {
-  mpcf::iterate_rectangles(pcfs[0].points(), pcfs[1].points(), collectRectangle);
+  sb::iterate_rectangles(pcfs[0].points(), pcfs[1].points(), collectRectangle);
   
   ASSERT_EQ(rectangles.size(), 7);
   
@@ -58,7 +58,7 @@ TEST_F(IterateRectanglesFixture, Full)
 
 TEST_F(IterateRectanglesFixture, EndEarly)
 {
-  mpcf::iterate_rectangles(pcfs[0].points(), pcfs[1].points(), collectRectangle, 0, 4.5);
+  sb::iterate_rectangles(pcfs[0].points(), pcfs[1].points(), collectRectangle, 0, 4.5);
   
   ASSERT_EQ(rectangles.size(), 4);
   
@@ -70,7 +70,7 @@ TEST_F(IterateRectanglesFixture, EndEarly)
 
 TEST_F(IterateRectanglesFixture, StartBeforeFirst)
 {
-  mpcf::iterate_rectangles(pcfs[0].points(), pcfs[1].points(), collectRectangle, -1., 1.);
+  sb::iterate_rectangles(pcfs[0].points(), pcfs[1].points(), collectRectangle, -1., 1.);
 
   ASSERT_EQ(rectangles.size(), 1);
 
@@ -79,7 +79,7 @@ TEST_F(IterateRectanglesFixture, StartBeforeFirst)
 
 TEST_F(IterateRectanglesFixture, StartLate)
 {
-  mpcf::iterate_rectangles(pcfs[0].points(), pcfs[1].points(), collectRectangle, 2.);
+  sb::iterate_rectangles(pcfs[0].points(), pcfs[1].points(), collectRectangle, 2.);
   
   ASSERT_EQ(rectangles.size(), 6);
   
@@ -93,7 +93,7 @@ TEST_F(IterateRectanglesFixture, StartLate)
 
 TEST_F(IterateRectanglesFixture, StartLateAndEndEarly)
 {
-  mpcf::iterate_rectangles(pcfs[0].points(), pcfs[1].points(), collectRectangle, 2., 4.5);
+  sb::iterate_rectangles(pcfs[0].points(), pcfs[1].points(), collectRectangle, 2., 4.5);
 
   ASSERT_EQ(rectangles.size(), 3);
 
@@ -104,7 +104,7 @@ TEST_F(IterateRectanglesFixture, StartLateAndEndEarly)
 
 TEST_F(IterateRectanglesFixture, StartAfterEverything)
 {
-  mpcf::iterate_rectangles(pcfs[0].points(), pcfs[1].points(), collectRectangle, 10.);
+  sb::iterate_rectangles(pcfs[0].points(), pcfs[1].points(), collectRectangle, 10.);
 
   ASSERT_EQ(rectangles.size(), 1);
 

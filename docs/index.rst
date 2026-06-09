@@ -1,8 +1,8 @@
 =========================================================================================================
-masspcf: A computational package for discrete objects in Python and C++
+stablebear: A computational package for discrete objects in Python and C++
 =========================================================================================================
 
-*masspcf* is a Python package with a C++/CUDA backend for GPU-accelerated computations on piecewise constant functions (PCFs) and related discrete objects such as point clouds, persistence barcodes, and distance matrices. The primary audience is practitioners within Topological Data Analysis (TDA) wanting to do statistical analysis on invariants such as *stable rank*, *Euler characteristic curves*, *Betti curves*, and so on.
+*stablebear* is a Python package with a C++/CUDA backend for GPU-accelerated computations on piecewise constant functions (PCFs) and related discrete objects such as point clouds, persistence barcodes, and distance matrices. The primary audience is practitioners within Topological Data Analysis (TDA) wanting to do statistical analysis on invariants such as *stable rank*, *Euler characteristic curves*, *Betti curves*, and so on.
 
 The core data structures are NumPy-like multidimensional tensors supporting slicing, broadcasting, arithmetic, and reductions. Key operations include pairwise :math:`L_p` distance matrices, :math:`L_2` kernels, norms, and persistent homology (via Ripser). The resulting distance matrices and kernels can be used directly with scikit-learn and other machine learning libraries for clustering, classification, and dimensionality reduction.
 
@@ -17,7 +17,7 @@ The core data structures are NumPy-like multidimensional tensors supporting slic
    :hidden:
    :caption: Reference:
 
-   masspcf
+   stablebear
 
 .. toctree::
    :hidden:
@@ -38,7 +38,7 @@ The core data structures are NumPy-like multidimensional tensors supporting slic
       :link: getting_started
       :link-type: doc
 
-      Install masspcf, quick start examples, and tutorials.
+      Install stablebear, quick start examples, and tutorials.
 
    .. grid-item-card:: :fas:`book` User guide
       :link: userguide
@@ -47,7 +47,7 @@ The core data structures are NumPy-like multidimensional tensors supporting slic
       In-depth guides on core concepts, tensors, distances, persistence, and GPU acceleration.
 
    .. grid-item-card:: :fas:`code` API reference
-      :link: masspcf
+      :link: stablebear
       :link-type: doc
 
       Detailed descriptions of the Python API.
@@ -56,7 +56,7 @@ The core data structures are NumPy-like multidimensional tensors supporting slic
       :link: acknowledgments
       :link-type: doc
 
-      Citing masspcf, acknowledgments, and licensing.
+      Citing stablebear, acknowledgments, and licensing.
 
    .. grid-item-card:: :fas:`gears` Internals
       :link: internals

@@ -14,12 +14,12 @@
 * limitations under the License.
 */
 
-#ifndef MASSPCF_PY_NP_SUPPORT_H
-#define MASSPCF_PY_NP_SUPPORT_H
+#ifndef STABLEBEAR_PY_NP_SUPPORT_H
+#define STABLEBEAR_PY_NP_SUPPORT_H
 
 #include <pybind11/numpy.h>
 
-#include <mpcf/concepts.hpp>
+#include <sbear/concepts.hpp>
 
 #include <string>
 #include <sstream>
@@ -121,6 +121,6 @@ private:
   pybind11::array_t<T> m_arr;
 };
 
-static_assert(mpcf::IsTensor<NumpyTensor<int>>);
+static_assert(sb::IsTensor<NumpyTensor<int>>);
 
-#endif //MASSPCF_PY_NP_SUPPORT_H
+#endif //STABLEBEAR_PY_NP_SUPPORT_H

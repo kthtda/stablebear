@@ -1,12 +1,12 @@
 import matplotlib.pyplot as plt
 
-import masspcf as mpcf
-from masspcf.plotting import plot as plotpcf
-from masspcf.random import noisy_cos, noisy_sin
+import stablebear as sb
+from stablebear.plotting import plot as plotpcf
+from stablebear.random import noisy_cos, noisy_sin
 
 plt.style.use("science")
 
-X = mpcf.zeros((10, 5, 4))
+X = sb.zeros((10, 5, 4))
 print(X[3, :, :].shape)
 print(X[2:9:3, 1:, 2].shape)  # [2,5,8] x [1,...,4] x [2]
 
@@ -27,7 +27,7 @@ print(v2.data.offset())
 print(v2.strides)
 
 M = 10
-A = mpcf.zeros((2, M))
+A = sb.zeros((2, M))
 
 # Generate 'M' noisy sin/cos functions @ 100 resp. 15 time points each.
 # Assign the sin(x) functions into the first row of 'A' and cos(x)
@@ -44,7 +44,7 @@ for j in range(A.shape[1]):
     plotpcf(A[1, j], ax=ax, color="r", linewidth=0.5, alpha=0.4)
 
 # Means across first axis of 'A'
-Aavg = mpcf.mean(A, dim=1)
+Aavg = sb.mean(A, dim=1)
 
 # Plot means
 plotpcf(Aavg[0], ax=ax, color="b", linewidth=2, label="$\\sin(2\\pi t)$")
@@ -63,7 +63,7 @@ raise SystemExit
 B = noisy_cos((10000, 500), nPoints=30)
 print(B.shape)
 
-Bbar = mpcf.mean(B, 1)
+Bbar = sb.mean(B, 1)
 print(Bbar.shape)
 
 for j in range(100):

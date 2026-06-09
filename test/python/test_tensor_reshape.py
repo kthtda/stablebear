@@ -1,19 +1,19 @@
 import numpy as np
 import pytest
 
-import masspcf as mpcf
+import stablebear as sb
 
 
 _NUMERIC_TYPES = [
-    pytest.param(mpcf.FloatTensor, np.float64, id="float64"),
-    pytest.param(mpcf.FloatTensor, np.float32, id="float32"),
-    pytest.param(mpcf.IntTensor, np.int32, id="int32"),
-    pytest.param(mpcf.IntTensor, np.int64, id="int64"),
+    pytest.param(sb.FloatTensor, np.float64, id="float64"),
+    pytest.param(sb.FloatTensor, np.float32, id="float32"),
+    pytest.param(sb.IntTensor, np.int32, id="int32"),
+    pytest.param(sb.IntTensor, np.int64, id="int64"),
 ]
 
 
 def _assert_reshape(np_arr, new_shape, TensorType):
-    """Assert that mpcf reshape matches NumPy."""
+    """Assert that stablebear reshape matches NumPy."""
     t = TensorType(np_arr)
     result = np.asarray(t.reshape(new_shape))
     expected = np_arr.reshape(new_shape)
@@ -23,7 +23,7 @@ def _assert_reshape(np_arr, new_shape, TensorType):
 
 def test_tensor2d_flatten():
     np_arr = np.array([[0, 1, 2], [10, 11, 12]], dtype=np.float32)
-    t = mpcf.FloatTensor(np_arr)
+    t = sb.FloatTensor(np_arr)
     np_flat = np_arr.flatten()
     flat = t.flatten()
     assert flat.shape == np_flat.shape
@@ -87,7 +87,7 @@ class TestReshape:
 
 
 def _assert_transpose(np_arr, axes, TensorType):
-    """Assert that mpcf transpose matches NumPy."""
+    """Assert that stablebear transpose matches NumPy."""
     t = TensorType(np_arr)
     if axes is None:
         result = np.asarray(t.T)
@@ -147,7 +147,7 @@ class TestTranspose:
 
 
 def _assert_swapaxes(np_arr, axis1, axis2, TensorType):
-    """Assert that mpcf swapaxes matches NumPy."""
+    """Assert that stablebear swapaxes matches NumPy."""
     t = TensorType(np_arr)
     result = np.asarray(t.swapaxes(axis1, axis2))
     expected = np_arr.swapaxes(axis1, axis2)
@@ -197,7 +197,7 @@ class TestSwapaxes:
 
 
 def _assert_squeeze(np_arr, axis, TensorType):
-    """Assert that mpcf squeeze matches NumPy."""
+    """Assert that stablebear squeeze matches NumPy."""
     t = TensorType(np_arr)
     if axis is None:
         result = np.asarray(t.squeeze())
@@ -240,7 +240,7 @@ class TestSqueeze:
 
 
 def _assert_expand_dims(np_arr, axis, TensorType):
-    """Assert that mpcf expand_dims matches NumPy."""
+    """Assert that stablebear expand_dims matches NumPy."""
     t = TensorType(np_arr)
     result = np.asarray(t.expand_dims(axis))
     expected = np.expand_dims(np_arr, axis)
@@ -294,64 +294,64 @@ def _assert_astype(tensor, target_dtype, expected_type):
 
 # Numeric precision changes
 _NUMERIC_ASTYPE_CASES = [
-    pytest.param(mpcf.float32, mpcf.float64, mpcf.FloatTensor, id="f32→f64"),
-    pytest.param(mpcf.float64, mpcf.float32, mpcf.FloatTensor, id="f64→f32"),
-    pytest.param(mpcf.int32, mpcf.int64, mpcf.IntTensor, id="i32→i64"),
-    pytest.param(mpcf.int64, mpcf.int32, mpcf.IntTensor, id="i64→i32"),
-    pytest.param(mpcf.uint32, mpcf.uint64, mpcf.IntTensor, id="u32→u64"),
-    pytest.param(mpcf.int32, mpcf.uint32, mpcf.IntTensor, id="i32→u32"),
+    pytest.param(sb.float32, sb.float64, sb.FloatTensor, id="f32→f64"),
+    pytest.param(sb.float64, sb.float32, sb.FloatTensor, id="f64→f32"),
+    pytest.param(sb.int32, sb.int64, sb.IntTensor, id="i32→i64"),
+    pytest.param(sb.int64, sb.int32, sb.IntTensor, id="i64→i32"),
+    pytest.param(sb.uint32, sb.uint64, sb.IntTensor, id="u32→u64"),
+    pytest.param(sb.int32, sb.uint32, sb.IntTensor, id="i32→u32"),
 ]
 
 # Cross-family numeric changes
 _CROSS_FAMILY_CASES = [
-    pytest.param(mpcf.float64, mpcf.int32, mpcf.IntTensor, id="f64→i32"),
-    pytest.param(mpcf.int32, mpcf.float64, mpcf.FloatTensor, id="i32→f64"),
+    pytest.param(sb.float64, sb.int32, sb.IntTensor, id="f64→i32"),
+    pytest.param(sb.int32, sb.float64, sb.FloatTensor, id="i32→f64"),
 ]
 
 
 @pytest.mark.parametrize("src_dtype, target_dtype, expected_type", _NUMERIC_ASTYPE_CASES + _CROSS_FAMILY_CASES)
 def test_astype_numeric(src_dtype, target_dtype, expected_type):
-    t = mpcf.zeros((3, 4), dtype=src_dtype)
+    t = sb.zeros((3, 4), dtype=src_dtype)
     _assert_astype(t, target_dtype, expected_type)
 
 
 # PCF precision changes
 _PCF_ASTYPE_CASES = [
-    pytest.param(mpcf.pcf32, mpcf.pcf64, mpcf.PcfTensor, id="pcf32→pcf64"),
-    pytest.param(mpcf.pcf64, mpcf.pcf32, mpcf.PcfTensor, id="pcf64→pcf32"),
-    pytest.param(mpcf.pcf32i, mpcf.pcf64i, mpcf.IntPcfTensor, id="pcf32i→pcf64i"),
-    pytest.param(mpcf.pcf64i, mpcf.pcf32i, mpcf.IntPcfTensor, id="pcf64i→pcf32i"),
+    pytest.param(sb.pcf32, sb.pcf64, sb.PcfTensor, id="pcf32→pcf64"),
+    pytest.param(sb.pcf64, sb.pcf32, sb.PcfTensor, id="pcf64→pcf32"),
+    pytest.param(sb.pcf32i, sb.pcf64i, sb.IntPcfTensor, id="pcf32i→pcf64i"),
+    pytest.param(sb.pcf64i, sb.pcf32i, sb.IntPcfTensor, id="pcf64i→pcf32i"),
 ]
 
 
 @pytest.mark.parametrize("src_dtype, target_dtype, expected_type", _PCF_ASTYPE_CASES)
 def test_astype_pcf(src_dtype, target_dtype, expected_type):
-    t = mpcf.zeros((3,), dtype=src_dtype)
+    t = sb.zeros((3,), dtype=src_dtype)
     _assert_astype(t, target_dtype, expected_type)
 
 
 # Point cloud precision changes
 def test_astype_pcloud32_to_64():
-    t = mpcf.zeros((3,), dtype=mpcf.pcloud32)
-    _assert_astype(t, mpcf.pcloud64, mpcf.PointCloudTensor)
+    t = sb.zeros((3,), dtype=sb.pcloud32)
+    _assert_astype(t, sb.pcloud64, sb.PointCloudTensor)
 
 
 def test_astype_pcloud64_to_32():
-    t = mpcf.zeros((3,), dtype=mpcf.pcloud64)
-    _assert_astype(t, mpcf.pcloud32, mpcf.PointCloudTensor)
+    t = sb.zeros((3,), dtype=sb.pcloud64)
+    _assert_astype(t, sb.pcloud32, sb.PointCloudTensor)
 
 
 # Same dtype always copies
 def test_astype_same_dtype_copies():
     arr = np.array([1.0, 2.0, 3.0])
-    t = mpcf.FloatTensor(arr)
-    t2 = t.astype(mpcf.float64)
+    t = sb.FloatTensor(arr)
+    t2 = t.astype(sb.float64)
     t2[0] = 99.0
     assert t[0] == 1.0
 
 
 # Cross-family errors
 def test_astype_float_to_pcf_raises():
-    t = mpcf.FloatTensor(np.array([1.0, 2.0], dtype=np.float32))
+    t = sb.FloatTensor(np.array([1.0, 2.0], dtype=np.float32))
     with pytest.raises((ValueError, TypeError)):
-        t.astype(mpcf.pcf32)
+        t.astype(sb.pcf32)

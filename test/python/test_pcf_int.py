@@ -16,31 +16,31 @@ import numpy as np
 import numpy.testing as npt
 import pytest
 
-import masspcf as mpcf
-from masspcf.functional import Pcf
+import stablebear as sb
+from stablebear.functional import Pcf
 
 
 class TestIntPcfDtypeConstruction:
     def test_from_float_array_with_pcf32i_dtype(self):
         arr = np.array([[0.0, 1.0], [2.0, 3.0]], dtype=np.float64)
-        f = Pcf(arr, dtype=mpcf.pcf32i)
-        assert f.ttype == mpcf.int32
-        assert f.vtype == mpcf.int32
+        f = Pcf(arr, dtype=sb.pcf32i)
+        assert f.ttype == sb.int32
+        assert f.vtype == sb.int32
         npt.assert_array_equal(f.to_numpy(), [[0, 1], [2, 3]])
 
     def test_from_float_array_with_pcf64i_dtype(self):
         arr = np.array([[0.0, 1.0], [2.0, 3.0]], dtype=np.float32)
-        f = Pcf(arr, dtype=mpcf.pcf64i)
-        assert f.ttype == mpcf.int64
-        assert f.vtype == mpcf.int64
+        f = Pcf(arr, dtype=sb.pcf64i)
+        assert f.ttype == sb.int64
+        assert f.vtype == sb.int64
 
     def test_from_list_pcf32i_dtype(self):
-        f = Pcf([[0, 1], [2, 3]], dtype=mpcf.pcf32i)
-        assert f.ttype == mpcf.int32
+        f = Pcf([[0, 1], [2, 3]], dtype=sb.pcf32i)
+        assert f.ttype == sb.int32
 
     def test_from_list_pcf64i_dtype(self):
-        f = Pcf([[0, 1], [2, 3]], dtype=mpcf.pcf64i)
-        assert f.ttype == mpcf.int64
+        f = Pcf([[0, 1], [2, 3]], dtype=sb.pcf64i)
+        assert f.ttype == sb.int64
 
 
 class TestIntPcfEval:
@@ -125,35 +125,35 @@ class TestIntPcfStr:
 class TestIntPcfAstype:
     def test_i32_to_f32(self):
         f = Pcf(np.array([[0, 1], [2, 3]], dtype=np.int32))
-        g = f.astype(mpcf.pcf32)
-        assert g.vtype == mpcf.float32
+        g = f.astype(sb.pcf32)
+        assert g.vtype == sb.float32
         npt.assert_array_almost_equal(g.to_numpy(), [[0.0, 1.0], [2.0, 3.0]])
 
     def test_f32_to_i32(self):
         f = Pcf(np.array([[0.0, 1.0], [2.0, 3.0]], dtype=np.float32))
-        g = f.astype(mpcf.pcf32i)
-        assert g.vtype == mpcf.int32
+        g = f.astype(sb.pcf32i)
+        assert g.vtype == sb.int32
         npt.assert_array_equal(g.to_numpy(), [[0, 1], [2, 3]])
 
     def test_i32_to_i64(self):
         f = Pcf(np.array([[0, 1], [2, 3]], dtype=np.int32))
-        g = f.astype(mpcf.pcf64i)
-        assert g.vtype == mpcf.int64
+        g = f.astype(sb.pcf64i)
+        assert g.vtype == sb.int64
 
 
 class TestIntPcfTensor:
     def test_pcf32i_tensor_create(self):
-        t = mpcf.zeros((3,), dtype=mpcf.pcf32i)
-        assert t.dtype == mpcf.pcf32i
+        t = sb.zeros((3,), dtype=sb.pcf32i)
+        assert t.dtype == sb.pcf32i
         assert t.shape == (3,)
 
     def test_pcf64i_tensor_create(self):
-        t = mpcf.zeros((3,), dtype=mpcf.pcf64i)
-        assert t.dtype == mpcf.pcf64i
+        t = sb.zeros((3,), dtype=sb.pcf64i)
+        assert t.dtype == sb.pcf64i
         assert t.shape == (3,)
 
     def test_tensor_set_get(self):
-        t = mpcf.zeros((2,), dtype=mpcf.pcf32i)
+        t = sb.zeros((2,), dtype=sb.pcf32i)
 
         f = Pcf(np.array([[0, 10], [2, 20]], dtype=np.int32))
         t[0] = f
@@ -184,17 +184,17 @@ class TestIntPcfIO:
     def test_save_load_pcf32i_tensor(self):
         from io import BytesIO
 
-        t = mpcf.zeros((2,), dtype=mpcf.pcf32i)
+        t = sb.zeros((2,), dtype=sb.pcf32i)
         t[0] = Pcf(np.array([[0, 10], [2, 20]], dtype=np.int32))
         t[1] = Pcf(np.array([[0, 30], [4, 40]], dtype=np.int32))
 
         buf = BytesIO()
-        mpcf.save(t, buf)
+        sb.save(t, buf)
         buf.seek(0)
-        loaded = mpcf.load(buf)
+        loaded = sb.load(buf)
 
-        assert isinstance(loaded, mpcf.IntPcfTensor)
-        assert loaded.dtype == mpcf.pcf32i
+        assert isinstance(loaded, sb.IntPcfTensor)
+        assert loaded.dtype == sb.pcf32i
         assert loaded.shape == (2,)
         npt.assert_array_equal(loaded[0].to_numpy(), t[0].to_numpy())
         npt.assert_array_equal(loaded[1].to_numpy(), t[1].to_numpy())
@@ -202,17 +202,17 @@ class TestIntPcfIO:
     def test_save_load_pcf64i_tensor(self):
         from io import BytesIO
 
-        t = mpcf.zeros((2,), dtype=mpcf.pcf64i)
+        t = sb.zeros((2,), dtype=sb.pcf64i)
         t[0] = Pcf(np.array([[0, 10], [2, 20]], dtype=np.int64))
         t[1] = Pcf(np.array([[0, 30], [4, 40]], dtype=np.int64))
 
         buf = BytesIO()
-        mpcf.save(t, buf)
+        sb.save(t, buf)
         buf.seek(0)
-        loaded = mpcf.load(buf)
+        loaded = sb.load(buf)
 
-        assert isinstance(loaded, mpcf.IntPcfTensor)
-        assert loaded.dtype == mpcf.pcf64i
+        assert isinstance(loaded, sb.IntPcfTensor)
+        assert loaded.dtype == sb.pcf64i
         assert loaded.shape == (2,)
         npt.assert_array_equal(loaded[0].to_numpy(), t[0].to_numpy())
         npt.assert_array_equal(loaded[1].to_numpy(), t[1].to_numpy())

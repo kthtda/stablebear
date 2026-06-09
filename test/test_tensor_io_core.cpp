@@ -14,20 +14,20 @@
 
 #include <gtest/gtest.h>
 
-#include <mpcf/tensor.hpp>
-#include <mpcf/walk.hpp>
-#include <mpcf/io/tensor_io.hpp>
-#include <mpcf/functional/pcf.hpp>
-#include <mpcf/persistence/barcode.hpp>
+#include <sbear/tensor.hpp>
+#include <sbear/walk.hpp>
+#include <sbear/io/tensor_io.hpp>
+#include <sbear/functional/pcf.hpp>
+#include <sbear/persistence/barcode.hpp>
 
 #include <sstream>
 #include <cstring>
 
 namespace
 {
-  using mpcf::io::detail::TensorFormat;
-  using mpcf::io::detail::tensorFormat;
-  using mpcf::io::detail::getTensorFormat;
+  using sb::io::detail::TensorFormat;
+  using sb::io::detail::tensorFormat;
+  using sb::io::detail::getTensorFormat;
 
   // ============================================================================
   // TensorFormat mapping for supported core types
@@ -35,8 +35,8 @@ namespace
 
   TEST(TensorIoCore, TensorFormatScalarAndCompositeTypes)
   {
-    using mpcf::float32_t;
-    using mpcf::float64_t;
+    using sb::float32_t;
+    using sb::float64_t;
 
     {
       auto fmt = tensorFormat<float32_t>();
@@ -49,32 +49,32 @@ namespace
       EXPECT_EQ(64, fmt.subFormat);
     }
     {
-      auto fmt = tensorFormat<mpcf::Pcf<float32_t, float32_t>>();
+      auto fmt = tensorFormat<sb::Pcf<float32_t, float32_t>>();
       EXPECT_EQ(100, fmt.baseFormat);
       EXPECT_EQ(32, fmt.subFormat);
     }
     {
-      auto fmt = tensorFormat<mpcf::Pcf<float64_t, float64_t>>();
+      auto fmt = tensorFormat<sb::Pcf<float64_t, float64_t>>();
       EXPECT_EQ(100, fmt.baseFormat);
       EXPECT_EQ(64, fmt.subFormat);
     }
     {
-      auto fmt = tensorFormat<mpcf::PointCloud<float32_t>>();
+      auto fmt = tensorFormat<sb::PointCloud<float32_t>>();
       EXPECT_EQ(1000, fmt.baseFormat);
       EXPECT_EQ(32, fmt.subFormat);
     }
     {
-      auto fmt = tensorFormat<mpcf::PointCloud<float64_t>>();
+      auto fmt = tensorFormat<sb::PointCloud<float64_t>>();
       EXPECT_EQ(1000, fmt.baseFormat);
       EXPECT_EQ(64, fmt.subFormat);
     }
     {
-      auto fmt = tensorFormat<mpcf::ph::Barcode<float32_t>>();
+      auto fmt = tensorFormat<sb::ph::Barcode<float32_t>>();
       EXPECT_EQ(10000, fmt.baseFormat);
       EXPECT_EQ(32, fmt.subFormat);
     }
     {
-      auto fmt = tensorFormat<mpcf::ph::Barcode<float64_t>>();
+      auto fmt = tensorFormat<sb::ph::Barcode<float64_t>>();
       EXPECT_EQ(10000, fmt.baseFormat);
       EXPECT_EQ(64, fmt.subFormat);
     }
@@ -92,21 +92,21 @@ namespace
 
   TEST(TensorIoCore, ContiguousScalarTensorRoundtrip)
   {
-    using T = mpcf::float32_t;
-    mpcf::Tensor<T> t({ 2, 3 });
+    using T = sb::float32_t;
+    sb::Tensor<T> t({ 2, 3 });
     T v = static_cast<T>(0);
     t.apply([&v](T& x) { x = v++; });
 
     std::stringstream ss;
-    mpcf::io::detail::write_contiguous_tensor(ss, t);
+    sb::io::detail::write_contiguous_tensor(ss, t);
 
     std::string all = ss.str();
 
     std::istringstream iss(all);
 
-    mpcf::io::detail::read_tensor_format(iss);
+    sb::io::detail::read_tensor_format(iss);
 
-    auto roundtrip = mpcf::io::detail::read_tensor<T>(iss);
+    auto roundtrip = sb::io::detail::read_tensor<T>(iss);
     EXPECT_EQ(roundtrip, t);
   }
 
@@ -118,27 +118,27 @@ namespace
   {
     using T = double;
 
-    mpcf::Tensor<T> base({ 4, 4 });
+    sb::Tensor<T> base({ 4, 4 });
     T v = 0;
     base.apply([&v](T& x) { x = v++; });
 
     // Take a strided view so that is_contiguous() is false
-    auto view = base[std::vector<mpcf::Slice>{ mpcf::range(0, 4, 2), mpcf::all() }];
+    auto view = base[std::vector<sb::Slice>{ sb::range(0, 4, 2), sb::all() }];
     ASSERT_FALSE(view.is_contiguous());
 
     std::stringstream ss;
-    mpcf::io::detail::write_tensor(ss, view);
+    sb::io::detail::write_tensor(ss, view);
 
     std::string all = ss.str();
 
     std::istringstream iss(all);
 
-    mpcf::io::detail::read_tensor_format(iss);
-    auto rt = mpcf::io::detail::read_tensor<T>(iss);
+    sb::io::detail::read_tensor_format(iss);
+    auto rt = sb::io::detail::read_tensor<T>(iss);
 
     EXPECT_EQ(rt.shape(), view.shape());
 
-    mpcf::walk(view, [&](const std::vector<size_t>& idx)
+    sb::walk(view, [&](const std::vector<size_t>& idx)
     {
       EXPECT_EQ(rt(idx), view(idx));
     });
@@ -152,12 +152,12 @@ namespace
   {
     using T = double;
 
-    mpcf::Tensor<T> t({ 2, 3 });
+    sb::Tensor<T> t({ 2, 3 });
     T v = 0;
     t.apply([&v](T& x) { x = v++; });
 
     std::stringstream ss;
-    mpcf::io::detail::write_contiguous_tensor(ss, t);
+    sb::io::detail::write_contiguous_tensor(ss, t);
 
     std::string all = ss.str();
     ASSERT_GE(all.size(), 8u);
@@ -177,7 +177,7 @@ namespace
 
     std::istringstream iss(payload);
 
-    EXPECT_THROW((void)mpcf::io::detail::read_tensor<T>(iss), std::runtime_error);
+    EXPECT_THROW((void)sb::io::detail::read_tensor<T>(iss), std::runtime_error);
   }
 
 } // namespace

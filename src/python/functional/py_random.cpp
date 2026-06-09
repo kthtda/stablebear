@@ -16,8 +16,8 @@
 
 #include "py_random.hpp"
 
-#include <mpcf/random.hpp>
-#include <mpcf/random_generator.hpp>
+#include <sbear/random.hpp>
+#include <sbear/random_generator.hpp>
 
 #include <pybind11/numpy.h>
 
@@ -35,25 +35,25 @@ namespace
   class PyRandomBindings
   {
   public:
-    using PcfT = mpcf::Pcf<Tt, Tv>;
-    using TensorT = mpcf::Tensor<PcfT>;
+    using PcfT = sb::Pcf<Tt, Tv>;
+    using TensorT = sb::Tensor<PcfT>;
 
-    static void noisy_sin(TensorT& out, size_t nPoints, const mpcf::DefaultRandomGenerator* gen)
+    static void noisy_sin(TensorT& out, size_t nPoints, const sb::DefaultRandomGenerator* gen)
     {
       auto func = [](Tv t) { return sin(static_cast<Tv>(2. * M_PI) * t); };
       if (gen)
-        mpcf::noisy_function(out, nPoints, func, static_cast<Tv>(0.1), *gen);
+        sb::noisy_function(out, nPoints, func, static_cast<Tv>(0.1), *gen);
       else
-        mpcf::noisy_function(out, nPoints, func);
+        sb::noisy_function(out, nPoints, func);
     }
 
-    static void noisy_cos(TensorT& out, size_t nPoints, const mpcf::DefaultRandomGenerator* gen)
+    static void noisy_cos(TensorT& out, size_t nPoints, const sb::DefaultRandomGenerator* gen)
     {
       auto func = [](Tv t) { return cos(static_cast<Tv>(2. * M_PI) * t); };
       if (gen)
-        mpcf::noisy_function(out, nPoints, func, static_cast<Tv>(0.1), *gen);
+        sb::noisy_function(out, nPoints, func, static_cast<Tv>(0.1), *gen);
       else
-        mpcf::noisy_function(out, nPoints, func);
+        sb::noisy_function(out, nPoints, func);
     }
 
     static void register_bindings(py::handle m, const std::string& suffix)
@@ -71,16 +71,16 @@ namespace
 
 }
 
-void mpcf_py::register_random(py::module_& m)
+void sb_py::register_random(py::module_& m)
 {
-  py::class_<mpcf::DefaultRandomGenerator>(m, "RandomGenerator")
+  py::class_<sb::DefaultRandomGenerator>(m, "RandomGenerator")
       .def(py::init<>())
       .def(py::init<uint64_t>())
-      .def("seed", &mpcf::DefaultRandomGenerator::seed)
+      .def("seed", &sb::DefaultRandomGenerator::seed)
       ;
 
-  m.def("seed", &mpcf::seed);
+  m.def("seed", &sb::seed);
 
-  PyRandomBindings<mpcf::float32_t, mpcf::float32_t>::register_bindings(m, "_f32_f32");
-  PyRandomBindings<mpcf::float64_t, mpcf::float64_t>::register_bindings(m, "_f64_f64");
+  PyRandomBindings<sb::float32_t, sb::float32_t>::register_bindings(m, "_f32_f32");
+  PyRandomBindings<sb::float64_t, sb::float64_t>::register_bindings(m, "_f64_f64");
 }

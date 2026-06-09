@@ -15,7 +15,7 @@ Scalar arithmetic
 
 Every operator accepts a scalar on either side::
 
-   X = mpcf.FloatTensor(np.array([1.0, 2.0, 3.0]))
+   X = sb.FloatTensor(np.array([1.0, 2.0, 3.0]))
 
    Y = X * 2.0      # [2.0, 4.0, 6.0]
    Z = 10.0 + X     # [11.0, 12.0, 13.0]
@@ -26,7 +26,7 @@ PCF tensors support all four operators with both ``Pcf`` operands (pointwise)
 and numeric scalars. Scalar ``+`` and ``-`` shift the values, while ``*`` and
 ``/`` scale them::
 
-   X = mpcf.zeros((5,))
+   X = sb.zeros((5,))
    # ... fill X with PCFs ...
    X * 3.0           # scale values
    X + 10.0          # shift values up
@@ -40,11 +40,11 @@ Power
 The ``**`` operator raises every element to a given exponent. It works for both
 numeric and PCF tensors::
 
-   X = mpcf.FloatTensor(np.array([4.0, 9.0, 16.0]))
+   X = sb.FloatTensor(np.array([4.0, 9.0, 16.0]))
    Y = X ** 0.5       # [2.0, 3.0, 4.0]
    X **= 2            # in-place: [16.0, 81.0, 256.0]
 
-   F = mpcf.zeros((5,))
+   F = sb.zeros((5,))
    # ... fill F with PCFs ...
    G = F ** 2          # square every PCF's values
    F **= 3             # cube in place
@@ -57,22 +57,22 @@ Division
 
 For ``FloatTensor``, ``/`` performs true division as expected::
 
-   X = mpcf.FloatTensor(np.array([10.0, 21.0, 35.0]))
+   X = sb.FloatTensor(np.array([10.0, 21.0, 35.0]))
    X / 4.0   # [2.5, 5.25, 8.75]
 
 For ``IntTensor``, ``/`` returns a ``FloatTensor`` (float64), matching NumPy::
 
-   A = mpcf.IntTensor(np.array([10, 21, 35]))
+   A = sb.IntTensor(np.array([10, 21, 35]))
    A / 4      # FloatTensor: [2.5, 5.25, 8.75]
 
 Floor division (``//``) rounds down to the nearest integer (e.g. ``7 // 2 = 3``
 and ``-7 // 2 = -4``). It is available on ``FloatTensor`` and ``IntTensor``,
 matching NumPy::
 
-   X = mpcf.FloatTensor(np.array([10.5, -7.3, 21.0]))
+   X = sb.FloatTensor(np.array([10.5, -7.3, 21.0]))
    X // 3.0   # [3.0, -3.0, 7.0]
 
-   A = mpcf.IntTensor(np.array([10, -7, 21]))
+   A = sb.IntTensor(np.array([10, -7, 21]))
    A // 3     # IntTensor: [3, -3, 7]
 
 Tensor-tensor arithmetic (broadcasting)
@@ -89,11 +89,11 @@ performed with `NumPy-style broadcasting
 ::
 
    import numpy as np
-   import masspcf as mpcf
+   import stablebear as sb
 
-   A = mpcf.FloatTensor(np.array([[1.0, 2.0, 3.0],
-                                     [4.0, 5.0, 6.0]]))    # shape (2, 3)
-   B = mpcf.FloatTensor(np.array([10.0, 20.0, 30.0]))    # shape (3,)
+   A = sb.FloatTensor(np.array([[1.0, 2.0, 3.0],
+                                [4.0, 5.0, 6.0]]))    # shape (2, 3)
+   B = sb.FloatTensor(np.array([10.0, 20.0, 30.0]))    # shape (3,)
 
    C = A + B   # shape (2, 3) — B is broadcast along dim 0
    # C == [[11, 22, 33],
@@ -101,8 +101,8 @@ performed with `NumPy-style broadcasting
 
 Both operands can be expanded at the same time::
 
-   col = mpcf.FloatTensor(np.array([[1.0], [2.0]]))       # shape (2, 1)
-   row = mpcf.FloatTensor(np.array([[10.0, 20.0, 30.0]])) # shape (1, 3)
+   col = sb.FloatTensor(np.array([[1.0], [2.0]]))       # shape (2, 1)
+   row = sb.FloatTensor(np.array([[10.0, 20.0, 30.0]])) # shape (1, 3)
 
    result = col + row   # shape (2, 3)
    # result == [[11, 21, 31],
@@ -117,16 +117,16 @@ shape of the left operand, just like NumPy::
 
 Incompatible shapes raise ``ValueError``::
 
-   X = mpcf.FloatTensor(np.array([1.0, 2.0, 3.0]))
-   Y = mpcf.FloatTensor(np.array([1.0, 2.0]))
+   X = sb.FloatTensor(np.array([1.0, 2.0, 3.0]))
+   Y = sb.FloatTensor(np.array([1.0, 2.0]))
    # X + Y  -> ValueError: shapes (3,) and (2,) are not broadcast-compatible
 
 Broadcasting also works with PCF tensors::
 
-   F = mpcf.zeros((4, 10))
+   F = sb.zeros((4, 10))
    # ... fill F with PCFs ...
 
-   bias = mpcf.zeros((10,))
+   bias = sb.zeros((10,))
    # ... fill bias ...
 
    adjusted = F + bias  # shape (4, 10) — bias broadcast along dim 0
@@ -134,11 +134,11 @@ Broadcasting also works with PCF tensors::
 broadcast_to
 ------------
 
-For advanced use, :py:meth:`~masspcf._tensor_base.Tensor.broadcast_to` returns
+For advanced use, :py:meth:`~stablebear._tensor_base.Tensor.broadcast_to` returns
 a view of a tensor as if it had the given shape. Size-1 dimensions are
 virtually repeated without copying data::
 
-   X = mpcf.FloatTensor(np.array([1.0, 2.0, 3.0]))   # shape (3,)
+   X = sb.FloatTensor(np.array([1.0, 2.0, 3.0]))   # shape (3,)
    view = X.broadcast_to((4, 3))                         # shape (4, 3)
    # Every row of view is [1, 2, 3]; view shares data with X
 
@@ -147,14 +147,14 @@ Comparisons
 ===========
 
 Tensors support the comparison operators ``==``, ``!=``, ``<``, ``<=``, ``>``,
-and ``>=``. Each returns a :py:class:`~masspcf.BoolTensor` containing the
+and ``>=``. Each returns a :py:class:`~stablebear.BoolTensor` containing the
 element-wise result, just like NumPy::
 
    import numpy as np
-   import masspcf as mpcf
+   import stablebear as sb
 
-   A = mpcf.FloatTensor(np.array([1.0, 2.0, 3.0]))
-   B = mpcf.FloatTensor(np.array([1.0, 9.0, 3.0]))
+   A = sb.FloatTensor(np.array([1.0, 2.0, 3.0]))
+   B = sb.FloatTensor(np.array([1.0, 9.0, 3.0]))
 
    result = A == B   # BoolTensor: [True, False, True]
    result = A < B    # BoolTensor: [False, True, False]
@@ -166,9 +166,9 @@ Comparisons follow the same broadcasting rules as arithmetic. Shapes are
 compared dimension-by-dimension from the right, and size-1 or missing
 dimensions are expanded::
 
-   A = mpcf.FloatTensor(np.array([[1.0, 2.0],
-                                     [3.0, 4.0]]))   # shape (2, 2)
-   B = mpcf.FloatTensor(np.array([1.0, 4.0]))        # shape (2,)
+   A = sb.FloatTensor(np.array([[1.0, 2.0],
+                                [3.0, 4.0]]))   # shape (2, 2)
+   B = sb.FloatTensor(np.array([1.0, 4.0]))        # shape (2,)
 
    result = A == B
    # BoolTensor of shape (2, 2):
@@ -177,13 +177,13 @@ dimensions are expanded::
 
 Column and scalar broadcasting also work::
 
-   col = mpcf.FloatTensor(np.array([[2.0], [3.0]]))  # shape (2, 1)
+   col = sb.FloatTensor(np.array([[2.0], [3.0]]))  # shape (2, 1)
    result = A < col
    # BoolTensor of shape (2, 2):
    # [[True, False],
    #  [False, False]]
 
-   scalar = mpcf.FloatTensor(np.array([2.0]))        # shape (1,)
+   scalar = sb.FloatTensor(np.array([2.0]))        # shape (1,)
    result = A >= scalar
    # BoolTensor of shape (2, 2):
    # [[False, True],
@@ -196,27 +196,27 @@ Calling ``bool()`` on a single-element ``BoolTensor`` returns a Python ``bool``.
 For multi-element tensors, ``bool()`` raises ``ValueError``, matching NumPy's
 behavior::
 
-   A = mpcf.FloatTensor(np.array([1.0]))
-   B = mpcf.FloatTensor(np.array([1.0]))
+   A = sb.FloatTensor(np.array([1.0]))
+   B = sb.FloatTensor(np.array([1.0]))
    bool(A == B)   # True
 
-   C = mpcf.FloatTensor(np.array([1.0, 2.0]))
-   D = mpcf.FloatTensor(np.array([1.0, 2.0]))
+   C = sb.FloatTensor(np.array([1.0, 2.0]))
+   D = sb.FloatTensor(np.array([1.0, 2.0]))
    bool(C == D)   # ValueError: more than one element
 
 array_equal
 -----------
 
 To check whether two tensors are entirely equal (as a single ``bool``), use
-:py:meth:`~masspcf._tensor_base.Tensor.array_equal`::
+:py:meth:`~stablebear._tensor_base.Tensor.array_equal`::
 
-   A = mpcf.FloatTensor(np.array([1.0, 2.0, 3.0]))
+   A = sb.FloatTensor(np.array([1.0, 2.0, 3.0]))
    B = A.copy()
 
    A.array_equal(B)   # True
    A.array_equal(np.array([1.0, 2.0, 3.0]))  # also accepts NumPy arrays
 
-   C = mpcf.FloatTensor(np.array([1.0, 9.0, 3.0]))
+   C = sb.FloatTensor(np.array([1.0, 9.0, 3.0]))
    A.array_equal(C)   # False
 
 Tensors with different shapes always compare as not equal.
@@ -227,7 +227,7 @@ PCF comparisons
 Comparison operators also work on PCF tensors. Two PCFs are equal if they have
 the same breakpoints and values::
 
-   F = mpcf.random.noisy_sin((3,))
+   F = sb.random.noisy_sin((3,))
    G = F.copy()
 
    result = F == G    # BoolTensor: [True, True, True]

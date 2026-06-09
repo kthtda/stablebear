@@ -1,8 +1,8 @@
 import numpy as np
 import pytest
 
-from masspcf.distance_matrix import DistanceMatrix
-from masspcf.typing import float32, float64
+from stablebear.distance_matrix import DistanceMatrix
+from stablebear.typing import float32, float64
 
 
 @pytest.fixture(params=[float32, float64], ids=["f32", "f64"])

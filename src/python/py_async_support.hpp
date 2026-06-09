@@ -12,27 +12,27 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef MASSPCF_PY_ASYNC_SUPPORT_H
-#define MASSPCF_PY_ASYNC_SUPPORT_H
+#ifndef STABLEBEAR_PY_ASYNC_SUPPORT_H
+#define STABLEBEAR_PY_ASYNC_SUPPORT_H
 
-#include <mpcf/task.hpp>
+#include <sbear/task.hpp>
 #include <memory>
 #include <utility>
 
-namespace mpcf_py
+namespace sb_py
 {
   template <typename TaskT, typename... Args>
   [[nodiscard]] std::unique_ptr<TaskT> execute_stoppable_task(Args&&... args)
   {
     auto task = std::make_unique<TaskT>(std::forward<Args>(args)...);
-    task->start_async(mpcf::default_executor());
+    task->start_async(sb::default_executor());
     return task;
   }
 
-  [[nodiscard]] inline std::unique_ptr<mpcf::EmptyTask<void>> execute_empty_task()
+  [[nodiscard]] inline std::unique_ptr<sb::EmptyTask<void>> execute_empty_task()
   {
-    return execute_stoppable_task<mpcf::EmptyTask<void>>();
+    return execute_stoppable_task<sb::EmptyTask<void>>();
   }
 }
 
-#endif //MASSPCF_PY_ASYNC_SUPPORT_H
+#endif //STABLEBEAR_PY_ASYNC_SUPPORT_H

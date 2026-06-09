@@ -5,7 +5,7 @@
 
 #include <string>
 
-namespace mpcf
+namespace sb
 {
   extern const std::string PROJECT_NAME = "@PROJECT_NAME@";
   extern const std::string PROJECT_TITLE = "@PROJECT_TITLE@";

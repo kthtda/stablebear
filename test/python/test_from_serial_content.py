@@ -1,14 +1,14 @@
 import numpy as np
 import pytest
 
-import masspcf as mpcf
+import stablebear as sb
 
 
 def test_fsc_shapes():
     content = np.zeros((0, 2))
     enumeration = np.zeros((0, 2))
 
-    X = mpcf.from_serial_content(content, enumeration)
+    X = sb.from_serial_content(content, enumeration)
 
     assert len(X.shape) == 1
     assert X.shape[0] == 0
@@ -17,7 +17,7 @@ def test_fsc_shapes():
     enumeration = np.zeros((10, 20, 30, 2), dtype=np.longlong)
     enumeration[:, :, :, 1] = 1  # To make every stop > start
 
-    X = mpcf.from_serial_content(content, enumeration)
+    X = sb.from_serial_content(content, enumeration)
 
     assert len(X.shape) == 3
     assert X.shape[0] == 10
@@ -29,9 +29,9 @@ def test_fsc_single():
     content = np.array([[0.0, 10.0], [10.0, 20.0], [20.0, 30.0]])
     enumeration = np.array([[0, 3]])
 
-    X = mpcf.from_serial_content(content, enumeration)
+    X = sb.from_serial_content(content, enumeration)
 
-    assert X[0] == mpcf.Pcf(content[0:3])
+    assert X[0] == sb.Pcf(content[0:3])
 
 
 def test_fsc_multiple():
@@ -40,10 +40,10 @@ def test_fsc_multiple():
     )
     enumeration = np.array([[0, 3], [3, 5]])
 
-    X = mpcf.from_serial_content(content, enumeration)
+    X = sb.from_serial_content(content, enumeration)
 
-    assert X[0] == mpcf.Pcf(content[0:3])
-    assert X[1] == mpcf.Pcf(content[3:5])
+    assert X[0] == sb.Pcf(content[0:3])
+    assert X[1] == sb.Pcf(content[3:5])
 
 
 def test_fsc_multidim():
@@ -69,16 +69,16 @@ def test_fsc_multidim():
 
     enumeration = np.array([[[0, 3], [3, 5]], [[5, 9], [9, 10]], [[10, 13], [13, 15]]])
 
-    X = mpcf.from_serial_content(content, enumeration)
+    X = sb.from_serial_content(content, enumeration)
 
     assert X.shape == (3, 2)
 
-    assert X[0, 0] == mpcf.Pcf(content[enumeration[0, 0, 0] : enumeration[0, 0, 1]])
-    assert X[0, 1] == mpcf.Pcf(content[enumeration[0, 1, 0] : enumeration[0, 1, 1]])
-    assert X[1, 0] == mpcf.Pcf(content[enumeration[1, 0, 0] : enumeration[1, 0, 1]])
-    assert X[1, 1] == mpcf.Pcf(content[enumeration[1, 1, 0] : enumeration[1, 1, 1]])
-    assert X[2, 0] == mpcf.Pcf(content[enumeration[2, 0, 0] : enumeration[2, 0, 1]])
-    assert X[2, 1] == mpcf.Pcf(content[enumeration[2, 1, 0] : enumeration[2, 1, 1]])
+    assert X[0, 0] == sb.Pcf(content[enumeration[0, 0, 0] : enumeration[0, 0, 1]])
+    assert X[0, 1] == sb.Pcf(content[enumeration[0, 1, 0] : enumeration[0, 1, 1]])
+    assert X[1, 0] == sb.Pcf(content[enumeration[1, 0, 0] : enumeration[1, 0, 1]])
+    assert X[1, 1] == sb.Pcf(content[enumeration[1, 1, 0] : enumeration[1, 1, 1]])
+    assert X[2, 0] == sb.Pcf(content[enumeration[2, 0, 0] : enumeration[2, 0, 1]])
+    assert X[2, 1] == sb.Pcf(content[enumeration[2, 1, 0] : enumeration[2, 1, 1]])
 
 
 def test_fsc_stop_le_start_throws():
@@ -88,7 +88,7 @@ def test_fsc_stop_le_start_throws():
     enumeration = np.array([[3, 0], [3, 5]])
 
     with pytest.raises(ValueError):
-        X = mpcf.from_serial_content(content, enumeration)
+        X = sb.from_serial_content(content, enumeration)
 
 
 def test_fsc_dtypes():
@@ -102,14 +102,14 @@ def test_fsc_dtypes():
     )
     enumeration = np.array([[0, 3], [3, 5]])
 
-    X32 = mpcf.from_serial_content(content32, enumeration)
-    assert X32.dtype == mpcf.pcf32
+    X32 = sb.from_serial_content(content32, enumeration)
+    assert X32.dtype == sb.pcf32
 
-    X64 = mpcf.from_serial_content(content64, enumeration)
-    assert X64.dtype == mpcf.pcf64
+    X64 = sb.from_serial_content(content64, enumeration)
+    assert X64.dtype == sb.pcf64
 
-    X32_64 = mpcf.from_serial_content(content32, enumeration, dtype=mpcf.pcf64)
-    assert X32_64.dtype == mpcf.pcf64
+    X32_64 = sb.from_serial_content(content32, enumeration, dtype=sb.pcf64)
+    assert X32_64.dtype == sb.pcf64
 
-    X64_32 = mpcf.from_serial_content(content32, enumeration, dtype=mpcf.pcf32)
-    assert X64_32.dtype == mpcf.pcf32
+    X64_32 = sb.from_serial_content(content32, enumeration, dtype=sb.pcf32)
+    assert X64_32.dtype == sb.pcf32

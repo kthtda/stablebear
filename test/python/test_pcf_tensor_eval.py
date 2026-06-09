@@ -16,22 +16,22 @@ import numpy as np
 import numpy.testing as npt
 import pytest
 
-import masspcf as mpcf
+import stablebear as sb
 
 
 # f(t) = 1 on [0,1), 2 on [1,3), 5 on [3,inf)
 def make_f(np_dtype):
-    return mpcf.Pcf(np.array([[0, 1], [1, 2], [3, 5]], dtype=np_dtype))
+    return sb.Pcf(np.array([[0, 1], [1, 2], [3, 5]], dtype=np_dtype))
 
 
 # g(t) = 3 on [0,2), 1 on [2,inf)
 def make_g(np_dtype):
-    return mpcf.Pcf(np.array([[0, 3], [2, 1]], dtype=np_dtype))
+    return sb.Pcf(np.array([[0, 3], [2, 1]], dtype=np_dtype))
 
 
 def make_1d_tensor(pcf_dtype, np_dtype):
     """Create a 1D PcfTensor [f, g]."""
-    X = mpcf.zeros((2,), dtype=pcf_dtype)
+    X = sb.zeros((2,), dtype=pcf_dtype)
     X[0] = make_f(np_dtype)
     X[1] = make_g(np_dtype)
     return X
@@ -39,7 +39,7 @@ def make_1d_tensor(pcf_dtype, np_dtype):
 
 def make_2d_tensor(pcf_dtype, np_dtype):
     """Create a 2D PcfTensor [[f, g], [g, f]]."""
-    X = mpcf.zeros((2, 2), dtype=pcf_dtype)
+    X = sb.zeros((2, 2), dtype=pcf_dtype)
     X[0, 0] = make_f(np_dtype)
     X[0, 1] = make_g(np_dtype)
     X[1, 0] = make_g(np_dtype)
@@ -48,10 +48,10 @@ def make_2d_tensor(pcf_dtype, np_dtype):
 
 
 pcf_params = [
-    pytest.param((mpcf.pcf32, np.float32), id="pcf32"),
-    pytest.param((mpcf.pcf64, np.float64), id="pcf64"),
-    pytest.param((mpcf.pcf32i, np.int32), id="pcf32i"),
-    pytest.param((mpcf.pcf64i, np.int64), id="pcf64i"),
+    pytest.param((sb.pcf32, np.float32), id="pcf32"),
+    pytest.param((sb.pcf64, np.float64), id="pcf64"),
+    pytest.param((sb.pcf32i, np.int32), id="pcf32i"),
+    pytest.param((sb.pcf64i, np.int64), id="pcf64i"),
 ]
 
 
@@ -139,7 +139,7 @@ class TestPcfTensorEvalArray:
     def test_float_tensor_input(self, dtypes, float_dtype):
         pcf_dtype, np_dtype = dtypes
         X = make_1d_tensor(pcf_dtype, np_dtype)
-        t = mpcf.FloatTensor(np.array([0, 5], dtype=float_dtype))
+        t = sb.FloatTensor(np.array([0, 5], dtype=float_dtype))
         result = X(t)
         assert result.shape == (2, 2)
         npt.assert_array_almost_equal(result, [[1, 5], [3, 1]])
@@ -155,15 +155,15 @@ class TestPcfTensorEvalParallel:
     @pytest.fixture(autouse=True)
     def low_threshold(self):
         """Temporarily lower the parallel threshold for these tests."""
-        old = mpcf.system.get_parallel_eval_threshold()
-        mpcf.system.set_parallel_eval_threshold(4)
+        old = sb.system.get_parallel_eval_threshold()
+        sb.system.set_parallel_eval_threshold(4)
         yield
-        mpcf.system.set_parallel_eval_threshold(old)
+        sb.system.set_parallel_eval_threshold(old)
 
-    def _make_tensor(self, n, np_dtype, pcf_dtype=mpcf.pcf64):
-        X = mpcf.zeros((n,), dtype=pcf_dtype)
+    def _make_tensor(self, n, np_dtype, pcf_dtype=sb.pcf64):
+        X = sb.zeros((n,), dtype=pcf_dtype)
         for i in range(n):
-            X[i] = mpcf.Pcf(np.array([[0, i + 1], [1, i + 2]], dtype=np_dtype))
+            X[i] = sb.Pcf(np.array([[0, i + 1], [1, i + 2]], dtype=np_dtype))
         return X
 
     def test_scalar_eval_parallel(self):
@@ -183,10 +183,10 @@ class TestPcfTensorEvalParallel:
             assert result[i, 1] == pytest.approx(i + 2)
 
     def test_2d_tensor_scalar_parallel(self):
-        X = mpcf.zeros((5, 4), dtype=mpcf.pcf64)
+        X = sb.zeros((5, 4), dtype=sb.pcf64)
         for i in range(5):
             for j in range(4):
-                X[i, j] = mpcf.Pcf(np.array(
+                X[i, j] = sb.Pcf(np.array(
                     [[0, i * 4 + j], [1, 0]], dtype=np.float64))
         result = X(0.5)
         assert result.shape == (5, 4)
@@ -203,15 +203,15 @@ class TestPcfTensorEvalParallel:
         parallel_result = X(t)
 
         # Sequential (raise threshold above tensor size)
-        mpcf.system.set_parallel_eval_threshold(100)
+        sb.system.set_parallel_eval_threshold(100)
         sequential_result = X(t)
 
         npt.assert_array_equal(parallel_result, sequential_result)
 
     def test_float32(self):
-        X = mpcf.zeros((10,), dtype=mpcf.pcf32)
+        X = sb.zeros((10,), dtype=sb.pcf32)
         for i in range(10):
-            X[i] = mpcf.Pcf(np.array([[0, i + 1], [1, i + 2]], dtype=np.float32))
+            X[i] = sb.Pcf(np.array([[0, i + 1], [1, i + 2]], dtype=np.float32))
         result = X(np.float32(0.5))
         assert result.shape == (10,)
         assert result.dtype == np.float32
@@ -221,11 +221,11 @@ class TestPcfTensorEvalParallel:
 
 class TestPcfTensorEvalErrors:
     def test_negative_time_raises(self):
-        X = make_1d_tensor(mpcf.pcf32, np.float32)
+        X = make_1d_tensor(sb.pcf32, np.float32)
         with pytest.raises(Exception):
             X(-1.0)
 
     def test_negative_time_in_array_raises(self):
-        X = make_1d_tensor(mpcf.pcf32, np.float32)
+        X = make_1d_tensor(sb.pcf32, np.float32)
         with pytest.raises(Exception):
             X(np.array([0.5, -1.0], dtype=np.float32))

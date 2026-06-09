@@ -7,7 +7,7 @@ requires = [
 build-backend = "scikit_build_core.build"
 
 [project]
-name = "masspcf"
+name = "stablebear"
 version = "0.4.1"
 authors = [ { name="Bjorn H. Wehlin", email="bwehlin@kth.se" } ]
 description = "Massively parallel computations for piecewise constant functions"
@@ -31,7 +31,7 @@ dependencies = [ "numpy>=2.0", "tqdm", "matplotlib" ]
 [tool.scikit-build]
 minimum-version = "build-system.requires"
 cmake.build-type = "Release"
-wheel.packages = ["masspcf"]
+wheel.packages = ["stablebear"]
 sdist.exclude = [
     ".*",
     "3rd/cuda",
@@ -64,20 +64,20 @@ sdist.exclude = [
     "examples",
     "gpucov",
     "test",
-    "masspcf/*.so",
-    "masspcf/*.pyi",
-    "masspcf/py.typed",
-    "masspcf/_mpcf_cpu",
-    "masspcf/_mpcf_cuda*",
-    "masspcf/_mpcf_cpp_cpu",
-    "masspcf/_mpcf_cpp_cuda",
+    "stablebear/*.so",
+    "stablebear/*.pyi",
+    "stablebear/py.typed",
+    "stablebear/_sb_cpu",
+    "stablebear/_sb_cuda*",
+    "stablebear/_sb_cpp_cpu",
+    "stablebear/_sb_cpp_cuda",
     "collect_sources*",
     "copydbg",
     "copypy",
     "environment.clion",
     "install_manifest.txt",
     "make_license_file.py",
-    "mpcf.LICENSE.input",
+    "sb.LICENSE.input",
     "pyrightconfig.json",
     "remove_cuda_from_env.bat",
     "run_coverage.sh",
@@ -88,19 +88,19 @@ sdist.exclude = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/bwehlin/masspcf"
-Issues = "https://github.com/bwehlin/masspcf/issues"
+Homepage = "https://github.com/bwehlin/stablebear"
+Issues = "https://github.com/bwehlin/stablebear/issues"
 
 [tool.coverage.run]
-source = ["masspcf"]
+source = ["stablebear"]
 relative_files = true
 
 [tool.coverage.paths]
 # Map installed copies back to the source tree so the HTML report shows
-# short paths like "masspcf/io.py" instead of the full tool-cache path.
-masspcf = [
-    "masspcf",               # source tree (editable / local runs)
-    "*/masspcf",             # any prefix, e.g. site-packages/masspcf
+# short paths like "stablebear/io.py" instead of the full tool-cache path.
+stablebear = [
+    "stablebear",               # source tree (editable / local runs)
+    "*/stablebear",             # any prefix, e.g. site-packages/stablebear
 ]
 
 [tool.cibuildwheel]
@@ -119,7 +119,7 @@ skip = ["*-win32", "*-manylinux_i686", "*-musllinux*",
 # runner. The `arm64` wheel is tested natively; the `x86_64` wheel is
 # tested under Rosetta 2. Rosetta does not implement AVX/AVX2/FMA, so the
 # macOS x86_64 slice is built at the SSE4.2 (`v2`) baseline — see the
-# MPCF_X86_64_LEVEL block in CMakeLists.txt — which Rosetta and every
+# SB_X86_64_LEVEL block in CMakeLists.txt — which Rosetta and every
 # Intel Mac support. This keeps x86_64 testing on Apple Silicon without
 # depending on the Intel CI runner that GitHub retires in 2027.
 [tool.cibuildwheel.macos]
@@ -151,4 +151,4 @@ ignore = ["E501"]  # No line length enforcement
 "__init__.py" = ["F401"]  # Allow unused imports (re-exports)
 
 [tool.ruff.lint.isort]
-known-first-party = ["masspcf"]
+known-first-party = ["stablebear"]

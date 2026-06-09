@@ -1,6 +1,8 @@
 #!/bin/bash
 SITE_PKG=$(python3 -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')
 
-cp -v masspcf/*.py "$SITE_PKG/masspcf/"
-cp -v build/debug/libmpcf_cpp.so "$SITE_PKG/masspcf/mpcf_cpp.cpython-311-x86_64-linux-gnu.so"
+cp -v stablebear/*.py "$SITE_PKG/stablebear/"
+cp -v cmake-build-debug/_sb_cpu.*.so "$SITE_PKG/stablebear/"
+cp -v cmake-build-debug/_gpu_detect.*.so "$SITE_PKG/stablebear/" 2>/dev/null || true
+cp -v cmake-build-debug/_sb_cuda*.so "$SITE_PKG/stablebear/" 2>/dev/null || true
 

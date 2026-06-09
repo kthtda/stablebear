@@ -14,8 +14,8 @@
 * limitations under the License.
 */
 
-#include <mpcf/tensor.hpp>
-#include <mpcf/functional/pcf.hpp>
+#include <sbear/tensor.hpp>
+#include <sbear/functional/pcf.hpp>
 
 #include "py_make_from_serial_content.hpp"
 #include "../py_tensor.hpp"
@@ -27,7 +27,7 @@
 
 namespace py = pybind11;
 
-namespace mpcf_py
+namespace sb_py
 {
 
   namespace detail
@@ -37,12 +37,12 @@ namespace mpcf_py
 
 
   template <typename Tt, typename Tv>
-  mpcf::Tensor<mpcf::Pcf<Tt, Tv>>
+  sb::Tensor<sb::Pcf<Tt, Tv>>
   make_from_serial_content(py::array_t<Tt> content, py::array_t<detail::EnumerationDt> enumeration)
   {
-    using PcfT = mpcf::Pcf<Tt, Tv>;
+    using PcfT = sb::Pcf<Tt, Tv>;
     using PointT = typename PcfT::point_type;
-    using TensorT = mpcf::Tensor<PcfT>;
+    using TensorT = sb::Tensor<PcfT>;
 
     auto content_buf = content.request();
     auto enumeration_buf = enumeration.request();
@@ -66,7 +66,7 @@ namespace mpcf_py
 
     TensorT target(targetShape);
 
-    mpcf::walk(target, [&target, &content, &enumeration](const std::vector<size_t>& idx) {
+    sb::walk(target, [&target, &content, &enumeration](const std::vector<size_t>& idx) {
 
       auto enumerationBaseOffset = std::inner_product(idx.begin(), idx.end(), enumeration.strides(), 0_uz);
       enumerationBaseOffset /= enumeration.itemsize();
@@ -81,7 +81,7 @@ namespace mpcf_py
       // TODO: Throw if stop <= start
       if (start >= stop)
       {
-        throw py::value_error("Item in index " + mpcf::index_to_string(idx) + " in the enumeration has start >= stop (" + std::to_string(start) + " >= " + std::to_string(stop) + ")");
+        throw py::value_error("Item in index " + sb::index_to_string(idx) + " in the enumeration has start >= stop (" + std::to_string(start) + " >= " + std::to_string(stop) + ")");
       }
 
       std::vector<PointT> pts;
@@ -102,8 +102,8 @@ namespace mpcf_py
 
   void register_make_from_serial_content(py::module_& m)
   {
-    m.def("make_from_serial_content_32", &make_from_serial_content<mpcf::float32_t, mpcf::float32_t>);
-    m.def("make_from_serial_content_64", &make_from_serial_content<mpcf::float64_t, mpcf::float64_t>);
+    m.def("make_from_serial_content_32", &make_from_serial_content<sb::float32_t, sb::float32_t>);
+    m.def("make_from_serial_content_64", &make_from_serial_content<sb::float64_t, sb::float64_t>);
   }
 
 }

@@ -16,20 +16,20 @@
 
 #pragma once
 
-#ifndef MASSPCF_PY_SYMMETRIC_MATRIX_H
-#define MASSPCF_PY_SYMMETRIC_MATRIX_H
+#ifndef STABLEBEAR_PY_SYMMETRIC_MATRIX_H
+#define STABLEBEAR_PY_SYMMETRIC_MATRIX_H
 
 #include "pybind.hpp"
 #include <pybind11/numpy.h>
 
-#include <mpcf/symmetric_matrix.hpp>
-#include <mpcf/tensor.hpp>
+#include <sbear/symmetric_matrix.hpp>
+#include <sbear/tensor.hpp>
 
 #include "py_np_support.hpp"
 
 #include <sstream>
 
-namespace mpcf_py
+namespace sb_py
 {
 
   void register_symmetric_matrix(pybind11::module_& m);
@@ -38,7 +38,7 @@ namespace mpcf_py
   void register_symmetric_matrix_bindings(pybind11::module_& m, const std::string& suffix)
   {
     namespace py = pybind11;
-    using MatT = mpcf::SymmetricMatrix<T>;
+    using MatT = sb::SymmetricMatrix<T>;
 
     py::class_<MatT>(m, ("SymmetricMatrix" + suffix).c_str(), py::buffer_protocol())
       .def(py::init<size_t>(), py::arg("n"))
@@ -96,7 +96,7 @@ namespace mpcf_py
         return sm;
       })
       .def("allclose", [](const MatT& self, const MatT& rhs, double atol, double rtol){
-        return mpcf::allclose(self, rhs, T(atol), T(rtol));
+        return sb::allclose(self, rhs, T(atol), T(rtol));
       }, py::arg("other"), py::arg("atol") = 1e-8, py::arg("rtol") = 1e-5)
       .def("__repr__", [suffix](const MatT& self) {
         std::ostringstream oss;
@@ -108,4 +108,4 @@ namespace mpcf_py
 
 }
 
-#endif // MASSPCF_PY_SYMMETRIC_MATRIX_H
+#endif // STABLEBEAR_PY_SYMMETRIC_MATRIX_H

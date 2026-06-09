@@ -2,15 +2,15 @@
 About
 =====
 
-Citing masspcf
-===============
+Citing stablebear
+=================
 
-If you use **masspcf** in your research, please use the following BibTeX citation.
+If you use **stablebear** in your research, please use the following BibTeX citation.
 
 
 .. code-block:: text
 
-    @misc{masspcf,
+    @misc{stablebear,
         title={Massively Parallel Computation of Similarity Matrices from Piecewise Constant Invariants},
         author={Bj\"{o}rn H. Wehlin},
         year={2024},
@@ -33,7 +33,7 @@ For more information about WASP, please visit https://wasp-sweden.org.
 Trademarks
 ===========
 
-masspcf is an independent open-source project and is not affiliated with, endorsed by, or sponsored by NVIDIA Corporation. NVIDIA, CUDA, GeForce, Tesla, and other product names are trademarks of NVIDIA Corporation. All other trademarks are property of their respective owners.
+stablebear is an independent open-source project and is not affiliated with, endorsed by, or sponsored by NVIDIA Corporation. NVIDIA, CUDA, GeForce, Tesla, and other product names are trademarks of NVIDIA Corporation. All other trademarks are property of their respective owners.
 
 
 .. include:: ../LICENSE.rst

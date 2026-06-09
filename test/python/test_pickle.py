@@ -16,8 +16,8 @@ import pickle
 
 import numpy as np
 
-import masspcf as mpcf
-from masspcf.persistence import Barcode
+import stablebear as sb
+from stablebear.persistence import Barcode
 
 
 # --- Helpers ---
@@ -41,17 +41,17 @@ def _assert_tensor_roundtrip(t):
 
 def test_pickle_float32_tensor():
     _assert_tensor_roundtrip(
-        mpcf.FloatTensor(np.array([1.0, 2.0, 3.0], dtype=np.float32)))
+        sb.FloatTensor(np.array([1.0, 2.0, 3.0], dtype=np.float32)))
 
 
 def test_pickle_float64_tensor():
     _assert_tensor_roundtrip(
-        mpcf.FloatTensor(np.array([[1.0, 2.0], [3.0, 4.0]], dtype=np.float64)))
+        sb.FloatTensor(np.array([[1.0, 2.0], [3.0, 4.0]], dtype=np.float64)))
 
 
 def test_pickle_float_tensor_3d():
     _assert_tensor_roundtrip(
-        mpcf.FloatTensor(np.arange(24, dtype=np.float32).reshape(2, 3, 4)))
+        sb.FloatTensor(np.arange(24, dtype=np.float32).reshape(2, 3, 4)))
 
 
 # --- Int tensors ---
@@ -59,12 +59,12 @@ def test_pickle_float_tensor_3d():
 
 def test_pickle_int32_tensor():
     _assert_tensor_roundtrip(
-        mpcf.IntTensor(np.array([10, 20, 30], dtype=np.int32)))
+        sb.IntTensor(np.array([10, 20, 30], dtype=np.int32)))
 
 
 def test_pickle_int64_tensor():
     _assert_tensor_roundtrip(
-        mpcf.IntTensor(np.array([[1, 2], [3, 4]], dtype=np.int64)))
+        sb.IntTensor(np.array([[1, 2], [3, 4]], dtype=np.int64)))
 
 
 # --- Bool tensor ---
@@ -72,27 +72,27 @@ def test_pickle_int64_tensor():
 
 def test_pickle_bool_tensor():
     _assert_tensor_roundtrip(
-        mpcf.BoolTensor(np.array([[True, False], [False, True]])))
+        sb.BoolTensor(np.array([[True, False], [False, True]])))
 
 
 # --- PCF tensors ---
 
 
 def test_pickle_pcf32_tensor():
-    f = mpcf.Pcf(np.array([[0.0, 1.0], [1.0, 2.0]], dtype=np.float32))
-    g = mpcf.Pcf(np.array([[0.0, 3.0], [2.0, 4.0]], dtype=np.float32))
-    _assert_tensor_roundtrip(mpcf.PcfTensor([f, g]))
+    f = sb.Pcf(np.array([[0.0, 1.0], [1.0, 2.0]], dtype=np.float32))
+    g = sb.Pcf(np.array([[0.0, 3.0], [2.0, 4.0]], dtype=np.float32))
+    _assert_tensor_roundtrip(sb.PcfTensor([f, g]))
 
 
 def test_pickle_pcf64_tensor():
-    f = mpcf.Pcf(np.array([[0.0, 1.0], [1.0, 2.0]], dtype=np.float64))
-    _assert_tensor_roundtrip(mpcf.PcfTensor([f]))
+    f = sb.Pcf(np.array([[0.0, 1.0], [1.0, 2.0]], dtype=np.float64))
+    _assert_tensor_roundtrip(sb.PcfTensor([f]))
 
 
 def test_pickle_pcf_tensor_2d():
-    fs = [mpcf.Pcf(np.array([[0, float(i)], [1, float(i + 1)]], dtype=np.float32))
+    fs = [sb.Pcf(np.array([[0, float(i)], [1, float(i + 1)]], dtype=np.float32))
           for i in range(6)]
-    t = mpcf.PcfTensor(fs).reshape((2, 3))
+    t = sb.PcfTensor(fs).reshape((2, 3))
     _assert_tensor_roundtrip(t)
 
 
@@ -100,30 +100,30 @@ def test_pickle_pcf_tensor_2d():
 
 
 def test_pickle_pcf_f32():
-    f = mpcf.Pcf(np.array([[0.0, 1.0], [1.0, 2.0], [3.0, 0.5]], dtype=np.float32))
+    f = sb.Pcf(np.array([[0.0, 1.0], [1.0, 2.0], [3.0, 0.5]], dtype=np.float32))
     restored = _pickle_roundtrip(f)
-    assert isinstance(restored, mpcf.Pcf)
+    assert isinstance(restored, sb.Pcf)
     assert f == restored
 
 
 def test_pickle_pcf_f64():
-    f = mpcf.Pcf(np.array([[0.0, 1.0], [1.0, 2.0]], dtype=np.float64))
+    f = sb.Pcf(np.array([[0.0, 1.0], [1.0, 2.0]], dtype=np.float64))
     restored = _pickle_roundtrip(f)
-    assert isinstance(restored, mpcf.Pcf)
+    assert isinstance(restored, sb.Pcf)
     assert f == restored
 
 
 def test_pickle_pcf_i32():
-    f = mpcf.Pcf(np.array([[0, 1], [2, 3]], dtype=np.int32))
+    f = sb.Pcf(np.array([[0, 1], [2, 3]], dtype=np.int32))
     restored = _pickle_roundtrip(f)
-    assert isinstance(restored, mpcf.Pcf)
+    assert isinstance(restored, sb.Pcf)
     assert f == restored
 
 
 def test_pickle_pcf_i64():
-    f = mpcf.Pcf(np.array([[0, 1], [2, 3]], dtype=np.int64))
+    f = sb.Pcf(np.array([[0, 1], [2, 3]], dtype=np.int64))
     restored = _pickle_roundtrip(f)
-    assert isinstance(restored, mpcf.Pcf)
+    assert isinstance(restored, sb.Pcf)
     assert f == restored
 
 
@@ -148,12 +148,12 @@ def test_pickle_barcode_f32():
 
 
 def test_pickle_distance_matrix():
-    dm = mpcf.DistanceMatrix(3, dtype=mpcf.float64)
+    dm = sb.DistanceMatrix(3, dtype=sb.float64)
     dm[0, 1] = 1.0
     dm[0, 2] = 2.0
     dm[1, 2] = 3.0
     restored = _pickle_roundtrip(dm)
-    assert isinstance(restored, mpcf.DistanceMatrix)
+    assert isinstance(restored, sb.DistanceMatrix)
     assert restored.size == dm.size
     assert restored[0, 1] == 1.0
     assert restored[0, 2] == 2.0
@@ -164,12 +164,12 @@ def test_pickle_distance_matrix():
 
 
 def test_pickle_symmetric_matrix():
-    sm = mpcf.SymmetricMatrix(3, dtype=mpcf.float64)
+    sm = sb.SymmetricMatrix(3, dtype=sb.float64)
     sm[0, 0] = 1.0
     sm[0, 1] = 2.0
     sm[1, 1] = 3.0
     restored = _pickle_roundtrip(sm)
-    assert isinstance(restored, mpcf.SymmetricMatrix)
+    assert isinstance(restored, sb.SymmetricMatrix)
     assert restored.size == sm.size
     assert restored[0, 0] == 1.0
     assert restored[0, 1] == 2.0

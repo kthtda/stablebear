@@ -23,27 +23,27 @@ import importlib.util
 import pathlib
 import sys
 
-def _find_cuda_extension(masspcf_dir: pathlib.Path):
-    candidates = list(masspcf_dir.glob("_mpcf_cuda*.pyd")) + list(masspcf_dir.glob("_mpcf_cuda*.so"))
+def _find_cuda_extension(stablebear_dir: pathlib.Path):
+    candidates = list(stablebear_dir.glob("_sb_cuda*.pyd")) + list(stablebear_dir.glob("_sb_cuda*.so"))
     return candidates[0] if candidates else None
 
 def _module_name_from_path(path: pathlib.Path) -> str:
     return path.name.split(".")[0]
 
-spec = importlib.util.find_spec("masspcf")
+spec = importlib.util.find_spec("stablebear")
 if spec is None or not spec.origin:
-    print("masspcf package not importable", file=sys.stderr)
+    print("stablebear package not importable", file=sys.stderr)
     sys.exit(1)
 
-masspcf_dir = pathlib.Path(spec.origin).parent
-cuda_ext = _find_cuda_extension(masspcf_dir)
+stablebear_dir = pathlib.Path(spec.origin).parent
+cuda_ext = _find_cuda_extension(stablebear_dir)
 if cuda_ext is None:
     print("No CUDA extension module in this wheel", file=sys.stderr)
     sys.exit(10)
 
-_cudart_path = masspcf_dir / "_cudart_preload.py"
+_cudart_path = stablebear_dir / "_cudart_preload.py"
 if not _cudart_path.exists():
-    print("masspcf._cudart_preload.py not found", file=sys.stderr)
+    print("stablebear._cudart_preload.py not found", file=sys.stderr)
     sys.exit(1)
 _cudart_spec = importlib.util.spec_from_file_location("_cudart_preload", _cudart_path)
 if _cudart_spec is None or _cudart_spec.loader is None:

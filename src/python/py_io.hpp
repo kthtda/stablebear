@@ -13,8 +13,8 @@
 // limitations under the License.
 
 
-#ifndef MASSPCF_PY_IO_H
-#define MASSPCF_PY_IO_H
+#ifndef STABLEBEAR_PY_IO_H
+#define STABLEBEAR_PY_IO_H
 
 #include "pybind.hpp"
 #include <iostream>
@@ -24,7 +24,7 @@
 
 namespace py = pybind11;
 
-namespace mpcf_py
+namespace sb_py
 {
   class PythonIStreamBuf : public std::streambuf {
   public:
@@ -65,4 +65,4 @@ namespace mpcf_py
   void register_io(pybind11::module_& m);
 }
 
-#endif //MASSPCF_PY_IO_H
+#endif //STABLEBEAR_PY_IO_H

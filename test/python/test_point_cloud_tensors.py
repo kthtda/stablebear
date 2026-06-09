@@ -14,14 +14,14 @@
 
 import numpy as np
 
-import masspcf as mpcf
+import stablebear as sb
 
 
 def test_can_create_point_clouds():
-    X = mpcf.zeros((2,), dtype=mpcf.pcloud64)
+    X = sb.zeros((2,), dtype=sb.pcloud64)
 
-    assert isinstance(X, mpcf.PointCloudTensor)
-    assert X.dtype == mpcf.pcloud64
+    assert isinstance(X, sb.PointCloudTensor)
+    assert X.dtype == sb.pcloud64
 
     X[0] = np.random.randn(10, 2)
     X[1] = np.random.randn(20, 2)
@@ -29,10 +29,10 @@ def test_can_create_point_clouds():
     assert X[0].shape == (10, 2)
     assert X[1].shape == (20, 2)
 
-    Y = mpcf.zeros((2, 3), dtype=mpcf.pcloud32)
+    Y = sb.zeros((2, 3), dtype=sb.pcloud32)
 
-    assert isinstance(Y, mpcf.PointCloudTensor)
-    assert Y.dtype == mpcf.pcloud32
+    assert isinstance(Y, sb.PointCloudTensor)
+    assert Y.dtype == sb.pcloud32
 
     Y[0, 0] = np.random.randn(30, 2, 20)
     Y[1, 1] = np.random.randn(40, 15, 10)
@@ -43,13 +43,13 @@ def test_can_create_point_clouds():
 
 def test_stored_is_same_as_numpy():
     shape = (10, 20, 30)
-    pclouds = mpcf.zeros(shape, dtype=mpcf.pcloud64)
+    pclouds = sb.zeros(shape, dtype=sb.pcloud64)
     X = np.random.randn(10, 2).astype(np.float64)
 
     pclouds[0, 1, 2] = X
     assert pclouds[0, 1, 2].array_equal(X)
 
-    pclouds = mpcf.zeros(shape, dtype=mpcf.pcloud32)
+    pclouds = sb.zeros(shape, dtype=sb.pcloud32)
     X = np.random.randn(10, 2).astype(np.float32)
 
     pclouds[0, 1, 2] = X

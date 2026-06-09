@@ -16,14 +16,14 @@
 
 #include <gtest/gtest.h>
 
-#include <mpcf/functional/pcf.hpp>
-#include <mpcf/distance_matrix.hpp>
-#include <mpcf/task.hpp>
-#include <mpcf/functional/operations.cuh>
-#include <mpcf/algorithms/functional/matrix_integrate.hpp>
+#include <sbear/functional/pcf.hpp>
+#include <sbear/distance_matrix.hpp>
+#include <sbear/task.hpp>
+#include <sbear/functional/operations.cuh>
+#include <sbear/algorithms/functional/matrix_integrate.hpp>
 
 #ifdef BUILD_WITH_CUDA
-#include <mpcf/cuda/cuda_matrix_integrate_api.hpp>
+#include <sbear/cuda/cuda_matrix_integrate_api.hpp>
 #endif
 
 #include <vector>
@@ -47,21 +47,21 @@ namespace
   TYPED_TEST(PcfL1DirectTest, TwoPointPcfIntegrate)
   {
     using T = TypeParam;
-    mpcf::Pcf<T, T> f(std::vector<mpcf::TimePoint<T, T>>({ {T(0), T(3)}, {T(1), T(0)} }));
-    mpcf::Pcf<T, T> g(std::vector<mpcf::TimePoint<T, T>>({ {T(0), T(1)}, {T(2), T(0)} }));
+    sb::Pcf<T, T> f(std::vector<sb::TimePoint<T, T>>({ {T(0), T(3)}, {T(1), T(0)} }));
+    sb::Pcf<T, T> g(std::vector<sb::TimePoint<T, T>>({ {T(0), T(1)}, {T(2), T(0)} }));
 
-    auto op = mpcf::OperationL1Dist<T, T>{};
-    T result = op(mpcf::integrate(f, g, op));
+    auto op = sb::OperationL1Dist<T, T>{};
+    T result = op(sb::integrate(f, g, op));
 
     EXPECT_NEAR(result, T(3), T(1e-6));
   }
 
   // Parameterized on precision and hardware
-  template <typename T, mpcf::Hardware Hw>
+  template <typename T, sb::Hardware Hw>
   struct TestConfig
   {
     using value_type = T;
-    static constexpr mpcf::Hardware hw = Hw;
+    static constexpr sb::Hardware hw = Hw;
   };
 
   template <typename Cfg>
@@ -69,45 +69,45 @@ namespace
   {
   public:
     using T = typename Cfg::value_type;
-    using PcfT = mpcf::Pcf<T, T>;
+    using PcfT = sb::Pcf<T, T>;
 
     void compute_l1()
     {
-      std::unique_ptr<mpcf::StoppableTask<void>> task;
+      std::unique_ptr<sb::StoppableTask<void>> task;
 
-      if constexpr (Cfg::hw == mpcf::Hardware::CUDA)
+      if constexpr (Cfg::hw == sb::Hardware::CUDA)
       {
 #ifdef BUILD_WITH_CUDA
-        if (mpcf::get_num_cuda_devices() == 0)
+        if (sb::get_num_cuda_devices() == 0)
         {
           GTEST_SKIP() << "No CUDA devices available";
           return;
         }
-        task = mpcf::create_cuda_block_integrate_l1_task(m_dm, m_pcfs);
+        task = sb::create_cuda_block_integrate_l1_task(m_dm, m_pcfs);
 #else
         GTEST_SKIP() << "CUDA not available";
 #endif
       }
       else
       {
-        auto op = mpcf::OperationL1Dist<T, T>{};
-        task = std::make_unique<mpcf::CpuPairwiseIntegrationTask<decltype(op), decltype(m_pcfs.cbegin()), mpcf::DistanceMatrix<T>, false>>(
+        auto op = sb::OperationL1Dist<T, T>{};
+        task = std::make_unique<sb::CpuPairwiseIntegrationTask<decltype(op), decltype(m_pcfs.cbegin()), sb::DistanceMatrix<T>, false>>(
             m_dm, m_pcfs.cbegin(), m_pcfs.cend(), op);
       }
 
-      task->start_async(mpcf::default_executor());
+      task->start_async(sb::default_executor());
       task->future().get();
     }
 
     std::vector<PcfT> m_pcfs;
-    mpcf::DistanceMatrix<T> m_dm{0};
+    sb::DistanceMatrix<T> m_dm{0};
   };
 
   using IntegratorConfigs = ::testing::Types<
-      TestConfig<float, mpcf::Hardware::CPU>,
-      TestConfig<double, mpcf::Hardware::CPU>,
-      TestConfig<float, mpcf::Hardware::CUDA>,
-      TestConfig<double, mpcf::Hardware::CUDA>
+      TestConfig<float, sb::Hardware::CPU>,
+      TestConfig<double, sb::Hardware::CPU>,
+      TestConfig<float, sb::Hardware::CUDA>,
+      TestConfig<double, sb::Hardware::CUDA>
   >;
   TYPED_TEST_SUITE(PcfL1IntegratorFixture, IntegratorConfigs);
 
@@ -115,7 +115,7 @@ namespace
   {
     using T = typename TypeParam::value_type;
     this->m_pcfs.resize(2);
-    this->m_dm = mpcf::DistanceMatrix<T>(2);
+    this->m_dm = sb::DistanceMatrix<T>(2);
 
     this->compute_l1();
 
@@ -125,11 +125,11 @@ namespace
   TYPED_TEST(PcfL1IntegratorFixture, TwoPointPcfL1dist)
   {
     using T = typename TypeParam::value_type;
-    using PointT = mpcf::TimePoint<T, T>;
+    using PointT = sb::TimePoint<T, T>;
 
     this->m_pcfs.emplace_back(std::vector<PointT>({{T(0), T(3)}, {T(1), T(0)}}));
     this->m_pcfs.emplace_back(std::vector<PointT>({{T(0), T(1)}, {T(2), T(0)}}));
-    this->m_dm = mpcf::DistanceMatrix<T>(2);
+    this->m_dm = sb::DistanceMatrix<T>(2);
 
     this->compute_l1();
 

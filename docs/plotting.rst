@@ -2,7 +2,7 @@
 Plotting
 ========
 
-The :py:func:`~masspcf.plotting.plot` function provides a quick way to visualize PCFs using matplotlib.
+The :py:func:`~stablebear.plotting.plot` function provides a quick way to visualize PCFs using matplotlib.
 
 A single PCF
 ============
@@ -92,7 +92,7 @@ their mean highlighted in the foreground:
 Persistence barcodes
 ====================
 
-Use :py:func:`~masspcf.plotting.plot_barcode` to visualize persistence barcodes
+Use :py:func:`~stablebear.plotting.plot_barcode` to visualize persistence barcodes
 as horizontal line segments. Each bar runs from its birth to its death value.
 Bars with infinite death are drawn as arrows extending to the right edge of the
 plot.
@@ -164,7 +164,7 @@ max_time
 
 By default, a single PCF is plotted only up to its last breakpoint. Pass ``max_time`` to extend the final constant segment::
 
-   f = mpcf.Pcf([[0, 1], [2, 3]])
+   f = sb.Pcf([[0, 1], [2, 3]])
    plotpcf(f, ax=ax, max_time=5)  # extends the plot to t=5
 
 When plotting a 1-D tensor, all elements are automatically extended to the latest breakpoint across the tensor. Passing ``max_time`` overrides this with a custom value.

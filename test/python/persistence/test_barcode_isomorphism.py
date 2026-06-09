@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from masspcf.persistence.barcode import Barcode
+from stablebear.persistence.barcode import Barcode
 
 
 def _bc(pairs, dtype=np.float64):

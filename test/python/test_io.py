@@ -17,23 +17,23 @@ import io
 import numpy as np
 import pytest
 
-import masspcf as mpcf
+import stablebear as sb
 
 
 def test_float32_tensor_roundtrip():
-    original = mpcf.FloatTensor(np.random.randn(2, 3))
+    original = sb.FloatTensor(np.random.randn(2, 3))
 
     buf = io.BytesIO()
-    mpcf.save(original, buf)
+    sb.save(original, buf)
 
     buf.seek(0)  # rewind before reading!
-    restored = mpcf.load(buf)
+    restored = sb.load(buf)
 
     assert original.array_equal(restored)
 
 
 def _make_symmetric_matrix(n, dtype):
-    mat = mpcf.SymmetricMatrix(n, dtype=dtype)
+    mat = sb.SymmetricMatrix(n, dtype=dtype)
     for i in range(n):
         for j in range(i + 1):
             mat[i, j] = float(i * n + j)
@@ -41,19 +41,19 @@ def _make_symmetric_matrix(n, dtype):
 
 
 @pytest.mark.parametrize("symmat_dtype, scalar_dtype", [
-    (mpcf.symmat32, mpcf.float32),
-    (mpcf.symmat64, mpcf.float64),
+    (sb.symmat32, sb.float32),
+    (sb.symmat64, sb.float64),
 ])
 def test_symmetric_matrix_tensor_roundtrip(symmat_dtype, scalar_dtype):
-    T = mpcf.zeros((2,), dtype=symmat_dtype)
+    T = sb.zeros((2,), dtype=symmat_dtype)
     T[0] = _make_symmetric_matrix(3, scalar_dtype)
     T[1] = _make_symmetric_matrix(4, scalar_dtype)
 
     buf = io.BytesIO()
-    mpcf.save(T, buf)
+    sb.save(T, buf)
 
     buf.seek(0)
-    restored = mpcf.load(buf)
+    restored = sb.load(buf)
 
     assert type(restored) is type(T)
     assert restored.shape == T.shape
@@ -62,18 +62,18 @@ def test_symmetric_matrix_tensor_roundtrip(symmat_dtype, scalar_dtype):
 
 
 @pytest.mark.parametrize("symmat_dtype, scalar_dtype", [
-    (mpcf.symmat32, mpcf.float32),
-    (mpcf.symmat64, mpcf.float64),
+    (sb.symmat32, sb.float32),
+    (sb.symmat64, sb.float64),
 ])
 def test_symmetric_matrix_tensor_roundtrip_empty(symmat_dtype, scalar_dtype):
-    T = mpcf.zeros((1,), dtype=symmat_dtype)
-    T[0] = mpcf.SymmetricMatrix(0, dtype=scalar_dtype)
+    T = sb.zeros((1,), dtype=symmat_dtype)
+    T[0] = sb.SymmetricMatrix(0, dtype=scalar_dtype)
 
     buf = io.BytesIO()
-    mpcf.save(T, buf)
+    sb.save(T, buf)
 
     buf.seek(0)
-    restored = mpcf.load(buf)
+    restored = sb.load(buf)
 
     assert type(restored) is type(T)
     assert restored.shape == T.shape
@@ -81,7 +81,7 @@ def test_symmetric_matrix_tensor_roundtrip_empty(symmat_dtype, scalar_dtype):
 
 
 def _make_distance_matrix(n, dtype):
-    mat = mpcf.DistanceMatrix(n, dtype=dtype)
+    mat = sb.DistanceMatrix(n, dtype=dtype)
     for i in range(n):
         for j in range(i):
             mat[i, j] = float(i * n + j + 1)
@@ -89,19 +89,19 @@ def _make_distance_matrix(n, dtype):
 
 
 @pytest.mark.parametrize("distmat_dtype, scalar_dtype", [
-    (mpcf.distmat32, mpcf.float32),
-    (mpcf.distmat64, mpcf.float64),
+    (sb.distmat32, sb.float32),
+    (sb.distmat64, sb.float64),
 ])
 def test_distance_matrix_tensor_roundtrip(distmat_dtype, scalar_dtype):
-    T = mpcf.zeros((2,), dtype=distmat_dtype)
+    T = sb.zeros((2,), dtype=distmat_dtype)
     T[0] = _make_distance_matrix(3, scalar_dtype)
     T[1] = _make_distance_matrix(4, scalar_dtype)
 
     buf = io.BytesIO()
-    mpcf.save(T, buf)
+    sb.save(T, buf)
 
     buf.seek(0)
-    restored = mpcf.load(buf)
+    restored = sb.load(buf)
 
     assert type(restored) is type(T)
     assert restored.shape == T.shape
@@ -110,18 +110,18 @@ def test_distance_matrix_tensor_roundtrip(distmat_dtype, scalar_dtype):
 
 
 @pytest.mark.parametrize("distmat_dtype, scalar_dtype", [
-    (mpcf.distmat32, mpcf.float32),
-    (mpcf.distmat64, mpcf.float64),
+    (sb.distmat32, sb.float32),
+    (sb.distmat64, sb.float64),
 ])
 def test_distance_matrix_tensor_roundtrip_empty(distmat_dtype, scalar_dtype):
-    T = mpcf.zeros((1,), dtype=distmat_dtype)
-    T[0] = mpcf.DistanceMatrix(0, dtype=scalar_dtype)
+    T = sb.zeros((1,), dtype=distmat_dtype)
+    T[0] = sb.DistanceMatrix(0, dtype=scalar_dtype)
 
     buf = io.BytesIO()
-    mpcf.save(T, buf)
+    sb.save(T, buf)
 
     buf.seek(0)
-    restored = mpcf.load(buf)
+    restored = sb.load(buf)
 
     assert type(restored) is type(T)
     assert restored.shape == T.shape

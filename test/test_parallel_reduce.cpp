@@ -16,18 +16,18 @@
 
 #include <gtest/gtest.h>
 
-#include <mpcf/functional/pcf.hpp>
-#include <mpcf/algorithms/functional/reduce.hpp>
+#include <sbear/functional/pcf.hpp>
+#include <sbear/algorithms/functional/reduce.hpp>
 
 TEST(ParallelReduce, AddThreeFunctions)
 {
-  std::vector<mpcf::Pcf_f64> pcfs;
+  std::vector<sb::Pcf_f64> pcfs;
 
-  pcfs.emplace_back(mpcf::Pcf_f64{ {0., 3.}, {1., 2.}, {4., 5.}, {6., 0.} });
-  pcfs.emplace_back(mpcf::Pcf_f64{ {0., 2.}, {3., 4.}, {4., 2.}, {5., 1.}, {8., 3.} });
-  pcfs.emplace_back(mpcf::Pcf_f64{ {0., 0.}, {3., 7.}, {5., 2.} });
+  pcfs.emplace_back(sb::Pcf_f64{ {0., 3.}, {1., 2.}, {4., 5.}, {6., 0.} });
+  pcfs.emplace_back(sb::Pcf_f64{ {0., 2.}, {3., 4.}, {4., 2.}, {5., 1.}, {8., 3.} });
+  pcfs.emplace_back(sb::Pcf_f64{ {0., 0.}, {3., 7.}, {5., 2.} });
 
-  auto res = mpcf::parallel_reduce(pcfs.begin(), pcfs.end(), [](const typename mpcf::Pcf_f64::rectangle_type& rect) {
+  auto res = sb::parallel_reduce(pcfs.begin(), pcfs.end(), [](const typename sb::Pcf_f64::rectangle_type& rect) {
     return rect.f_value + rect.g_value;
     });
 

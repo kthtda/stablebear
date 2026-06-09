@@ -20,9 +20,9 @@ import pytest
 
 from plot_helpers import FigureGallery, gallery_fixture, ax_fixture, SHOW
 
-import masspcf as mpcf
-from masspcf.persistence import Barcode, BarcodeTensor
-from masspcf.plotting import plot, plot_barcode
+import stablebear as sb
+from stablebear.persistence import Barcode, BarcodeTensor
+from stablebear.plotting import plot, plot_barcode
 
 _gallery = FigureGallery()
 _show_gallery = gallery_fixture(_gallery)
@@ -30,7 +30,7 @@ ax = ax_fixture(_gallery)
 
 
 def _make_pcf(pairs, dtype=np.float32):
-    return mpcf.Pcf(np.array(pairs, dtype=dtype))
+    return sb.Pcf(np.array(pairs, dtype=dtype))
 
 
 # ---------- plot() tests ----------
@@ -45,7 +45,7 @@ class TestPlot:
         np.testing.assert_array_equal(line.get_ydata(), [1, 3, 0])
 
     def test_tensor_plots_all_functions(self, ax):
-        t = mpcf.PcfTensor([
+        t = sb.PcfTensor([
             _make_pcf([[0, 1], [1, 2]]),
             _make_pcf([[0, 3], [1, 4]]),
             _make_pcf([[0, 5], [1, 6]]),
@@ -57,7 +57,7 @@ class TestPlot:
             np.testing.assert_array_equal(ax.lines[i].get_ydata(), [y0, y1])
 
     def test_auto_label(self, ax):
-        t = mpcf.PcfTensor([
+        t = sb.PcfTensor([
             _make_pcf([[0, 1], [1, 2]]),
             _make_pcf([[0, 3], [1, 4]]),
         ])
@@ -67,7 +67,7 @@ class TestPlot:
         assert labels == ["f0", "f1"]
 
     def test_no_auto_label_by_default(self, ax):
-        t = mpcf.PcfTensor([
+        t = sb.PcfTensor([
             _make_pcf([[0, 1], [1, 2]]),
             _make_pcf([[0, 3], [1, 4]]),
         ])
@@ -82,7 +82,7 @@ class TestPlot:
         assert xdata[-1] == pytest.approx(3.0)
 
     def test_max_time_extends_tensor(self, ax):
-        t = mpcf.PcfTensor([
+        t = sb.PcfTensor([
             _make_pcf([[0, 1], [1, 2]]),
             _make_pcf([[0, 3], [2, 4]]),
         ])
@@ -91,7 +91,7 @@ class TestPlot:
             assert line.get_xdata()[-1] == pytest.approx(5.0)
 
     def test_tensor_default_max_time_extends_to_latest_breakpoint(self, ax):
-        t = mpcf.PcfTensor([
+        t = sb.PcfTensor([
             _make_pcf([[0, 1], [1, 2]]),
             _make_pcf([[0, 3], [3, 4]]),
         ])
@@ -108,14 +108,14 @@ class TestPlot:
         assert line.get_linewidth() == 3
 
     def test_squeezable_tensor_is_accepted(self, ax):
-        t = mpcf.PcfTensor([
+        t = sb.PcfTensor([
             [_make_pcf([[0, 1], [1, 2]]), _make_pcf([[0, 3], [1, 4]])],
         ])
         plot(t, ax=ax)
         assert len(ax.lines) == 2
 
     def test_multidim_tensor_raises(self, ax):
-        t = mpcf.PcfTensor([
+        t = sb.PcfTensor([
             [_make_pcf([[0, 1], [1, 2]]), _make_pcf([[0, 3], [1, 4]])],
             [_make_pcf([[0, 5], [1, 6]]), _make_pcf([[0, 7], [1, 8]])],
         ])
@@ -222,8 +222,8 @@ class TestPlotBarcode:
 
 if __name__ == "__main__":
     # Re-exec with the env var set so the backend selection at the top of
-    # this file picks up MPCF_SHOW_PLOTS before matplotlib is configured.
-    if not os.environ.get("MPCF_SHOW_PLOTS"):
-        os.environ["MPCF_SHOW_PLOTS"] = "1"
+    # this file picks up SB_SHOW_PLOTS before matplotlib is configured.
+    if not os.environ.get("SB_SHOW_PLOTS"):
+        os.environ["SB_SHOW_PLOTS"] = "1"
         os.execv(sys.executable, [sys.executable, "-m", "pytest", __file__, "-v"] + sys.argv[1:])
     sys.exit(pytest.main([__file__, "-v"] + sys.argv[1:]))

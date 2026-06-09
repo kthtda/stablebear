@@ -14,13 +14,13 @@
  * limitations under the License.
  */
 
-#ifndef MASSPCF_PYBIND_H
-#define MASSPCF_PYBIND_H
+#ifndef STABLEBEAR_PYBIND_H
+#define STABLEBEAR_PYBIND_H
 
-#include <mpcf/config.hpp>
+#include <sbear/config.hpp>
 
 #include <pybind11/pybind11.h>
 
 namespace py = pybind11;
 
-#endif // MASSPCF_PYBIND_H
+#endif // STABLEBEAR_PYBIND_H

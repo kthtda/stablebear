@@ -1,6 +1,6 @@
 """Tests for pdist and l2_kernel on the CUDA path.
 
-Skipped when no GPU is available, unless MPCF_REQUIRE_CUDA=1 is set,
+Skipped when no GPU is available, unless SB_REQUIRE_CUDA=1 is set,
 in which case missing CUDA causes a hard failure.
 """
 
@@ -9,17 +9,17 @@ import os
 import numpy as np
 import pytest
 
-import masspcf as mpcf
-from masspcf import _mpcf_cpp as cpp
-from masspcf.distance_matrix import DistanceMatrix
-from masspcf.symmetric_matrix import SymmetricMatrix
+import stablebear as sb
+from stablebear import _sb_cpp as cpp
+from stablebear.distance_matrix import DistanceMatrix
+from stablebear.symmetric_matrix import SymmetricMatrix
 
 _has_cuda = cpp._build_type() == "CUDA" and cpp.get_ngpus() > 0
-_require_cuda = os.environ.get("MPCF_REQUIRE_CUDA", "0") == "1"
+_require_cuda = os.environ.get("SB_REQUIRE_CUDA", "0") == "1"
 
 if _require_cuda and not _has_cuda:
     pytest.fail(
-        "MPCF_REQUIRE_CUDA=1 but CUDA is not available "
+        "SB_REQUIRE_CUDA=1 but CUDA is not available "
         f"(build_type={cpp._build_type()}, ngpus={cpp.get_ngpus()})",
         pytrace=False,
     )
@@ -49,8 +49,8 @@ def _assert_ran_on_cuda(captured_err_out):
 
 @requires_cuda
 def test_pdist_cuda_returns_distance_matrix(capfd):
-    X = mpcf.zeros((3,))
-    D = mpcf.pdist(X)
+    X = sb.zeros((3,))
+    D = sb.pdist(X)
     _assert_ran_on_cuda(capfd.readouterr().out)
     assert isinstance(D, DistanceMatrix)
     assert D.size == 3
@@ -58,12 +58,12 @@ def test_pdist_cuda_returns_distance_matrix(capfd):
 
 @requires_cuda
 def test_pdist_cuda_correct_values(capfd):
-    X = mpcf.zeros((2,), dtype=mpcf.pcf64)
+    X = sb.zeros((2,), dtype=sb.pcf64)
 
-    X[0] = mpcf.Pcf(np.array([[0.0, 10.0], [2.0, 5.0], [3.0, 0.0]]))
-    X[1] = mpcf.Pcf(np.array([[0.0, 5.0], [6.0, 0.0]]))
+    X[0] = sb.Pcf(np.array([[0.0, 10.0], [2.0, 5.0], [3.0, 0.0]]))
+    X[1] = sb.Pcf(np.array([[0.0, 5.0], [6.0, 0.0]]))
 
-    D = mpcf.pdist(X)
+    D = sb.pdist(X)
     _assert_ran_on_cuda(capfd.readouterr().out)
 
     assert D.size == 2
@@ -75,12 +75,12 @@ def test_pdist_cuda_correct_values(capfd):
 
 @requires_cuda
 def test_pdist_cuda_to_dense(capfd):
-    X = mpcf.zeros((2,), dtype=mpcf.pcf64)
+    X = sb.zeros((2,), dtype=sb.pcf64)
 
-    X[0] = mpcf.Pcf(np.array([[0.0, 10.0], [2.0, 5.0], [3.0, 0.0]]))
-    X[1] = mpcf.Pcf(np.array([[0.0, 5.0], [6.0, 0.0]]))
+    X[0] = sb.Pcf(np.array([[0.0, 10.0], [2.0, 5.0], [3.0, 0.0]]))
+    X[1] = sb.Pcf(np.array([[0.0, 5.0], [6.0, 0.0]]))
 
-    D = mpcf.pdist(X)
+    D = sb.pdist(X)
     _assert_ran_on_cuda(capfd.readouterr().out)
     dense = D.to_dense()
 
@@ -91,8 +91,8 @@ def test_pdist_cuda_to_dense(capfd):
 
 @requires_cuda
 def test_l2_kernel_cuda_returns_symmetric_matrix(capfd):
-    X = mpcf.zeros((3,))
-    K = mpcf.l2_kernel(X)
+    X = sb.zeros((3,))
+    K = sb.l2_kernel(X)
     _assert_ran_on_cuda(capfd.readouterr().out)
     assert isinstance(K, SymmetricMatrix)
     assert K.size == 3
@@ -100,12 +100,12 @@ def test_l2_kernel_cuda_returns_symmetric_matrix(capfd):
 
 @requires_cuda
 def test_l2_kernel_cuda_correct_values(capfd):
-    X = mpcf.zeros((2,), dtype=mpcf.pcf64)
+    X = sb.zeros((2,), dtype=sb.pcf64)
 
-    X[0] = mpcf.Pcf(np.array([[0.0, 4.0], [3.0, 0.0]]))
-    X[1] = mpcf.Pcf(np.array([[0.0, 2.0], [3.0, 0.0]]))
+    X[0] = sb.Pcf(np.array([[0.0, 4.0], [3.0, 0.0]]))
+    X[1] = sb.Pcf(np.array([[0.0, 2.0], [3.0, 0.0]]))
 
-    K = mpcf.l2_kernel(X)
+    K = sb.l2_kernel(X)
     _assert_ran_on_cuda(capfd.readouterr().out)
 
     assert K.size == 2
@@ -117,12 +117,12 @@ def test_l2_kernel_cuda_correct_values(capfd):
 
 @requires_cuda
 def test_l2_kernel_cuda_to_dense(capfd):
-    X = mpcf.zeros((2,), dtype=mpcf.pcf64)
+    X = sb.zeros((2,), dtype=sb.pcf64)
 
-    X[0] = mpcf.Pcf(np.array([[0.0, 4.0], [3.0, 0.0]]))
-    X[1] = mpcf.Pcf(np.array([[0.0, 2.0], [3.0, 0.0]]))
+    X[0] = sb.Pcf(np.array([[0.0, 4.0], [3.0, 0.0]]))
+    X[1] = sb.Pcf(np.array([[0.0, 2.0], [3.0, 0.0]]))
 
-    K = mpcf.l2_kernel(X)
+    K = sb.l2_kernel(X)
     _assert_ran_on_cuda(capfd.readouterr().out)
     dense = K.to_dense()
 
@@ -134,12 +134,12 @@ def test_l2_kernel_cuda_to_dense(capfd):
 
 @requires_cuda
 def test_pdist_lp_cuda_correct_values(capfd):
-    X = mpcf.zeros((2,), dtype=mpcf.pcf64)
+    X = sb.zeros((2,), dtype=sb.pcf64)
 
-    X[0] = mpcf.Pcf(np.array([[0.0, 4.0], [1.0, 0.0]]))
-    X[1] = mpcf.Pcf(np.array([[0.0, 1.0], [1.0, 0.0]]))
+    X[0] = sb.Pcf(np.array([[0.0, 4.0], [1.0, 0.0]]))
+    X[1] = sb.Pcf(np.array([[0.0, 1.0], [1.0, 0.0]]))
 
-    D = mpcf.pdist(X, p=3)
+    D = sb.pdist(X, p=3)
     _assert_ran_on_cuda(capfd.readouterr().out)
 
     assert isinstance(D, DistanceMatrix)

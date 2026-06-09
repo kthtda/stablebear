@@ -1,14 +1,14 @@
 import numpy as np
 import pytest
 
-import masspcf as mpcf
+import stablebear as sb
 
 
 _NUMERIC_TYPES = [
-    pytest.param(mpcf.FloatTensor, np.float64, id="float64"),
-    pytest.param(mpcf.FloatTensor, np.float32, id="float32"),
-    pytest.param(mpcf.IntTensor, np.int32, id="int32"),
-    pytest.param(mpcf.IntTensor, np.int64, id="int64"),
+    pytest.param(sb.FloatTensor, np.float64, id="float64"),
+    pytest.param(sb.FloatTensor, np.float32, id="float32"),
+    pytest.param(sb.IntTensor, np.int32, id="int32"),
+    pytest.param(sb.IntTensor, np.int64, id="int64"),
 ]
 
 

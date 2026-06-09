@@ -16,9 +16,9 @@
 
 #include "py_reductions.hpp"
 
-#include <mpcf/functional/pcf.hpp>
-#include <mpcf/tensor.hpp>
-#include <mpcf/algorithms/functional/matrix_reduce.hpp>
+#include <sbear/functional/pcf.hpp>
+#include <sbear/tensor.hpp>
+#include <sbear/algorithms/functional/matrix_reduce.hpp>
 
 #include <stdexcept>
 #include <algorithm>
@@ -31,17 +31,17 @@ namespace
   class PyReductionsBindings
   {
   public:
-    using pcf_type = mpcf::Pcf<Tt, Tv>;
-    using tensor_type = mpcf::Tensor<pcf_type>;
+    using pcf_type = sb::Pcf<Tt, Tv>;
+    using tensor_type = sb::Tensor<pcf_type>;
 
     static tensor_type mean(const tensor_type& tensor, size_t dim)
     {
-      return mpcf::mean(tensor, dim);
+      return sb::mean(tensor, dim);
     }
 
-    static mpcf::Tensor<Tt> max_time(const tensor_type& tensor, size_t dim)
+    static sb::Tensor<Tt> max_time(const tensor_type& tensor, size_t dim)
     {
-      return mpcf::max_element(tensor, dim, [](const pcf_type& pcf){
+      return sb::max_element(tensor, dim, [](const pcf_type& pcf){
         if (pcf.points().empty())
           return Tt{0};
         return pcf.points().back().t;
@@ -62,13 +62,13 @@ namespace
 
 }
 
-namespace mpcf_py
+namespace sb_py
 {
 
   void register_reductions(py::module_& m)
   {
-    PyReductionsBindings<mpcf::float32_t, mpcf::float32_t>::register_bindings(m, "_f32_f32");
-    PyReductionsBindings<mpcf::float64_t, mpcf::float64_t>::register_bindings(m, "_f64_f64");
+    PyReductionsBindings<sb::float32_t, sb::float32_t>::register_bindings(m, "_f32_f32");
+    PyReductionsBindings<sb::float64_t, sb::float64_t>::register_bindings(m, "_f64_f64");
   }
 
 }

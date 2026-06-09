@@ -28,7 +28,7 @@ while true; do
         -e TOKEN="$TOKEN" \
         -e RUNNER_NAME="$(hostname)-cuda12" \
         -e LABELS="self-hosted,gpu,cuda12" \
-        "masspcf-runner:cuda12"
+        "stablebear-runner:cuda12"
     echo "[cuda12] Job finished. Respawning..."
     sleep 1
 done

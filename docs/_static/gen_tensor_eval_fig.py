@@ -1,8 +1,8 @@
 """Generate the tensor evaluation example figures for the docs."""
 
 import numpy as np
-import masspcf as mpcf
-from masspcf.plotting import plot as plotpcf
+import stablebear as sb
+from stablebear.plotting import plot as plotpcf
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -12,12 +12,12 @@ HERE = Path(__file__).parent
 
 # -- PCFs used in the docs example --
 # f(t) = 1 on [0,1), 4 on [1,3), 2 on [3,inf)
-f = mpcf.Pcf(np.array([[0, 1], [1, 4], [3, 2]], dtype=np.float32))
+f = sb.Pcf(np.array([[0, 1], [1, 4], [3, 2]], dtype=np.float32))
 
 # g(t) = 1 on [0,2), 2 on [2,inf)
-g = mpcf.Pcf(np.array([[0, 1], [2, 2]], dtype=np.float32))
+g = sb.Pcf(np.array([[0, 1], [2, 2]], dtype=np.float32))
 
-X = mpcf.zeros((2, 2))
+X = sb.zeros((2, 2))
 X[0, 0] = f
 X[0, 1] = g
 X[1, 0] = 0.5 * g

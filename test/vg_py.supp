@@ -34,7 +34,7 @@
    pybind11_module_init
    Memcheck:Leak
    ...
-   fun:pybind11_init__mpcf*
+   fun:pybind11_init__sb*
 }
 
 # CPython path initialisation uses glibc AVX2 wide-string routines that

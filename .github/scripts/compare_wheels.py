@@ -6,23 +6,23 @@ from fnmatch import fnmatch
 from pathlib import Path
 
 IGNORE_GLOBS = [
-    "masspcf/_mpcf_cpu*.so*",  # Linux/Mac Python extension module (CPU)
-    "masspcf/_mpcf_cpu*.pyd",  # Windows Python extension module (CPU)
-    "masspcf/_mpcf_cuda*.so*",  # Linux/Mac Python extension module (CUDA)
-    "masspcf/_mpcf_cuda*.pyd",  # Windows Python extension module (CUDA)
-    "masspcf/_gpu_detect*.so*",  # Linux/Mac Python extension module (GPU detect)
-    "masspcf/_gpu_detect*.pyd",  # Windows Python extension module (GPU detect)
+    "stablebear/_sb_cpu*.so*",  # Linux/Mac Python extension module (CPU)
+    "stablebear/_sb_cpu*.pyd",  # Windows Python extension module (CPU)
+    "stablebear/_sb_cuda*.so*",  # Linux/Mac Python extension module (CUDA)
+    "stablebear/_sb_cuda*.pyd",  # Windows Python extension module (CUDA)
+    "stablebear/_gpu_detect*.so*",  # Linux/Mac Python extension module (GPU detect)
+    "stablebear/_gpu_detect*.pyd",  # Windows Python extension module (GPU detect)
     "*/sboms/auditwheel.cdx.json",  # auditwheel metadata, varies by platform
-    "masspcf.libs/libgcc*.so*",  # bundled gcc library
-    "masspcf.libs/libstdc++*.so*",  # bundled stdc++ library
-    "masspcf.libs/*.dll",  # delvewheel-bundled DLLs (hash-mangled, vary per wheel)
+    "stablebear.libs/libgcc*.so*",  # bundled gcc library
+    "stablebear.libs/libstdc++*.so*",  # bundled stdc++ library
+    "stablebear.libs/*.dll",  # delvewheel-bundled DLLs (hash-mangled, vary per wheel)
     "*.dist-info/DELVEWHEEL",  # delvewheel marker file, Windows wheels only
 ]
 
 BUNDLED_LIB_GLOBS = [
-    "masspcf.libs/*.so*",
-    "masspcf.libs/*.dll",
-    "masspcf.libs/*.dylib",
+    "stablebear.libs/*.so*",
+    "stablebear.libs/*.dll",
+    "stablebear.libs/*.dylib",
 ]
 
 
@@ -155,8 +155,8 @@ def main(input_path, verbose=False, cpu_only=False):
             print(f"  ⏭️  {name}: non-CUDA platform, skipped")
             continue
         all_files = raw[name]
-        has_cuda12 = any(fnmatch(f, "masspcf/_mpcf_cuda12*") for f in all_files)
-        has_cuda13 = any(fnmatch(f, "masspcf/_mpcf_cuda13*") for f in all_files)
+        has_cuda12 = any(fnmatch(f, "stablebear/_sb_cuda12*") for f in all_files)
+        has_cuda13 = any(fnmatch(f, "stablebear/_sb_cuda13*") for f in all_files)
         if has_cuda12 and has_cuda13:
             print(f"  ✅ {name}: contains CUDA 12 and CUDA 13 modules")
         else:

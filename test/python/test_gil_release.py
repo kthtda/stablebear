@@ -8,7 +8,7 @@ call advance(), and the test would deadlock.
 
 import threading
 
-import masspcf._mpcf_cpp as cpp
+import stablebear._sb_cpp as cpp
 
 
 def test_gil_released_during_wait_for():

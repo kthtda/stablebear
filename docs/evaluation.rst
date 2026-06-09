@@ -11,13 +11,13 @@ in a single call.
 Consider a small example with two PCFs::
 
    import numpy as np
-   import masspcf as mpcf
+   import stablebear as sb
 
    # f(t) = 1 on [0,1), 4 on [1,3), 2 on [3,inf)
-   f = mpcf.Pcf(np.array([[0, 1], [1, 4], [3, 2]], dtype=np.float32))
+   f = sb.Pcf(np.array([[0, 1], [1, 4], [3, 2]], dtype=np.float32))
 
    # g(t) = 1 on [0,2), 2 on [2,inf)
-   g = mpcf.Pcf(np.array([[0, 1], [2, 2]], dtype=np.float32))
+   g = sb.Pcf(np.array([[0, 1], [2, 2]], dtype=np.float32))
 
 .. image:: _static/pcf_definitions_light.png
    :width: 80%
@@ -38,7 +38,7 @@ Consider a small example with two PCFs::
 
 Arrange them in a 2x2 tensor::
 
-   X = mpcf.zeros((2, 2))
+   X = sb.zeros((2, 2))
    X[0, 0] = f
    X[0, 1] = g
    X[1, 0] = 0.5 * g
@@ -115,10 +115,10 @@ Lists are converted to NumPy arrays internally::
 Float tensor evaluation
 -----------------------
 
-Passing a :py:class:`~masspcf.FloatTensor`
+Passing a :py:class:`~stablebear.FloatTensor`
 returns a tensor of the same type::
 
-   t = mpcf.FloatTensor(np.array([1, 2, 4], dtype=np.float32))
+   t = sb.FloatTensor(np.array([1, 2, 4], dtype=np.float32))
    result = X(t)  # returns a FloatTensor of shape (2, 2, 3)
 
 Time complexity
@@ -163,54 +163,54 @@ column index. For each column ``j``, the elements ``A[0,j], A[1,j], ...,
 A[m-1,j]`` are reduced together. The result has shape ``(n,)``::
 
    # result[j] = reduce(A[0,j], A[1,j], ..., A[m-1,j])
-   result = mpcf.mean(A, dim=0)    # shape (n,)
+   result = sb.mean(A, dim=0)    # shape (n,)
 
 **Reducing along dim=1** (the column axis) combines elements that share the same
 row index. For each row ``i``, the elements ``A[i,0], A[i,1], ..., A[i,n-1]``
 are reduced together. The result has shape ``(m,)``::
 
    # result[i] = reduce(A[i,0], A[i,1], ..., A[i,n-1])
-   result = mpcf.mean(A, dim=1)    # shape (m,)
+   result = sb.mean(A, dim=1)    # shape (m,)
 
 In general, for a tensor of shape ``(d_0, d_1, ..., d_k)``, reducing along
 ``dim=j`` produces a result of shape ``(d_0, ..., d_{j-1}, d_{j+1}, ..., d_k)``
 -- the ``j``-th dimension is removed, and each position in the output
 corresponds to the reduction of all elements along that axis.
 
-When the result would be a single element (a tensor of shape ``(1,)``), masspcf
+When the result would be a single element (a tensor of shape ``(1,)``), stablebear
 returns a scalar (a ``Pcf`` or a ``float``) directly rather than a 1-element
 tensor.
 
 mean
 ----
 
-:py:func:`~masspcf.mean` computes the pointwise average of PCFs along a dimension::
+:py:func:`~stablebear.mean` computes the pointwise average of PCFs along a dimension::
 
-   import masspcf as mpcf
-   from masspcf.random import noisy_sin
+   import stablebear as sb
+   from stablebear.random import noisy_sin
 
    X = noisy_sin((50,), n_points=100)
 
    # Average all 50 functions into a single Pcf
-   avg = mpcf.mean(X, dim=0)
+   avg = sb.mean(X, dim=0)
 
 For a higher-dimensional tensor, the specified dimension is collapsed::
 
-   A = mpcf.zeros((3, 100))
+   A = sb.zeros((3, 100))
    # ... fill A ...
 
    # Average across dim=1: result has shape (3,)
-   row_means = mpcf.mean(A, dim=1)
+   row_means = sb.mean(A, dim=1)
 
    # Average across dim=0: result has shape (100,)
-   col_means = mpcf.mean(A, dim=0)
+   col_means = sb.mean(A, dim=0)
 
 max_time
 --------
 
-:py:func:`~masspcf.max_time` finds the maximum time value (the rightmost breakpoint) across PCFs along a dimension::
+:py:func:`~stablebear.max_time` finds the maximum time value (the rightmost breakpoint) across PCFs along a dimension::
 
-   t_max = mpcf.max_time(X, dim=0)
+   t_max = sb.max_time(X, dim=0)
 
 The result is a numeric value (or numeric tensor), not a PCF. This is useful for
 aligning PCFs for plotting or further analysis.

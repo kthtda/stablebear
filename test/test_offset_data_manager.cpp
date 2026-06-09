@@ -16,7 +16,7 @@
 
 #include <gtest/gtest.h>
 
-#include <mpcf/cuda/offset_data_manager.hpp>
+#include <sbear/cuda/offset_data_manager.hpp>
 
 #include <vector>
 
@@ -44,7 +44,7 @@ TEST(OffsetDataManager, InitThreeObjects)
     {{TestElement{5}, TestElement{6}}}                    // 2 elements
   };
 
-  mpcf::OffsetDataManager<TestElement> mgr;
+  sb::OffsetDataManager<TestElement> mgr;
   mgr.init(objects.begin(), objects.end(),
       [](const TestObject& o) { return o.elements.size(); },
       [](const TestObject& o, size_t i) { return o.elements[i]; });
@@ -74,7 +74,7 @@ TEST(OffsetDataManager, EmptyInput)
 {
   std::vector<TestObject> objects;
 
-  mpcf::OffsetDataManager<TestElement> mgr;
+  sb::OffsetDataManager<TestElement> mgr;
   mgr.init(objects.begin(), objects.end(),
       [](const TestObject& o) { return o.elements.size(); },
       [](const TestObject& o, size_t i) { return o.elements[i]; });
@@ -89,7 +89,7 @@ TEST(OffsetDataManager, SingleEmptyObject)
 {
   std::vector<TestObject> objects = {{{}}};  // one object with 0 elements
 
-  mpcf::OffsetDataManager<TestElement> mgr;
+  sb::OffsetDataManager<TestElement> mgr;
   mgr.init(objects.begin(), objects.end(),
       [](const TestObject& o) { return o.elements.size(); },
       [](const TestObject& o, size_t i) { return o.elements[i]; });
@@ -108,7 +108,7 @@ TEST(OffsetDataManager, TotalElementsForRange)
     {{TestElement{5}, TestElement{6}}}                    // 2
   };
 
-  mpcf::OffsetDataManager<TestElement> mgr;
+  sb::OffsetDataManager<TestElement> mgr;
   mgr.init(objects.begin(), objects.end(),
       [](const TestObject& o) { return o.elements.size(); },
       [](const TestObject& o, size_t i) { return o.elements[i]; });
@@ -129,7 +129,7 @@ TEST(OffsetDataManager, MaxElementsInRange)
     {{TestElement{5}, TestElement{6}}}                    // 2
   };
 
-  mpcf::OffsetDataManager<TestElement> mgr;
+  sb::OffsetDataManager<TestElement> mgr;
   mgr.init(objects.begin(), objects.end(),
       [](const TestObject& o) { return o.elements.size(); },
       [](const TestObject& o, size_t i) { return o.elements[i]; });
@@ -144,7 +144,7 @@ TEST(OffsetDataManager, WorksWithPrimitiveType)
   // Verify it works with plain int, not just structs
   std::vector<std::vector<int>> data = {{10, 20}, {30}, {40, 50, 60}};
 
-  mpcf::OffsetDataManager<int> mgr;
+  sb::OffsetDataManager<int> mgr;
   mgr.init(data.begin(), data.end(),
       [](const std::vector<int>& v) { return v.size(); },
       [](const std::vector<int>& v, size_t i) { return v[i]; });

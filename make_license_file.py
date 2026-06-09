@@ -22,16 +22,16 @@ REPO_ROOT = Path(__file__).resolve().parent
 
 APACHE2_SPDX = "Apache-2.0"
 
-LICENSE_INPUT = REPO_ROOT / "mpcf.LICENSE.input"
-_SEP = "=" * 20  # minimum prefix for separator lines in mpcf.LICENSE.input
+LICENSE_INPUT = REPO_ROOT / "sb.LICENSE.input"
+_SEP = "=" * 20  # minimum prefix for separator lines in sb.LICENSE.input
 
 
 def _read_apache2_text() -> str:
-    """Read the Apache 2.0 license text from mpcf.LICENSE.input."""
+    """Read the Apache 2.0 license text from sb.LICENSE.input."""
     lines = LICENSE_INPUT.read_text().splitlines()
     sep_indices = [i for i, l in enumerate(lines) if l.startswith(_SEP)]
     if len(sep_indices) < 2:
-        raise RuntimeError("Could not find license text delimiters in mpcf.LICENSE.input")
+        raise RuntimeError("Could not find license text delimiters in sb.LICENSE.input")
     return "\n".join(lines[sep_indices[0] + 1 : sep_indices[1]]).strip()
 
 # 3rd-party packages bundled in the repository.
@@ -52,7 +52,7 @@ PLATFORM_NOTICES = [
         "GCC runtime libraries",
         "3rd/gcc-runtime/LICENSE",
         "https://www.gnu.org/licenses/gcc-exception-3.1.html",
-        "On platforms where masspcf is compiled with GCC, the binary may ship "
+        "On platforms where stablebear is compiled with GCC, the binary may ship "
         "with GCC runtime libraries covered by the GCC Runtime Library Exception 3.1.",
     ),
     (
@@ -105,19 +105,19 @@ def build_rst() -> str:
     parts.append(rst_section("License"))
     parts.append("")
     parts.append(
-        "masspcf is Copyright 2024-2026 Bjorn H. Wehlin and is distributed "
+        "stablebear is Copyright 2024-2026 Bjorn H. Wehlin and is distributed "
         "under the Apache License, Version 2.0."
     )
     parts.append("")
     parts.append(
-        "In addition, the masspcf repository and source distributions bundle "
+        "In addition, the stablebear repository and source distributions bundle "
         "several third-party libraries under compatible licenses, listed below."
     )
 
-    # -- masspcf license --
+    # -- stablebear license --
     parts.append("")
     parts.append("")
-    parts.append(rst_subsection("masspcf license (Apache-2.0)"))
+    parts.append(rst_subsection("stablebear license (Apache-2.0)"))
     parts.append("")
     parts.append("::")
     parts.append("")

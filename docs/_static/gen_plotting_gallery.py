@@ -1,9 +1,9 @@
 """Generate the plotting gallery figures for the docs."""
 
 import numpy as np
-import masspcf as mpcf
-from masspcf.random import noisy_sin, noisy_cos
-from masspcf.plotting import plot as plotpcf
+import stablebear as sb
+from stablebear.random import noisy_sin, noisy_cos
+from stablebear.plotting import plot as plotpcf
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -14,7 +14,7 @@ HERE = Path(__file__).parent
 
 # -- docs snippet start single_pcf --
 def plot_single_pcf():
-    f = mpcf.Pcf(np.array([[0, 1], [1, 4], [3, 2], [4, 3]], dtype=np.float32))
+    f = sb.Pcf(np.array([[0, 1], [1, 4], [3, 2], [4, 3]], dtype=np.float32))
 
     fig, ax = plt.subplots(figsize=(5, 2.5))
     plotpcf(f, ax=ax, max_time=6, linewidth=2)
@@ -41,8 +41,8 @@ def plot_overlaid():
 
 # -- docs snippet start arithmetic --
 def plot_arithmetic():
-    f = mpcf.Pcf(np.array([[0, 1], [1, 3], [3, 1]], dtype=np.float32))
-    g = mpcf.Pcf(np.array([[0, 2], [2, 0]], dtype=np.float32))
+    f = sb.Pcf(np.array([[0, 1], [1, 3], [3, 1]], dtype=np.float32))
+    g = sb.Pcf(np.array([[0, 2], [2, 0]], dtype=np.float32))
 
     fig, axes = plt.subplots(1, 3, figsize=(9, 2.5), sharex=True, sharey=True)
     for ax, pcf, title in [
@@ -68,8 +68,8 @@ def plot_mean_highlight(sin_color="b", cos_color="r"):
     plotpcf(sines, ax=ax, color=sin_color, linewidth=0.5, alpha=0.2)
     plotpcf(cosines, ax=ax, color=cos_color, linewidth=0.5, alpha=0.2)
 
-    plotpcf(mpcf.mean(sines), ax=ax, color=sin_color, linewidth=2.5, label="mean(sin)")
-    plotpcf(mpcf.mean(cosines), ax=ax, color=cos_color, linewidth=2.5, label="mean(cos)")
+    plotpcf(sb.mean(sines), ax=ax, color=sin_color, linewidth=2.5, label="mean(sin)")
+    plotpcf(sb.mean(cosines), ax=ax, color=cos_color, linewidth=2.5, label="mean(cos)")
 
     ax.set_xlabel("t")
     ax.set_ylabel("f(t)")
@@ -81,8 +81,8 @@ def plot_mean_highlight(sin_color="b", cos_color="r"):
 
 # -- docs snippet start barcode --
 def plot_barcode_example(h0_color="steelblue", h1_color="orangered"):
-    from masspcf.persistence import Barcode
-    from masspcf.plotting import plot_barcode
+    from stablebear.persistence import Barcode
+    from stablebear.plotting import plot_barcode
 
     bc_h0 = Barcode(np.array([
         [0.0, np.inf], [0.0, 1.8], [0.0, 0.6], [0.1, 1.2],
@@ -105,8 +105,8 @@ def plot_barcode_example(h0_color="steelblue", h1_color="orangered"):
 
 # -- docs snippet start tda_pipeline --
 def plot_tda_pipeline(h0_color="steelblue", h1_color="orangered"):
-    from masspcf import persistence as mpers
-    from masspcf.plotting import plot_barcode
+    from stablebear import persistence
+    from stablebear.plotting import plot_barcode
 
     # 1. Noisy circle (clear H1 topology)
     rng = np.random.RandomState(10)
@@ -115,11 +115,11 @@ def plot_tda_pipeline(h0_color="steelblue", h1_color="orangered"):
     points = np.column_stack([r * np.cos(theta), r * np.sin(theta)]).astype(np.float64)
 
     # 2. Compute persistent homology
-    bcs = mpers.compute_persistent_homology(points, max_dim=1, verbose=False)
+    bcs = persistence.compute_persistent_homology(points, max_dim=1, verbose=False)
     bc_h0, bc_h1 = bcs[0], bcs[1]
 
     # 3. Convert to stable rank
-    sranks = mpers.barcode_to_stable_rank(bcs)
+    sranks = persistence.barcode_to_stable_rank(bcs)
 
     fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(10, 3),
                                          gridspec_kw={"width_ratios": [1, 1, 1.2]})
@@ -165,8 +165,8 @@ def plot_tda_pipeline(h0_color="steelblue", h1_color="orangered"):
 
 # -- docs snippet start betti_pipeline --
 def plot_betti_pipeline(h0_color="steelblue", h1_color="orangered"):
-    from masspcf import persistence as mpers
-    from masspcf.plotting import plot_barcode
+    from stablebear import persistence
+    from stablebear.plotting import plot_barcode
 
     # 1. Noisy circle
     rng = np.random.RandomState(10)
@@ -175,11 +175,11 @@ def plot_betti_pipeline(h0_color="steelblue", h1_color="orangered"):
     points = np.column_stack([r * np.cos(theta), r * np.sin(theta)]).astype(np.float64)
 
     # 2. Compute persistent homology
-    bcs = mpers.compute_persistent_homology(points, max_dim=1, verbose=False)
+    bcs = persistence.compute_persistent_homology(points, max_dim=1, verbose=False)
     bc_h0, bc_h1 = bcs[0], bcs[1]
 
     # 3. Convert to Betti curves
-    bettis = mpers.barcode_to_betti_curve(bcs, verbose=False)
+    bettis = persistence.barcode_to_betti_curve(bcs, verbose=False)
 
     fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(10, 3),
                                          gridspec_kw={"width_ratios": [1, 1, 1.2]})
@@ -216,8 +216,8 @@ def plot_betti_pipeline(h0_color="steelblue", h1_color="orangered"):
 
 # -- docs snippet start apf --
 def plot_apf_example(h0_color="steelblue", h1_color="orangered"):
-    from masspcf import persistence as mpers
-    from masspcf.plotting import plot_barcode
+    from stablebear import persistence
+    from stablebear.plotting import plot_barcode
 
     # Noisy circle
     rng = np.random.RandomState(10)
@@ -225,9 +225,9 @@ def plot_apf_example(h0_color="steelblue", h1_color="orangered"):
     r = 1.0 + rng.normal(0, 0.15, 30)
     points = np.column_stack([r * np.cos(theta), r * np.sin(theta)]).astype(np.float64)
 
-    bcs = mpers.compute_persistent_homology(points, max_dim=1, verbose=False)
+    bcs = persistence.compute_persistent_homology(points, max_dim=1, verbose=False)
     bc_h0, bc_h1 = bcs[0], bcs[1]
-    apfs = mpers.barcode_to_accumulated_persistence(bcs, verbose=False)
+    apfs = persistence.barcode_to_accumulated_persistence(bcs, verbose=False)
 
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(8, 3))
 
@@ -255,8 +255,8 @@ def plot_apf_example(h0_color="steelblue", h1_color="orangered"):
 
 # -- docs snippet start apf_max_death --
 def plot_apf_max_death(color1="steelblue", color2="orangered"):
-    from masspcf.persistence import Barcode, barcode_to_accumulated_persistence
-    from masspcf.plotting import plot_barcode
+    from stablebear.persistence import Barcode, barcode_to_accumulated_persistence
+    from stablebear.plotting import plot_barcode
 
     bc = Barcode(np.array([
         [0.0, 0.5], [0.0, 0.5], [0.0, 0.5],
@@ -293,10 +293,10 @@ def plot_apf_max_death(color1="steelblue", color2="orangered"):
 
 # -- docs snippet start poisson_samples --
 def plot_poisson_samples(color="steelblue"):
-    from masspcf.point_process import sample_poisson
-    import masspcf as mpcf
+    from stablebear.point_process import sample_poisson
+    import stablebear as sb
 
-    gen = mpcf.random.Generator(seed=42)
+    gen = sb.random.Generator(seed=42)
     X = sample_poisson((3,), dim=2, rate=50.0, generator=gen)
 
     fig, axes = plt.subplots(1, 3, figsize=(9, 3))

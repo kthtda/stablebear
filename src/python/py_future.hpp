@@ -14,8 +14,8 @@
 * limitations under the License.
 */
 
-#ifndef MASSPCF_PY_FUTURE_H
-#define MASSPCF_PY_FUTURE_H
+#ifndef STABLEBEAR_PY_FUTURE_H
+#define STABLEBEAR_PY_FUTURE_H
 
 #include "pybind.hpp"
 #include <future>
@@ -23,7 +23,7 @@
 #include <type_traits>
 #include <utility>
 
-namespace mpcf_py
+namespace sb_py
 {
   template <typename RetT>
   class Future
@@ -79,4 +79,4 @@ namespace mpcf_py
   }
 }
 
-#endif //MASSPCF_PY_FUTURE_H
+#endif //STABLEBEAR_PY_FUTURE_H

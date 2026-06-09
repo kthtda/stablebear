@@ -14,14 +14,14 @@
 
 #include <gtest/gtest.h>
 
-#include <mpcf/algorithms/subdivide.hpp>
+#include <sbear/algorithms/subdivide.hpp>
 
 namespace
 {
 
   TEST(Subdivide, SingleBlock)
   {
-    auto blocks = mpcf::subdivide(100, 5);
+    auto blocks = sb::subdivide(100, 5);
     ASSERT_EQ(blocks.size(), 1u);
     EXPECT_EQ(blocks[0].first, 0u);
     EXPECT_EQ(blocks[0].second, 4u);
@@ -30,7 +30,7 @@ namespace
   TEST(Subdivide, ExactMultiple)
   {
     // 10 items, block size 5 => 2 blocks
-    auto blocks = mpcf::subdivide(5, 10);
+    auto blocks = sb::subdivide(5, 10);
     ASSERT_EQ(blocks.size(), 2u);
     EXPECT_EQ(blocks[0].first, 0u);
     EXPECT_EQ(blocks[0].second, 4u);
@@ -41,7 +41,7 @@ namespace
   TEST(Subdivide, NonExactMultiple)
   {
     // 7 items, block size 3 => 3 blocks: [0,2], [3,5], [6,6]
-    auto blocks = mpcf::subdivide(3, 7);
+    auto blocks = sb::subdivide(3, 7);
     ASSERT_EQ(blocks.size(), 3u);
     EXPECT_EQ(blocks[0], std::make_pair(size_t(0), size_t(2)));
     EXPECT_EQ(blocks[1], std::make_pair(size_t(3), size_t(5)));
@@ -50,7 +50,7 @@ namespace
 
   TEST(Subdivide, BlockSizeOne)
   {
-    auto blocks = mpcf::subdivide(1, 4);
+    auto blocks = sb::subdivide(1, 4);
     ASSERT_EQ(blocks.size(), 4u);
     for (size_t i = 0; i < 4; ++i)
     {
@@ -61,7 +61,7 @@ namespace
 
   TEST(Subdivide, SingleItem)
   {
-    auto blocks = mpcf::subdivide(5, 1);
+    auto blocks = sb::subdivide(5, 1);
     ASSERT_EQ(blocks.size(), 1u);
     EXPECT_EQ(blocks[0].first, 0u);
     EXPECT_EQ(blocks[0].second, 0u);
@@ -74,7 +74,7 @@ namespace
     {
       for (size_t bs = 1; bs <= n + 5; ++bs)
       {
-        auto blocks = mpcf::subdivide(bs, n);
+        auto blocks = sb::subdivide(bs, n);
         EXPECT_EQ(blocks.front().first, 0u);
         EXPECT_EQ(blocks.back().second, n - 1);
         // No gaps between blocks

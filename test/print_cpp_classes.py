@@ -16,7 +16,7 @@
 
 import inspect
 
-import masspcf.mpcf_cpp as cpp
+import stablebear._sb_cpp as cpp
 
 classes = inspect.getmembers(cpp, inspect.isclass)
 

@@ -12,15 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef MASSPCF_PY_NP_TENSOR_CONVERT_H
-#define MASSPCF_PY_NP_TENSOR_CONVERT_H
+#ifndef STABLEBEAR_PY_NP_TENSOR_CONVERT_H
+#define STABLEBEAR_PY_NP_TENSOR_CONVERT_H
 
 #include "pybind.hpp"
 
-namespace mpcf_py
+namespace sb_py
 {
   void register_np_conversions(pybind11::module_& m);
 }
 
 
-#endif //MASSPCF_PY_NP_TENSOR_CONVERT_H
+#endif //STABLEBEAR_PY_NP_TENSOR_CONVERT_H

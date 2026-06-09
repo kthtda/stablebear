@@ -16,15 +16,15 @@
 
 #include <gtest/gtest.h>
 
-#include <mpcf/special_tensors.hpp>
+#include <sbear/special_tensors.hpp>
 
-#include "mpcf/tensor_to_string.hpp"
+#include "sbear/tensor_to_string.hpp"
 
 TEST(SpecialTensors, MappingTensor2x3x2)
 {
-  auto tensor = mpcf::mapping_tensor<int>({2, 3, 2});
+  auto tensor = sb::mapping_tensor<int>({2, 3, 2});
 
-  mpcf::Tensor<int> expected{tensor.shape()};
+  sb::Tensor<int> expected{tensor.shape()};
 
   expected({0, 0, 0}) = 0;
   expected({0, 0, 1}) = 1;
@@ -40,5 +40,5 @@ TEST(SpecialTensors, MappingTensor2x3x2)
   expected({1, 2, 0}) = 120;
   expected({1, 2, 1}) = 121;
 
-  EXPECT_EQ(tensor, expected) << mpcf::tensor_to_string(tensor);
+  EXPECT_EQ(tensor, expected) << sb::tensor_to_string(tensor);
 }

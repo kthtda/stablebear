@@ -19,9 +19,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 from tqdm import tqdm
 
-import masspcf as mpcf
-from masspcf import persistence as mpers
-from masspcf.plotting import plot as plotpcf
+import stablebear as sb
+from stablebear import persistence as pers
+from stablebear.plotting import plot as plotpcf
 
 # The dimension of the tensor holding the point clouds
 shape = (100, 20, 30)
@@ -37,7 +37,7 @@ pcloud_dim = 4
 print(f"Will compute {math.prod(shape)} barcodes...")
 
 # Create a tensor to hold our point clouds
-pclouds = mpcf.zeros(shape, dtype=mpcf.pcloud64)
+pclouds = sb.zeros(shape, dtype=sb.pcloud64)
 
 # Here, we are creating random point clouds and filling in the elements of `pclouds`
 
@@ -67,12 +67,12 @@ for i, j, k in tqdm(
 # persistence diagrams). We compute the `maxDim` first homologies, so the resulting tensor will have the same shape
 # as the input tensor, with an extra dimension of size `maxDim`. To get the H_n barcode corresponding to point cloud
 # (i, j, k), we would request element (i, j, k, n) from the resulting tensor.
-bcs = mpers.compute_persistent_homology(pclouds, maxDim=1)
+bcs = pers.compute_persistent_homology(pclouds, maxDim=1)
 print(bcs.shape)
 
 # barcode_to_stable_rank converts all barcodes in the input to stable rank PCFs. The input and output shapes will be
 # the same
-sranks = mpers.barcode_to_stable_rank(bcs)
+sranks = pers.barcode_to_stable_rank(bcs)
 print(sranks.shape)
 
 # Plot H1 stable ranks corresponding to the point clouds in pclouds[:, 0, 0]

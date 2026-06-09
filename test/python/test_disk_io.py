@@ -15,12 +15,12 @@
 
 """
 def test_save_empty():
-    X = mpcf.zeros((0,))
+    X = sb.zeros((0,))
 
     mem_file = BytesIO()
 
-    mpcf.save(X, mem_file)
-    Y = mpcf.load(X, mem_file)
+    sb.save(X, mem_file)
+    Y = sb.load(X, mem_file)
 
     assert X == Y
 

@@ -51,7 +51,7 @@ def _write_record(root, dist_info_dir):
 
 
 def _merge_cuda_modules(base_root, extra_root, cuda_major):
-    prefix = f"masspcf/_mpcf_cuda{cuda_major}"
+    prefix = f"stablebear/_sb_cuda{cuda_major}"
     for path in _iter_files(extra_root):
         rel = os.path.relpath(path, extra_root).replace(os.sep, "/")
         if (
@@ -94,10 +94,10 @@ def main():
         description="Merge CUDA wheel variants into one wheel."
     )
     parser.add_argument(
-        "--base-wheel", required=True, help="Wheel containing _mpcf_cuda12"
+        "--base-wheel", required=True, help="Wheel containing _sb_cuda12"
     )
     parser.add_argument(
-        "--extra-wheel", required=True, help="Wheel containing _mpcf_cuda13"
+        "--extra-wheel", required=True, help="Wheel containing _sb_cuda13"
     )
     parser.add_argument(
         "--output-dir", required=True, help="Directory to write merged wheel"

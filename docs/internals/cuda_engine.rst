@@ -2,13 +2,13 @@
 CUDA block execution engine
 ==============================
 
-masspcf's CUDA engine computes pairwise matrix operations (distance matrices, kernel matrices, cross-distance tensors) by partitioning the work into 2D blocks and distributing them across GPUs. The framework is designed to be **function-type agnostic** -- the orchestration logic is generic, while function-specific behavior (data layout, kernels) is provided by a policy class.
+stablebear's CUDA engine computes pairwise matrix operations (distance matrices, kernel matrices, cross-distance tensors) by partitioning the work into 2D blocks and distributing them across GPUs. The framework is designed to be **function-type agnostic** -- the orchestration logic is generic, while function-specific behavior (data layout, kernels) is provided by a policy class.
 
 
 File structure
 ===============
 
-All files live under ``include/mpcf/cuda/`` (headers) and ``src/cuda/`` (compiled sources).
+All files live under ``include/sbear/cuda/`` (headers) and ``src/cuda/`` (compiled sources).
 
 **Generic framework** (function-type agnostic):
 
@@ -382,7 +382,7 @@ All operations share the same ``CudaBlockPipeline`` -- they differ in the task c
 
 .. code-block:: text
 
-   Python: mpcf.pdist(X)
+   Python: sb.pdist(X)
      -> C++: create DistanceMatrix(n), one CudaPcfDataManager
      -> CudaPairwiseIntegrationTask:
           One function set, one data manager (shared for row and col)
@@ -396,7 +396,7 @@ All operations share the same ``CudaBlockPipeline`` -- they differ in the task c
 
 .. code-block:: text
 
-   Python: mpcf.l2_kernel(X)
+   Python: sb.l2_kernel(X)
      -> C++: create SymmetricMatrix(n), one CudaPcfDataManager
      -> CudaPairwiseIntegrationTask:
           One function set, one data manager (shared for row and col)
@@ -410,7 +410,7 @@ All operations share the same ``CudaBlockPipeline`` -- they differ in the task c
 
 .. code-block:: text
 
-   Python: mpcf.cdist(X, Y)
+   Python: sb.cdist(X, Y)
      -> C++: create Tensor<Tv> with shape (*X.shape, *Y.shape)
      -> C++: create separate row/col CudaPcfDataManagers
      -> CudaCrossIntegrationTask:

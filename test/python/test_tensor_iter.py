@@ -1,22 +1,22 @@
 import numpy as np
 import pytest
 
-import masspcf as mpcf
+import stablebear as sb
 
 
 _NUMERIC_TYPES = [
-    pytest.param(mpcf.FloatTensor, np.float64, id="float64"),
-    pytest.param(mpcf.FloatTensor, np.float32, id="float32"),
-    pytest.param(mpcf.IntTensor, np.int32, id="int32"),
-    pytest.param(mpcf.IntTensor, np.int64, id="int64"),
+    pytest.param(sb.FloatTensor, np.float64, id="float64"),
+    pytest.param(sb.FloatTensor, np.float32, id="float32"),
+    pytest.param(sb.IntTensor, np.int32, id="int32"),
+    pytest.param(sb.IntTensor, np.int64, id="int64"),
 ]
 
 
 def _assert_iter(np_arr, TensorType):
-    """Assert that iterating an mpcf tensor matches iterating a NumPy array."""
+    """Assert that iterating a stablebear tensor matches iterating a NumPy array."""
     t = TensorType(np_arr)
-    for mpcf_item, np_item in zip(t, np_arr):
-        np.testing.assert_array_equal(np.asarray(mpcf_item), np_item)
+    for sb_item, np_item in zip(t, np_arr):
+        np.testing.assert_array_equal(np.asarray(sb_item), np_item)
 
 
 @pytest.mark.parametrize("TensorType, np_dtype", _NUMERIC_TYPES)
@@ -40,8 +40,8 @@ class TestIter:
         t = TensorType(np_arr)
         items = list(t)
         assert len(items) == 2
-        for mpcf_item, np_item in zip(items, np_arr):
-            np.testing.assert_array_equal(np.asarray(mpcf_item), np_item)
+        for sb_item, np_item in zip(items, np_arr):
+            np.testing.assert_array_equal(np.asarray(sb_item), np_item)
 
     def test_unpacking(self, TensorType, np_dtype):
         np_arr = np.arange(6, dtype=np_dtype).reshape(2, 3)
@@ -53,9 +53,9 @@ class TestIter:
     def test_nested_iter(self, TensorType, np_dtype):
         np_arr = np.arange(24, dtype=np_dtype).reshape(2, 3, 4)
         t = TensorType(np_arr)
-        for mpcf_row, np_row in zip(t, np_arr):
-            for mpcf_item, np_item in zip(mpcf_row, np_row):
-                np.testing.assert_array_equal(np.asarray(mpcf_item), np_item)
+        for sb_row, np_row in zip(t, np_arr):
+            for sb_item, np_item in zip(sb_row, np_row):
+                np.testing.assert_array_equal(np.asarray(sb_item), np_item)
 
     def test_empty(self, TensorType, np_dtype):
         np_arr = np.zeros((0, 3), dtype=np_dtype)
@@ -66,5 +66,5 @@ class TestIter:
         np_arr = np.arange(12, dtype=np_dtype).reshape(3, 4)
         t = TensorType(np_arr)
         _assert_iter(np_arr.T, type(t.T))
-        for mpcf_item, np_item in zip(t.T, np_arr.T):
-            np.testing.assert_array_equal(np.asarray(mpcf_item), np_item)
+        for sb_item, np_item in zip(t.T, np_arr.T):
+            np.testing.assert_array_equal(np.asarray(sb_item), np_item)

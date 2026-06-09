@@ -14,10 +14,10 @@
 * limitations under the License.
 */
 
-#ifndef MPCF_PYPCF_SUPPORT_H
-#define MPCF_PYPCF_SUPPORT_H
+#ifndef SB_PYPCF_SUPPORT_H
+#define SB_PYPCF_SUPPORT_H
 
-#include <mpcf/functional/pcf.hpp>
+#include <sbear/functional/pcf.hpp>
 
 #include <sstream>
 
@@ -26,7 +26,7 @@
 
 namespace py = pybind11;
 
-namespace mpcf
+namespace sb
 {
   namespace detail
   {
@@ -48,17 +48,17 @@ namespace mpcf
     }
 
     template <typename Tt, typename Tv>
-    mpcf::Pcf<Tt, Tv> construct_pcf(py::array_t<Tt> arr)
+    sb::Pcf<Tt, Tv> construct_pcf(py::array_t<Tt> arr)
     {
-      using point_type = typename mpcf::Pcf<Tt, Tv>::point_type;
+      using point_type = typename sb::Pcf<Tt, Tv>::point_type;
 
-      std::vector<mpcf::TimePoint<Tt, Tv>> points;
+      std::vector<sb::TimePoint<Tt, Tv>> points;
 
       py::buffer_info buf = arr.request();
       if (buf.size == 0)
       {
         points.emplace_back(static_cast<Tt>(0), static_cast<Tv>(0));
-        return mpcf::Pcf<Tt, Tv>(std::move(points));
+        return sb::Pcf<Tt, Tv>(std::move(points));
       }
 
       if (buf.ndim != 2)
@@ -98,7 +98,7 @@ namespace mpcf
         std::sort(points.begin(), points.end(), sortByTime);
       }
 
-      return mpcf::Pcf<Tt, Tv>(std::move(points));
+      return sb::Pcf<Tt, Tv>(std::move(points));
     }
 
 #if 0

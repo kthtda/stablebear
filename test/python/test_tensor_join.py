@@ -15,21 +15,21 @@
 import numpy as np
 import pytest
 
-import masspcf as mpcf
+import stablebear as sb
 
 
 _NUMERIC_TYPES = [
-    pytest.param(mpcf.FloatTensor, np.float64, id="float64"),
-    pytest.param(mpcf.FloatTensor, np.float32, id="float32"),
-    pytest.param(mpcf.IntTensor, np.int32, id="int32"),
-    pytest.param(mpcf.IntTensor, np.int64, id="int64"),
+    pytest.param(sb.FloatTensor, np.float64, id="float64"),
+    pytest.param(sb.FloatTensor, np.float32, id="float32"),
+    pytest.param(sb.IntTensor, np.int32, id="int32"),
+    pytest.param(sb.IntTensor, np.int64, id="int64"),
 ]
 
 
 def _assert_concatenate(arrays, axis, TensorType, np_dtype):
     np_arrays = tuple(np.asarray(a, dtype=np_dtype) for a in arrays)
     tensors = tuple(TensorType(a) for a in np_arrays)
-    result = np.asarray(mpcf.concatenate(tensors, axis=axis))
+    result = np.asarray(sb.concatenate(tensors, axis=axis))
     expected = np.concatenate(np_arrays, axis=axis)
     np.testing.assert_array_equal(result, expected)
     assert result.shape == expected.shape
@@ -38,7 +38,7 @@ def _assert_concatenate(arrays, axis, TensorType, np_dtype):
 def _assert_stack(arrays, axis, TensorType, np_dtype):
     np_arrays = tuple(np.asarray(a, dtype=np_dtype) for a in arrays)
     tensors = tuple(TensorType(a) for a in np_arrays)
-    result = np.asarray(mpcf.stack(tensors, axis=axis))
+    result = np.asarray(sb.stack(tensors, axis=axis))
     expected = np.stack(np_arrays, axis=axis)
     np.testing.assert_array_equal(result, expected)
     assert result.shape == expected.shape
@@ -68,7 +68,7 @@ class TestConcatenate:
         a = TensorType(np.zeros((2, 3), dtype=np_dtype))
         b = TensorType(np.zeros((2, 4), dtype=np_dtype))
         with pytest.raises((ValueError, RuntimeError)):
-            mpcf.concatenate((a, b), axis=0)
+            sb.concatenate((a, b), axis=0)
 
 
 # --- stack ---
@@ -99,4 +99,4 @@ class TestStack:
         a = TensorType(np.zeros((2, 3), dtype=np_dtype))
         b = TensorType(np.zeros((2, 4), dtype=np_dtype))
         with pytest.raises((ValueError, RuntimeError)):
-            mpcf.stack((a, b), axis=0)
+            sb.stack((a, b), axis=0)

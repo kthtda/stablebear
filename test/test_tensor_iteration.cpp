@@ -16,20 +16,20 @@
 
 #include <gtest/gtest.h>
 
-#include <mpcf/tensor.hpp>
-#include <mpcf/walk.hpp>
+#include <sbear/tensor.hpp>
+#include <sbear/walk.hpp>
 
-static_assert(std::random_access_iterator<mpcf::Tensor1dValueIterator<mpcf::Tensor<double>>>);
+static_assert(std::random_access_iterator<sb::Tensor1dValueIterator<sb::Tensor<double>>>);
 
 TEST(TensorIteration, Iterate1dValues)
 {
-  mpcf::Tensor<int> x({3});
+  sb::Tensor<int> x({3});
   x(0) = 1;
   x(1) = 2;
   x(2) = 3;
 
-  auto begin = mpcf::begin1dValues(x);
-  auto end = mpcf::end1dValues(x);
+  auto begin = sb::begin1dValues(x);
+  auto end = sb::end1dValues(x);
 
   EXPECT_EQ(*begin, 1);
   EXPECT_EQ(*(begin + 1), 2);
@@ -40,7 +40,7 @@ TEST(TensorIteration, Iterate1dValues)
 
 TEST(TensorIteration, AxisIteration)
 {
-  mpcf::Tensor<int> x{{3, 3}};
+  sb::Tensor<int> x{{3, 3}};
   for (auto i = 0_uz; i < x.shape(0); ++i)
   {
     for (auto j = 0_uz; j < x.shape(1); ++j)
@@ -56,9 +56,9 @@ TEST(TensorIteration, AxisIteration)
 
 TEST(TensorWalk, Walk1dOdometerOrder)
 {
-  mpcf::Tensor<int> x({4});
+  sb::Tensor<int> x({4});
   std::vector<std::vector<size_t>> visited;
-  mpcf::walk(x, [&](const std::vector<size_t>& idx) {
+  sb::walk(x, [&](const std::vector<size_t>& idx) {
     visited.push_back(idx);
   });
 
@@ -68,9 +68,9 @@ TEST(TensorWalk, Walk1dOdometerOrder)
 
 TEST(TensorWalk, Walk2dOdometerOrder)
 {
-  mpcf::Tensor<int> x({2, 3});
+  sb::Tensor<int> x({2, 3});
   std::vector<std::vector<size_t>> visited;
-  mpcf::walk(x, [&](const std::vector<size_t>& idx) {
+  sb::walk(x, [&](const std::vector<size_t>& idx) {
     visited.push_back(idx);
   });
 
@@ -83,9 +83,9 @@ TEST(TensorWalk, Walk2dOdometerOrder)
 
 TEST(TensorWalk, Walk3dOdometerOrder)
 {
-  mpcf::Tensor<int> x({2, 2, 2});
+  sb::Tensor<int> x({2, 2, 2});
   std::vector<std::vector<size_t>> visited;
-  mpcf::walk(x, [&](const std::vector<size_t>& idx) {
+  sb::walk(x, [&](const std::vector<size_t>& idx) {
     visited.push_back(idx);
   });
 
@@ -98,25 +98,25 @@ TEST(TensorWalk, Walk3dOdometerOrder)
 
 TEST(TensorWalk, WalkEmptyTensor)
 {
-  mpcf::Tensor<int> x({0});
+  sb::Tensor<int> x({0});
   size_t count = 0;
-  mpcf::walk(x, [&](const std::vector<size_t>&) { ++count; });
+  sb::walk(x, [&](const std::vector<size_t>&) { ++count; });
   EXPECT_EQ(count, 0);
 }
 
 TEST(TensorWalk, WalkEmptyShape)
 {
-  mpcf::Tensor<int> x(std::vector<size_t>{});
+  sb::Tensor<int> x(std::vector<size_t>{});
   size_t count = 0;
-  mpcf::walk(x, [&](const std::vector<size_t>&) { ++count; });
+  sb::walk(x, [&](const std::vector<size_t>&) { ++count; });
   EXPECT_EQ(count, 0);
 }
 
 TEST(TensorWalk, WalkBoolEarlyTermination)
 {
-  mpcf::Tensor<int> x({10});
+  sb::Tensor<int> x({10});
   std::vector<std::vector<size_t>> visited;
-  mpcf::walk(x, [&](const std::vector<size_t>& idx) -> bool {
+  sb::walk(x, [&](const std::vector<size_t>& idx) -> bool {
     visited.push_back(idx);
     return idx[0] < 3;
   });
@@ -127,7 +127,7 @@ TEST(TensorWalk, WalkBoolEarlyTermination)
 
 TEST(TensorWalk, WalkReadsCorrectValues)
 {
-  mpcf::Tensor<int> x({2, 3});
+  sb::Tensor<int> x({2, 3});
   int val = 0;
   x({0, 0}) = val++;
   x({0, 1}) = val++;
@@ -137,7 +137,7 @@ TEST(TensorWalk, WalkReadsCorrectValues)
   x({1, 2}) = val++;
 
   std::vector<int> values;
-  mpcf::walk(x, [&](const std::vector<size_t>& idx) {
+  sb::walk(x, [&](const std::vector<size_t>& idx) {
     values.push_back(x(idx));
   });
 
@@ -147,9 +147,9 @@ TEST(TensorWalk, WalkReadsCorrectValues)
 
 TEST(TensorWalk, WalkSingleElement)
 {
-  mpcf::Tensor<int> x({1});
+  sb::Tensor<int> x({1});
   std::vector<std::vector<size_t>> visited;
-  mpcf::walk(x, [&](const std::vector<size_t>& idx) {
+  sb::walk(x, [&](const std::vector<size_t>& idx) {
     visited.push_back(idx);
   });
 
@@ -159,23 +159,23 @@ TEST(TensorWalk, WalkSingleElement)
 
 TEST(TensorWalk, WalkZeroDimInMiddle)
 {
-  mpcf::Tensor<int> x({3, 0, 2});
+  sb::Tensor<int> x({3, 0, 2});
   size_t count = 0;
-  mpcf::walk(x, [&](const std::vector<size_t>&) { ++count; });
+  sb::walk(x, [&](const std::vector<size_t>&) { ++count; });
   EXPECT_EQ(count, 0);
 }
 
 TEST(TensorWalk, MemberWalkMatchesFreeWalk)
 {
-  mpcf::Tensor<int> x({2, 3});
+  sb::Tensor<int> x({2, 3});
 
   std::vector<std::vector<size_t>> from_member;
-  mpcf::walk(x, [&](const std::vector<size_t>& idx) {
+  sb::walk(x, [&](const std::vector<size_t>& idx) {
     from_member.push_back(idx);
   });
 
   std::vector<std::vector<size_t>> from_free;
-  mpcf::walk(x, [&](const std::vector<size_t>& idx) {
+  sb::walk(x, [&](const std::vector<size_t>& idx) {
     from_free.push_back(idx);
   });
 

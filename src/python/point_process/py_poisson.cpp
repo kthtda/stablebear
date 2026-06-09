@@ -16,7 +16,7 @@
 
 #include "py_poisson.hpp"
 
-#include <mpcf/point_process/poisson.hpp>
+#include <sbear/point_process/poisson.hpp>
 
 #include <pybind11/numpy.h>
 #include <pybind11/stl.h>
@@ -30,16 +30,16 @@ namespace
   class PyPoissonBindings
   {
   public:
-    using TensorT = mpcf::Tensor<mpcf::PointCloud<T>>;
+    using TensorT = sb::Tensor<sb::PointCloud<T>>;
 
     static void poisson_pp(TensorT& out, size_t dim, T rate,
                            std::vector<T> lo, std::vector<T> hi,
-                           const mpcf::DefaultRandomGenerator* gen)
+                           const sb::DefaultRandomGenerator* gen)
     {
       if (gen)
-        mpcf::pp::sample_poisson(out, dim, rate, lo, hi, *gen, mpcf::default_executor());
+        sb::pp::sample_poisson(out, dim, rate, lo, hi, *gen, sb::default_executor());
       else
-        mpcf::pp::sample_poisson(out, dim, rate, lo, hi, mpcf::default_generator(), mpcf::default_executor());
+        sb::pp::sample_poisson(out, dim, rate, lo, hi, sb::default_generator(), sb::default_executor());
     }
 
     static void register_bindings(py::handle m, const std::string& suffix)
@@ -57,8 +57,8 @@ namespace
 
 }
 
-void mpcf_py::register_point_process_poisson(py::module_& m)
+void sb_py::register_point_process_poisson(py::module_& m)
 {
-  PyPoissonBindings<mpcf::float32_t>::register_bindings(m, "32");
-  PyPoissonBindings<mpcf::float64_t>::register_bindings(m, "64");
+  PyPoissonBindings<sb::float32_t>::register_bindings(m, "32");
+  PyPoissonBindings<sb::float64_t>::register_bindings(m, "64");
 }

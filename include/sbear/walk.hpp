@@ -1,0 +1,228 @@
+/*
+* Copyright 2024-2026 Bjorn Wehlin
+*
+* Licensed under the Apache License, Version 2.0 (the "License");
+* you may not use this file except in compliance with the License.
+* You may obtain a copy of the License at
+*
+*    http://www.apache.org/licenses/LICENSE-2.0
+*
+* Unless required by applicable law or agreed to in writing, software
+* distributed under the License is distributed on an "AS IS" BASIS,
+* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+* See the License for the specific language governing permissions and
+* limitations under the License.
+*/
+
+#ifndef SB_WALK_H
+#define SB_WALK_H
+
+#include "config.hpp"
+#include "concepts.hpp"
+#include "executor.hpp"
+#include "random_generator.hpp"
+
+#include <taskflow/algorithm/for_each.hpp>
+
+namespace sb
+{
+
+  namespace detail
+  {
+    /**
+     * Core sequential walk: visits every index in row-major order, providing
+     * both the multi-index and the flat (row-major) counter to the callback.
+     * If f returns bool, walking stops when f returns false.
+     */
+    template <IsTensor TTensor, typename Func>
+    void walk_impl(const TTensor& tensor, Func&& f)
+    {
+      auto shape_range = tensor.shape();
+      std::vector<size_t> shape(std::begin(shape_range), std::end(shape_range));
+
+      if (shape.empty() || std::any_of(shape.begin(), shape.end(), [](size_t n){ return n == 0; }))
+      {
+        return;
+      }
+
+      auto ndim = shape.size();
+      std::vector<size_t> cur(ndim, 0_uz);
+      size_t flat = 0;
+
+      while (true)
+      {
+        if constexpr (std::is_same_v<decltype(f(cur, flat)), bool>)
+        {
+          if (!f(cur, flat))
+          {
+            return;
+          }
+        }
+        else
+        {
+          f(cur, flat);
+        }
+
+        ++flat;
+
+        for (ptrdiff_t i = ndim - 1; i >= 0; --i)
+        {
+          ++cur[i];
+
+          if (cur[i] < shape[i])
+          {
+            break;
+          }
+
+          if (i == 0)
+          {
+            return;
+          }
+
+          cur[i] = 0;
+        }
+      }
+    }
+
+    /**
+     * Core parallel walk: distributes flat indices across threads, converting
+     * each to a multi-index. The callback receives both the multi-index and
+     * the flat index. Returns a tf::Future.
+     */
+    template <IsTensor TTensor, typename Func>
+    tf::Future<void> parallel_walk_impl(const TTensor& tensor, Func&& f, Executor& exec)
+    {
+      auto shape_range = tensor.shape();
+      std::vector<size_t> shape(std::begin(shape_range), std::end(shape_range));
+
+      if (shape.empty() || std::any_of(shape.begin(), shape.end(), [](size_t n){ return n == 0; }))
+      {
+        tf::Taskflow flow;
+        return exec.cpu()->run(std::move(flow));
+      }
+
+      auto ndim = shape.size();
+      size_t total = 1;
+      for (auto s : shape)
+        total *= s;
+
+      tf::Taskflow flow;
+      flow.for_each_index<size_t, size_t, size_t>(0ul, total, 1ul,
+          [f, shape = std::move(shape), ndim](size_t flat) {
+        thread_local std::vector<size_t> idx;
+        idx.resize(ndim);
+
+        size_t rem = flat;
+        for (ptrdiff_t i = ndim - 1; i >= 0; --i)
+        {
+          idx[i] = rem % shape[i];
+          rem /= shape[i];
+        }
+
+        f(idx, flat);
+      });
+
+      return exec.cpu()->run(std::move(flow));
+    }
+  }
+
+  // ============================================================================
+  // Standard walk overloads
+  // ============================================================================
+
+  /**
+   * Visit every index of any IsTensor in row-major order, invoking f(idx) at each.
+   * If f returns bool, walking stops when f returns false.
+   */
+  template <IsTensor TTensor, typename UnaryFunc>
+#ifndef __CUDACC__
+  requires std::invocable<UnaryFunc, std::vector<size_t>>
+#endif
+  void walk(const TTensor& tensor, UnaryFunc&& f)
+  {
+    detail::walk_impl(tensor, [&f](const std::vector<size_t>& idx, size_t) -> decltype(auto) {
+      return f(idx);
+    });
+  }
+
+  /**
+   * Visit every index in parallel via the given Executor, invoking f(idx) at each.
+   * Does not support early termination. Returns a tf::Future.
+   */
+  template <IsTensor TTensor, typename UnaryFunc>
+#ifndef __CUDACC__
+  requires std::invocable<UnaryFunc, std::vector<size_t>>
+#endif
+  tf::Future<void> parallel_walk_async(const TTensor& tensor, UnaryFunc&& f, Executor& exec)
+  {
+    return detail::parallel_walk_impl(tensor, [f = std::forward<UnaryFunc>(f)](const std::vector<size_t>& idx, size_t) {
+      f(idx);
+    }, exec);
+  }
+
+  /**
+   * Like parallel_walk_async(), but blocks until complete.
+   */
+  template <IsTensor TTensor, typename UnaryFunc>
+#ifndef __CUDACC__
+  requires std::invocable<UnaryFunc, std::vector<size_t>>
+#endif
+  void parallel_walk(const TTensor& tensor, UnaryFunc&& f, Executor& exec)
+  {
+    parallel_walk_async(tensor, std::forward<UnaryFunc>(f), exec).wait();
+  }
+
+  // ============================================================================
+  // Walk with random: deterministically-seeded engine at each element
+  // ============================================================================
+
+  /**
+   * Walk every index of a tensor, providing a deterministically-seeded random
+   * engine at each element. The lambda receives (idx, engine&) where the engine
+   * is seeded from the generator and the element's flat (row-major) index.
+   */
+  template <IsTensor TTensor, typename EngineT, typename BinaryFunc>
+#ifndef __CUDACC__
+  requires std::invocable<BinaryFunc, std::vector<size_t>, EngineT&>
+#endif
+  void walk(const TTensor& tensor, const RandomGenerator<EngineT>& gen, BinaryFunc&& f)
+  {
+    detail::walk_impl(tensor, [&gen, &f](const std::vector<size_t>& idx, size_t flat) {
+      auto engine = gen.sub_generator(flat);
+      f(idx, engine);
+    });
+  }
+
+  /**
+   * Like walk() with random, but distributes work across threads.
+   * Deterministic regardless of thread count or execution order. Returns a tf::Future.
+   */
+  template <IsTensor TTensor, typename EngineT, typename BinaryFunc>
+#ifndef __CUDACC__
+  requires std::invocable<BinaryFunc, std::vector<size_t>, EngineT&>
+#endif
+  tf::Future<void> parallel_walk_async(const TTensor& tensor, const RandomGenerator<EngineT>& gen,
+                                       BinaryFunc&& f, Executor& exec)
+  {
+    return detail::parallel_walk_impl(tensor, [&gen, f = std::forward<BinaryFunc>(f)](const std::vector<size_t>& idx, size_t flat) {
+      auto engine = gen.sub_generator(flat);
+      f(idx, engine);
+    }, exec);
+  }
+
+  /**
+   * Like parallel_walk_async() with random, but blocks until complete.
+   */
+  template <IsTensor TTensor, typename EngineT, typename BinaryFunc>
+#ifndef __CUDACC__
+  requires std::invocable<BinaryFunc, std::vector<size_t>, EngineT&>
+#endif
+  void parallel_walk(const TTensor& tensor, const RandomGenerator<EngineT>& gen,
+                     BinaryFunc&& f, Executor& exec)
+  {
+    parallel_walk_async(tensor, gen, std::forward<BinaryFunc>(f), exec).wait();
+  }
+
+}
+
+#endif

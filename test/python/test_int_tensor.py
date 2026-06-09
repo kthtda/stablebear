@@ -15,44 +15,44 @@
 import numpy as np
 import pytest
 
-import masspcf as mpcf
-from masspcf.tensor import IntTensor
+import stablebear as sb
+from stablebear.tensor import IntTensor
 
 
 _INT_DTYPES = [
-    pytest.param(np.int32, mpcf.int32, id="int32"),
-    pytest.param(np.int64, mpcf.int64, id="int64"),
-    pytest.param(np.uint32, mpcf.uint32, id="uint32"),
-    pytest.param(np.uint64, mpcf.uint64, id="uint64"),
+    pytest.param(np.int32, sb.int32, id="int32"),
+    pytest.param(np.int64, sb.int64, id="int64"),
+    pytest.param(np.uint32, sb.uint32, id="uint32"),
+    pytest.param(np.uint64, sb.uint64, id="uint64"),
 ]
 
 
 # -- Construction and dtype inference --
 
-@pytest.mark.parametrize("np_dtype, mpcf_dtype", _INT_DTYPES)
+@pytest.mark.parametrize("np_dtype, sb_dtype", _INT_DTYPES)
 class TestIntTensorConstruction:
-    def test_construct_from_array(self, np_dtype, mpcf_dtype):
+    def test_construct_from_array(self, np_dtype, sb_dtype):
         arr = np.array([1, 2, 3], dtype=np_dtype)
         t = IntTensor(arr)
-        assert t.dtype == mpcf_dtype
+        assert t.dtype == sb_dtype
         np.testing.assert_array_equal(np.asarray(t), arr)
 
-    def test_numpy_roundtrip(self, np_dtype, mpcf_dtype):
+    def test_numpy_roundtrip(self, np_dtype, sb_dtype):
         arr = np.array([10, 20, 30], dtype=np_dtype)
         t = IntTensor(arr)
         np.testing.assert_array_equal(np.asarray(t), arr)
 
-    def test_zeros(self, np_dtype, mpcf_dtype):
-        t = mpcf.zeros((3,), dtype=mpcf_dtype)
+    def test_zeros(self, np_dtype, sb_dtype):
+        t = sb.zeros((3,), dtype=sb_dtype)
         assert isinstance(t, IntTensor)
-        assert t.dtype == mpcf_dtype
+        assert t.dtype == sb_dtype
         np.testing.assert_array_equal(np.asarray(t), np.zeros(3, dtype=np_dtype))
 
 
 def test_construct_explicit_dtype():
     arr = np.array([1, 2, 3])
-    t = IntTensor(arr, dtype=mpcf.int32)
-    assert t.dtype == mpcf.int32
+    t = IntTensor(arr, dtype=sb.int32)
+    assert t.dtype == sb.int32
     np.testing.assert_array_equal(np.asarray(t), arr)
 
 
@@ -60,7 +60,7 @@ def test_construct_from_int_tensor():
     arr = np.array([5, 6, 7], dtype=np.int64)
     t1 = IntTensor(arr)
     t2 = IntTensor(t1)
-    assert t2.dtype == mpcf.int64
+    assert t2.dtype == sb.int64
     np.testing.assert_array_equal(np.asarray(t2), arr)
 
 
@@ -88,21 +88,21 @@ def test_div_tensor_tensor():
     np_a = np.array([10, 21, 35], dtype=np.int64)
     np_b = np.array([3, 7, 5], dtype=np.int64)
     result = IntTensor(np_a) / IntTensor(np_b)
-    assert isinstance(result, mpcf.FloatTensor)
+    assert isinstance(result, sb.FloatTensor)
     np.testing.assert_array_almost_equal(np.asarray(result), np_a / np_b)
 
 
 def test_div_scalar():
     np_a = np.array([10, 21, 35], dtype=np.int64)
     result = IntTensor(np_a) / 2
-    assert isinstance(result, mpcf.FloatTensor)
+    assert isinstance(result, sb.FloatTensor)
     np.testing.assert_array_almost_equal(np.asarray(result), np_a / 2)
 
 
 def test_rdiv_scalar():
     np_a = np.array([2, 5, 10], dtype=np.int32)
     result = 100 / IntTensor(np_a)
-    assert isinstance(result, mpcf.FloatTensor)
+    assert isinstance(result, sb.FloatTensor)
     np.testing.assert_array_almost_equal(np.asarray(result), 100 / np_a)
 
 

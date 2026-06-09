@@ -2,7 +2,7 @@
 set -euo pipefail
 
 if [[ -z "${REPO_URL:-}" ]]; then
-    echo "ERROR: REPO_URL is required (e.g. https://github.com/you/masspcf)"
+    echo "ERROR: REPO_URL is required (e.g. https://github.com/you/stablebear)"
     exit 1
 fi
 

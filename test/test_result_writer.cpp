@@ -16,7 +16,7 @@
 
 #include <gtest/gtest.h>
 
-#include <mpcf/cuda/cuda_result_writer.hpp>
+#include <sbear/cuda/cuda_result_writer.hpp>
 
 template <typename T>
 class DistanceMatrixResultWriterTyped : public ::testing::Test {};
@@ -27,7 +27,7 @@ TYPED_TEST_SUITE(DistanceMatrixResultWriterTyped, ResultWriterTypes);
 TYPED_TEST(DistanceMatrixResultWriterTyped, ScatterLowerTriangle)
 {
   using Tv = TypeParam;
-  mpcf::DistanceMatrix<Tv> dm(4);
+  sb::DistanceMatrix<Tv> dm(4);
 
   // Block covers rows [2,3], cols [0,1]
   Tv hostBlock[] = {
@@ -35,13 +35,13 @@ TYPED_TEST(DistanceMatrixResultWriterTyped, ScatterLowerTriangle)
     Tv(30), Tv(40)    // row 3: (3,0)=30, (3,1)=40
   };
 
-  mpcf::BlockInfo block{};
+  sb::BlockInfo block{};
   block.rowStart = 2;
   block.rowHeight = 2;
   block.colStart = 0;
   block.colWidth = 2;
 
-  mpcf::DistanceMatrixResultWriter<Tv> writer(dm);
+  sb::DistanceMatrixResultWriter<Tv> writer(dm);
   writer.scatter(hostBlock, block);
 
   EXPECT_EQ(dm(2, 0), Tv(10));
@@ -58,7 +58,7 @@ TYPED_TEST(DistanceMatrixResultWriterTyped, ScatterLowerTriangle)
 TYPED_TEST(DistanceMatrixResultWriterTyped, DiagonalBlock)
 {
   using Tv = TypeParam;
-  mpcf::DistanceMatrix<Tv> dm(4);
+  sb::DistanceMatrix<Tv> dm(4);
 
   // Block on diagonal: rows [1,2], cols [1,2]
   // Lower triangle: only (2,1) has i > j
@@ -67,13 +67,13 @@ TYPED_TEST(DistanceMatrixResultWriterTyped, DiagonalBlock)
     Tv(60), Tv(0)     // (2,1)=60, (2,2)=skip(diag)
   };
 
-  mpcf::BlockInfo block{};
+  sb::BlockInfo block{};
   block.rowStart = 1;
   block.rowHeight = 2;
   block.colStart = 1;
   block.colWidth = 2;
 
-  mpcf::DistanceMatrixResultWriter<Tv> writer(dm);
+  sb::DistanceMatrixResultWriter<Tv> writer(dm);
   writer.scatter(hostBlock, block);
 
   EXPECT_EQ(dm(2, 1), Tv(60));
@@ -83,7 +83,7 @@ TYPED_TEST(DistanceMatrixResultWriterTyped, DiagonalBlock)
 TYPED_TEST(DistanceMatrixResultWriterTyped, ThrowsOnNonZeroSkippedEntry)
 {
   using Tv = TypeParam;
-  mpcf::DistanceMatrix<Tv> dm(4);
+  sb::DistanceMatrix<Tv> dm(4);
 
   // (1,2) is upper triangle and nonzero — should throw
   Tv hostBlock[] = {
@@ -91,28 +91,28 @@ TYPED_TEST(DistanceMatrixResultWriterTyped, ThrowsOnNonZeroSkippedEntry)
     Tv(60), Tv(0)
   };
 
-  mpcf::BlockInfo block{};
+  sb::BlockInfo block{};
   block.rowStart = 1;
   block.rowHeight = 2;
   block.colStart = 1;
   block.colWidth = 2;
 
-  mpcf::DistanceMatrixResultWriter<Tv> writer(dm);
+  sb::DistanceMatrixResultWriter<Tv> writer(dm);
   EXPECT_THROW(writer.scatter(hostBlock, block), std::logic_error);
 }
 
 TYPED_TEST(DistanceMatrixResultWriterTyped, NonOverlappingBlocks)
 {
   using Tv = TypeParam;
-  mpcf::DistanceMatrix<Tv> dm(4);
-  mpcf::DistanceMatrixResultWriter<Tv> writer(dm);
+  sb::DistanceMatrix<Tv> dm(4);
+  sb::DistanceMatrixResultWriter<Tv> writer(dm);
 
   Tv block1[] = { Tv(1), Tv(2), Tv(3), Tv(4) };
-  mpcf::BlockInfo bi1{.rowStart = 2, .rowHeight = 2, .colStart = 0, .colWidth = 2, .blockIndex = 0};
+  sb::BlockInfo bi1{.rowStart = 2, .rowHeight = 2, .colStart = 0, .colWidth = 2, .blockIndex = 0};
   writer.scatter(block1, bi1);
 
   Tv block2[] = { Tv(5) };
-  mpcf::BlockInfo bi2{.rowStart = 1, .rowHeight = 1, .colStart = 0, .colWidth = 1, .blockIndex = 1};
+  sb::BlockInfo bi2{.rowStart = 1, .rowHeight = 1, .colStart = 0, .colWidth = 1, .blockIndex = 1};
   writer.scatter(block2, bi2);
 
   EXPECT_EQ(dm(1, 0), Tv(5));
@@ -129,7 +129,7 @@ TYPED_TEST_SUITE(SymmetricMatrixResultWriterTyped, ResultWriterTypes);
 TYPED_TEST(SymmetricMatrixResultWriterTyped, ScatterWithDiagonal)
 {
   using Tv = TypeParam;
-  mpcf::SymmetricMatrix<Tv> sm(4);
+  sb::SymmetricMatrix<Tv> sm(4);
 
   // Block covers rows [0,1], cols [0,1]
   // Lower triangle + diagonal: (0,0), (1,0), (1,1)
@@ -138,13 +138,13 @@ TYPED_TEST(SymmetricMatrixResultWriterTyped, ScatterWithDiagonal)
     Tv(30), Tv(40)
   };
 
-  mpcf::BlockInfo block{};
+  sb::BlockInfo block{};
   block.rowStart = 0;
   block.rowHeight = 2;
   block.colStart = 0;
   block.colWidth = 2;
 
-  mpcf::SymmetricMatrixResultWriter<Tv> writer(sm);
+  sb::SymmetricMatrixResultWriter<Tv> writer(sm);
   writer.scatter(hostBlock, block);
 
   EXPECT_EQ(sm(0, 0), Tv(10));
@@ -156,7 +156,7 @@ TYPED_TEST(SymmetricMatrixResultWriterTyped, ScatterWithDiagonal)
 TYPED_TEST(SymmetricMatrixResultWriterTyped, ThrowsOnNonZeroSkippedEntry)
 {
   using Tv = TypeParam;
-  mpcf::SymmetricMatrix<Tv> sm(4);
+  sb::SymmetricMatrix<Tv> sm(4);
 
   // (0,1) is upper triangle and nonzero — should throw
   Tv hostBlock[] = {
@@ -164,31 +164,31 @@ TYPED_TEST(SymmetricMatrixResultWriterTyped, ThrowsOnNonZeroSkippedEntry)
     Tv(30), Tv(40)
   };
 
-  mpcf::BlockInfo block{};
+  sb::BlockInfo block{};
   block.rowStart = 0;
   block.rowHeight = 2;
   block.colStart = 0;
   block.colWidth = 2;
 
-  mpcf::SymmetricMatrixResultWriter<Tv> writer(sm);
+  sb::SymmetricMatrixResultWriter<Tv> writer(sm);
   EXPECT_THROW(writer.scatter(hostBlock, block), std::logic_error);
 }
 
 TYPED_TEST(SymmetricMatrixResultWriterTyped, OffDiagonalBlock)
 {
   using Tv = TypeParam;
-  mpcf::SymmetricMatrix<Tv> sm(4);
+  sb::SymmetricMatrix<Tv> sm(4);
 
   // Block covers rows [2,3], cols [0,1] — entirely below diagonal
   Tv hostBlock[] = { Tv(1), Tv(2), Tv(3), Tv(4) };
 
-  mpcf::BlockInfo block{};
+  sb::BlockInfo block{};
   block.rowStart = 2;
   block.rowHeight = 2;
   block.colStart = 0;
   block.colWidth = 2;
 
-  mpcf::SymmetricMatrixResultWriter<Tv> writer(sm);
+  sb::SymmetricMatrixResultWriter<Tv> writer(sm);
   writer.scatter(hostBlock, block);
 
   EXPECT_EQ(sm(2, 0), Tv(1));
@@ -205,13 +205,13 @@ TYPED_TEST_SUITE(DenseResultWriterTyped, ResultWriterTypes);
 TYPED_TEST(DenseResultWriterTyped, ScatterAll)
 {
   using Tv = TypeParam;
-  mpcf::Tensor<Tv> dense({4, 4}, Tv(0));
-  mpcf::DenseMatrixView<Tv> view(dense, 4);
-  mpcf::DenseResultWriter<Tv> writer(view);
+  sb::Tensor<Tv> dense({4, 4}, Tv(0));
+  sb::DenseMatrixView<Tv> view(dense, 4);
+  sb::DenseResultWriter<Tv> writer(view);
 
   Tv hostBlock[] = { Tv(1), Tv(2), Tv(3), Tv(4) };
 
-  mpcf::BlockInfo block{};
+  sb::BlockInfo block{};
   block.rowStart = 1;
   block.rowHeight = 2;
   block.colStart = 2;
@@ -229,13 +229,13 @@ TYPED_TEST(DenseResultWriterTyped, ScatterAll)
 TYPED_TEST(DenseResultWriterTyped, RectangularOutput)
 {
   using Tv = TypeParam;
-  mpcf::Tensor<Tv> dense({3, 5}, Tv(0));
-  mpcf::DenseMatrixView<Tv> view(dense, 5);
-  mpcf::DenseResultWriter<Tv> writer(view);
+  sb::Tensor<Tv> dense({3, 5}, Tv(0));
+  sb::DenseMatrixView<Tv> view(dense, 5);
+  sb::DenseResultWriter<Tv> writer(view);
 
   Tv hostBlock[] = { Tv(7), Tv(8), Tv(9) };
 
-  mpcf::BlockInfo block{};
+  sb::BlockInfo block{};
   block.rowStart = 1;
   block.rowHeight = 1;
   block.colStart = 2;

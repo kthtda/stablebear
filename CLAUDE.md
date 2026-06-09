@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**masspcf** is a Python package with a C++20/CUDA backend for massively parallel computation of similarity matrices from piecewise functions (currently piecewise constant functions, with piecewise linear functions planned). The primary audience is TDA (Topological Data Analysis) practitioners doing statistical analysis on invariants such as stable rank, Euler characteristic curves, and Betti curves. The core objects are numpy-like multidimensional arrays (tensors) supporting reductions, Lp distance matrices, and L2 kernels.
+**stablebear** is a Python package with a C++20/CUDA backend for massively parallel computation of similarity matrices from piecewise functions (currently piecewise constant functions, with piecewise linear functions planned). The primary audience is TDA (Topological Data Analysis) practitioners doing statistical analysis on invariants such as stable rank, Euler characteristic curves, and Betti curves. The core objects are numpy-like multidimensional arrays (tensors) supporting reductions, Lp distance matrices, and L2 kernels.
 
 ## Build & Development
 
@@ -19,12 +19,12 @@ cmake -B cmake-build-debug
 cmake --build cmake-build-debug -j$(nproc)
 cmake --install cmake-build-debug
 ```
-This works when `SKBUILD` is off (plain CMake). Builds `_mpcf_cpu` (always) and `_mpcf_cudaXX` (when CUDA available). Extensions are symlinked into `masspcf/` for immediate use.
+This works when `SKBUILD` is off (plain CMake). Builds `_sb_cpu` (always) and `_sb_cudaXX` (when CUDA available). Extensions are symlinked into `stablebear/` for immediate use.
 
 ### CUDA control
 - `BUILD_WITH_CUDA=0` env var disables CUDA (auto-detected otherwise, always off on macOS)
 - Supports pip-installed CUDA toolkits (`nvidia.cu12`, `nvidia.cu13`)
-- Produces version-specific modules: `_mpcf_cuda12`, `_mpcf_cuda13`
+- Produces version-specific modules: `_sb_cuda12`, `_sb_cuda13`
 
 ### Other env vars
 - `SKIP_STUBGEN=1` — skip pybind11_stubgen (useful if it causes issues)
@@ -33,7 +33,7 @@ This works when `SKBUILD` is off (plain CMake). Builds `_mpcf_cpu` (always) and 
 
 ## Testing
 
-**Important**: Always `cd test` before running pytest. Running from the repo root causes the local `masspcf/` directory to shadow the installed package. You must also build and install first.
+**Important**: Always `cd test` before running pytest. Running from the repo root causes the local `stablebear/` directory to shadow the installed package. You must also build and install first.
 
 ### Python tests
 ```bash
@@ -44,8 +44,8 @@ cd test && python -m pytest python/test_pdist.py  # single test file
 
 ### C++ tests (GoogleTest)
 ```bash
-cmake --build cmake-build-debug --target mpcf_test
-cd test && ../cmake-build-debug/mpcf_test  # run from test/ directory
+cmake --build cmake-build-debug --target sb_test
+cd test && ../cmake-build-debug/sb_test  # run from test/ directory
 ```
 
 ### Coverage
@@ -57,12 +57,12 @@ cd test && ../cmake-build-debug/mpcf_test  # run from test/ directory
 ## Architecture
 
 ### Python ↔ C++ boundary
-- **`masspcf/_mpcf_cpp.py`** is the runtime backend selector. It detects GPU availability, preloads libcudart if needed, and imports `_mpcf_cuda{12,13}` or falls back to `_mpcf_cpu`. All other Python code imports through this module.
+- **`stablebear/_sb_cpp.py`** is the runtime backend selector. It detects GPU availability, preloads libcudart if needed, and imports `_sb_cuda{12,13}` or falls back to `_sb_cpu`. All other Python code imports through this module.
 - **`src/python/`** contains pybind11 bindings. Each `py_*.cpp` wraps a corresponding C++ subsystem.
 - **`src/gpu_detect/`** is a separate pybind11 module (`_gpu_detect`) with no CUDA dependency — used to detect GPUs without requiring the CUDA toolkit.
 - NumPy array ↔ C++ tensor conversion happens in `py_np_tensor_convert.{h,cpp}` (zero-copy where possible).
 
-### C++ core (`include/mpcf/`)
+### C++ core (`include/sbear/`)
 - **`pcf.h`** — `Pcf<TimeT, ValueT>` template, the fundamental piecewise constant function type
 - **`tensor.h` / `tensor.tpp`** — N-dimensional tensor template (stores PCFs, floats, point clouds, or barcodes)
 - **`algorithms/`** — core algorithms: `matrix_integrate.h` (distance matrices), `reduce.h`, `iterate_rectangles.h`, `subdivide.h`, `apply_functional.h`
@@ -71,14 +71,14 @@ cd test && ../cmake-build-debug/mpcf_test  # run from test/ directory
 - **`executor.h`** — taskflow-based parallel task dispatch (CPU)
 
 ### Type system
-Each tensor class supports multiple precisions via a `dtype` parameter: `PcfTensor` (dtype=pcf32/pcf64), `IntPcfTensor` (dtype=pcf32i/pcf64i), `FloatTensor` (dtype=float32/float64), `PointCloudTensor` (dtype=pcloud32/pcloud64), `BarcodeTensor` (dtype=barcode32/barcode64), `DistanceMatrixTensor` (dtype=distmat32/distmat64), `SymmetricMatrixTensor` (dtype=symmat32/symmat64). Dtype sentinels live in `masspcf/typing.py`. The C++ layer still has separate types per precision (e.g. `cpp.Float32Tensor`, `cpp.Float64Tensor`); the Python classes dispatch internally.
+Each tensor class supports multiple precisions via a `dtype` parameter: `PcfTensor` (dtype=pcf32/pcf64), `IntPcfTensor` (dtype=pcf32i/pcf64i), `FloatTensor` (dtype=float32/float64), `PointCloudTensor` (dtype=pcloud32/pcloud64), `BarcodeTensor` (dtype=barcode32/barcode64), `DistanceMatrixTensor` (dtype=distmat32/distmat64), `SymmetricMatrixTensor` (dtype=symmat32/symmat64). Dtype sentinels live in `stablebear/typing.py`. The C++ layer still has separate types per precision (e.g. `cpp.Float32Tensor`, `cpp.Float64Tensor`); the Python classes dispatch internally.
 
 ### Python module layers
-1. **Low**: `_mpcf_cpp` (backend dispatch) → `_mpcf_cpu` / `_mpcf_cudaXX` (pybind11)
+1. **Low**: `_sb_cpp` (backend dispatch) → `_sb_cpu` / `_sb_cudaXX` (pybind11)
 2. **Mid**: `pcf.py`, `tensor.py`, `_tensor_base.py` (Python wrappers)
 3. **High**: `distance.py` (`pdist`), `reductions.py` (`mean`, `max_time`), `norms.py`, `persistence/`
 
-### GPU/CPU runtime control (`masspcf/system.py`)
+### GPU/CPU runtime control (`stablebear/system.py`)
 `force_cpu()`, `limit_cpus()`, `limit_gpus()`, `set_cuda_threshold()`, `set_device_verbose()` — all configure the backend at runtime.
 
 ## Third-party submodules (`3rd/`)
