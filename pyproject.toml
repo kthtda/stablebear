@@ -88,8 +88,8 @@ sdist.exclude = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/bwehlin/stablebear"
-Issues = "https://github.com/bwehlin/stablebear/issues"
+Homepage = "https://github.com/kthtda/stablebear"
+Issues = "https://github.com/kthtda/stablebear/issues"
 
 [tool.coverage.run]
 source = ["stablebear"]

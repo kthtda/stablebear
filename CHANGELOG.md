@@ -38,7 +38,7 @@ Tensor indexing is now much closer to NumPy. These changes apply to every tensor
 * **`DistanceMatrix` / `SymmetricMatrix`** — negative `(i, j)` indices are resolved, and out-of-range access raises `IndexError`.
 * **Memory safety** — out-of-shape values in multi-axis (outer / `np.ix_`-style) assignment now raise instead of writing out of bounds, and out-of-bounds selectors in a multi-axis read now raise `IndexError`.
 
-Multiple advanced indices keep their outer (`np.ix_`-style) semantics, as documented in [Indexing and Masking](https://github.com/bwehlin/stablebear/blob/main/docs/indexing.rst).
+Multiple advanced indices keep their outer (`np.ix_`-style) semantics, as documented in [Indexing and Masking](https://github.com/kthtda/stablebear/blob/main/docs/indexing.rst).
 
 ### Packaging
 

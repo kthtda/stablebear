@@ -32,7 +32,7 @@ To install the latest released version from source::
 
 To build a specific branch or tag from a Git checkout::
 
-    git clone https://github.com/bwehlin/stablebear.git
+    git clone https://github.com/kthtda/stablebear.git
     cd stablebear
 
     # optional: select a specific tagged version to build
