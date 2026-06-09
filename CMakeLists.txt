@@ -34,6 +34,27 @@ endif ()
 message(STATUS "!!! CMAKE_BUILD_TYPE: ${CMAKE_BUILD_TYPE}")
 message(STATUS "!!! CMAKE_MSVC_RUNTIME_LIBRARY: ${CMAKE_MSVC_RUNTIME_LIBRARY}")
 
+# Probe for a physical NVIDIA GPU via nvidia-smi (shipped with the driver).
+# This is only used to pick the auto-default below; an explicit
+# BUILD_WITH_CUDA=1 still forces a CUDA build even with no GPU present
+# (e.g. CI hosts that cross-compile CUDA without a card).
+function (detect_nvidia_gpu OUTVAR)
+  find_program(_NVIDIA_SMI nvidia-smi)
+  if (_NVIDIA_SMI)
+    execute_process(
+      COMMAND "${_NVIDIA_SMI}" -L
+      OUTPUT_VARIABLE _SMI_OUT
+      RESULT_VARIABLE _SMI_RES
+      ERROR_QUIET
+      OUTPUT_STRIP_TRAILING_WHITESPACE)
+    if (_SMI_RES EQUAL 0 AND _SMI_OUT MATCHES "GPU")
+      set(${OUTVAR} ON PARENT_SCOPE)
+      return ()
+    endif ()
+  endif ()
+  set(${OUTVAR} OFF PARENT_SCOPE)
+endfunction ()
+
 if (DEFINED ENV{BUILD_WITH_CUDA})
   if ($ENV{BUILD_WITH_CUDA} MATCHES "0")
     set(BUILD_WITH_CUDA OFF)
@@ -45,7 +66,15 @@ if (DEFINED ENV{BUILD_WITH_CUDA})
 elseif (APPLE)
   set(BUILD_WITH_CUDA OFF)
 else ()
-  set(BUILD_WITH_CUDA ON)
+  # No explicit request: only build CUDA if an NVIDIA GPU is detected.
+  detect_nvidia_gpu(_HAS_NVIDIA_GPU)
+  if (_HAS_NVIDIA_GPU)
+    set(BUILD_WITH_CUDA ON)
+    message(STATUS "!!! NVIDIA GPU detected; defaulting BUILD_WITH_CUDA=ON")
+  else ()
+    set(BUILD_WITH_CUDA OFF)
+    message(STATUS "!!! No NVIDIA GPU detected; defaulting BUILD_WITH_CUDA=OFF (set BUILD_WITH_CUDA=1 to force)")
+  endif ()
 endif ()
 
 if ((DEFINED ENV{SKIP_STUBGEN}) AND (NOT $ENV{SKIP_STUBGEN} MATCHES "0"))
