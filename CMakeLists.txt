@@ -137,29 +137,38 @@ if (WIN32)
     endif()
   endif()
 
-  # If find_package didn't resolve the import library, patch Python::Module so that
-  # targets linking against it get the full path (avoids relying solely on #pragma comment).
-  if (NOT Python_LIBRARY)
-    set(_v "python${Python_VERSION_MAJOR}${Python_VERSION_MINOR}")
-    set(_PY_LIB_CANDIDATE "")
-    foreach(_candidate
-        "${_PY_BASE_PREFIX}/libs/${_v}t.lib"
-        "${_PY_BASE_PREFIX}/libs/${_v}.lib"
-        "${_PY_BASE_PREFIX}/libs/${_v}_d.lib"
-        "${_PY_BASE_PREFIX}/libs/${_v}t_d.lib")
-      if (EXISTS "${_candidate}")
-        set(_PY_LIB_CANDIDATE "${_candidate}")
-        break()
-      endif()
-    endforeach()
-    if (NOT _PY_LIB_CANDIDATE)
-      message(FATAL_ERROR "Could not locate Python import library (.lib) in ${_PY_BASE_PREFIX}/libs")
+  # Always link the import library explicitly via Python::Module.  Up to Python 3.13,
+  # pyconfig.h auto-linked pythonXY.lib through #pragma comment(lib, ...), so having the
+  # libs/ directory on the linker path was enough.  CPython 3.14 removed that pragma,
+  # which left extension modules with unresolved Py* externals unless the .lib is named
+  # on the link line.  (Python_LIBRARY being set, e.g. by scikit-build-core hints, does
+  # not guarantee FindPython propagates it to Python::Module for Development.Module.)
+  execute_process(
+      COMMAND "${Python_EXECUTABLE}" -c "import sysconfig; print(int(bool(sysconfig.get_config_var('Py_GIL_DISABLED'))))"
+      OUTPUT_VARIABLE _PY_GIL_DISABLED
+      OUTPUT_STRIP_TRAILING_WHITESPACE
+  )
+  set(_v "python${Python_VERSION_MAJOR}${Python_VERSION_MINOR}")
+  if (_PY_GIL_DISABLED STREQUAL "1")
+    # Free-threaded build: prefer the t-suffixed import library.
+    set(_PY_LIB_SEARCH_ORDER "${_v}t.lib" "${_v}t_d.lib" "${_v}.lib" "${_v}_d.lib")
+  else()
+    set(_PY_LIB_SEARCH_ORDER "${_v}.lib" "${_v}_d.lib" "${_v}t.lib" "${_v}t_d.lib")
+  endif()
+  set(_PY_LIB_CANDIDATE "")
+  foreach(_name IN LISTS _PY_LIB_SEARCH_ORDER)
+    if (EXISTS "${_PY_BASE_PREFIX}/libs/${_name}")
+      set(_PY_LIB_CANDIDATE "${_PY_BASE_PREFIX}/libs/${_name}")
+      break()
     endif()
-    set(Python_LIBRARY "${_PY_LIB_CANDIDATE}" CACHE FILEPATH "Python import library" FORCE)
-    message(STATUS "!!! Python import library resolved to: ${_PY_LIB_CANDIDATE}")
-    if (TARGET Python::Module)
-      set_property(TARGET Python::Module APPEND PROPERTY INTERFACE_LINK_LIBRARIES "${_PY_LIB_CANDIDATE}")
-    endif()
+  endforeach()
+  if (NOT _PY_LIB_CANDIDATE)
+    message(FATAL_ERROR "Could not locate Python import library (.lib) in ${_PY_BASE_PREFIX}/libs")
+  endif()
+  set(Python_LIBRARY "${_PY_LIB_CANDIDATE}" CACHE FILEPATH "Python import library" FORCE)
+  message(STATUS "!!! Python import library resolved to: ${_PY_LIB_CANDIDATE}")
+  if (TARGET Python::Module)
+    set_property(TARGET Python::Module APPEND PROPERTY INTERFACE_LINK_LIBRARIES "${_PY_LIB_CANDIDATE}")
   endif()
 endif()
 
