@@ -177,7 +177,7 @@ jobs:
           echo "${{github.workspace}}/.venv/bin" >> $GITHUB_PATH
 
       - name: Install Python dependencies
-        run: pip install numpy tqdm pytest ValgrindCI scipy
+        run: pip install numpy tqdm pytest ValgrindCI scipy matplotlib
 
       - name: Install Valgrind (GitHub runner)
         if: inputs.use_github_runners
