@@ -985,7 +985,7 @@
         var f = files[filePath];
         var summary = f.summary || {};
         var pct = summary.percent_covered != null ? summary.percent_covered.toFixed(1) + '%' : '?';
-        var displayPath = filePath.replace(/^.*masspcf\//, 'masspcf/');
+        var displayPath = filePath.replace(/^.*stablebear\//, 'stablebear/');
         lines.push('  ' + displayPath + ': ' + pct +
           ' (' + (summary.covered_lines || 0) + '/' + (summary.num_statements || 0) + ' stmts)');
         var missing = f.missing_lines || [];
@@ -1011,7 +1011,7 @@
           var pct = f.line_percent != null ? f.line_percent.toFixed(1) + '%' : '?';
           var covered = f.line_covered != null ? f.line_covered : (f.lines ? f.lines.covered : '?');
           var total   = f.line_total   != null ? f.line_total   : (f.lines ? f.lines.count   : '?');
-          var displayPath = (f.filename || '').replace(/^.*masspcf\//, 'masspcf/');
+          var displayPath = (f.filename || '').replace(/^.*stablebear\//, 'stablebear/');
           lines.push('  ' + displayPath + ': ' + pct + ' (' + covered + '/' + total + ' lines)');
         });
       }
@@ -1021,7 +1021,7 @@
     function buildHeader() {
       var label  = (document.querySelector('.topbar-sha')    || {}).textContent || '';
       var branch = (document.querySelector('.topbar-branch') || {}).textContent || '';
-      var lines = ['# masspcf coverage report', 'Run: ' + label.trim()];
+      var lines = ['# stablebear coverage report', 'Run: ' + label.trim()];
       if (branch.trim()) lines.push('Branch: ' + branch.trim());
       lines.push('');
       return lines.join('\n');
