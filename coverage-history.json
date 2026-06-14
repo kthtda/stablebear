@@ -500,5 +500,15 @@
     "py": 86.0,
     "cuda": null,
     "release_tag": null
+  },
+  {
+    "utc_iso": "2026-06-14T12:47:17Z",
+    "sha": "249dd9e",
+    "branch": "104/merge",
+    "detail_path": "reports/2026-06-14_12-47-17_249dd9e/report.html",
+    "cpp": 88.0,
+    "py": 86.0,
+    "cuda": null,
+    "release_tag": null
   }
 ]
