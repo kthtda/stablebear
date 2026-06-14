@@ -63,6 +63,11 @@ def mean(fs: PcfContainerLike, dim: int = 0):
     -------
     PcfTensor
         A ``PcfTensor`` with the reduced dimension removed.
+
+    Raises
+    ------
+    IndexError
+        If ``dim`` is out of range for the input tensor's number of dimensions.
     """
     backend, tensor = _resolve_pcf_inputs(_REDUCTIONS_BACKEND_MAP, fs)
     return _to_tensor(backend.mean(tensor._data, dim))
@@ -95,6 +100,11 @@ def max_time(fs: PcfContainerLike, dim: int = 0):
     -------
     FloatTensor
         A numeric tensor with the reduced dimension removed.
+
+    Raises
+    ------
+    IndexError
+        If ``dim`` is out of range for the input tensor's number of dimensions.
     """
     backend, tensor = _resolve_pcf_inputs(_REDUCTIONS_BACKEND_MAP, fs)
     return _to_tensor(backend.max_time(tensor._data, dim))

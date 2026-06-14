@@ -70,12 +70,18 @@ namespace sb
     return TPcf(std::move(retPts));
   }
 
+  template <typename InputIt, typename TPcf = typename std::iterator_traits<InputIt>::value_type>
+  TPcf reduce(InputIt begin, InputIt end, TOp<TPcf> op)
+  {
+    return std::reduce(begin, end, TPcf(), [&op](const TPcf& f, const TPcf& g) {
+      return combine(f, g, op);
+    });
+  }
+
   template <typename TPcf>
   TPcf reduce(const std::vector<TPcf>& fs, TOp<TPcf> op)
   {
-    return std::reduce(fs.begin(), fs.end(), TPcf(), [&op](const TPcf& f, const TPcf& g) {
-      return combine(f, g, op);
-    });
+    return reduce(fs.begin(), fs.end(), op);
   }
 
   template <typename TPcf>
