@@ -24,7 +24,7 @@ Building from source
 Building from source is useful in two situations:
 
 1. **Your CPU is older than x86-64-v3** and the pre-built wheel refuses to load.
-2. **You want maximum performance.** A source build defaults to ``-march=native`` (or a CPUID-probed ``/arch:`` flag on MSVC), so the resulting extension can use every instruction set your CPU supports — including AVX-512 where available — rather than stopping at the v3 baseline shipped in the wheel. Speedups are workload-dependent but often measurable on AVX-512-capable and newer AMD/Intel parts.
+2. **You want a build tuned to your exact CPU.** A source build defaults to ``-march=native`` (or a CPUID-probed ``/arch:`` flag on MSVC), so the resulting extension can use every instruction set your CPU supports — including AVX-512 where available — rather than stopping at the v3 baseline shipped in the wheel. Whether this improves performance is workload- and hardware-dependent; benchmark your own workload to find out.
 
 To install the latest released version from source::
 
