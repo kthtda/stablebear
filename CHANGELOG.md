@@ -2,9 +2,20 @@
 
 * masspcf is now stablebear.
 
+### Bug fixes
+
+* **`flatten()` now exposes correct data through NumPy and `print`** — `np.asarray(t.flatten())`, `print(t.flatten())`/`repr`, and operations chained after `flatten` (e.g. `expand_dims`, `transpose`) returned the first element repeated, because the flattened axis was given a stride of `0`. The flattened axis now has stride `1`, so the NumPy/buffer view reads the correct row-major data. Element indexing (`f[i]`) was already correct; the two paths now agree. ([#15](https://github.com/kthtda/stablebear/issues/15))
+* **Out-of-range reduction axis raises instead of corrupting memory** — `mean` and `max_time` with a `dim` outside the tensor's rank silently returned a wrong-shaped result (`dim == ndim`) or corrupted the heap and aborted the interpreter (`dim > ndim`). The dimension is now validated at the C++ root cause, raising a catchable `IndexError`. ([#24](https://github.com/kthtda/stablebear/issues/24))
+* **`l2_kernel` and `pdist` no longer crash on negative-step views** — passing a PCF view with a negative step (e.g. `X[::-1]`) segfaulted, because the internal 1-D value iterator stored its stride as an unsigned `size_t` and a negative stride wrapped to a huge value. The iterator now tracks a signed logical position, so reversed and strided views integrate correctly. ([#23](https://github.com/kthtda/stablebear/issues/23))
+* **`from_serial_content` validates enumeration bounds** — an enumeration entry whose `stop` exceeded the content length, or whose `start` was negative, read out of bounds: small overflows returned uninitialized heap memory and large ones segfaulted, both silently. Each entry is now validated as `0 <= start < stop <= len(content)` and raises `ValueError` otherwise, matching the existing `start >= stop` check. ([#37](https://github.com/kthtda/stablebear/issues/37))
+
+### Performance
+
+* **Reductions read input slices in place** — `mean` and `max_time` no longer deep-copy every PCF into a temporary vector before reducing; they iterate each slice in place via the value iterator, cutting allocation on large reductions.
+
 ### Persistence
 
-* `barcode_to_accumulated_persistence` no longer prints progress by default (`verbose` default changed from `True` to `False`).
+* `barcode_to_accumulated_persistence` no longer prints progress by default (`verbose` default changed from `True` to `False`). ([#30](https://github.com/kthtda/stablebear/issues/30))
 
 ## 0.4.1
 
@@ -46,7 +57,7 @@ Tensor indexing is now much closer to NumPy. These changes apply to every tensor
 * **`DistanceMatrix` / `SymmetricMatrix`** — negative `(i, j)` indices are resolved, and out-of-range access raises `IndexError`.
 * **Memory safety** — out-of-shape values in multi-axis (outer / `np.ix_`-style) assignment now raise instead of writing out of bounds, and out-of-bounds selectors in a multi-axis read now raise `IndexError`.
 
-Multiple advanced indices keep their outer (`np.ix_`-style) semantics, as documented in [Indexing and Masking](https://github.com/kthtda/masspcf/blob/main/docs/indexing.rst).
+Multiple advanced indices keep their outer (`np.ix_`-style) semantics, as documented in [Indexing and Masking](https://github.com/kthtda/stablebear/blob/main/docs/indexing.rst).
 
 ### Packaging
 
