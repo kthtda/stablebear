@@ -29,9 +29,9 @@ jobs:
         shell: bash
         run: |
           if [ "${{ inputs.cpu_only }}" == "true" ]; then
-            MATRIX='{"include":[{"os":"ubuntu-24.04","cuda":0,"artifact_suffix":"-cpu"},{"os":"ubuntu-22.04-arm","cuda":0,"artifact_suffix":"-cpu"},{"os":"macos-26","cuda":0,"artifact_suffix":"-cpu"},{"os":"windows-2025","cuda":0,"artifact_suffix":"-cpu"}]}'
+            MATRIX='{"include":[{"os":"ubuntu-24.04","cuda":0,"artifact_suffix":"-cpu"},{"os":"ubuntu-22.04-arm","cuda":0,"artifact_suffix":"-cpu"},{"os":"macos-26","cuda":0,"artifact_suffix":"-cpu"},{"os":"windows-2022","cuda":0,"artifact_suffix":"-cpu"}]}'
           else
-            MATRIX='{"include":[{"os":"ubuntu-24.04","cuda":1,"cuda_tag":"12-8","cuda_major":12,"artifact_suffix":"-cuda12"},{"os":"ubuntu-24.04","cuda":1,"cuda_tag":"13-1","cuda_major":13,"artifact_suffix":"-cuda13"},{"os":"ubuntu-22.04-arm","cuda":0,"artifact_suffix":"-cpu"},{"os":"macos-26","cuda":0,"artifact_suffix":"-cpu"},{"os":"windows-2025","cuda":1,"cuda_version":"12.6","cuda_major":12,"artifact_suffix":"-cuda12"},{"os":"windows-2025","cuda":1,"cuda_version":"13.1","cuda_major":13,"artifact_suffix":"-cuda13"}]}'
+            MATRIX='{"include":[{"os":"ubuntu-24.04","cuda":1,"cuda_tag":"12-8","cuda_major":12,"artifact_suffix":"-cuda12"},{"os":"ubuntu-24.04","cuda":1,"cuda_tag":"13-1","cuda_major":13,"artifact_suffix":"-cuda13"},{"os":"ubuntu-22.04-arm","cuda":0,"artifact_suffix":"-cpu"},{"os":"macos-26","cuda":0,"artifact_suffix":"-cpu"},{"os":"windows-2022","cuda":1,"cuda_version":"12.6","cuda_major":12,"artifact_suffix":"-cuda12"},{"os":"windows-2022","cuda":1,"cuda_version":"13.1","cuda_major":13,"artifact_suffix":"-cuda13"}]}'
           fi
           echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
 
@@ -169,7 +169,7 @@ jobs:
     needs: build_wheels
     strategy:
       matrix:
-        os: [ubuntu-24.04, windows-2025]
+        os: [ubuntu-24.04, windows-2022]
     steps:
       - uses: actions/checkout@v6
       - uses: actions/download-artifact@v8
