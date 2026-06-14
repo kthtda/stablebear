@@ -1208,7 +1208,7 @@ namespace sb
 
     ret.m_viewType = ViewType::Flattened;
     ret.m_shape = { get_total_size() };
-    ret.m_strides = { ptrdiff_t{0} };
+    ret.m_strides = { ptrdiff_t{1} };
     return ret;
   }
 
