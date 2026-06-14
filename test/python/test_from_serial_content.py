@@ -91,6 +91,41 @@ def test_fsc_stop_le_start_throws():
         X = sb.from_serial_content(content, enumeration)
 
 
+@pytest.mark.parametrize("dtype", [np.float64, np.float32])
+def test_fsc_stop_overflow_raises(dtype):
+    """stop beyond content length must raise cleanly, not read OOB heap memory.
+
+    Regression for #37: stop > content.shape(0) was unchecked, so the loop read
+    past the content buffer and returned uninitialized heap garbage (small
+    overflow) or segfaulted (large overflow), exit 0 / no exception.
+    """
+    content = np.array([[0.0, 1.0], [2.0, 3.0]], dtype=dtype)
+    enumeration = np.array([[0, 20]], dtype=np.int64)
+    with pytest.raises((ValueError, IndexError)):
+        sb.from_serial_content(content, enumeration)
+
+
+@pytest.mark.parametrize("dtype", [np.float64, np.float32])
+def test_fsc_negative_start_raises(dtype):
+    """Negative start bypassed the start>=stop guard and read negative offsets.
+
+    Regression for #37 case (C): enum [[-1000, 1]] satisfied start < stop yet
+    read OOB; it must raise.
+    """
+    content = np.array([[0.0, 1.0], [2.0, 3.0]], dtype=dtype)
+    enumeration = np.array([[-1000, 1]], dtype=np.int64)
+    with pytest.raises((ValueError, IndexError)):
+        sb.from_serial_content(content, enumeration)
+
+
+def test_fsc_stop_equals_length_ok():
+    """stop == content.shape(0) is in-bounds and must still succeed."""
+    content = np.array([[0.0, 10.0], [10.0, 20.0], [20.0, 30.0]])
+    enumeration = np.array([[0, 3]])
+    X = sb.from_serial_content(content, enumeration)
+    assert X[0] == sb.Pcf(content[0:3])
+
+
 def test_fsc_dtypes():
     content32 = np.array(
         [[0.0, 10.0], [10.0, 20.0], [20.0, 30.0], [0.0, 50.0], [10.0, 60.0]],
