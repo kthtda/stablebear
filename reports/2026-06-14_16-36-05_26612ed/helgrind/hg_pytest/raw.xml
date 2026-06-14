@@ -1,0 +1,54 @@
+<?xml version="1.0"?>
+
+<valgrindoutput>
+
+<protocolversion>4</protocolversion>
+<protocoltool>helgrind</protocoltool>
+
+<preamble>
+  <line>Helgrind, a thread error detector</line>
+  <line>Copyright (C) 2007-2017, and GNU GPL'd, by OpenWorks LLP et al.</line>
+  <line>Using Valgrind-3.22.0 and LibVEX; rerun with -h for copyright info</line>
+  <line>Command: python -m pytest . -vv -s</line>
+</preamble>
+
+<pid>1369</pid>
+<ppid>1368</ppid>
+<tool>helgrind</tool>
+
+<args>
+  <vargv>
+    <exe>/usr/bin/valgrind.bin</exe>
+    <arg>--tool=helgrind</arg>
+    <arg>--xml=yes</arg>
+    <arg>--xml-file=./reports/hg-pytest.xml</arg>
+    <arg>--suppressions=/home/runner/actions-runner/_work/stablebear/stablebear/test/reports/vg_cpython.supp</arg>
+  </vargv>
+  <argv>
+    <exe>python</exe>
+    <arg>-m</arg>
+    <arg>pytest</arg>
+    <arg>.</arg>
+    <arg>-vv</arg>
+    <arg>-s</arg>
+  </argv>
+</args>
+
+<status>
+  <state>RUNNING</state>
+  <time>00:00:00:00.016 </time>
+</status>
+
+
+<status>
+  <state>FINISHED</state>
+  <time>00:00:00:10.841 </time>
+</status>
+
+<errorcounts>
+</errorcounts>
+
+<suppcounts>
+</suppcounts>
+
+</valgrindoutput>
