@@ -20,9 +20,12 @@
 #include "../../functional/pcf.hpp"
 #include "../../tensor.hpp"
 #include "../../executor.hpp"
+#include "../../detail/tensor_1d_value_iterator.hpp"
 #include "reduce.hpp"
 
 #include <iostream>
+#include <sstream>
+#include <stdexcept>
 #include <utility>
 
 namespace sb
@@ -37,14 +40,35 @@ namespace sb
     std::cout << std::endl;
   };
 
-  template <typename PcfT, typename ReductionF>
-  Tensor<PcfT> parallel_tensor_reduce(
+  // Validate a reduction dimension against a tensor shape. An out-of-range dim
+  // would otherwise index/erase past the end of the shape vector (UB: wrong
+  // result for dim == ndim, heap corruption for dim > ndim). Throwing here
+  // surfaces a clean, catchable exception (pybind11 maps std::out_of_range to
+  // a Python IndexError).
+  inline void check_reduce_dim(size_t dim, size_t ndim)
+  {
+    if (dim >= ndim)
+    {
+      std::ostringstream oss;
+      oss << "Reduction dimension " << dim << " is out of range for tensor of dimension " << ndim;
+      throw std::out_of_range(oss.str());
+    }
+  }
+
+  // Shared skeleton for every dimension reduction: build the reduced-shape
+  // output tensor, then for each output cell reduce the input slice along `dim`
+  // in place (via a strided iterator -- no per-slice copy). Callers supply the
+  // output element type `OutT` and a `reduction` functor mapping the slice
+  // [first, last) to a single OutT value.
+  template <typename OutT, typename PcfT, typename ReductionF>
+  Tensor<OutT> parallel_dim_reduce(
       const Tensor<PcfT>& in,
       size_t dim,
       ReductionF&& reduction,
       Executor& exec = default_executor())
   {
     auto shape = in.shape();
+    check_reduce_dim(dim, shape.size());
     auto inDimSize = shape[dim];
 
     shape.erase(shape.begin() + dim);
@@ -53,7 +77,7 @@ namespace sb
       shape.resize(1, 1);
     }
 
-    Tensor<PcfT> ret(shape);
+    Tensor<OutT> ret(shape);
     auto op = std::forward<ReductionF>(reduction);
     sb::parallel_walk(ret, [&ret, &in, inDimSize, dim, &op](const std::vector<size_t>& idx){
       std::vector<size_t> inIdx(in.shape().size(), 0_uz);
@@ -65,20 +89,27 @@ namespace sb
         std::copy(idx.begin() + dim, idx.end(), inIdx.begin() + dim + 1);
       }
 
-      std::vector<PcfT> tmp; // TODO: Rewrite without need to copy
-      tmp.reserve(inDimSize);
-      for (auto i = 0_uz; i < inDimSize; ++i)
-      {
-        inIdx[dim] = i;
-        tmp.emplace_back( in(inIdx) );
-      }
+      // inIdx[dim] == 0 marks the origin of the slice; the iterator walks `dim`.
+      Tensor1dValueIterator<const Tensor<PcfT>> first(in, inIdx, dim, 0_uz);
+      Tensor1dValueIterator<const Tensor<PcfT>> last(in, inIdx, dim, inDimSize);
 
-      auto & out = ret(idx);
-
-      out = reduce(tmp, op);
+      ret(idx) = op(first, last);
     }, exec);
 
     return ret;
+  }
+
+  template <typename PcfT, typename ReductionF>
+  Tensor<PcfT> parallel_tensor_reduce(
+      const Tensor<PcfT>& in,
+      size_t dim,
+      ReductionF&& reduction,
+      Executor& exec = default_executor())
+  {
+    auto op = std::forward<ReductionF>(reduction);
+    return parallel_dim_reduce<PcfT>(in, dim, [op](auto first, auto last) {
+      return reduce(first, last, op);
+    }, exec);
   }
 
   template <typename PcfT>
@@ -97,50 +128,16 @@ namespace sb
   template <typename PcfT, typename UnaryF, typename MaxOp>
   auto max_element(const Tensor<PcfT>& in, size_t dim, UnaryF&& f, MaxOp&& maxOp, Executor& exec = default_executor())
   {
-    using OutTensorT = Tensor<std::decay_t<
-        decltype(f(std::declval<PcfT>()))
-    >>;
-
-    using OutValueT = typename OutTensorT::value_type;
+    using OutValueT = std::decay_t<decltype(f(std::declval<PcfT>()))>;
 
     static_assert(std::invocable<MaxOp, OutValueT, OutValueT>);
 
-    auto shape = in.shape();
-    auto inDimSize = shape[dim];
-
-    shape.erase(shape.begin() + dim);
-    if (shape.empty())
-    {
-      shape.resize(1, 1);
-    }
-    OutTensorT ret(shape);
-
-    sb::parallel_walk(ret, [&ret, &in, inDimSize, dim, &f, &maxOp](const std::vector<size_t>& idx){
-      std::vector<size_t> inIdx(in.shape().size(), 0_uz);
-
-      std::copy(idx.begin(), idx.begin() + dim, inIdx.begin());
-      if (inIdx.size() > 1)
-      {
-        // MSVC debug does not like (inIdx.begin() + dim + 1) even if nothing is written there it seems.
-        std::copy(idx.begin() + dim, idx.end(), inIdx.begin() + dim + 1);
-      }
-
-      std::vector<PcfT> tmp; // TODO: Rewrite without need to copy
-      tmp.reserve(inDimSize);
-      for (auto i = 0_uz; i < inDimSize; ++i)
-      {
-        inIdx[dim] = i;
-        tmp.emplace_back( in(inIdx) );
-      }
-
-      auto & out = ret(idx);
-
-      auto init = f(*tmp.begin());
-      out =  std::transform_reduce(tmp.begin() + 1, tmp.end(), init, maxOp, f);
-
+    auto fn = std::forward<UnaryF>(f);
+    auto mop = std::forward<MaxOp>(maxOp);
+    return parallel_dim_reduce<OutValueT>(in, dim, [fn, mop](auto first, auto last) {
+      auto init = fn(*first);
+      return std::transform_reduce(first + 1, last, init, mop, fn);
     }, exec);
-
-    return ret;
   }
 }
 
