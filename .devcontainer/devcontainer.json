@@ -1,0 +1,66 @@
+{
+  "name": "stablebear-cuda",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": "..",
+    "args": {
+      "BASE_IMAGE": "nvidia/cuda:12.6.3-devel-ubuntu22.04"
+    }
+  },
+
+  // GPU passthrough. Requires nvidia-container-toolkit on the host (present).
+  "runArgs": [
+    "--gpus", "all"
+  ],
+  "hostRequirements": {
+    "gpu": true
+  },
+
+  "containerEnv": {
+    "NVIDIA_VISIBLE_DEVICES": "all",
+    "NVIDIA_DRIVER_CAPABILITIES": "compute,utility",
+    // gh token passthrough for hosts that keep it in the OS keyring rather
+    // than hosts.yml (where the ~/.config/gh mount alone wouldn't carry it).
+    // Empty when unset on the host; gh treats that as absent.
+    "GH_TOKEN": "${localEnv:GH_TOKEN}"
+  },
+
+  "remoteUser": "ubuntu",
+
+  "mounts": [
+    // Persist Claude Code auth/config across rebuilds.
+    "source=${localEnv:HOME}/.claude,target=/home/ubuntu/.claude,type=bind,consistency=cached",
+    "source=${localEnv:HOME}/.claude.json,target=/home/ubuntu/.claude.json,type=bind,consistency=cached",
+    // Share gh CLI auth/config with the host (requires `gh auth login` on the
+    // host first, or once in the container -- it persists back to the host).
+    "source=${localEnv:HOME}/.config/gh,target=/home/ubuntu/.config/gh,type=bind,consistency=cached",
+    // Container-private build dir. The workspace is bind-mounted from the host,
+    // whose cmake-build-debug holds a CMakeCache.txt baked with host paths; this
+    // volume shadows it so the container keeps its own cache (CMake refuses a
+    // cache generated under a different source/binary path).
+    "source=stablebear-cuda-build,target=${containerWorkspaceFolder}/cmake-build-debug,type=volume"
+  ],
+
+  // Init submodules, then build + install the extensions (_sb_cpu + _sb_cuda12)
+  // via cmake. `cmake --install` symlinks them into stablebear/. Python deps are
+  // already installed at image-build time (see Dockerfile). The chown gives the
+  // ubuntu user ownership of the freshly-created (root-owned) build volume.
+  // The ~/.local/bin/claude symlink quiets `/doctor`: this container installs
+  // Claude Code via `npm -g` (-> /usr/bin/claude), but the bind-mounted
+  // ~/.claude.json records installMethod=native, so doctor looks for a binary at
+  // the native path ~/.local/bin/claude. ~/.local is container-private (not
+  // mounted), so this fix stays local and won't mislabel the host's install.
+  "postCreateCommand": "mkdir -p ~/.local/bin && ln -sf \"$(command -v claude)\" ~/.local/bin/claude && sudo chown ubuntu:ubuntu cmake-build-debug && git submodule update --init --recursive && cmake --preset debug && cmake --build --preset debug && cmake --install cmake-build-debug",
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-vscode.cpptools",
+        "ms-vscode.cmake-tools",
+        "llvm-vs-code-extensions.vscode-clangd",
+        "anthropic.claude-code"
+      ]
+    }
+  }
+}
