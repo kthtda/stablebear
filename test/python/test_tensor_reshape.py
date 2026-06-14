@@ -31,6 +31,43 @@ def test_tensor2d_flatten():
         assert flat[i] == np_flat[i]
 
 
+def test_flatten_numpy_view_is_row_major():
+    """flatten() must expose row-major data through numpy/buffer, not stride-0.
+
+    Regression for #15: flatten() used to set the flattened-axis stride to 0,
+    leaving m_isContiguous=true, so np.asarray()/print() read element 0 repeated
+    while element indexing (a different C++ path) stayed correct.
+    """
+    t = sb.FloatTensor(np.arange(6, dtype=np.float64).reshape(2, 3))
+    f = t.flatten()
+
+    expected = np.arange(6, dtype=np.float64).reshape(2, 3).flatten()
+
+    # The numpy/buffer view must match the canonical row-major flatten...
+    assert np.array_equal(np.asarray(f), expected)
+    # ...and must agree with the element-access path (which is already correct).
+    assert [f[i] for i in range(6)] == expected.tolist()
+    # The contiguous flattened axis must have stride 1, never 0.
+    assert tuple(f.strides) == (1,)
+
+
+def test_flatten_noncontiguous_slice_numpy_view():
+    """flatten() of a non-contiguous slice copies, then exposes a correct view."""
+    big = sb.FloatTensor(np.arange(12, dtype=np.float64).reshape(3, 4))
+    f = big[:, 1:3].flatten()
+    expected = np.arange(12, dtype=np.float64).reshape(3, 4)[:, 1:3].flatten()
+    assert np.array_equal(np.asarray(f), expected)
+    assert tuple(f.strides) == (1,)
+
+
+def test_flatten_expand_dims_numpy_view():
+    """expand_dims after flatten must still produce a correct numpy view."""
+    t = sb.FloatTensor(np.arange(6, dtype=np.float64).reshape(2, 3))
+    f = t.flatten().expand_dims(0)
+    expected = np.arange(6, dtype=np.float64).reshape(2, 3).flatten()[np.newaxis, :]
+    assert np.array_equal(np.asarray(f), expected)
+
+
 @pytest.mark.parametrize("TensorType, np_dtype", _NUMERIC_TYPES)
 class TestReshape:
     def test_2d_to_1d(self, TensorType, np_dtype):
