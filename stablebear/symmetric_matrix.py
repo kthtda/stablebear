@@ -173,14 +173,38 @@ class SymmetricMatrix:
 
 
 class SymmetricMatrixTensor(Tensor):
-    def __init__(self, data: cpp.SymmetricMatrix32Tensor | cpp.SymmetricMatrix64Tensor):
+    """Tensor whose elements are :class:`SymmetricMatrix` objects.
+
+    Parameters
+    ----------
+    data : ndarray, SymmetricMatrixTensor, or C++ tensor
+        An ndarray of shape ``(*tensor_shape, n, n)`` whose trailing two axes
+        form each n×n symmetric matrix, or an existing tensor.
+    dtype : symmat32 | symmat64 | None, optional
+        Element precision. Inferred from the array dtype when ``None``.
+    """
+
+    def __init__(self, data, dtype=None):
         super().__init__()
         if isinstance(data, SymmetricMatrixTensor):
             data = data._data
+        elif isinstance(data, np.ndarray):
+            from .distance_matrix import _matrix_tensor_cpp_from_array
+            data = _matrix_tensor_cpp_from_array(
+                data, dtype, SymmetricMatrix, symmat32, symmat64)
         elif not isinstance(data, (cpp.SymmetricMatrix32Tensor, cpp.SymmetricMatrix64Tensor)):
             raise TypeError(f"Cannot create SymmetricMatrixTensor from {type(data)}")
         self._data = data
         self.dtype = _SYMMAT_CPP_TO_DTYPE[type(self._data)]
+
+    @classmethod
+    def from_numpy(cls, array, dtype=None):
+        """Build a tensor of symmetric matrices from an ``(*tensor_shape, n, n)`` array.
+
+        The trailing two axes of *array* form each n×n symmetric matrix; the
+        leading axes form the tensor shape.
+        """
+        return cls(np.asarray(array), dtype=dtype)
 
     def _to_py_tensor(self, data):
         return SymmetricMatrixTensor(data)

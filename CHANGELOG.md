@@ -1,5 +1,13 @@
 ## 0.4.3
 
+### New features
+
+* **NumPy/list constructors for the non-numeric tensor families** — `PointCloudTensor`, `DistanceMatrixTensor`, and `SymmetricMatrixTensor` can now be built directly from a NumPy array or nested list, instead of allocating with `zeros()` and filling element by element. `PointCloudTensor(arr)` reads a trailing `(n_points, dim)` block per cell (with ragged lists of per-cloud arrays also accepted); `DistanceMatrixTensor` and `SymmetricMatrixTensor` accept a stack of square matrices via `from_numpy(...)` (or the constructor). Dtype is inferred from the array (`float32` → `pcloud32`/`distmat32`/…, `float64` → the 64-bit dtype) and can be overridden with `dtype=`. A generic `sb.tensor(data, dtype=...)` factory dispatches to the right tensor type from the dtype sentinel. ([#53](https://github.com/kthtda/stablebear/issues/53), [#92](https://github.com/kthtda/stablebear/issues/92), [#84](https://github.com/kthtda/stablebear/issues/84))
+
+### Breaking changes
+
+* **The `stablebear.tensor` submodule has been renamed to `stablebear.base_tensor`** — the name `stablebear.tensor` now refers to the new `tensor()` factory function (above), so the module that holds the tensor classes (`PcfTensor`, `FloatTensor`, `PointCloudTensor`, …) moved to `stablebear.base_tensor`. Code that imported from the module path must update its imports (`from stablebear.tensor import FloatTensor` → `from stablebear.base_tensor import FloatTensor`). The classes remain re-exported at the top level, so the recommended `import stablebear as sb; sb.FloatTensor` form is unaffected.
+
 ### Bug fixes
 
 * **A `Generator` now advances between draws** — two consecutive draws from the same generator (or from the global generator after a single `random.seed(s)`) returned byte-for-byte identical tensors, silently breaking any repeated-sampling workflow (bootstrap, Monte Carlo) and contradicting the `numpy.random.Generator` / `torch.Generator` convention. Each sampling call now reserves a fresh, contiguous block of seed slots and advances the generator past it, so successive draws are independent yet fully reproducible for a given seed. The first draw after seeding is unchanged, so existing seeds reproduce their historical first result. ([#86](https://github.com/kthtda/stablebear/issues/86))

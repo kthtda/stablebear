@@ -14,7 +14,7 @@
 
 import numpy as np
 
-from .tensor import PcfContainerLike, PcfTensor
+from .base_tensor import PcfContainerLike, PcfTensor
 from .typing import _validate_dtype, pcf32, pcf64
 
 

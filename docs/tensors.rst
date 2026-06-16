@@ -68,6 +68,53 @@ The precision (32- or 64-bit) is inferred from the elements.
 An empty list produces a shape ``(0,)`` tensor.
 
 
+From NumPy arrays
+-----------------
+
+Point-cloud, distance-matrix, and symmetric-matrix tensors can be built
+directly from a single NumPy array, avoiding an explicit element-assignment
+loop.
+
+For a :py:class:`~stablebear.PointCloudTensor`, the trailing ``cloud_ndim``
+axes (2 by default) form each ``(n_points, dim)`` cloud and the leading axes
+form the tensor shape::
+
+   import numpy as np
+   import stablebear as sb
+
+   arr = np.random.rand(3, 5, 4, 2)        # 3 x 5 grid of (4, 2) clouds
+   pc = sb.PointCloudTensor(arr)           # shape (3, 5)
+
+   batch = np.random.rand(10, 8, 2)        # 10 clouds of 8 points in 2-D
+   clouds = sb.PointCloudTensor(batch)     # shape (10,)
+
+A list of cloud arrays (which may have differing numbers of points) builds a
+1-D tensor::
+
+   ragged = sb.PointCloudTensor([np.random.rand(3, 2), np.random.rand(5, 2)])
+
+For matrix tensors, the trailing two axes of the array form each ``n x n``
+matrix and the leading axes form the tensor shape::
+
+   distances = np.zeros((6, 4, 4))         # 6 distance matrices, each 4 x 4
+   dmats = sb.DistanceMatrixTensor.from_numpy(distances)   # shape (6,)
+
+   values = np.zeros((2, 3, 5, 5))         # 2 x 3 grid of 5 x 5 matrices
+   smats = sb.SymmetricMatrixTensor.from_numpy(values)     # shape (2, 3)
+
+The precision is inferred from the array dtype (``float32`` → the 32-bit
+variant, otherwise 64-bit) and can be overridden with ``dtype=``. These
+batch constructors are the natural entry point for computing persistent
+homology across many clouds or distance matrices in one parallel call.
+
+The :py:func:`~stablebear.tensor` factory is a NumPy-like front end that
+dispatches to the right constructor based on ``dtype``::
+
+   X = sb.tensor([1.0, 2.0, 3.0])                  # FloatTensor (inferred)
+   pc = sb.tensor(arr, dtype=sb.pcloud64)          # PointCloudTensor
+   dmats = sb.tensor(distances, dtype=sb.distmat64)  # DistanceMatrixTensor
+
+
 From serialized NumPy data
 ---------------------------
 

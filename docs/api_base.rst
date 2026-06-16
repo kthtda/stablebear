@@ -11,10 +11,10 @@ pcf
    :undoc-members:
    :show-inheritance:
 
-tensor
-------
+base_tensor
+-----------
 
-.. automodule:: stablebear.tensor
+.. automodule:: stablebear.base_tensor
    :members:
    :undoc-members:
    :show-inheritance:

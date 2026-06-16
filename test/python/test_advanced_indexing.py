@@ -16,7 +16,7 @@ import numpy as np
 import pytest
 
 import stablebear as sb
-from stablebear.tensor import FloatTensor, IntTensor
+from stablebear.base_tensor import FloatTensor, IntTensor
 
 
 def _sb(arr):

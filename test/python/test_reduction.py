@@ -63,7 +63,7 @@ def test_mean_2d_dim1():
 
 
 def test_resolve_pcf_inputs_invalid():
-    from stablebear.tensor import _resolve_pcf_inputs
+    from stablebear.base_tensor import _resolve_pcf_inputs
     from stablebear.reductions import _REDUCTIONS_BACKEND_MAP
 
     with pytest.raises(ValueError, match="not supported"):
