@@ -835,7 +835,16 @@ class ArithmeticTensorMixin:
     """
 
     def _decay_operand(self, val):
-        return val._data if hasattr(val, "_data") else val
+        if hasattr(val, "_data"):
+            return val._data
+        import numpy as np
+        if isinstance(val, (np.ndarray, list, tuple)):
+            # Wrap an array-like RHS as a same-type tensor (cast to this
+            # tensor's dtype where applicable) so that ``tensor + array``
+            # mirrors ``array + tensor``. See issue #62.
+            wrapped = self._coerce_rhs(type(self)(val))
+            return wrapped._data
+        return val
 
     def __add__(self, rhs):
         return self._to_py_tensor(self._data + self._decay_operand(rhs))
