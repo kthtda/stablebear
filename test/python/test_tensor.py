@@ -121,7 +121,7 @@ def test_broadcast_to_preserves_dtype(dtype):
 
 
 import numpy as np
-from stablebear.tensor import BoolTensor
+from stablebear.base_tensor import BoolTensor
 
 
 @pytest.mark.parametrize("dtype", ALL_DTYPES, ids=[d.__name__ for d in ALL_DTYPES])

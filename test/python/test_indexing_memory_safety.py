@@ -28,7 +28,7 @@ fixed, so these cases now run safely in-process and assert NumPy parity.
 import numpy as np
 import pytest
 
-from stablebear.tensor import FloatTensor, BoolTensor
+from stablebear.base_tensor import FloatTensor, BoolTensor
 from _indexing_support import assert_getitem_matches, assert_setitem_matches, ref_array
 
 

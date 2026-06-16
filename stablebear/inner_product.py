@@ -17,7 +17,7 @@ import numpy as np
 from . import _sb_cpp as cpp
 from .async_task import _run_task
 from .symmetric_matrix import SymmetricMatrix
-from .tensor import PcfContainerLike, _resolve_pcf_inputs
+from .base_tensor import PcfContainerLike, _resolve_pcf_inputs
 from .typing import pcf32, pcf64
 
 

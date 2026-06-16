@@ -19,7 +19,7 @@ import numpy as np
 from .persistence.barcode import Barcode
 from .persistence.ph_tensor import BarcodeTensor
 from .reductions import max_time as max_time_reduction
-from .tensor import PcfContainerLike, PcfTensor
+from .base_tensor import PcfContainerLike, PcfTensor
 
 
 def plot(f: PcfContainerLike, fmt="", ax=None, auto_label=False, max_time=None, **kwargs):

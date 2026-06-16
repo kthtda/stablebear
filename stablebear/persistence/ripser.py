@@ -14,7 +14,7 @@
 
 from .. import _sb_cpp as cpp
 from ..distance_matrix import DistanceMatrixTensor
-from ..tensor import PointCloudTensor, _get_backend
+from ..base_tensor import PointCloudTensor, _get_backend
 from ..typing import distmat32, distmat64, pcloud32, pcloud64
 from .ph_tensor import BarcodeTensor
 

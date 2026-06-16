@@ -14,7 +14,7 @@
 
 from . import _sb_cpp as cpp
 from .functional.pcf import Pcf
-from .tensor import (
+from .base_tensor import (
     FloatTensor,
     PcfTensor,
     PcfContainerLike,

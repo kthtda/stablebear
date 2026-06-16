@@ -32,7 +32,7 @@ def assert_getitem_matches(arr, index):
     a legal NumPy index (int, slice, tuple, Ellipsis, None, list, ndarray, ...).
     """
     import numpy as np
-    from stablebear.tensor import FloatTensor
+    from stablebear.base_tensor import FloatTensor
 
     a = np.asarray(arr, dtype=np.float64)
     expected = a[index]
@@ -48,7 +48,7 @@ def assert_setitem_matches(arr, index, value):
     ``FloatTensor`` for the stablebear side (its RHS contract).
     """
     import numpy as np
-    from stablebear.tensor import FloatTensor
+    from stablebear.base_tensor import FloatTensor
 
     a = np.asarray(arr, dtype=np.float64)
     expected = a.copy()

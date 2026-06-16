@@ -14,7 +14,7 @@
 
 from __future__ import annotations
 
-from .tensor import FloatTensor
+from .base_tensor import FloatTensor
 from .distance_matrix import DistanceMatrix
 from .symmetric_matrix import SymmetricMatrix
 

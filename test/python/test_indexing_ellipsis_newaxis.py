@@ -25,7 +25,7 @@ pass is added.
 import numpy as np
 import pytest
 
-from stablebear.tensor import FloatTensor
+from stablebear.base_tensor import FloatTensor
 from _indexing_support import assert_getitem_matches, assert_setitem_matches, ref_array
 
 _B = np.arange(24.0, dtype=np.float64).reshape(2, 3, 4)

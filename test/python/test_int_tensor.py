@@ -16,7 +16,7 @@ import numpy as np
 import pytest
 
 import stablebear as sb
-from stablebear.tensor import IntTensor
+from stablebear.base_tensor import IntTensor
 
 
 _INT_DTYPES = [

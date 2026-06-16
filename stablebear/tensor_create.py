@@ -14,7 +14,7 @@
 
 from . import _sb_cpp as cpp
 from ._tensor_base import Shape, ShapeLike
-from .tensor import (
+from .base_tensor import (
     BoolTensor,
     FloatTensor,
     IntPcfTensor,
@@ -49,6 +49,50 @@ from .typing import (
 cpp_p = cpp.persistence
 
 
+# Single source of truth for dtype dispatch, shared by zeros() and tensor().
+# Maps each dtype sentinel to (wrapper class, C++ tensor class, zero-fill args).
+# Built lazily and cached because the matrix / barcode wrappers import back
+# into this module.
+_DTYPE_DISPATCH = {}
+
+# Families whose constructor selects precision via a ``dtype=`` keyword; the
+# rest (bool, PCF, barcode) infer it from the data or have a single precision.
+_DATA_DTYPE_KW = frozenset({
+    float32, float64, int32, int64, uint32, uint64,
+    pcloud32, pcloud64, distmat32, distmat64, symmat32, symmat64,
+})
+
+
+def _dtype_dispatch():
+    if not _DTYPE_DISPATCH:
+        from .persistence.ph_tensor import BarcodeTensor
+        from .distance_matrix import DistanceMatrixTensor
+        from .symmetric_matrix import SymmetricMatrixTensor
+        # Insertion order is the canonical dtype list used in error messages.
+        _DTYPE_DISPATCH.update({
+            pcf32: (PcfTensor, cpp.Pcf32Tensor, ()),
+            pcf64: (PcfTensor, cpp.Pcf64Tensor, ()),
+            pcf32i: (IntPcfTensor, cpp.Pcf32iTensor, ()),
+            pcf64i: (IntPcfTensor, cpp.Pcf64iTensor, ()),
+            float32: (FloatTensor, cpp.Float32Tensor, (0.0,)),
+            float64: (FloatTensor, cpp.Float64Tensor, (0.0,)),
+            int32: (IntTensor, cpp.Int32Tensor, (0,)),
+            int64: (IntTensor, cpp.Int64Tensor, (0,)),
+            uint32: (IntTensor, cpp.Uint32Tensor, (0,)),
+            uint64: (IntTensor, cpp.Uint64Tensor, (0,)),
+            boolean: (BoolTensor, cpp.BoolTensor, (False,)),
+            pcloud32: (PointCloudTensor, cpp.PointCloud32Tensor, ()),
+            pcloud64: (PointCloudTensor, cpp.PointCloud64Tensor, ()),
+            barcode32: (BarcodeTensor, cpp_p.Barcode32Tensor, ()),
+            barcode64: (BarcodeTensor, cpp_p.Barcode64Tensor, ()),
+            distmat32: (DistanceMatrixTensor, cpp.DistanceMatrix32Tensor, ()),
+            distmat64: (DistanceMatrixTensor, cpp.DistanceMatrix64Tensor, ()),
+            symmat32: (SymmetricMatrixTensor, cpp.SymmetricMatrix32Tensor, ()),
+            symmat64: (SymmetricMatrixTensor, cpp.SymmetricMatrix64Tensor, ()),
+        })
+    return _DTYPE_DISPATCH
+
+
 def zeros(shape: ShapeLike, dtype: Dtype = pcf32):
     """
     Creates a new `Tensor` of the specified `shape` and `dtype` whose entries are "zero." What "zero" means depends on the `dtype`:
@@ -74,80 +118,58 @@ def zeros(shape: ShapeLike, dtype: Dtype = pcf32):
         The newly created tensor
     """
 
-    from .persistence.ph_tensor import BarcodeTensor
-
     if not isinstance(shape, Shape):
         shape = Shape(shape)  # If passed as, e.g., tuple of ints
 
-    _assert_valid_dtype(
-        dtype,
-        [
-            pcf32,
-            pcf64,
-            pcf32i,
-            pcf64i,
-            float32,
-            float64,
-            int32,
-            int64,
-            uint32,
-            uint64,
-            boolean,
-            pcloud32,
-            pcloud64,
-            barcode32,
-            barcode64,
-            distmat32,
-            distmat64,
-            symmat32,
-            symmat64,
-        ],
-    )
+    dispatch = _dtype_dispatch()
+    _assert_valid_dtype(dtype, list(dispatch))
+    wrapper, cpp_cls, zero_fill = dispatch[dtype]
+    return wrapper(cpp_cls(shape, *zero_fill))
 
-    if dtype == boolean:
-        return BoolTensor(cpp.BoolTensor(shape, False))
-    elif dtype == pcf32:
-        return PcfTensor(cpp.Pcf32Tensor(shape))
-    elif dtype == pcf64:
-        return PcfTensor(cpp.Pcf64Tensor(shape))
-    elif dtype == pcf32i:
-        return IntPcfTensor(cpp.Pcf32iTensor(shape))
-    elif dtype == pcf64i:
-        return IntPcfTensor(cpp.Pcf64iTensor(shape))
-    elif dtype == float32:
-        return FloatTensor(cpp.Float32Tensor(shape, 0.0))
-    elif dtype == float64:
-        return FloatTensor(cpp.Float64Tensor(shape, 0.0))
-    elif dtype == int32:
-        return IntTensor(cpp.Int32Tensor(shape, 0))
-    elif dtype == int64:
-        return IntTensor(cpp.Int64Tensor(shape, 0))
-    elif dtype == uint32:
-        return IntTensor(cpp.Uint32Tensor(shape, 0))
-    elif dtype == uint64:
-        return IntTensor(cpp.Uint64Tensor(shape, 0))
-    elif dtype == pcloud32:
-        return PointCloudTensor(cpp.PointCloud32Tensor(shape))
-    elif dtype == pcloud64:
-        return PointCloudTensor(cpp.PointCloud64Tensor(shape))
-    elif dtype == barcode32:
-        return BarcodeTensor(cpp_p.Barcode32Tensor(shape))
-    elif dtype == barcode64:
-        return BarcodeTensor(cpp_p.Barcode64Tensor(shape))
-    elif dtype == distmat32:
-        from .distance_matrix import DistanceMatrixTensor
-        return DistanceMatrixTensor(cpp.DistanceMatrix32Tensor(shape))
-    elif dtype == distmat64:
-        from .distance_matrix import DistanceMatrixTensor
-        return DistanceMatrixTensor(cpp.DistanceMatrix64Tensor(shape))
-    elif dtype == symmat32:
-        from .symmetric_matrix import SymmetricMatrixTensor
-        return SymmetricMatrixTensor(cpp.SymmetricMatrix32Tensor(shape))
-    elif dtype == symmat64:
-        from .symmetric_matrix import SymmetricMatrixTensor
-        return SymmetricMatrixTensor(cpp.SymmetricMatrix64Tensor(shape))
-    else:
-        raise NotImplementedError("This dtype has not been implemented.")
+
+def tensor(data, dtype: Dtype = None):
+    """Create a tensor from existing data, dispatching on *dtype*.
+
+    A NumPy-like factory that wraps the per-family constructors so any
+    supported tensor can be built from an ndarray (or nested list) in one
+    call, instead of allocating with :func:`zeros` and assigning elements in
+    a Python loop.
+
+    Parameters
+    ----------
+    data : ndarray, list, or tuple
+        The source data. For point-cloud / matrix / barcode tensors this is
+        interpreted by the corresponding constructor (see those classes).
+    dtype : Dtype, optional
+        Target element dtype. When ``None``, a numeric dtype is inferred from
+        the array (bool/int/float); non-numeric tensors require an explicit
+        dtype.
+
+    Returns
+    -------
+    Tensor
+    """
+    if dtype is None:
+        import numpy as np
+        arr = np.asarray(data)
+        if arr.dtype == np.bool_:
+            return BoolTensor(arr)
+        if np.issubdtype(arr.dtype, np.integer):
+            return IntTensor(arr)
+        if np.issubdtype(arr.dtype, np.floating):
+            return FloatTensor(arr)
+        raise TypeError(
+            f"Cannot infer a tensor dtype from data of dtype {arr.dtype}; "
+            "pass an explicit dtype= argument")
+
+    dispatch = _dtype_dispatch()
+    # Barcode tensors are not constructible from raw array/list data.
+    if dtype not in dispatch or dtype in (barcode32, barcode64):
+        raise TypeError(f"Unsupported dtype {dtype} for tensor()")
+    wrapper = dispatch[dtype][0]
+    if dtype in _DATA_DTYPE_KW:
+        return wrapper(data, dtype=dtype)
+    return wrapper(data)
 
 
 def concatenate(tensors, axis=0):

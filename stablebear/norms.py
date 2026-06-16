@@ -14,7 +14,7 @@
 
 from . import _sb_cpp as cpp
 from .async_task import _run_task
-from .tensor import FloatTensor, PcfContainerLike, _resolve_pcf_inputs
+from .base_tensor import FloatTensor, PcfContainerLike, _resolve_pcf_inputs
 from .typing import pcf32, pcf64
 
 

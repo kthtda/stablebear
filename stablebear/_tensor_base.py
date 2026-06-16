@@ -138,7 +138,7 @@ def _is_full_slice(s):
 def _resolve_negative_indices(index_tensor, axis_size):
     """Resolve negative indices and bounds-check."""
     import numpy as np
-    from .tensor import IntTensor
+    from .base_tensor import IntTensor
     arr = np.asarray(index_tensor).astype(np.int64).copy()
     neg = arr < 0
     arr[neg] += axis_size
@@ -168,7 +168,7 @@ class Tensor(ABC):
         ``IndexError`` (matching NumPy) for non-integer/boolean arrays.
         """
         import numpy as np
-        from .tensor import BoolTensor, IntTensor
+        from .base_tensor import BoolTensor, IntTensor
         if arr.dtype == np.bool_:
             return ('adv', BoolTensor(arr))
         if np.issubdtype(arr.dtype, np.integer):
@@ -191,7 +191,7 @@ class Tensor(ABC):
           ``True``, 0 for ``False``) axes to insert after the core indexing.
         """
         import numpy as np
-        from .tensor import BoolTensor, IntTensor
+        from .base_tensor import BoolTensor, IntTensor
 
         ndim = self.ndim
 
@@ -342,7 +342,7 @@ class Tensor(ABC):
 
     def _getitem_entries(self, entries, allow_scalar=True):
         """Index using normalized entries (int/slice/IntTensor/BoolTensor)."""
-        from .tensor import BoolTensor, IntTensor
+        from .base_tensor import BoolTensor, IntTensor
 
         advanced = [(i, s) for i, s in enumerate(entries)
                     if isinstance(s, (BoolTensor, IntTensor))]
@@ -389,7 +389,7 @@ class Tensor(ABC):
     def _bool_mask_getitem(self, mask):
         """Select with a boolean mask matching the full shape or leading axes."""
         import numpy as np
-        from .tensor import IntTensor
+        from .base_tensor import IntTensor
 
         tshape = tuple(self.shape[i] for i in range(self.ndim))
         mshape = tuple(mask.shape[i] for i in range(mask.ndim))
@@ -410,7 +410,7 @@ class Tensor(ABC):
     def _index_select_nd(self, result, axis, idx):
         """Gather along ``axis`` using an integer index array of any rank."""
         import numpy as np
-        from .tensor import IntTensor
+        from .base_tensor import IntTensor
 
         axis_size = result.shape[axis]
         arr = np.asarray(idx).astype(np.int64)
@@ -446,7 +446,7 @@ class Tensor(ABC):
         Only numeric tensors are cross-cast (e.g. int -> float); other tensor
         families are returned unchanged.
         """
-        from .tensor import NumericTensor
+        from .base_tensor import NumericTensor
         if (isinstance(self, NumericTensor) and isinstance(val, NumericTensor)
                 and getattr(val, "dtype", None) is not getattr(self, "dtype", None)):
             return val.astype(self.dtype)
@@ -491,7 +491,7 @@ class Tensor(ABC):
 
     def _setitem_entries(self, entries, val):
         """Assign using normalized entries (int/slice/IntTensor/BoolTensor)."""
-        from .tensor import BoolTensor, IntTensor
+        from .base_tensor import BoolTensor, IntTensor
 
         # Single full-shape boolean mask: flat masked assign/fill.
         if len(entries) == 1 and isinstance(entries[0], BoolTensor):
@@ -544,7 +544,7 @@ class Tensor(ABC):
     def _basic_setitem(self, entries, val):
         """Assign using only ints and slices (negatives resolved, bounds checked)."""
         import numpy as np
-        from .tensor import NumericTensor
+        from .base_tensor import NumericTensor
 
         if (len(entries) == self.ndim
                 and all(isinstance(s, int) for s in entries)):
@@ -580,29 +580,29 @@ class Tensor(ABC):
     def __eq__(self, rhs):
         if not isinstance(rhs, Tensor):
             return NotImplemented
-        from .tensor import BoolTensor
+        from .base_tensor import BoolTensor
         return BoolTensor(self._data == rhs._data)  # type: ignore[arg-type]
 
     def __ne__(self, rhs):
         if not isinstance(rhs, Tensor):
             return NotImplemented
-        from .tensor import BoolTensor
+        from .base_tensor import BoolTensor
         return BoolTensor(self._data != rhs._data)  # type: ignore[arg-type]
 
     def __lt__(self, rhs):
-        from .tensor import BoolTensor
+        from .base_tensor import BoolTensor
         return BoolTensor(self._data < rhs._data)
 
     def __le__(self, rhs):
-        from .tensor import BoolTensor
+        from .base_tensor import BoolTensor
         return BoolTensor(self._data <= rhs._data)
 
     def __gt__(self, rhs):
-        from .tensor import BoolTensor
+        from .base_tensor import BoolTensor
         return BoolTensor(self._data > rhs._data)
 
     def __ge__(self, rhs):
-        from .tensor import BoolTensor
+        from .base_tensor import BoolTensor
         return BoolTensor(self._data >= rhs._data)
 
     def array_equal(self, rhs) -> bool:
