@@ -30,7 +30,7 @@ namespace sb
 
   template <typename Tt, typename Tv, typename F>
   void noisy_function(Tensor<Pcf<Tt, Tv>>& out, size_t nPoints, F func,
-                      Tv noise = 0.1, const DefaultRandomGenerator& gen = default_generator())
+                      Tv noise = 0.1, DefaultRandomGenerator& gen = default_generator())
   {
     using PcfT = Pcf<Tt, Tv>;
     using PointT = typename PcfT::point_type;

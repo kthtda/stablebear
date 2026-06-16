@@ -34,7 +34,7 @@ namespace
 
     static void poisson_pp(TensorT& out, size_t dim, T rate,
                            std::vector<T> lo, std::vector<T> hi,
-                           const sb::DefaultRandomGenerator* gen)
+                           sb::DefaultRandomGenerator* gen)
     {
       if (gen)
         sb::pp::sample_poisson(out, dim, rate, lo, hi, *gen, sb::default_executor());

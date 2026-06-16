@@ -2,6 +2,7 @@
 
 ### Bug fixes
 
+* **A `Generator` now advances between draws** — two consecutive draws from the same generator (or from the global generator after a single `random.seed(s)`) returned byte-for-byte identical tensors, silently breaking any repeated-sampling workflow (bootstrap, Monte Carlo) and contradicting the `numpy.random.Generator` / `torch.Generator` convention. Each sampling call now reserves a fresh, contiguous block of seed slots and advances the generator past it, so successive draws are independent yet fully reproducible for a given seed. The first draw after seeding is unchanged, so existing seeds reproduce their historical first result. ([#86](https://github.com/kthtda/stablebear/issues/86))
 * **`max_time` and `plotting.plot` no longer segfault on an empty tensor** — reducing an empty PcfTensor (or any tensor whose reduction dimension has size 0) with `max_time` crashed the interpreter, because `max_element` seeded the reduction from the first element of an empty range and reduced past-the-end iterators. `max` has no identity over an empty range, so `max_time` now raises a catchable `ValueError` (mirroring NumPy's zero-size reduction error), and `plotting.plot` — which calls `max_time` internally — degrades to a graceful no-op when there is nothing to draw. ([#46](https://github.com/kthtda/stablebear/issues/46))
 
 ## 0.4.2

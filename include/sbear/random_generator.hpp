@@ -82,25 +82,55 @@ namespace sb
   public:
     using engine_type = EngineT;
 
+    /// A reserved, contiguous block of seed slots. Derives one deterministic
+    /// engine per element of a draw and is captured by value, so it stays valid
+    /// even when the draw runs asynchronously after the generator has advanced.
+    class Block
+    {
+    public:
+      explicit Block(uint64_t base) noexcept : m_base(base) {}
+
+      [[nodiscard]] EngineT sub_generator(size_t flatIndex) const
+      {
+        return detail::make_engine<EngineT>(m_base + flatIndex);
+      }
+
+    private:
+      uint64_t m_base;
+    };
+
     RandomGenerator()
       : m_seed(std::random_device{}())
+      , m_offset(0)
     {
     }
 
     explicit RandomGenerator(uint64_t seed)
       : m_seed(seed)
+      , m_offset(0)
     {
     }
 
-    void seed(uint64_t seed) noexcept { m_seed = seed; }
-
-    [[nodiscard]] EngineT sub_generator(size_t flatIndex) const
+    void seed(uint64_t seed) noexcept
     {
-      return detail::make_engine<EngineT>(m_seed + flatIndex);
+      m_seed = seed;
+      m_offset = 0;
+    }
+
+    /// Reserve the next @p n seed slots and advance past them, so a subsequent
+    /// draw never overlaps this one. The returned block occupies the slots
+    /// [m_offset, m_offset + n). The first reservation after (re-)seeding starts
+    /// at offset 0, reproducing the historical raw-seed behaviour exactly.
+    [[nodiscard]] Block reserve(size_t n) noexcept
+    {
+      Block block(m_seed + m_offset);
+      m_offset += n;
+      return block;
     }
 
   private:
     uint64_t m_seed;
+    uint64_t m_offset;
   };
 
   using DefaultRandomGenerator = RandomGenerator<Xoroshiro128pp>;

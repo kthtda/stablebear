@@ -51,11 +51,15 @@ For the default engine, the seeding chain is:
 
 .. code-block:: text
 
-   m_seed + flatIndex
+   m_seed + m_offset + flatIndex
      -> make_engine<Xoroshiro128pp>
        -> s0 = splitmix64(seed)
        -> s1 = splitmix64(s0)
        -> Xoroshiro128pp(s0, s1)
+
+(``m_offset`` is the per-generator stream counter described in
+:ref:`advancing-between-draws` below; it is ``0`` for the first draw after
+seeding, so the chain reduces to ``m_seed + flatIndex`` there.)
 
 This follows the recommended seeding approach from :footcite:`Blackman2021`: chain ``splitmix64`` outputs to fill the state words, feeding each output as the next input. Since ``splitmix64`` is a bijection, this guarantees two distinct, well-distributed state words and avoids the all-zeros state (which xoroshiro cannot be in).
 
@@ -93,7 +97,7 @@ This ensures that adjacent indices produce statistically independent seed values
 RandomGenerator
 ================
 
-``RandomGenerator<EngineT>`` stores a single ``uint64_t`` master seed. It holds no RNG state. To produce an engine for element ``i``, it computes ``make_engine<EngineT>(m_seed + i)``:
+``RandomGenerator<EngineT>`` stores a ``uint64_t`` master seed and a ``uint64_t`` offset -- a counter of how many seed slots have been handed out so far. It holds no RNG *engine* state. A draw does not pull engines from the generator directly; instead it **reserves a contiguous block** of seed slots via ``reserve(n)`` and derives one engine per element from that block:
 
 .. code-block:: cpp
 
@@ -103,13 +107,52 @@ RandomGenerator
    public:
      explicit RandomGenerator(uint64_t seed);
 
-     EngineT sub_generator(size_t flatIndex) const
+     // A reserved, contiguous range of seed slots. Captured by value, so it
+     // stays valid even after the generator advances or the draw runs async.
+     class Block
      {
-       return detail::make_engine<EngineT>(m_seed + flatIndex);
+     public:
+       EngineT sub_generator(size_t flatIndex) const
+       {
+         return detail::make_engine<EngineT>(m_base + flatIndex);
+       }
+     private:
+       uint64_t m_base;
+     };
+
+     // Reserve the next n slots [m_offset, m_offset + n) and advance past them.
+     Block reserve(size_t n)
+     {
+       Block block(m_seed + m_offset);
+       m_offset += n;
+       return block;
      }
    };
 
-Since ``flatIndex`` is the row-major index into the tensor, it is a pure function of position -- not of execution order.
+Within a single draw, element ``i`` is seeded from ``m_base + i`` where ``m_base = m_seed + m_offset``. Since ``flatIndex`` is the row-major index into the tensor, the engine for each element is a pure function of position -- not of execution order. Across draws, the offset moves forward (see below), so successive draws occupy disjoint ranges of seed slots.
+
+
+.. _advancing-between-draws:
+
+Advancing between draws
+=======================
+
+A generator must advance its state between sampling calls. Otherwise two consecutive draws from the same generator would reuse the same seed slots and produce **byte-for-byte identical** tensors -- a silent footgun for any repeated-sampling loop (bootstrap, Monte Carlo), and contrary to the ``numpy.random.Generator`` / ``torch.Generator`` convention:
+
+.. code-block:: python
+
+   g = sb.random.Generator(seed=5)
+   a = sb.random.noisy_sin((3,), generator=g)
+   b = sb.random.noisy_sin((3,), generator=g)
+   # a and b differ; a fresh Generator(5) reproduces both, in order.
+
+Advancing is the job of ``reserve(n)``: a draw over an ``N``-element tensor reserves the block ``[m_offset, m_offset + N)`` and bumps ``m_offset`` by ``N`` **immediately**, before any element is filled. The next draw therefore starts at ``m_offset = N`` and cannot overlap the previous one. Re-seeding (``seed()``) resets the offset to ``0``.
+
+Reserving up front -- rather than advancing *after* the draw -- is what makes this correct under parallelism. ``parallel_walk`` dispatches its per-element callback asynchronously via Taskflow, so the callbacks run *after* the call returns. If the generator were advanced only once the draw "finished", there would be no well-defined moment to do so, and reading the live generator's offset from inside the async callbacks would race. Instead, ``reserve`` computes the block base and advances the counter synchronously, then the immutable ``Block`` (a single ``uint64_t``) is captured **by value** into the callback. Workers read only their copy; the generator is free to advance for the next draw.
+
+**Backward compatibility.** The first draw after seeding uses ``m_offset == 0``, so its element ``i`` is seeded from ``m_seed + i`` -- exactly the pre-advancement behaviour. Existing seeds reproduce their historical first draw unchanged; only the *second and later* draws (previously duplicates) now differ.
+
+**Non-overlap by construction.** Because each draw reserves a disjoint, contiguous slot range, independence between draws is structural -- it does not rely on a hash scattering nearby seeds apart. (``splitmix64`` still decorrelates adjacent slots *within* the engine seeding chain, as described above.)
 
 
 Walk integration
@@ -129,7 +172,7 @@ The ``walk()`` and ``parallel_walk()`` functions in ``walk.hpp`` provide the bri
      // same engine for same idx, regardless of which thread runs this
    }, executor);
 
-Internally, both variants compute the flat (row-major) index for each element, then call ``gen.sub_generator(flatIndex)`` to create a fresh engine for that element. The callback receives the engine by reference and can draw as many samples as needed.
+Internally, both variants first call ``gen.reserve(tensor.size())`` once to claim a block for the whole draw (advancing the generator), then compute the flat (row-major) index for each element and call ``block.sub_generator(flatIndex)`` to create that element's engine. The ``Block`` is captured by value, so the parallel variant is safe even though its callbacks run asynchronously. The callback receives the engine by reference and can draw as many samples as needed.
 
 This is the only entry point for deterministic randomness. A consumer function does not manage seeds or engines directly -- it receives a ready-to-use engine from the walk and draws from it:
 
@@ -185,6 +228,15 @@ Consider a ``(3, 4)`` tensor populated with seed 42:
    Element (2, 3): flat = 11 -> make_engine(42 + 11) -> splitmix64 chain -> engine
 
 Each element gets its own ``Xoroshiro128pp`` engine with a unique state derived from its position. Whether the walk visits these 12 elements on 1 thread or 12 threads, each element always receives the same engine, producing identical results.
+
+The draw reserves slots ``[0, 12)`` and advances the offset to ``12``, so a **second** draw from the same generator shifts every base by 12:
+
+.. code-block:: text
+
+   Second draw, element (0, 0): flat = 0  -> make_engine(42 + 12 + 0)  -> engine
+   Second draw, element (2, 3): flat = 11 -> make_engine(42 + 12 + 11) -> engine
+
+The two draws never share a seed slot, so they differ -- yet replaying with a fresh ``Generator(42)`` reproduces both draws in the same order.
 
 
 Global and explicit generators

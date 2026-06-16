@@ -185,10 +185,11 @@ namespace sb
 #ifndef __CUDACC__
   requires std::invocable<BinaryFunc, std::vector<size_t>, EngineT&>
 #endif
-  void walk(const TTensor& tensor, const RandomGenerator<EngineT>& gen, BinaryFunc&& f)
+  void walk(const TTensor& tensor, RandomGenerator<EngineT>& gen, BinaryFunc&& f)
   {
-    detail::walk_impl(tensor, [&gen, &f](const std::vector<size_t>& idx, size_t flat) {
-      auto engine = gen.sub_generator(flat);
+    auto block = gen.reserve(tensor.size());
+    detail::walk_impl(tensor, [block, &f](const std::vector<size_t>& idx, size_t flat) {
+      auto engine = block.sub_generator(flat);
       f(idx, engine);
     });
   }
@@ -201,11 +202,12 @@ namespace sb
 #ifndef __CUDACC__
   requires std::invocable<BinaryFunc, std::vector<size_t>, EngineT&>
 #endif
-  tf::Future<void> parallel_walk_async(const TTensor& tensor, const RandomGenerator<EngineT>& gen,
+  tf::Future<void> parallel_walk_async(const TTensor& tensor, RandomGenerator<EngineT>& gen,
                                        BinaryFunc&& f, Executor& exec)
   {
-    return detail::parallel_walk_impl(tensor, [&gen, f = std::forward<BinaryFunc>(f)](const std::vector<size_t>& idx, size_t flat) {
-      auto engine = gen.sub_generator(flat);
+    auto block = gen.reserve(tensor.size());
+    return detail::parallel_walk_impl(tensor, [block, f = std::forward<BinaryFunc>(f)](const std::vector<size_t>& idx, size_t flat) {
+      auto engine = block.sub_generator(flat);
       f(idx, engine);
     }, exec);
   }
@@ -217,7 +219,7 @@ namespace sb
 #ifndef __CUDACC__
   requires std::invocable<BinaryFunc, std::vector<size_t>, EngineT&>
 #endif
-  void parallel_walk(const TTensor& tensor, const RandomGenerator<EngineT>& gen,
+  void parallel_walk(const TTensor& tensor, RandomGenerator<EngineT>& gen,
                      BinaryFunc&& f, Executor& exec)
   {
     parallel_walk_async(tensor, gen, std::forward<BinaryFunc>(f), exec).wait();
