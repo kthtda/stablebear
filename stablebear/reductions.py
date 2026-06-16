@@ -105,6 +105,9 @@ def max_time(fs: PcfContainerLike, dim: int = 0):
     ------
     IndexError
         If ``dim`` is out of range for the input tensor's number of dimensions.
+    ValueError
+        If the reduction dimension is empty (size 0). ``max`` has no identity
+        over an empty range, so there is no value to return.
     """
     backend, tensor = _resolve_pcf_inputs(_REDUCTIONS_BACKEND_MAP, fs)
     return _to_tensor(backend.max_time(tensor._data, dim))

@@ -1,3 +1,9 @@
+## 0.4.3
+
+### Bug fixes
+
+* **`max_time` and `plotting.plot` no longer segfault on an empty tensor** — reducing an empty PcfTensor (or any tensor whose reduction dimension has size 0) with `max_time` crashed the interpreter, because `max_element` seeded the reduction from the first element of an empty range and reduced past-the-end iterators. `max` has no identity over an empty range, so `max_time` now raises a catchable `ValueError` (mirroring NumPy's zero-size reduction error), and `plotting.plot` — which calls `max_time` internally — degrades to a graceful no-op when there is nothing to draw. ([#46](https://github.com/kthtda/stablebear/issues/46))
+
 ## 0.4.2
 
 * masspcf is now stablebear.
