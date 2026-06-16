@@ -151,6 +151,26 @@ class SymmetricMatrix:
         """Return the full n×n symmetric matrix as a numpy array."""
         return self._data.to_dense()
 
+    def to_numpy(self) -> np.ndarray:
+        """Return the full n×n symmetric matrix as a numpy array.
+
+        Alias for :meth:`to_dense`, provided for naming consistency with the
+        rest of the library.
+        """
+        return self.to_dense()
+
+    def __array__(self, dtype=None, copy=None):
+        """Return the dense n×n matrix so ``np.asarray(matrix)`` works.
+
+        Without this, ``np.asarray``/``np.array`` would silently wrap the
+        object in a 0-d ``object`` array instead of materializing the matrix
+        (see issue #75).
+        """
+        arr = self.to_dense()
+        if dtype is not None:
+            arr = arr.astype(dtype, copy=False)
+        return arr
+
     def __reduce__(self):
         import io as _io
         from .io import _save_object, _unpickle_object
