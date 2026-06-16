@@ -589,21 +589,37 @@ class Tensor(ABC):
         from .base_tensor import BoolTensor
         return BoolTensor(self._data != rhs._data)  # type: ignore[arg-type]
 
-    def __lt__(self, rhs):
+    def _compare(self, rhs, op, symbol):
+        """Elementwise ordering comparison returning a ``BoolTensor``.
+
+        Accepts another ``Tensor`` (compared in C++) or a scalar / ``numpy``
+        array on the right-hand side. Scalars and arrays are broadcast against
+        ``self`` (NumPy semantics), so idioms such as ``t[t > 3]`` work.
+        """
         from .base_tensor import BoolTensor
-        return BoolTensor(self._data < rhs._data)
+        if isinstance(rhs, Tensor):
+            return BoolTensor(op(self._data, rhs._data))
+        import numpy as np
+        try:
+            arr = np.asarray(self)
+        except TypeError:
+            raise TypeError(
+                f"'{symbol}' not supported between instances of "
+                f"'{type(self).__name__}' and '{type(rhs).__name__}'"
+            ) from None
+        return BoolTensor(op(arr, rhs))
+
+    def __lt__(self, rhs):
+        return self._compare(rhs, operator.lt, "<")
 
     def __le__(self, rhs):
-        from .base_tensor import BoolTensor
-        return BoolTensor(self._data <= rhs._data)
+        return self._compare(rhs, operator.le, "<=")
 
     def __gt__(self, rhs):
-        from .base_tensor import BoolTensor
-        return BoolTensor(self._data > rhs._data)
+        return self._compare(rhs, operator.gt, ">")
 
     def __ge__(self, rhs):
-        from .base_tensor import BoolTensor
-        return BoolTensor(self._data >= rhs._data)
+        return self._compare(rhs, operator.ge, ">=")
 
     def array_equal(self, rhs) -> bool:
         """Test whether two tensors have the same shape and all equal elements.
