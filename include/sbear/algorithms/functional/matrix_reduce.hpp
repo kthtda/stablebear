@@ -132,6 +132,21 @@ namespace sb
 
     static_assert(std::invocable<MaxOp, OutValueT, OutValueT>);
 
+    // max has no identity element, so it cannot reduce an empty range: the
+    // body below seeds from *first and reduces [first + 1, last), both UB when
+    // the slice is empty (inDimSize == 0). Reject up front with a clean,
+    // catchable exception (pybind11 maps std::invalid_argument to a Python
+    // ValueError) instead of dereferencing a past-the-end iterator -- mirrors
+    // numpy's "zero-size array to reduction operation" error. Validate dim
+    // first so shape[dim] is in range.
+    check_reduce_dim(dim, in.shape().size());
+    if (in.shape()[dim] == 0)
+    {
+      std::ostringstream oss;
+      oss << "Cannot reduce an empty dimension: dimension " << dim << " has size 0";
+      throw std::invalid_argument(oss.str());
+    }
+
     auto fn = std::forward<UnaryF>(f);
     auto mop = std::forward<MaxOp>(maxOp);
     return parallel_dim_reduce<OutValueT>(in, dim, [fn, mop](auto first, auto last) {
