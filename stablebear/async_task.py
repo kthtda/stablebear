@@ -52,4 +52,6 @@ def _run_task(task_fn, verbose=True):
     finally:
         if task is not None:
             task.request_stop()
-            _wait_for_task(task, verbose=verbose)
+            # Cleanup wait: the work is already finished (normal path) or being
+            # cancelled (error path), so suppress the redundant progress bar.
+            _wait_for_task(task, verbose=False)

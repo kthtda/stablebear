@@ -15,6 +15,7 @@
 import numpy as np
 
 from .. import _sb_cpp as cpp
+from ..async_task import _run_task
 from ..tensor import FloatTensor, PointCloudTensor
 from ..typing import float32, float64, pcloud32, pcloud64
 from .distributions import Gaussian, _BuiltinDistribution
@@ -75,7 +76,7 @@ def _compute_probabilities(reference_np, query_np, filter_fn, distribution, np_f
 
 def subsample(
     reference,
-    query,
+    query=None,
     *,
     sample_size,
     n_instances,
@@ -83,6 +84,7 @@ def subsample(
     distribution=None,
     replace=True,
     generator=None,
+    verbose=False,
 ):
     r"""Subsample a reference point cloud relative to each query point.
 
@@ -129,6 +131,10 @@ def subsample(
         (as in the paper).
     generator : Generator, optional
         Random number generator. If ``None``, the global generator is used.
+    verbose : bool, optional
+        If True, display a progress bar while the subsamples are drawn and allow
+        cooperative cancellation (e.g. via ``KeyboardInterrupt``). By default
+        False.
 
     Returns
     -------
@@ -145,7 +151,7 @@ def subsample(
         distribution = Gaussian(0.0, 1.0)
 
     R = _as_float_tensor(reference)
-    X = _as_float_tensor(query, dtype=R.dtype)
+    X = R if query is None else _as_float_tensor(query, dtype=R.dtype)
 
     if R.shape[1] != X.shape[1]:
         raise ValueError("reference and query must have the same dimension.")
@@ -155,7 +161,7 @@ def subsample(
     gen = generator._gen if generator is not None else None
 
     if filter_fn == "distance" and isinstance(distribution, _BuiltinDistribution):
-        result = distribution._fused_call(
+        task, result = distribution._fused_call(
             backend, R._data, X._data, sample_size, n_instances, replace, gen
         )
     else:
@@ -164,8 +170,9 @@ def subsample(
             np.asarray(R), np.asarray(X), filter_fn, distribution, np_float
         )
         prob_tensor = FloatTensor(prob, dtype=R.dtype)
-        result = backend.sample_subsets_from_probabilities(
+        task, result = backend.sample_subsets_from_probabilities(
             R._data, prob_tensor._data, sample_size, n_instances, replace, gen
         )
 
+    _run_task(lambda: task, verbose=verbose)
     return PointCloudTensor(result)

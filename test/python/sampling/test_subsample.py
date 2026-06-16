@@ -129,6 +129,24 @@ def test_reproducible_with_seed(float_kind):
     assert any_diff
 
 
+def test_verbose_matches_nonverbose():
+    # verbose=True drives the result through the stoppable-task progress loop;
+    # it must produce exactly the same (deterministic) subsamples as verbose=False.
+    R = np.random.default_rng(6).standard_normal((40, 2))
+    X = np.random.default_rng(7).standard_normal((3, 2))
+
+    quiet = subsample(R, X, sample_size=10, n_instances=5,
+                      generator=sb.random.Generator(11), verbose=False)
+    loud = subsample(R, X, sample_size=10, n_instances=5,
+                     generator=sb.random.Generator(11), verbose=True)
+
+    assert isinstance(loud, sb.PointCloudTensor)
+    assert loud.shape == quiet.shape
+    for i in range(3):
+        for j in range(5):
+            assert np.array_equal(np.asarray(loud[i, j]), np.asarray(quiet[i, j]))
+
+
 def test_callable_path_matches_builtin():
     R = np.random.default_rng(4).standard_normal((60, 2))
     X = np.random.default_rng(5).standard_normal((3, 2))

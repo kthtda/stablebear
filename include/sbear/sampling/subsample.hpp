@@ -188,6 +188,20 @@ namespace sb::sampling
       return out;
     }
 
+    /// Evaluate @p distribution(@p filter(query, reference)) for every
+    /// (query, reference) pair into an (n_query, n_reference) weight matrix.
+    template <typename T, typename FilterF, typename DistF>
+    Tensor<T> compute_weights(const PointCloud<T>& R, const PointCloud<T>& X,
+                              FilterF filter, DistF distribution, Executor& exec)
+    {
+      Tensor<T> weights({X.n_points(), R.n_points()});
+      parallel_walk(weights,
+          [&weights, &R, &X, filter, distribution](const std::vector<size_t>& idx) {
+        weights(idx) = distribution(filter(X, idx[0], R, idx[1]));
+      }, exec);
+      return weights;
+    }
+
   } // namespace detail
 
   // ===========================================================================
@@ -215,11 +229,7 @@ namespace sb::sampling
 
     // Evaluate the filter/distribution once per (query, reference) pair into a
     // weight matrix, then share the draw step with the precomputed-weight path.
-    Tensor<T> weights({X.n_points(), R.n_points()});
-    parallel_walk(weights,
-        [&weights, &R, &X, filter, distribution](const std::vector<size_t>& idx) {
-      weights(idx) = distribution(filter(X, idx[0], R, idx[1]));
-    }, exec);
+    Tensor<T> weights = detail::compute_weights(R, X, filter, distribution, exec);
 
     return detail::draw_subsets_from_weights(R, weights, sampleSize, nInstances, replace, gen, exec);
   }
