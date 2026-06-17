@@ -15,6 +15,9 @@ jobs:
 
     env:
       BUILD_WITH_CUDA: 0
+      UV_HTTP_TIMEOUT: 120
+      PIP_RETRIES: 5
+      PIP_DEFAULT_TIMEOUT: 60
 
     steps:
 
@@ -48,6 +51,13 @@ jobs:
             CMAKE_BUILD_PARALLEL_LEVEL=$CMAKE_BUILD_PARALLEL_LEVEL
             CMAKE_UNITY_BUILD=ON
             CMAKE_UNITY_BUILD_BATCH_SIZE=4
+            UV_HTTP_TIMEOUT=120
+          # Longer HTTP timeout for the wheel-test phase, which fetches runtime
+          # deps (incl. matplotlib) from PyPI via uv.
+          CIBW_TEST_ENVIRONMENT: >-
+            UV_HTTP_TIMEOUT=120
+            PIP_RETRIES=5
+            PIP_DEFAULT_TIMEOUT=60
           CIBW_BUILD_FRONTEND: "build[uv]"
           CIBW_BUILD: "cp313-manylinux_x86_64 cp313-musllinux_x86_64"
           CIBW_MANYLINUX_X86_64_IMAGE: "manylinux_2_28"
