@@ -16,68 +16,16 @@
 
 #include "py_subsample.hpp"
 
-#include "../py_async_support.hpp"
-
 #include <sbear/sampling/subsample.hpp>
 
 #include <pybind11/stl.h>
 
-#include <memory>
-#include <stdexcept>
+#include <utility>
 
 namespace py = pybind11;
 
 namespace
 {
-
-  // Stoppable, progress-reporting draw task. The weight matrix is built up
-  // front (cheap relative to the draw); this task runs the per-(query,instance)
-  // draw asynchronously so it can be cancelled (request_stop) and report
-  // progress, mirroring the distance/persistence tasks. The output tensor is
-  // allocated once and shared (Tensor is shared_ptr-backed) with the handle
-  // returned to Python, which reads it only after the task completes.
-  template <typename T>
-  class SubsampleTask : public sb::StoppableTask<void>
-  {
-  public:
-    using PointCloudT = sb::PointCloud<T>;
-    using OutT = sb::Tensor<PointCloudT>;
-
-    SubsampleTask(PointCloudT R, sb::Tensor<T> weights, OutT out, size_t sampleSize,
-                  bool replace, sb::DefaultRandomGenerator gen)
-      : m_R(std::move(R)), m_weights(std::move(weights)), m_out(std::move(out)),
-        m_sampleSize(sampleSize), m_replace(replace), m_gen(std::move(gen))
-    { }
-
-  private:
-    tf::Future<void> run_async(sb::Executor& exec) override
-    {
-      const size_t nR = m_weights.shape(1);
-      next_step(m_out.size(), "Drawing subsamples.", "subsample");
-
-      // Walk the (n_query, n_instances) output grid; the per-element engine is
-      // seeded from the element's flat index, so results are independent of
-      // thread count. Each cell draws one subsample into a shared, indexed view.
-      return sb::parallel_walk_async(m_out, m_gen,
-          [this, nR](const std::vector<size_t>& idx, auto& engine) {
-        if (stop_requested())
-          return;
-        sb::Tensor<uint64_t> row({m_sampleSize});
-        sb::sampling::detail::draw_indices(
-            m_weights, idx[0], nR, m_sampleSize, m_replace, engine,
-            [&row](size_t s, size_t r) { row({s}) = static_cast<uint64_t>(r); });
-        m_out(idx) = PointCloudT(m_R, std::move(row));
-        add_progress(1);
-      }, exec);
-    }
-
-    PointCloudT m_R;
-    sb::Tensor<T> m_weights;
-    OutT m_out;
-    size_t m_sampleSize;
-    bool m_replace;
-    sb::DefaultRandomGenerator m_gen;  // owned: captured by reference in the async walk
-  };
 
   template <typename T>
   class PySubsampleBindings
@@ -85,13 +33,12 @@ namespace
   public:
     using PointCloudT = sb::PointCloud<T>;
     using TensorT = sb::Tensor<T>;
-    using OutT = sb::Tensor<sb::PointCloud<T>>;
 
     // The runtime "which built-in distribution" choice lives here: each method
-    // builds the weight matrix with the matching functor (or accepts a
-    // precomputed one), then launches a stoppable draw task. Each returns a
-    // (task, output) tuple; output is a (n_query, n_instances) tensor of indexed
-    // subsamples sharing R, filled asynchronously by the task.
+    // picks the matching functor and delegates to the core sampler, which
+    // launches a stoppable draw task. Each returns a (task, samples) tuple;
+    // samples is a (n_query, n_instances) tensor of indexed subsamples sharing
+    // R, filled asynchronously by the task.
 
     // reference/query arrive as scalar Tensor<T> (a FloatTensor's data) and
     // convert implicitly to PointCloud<T>.
@@ -100,10 +47,11 @@ namespace
                                                       size_t nInstances, bool replace,
                                                       const sb::DefaultRandomGenerator* gen)
     {
-      return launch(PointCloudT(reference), PointCloudT(query),
-                    sb::sampling::EuclideanDistance<T>{},
-                    sb::sampling::Gaussian<T>{mean, sigma},
-                    sampleSize, nInstances, replace, gen);
+      sb::sampling::SubsampleHandle<T> handle = sb::sampling::sample_subsets(
+          PointCloudT(reference), PointCloudT(query),
+          sb::sampling::EuclideanDistance<T>{}, sb::sampling::Gaussian<T>{mean, sigma},
+          sampleSize, nInstances, replace, pick(gen), sb::default_executor());
+      return to_tuple(std::move(handle));
     }
 
     static py::tuple sample_subsets_distance_identity(const TensorT& reference, const TensorT& query,
@@ -111,10 +59,11 @@ namespace
                                                       bool replace,
                                                       const sb::DefaultRandomGenerator* gen)
     {
-      return launch(PointCloudT(reference), PointCloudT(query),
-                    sb::sampling::EuclideanDistance<T>{},
-                    sb::sampling::Identity<T>{},
-                    sampleSize, nInstances, replace, gen);
+      sb::sampling::SubsampleHandle<T> handle = sb::sampling::sample_subsets(
+          PointCloudT(reference), PointCloudT(query),
+          sb::sampling::EuclideanDistance<T>{}, sb::sampling::Identity<T>{},
+          sampleSize, nInstances, replace, pick(gen), sb::default_executor());
+      return to_tuple(std::move(handle));
     }
 
     static py::tuple sample_subsets_from_probabilities(const TensorT& reference,
@@ -123,19 +72,10 @@ namespace
                                                        bool replace,
                                                        const sb::DefaultRandomGenerator* gen)
     {
-      PointCloudT R(reference);
-      sb::sampling::detail::validate_reference(R, sampleSize, replace);
-      if (probabilities.rank() != 2)
-        throw std::invalid_argument("probabilities must be a 2-D (n_query, n_reference) array");
-      if (probabilities.shape(1) != R.n_points())
-        throw std::invalid_argument("probabilities must have one column per reference point");
-
-      size_t nQuery = probabilities.shape(0);
-      OutT out({nQuery, nInstances});
-      std::unique_ptr<sb::StoppableTask<void>> task =
-          sb_py::execute_stoppable_task<SubsampleTask<T>>(
-              std::move(R), probabilities, out, sampleSize, replace, pick(gen));
-      return py::make_tuple(std::move(task), out);
+      sb::sampling::SubsampleHandle<T> handle = sb::sampling::sample_subsets_from_probabilities(
+          PointCloudT(reference), probabilities,
+          sampleSize, nInstances, replace, pick(gen), sb::default_executor());
+      return to_tuple(std::move(handle));
     }
 
     static void register_bindings(py::handle m, const std::string& suffix)
@@ -163,26 +103,10 @@ namespace
     }
 
   private:
-    // Validate, build the weight matrix, then launch the stoppable draw task.
-    template <typename FilterF, typename DistF>
-    static py::tuple launch(PointCloudT R, PointCloudT X, FilterF filter, DistF distribution,
-                            size_t sampleSize, size_t nInstances, bool replace,
-                            const sb::DefaultRandomGenerator* gen)
+    // Unpack a launched run into the (task, samples) tuple Python expects.
+    static py::tuple to_tuple(sb::sampling::SubsampleHandle<T> handle)
     {
-      sb::Executor& exec = sb::default_executor();
-      sb::sampling::detail::validate_reference(R, sampleSize, replace);
-      if (X.rank() != 2)
-        throw std::invalid_argument("query must be a 2-D (n_points, dim) point cloud");
-      if (X.dim() != R.dim())
-        throw std::invalid_argument("reference and query must have the same dimension");
-
-      TensorT weights = sb::sampling::detail::compute_weights(R, X, filter, distribution, exec);
-      OutT out({X.n_points(), nInstances});
-
-      std::unique_ptr<sb::StoppableTask<void>> task =
-          sb_py::execute_stoppable_task<SubsampleTask<T>>(
-              std::move(R), std::move(weights), out, sampleSize, replace, pick(gen));
-      return py::make_tuple(std::move(task), out);
+      return py::make_tuple(std::move(handle.task), std::move(handle.samples));
     }
 
     static const sb::DefaultRandomGenerator& pick(const sb::DefaultRandomGenerator* gen)

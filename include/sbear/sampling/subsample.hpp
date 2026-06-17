@@ -20,12 +20,14 @@
 #include "../executor.hpp"
 #include "../point_cloud.hpp"
 #include "../random_generator.hpp"
+#include "../task.hpp"
 #include "../tensor.hpp"
 #include "../walk.hpp"
 
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <memory>
 #include <random>
 #include <stdexcept>
 #include <vector>
@@ -80,6 +82,17 @@ namespace sb::sampling
       T d = (v - mean) / sigma;
       return std::exp(T(-0.5) * d * d);
     }
+  };
+
+  /// A launched subsampling run: the in-flight draw @p task plus the @p samples
+  /// tensor it fills, of shape (n_query, n_instances). The two share storage —
+  /// the task writes into @p samples — so read @p samples only once @p task
+  /// reports complete.
+  template <typename T>
+  struct SubsampleHandle
+  {
+    std::unique_ptr<StoppableTask<void>> task;
+    Tensor<PointCloud<T>> samples;
   };
 
   namespace detail
@@ -158,34 +171,66 @@ namespace sb::sampling
                                     "points when sampling without replacement");
     }
 
-    /// Shared draw step: build the (n_query, n_instances) tensor of subsamples,
-    /// drawing each from row i of the (n_query, n_reference) weight matrix
-    /// @p weights. Each subsample is an *indexed* PointCloud sharing @p R's
-    /// coordinates — only the chosen indices are stored, never the coordinates.
-    /// The per-entry engine from parallel_walk makes the result deterministic
-    /// regardless of thread count.
-    template <typename T, typename EngineT>
-    Tensor<PointCloud<T>> draw_subsets_from_weights(const PointCloud<T>& R, const Tensor<T>& weights,
-                                                    size_t sampleSize, size_t nInstances, bool replace,
-                                                    const RandomGenerator<EngineT>& gen, Executor& exec)
+    /// Stoppable, progress-reporting draw: fills a (n_query, n_instances) tensor
+    /// of indexed subsamples, each drawn from a row of the weight matrix. Every
+    /// subsample is an *indexed* PointCloud sharing the reference coordinates —
+    /// only the chosen indices are stored, never the coordinates. The per-element
+    /// engine (seeded from the flat index) keeps results independent of thread
+    /// count. The output tensor is allocated by the caller and shared (Tensor is
+    /// shared_ptr-backed); it is read only after the task completes.
+    template <typename T>
+    class SubsampleTask : public StoppableTask<void>
     {
-      size_t nQuery = weights.shape(0);
-      size_t nR = weights.shape(1);
+    public:
+      SubsampleTask(PointCloud<T> R, Tensor<T> weights, Tensor<PointCloud<T>> out,
+                    size_t sampleSize, bool replace, DefaultRandomGenerator gen)
+        : m_R(std::move(R)), m_weights(std::move(weights)), m_out(std::move(out)),
+          m_sampleSize(sampleSize), m_replace(replace), m_gen(std::move(gen))
+      { }
 
-      Tensor<PointCloud<T>> out({nQuery, nInstances});
+    private:
+      tf::Future<void> run_async(Executor& exec) override
+      {
+        const size_t nR = m_weights.shape(1);
+        next_step(m_out.size(), "Drawing subsamples.", "subsample");
 
-      // One parallel task per (query, instance); the grid only drives the walk.
-      Tensor<uint8_t> grid({nQuery, nInstances});
-      parallel_walk(grid, gen,
-          [&out, &R, &weights, nR, sampleSize, replace](const std::vector<size_t>& idx,
-                                                        EngineT& engine) {
-        Tensor<uint64_t> row({sampleSize});
-        draw_indices(weights, idx[0], nR, sampleSize, replace, engine,
-                     [&row](size_t s, size_t r) { row({s}) = static_cast<uint64_t>(r); });
-        out(idx) = PointCloud<T>(R, std::move(row));
-      }, exec);
+        // Walk the (n_query, n_instances) output grid; the per-element engine is
+        // seeded from the element's flat index, so results are independent of
+        // thread count. Each cell draws one subsample into a shared, indexed view.
+        return parallel_walk_async(m_out, m_gen,
+            [this, nR](const std::vector<size_t>& idx, auto& engine) {
+          if (this->stop_requested())
+            return;
+          Tensor<uint64_t> row({m_sampleSize});
+          draw_indices(m_weights, idx[0], nR, m_sampleSize, m_replace, engine,
+                       [&row](size_t s, size_t r) { row({s}) = static_cast<uint64_t>(r); });
+          m_out(idx) = PointCloud<T>(m_R, std::move(row));
+          this->add_progress(1);
+        }, exec);
+      }
 
-      return out;
+      PointCloud<T> m_R;
+      Tensor<T> m_weights;
+      Tensor<PointCloud<T>> m_out;
+      size_t m_sampleSize;
+      bool m_replace;
+      DefaultRandomGenerator m_gen;  // owned: captured by reference in the async walk
+    };
+
+    /// Shared draw step: allocate the (n_query, n_instances) output and launch a
+    /// stoppable SubsampleTask that fills it from the (n_query, n_reference)
+    /// weight matrix @p weights. Returns the running task together with its
+    /// (not-yet-filled) output tensor.
+    template <typename T>
+    SubsampleHandle<T> draw_subsets_from_weights(PointCloud<T> R, Tensor<T> weights,
+                                                 size_t sampleSize, size_t nInstances, bool replace,
+                                                 DefaultRandomGenerator gen, Executor& exec)
+    {
+      Tensor<PointCloud<T>> samples({weights.shape(0), nInstances});
+      auto task = std::make_unique<SubsampleTask<T>>(
+          std::move(R), std::move(weights), samples, sampleSize, replace, std::move(gen));
+      task->start_async(exec);
+      return {std::move(task), std::move(samples)};
     }
 
     /// Evaluate @p distribution(@p filter(query, reference)) for every
@@ -212,14 +257,15 @@ namespace sb::sampling
   /// weights given by @p distribution applied to @p filter of each
   /// (query point, reference point) pair.
   ///
-  /// Returns a (n_query, n_instances) tensor of subsamples; element (i, j) is the
-  /// j-th subsample for query point i, as an indexed view sharing @p R's
-  /// coordinates (each of shape (sample_size, dim)).
-  template <typename T, typename FilterF, typename DistF, typename EngineT>
-  Tensor<PointCloud<T>> sample_subsets(const PointCloud<T>& R, const PointCloud<T>& X,
-                                       FilterF filter, DistF distribution, size_t sampleSize,
-                                       size_t nInstances, bool replace,
-                                       const RandomGenerator<EngineT>& gen, Executor& exec)
+  /// Launches the draw asynchronously and returns a SubsampleHandle: a
+  /// (n_query, n_instances) @p samples tensor whose element (i, j) is the j-th
+  /// subsample for query point i — an indexed view sharing @p R's coordinates
+  /// (each of shape (sample_size, dim)) — together with the task filling it.
+  template <typename T, typename FilterF, typename DistF>
+  SubsampleHandle<T> sample_subsets(const PointCloud<T>& R, const PointCloud<T>& X,
+                                    FilterF filter, DistF distribution, size_t sampleSize,
+                                    size_t nInstances, bool replace,
+                                    DefaultRandomGenerator gen, Executor& exec)
   {
     detail::validate_reference(R, sampleSize, replace);
     if (X.rank() != 2)
@@ -231,21 +277,22 @@ namespace sb::sampling
     // weight matrix, then share the draw step with the precomputed-weight path.
     Tensor<T> weights = detail::compute_weights(R, X, filter, distribution, exec);
 
-    return detail::draw_subsets_from_weights(R, weights, sampleSize, nInstances, replace, gen, exec);
+    return detail::draw_subsets_from_weights(R, std::move(weights), sampleSize, nInstances,
+                                             replace, std::move(gen), exec);
   }
 
   /// Per-query-point subsampling from precomputed sampling weights.
   ///
   /// @p probabilities must have shape (n_query, n_reference); row i gives the
   /// (unnormalized, non-negative) sampling weights over the reference for query
-  /// point i. Returns a (n_query, n_instances) tensor of indexed subsamples.
-  template <typename T, typename EngineT>
-  Tensor<PointCloud<T>> sample_subsets_from_probabilities(const PointCloud<T>& R,
-                                                          const Tensor<T>& probabilities,
-                                                          size_t sampleSize, size_t nInstances,
-                                                          bool replace,
-                                                          const RandomGenerator<EngineT>& gen,
-                                                          Executor& exec)
+  /// point i. Launches the draw asynchronously and returns a SubsampleHandle
+  /// whose @p samples tensor has shape (n_query, n_instances).
+  template <typename T>
+  SubsampleHandle<T> sample_subsets_from_probabilities(const PointCloud<T>& R,
+                                                       Tensor<T> probabilities,
+                                                       size_t sampleSize, size_t nInstances,
+                                                       bool replace, DefaultRandomGenerator gen,
+                                                       Executor& exec)
   {
     detail::validate_reference(R, sampleSize, replace);
     if (probabilities.rank() != 2)
@@ -253,7 +300,8 @@ namespace sb::sampling
     if (probabilities.shape(1) != R.n_points())
       throw std::invalid_argument("probabilities must have one column per reference point");
 
-    return detail::draw_subsets_from_weights(R, probabilities, sampleSize, nInstances, replace, gen, exec);
+    return detail::draw_subsets_from_weights(R, std::move(probabilities), sampleSize, nInstances,
+                                             replace, std::move(gen), exec);
   }
 
 }
