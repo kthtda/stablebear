@@ -39,30 +39,34 @@ def _infer_shape_and_flatten(data):
     Recursion stops at any element that is not a list or tuple.
     Validates that the structure is rectangular.
     """
+    # Infer the expected shape from the first branch at each depth.
     shape: list[int] = []
-
-    def _probe(obj, depth):
-        if not isinstance(obj, (list, tuple)):
-            return
-        if depth == len(shape):
-            shape.append(len(obj))
-        elif shape[depth] != len(obj):
-            raise ValueError(
-                f"Ragged nested list: expected length {shape[depth]} at depth {depth}, got {len(obj)}"
-            )
-        if obj:
-            _probe(obj[0], depth + 1)
-
-    _probe(data, 0)
+    node = data
+    while isinstance(node, (list, tuple)):
+        shape.append(len(node))
+        node = node[0] if node else None
 
     flat: list = []
 
     def _collect(obj, depth):
+        # At the leaf depth, ``obj`` is an element; collect it.
         if depth == len(shape):
             flat.append(obj)
-        else:
-            for item in obj:
-                _collect(item, depth + 1)
+            return
+        # Otherwise every sibling branch must be a sequence of the expected
+        # length -- validate each one (not just the first), so ragged input is
+        # rejected instead of being silently flattened into a wrong shape.
+        if not isinstance(obj, (list, tuple)):
+            raise ValueError(
+                f"Ragged nested list: expected a sequence of length {shape[depth]} "
+                f"at depth {depth}, got a non-sequence element"
+            )
+        if len(obj) != shape[depth]:
+            raise ValueError(
+                f"Ragged nested list: expected length {shape[depth]} at depth {depth}, got {len(obj)}"
+            )
+        for item in obj:
+            _collect(item, depth + 1)
 
     _collect(data, 0)
     return tuple(shape), flat

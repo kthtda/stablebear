@@ -126,3 +126,42 @@ def test_empty_list():
 def test_ragged_list_raises():
     with pytest.raises(ValueError):
         sb.PcfTensor([[_make_pcf(0), _make_pcf(1)], [_make_pcf(2)]])
+
+
+# ---------------------------------------------------------------------------
+# Bug #4: ragged nested lists were silently accepted (and elements placed at
+# wrong positions) whenever the total element count happened to equal a
+# rectangular product, because validation only inspected the first sub-list at
+# each depth. Every branch is now validated.
+# ---------------------------------------------------------------------------
+
+
+def test_ragged_with_matching_total_raises():
+    """Rows of length 2, 3, 1 (total 6 == 3*2) was silently accepted as (3, 2)."""
+    data = [[_make_pcf(0), _make_pcf(1)],
+            [_make_pcf(2), _make_pcf(3), _make_pcf(4)],
+            [_make_pcf(5)]]
+    with pytest.raises(ValueError, match="Ragged nested list"):
+        sb.PcfTensor(data)
+
+
+def test_rank3_ragged_raises():
+    """Non-first-branch raggedness at depth 2 must be caught."""
+    data = [[[_make_pcf(0), _make_pcf(1)], [_make_pcf(2), _make_pcf(3)]],
+            [[_make_pcf(4)], [_make_pcf(5), _make_pcf(6), _make_pcf(7)]]]
+    with pytest.raises(ValueError, match="Ragged nested list"):
+        sb.PcfTensor(data)
+
+
+def test_ragged_intpcf_raises():
+    data = [[_make_int_pcf(0), _make_int_pcf(1)],
+            [_make_int_pcf(2), _make_int_pcf(3), _make_int_pcf(4)],
+            [_make_int_pcf(5)]]
+    with pytest.raises(ValueError, match="Ragged nested list"):
+        sb.IntPcfTensor(data)
+
+
+def test_mixed_depth_scalar_among_lists_raises():
+    """A non-sequence sibling where a sub-list is expected is also ragged."""
+    with pytest.raises(ValueError, match="Ragged nested list"):
+        sb.PcfTensor([[_make_pcf(0), _make_pcf(1)], _make_pcf(2)])
