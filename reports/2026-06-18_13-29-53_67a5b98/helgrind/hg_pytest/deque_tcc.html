@@ -1,0 +1,1781 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>/usr/include/c++/13/bits/deque.tcc</title>
+    <link href='valgrind.css' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+    <script src="https://code.jquery.com/jquery-3.4.1.js"></script>
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.0.0/styles/default.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.0.0/highlight.min.js"></script>
+    <script src="valgrind.js"></script>
+</head>
+
+<body>
+    <div class="global">
+        <div class="header">
+            <h1>/usr/include/c++/13/bits/deque.tcc</h1>
+            <p><b>2</b> errors</p>
+            <button class="next_error">Goto First Error</button>
+        </div>
+        <div class="listing">
+            <pre class="code">
+<code class="c++"><span class="line_number">1</span>// Deque implementation (out of line) -*- C++ -*-
+<span class="line_number">2</span>
+<span class="line_number">3</span>// Copyright (C) 2001-2023 Free Software Foundation, Inc.
+<span class="line_number">4</span>//
+<span class="line_number">5</span>// This file is part of the GNU ISO C++ Library.  This library is free
+<span class="line_number">6</span>// software; you can redistribute it and/or modify it under the
+<span class="line_number">7</span>// terms of the GNU General Public License as published by the
+<span class="line_number">8</span>// Free Software Foundation; either version 3, or (at your option)
+<span class="line_number">9</span>// any later version.
+<span class="line_number">10</span>
+<span class="line_number">11</span>// This library is distributed in the hope that it will be useful,
+<span class="line_number">12</span>// but WITHOUT ANY WARRANTY; without even the implied warranty of
+<span class="line_number">13</span>// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+<span class="line_number">14</span>// GNU General Public License for more details.
+<span class="line_number">15</span>
+<span class="line_number">16</span>// Under Section 7 of GPL version 3, you are granted additional
+<span class="line_number">17</span>// permissions described in the GCC Runtime Library Exception, version
+<span class="line_number">18</span>// 3.1, as published by the Free Software Foundation.
+<span class="line_number">19</span>
+<span class="line_number">20</span>// You should have received a copy of the GNU General Public License and
+<span class="line_number">21</span>// a copy of the GCC Runtime Library Exception along with this program;
+<span class="line_number">22</span>// see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
+<span class="line_number">23</span>// &lt;http://www.gnu.org/licenses/&gt;.
+<span class="line_number">24</span>
+<span class="line_number">25</span>/*
+<span class="line_number">26</span> *
+<span class="line_number">27</span> * Copyright (c) 1994
+<span class="line_number">28</span> * Hewlett-Packard Company
+<span class="line_number">29</span> *
+<span class="line_number">30</span> * Permission to use, copy, modify, distribute and sell this software
+<span class="line_number">31</span> * and its documentation for any purpose is hereby granted without fee,
+<span class="line_number">32</span> * provided that the above copyright notice appear in all copies and
+<span class="line_number">33</span> * that both that copyright notice and this permission notice appear
+<span class="line_number">34</span> * in supporting documentation.  Hewlett-Packard Company makes no
+<span class="line_number">35</span> * representations about the suitability of this software for any
+<span class="line_number">36</span> * purpose.  It is provided &#34;as is&#34; without express or implied warranty.
+<span class="line_number">37</span> *
+<span class="line_number">38</span> *
+<span class="line_number">39</span> * Copyright (c) 1997
+<span class="line_number">40</span> * Silicon Graphics Computer Systems, Inc.
+<span class="line_number">41</span> *
+<span class="line_number">42</span> * Permission to use, copy, modify, distribute and sell this software
+<span class="line_number">43</span> * and its documentation for any purpose is hereby granted without fee,
+<span class="line_number">44</span> * provided that the above copyright notice appear in all copies and
+<span class="line_number">45</span> * that both that copyright notice and this permission notice appear
+<span class="line_number">46</span> * in supporting documentation.  Silicon Graphics makes no
+<span class="line_number">47</span> * representations about the suitability of this software for any
+<span class="line_number">48</span> * purpose.  It is provided &#34;as is&#34; without express or implied warranty.
+<span class="line_number">49</span> */
+<span class="line_number">50</span>
+<span class="line_number">51</span>/** @file bits/deque.tcc
+<span class="line_number">52</span> *  This is an internal header file, included by other library headers.
+<span class="line_number">53</span> *  Do not attempt to use it directly. @headername{deque}
+<span class="line_number">54</span> */
+<span class="line_number">55</span>
+<span class="line_number">56</span>#ifndef _DEQUE_TCC
+<span class="line_number">57</span>#define _DEQUE_TCC 1
+<span class="line_number">58</span>
+<span class="line_number">59</span>#include &lt;bits/stl_algobase.h&gt;
+<span class="line_number">60</span>
+<span class="line_number">61</span>namespace std _GLIBCXX_VISIBILITY(default)
+<span class="line_number">62</span>{
+<span class="line_number">63</span>_GLIBCXX_BEGIN_NAMESPACE_VERSION
+<span class="line_number">64</span>_GLIBCXX_BEGIN_NAMESPACE_CONTAINER
+<span class="line_number">65</span>
+<span class="line_number">66</span>#if __cplusplus &gt;= 201103L
+<span class="line_number">67</span>  template &lt;typename _Tp, typename _Alloc&gt;
+<span class="line_number">68</span>    void
+<span class="line_number">69</span>    deque&lt;_Tp, _Alloc&gt;::
+<span class="line_number">70</span>    _M_default_initialize()
+<span class="line_number">71</span>    {
+<span class="line_number">72</span>      _Map_pointer __cur;
+<span class="line_number">73</span>      __try
+<span class="line_number">74</span>	{
+<span class="line_number">75</span>	  for (__cur = this-&gt;_M_impl._M_start._M_node;
+<span class="line_number">76</span>	       __cur &lt; this-&gt;_M_impl._M_finish._M_node;
+<span class="line_number">77</span>	       ++__cur)
+<span class="line_number">78</span>	    std::__uninitialized_default_a(*__cur, *__cur + _S_buffer_size(),
+<span class="line_number">79</span>					   _M_get_Tp_allocator());
+<span class="line_number">80</span>	  std::__uninitialized_default_a(this-&gt;_M_impl._M_finish._M_first,
+<span class="line_number">81</span>					 this-&gt;_M_impl._M_finish._M_cur,
+<span class="line_number">82</span>					 _M_get_Tp_allocator());
+<span class="line_number">83</span>	}
+<span class="line_number">84</span>      __catch(...)
+<span class="line_number">85</span>	{
+<span class="line_number">86</span>	  std::_Destroy(this-&gt;_M_impl._M_start, iterator(*__cur, __cur),
+<span class="line_number">87</span>			_M_get_Tp_allocator());
+<span class="line_number">88</span>	  __throw_exception_again;
+<span class="line_number">89</span>	}
+<span class="line_number">90</span>    }
+<span class="line_number">91</span>#endif
+<span class="line_number">92</span>
+<span class="line_number">93</span>  template &lt;typename _Tp, typename _Alloc&gt;
+<span class="line_number">94</span>    deque&lt;_Tp, _Alloc&gt;&amp;
+<span class="line_number">95</span>    deque&lt;_Tp, _Alloc&gt;::
+<span class="line_number">96</span>    operator=(const deque&amp; __x)
+<span class="line_number">97</span>    {
+<span class="line_number">98</span>      if (std::__addressof(__x) != this)
+<span class="line_number">99</span>	{
+<span class="line_number">100</span>#if __cplusplus &gt;= 201103L
+<span class="line_number">101</span>	  if (_Alloc_traits::_S_propagate_on_copy_assign())
+<span class="line_number">102</span>	    {
+<span class="line_number">103</span>	      if (!_Alloc_traits::_S_always_equal()
+<span class="line_number">104</span>		  &amp;&amp; _M_get_Tp_allocator() != __x._M_get_Tp_allocator())
+<span class="line_number">105</span>		{
+<span class="line_number">106</span>		  // Replacement allocator cannot free existing storage,
+<span class="line_number">107</span>		  // so deallocate everything and take copy of __x&#39;s data.
+<span class="line_number">108</span>		  _M_replace_map(__x, __x.get_allocator());
+<span class="line_number">109</span>		  std::__alloc_on_copy(_M_get_Tp_allocator(),
+<span class="line_number">110</span>				       __x._M_get_Tp_allocator());
+<span class="line_number">111</span>		  return *this;
+<span class="line_number">112</span>		}
+<span class="line_number">113</span>	      std::__alloc_on_copy(_M_get_Tp_allocator(),
+<span class="line_number">114</span>				   __x._M_get_Tp_allocator());
+<span class="line_number">115</span>	    }
+<span class="line_number">116</span>#endif
+<span class="line_number">117</span>	  const size_type __len = size();
+<span class="line_number">118</span>	  if (__len &gt;= __x.size())
+<span class="line_number">119</span>	    _M_erase_at_end(std::copy(__x.begin(), __x.end(),
+<span class="line_number">120</span>				      this-&gt;_M_impl._M_start));
+<span class="line_number">121</span>	  else
+<span class="line_number">122</span>	    {
+<span class="line_number">123</span>	      const_iterator __mid = __x.begin() + difference_type(__len);
+<span class="line_number">124</span>	      std::copy(__x.begin(), __mid, this-&gt;_M_impl._M_start);
+<span class="line_number">125</span>	      _M_range_insert_aux(this-&gt;_M_impl._M_finish, __mid, __x.end(),
+<span class="line_number">126</span>				  std::random_access_iterator_tag());
+<span class="line_number">127</span>	    }
+<span class="line_number">128</span>	}
+<span class="line_number">129</span>      return *this;
+<span class="line_number">130</span>    }
+<span class="line_number">131</span>
+<span class="line_number">132</span>#if __cplusplus &gt;= 201103L
+<span class="line_number">133</span>  template&lt;typename _Tp, typename _Alloc&gt;
+<span class="line_number">134</span>    template&lt;typename... _Args&gt;
+<span class="line_number">135</span>#if __cplusplus &gt; 201402L
+<span class="line_number">136</span>      typename deque&lt;_Tp, _Alloc&gt;::reference
+<span class="line_number">137</span>#else
+<span class="line_number">138</span>      void
+<span class="line_number">139</span>#endif
+<span class="line_number">140</span>      deque&lt;_Tp, _Alloc&gt;::
+<span class="line_number">141</span>      emplace_front(_Args&amp;&amp;... __args)
+<span class="line_number">142</span>      {
+<span class="line_number">143</span>	if (this-&gt;_M_impl._M_start._M_cur != this-&gt;_M_impl._M_start._M_first)
+<span class="line_number">144</span>	  {
+<span class="line_number">145</span>	    _Alloc_traits::construct(this-&gt;_M_impl,
+<span class="line_number">146</span>				     this-&gt;_M_impl._M_start._M_cur - 1,
+<span class="line_number">147</span>				     std::forward&lt;_Args&gt;(__args)...);
+<span class="line_number">148</span>	    --this-&gt;_M_impl._M_start._M_cur;
+<span class="line_number">149</span>	  }
+<span class="line_number">150</span>	else
+<span class="line_number">151</span>	  _M_push_front_aux(std::forward&lt;_Args&gt;(__args)...);
+<span class="line_number">152</span>#if __cplusplus &gt; 201402L
+<span class="line_number">153</span>	return front();
+<span class="line_number">154</span>#endif
+<span class="line_number">155</span>      }
+<span class="line_number">156</span>
+<span class="line_number">157</span>  template&lt;typename _Tp, typename _Alloc&gt;
+<span class="line_number">158</span>    template&lt;typename... _Args&gt;
+<span class="line_number">159</span>#if __cplusplus &gt; 201402L
+<span class="line_number">160</span>      typename deque&lt;_Tp, _Alloc&gt;::reference
+<span class="line_number">161</span>#else
+<span class="line_number">162</span>      void
+<span class="line_number">163</span>#endif
+<span class="line_number">164</span>      deque&lt;_Tp, _Alloc&gt;::
+<span class="line_number">165</span>      emplace_back(_Args&amp;&amp;... __args)
+<span class="line_number">166</span>      {
+<span class="line_number">167</span>	if (this-&gt;_M_impl._M_finish._M_cur
+</code></pre>
+            <div class="issue">
+                <div>
+                    <span class="what">Possible data race during read of size 8 at 0x29388578 by thread #11</span>
+                    <div class="navigation">
+                        <button class="next_error">Next</button>
+                        <button class="prev_error">Previous</button>
+                    </div>
+                </div>
+                <div>
+                    <table class="call_stack">
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/stl_queue.h:297<br>
+                                    <code class="cpp">decltype(auto) std::queue&lt;std::shared_ptr&lt;tf::Topology&gt;, std::deque&lt;std::shared_ptr&lt;tf::Topology&gt;, std::allocator&lt;std::shared_ptr&lt;tf::Topology&gt; &gt; &gt; &gt;::emplace&lt;std::shared_ptr&lt;tf::Topology&gt; &gt;(std::shared_ptr&lt;tf::Topology&gt;&amp;&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">294</span>      template&lt;typename... _Args&gt;
+<span class="line_number">295</span>	decltype(auto)
+<span class="line_number">296</span>	emplace(_Args&amp;&amp;... __args)
+<span class="line_number">297</span><span class="error">	{ return c.emplace_back(std::forward&lt;_Args&gt;(__args)...); }
+</span><span class="line_number">298</span>#else
+<span class="line_number">299</span>      template&lt;typename... _Args&gt;
+<span class="line_number">300</span>	void
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/taskflow.hpp:421<br>
+                                    <code class="cpp">tf::Taskflow::_fetch_enqueue(std::shared_ptr&lt;tf::Topology&gt;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">418</span>inline size_t Taskflow::_fetch_enqueue(std::shared_ptr&lt;Topology&gt; tpg) {
+<span class="line_number">419</span>  std::lock_guard&lt;std::mutex&gt; lock(_mutex);
+<span class="line_number">420</span>  auto pre_size = _topologies.size();
+<span class="line_number">421</span><span class="error">  _topologies.emplace(std::move(tpg));
+</span><span class="line_number">422</span>  return pre_size;
+<span class="line_number">423</span>}
+<span class="line_number">424</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/algorithm/../core/runtime.hpp:994<br>
+                                    <code class="cpp">tf::Executor::run_until&lt;tf::Executor::run_n&lt;tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&gt;(tf::Taskflow&amp;&amp;, unsigned long, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&amp;&amp;)::{lambda()#1}, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&gt;(tf::Taskflow&amp;&amp;, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&amp;&amp;, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&amp;&amp;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">991</span>  silent_async([g=MoC{std::move(g)}, t](tf::Runtime&amp; rt) mutable {
+<span class="line_number">992</span>    t-&gt;_parent = rt._node;
+<span class="line_number">993</span>    t-&gt;_parent-&gt;_join_counter.fetch_add(1, std::memory_order_release);
+<span class="line_number">994</span><span class="error">    if(g.object-&gt;_fetch_enqueue(t) == 0) {
+</span><span class="line_number">995</span>      rt._executor._schedule_graph_with_parent(
+<span class="line_number">996</span>        rt._worker, g.object-&gt;_graph, t.get(), t.get()
+<span class="line_number">997</span>      );
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:61<br>
+                                    <code class="cpp">void std::__invoke_impl&lt;void, tf::Executor::run_until&lt;tf::Executor::run_n&lt;tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&gt;(tf::Taskflow&amp;&amp;, unsigned long, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&amp;&amp;)::{lambda()#1}, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&gt;(tf::Taskflow&amp;&amp;, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&amp;&amp;, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&amp;&amp;)::{lambda(tf::Runtime&amp;)#1}&amp;, tf::Runtime&amp;&gt;(std::__invoke_other, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&amp;&amp;, tf::Runtime&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">58</span>  template&lt;typename _Res, typename _Fn, typename... _Args&gt;
+<span class="line_number">59</span>    constexpr _Res
+<span class="line_number">60</span>    __invoke_impl(__invoke_other, _Fn&amp;&amp; __f, _Args&amp;&amp;... __args)
+<span class="line_number">61</span><span class="error">    { return std::forward&lt;_Fn&gt;(__f)(std::forward&lt;_Args&gt;(__args)...); }
+</span><span class="line_number">62</span>
+<span class="line_number">63</span>  template&lt;typename _Res, typename _MemFun, typename _Tp, typename... _Args&gt;
+<span class="line_number">64</span>    constexpr _Res
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:111<br>
+                                    <code class="cpp">std::enable_if&lt;is_invocable_r_v&lt;void, tf::Executor::run_until&lt;tf::Executor::run_n&lt;tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&gt;(tf::Taskflow&amp;&amp;, unsigned long, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&amp;&amp;)::{lambda()#1}, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&gt;(tf::Taskflow&amp;&amp;, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&amp;&amp;, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&amp;&amp;)::{lambda(tf::Runtime&amp;)#1}&amp;, tf::Runtime&amp;&gt;, void&gt;::type std::__invoke_r&lt;void, tf::Executor::run_until&lt;tf::Executor::run_n&lt;tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&gt;(tf::Taskflow&amp;&amp;, unsigned long, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&amp;&amp;)::{lambda()#1}, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&gt;(tf::Taskflow&amp;&amp;, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&amp;&amp;, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&amp;&amp;)::{lambda(tf::Runtime&amp;)#1}&amp;, tf::Runtime&amp;&gt;(tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&amp;&amp;, tf::Runtime&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">108</span>      using __type = typename __result::type;
+<span class="line_number">109</span>      using __tag = typename __result::__invoke_type;
+<span class="line_number">110</span>      if constexpr (is_void_v&lt;_Res&gt;)
+<span class="line_number">111</span><span class="error">	std::__invoke_impl&lt;__type&gt;(__tag{}, std::forward&lt;_Callable&gt;(__fn),
+</span><span class="line_number">112</span>					std::forward&lt;_Args&gt;(__args)...);
+<span class="line_number">113</span>      else
+<span class="line_number">114</span>	return std::__invoke_impl&lt;__type&gt;(__tag{},
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/std_function.h:290<br>
+                                    <code class="cpp">std::_Function_handler&lt;void (tf::Runtime&amp;), tf::Executor::run_until&lt;tf::Executor::run_n&lt;tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&gt;(tf::Taskflow&amp;&amp;, unsigned long, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&amp;&amp;)::{lambda()#1}, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&gt;(tf::Taskflow&amp;&amp;, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&amp;&amp;, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&amp;&amp;)::{lambda(tf::Runtime&amp;)#1}&gt;::_M_invoke(std::_Any_data const&amp;, tf::Runtime&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">287</span>      static _Res
+<span class="line_number">288</span>      _M_invoke(const _Any_data&amp; __functor, _ArgTypes&amp;&amp;... __args)
+<span class="line_number">289</span>      {
+<span class="line_number">290</span><span class="error">	return std::__invoke_r&lt;_Res&gt;(*_Base::_M_get_pointer(__functor),
+</span><span class="line_number">291</span>				     std::forward&lt;_ArgTypes&gt;(__args)...);
+<span class="line_number">292</span>      }
+<span class="line_number">293</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/std_function.h:591<br>
+                                    <code class="cpp">std::function&lt;void (tf::Runtime&amp;)&gt;::operator()(tf::Runtime&amp;) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">588</span>      {
+<span class="line_number">589</span>	if (_M_empty())
+<span class="line_number">590</span>	  __throw_bad_function_call();
+<span class="line_number">591</span><span class="error">	return _M_invoker(_M_functor, std::forward&lt;_ArgTypes&gt;(__args)...);
+</span><span class="line_number">592</span>      }
+<span class="line_number">593</span>
+<span class="line_number">594</span>#if __cpp_rtti
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/runtime.hpp:826<br>
+                                    <code class="cpp">tf::Executor::_invoke_runtime_task_impl(tf::Worker&amp;, tf::Node*, std::function&lt;void (tf::Runtime&amp;)&gt;&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">823</span>    node-&gt;_join_counter.fetch_add(1, std::memory_order_release);
+<span class="line_number">824</span>
+<span class="line_number">825</span>    _observer_prologue(worker, node);
+<span class="line_number">826</span><span class="error">    TF_EXECUTOR_EXCEPTION_HANDLER(worker, node, {
+</span><span class="line_number">827</span>      work(rt);
+<span class="line_number">828</span>    });
+<span class="line_number">829</span>    _observer_epilogue(worker, node);
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/executor.hpp:2010<br>
+                                    <code class="cpp">tf::Executor::_invoke_async_task(tf::Worker&amp;, tf::Node*)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">2007</span>    
+<span class="line_number">2008</span>    // void(Runtime&amp;)
+<span class="line_number">2009</span>    case 1:
+<span class="line_number">2010</span><span class="error">      if(_invoke_runtime_task_impl(worker, node, *std::get_if&lt;1&gt;(&amp;work))) {
+</span><span class="line_number">2011</span>        return true;
+<span class="line_number">2012</span>      }
+<span class="line_number">2013</span>    break;
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/executor.hpp:1710<br>
+                                    <code class="cpp">tf::Executor::_invoke(tf::Worker&amp;, tf::Node*)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1707</span>
+<span class="line_number">1708</span>    // async task
+<span class="line_number">1709</span>    case Node::ASYNC: {
+<span class="line_number">1710</span><span class="error">      if(_invoke_async_task(worker, node)) {
+</span><span class="line_number">1711</span>        return;
+<span class="line_number">1712</span>      }
+<span class="line_number">1713</span>      _tear_down_async(worker, node, cache);
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/executor.hpp:1424<br>
+                                    <code class="cpp">tf::Executor::_exploit_task(tf::Worker&amp;, tf::Node*&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1421</span>// Procedure: _exploit_task
+<span class="line_number">1422</span>inline void Executor::_exploit_task(Worker&amp; w, Node*&amp; t) {
+<span class="line_number">1423</span>  while(t) {
+<span class="line_number">1424</span><span class="error">    _invoke(w, t);
+</span><span class="line_number">1425</span>    t = w._wsq.pop();
+<span class="line_number">1426</span>  }
+<span class="line_number">1427</span>}
+</code></pre>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            <pre class="code">
+<code class="c++"><span class="line_number">168</span><span class="error">	    != this-&gt;_M_impl._M_finish._M_last - 1)</span>
+<span class="line_number">169</span>	  {
+<span class="line_number">170</span>	    _Alloc_traits::construct(this-&gt;_M_impl,
+<span class="line_number">171</span>				     this-&gt;_M_impl._M_finish._M_cur,
+<span class="line_number">172</span>				     std::forward&lt;_Args&gt;(__args)...);
+</code></pre>
+            <div class="issue">
+                <div>
+                    <span class="what">Possible data race during write of size 8 at 0x29388568 by thread #11</span>
+                    <div class="navigation">
+                        <button class="next_error">Next</button>
+                        <button class="prev_error">Previous</button>
+                    </div>
+                </div>
+                <div>
+                    <table class="call_stack">
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/stl_queue.h:297<br>
+                                    <code class="cpp">decltype(auto) std::queue&lt;std::shared_ptr&lt;tf::Topology&gt;, std::deque&lt;std::shared_ptr&lt;tf::Topology&gt;, std::allocator&lt;std::shared_ptr&lt;tf::Topology&gt; &gt; &gt; &gt;::emplace&lt;std::shared_ptr&lt;tf::Topology&gt; &gt;(std::shared_ptr&lt;tf::Topology&gt;&amp;&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">294</span>      template&lt;typename... _Args&gt;
+<span class="line_number">295</span>	decltype(auto)
+<span class="line_number">296</span>	emplace(_Args&amp;&amp;... __args)
+<span class="line_number">297</span><span class="error">	{ return c.emplace_back(std::forward&lt;_Args&gt;(__args)...); }
+</span><span class="line_number">298</span>#else
+<span class="line_number">299</span>      template&lt;typename... _Args&gt;
+<span class="line_number">300</span>	void
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/taskflow.hpp:421<br>
+                                    <code class="cpp">tf::Taskflow::_fetch_enqueue(std::shared_ptr&lt;tf::Topology&gt;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">418</span>inline size_t Taskflow::_fetch_enqueue(std::shared_ptr&lt;Topology&gt; tpg) {
+<span class="line_number">419</span>  std::lock_guard&lt;std::mutex&gt; lock(_mutex);
+<span class="line_number">420</span>  auto pre_size = _topologies.size();
+<span class="line_number">421</span><span class="error">  _topologies.emplace(std::move(tpg));
+</span><span class="line_number">422</span>  return pre_size;
+<span class="line_number">423</span>}
+<span class="line_number">424</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/algorithm/../core/runtime.hpp:994<br>
+                                    <code class="cpp">tf::Executor::run_until&lt;tf::Executor::run_n&lt;tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&gt;(tf::Taskflow&amp;&amp;, unsigned long, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&amp;&amp;)::{lambda()#1}, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&gt;(tf::Taskflow&amp;&amp;, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&amp;&amp;, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&amp;&amp;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">991</span>  silent_async([g=MoC{std::move(g)}, t](tf::Runtime&amp; rt) mutable {
+<span class="line_number">992</span>    t-&gt;_parent = rt._node;
+<span class="line_number">993</span>    t-&gt;_parent-&gt;_join_counter.fetch_add(1, std::memory_order_release);
+<span class="line_number">994</span><span class="error">    if(g.object-&gt;_fetch_enqueue(t) == 0) {
+</span><span class="line_number">995</span>      rt._executor._schedule_graph_with_parent(
+<span class="line_number">996</span>        rt._worker, g.object-&gt;_graph, t.get(), t.get()
+<span class="line_number">997</span>      );
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:61<br>
+                                    <code class="cpp">void std::__invoke_impl&lt;void, tf::Executor::run_until&lt;tf::Executor::run_n&lt;tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&gt;(tf::Taskflow&amp;&amp;, unsigned long, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&amp;&amp;)::{lambda()#1}, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&gt;(tf::Taskflow&amp;&amp;, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&amp;&amp;, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&amp;&amp;)::{lambda(tf::Runtime&amp;)#1}&amp;, tf::Runtime&amp;&gt;(std::__invoke_other, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&amp;&amp;, tf::Runtime&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">58</span>  template&lt;typename _Res, typename _Fn, typename... _Args&gt;
+<span class="line_number">59</span>    constexpr _Res
+<span class="line_number">60</span>    __invoke_impl(__invoke_other, _Fn&amp;&amp; __f, _Args&amp;&amp;... __args)
+<span class="line_number">61</span><span class="error">    { return std::forward&lt;_Fn&gt;(__f)(std::forward&lt;_Args&gt;(__args)...); }
+</span><span class="line_number">62</span>
+<span class="line_number">63</span>  template&lt;typename _Res, typename _MemFun, typename _Tp, typename... _Args&gt;
+<span class="line_number">64</span>    constexpr _Res
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:111<br>
+                                    <code class="cpp">std::enable_if&lt;is_invocable_r_v&lt;void, tf::Executor::run_until&lt;tf::Executor::run_n&lt;tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&gt;(tf::Taskflow&amp;&amp;, unsigned long, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&amp;&amp;)::{lambda()#1}, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&gt;(tf::Taskflow&amp;&amp;, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&amp;&amp;, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&amp;&amp;)::{lambda(tf::Runtime&amp;)#1}&amp;, tf::Runtime&amp;&gt;, void&gt;::type std::__invoke_r&lt;void, tf::Executor::run_until&lt;tf::Executor::run_n&lt;tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&gt;(tf::Taskflow&amp;&amp;, unsigned long, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&amp;&amp;)::{lambda()#1}, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&gt;(tf::Taskflow&amp;&amp;, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&amp;&amp;, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&amp;&amp;)::{lambda(tf::Runtime&amp;)#1}&amp;, tf::Runtime&amp;&gt;(tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&amp;&amp;, tf::Runtime&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">108</span>      using __type = typename __result::type;
+<span class="line_number">109</span>      using __tag = typename __result::__invoke_type;
+<span class="line_number">110</span>      if constexpr (is_void_v&lt;_Res&gt;)
+<span class="line_number">111</span><span class="error">	std::__invoke_impl&lt;__type&gt;(__tag{}, std::forward&lt;_Callable&gt;(__fn),
+</span><span class="line_number">112</span>					std::forward&lt;_Args&gt;(__args)...);
+<span class="line_number">113</span>      else
+<span class="line_number">114</span>	return std::__invoke_impl&lt;__type&gt;(__tag{},
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/std_function.h:290<br>
+                                    <code class="cpp">std::_Function_handler&lt;void (tf::Runtime&amp;), tf::Executor::run_until&lt;tf::Executor::run_n&lt;tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&gt;(tf::Taskflow&amp;&amp;, unsigned long, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&amp;&amp;)::{lambda()#1}, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&gt;(tf::Taskflow&amp;&amp;, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&amp;&amp;, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&amp;&amp;)::{lambda(tf::Runtime&amp;)#1}&gt;::_M_invoke(std::_Any_data const&amp;, tf::Runtime&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">287</span>      static _Res
+<span class="line_number">288</span>      _M_invoke(const _Any_data&amp; __functor, _ArgTypes&amp;&amp;... __args)
+<span class="line_number">289</span>      {
+<span class="line_number">290</span><span class="error">	return std::__invoke_r&lt;_Res&gt;(*_Base::_M_get_pointer(__functor),
+</span><span class="line_number">291</span>				     std::forward&lt;_ArgTypes&gt;(__args)...);
+<span class="line_number">292</span>      }
+<span class="line_number">293</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/std_function.h:591<br>
+                                    <code class="cpp">std::function&lt;void (tf::Runtime&amp;)&gt;::operator()(tf::Runtime&amp;) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">588</span>      {
+<span class="line_number">589</span>	if (_M_empty())
+<span class="line_number">590</span>	  __throw_bad_function_call();
+<span class="line_number">591</span><span class="error">	return _M_invoker(_M_functor, std::forward&lt;_ArgTypes&gt;(__args)...);
+</span><span class="line_number">592</span>      }
+<span class="line_number">593</span>
+<span class="line_number">594</span>#if __cpp_rtti
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/runtime.hpp:826<br>
+                                    <code class="cpp">tf::Executor::_invoke_runtime_task_impl(tf::Worker&amp;, tf::Node*, std::function&lt;void (tf::Runtime&amp;)&gt;&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">823</span>    node-&gt;_join_counter.fetch_add(1, std::memory_order_release);
+<span class="line_number">824</span>
+<span class="line_number">825</span>    _observer_prologue(worker, node);
+<span class="line_number">826</span><span class="error">    TF_EXECUTOR_EXCEPTION_HANDLER(worker, node, {
+</span><span class="line_number">827</span>      work(rt);
+<span class="line_number">828</span>    });
+<span class="line_number">829</span>    _observer_epilogue(worker, node);
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/executor.hpp:2010<br>
+                                    <code class="cpp">tf::Executor::_invoke_async_task(tf::Worker&amp;, tf::Node*)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">2007</span>    
+<span class="line_number">2008</span>    // void(Runtime&amp;)
+<span class="line_number">2009</span>    case 1:
+<span class="line_number">2010</span><span class="error">      if(_invoke_runtime_task_impl(worker, node, *std::get_if&lt;1&gt;(&amp;work))) {
+</span><span class="line_number">2011</span>        return true;
+<span class="line_number">2012</span>      }
+<span class="line_number">2013</span>    break;
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/executor.hpp:1710<br>
+                                    <code class="cpp">tf::Executor::_invoke(tf::Worker&amp;, tf::Node*)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1707</span>
+<span class="line_number">1708</span>    // async task
+<span class="line_number">1709</span>    case Node::ASYNC: {
+<span class="line_number">1710</span><span class="error">      if(_invoke_async_task(worker, node)) {
+</span><span class="line_number">1711</span>        return;
+<span class="line_number">1712</span>      }
+<span class="line_number">1713</span>      _tear_down_async(worker, node, cache);
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/executor.hpp:1424<br>
+                                    <code class="cpp">tf::Executor::_exploit_task(tf::Worker&amp;, tf::Node*&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1421</span>// Procedure: _exploit_task
+<span class="line_number">1422</span>inline void Executor::_exploit_task(Worker&amp; w, Node*&amp; t) {
+<span class="line_number">1423</span>  while(t) {
+<span class="line_number">1424</span><span class="error">    _invoke(w, t);
+</span><span class="line_number">1425</span>    t = w._wsq.pop();
+<span class="line_number">1426</span>  }
+<span class="line_number">1427</span>}
+</code></pre>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            <pre class="code">
+<code class="c++"><span class="line_number">173</span><span class="error">	    ++this-&gt;_M_impl._M_finish._M_cur;</span>
+<span class="line_number">174</span>	  }
+<span class="line_number">175</span>	else
+<span class="line_number">176</span>	  _M_push_back_aux(std::forward&lt;_Args&gt;(__args)...);
+<span class="line_number">177</span>#if __cplusplus &gt; 201402L
+<span class="line_number">178</span>	return back();
+<span class="line_number">179</span>#endif
+<span class="line_number">180</span>      }
+<span class="line_number">181</span>#endif
+<span class="line_number">182</span>
+<span class="line_number">183</span>#if __cplusplus &gt;= 201103L
+<span class="line_number">184</span>  template&lt;typename _Tp, typename _Alloc&gt;
+<span class="line_number">185</span>    template&lt;typename... _Args&gt;
+<span class="line_number">186</span>      typename deque&lt;_Tp, _Alloc&gt;::iterator
+<span class="line_number">187</span>      deque&lt;_Tp, _Alloc&gt;::
+<span class="line_number">188</span>      emplace(const_iterator __position, _Args&amp;&amp;... __args)
+<span class="line_number">189</span>      {
+<span class="line_number">190</span>	if (__position._M_cur == this-&gt;_M_impl._M_start._M_cur)
+<span class="line_number">191</span>	  {
+<span class="line_number">192</span>	    emplace_front(std::forward&lt;_Args&gt;(__args)...);
+<span class="line_number">193</span>	    return this-&gt;_M_impl._M_start;
+<span class="line_number">194</span>	  }
+<span class="line_number">195</span>	else if (__position._M_cur == this-&gt;_M_impl._M_finish._M_cur)
+<span class="line_number">196</span>	  {
+<span class="line_number">197</span>	    emplace_back(std::forward&lt;_Args&gt;(__args)...);
+<span class="line_number">198</span>	    iterator __tmp = this-&gt;_M_impl._M_finish;
+<span class="line_number">199</span>	    --__tmp;
+<span class="line_number">200</span>	    return __tmp;
+<span class="line_number">201</span>	  }
+<span class="line_number">202</span>	else
+<span class="line_number">203</span>	  return _M_insert_aux(__position._M_const_cast(),
+<span class="line_number">204</span>			       std::forward&lt;_Args&gt;(__args)...);
+<span class="line_number">205</span>      }
+<span class="line_number">206</span>#endif
+<span class="line_number">207</span>
+<span class="line_number">208</span>  template &lt;typename _Tp, typename _Alloc&gt;
+<span class="line_number">209</span>    typename deque&lt;_Tp, _Alloc&gt;::iterator
+<span class="line_number">210</span>    deque&lt;_Tp, _Alloc&gt;::
+<span class="line_number">211</span>#if __cplusplus &gt;= 201103L
+<span class="line_number">212</span>    insert(const_iterator __position, const value_type&amp; __x)
+<span class="line_number">213</span>#else
+<span class="line_number">214</span>    insert(iterator __position, const value_type&amp; __x)
+<span class="line_number">215</span>#endif
+<span class="line_number">216</span>    {
+<span class="line_number">217</span>      if (__position._M_cur == this-&gt;_M_impl._M_start._M_cur)
+<span class="line_number">218</span>	{
+<span class="line_number">219</span>	  push_front(__x);
+<span class="line_number">220</span>	  return this-&gt;_M_impl._M_start;
+<span class="line_number">221</span>	}
+<span class="line_number">222</span>      else if (__position._M_cur == this-&gt;_M_impl._M_finish._M_cur)
+<span class="line_number">223</span>	{
+<span class="line_number">224</span>	  push_back(__x);
+<span class="line_number">225</span>	  iterator __tmp = this-&gt;_M_impl._M_finish;
+<span class="line_number">226</span>	  --__tmp;
+<span class="line_number">227</span>	  return __tmp;
+<span class="line_number">228</span>	}
+<span class="line_number">229</span>      else
+<span class="line_number">230</span>	return _M_insert_aux(__position._M_const_cast(), __x);
+<span class="line_number">231</span>   }
+<span class="line_number">232</span>
+<span class="line_number">233</span>  template &lt;typename _Tp, typename _Alloc&gt;
+<span class="line_number">234</span>    typename deque&lt;_Tp, _Alloc&gt;::iterator
+<span class="line_number">235</span>    deque&lt;_Tp, _Alloc&gt;::
+<span class="line_number">236</span>    _M_erase(iterator __position)
+<span class="line_number">237</span>    {
+<span class="line_number">238</span>      iterator __next = __position;
+<span class="line_number">239</span>      ++__next;
+<span class="line_number">240</span>      const difference_type __index = __position - begin();
+<span class="line_number">241</span>      if (static_cast&lt;size_type&gt;(__index) &lt; (size() &gt;&gt; 1))
+<span class="line_number">242</span>	{
+<span class="line_number">243</span>	  if (__position != begin())
+<span class="line_number">244</span>	    _GLIBCXX_MOVE_BACKWARD3(begin(), __position, __next);
+<span class="line_number">245</span>	  pop_front();
+<span class="line_number">246</span>	}
+<span class="line_number">247</span>      else
+<span class="line_number">248</span>	{
+<span class="line_number">249</span>	  if (__next != end())
+<span class="line_number">250</span>	    _GLIBCXX_MOVE3(__next, end(), __position);
+<span class="line_number">251</span>	  pop_back();
+<span class="line_number">252</span>	}
+<span class="line_number">253</span>      return begin() + __index;
+<span class="line_number">254</span>    }
+<span class="line_number">255</span>
+<span class="line_number">256</span>  template &lt;typename _Tp, typename _Alloc&gt;
+<span class="line_number">257</span>    typename deque&lt;_Tp, _Alloc&gt;::iterator
+<span class="line_number">258</span>    deque&lt;_Tp, _Alloc&gt;::
+<span class="line_number">259</span>    _M_erase(iterator __first, iterator __last)
+<span class="line_number">260</span>    {
+<span class="line_number">261</span>      if (__first == __last)
+<span class="line_number">262</span>	return __first;
+<span class="line_number">263</span>      else if (__first == begin() &amp;&amp; __last == end())
+<span class="line_number">264</span>	{
+<span class="line_number">265</span>	  clear();
+<span class="line_number">266</span>	  return end();
+<span class="line_number">267</span>	}
+<span class="line_number">268</span>      else
+<span class="line_number">269</span>	{
+<span class="line_number">270</span>	  const difference_type __n = __last - __first;
+<span class="line_number">271</span>	  const difference_type __elems_before = __first - begin();
+<span class="line_number">272</span>	  if (static_cast&lt;size_type&gt;(__elems_before) &lt;= (size() - __n) / 2)
+<span class="line_number">273</span>	    {
+<span class="line_number">274</span>	      if (__first != begin())
+<span class="line_number">275</span>		_GLIBCXX_MOVE_BACKWARD3(begin(), __first, __last);
+<span class="line_number">276</span>	      _M_erase_at_begin(begin() + __n);
+<span class="line_number">277</span>	    }
+<span class="line_number">278</span>	  else
+<span class="line_number">279</span>	    {
+<span class="line_number">280</span>	      if (__last != end())
+<span class="line_number">281</span>		_GLIBCXX_MOVE3(__last, end(), __first);
+<span class="line_number">282</span>	      _M_erase_at_end(end() - __n);
+<span class="line_number">283</span>	    }
+<span class="line_number">284</span>	  return begin() + __elems_before;
+<span class="line_number">285</span>	}
+<span class="line_number">286</span>    }
+<span class="line_number">287</span>
+<span class="line_number">288</span>  template &lt;typename _Tp, class _Alloc&gt;
+<span class="line_number">289</span>    template &lt;typename _InputIterator&gt;
+<span class="line_number">290</span>      void
+<span class="line_number">291</span>      deque&lt;_Tp, _Alloc&gt;::
+<span class="line_number">292</span>      _M_assign_aux(_InputIterator __first, _InputIterator __last,
+<span class="line_number">293</span>		    std::input_iterator_tag)
+<span class="line_number">294</span>      {
+<span class="line_number">295</span>	iterator __cur = begin();
+<span class="line_number">296</span>	for (; __first != __last &amp;&amp; __cur != end(); ++__cur, (void)++__first)
+<span class="line_number">297</span>	  *__cur = *__first;
+<span class="line_number">298</span>	if (__first == __last)
+<span class="line_number">299</span>	  _M_erase_at_end(__cur);
+<span class="line_number">300</span>	else
+<span class="line_number">301</span>	  _M_range_insert_aux(end(), __first, __last,
+<span class="line_number">302</span>			      std::__iterator_category(__first));
+<span class="line_number">303</span>      }
+<span class="line_number">304</span>
+<span class="line_number">305</span>  template &lt;typename _Tp, typename _Alloc&gt;
+<span class="line_number">306</span>    void
+<span class="line_number">307</span>    deque&lt;_Tp, _Alloc&gt;::
+<span class="line_number">308</span>    _M_fill_insert(iterator __pos, size_type __n, const value_type&amp; __x)
+<span class="line_number">309</span>    {
+<span class="line_number">310</span>      if (__pos._M_cur == this-&gt;_M_impl._M_start._M_cur)
+<span class="line_number">311</span>	{
+<span class="line_number">312</span>	  iterator __new_start = _M_reserve_elements_at_front(__n);
+<span class="line_number">313</span>	  __try
+<span class="line_number">314</span>	    {
+<span class="line_number">315</span>	      std::__uninitialized_fill_a(__new_start, this-&gt;_M_impl._M_start,
+<span class="line_number">316</span>					  __x, _M_get_Tp_allocator());
+<span class="line_number">317</span>	      this-&gt;_M_impl._M_start = __new_start;
+<span class="line_number">318</span>	    }
+<span class="line_number">319</span>	  __catch(...)
+<span class="line_number">320</span>	    {
+<span class="line_number">321</span>	      _M_destroy_nodes(__new_start._M_node,
+<span class="line_number">322</span>			       this-&gt;_M_impl._M_start._M_node);
+<span class="line_number">323</span>	      __throw_exception_again;
+<span class="line_number">324</span>	    }
+<span class="line_number">325</span>	}
+<span class="line_number">326</span>      else if (__pos._M_cur == this-&gt;_M_impl._M_finish._M_cur)
+<span class="line_number">327</span>	{
+<span class="line_number">328</span>	  iterator __new_finish = _M_reserve_elements_at_back(__n);
+<span class="line_number">329</span>	  __try
+<span class="line_number">330</span>	    {
+<span class="line_number">331</span>	      std::__uninitialized_fill_a(this-&gt;_M_impl._M_finish,
+<span class="line_number">332</span>					  __new_finish, __x,
+<span class="line_number">333</span>					  _M_get_Tp_allocator());
+<span class="line_number">334</span>	      this-&gt;_M_impl._M_finish = __new_finish;
+<span class="line_number">335</span>	    }
+<span class="line_number">336</span>	  __catch(...)
+<span class="line_number">337</span>	    {
+<span class="line_number">338</span>	      _M_destroy_nodes(this-&gt;_M_impl._M_finish._M_node + 1,
+<span class="line_number">339</span>			       __new_finish._M_node + 1);
+<span class="line_number">340</span>	      __throw_exception_again;
+<span class="line_number">341</span>	    }
+<span class="line_number">342</span>	}
+<span class="line_number">343</span>      else
+<span class="line_number">344</span>	_M_insert_aux(__pos, __n, __x);
+<span class="line_number">345</span>    }
+<span class="line_number">346</span>
+<span class="line_number">347</span>#if __cplusplus &gt;= 201103L
+<span class="line_number">348</span>  template &lt;typename _Tp, typename _Alloc&gt;
+<span class="line_number">349</span>    void
+<span class="line_number">350</span>    deque&lt;_Tp, _Alloc&gt;::
+<span class="line_number">351</span>    _M_default_append(size_type __n)
+<span class="line_number">352</span>    {
+<span class="line_number">353</span>      if (__n)
+<span class="line_number">354</span>	{
+<span class="line_number">355</span>	  iterator __new_finish = _M_reserve_elements_at_back(__n);
+<span class="line_number">356</span>	  __try
+<span class="line_number">357</span>	    {
+<span class="line_number">358</span>	      std::__uninitialized_default_a(this-&gt;_M_impl._M_finish,
+<span class="line_number">359</span>					     __new_finish,
+<span class="line_number">360</span>					     _M_get_Tp_allocator());
+<span class="line_number">361</span>	      this-&gt;_M_impl._M_finish = __new_finish;
+<span class="line_number">362</span>	    }
+<span class="line_number">363</span>	  __catch(...)
+<span class="line_number">364</span>	    {
+<span class="line_number">365</span>	      _M_destroy_nodes(this-&gt;_M_impl._M_finish._M_node + 1,
+<span class="line_number">366</span>			       __new_finish._M_node + 1);
+<span class="line_number">367</span>	      __throw_exception_again;
+<span class="line_number">368</span>	    }
+<span class="line_number">369</span>	}
+<span class="line_number">370</span>    }
+<span class="line_number">371</span>
+<span class="line_number">372</span>  template &lt;typename _Tp, typename _Alloc&gt;
+<span class="line_number">373</span>    bool
+<span class="line_number">374</span>    deque&lt;_Tp, _Alloc&gt;::
+<span class="line_number">375</span>    _M_shrink_to_fit()
+<span class="line_number">376</span>    {
+<span class="line_number">377</span>      const difference_type __front_capacity
+<span class="line_number">378</span>	= (this-&gt;_M_impl._M_start._M_cur - this-&gt;_M_impl._M_start._M_first);
+<span class="line_number">379</span>      if (__front_capacity == 0)
+<span class="line_number">380</span>	return false;
+<span class="line_number">381</span>
+<span class="line_number">382</span>      const difference_type __back_capacity
+<span class="line_number">383</span>	= (this-&gt;_M_impl._M_finish._M_last - this-&gt;_M_impl._M_finish._M_cur);
+<span class="line_number">384</span>      if (__front_capacity + __back_capacity &lt; _S_buffer_size())
+<span class="line_number">385</span>	return false;
+<span class="line_number">386</span>
+<span class="line_number">387</span>      return std::__shrink_to_fit_aux&lt;deque&gt;::_S_do_it(*this);
+<span class="line_number">388</span>    }
+<span class="line_number">389</span>#endif
+<span class="line_number">390</span>
+<span class="line_number">391</span>  template &lt;typename _Tp, typename _Alloc&gt;
+<span class="line_number">392</span>    void
+<span class="line_number">393</span>    deque&lt;_Tp, _Alloc&gt;::
+<span class="line_number">394</span>    _M_fill_initialize(const value_type&amp; __value)
+<span class="line_number">395</span>    {
+<span class="line_number">396</span>      _Map_pointer __cur;
+<span class="line_number">397</span>      __try
+<span class="line_number">398</span>	{
+<span class="line_number">399</span>	  for (__cur = this-&gt;_M_impl._M_start._M_node;
+<span class="line_number">400</span>	       __cur &lt; this-&gt;_M_impl._M_finish._M_node;
+<span class="line_number">401</span>	       ++__cur)
+<span class="line_number">402</span>	    std::__uninitialized_fill_a(*__cur, *__cur + _S_buffer_size(),
+<span class="line_number">403</span>					__value, _M_get_Tp_allocator());
+<span class="line_number">404</span>	  std::__uninitialized_fill_a(this-&gt;_M_impl._M_finish._M_first,
+<span class="line_number">405</span>				      this-&gt;_M_impl._M_finish._M_cur,
+<span class="line_number">406</span>				      __value, _M_get_Tp_allocator());
+<span class="line_number">407</span>	}
+<span class="line_number">408</span>      __catch(...)
+<span class="line_number">409</span>	{
+<span class="line_number">410</span>	  std::_Destroy(this-&gt;_M_impl._M_start, iterator(*__cur, __cur),
+<span class="line_number">411</span>			_M_get_Tp_allocator());
+<span class="line_number">412</span>	  __throw_exception_again;
+<span class="line_number">413</span>	}
+<span class="line_number">414</span>    }
+<span class="line_number">415</span>
+<span class="line_number">416</span>  template &lt;typename _Tp, typename _Alloc&gt;
+<span class="line_number">417</span>    template &lt;typename _InputIterator&gt;
+<span class="line_number">418</span>      void
+<span class="line_number">419</span>      deque&lt;_Tp, _Alloc&gt;::
+<span class="line_number">420</span>      _M_range_initialize(_InputIterator __first, _InputIterator __last,
+<span class="line_number">421</span>			  std::input_iterator_tag)
+<span class="line_number">422</span>      {
+<span class="line_number">423</span>	this-&gt;_M_initialize_map(0);
+<span class="line_number">424</span>	__try
+<span class="line_number">425</span>	  {
+<span class="line_number">426</span>	    for (; __first != __last; ++__first)
+<span class="line_number">427</span>#if __cplusplus &gt;= 201103L
+<span class="line_number">428</span>	      emplace_back(*__first);
+<span class="line_number">429</span>#else
+<span class="line_number">430</span>	      push_back(*__first);
+<span class="line_number">431</span>#endif
+<span class="line_number">432</span>	  }
+<span class="line_number">433</span>	__catch(...)
+<span class="line_number">434</span>	  {
+<span class="line_number">435</span>	    clear();
+<span class="line_number">436</span>	    __throw_exception_again;
+<span class="line_number">437</span>	  }
+<span class="line_number">438</span>      }
+<span class="line_number">439</span>
+<span class="line_number">440</span>  template &lt;typename _Tp, typename _Alloc&gt;
+<span class="line_number">441</span>    template &lt;typename _ForwardIterator&gt;
+<span class="line_number">442</span>      void
+<span class="line_number">443</span>      deque&lt;_Tp, _Alloc&gt;::
+<span class="line_number">444</span>      _M_range_initialize(_ForwardIterator __first, _ForwardIterator __last,
+<span class="line_number">445</span>			  std::forward_iterator_tag)
+<span class="line_number">446</span>      {
+<span class="line_number">447</span>	const size_type __n = std::distance(__first, __last);
+<span class="line_number">448</span>	this-&gt;_M_initialize_map(_S_check_init_len(__n, _M_get_Tp_allocator()));
+<span class="line_number">449</span>
+<span class="line_number">450</span>	_Map_pointer __cur_node;
+<span class="line_number">451</span>	__try
+<span class="line_number">452</span>	  {
+<span class="line_number">453</span>	    for (__cur_node = this-&gt;_M_impl._M_start._M_node;
+<span class="line_number">454</span>		 __cur_node &lt; this-&gt;_M_impl._M_finish._M_node;
+<span class="line_number">455</span>		 ++__cur_node)
+<span class="line_number">456</span>	      {
+<span class="line_number">457</span>		if (__n &lt; _S_buffer_size())
+<span class="line_number">458</span>		  __builtin_unreachable(); // See PR 100516
+<span class="line_number">459</span>
+<span class="line_number">460</span>		_ForwardIterator __mid = __first;
+<span class="line_number">461</span>		std::advance(__mid, _S_buffer_size());
+<span class="line_number">462</span>		std::__uninitialized_copy_a(__first, __mid, *__cur_node,
+<span class="line_number">463</span>					    _M_get_Tp_allocator());
+<span class="line_number">464</span>		__first = __mid;
+<span class="line_number">465</span>	      }
+<span class="line_number">466</span>	    std::__uninitialized_copy_a(__first, __last,
+<span class="line_number">467</span>					this-&gt;_M_impl._M_finish._M_first,
+<span class="line_number">468</span>					_M_get_Tp_allocator());
+<span class="line_number">469</span>	  }
+<span class="line_number">470</span>	__catch(...)
+<span class="line_number">471</span>	  {
+<span class="line_number">472</span>	    std::_Destroy(this-&gt;_M_impl._M_start,
+<span class="line_number">473</span>			  iterator(*__cur_node, __cur_node),
+<span class="line_number">474</span>			  _M_get_Tp_allocator());
+<span class="line_number">475</span>	    __throw_exception_again;
+<span class="line_number">476</span>	  }
+<span class="line_number">477</span>      }
+<span class="line_number">478</span>
+<span class="line_number">479</span>  // Called only if _M_impl._M_finish._M_cur == _M_impl._M_finish._M_last - 1.
+<span class="line_number">480</span>  template&lt;typename _Tp, typename _Alloc&gt;
+<span class="line_number">481</span>#if __cplusplus &gt;= 201103L
+<span class="line_number">482</span>    template&lt;typename... _Args&gt;
+<span class="line_number">483</span>      void
+<span class="line_number">484</span>      deque&lt;_Tp, _Alloc&gt;::
+<span class="line_number">485</span>      _M_push_back_aux(_Args&amp;&amp;... __args)
+<span class="line_number">486</span>#else
+<span class="line_number">487</span>      void
+<span class="line_number">488</span>      deque&lt;_Tp, _Alloc&gt;::
+<span class="line_number">489</span>      _M_push_back_aux(const value_type&amp; __t)
+<span class="line_number">490</span>#endif
+<span class="line_number">491</span>      {
+<span class="line_number">492</span>	if (size() == max_size())
+<span class="line_number">493</span>	  __throw_length_error(
+<span class="line_number">494</span>	      __N(&#34;cannot create std::deque larger than max_size()&#34;));
+<span class="line_number">495</span>
+<span class="line_number">496</span>	_M_reserve_map_at_back();
+<span class="line_number">497</span>	*(this-&gt;_M_impl._M_finish._M_node + 1) = this-&gt;_M_allocate_node();
+<span class="line_number">498</span>	__try
+<span class="line_number">499</span>	  {
+<span class="line_number">500</span>#if __cplusplus &gt;= 201103L
+<span class="line_number">501</span>	    _Alloc_traits::construct(this-&gt;_M_impl,
+<span class="line_number">502</span>				     this-&gt;_M_impl._M_finish._M_cur,
+<span class="line_number">503</span>				     std::forward&lt;_Args&gt;(__args)...);
+<span class="line_number">504</span>#else
+<span class="line_number">505</span>	    this-&gt;_M_impl.construct(this-&gt;_M_impl._M_finish._M_cur, __t);
+<span class="line_number">506</span>#endif
+<span class="line_number">507</span>	    this-&gt;_M_impl._M_finish._M_set_node(this-&gt;_M_impl._M_finish._M_node
+<span class="line_number">508</span>						+ 1);
+<span class="line_number">509</span>	    this-&gt;_M_impl._M_finish._M_cur = this-&gt;_M_impl._M_finish._M_first;
+<span class="line_number">510</span>	  }
+<span class="line_number">511</span>	__catch(...)
+<span class="line_number">512</span>	  {
+<span class="line_number">513</span>	    _M_deallocate_node(*(this-&gt;_M_impl._M_finish._M_node + 1));
+<span class="line_number">514</span>	    __throw_exception_again;
+<span class="line_number">515</span>	  }
+<span class="line_number">516</span>      }
+<span class="line_number">517</span>
+<span class="line_number">518</span>  // Called only if _M_impl._M_start._M_cur == _M_impl._M_start._M_first.
+<span class="line_number">519</span>  template&lt;typename _Tp, typename _Alloc&gt;
+<span class="line_number">520</span>#if __cplusplus &gt;= 201103L
+<span class="line_number">521</span>    template&lt;typename... _Args&gt;
+<span class="line_number">522</span>      void
+<span class="line_number">523</span>      deque&lt;_Tp, _Alloc&gt;::
+<span class="line_number">524</span>      _M_push_front_aux(_Args&amp;&amp;... __args)
+<span class="line_number">525</span>#else
+<span class="line_number">526</span>      void
+<span class="line_number">527</span>      deque&lt;_Tp, _Alloc&gt;::
+<span class="line_number">528</span>      _M_push_front_aux(const value_type&amp; __t)
+<span class="line_number">529</span>#endif
+<span class="line_number">530</span>      {
+<span class="line_number">531</span>	if (size() == max_size())
+<span class="line_number">532</span>	  __throw_length_error(
+<span class="line_number">533</span>	      __N(&#34;cannot create std::deque larger than max_size()&#34;));
+<span class="line_number">534</span>
+<span class="line_number">535</span>	_M_reserve_map_at_front();
+<span class="line_number">536</span>	*(this-&gt;_M_impl._M_start._M_node - 1) = this-&gt;_M_allocate_node();
+<span class="line_number">537</span>	__try
+<span class="line_number">538</span>	  {
+<span class="line_number">539</span>	    this-&gt;_M_impl._M_start._M_set_node(this-&gt;_M_impl._M_start._M_node
+<span class="line_number">540</span>					       - 1);
+<span class="line_number">541</span>	    this-&gt;_M_impl._M_start._M_cur = this-&gt;_M_impl._M_start._M_last - 1;
+<span class="line_number">542</span>#if __cplusplus &gt;= 201103L
+<span class="line_number">543</span>	    _Alloc_traits::construct(this-&gt;_M_impl,
+<span class="line_number">544</span>				     this-&gt;_M_impl._M_start._M_cur,
+<span class="line_number">545</span>				     std::forward&lt;_Args&gt;(__args)...);
+<span class="line_number">546</span>#else
+<span class="line_number">547</span>	    this-&gt;_M_impl.construct(this-&gt;_M_impl._M_start._M_cur, __t);
+<span class="line_number">548</span>#endif
+<span class="line_number">549</span>	  }
+<span class="line_number">550</span>	__catch(...)
+<span class="line_number">551</span>	  {
+<span class="line_number">552</span>	    ++this-&gt;_M_impl._M_start;
+<span class="line_number">553</span>	    _M_deallocate_node(*(this-&gt;_M_impl._M_start._M_node - 1));
+<span class="line_number">554</span>	    __throw_exception_again;
+<span class="line_number">555</span>	  }
+<span class="line_number">556</span>      }
+<span class="line_number">557</span>
+<span class="line_number">558</span>  // Called only if _M_impl._M_finish._M_cur == _M_impl._M_finish._M_first.
+<span class="line_number">559</span>  template &lt;typename _Tp, typename _Alloc&gt;
+<span class="line_number">560</span>    void deque&lt;_Tp, _Alloc&gt;::
+<span class="line_number">561</span>    _M_pop_back_aux()
+<span class="line_number">562</span>    {
+<span class="line_number">563</span>      _M_deallocate_node(this-&gt;_M_impl._M_finish._M_first);
+<span class="line_number">564</span>      this-&gt;_M_impl._M_finish._M_set_node(this-&gt;_M_impl._M_finish._M_node - 1);
+<span class="line_number">565</span>      this-&gt;_M_impl._M_finish._M_cur = this-&gt;_M_impl._M_finish._M_last - 1;
+<span class="line_number">566</span>      _Alloc_traits::destroy(_M_get_Tp_allocator(),
+<span class="line_number">567</span>			     this-&gt;_M_impl._M_finish._M_cur);
+<span class="line_number">568</span>    }
+<span class="line_number">569</span>
+<span class="line_number">570</span>  // Called only if _M_impl._M_start._M_cur == _M_impl._M_start._M_last - 1.
+<span class="line_number">571</span>  // Note that if the deque has at least one element (a precondition for this
+<span class="line_number">572</span>  // member function), and if
+<span class="line_number">573</span>  //   _M_impl._M_start._M_cur == _M_impl._M_start._M_last,
+<span class="line_number">574</span>  // then the deque must have at least two nodes.
+<span class="line_number">575</span>  template &lt;typename _Tp, typename _Alloc&gt;
+<span class="line_number">576</span>    void deque&lt;_Tp, _Alloc&gt;::
+<span class="line_number">577</span>    _M_pop_front_aux()
+<span class="line_number">578</span>    {
+<span class="line_number">579</span>      _Alloc_traits::destroy(_M_get_Tp_allocator(),
+<span class="line_number">580</span>			     this-&gt;_M_impl._M_start._M_cur);
+<span class="line_number">581</span>      _M_deallocate_node(this-&gt;_M_impl._M_start._M_first);
+<span class="line_number">582</span>      this-&gt;_M_impl._M_start._M_set_node(this-&gt;_M_impl._M_start._M_node + 1);
+<span class="line_number">583</span>      this-&gt;_M_impl._M_start._M_cur = this-&gt;_M_impl._M_start._M_first;
+<span class="line_number">584</span>    }
+<span class="line_number">585</span>
+<span class="line_number">586</span>  template &lt;typename _Tp, typename _Alloc&gt;
+<span class="line_number">587</span>    template &lt;typename _InputIterator&gt;
+<span class="line_number">588</span>      void
+<span class="line_number">589</span>      deque&lt;_Tp, _Alloc&gt;::
+<span class="line_number">590</span>      _M_range_insert_aux(iterator __pos,
+<span class="line_number">591</span>			  _InputIterator __first, _InputIterator __last,
+<span class="line_number">592</span>			  std::input_iterator_tag)
+<span class="line_number">593</span>      { std::copy(__first, __last, std::inserter(*this, __pos)); }
+<span class="line_number">594</span>
+<span class="line_number">595</span>  template &lt;typename _Tp, typename _Alloc&gt;
+<span class="line_number">596</span>    template &lt;typename _ForwardIterator&gt;
+<span class="line_number">597</span>      void
+<span class="line_number">598</span>      deque&lt;_Tp, _Alloc&gt;::
+<span class="line_number">599</span>      _M_range_insert_aux(iterator __pos,
+<span class="line_number">600</span>			  _ForwardIterator __first, _ForwardIterator __last,
+<span class="line_number">601</span>			  std::forward_iterator_tag)
+<span class="line_number">602</span>      {
+<span class="line_number">603</span>	const size_type __n = std::distance(__first, __last);
+<span class="line_number">604</span>	if (__pos._M_cur == this-&gt;_M_impl._M_start._M_cur)
+<span class="line_number">605</span>	  {
+<span class="line_number">606</span>	    iterator __new_start = _M_reserve_elements_at_front(__n);
+<span class="line_number">607</span>	    __try
+<span class="line_number">608</span>	      {
+<span class="line_number">609</span>		std::__uninitialized_copy_a(__first, __last, __new_start,
+<span class="line_number">610</span>					    _M_get_Tp_allocator());
+<span class="line_number">611</span>		this-&gt;_M_impl._M_start = __new_start;
+<span class="line_number">612</span>	      }
+<span class="line_number">613</span>	    __catch(...)
+<span class="line_number">614</span>	      {
+<span class="line_number">615</span>		_M_destroy_nodes(__new_start._M_node,
+<span class="line_number">616</span>				 this-&gt;_M_impl._M_start._M_node);
+<span class="line_number">617</span>		__throw_exception_again;
+<span class="line_number">618</span>	      }
+<span class="line_number">619</span>	  }
+<span class="line_number">620</span>	else if (__pos._M_cur == this-&gt;_M_impl._M_finish._M_cur)
+<span class="line_number">621</span>	  {
+<span class="line_number">622</span>	    iterator __new_finish = _M_reserve_elements_at_back(__n);
+<span class="line_number">623</span>	    __try
+<span class="line_number">624</span>	      {
+<span class="line_number">625</span>		std::__uninitialized_copy_a(__first, __last,
+<span class="line_number">626</span>					    this-&gt;_M_impl._M_finish,
+<span class="line_number">627</span>					    _M_get_Tp_allocator());
+<span class="line_number">628</span>		this-&gt;_M_impl._M_finish = __new_finish;
+<span class="line_number">629</span>	      }
+<span class="line_number">630</span>	    __catch(...)
+<span class="line_number">631</span>	      {
+<span class="line_number">632</span>		_M_destroy_nodes(this-&gt;_M_impl._M_finish._M_node + 1,
+<span class="line_number">633</span>				 __new_finish._M_node + 1);
+<span class="line_number">634</span>		__throw_exception_again;
+<span class="line_number">635</span>	      }
+<span class="line_number">636</span>	  }
+<span class="line_number">637</span>	else
+<span class="line_number">638</span>	  _M_insert_aux(__pos, __first, __last, __n);
+<span class="line_number">639</span>      }
+<span class="line_number">640</span>
+<span class="line_number">641</span>  template&lt;typename _Tp, typename _Alloc&gt;
+<span class="line_number">642</span>#if __cplusplus &gt;= 201103L
+<span class="line_number">643</span>    template&lt;typename... _Args&gt;
+<span class="line_number">644</span>      typename deque&lt;_Tp, _Alloc&gt;::iterator
+<span class="line_number">645</span>      deque&lt;_Tp, _Alloc&gt;::
+<span class="line_number">646</span>      _M_insert_aux(iterator __pos, _Args&amp;&amp;... __args)
+<span class="line_number">647</span>      {
+<span class="line_number">648</span>	value_type __x_copy(std::forward&lt;_Args&gt;(__args)...); // XXX copy
+<span class="line_number">649</span>#else
+<span class="line_number">650</span>    typename deque&lt;_Tp, _Alloc&gt;::iterator
+<span class="line_number">651</span>      deque&lt;_Tp, _Alloc&gt;::
+<span class="line_number">652</span>      _M_insert_aux(iterator __pos, const value_type&amp; __x)
+<span class="line_number">653</span>      {
+<span class="line_number">654</span>	value_type __x_copy = __x; // XXX copy
+<span class="line_number">655</span>#endif
+<span class="line_number">656</span>	difference_type __index = __pos - this-&gt;_M_impl._M_start;
+<span class="line_number">657</span>	if (static_cast&lt;size_type&gt;(__index) &lt; size() / 2)
+<span class="line_number">658</span>	  {
+<span class="line_number">659</span>	    push_front(_GLIBCXX_MOVE(front()));
+<span class="line_number">660</span>	    iterator __front1 = this-&gt;_M_impl._M_start;
+<span class="line_number">661</span>	    ++__front1;
+<span class="line_number">662</span>	    iterator __front2 = __front1;
+<span class="line_number">663</span>	    ++__front2;
+<span class="line_number">664</span>	    __pos = this-&gt;_M_impl._M_start + __index;
+<span class="line_number">665</span>	    iterator __pos1 = __pos;
+<span class="line_number">666</span>	    ++__pos1;
+<span class="line_number">667</span>	    _GLIBCXX_MOVE3(__front2, __pos1, __front1);
+<span class="line_number">668</span>	  }
+<span class="line_number">669</span>	else
+<span class="line_number">670</span>	  {
+<span class="line_number">671</span>	    push_back(_GLIBCXX_MOVE(back()));
+<span class="line_number">672</span>	    iterator __back1 = this-&gt;_M_impl._M_finish;
+<span class="line_number">673</span>	    --__back1;
+<span class="line_number">674</span>	    iterator __back2 = __back1;
+<span class="line_number">675</span>	    --__back2;
+<span class="line_number">676</span>	    __pos = this-&gt;_M_impl._M_start + __index;
+<span class="line_number">677</span>	    _GLIBCXX_MOVE_BACKWARD3(__pos, __back2, __back1);
+<span class="line_number">678</span>	  }
+<span class="line_number">679</span>	*__pos = _GLIBCXX_MOVE(__x_copy);
+<span class="line_number">680</span>	return __pos;
+<span class="line_number">681</span>      }
+<span class="line_number">682</span>
+<span class="line_number">683</span>  template &lt;typename _Tp, typename _Alloc&gt;
+<span class="line_number">684</span>    void
+<span class="line_number">685</span>    deque&lt;_Tp, _Alloc&gt;::
+<span class="line_number">686</span>    _M_insert_aux(iterator __pos, size_type __n, const value_type&amp; __x)
+<span class="line_number">687</span>    {
+<span class="line_number">688</span>      const difference_type __elems_before = __pos - this-&gt;_M_impl._M_start;
+<span class="line_number">689</span>      const size_type __length = this-&gt;size();
+<span class="line_number">690</span>      value_type __x_copy = __x;
+<span class="line_number">691</span>      if (__elems_before &lt; difference_type(__length / 2))
+<span class="line_number">692</span>	{
+<span class="line_number">693</span>	  iterator __new_start = _M_reserve_elements_at_front(__n);
+<span class="line_number">694</span>	  iterator __old_start = this-&gt;_M_impl._M_start;
+<span class="line_number">695</span>	  __pos = this-&gt;_M_impl._M_start + __elems_before;
+<span class="line_number">696</span>	  __try
+<span class="line_number">697</span>	    {
+<span class="line_number">698</span>	      if (__elems_before &gt;= difference_type(__n))
+<span class="line_number">699</span>		{
+<span class="line_number">700</span>		  iterator __start_n = (this-&gt;_M_impl._M_start
+<span class="line_number">701</span>					+ difference_type(__n));
+<span class="line_number">702</span>		  std::__uninitialized_move_a(this-&gt;_M_impl._M_start,
+<span class="line_number">703</span>					      __start_n, __new_start,
+<span class="line_number">704</span>					      _M_get_Tp_allocator());
+<span class="line_number">705</span>		  this-&gt;_M_impl._M_start = __new_start;
+<span class="line_number">706</span>		  _GLIBCXX_MOVE3(__start_n, __pos, __old_start);
+<span class="line_number">707</span>		  std::fill(__pos - difference_type(__n), __pos, __x_copy);
+<span class="line_number">708</span>		}
+<span class="line_number">709</span>	      else
+<span class="line_number">710</span>		{
+<span class="line_number">711</span>		  std::__uninitialized_move_fill(this-&gt;_M_impl._M_start,
+<span class="line_number">712</span>						 __pos, __new_start,
+<span class="line_number">713</span>						 this-&gt;_M_impl._M_start,
+<span class="line_number">714</span>						 __x_copy,
+<span class="line_number">715</span>						 _M_get_Tp_allocator());
+<span class="line_number">716</span>		  this-&gt;_M_impl._M_start = __new_start;
+<span class="line_number">717</span>		  std::fill(__old_start, __pos, __x_copy);
+<span class="line_number">718</span>		}
+<span class="line_number">719</span>	    }
+<span class="line_number">720</span>	  __catch(...)
+<span class="line_number">721</span>	    {
+<span class="line_number">722</span>	      _M_destroy_nodes(__new_start._M_node,
+<span class="line_number">723</span>			       this-&gt;_M_impl._M_start._M_node);
+<span class="line_number">724</span>	      __throw_exception_again;
+<span class="line_number">725</span>	    }
+<span class="line_number">726</span>	}
+<span class="line_number">727</span>      else
+<span class="line_number">728</span>	{
+<span class="line_number">729</span>	  iterator __new_finish = _M_reserve_elements_at_back(__n);
+<span class="line_number">730</span>	  iterator __old_finish = this-&gt;_M_impl._M_finish;
+<span class="line_number">731</span>	  const difference_type __elems_after =
+<span class="line_number">732</span>	    difference_type(__length) - __elems_before;
+<span class="line_number">733</span>	  __pos = this-&gt;_M_impl._M_finish - __elems_after;
+<span class="line_number">734</span>	  __try
+<span class="line_number">735</span>	    {
+<span class="line_number">736</span>	      if (__elems_after &gt; difference_type(__n))
+<span class="line_number">737</span>		{
+<span class="line_number">738</span>		  iterator __finish_n = (this-&gt;_M_impl._M_finish
+<span class="line_number">739</span>					 - difference_type(__n));
+<span class="line_number">740</span>		  std::__uninitialized_move_a(__finish_n,
+<span class="line_number">741</span>					      this-&gt;_M_impl._M_finish,
+<span class="line_number">742</span>					      this-&gt;_M_impl._M_finish,
+<span class="line_number">743</span>					      _M_get_Tp_allocator());
+<span class="line_number">744</span>		  this-&gt;_M_impl._M_finish = __new_finish;
+<span class="line_number">745</span>		  _GLIBCXX_MOVE_BACKWARD3(__pos, __finish_n, __old_finish);
+<span class="line_number">746</span>		  std::fill(__pos, __pos + difference_type(__n), __x_copy);
+<span class="line_number">747</span>		}
+<span class="line_number">748</span>	      else
+<span class="line_number">749</span>		{
+<span class="line_number">750</span>		  std::__uninitialized_fill_move(this-&gt;_M_impl._M_finish,
+<span class="line_number">751</span>						 __pos + difference_type(__n),
+<span class="line_number">752</span>						 __x_copy, __pos,
+<span class="line_number">753</span>						 this-&gt;_M_impl._M_finish,
+<span class="line_number">754</span>						 _M_get_Tp_allocator());
+<span class="line_number">755</span>		  this-&gt;_M_impl._M_finish = __new_finish;
+<span class="line_number">756</span>		  std::fill(__pos, __old_finish, __x_copy);
+<span class="line_number">757</span>		}
+<span class="line_number">758</span>	    }
+<span class="line_number">759</span>	  __catch(...)
+<span class="line_number">760</span>	    {
+<span class="line_number">761</span>	      _M_destroy_nodes(this-&gt;_M_impl._M_finish._M_node + 1,
+<span class="line_number">762</span>			       __new_finish._M_node + 1);
+<span class="line_number">763</span>	      __throw_exception_again;
+<span class="line_number">764</span>	    }
+<span class="line_number">765</span>	}
+<span class="line_number">766</span>    }
+<span class="line_number">767</span>
+<span class="line_number">768</span>  template &lt;typename _Tp, typename _Alloc&gt;
+<span class="line_number">769</span>    template &lt;typename _ForwardIterator&gt;
+<span class="line_number">770</span>      void
+<span class="line_number">771</span>      deque&lt;_Tp, _Alloc&gt;::
+<span class="line_number">772</span>      _M_insert_aux(iterator __pos,
+<span class="line_number">773</span>		    _ForwardIterator __first, _ForwardIterator __last,
+<span class="line_number">774</span>		    size_type __n)
+<span class="line_number">775</span>      {
+<span class="line_number">776</span>	const difference_type __elemsbefore = __pos - this-&gt;_M_impl._M_start;
+<span class="line_number">777</span>	const size_type __length = size();
+<span class="line_number">778</span>	if (static_cast&lt;size_type&gt;(__elemsbefore) &lt; __length / 2)
+<span class="line_number">779</span>	  {
+<span class="line_number">780</span>	    iterator __new_start = _M_reserve_elements_at_front(__n);
+<span class="line_number">781</span>	    iterator __old_start = this-&gt;_M_impl._M_start;
+<span class="line_number">782</span>	    __pos = this-&gt;_M_impl._M_start + __elemsbefore;
+<span class="line_number">783</span>	    __try
+<span class="line_number">784</span>	      {
+<span class="line_number">785</span>		if (__elemsbefore &gt;= difference_type(__n))
+<span class="line_number">786</span>		  {
+<span class="line_number">787</span>		    iterator __start_n = (this-&gt;_M_impl._M_start
+<span class="line_number">788</span>					  + difference_type(__n));
+<span class="line_number">789</span>		    std::__uninitialized_move_a(this-&gt;_M_impl._M_start,
+<span class="line_number">790</span>						__start_n, __new_start,
+<span class="line_number">791</span>						_M_get_Tp_allocator());
+<span class="line_number">792</span>		    this-&gt;_M_impl._M_start = __new_start;
+<span class="line_number">793</span>		    _GLIBCXX_MOVE3(__start_n, __pos, __old_start);
+<span class="line_number">794</span>		    std::copy(__first, __last, __pos - difference_type(__n));
+<span class="line_number">795</span>		  }
+<span class="line_number">796</span>		else
+<span class="line_number">797</span>		  {
+<span class="line_number">798</span>		    _ForwardIterator __mid = __first;
+<span class="line_number">799</span>		    std::advance(__mid, difference_type(__n) - __elemsbefore);
+<span class="line_number">800</span>		    std::__uninitialized_move_copy(this-&gt;_M_impl._M_start,
+<span class="line_number">801</span>						   __pos, __first, __mid,
+<span class="line_number">802</span>						   __new_start,
+<span class="line_number">803</span>						   _M_get_Tp_allocator());
+<span class="line_number">804</span>		    this-&gt;_M_impl._M_start = __new_start;
+<span class="line_number">805</span>		    std::copy(__mid, __last, __old_start);
+<span class="line_number">806</span>		  }
+<span class="line_number">807</span>	      }
+<span class="line_number">808</span>	    __catch(...)
+<span class="line_number">809</span>	      {
+<span class="line_number">810</span>		_M_destroy_nodes(__new_start._M_node,
+<span class="line_number">811</span>				 this-&gt;_M_impl._M_start._M_node);
+<span class="line_number">812</span>		__throw_exception_again;
+<span class="line_number">813</span>	      }
+<span class="line_number">814</span>	  }
+<span class="line_number">815</span>	else
+<span class="line_number">816</span>	{
+<span class="line_number">817</span>	  iterator __new_finish = _M_reserve_elements_at_back(__n);
+<span class="line_number">818</span>	  iterator __old_finish = this-&gt;_M_impl._M_finish;
+<span class="line_number">819</span>	  const difference_type __elemsafter =
+<span class="line_number">820</span>	    difference_type(__length) - __elemsbefore;
+<span class="line_number">821</span>	  __pos = this-&gt;_M_impl._M_finish - __elemsafter;
+<span class="line_number">822</span>	  __try
+<span class="line_number">823</span>	    {
+<span class="line_number">824</span>	      if (__elemsafter &gt; difference_type(__n))
+<span class="line_number">825</span>		{
+<span class="line_number">826</span>		  iterator __finish_n = (this-&gt;_M_impl._M_finish
+<span class="line_number">827</span>					 - difference_type(__n));
+<span class="line_number">828</span>		  std::__uninitialized_move_a(__finish_n,
+<span class="line_number">829</span>					      this-&gt;_M_impl._M_finish,
+<span class="line_number">830</span>					      this-&gt;_M_impl._M_finish,
+<span class="line_number">831</span>					      _M_get_Tp_allocator());
+<span class="line_number">832</span>		  this-&gt;_M_impl._M_finish = __new_finish;
+<span class="line_number">833</span>		  _GLIBCXX_MOVE_BACKWARD3(__pos, __finish_n, __old_finish);
+<span class="line_number">834</span>		  std::copy(__first, __last, __pos);
+<span class="line_number">835</span>		}
+<span class="line_number">836</span>	      else
+<span class="line_number">837</span>		{
+<span class="line_number">838</span>		  _ForwardIterator __mid = __first;
+<span class="line_number">839</span>		  std::advance(__mid, __elemsafter);
+<span class="line_number">840</span>		  std::__uninitialized_copy_move(__mid, __last, __pos,
+<span class="line_number">841</span>						 this-&gt;_M_impl._M_finish,
+<span class="line_number">842</span>						 this-&gt;_M_impl._M_finish,
+<span class="line_number">843</span>						 _M_get_Tp_allocator());
+<span class="line_number">844</span>		  this-&gt;_M_impl._M_finish = __new_finish;
+<span class="line_number">845</span>		  std::copy(__first, __mid, __pos);
+<span class="line_number">846</span>		}
+<span class="line_number">847</span>	    }
+<span class="line_number">848</span>	  __catch(...)
+<span class="line_number">849</span>	    {
+<span class="line_number">850</span>	      _M_destroy_nodes(this-&gt;_M_impl._M_finish._M_node + 1,
+<span class="line_number">851</span>			       __new_finish._M_node + 1);
+<span class="line_number">852</span>	      __throw_exception_again;
+<span class="line_number">853</span>	    }
+<span class="line_number">854</span>	}
+<span class="line_number">855</span>      }
+<span class="line_number">856</span>
+<span class="line_number">857</span>   template&lt;typename _Tp, typename _Alloc&gt;
+<span class="line_number">858</span>     void
+<span class="line_number">859</span>     deque&lt;_Tp, _Alloc&gt;::
+<span class="line_number">860</span>     _M_destroy_data_aux(iterator __first, iterator __last)
+<span class="line_number">861</span>     {
+<span class="line_number">862</span>       for (_Map_pointer __node = __first._M_node + 1;
+<span class="line_number">863</span>	    __node &lt; __last._M_node; ++__node)
+<span class="line_number">864</span>	 std::_Destroy(*__node, *__node + _S_buffer_size(),
+<span class="line_number">865</span>		       _M_get_Tp_allocator());
+<span class="line_number">866</span>
+<span class="line_number">867</span>       if (__first._M_node != __last._M_node)
+<span class="line_number">868</span>	 {
+<span class="line_number">869</span>	   std::_Destroy(__first._M_cur, __first._M_last,
+<span class="line_number">870</span>			 _M_get_Tp_allocator());
+<span class="line_number">871</span>	   std::_Destroy(__last._M_first, __last._M_cur,
+<span class="line_number">872</span>			 _M_get_Tp_allocator());
+<span class="line_number">873</span>	 }
+<span class="line_number">874</span>       else
+<span class="line_number">875</span>	 std::_Destroy(__first._M_cur, __last._M_cur,
+<span class="line_number">876</span>		       _M_get_Tp_allocator());
+<span class="line_number">877</span>     }
+<span class="line_number">878</span>
+<span class="line_number">879</span>  template &lt;typename _Tp, typename _Alloc&gt;
+<span class="line_number">880</span>    void
+<span class="line_number">881</span>    deque&lt;_Tp, _Alloc&gt;::
+<span class="line_number">882</span>    _M_new_elements_at_front(size_type __new_elems)
+<span class="line_number">883</span>    {
+<span class="line_number">884</span>      if (this-&gt;max_size() - this-&gt;size() &lt; __new_elems)
+<span class="line_number">885</span>	__throw_length_error(__N(&#34;deque::_M_new_elements_at_front&#34;));
+<span class="line_number">886</span>
+<span class="line_number">887</span>      const size_type __new_nodes = ((__new_elems + _S_buffer_size() - 1)
+<span class="line_number">888</span>				     / _S_buffer_size());
+<span class="line_number">889</span>      _M_reserve_map_at_front(__new_nodes);
+<span class="line_number">890</span>      size_type __i;
+<span class="line_number">891</span>      __try
+<span class="line_number">892</span>	{
+<span class="line_number">893</span>	  for (__i = 1; __i &lt;= __new_nodes; ++__i)
+<span class="line_number">894</span>	    *(this-&gt;_M_impl._M_start._M_node - __i) = this-&gt;_M_allocate_node();
+<span class="line_number">895</span>	}
+<span class="line_number">896</span>      __catch(...)
+<span class="line_number">897</span>	{
+<span class="line_number">898</span>	  for (size_type __j = 1; __j &lt; __i; ++__j)
+<span class="line_number">899</span>	    _M_deallocate_node(*(this-&gt;_M_impl._M_start._M_node - __j));
+<span class="line_number">900</span>	  __throw_exception_again;
+<span class="line_number">901</span>	}
+<span class="line_number">902</span>    }
+<span class="line_number">903</span>
+<span class="line_number">904</span>  template &lt;typename _Tp, typename _Alloc&gt;
+<span class="line_number">905</span>    void
+<span class="line_number">906</span>    deque&lt;_Tp, _Alloc&gt;::
+<span class="line_number">907</span>    _M_new_elements_at_back(size_type __new_elems)
+<span class="line_number">908</span>    {
+<span class="line_number">909</span>      if (this-&gt;max_size() - this-&gt;size() &lt; __new_elems)
+<span class="line_number">910</span>	__throw_length_error(__N(&#34;deque::_M_new_elements_at_back&#34;));
+<span class="line_number">911</span>
+<span class="line_number">912</span>      const size_type __new_nodes = ((__new_elems + _S_buffer_size() - 1)
+<span class="line_number">913</span>				     / _S_buffer_size());
+<span class="line_number">914</span>      _M_reserve_map_at_back(__new_nodes);
+<span class="line_number">915</span>      size_type __i;
+<span class="line_number">916</span>      __try
+<span class="line_number">917</span>	{
+<span class="line_number">918</span>	  for (__i = 1; __i &lt;= __new_nodes; ++__i)
+<span class="line_number">919</span>	    *(this-&gt;_M_impl._M_finish._M_node + __i) = this-&gt;_M_allocate_node();
+<span class="line_number">920</span>	}
+<span class="line_number">921</span>      __catch(...)
+<span class="line_number">922</span>	{
+<span class="line_number">923</span>	  for (size_type __j = 1; __j &lt; __i; ++__j)
+<span class="line_number">924</span>	    _M_deallocate_node(*(this-&gt;_M_impl._M_finish._M_node + __j));
+<span class="line_number">925</span>	  __throw_exception_again;
+<span class="line_number">926</span>	}
+<span class="line_number">927</span>    }
+<span class="line_number">928</span>
+<span class="line_number">929</span>  template &lt;typename _Tp, typename _Alloc&gt;
+<span class="line_number">930</span>    void
+<span class="line_number">931</span>    deque&lt;_Tp, _Alloc&gt;::
+<span class="line_number">932</span>    _M_reallocate_map(size_type __nodes_to_add, bool __add_at_front)
+<span class="line_number">933</span>    {
+<span class="line_number">934</span>      const size_type __old_num_nodes
+<span class="line_number">935</span>	= this-&gt;_M_impl._M_finish._M_node - this-&gt;_M_impl._M_start._M_node + 1;
+<span class="line_number">936</span>      const size_type __new_num_nodes = __old_num_nodes + __nodes_to_add;
+<span class="line_number">937</span>
+<span class="line_number">938</span>      _Map_pointer __new_nstart;
+<span class="line_number">939</span>      if (this-&gt;_M_impl._M_map_size &gt; 2 * __new_num_nodes)
+<span class="line_number">940</span>	{
+<span class="line_number">941</span>	  __new_nstart = this-&gt;_M_impl._M_map + (this-&gt;_M_impl._M_map_size
+<span class="line_number">942</span>					 - __new_num_nodes) / 2
+<span class="line_number">943</span>			 + (__add_at_front ? __nodes_to_add : 0);
+<span class="line_number">944</span>	  if (__new_nstart &lt; this-&gt;_M_impl._M_start._M_node)
+<span class="line_number">945</span>	    std::copy(this-&gt;_M_impl._M_start._M_node,
+<span class="line_number">946</span>		      this-&gt;_M_impl._M_finish._M_node + 1,
+<span class="line_number">947</span>		      __new_nstart);
+<span class="line_number">948</span>	  else
+<span class="line_number">949</span>	    std::copy_backward(this-&gt;_M_impl._M_start._M_node,
+<span class="line_number">950</span>			       this-&gt;_M_impl._M_finish._M_node + 1,
+<span class="line_number">951</span>			       __new_nstart + __old_num_nodes);
+<span class="line_number">952</span>	}
+<span class="line_number">953</span>      else
+<span class="line_number">954</span>	{
+<span class="line_number">955</span>	  size_type __new_map_size = this-&gt;_M_impl._M_map_size
+<span class="line_number">956</span>				     + std::max(this-&gt;_M_impl._M_map_size,
+<span class="line_number">957</span>						__nodes_to_add) + 2;
+<span class="line_number">958</span>
+<span class="line_number">959</span>	  _Map_pointer __new_map = this-&gt;_M_allocate_map(__new_map_size);
+<span class="line_number">960</span>	  __new_nstart = __new_map + (__new_map_size - __new_num_nodes) / 2
+<span class="line_number">961</span>			 + (__add_at_front ? __nodes_to_add : 0);
+<span class="line_number">962</span>	  std::copy(this-&gt;_M_impl._M_start._M_node,
+<span class="line_number">963</span>		    this-&gt;_M_impl._M_finish._M_node + 1,
+<span class="line_number">964</span>		    __new_nstart);
+<span class="line_number">965</span>	  _M_deallocate_map(this-&gt;_M_impl._M_map, this-&gt;_M_impl._M_map_size);
+<span class="line_number">966</span>
+<span class="line_number">967</span>	  this-&gt;_M_impl._M_map = __new_map;
+<span class="line_number">968</span>	  this-&gt;_M_impl._M_map_size = __new_map_size;
+<span class="line_number">969</span>	}
+<span class="line_number">970</span>
+<span class="line_number">971</span>      this-&gt;_M_impl._M_start._M_set_node(__new_nstart);
+<span class="line_number">972</span>      this-&gt;_M_impl._M_finish._M_set_node(__new_nstart + __old_num_nodes - 1);
+<span class="line_number">973</span>    }
+<span class="line_number">974</span>
+<span class="line_number">975</span>_GLIBCXX_END_NAMESPACE_CONTAINER
+<span class="line_number">976</span>
+<span class="line_number">977</span>  // Overload for deque::iterators, exploiting the &#34;segmented-iterator
+<span class="line_number">978</span>  // optimization&#34;.
+<span class="line_number">979</span>  template&lt;typename _Tp, typename _VTp&gt;
+<span class="line_number">980</span>    void
+<span class="line_number">981</span>    __fill_a1(const _GLIBCXX_STD_C::_Deque_iterator&lt;_Tp, _Tp&amp;, _Tp*&gt;&amp; __first,
+<span class="line_number">982</span>	      const _GLIBCXX_STD_C::_Deque_iterator&lt;_Tp, _Tp&amp;, _Tp*&gt;&amp; __last,
+<span class="line_number">983</span>	      const _VTp&amp; __value)
+<span class="line_number">984</span>    {
+<span class="line_number">985</span>      typedef _GLIBCXX_STD_C::_Deque_iterator&lt;_Tp, _Tp&amp;, _Tp*&gt; _Iter;
+<span class="line_number">986</span>      if (__first._M_node != __last._M_node)
+<span class="line_number">987</span>	{
+<span class="line_number">988</span>	  std::__fill_a1(__first._M_cur, __first._M_last, __value);
+<span class="line_number">989</span>
+<span class="line_number">990</span>	  for (typename _Iter::_Map_pointer __node = __first._M_node + 1;
+<span class="line_number">991</span>	       __node &lt; __last._M_node; ++__node)
+<span class="line_number">992</span>	    std::__fill_a1(*__node, *__node + _Iter::_S_buffer_size(), __value);
+<span class="line_number">993</span>
+<span class="line_number">994</span>	  std::__fill_a1(__last._M_first, __last._M_cur, __value);
+<span class="line_number">995</span>	}
+<span class="line_number">996</span>      else
+<span class="line_number">997</span>	std::__fill_a1(__first._M_cur, __last._M_cur, __value);
+<span class="line_number">998</span>    }
+<span class="line_number">999</span>
+<span class="line_number">1000</span>  template&lt;bool _IsMove,
+<span class="line_number">1001</span>	   typename _Tp, typename _Ref, typename _Ptr, typename _OI&gt;
+<span class="line_number">1002</span>    _OI
+<span class="line_number">1003</span>    __copy_move_dit(_GLIBCXX_STD_C::_Deque_iterator&lt;_Tp, _Ref, _Ptr&gt; __first,
+<span class="line_number">1004</span>		    _GLIBCXX_STD_C::_Deque_iterator&lt;_Tp, _Ref, _Ptr&gt; __last,
+<span class="line_number">1005</span>		    _OI __result)
+<span class="line_number">1006</span>    {
+<span class="line_number">1007</span>      typedef _GLIBCXX_STD_C::_Deque_iterator&lt;_Tp, _Ref, _Ptr&gt; _Iter;
+<span class="line_number">1008</span>      if (__first._M_node != __last._M_node)
+<span class="line_number">1009</span>	{
+<span class="line_number">1010</span>	  __result
+<span class="line_number">1011</span>	    = std::__copy_move_a1&lt;_IsMove&gt;(__first._M_cur, __first._M_last,
+<span class="line_number">1012</span>					   __result);
+<span class="line_number">1013</span>
+<span class="line_number">1014</span>	  for (typename _Iter::_Map_pointer __node = __first._M_node + 1;
+<span class="line_number">1015</span>	       __node != __last._M_node; ++__node)
+<span class="line_number">1016</span>	    __result
+<span class="line_number">1017</span>	      = std::__copy_move_a1&lt;_IsMove&gt;(*__node,
+<span class="line_number">1018</span>					     *__node + _Iter::_S_buffer_size(),
+<span class="line_number">1019</span>					     __result);
+<span class="line_number">1020</span>
+<span class="line_number">1021</span>	  return std::__copy_move_a1&lt;_IsMove&gt;(__last._M_first, __last._M_cur,
+<span class="line_number">1022</span>					      __result);
+<span class="line_number">1023</span>	}
+<span class="line_number">1024</span>
+<span class="line_number">1025</span>      return std::__copy_move_a1&lt;_IsMove&gt;(__first._M_cur, __last._M_cur,
+<span class="line_number">1026</span>					  __result);
+<span class="line_number">1027</span>    }
+<span class="line_number">1028</span>
+<span class="line_number">1029</span>  template&lt;bool _IsMove,
+<span class="line_number">1030</span>	   typename _Tp, typename _Ref, typename _Ptr, typename _OI&gt;
+<span class="line_number">1031</span>    _OI
+<span class="line_number">1032</span>    __copy_move_a1(_GLIBCXX_STD_C::_Deque_iterator&lt;_Tp, _Ref, _Ptr&gt; __first,
+<span class="line_number">1033</span>		   _GLIBCXX_STD_C::_Deque_iterator&lt;_Tp, _Ref, _Ptr&gt; __last,
+<span class="line_number">1034</span>		   _OI __result)
+<span class="line_number">1035</span>    { return __copy_move_dit&lt;_IsMove&gt;(__first, __last, __result); }
+<span class="line_number">1036</span>
+<span class="line_number">1037</span>  template&lt;bool _IsMove,
+<span class="line_number">1038</span>	   typename _ITp, typename _IRef, typename _IPtr, typename _OTp&gt;
+<span class="line_number">1039</span>    _GLIBCXX_STD_C::_Deque_iterator&lt;_OTp, _OTp&amp;, _OTp*&gt;
+<span class="line_number">1040</span>    __copy_move_a1(_GLIBCXX_STD_C::_Deque_iterator&lt;_ITp, _IRef, _IPtr&gt; __first,
+<span class="line_number">1041</span>		   _GLIBCXX_STD_C::_Deque_iterator&lt;_ITp, _IRef, _IPtr&gt; __last,
+<span class="line_number">1042</span>		   _GLIBCXX_STD_C::_Deque_iterator&lt;_OTp, _OTp&amp;, _OTp*&gt; __result)
+<span class="line_number">1043</span>    { return __copy_move_dit&lt;_IsMove&gt;(__first, __last, __result); }
+<span class="line_number">1044</span>
+<span class="line_number">1045</span>  template&lt;bool _IsMove, typename _II, typename _Tp&gt;
+<span class="line_number">1046</span>    typename __gnu_cxx::__enable_if&lt;
+<span class="line_number">1047</span>      __is_random_access_iter&lt;_II&gt;::__value,
+<span class="line_number">1048</span>      _GLIBCXX_STD_C::_Deque_iterator&lt;_Tp, _Tp&amp;, _Tp*&gt; &gt;::__type
+<span class="line_number">1049</span>    __copy_move_a1(_II __first, _II __last,
+<span class="line_number">1050</span>		   _GLIBCXX_STD_C::_Deque_iterator&lt;_Tp, _Tp&amp;, _Tp*&gt; __result)
+<span class="line_number">1051</span>    {
+<span class="line_number">1052</span>      typedef _GLIBCXX_STD_C::_Deque_iterator&lt;_Tp, _Tp&amp;, _Tp*&gt; _Iter;
+<span class="line_number">1053</span>      typedef typename _Iter::difference_type difference_type;
+<span class="line_number">1054</span>
+<span class="line_number">1055</span>      difference_type __len = __last - __first;
+<span class="line_number">1056</span>      while (__len &gt; 0)
+<span class="line_number">1057</span>	{
+<span class="line_number">1058</span>	  const difference_type __clen
+<span class="line_number">1059</span>	    = std::min(__len, __result._M_last - __result._M_cur);
+<span class="line_number">1060</span>	  std::__copy_move_a1&lt;_IsMove&gt;(__first, __first + __clen,
+<span class="line_number">1061</span>				       __result._M_cur);
+<span class="line_number">1062</span>
+<span class="line_number">1063</span>	  __first += __clen;
+<span class="line_number">1064</span>	  __result += __clen;
+<span class="line_number">1065</span>	  __len -= __clen;
+<span class="line_number">1066</span>	}
+<span class="line_number">1067</span>
+<span class="line_number">1068</span>      return __result;
+<span class="line_number">1069</span>    }
+<span class="line_number">1070</span>
+<span class="line_number">1071</span>  template&lt;bool _IsMove, typename _CharT&gt;
+<span class="line_number">1072</span>    typename __gnu_cxx::__enable_if&lt;
+<span class="line_number">1073</span>      __is_char&lt;_CharT&gt;::__value,
+<span class="line_number">1074</span>      _GLIBCXX_STD_C::_Deque_iterator&lt;_CharT, _CharT&amp;, _CharT*&gt; &gt;::__type
+<span class="line_number">1075</span>    __copy_move_a2(
+<span class="line_number">1076</span>	istreambuf_iterator&lt;_CharT, char_traits&lt;_CharT&gt; &gt; __first,
+<span class="line_number">1077</span>	istreambuf_iterator&lt;_CharT, char_traits&lt;_CharT&gt; &gt; __last,
+<span class="line_number">1078</span>	_GLIBCXX_STD_C::_Deque_iterator&lt;_CharT, _CharT&amp;, _CharT*&gt; __result)
+<span class="line_number">1079</span>    {
+<span class="line_number">1080</span>      if (__first == __last)
+<span class="line_number">1081</span>	return __result;
+<span class="line_number">1082</span>
+<span class="line_number">1083</span>      for (;;)
+<span class="line_number">1084</span>	{
+<span class="line_number">1085</span>	  const std::ptrdiff_t __len = __result._M_last - __result._M_cur;
+<span class="line_number">1086</span>	  const std::ptrdiff_t __nb
+<span class="line_number">1087</span>	    = std::__copy_n_a(__first, __len, __result._M_cur, false)
+<span class="line_number">1088</span>	    - __result._M_cur;
+<span class="line_number">1089</span>	  __result += __nb;
+<span class="line_number">1090</span>
+<span class="line_number">1091</span>	  if (__nb != __len)
+<span class="line_number">1092</span>	    break;
+<span class="line_number">1093</span>	}
+<span class="line_number">1094</span>
+<span class="line_number">1095</span>      return __result;
+<span class="line_number">1096</span>    }
+<span class="line_number">1097</span>
+<span class="line_number">1098</span>  template&lt;typename _CharT, typename _Size&gt;
+<span class="line_number">1099</span>    typename __gnu_cxx::__enable_if&lt;
+<span class="line_number">1100</span>      __is_char&lt;_CharT&gt;::__value,
+<span class="line_number">1101</span>      _GLIBCXX_STD_C::_Deque_iterator&lt;_CharT, _CharT&amp;, _CharT*&gt; &gt;::__type
+<span class="line_number">1102</span>    __copy_n_a(
+<span class="line_number">1103</span>      istreambuf_iterator&lt;_CharT, char_traits&lt;_CharT&gt; &gt; __it, _Size __size,
+<span class="line_number">1104</span>      _GLIBCXX_STD_C::_Deque_iterator&lt;_CharT, _CharT&amp;, _CharT*&gt; __result,
+<span class="line_number">1105</span>      bool __strict)
+<span class="line_number">1106</span>    {
+<span class="line_number">1107</span>      if (__size == 0)
+<span class="line_number">1108</span>	return __result;
+<span class="line_number">1109</span>
+<span class="line_number">1110</span>      do
+<span class="line_number">1111</span>	{
+<span class="line_number">1112</span>	  const _Size __len
+<span class="line_number">1113</span>	    = std::min&lt;_Size&gt;(__result._M_last - __result._M_cur, __size);
+<span class="line_number">1114</span>	  std::__copy_n_a(__it, __len, __result._M_cur, __strict);
+<span class="line_number">1115</span>	  __result += __len;
+<span class="line_number">1116</span>	  __size -= __len;
+<span class="line_number">1117</span>	}
+<span class="line_number">1118</span>      while (__size != 0);
+<span class="line_number">1119</span>      return __result;
+<span class="line_number">1120</span>    }
+<span class="line_number">1121</span>
+<span class="line_number">1122</span>  template&lt;bool _IsMove,
+<span class="line_number">1123</span>	   typename _Tp, typename _Ref, typename _Ptr, typename _OI&gt;
+<span class="line_number">1124</span>    _OI
+<span class="line_number">1125</span>    __copy_move_backward_dit(
+<span class="line_number">1126</span>		_GLIBCXX_STD_C::_Deque_iterator&lt;_Tp, _Ref, _Ptr&gt; __first,
+<span class="line_number">1127</span>		_GLIBCXX_STD_C::_Deque_iterator&lt;_Tp, _Ref, _Ptr&gt; __last,
+<span class="line_number">1128</span>		_OI __result)
+<span class="line_number">1129</span>    {
+<span class="line_number">1130</span>      typedef _GLIBCXX_STD_C::_Deque_iterator&lt;_Tp, _Ref, _Ptr&gt; _Iter;
+<span class="line_number">1131</span>      if (__first._M_node != __last._M_node)
+<span class="line_number">1132</span>	{
+<span class="line_number">1133</span>	  __result = std::__copy_move_backward_a1&lt;_IsMove&gt;(
+<span class="line_number">1134</span>		__last._M_first, __last._M_cur, __result);
+<span class="line_number">1135</span>
+<span class="line_number">1136</span>	  for (typename _Iter::_Map_pointer __node = __last._M_node - 1;
+<span class="line_number">1137</span>	       __node != __first._M_node; --__node)
+<span class="line_number">1138</span>	    __result = std::__copy_move_backward_a1&lt;_IsMove&gt;(
+<span class="line_number">1139</span>		*__node, *__node + _Iter::_S_buffer_size(), __result);
+<span class="line_number">1140</span>
+<span class="line_number">1141</span>	  return std::__copy_move_backward_a1&lt;_IsMove&gt;(
+<span class="line_number">1142</span>			__first._M_cur, __first._M_last, __result);
+<span class="line_number">1143</span>	}
+<span class="line_number">1144</span>
+<span class="line_number">1145</span>      return std::__copy_move_backward_a1&lt;_IsMove&gt;(
+<span class="line_number">1146</span>		__first._M_cur, __last._M_cur, __result);
+<span class="line_number">1147</span>    }
+<span class="line_number">1148</span>
+<span class="line_number">1149</span>  template&lt;bool _IsMove,
+<span class="line_number">1150</span>	   typename _Tp, typename _Ref, typename _Ptr, typename _OI&gt;
+<span class="line_number">1151</span>    _OI
+<span class="line_number">1152</span>    __copy_move_backward_a1(
+<span class="line_number">1153</span>		_GLIBCXX_STD_C::_Deque_iterator&lt;_Tp, _Ref, _Ptr&gt; __first,
+<span class="line_number">1154</span>		_GLIBCXX_STD_C::_Deque_iterator&lt;_Tp, _Ref, _Ptr&gt; __last,
+<span class="line_number">1155</span>		_OI __result)
+<span class="line_number">1156</span>    { return __copy_move_backward_dit&lt;_IsMove&gt;(__first, __last, __result); }
+<span class="line_number">1157</span>
+<span class="line_number">1158</span>  template&lt;bool _IsMove,
+<span class="line_number">1159</span>	   typename _ITp, typename _IRef, typename _IPtr, typename _OTp&gt;
+<span class="line_number">1160</span>    _GLIBCXX_STD_C::_Deque_iterator&lt;_OTp, _OTp&amp;, _OTp*&gt;
+<span class="line_number">1161</span>    __copy_move_backward_a1(
+<span class="line_number">1162</span>		_GLIBCXX_STD_C::_Deque_iterator&lt;_ITp, _IRef, _IPtr&gt; __first,
+<span class="line_number">1163</span>		_GLIBCXX_STD_C::_Deque_iterator&lt;_ITp, _IRef, _IPtr&gt; __last,
+<span class="line_number">1164</span>		_GLIBCXX_STD_C::_Deque_iterator&lt;_OTp, _OTp&amp;, _OTp*&gt; __result)
+<span class="line_number">1165</span>    { return __copy_move_backward_dit&lt;_IsMove&gt;(__first, __last, __result); }
+<span class="line_number">1166</span>
+<span class="line_number">1167</span>  template&lt;bool _IsMove, typename _II, typename _Tp&gt;
+<span class="line_number">1168</span>    typename __gnu_cxx::__enable_if&lt;
+<span class="line_number">1169</span>      __is_random_access_iter&lt;_II&gt;::__value,
+<span class="line_number">1170</span>      _GLIBCXX_STD_C::_Deque_iterator&lt;_Tp, _Tp&amp;, _Tp*&gt; &gt;::__type
+<span class="line_number">1171</span>    __copy_move_backward_a1(_II __first, _II __last,
+<span class="line_number">1172</span>		_GLIBCXX_STD_C::_Deque_iterator&lt;_Tp, _Tp&amp;, _Tp*&gt; __result)
+<span class="line_number">1173</span>    {
+<span class="line_number">1174</span>      typedef _GLIBCXX_STD_C::_Deque_iterator&lt;_Tp, _Tp&amp;, _Tp*&gt; _Iter;
+<span class="line_number">1175</span>      typedef typename _Iter::difference_type difference_type;
+<span class="line_number">1176</span>
+<span class="line_number">1177</span>      difference_type __len = __last - __first;
+<span class="line_number">1178</span>      while (__len &gt; 0)
+<span class="line_number">1179</span>	{
+<span class="line_number">1180</span>	  difference_type __rlen = __result._M_cur - __result._M_first;
+<span class="line_number">1181</span>	  _Tp* __rend = __result._M_cur;
+<span class="line_number">1182</span>	  if (!__rlen)
+<span class="line_number">1183</span>	    {
+<span class="line_number">1184</span>	      __rlen = _Iter::_S_buffer_size();
+<span class="line_number">1185</span>	      __rend = *(__result._M_node - 1) + __rlen;
+<span class="line_number">1186</span>	    }
+<span class="line_number">1187</span>
+<span class="line_number">1188</span>	  const difference_type __clen = std::min(__len, __rlen);
+<span class="line_number">1189</span>	  std::__copy_move_backward_a1&lt;_IsMove&gt;(__last - __clen, __last, __rend);
+<span class="line_number">1190</span>
+<span class="line_number">1191</span>	  __last -= __clen;
+<span class="line_number">1192</span>	  __result -= __clen;
+<span class="line_number">1193</span>	  __len -= __clen;
+<span class="line_number">1194</span>	}
+<span class="line_number">1195</span>
+<span class="line_number">1196</span>      return __result;
+<span class="line_number">1197</span>    }
+<span class="line_number">1198</span>
+<span class="line_number">1199</span>  template&lt;typename _Tp, typename _Ref, typename _Ptr, typename _II&gt;
+<span class="line_number">1200</span>    bool
+<span class="line_number">1201</span>    __equal_dit(
+<span class="line_number">1202</span>	const _GLIBCXX_STD_C::_Deque_iterator&lt;_Tp, _Ref, _Ptr&gt;&amp; __first1,
+<span class="line_number">1203</span>	const _GLIBCXX_STD_C::_Deque_iterator&lt;_Tp, _Ref, _Ptr&gt;&amp; __last1,
+<span class="line_number">1204</span>	_II __first2)
+<span class="line_number">1205</span>    {
+<span class="line_number">1206</span>      typedef _GLIBCXX_STD_C::_Deque_iterator&lt;_Tp, _Ref, _Ptr&gt; _Iter;
+<span class="line_number">1207</span>      if (__first1._M_node != __last1._M_node)
+<span class="line_number">1208</span>	{
+<span class="line_number">1209</span>	  if (!std::__equal_aux1(__first1._M_cur, __first1._M_last, __first2))
+<span class="line_number">1210</span>	    return false;
+<span class="line_number">1211</span>
+<span class="line_number">1212</span>	  __first2 += __first1._M_last - __first1._M_cur;
+<span class="line_number">1213</span>	  for (typename _Iter::_Map_pointer __node = __first1._M_node + 1;
+<span class="line_number">1214</span>	       __node != __last1._M_node;
+<span class="line_number">1215</span>	       __first2 += _Iter::_S_buffer_size(), ++__node)
+<span class="line_number">1216</span>	    if (!std::__equal_aux1(*__node, *__node + _Iter::_S_buffer_size(),
+<span class="line_number">1217</span>				  __first2))
+<span class="line_number">1218</span>	      return false;
+<span class="line_number">1219</span>
+<span class="line_number">1220</span>	  return std::__equal_aux1(__last1._M_first, __last1._M_cur, __first2);
+<span class="line_number">1221</span>	}
+<span class="line_number">1222</span>
+<span class="line_number">1223</span>      return std::__equal_aux1(__first1._M_cur, __last1._M_cur, __first2);
+<span class="line_number">1224</span>    }
+<span class="line_number">1225</span>
+<span class="line_number">1226</span>  template&lt;typename _Tp, typename _Ref, typename _Ptr, typename _II&gt;
+<span class="line_number">1227</span>    typename __gnu_cxx::__enable_if&lt;
+<span class="line_number">1228</span>      __is_random_access_iter&lt;_II&gt;::__value, bool&gt;::__type
+<span class="line_number">1229</span>    __equal_aux1(_GLIBCXX_STD_C::_Deque_iterator&lt;_Tp, _Ref, _Ptr&gt; __first1,
+<span class="line_number">1230</span>		 _GLIBCXX_STD_C::_Deque_iterator&lt;_Tp, _Ref, _Ptr&gt; __last1,
+<span class="line_number">1231</span>		 _II __first2)
+<span class="line_number">1232</span>    { return std::__equal_dit(__first1, __last1, __first2); }
+<span class="line_number">1233</span>
+<span class="line_number">1234</span>  template&lt;typename _Tp1, typename _Ref1, typename _Ptr1,
+<span class="line_number">1235</span>	   typename _Tp2, typename _Ref2, typename _Ptr2&gt;
+<span class="line_number">1236</span>    bool
+<span class="line_number">1237</span>    __equal_aux1(_GLIBCXX_STD_C::_Deque_iterator&lt;_Tp1, _Ref1, _Ptr1&gt; __first1,
+<span class="line_number">1238</span>		 _GLIBCXX_STD_C::_Deque_iterator&lt;_Tp1, _Ref1, _Ptr1&gt; __last1,
+<span class="line_number">1239</span>		 _GLIBCXX_STD_C::_Deque_iterator&lt;_Tp2, _Ref2, _Ptr2&gt; __first2)
+<span class="line_number">1240</span>    { return std::__equal_dit(__first1, __last1, __first2); }
+<span class="line_number">1241</span>
+<span class="line_number">1242</span>  template&lt;typename _II, typename _Tp, typename _Ref, typename _Ptr&gt;
+<span class="line_number">1243</span>    typename __gnu_cxx::__enable_if&lt;
+<span class="line_number">1244</span>      __is_random_access_iter&lt;_II&gt;::__value, bool&gt;::__type
+<span class="line_number">1245</span>    __equal_aux1(_II __first1, _II __last1,
+<span class="line_number">1246</span>		_GLIBCXX_STD_C::_Deque_iterator&lt;_Tp, _Ref, _Ptr&gt; __first2)
+<span class="line_number">1247</span>    {
+<span class="line_number">1248</span>      typedef _GLIBCXX_STD_C::_Deque_iterator&lt;_Tp, _Ref, _Ptr&gt; _Iter;
+<span class="line_number">1249</span>      typedef typename _Iter::difference_type difference_type;
+<span class="line_number">1250</span>
+<span class="line_number">1251</span>      difference_type __len = __last1 - __first1;
+<span class="line_number">1252</span>      while (__len &gt; 0)
+<span class="line_number">1253</span>	{
+<span class="line_number">1254</span>	  const difference_type __clen
+<span class="line_number">1255</span>	    = std::min(__len, __first2._M_last - __first2._M_cur);
+<span class="line_number">1256</span>	  if (!std::__equal_aux1(__first1, __first1 + __clen, __first2._M_cur))
+<span class="line_number">1257</span>	    return false;
+<span class="line_number">1258</span>
+<span class="line_number">1259</span>	  __first1 += __clen;
+<span class="line_number">1260</span>	  __len -= __clen;
+<span class="line_number">1261</span>	  __first2 += __clen;
+<span class="line_number">1262</span>	}
+<span class="line_number">1263</span>
+<span class="line_number">1264</span>      return true;
+<span class="line_number">1265</span>    }
+<span class="line_number">1266</span>
+<span class="line_number">1267</span>  template&lt;typename _Tp1, typename _Ref, typename _Ptr, typename _Tp2&gt;
+<span class="line_number">1268</span>    int
+<span class="line_number">1269</span>    __lex_cmp_dit(
+<span class="line_number">1270</span>	_GLIBCXX_STD_C::_Deque_iterator&lt;_Tp1, _Ref, _Ptr&gt; __first1,
+<span class="line_number">1271</span>	_GLIBCXX_STD_C::_Deque_iterator&lt;_Tp1, _Ref, _Ptr&gt; __last1,
+<span class="line_number">1272</span>	const _Tp2* __first2, const _Tp2* __last2)
+<span class="line_number">1273</span>    {
+<span class="line_number">1274</span>      const bool __simple =
+<span class="line_number">1275</span>	(__is_memcmp_ordered_with&lt;_Tp1, _Tp2&gt;::__value
+<span class="line_number">1276</span>	 &amp;&amp; __is_pointer&lt;_Ptr&gt;::__value
+<span class="line_number">1277</span>#if __cplusplus &gt; 201703L &amp;&amp; __cpp_lib_concepts
+<span class="line_number">1278</span>	 // For C++20 iterator_traits&lt;volatile T*&gt;::value_type is non-volatile
+<span class="line_number">1279</span>	 // so __is_byte&lt;T&gt; could be true, but we can&#39;t use memcmp with
+<span class="line_number">1280</span>	 // volatile data.
+<span class="line_number">1281</span>	 &amp;&amp; !is_volatile_v&lt;_Tp1&gt;
+<span class="line_number">1282</span>	 &amp;&amp; !is_volatile_v&lt;_Tp2&gt;
+<span class="line_number">1283</span>#endif
+<span class="line_number">1284</span>	 );
+<span class="line_number">1285</span>      typedef std::__lexicographical_compare&lt;__simple&gt; _Lc;
+<span class="line_number">1286</span>
+<span class="line_number">1287</span>      while (__first1._M_node != __last1._M_node)
+<span class="line_number">1288</span>	{
+<span class="line_number">1289</span>	  const ptrdiff_t __len1 = __first1._M_last - __first1._M_cur;
+<span class="line_number">1290</span>	  const ptrdiff_t __len2 = __last2 - __first2;
+<span class="line_number">1291</span>	  const ptrdiff_t __len = std::min(__len1, __len2);
+<span class="line_number">1292</span>	  // if __len1 &gt; __len2 this will return a positive value:
+<span class="line_number">1293</span>	  if (int __ret = _Lc::__3way(__first1._M_cur, __first1._M_last,
+<span class="line_number">1294</span>				      __first2, __first2 + __len))
+<span class="line_number">1295</span>	    return __ret;
+<span class="line_number">1296</span>
+<span class="line_number">1297</span>	  __first1 += __len;
+<span class="line_number">1298</span>	  __first2 += __len;
+<span class="line_number">1299</span>	}
+<span class="line_number">1300</span>      return _Lc::__3way(__first1._M_cur, __last1._M_cur,
+<span class="line_number">1301</span>			 __first2, __last2);
+<span class="line_number">1302</span>    }
+<span class="line_number">1303</span>
+<span class="line_number">1304</span>  template&lt;typename _Tp1, typename _Ref1, typename _Ptr1,
+<span class="line_number">1305</span>	   typename _Tp2&gt;
+<span class="line_number">1306</span>    inline bool
+<span class="line_number">1307</span>    __lexicographical_compare_aux1(
+<span class="line_number">1308</span>	_GLIBCXX_STD_C::_Deque_iterator&lt;_Tp1, _Ref1, _Ptr1&gt; __first1,
+<span class="line_number">1309</span>	_GLIBCXX_STD_C::_Deque_iterator&lt;_Tp1, _Ref1, _Ptr1&gt; __last1,
+<span class="line_number">1310</span>	_Tp2* __first2, _Tp2* __last2)
+<span class="line_number">1311</span>    { return std::__lex_cmp_dit(__first1, __last1, __first2, __last2) &lt; 0; }
+<span class="line_number">1312</span>
+<span class="line_number">1313</span>  template&lt;typename _Tp1,
+<span class="line_number">1314</span>	   typename _Tp2, typename _Ref2, typename _Ptr2&gt;
+<span class="line_number">1315</span>    inline  bool
+<span class="line_number">1316</span>    __lexicographical_compare_aux1(_Tp1* __first1, _Tp1* __last1,
+<span class="line_number">1317</span>	_GLIBCXX_STD_C::_Deque_iterator&lt;_Tp2, _Ref2, _Ptr2&gt; __first2,
+<span class="line_number">1318</span>	_GLIBCXX_STD_C::_Deque_iterator&lt;_Tp2, _Ref2, _Ptr2&gt; __last2)
+<span class="line_number">1319</span>    { return std::__lex_cmp_dit(__first2, __last2, __first1, __last1) &gt; 0; }
+<span class="line_number">1320</span>
+<span class="line_number">1321</span>  template&lt;typename _Tp1, typename _Ref1, typename _Ptr1,
+<span class="line_number">1322</span>	   typename _Tp2, typename _Ref2, typename _Ptr2&gt;
+<span class="line_number">1323</span>    inline bool
+<span class="line_number">1324</span>    __lexicographical_compare_aux1(
+<span class="line_number">1325</span>		_GLIBCXX_STD_C::_Deque_iterator&lt;_Tp1, _Ref1, _Ptr1&gt; __first1,
+<span class="line_number">1326</span>		_GLIBCXX_STD_C::_Deque_iterator&lt;_Tp1, _Ref1, _Ptr1&gt; __last1,
+<span class="line_number">1327</span>		_GLIBCXX_STD_C::_Deque_iterator&lt;_Tp2, _Ref2, _Ptr2&gt; __first2,
+<span class="line_number">1328</span>		_GLIBCXX_STD_C::_Deque_iterator&lt;_Tp2, _Ref2, _Ptr2&gt; __last2)
+<span class="line_number">1329</span>    {
+<span class="line_number">1330</span>      const bool __simple =
+<span class="line_number">1331</span>	(__is_memcmp_ordered_with&lt;_Tp1, _Tp2&gt;::__value
+<span class="line_number">1332</span>	 &amp;&amp; __is_pointer&lt;_Ptr1&gt;::__value
+<span class="line_number">1333</span>	 &amp;&amp; __is_pointer&lt;_Ptr2&gt;::__value
+<span class="line_number">1334</span>#if __cplusplus &gt; 201703L &amp;&amp; __cpp_lib_concepts
+<span class="line_number">1335</span>	 // For C++20 iterator_traits&lt;volatile T*&gt;::value_type is non-volatile
+<span class="line_number">1336</span>	 // so __is_byte&lt;T&gt; could be true, but we can&#39;t use memcmp with
+<span class="line_number">1337</span>	 // volatile data.
+<span class="line_number">1338</span>	 &amp;&amp; !is_volatile_v&lt;_Tp1&gt;
+<span class="line_number">1339</span>	 &amp;&amp; !is_volatile_v&lt;_Tp2&gt;
+<span class="line_number">1340</span>#endif
+<span class="line_number">1341</span>	 );
+<span class="line_number">1342</span>      typedef std::__lexicographical_compare&lt;__simple&gt; _Lc;
+<span class="line_number">1343</span>
+<span class="line_number">1344</span>      while (__first1 != __last1)
+<span class="line_number">1345</span>	{
+<span class="line_number">1346</span>	  const ptrdiff_t __len2 = __first2._M_node == __last2._M_node
+<span class="line_number">1347</span>	    ? __last2._M_cur - __first2._M_cur
+<span class="line_number">1348</span>	    : __first2._M_last - __first2._M_cur;
+<span class="line_number">1349</span>	  if (__len2 == 0)
+<span class="line_number">1350</span>	    return false;
+<span class="line_number">1351</span>	  const ptrdiff_t __len1 = __first1._M_node == __last1._M_node
+<span class="line_number">1352</span>	    ? __last1._M_cur - __first1._M_cur
+<span class="line_number">1353</span>	    : __first1._M_last - __first1._M_cur;
+<span class="line_number">1354</span>	  const ptrdiff_t __len = std::min(__len1, __len2);
+<span class="line_number">1355</span>	  if (int __ret = _Lc::__3way(__first1._M_cur, __first1._M_cur + __len,
+<span class="line_number">1356</span>				      __first2._M_cur, __first2._M_cur + __len))
+<span class="line_number">1357</span>	    return __ret &lt; 0;
+<span class="line_number">1358</span>
+<span class="line_number">1359</span>	  __first1 += __len;
+<span class="line_number">1360</span>	  __first2 += __len;
+<span class="line_number">1361</span>	}
+<span class="line_number">1362</span>
+<span class="line_number">1363</span>      return __last2 != __first2;
+<span class="line_number">1364</span>    }
+<span class="line_number">1365</span>
+<span class="line_number">1366</span>_GLIBCXX_END_NAMESPACE_VERSION
+<span class="line_number">1367</span>} // namespace std
+<span class="line_number">1368</span>
+<span class="line_number">1369</span>#endif
+</code>
+            </pre>
+        </div>
+    </div>
+</body>
+
+</html>
