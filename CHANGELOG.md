@@ -3,6 +3,7 @@
 ### Bug fixes
 
 * **A single point cloud is now subscriptable** — a 0-d `PointCloudTensor` (one cloud, e.g. `sb.PointCloudTensor(arr)` from an `(n_points, dim)` array) can be indexed as its underlying array, so the natural plotting idiom `pc[:, 0]` / `pc[:, 1]` works directly instead of raising `IndexError`. Indexing tensors of rank ≥ 1 still selects clouds as before. ([#133](https://github.com/kthtda/stablebear/issues/133))
+* **Self-aliasing slice assignment no longer corrupts data** — assigning an overlapping view of a tensor into itself (`a[:] = a[::-1]`, `a[1:] = a[:-1]`) silently produced wrong results, because the element-wise copy read positions it had already overwritten. The right-hand side is now materialized first when it overlaps the destination (matching NumPy), so `a[:] = a[::-1]` reverses correctly; non-overlapping assignments are unaffected. ([#6](https://github.com/kthtda/stablebear/issues/6))
 
 ## 0.4.3
 
