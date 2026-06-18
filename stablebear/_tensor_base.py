@@ -540,7 +540,7 @@ class Tensor(ABC):
     def _basic_setitem(self, entries, val):
         """Assign using only ints and slices (negatives resolved, bounds checked)."""
         import numpy as np
-        from .base_tensor import NumericTensor
+        from .base_tensor import NumericTensor, PointCloudTensor
 
         if (len(entries) == self.ndim
                 and all(isinstance(s, int) for s in entries)):
@@ -560,6 +560,13 @@ class Tensor(ABC):
         elif isinstance(val, np.ndarray) and isinstance(self, NumericTensor):
             # Element-wise array RHS: wrap as a same-dtype tensor and broadcast.
             self._data[cpp_slices] = self._coerce_rhs(type(self)(val))._data
+        elif isinstance(val, np.ndarray) and isinstance(self, PointCloudTensor):
+            # Distribute the array across the selected cells: a PointCloudTensor
+            # reads its trailing axes as each cloud and the leading axes as the
+            # tensor shape, so one cloud lands per cell. Without this the scalar
+            # branch below would store the whole array as a single cloud in
+            # every selected cell.
+            self._data[cpp_slices] = type(self)(val, dtype=self.dtype)._data
         else:
             # Scalar (or single-element) RHS: broadcast-fill the selected view.
             view = self._to_py_tensor(self._data[cpp_slices])
