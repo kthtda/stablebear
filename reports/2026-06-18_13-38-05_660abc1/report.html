@@ -1,0 +1,1131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Report — 660abc1</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --sidebar-w: 288px;
+      --header-h: 52px;
+      --bg: #f8f9fb;
+      --surface: #ffffff;
+      --surface2: #f1f4f9;
+      --border: #e2e7ef;
+      --border-bright: #c8d1de;
+      --accent: #2563eb;
+      --accent-light: #eff4ff;
+      --accent-mid: #bfcffe;
+      --accent-text: #2563eb;
+      --text: #111827;
+      --muted: #6b7280;
+      --subtle: #9ca3af;
+      --ok: #16a34a;
+      --ok-bg: #dcfce7;
+      --error: #dc2626;
+      --error-bg: #fee2e2;
+      --warn: #d97706;
+      --warn-bg: #fef3c7;
+      --memory: #7c3aed;
+      --memory-light: #f5f3ff;
+      --memory-mid: #ddd6fe;
+      --sans: 'Inter', sans-serif;
+      --mono: 'DM Mono', monospace;
+    }
+
+    html, body { height: 100%; overflow: hidden; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      display: flex;
+      flex-direction: column;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── Top header bar ── */
+    .topbar {
+      height: var(--header-h);
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 0 20px;
+      flex-shrink: 0;
+      z-index: 100;
+    }
+
+    .topbar-back {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--muted);
+      text-decoration: none;
+      padding: 5px 10px;
+      border-radius: 6px;
+      border: 1px solid var(--border-bright);
+      transition: color 0.12s, border-color 0.12s, background 0.12s;
+      font-family: var(--mono);
+      flex-shrink: 0;
+    }
+
+    .topbar-back:hover {
+      color: var(--accent-text);
+      border-color: var(--accent);
+      background: var(--accent-light);
+    }
+
+    .topbar-back svg { flex-shrink: 0; }
+
+    .topbar-divider {
+      width: 1px;
+      height: 20px;
+      background: var(--border);
+      flex-shrink: 0;
+    }
+
+    .topbar-meta { flex: 1; min-width: 0; }
+
+    .topbar-sha {
+      font-family: var(--mono);
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .topbar-branch {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 1px;
+    }
+
+    .topbar-time {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--subtle);
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .hamburger {
+      display: none;
+      background: none;
+      border: 1px solid var(--border-bright);
+      border-radius: 6px;
+      padding: 6px 8px;
+      cursor: pointer;
+      color: var(--muted);
+      flex-shrink: 0;
+    }
+
+    .hamburger:hover { color: var(--text); border-color: var(--accent); }
+    .hamburger svg { display: block; }
+
+    /* ── Export for AI button ── */
+    .export-ai-btn {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      font-weight: 500;
+      font-family: var(--mono);
+      color: var(--memory);
+      background: var(--memory-light);
+      border: 1px solid var(--memory-mid);
+      border-radius: 6px;
+      padding: 5px 10px;
+      cursor: pointer;
+      white-space: nowrap;
+      flex-shrink: 0;
+      transition: background 0.12s, border-color 0.12s, color 0.12s;
+    }
+
+    .export-ai-btn:hover {
+      background: var(--memory-mid);
+      border-color: var(--memory);
+    }
+
+    /* ── Body: sidebar + content ── */
+    .body-wrap {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* ── Sidebar ── */
+    .sidebar {
+      width: var(--sidebar-w);
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      flex-shrink: 0;
+      z-index: 50;
+    }
+
+    .sidebar-section { border-bottom: 1px solid var(--border); }
+
+    .sidebar-section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 16px;
+      cursor: pointer;
+      user-select: none;
+      gap: 8px;
+    }
+
+    .sidebar-section-header:hover { background: var(--surface2); }
+
+    .sidebar-section-title {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+      flex: 1;
+    }
+
+    .sidebar-section-badge {
+      font-size: 10px;
+      font-weight: 600;
+      font-family: var(--mono);
+      padding: 1px 6px;
+      border-radius: 4px;
+    }
+
+    .badge-ok   { color: var(--ok);    background: var(--ok-bg); }
+    .badge-err  { color: var(--error);  background: var(--error-bg); }
+    .badge-warn { color: var(--warn);   background: var(--warn-bg); }
+    .badge-none { color: var(--subtle); background: var(--surface2); }
+
+    .sidebar-chevron {
+      font-size: 9px;
+      color: var(--subtle);
+      transition: transform 0.15s;
+    }
+
+    .sidebar-section.open .sidebar-chevron { transform: rotate(90deg); }
+
+    .sidebar-section-body { display: none; padding: 4px 0 8px; }
+    .sidebar-section.open .sidebar-section-body { display: block; }
+
+    /* ── Nav row: item + download button side-by-side ── */
+    .sidebar-nav-row {
+      display: flex;
+      align-items: stretch;
+    }
+
+    .sidebar-nav-item {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      padding: 7px 8px 7px 24px;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--muted);
+      cursor: pointer;
+      text-decoration: none;
+      font-family: var(--mono);
+      border-left: 2px solid transparent;
+      transition: color 0.1s, background 0.1s, border-color 0.1s;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      min-width: 0;
+    }
+
+    .sidebar-nav-item:hover { color: var(--text); background: var(--surface2); }
+
+    .sidebar-nav-item.active {
+      color: var(--accent);
+      background: var(--accent-light);
+      border-left-color: var(--accent);
+    }
+
+    .sidebar-nav-item .nav-icon { font-size: 13px; flex-shrink: 0; }
+
+    /* Download button */
+    .sidebar-dl-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 30px;
+      flex-shrink: 0;
+      font-size: 13px;
+      color: var(--subtle);
+      text-decoration: none;
+      border-left: 1px solid var(--border);
+      transition: color 0.1s, background 0.1s;
+    }
+
+    .sidebar-dl-btn:hover {
+      color: var(--accent);
+      background: var(--accent-light);
+    }
+
+    /* Standalone nav items (coverage section — no download pairing) */
+    .sidebar-nav-item.standalone {
+      padding-right: 16px;
+      border-left-width: 2px;
+    }
+
+    .sidebar-subsection-label {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--subtle);
+      padding: 8px 16px 4px 16px;
+      font-family: var(--mono);
+    }
+
+    /* ── Content area ── */
+    .content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      background: #fff;
+    }
+
+    .content-placeholder {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      background: var(--bg);
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .content-placeholder svg { opacity: 0.25; }
+
+    #report-frame {
+      flex: 1;
+      width: 100%;
+      border: none;
+      display: none;
+    }
+
+    /* ── XML viewer ── */
+    #xml-viewer {
+      display: none;
+      flex: 1;
+      overflow: auto;
+      background: var(--bg);
+      padding: 20px 24px;
+    }
+
+    .xml-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+
+    .xml-toolbar-label {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--muted);
+      flex: 1;
+    }
+
+    .xml-btn {
+      font-family: var(--mono);
+      font-size: 11px;
+      font-weight: 500;
+      padding: 4px 10px;
+      border-radius: 5px;
+      border: 1px solid var(--border-bright);
+      background: var(--surface);
+      color: var(--muted);
+      cursor: pointer;
+      text-decoration: none;
+      transition: color 0.1s, border-color 0.1s, background 0.1s;
+    }
+
+    .xml-btn:hover {
+      color: var(--accent);
+      border-color: var(--accent);
+      background: var(--accent-light);
+    }
+
+    .xml-progress {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--subtle);
+    }
+
+    #xml-pre {
+      font-family: var(--mono);
+      font-size: 11px;
+      line-height: 1.6;
+      color: var(--text);
+      white-space: pre-wrap;
+      word-break: break-all;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 16px;
+    }
+
+    .xml-load-more {
+      display: block;
+      margin-top: 12px;
+      text-align: center;
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--accent);
+      cursor: pointer;
+      padding: 8px;
+      border: 1px dashed var(--accent-mid);
+      border-radius: 6px;
+      background: var(--accent-light);
+      transition: background 0.1s;
+    }
+
+    .xml-load-more:hover { background: #e0e9fd; }
+
+    /* ── Export for AI modal ── */
+    .ai-modal-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.45);
+      z-index: 200;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .ai-modal-backdrop.open { display: flex; }
+
+    .ai-modal {
+      background: var(--surface);
+      border: 1px solid var(--border-bright);
+      border-radius: 10px;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.18);
+      width: min(760px, 95vw);
+      max-height: 85vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .ai-modal-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .ai-modal-title {
+      flex: 1;
+      font-size: 13px;
+      font-weight: 600;
+      font-family: var(--mono);
+      color: var(--text);
+    }
+
+    .ai-modal-status {
+      font-size: 11px;
+      font-family: var(--mono);
+      color: var(--subtle);
+    }
+
+    .ai-modal-copy-btn {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      font-weight: 500;
+      font-family: var(--mono);
+      padding: 5px 12px;
+      border-radius: 6px;
+      border: 1px solid var(--border-bright);
+      background: var(--surface);
+      color: var(--muted);
+      cursor: pointer;
+      transition: color 0.1s, border-color 0.1s, background 0.1s;
+    }
+
+    .ai-modal-copy-btn:hover {
+      color: var(--accent);
+      border-color: var(--accent);
+      background: var(--accent-light);
+    }
+
+    .ai-modal-copy-btn.copied {
+      color: var(--ok);
+      border-color: var(--ok);
+      background: var(--ok-bg);
+    }
+
+    .ai-modal-close {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      border: 1px solid var(--border-bright);
+      background: none;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 14px;
+      transition: color 0.1s, background 0.1s;
+    }
+
+    .ai-modal-close:hover { color: var(--text); background: var(--surface2); }
+
+    .ai-modal-body {
+      flex: 1;
+      overflow: auto;
+      padding: 16px 18px;
+    }
+
+    #ai-export-pre {
+      font-family: var(--mono);
+      font-size: 11px;
+      line-height: 1.65;
+      color: var(--text);
+      white-space: pre-wrap;
+      word-break: break-all;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 14px 16px;
+      min-height: 120px;
+    }
+
+    /* ── Mobile overlay ── */
+    .sidebar-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.3);
+      z-index: 40;
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 700px) {
+      .hamburger { display: flex; align-items: center; }
+      .topbar-time { display: none; }
+      .export-ai-btn span { display: none; } /* icon only on mobile */
+
+      .sidebar {
+        position: fixed;
+        top: var(--header-h);
+        left: 0;
+        bottom: 0;
+        transform: translateX(-100%);
+        transition: transform 0.22s ease;
+        z-index: 50;
+        box-shadow: 4px 0 24px rgba(0,0,0,0.15);
+      }
+
+      .sidebar.open { transform: translateX(0); }
+      .sidebar-overlay.open { display: block; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Top bar ── -->
+<div class="topbar">
+  <button class="hamburger" id="hamburger-btn" aria-label="Toggle navigation">
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+      <rect x="1" y="3" width="14" height="1.5" rx="0.75" fill="currentColor"/>
+      <rect x="1" y="7.25" width="14" height="1.5" rx="0.75" fill="currentColor"/>
+      <rect x="1" y="11.5" width="14" height="1.5" rx="0.75" fill="currentColor"/>
+    </svg>
+  </button>
+
+  <a class="topbar-back" href="../../index.html">
+    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+      <path d="M7.5 2L3.5 6L7.5 10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    All runs
+  </a>
+
+  <div class="topbar-divider"></div>
+
+  <div class="topbar-meta">
+    <div class="topbar-sha" data-utc="2026-06-18T13:38:05Z" data-sha="660abc1">2026-06-18 13:38:05 UTC — 660abc1</div>
+    <div class="topbar-branch">&#x2387; 123/merge</div>
+  </div>
+
+  <div class="topbar-time" id="topbar-ago"></div>
+
+  <button class="export-ai-btn" id="export-ai-btn" title="Export coverage data dump">
+    &#x2728; <span>Export for AI</span>
+  </button>
+</div>
+
+<!-- ── Body ── -->
+<div class="body-wrap">
+
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+  <!-- ── Sidebar ── -->
+  <nav class="sidebar" id="sidebar">
+
+    <!-- Coverage section -->
+    <div class="sidebar-section open">
+      <div class="sidebar-section-header">
+        <span class="sidebar-section-title">Coverage</span>
+        <span class="sidebar-chevron">&#x25b8;</span>
+      </div>
+      <div class="sidebar-section-body">
+        <div class="sidebar-nav-row">
+          <a class="sidebar-nav-item" data-src="cpp/coverage.html" href="#">
+            <span class="nav-icon">
+              <svg width="14" height="14" viewBox="0 0 64 64" style="vertical-align:middle">
+                <polygon points="32,2 58,17 58,47 32,62 6,47 6,17" fill="#004482"/>
+                <polygon points="32,2 58,17 58,47 32,62 6,47 6,17" fill="none" stroke="#659ad2" stroke-width="4"/>
+                <text x="32" y="38" text-anchor="middle" font-family="Arial,sans-serif" font-weight="bold" font-size="22" fill="white">C++</text>
+              </svg>
+            </span> C++ <span class="sidebar-section-badge badge-ok">88.4%</span>
+          </a>
+          <a class="sidebar-dl-btn" href="cpp/coverage.html" download title="Download">&#x2913;</a>
+        </div>
+        <div class="sidebar-nav-row">
+          <a class="sidebar-nav-item" data-src="cpp/detailed/index.html" href="#">
+            <span class="nav-icon">
+              <svg width="14" height="14" viewBox="0 0 64 64" style="vertical-align:middle">
+                <polygon points="32,2 58,17 58,47 32,62 6,47 6,17" fill="#004482"/>
+                <polygon points="32,2 58,17 58,47 32,62 6,47 6,17" fill="none" stroke="#659ad2" stroke-width="4"/>
+                <text x="32" y="38" text-anchor="middle" font-family="Arial,sans-serif" font-weight="bold" font-size="22" fill="white">C++</text>
+              </svg>
+            </span> C++ detailed
+          </a>
+          <a class="sidebar-dl-btn" href="cpp/detailed/index.html" download title="Download">&#x2913;</a>
+        </div>
+        <div class="sidebar-nav-row">
+          <a class="sidebar-nav-item" data-src="python/index.html" href="#">
+            <span class="nav-icon">&#x1f40d;</span> Python <span class="sidebar-section-badge badge-ok">87%</span>
+          </a>
+          <a class="sidebar-dl-btn" href="python/index.html" download title="Download">&#x2913;</a>
+        </div>
+        
+      </div>
+    </div>
+
+    
+    <!-- Valgrind section -->
+    <div class="sidebar-section open">
+      <div class="sidebar-section-header">
+        <span class="sidebar-section-title">Valgrind (memcheck)</span>
+        <span class="sidebar-section-badge badge-err">1 err</span>
+        <span class="sidebar-chevron">&#x25b8;</span>
+      </div>
+      <div class="sidebar-section-body">
+        <div class="sidebar-subsection-label">pytest</div>
+        
+        <div class="sidebar-nav-row">
+          <a class="sidebar-nav-item" data-src="valgrind/vg_pytest/index.html" href="#">
+            <span class="nav-icon">&#x1f4ca;</span> HTML report <span class="sidebar-section-badge badge-err">1 err</span>
+          </a>
+          <a class="sidebar-dl-btn" href="valgrind/vg_pytest/index.html" download title="Download">&#x2913;</a>
+        </div>
+        <div class="sidebar-nav-row">
+          <a class="sidebar-nav-item" data-src="valgrind/vg_pytest/summary.txt" href="#">
+            <span class="nav-icon">&#x1f4cb;</span> summary.txt
+          </a>
+          <a class="sidebar-dl-btn" href="valgrind/vg_pytest/summary.txt" download title="Download">&#x2913;</a>
+        </div>
+        <div class="sidebar-nav-row">
+          <a class="sidebar-nav-item" data-src="valgrind/vg_pytest/raw.log" data-mode="text" href="#">
+            <span class="nav-icon">&#x1f4dd;</span> raw.log
+          </a>
+          <a class="sidebar-dl-btn" href="valgrind/vg_pytest/raw.log" download title="Download">&#x2913;</a>
+        </div>
+        <div class="sidebar-nav-row">
+          <a class="sidebar-nav-item" data-src="valgrind/vg_pytest/raw.xml" data-mode="xml" href="#">
+            <span class="nav-icon">&#x1f5c2;</span> raw.xml
+          </a>
+          <a class="sidebar-dl-btn" href="valgrind/vg_pytest/raw.xml" download title="Download">&#x2913;</a>
+        </div>
+        <div class="sidebar-subsection-label">gtest</div>
+        
+        <div class="sidebar-nav-row">
+          <a class="sidebar-nav-item" data-src="valgrind/vg_gtest/index.html" href="#">
+            <span class="nav-icon">&#x1f4ca;</span> HTML report <span class="sidebar-section-badge badge-ok">0 errs</span>
+          </a>
+          <a class="sidebar-dl-btn" href="valgrind/vg_gtest/index.html" download title="Download">&#x2913;</a>
+        </div>
+        <div class="sidebar-nav-row">
+          <a class="sidebar-nav-item" data-src="valgrind/vg_gtest/summary.txt" href="#">
+            <span class="nav-icon">&#x1f4cb;</span> summary.txt
+          </a>
+          <a class="sidebar-dl-btn" href="valgrind/vg_gtest/summary.txt" download title="Download">&#x2913;</a>
+        </div>
+        <div class="sidebar-nav-row">
+          <a class="sidebar-nav-item" data-src="valgrind/vg_gtest/raw.log" data-mode="text" href="#">
+            <span class="nav-icon">&#x1f4dd;</span> raw.log
+          </a>
+          <a class="sidebar-dl-btn" href="valgrind/vg_gtest/raw.log" download title="Download">&#x2913;</a>
+        </div>
+        <div class="sidebar-nav-row">
+          <a class="sidebar-nav-item" data-src="valgrind/vg_gtest/raw.xml" data-mode="xml" href="#">
+            <span class="nav-icon">&#x1f5c2;</span> raw.xml
+          </a>
+          <a class="sidebar-dl-btn" href="valgrind/vg_gtest/raw.xml" download title="Download">&#x2913;</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Helgrind section -->
+    <div class="sidebar-section open">
+      <div class="sidebar-section-header">
+        <span class="sidebar-section-title">Helgrind</span>
+        <span class="sidebar-section-badge badge-err">253 errs</span>
+        <span class="sidebar-chevron">&#x25b8;</span>
+      </div>
+      <div class="sidebar-section-body">
+        <div class="sidebar-subsection-label">pytest</div>
+        
+        <div class="sidebar-nav-row">
+          <a class="sidebar-nav-item" data-src="helgrind/hg_pytest/index.html" href="#">
+            <span class="nav-icon">&#x1f4ca;</span> HTML report <span class="sidebar-section-badge badge-err">117 errs</span>
+          </a>
+          <a class="sidebar-dl-btn" href="helgrind/hg_pytest/index.html" download title="Download">&#x2913;</a>
+        </div>
+        <div class="sidebar-nav-row">
+          <a class="sidebar-nav-item" data-src="helgrind/hg_pytest/summary.txt" href="#">
+            <span class="nav-icon">&#x1f4cb;</span> summary.txt
+          </a>
+          <a class="sidebar-dl-btn" href="helgrind/hg_pytest/summary.txt" download title="Download">&#x2913;</a>
+        </div>
+        <div class="sidebar-nav-row">
+          <a class="sidebar-nav-item" data-src="helgrind/hg_pytest/raw.log" data-mode="text" href="#">
+            <span class="nav-icon">&#x1f4dd;</span> raw.log
+          </a>
+          <a class="sidebar-dl-btn" href="helgrind/hg_pytest/raw.log" download title="Download">&#x2913;</a>
+        </div>
+        <div class="sidebar-nav-row">
+          <a class="sidebar-nav-item" data-src="helgrind/hg_pytest/raw.xml" data-mode="xml" href="#">
+            <span class="nav-icon">&#x1f5c2;</span> raw.xml
+          </a>
+          <a class="sidebar-dl-btn" href="helgrind/hg_pytest/raw.xml" download title="Download">&#x2913;</a>
+        </div>
+        <div class="sidebar-nav-row">
+          <a class="sidebar-nav-item" data-src="helgrind/hg_pytest/generated.supp" data-mode="text" href="#">
+            <span class="nav-icon">&#x1f6e1;</span> generated.supp
+          </a>
+          <a class="sidebar-dl-btn" href="helgrind/hg_pytest/generated.supp" download title="Download">&#x2913;</a>
+        </div>
+        <div class="sidebar-subsection-label">gtest</div>
+        
+        <div class="sidebar-nav-row">
+          <a class="sidebar-nav-item" data-src="helgrind/hg_gtest/index.html" href="#">
+            <span class="nav-icon">&#x1f4ca;</span> HTML report <span class="sidebar-section-badge badge-err">136 errs</span>
+          </a>
+          <a class="sidebar-dl-btn" href="helgrind/hg_gtest/index.html" download title="Download">&#x2913;</a>
+        </div>
+        <div class="sidebar-nav-row">
+          <a class="sidebar-nav-item" data-src="helgrind/hg_gtest/summary.txt" href="#">
+            <span class="nav-icon">&#x1f4cb;</span> summary.txt
+          </a>
+          <a class="sidebar-dl-btn" href="helgrind/hg_gtest/summary.txt" download title="Download">&#x2913;</a>
+        </div>
+        <div class="sidebar-nav-row">
+          <a class="sidebar-nav-item" data-src="helgrind/hg_gtest/raw.log" data-mode="text" href="#">
+            <span class="nav-icon">&#x1f4dd;</span> raw.log
+          </a>
+          <a class="sidebar-dl-btn" href="helgrind/hg_gtest/raw.log" download title="Download">&#x2913;</a>
+        </div>
+        <div class="sidebar-nav-row">
+          <a class="sidebar-nav-item" data-src="helgrind/hg_gtest/raw.xml" data-mode="xml" href="#">
+            <span class="nav-icon">&#x1f5c2;</span> raw.xml
+          </a>
+          <a class="sidebar-dl-btn" href="helgrind/hg_gtest/raw.xml" download title="Download">&#x2913;</a>
+        </div>
+        <div class="sidebar-nav-row">
+          <a class="sidebar-nav-item" data-src="helgrind/hg_gtest/generated.supp" data-mode="text" href="#">
+            <span class="nav-icon">&#x1f6e1;</span> generated.supp
+          </a>
+          <a class="sidebar-dl-btn" href="helgrind/hg_gtest/generated.supp" download title="Download">&#x2913;</a>
+        </div>
+      </div>
+    </div>
+
+  </nav>
+
+  <!-- ── Content ── -->
+  <div class="content">
+    <div class="content-placeholder" id="placeholder">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
+        <path d="M9 12h6M9 16h6M9 8h2M5 3h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2z"
+          stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+      <span>Select a report from the sidebar</span>
+    </div>
+    <iframe id="report-frame" title="Report viewer" sandbox="allow-scripts allow-same-origin"></iframe>
+    <div id="xml-viewer">
+      <div class="xml-toolbar">
+        <span class="xml-toolbar-label" id="xml-label"></span>
+        <span class="xml-progress" id="xml-progress"></span>
+        <a class="xml-btn" id="xml-dl-btn" download>&#x2913; Download</a>
+      </div>
+      <pre id="xml-pre"></pre>
+      <button class="xml-load-more" id="xml-load-more" style="display:none">Load more…</button>
+    </div>
+  </div>
+
+</div>
+
+<!-- ── Export for AI modal ── -->
+<div class="ai-modal-backdrop" id="ai-modal-backdrop">
+  <div class="ai-modal">
+    <div class="ai-modal-header">
+      <span class="ai-modal-title">&#x2728; Coverage dump export</span>
+      <span class="ai-modal-status" id="ai-modal-status">Loading…</span>
+      <button class="ai-modal-copy-btn" id="ai-copy-btn">&#x2398; Copy all</button>
+      <button class="ai-modal-close" id="ai-modal-close">&#x2715;</button>
+    </div>
+    <div class="ai-modal-body">
+      <pre id="ai-export-pre">Loading coverage data…</pre>
+    </div>
+  </div>
+</div>
+
+<script>
+  (function () {
+    var CHUNK = 50000; // characters per page
+
+    function timeAgo(date) {
+      var s = Math.floor((Date.now() - date) / 1000);
+      if (s < 60) return 'just now';
+      var m = Math.floor(s / 60);
+      if (m < 60) return m + ' minute' + (m === 1 ? '' : 's') + ' ago';
+      var h = Math.floor(m / 60);
+      if (h < 24) return h + ' hour' + (h === 1 ? '' : 's') + ' ago';
+      var d = Math.floor(h / 24);
+      return d + ' day' + (d === 1 ? '' : 's') + ' ago';
+    }
+
+    var shaEl = document.querySelector('.topbar-sha[data-utc]');
+    if (shaEl) {
+      var iso = shaEl.getAttribute('data-utc');
+      var sha = shaEl.getAttribute('data-sha');
+      if (iso) {
+        var d = new Date(iso);
+        var local = d.toLocaleString(undefined, {
+          year: 'numeric', month: '2-digit', day: '2-digit',
+          hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+        });
+        shaEl.textContent = local + (sha ? ' \u2014 ' + sha : '');
+        var agoEl = document.getElementById('topbar-ago');
+        if (agoEl) agoEl.textContent = timeAgo(d.getTime());
+      }
+    }
+
+    // ── Content area elements ──
+    var frame       = document.getElementById('report-frame');
+    var placeholder = document.getElementById('placeholder');
+    var xmlViewer   = document.getElementById('xml-viewer');
+    var xmlPre      = document.getElementById('xml-pre');
+    var xmlLabel    = document.getElementById('xml-label');
+    var xmlProgress = document.getElementById('xml-progress');
+    var xmlDlBtn    = document.getElementById('xml-dl-btn');
+    var xmlLoadMore = document.getElementById('xml-load-more');
+    var activeItem  = null;
+
+    var xmlFull     = '';   // full text of the loaded XML
+    var xmlOffset   = 0;    // how many chars we've rendered so far
+
+    function showPlaceholder() {
+      placeholder.style.display = '';
+      frame.style.display = 'none';
+      xmlViewer.style.display = 'none';
+    }
+
+    function loadIframe(src) {
+      placeholder.style.display = 'none';
+      xmlViewer.style.display = 'none';
+      frame.style.display = 'block';
+      frame.src = src;
+    }
+
+    function renderXmlChunk() {
+      var chunk = xmlFull.slice(xmlOffset, xmlOffset + CHUNK);
+      xmlPre.textContent += chunk;
+      xmlOffset += chunk.length;
+      var total = xmlFull.length;
+      xmlProgress.textContent = Math.min(xmlOffset, total).toLocaleString() + ' / ' + total.toLocaleString() + ' chars';
+      if (xmlOffset >= total) {
+        xmlLoadMore.style.display = 'none';
+        xmlProgress.textContent = total.toLocaleString() + ' chars (fully loaded)';
+      } else {
+        xmlLoadMore.style.display = 'block';
+      }
+    }
+
+    function loadXml(src) {
+      placeholder.style.display = 'none';
+      frame.style.display = 'none';
+      xmlViewer.style.display = 'flex';
+      xmlViewer.style.flexDirection = 'column';
+      xmlPre.textContent = '';
+      xmlFull = '';
+      xmlOffset = 0;
+      xmlLabel.textContent = src.split('/').pop();
+      xmlProgress.textContent = 'Loading…';
+      xmlLoadMore.style.display = 'none';
+      xmlDlBtn.href = src;
+      xmlDlBtn.setAttribute('download', src.split('/').pop());
+
+      fetch(src)
+        .then(function(r) { return r.text(); })
+        .then(function(text) {
+          xmlFull = text;
+          renderXmlChunk();
+        })
+        .catch(function(err) {
+          xmlPre.textContent = 'Failed to load: ' + err;
+          xmlProgress.textContent = '';
+        });
+    }
+
+    xmlLoadMore.addEventListener('click', renderXmlChunk);
+
+    function loadReport(src, mode) {
+      if (mode === 'xml') {
+        loadXml(src);
+      } else {
+        loadIframe(src);
+      }
+    }
+
+    document.querySelectorAll('.sidebar-nav-item[data-src]').forEach(function (el) {
+      el.addEventListener('click', function (e) {
+        e.preventDefault();
+        if (activeItem) activeItem.classList.remove('active');
+        activeItem = el;
+        el.classList.add('active');
+        loadReport(el.getAttribute('data-src'), el.getAttribute('data-mode'));
+        closeSidebar();
+      });
+    });
+
+    // Load first item by default
+    var first = document.querySelector('.sidebar-nav-item[data-src]');
+    if (first) {
+      first.classList.add('active');
+      activeItem = first;
+      loadReport(first.getAttribute('data-src'), first.getAttribute('data-mode'));
+    }
+
+    // ── Collapsible sidebar sections ──
+    document.querySelectorAll('.sidebar-section-header').forEach(function (hdr) {
+      hdr.addEventListener('click', function () {
+        hdr.closest('.sidebar-section').classList.toggle('open');
+      });
+    });
+
+    // ── Hamburger / mobile sidebar ──
+    var sidebar   = document.getElementById('sidebar');
+    var overlay   = document.getElementById('sidebar-overlay');
+    var hamburger = document.getElementById('hamburger-btn');
+
+    function openSidebar()  { sidebar.classList.add('open');    overlay.classList.add('open'); }
+    function closeSidebar() { sidebar.classList.remove('open'); overlay.classList.remove('open'); }
+
+    hamburger.addEventListener('click', function () {
+      sidebar.classList.contains('open') ? closeSidebar() : openSidebar();
+    });
+
+    overlay.addEventListener('click', closeSidebar);
+
+    // ── Export for AI ──────────────────────────────────────────────────────────
+
+    var aiBackdrop = document.getElementById('ai-modal-backdrop');
+    var aiPre      = document.getElementById('ai-export-pre');
+    var aiStatus   = document.getElementById('ai-modal-status');
+    var aiCopyBtn  = document.getElementById('ai-copy-btn');
+    var aiCloseBtn = document.getElementById('ai-modal-close');
+    var exportBtn  = document.getElementById('export-ai-btn');
+
+    // Derive JSON paths from sidebar nav data-src attributes:
+    //   cpp/coverage.html  → cpp/coverage-summary.json
+    //   python/index.html  → python/coverage.json
+    function getJsonPaths() {
+      var cppSrc = '', pySrc = '';
+      document.querySelectorAll('.sidebar-nav-item[data-src]').forEach(function(el) {
+        var src = el.getAttribute('data-src') || '';
+        if (src.indexOf('cpp/coverage.html') !== -1)
+          cppSrc = src.replace('coverage.html', 'coverage-summary.json');
+        if (src.indexOf('python/index.html') !== -1)
+          pySrc = src.replace('index.html', 'coverage.json');
+      });
+      return { cpp: cppSrc, py: pySrc };
+    }
+
+    function formatPyCoverage(data) {
+      var lines = [];
+      var totals = data.totals || {};
+      lines.push('=== Python Coverage ===');
+      lines.push('Total: ' + (totals.percent_covered != null ? totals.percent_covered.toFixed(1) + '%' : 'N/A'));
+      lines.push('Covered lines: ' + (totals.covered_lines != null ? totals.covered_lines : 'N/A'));
+      lines.push('Missing lines: ' + (totals.missing_lines != null ? totals.missing_lines : 'N/A'));
+      lines.push('');
+      lines.push('Per-file breakdown:');
+      var files = data.files || {};
+      Object.keys(files).sort().forEach(function(filePath) {
+        var f = files[filePath];
+        var summary = f.summary || {};
+        var pct = summary.percent_covered != null ? summary.percent_covered.toFixed(1) + '%' : '?';
+        var displayPath = filePath.replace(/^.*stablebear\//, 'stablebear/');
+        lines.push('  ' + displayPath + ': ' + pct +
+          ' (' + (summary.covered_lines || 0) + '/' + (summary.num_statements || 0) + ' stmts)');
+        var missing = f.missing_lines || [];
+        if (missing.length > 0)
+          lines.push('    missing lines: ' + missing.join(', '));
+      });
+      return lines.join('\n');
+    }
+
+    function formatCppCoverage(data) {
+      var lines = [];
+      lines.push('=== C++ Coverage ===');
+      lines.push('Line coverage:     ' + (data.line_percent     != null ? data.line_percent.toFixed(1)     + '%' : 'N/A'));
+      lines.push('Function coverage: ' + (data.function_percent != null ? data.function_percent.toFixed(1) + '%' : 'N/A'));
+      lines.push('Branch coverage:   ' + (data.branch_percent   != null ? data.branch_percent.toFixed(1)   + '%' : 'N/A'));
+      if (data.lines)     lines.push('Lines covered:     ' + data.lines.covered     + ' / ' + data.lines.count);
+      if (data.functions) lines.push('Functions covered: ' + data.functions.covered + ' / ' + data.functions.count);
+      var files = data.files || [];
+      if (files.length > 0) {
+        lines.push('');
+        lines.push('Per-file breakdown:');
+        files.slice().sort(function(a, b) { return (a.filename || '').localeCompare(b.filename || ''); }).forEach(function(f) {
+          var pct = f.line_percent != null ? f.line_percent.toFixed(1) + '%' : '?';
+          var covered = f.line_covered != null ? f.line_covered : (f.lines ? f.lines.covered : '?');
+          var total   = f.line_total   != null ? f.line_total   : (f.lines ? f.lines.count   : '?');
+          var displayPath = (f.filename || '').replace(/^.*stablebear\//, 'stablebear/');
+          lines.push('  ' + displayPath + ': ' + pct + ' (' + covered + '/' + total + ' lines)');
+        });
+      }
+      return lines.join('\n');
+    }
+
+    function buildHeader() {
+      var label  = (document.querySelector('.topbar-sha')    || {}).textContent || '';
+      var branch = (document.querySelector('.topbar-branch') || {}).textContent || '';
+      var lines = ['# stablebear coverage report', 'Run: ' + label.trim()];
+      if (branch.trim()) lines.push('Branch: ' + branch.trim());
+      lines.push('');
+      return lines.join('\n');
+    }
+
+    function openExportModal() {
+      aiPre.textContent = 'Loading…';
+      aiStatus.textContent = 'Fetching…';
+      aiCopyBtn.textContent = '⎘ Copy all';
+      aiCopyBtn.className = 'ai-modal-copy-btn';
+      aiBackdrop.classList.add('open');
+
+      var paths = getJsonPaths();
+      var results = { cpp: null, py: null, cppErr: null, pyErr: null };
+      var pending = 0;
+
+      function tryFinish() {
+        if (pending > 0) return;
+        var out = buildHeader();
+        if (results.py !== null)  out += formatPyCoverage(results.py)  + '\n\n';
+        else if (results.pyErr)   out += '=== Python Coverage ===\nFailed to load: ' + results.pyErr + '\n\n';
+        if (results.cpp !== null) out += formatCppCoverage(results.cpp) + '\n';
+        else if (results.cppErr)  out += '=== C++ Coverage ===\nFailed to load: '  + results.cppErr + '\n';
+        aiPre.textContent = out;
+        aiStatus.textContent = out.length.toLocaleString() + ' chars';
+      }
+
+      if (paths.py) {
+        pending++;
+        fetch(paths.py)
+          .then(function(r) { return r.json(); })
+          .then(function(d) { results.py  = d; })
+          .catch(function(e) { results.pyErr  = e.message; })
+          .finally(function() { pending--; tryFinish(); });
+      }
+      if (paths.cpp) {
+        pending++;
+        fetch(paths.cpp)
+          .then(function(r) { return r.json(); })
+          .then(function(d) { results.cpp = d; })
+          .catch(function(e) { results.cppErr = e.message; })
+          .finally(function() { pending--; tryFinish(); });
+      }
+      if (!paths.py && !paths.cpp) {
+        aiPre.textContent = buildHeader() + 'No coverage JSON files found.';
+        aiStatus.textContent = 'Nothing to load';
+      }
+    }
+
+    exportBtn.addEventListener('click', openExportModal);
+
+    aiCloseBtn.addEventListener('click', function() {
+      aiBackdrop.classList.remove('open');
+    });
+
+    aiBackdrop.addEventListener('click', function(e) {
+      if (e.target === aiBackdrop) aiBackdrop.classList.remove('open');
+    });
+
+    aiCopyBtn.addEventListener('click', function() {
+      var text = aiPre.textContent;
+      if (!text) return;
+      navigator.clipboard.writeText(text).then(function() {
+        aiCopyBtn.textContent = '✓ Copied!';
+        aiCopyBtn.className = 'ai-modal-copy-btn copied';
+        setTimeout(function() {
+          aiCopyBtn.textContent = '⎘ Copy all';
+          aiCopyBtn.className = 'ai-modal-copy-btn';
+        }, 2000);
+      }).catch(function() {
+        // Fallback for browsers without clipboard API
+        var ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.cssText = 'position:fixed;opacity:0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        aiCopyBtn.textContent = '✓ Copied!';
+        aiCopyBtn.className = 'ai-modal-copy-btn copied';
+        setTimeout(function() {
+          aiCopyBtn.textContent = '⎘ Copy all';
+          aiCopyBtn.className = 'ai-modal-copy-btn';
+        }, 2000);
+      });
+    });
+
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') aiBackdrop.classList.remove('open');
+    });
+
+  })();
+</script>
+</body>
+</html>
