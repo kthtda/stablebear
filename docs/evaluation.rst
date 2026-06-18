@@ -181,9 +181,10 @@ When the result would be a single element (a tensor of shape ``(1,)``), stablebe
 returns a scalar (a ``Pcf`` or a ``float``) directly rather than a 1-element
 tensor.
 
-``dim`` must be in range for the input tensor: for a ``k``-dimensional tensor the
-valid values are ``0`` through ``k - 1``. An out-of-range ``dim`` raises an
-``IndexError``.
+``dim`` follows NumPy axis conventions: it may be negative to count from the
+last axis (``dim=-1`` is the last axis, ``dim=-2`` the second-to-last). For a
+``k``-dimensional tensor the valid values are ``-k`` through ``k - 1``; an
+out-of-range ``dim`` raises ``IndexError``.
 
 mean
 ----
