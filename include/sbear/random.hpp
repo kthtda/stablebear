@@ -6,6 +6,7 @@
 #include "walk.hpp"
 
 #include <algorithm>
+#include <stdexcept>
 #include <vector>
 #include <random>
 
@@ -18,6 +19,14 @@ namespace sb
   {
     using PcfT = Pcf<Tt, Tv>;
     using PointT = typename PcfT::point_type;
+
+    // Each PCF needs at least one breakpoint: the body unconditionally sets
+    // randomTs.front() and pts.back(), which are undefined behavior (a crash)
+    // on the empty vectors produced when nPoints == 0.
+    if (nPoints == 0)
+    {
+      throw std::invalid_argument("n_points must be >= 1");
+    }
 
     sb::walk(out, gen, [nPoints, noise, &func, &out](const std::vector<size_t>& idx, auto& engine) {
 
