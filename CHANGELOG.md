@@ -1,5 +1,9 @@
 ## 0.4.4
 
+### Breaking changes
+
+* **`Pcf` no longer sorts breakpoints; unsorted, negative, and offset times are rejected** — `Pcf` construction used to silently sort the supplied `(time, value)` rows and checked the `t=0` requirement on the unsorted input row 0, so out-of-order breakpoints were accepted and a negative time on a later row could be reordered to the front into a malformed PCF that then evaluated at negative times. Breakpoints must now be supplied in non-decreasing time order (out-of-order input raises `ValueError` instead of being silently sorted), and the first time must be 0 — so any input whose first time is not 0, in particular any negative time, raises `ValueError`. `Pcf` evaluation also rejects `t < 0` directly (it previously compared against the first breakpoint rather than 0). ([#11](https://github.com/kthtda/stablebear/issues/11))
+
 ### Bug fixes
 
 * **A single point cloud is now subscriptable** — a 0-d `PointCloudTensor` (one cloud, e.g. `sb.PointCloudTensor(arr)` from an `(n_points, dim)` array) can be indexed as its underlying array, so the natural plotting idiom `pc[:, 0]` / `pc[:, 1]` works directly instead of raising `IndexError`. Indexing tensors of rank ≥ 1 still selects clouds as before. ([#133](https://github.com/kthtda/stablebear/issues/133))
