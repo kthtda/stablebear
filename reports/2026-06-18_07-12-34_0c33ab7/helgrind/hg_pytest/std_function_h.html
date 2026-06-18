@@ -1,0 +1,1775 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>/usr/include/c++/13/bits/std_function.h</title>
+    <link href='valgrind.css' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+    <script src="https://code.jquery.com/jquery-3.4.1.js"></script>
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.0.0/styles/default.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.0.0/highlight.min.js"></script>
+    <script src="valgrind.js"></script>
+</head>
+
+<body>
+    <div class="global">
+        <div class="header">
+            <h1>/usr/include/c++/13/bits/std_function.h</h1>
+            <p><b>5</b> errors</p>
+            <button class="next_error">Goto First Error</button>
+        </div>
+        <div class="listing">
+            <pre class="code">
+<code class="c++"><span class="line_number">1</span>// Implementation of std::function -*- C++ -*-
+<span class="line_number">2</span>
+<span class="line_number">3</span>// Copyright (C) 2004-2023 Free Software Foundation, Inc.
+<span class="line_number">4</span>//
+<span class="line_number">5</span>// This file is part of the GNU ISO C++ Library.  This library is free
+<span class="line_number">6</span>// software; you can redistribute it and/or modify it under the
+<span class="line_number">7</span>// terms of the GNU General Public License as published by the
+<span class="line_number">8</span>// Free Software Foundation; either version 3, or (at your option)
+<span class="line_number">9</span>// any later version.
+<span class="line_number">10</span>
+<span class="line_number">11</span>// This library is distributed in the hope that it will be useful,
+<span class="line_number">12</span>// but WITHOUT ANY WARRANTY; without even the implied warranty of
+<span class="line_number">13</span>// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+<span class="line_number">14</span>// GNU General Public License for more details.
+<span class="line_number">15</span>
+<span class="line_number">16</span>// Under Section 7 of GPL version 3, you are granted additional
+<span class="line_number">17</span>// permissions described in the GCC Runtime Library Exception, version
+<span class="line_number">18</span>// 3.1, as published by the Free Software Foundation.
+<span class="line_number">19</span>
+<span class="line_number">20</span>// You should have received a copy of the GNU General Public License and
+<span class="line_number">21</span>// a copy of the GCC Runtime Library Exception along with this program;
+<span class="line_number">22</span>// see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
+<span class="line_number">23</span>// &lt;http://www.gnu.org/licenses/&gt;.
+<span class="line_number">24</span>
+<span class="line_number">25</span>/** @file include/bits/std_function.h
+<span class="line_number">26</span> *  This is an internal header file, included by other library headers.
+<span class="line_number">27</span> *  Do not attempt to use it directly. @headername{functional}
+<span class="line_number">28</span> */
+<span class="line_number">29</span>
+<span class="line_number">30</span>#ifndef _GLIBCXX_STD_FUNCTION_H
+<span class="line_number">31</span>#define _GLIBCXX_STD_FUNCTION_H 1
+<span class="line_number">32</span>
+<span class="line_number">33</span>#pragma GCC system_header
+<span class="line_number">34</span>
+<span class="line_number">35</span>#if __cplusplus &lt; 201103L
+<span class="line_number">36</span># include &lt;bits/c++0x_warning.h&gt;
+<span class="line_number">37</span>#else
+<span class="line_number">38</span>
+<span class="line_number">39</span>#include &lt;new&gt;                // placement new
+<span class="line_number">40</span>#include &lt;typeinfo&gt;           // typeid
+<span class="line_number">41</span>#include &lt;bits/invoke.h&gt;      // __invoke_r
+<span class="line_number">42</span>#include &lt;bits/refwrap.h&gt;     // ref wrapper, _Maybe_unary_or_binary_function
+<span class="line_number">43</span>#include &lt;bits/functexcept.h&gt; // __throw_bad_function_call
+<span class="line_number">44</span>
+<span class="line_number">45</span>namespace std _GLIBCXX_VISIBILITY(default)
+<span class="line_number">46</span>{
+<span class="line_number">47</span>_GLIBCXX_BEGIN_NAMESPACE_VERSION
+<span class="line_number">48</span>
+<span class="line_number">49</span>  /**
+<span class="line_number">50</span>   *  @brief Exception class thrown when class template function&#39;s
+<span class="line_number">51</span>   *  operator() is called with an empty target.
+<span class="line_number">52</span>   *  @ingroup exceptions
+<span class="line_number">53</span>   */
+<span class="line_number">54</span>  class bad_function_call : public std::exception
+<span class="line_number">55</span>  {
+<span class="line_number">56</span>  public:
+<span class="line_number">57</span>    virtual ~bad_function_call() noexcept;
+<span class="line_number">58</span>
+<span class="line_number">59</span>    const char* what() const noexcept;
+<span class="line_number">60</span>  };
+<span class="line_number">61</span>
+<span class="line_number">62</span>  /**
+<span class="line_number">63</span>   *  Trait identifying &#34;location-invariant&#34; types, meaning that the
+<span class="line_number">64</span>   *  address of the object (or any of its members) will not escape.
+<span class="line_number">65</span>   *  Trivially copyable types are location-invariant and users can
+<span class="line_number">66</span>   *  specialize this trait for other types.
+<span class="line_number">67</span>   */
+<span class="line_number">68</span>  template&lt;typename _Tp&gt;
+<span class="line_number">69</span>    struct __is_location_invariant
+<span class="line_number">70</span>    : is_trivially_copyable&lt;_Tp&gt;::type
+<span class="line_number">71</span>    { };
+<span class="line_number">72</span>
+<span class="line_number">73</span>  class _Undefined_class;
+<span class="line_number">74</span>
+<span class="line_number">75</span>  union _Nocopy_types
+<span class="line_number">76</span>  {
+<span class="line_number">77</span>    void*       _M_object;
+<span class="line_number">78</span>    const void* _M_const_object;
+<span class="line_number">79</span>    void (*_M_function_pointer)();
+<span class="line_number">80</span>    void (_Undefined_class::*_M_member_pointer)();
+<span class="line_number">81</span>  };
+<span class="line_number">82</span>
+<span class="line_number">83</span>  union [[gnu::may_alias]] _Any_data
+<span class="line_number">84</span>  {
+<span class="line_number">85</span>    void*       _M_access()       noexcept { return &amp;_M_pod_data[0]; }
+<span class="line_number">86</span>    const void* _M_access() const noexcept { return &amp;_M_pod_data[0]; }
+<span class="line_number">87</span>
+<span class="line_number">88</span>    template&lt;typename _Tp&gt;
+<span class="line_number">89</span>      _Tp&amp;
+<span class="line_number">90</span>      _M_access() noexcept
+<span class="line_number">91</span>      { return *static_cast&lt;_Tp*&gt;(_M_access()); }
+<span class="line_number">92</span>
+<span class="line_number">93</span>    template&lt;typename _Tp&gt;
+<span class="line_number">94</span>      const _Tp&amp;
+<span class="line_number">95</span>      _M_access() const noexcept
+<span class="line_number">96</span>      { return *static_cast&lt;const _Tp*&gt;(_M_access()); }
+<span class="line_number">97</span>
+<span class="line_number">98</span>    _Nocopy_types _M_unused;
+<span class="line_number">99</span>    char _M_pod_data[sizeof(_Nocopy_types)];
+<span class="line_number">100</span>  };
+<span class="line_number">101</span>
+<span class="line_number">102</span>  enum _Manager_operation
+<span class="line_number">103</span>  {
+<span class="line_number">104</span>    __get_type_info,
+<span class="line_number">105</span>    __get_functor_ptr,
+<span class="line_number">106</span>    __clone_functor,
+<span class="line_number">107</span>    __destroy_functor
+<span class="line_number">108</span>  };
+<span class="line_number">109</span>
+<span class="line_number">110</span>  template&lt;typename _Signature&gt;
+<span class="line_number">111</span>    class function;
+<span class="line_number">112</span>
+<span class="line_number">113</span>  /// Base class of all polymorphic function object wrappers.
+<span class="line_number">114</span>  class _Function_base
+<span class="line_number">115</span>  {
+<span class="line_number">116</span>  public:
+<span class="line_number">117</span>    static const size_t _M_max_size = sizeof(_Nocopy_types);
+<span class="line_number">118</span>    static const size_t _M_max_align = __alignof__(_Nocopy_types);
+<span class="line_number">119</span>
+<span class="line_number">120</span>    template&lt;typename _Functor&gt;
+<span class="line_number">121</span>      class _Base_manager
+<span class="line_number">122</span>      {
+<span class="line_number">123</span>      protected:
+<span class="line_number">124</span>	static const bool __stored_locally =
+<span class="line_number">125</span>	(__is_location_invariant&lt;_Functor&gt;::value
+<span class="line_number">126</span>	 &amp;&amp; sizeof(_Functor) &lt;= _M_max_size
+<span class="line_number">127</span>	 &amp;&amp; __alignof__(_Functor) &lt;= _M_max_align
+<span class="line_number">128</span>	 &amp;&amp; (_M_max_align % __alignof__(_Functor) == 0));
+<span class="line_number">129</span>
+<span class="line_number">130</span>	using _Local_storage = integral_constant&lt;bool, __stored_locally&gt;;
+<span class="line_number">131</span>
+<span class="line_number">132</span>	// Retrieve a pointer to the function object
+<span class="line_number">133</span>	static _Functor*
+<span class="line_number">134</span>	_M_get_pointer(const _Any_data&amp; __source) noexcept
+<span class="line_number">135</span>	{
+<span class="line_number">136</span>	  if _GLIBCXX17_CONSTEXPR (__stored_locally)
+<span class="line_number">137</span>	    {
+<span class="line_number">138</span>	      const _Functor&amp; __f = __source._M_access&lt;_Functor&gt;();
+<span class="line_number">139</span>	      return const_cast&lt;_Functor*&gt;(std::__addressof(__f));
+<span class="line_number">140</span>	    }
+<span class="line_number">141</span>	  else // have stored a pointer
+</code></pre>
+            <div class="issue">
+                <div>
+                    <span class="what">Possible data race during read of size 8 at 0x29EF0CA0 by thread #8</span>
+                    <div class="navigation">
+                        <button class="next_error">Next</button>
+                        <button class="prev_error">Previous</button>
+                    </div>
+                </div>
+                <div>
+                    <table class="call_stack">
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/std_function.h:290<br>
+                                    <code class="cpp">std::_Function_handler&lt;void (tf::Runtime&amp;), tf::Executor::run_until&lt;tf::Executor::run_n&lt;tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&gt;(tf::Taskflow&amp;&amp;, unsigned long, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&amp;&amp;)::{lambda()#1}, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&gt;(tf::Taskflow&amp;&amp;, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&amp;&amp;, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&amp;&amp;)::{lambda(tf::Runtime&amp;)#1}&gt;::_M_invoke(std::_Any_data const&amp;, tf::Runtime&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">287</span>      static _Res
+<span class="line_number">288</span>      _M_invoke(const _Any_data&amp; __functor, _ArgTypes&amp;&amp;... __args)
+<span class="line_number">289</span>      {
+<span class="line_number">290</span><span class="error">	return std::__invoke_r&lt;_Res&gt;(*_Base::_M_get_pointer(__functor),
+</span><span class="line_number">291</span>				     std::forward&lt;_ArgTypes&gt;(__args)...);
+<span class="line_number">292</span>      }
+<span class="line_number">293</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/std_function.h:591<br>
+                                    <code class="cpp">std::function&lt;void (tf::Runtime&amp;)&gt;::operator()(tf::Runtime&amp;) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">588</span>      {
+<span class="line_number">589</span>	if (_M_empty())
+<span class="line_number">590</span>	  __throw_bad_function_call();
+<span class="line_number">591</span><span class="error">	return _M_invoker(_M_functor, std::forward&lt;_ArgTypes&gt;(__args)...);
+</span><span class="line_number">592</span>      }
+<span class="line_number">593</span>
+<span class="line_number">594</span>#if __cpp_rtti
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/runtime.hpp:826<br>
+                                    <code class="cpp">tf::Executor::_invoke_runtime_task_impl(tf::Worker&amp;, tf::Node*, std::function&lt;void (tf::Runtime&amp;)&gt;&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">823</span>    node-&gt;_join_counter.fetch_add(1, std::memory_order_release);
+<span class="line_number">824</span>
+<span class="line_number">825</span>    _observer_prologue(worker, node);
+<span class="line_number">826</span><span class="error">    TF_EXECUTOR_EXCEPTION_HANDLER(worker, node, {
+</span><span class="line_number">827</span>      work(rt);
+<span class="line_number">828</span>    });
+<span class="line_number">829</span>    _observer_epilogue(worker, node);
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/executor.hpp:2010<br>
+                                    <code class="cpp">tf::Executor::_invoke_async_task(tf::Worker&amp;, tf::Node*)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">2007</span>    
+<span class="line_number">2008</span>    // void(Runtime&amp;)
+<span class="line_number">2009</span>    case 1:
+<span class="line_number">2010</span><span class="error">      if(_invoke_runtime_task_impl(worker, node, *std::get_if&lt;1&gt;(&amp;work))) {
+</span><span class="line_number">2011</span>        return true;
+<span class="line_number">2012</span>      }
+<span class="line_number">2013</span>    break;
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/executor.hpp:1710<br>
+                                    <code class="cpp">tf::Executor::_invoke(tf::Worker&amp;, tf::Node*)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1707</span>
+<span class="line_number">1708</span>    // async task
+<span class="line_number">1709</span>    case Node::ASYNC: {
+<span class="line_number">1710</span><span class="error">      if(_invoke_async_task(worker, node)) {
+</span><span class="line_number">1711</span>        return;
+<span class="line_number">1712</span>      }
+<span class="line_number">1713</span>      _tear_down_async(worker, node, cache);
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/executor.hpp:1424<br>
+                                    <code class="cpp">tf::Executor::_exploit_task(tf::Worker&amp;, tf::Node*&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1421</span>// Procedure: _exploit_task
+<span class="line_number">1422</span>inline void Executor::_exploit_task(Worker&amp; w, Node*&amp; t) {
+<span class="line_number">1423</span>  while(t) {
+<span class="line_number">1424</span><span class="error">    _invoke(w, t);
+</span><span class="line_number">1425</span>    t = w._wsq.pop();
+<span class="line_number">1426</span>  }
+<span class="line_number">1427</span>}
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/executor.hpp:1327<br>
+                                    <code class="cpp">tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}::operator()() const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1324</span>        while(1) {
+<span class="line_number">1325</span>
+<span class="line_number">1326</span>          // drains out the local queue first
+<span class="line_number">1327</span><span class="error">          _exploit_task(worker, t);
+</span><span class="line_number">1328</span>
+<span class="line_number">1329</span>          // steals and waits for tasks
+<span class="line_number">1330</span>          if(_wait_for_task(worker, t) == false) {
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:61<br>
+                                    <code class="cpp">void std::__invoke_impl&lt;void, tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}&gt;(std::__invoke_other, tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}&amp;&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">58</span>  template&lt;typename _Res, typename _Fn, typename... _Args&gt;
+<span class="line_number">59</span>    constexpr _Res
+<span class="line_number">60</span>    __invoke_impl(__invoke_other, _Fn&amp;&amp; __f, _Args&amp;&amp;... __args)
+<span class="line_number">61</span><span class="error">    { return std::forward&lt;_Fn&gt;(__f)(std::forward&lt;_Args&gt;(__args)...); }
+</span><span class="line_number">62</span>
+<span class="line_number">63</span>  template&lt;typename _Res, typename _MemFun, typename _Tp, typename... _Args&gt;
+<span class="line_number">64</span>    constexpr _Res
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:96<br>
+                                    <code class="cpp">std::__invoke_result&lt;tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}&gt;::type std::__invoke&lt;tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}&gt;(tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}&amp;&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">93</span>      using __result = __invoke_result&lt;_Callable, _Args...&gt;;
+<span class="line_number">94</span>      using __type = typename __result::type;
+<span class="line_number">95</span>      using __tag = typename __result::__invoke_type;
+<span class="line_number">96</span><span class="error">      return std::__invoke_impl&lt;__type&gt;(__tag{}, std::forward&lt;_Callable&gt;(__fn),
+</span><span class="line_number">97</span>					std::forward&lt;_Args&gt;(__args)...);
+<span class="line_number">98</span>    }
+<span class="line_number">99</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/std_thread.h:292<br>
+                                    <code class="cpp">void std::thread::_Invoker&lt;std::tuple&lt;tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}&gt; &gt;::_M_invoke&lt;0ul&gt;(std::_Index_tuple&lt;0ul&gt;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">289</span>	template&lt;size_t... _Ind&gt;
+<span class="line_number">290</span>	  typename __result&lt;_Tuple&gt;::type
+<span class="line_number">291</span>	  _M_invoke(_Index_tuple&lt;_Ind...&gt;)
+<span class="line_number">292</span><span class="error">	  { return std::__invoke(std::get&lt;_Ind&gt;(std::move(_M_t))...); }
+</span><span class="line_number">293</span>
+<span class="line_number">294</span>	typename __result&lt;_Tuple&gt;::type
+<span class="line_number">295</span>	operator()()
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/std_thread.h:299<br>
+                                    <code class="cpp">std::thread::_Invoker&lt;std::tuple&lt;tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}&gt; &gt;::operator()()</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">296</span>	{
+<span class="line_number">297</span>	  using _Indices
+<span class="line_number">298</span>	    = typename _Build_index_tuple&lt;tuple_size&lt;_Tuple&gt;::value&gt;::__type;
+<span class="line_number">299</span><span class="error">	  return _M_invoke(_Indices());
+</span><span class="line_number">300</span>	}
+<span class="line_number">301</span>      };
+<span class="line_number">302</span>
+</code></pre>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            <pre class="code">
+<code class="c++"><span class="line_number">142</span><span class="error">	    return __source._M_access&lt;_Functor*&gt;();</span>
+<span class="line_number">143</span>	}
+<span class="line_number">144</span>
+<span class="line_number">145</span>      private:
+<span class="line_number">146</span>	// Construct a location-invariant function object that fits within
+<span class="line_number">147</span>	// an _Any_data structure.
+<span class="line_number">148</span>	template&lt;typename _Fn&gt;
+<span class="line_number">149</span>	  static void
+<span class="line_number">150</span>	  _M_create(_Any_data&amp; __dest, _Fn&amp;&amp; __f, true_type)
+<span class="line_number">151</span>	  {
+<span class="line_number">152</span>	    ::new (__dest._M_access()) _Functor(std::forward&lt;_Fn&gt;(__f));
+<span class="line_number">153</span>	  }
+<span class="line_number">154</span>
+<span class="line_number">155</span>	// Construct a function object on the heap and store a pointer.
+<span class="line_number">156</span>	template&lt;typename _Fn&gt;
+<span class="line_number">157</span>	  static void
+<span class="line_number">158</span>	  _M_create(_Any_data&amp; __dest, _Fn&amp;&amp; __f, false_type)
+<span class="line_number">159</span>	  {
+<span class="line_number">160</span>	    __dest._M_access&lt;_Functor*&gt;()
+<span class="line_number">161</span>	      = new _Functor(std::forward&lt;_Fn&gt;(__f));
+<span class="line_number">162</span>	  }
+<span class="line_number">163</span>
+<span class="line_number">164</span>	// Destroy an object stored in the internal buffer.
+<span class="line_number">165</span>	static void
+<span class="line_number">166</span>	_M_destroy(_Any_data&amp; __victim, true_type)
+<span class="line_number">167</span>	{
+<span class="line_number">168</span>	  __victim._M_access&lt;_Functor&gt;().~_Functor();
+<span class="line_number">169</span>	}
+<span class="line_number">170</span>
+<span class="line_number">171</span>	// Destroy an object located on the heap.
+<span class="line_number">172</span>	static void
+<span class="line_number">173</span>	_M_destroy(_Any_data&amp; __victim, false_type)
+<span class="line_number">174</span>	{
+</code></pre>
+            <div class="issue">
+                <div>
+                    <span class="what">Possible data race during read of size 8 at 0x29EF0CA0 by thread #8</span>
+                    <div class="navigation">
+                        <button class="next_error">Next</button>
+                        <button class="prev_error">Previous</button>
+                    </div>
+                </div>
+                <div>
+                    <table class="call_stack">
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/std_function.h:203<br>
+                                    <code class="cpp">std::_Function_base::_Base_manager&lt;tf::Executor::run_until&lt;tf::Executor::run_n&lt;tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&gt;(tf::Taskflow&amp;&amp;, unsigned long, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&amp;&amp;)::{lambda()#1}, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&gt;(tf::Taskflow&amp;&amp;, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&amp;&amp;, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&amp;&amp;)::{lambda(tf::Runtime&amp;)#1}&gt;::_M_manager(std::_Any_data&amp;, std::_Any_data const&amp;, std::_Manager_operation)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">200</span>	      break;
+<span class="line_number">201</span>
+<span class="line_number">202</span>	    case __destroy_functor:
+<span class="line_number">203</span><span class="error">	      _M_destroy(__dest, _Local_storage());
+</span><span class="line_number">204</span>	      break;
+<span class="line_number">205</span>	    }
+<span class="line_number">206</span>	  return false;
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/std_function.h:282<br>
+                                    <code class="cpp">std::_Function_handler&lt;void (tf::Runtime&amp;), tf::Executor::run_until&lt;tf::Executor::run_n&lt;tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&gt;(tf::Taskflow&amp;&amp;, unsigned long, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&amp;&amp;)::{lambda()#1}, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&gt;(tf::Taskflow&amp;&amp;, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&amp;&amp;, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&amp;&amp;)::{lambda(tf::Runtime&amp;)#1}&gt;::_M_manager(std::_Any_data&amp;, std::_Any_data const&amp;, std::_Manager_operation)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">279</span>	    break;
+<span class="line_number">280</span>
+<span class="line_number">281</span>	  default:
+<span class="line_number">282</span><span class="error">	    _Base::_M_manager(__dest, __source, __op);
+</span><span class="line_number">283</span>	  }
+<span class="line_number">284</span>	return false;
+<span class="line_number">285</span>      }
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/std_function.h:244<br>
+                                    <code class="cpp">std::_Function_base::~_Function_base()</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">241</span>    ~_Function_base()
+<span class="line_number">242</span>    {
+<span class="line_number">243</span>      if (_M_manager)
+<span class="line_number">244</span><span class="error">	_M_manager(_M_functor, _M_functor, __destroy_functor);
+</span><span class="line_number">245</span>    }
+<span class="line_number">246</span>
+<span class="line_number">247</span>    bool _M_empty() const { return !_M_manager; }
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/std_function.h:334<br>
+                                    <code class="cpp">std::function&lt;void (tf::Runtime&amp;)&gt;::~function()</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">331</span>   *  @since C++11
+<span class="line_number">332</span>   */
+<span class="line_number">333</span>  template&lt;typename _Res, typename... _ArgTypes&gt;
+<span class="line_number">334</span><span class="error">    class function&lt;_Res(_ArgTypes...)&gt;
+</span><span class="line_number">335</span>    : public _Maybe_unary_or_binary_function&lt;_Res, _ArgTypes...&gt;,
+<span class="line_number">336</span>      private _Function_base
+<span class="line_number">337</span>    {
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/stl_construct.h:88<br>
+                                    <code class="cpp">void std::destroy_at&lt;std::function&lt;void (tf::Runtime&amp;)&gt; &gt;(std::function&lt;void (tf::Runtime&amp;)&gt;*)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">85</span>	    std::destroy_at(std::__addressof(__x));
+<span class="line_number">86</span>	}
+<span class="line_number">87</span>      else
+<span class="line_number">88</span><span class="error">	__location-&gt;~_Tp();
+</span><span class="line_number">89</span>    }
+<span class="line_number">90</span>
+<span class="line_number">91</span>#if __cplusplus &gt;= 202002L
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/stl_construct.h:149<br>
+                                    <code class="cpp">void std::_Destroy&lt;std::function&lt;void (tf::Runtime&amp;)&gt; &gt;(std::function&lt;void (tf::Runtime&amp;)&gt;*)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">146</span>    _Destroy(_Tp* __pointer)
+<span class="line_number">147</span>    {
+<span class="line_number">148</span>#if __cplusplus &gt; 201703L
+<span class="line_number">149</span><span class="error">      std::destroy_at(__pointer);
+</span><span class="line_number">150</span>#else
+<span class="line_number">151</span>      __pointer-&gt;~_Tp();
+<span class="line_number">152</span>#endif
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/variant:498<br>
+                                    <code class="cpp">auto std::__detail::__variant::_Variant_storage&lt;false, std::function&lt;void ()&gt;, std::function&lt;void (tf::Runtime&amp;)&gt;, std::function&lt;void (tf::Runtime&amp;, bool)&gt; &gt;::_M_reset()::{lambda(auto:1&amp;&amp;)#1}::operator()&lt;std::function&lt;void (tf::Runtime&amp;)&gt;&amp;&gt;(std::function&lt;void (tf::Runtime&amp;)&gt;&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">495</span>
+<span class="line_number">496</span>	std::__do_visit&lt;void&gt;([](auto&amp;&amp; __this_mem) mutable
+<span class="line_number">497</span>	  {
+<span class="line_number">498</span><span class="error">	    std::_Destroy(std::__addressof(__this_mem));
+</span><span class="line_number">499</span>	  }, __variant_cast&lt;_Types...&gt;(*this));
+<span class="line_number">500</span>
+<span class="line_number">501</span>	_M_index = static_cast&lt;__index_type&gt;(variant_npos);
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:61<br>
+                                    <code class="cpp">void std::__invoke_impl&lt;void, std::__detail::__variant::_Variant_storage&lt;false, std::function&lt;void ()&gt;, std::function&lt;void (tf::Runtime&amp;)&gt;, std::function&lt;void (tf::Runtime&amp;, bool)&gt; &gt;::_M_reset()::{lambda(auto:1&amp;&amp;)#1}, std::function&lt;void (tf::Runtime&amp;)&gt;&amp;&gt;(std::__invoke_other, std::__detail::__variant::_Variant_storage&lt;false, std::function&lt;void ()&gt;, std::function&lt;void (tf::Runtime&amp;)&gt;, std::function&lt;void (tf::Runtime&amp;, bool)&gt; &gt;::_M_reset()::{lambda(auto:1&amp;&amp;)#1}&amp;&amp;, std::function&lt;void (tf::Runtime&amp;)&gt;&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">58</span>  template&lt;typename _Res, typename _Fn, typename... _Args&gt;
+<span class="line_number">59</span>    constexpr _Res
+<span class="line_number">60</span>    __invoke_impl(__invoke_other, _Fn&amp;&amp; __f, _Args&amp;&amp;... __args)
+<span class="line_number">61</span><span class="error">    { return std::forward&lt;_Fn&gt;(__f)(std::forward&lt;_Args&gt;(__args)...); }
+</span><span class="line_number">62</span>
+<span class="line_number">63</span>  template&lt;typename _Res, typename _MemFun, typename _Tp, typename... _Args&gt;
+<span class="line_number">64</span>    constexpr _Res
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:111<br>
+                                    <code class="cpp">std::enable_if&lt;is_invocable_r_v&lt;void, std::__detail::__variant::_Variant_storage&lt;false, std::function&lt;void ()&gt;, std::function&lt;void (tf::Runtime&amp;)&gt;, std::function&lt;void (tf::Runtime&amp;, bool)&gt; &gt;::_M_reset()::{lambda(auto:1&amp;&amp;)#1}, std::function&lt;void (tf::Runtime&amp;)&gt;&amp;&gt;, void&gt;::type std::__invoke_r&lt;void, std::__detail::__variant::_Variant_storage&lt;false, std::function&lt;void ()&gt;, std::function&lt;void (tf::Runtime&amp;)&gt;, std::function&lt;void (tf::Runtime&amp;, bool)&gt; &gt;::_M_reset()::{lambda(auto:1&amp;&amp;)#1}, std::function&lt;void (tf::Runtime&amp;)&gt;&amp;&gt;(std::__detail::__variant::_Variant_storage&lt;false, std::function&lt;void ()&gt;, std::function&lt;void (tf::Runtime&amp;)&gt;, std::function&lt;void (tf::Runtime&amp;, bool)&gt; &gt;::_M_reset()::{lambda(auto:1&amp;&amp;)#1}&amp;&amp;, std::function&lt;void (tf::Runtime&amp;)&gt;&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">108</span>      using __type = typename __result::type;
+<span class="line_number">109</span>      using __tag = typename __result::__invoke_type;
+<span class="line_number">110</span>      if constexpr (is_void_v&lt;_Res&gt;)
+<span class="line_number">111</span><span class="error">	std::__invoke_impl&lt;__type&gt;(__tag{}, std::forward&lt;_Callable&gt;(__fn),
+</span><span class="line_number">112</span>					std::forward&lt;_Args&gt;(__args)...);
+<span class="line_number">113</span>      else
+<span class="line_number">114</span>	return std::__invoke_impl&lt;__type&gt;(__tag{},
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/variant:1064<br>
+                                    <code class="cpp">std::__detail::__variant::__gen_vtable_impl&lt;std::__detail::__variant::_Multi_array&lt;void (*)(std::__detail::__variant::_Variant_storage&lt;false, std::function&lt;void ()&gt;, std::function&lt;void (tf::Runtime&amp;)&gt;, std::function&lt;void (tf::Runtime&amp;, bool)&gt; &gt;::_M_reset()::{lambda(auto:1&amp;&amp;)#1}&amp;&amp;, std::variant&lt;std::function&lt;void ()&gt;, std::function&lt;void (tf::Runtime&amp;)&gt;, std::function&lt;void (tf::Runtime&amp;, bool)&gt; &gt;&amp;)&gt;, std::integer_sequence&lt;unsigned long, 1ul&gt; &gt;::__visit_invoke(std::__detail::__variant::_Variant_storage&lt;false, std::function&lt;void ()&gt;, std::function&lt;void (tf::Runtime&amp;)&gt;, std::function&lt;void (tf::Runtime&amp;, bool)&gt; &gt;::_M_reset()::{lambda(auto:1&amp;&amp;)#1}&amp;&amp;, std::variant&lt;std::function&lt;void ()&gt;, std::function&lt;void (tf::Runtime&amp;)&gt;, std::function&lt;void (tf::Runtime&amp;, bool)&gt; &gt;&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1061</span>	      __element_by_index_or_cookie&lt;__indices&gt;(
+<span class="line_number">1062</span>		std::forward&lt;_Variants&gt;(__vars))...);
+<span class="line_number">1063</span>	else // for std::visit&lt;R&gt; use INVOKE&lt;R&gt;
+<span class="line_number">1064</span><span class="error">	  return std::__invoke_r&lt;_Result_type&gt;(
+</span><span class="line_number">1065</span>	      std::forward&lt;_Visitor&gt;(__visitor),
+<span class="line_number">1066</span>	      __variant::__get&lt;__indices&gt;(std::forward&lt;_Variants&gt;(__vars))...);
+<span class="line_number">1067</span>      }
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/variant:1816<br>
+                                    <code class="cpp">decltype(auto) std::__do_visit&lt;void, std::__detail::__variant::_Variant_storage&lt;false, std::function&lt;void ()&gt;, std::function&lt;void (tf::Runtime&amp;)&gt;, std::function&lt;void (tf::Runtime&amp;, bool)&gt; &gt;::_M_reset()::{lambda(auto:1&amp;&amp;)#1}, std::variant&lt;std::function&lt;void ()&gt;, std::function&lt;void (tf::Runtime&amp;)&gt;, std::function&lt;void (tf::Runtime&amp;, bool)&gt; &gt;&amp;&gt;(std::__detail::__variant::_Variant_storage&lt;false, std::function&lt;void ()&gt;, std::function&lt;void (tf::Runtime&amp;)&gt;, std::function&lt;void (tf::Runtime&amp;, bool)&gt; &gt;::_M_reset()::{lambda(auto:1&amp;&amp;)#1}&amp;&amp;, std::variant&lt;std::function&lt;void ()&gt;, std::function&lt;void (tf::Runtime&amp;)&gt;, std::function&lt;void (tf::Runtime&amp;, bool)&gt; &gt;&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1813</span>	      switch (__v0.index())
+<span class="line_number">1814</span>		{
+<span class="line_number">1815</span>		  _GLIBCXX_VISIT_CASE(0)
+<span class="line_number">1816</span><span class="error">		  _GLIBCXX_VISIT_CASE(1)
+</span><span class="line_number">1817</span>		  _GLIBCXX_VISIT_CASE(2)
+<span class="line_number">1818</span>		  _GLIBCXX_VISIT_CASE(3)
+<span class="line_number">1819</span>		  _GLIBCXX_VISIT_CASE(4)
+</code></pre>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            <pre class="code">
+<code class="c++"><span class="line_number">175</span><span class="error">	  delete __victim._M_access&lt;_Functor*&gt;();</span>
+<span class="line_number">176</span>	}
+<span class="line_number">177</span>
+<span class="line_number">178</span>      public:
+<span class="line_number">179</span>	static bool
+<span class="line_number">180</span>	_M_manager(_Any_data&amp; __dest, const _Any_data&amp; __source,
+<span class="line_number">181</span>		   _Manager_operation __op)
+<span class="line_number">182</span>	{
+<span class="line_number">183</span>	  switch (__op)
+<span class="line_number">184</span>	    {
+<span class="line_number">185</span>	    case __get_type_info:
+<span class="line_number">186</span>#if __cpp_rtti
+<span class="line_number">187</span>	      __dest._M_access&lt;const type_info*&gt;() = &amp;typeid(_Functor);
+<span class="line_number">188</span>#else
+<span class="line_number">189</span>	      __dest._M_access&lt;const type_info*&gt;() = nullptr;
+<span class="line_number">190</span>#endif
+<span class="line_number">191</span>	      break;
+<span class="line_number">192</span>
+<span class="line_number">193</span>	    case __get_functor_ptr:
+<span class="line_number">194</span>	      __dest._M_access&lt;_Functor*&gt;() = _M_get_pointer(__source);
+<span class="line_number">195</span>	      break;
+<span class="line_number">196</span>
+<span class="line_number">197</span>	    case __clone_functor:
+<span class="line_number">198</span>	      _M_init_functor(__dest,
+<span class="line_number">199</span>		  *const_cast&lt;const _Functor*&gt;(_M_get_pointer(__source)));
+<span class="line_number">200</span>	      break;
+<span class="line_number">201</span>
+<span class="line_number">202</span>	    case __destroy_functor:
+<span class="line_number">203</span>	      _M_destroy(__dest, _Local_storage());
+<span class="line_number">204</span>	      break;
+<span class="line_number">205</span>	    }
+<span class="line_number">206</span>	  return false;
+<span class="line_number">207</span>	}
+<span class="line_number">208</span>
+<span class="line_number">209</span>	template&lt;typename _Fn&gt;
+<span class="line_number">210</span>	  static void
+<span class="line_number">211</span>	  _M_init_functor(_Any_data&amp; __functor, _Fn&amp;&amp; __f)
+<span class="line_number">212</span>	  noexcept(__and_&lt;_Local_storage,
+<span class="line_number">213</span>			  is_nothrow_constructible&lt;_Functor, _Fn&gt;&gt;::value)
+<span class="line_number">214</span>	  {
+<span class="line_number">215</span>	    _M_create(__functor, std::forward&lt;_Fn&gt;(__f), _Local_storage());
+<span class="line_number">216</span>	  }
+<span class="line_number">217</span>
+<span class="line_number">218</span>	template&lt;typename _Signature&gt;
+<span class="line_number">219</span>	  static bool
+<span class="line_number">220</span>	  _M_not_empty_function(const function&lt;_Signature&gt;&amp; __f) noexcept
+<span class="line_number">221</span>	  { return static_cast&lt;bool&gt;(__f); }
+<span class="line_number">222</span>
+<span class="line_number">223</span>	template&lt;typename _Tp&gt;
+<span class="line_number">224</span>	  static bool
+<span class="line_number">225</span>	  _M_not_empty_function(_Tp* __fp) noexcept
+<span class="line_number">226</span>	  { return __fp != nullptr; }
+<span class="line_number">227</span>
+<span class="line_number">228</span>	template&lt;typename _Class, typename _Tp&gt;
+<span class="line_number">229</span>	  static bool
+<span class="line_number">230</span>	  _M_not_empty_function(_Tp _Class::* __mp) noexcept
+<span class="line_number">231</span>	  { return __mp != nullptr; }
+<span class="line_number">232</span>
+<span class="line_number">233</span>	template&lt;typename _Tp&gt;
+<span class="line_number">234</span>	  static bool
+<span class="line_number">235</span>	  _M_not_empty_function(const _Tp&amp;) noexcept
+<span class="line_number">236</span>	  { return true; }
+<span class="line_number">237</span>      };
+<span class="line_number">238</span>
+<span class="line_number">239</span>    _Function_base() = default;
+<span class="line_number">240</span>
+<span class="line_number">241</span>    ~_Function_base()
+<span class="line_number">242</span>    {
+</code></pre>
+            <div class="issue">
+                <div>
+                    <span class="what">Possible data race during read of size 8 at 0x29EF0CB0 by thread #8</span>
+                    <div class="navigation">
+                        <button class="next_error">Next</button>
+                        <button class="prev_error">Previous</button>
+                    </div>
+                </div>
+                <div>
+                    <table class="call_stack">
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/std_function.h:334<br>
+                                    <code class="cpp">std::function&lt;void (tf::Runtime&amp;)&gt;::~function()</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">331</span>   *  @since C++11
+<span class="line_number">332</span>   */
+<span class="line_number">333</span>  template&lt;typename _Res, typename... _ArgTypes&gt;
+<span class="line_number">334</span><span class="error">    class function&lt;_Res(_ArgTypes...)&gt;
+</span><span class="line_number">335</span>    : public _Maybe_unary_or_binary_function&lt;_Res, _ArgTypes...&gt;,
+<span class="line_number">336</span>      private _Function_base
+<span class="line_number">337</span>    {
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/stl_construct.h:88<br>
+                                    <code class="cpp">void std::destroy_at&lt;std::function&lt;void (tf::Runtime&amp;)&gt; &gt;(std::function&lt;void (tf::Runtime&amp;)&gt;*)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">85</span>	    std::destroy_at(std::__addressof(__x));
+<span class="line_number">86</span>	}
+<span class="line_number">87</span>      else
+<span class="line_number">88</span><span class="error">	__location-&gt;~_Tp();
+</span><span class="line_number">89</span>    }
+<span class="line_number">90</span>
+<span class="line_number">91</span>#if __cplusplus &gt;= 202002L
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/stl_construct.h:149<br>
+                                    <code class="cpp">void std::_Destroy&lt;std::function&lt;void (tf::Runtime&amp;)&gt; &gt;(std::function&lt;void (tf::Runtime&amp;)&gt;*)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">146</span>    _Destroy(_Tp* __pointer)
+<span class="line_number">147</span>    {
+<span class="line_number">148</span>#if __cplusplus &gt; 201703L
+<span class="line_number">149</span><span class="error">      std::destroy_at(__pointer);
+</span><span class="line_number">150</span>#else
+<span class="line_number">151</span>      __pointer-&gt;~_Tp();
+<span class="line_number">152</span>#endif
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/variant:498<br>
+                                    <code class="cpp">auto std::__detail::__variant::_Variant_storage&lt;false, std::function&lt;void ()&gt;, std::function&lt;void (tf::Runtime&amp;)&gt;, std::function&lt;void (tf::Runtime&amp;, bool)&gt; &gt;::_M_reset()::{lambda(auto:1&amp;&amp;)#1}::operator()&lt;std::function&lt;void (tf::Runtime&amp;)&gt;&amp;&gt;(std::function&lt;void (tf::Runtime&amp;)&gt;&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">495</span>
+<span class="line_number">496</span>	std::__do_visit&lt;void&gt;([](auto&amp;&amp; __this_mem) mutable
+<span class="line_number">497</span>	  {
+<span class="line_number">498</span><span class="error">	    std::_Destroy(std::__addressof(__this_mem));
+</span><span class="line_number">499</span>	  }, __variant_cast&lt;_Types...&gt;(*this));
+<span class="line_number">500</span>
+<span class="line_number">501</span>	_M_index = static_cast&lt;__index_type&gt;(variant_npos);
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:61<br>
+                                    <code class="cpp">void std::__invoke_impl&lt;void, std::__detail::__variant::_Variant_storage&lt;false, std::function&lt;void ()&gt;, std::function&lt;void (tf::Runtime&amp;)&gt;, std::function&lt;void (tf::Runtime&amp;, bool)&gt; &gt;::_M_reset()::{lambda(auto:1&amp;&amp;)#1}, std::function&lt;void (tf::Runtime&amp;)&gt;&amp;&gt;(std::__invoke_other, std::__detail::__variant::_Variant_storage&lt;false, std::function&lt;void ()&gt;, std::function&lt;void (tf::Runtime&amp;)&gt;, std::function&lt;void (tf::Runtime&amp;, bool)&gt; &gt;::_M_reset()::{lambda(auto:1&amp;&amp;)#1}&amp;&amp;, std::function&lt;void (tf::Runtime&amp;)&gt;&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">58</span>  template&lt;typename _Res, typename _Fn, typename... _Args&gt;
+<span class="line_number">59</span>    constexpr _Res
+<span class="line_number">60</span>    __invoke_impl(__invoke_other, _Fn&amp;&amp; __f, _Args&amp;&amp;... __args)
+<span class="line_number">61</span><span class="error">    { return std::forward&lt;_Fn&gt;(__f)(std::forward&lt;_Args&gt;(__args)...); }
+</span><span class="line_number">62</span>
+<span class="line_number">63</span>  template&lt;typename _Res, typename _MemFun, typename _Tp, typename... _Args&gt;
+<span class="line_number">64</span>    constexpr _Res
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:111<br>
+                                    <code class="cpp">std::enable_if&lt;is_invocable_r_v&lt;void, std::__detail::__variant::_Variant_storage&lt;false, std::function&lt;void ()&gt;, std::function&lt;void (tf::Runtime&amp;)&gt;, std::function&lt;void (tf::Runtime&amp;, bool)&gt; &gt;::_M_reset()::{lambda(auto:1&amp;&amp;)#1}, std::function&lt;void (tf::Runtime&amp;)&gt;&amp;&gt;, void&gt;::type std::__invoke_r&lt;void, std::__detail::__variant::_Variant_storage&lt;false, std::function&lt;void ()&gt;, std::function&lt;void (tf::Runtime&amp;)&gt;, std::function&lt;void (tf::Runtime&amp;, bool)&gt; &gt;::_M_reset()::{lambda(auto:1&amp;&amp;)#1}, std::function&lt;void (tf::Runtime&amp;)&gt;&amp;&gt;(std::__detail::__variant::_Variant_storage&lt;false, std::function&lt;void ()&gt;, std::function&lt;void (tf::Runtime&amp;)&gt;, std::function&lt;void (tf::Runtime&amp;, bool)&gt; &gt;::_M_reset()::{lambda(auto:1&amp;&amp;)#1}&amp;&amp;, std::function&lt;void (tf::Runtime&amp;)&gt;&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">108</span>      using __type = typename __result::type;
+<span class="line_number">109</span>      using __tag = typename __result::__invoke_type;
+<span class="line_number">110</span>      if constexpr (is_void_v&lt;_Res&gt;)
+<span class="line_number">111</span><span class="error">	std::__invoke_impl&lt;__type&gt;(__tag{}, std::forward&lt;_Callable&gt;(__fn),
+</span><span class="line_number">112</span>					std::forward&lt;_Args&gt;(__args)...);
+<span class="line_number">113</span>      else
+<span class="line_number">114</span>	return std::__invoke_impl&lt;__type&gt;(__tag{},
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/variant:1064<br>
+                                    <code class="cpp">std::__detail::__variant::__gen_vtable_impl&lt;std::__detail::__variant::_Multi_array&lt;void (*)(std::__detail::__variant::_Variant_storage&lt;false, std::function&lt;void ()&gt;, std::function&lt;void (tf::Runtime&amp;)&gt;, std::function&lt;void (tf::Runtime&amp;, bool)&gt; &gt;::_M_reset()::{lambda(auto:1&amp;&amp;)#1}&amp;&amp;, std::variant&lt;std::function&lt;void ()&gt;, std::function&lt;void (tf::Runtime&amp;)&gt;, std::function&lt;void (tf::Runtime&amp;, bool)&gt; &gt;&amp;)&gt;, std::integer_sequence&lt;unsigned long, 1ul&gt; &gt;::__visit_invoke(std::__detail::__variant::_Variant_storage&lt;false, std::function&lt;void ()&gt;, std::function&lt;void (tf::Runtime&amp;)&gt;, std::function&lt;void (tf::Runtime&amp;, bool)&gt; &gt;::_M_reset()::{lambda(auto:1&amp;&amp;)#1}&amp;&amp;, std::variant&lt;std::function&lt;void ()&gt;, std::function&lt;void (tf::Runtime&amp;)&gt;, std::function&lt;void (tf::Runtime&amp;, bool)&gt; &gt;&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1061</span>	      __element_by_index_or_cookie&lt;__indices&gt;(
+<span class="line_number">1062</span>		std::forward&lt;_Variants&gt;(__vars))...);
+<span class="line_number">1063</span>	else // for std::visit&lt;R&gt; use INVOKE&lt;R&gt;
+<span class="line_number">1064</span><span class="error">	  return std::__invoke_r&lt;_Result_type&gt;(
+</span><span class="line_number">1065</span>	      std::forward&lt;_Visitor&gt;(__visitor),
+<span class="line_number">1066</span>	      __variant::__get&lt;__indices&gt;(std::forward&lt;_Variants&gt;(__vars))...);
+<span class="line_number">1067</span>      }
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/variant:1816<br>
+                                    <code class="cpp">decltype(auto) std::__do_visit&lt;void, std::__detail::__variant::_Variant_storage&lt;false, std::function&lt;void ()&gt;, std::function&lt;void (tf::Runtime&amp;)&gt;, std::function&lt;void (tf::Runtime&amp;, bool)&gt; &gt;::_M_reset()::{lambda(auto:1&amp;&amp;)#1}, std::variant&lt;std::function&lt;void ()&gt;, std::function&lt;void (tf::Runtime&amp;)&gt;, std::function&lt;void (tf::Runtime&amp;, bool)&gt; &gt;&amp;&gt;(std::__detail::__variant::_Variant_storage&lt;false, std::function&lt;void ()&gt;, std::function&lt;void (tf::Runtime&amp;)&gt;, std::function&lt;void (tf::Runtime&amp;, bool)&gt; &gt;::_M_reset()::{lambda(auto:1&amp;&amp;)#1}&amp;&amp;, std::variant&lt;std::function&lt;void ()&gt;, std::function&lt;void (tf::Runtime&amp;)&gt;, std::function&lt;void (tf::Runtime&amp;, bool)&gt; &gt;&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1813</span>	      switch (__v0.index())
+<span class="line_number">1814</span>		{
+<span class="line_number">1815</span>		  _GLIBCXX_VISIT_CASE(0)
+<span class="line_number">1816</span><span class="error">		  _GLIBCXX_VISIT_CASE(1)
+</span><span class="line_number">1817</span>		  _GLIBCXX_VISIT_CASE(2)
+<span class="line_number">1818</span>		  _GLIBCXX_VISIT_CASE(3)
+<span class="line_number">1819</span>		  _GLIBCXX_VISIT_CASE(4)
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/variant:496<br>
+                                    <code class="cpp">std::__detail::__variant::_Variant_storage&lt;false, std::function&lt;void ()&gt;, std::function&lt;void (tf::Runtime&amp;)&gt;, std::function&lt;void (tf::Runtime&amp;, bool)&gt; &gt;::_M_reset()</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">493</span>	if (!_M_valid()) [[unlikely]]
+<span class="line_number">494</span>	  return;
+<span class="line_number">495</span>
+<span class="line_number">496</span><span class="error">	std::__do_visit&lt;void&gt;([](auto&amp;&amp; __this_mem) mutable
+</span><span class="line_number">497</span>	  {
+<span class="line_number">498</span>	    std::_Destroy(std::__addressof(__this_mem));
+<span class="line_number">499</span>	  }, __variant_cast&lt;_Types...&gt;(*this));
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/variant:506<br>
+                                    <code class="cpp">std::__detail::__variant::_Variant_storage&lt;false, std::function&lt;void ()&gt;, std::function&lt;void (tf::Runtime&amp;)&gt;, std::function&lt;void (tf::Runtime&amp;, bool)&gt; &gt;::~_Variant_storage()</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">503</span>
+<span class="line_number">504</span>      _GLIBCXX20_CONSTEXPR
+<span class="line_number">505</span>      ~_Variant_storage()
+<span class="line_number">506</span><span class="error">      { _M_reset(); }
+</span><span class="line_number">507</span>
+<span class="line_number">508</span>      constexpr bool
+<span class="line_number">509</span>      _M_valid() const noexcept
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/variant:581<br>
+                                    <code class="cpp">std::__detail::__variant::_Copy_ctor_base&lt;false, std::function&lt;void ()&gt;, std::function&lt;void (tf::Runtime&amp;)&gt;, std::function&lt;void (tf::Runtime&amp;, bool)&gt; &gt;::~_Copy_ctor_base()</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">578</span>  // triviality and handling non-trivial SMF behaviors.
+<span class="line_number">579</span>
+<span class="line_number">580</span>  template&lt;bool, typename... _Types&gt;
+<span class="line_number">581</span><span class="error">    struct _Copy_ctor_base : _Variant_storage_alias&lt;_Types...&gt;
+</span><span class="line_number">582</span>    {
+<span class="line_number">583</span>      using _Base = _Variant_storage_alias&lt;_Types...&gt;;
+<span class="line_number">584</span>      using _Base::_Base;
+</code></pre>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            <pre class="code">
+<code class="c++"><span class="line_number">243</span><span class="error">      if (_M_manager)</span>
+<span class="line_number">244</span>	_M_manager(_M_functor, _M_functor, __destroy_functor);
+<span class="line_number">245</span>    }
+<span class="line_number">246</span>
+</code></pre>
+            <div class="issue">
+                <div>
+                    <span class="what">Possible data race during read of size 8 at 0x29EF0CB0 by thread #8</span>
+                    <div class="navigation">
+                        <button class="next_error">Next</button>
+                        <button class="prev_error">Previous</button>
+                    </div>
+                </div>
+                <div>
+                    <table class="call_stack">
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/std_function.h:589<br>
+                                    <code class="cpp">std::function&lt;void (tf::Runtime&amp;)&gt;::operator()(tf::Runtime&amp;) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">586</span>      _Res
+<span class="line_number">587</span>      operator()(_ArgTypes... __args) const
+<span class="line_number">588</span>      {
+<span class="line_number">589</span><span class="error">	if (_M_empty())
+</span><span class="line_number">590</span>	  __throw_bad_function_call();
+<span class="line_number">591</span>	return _M_invoker(_M_functor, std::forward&lt;_ArgTypes&gt;(__args)...);
+<span class="line_number">592</span>      }
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/runtime.hpp:826<br>
+                                    <code class="cpp">tf::Executor::_invoke_runtime_task_impl(tf::Worker&amp;, tf::Node*, std::function&lt;void (tf::Runtime&amp;)&gt;&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">823</span>    node-&gt;_join_counter.fetch_add(1, std::memory_order_release);
+<span class="line_number">824</span>
+<span class="line_number">825</span>    _observer_prologue(worker, node);
+<span class="line_number">826</span><span class="error">    TF_EXECUTOR_EXCEPTION_HANDLER(worker, node, {
+</span><span class="line_number">827</span>      work(rt);
+<span class="line_number">828</span>    });
+<span class="line_number">829</span>    _observer_epilogue(worker, node);
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/executor.hpp:2010<br>
+                                    <code class="cpp">tf::Executor::_invoke_async_task(tf::Worker&amp;, tf::Node*)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">2007</span>    
+<span class="line_number">2008</span>    // void(Runtime&amp;)
+<span class="line_number">2009</span>    case 1:
+<span class="line_number">2010</span><span class="error">      if(_invoke_runtime_task_impl(worker, node, *std::get_if&lt;1&gt;(&amp;work))) {
+</span><span class="line_number">2011</span>        return true;
+<span class="line_number">2012</span>      }
+<span class="line_number">2013</span>    break;
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/executor.hpp:1710<br>
+                                    <code class="cpp">tf::Executor::_invoke(tf::Worker&amp;, tf::Node*)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1707</span>
+<span class="line_number">1708</span>    // async task
+<span class="line_number">1709</span>    case Node::ASYNC: {
+<span class="line_number">1710</span><span class="error">      if(_invoke_async_task(worker, node)) {
+</span><span class="line_number">1711</span>        return;
+<span class="line_number">1712</span>      }
+<span class="line_number">1713</span>      _tear_down_async(worker, node, cache);
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/executor.hpp:1424<br>
+                                    <code class="cpp">tf::Executor::_exploit_task(tf::Worker&amp;, tf::Node*&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1421</span>// Procedure: _exploit_task
+<span class="line_number">1422</span>inline void Executor::_exploit_task(Worker&amp; w, Node*&amp; t) {
+<span class="line_number">1423</span>  while(t) {
+<span class="line_number">1424</span><span class="error">    _invoke(w, t);
+</span><span class="line_number">1425</span>    t = w._wsq.pop();
+<span class="line_number">1426</span>  }
+<span class="line_number">1427</span>}
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/executor.hpp:1327<br>
+                                    <code class="cpp">tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}::operator()() const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1324</span>        while(1) {
+<span class="line_number">1325</span>
+<span class="line_number">1326</span>          // drains out the local queue first
+<span class="line_number">1327</span><span class="error">          _exploit_task(worker, t);
+</span><span class="line_number">1328</span>
+<span class="line_number">1329</span>          // steals and waits for tasks
+<span class="line_number">1330</span>          if(_wait_for_task(worker, t) == false) {
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:61<br>
+                                    <code class="cpp">void std::__invoke_impl&lt;void, tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}&gt;(std::__invoke_other, tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}&amp;&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">58</span>  template&lt;typename _Res, typename _Fn, typename... _Args&gt;
+<span class="line_number">59</span>    constexpr _Res
+<span class="line_number">60</span>    __invoke_impl(__invoke_other, _Fn&amp;&amp; __f, _Args&amp;&amp;... __args)
+<span class="line_number">61</span><span class="error">    { return std::forward&lt;_Fn&gt;(__f)(std::forward&lt;_Args&gt;(__args)...); }
+</span><span class="line_number">62</span>
+<span class="line_number">63</span>  template&lt;typename _Res, typename _MemFun, typename _Tp, typename... _Args&gt;
+<span class="line_number">64</span>    constexpr _Res
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:96<br>
+                                    <code class="cpp">std::__invoke_result&lt;tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}&gt;::type std::__invoke&lt;tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}&gt;(tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}&amp;&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">93</span>      using __result = __invoke_result&lt;_Callable, _Args...&gt;;
+<span class="line_number">94</span>      using __type = typename __result::type;
+<span class="line_number">95</span>      using __tag = typename __result::__invoke_type;
+<span class="line_number">96</span><span class="error">      return std::__invoke_impl&lt;__type&gt;(__tag{}, std::forward&lt;_Callable&gt;(__fn),
+</span><span class="line_number">97</span>					std::forward&lt;_Args&gt;(__args)...);
+<span class="line_number">98</span>    }
+<span class="line_number">99</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/std_thread.h:292<br>
+                                    <code class="cpp">void std::thread::_Invoker&lt;std::tuple&lt;tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}&gt; &gt;::_M_invoke&lt;0ul&gt;(std::_Index_tuple&lt;0ul&gt;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">289</span>	template&lt;size_t... _Ind&gt;
+<span class="line_number">290</span>	  typename __result&lt;_Tuple&gt;::type
+<span class="line_number">291</span>	  _M_invoke(_Index_tuple&lt;_Ind...&gt;)
+<span class="line_number">292</span><span class="error">	  { return std::__invoke(std::get&lt;_Ind&gt;(std::move(_M_t))...); }
+</span><span class="line_number">293</span>
+<span class="line_number">294</span>	typename __result&lt;_Tuple&gt;::type
+<span class="line_number">295</span>	operator()()
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/std_thread.h:299<br>
+                                    <code class="cpp">std::thread::_Invoker&lt;std::tuple&lt;tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}&gt; &gt;::operator()()</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">296</span>	{
+<span class="line_number">297</span>	  using _Indices
+<span class="line_number">298</span>	    = typename _Build_index_tuple&lt;tuple_size&lt;_Tuple&gt;::value&gt;::__type;
+<span class="line_number">299</span><span class="error">	  return _M_invoke(_Indices());
+</span><span class="line_number">300</span>	}
+<span class="line_number">301</span>      };
+<span class="line_number">302</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/std_thread.h:244<br>
+                                    <code class="cpp">std::thread::_State_impl&lt;std::thread::_Invoker&lt;std::tuple&lt;tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}&gt; &gt; &gt;::_M_run()</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">241</span>	  { }
+<span class="line_number">242</span>
+<span class="line_number">243</span>	void
+<span class="line_number">244</span><span class="error">	_M_run() { _M_func(); }
+</span><span class="line_number">245</span>      };
+<span class="line_number">246</span>
+<span class="line_number">247</span>    void
+</code></pre>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            <pre class="code">
+<code class="c++"><span class="line_number">247</span><span class="error">    bool _M_empty() const { return !_M_manager; }</span>
+<span class="line_number">248</span>
+<span class="line_number">249</span>    using _Manager_type
+<span class="line_number">250</span>      = bool (*)(_Any_data&amp;, const _Any_data&amp;, _Manager_operation);
+<span class="line_number">251</span>
+<span class="line_number">252</span>    _Any_data     _M_functor{};
+<span class="line_number">253</span>    _Manager_type _M_manager{};
+<span class="line_number">254</span>  };
+<span class="line_number">255</span>
+<span class="line_number">256</span>  template&lt;typename _Signature, typename _Functor&gt;
+<span class="line_number">257</span>    class _Function_handler;
+<span class="line_number">258</span>
+<span class="line_number">259</span>  template&lt;typename _Res, typename _Functor, typename... _ArgTypes&gt;
+<span class="line_number">260</span>    class _Function_handler&lt;_Res(_ArgTypes...), _Functor&gt;
+<span class="line_number">261</span>    : public _Function_base::_Base_manager&lt;_Functor&gt;
+<span class="line_number">262</span>    {
+<span class="line_number">263</span>      using _Base = _Function_base::_Base_manager&lt;_Functor&gt;;
+<span class="line_number">264</span>
+<span class="line_number">265</span>    public:
+<span class="line_number">266</span>      static bool
+<span class="line_number">267</span>      _M_manager(_Any_data&amp; __dest, const _Any_data&amp; __source,
+<span class="line_number">268</span>		 _Manager_operation __op)
+<span class="line_number">269</span>      {
+<span class="line_number">270</span>	switch (__op)
+<span class="line_number">271</span>	  {
+<span class="line_number">272</span>#if __cpp_rtti
+<span class="line_number">273</span>	  case __get_type_info:
+<span class="line_number">274</span>	    __dest._M_access&lt;const type_info*&gt;() = &amp;typeid(_Functor);
+<span class="line_number">275</span>	    break;
+<span class="line_number">276</span>#endif
+<span class="line_number">277</span>	  case __get_functor_ptr:
+<span class="line_number">278</span>	    __dest._M_access&lt;_Functor*&gt;() = _Base::_M_get_pointer(__source);
+<span class="line_number">279</span>	    break;
+<span class="line_number">280</span>
+<span class="line_number">281</span>	  default:
+<span class="line_number">282</span>	    _Base::_M_manager(__dest, __source, __op);
+<span class="line_number">283</span>	  }
+<span class="line_number">284</span>	return false;
+<span class="line_number">285</span>      }
+<span class="line_number">286</span>
+<span class="line_number">287</span>      static _Res
+<span class="line_number">288</span>      _M_invoke(const _Any_data&amp; __functor, _ArgTypes&amp;&amp;... __args)
+<span class="line_number">289</span>      {
+<span class="line_number">290</span>	return std::__invoke_r&lt;_Res&gt;(*_Base::_M_get_pointer(__functor),
+<span class="line_number">291</span>				     std::forward&lt;_ArgTypes&gt;(__args)...);
+<span class="line_number">292</span>      }
+<span class="line_number">293</span>
+<span class="line_number">294</span>      template&lt;typename _Fn&gt;
+<span class="line_number">295</span>	static constexpr bool
+<span class="line_number">296</span>	_S_nothrow_init() noexcept
+<span class="line_number">297</span>	{
+<span class="line_number">298</span>	  return __and_&lt;typename _Base::_Local_storage,
+<span class="line_number">299</span>			is_nothrow_constructible&lt;_Functor, _Fn&gt;&gt;::value;
+<span class="line_number">300</span>	}
+<span class="line_number">301</span>    };
+<span class="line_number">302</span>
+<span class="line_number">303</span>  // Specialization for invalid types
+<span class="line_number">304</span>  template&lt;&gt;
+<span class="line_number">305</span>    class _Function_handler&lt;void, void&gt;
+<span class="line_number">306</span>    {
+<span class="line_number">307</span>    public:
+<span class="line_number">308</span>      static bool
+<span class="line_number">309</span>      _M_manager(_Any_data&amp;, const _Any_data&amp;, _Manager_operation)
+<span class="line_number">310</span>      { return false; }
+<span class="line_number">311</span>    };
+<span class="line_number">312</span>
+<span class="line_number">313</span>  // Avoids instantiating ill-formed specializations of _Function_handler
+<span class="line_number">314</span>  // in std::function&lt;_Signature&gt;::target&lt;_Functor&gt;().
+<span class="line_number">315</span>  // e.g. _Function_handler&lt;Sig, void()&gt; and _Function_handler&lt;Sig, void&gt;
+<span class="line_number">316</span>  // would be ill-formed.
+<span class="line_number">317</span>  template&lt;typename _Signature, typename _Functor,
+<span class="line_number">318</span>	   bool __valid = is_object&lt;_Functor&gt;::value&gt;
+<span class="line_number">319</span>    struct _Target_handler
+<span class="line_number">320</span>    : _Function_handler&lt;_Signature, typename remove_cv&lt;_Functor&gt;::type&gt;
+<span class="line_number">321</span>    { };
+<span class="line_number">322</span>
+<span class="line_number">323</span>  template&lt;typename _Signature, typename _Functor&gt;
+<span class="line_number">324</span>    struct _Target_handler&lt;_Signature, _Functor, false&gt;
+<span class="line_number">325</span>    : _Function_handler&lt;void, void&gt;
+<span class="line_number">326</span>    { };
+<span class="line_number">327</span>
+<span class="line_number">328</span>  /**
+<span class="line_number">329</span>   *  @brief Polymorphic function wrapper.
+<span class="line_number">330</span>   *  @ingroup functors
+<span class="line_number">331</span>   *  @since C++11
+<span class="line_number">332</span>   */
+<span class="line_number">333</span>  template&lt;typename _Res, typename... _ArgTypes&gt;
+<span class="line_number">334</span>    class function&lt;_Res(_ArgTypes...)&gt;
+<span class="line_number">335</span>    : public _Maybe_unary_or_binary_function&lt;_Res, _ArgTypes...&gt;,
+<span class="line_number">336</span>      private _Function_base
+<span class="line_number">337</span>    {
+<span class="line_number">338</span>      // Equivalent to std::decay_t except that it produces an invalid type
+<span class="line_number">339</span>      // if the decayed type is the current specialization of std::function.
+<span class="line_number">340</span>      template&lt;typename _Func,
+<span class="line_number">341</span>	       bool _Self = is_same&lt;__remove_cvref_t&lt;_Func&gt;, function&gt;::value&gt;
+<span class="line_number">342</span>	using _Decay_t
+<span class="line_number">343</span>	  = typename __enable_if_t&lt;!_Self, decay&lt;_Func&gt;&gt;::type;
+<span class="line_number">344</span>
+<span class="line_number">345</span>      template&lt;typename _Func,
+<span class="line_number">346</span>	       typename _DFunc = _Decay_t&lt;_Func&gt;,
+<span class="line_number">347</span>	       typename _Res2 = __invoke_result&lt;_DFunc&amp;, _ArgTypes...&gt;&gt;
+<span class="line_number">348</span>	struct _Callable
+<span class="line_number">349</span>	: __is_invocable_impl&lt;_Res2, _Res&gt;::type
+<span class="line_number">350</span>	{ };
+<span class="line_number">351</span>
+<span class="line_number">352</span>      template&lt;typename _Cond, typename _Tp = void&gt;
+<span class="line_number">353</span>	using _Requires = __enable_if_t&lt;_Cond::value, _Tp&gt;;
+<span class="line_number">354</span>
+<span class="line_number">355</span>      template&lt;typename _Functor&gt;
+<span class="line_number">356</span>	using _Handler
+<span class="line_number">357</span>	  = _Function_handler&lt;_Res(_ArgTypes...), __decay_t&lt;_Functor&gt;&gt;;
+<span class="line_number">358</span>
+<span class="line_number">359</span>    public:
+<span class="line_number">360</span>      typedef _Res result_type;
+<span class="line_number">361</span>
+<span class="line_number">362</span>      // [3.7.2.1] construct/copy/destroy
+<span class="line_number">363</span>
+<span class="line_number">364</span>      /**
+<span class="line_number">365</span>       *  @brief Default construct creates an empty function call wrapper.
+<span class="line_number">366</span>       *  @post `!(bool)*this`
+<span class="line_number">367</span>       */
+<span class="line_number">368</span>      function() noexcept
+<span class="line_number">369</span>      : _Function_base() { }
+<span class="line_number">370</span>
+<span class="line_number">371</span>      /**
+<span class="line_number">372</span>       *  @brief Creates an empty function call wrapper.
+<span class="line_number">373</span>       *  @post @c !(bool)*this
+<span class="line_number">374</span>       */
+<span class="line_number">375</span>      function(nullptr_t) noexcept
+<span class="line_number">376</span>      : _Function_base() { }
+<span class="line_number">377</span>
+<span class="line_number">378</span>      /**
+<span class="line_number">379</span>       *  @brief %Function copy constructor.
+<span class="line_number">380</span>       *  @param __x A %function object with identical call signature.
+<span class="line_number">381</span>       *  @post `bool(*this) == bool(__x)`
+<span class="line_number">382</span>       *
+<span class="line_number">383</span>       *  The newly-created %function contains a copy of the target of
+<span class="line_number">384</span>       *  `__x` (if it has one).
+<span class="line_number">385</span>       */
+<span class="line_number">386</span>      function(const function&amp; __x)
+<span class="line_number">387</span>      : _Function_base()
+<span class="line_number">388</span>      {
+<span class="line_number">389</span>	if (static_cast&lt;bool&gt;(__x))
+<span class="line_number">390</span>	  {
+<span class="line_number">391</span>	    __x._M_manager(_M_functor, __x._M_functor, __clone_functor);
+<span class="line_number">392</span>	    _M_invoker = __x._M_invoker;
+<span class="line_number">393</span>	    _M_manager = __x._M_manager;
+<span class="line_number">394</span>	  }
+<span class="line_number">395</span>      }
+<span class="line_number">396</span>
+<span class="line_number">397</span>      /**
+<span class="line_number">398</span>       *  @brief %Function move constructor.
+<span class="line_number">399</span>       *  @param __x A %function object rvalue with identical call signature.
+<span class="line_number">400</span>       *
+<span class="line_number">401</span>       *  The newly-created %function contains the target of `__x`
+<span class="line_number">402</span>       *  (if it has one).
+<span class="line_number">403</span>       */
+<span class="line_number">404</span>      function(function&amp;&amp; __x) noexcept
+<span class="line_number">405</span>      : _Function_base(), _M_invoker(__x._M_invoker)
+<span class="line_number">406</span>      {
+<span class="line_number">407</span>	if (static_cast&lt;bool&gt;(__x))
+<span class="line_number">408</span>	  {
+<span class="line_number">409</span>	    _M_functor = __x._M_functor;
+<span class="line_number">410</span>	    _M_manager = __x._M_manager;
+<span class="line_number">411</span>	    __x._M_manager = nullptr;
+<span class="line_number">412</span>	    __x._M_invoker = nullptr;
+<span class="line_number">413</span>	  }
+<span class="line_number">414</span>      }
+<span class="line_number">415</span>
+<span class="line_number">416</span>      /**
+<span class="line_number">417</span>       *  @brief Builds a %function that targets a copy of the incoming
+<span class="line_number">418</span>       *  function object.
+<span class="line_number">419</span>       *  @param __f A %function object that is callable with parameters of
+<span class="line_number">420</span>       *  type `ArgTypes...` and returns a value convertible to `Res`.
+<span class="line_number">421</span>       *
+<span class="line_number">422</span>       *  The newly-created %function object will target a copy of
+<span class="line_number">423</span>       *  `__f`. If `__f` is `reference_wrapper&lt;F&gt;`, then this function
+<span class="line_number">424</span>       *  object will contain a reference to the function object `__f.get()`.
+<span class="line_number">425</span>       *  If `__f` is a null function pointer, null pointer-to-member, or
+<span class="line_number">426</span>       *  empty `std::function`, the newly-created object will be empty.
+<span class="line_number">427</span>       *
+<span class="line_number">428</span>       *  If `__f` is a non-null function pointer or an object of type
+<span class="line_number">429</span>       *  `reference_wrapper&lt;F&gt;`, this function will not throw.
+<span class="line_number">430</span>       */
+<span class="line_number">431</span>      // _GLIBCXX_RESOLVE_LIB_DEFECTS
+<span class="line_number">432</span>      // 2774. std::function construction vs assignment
+<span class="line_number">433</span>      template&lt;typename _Functor,
+<span class="line_number">434</span>	       typename _Constraints = _Requires&lt;_Callable&lt;_Functor&gt;&gt;&gt;
+<span class="line_number">435</span>	function(_Functor&amp;&amp; __f)
+<span class="line_number">436</span>	noexcept(_Handler&lt;_Functor&gt;::template _S_nothrow_init&lt;_Functor&gt;())
+<span class="line_number">437</span>	: _Function_base()
+<span class="line_number">438</span>	{
+<span class="line_number">439</span>	  static_assert(is_copy_constructible&lt;__decay_t&lt;_Functor&gt;&gt;::value,
+<span class="line_number">440</span>	      &#34;std::function target must be copy-constructible&#34;);
+<span class="line_number">441</span>	  static_assert(is_constructible&lt;__decay_t&lt;_Functor&gt;, _Functor&gt;::value,
+<span class="line_number">442</span>	      &#34;std::function target must be constructible from the &#34;
+<span class="line_number">443</span>	      &#34;constructor argument&#34;);
+<span class="line_number">444</span>
+<span class="line_number">445</span>	  using _My_handler = _Handler&lt;_Functor&gt;;
+<span class="line_number">446</span>
+<span class="line_number">447</span>	  if (_My_handler::_M_not_empty_function(__f))
+<span class="line_number">448</span>	    {
+<span class="line_number">449</span>	      _My_handler::_M_init_functor(_M_functor,
+<span class="line_number">450</span>					   std::forward&lt;_Functor&gt;(__f));
+<span class="line_number">451</span>	      _M_invoker = &amp;_My_handler::_M_invoke;
+<span class="line_number">452</span>	      _M_manager = &amp;_My_handler::_M_manager;
+<span class="line_number">453</span>	    }
+<span class="line_number">454</span>	}
+<span class="line_number">455</span>
+<span class="line_number">456</span>      /**
+<span class="line_number">457</span>       *  @brief Function assignment operator.
+<span class="line_number">458</span>       *  @param __x A %function with identical call signature.
+<span class="line_number">459</span>       *  @post `(bool)*this == (bool)x`
+<span class="line_number">460</span>       *  @returns `*this`
+<span class="line_number">461</span>       *
+<span class="line_number">462</span>       *  The target of `__x` is copied to `*this`. If `__x` has no
+<span class="line_number">463</span>       *  target, then `*this` will be empty.
+<span class="line_number">464</span>       *
+<span class="line_number">465</span>       *  If `__x` targets a function pointer or a reference to a function
+<span class="line_number">466</span>       *  object, then this operation will not throw an exception.
+<span class="line_number">467</span>       */
+<span class="line_number">468</span>      function&amp;
+<span class="line_number">469</span>      operator=(const function&amp; __x)
+<span class="line_number">470</span>      {
+<span class="line_number">471</span>	function(__x).swap(*this);
+<span class="line_number">472</span>	return *this;
+<span class="line_number">473</span>      }
+<span class="line_number">474</span>
+<span class="line_number">475</span>      /**
+<span class="line_number">476</span>       *  @brief Function move-assignment operator.
+<span class="line_number">477</span>       *  @param __x A %function rvalue with identical call signature.
+<span class="line_number">478</span>       *  @returns `*this`
+<span class="line_number">479</span>       *
+<span class="line_number">480</span>       *  The target of `__x` is moved to `*this`. If `__x` has no
+<span class="line_number">481</span>       *  target, then `*this` will be empty.
+<span class="line_number">482</span>       *
+<span class="line_number">483</span>       *  If `__x` targets a function pointer or a reference to a function
+<span class="line_number">484</span>       *  object, then this operation will not throw an exception.
+<span class="line_number">485</span>       */
+<span class="line_number">486</span>      function&amp;
+<span class="line_number">487</span>      operator=(function&amp;&amp; __x) noexcept
+<span class="line_number">488</span>      {
+<span class="line_number">489</span>	function(std::move(__x)).swap(*this);
+<span class="line_number">490</span>	return *this;
+<span class="line_number">491</span>      }
+<span class="line_number">492</span>
+<span class="line_number">493</span>      /**
+<span class="line_number">494</span>       *  @brief Function assignment to empty.
+<span class="line_number">495</span>       *  @post `!(bool)*this`
+<span class="line_number">496</span>       *  @returns `*this`
+<span class="line_number">497</span>       *
+<span class="line_number">498</span>       *  The target of `*this` is deallocated, leaving it empty.
+<span class="line_number">499</span>       */
+<span class="line_number">500</span>      function&amp;
+<span class="line_number">501</span>      operator=(nullptr_t) noexcept
+<span class="line_number">502</span>      {
+<span class="line_number">503</span>	if (_M_manager)
+<span class="line_number">504</span>	  {
+<span class="line_number">505</span>	    _M_manager(_M_functor, _M_functor, __destroy_functor);
+<span class="line_number">506</span>	    _M_manager = nullptr;
+<span class="line_number">507</span>	    _M_invoker = nullptr;
+<span class="line_number">508</span>	  }
+<span class="line_number">509</span>	return *this;
+<span class="line_number">510</span>      }
+<span class="line_number">511</span>
+<span class="line_number">512</span>      /**
+<span class="line_number">513</span>       *  @brief Function assignment to a new target.
+<span class="line_number">514</span>       *  @param __f  A function object that is callable with parameters of
+<span class="line_number">515</span>       *              type  `_ArgTypes...` and returns a value convertible
+<span class="line_number">516</span>       *              to `_Res`.
+<span class="line_number">517</span>       *  @return `*this`
+<span class="line_number">518</span>       *  @since C++11
+<span class="line_number">519</span>       *
+<span class="line_number">520</span>       *  This function object wrapper will target a copy of `__f`. If `__f`
+<span class="line_number">521</span>       *  is `reference_wrapper&lt;F&gt;`, then this function object will contain
+<span class="line_number">522</span>       *  a reference to the function object `__f.get()`. If `__f` is a null
+<span class="line_number">523</span>       *  function pointer or null pointer-to-member, this object will be
+<span class="line_number">524</span>       *  empty.
+<span class="line_number">525</span>       *
+<span class="line_number">526</span>       *  If `__f` is a non-null function pointer or an object of type
+<span class="line_number">527</span>       *  `reference_wrapper&lt;F&gt;`, this function will not throw.
+<span class="line_number">528</span>       */
+<span class="line_number">529</span>      template&lt;typename _Functor&gt;
+<span class="line_number">530</span>	_Requires&lt;_Callable&lt;_Functor&gt;, function&amp;&gt;
+<span class="line_number">531</span>	operator=(_Functor&amp;&amp; __f)
+<span class="line_number">532</span>	noexcept(_Handler&lt;_Functor&gt;::template _S_nothrow_init&lt;_Functor&gt;())
+<span class="line_number">533</span>	{
+<span class="line_number">534</span>	  function(std::forward&lt;_Functor&gt;(__f)).swap(*this);
+<span class="line_number">535</span>	  return *this;
+<span class="line_number">536</span>	}
+<span class="line_number">537</span>
+<span class="line_number">538</span>      /// @overload
+<span class="line_number">539</span>      template&lt;typename _Functor&gt;
+<span class="line_number">540</span>	function&amp;
+<span class="line_number">541</span>	operator=(reference_wrapper&lt;_Functor&gt; __f) noexcept
+<span class="line_number">542</span>	{
+<span class="line_number">543</span>	  function(__f).swap(*this);
+<span class="line_number">544</span>	  return *this;
+<span class="line_number">545</span>	}
+<span class="line_number">546</span>
+<span class="line_number">547</span>      // [3.7.2.2] function modifiers
+<span class="line_number">548</span>
+<span class="line_number">549</span>      /**
+<span class="line_number">550</span>       *  @brief Swap the targets of two %function objects.
+<span class="line_number">551</span>       *  @param __x A %function with identical call signature.
+<span class="line_number">552</span>       *
+<span class="line_number">553</span>       *  Swap the targets of `this` function object and `__f`.
+<span class="line_number">554</span>       *  This function will not throw exceptions.
+<span class="line_number">555</span>       */
+<span class="line_number">556</span>      void swap(function&amp; __x) noexcept
+<span class="line_number">557</span>      {
+<span class="line_number">558</span>	std::swap(_M_functor, __x._M_functor);
+<span class="line_number">559</span>	std::swap(_M_manager, __x._M_manager);
+<span class="line_number">560</span>	std::swap(_M_invoker, __x._M_invoker);
+<span class="line_number">561</span>      }
+<span class="line_number">562</span>
+<span class="line_number">563</span>      // [3.7.2.3] function capacity
+<span class="line_number">564</span>
+<span class="line_number">565</span>      /**
+<span class="line_number">566</span>       *  @brief Determine if the %function wrapper has a target.
+<span class="line_number">567</span>       *
+<span class="line_number">568</span>       *  @return `true` when this function object contains a target,
+<span class="line_number">569</span>       *  or `false` when it is empty.
+<span class="line_number">570</span>       *
+<span class="line_number">571</span>       *  This function will not throw exceptions.
+<span class="line_number">572</span>       */
+<span class="line_number">573</span>      explicit operator bool() const noexcept
+<span class="line_number">574</span>      { return !_M_empty(); }
+<span class="line_number">575</span>
+<span class="line_number">576</span>      // [3.7.2.4] function invocation
+<span class="line_number">577</span>
+<span class="line_number">578</span>      /**
+<span class="line_number">579</span>       *  @brief Invokes the function targeted by `*this`.
+<span class="line_number">580</span>       *  @returns the result of the target.
+<span class="line_number">581</span>       *  @throws `bad_function_call` when `!(bool)*this`
+<span class="line_number">582</span>       *
+<span class="line_number">583</span>       *  The function call operator invokes the target function object
+<span class="line_number">584</span>       *  stored by `this`.
+<span class="line_number">585</span>       */
+<span class="line_number">586</span>      _Res
+<span class="line_number">587</span>      operator()(_ArgTypes... __args) const
+<span class="line_number">588</span>      {
+<span class="line_number">589</span>	if (_M_empty())
+<span class="line_number">590</span>	  __throw_bad_function_call();
+</code></pre>
+            <div class="issue">
+                <div>
+                    <span class="what">Possible data race during read of size 8 at 0x29EF0CB8 by thread #8</span>
+                    <div class="navigation">
+                        <button class="next_error">Next</button>
+                        <button class="prev_error">Previous</button>
+                    </div>
+                </div>
+                <div>
+                    <table class="call_stack">
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/runtime.hpp:826<br>
+                                    <code class="cpp">tf::Executor::_invoke_runtime_task_impl(tf::Worker&amp;, tf::Node*, std::function&lt;void (tf::Runtime&amp;)&gt;&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">823</span>    node-&gt;_join_counter.fetch_add(1, std::memory_order_release);
+<span class="line_number">824</span>
+<span class="line_number">825</span>    _observer_prologue(worker, node);
+<span class="line_number">826</span><span class="error">    TF_EXECUTOR_EXCEPTION_HANDLER(worker, node, {
+</span><span class="line_number">827</span>      work(rt);
+<span class="line_number">828</span>    });
+<span class="line_number">829</span>    _observer_epilogue(worker, node);
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/executor.hpp:2010<br>
+                                    <code class="cpp">tf::Executor::_invoke_async_task(tf::Worker&amp;, tf::Node*)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">2007</span>    
+<span class="line_number">2008</span>    // void(Runtime&amp;)
+<span class="line_number">2009</span>    case 1:
+<span class="line_number">2010</span><span class="error">      if(_invoke_runtime_task_impl(worker, node, *std::get_if&lt;1&gt;(&amp;work))) {
+</span><span class="line_number">2011</span>        return true;
+<span class="line_number">2012</span>      }
+<span class="line_number">2013</span>    break;
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/executor.hpp:1710<br>
+                                    <code class="cpp">tf::Executor::_invoke(tf::Worker&amp;, tf::Node*)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1707</span>
+<span class="line_number">1708</span>    // async task
+<span class="line_number">1709</span>    case Node::ASYNC: {
+<span class="line_number">1710</span><span class="error">      if(_invoke_async_task(worker, node)) {
+</span><span class="line_number">1711</span>        return;
+<span class="line_number">1712</span>      }
+<span class="line_number">1713</span>      _tear_down_async(worker, node, cache);
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/executor.hpp:1424<br>
+                                    <code class="cpp">tf::Executor::_exploit_task(tf::Worker&amp;, tf::Node*&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1421</span>// Procedure: _exploit_task
+<span class="line_number">1422</span>inline void Executor::_exploit_task(Worker&amp; w, Node*&amp; t) {
+<span class="line_number">1423</span>  while(t) {
+<span class="line_number">1424</span><span class="error">    _invoke(w, t);
+</span><span class="line_number">1425</span>    t = w._wsq.pop();
+<span class="line_number">1426</span>  }
+<span class="line_number">1427</span>}
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/executor.hpp:1327<br>
+                                    <code class="cpp">tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}::operator()() const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1324</span>        while(1) {
+<span class="line_number">1325</span>
+<span class="line_number">1326</span>          // drains out the local queue first
+<span class="line_number">1327</span><span class="error">          _exploit_task(worker, t);
+</span><span class="line_number">1328</span>
+<span class="line_number">1329</span>          // steals and waits for tasks
+<span class="line_number">1330</span>          if(_wait_for_task(worker, t) == false) {
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:61<br>
+                                    <code class="cpp">void std::__invoke_impl&lt;void, tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}&gt;(std::__invoke_other, tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}&amp;&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">58</span>  template&lt;typename _Res, typename _Fn, typename... _Args&gt;
+<span class="line_number">59</span>    constexpr _Res
+<span class="line_number">60</span>    __invoke_impl(__invoke_other, _Fn&amp;&amp; __f, _Args&amp;&amp;... __args)
+<span class="line_number">61</span><span class="error">    { return std::forward&lt;_Fn&gt;(__f)(std::forward&lt;_Args&gt;(__args)...); }
+</span><span class="line_number">62</span>
+<span class="line_number">63</span>  template&lt;typename _Res, typename _MemFun, typename _Tp, typename... _Args&gt;
+<span class="line_number">64</span>    constexpr _Res
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:96<br>
+                                    <code class="cpp">std::__invoke_result&lt;tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}&gt;::type std::__invoke&lt;tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}&gt;(tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}&amp;&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">93</span>      using __result = __invoke_result&lt;_Callable, _Args...&gt;;
+<span class="line_number">94</span>      using __type = typename __result::type;
+<span class="line_number">95</span>      using __tag = typename __result::__invoke_type;
+<span class="line_number">96</span><span class="error">      return std::__invoke_impl&lt;__type&gt;(__tag{}, std::forward&lt;_Callable&gt;(__fn),
+</span><span class="line_number">97</span>					std::forward&lt;_Args&gt;(__args)...);
+<span class="line_number">98</span>    }
+<span class="line_number">99</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/std_thread.h:292<br>
+                                    <code class="cpp">void std::thread::_Invoker&lt;std::tuple&lt;tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}&gt; &gt;::_M_invoke&lt;0ul&gt;(std::_Index_tuple&lt;0ul&gt;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">289</span>	template&lt;size_t... _Ind&gt;
+<span class="line_number">290</span>	  typename __result&lt;_Tuple&gt;::type
+<span class="line_number">291</span>	  _M_invoke(_Index_tuple&lt;_Ind...&gt;)
+<span class="line_number">292</span><span class="error">	  { return std::__invoke(std::get&lt;_Ind&gt;(std::move(_M_t))...); }
+</span><span class="line_number">293</span>
+<span class="line_number">294</span>	typename __result&lt;_Tuple&gt;::type
+<span class="line_number">295</span>	operator()()
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/std_thread.h:299<br>
+                                    <code class="cpp">std::thread::_Invoker&lt;std::tuple&lt;tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}&gt; &gt;::operator()()</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">296</span>	{
+<span class="line_number">297</span>	  using _Indices
+<span class="line_number">298</span>	    = typename _Build_index_tuple&lt;tuple_size&lt;_Tuple&gt;::value&gt;::__type;
+<span class="line_number">299</span><span class="error">	  return _M_invoke(_Indices());
+</span><span class="line_number">300</span>	}
+<span class="line_number">301</span>      };
+<span class="line_number">302</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/std_thread.h:244<br>
+                                    <code class="cpp">std::thread::_State_impl&lt;std::thread::_Invoker&lt;std::tuple&lt;tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}&gt; &gt; &gt;::_M_run()</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">241</span>	  { }
+<span class="line_number">242</span>
+<span class="line_number">243</span>	void
+<span class="line_number">244</span><span class="error">	_M_run() { _M_func(); }
+</span><span class="line_number">245</span>      };
+<span class="line_number">246</span>
+<span class="line_number">247</span>    void
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    None<br>
+                                    <code class="cpp">None</code>
+                                </div>
+                                <pre><code class="c++"></code></pre>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            <pre class="code">
+<code class="c++"><span class="line_number">591</span><span class="error">	return _M_invoker(_M_functor, std::forward&lt;_ArgTypes&gt;(__args)...);</span>
+<span class="line_number">592</span>      }
+<span class="line_number">593</span>
+<span class="line_number">594</span>#if __cpp_rtti
+<span class="line_number">595</span>      // [3.7.2.5] function target access
+<span class="line_number">596</span>      /**
+<span class="line_number">597</span>       *  @brief Determine the type of the target of this function object
+<span class="line_number">598</span>       *  wrapper.
+<span class="line_number">599</span>       *
+<span class="line_number">600</span>       *  @returns the type identifier of the target function object, or
+<span class="line_number">601</span>       *  `typeid(void)` if `!(bool)*this`.
+<span class="line_number">602</span>       *
+<span class="line_number">603</span>       *  This function will not throw exceptions.
+<span class="line_number">604</span>       */
+<span class="line_number">605</span>      const type_info&amp;
+<span class="line_number">606</span>      target_type() const noexcept
+<span class="line_number">607</span>      {
+<span class="line_number">608</span>	if (_M_manager)
+<span class="line_number">609</span>	  {
+<span class="line_number">610</span>	    _Any_data __typeinfo_result;
+<span class="line_number">611</span>	    _M_manager(__typeinfo_result, _M_functor, __get_type_info);
+<span class="line_number">612</span>	    if (auto __ti =  __typeinfo_result._M_access&lt;const type_info*&gt;())
+<span class="line_number">613</span>	      return *__ti;
+<span class="line_number">614</span>	  }
+<span class="line_number">615</span>	return typeid(void);
+<span class="line_number">616</span>      }
+<span class="line_number">617</span>#endif
+<span class="line_number">618</span>
+<span class="line_number">619</span>      /**
+<span class="line_number">620</span>       *  @brief Access the stored target function object.
+<span class="line_number">621</span>       *
+<span class="line_number">622</span>       *  @return Returns a pointer to the stored target function object,
+<span class="line_number">623</span>       *  if `typeid(_Functor).equals(target_type())`; otherwise, a null
+<span class="line_number">624</span>       *  pointer.
+<span class="line_number">625</span>       *
+<span class="line_number">626</span>       * This function does not throw exceptions.
+<span class="line_number">627</span>       *
+<span class="line_number">628</span>       * @{
+<span class="line_number">629</span>       */
+<span class="line_number">630</span>      template&lt;typename _Functor&gt;
+<span class="line_number">631</span>	_Functor*
+<span class="line_number">632</span>	target() noexcept
+<span class="line_number">633</span>	{
+<span class="line_number">634</span>	  const function* __const_this = this;
+<span class="line_number">635</span>	  const _Functor* __func = __const_this-&gt;template target&lt;_Functor&gt;();
+<span class="line_number">636</span>	  // If is_function_v&lt;_Functor&gt; is true then const_cast&lt;_Functor*&gt;
+<span class="line_number">637</span>	  // would be ill-formed, so use *const_cast&lt;_Functor**&gt; instead.
+<span class="line_number">638</span>	  return *const_cast&lt;_Functor**&gt;(&amp;__func);
+<span class="line_number">639</span>	}
+<span class="line_number">640</span>
+<span class="line_number">641</span>      template&lt;typename _Functor&gt;
+<span class="line_number">642</span>	const _Functor*
+<span class="line_number">643</span>	target() const noexcept
+<span class="line_number">644</span>	{
+<span class="line_number">645</span>	  if _GLIBCXX17_CONSTEXPR (is_object&lt;_Functor&gt;::value)
+<span class="line_number">646</span>	    {
+<span class="line_number">647</span>	      // For C++11 and C++14 if-constexpr is not used above, so
+<span class="line_number">648</span>	      // _Target_handler avoids ill-formed _Function_handler types.
+<span class="line_number">649</span>	      using _Handler = _Target_handler&lt;_Res(_ArgTypes...), _Functor&gt;;
+<span class="line_number">650</span>
+<span class="line_number">651</span>	      if (_M_manager == &amp;_Handler::_M_manager
+<span class="line_number">652</span>#if __cpp_rtti
+<span class="line_number">653</span>		  || (_M_manager &amp;&amp; typeid(_Functor) == target_type())
+<span class="line_number">654</span>#endif
+<span class="line_number">655</span>		 )
+<span class="line_number">656</span>		{
+<span class="line_number">657</span>		  _Any_data __ptr;
+<span class="line_number">658</span>		  _M_manager(__ptr, _M_functor, __get_functor_ptr);
+<span class="line_number">659</span>		  return __ptr._M_access&lt;const _Functor*&gt;();
+<span class="line_number">660</span>		}
+<span class="line_number">661</span>	    }
+<span class="line_number">662</span>	  return nullptr;
+<span class="line_number">663</span>	}
+<span class="line_number">664</span>      /// @}
+<span class="line_number">665</span>
+<span class="line_number">666</span>    private:
+<span class="line_number">667</span>      using _Invoker_type = _Res (*)(const _Any_data&amp;, _ArgTypes&amp;&amp;...);
+<span class="line_number">668</span>      _Invoker_type _M_invoker = nullptr;
+<span class="line_number">669</span>    };
+<span class="line_number">670</span>
+<span class="line_number">671</span>#if __cpp_deduction_guides &gt;= 201606
+<span class="line_number">672</span>  template&lt;typename&gt;
+<span class="line_number">673</span>    struct __function_guide_helper
+<span class="line_number">674</span>    { };
+<span class="line_number">675</span>
+<span class="line_number">676</span>  template&lt;typename _Res, typename _Tp, bool _Nx, typename... _Args&gt;
+<span class="line_number">677</span>    struct __function_guide_helper&lt;
+<span class="line_number">678</span>      _Res (_Tp::*) (_Args...) noexcept(_Nx)
+<span class="line_number">679</span>    &gt;
+<span class="line_number">680</span>    { using type = _Res(_Args...); };
+<span class="line_number">681</span>
+<span class="line_number">682</span>  template&lt;typename _Res, typename _Tp, bool _Nx, typename... _Args&gt;
+<span class="line_number">683</span>    struct __function_guide_helper&lt;
+<span class="line_number">684</span>      _Res (_Tp::*) (_Args...) &amp; noexcept(_Nx)
+<span class="line_number">685</span>    &gt;
+<span class="line_number">686</span>    { using type = _Res(_Args...); };
+<span class="line_number">687</span>
+<span class="line_number">688</span>  template&lt;typename _Res, typename _Tp, bool _Nx, typename... _Args&gt;
+<span class="line_number">689</span>    struct __function_guide_helper&lt;
+<span class="line_number">690</span>      _Res (_Tp::*) (_Args...) const noexcept(_Nx)
+<span class="line_number">691</span>    &gt;
+<span class="line_number">692</span>    { using type = _Res(_Args...); };
+<span class="line_number">693</span>
+<span class="line_number">694</span>  template&lt;typename _Res, typename _Tp, bool _Nx, typename... _Args&gt;
+<span class="line_number">695</span>    struct __function_guide_helper&lt;
+<span class="line_number">696</span>      _Res (_Tp::*) (_Args...) const &amp; noexcept(_Nx)
+<span class="line_number">697</span>    &gt;
+<span class="line_number">698</span>    { using type = _Res(_Args...); };
+<span class="line_number">699</span>
+<span class="line_number">700</span>#if __cpp_static_call_operator &gt;= 202207L &amp;&amp; __cpp_concepts &gt;= 202002L
+<span class="line_number">701</span>  template&lt;typename _StaticCallOp&gt;
+<span class="line_number">702</span>    struct __function_guide_static_helper
+<span class="line_number">703</span>    { };
+<span class="line_number">704</span>
+<span class="line_number">705</span>  template&lt;typename _Res, bool _Nx, typename... _Args&gt;
+<span class="line_number">706</span>    struct __function_guide_static_helper&lt;_Res (*) (_Args...) noexcept(_Nx)&gt;
+<span class="line_number">707</span>    { using type = _Res(_Args...); };
+<span class="line_number">708</span>
+<span class="line_number">709</span>  template&lt;typename _Fn, typename _Op&gt;
+<span class="line_number">710</span>    using __function_guide_t = typename __conditional_t&lt;
+<span class="line_number">711</span>      requires (_Fn&amp; __f) { (void) __f.operator(); },
+<span class="line_number">712</span>      __function_guide_static_helper&lt;_Op&gt;,
+<span class="line_number">713</span>      __function_guide_helper&lt;_Op&gt;&gt;::type;
+<span class="line_number">714</span>#else
+<span class="line_number">715</span>  template&lt;typename _Fn, typename _Op&gt;
+<span class="line_number">716</span>    using __function_guide_t = typename __function_guide_helper&lt;_Op&gt;::type;
+<span class="line_number">717</span>#endif
+<span class="line_number">718</span>
+<span class="line_number">719</span>  template&lt;typename _Res, typename... _ArgTypes&gt;
+<span class="line_number">720</span>    function(_Res(*)(_ArgTypes...)) -&gt; function&lt;_Res(_ArgTypes...)&gt;;
+<span class="line_number">721</span>
+<span class="line_number">722</span>  template&lt;typename _Fn, typename _Signature
+<span class="line_number">723</span>	     = __function_guide_t&lt;_Fn, decltype(&amp;_Fn::operator())&gt;&gt;
+<span class="line_number">724</span>    function(_Fn) -&gt; function&lt;_Signature&gt;;
+<span class="line_number">725</span>#endif
+<span class="line_number">726</span>
+<span class="line_number">727</span>  // [20.7.15.2.6] null pointer comparisons
+<span class="line_number">728</span>
+<span class="line_number">729</span>  /**
+<span class="line_number">730</span>   *  @brief Test whether a polymorphic function object wrapper is empty.
+<span class="line_number">731</span>   *  @returns `true` if the wrapper has no target, `false` otherwise
+<span class="line_number">732</span>   *
+<span class="line_number">733</span>   *  This function will not throw exceptions.
+<span class="line_number">734</span>   */
+<span class="line_number">735</span>  template&lt;typename _Res, typename... _Args&gt;
+<span class="line_number">736</span>    inline bool
+<span class="line_number">737</span>    operator==(const function&lt;_Res(_Args...)&gt;&amp; __f, nullptr_t) noexcept
+<span class="line_number">738</span>    { return !static_cast&lt;bool&gt;(__f); }
+<span class="line_number">739</span>
+<span class="line_number">740</span>#if __cpp_impl_three_way_comparison &lt; 201907L
+<span class="line_number">741</span>  /// @overload
+<span class="line_number">742</span>  template&lt;typename _Res, typename... _Args&gt;
+<span class="line_number">743</span>    inline bool
+<span class="line_number">744</span>    operator==(nullptr_t, const function&lt;_Res(_Args...)&gt;&amp; __f) noexcept
+<span class="line_number">745</span>    { return !static_cast&lt;bool&gt;(__f); }
+<span class="line_number">746</span>
+<span class="line_number">747</span>  /**
+<span class="line_number">748</span>   *  @brief Test whether a polymorphic function object wrapper is non-empty.
+<span class="line_number">749</span>   *  @returns `false` if the wrapper has no target, `true` otherwise
+<span class="line_number">750</span>   *
+<span class="line_number">751</span>   *  This function will not throw exceptions.
+<span class="line_number">752</span>   */
+<span class="line_number">753</span>  template&lt;typename _Res, typename... _Args&gt;
+<span class="line_number">754</span>    inline bool
+<span class="line_number">755</span>    operator!=(const function&lt;_Res(_Args...)&gt;&amp; __f, nullptr_t) noexcept
+<span class="line_number">756</span>    { return static_cast&lt;bool&gt;(__f); }
+<span class="line_number">757</span>
+<span class="line_number">758</span>  /// @overload
+<span class="line_number">759</span>  template&lt;typename _Res, typename... _Args&gt;
+<span class="line_number">760</span>    inline bool
+<span class="line_number">761</span>    operator!=(nullptr_t, const function&lt;_Res(_Args...)&gt;&amp; __f) noexcept
+<span class="line_number">762</span>    { return static_cast&lt;bool&gt;(__f); }
+<span class="line_number">763</span>#endif
+<span class="line_number">764</span>
+<span class="line_number">765</span>  // [20.7.15.2.7] specialized algorithms
+<span class="line_number">766</span>
+<span class="line_number">767</span>  /**
+<span class="line_number">768</span>   *  @brief Swap the targets of two polymorphic function object wrappers.
+<span class="line_number">769</span>   *
+<span class="line_number">770</span>   *  This function will not throw exceptions.
+<span class="line_number">771</span>   */
+<span class="line_number">772</span>  // _GLIBCXX_RESOLVE_LIB_DEFECTS
+<span class="line_number">773</span>  // 2062. Effect contradictions w/o no-throw guarantee of std::function swaps
+<span class="line_number">774</span>  template&lt;typename _Res, typename... _Args&gt;
+<span class="line_number">775</span>    inline void
+<span class="line_number">776</span>    swap(function&lt;_Res(_Args...)&gt;&amp; __x, function&lt;_Res(_Args...)&gt;&amp; __y) noexcept
+<span class="line_number">777</span>    { __x.swap(__y); }
+<span class="line_number">778</span>
+<span class="line_number">779</span>#if __cplusplus &gt;= 201703L
+<span class="line_number">780</span>  namespace __detail::__variant
+<span class="line_number">781</span>  {
+<span class="line_number">782</span>    template&lt;typename&gt; struct _Never_valueless_alt; // see &lt;variant&gt;
+<span class="line_number">783</span>
+<span class="line_number">784</span>    // Provide the strong exception-safety guarantee when emplacing a
+<span class="line_number">785</span>    // function into a variant.
+<span class="line_number">786</span>    template&lt;typename _Signature&gt;
+<span class="line_number">787</span>      struct _Never_valueless_alt&lt;std::function&lt;_Signature&gt;&gt;
+<span class="line_number">788</span>      : std::true_type
+<span class="line_number">789</span>      { };
+<span class="line_number">790</span>  }  // namespace __detail::__variant
+<span class="line_number">791</span>#endif // C++17
+<span class="line_number">792</span>
+<span class="line_number">793</span>_GLIBCXX_END_NAMESPACE_VERSION
+<span class="line_number">794</span>} // namespace std
+<span class="line_number">795</span>
+<span class="line_number">796</span>#endif // C++11
+<span class="line_number">797</span>#endif // _GLIBCXX_STD_FUNCTION_H
+</code>
+            </pre>
+        </div>
+    </div>
+</body>
+
+</html>
