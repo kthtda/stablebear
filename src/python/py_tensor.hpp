@@ -221,7 +221,7 @@ namespace sb_py
 
       .def("_set_element", [](TTensor& self, const std::vector<size_t>& index, const T& val) {
           assert_valid_index(self, index);
-          self(index) = val;
+          self(index) = sb::detail::store_copy(val);
         })
 
       .def("copy", &TTensor::copy)

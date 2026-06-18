@@ -137,7 +137,9 @@ namespace sb
 
     auto rhs_view = rhs.broadcast_to(target);
     sb::walk(*this, [this, &rhs_view](const std::vector<size_t>& idx){
-      (*this)(idx) = T(rhs_view(idx));
+      // store_copy deep-copies element types that share a buffer (point clouds
+      // and the matrix types), so a slice assignment never aliases the source.
+      (*this)(idx) = detail::store_copy(T(rhs_view(idx)));
     });
   }
 

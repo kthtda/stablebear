@@ -3,6 +3,7 @@
 ### Bug fixes
 
 * **A single point cloud is now subscriptable** — a 0-d `PointCloudTensor` (one cloud, e.g. `sb.PointCloudTensor(arr)` from an `(n_points, dim)` array) can be indexed as its underlying array, so the natural plotting idiom `pc[:, 0]` / `pc[:, 1]` works directly instead of raising `IndexError`. Indexing tensors of rank ≥ 1 still selects clouds as before. ([#133](https://github.com/kthtda/stablebear/issues/133))
+* **Storing a matrix or point cloud in a tensor cell now copies it (no aliasing)** — assigning a `DistanceMatrix`, `SymmetricMatrix`, or point cloud into a tensor cell (`t[i] = m`) or slice (`t[0:2] = src`) now copies the element instead of sharing its buffer, so later mutation of the source (or assigning one object into several cells) no longer silently corrupts the stored cells. Matches NumPy object-array assignment. ([#39](https://github.com/kthtda/stablebear/issues/39))
 
 ## 0.4.3
 
