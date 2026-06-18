@@ -88,3 +88,23 @@ def test_out_of_range_dim_raises_index_error(bad_dim):
     for fn in (sb.mean, sb.max_time):
         with pytest.raises(IndexError):
             fn(A, dim=bad_dim)
+
+
+def test_max_time_empty_reduced_axis_raises_not_segfault():
+    """max_time over a size-0 reduced axis must raise cleanly, never SIGSEGV.
+
+    Issue #25 (bug scan): ``max_time`` segfaulted on an empty reduction
+    dimension while ``mean`` handled it. Resolved together with #46 —
+    ``max_element`` now rejects an empty reduction range with ``ValueError``
+    (``max`` has no identity over an empty range). ``mean`` still returns a
+    valid reduced tensor over the same empty axes, so the two stay consistent.
+    """
+    # 1-D empty tensor reduced along its only (empty) axis.
+    with pytest.raises(ValueError):
+        sb.max_time(sb.zeros((0,)), dim=0)
+    # Empty inner dimension of a higher-rank tensor.
+    with pytest.raises(ValueError):
+        sb.max_time(sb.zeros((3, 0)), dim=1)
+    # Contrast: mean returns a valid reduced tensor over the same empty axes.
+    assert sb.mean(sb.zeros((0,)), dim=0).shape == (1,)
+    assert sb.mean(sb.zeros((3, 0)), dim=1).shape == (3,)
