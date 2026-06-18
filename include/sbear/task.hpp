@@ -18,6 +18,7 @@
 #define SB_TASK_H
 
 #include <atomic>
+#include <exception>
 #include <functional>
 #include <iostream>
 
@@ -90,14 +91,35 @@ namespace sb
       return m_work_step_unit;
     }
 
+    /// Poll for completion. Returns false while the task is still running and
+    /// true once it has finished. When the task finishes, any exception a
+    /// worker stored in the future (e.g. a malformed input rejected deep in the
+    /// parallel walk) is rethrown here -- so a caller polling in a loop surfaces
+    /// worker errors without a separate call. The rethrow happens once; calling
+    /// again after completion returns true and does not rethrow.
     bool wait_for(std::chrono::milliseconds duration)
     {
-      return m_future.wait_for(duration) == std::future_status::ready;
+      if (m_future.valid())
+      {
+        if (m_future.wait_for(duration) != std::future_status::ready)
+        {
+          return false;
+        }
+        consume();
+      }
+      rethrow_captured();
+      return true;
     }
-    
+
+    /// Block until the task finishes, rethrowing any worker exception (once).
     void wait()
     {
-      m_future.wait();
+      if (m_future.valid())
+      {
+        m_future.wait();
+        consume();
+      }
+      rethrow_captured();
     }
 
   protected:
@@ -120,10 +142,38 @@ namespace sb
 
   private:
     virtual tf::Future<RetT> run_async(sb::Executor& exec) = 0;
-    
+
     virtual void on_stop_requested() { }
-    
+
+    // Consume the (ready) future, capturing any worker exception rather than
+    // letting it escape get() immediately, so wait()/wait_for() decide when to
+    // rethrow it. Precondition: m_future is valid and ready.
+    void consume()
+    {
+      try
+      {
+        m_future.get();
+      }
+      catch (...)
+      {
+        m_exception = std::current_exception();
+      }
+    }
+
+    // Rethrow a captured worker exception at most once (mirrors future::get(),
+    // which can only be consumed a single time).
+    void rethrow_captured()
+    {
+      if (m_exception)
+      {
+        auto e = m_exception;
+        m_exception = nullptr;
+        std::rethrow_exception(e);
+      }
+    }
+
     tf::Future<RetT> m_future;
+    std::exception_ptr m_exception;
     std::atomic_bool m_stop_requested = false;
     
     std::atomic_uint64_t m_work_total{0};
