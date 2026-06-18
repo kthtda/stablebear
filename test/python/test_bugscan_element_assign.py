@@ -77,3 +77,61 @@ def test_mutating_one_cell_leaves_others_untouched():
     assert t[0][0, 1] == 0.0
     assert t[2][0, 1] == 0.0
     assert t[1][0, 1] == 5.0
+
+
+# ---------------------------------------------------------------------------
+# Bug #129: self-aliasing slice assignment of an object-element tensor into
+# itself (t[1:] = t[:-1], t[:] = t[::-1]) must leave every cell independent.
+# The overlap-copy path only duplicated the outer buffer, so the matrix
+# elements stayed shallow-shared with the source cells; it now deep-copies
+# each stored element too.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "dt, mk",
+    [
+        pytest.param(sb.distmat64, lambda v: _distmat(v), id="distmat"),
+        pytest.param(sb.symmat64, lambda v: _symmat(v), id="symmat"),
+    ],
+)
+def test_forward_overlap_self_assignment_independent(dt, mk):
+    t = sb.zeros((3,), dtype=dt)
+    for i in range(3):
+        t[i] = mk(i + 1)                  # values 1, 2, 3
+    t[1:] = t[:-1]                         # shift down -> values 1, 1, 2
+    assert [t[i][0, 1] for i in range(3)] == [1.0, 1.0, 2.0]
+    # every cell is an independent copy
+    t[0][0, 1] = 99.0
+    assert t[1][0, 1] == 1.0
+    assert t[2][0, 1] == 2.0
+
+
+@pytest.mark.parametrize(
+    "dt, mk",
+    [
+        pytest.param(sb.distmat64, lambda v: _distmat(v), id="distmat"),
+        pytest.param(sb.symmat64, lambda v: _symmat(v), id="symmat"),
+    ],
+)
+def test_reverse_self_assignment_independent(dt, mk):
+    t = sb.zeros((2,), dtype=dt)
+    t[0] = mk(1)
+    t[1] = mk(2)
+    t[:] = t[::-1]                         # swap
+    assert t[0][0, 1] == 2.0
+    assert t[1][0, 1] == 1.0
+    t[0][0, 1] = 77.0                      # mutate one cell
+    assert t[1][0, 1] == 1.0              # sibling unaffected
+
+
+def _distmat(v):
+    m = DistanceMatrix(3)
+    m[0, 1] = float(v)
+    return m
+
+
+def _symmat(v):
+    m = SymmetricMatrix(3)
+    m[0, 1] = float(v)
+    return m

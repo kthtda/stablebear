@@ -150,7 +150,10 @@ namespace sb
       {
         Tensor<T> rhs_copy = rhs_view.copy();
         sb::walk(*this, [this, &rhs_copy](const std::vector<size_t>& idx){
-          (*this)(idx) = rhs_copy(idx);
+          // store_copy as well: rhs_copy.copy() duplicates only the outer
+          // buffer, so element types that share a buffer (point clouds, the
+          // matrix types) would still alias the source until copied per cell.
+          (*this)(idx) = detail::store_copy(rhs_copy(idx));
         });
         return;
       }
