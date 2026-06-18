@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>/usr/include/c++/13/bits/functional_hash.h</title>
+    <link href='valgrind.css' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+    <script src="https://code.jquery.com/jquery-3.4.1.js"></script>
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.0.0/styles/default.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.0.0/highlight.min.js"></script>
+    <script src="valgrind.js"></script>
+</head>
+
+<body>
+    <div class="global">
+        <div class="header">
+            <h1>/usr/include/c++/13/bits/functional_hash.h</h1>
+            <p><b>1</b> errors</p>
+            <button class="next_error">Goto First Error</button>
+        </div>
+        <div class="listing">
+            <pre class="code">
+<code class="c++"><span class="line_number">1</span>// functional_hash.h header -*- C++ -*-
+<span class="line_number">2</span>
+<span class="line_number">3</span>// Copyright (C) 2007-2023 Free Software Foundation, Inc.
+<span class="line_number">4</span>//
+<span class="line_number">5</span>// This file is part of the GNU ISO C++ Library.  This library is free
+<span class="line_number">6</span>// software; you can redistribute it and/or modify it under the
+<span class="line_number">7</span>// terms of the GNU General Public License as published by the
+<span class="line_number">8</span>// Free Software Foundation; either version 3, or (at your option)
+<span class="line_number">9</span>// any later version.
+<span class="line_number">10</span>
+<span class="line_number">11</span>// This library is distributed in the hope that it will be useful,
+<span class="line_number">12</span>// but WITHOUT ANY WARRANTY; without even the implied warranty of
+<span class="line_number">13</span>// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+<span class="line_number">14</span>// GNU General Public License for more details.
+<span class="line_number">15</span>
+<span class="line_number">16</span>// Under Section 7 of GPL version 3, you are granted additional
+<span class="line_number">17</span>// permissions described in the GCC Runtime Library Exception, version
+<span class="line_number">18</span>// 3.1, as published by the Free Software Foundation.
+<span class="line_number">19</span>
+<span class="line_number">20</span>// You should have received a copy of the GNU General Public License and
+<span class="line_number">21</span>// a copy of the GCC Runtime Library Exception along with this program;
+<span class="line_number">22</span>// see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
+<span class="line_number">23</span>// &lt;http://www.gnu.org/licenses/&gt;.
+<span class="line_number">24</span>
+<span class="line_number">25</span>/** @file bits/functional_hash.h
+<span class="line_number">26</span> *  This is an internal header file, included by other library headers.
+<span class="line_number">27</span> *  Do not attempt to use it directly. @headername{functional}
+<span class="line_number">28</span> */
+<span class="line_number">29</span>
+<span class="line_number">30</span>#ifndef _FUNCTIONAL_HASH_H
+<span class="line_number">31</span>#define _FUNCTIONAL_HASH_H 1
+<span class="line_number">32</span>
+<span class="line_number">33</span>#pragma GCC system_header
+<span class="line_number">34</span>
+<span class="line_number">35</span>#include &lt;type_traits&gt;
+<span class="line_number">36</span>#include &lt;bits/hash_bytes.h&gt;
+<span class="line_number">37</span>
+<span class="line_number">38</span>namespace std _GLIBCXX_VISIBILITY(default)
+<span class="line_number">39</span>{
+<span class="line_number">40</span>_GLIBCXX_BEGIN_NAMESPACE_VERSION
+<span class="line_number">41</span>
+<span class="line_number">42</span>  /** @defgroup hashes Hashes
+<span class="line_number">43</span>   *  @ingroup functors
+<span class="line_number">44</span>   *
+<span class="line_number">45</span>   *   Hashing functors taking a variable type and returning a @c std::size_t.
+<span class="line_number">46</span>   *
+<span class="line_number">47</span>   *  @{
+<span class="line_number">48</span>   */
+<span class="line_number">49</span>
+<span class="line_number">50</span>  template&lt;typename _Result, typename _Arg&gt;
+<span class="line_number">51</span>    struct __hash_base
+<span class="line_number">52</span>    {
+<span class="line_number">53</span>      typedef _Result     result_type _GLIBCXX17_DEPRECATED;
+<span class="line_number">54</span>      typedef _Arg      argument_type _GLIBCXX17_DEPRECATED;
+<span class="line_number">55</span>    };
+<span class="line_number">56</span>
+<span class="line_number">57</span>  /// Primary class template hash.
+<span class="line_number">58</span>  template&lt;typename _Tp&gt;
+<span class="line_number">59</span>    struct hash;
+<span class="line_number">60</span>
+<span class="line_number">61</span>  template&lt;typename _Tp, typename = void&gt;
+<span class="line_number">62</span>    struct __poison_hash
+<span class="line_number">63</span>    {
+<span class="line_number">64</span>      static constexpr bool __enable_hash_call = false;
+<span class="line_number">65</span>    private:
+<span class="line_number">66</span>      // Private rather than deleted to be non-trivially-copyable.
+<span class="line_number">67</span>      __poison_hash(__poison_hash&amp;&amp;);
+<span class="line_number">68</span>      ~__poison_hash();
+<span class="line_number">69</span>    };
+<span class="line_number">70</span>
+<span class="line_number">71</span>  template&lt;typename _Tp&gt;
+<span class="line_number">72</span>    struct __poison_hash&lt;_Tp, __void_t&lt;decltype(hash&lt;_Tp&gt;()(declval&lt;_Tp&gt;()))&gt;&gt;
+<span class="line_number">73</span>    {
+<span class="line_number">74</span>      static constexpr bool __enable_hash_call = true;
+<span class="line_number">75</span>    };
+<span class="line_number">76</span>
+<span class="line_number">77</span>  // Helper struct for SFINAE-poisoning non-enum types.
+<span class="line_number">78</span>  template&lt;typename _Tp, bool = is_enum&lt;_Tp&gt;::value&gt;
+<span class="line_number">79</span>    struct __hash_enum
+<span class="line_number">80</span>    {
+<span class="line_number">81</span>    private:
+<span class="line_number">82</span>      // Private rather than deleted to be non-trivially-copyable.
+<span class="line_number">83</span>      __hash_enum(__hash_enum&amp;&amp;);
+<span class="line_number">84</span>      ~__hash_enum();
+<span class="line_number">85</span>    };
+<span class="line_number">86</span>
+<span class="line_number">87</span>  // Helper struct for hash with enum types.
+<span class="line_number">88</span>  template&lt;typename _Tp&gt;
+<span class="line_number">89</span>    struct __hash_enum&lt;_Tp, true&gt; : public __hash_base&lt;size_t, _Tp&gt;
+<span class="line_number">90</span>    {
+<span class="line_number">91</span>      size_t
+<span class="line_number">92</span>      operator()(_Tp __val) const noexcept
+<span class="line_number">93</span>      {
+<span class="line_number">94</span>       using __type = typename underlying_type&lt;_Tp&gt;::type;
+<span class="line_number">95</span>       return hash&lt;__type&gt;{}(static_cast&lt;__type&gt;(__val));
+<span class="line_number">96</span>      }
+<span class="line_number">97</span>    };
+<span class="line_number">98</span>
+<span class="line_number">99</span>  /// Primary class template hash, usable for enum types only.
+<span class="line_number">100</span>  // Use with non-enum types still SFINAES.
+<span class="line_number">101</span>  template&lt;typename _Tp&gt;
+<span class="line_number">102</span>    struct hash : __hash_enum&lt;_Tp&gt;
+<span class="line_number">103</span>    { };
+<span class="line_number">104</span>
+<span class="line_number">105</span>  /// Partial specializations for pointer types.
+<span class="line_number">106</span>  template&lt;typename _Tp&gt;
+<span class="line_number">107</span>    struct hash&lt;_Tp*&gt; : public __hash_base&lt;size_t, _Tp*&gt;
+<span class="line_number">108</span>    {
+<span class="line_number">109</span>      size_t
+<span class="line_number">110</span>      operator()(_Tp* __p) const noexcept
+<span class="line_number">111</span>      { return reinterpret_cast&lt;size_t&gt;(__p); }
+<span class="line_number">112</span>    };
+<span class="line_number">113</span>
+<span class="line_number">114</span>  // Explicit specializations for integer types.
+<span class="line_number">115</span>#define _Cxx_hashtable_define_trivial_hash(_Tp) 	\
+<span class="line_number">116</span>  template&lt;&gt;						\
+<span class="line_number">117</span>    struct hash&lt;_Tp&gt; : public __hash_base&lt;size_t, _Tp&gt;  \
+<span class="line_number">118</span>    {                                                   \
+<span class="line_number">119</span>      size_t                                            \
+<span class="line_number">120</span>      operator()(_Tp __val) const noexcept              \
+<span class="line_number">121</span>      { return static_cast&lt;size_t&gt;(__val); }            \
+<span class="line_number">122</span>    };
+<span class="line_number">123</span>
+<span class="line_number">124</span>  /// Explicit specialization for bool.
+<span class="line_number">125</span>  _Cxx_hashtable_define_trivial_hash(bool)
+<span class="line_number">126</span>
+<span class="line_number">127</span>  /// Explicit specialization for char.
+<span class="line_number">128</span>  _Cxx_hashtable_define_trivial_hash(char)
+<span class="line_number">129</span>
+<span class="line_number">130</span>  /// Explicit specialization for signed char.
+<span class="line_number">131</span>  _Cxx_hashtable_define_trivial_hash(signed char)
+<span class="line_number">132</span>
+<span class="line_number">133</span>  /// Explicit specialization for unsigned char.
+<span class="line_number">134</span>  _Cxx_hashtable_define_trivial_hash(unsigned char)
+<span class="line_number">135</span>
+<span class="line_number">136</span>  /// Explicit specialization for wchar_t.
+<span class="line_number">137</span>  _Cxx_hashtable_define_trivial_hash(wchar_t)
+<span class="line_number">138</span>
+<span class="line_number">139</span>#ifdef _GLIBCXX_USE_CHAR8_T
+<span class="line_number">140</span>  /// Explicit specialization for char8_t.
+<span class="line_number">141</span>  _Cxx_hashtable_define_trivial_hash(char8_t)
+<span class="line_number">142</span>#endif
+<span class="line_number">143</span>
+<span class="line_number">144</span>  /// Explicit specialization for char16_t.
+<span class="line_number">145</span>  _Cxx_hashtable_define_trivial_hash(char16_t)
+<span class="line_number">146</span>
+<span class="line_number">147</span>  /// Explicit specialization for char32_t.
+<span class="line_number">148</span>  _Cxx_hashtable_define_trivial_hash(char32_t)
+<span class="line_number">149</span>
+<span class="line_number">150</span>  /// Explicit specialization for short.
+<span class="line_number">151</span>  _Cxx_hashtable_define_trivial_hash(short)
+<span class="line_number">152</span>
+<span class="line_number">153</span>  /// Explicit specialization for int.
+<span class="line_number">154</span>  _Cxx_hashtable_define_trivial_hash(int)
+<span class="line_number">155</span>
+<span class="line_number">156</span>  /// Explicit specialization for long.
+<span class="line_number">157</span>  _Cxx_hashtable_define_trivial_hash(long)
+<span class="line_number">158</span>
+<span class="line_number">159</span>  /// Explicit specialization for long long.
+<span class="line_number">160</span>  _Cxx_hashtable_define_trivial_hash(long long)
+<span class="line_number">161</span>
+<span class="line_number">162</span>  /// Explicit specialization for unsigned short.
+<span class="line_number">163</span>  _Cxx_hashtable_define_trivial_hash(unsigned short)
+<span class="line_number">164</span>
+<span class="line_number">165</span>  /// Explicit specialization for unsigned int.
+<span class="line_number">166</span>  _Cxx_hashtable_define_trivial_hash(unsigned int)
+<span class="line_number">167</span>
+<span class="line_number">168</span>  /// Explicit specialization for unsigned long.
+<span class="line_number">169</span>  _Cxx_hashtable_define_trivial_hash(unsigned long)
+<span class="line_number">170</span>
+<span class="line_number">171</span>  /// Explicit specialization for unsigned long long.
+<span class="line_number">172</span>  _Cxx_hashtable_define_trivial_hash(unsigned long long)
+<span class="line_number">173</span>
+<span class="line_number">174</span>#ifdef __GLIBCXX_TYPE_INT_N_0
+<span class="line_number">175</span>  __extension__
+<span class="line_number">176</span>  _Cxx_hashtable_define_trivial_hash(__GLIBCXX_TYPE_INT_N_0)
+<span class="line_number">177</span>  __extension__
+<span class="line_number">178</span>  _Cxx_hashtable_define_trivial_hash(__GLIBCXX_TYPE_INT_N_0 unsigned)
+<span class="line_number">179</span>#endif
+<span class="line_number">180</span>#ifdef __GLIBCXX_TYPE_INT_N_1
+<span class="line_number">181</span>  __extension__
+<span class="line_number">182</span>  _Cxx_hashtable_define_trivial_hash(__GLIBCXX_TYPE_INT_N_1)
+<span class="line_number">183</span>  __extension__
+<span class="line_number">184</span>  _Cxx_hashtable_define_trivial_hash(__GLIBCXX_TYPE_INT_N_1 unsigned)
+<span class="line_number">185</span>#endif
+<span class="line_number">186</span>#ifdef __GLIBCXX_TYPE_INT_N_2
+<span class="line_number">187</span>  __extension__
+<span class="line_number">188</span>  _Cxx_hashtable_define_trivial_hash(__GLIBCXX_TYPE_INT_N_2)
+<span class="line_number">189</span>  __extension__
+<span class="line_number">190</span>  _Cxx_hashtable_define_trivial_hash(__GLIBCXX_TYPE_INT_N_2 unsigned)
+<span class="line_number">191</span>#endif
+<span class="line_number">192</span>#ifdef __GLIBCXX_TYPE_INT_N_3
+<span class="line_number">193</span>  __extension__
+<span class="line_number">194</span>  _Cxx_hashtable_define_trivial_hash(__GLIBCXX_TYPE_INT_N_3)
+<span class="line_number">195</span>  __extension__
+<span class="line_number">196</span>  _Cxx_hashtable_define_trivial_hash(__GLIBCXX_TYPE_INT_N_3 unsigned)
+<span class="line_number">197</span>#endif
+<span class="line_number">198</span>
+<span class="line_number">199</span>#undef _Cxx_hashtable_define_trivial_hash
+<span class="line_number">200</span>
+<span class="line_number">201</span>  struct _Hash_impl
+<span class="line_number">202</span>  {
+<span class="line_number">203</span>    static size_t
+<span class="line_number">204</span>    hash(const void* __ptr, size_t __clength,
+<span class="line_number">205</span>	 size_t __seed = static_cast&lt;size_t&gt;(0xc70f6907UL))
+</code></pre>
+            <div class="issue">
+                <div>
+                    <span class="what">Possible data race during read of size 8 at 0x2A027EB8 by thread #8</span>
+                    <div class="navigation">
+                        <button class="next_error">Next</button>
+                        <button class="prev_error">Previous</button>
+                    </div>
+                </div>
+                <div>
+                    <table class="call_stack">
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/functional_hash.h:211<br>
+                                    <code class="cpp">unsigned long std::_Hash_impl::hash&lt;unsigned long&gt;(unsigned long const&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">208</span>    template&lt;typename _Tp&gt;
+<span class="line_number">209</span>      static size_t
+<span class="line_number">210</span>      hash(const _Tp&amp; __val)
+<span class="line_number">211</span><span class="error">      { return hash(&amp;__val, sizeof(__val)); }
+</span><span class="line_number">212</span>
+<span class="line_number">213</span>    template&lt;typename _Tp&gt;
+<span class="line_number">214</span>      static size_t
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/std_thread.h:343<br>
+                                    <code class="cpp">std::hash&lt;std::thread::id&gt;::operator()(std::thread::id const&amp;) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">340</span>    {
+<span class="line_number">341</span>      size_t
+<span class="line_number">342</span>      operator()(const thread::id&amp; __id) const noexcept
+<span class="line_number">343</span><span class="error">      { return std::_Hash_impl::hash(__id._M_thread); }
+</span><span class="line_number">344</span>    };
+<span class="line_number">345</span>
+<span class="line_number">346</span>  namespace this_thread
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/hashtable_policy.h:1310<br>
+                                    <code class="cpp">std::__detail::_Hash_code_base&lt;std::thread::id, std::pair&lt;std::thread::id const, tf::Worker*&gt;, std::__detail::_Select1st, std::hash&lt;std::thread::id&gt;, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, false&gt;::_M_hash_code(std::thread::id const&amp;) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1307</span>      {
+<span class="line_number">1308</span>	static_assert(__is_invocable&lt;const _Hash&amp;, const _Key&amp;&gt;{},
+<span class="line_number">1309</span>	    &#34;hash function must be invocable with an argument of key type&#34;);
+<span class="line_number">1310</span><span class="error">	return _M_hash()(__k);
+</span><span class="line_number">1311</span>      }
+<span class="line_number">1312</span>
+<span class="line_number">1313</span>      template&lt;typename _Kt&gt;
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/hashtable_policy.h:1341<br>
+                                    <code class="cpp">std::__detail::_Hash_code_base&lt;std::thread::id, std::pair&lt;std::thread::id const, tf::Worker*&gt;, std::__detail::_Select1st, std::hash&lt;std::thread::id&gt;, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, false&gt;::_M_bucket_index(std::__detail::_Hash_node_value&lt;std::pair&lt;std::thread::id const, tf::Worker*&gt;, false&gt; const&amp;, unsigned long) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1338</span>		  &amp;&amp; noexcept(declval&lt;const _RangeHash&amp;&gt;()((__hash_code)0,
+<span class="line_number">1339</span>							   (std::size_t)0)) )
+<span class="line_number">1340</span>      {
+<span class="line_number">1341</span><span class="error">	return _RangeHash{}(_M_hash_code(_ExtractKey{}(__n._M_v())),
+</span><span class="line_number">1342</span>			    __bkt_count);
+<span class="line_number">1343</span>      }
+<span class="line_number">1344</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/hashtable.h:793<br>
+                                    <code class="cpp">std::_Hashtable&lt;std::thread::id, std::pair&lt;std::thread::id const, tf::Worker*&gt;, std::allocator&lt;std::pair&lt;std::thread::id const, tf::Worker*&gt; &gt;, std::__detail::_Select1st, std::equal_to&lt;std::thread::id&gt;, std::hash&lt;std::thread::id&gt;, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits&lt;false, false, true&gt; &gt;::_M_bucket_index(std::__detail::_Hash_node_value&lt;std::pair&lt;std::thread::id const, tf::Worker*&gt;, false&gt; const&amp;) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">790</span>      // Bucket index computation helpers.
+<span class="line_number">791</span>      size_type
+<span class="line_number">792</span>      _M_bucket_index(const __node_value_type&amp; __n) const noexcept
+<span class="line_number">793</span><span class="error">      { return __hash_code_base::_M_bucket_index(__n, _M_bucket_count); }
+</span><span class="line_number">794</span>
+<span class="line_number">795</span>      size_type
+<span class="line_number">796</span>      _M_bucket_index(__hash_code __c) const
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/hashtable.h:1964<br>
+                                    <code class="cpp">std::_Hashtable&lt;std::thread::id, std::pair&lt;std::thread::id const, tf::Worker*&gt;, std::allocator&lt;std::pair&lt;std::thread::id const, tf::Worker*&gt; &gt;, std::__detail::_Select1st, std::equal_to&lt;std::thread::id&gt;, std::hash&lt;std::thread::id&gt;, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits&lt;false, false, true&gt; &gt;::_M_find_before_node(unsigned long, std::thread::id const&amp;, unsigned long) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1961</span>	  if (this-&gt;_M_equals(__k, __code, *__p))
+<span class="line_number">1962</span>	    return __prev_p;
+<span class="line_number">1963</span>
+<span class="line_number">1964</span><span class="error">	  if (!__p-&gt;_M_nxt || _M_bucket_index(*__p-&gt;_M_next()) != __bkt)
+</span><span class="line_number">1965</span>	    break;
+<span class="line_number">1966</span>	  __prev_p = __p;
+<span class="line_number">1967</span>	}
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/hashtable.h:815<br>
+                                    <code class="cpp">std::_Hashtable&lt;std::thread::id, std::pair&lt;std::thread::id const, tf::Worker*&gt;, std::allocator&lt;std::pair&lt;std::thread::id const, tf::Worker*&gt; &gt;, std::__detail::_Select1st, std::equal_to&lt;std::thread::id&gt;, std::hash&lt;std::thread::id&gt;, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits&lt;false, false, true&gt; &gt;::_M_find_node(unsigned long, std::thread::id const&amp;, unsigned long) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">812</span>      _M_find_node(size_type __bkt, const key_type&amp; __key,
+<span class="line_number">813</span>		   __hash_code __c) const
+<span class="line_number">814</span>      {
+<span class="line_number">815</span><span class="error">	__node_base_ptr __before_n = _M_find_before_node(__bkt, __key, __c);
+</span><span class="line_number">816</span>	if (__before_n)
+<span class="line_number">817</span>	  return static_cast&lt;__node_ptr&gt;(__before_n-&gt;_M_nxt);
+<span class="line_number">818</span>	return nullptr;
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/hashtable.h:1679<br>
+                                    <code class="cpp">std::_Hashtable&lt;std::thread::id, std::pair&lt;std::thread::id const, tf::Worker*&gt;, std::allocator&lt;std::pair&lt;std::thread::id const, tf::Worker*&gt; &gt;, std::__detail::_Select1st, std::equal_to&lt;std::thread::id&gt;, std::hash&lt;std::thread::id&gt;, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits&lt;false, false, true&gt; &gt;::find(std::thread::id const&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1676</span>
+<span class="line_number">1677</span>      __hash_code __code = this-&gt;_M_hash_code(__k);
+<span class="line_number">1678</span>      std::size_t __bkt = _M_bucket_index(__code);
+<span class="line_number">1679</span><span class="error">      return iterator(_M_find_node(__bkt, __k, __code));
+</span><span class="line_number">1680</span>    }
+<span class="line_number">1681</span>
+<span class="line_number">1682</span>  template&lt;typename _Key, typename _Value, typename _Alloc,
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/unordered_map.h:876<br>
+                                    <code class="cpp">std::unordered_map&lt;std::thread::id, tf::Worker*, std::hash&lt;std::thread::id&gt;, std::equal_to&lt;std::thread::id&gt;, std::allocator&lt;std::pair&lt;std::thread::id const, tf::Worker*&gt; &gt; &gt;::find(std::thread::id const&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">873</span>       */
+<span class="line_number">874</span>      iterator
+<span class="line_number">875</span>      find(const key_type&amp; __x)
+<span class="line_number">876</span><span class="error">      { return _M_h.find(__x); }
+</span><span class="line_number">877</span>
+<span class="line_number">878</span>#if __cplusplus &gt; 201703L
+<span class="line_number">879</span>      template&lt;typename _Kt&gt;
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/algorithm/../core/executor.hpp:1287<br>
+                                    <code class="cpp">tf::Executor::this_worker()</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1284</span>
+<span class="line_number">1285</span>// Function: this_worker
+<span class="line_number">1286</span>inline Worker* Executor::this_worker() {
+<span class="line_number">1287</span><span class="error">  auto itr = _t2w.find(std::this_thread::get_id());
+</span><span class="line_number">1288</span>  return itr == _t2w.end() ? nullptr : itr-&gt;second;
+<span class="line_number">1289</span>}
+<span class="line_number">1290</span>
+</code></pre>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            <pre class="code">
+<code class="c++"><span class="line_number">206</span><span class="error">    { return _Hash_bytes(__ptr, __clength, __seed); }</span>
+<span class="line_number">207</span>
+<span class="line_number">208</span>    template&lt;typename _Tp&gt;
+<span class="line_number">209</span>      static size_t
+<span class="line_number">210</span>      hash(const _Tp&amp; __val)
+<span class="line_number">211</span>      { return hash(&amp;__val, sizeof(__val)); }
+<span class="line_number">212</span>
+<span class="line_number">213</span>    template&lt;typename _Tp&gt;
+<span class="line_number">214</span>      static size_t
+<span class="line_number">215</span>      __hash_combine(const _Tp&amp; __val, size_t __hash)
+<span class="line_number">216</span>      { return hash(&amp;__val, sizeof(__val), __hash); }
+<span class="line_number">217</span>  };
+<span class="line_number">218</span>
+<span class="line_number">219</span>  // A hash function similar to FNV-1a (see PR59406 for how it differs).
+<span class="line_number">220</span>  struct _Fnv_hash_impl
+<span class="line_number">221</span>  {
+<span class="line_number">222</span>    static size_t
+<span class="line_number">223</span>    hash(const void* __ptr, size_t __clength,
+<span class="line_number">224</span>	 size_t __seed = static_cast&lt;size_t&gt;(2166136261UL))
+<span class="line_number">225</span>    { return _Fnv_hash_bytes(__ptr, __clength, __seed); }
+<span class="line_number">226</span>
+<span class="line_number">227</span>    template&lt;typename _Tp&gt;
+<span class="line_number">228</span>      static size_t
+<span class="line_number">229</span>      hash(const _Tp&amp; __val)
+<span class="line_number">230</span>      { return hash(&amp;__val, sizeof(__val)); }
+<span class="line_number">231</span>
+<span class="line_number">232</span>    template&lt;typename _Tp&gt;
+<span class="line_number">233</span>      static size_t
+<span class="line_number">234</span>      __hash_combine(const _Tp&amp; __val, size_t __hash)
+<span class="line_number">235</span>      { return hash(&amp;__val, sizeof(__val), __hash); }
+<span class="line_number">236</span>  };
+<span class="line_number">237</span>
+<span class="line_number">238</span>  /// Specialization for float.
+<span class="line_number">239</span>  template&lt;&gt;
+<span class="line_number">240</span>    struct hash&lt;float&gt; : public __hash_base&lt;size_t, float&gt;
+<span class="line_number">241</span>    {
+<span class="line_number">242</span>      size_t
+<span class="line_number">243</span>      operator()(float __val) const noexcept
+<span class="line_number">244</span>      {
+<span class="line_number">245</span>	// 0 and -0 both hash to zero.
+<span class="line_number">246</span>	return __val != 0.0f ? std::_Hash_impl::hash(__val) : 0;
+<span class="line_number">247</span>      }
+<span class="line_number">248</span>    };
+<span class="line_number">249</span>
+<span class="line_number">250</span>  /// Specialization for double.
+<span class="line_number">251</span>  template&lt;&gt;
+<span class="line_number">252</span>    struct hash&lt;double&gt; : public __hash_base&lt;size_t, double&gt;
+<span class="line_number">253</span>    {
+<span class="line_number">254</span>      size_t
+<span class="line_number">255</span>      operator()(double __val) const noexcept
+<span class="line_number">256</span>      {
+<span class="line_number">257</span>	// 0 and -0 both hash to zero.
+<span class="line_number">258</span>	return __val != 0.0 ? std::_Hash_impl::hash(__val) : 0;
+<span class="line_number">259</span>      }
+<span class="line_number">260</span>    };
+<span class="line_number">261</span>
+<span class="line_number">262</span>  /// Specialization for long double.
+<span class="line_number">263</span>  template&lt;&gt;
+<span class="line_number">264</span>    struct hash&lt;long double&gt;
+<span class="line_number">265</span>    : public __hash_base&lt;size_t, long double&gt;
+<span class="line_number">266</span>    {
+<span class="line_number">267</span>      _GLIBCXX_PURE size_t
+<span class="line_number">268</span>      operator()(long double __val) const noexcept;
+<span class="line_number">269</span>    };
+<span class="line_number">270</span>
+<span class="line_number">271</span>#if __cplusplus &gt;= 201703L
+<span class="line_number">272</span>  template&lt;&gt;
+<span class="line_number">273</span>    struct hash&lt;nullptr_t&gt; : public __hash_base&lt;size_t, nullptr_t&gt;
+<span class="line_number">274</span>    {
+<span class="line_number">275</span>      size_t
+<span class="line_number">276</span>      operator()(nullptr_t) const noexcept
+<span class="line_number">277</span>      { return 0; }
+<span class="line_number">278</span>    };
+<span class="line_number">279</span>#endif
+<span class="line_number">280</span>
+<span class="line_number">281</span>  /// @} group hashes
+<span class="line_number">282</span>
+<span class="line_number">283</span>  /** Hint about performance of hash functions.
+<span class="line_number">284</span>   *
+<span class="line_number">285</span>   * If a given hash function object is not fast, the hash-based containers
+<span class="line_number">286</span>   * will cache the hash code.
+<span class="line_number">287</span>   * The default behavior is to consider that hashers are fast unless specified
+<span class="line_number">288</span>   * otherwise.
+<span class="line_number">289</span>   *
+<span class="line_number">290</span>   * Users can specialize this for their own hash functions in order to force
+<span class="line_number">291</span>   * caching of hash codes in unordered containers. Specializing this trait
+<span class="line_number">292</span>   * affects the ABI of the unordered containers, so use it carefully.
+<span class="line_number">293</span>   */
+<span class="line_number">294</span>  template&lt;typename _Hash&gt;
+<span class="line_number">295</span>    struct __is_fast_hash : public std::true_type
+<span class="line_number">296</span>    { };
+<span class="line_number">297</span>
+<span class="line_number">298</span>  template&lt;&gt;
+<span class="line_number">299</span>    struct __is_fast_hash&lt;hash&lt;long double&gt;&gt; : public std::false_type
+<span class="line_number">300</span>    { };
+<span class="line_number">301</span>
+<span class="line_number">302</span>_GLIBCXX_END_NAMESPACE_VERSION
+<span class="line_number">303</span>} // namespace
+<span class="line_number">304</span>
+<span class="line_number">305</span>#endif // _FUNCTIONAL_HASH_H
+</code>
+            </pre>
+        </div>
+    </div>
+</body>
+
+</html>
