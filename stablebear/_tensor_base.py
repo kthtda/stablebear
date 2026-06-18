@@ -778,6 +778,23 @@ class Tensor(ABC):
             raise TypeError("len() of unsized object")
         return self._data.shape[0]
 
+    def __bool__(self) -> bool:
+        """Return the truth value of a single-element tensor (NumPy semantics).
+
+        A tensor with exactly one element (including a 0-d/scalar tensor)
+        returns that element's truthiness; a tensor with any other number of
+        elements has an ambiguous truth value and raises ``ValueError``.
+        Without this, ``bool()`` would fall back to ``__len__`` and report the
+        first-dim length rather than the value.
+        """
+        if self.size == 1:
+            idx = [0] * self.ndim
+            return bool(self._data._get_element(idx))
+        raise ValueError(
+            f"The truth value of a tensor with {self.size} elements is ambiguous. "
+            "Use array_equal() for whole-tensor comparison."
+        )
+
     @property
     def strides(self):
         return self._data.strides

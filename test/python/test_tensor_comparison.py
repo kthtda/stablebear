@@ -41,7 +41,7 @@ def test_bool_tensor_bool_multi_element_raises():
 
     a = sb.FloatTensor(np_a)
     b = sb.FloatTensor(np_b)
-    with pytest.raises(ValueError, match="more than one element"):
+    with pytest.raises(ValueError, match="ambiguous"):
         bool(a == b)
 
 

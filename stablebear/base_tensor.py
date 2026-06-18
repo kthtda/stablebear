@@ -411,18 +411,6 @@ class BoolTensor(Tensor):
     def _get_valid_setitem_dtypes(self):
         return [BoolTensor, bool]
 
-    def __bool__(self):
-        total = 1
-        for d in self.shape:
-            total *= d
-        if total == 1:
-            idx = [0] * len(self.shape)
-            return bool(self._data._get_element(idx))
-        raise ValueError(
-            "The truth value of a tensor with more than one element is ambiguous. "
-            "Use array_equal() for whole-tensor comparison."
-        )
-
     def __array__(self, dtype=None, copy=None):
         data = self._data if self._data.is_contiguous() else self.copy()._data
         arr = np.array(data)

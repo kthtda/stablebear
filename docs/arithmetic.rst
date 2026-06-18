@@ -192,17 +192,21 @@ Column and scalar broadcasting also work::
 Converting to Python bool
 -------------------------
 
-Calling ``bool()`` on a single-element ``BoolTensor`` returns a Python ``bool``.
-For multi-element tensors, ``bool()`` raises ``ValueError``, matching NumPy's
-behavior::
+Calling ``bool()`` on any single-element tensor (a ``BoolTensor``, a numeric
+tensor, or a 0-d/scalar tensor) returns the element's truthiness. For tensors
+with any other number of elements, ``bool()`` raises ``ValueError``, matching
+NumPy's behavior::
 
    A = sb.FloatTensor(np.array([1.0]))
    B = sb.FloatTensor(np.array([1.0]))
    bool(A == B)   # True
 
+   bool(sb.FloatTensor(np.array([0.0])))   # False — reflects the value
+   bool(sb.IntTensor(np.array([5])))       # True
+
    C = sb.FloatTensor(np.array([1.0, 2.0]))
    D = sb.FloatTensor(np.array([1.0, 2.0]))
-   bool(C == D)   # ValueError: more than one element
+   bool(C == D)   # ValueError: ambiguous truth value
 
 array_equal
 -----------
