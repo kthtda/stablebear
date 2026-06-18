@@ -800,5 +800,15 @@
     "py": 87.0,
     "cuda": null,
     "release_tag": null
+  },
+  {
+    "utc_iso": "2026-06-18T14:20:43Z",
+    "sha": "b3bd812",
+    "branch": "128/merge",
+    "detail_path": "reports/2026-06-18_14-20-43_b3bd812/report.html",
+    "cpp": 88.4,
+    "py": 87.0,
+    "cuda": null,
+    "release_tag": null
   }
 ]
