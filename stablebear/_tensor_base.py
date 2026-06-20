@@ -147,6 +147,16 @@ def _resolve_negative_indices(index_tensor, axis_size):
     return IntTensor(arr)
 
 
+def _resolve_axis(axis: int, ndim: int) -> int:
+    axis = operator.index(axis)
+    resolved = axis + ndim if axis < 0 else axis
+    if not 0 <= resolved < ndim:
+        raise IndexError(
+            f"axis {axis} is out of range for tensor with {ndim} dimension(s)"
+        )
+    return resolved
+
+
 class Tensor(ABC):
     _data: CppTensor
 
@@ -709,7 +719,10 @@ class Tensor(ABC):
         return self._to_py_tensor(self._data.reshape(list(shape)))
 
     def transpose(self, axes=None):
-        return self._to_py_tensor(self._data.transpose(list(axes) if axes else []))
+        if axes is None:
+            return self._to_py_tensor(self._data.transpose([]))
+        resolved_axes = [_resolve_axis(axis, self.ndim) for axis in axes]
+        return self._to_py_tensor(self._data.transpose(resolved_axes))
 
     @property
     def T(self):
@@ -729,7 +742,7 @@ class Tensor(ABC):
     def squeeze(self, axis=None):
         if axis is None:
             return self._to_py_tensor(self._data.squeeze())
-        return self._to_py_tensor(self._data.squeeze(axis))
+        return self._to_py_tensor(self._data.squeeze(_resolve_axis(axis, self.ndim)))
 
     def expand_dims(self, axis):
         return self._to_py_tensor(self._data.expand_dims(axis))
