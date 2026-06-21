@@ -323,6 +323,9 @@ class TestExpandDims:
     def test_expand_negative_axis(self, TensorType, np_dtype):
         _assert_expand_dims(np.arange(12, dtype=np_dtype).reshape(3, 4), -2, TensorType)
 
+    def test_expand_negative_axis_before_first(self, TensorType, np_dtype):
+        _assert_expand_dims(np.arange(12, dtype=np_dtype).reshape(3, 4), -3, TensorType)
+
     def test_expand_is_view(self, TensorType, np_dtype):
         np_arr = np.arange(6, dtype=np_dtype)
         t = TensorType(np_arr)
@@ -332,8 +335,10 @@ class TestExpandDims:
 
     def test_expand_out_of_range_raises(self, TensorType, np_dtype):
         t = TensorType(np.arange(6, dtype=np_dtype))
-        with pytest.raises((ValueError, RuntimeError)):
+        with pytest.raises((ValueError, RuntimeError, IndexError)):
             t.expand_dims(3)
+        with pytest.raises((ValueError, RuntimeError, IndexError)):
+            t.expand_dims(-3)
 
 
 # --- astype ---
