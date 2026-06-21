@@ -206,10 +206,12 @@ jobs:
       - name: Download CPython valgrind suppressions
         run: |
           PYVER=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
-          # --retry/--retry-all-errors absorbs transient raw.githubusercontent.com
-          # blips; a missing suppression file is non-fatal (valgrind tolerates it),
-          # so don't fail the job if the download is unreachable after retries.
-          curl -fsSL --retry 5 --retry-delay 2 --retry-all-errors \
+          # --retry/--retry-connrefused absorbs transient raw.githubusercontent.com
+          # blips (--retry-connrefused works on the older curl shipped in some
+          # runner images, unlike --retry-all-errors); a missing suppression file
+          # is non-fatal (valgrind tolerates it), so don't fail the job if the
+          # download is unreachable after retries.
+          curl -fsSL --retry 5 --retry-delay 2 --retry-connrefused \
             "https://raw.githubusercontent.com/python/cpython/${PYVER}/Misc/valgrind-python.supp" \
             -o test/reports/vg_cpython.supp \
             || { echo "Warning: could not download CPython ${PYVER} suppressions; continuing without them"; : > test/reports/vg_cpython.supp; }
