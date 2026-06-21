@@ -850,5 +850,15 @@
     "py": 88.0,
     "cuda": 100.0,
     "release_tag": null
+  },
+  {
+    "utc_iso": "2026-06-21T17:48:47Z",
+    "sha": "ffd26b4",
+    "branch": "main",
+    "detail_path": "reports/2026-06-21_17-48-47_ffd26b4/report.html",
+    "cpp": 88.3,
+    "py": 88.0,
+    "cuda": 100.0,
+    "release_tag": null
   }
 ]
