@@ -729,14 +729,8 @@ class Tensor(ABC):
         return self.transpose()
 
     def swapaxes(self, axis1, axis2):
-        n = self.ndim
-        if axis1 < 0:
-            axis1 += n
-        if axis2 < 0:
-            axis2 += n
-        if not (0 <= axis1 < n and 0 <= axis2 < n):
-            raise IndexError(
-                f"swapaxes: axis out of range for tensor with {n} dimensions")
+        axis1 = _resolve_axis(axis1, self.ndim)
+        axis2 = _resolve_axis(axis2, self.ndim)
         return self._to_py_tensor(self._data.swapaxes(axis1, axis2))
 
     def squeeze(self, axis=None):
@@ -745,6 +739,7 @@ class Tensor(ABC):
         return self._to_py_tensor(self._data.squeeze(_resolve_axis(axis, self.ndim)))
 
     def expand_dims(self, axis):
+        axis = _resolve_axis(axis, self.ndim + 1)
         return self._to_py_tensor(self._data.expand_dims(axis))
 
     # Implementation: looks up a C++ cast function by naming convention:
