@@ -141,8 +141,8 @@ jobs:
             [ "$(uname -m)" != "x86_64" ] && exit 0;
             [ -f /lib/ld-musl-x86_64.so.1 ] && exit 0;
             [ "${{ matrix.cuda }}" != "1" ] && exit 0;
-            curl -fsS --retry 5 --retry-delay 2 --retry-all-errors -o /etc/yum.repos.d/cuda.repo
-            https://developer.download.nvidia.com/compute/cuda/repos/rhel8/x86_64/cuda-rhel8.repo &&
+            dnf install -y dnf-plugins-core &&
+            dnf config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/rhel8/x86_64/cuda-rhel8.repo &&
             { n=0; until dnf install -y --nogpgcheck cuda-nvcc-${{ matrix.cuda_tag }} cuda-cudart-devel-${{ matrix.cuda_tag }}; do n=$((n+1)); [ $n -ge 5 ] && exit 1; echo "dnf install failed (attempt $n), retrying..."; sleep $((n*5)); done; } &&
             CUDA_NVCC="$(find /usr/local -path "*/bin/nvcc" -print -quit)" &&
             "$CUDA_NVCC" --version &&
