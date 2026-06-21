@@ -17,6 +17,7 @@
 * **`tensor + ndarray` works** — arithmetic (`+`, `-`, `*`, `/` and in-place variants) with an ndarray/list/tuple on the right now works, matching the already-working reflected form. ([#62](https://github.com/kthtda/stablebear/issues/62))
 * **`np.asarray` on a `DistanceMatrix`/`SymmetricMatrix` returns the dense matrix** — `np.asarray`/`np.array` now yield the dense `(n, n)` matrix (plus a `to_numpy()` alias) instead of a 0-d object array. ([#75](https://github.com/kthtda/stablebear/issues/75))
 * **Comparing a tensor to a scalar or array works** — `t > 3` (and `<`, `<=`, `>=`) now returns a `BoolTensor`, so `t[t > 3]` works; non-numeric tensors raise a clear `TypeError`. ([#57](https://github.com/kthtda/stablebear/issues/57))
+* **`transpose` and `squeeze` accept negative axes** — `transpose(..., -1)` and `squeeze(axis=-1)` now resolve axes against the tensor's rank instead of raising a `TypeError`, matching NumPy and the existing `swapaxes` behavior. ([#17](https://github.com/kthtda/stablebear/issues/17), [#18](https://github.com/kthtda/stablebear/issues/18))
 
 ## 0.4.2
 
