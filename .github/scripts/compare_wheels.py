@@ -25,6 +25,14 @@ BUNDLED_LIB_GLOBS = [
     "stablebear.libs/*.dylib",
 ]
 
+# License files that must ship inside every wheel (declared via
+# [project].license-files in pyproject.toml). Matched anywhere under
+# *.dist-info/ so the check is robust to the PEP 639 licenses/ subdir.
+REQUIRED_LICENSE_GLOBS = [
+    "*.dist-info/*LICENSE",
+    "*.dist-info/*THIRD-PARTY-NOTICES.rst",
+]
+
 
 def should_ignore(filename):
     return any(fnmatch(filename, pattern) for pattern in IGNORE_GLOBS)
@@ -141,6 +149,25 @@ def main(input_path, verbose=False, cpu_only=False):
         print(f"  {name}:")
         for f in bundled:
             print(f"    {f}")
+    print()
+
+    # Verify every wheel ships the required license files.
+    print("License files (must be present in every wheel):")
+    for name in names:
+        all_files = raw[name]
+        missing = [
+            g for g in REQUIRED_LICENSE_GLOBS
+            if not any(fnmatch(f, g) for f in all_files)
+        ]
+        if missing:
+            failed = True
+            print(f"  ❌ {name}: missing {', '.join(missing)}")
+        else:
+            present = sorted(
+                f for f in all_files
+                if any(fnmatch(f, g) for g in REQUIRED_LICENSE_GLOBS)
+            )
+            print(f"  ✅ {name}: {', '.join(Path(f).name for f in present)}")
     print()
 
     # Verify CUDA wheels contain both CUDA 12 and CUDA 13 modules.
