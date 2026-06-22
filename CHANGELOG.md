@@ -1,3 +1,9 @@
+## 0.4.4
+
+### Bug fixes
+
+* **A single point cloud is now subscriptable** — a 0-d `PointCloudTensor` (one cloud, e.g. `sb.PointCloudTensor(arr)` from an `(n_points, dim)` array) can be indexed as its underlying array, so the natural plotting idiom `pc[:, 0]` / `pc[:, 1]` works directly instead of raising `IndexError`. Indexing tensors of rank ≥ 1 still selects clouds as before. ([#133](https://github.com/kthtda/stablebear/issues/133))
+
 ## 0.4.3
 
 ### New features
