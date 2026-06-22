@@ -23,6 +23,23 @@ integer raises ``IndexError``::
 A NumPy integer scalar (e.g. ``np.int64(3)``) is accepted anywhere a Python
 ``int`` is.
 
+Indexing a single point cloud
+-----------------------------
+
+A 0-d ``PointCloudTensor`` wraps exactly one point cloud (for example
+``sb.PointCloudTensor(arr)`` built from an ``(n_points, dim)`` array). Indexing
+it delegates to that cloud's ``(n_points, dim)`` array, so the natural NumPy
+idiom for plotting works directly::
+
+   pc = sb.PointCloudTensor(arr)   # arr has shape (n_points, 2)
+
+   plt.scatter(pc[:, 0], pc[:, 1])  # x and y coordinate columns
+   first_point = pc[0]              # shape (2,)
+
+Tensors of clouds (rank ≥ 1) index over the clouds instead: ``X[i]`` returns
+the ``i``-th cloud as a ``FloatTensor`` (see above), which then supports the
+same column indexing.
+
 Slicing
 -------
 

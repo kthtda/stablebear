@@ -367,6 +367,26 @@ class PointCloudTensor(Tensor):
     def _represent_element(self, element):
         return FloatTensor(element)
 
+    def _single_cloud(self):
+        """Return the lone cloud of a 0-d tensor as a ``(n_points, dim)`` FloatTensor."""
+        return self._represent_element(self._data._get_element([]))
+
+    def __getitem__(self, index):
+        """Index the tensor of clouds, or — when this is a single cloud — the cloud itself.
+
+        A 0-d ``PointCloudTensor`` wraps exactly one point cloud. Indexing it
+        delegates to that cloud's ``(n_points, dim)`` array, so the natural
+        NumPy idiom for plotting a cloud works directly::
+
+            plt.scatter(pc[:, 0], pc[:, 1])
+
+        For tensors of rank >= 1, indexing selects clouds as usual (a full
+        integer index returns one cloud as a ``FloatTensor``).
+        """
+        if self.ndim == 0:
+            return self._single_cloud()[index]
+        return super().__getitem__(index)
+
     def _decay_value(self, val):
         float_dtype = _PCLOUD_TO_FLOAT_DTYPE[self.dtype]
         t = FloatTensor(val, dtype=float_dtype)
