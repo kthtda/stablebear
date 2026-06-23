@@ -1,6 +1,6 @@
 # stablebear
 
-Copyright 2024-2026 Bj&ouml;rn H. Wehlin
+Copyright 2024-2026 Bj&ouml;rn H. Wehlin and the stablebear contributors
 
 ## Description
 

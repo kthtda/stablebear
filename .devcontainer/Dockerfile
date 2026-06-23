@@ -58,19 +58,20 @@ RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
     && apt-get update && apt-get install -y --no-install-recommends gh \
     && rm -rf /var/lib/apt/lists/*
 
-# Node.js 20 LTS via NodeSource (for @anthropic-ai/claude-code).
+# Claude Code is installed further down via the native installer, as the non-root
+# 'ubuntu' user into a user-writable ~/.local -- so its background auto-updater can
+# self-update in place (no image rebuild needed to stay current). The older npm
+# global install (as root, npm prefix /usr) had to pin the version + set
+# DISABLE_AUTOUPDATER=1 because ubuntu couldn't write /usr/lib/node_modules.
+
+# Node.js 20 LTS via NodeSource. Claude Code no longer needs it (native install),
+# but it's kept as a general runtime so that npx-based tooling configured in a
+# user's bind-mounted ~/.claude/settings.json -- e.g. a status line run via
+# `npx ...` -- has node/npx available instead of silently failing. No specific
+# package is baked in; that stays in each user's personal config.
 RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && apt-get install -y --no-install-recommends nodejs \
-    && rm -rf /var/lib/apt/lists/* \
-    && npm install -g @anthropic-ai/claude-code
-
-# Claude Code is installed npm-global as root (npm prefix is /usr), so the
-# non-root 'ubuntu' runtime user can't write to /usr/lib/node_modules and its
-# background auto-updater fails with "no write permission to npm prefix". The
-# image pins the version, so disable the background updater; bump Claude Code by
-# rebuilding the image (or switch to the native installer, which installs into a
-# user-writable ~/.local and self-updates, if in-container updates are wanted).
-ENV DISABLE_AUTOUPDATER=1
+    && rm -rf /var/lib/apt/lists/*
 
 # Make CUDA discoverable system-wide, not just in env-inheriting shells. The base
 # nvidia/cuda image exports /usr/local/cuda/bin on PATH via docker ENV, which
@@ -105,6 +106,14 @@ ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
 USER ubuntu
 RUN pip install --upgrade pip
+
+# Claude Code via the native installer (installs into ~/.local, which is
+# user-writable and container-private -- not bind-mounted -- so the background
+# auto-updater can self-update without touching the host or needing an image
+# rebuild). This also matches installMethod=native recorded in the bind-mounted
+# ~/.claude.json, so `/doctor` finds the binary at ~/.local/bin/claude.
+RUN curl -fsSL https://claude.ai/install.sh | bash
+ENV PATH="/home/ubuntu/.local/bin:$PATH"
 
 # Modern CMake into the venv (on PATH ahead of /usr/bin, so it shadows Jammy's
 # apt cmake 3.22). The minimal-module build sets CMAKE_CUDA_ARCHITECTURES=native
