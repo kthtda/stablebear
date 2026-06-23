@@ -18,7 +18,7 @@ import pytest
 import stablebear as sb
 from stablebear.persistence import barcode_to_stable_rank, compute_persistent_homology
 from stablebear.reductions import mean
-from stablebear.sampling import Gaussian, Identity, Uniform, subsample
+from stablebear.sampling import Gaussian, Uniform, subsample
 
 
 @pytest.fixture(params=[(np.float32, sb.pcloud32), (np.float64, sb.pcloud64)],
@@ -265,7 +265,7 @@ def test_without_replacement_gives_distinct_points():
     X = np.array([[0.0]])
 
     subs = subsample(R, X, sample_size=10, n_instances=20,
-                     distribution=Identity(), replace=False,
+                     distribution=Uniform(), replace=False,
                      generator=sb.random.Generator(0))
 
     idx_map = _ref_index_map(R)

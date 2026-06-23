@@ -64,13 +64,6 @@ namespace sb::sampling
     }
   };
 
-  /// Identity distribution: the filter value is used directly as the weight.
-  template <typename T>
-  struct Identity
-  {
-    T operator()(T v) const { return v; }
-  };
-
   /// Uniform distribution over a distance band [inner, outer]: weight 1 when the
   /// filter value lies in the band, 0 otherwise. With the "distance" filter this
   /// samples uniformly from a region around the query point — a disk

@@ -73,7 +73,7 @@ def _compute_probabilities(reference_np, query_np, filter_fn, distribution, np_f
 
     return prob
 
-## TODO: Evaluate if "identity" distribution should be removed
+
 def subsample(
     reference,
     query=None,
@@ -123,8 +123,7 @@ def subsample(
         mapping a single query point and the reference array to per-reference
         values. By default ``"distance"``.
     distribution : distribution spec or callable, optional
-        A built-in spec (:class:`Gaussian`, :class:`Identity`, :class:`Uniform`)
-        or a callable
+        A built-in spec (:class:`Gaussian`, :class:`Uniform`) or a callable
         ``distribution(values) -> (n_reference,)`` returning non-negative
         weights. By default :class:`Gaussian` with ``mean=0``, ``sigma=1``.
     replace : bool, optional

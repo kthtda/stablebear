@@ -30,18 +30,6 @@ class _BuiltinDistribution:
         raise NotImplementedError
 
 
-class Identity(_BuiltinDistribution):
-    r"""Use the filter value directly as the sampling weight, :math:`D(v) = v`."""
-
-    def __call__(self, values):
-        return values
-
-    def _fused_call(self, backend, reference, query, sample_size, n_instances, replace, gen):
-        return backend.sample_subsets_distance_identity(
-            reference, query, sample_size, n_instances, replace, gen
-        )
-
-
 class Uniform(_BuiltinDistribution):
     r"""Uniform weight over a distance band :math:`[\text{inner}, \text{outer}]`,
 
