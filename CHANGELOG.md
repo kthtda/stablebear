@@ -3,6 +3,9 @@
 ### Bug fixes
 
 * **A single point cloud is now subscriptable** — a 0-d `PointCloudTensor` (one cloud, e.g. `sb.PointCloudTensor(arr)` from an `(n_points, dim)` array) can be indexed as its underlying array, so the natural plotting idiom `pc[:, 0]` / `pc[:, 1]` works directly instead of raising `IndexError`. Indexing tensors of rank ≥ 1 still selects clouds as before. ([#133](https://github.com/kthtda/stablebear/issues/133))
+* **Storing a matrix or point cloud in a tensor cell now copies it (no aliasing)** — assigning a `DistanceMatrix`, `SymmetricMatrix`, or point cloud into a tensor cell (`t[i] = m`) or slice (`t[0:2] = src`) now copies the element instead of sharing its buffer, so later mutation of the source (or assigning one object into several cells) no longer silently corrupts the stored cells. Matches NumPy object-array assignment. ([#39](https://github.com/kthtda/stablebear/issues/39))
+* **Self-aliasing slice assignment no longer corrupts data** — assigning an overlapping view of a tensor into itself (`a[:] = a[::-1]`, `a[1:] = a[:-1]`) silently produced wrong results, because the element-wise copy read positions it had already overwritten. The right-hand side is now materialized first when it overlaps the destination (matching NumPy), so `a[:] = a[::-1]` reverses correctly; non-overlapping assignments are unaffected. ([#6](https://github.com/kthtda/stablebear/issues/6))
+* **Self-aliasing slice assignment of an object-element tensor keeps cells independent** — extending the overlapping-assignment fix to point-cloud, `DistanceMatrix`, and `SymmetricMatrix` tensors: `t[1:] = t[:-1]` (or `t[:] = t[::-1]`) duplicated only the outer buffer, so the matrix/cloud elements stayed shared with the source cells. The overlap copy now copies each stored element too, so every cell is independent. ([#129](https://github.com/kthtda/stablebear/issues/129))
 
 ## 0.4.3
 
