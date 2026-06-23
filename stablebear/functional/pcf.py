@@ -251,7 +251,7 @@ class Pcf:
         >>> f(np.array([0.5, 1.5, 4.0]))
         array([1. , 2. , 0.5], dtype=float32)
         """
-        from ..tensor import FloatTensor
+        from ..base_tensor import FloatTensor
 
         if isinstance(t, int | float):
             return self._data(t)

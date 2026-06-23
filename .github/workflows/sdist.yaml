@@ -18,6 +18,12 @@ jobs:
     name: Build & test source distribution
     runs-on: ${{ inputs.use_github_runners && 'ubuntu-24.04' || fromJSON('["self-hosted", "gpu", "cuda12"]') }}
     timeout-minutes: 20
+    # Make pip/uv (build isolation + dependency installs) tolerant of
+    # transient PyPI/network hiccups.
+    env:
+      UV_HTTP_TIMEOUT: 120
+      PIP_RETRIES: 5
+      PIP_DEFAULT_TIMEOUT: 60
     steps:
       - uses: actions/checkout@v6
         with:
@@ -41,22 +47,22 @@ jobs:
       - name: Install build tooling (GitHub runner)
         if: inputs.use_github_runners
         run: |
-          pip install build
+          bash .github/scripts/ci-retry.sh pip install build
           echo "CMAKE_BUILD_PARALLEL_LEVEL=$(nproc)" >> $GITHUB_ENV
           echo "CMAKE_UNITY_BUILD=ON" >> $GITHUB_ENV
           echo "CMAKE_UNITY_BUILD_BATCH_SIZE=4" >> $GITHUB_ENV
 
       - name: Build sdist
-        run: python3 -m build --sdist
+        run: bash .github/scripts/ci-retry.sh python3 -m build --sdist
 
       - name: Install from sdist
-        run: python3 -m pip install dist/stablebear-*.tar.gz --force-reinstall
+        run: bash .github/scripts/ci-retry.sh bash -c 'python3 -m pip install dist/stablebear-*.tar.gz --force-reinstall'
         env:
           BUILD_WITH_CUDA: "0"
 
       - name: Install test dependencies (GitHub runner)
         if: inputs.use_github_runners
-        run: pip install pytest scipy
+        run: bash .github/scripts/ci-retry.sh pip install pytest scipy
 
       - name: Test sdist install
         working-directory: test

@@ -16,7 +16,7 @@ import numpy as np
 
 from .. import _sb_cpp as cpp
 from ..async_task import _run_task
-from ..tensor import FloatTensor, PointCloudTensor
+from ..base_tensor import FloatTensor, PointCloudTensor
 from ..typing import float32, float64, pcloud32, pcloud64
 from .distributions import Gaussian, _BuiltinDistribution
 

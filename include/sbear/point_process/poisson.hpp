@@ -39,7 +39,7 @@ namespace sb::pp
       T rate,
       const std::vector<T>& lo,
       const std::vector<T>& hi,
-      const RandomGenerator<EngineT>& gen,
+      RandomGenerator<EngineT>& gen,
       Executor& exec)
   {
     if (lo.size() != dim || hi.size() != dim)

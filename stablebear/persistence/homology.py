@@ -22,7 +22,7 @@ from ..distance_matrix import (
     DistanceMatrix,
     DistanceMatrixTensor,
 )
-from ..tensor import (
+from ..base_tensor import (
     FloatTensor,
     PointCloud,
     PointCloudTensor,

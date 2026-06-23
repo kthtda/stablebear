@@ -150,6 +150,20 @@ class TestTranspose:
     def test_3d_transpose_axes(self, TensorType, np_dtype):
         _assert_transpose(np.arange(24, dtype=np_dtype).reshape(2, 3, 4), (2, 0, 1), TensorType)
 
+    def test_3d_transpose_negative_axes(self, TensorType, np_dtype):
+        _assert_transpose(
+            np.arange(24, dtype=np_dtype).reshape(2, 3, 4),
+            (-1, -2, -3),
+            TensorType,
+        )
+
+    def test_3d_transpose_mixed_negative_axes(self, TensorType, np_dtype):
+        _assert_transpose(
+            np.arange(24, dtype=np_dtype).reshape(2, 3, 4),
+            (2, 1, -3),
+            TensorType,
+        )
+
     def test_1d_T_is_noop(self, TensorType, np_dtype):
         np_arr = np.arange(5, dtype=np_dtype)
         t = TensorType(np_arr)
@@ -257,6 +271,10 @@ class TestSqueeze:
     def test_squeeze_last_axis(self, TensorType, np_dtype):
         _assert_squeeze(np.arange(6, dtype=np_dtype).reshape(1, 6, 1), 2, TensorType)
 
+    def test_squeeze_negative_axes(self, TensorType, np_dtype):
+        _assert_squeeze(np.arange(6, dtype=np_dtype).reshape(1, 6, 1), -1, TensorType)
+        _assert_squeeze(np.arange(6, dtype=np_dtype).reshape(1, 6, 1), -3, TensorType)
+
     def test_squeeze_no_size1_dims(self, TensorType, np_dtype):
         _assert_squeeze(np.arange(12, dtype=np_dtype).reshape(3, 4), None, TensorType)
 
@@ -305,6 +323,9 @@ class TestExpandDims:
     def test_expand_negative_axis(self, TensorType, np_dtype):
         _assert_expand_dims(np.arange(12, dtype=np_dtype).reshape(3, 4), -2, TensorType)
 
+    def test_expand_negative_axis_before_first(self, TensorType, np_dtype):
+        _assert_expand_dims(np.arange(12, dtype=np_dtype).reshape(3, 4), -3, TensorType)
+
     def test_expand_is_view(self, TensorType, np_dtype):
         np_arr = np.arange(6, dtype=np_dtype)
         t = TensorType(np_arr)
@@ -314,8 +335,10 @@ class TestExpandDims:
 
     def test_expand_out_of_range_raises(self, TensorType, np_dtype):
         t = TensorType(np.arange(6, dtype=np_dtype))
-        with pytest.raises((ValueError, RuntimeError)):
+        with pytest.raises((ValueError, RuntimeError, IndexError)):
             t.expand_dims(3)
+        with pytest.raises((ValueError, RuntimeError, IndexError)):
+            t.expand_dims(-3)
 
 
 # --- astype ---

@@ -3,7 +3,7 @@ Point Processes
 ===============
 
 The :py:mod:`stablebear.point_process` module provides samplers for spatial point
-processes, returning :py:class:`~stablebear.tensor.PointCloudTensor` objects. All
+processes, returning :py:class:`~stablebear.base_tensor.PointCloudTensor` objects. All
 samplers support deterministic seeding via :py:class:`~stablebear.random.Generator`
 (see :doc:`random`).
 

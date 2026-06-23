@@ -138,13 +138,23 @@ def _is_full_slice(s):
 def _resolve_negative_indices(index_tensor, axis_size):
     """Resolve negative indices and bounds-check."""
     import numpy as np
-    from .tensor import IntTensor
+    from .base_tensor import IntTensor
     arr = np.asarray(index_tensor).astype(np.int64).copy()
     neg = arr < 0
     arr[neg] += axis_size
     if np.any((arr < 0) | (arr >= axis_size)):
         raise IndexError(f"Index out of bounds for axis with size {axis_size}")
     return IntTensor(arr)
+
+
+def _resolve_axis(axis: int, ndim: int) -> int:
+    axis = operator.index(axis)
+    resolved = axis + ndim if axis < 0 else axis
+    if not 0 <= resolved < ndim:
+        raise IndexError(
+            f"axis {axis} is out of range for tensor with {ndim} dimension(s)"
+        )
+    return resolved
 
 
 class Tensor(ABC):
@@ -168,7 +178,7 @@ class Tensor(ABC):
         ``IndexError`` (matching NumPy) for non-integer/boolean arrays.
         """
         import numpy as np
-        from .tensor import BoolTensor, IntTensor
+        from .base_tensor import BoolTensor, IntTensor
         if arr.dtype == np.bool_:
             return ('adv', BoolTensor(arr))
         if np.issubdtype(arr.dtype, np.integer):
@@ -191,7 +201,7 @@ class Tensor(ABC):
           ``True``, 0 for ``False``) axes to insert after the core indexing.
         """
         import numpy as np
-        from .tensor import BoolTensor, IntTensor
+        from .base_tensor import BoolTensor, IntTensor
 
         ndim = self.ndim
 
@@ -342,7 +352,7 @@ class Tensor(ABC):
 
     def _getitem_entries(self, entries, allow_scalar=True):
         """Index using normalized entries (int/slice/IntTensor/BoolTensor)."""
-        from .tensor import BoolTensor, IntTensor
+        from .base_tensor import BoolTensor, IntTensor
 
         advanced = [(i, s) for i, s in enumerate(entries)
                     if isinstance(s, (BoolTensor, IntTensor))]
@@ -389,7 +399,7 @@ class Tensor(ABC):
     def _bool_mask_getitem(self, mask):
         """Select with a boolean mask matching the full shape or leading axes."""
         import numpy as np
-        from .tensor import IntTensor
+        from .base_tensor import IntTensor
 
         tshape = tuple(self.shape[i] for i in range(self.ndim))
         mshape = tuple(mask.shape[i] for i in range(mask.ndim))
@@ -410,7 +420,7 @@ class Tensor(ABC):
     def _index_select_nd(self, result, axis, idx):
         """Gather along ``axis`` using an integer index array of any rank."""
         import numpy as np
-        from .tensor import IntTensor
+        from .base_tensor import IntTensor
 
         axis_size = result.shape[axis]
         arr = np.asarray(idx).astype(np.int64)
@@ -446,7 +456,7 @@ class Tensor(ABC):
         Only numeric tensors are cross-cast (e.g. int -> float); other tensor
         families are returned unchanged.
         """
-        from .tensor import NumericTensor
+        from .base_tensor import NumericTensor
         if (isinstance(self, NumericTensor) and isinstance(val, NumericTensor)
                 and getattr(val, "dtype", None) is not getattr(self, "dtype", None)):
             return val.astype(self.dtype)
@@ -491,7 +501,7 @@ class Tensor(ABC):
 
     def _setitem_entries(self, entries, val):
         """Assign using normalized entries (int/slice/IntTensor/BoolTensor)."""
-        from .tensor import BoolTensor, IntTensor
+        from .base_tensor import BoolTensor, IntTensor
 
         # Single full-shape boolean mask: flat masked assign/fill.
         if len(entries) == 1 and isinstance(entries[0], BoolTensor):
@@ -544,7 +554,7 @@ class Tensor(ABC):
     def _basic_setitem(self, entries, val):
         """Assign using only ints and slices (negatives resolved, bounds checked)."""
         import numpy as np
-        from .tensor import NumericTensor
+        from .base_tensor import NumericTensor
 
         if (len(entries) == self.ndim
                 and all(isinstance(s, int) for s in entries)):
@@ -580,30 +590,46 @@ class Tensor(ABC):
     def __eq__(self, rhs):
         if not isinstance(rhs, Tensor):
             return NotImplemented
-        from .tensor import BoolTensor
+        from .base_tensor import BoolTensor
         return BoolTensor(self._data == rhs._data)  # type: ignore[arg-type]
 
     def __ne__(self, rhs):
         if not isinstance(rhs, Tensor):
             return NotImplemented
-        from .tensor import BoolTensor
+        from .base_tensor import BoolTensor
         return BoolTensor(self._data != rhs._data)  # type: ignore[arg-type]
 
+    def _compare(self, rhs, op, symbol):
+        """Elementwise ordering comparison returning a ``BoolTensor``.
+
+        Accepts another ``Tensor`` (compared in C++) or a scalar / ``numpy``
+        array on the right-hand side. Scalars and arrays are broadcast against
+        ``self`` (NumPy semantics), so idioms such as ``t[t > 3]`` work.
+        """
+        from .base_tensor import BoolTensor
+        if isinstance(rhs, Tensor):
+            return BoolTensor(op(self._data, rhs._data))
+        import numpy as np
+        try:
+            arr = np.asarray(self)
+        except TypeError:
+            raise TypeError(
+                f"'{symbol}' not supported between instances of "
+                f"'{type(self).__name__}' and '{type(rhs).__name__}'"
+            ) from None
+        return BoolTensor(op(arr, rhs))
+
     def __lt__(self, rhs):
-        from .tensor import BoolTensor
-        return BoolTensor(self._data < rhs._data)
+        return self._compare(rhs, operator.lt, "<")
 
     def __le__(self, rhs):
-        from .tensor import BoolTensor
-        return BoolTensor(self._data <= rhs._data)
+        return self._compare(rhs, operator.le, "<=")
 
     def __gt__(self, rhs):
-        from .tensor import BoolTensor
-        return BoolTensor(self._data > rhs._data)
+        return self._compare(rhs, operator.gt, ">")
 
     def __ge__(self, rhs):
-        from .tensor import BoolTensor
-        return BoolTensor(self._data >= rhs._data)
+        return self._compare(rhs, operator.ge, ">=")
 
     def array_equal(self, rhs) -> bool:
         """Test whether two tensors have the same shape and all equal elements.
@@ -693,29 +719,27 @@ class Tensor(ABC):
         return self._to_py_tensor(self._data.reshape(list(shape)))
 
     def transpose(self, axes=None):
-        return self._to_py_tensor(self._data.transpose(list(axes) if axes else []))
+        if axes is None:
+            return self._to_py_tensor(self._data.transpose([]))
+        resolved_axes = [_resolve_axis(axis, self.ndim) for axis in axes]
+        return self._to_py_tensor(self._data.transpose(resolved_axes))
 
     @property
     def T(self):
         return self.transpose()
 
     def swapaxes(self, axis1, axis2):
-        n = self.ndim
-        if axis1 < 0:
-            axis1 += n
-        if axis2 < 0:
-            axis2 += n
-        if not (0 <= axis1 < n and 0 <= axis2 < n):
-            raise IndexError(
-                f"swapaxes: axis out of range for tensor with {n} dimensions")
+        axis1 = _resolve_axis(axis1, self.ndim)
+        axis2 = _resolve_axis(axis2, self.ndim)
         return self._to_py_tensor(self._data.swapaxes(axis1, axis2))
 
     def squeeze(self, axis=None):
         if axis is None:
             return self._to_py_tensor(self._data.squeeze())
-        return self._to_py_tensor(self._data.squeeze(axis))
+        return self._to_py_tensor(self._data.squeeze(_resolve_axis(axis, self.ndim)))
 
     def expand_dims(self, axis):
+        axis = _resolve_axis(axis, self.ndim + 1)
         return self._to_py_tensor(self._data.expand_dims(axis))
 
     # Implementation: looks up a C++ cast function by naming convention:
@@ -835,7 +859,16 @@ class ArithmeticTensorMixin:
     """
 
     def _decay_operand(self, val):
-        return val._data if hasattr(val, "_data") else val
+        if hasattr(val, "_data"):
+            return val._data
+        import numpy as np
+        if isinstance(val, (np.ndarray, list, tuple)):
+            # Wrap an array-like RHS as a same-type tensor (cast to this
+            # tensor's dtype where applicable) so that ``tensor + array``
+            # mirrors ``array + tensor``. See issue #62.
+            wrapped = self._coerce_rhs(type(self)(val))
+            return wrapped._data
+        return val
 
     def __add__(self, rhs):
         return self._to_py_tensor(self._data + self._decay_operand(rhs))

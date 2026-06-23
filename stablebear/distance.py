@@ -16,7 +16,7 @@ from . import _sb_cpp as cpp
 from .async_task import _run_task
 from .distance_matrix import DistanceMatrix
 from .functional.pcf import Pcf, _has_matching_types
-from .tensor import FloatTensor, PcfContainerLike, _resolve_pcf_inputs
+from .base_tensor import FloatTensor, PcfContainerLike, _resolve_pcf_inputs
 from .typing import float32, float64, pcf32, pcf64
 
 

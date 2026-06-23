@@ -25,6 +25,14 @@ BUNDLED_LIB_GLOBS = [
     "stablebear.libs/*.dylib",
 ]
 
+# License files that must ship inside every wheel (declared via
+# [project].license-files in pyproject.toml). Matched anywhere under
+# *.dist-info/ so the check is robust to the PEP 639 licenses/ subdir.
+REQUIRED_LICENSE_GLOBS = [
+    "*.dist-info/*LICENSE",
+    "*.dist-info/*THIRD-PARTY-NOTICES.rst",
+]
+
 
 def should_ignore(filename):
     return any(fnmatch(filename, pattern) for pattern in IGNORE_GLOBS)
@@ -105,10 +113,6 @@ def main(input_path, verbose=False, cpu_only=False):
 
     print(f"Reference: {reference_name}\n")
 
-    if verbose:
-        dump_contents(reference_name, raw[reference_name])
-        print()
-
     failed = False
     for name in names[1:]:
         files = wheels[name]
@@ -124,8 +128,6 @@ def main(input_path, verbose=False, cpu_only=False):
                 print(f"   only in reference: {f}")
             for f in sorted(only_in_this):
                 print(f"   only in this:      {f}")
-            if verbose:
-                dump_contents(name, raw[name])
         print()
 
     # Bundled vendored libraries per wheel (license audit surface).
@@ -143,31 +145,57 @@ def main(input_path, verbose=False, cpu_only=False):
             print(f"    {f}")
     print()
 
+    # Verify every wheel ships the required license files.
+    print("License files (must be present in every wheel):")
+    for name in names:
+        all_files = raw[name]
+        missing = [
+            g for g in REQUIRED_LICENSE_GLOBS
+            if not any(fnmatch(f, g) for f in all_files)
+        ]
+        if missing:
+            failed = True
+            print(f"  ❌ {name}: missing {', '.join(missing)}")
+        else:
+            present = sorted(
+                f for f in all_files
+                if any(fnmatch(f, g) for g in REQUIRED_LICENSE_GLOBS)
+            )
+            print(f"  ✅ {name}: {', '.join(Path(f).name for f in present)}")
+    print()
+
     # Verify CUDA wheels contain both CUDA 12 and CUDA 13 modules.
     # Skipped for CPU-only builds (ci.yaml), which ship no CUDA modules.
     CUDA_PLATFORMS = ("manylinux_*_x86_64", "win_amd64")
     if cpu_only:
         print("CUDA module check: skipped (--cpu-only)\n")
-        return 1 if failed else 0
-    print("CUDA module check:")
-    for name in names:
-        if not any(fnmatch(name, f"*{p}*") for p in CUDA_PLATFORMS):
-            print(f"  ⏭️  {name}: non-CUDA platform, skipped")
-            continue
-        all_files = raw[name]
-        has_cuda12 = any(fnmatch(f, "stablebear/_sb_cuda12*") for f in all_files)
-        has_cuda13 = any(fnmatch(f, "stablebear/_sb_cuda13*") for f in all_files)
-        if has_cuda12 and has_cuda13:
-            print(f"  ✅ {name}: contains CUDA 12 and CUDA 13 modules")
-        else:
-            failed = True
-            missing = []
-            if not has_cuda12:
-                missing.append("CUDA 12")
-            if not has_cuda13:
-                missing.append("CUDA 13")
-            print(f"  ❌ {name}: missing {', '.join(missing)} module!")
-    print()
+    else:
+        print("CUDA module check:")
+        for name in names:
+            if not any(fnmatch(name, f"*{p}*") for p in CUDA_PLATFORMS):
+                print(f"  ⏭️  {name}: non-CUDA platform, skipped")
+                continue
+            all_files = raw[name]
+            has_cuda12 = any(fnmatch(f, "stablebear/_sb_cuda12*") for f in all_files)
+            has_cuda13 = any(fnmatch(f, "stablebear/_sb_cuda13*") for f in all_files)
+            if has_cuda12 and has_cuda13:
+                print(f"  ✅ {name}: contains CUDA 12 and CUDA 13 modules")
+            else:
+                failed = True
+                missing = []
+                if not has_cuda12:
+                    missing.append("CUDA 12")
+                if not has_cuda13:
+                    missing.append("CUDA 13")
+                print(f"  ❌ {name}: missing {', '.join(missing)} module!")
+        print()
+
+    # Full contents of every wheel (verbose only).
+    if verbose:
+        print("Full wheel contents:")
+        for name in names:
+            dump_contents(name, raw[name])
+            print()
 
     return 1 if failed else 0
 

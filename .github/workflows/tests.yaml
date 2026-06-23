@@ -11,9 +11,11 @@ jobs:
       matrix:
         python-version: ["3.10"] #["3.9", "3.10", "3.11", "3.12", "3.13"]
       
-    env: 
+    env:
       BUILD_WITH_CUDA: 0
-    
+      PIP_RETRIES: 5
+      PIP_DEFAULT_TIMEOUT: 60
+
     steps:
       - uses: actions/checkout@v6
         with:
@@ -25,10 +27,10 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Build module
-        run: pip install .
+        run: bash .github/scripts/ci-retry.sh pip install .
 
       - name: Install dependencies
-        run: pip install pytest pytest-cov scipy
+        run: bash .github/scripts/ci-retry.sh pip install pytest pytest-cov scipy
       
       - name: Run tests
         working-directory: ./test

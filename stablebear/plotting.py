@@ -19,7 +19,7 @@ import numpy as np
 from .persistence.barcode import Barcode
 from .persistence.ph_tensor import BarcodeTensor
 from .reductions import max_time as max_time_reduction
-from .tensor import PcfContainerLike, PcfTensor
+from .base_tensor import PcfContainerLike, PcfTensor
 
 
 def plot(f: PcfContainerLike, fmt="", ax=None, auto_label=False, max_time=None, **kwargs):
@@ -63,6 +63,11 @@ def plot(f: PcfContainerLike, fmt="", ax=None, auto_label=False, max_time=None, 
             if len(squeezed.shape) != 1:
                 raise ValueError(f"Expected 1-dimensional array (got array with {f.shape})")
             return plot(squeezed, ax=ax, max_time=max_time, auto_label=auto_label, **kwargs)
+        if f.shape[0] == 0:
+            # Nothing to plot: an empty tensor has no PCFs. Bail out before
+            # reducing with max_time, which has no identity over an empty range
+            # and would otherwise raise on the (vacuous) reduction.
+            return
         mt = max_time if max_time is not None else float(max_time_reduction(f))
         for i in range(f.shape[0]):
             kw = {"label": f"f{i}"} if auto_label else {}

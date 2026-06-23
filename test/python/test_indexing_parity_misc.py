@@ -23,7 +23,7 @@ import numpy as np
 import pytest
 
 import stablebear as sb
-from stablebear.tensor import BoolTensor, FloatTensor, IntTensor
+from stablebear.base_tensor import BoolTensor, FloatTensor, IntTensor
 from _indexing_support import assert_getitem_matches, assert_setitem_matches, ref_array
 
 

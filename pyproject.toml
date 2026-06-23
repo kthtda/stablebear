@@ -8,12 +8,12 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "stablebear"
-version = "0.4.2"
+version = "0.4.4"
 authors = [ { name="Bjorn H. Wehlin", email="bwehlin@kth.se" } ]
 description = "Massively parallel computations for piecewise constant functions"
 readme = "README.md"
 license = "Apache-2.0"
-license-files = ["LICENSE.rst"]
+license-files = ["LICENSE", "THIRD-PARTY-NOTICES.rst"]
 requires-python = ">=3.10"
 classifiers = [
     "Programming Language :: Python :: 3",

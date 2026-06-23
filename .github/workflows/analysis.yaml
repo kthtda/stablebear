@@ -25,6 +25,9 @@ jobs:
       SKIP_BACK_COPY: 1
       ENABLE_COVERAGE: 1
       LLVM_VERSION: 21
+      # Make pip more tolerant of transient PyPI/network hiccups.
+      PIP_RETRIES: 5
+      PIP_DEFAULT_TIMEOUT: 60
     steps:
       - uses: actions/checkout@v6
         with:
@@ -44,14 +47,14 @@ jobs:
           echo "${{github.workspace}}/.venv/bin" >> $GITHUB_PATH
 
       - name: Install Python dependencies
-        run: pip install numpy tqdm pytest pytest-cov scipy matplotlib
+        run: bash .github/scripts/ci-retry.sh pip install numpy tqdm pytest pytest-cov scipy matplotlib
 
       - name: Install LLVM toolchain (GitHub runner)
         if: inputs.use_github_runners
         run: |
-          wget https://apt.llvm.org/llvm.sh
+          bash .github/scripts/ci-retry.sh wget https://apt.llvm.org/llvm.sh
           chmod +x llvm.sh
-          sudo ./llvm.sh $LLVM_VERSION
+          bash .github/scripts/ci-retry.sh sudo ./llvm.sh $LLVM_VERSION
           sudo update-alternatives --install /usr/bin/llvm-cov llvm-cov /usr/bin/llvm-cov-$LLVM_VERSION 100
           sudo update-alternatives --install /usr/bin/llvm-profdata llvm-profdata /usr/bin/llvm-profdata-$LLVM_VERSION 100
           sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-$LLVM_VERSION 100
@@ -158,6 +161,9 @@ jobs:
       SKIP_STUBGEN: 1
       SKIP_BACK_COPY: 1
       PYTHONMALLOC: malloc
+      # Make pip more tolerant of transient PyPI/network hiccups.
+      PIP_RETRIES: 5
+      PIP_DEFAULT_TIMEOUT: 60
     steps:
       - uses: actions/checkout@v6
         with:
@@ -177,13 +183,13 @@ jobs:
           echo "${{github.workspace}}/.venv/bin" >> $GITHUB_PATH
 
       - name: Install Python dependencies
-        run: pip install numpy tqdm pytest ValgrindCI scipy matplotlib
+        run: bash .github/scripts/ci-retry.sh pip install numpy tqdm pytest ValgrindCI scipy matplotlib
 
       - name: Install Valgrind (GitHub runner)
         if: inputs.use_github_runners
         run: |
-          sudo apt-get update
-          sudo apt-get install -y valgrind libc6-dbg
+          bash .github/scripts/ci-retry.sh sudo apt-get update
+          bash .github/scripts/ci-retry.sh sudo apt-get install -y valgrind libc6-dbg
 
       - name: Configure CMake
         run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=Debug
@@ -200,8 +206,15 @@ jobs:
       - name: Download CPython valgrind suppressions
         run: |
           PYVER=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
-          curl -sL "https://raw.githubusercontent.com/python/cpython/${PYVER}/Misc/valgrind-python.supp" \
-            -o test/reports/vg_cpython.supp
+          # --retry/--retry-connrefused absorbs transient raw.githubusercontent.com
+          # blips (--retry-connrefused works on the older curl shipped in some
+          # runner images, unlike --retry-all-errors); a missing suppression file
+          # is non-fatal (valgrind tolerates it), so don't fail the job if the
+          # download is unreachable after retries.
+          curl -fsSL --retry 5 --retry-delay 2 --retry-connrefused \
+            "https://raw.githubusercontent.com/python/cpython/${PYVER}/Misc/valgrind-python.supp" \
+            -o test/reports/vg_cpython.supp \
+            || { echo "Warning: could not download CPython ${PYVER} suppressions; continuing without them"; : > test/reports/vg_cpython.supp; }
           echo "Downloaded CPython ${PYVER} suppressions"
 
       - name: Run valgrind on Pytest
@@ -334,6 +347,9 @@ jobs:
       SKIP_BACK_COPY: 1
       ENABLE_CUDA_COVERAGE: 1
       GPUCOV_OUTPUT: ${{ github.workspace }}/covreport/cuda/cuda_%p.bin
+      # Make pip more tolerant of transient PyPI/network hiccups.
+      PIP_RETRIES: 5
+      PIP_DEFAULT_TIMEOUT: 60
     steps:
       - uses: actions/checkout@v6
         with:
@@ -345,12 +361,12 @@ jobs:
           echo "${{github.workspace}}/.venv/bin" >> $GITHUB_PATH
 
       - name: Install Python dependencies
-        run: pip install numpy tqdm pytest scipy
+        run: bash .github/scripts/ci-retry.sh pip install numpy tqdm pytest scipy
 
       - name: Install gpucov and lcov
         run: |
-          pip install ./gpucov
-          sudo apt-get update && sudo apt-get install -y lcov
+          bash .github/scripts/ci-retry.sh pip install ./gpucov
+          bash .github/scripts/ci-retry.sh bash -c "sudo apt-get update && sudo apt-get install -y lcov"
 
       - name: Configure CMake (with CUDA coverage)
         run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=Debug
@@ -494,8 +510,26 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A
-          git diff --cached --quiet || git commit -m "reports: add run for ${{ github.sha }}"
-          git push
+          if git diff --cached --quiet; then
+            echo "No report changes to publish."
+            exit 0
+          fi
+          git commit -m "reports: add run for ${{ github.sha }}"
+          # gh-pages is shared, so concurrent runs can leave our push behind the
+          # remote (non-fast-forward). Rebase onto the latest remote tip and try
+          # again rather than failing on a benign race.
+          for attempt in 1 2 3 4 5; do
+            if git push origin HEAD:gh-pages; then
+              echo "Pushed reports on attempt ${attempt}."
+              exit 0
+            fi
+            echo "Push attempt ${attempt} failed; rebasing onto remote gh-pages and retrying..."
+            git fetch origin gh-pages
+            git rebase origin/gh-pages || git rebase --abort
+            sleep $((attempt * 3))
+          done
+          echo "Failed to push reports to gh-pages after 5 attempts." >&2
+          exit 1
 
       - name: Wait for GitHub Pages deployment
         env:
@@ -536,8 +570,11 @@ jobs:
                 echo "GitHub Pages deployed: https://${{ github.repository_owner }}.github.io/$(basename ${{ github.repository }})/"
                 break ;;
               error|failure)
-                echo "Pages deployment failed: $STATUS"
-                exit 1 ;;
+                # The reports are already committed to gh-pages; a failure of
+                # the GitHub Pages deployment service itself is outside our
+                # control, so warn rather than failing the whole pipeline.
+                echo "::warning::GitHub Pages deployment reported '$STATUS' (reports were pushed successfully)."
+                exit 0 ;;
             esac
             sleep 5
           done

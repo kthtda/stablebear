@@ -1,3 +1,36 @@
+## 0.4.4
+
+### New features
+
+* **New `stablebear.sampling` subpackage** — implements the front end of the relative-approach pipeline of Agerberg, Chacholski & Ramanujam (2023). `stablebear.sampling.subsample(reference, query, sample_size=..., n_instances=...)` draws, for each query point, `n_instances` subsamples of `sample_size` points from a reference point cloud, with per-query-point sampling probabilities formed by applying a *filter* to each (query point, reference point) pair and passing the result through a *distribution*. The built-in `"distance"` filter (Euclidean) and the `Gaussian` (concentrate sampling near a target distance) and `Uniform` (sample uniformly from a disk or an annulus/circle around the query point) distributions run entirely in parallel C++; arbitrary Python callables are also accepted for both. The result is a `(n_query, n_instances)` `PointCloudTensor` that feeds directly into `compute_persistent_homology` → `barcode_to_stable_rank` → `mean` to obtain a relative stable rank per query point.
+* **Indexed point clouds** — subsamples are returned as *indexed views* that share the reference cloud's coordinates and store only the chosen row indices, rather than re-storing every (possibly high-dimensional) point. A single `PointCloud` element exposes `.is_indexed`, `.indices`, `.shape`, and `.materialize()`; its coordinates are only copied when it is converted to NumPy. Persistent homology consumes indexed subsamples directly, so the full sampling → persistence pipeline never materializes all subsamples at once. Point clouds are now first-class (rank-2 `(n_points, dim)`) objects backed by `sb::PointCloud`.
+* **Point cloud serialization** — `save`/`load` of a point cloud tensor now stores each distinct source coordinate buffer once, followed by each element as a source id plus (for indexed views) its index array, so a tensor of shared-source subsamples no longer duplicates coordinates on disk. Point cloud files written by earlier versions remain readable (they load as materialized clouds).
+
+### Bug fixes
+
+* **A single point cloud is now subscriptable** — a 0-d `PointCloudTensor` (one cloud, e.g. `sb.PointCloudTensor(arr)` from an `(n_points, dim)` array) can be indexed as its underlying array, so the natural plotting idiom `pc[:, 0]` / `pc[:, 1]` works directly instead of raising `IndexError`. Indexing tensors of rank ≥ 1 still selects clouds as before. ([#133](https://github.com/kthtda/stablebear/issues/133))
+
+## 0.4.3
+
+### New features
+
+* **NumPy/list constructors for the non-numeric tensor families** — `PointCloudTensor`, `DistanceMatrixTensor`, and `SymmetricMatrixTensor` can now be built directly from a NumPy array or nested list instead of `zeros()`-and-fill. `PointCloudTensor(arr)` reads a trailing `(n_points, dim)` block per cell (ragged lists accepted); `DistanceMatrixTensor`/`SymmetricMatrixTensor` accept a stack of square matrices. Dtype is inferred (overridable with `dtype=`), and a generic `sb.tensor(data, dtype=...)` factory dispatches to the right type. ([#53](https://github.com/kthtda/stablebear/issues/53), [#92](https://github.com/kthtda/stablebear/issues/92), [#84](https://github.com/kthtda/stablebear/issues/84))
+
+### Breaking changes
+
+* **The `stablebear.tensor` submodule is now `stablebear.base_tensor`** — `stablebear.tensor` is now the `tensor()` factory function (above), so the tensor classes moved. Update module-path imports (`from stablebear.tensor import FloatTensor` → `from stablebear.base_tensor import FloatTensor`); the top-level `sb.FloatTensor` form is unaffected.
+
+### Bug fixes
+
+* **`compute_persistent_homology` reports malformed point clouds** — a point cloud with per-cloud rank ≠ 2 now raises a `RuntimeError` instead of silently returning empty barcodes. ([#27](https://github.com/kthtda/stablebear/issues/27))
+* **Reductions accept a negative `dim`** — `mean`/`max_time` now take `dim=-1` (counting from the last axis), matching NumPy; out-of-range raises `IndexError`. ([#26](https://github.com/kthtda/stablebear/issues/26))
+* **A `Generator` now advances between draws** — consecutive draws (or draws after a single `random.seed(s)`) are now independent rather than identical, while staying reproducible for a given seed. ([#86](https://github.com/kthtda/stablebear/issues/86))
+* **`max_time` and `plotting.plot` handle empty tensors** — `max_time` on a zero-size dimension now raises `ValueError` instead of crashing, and `plotting.plot` becomes a no-op. ([#46](https://github.com/kthtda/stablebear/issues/46))
+* **`tensor + ndarray` works** — arithmetic (`+`, `-`, `*`, `/` and in-place variants) with an ndarray/list/tuple on the right now works, matching the already-working reflected form. ([#62](https://github.com/kthtda/stablebear/issues/62))
+* **`np.asarray` on a `DistanceMatrix`/`SymmetricMatrix` returns the dense matrix** — `np.asarray`/`np.array` now yield the dense `(n, n)` matrix (plus a `to_numpy()` alias) instead of a 0-d object array. ([#75](https://github.com/kthtda/stablebear/issues/75))
+* **Comparing a tensor to a scalar or array works** — `t > 3` (and `<`, `<=`, `>=`) now returns a `BoolTensor`, so `t[t > 3]` works; non-numeric tensors raise a clear `TypeError`. ([#57](https://github.com/kthtda/stablebear/issues/57))
+* **`transpose` and `squeeze` accept negative axes** — `transpose(..., -1)` and `squeeze(axis=-1)` now resolve axes against the tensor's rank instead of raising a `TypeError`, matching NumPy and the existing `swapaxes` behavior. ([#17](https://github.com/kthtda/stablebear/issues/17), [#18](https://github.com/kthtda/stablebear/issues/18))
+
 ## 0.4.2
 
 * masspcf is now stablebear.
@@ -12,11 +45,6 @@
 ### Performance
 
 * **Reductions read input slices in place** — `mean` and `max_time` no longer deep-copy every PCF into a temporary vector before reducing; they iterate each slice in place via the value iterator, cutting allocation on large reductions.
-### Sampling
-
-* **New `stablebear.sampling` subpackage** — implements the front end of the relative-approach pipeline of Agerberg, Chacholski & Ramanujam (2023). `stablebear.sampling.subsample(reference, query, sample_size=..., n_instances=...)` draws, for each query point, `n_instances` subsamples of `sample_size` points from a reference point cloud, with per-query-point sampling probabilities formed by applying a *filter* to each (query point, reference point) pair and passing the result through a *distribution*. The built-in `"distance"` filter (Euclidean) and the `Gaussian` / `Identity` distributions run entirely in parallel C++; arbitrary Python callables are also accepted for both. The result is a `(n_query, n_instances)` `PointCloudTensor` that feeds directly into `compute_persistent_homology` → `barcode_to_stable_rank` → `mean` to obtain a relative stable rank per query point.
-* **Indexed point clouds** — subsamples are returned as *indexed views* that share the reference cloud's coordinates and store only the chosen row indices, rather than re-storing every (possibly high-dimensional) point. A single `PointCloud` element exposes `.is_indexed`, `.indices`, `.shape`, and `.materialize()`; its coordinates are only copied when it is converted to NumPy. Persistent homology consumes indexed subsamples directly, so the full sampling → persistence pipeline never materializes all subsamples at once. Point clouds are now first-class (rank-2 `(n_points, dim)`) objects backed by `sb::PointCloud`.
-* **Point cloud serialization** — `save`/`load` of a point cloud tensor now stores each distinct source coordinate buffer once, followed by each element as a source id plus (for indexed views) its index array, so a tensor of shared-source subsamples no longer duplicates coordinates on disk. Point cloud files written by earlier versions remain readable (they load as materialized clouds).
 
 ### Persistence
 

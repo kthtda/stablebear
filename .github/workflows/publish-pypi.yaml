@@ -133,5 +133,23 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A
-          git diff --cached --quiet || git commit -m "reports: tag release for ${{ github.sha }}"
-          git push
+          if git diff --cached --quiet; then
+            echo "No report changes to publish."
+            exit 0
+          fi
+          git commit -m "reports: tag release for ${{ github.sha }}"
+          # gh-pages is shared, so concurrent runs can leave our push behind the
+          # remote (non-fast-forward). Rebase onto the latest remote tip and try
+          # again rather than failing on a benign race.
+          for attempt in 1 2 3 4 5; do
+            if git push origin HEAD:gh-pages; then
+              echo "Pushed reports on attempt ${attempt}."
+              exit 0
+            fi
+            echo "Push attempt ${attempt} failed; rebasing onto remote gh-pages and retrying..."
+            git fetch origin gh-pages
+            git rebase origin/gh-pages || git rebase --abort
+            sleep $((attempt * 3))
+          done
+          echo "Failed to push reports to gh-pages after 5 attempts." >&2
+          exit 1

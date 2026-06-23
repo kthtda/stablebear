@@ -14,7 +14,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Generate LICENSE.rst from the project license and bundled 3rd-party licenses."""
+"""Generate LICENSE and THIRD-PARTY-NOTICES.rst from the project license and bundled 3rd-party licenses.
+
+``LICENSE`` is the plain, verbatim Apache-2.0 text so GitHub (and other tools that
+use the ``licensee`` gem) detect the project license correctly. ``THIRD-PARTY-NOTICES.rst``
+is the fuller document that also reproduces the bundled third-party notices and is
+shipped via ``license-files`` and included in the docs. It is deliberately *not*
+named ``LICENSE.*`` so that ``licensee`` does not flag it as an unidentified license.
+"""
 
 from pathlib import Path
 
@@ -164,8 +171,13 @@ def build_rst() -> str:
 
 
 def main() -> None:
+    # Plain, verbatim Apache-2.0 text -- detectable by GitHub's licensee.
+    plain = REPO_ROOT / "LICENSE"
+    plain.write_text(_read_apache2_text() + "\n")
+    print(f"Wrote {plain}")
+
     content = build_rst()
-    out = REPO_ROOT / "LICENSE.rst"
+    out = REPO_ROOT / "THIRD-PARTY-NOTICES.rst"
     out.write_text(content)
     print(f"Wrote {out}")
 

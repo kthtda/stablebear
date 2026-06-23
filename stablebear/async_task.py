@@ -47,11 +47,21 @@ def _wait_for_task(task, verbose=True):
 def _run_task(task_fn, verbose=True):
     task = None
     try:
+        # _wait_for_task() polls task.wait_for(), which rethrows any exception a
+        # worker stored in the task (e.g. a malformed point cloud rejected inside
+        # the parallel walk) once the task completes -- so worker errors surface
+        # here instead of silently returning an empty/garbage result.
         task = task_fn()
         _wait_for_task(task, verbose=verbose)
     finally:
         if task is not None:
             task.request_stop()
-            # Cleanup wait: the work is already finished (normal path) or being
-            # cancelled (error path), so suppress the redundant progress bar.
-            _wait_for_task(task, verbose=False)
+            try:
+                # Cleanup drain: make sure the workers have actually stopped
+                # before the task is destroyed. Don't let an error surfaced here
+                # mask the exception (or KeyboardInterrupt) that triggered it.
+                # The work is already finished (normal path) or being cancelled
+                # (error path), so suppress the redundant progress bar.
+                _wait_for_task(task, verbose=False)
+            except BaseException:
+                pass

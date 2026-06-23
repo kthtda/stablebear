@@ -38,7 +38,7 @@ namespace
     using PcfT = sb::Pcf<Tt, Tv>;
     using TensorT = sb::Tensor<PcfT>;
 
-    static void noisy_sin(TensorT& out, size_t nPoints, const sb::DefaultRandomGenerator* gen)
+    static void noisy_sin(TensorT& out, size_t nPoints, sb::DefaultRandomGenerator* gen)
     {
       auto func = [](Tv t) { return sin(static_cast<Tv>(2. * M_PI) * t); };
       if (gen)
@@ -47,7 +47,7 @@ namespace
         sb::noisy_function(out, nPoints, func);
     }
 
-    static void noisy_cos(TensorT& out, size_t nPoints, const sb::DefaultRandomGenerator* gen)
+    static void noisy_cos(TensorT& out, size_t nPoints, sb::DefaultRandomGenerator* gen)
     {
       auto func = [](Tv t) { return cos(static_cast<Tv>(2. * M_PI) * t); };
       if (gen)

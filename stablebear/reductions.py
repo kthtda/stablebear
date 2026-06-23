@@ -14,7 +14,7 @@
 
 from . import _sb_cpp as cpp
 from .functional.pcf import Pcf
-from .tensor import (
+from .base_tensor import (
     FloatTensor,
     PcfTensor,
     PcfContainerLike,
@@ -37,6 +37,22 @@ def _to_tensor(outFs):
         )
 
 
+def _resolve_dim(dim: int, ndim: int) -> int:
+    """Normalize a reduction ``dim`` to a non-negative axis (NumPy semantics).
+
+    Negative ``dim`` counts from the last axis (``dim=-1`` is the last axis),
+    matching NumPy and the rest of the tensor API (``t[-1]``, ``stack(axis=-1)``).
+    Raises ``IndexError`` when ``dim`` is out of range for a tensor of rank
+    ``ndim``.
+    """
+    resolved = dim + ndim if dim < 0 else dim
+    if not 0 <= resolved < ndim:
+        raise IndexError(
+            f"dim {dim} is out of range for tensor with {ndim} dimension(s)"
+        )
+    return resolved
+
+
 def mean(fs: PcfContainerLike, dim: int = 0):
     r"""Compute the pointwise mean of a PCF tensor along the given dimension.
 
@@ -57,7 +73,8 @@ def mean(fs: PcfContainerLike, dim: int = 0):
     fs : PcfContainerLike
         A ``PcfTensor`` with dtype ``pcf32`` or ``pcf64``.
     dim : int, optional
-        Dimension along which to reduce, by default 0.
+        Dimension along which to reduce, by default 0. Negative values count
+        from the last axis (NumPy semantics: ``dim=-1`` is the last axis).
 
     Returns
     -------
@@ -70,7 +87,7 @@ def mean(fs: PcfContainerLike, dim: int = 0):
         If ``dim`` is out of range for the input tensor's number of dimensions.
     """
     backend, tensor = _resolve_pcf_inputs(_REDUCTIONS_BACKEND_MAP, fs)
-    return _to_tensor(backend.mean(tensor._data, dim))
+    return _to_tensor(backend.mean(tensor._data, _resolve_dim(dim, tensor.ndim)))
 
 
 def max_time(fs: PcfContainerLike, dim: int = 0):
@@ -94,7 +111,8 @@ def max_time(fs: PcfContainerLike, dim: int = 0):
     fs : PcfContainerLike
         A ``PcfTensor`` with dtype ``pcf32`` or ``pcf64``.
     dim : int, optional
-        Dimension along which to reduce, by default 0.
+        Dimension along which to reduce, by default 0. Negative values count
+        from the last axis (NumPy semantics: ``dim=-1`` is the last axis).
 
     Returns
     -------
@@ -105,6 +123,9 @@ def max_time(fs: PcfContainerLike, dim: int = 0):
     ------
     IndexError
         If ``dim`` is out of range for the input tensor's number of dimensions.
+    ValueError
+        If the reduction dimension is empty (size 0). ``max`` has no identity
+        over an empty range, so there is no value to return.
     """
     backend, tensor = _resolve_pcf_inputs(_REDUCTIONS_BACKEND_MAP, fs)
-    return _to_tensor(backend.max_time(tensor._data, dim))
+    return _to_tensor(backend.max_time(tensor._data, _resolve_dim(dim, tensor.ndim)))

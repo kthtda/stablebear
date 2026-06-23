@@ -48,6 +48,47 @@ def test_point_clouds_must_be_rank_2():
         X[0] = np.random.randn(30, 2, 20)
 
 
+def test_single_cloud_is_subscriptable():
+    # A 0-d PointCloudTensor wraps a single cloud; it should be indexable as
+    # its (n_points, dim) array so the natural pc[:, 0] / pc[:, 1] plotting
+    # idiom works directly (see issue #133).
+    arr = np.random.RandomState(0).rand(6, 2)
+    pc = sb.PointCloudTensor(arr)
+    assert pc.ndim == 0
+
+    assert pc[:, 0].array_equal(arr[:, 0])
+    assert pc[:, 1].array_equal(arr[:, 1])
+    assert pc[0].array_equal(arr[0])
+    assert pc[1:3].array_equal(arr[1:3])
+
+    # Whole-cloud element access is unchanged.
+    assert pc[()].array_equal(arr)
+    assert pc[...].array_equal(arr)
+
+
+def test_tensor_of_clouds_indexing_unchanged():
+    # Rank >= 1 tensors still index over clouds, not into them: T[0] is one
+    # cloud (a PointCloud), which is itself subscriptable as its (n_points, dim)
+    # coordinates.
+    arr = np.random.RandomState(1).rand(5, 2)
+    T = sb.zeros((3,), dtype=sb.pcloud64)
+    T[0] = arr
+
+    assert isinstance(T[0], sb.PointCloud)
+    assert T[0].shape == (5, 2)
+    assert T[0][:, 1].array_equal(arr[:, 1])
+
+    sub = T[1:]
+    assert isinstance(sub, sb.PointCloudTensor)
+    assert sub.shape == (2,)
+
+    # Selecting one cloud from a higher-rank tensor, then column-indexing it.
+    grid = sb.zeros((2, 3), dtype=sb.pcloud64)
+    grid[0, 1] = arr
+    assert grid[0, 1][:, 0].array_equal(arr[:, 0])
+    assert grid[0, 1][3].array_equal(arr[3])
+
+
 def test_stored_is_same_as_numpy():
     shape = (10, 20, 30)
     pclouds = sb.zeros(shape, dtype=sb.pcloud64)

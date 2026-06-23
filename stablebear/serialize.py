@@ -15,7 +15,7 @@
 import numpy as np
 
 from . import _sb_cpp as cpp
-from .tensor import PcfTensor
+from .base_tensor import PcfTensor
 from .typing import _assert_valid_dtype, pcf32, pcf64
 
 

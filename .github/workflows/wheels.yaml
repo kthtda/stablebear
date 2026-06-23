@@ -40,6 +40,15 @@ jobs:
     needs: setup
     runs-on: ${{ matrix.os }}
 
+    # Network-resilience defaults for the host-side uv/pip that cibuildwheel
+    # drives on macOS/Windows (e.g. installing matplotlib & friends during the
+    # wheel-test phase). The Linux build/test runs in a container, so the same
+    # vars are also injected via CIBW_ENVIRONMENT_LINUX / CIBW_TEST_ENVIRONMENT.
+    env:
+      UV_HTTP_TIMEOUT: 120
+      PIP_RETRIES: 5
+      PIP_DEFAULT_TIMEOUT: 60
+
     strategy:
       # Don't let one platform's failure cancel the others.
       fail-fast: false
@@ -88,7 +97,15 @@ jobs:
         if: runner.os == 'Windows' && matrix.cuda == 1
         shell: pwsh
         run: |
-          conda install -y cuda-compiler=${{ matrix.cuda_version }} -c nvidia
+          # Retry the conda fetch to ride out transient nvidia-channel hiccups.
+          $ok = $false
+          for ($i = 1; $i -le 5; $i++) {
+            conda install -y cuda-compiler=${{ matrix.cuda_version }} -c nvidia
+            if ($LASTEXITCODE -eq 0) { $ok = $true; break }
+            Write-Host "conda install failed (attempt $i), retrying..."
+            Start-Sleep -Seconds ($i * 5)
+          }
+          if (-not $ok) { exit 1 }
           $condaBase = (conda info --base).Trim()
           $cudaPath = ("$condaBase\Library") -replace '\\', '/'
           "CUDA_PATH=$cudaPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
@@ -111,15 +128,22 @@ jobs:
           # Pin cudart to the CUDA major the wheel was built against (CUDA DLLs are not ABI-compatible across majors).
           # Non-CUDA builds use test-requires from pyproject.toml.
           CIBW_TEST_REQUIRES: ${{ matrix.cuda == 1 && format('pytest scipy cuda-toolkit[cudart]=={0}.*', matrix.cuda_major) || 'pytest scipy' }}
+          # The wheel-test phase installs the wheel + its runtime deps (incl.
+          # matplotlib) via uv; a longer HTTP timeout absorbs slow/transient
+          # PyPI fetches that otherwise time out after uv's short default.
+          CIBW_TEST_ENVIRONMENT: >-
+            UV_HTTP_TIMEOUT=120
+            PIP_RETRIES=5
+            PIP_DEFAULT_TIMEOUT=60
           CIBW_MANYLINUX_X86_64_IMAGE: "manylinux_2_28"
           CIBW_BEFORE_ALL_LINUX: >-
             bash -c '
             [ "$(uname -m)" != "x86_64" ] && exit 0;
             [ -f /lib/ld-musl-x86_64.so.1 ] && exit 0;
             [ "${{ matrix.cuda }}" != "1" ] && exit 0;
-            curl -o /etc/yum.repos.d/cuda.repo
-            https://developer.download.nvidia.com/compute/cuda/repos/rhel8/x86_64/cuda-rhel8.repo &&
-            dnf install -y --nogpgcheck cuda-nvcc-${{ matrix.cuda_tag }} cuda-cudart-devel-${{ matrix.cuda_tag }} &&
+            dnf install -y dnf-plugins-core &&
+            dnf config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/rhel8/x86_64/cuda-rhel8.repo &&
+            { n=0; until dnf install -y --nogpgcheck cuda-nvcc-${{ matrix.cuda_tag }} cuda-cudart-devel-${{ matrix.cuda_tag }}; do n=$((n+1)); [ $n -ge 5 ] && exit 1; echo "dnf install failed (attempt $n), retrying..."; sleep $((n*5)); done; } &&
             CUDA_NVCC="$(find /usr/local -path "*/bin/nvcc" -print -quit)" &&
             "$CUDA_NVCC" --version &&
             CUDA_DIR="$(dirname "$(dirname "$CUDA_NVCC")")" &&
@@ -136,17 +160,20 @@ jobs:
             CMAKE_BUILD_PARALLEL_LEVEL=$CMAKE_BUILD_PARALLEL_LEVEL
             CMAKE_UNITY_BUILD=ON
             CMAKE_UNITY_BUILD_BATCH_SIZE=4
+            UV_HTTP_TIMEOUT=120
           CIBW_ENVIRONMENT_MACOS: >-
             BUILD_WITH_CUDA=${{ matrix.cuda }}
             MACOSX_DEPLOYMENT_TARGET=11.0
             CMAKE_BUILD_PARALLEL_LEVEL=$CMAKE_BUILD_PARALLEL_LEVEL
             CMAKE_UNITY_BUILD=ON
             CMAKE_UNITY_BUILD_BATCH_SIZE=4
+            UV_HTTP_TIMEOUT=120
           CIBW_ENVIRONMENT_WINDOWS: >-
             BUILD_WITH_CUDA=${{ matrix.cuda }}
             CMAKE_BUILD_PARALLEL_LEVEL=$CMAKE_BUILD_PARALLEL_LEVEL
             CMAKE_UNITY_BUILD=ON
             CMAKE_UNITY_BUILD_BATCH_SIZE=4
+            UV_HTTP_TIMEOUT=120
             CMAKE_ARGS=${{ matrix.cuda == 1 && '"-G Ninja -DCUDAToolkit_ROOT=${CUDA_PATH} -DCMAKE_CUDA_COMPILER=${CUDA_PATH}/bin/nvcc.exe"' || '' }}
       - uses: actions/upload-artifact@v6
         if: matrix.cuda == 1

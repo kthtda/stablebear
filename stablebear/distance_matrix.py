@@ -152,6 +152,26 @@ class DistanceMatrix:
         """Return the full n×n distance matrix as a numpy array."""
         return self._data.to_dense()
 
+    def to_numpy(self) -> np.ndarray:
+        """Return the full n×n distance matrix as a numpy array.
+
+        Alias for :meth:`to_dense`, provided for naming consistency with the
+        rest of the library.
+        """
+        return self.to_dense()
+
+    def __array__(self, dtype=None, copy=None):
+        """Return the dense n×n matrix so ``np.asarray(matrix)`` works.
+
+        Without this, ``np.asarray``/``np.array`` would silently wrap the
+        object in a 0-d ``object`` array instead of materializing the matrix
+        (see issue #75).
+        """
+        arr = self.to_dense()
+        if dtype is not None:
+            arr = arr.astype(dtype, copy=False)
+        return arr
+
     def __reduce__(self):
         import io as _io
         from .io import _save_object, _unpickle_object
@@ -173,15 +193,73 @@ class DistanceMatrix:
         return repr(self._data)
 
 
+def _matrix_dtype_for(arr_dtype, dtype, dtype32, dtype64, name):
+    if dtype is not None:
+        if dtype not in (dtype32, dtype64):
+            raise TypeError(
+                f"dtype must be {dtype32.__name__} or {dtype64.__name__}, "
+                f"got {getattr(dtype, '__name__', dtype)}")
+        return dtype
+    return dtype32 if np.dtype(arr_dtype) == np.float32 else dtype64
+
+
+def _matrix_tensor_cpp_from_array(arr, dtype, scalar_cls, dtype32, dtype64):
+    """Build a C++ matrix tensor from an ``(*tensor_shape, n, n)`` ndarray.
+
+    The trailing two axes of *arr* form each n×n matrix; the leading axes
+    form the tensor shape.
+    """
+    from .tensor_create import zeros
+    arr = np.asarray(arr)
+    if arr.ndim < 2:
+        raise ValueError(
+            "array must have at least 2 dimensions (the trailing two form each matrix)")
+    if arr.shape[-1] != arr.shape[-2]:
+        raise ValueError(
+            f"the trailing two axes must be square, got {tuple(arr.shape[-2:])}")
+    dt = _matrix_dtype_for(arr.dtype, dtype, dtype32, dtype64, scalar_cls.__name__)
+    np_float = np.float32 if dt == dtype32 else np.float64
+    arr = np.ascontiguousarray(arr, dtype=np_float)
+    tensor_shape = arr.shape[:-2]
+    t = zeros(tensor_shape, dtype=dt)
+    for idx in np.ndindex(*tensor_shape):
+        t[idx] = scalar_cls.from_dense(arr[idx])
+    return t._data
+
+
 class DistanceMatrixTensor(Tensor):
-    def __init__(self, data: cpp.DistanceMatrix32Tensor | cpp.DistanceMatrix64Tensor):
+    """Tensor whose elements are :class:`DistanceMatrix` objects.
+
+    Parameters
+    ----------
+    data : ndarray, DistanceMatrixTensor, or C++ tensor
+        An ndarray of shape ``(*tensor_shape, n, n)`` whose trailing two axes
+        form each n×n distance matrix, or an existing tensor.
+    dtype : distmat32 | distmat64 | None, optional
+        Element precision. Inferred from the array dtype when ``None``.
+    """
+
+    def __init__(self, data, dtype=None):
         super().__init__()
         if isinstance(data, DistanceMatrixTensor):
             data = data._data
+        elif isinstance(data, np.ndarray):
+            data = _matrix_tensor_cpp_from_array(
+                data, dtype, DistanceMatrix, distmat32, distmat64)
         elif not isinstance(data, (cpp.DistanceMatrix32Tensor, cpp.DistanceMatrix64Tensor)):
             raise TypeError(f"Cannot create DistanceMatrixTensor from {type(data)}")
         self._data = data
         self.dtype = _DISTMAT_CPP_TO_DTYPE[type(self._data)]
+
+    @classmethod
+    def from_numpy(cls, array, dtype=None):
+        """Build a tensor of distance matrices from an ``(*tensor_shape, n, n)`` array.
+
+        The trailing two axes of *array* form each n×n distance matrix (which
+        must be symmetric with a zero diagonal and nonnegative entries); the
+        leading axes form the tensor shape.
+        """
+        return cls(np.asarray(array), dtype=dtype)
 
     def _to_py_tensor(self, data):
         return DistanceMatrixTensor(data)
