@@ -27,6 +27,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <limits>
 #include <memory>
 #include <random>
 #include <stdexcept>
@@ -68,6 +69,20 @@ namespace sb::sampling
   struct Identity
   {
     T operator()(T v) const { return v; }
+  };
+
+  /// Uniform distribution over a distance band [inner, outer]: weight 1 when the
+  /// filter value lies in the band, 0 otherwise. With the "distance" filter this
+  /// samples uniformly from a region around the query point — a disk
+  /// (inner = 0), a circle/annulus (0 < inner < outer), or the whole cloud
+  /// (inner = 0, outer = +inf, the default).
+  template <typename T>
+  struct Uniform
+  {
+    T inner = T(0);
+    T outer = std::numeric_limits<T>::infinity();
+
+    T operator()(T v) const { return (v >= inner && v <= outer) ? T(1) : T(0); }
   };
 
   /// Unnormalized Gaussian of the filter value.

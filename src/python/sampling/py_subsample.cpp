@@ -66,6 +66,18 @@ namespace
       return to_tuple(std::move(handle));
     }
 
+    static py::tuple sample_subsets_distance_uniform(const TensorT& reference, const TensorT& query,
+                                                     T inner, T outer, size_t sampleSize,
+                                                     size_t nInstances, bool replace,
+                                                     const sb::DefaultRandomGenerator* gen)
+    {
+      sb::sampling::SubsampleHandle<T> handle = sb::sampling::sample_subsets(
+          PointCloudT(reference), PointCloudT(query),
+          sb::sampling::EuclideanDistance<T>{}, sb::sampling::Uniform<T>{inner, outer},
+          sampleSize, nInstances, replace, pick(gen), sb::default_executor());
+      return to_tuple(std::move(handle));
+    }
+
     static py::tuple sample_subsets_from_probabilities(const TensorT& reference,
                                                        const TensorT& probabilities,
                                                        size_t sampleSize, size_t nInstances,
@@ -93,6 +105,12 @@ namespace
                       &PySubsampleBindings::sample_subsets_distance_identity,
                       py::arg("reference"), py::arg("query"),
                       py::arg("sample_size"), py::arg("n_instances"), py::arg("replace"),
+                      py::arg("generator").none(true) = py::none())
+          .def_static("sample_subsets_distance_uniform",
+                      &PySubsampleBindings::sample_subsets_distance_uniform,
+                      py::arg("reference"), py::arg("query"),
+                      py::arg("inner"), py::arg("outer"), py::arg("sample_size"),
+                      py::arg("n_instances"), py::arg("replace"),
                       py::arg("generator").none(true) = py::none())
           .def_static("sample_subsets_from_probabilities",
                       &PySubsampleBindings::sample_subsets_from_probabilities,

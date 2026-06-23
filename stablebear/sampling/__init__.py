@@ -14,7 +14,7 @@
 
 __before = set(dir())
 
-from .distributions import Gaussian, Identity
+from .distributions import Gaussian, Identity, Uniform
 from .subsample import subsample
 
 import types as _types
