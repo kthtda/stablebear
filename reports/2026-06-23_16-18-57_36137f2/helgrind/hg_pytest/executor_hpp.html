@@ -1,0 +1,2817 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>/home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/algorithm/../core/executor.hpp</title>
+    <link href='valgrind.css' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+    <script src="https://code.jquery.com/jquery-3.4.1.js"></script>
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.0.0/styles/default.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.0.0/highlight.min.js"></script>
+    <script src="valgrind.js"></script>
+</head>
+
+<body>
+    <div class="global">
+        <div class="header">
+            <h1>/home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/algorithm/../core/executor.hpp</h1>
+            <p><b>2</b> errors</p>
+            <button class="next_error">Goto First Error</button>
+        </div>
+        <div class="listing">
+            <pre class="code">
+<code class="c++"><span class="line_number">1</span>#pragma once
+<span class="line_number">2</span>
+<span class="line_number">3</span>#include &#34;observer.hpp&#34;
+<span class="line_number">4</span>#include &#34;taskflow.hpp&#34;
+<span class="line_number">5</span>#include &#34;async_task.hpp&#34;
+<span class="line_number">6</span>
+<span class="line_number">7</span>/**
+<span class="line_number">8</span>@file executor.hpp
+<span class="line_number">9</span>@brief executor include file
+<span class="line_number">10</span>*/
+<span class="line_number">11</span>
+<span class="line_number">12</span>namespace tf {
+<span class="line_number">13</span>
+<span class="line_number">14</span>// ----------------------------------------------------------------------------
+<span class="line_number">15</span>// Executor Definition
+<span class="line_number">16</span>// ----------------------------------------------------------------------------
+<span class="line_number">17</span>
+<span class="line_number">18</span>/** 
+<span class="line_number">19</span>@class Executor
+<span class="line_number">20</span>
+<span class="line_number">21</span>@brief class to create an executor 
+<span class="line_number">22</span>
+<span class="line_number">23</span>An tf::Executor manages a set of worker threads to run tasks 
+<span class="line_number">24</span>using an efficient work-stealing scheduling algorithm.
+<span class="line_number">25</span>
+<span class="line_number">26</span>@code{.cpp}
+<span class="line_number">27</span>// Declare an executor and a taskflow
+<span class="line_number">28</span>tf::Executor executor;
+<span class="line_number">29</span>tf::Taskflow taskflow;
+<span class="line_number">30</span>
+<span class="line_number">31</span>// Add three tasks into the taskflow
+<span class="line_number">32</span>tf::Task A = taskflow.emplace([] () { std::cout &lt;&lt; &#34;This is TaskA\n&#34;; });
+<span class="line_number">33</span>tf::Task B = taskflow.emplace([] () { std::cout &lt;&lt; &#34;This is TaskB\n&#34;; });
+<span class="line_number">34</span>tf::Task C = taskflow.emplace([] () { std::cout &lt;&lt; &#34;This is TaskC\n&#34;; });
+<span class="line_number">35</span>
+<span class="line_number">36</span>// Build precedence between tasks
+<span class="line_number">37</span>A.precede(B, C);
+<span class="line_number">38</span>
+<span class="line_number">39</span>tf::Future&lt;void&gt; fu = executor.run(taskflow);
+<span class="line_number">40</span>fu.wait();  // block until the execution completes
+<span class="line_number">41</span>
+<span class="line_number">42</span>executor.run(taskflow, [](){ std::cout &lt;&lt; &#34;end of 1 run&#34;; }).wait();
+<span class="line_number">43</span>executor.run_n(taskflow, 4);
+<span class="line_number">44</span>executor.wait_for_all();  // block until all associated executions finish
+<span class="line_number">45</span>executor.run_n(taskflow, 4, [](){ std::cout &lt;&lt; &#34;end of 4 runs&#34;; }).wait();
+<span class="line_number">46</span>executor.run_until(taskflow, [cnt=0] () mutable { return ++cnt == 10; });
+<span class="line_number">47</span>@endcode
+<span class="line_number">48</span>
+<span class="line_number">49</span>Most executor methods are @em thread-safe. 
+<span class="line_number">50</span>For example, you can submit multiple taskflows to an executor concurrently 
+<span class="line_number">51</span>from different threads, while other threads simultaneously create asynchronous tasks.
+<span class="line_number">52</span>
+<span class="line_number">53</span>@code{.cpp}
+<span class="line_number">54</span>std::thread t1([&amp;](){ executor.run(taskflow); };
+<span class="line_number">55</span>std::thread t2([&amp;](){ executor.async([](){ std::cout &lt;&lt; &#34;async task from t2\n&#34;; }); });
+<span class="line_number">56</span>executor.async([&amp;](){ std::cout &lt;&lt; &#34;async task from the main thread\n&#34;; });
+<span class="line_number">57</span>@endcode
+<span class="line_number">58</span>
+<span class="line_number">59</span>@note
+<span class="line_number">60</span>To know more about tf::Executor, please refer to @ref ExecuteTaskflow.
+<span class="line_number">61</span>*/
+<span class="line_number">62</span>class Executor {
+<span class="line_number">63</span>
+<span class="line_number">64</span>  friend class FlowBuilder;
+<span class="line_number">65</span>  friend class Subflow;
+<span class="line_number">66</span>  friend class Runtime;
+<span class="line_number">67</span>  friend class NonpreemptiveRuntime;
+<span class="line_number">68</span>  friend class Algorithm;
+<span class="line_number">69</span>  friend class TaskGroup;
+<span class="line_number">70</span>
+<span class="line_number">71</span>  public:
+<span class="line_number">72</span>
+<span class="line_number">73</span>  /**
+<span class="line_number">74</span>  @brief constructs the executor with @c N worker threads
+<span class="line_number">75</span>
+<span class="line_number">76</span>  @param N number of workers (default std::thread::hardware_concurrency)
+<span class="line_number">77</span>  @param wif interface class instance to configure workers&#39; behaviors
+<span class="line_number">78</span>
+<span class="line_number">79</span>  The constructor spawns @c N worker threads to run tasks in a
+<span class="line_number">80</span>  work-stealing loop. The number of workers must be greater than zero
+<span class="line_number">81</span>  or an exception will be thrown.
+<span class="line_number">82</span>  By default, the number of worker threads is equal to the maximum
+<span class="line_number">83</span>  hardware concurrency returned by std::thread::hardware_concurrency.
+<span class="line_number">84</span>
+<span class="line_number">85</span>  Users can alter the worker behavior, such as changing thread affinity,
+<span class="line_number">86</span>  via deriving an instance from tf::WorkerInterface.
+<span class="line_number">87</span>
+<span class="line_number">88</span>  @attention
+<span class="line_number">89</span>  An exception will be thrown if executor construction fails.
+<span class="line_number">90</span>  */
+<span class="line_number">91</span>  explicit Executor(
+<span class="line_number">92</span>    size_t N = std::thread::hardware_concurrency(),
+<span class="line_number">93</span>    std::shared_ptr&lt;WorkerInterface&gt; wif = nullptr
+<span class="line_number">94</span>  );
+<span class="line_number">95</span>
+<span class="line_number">96</span>  /**
+<span class="line_number">97</span>  @brief destructs the executor
+<span class="line_number">98</span>
+<span class="line_number">99</span>  The destructor calls Executor::wait_for_all to wait for all submitted
+<span class="line_number">100</span>  taskflows to complete and then notifies all worker threads to stop
+<span class="line_number">101</span>  and join these threads.
+<span class="line_number">102</span>  */
+<span class="line_number">103</span>  ~Executor();
+<span class="line_number">104</span>
+<span class="line_number">105</span>  /**
+<span class="line_number">106</span>  @brief runs a taskflow once
+<span class="line_number">107</span>
+<span class="line_number">108</span>  @param taskflow a tf::Taskflow object
+<span class="line_number">109</span>
+<span class="line_number">110</span>  @return a tf::Future that holds the result of the execution
+<span class="line_number">111</span>
+<span class="line_number">112</span>  This member function executes the given taskflow once and returns a tf::Future
+<span class="line_number">113</span>  object that eventually holds the result of the execution.
+<span class="line_number">114</span>
+<span class="line_number">115</span>  @code{.cpp}
+<span class="line_number">116</span>  tf::Future&lt;void&gt; future = executor.run(taskflow);
+<span class="line_number">117</span>  // do something else
+<span class="line_number">118</span>  future.wait();
+<span class="line_number">119</span>  @endcode
+<span class="line_number">120</span>
+<span class="line_number">121</span>  This member function is thread-safe.
+<span class="line_number">122</span>  */
+<span class="line_number">123</span>  tf::Future&lt;void&gt; run(Taskflow&amp; taskflow);
+<span class="line_number">124</span>
+<span class="line_number">125</span>  /**
+<span class="line_number">126</span>  @brief runs a moved taskflow once
+<span class="line_number">127</span>
+<span class="line_number">128</span>  @param taskflow a moved tf::Taskflow object
+<span class="line_number">129</span>
+<span class="line_number">130</span>  @return a tf::Future that holds the result of the execution
+<span class="line_number">131</span>
+<span class="line_number">132</span>  This member function executes a moved taskflow once and returns a tf::Future
+<span class="line_number">133</span>  object that eventually holds the result of the execution.
+<span class="line_number">134</span>  The executor will take care of the lifetime of the moved taskflow.
+<span class="line_number">135</span>
+<span class="line_number">136</span>  @code{.cpp}
+<span class="line_number">137</span>  tf::Future&lt;void&gt; future = executor.run(std::move(taskflow));
+<span class="line_number">138</span>  // do something else
+<span class="line_number">139</span>  future.wait();
+<span class="line_number">140</span>  @endcode
+<span class="line_number">141</span>
+<span class="line_number">142</span>  This member function is thread-safe.
+<span class="line_number">143</span>  */
+<span class="line_number">144</span>  tf::Future&lt;void&gt; run(Taskflow&amp;&amp; taskflow);
+<span class="line_number">145</span>
+<span class="line_number">146</span>  /**
+<span class="line_number">147</span>  @brief runs a taskflow once and invoke a callback upon completion
+<span class="line_number">148</span>
+<span class="line_number">149</span>  @param taskflow a tf::Taskflow object
+<span class="line_number">150</span>  @param callable a callable object to be invoked after this run
+<span class="line_number">151</span>
+<span class="line_number">152</span>  @return a tf::Future that holds the result of the execution
+<span class="line_number">153</span>
+<span class="line_number">154</span>  This member function executes the given taskflow once and invokes the given
+<span class="line_number">155</span>  callable when the execution completes.
+<span class="line_number">156</span>  This member function returns a tf::Future object that
+<span class="line_number">157</span>  eventually holds the result of the execution.
+<span class="line_number">158</span>
+<span class="line_number">159</span>  @code{.cpp}
+<span class="line_number">160</span>  tf::Future&lt;void&gt; future = executor.run(taskflow, [](){ std::cout &lt;&lt; &#34;done&#34;; });
+<span class="line_number">161</span>  // do something else
+<span class="line_number">162</span>  future.wait();
+<span class="line_number">163</span>  @endcode
+<span class="line_number">164</span>
+<span class="line_number">165</span>  This member function is thread-safe.
+<span class="line_number">166</span>
+<span class="line_number">167</span>  */
+<span class="line_number">168</span>  template&lt;typename C&gt;
+<span class="line_number">169</span>  tf::Future&lt;void&gt; run(Taskflow&amp; taskflow, C&amp;&amp; callable);
+<span class="line_number">170</span>
+<span class="line_number">171</span>  /**
+<span class="line_number">172</span>  @brief runs a moved taskflow once and invoke a callback upon completion
+<span class="line_number">173</span>
+<span class="line_number">174</span>  @param taskflow a moved tf::Taskflow object
+<span class="line_number">175</span>  @param callable a callable object to be invoked after this run
+<span class="line_number">176</span>
+<span class="line_number">177</span>  @return a tf::Future that holds the result of the execution
+<span class="line_number">178</span>
+<span class="line_number">179</span>  This member function executes a moved taskflow once and invokes the given
+<span class="line_number">180</span>  callable when the execution completes.
+<span class="line_number">181</span>  This member function returns a tf::Future object that
+<span class="line_number">182</span>  eventually holds the result of the execution.
+<span class="line_number">183</span>  The executor will take care of the lifetime of the moved taskflow.
+<span class="line_number">184</span>
+<span class="line_number">185</span>  @code{.cpp}
+<span class="line_number">186</span>  tf::Future&lt;void&gt; future = executor.run(
+<span class="line_number">187</span>    std::move(taskflow), [](){ std::cout &lt;&lt; &#34;done&#34;; }
+<span class="line_number">188</span>  );
+<span class="line_number">189</span>  // do something else
+<span class="line_number">190</span>  future.wait();
+<span class="line_number">191</span>  @endcode
+<span class="line_number">192</span>
+<span class="line_number">193</span>  This member function is thread-safe.
+<span class="line_number">194</span>  */
+<span class="line_number">195</span>  template&lt;typename C&gt;
+<span class="line_number">196</span>  tf::Future&lt;void&gt; run(Taskflow&amp;&amp; taskflow, C&amp;&amp; callable);
+<span class="line_number">197</span>
+<span class="line_number">198</span>  /**
+<span class="line_number">199</span>  @brief runs a taskflow for @c N times
+<span class="line_number">200</span>
+<span class="line_number">201</span>  @param taskflow a tf::Taskflow object
+<span class="line_number">202</span>  @param N number of runs
+<span class="line_number">203</span>
+<span class="line_number">204</span>  @return a tf::Future that holds the result of the execution
+<span class="line_number">205</span>
+<span class="line_number">206</span>  This member function executes the given taskflow @c N times and returns a tf::Future
+<span class="line_number">207</span>  object that eventually holds the result of the execution.
+<span class="line_number">208</span>
+<span class="line_number">209</span>  @code{.cpp}
+<span class="line_number">210</span>  tf::Future&lt;void&gt; future = executor.run_n(taskflow, 2);  // run taskflow 2 times
+<span class="line_number">211</span>  // do something else
+<span class="line_number">212</span>  future.wait();
+<span class="line_number">213</span>  @endcode
+<span class="line_number">214</span>
+<span class="line_number">215</span>  This member function is thread-safe.
+<span class="line_number">216</span>  */
+<span class="line_number">217</span>  tf::Future&lt;void&gt; run_n(Taskflow&amp; taskflow, size_t N);
+<span class="line_number">218</span>
+<span class="line_number">219</span>  /**
+<span class="line_number">220</span>  @brief runs a moved taskflow for @c N times
+<span class="line_number">221</span>
+<span class="line_number">222</span>  @param taskflow a moved tf::Taskflow object
+<span class="line_number">223</span>  @param N number of runs
+<span class="line_number">224</span>
+<span class="line_number">225</span>  @return a tf::Future that holds the result of the execution
+<span class="line_number">226</span>
+<span class="line_number">227</span>  This member function executes a moved taskflow @c N times and returns a tf::Future
+<span class="line_number">228</span>  object that eventually holds the result of the execution.
+<span class="line_number">229</span>  The executor will take care of the lifetime of the moved taskflow.
+<span class="line_number">230</span>
+<span class="line_number">231</span>  @code{.cpp}
+<span class="line_number">232</span>  tf::Future&lt;void&gt; future = executor.run_n(
+<span class="line_number">233</span>    std::move(taskflow), 2    // run the moved taskflow 2 times
+<span class="line_number">234</span>  );
+<span class="line_number">235</span>  // do something else
+<span class="line_number">236</span>  future.wait();
+<span class="line_number">237</span>  @endcode
+<span class="line_number">238</span>
+<span class="line_number">239</span>  This member function is thread-safe.
+<span class="line_number">240</span>  */
+<span class="line_number">241</span>  tf::Future&lt;void&gt; run_n(Taskflow&amp;&amp; taskflow, size_t N);
+<span class="line_number">242</span>
+<span class="line_number">243</span>  /**
+<span class="line_number">244</span>  @brief runs a taskflow for @c N times and then invokes a callback
+<span class="line_number">245</span>
+<span class="line_number">246</span>  @param taskflow a tf::Taskflow
+<span class="line_number">247</span>  @param N number of runs
+<span class="line_number">248</span>  @param callable a callable object to be invoked after this run
+<span class="line_number">249</span>
+<span class="line_number">250</span>  @return a tf::Future that holds the result of the execution
+<span class="line_number">251</span>
+<span class="line_number">252</span>  This member function executes the given taskflow @c N times and invokes the given
+<span class="line_number">253</span>  callable when the execution completes.
+<span class="line_number">254</span>  This member function returns a tf::Future object that
+<span class="line_number">255</span>  eventually holds the result of the execution.
+<span class="line_number">256</span>
+<span class="line_number">257</span>  @code{.cpp}
+<span class="line_number">258</span>  tf::Future&lt;void&gt; future = executor.run(
+<span class="line_number">259</span>    taskflow, 2, [](){ std::cout &lt;&lt; &#34;done&#34;; }  // runs taskflow 2 times and invoke
+<span class="line_number">260</span>                                               // the lambda to print &#34;done&#34;
+<span class="line_number">261</span>  );
+<span class="line_number">262</span>  // do something else
+<span class="line_number">263</span>  future.wait();
+<span class="line_number">264</span>  @endcode
+<span class="line_number">265</span>
+<span class="line_number">266</span>  This member function is thread-safe.
+<span class="line_number">267</span>  */
+<span class="line_number">268</span>  template&lt;typename C&gt;
+<span class="line_number">269</span>  tf::Future&lt;void&gt; run_n(Taskflow&amp; taskflow, size_t N, C&amp;&amp; callable);
+<span class="line_number">270</span>
+<span class="line_number">271</span>  /**
+<span class="line_number">272</span>  @brief runs a moved taskflow for @c N times and then invokes a callback
+<span class="line_number">273</span>
+<span class="line_number">274</span>  @param taskflow a moved tf::Taskflow
+<span class="line_number">275</span>  @param N number of runs
+<span class="line_number">276</span>  @param callable a callable object to be invoked after this run
+<span class="line_number">277</span>
+<span class="line_number">278</span>  @return a tf::Future that holds the result of the execution
+<span class="line_number">279</span>
+<span class="line_number">280</span>  This member function executes a moved taskflow @c N times and invokes the given
+<span class="line_number">281</span>  callable when the execution completes.
+<span class="line_number">282</span>  This member function returns a tf::Future object that
+<span class="line_number">283</span>  eventually holds the result of the execution.
+<span class="line_number">284</span>
+<span class="line_number">285</span>  @code{.cpp}
+<span class="line_number">286</span>  tf::Future&lt;void&gt; future = executor.run_n(
+<span class="line_number">287</span>    // run the moved taskflow 2 times and invoke the lambda to print &#34;done&#34;
+<span class="line_number">288</span>    std::move(taskflow), 2, [](){ std::cout &lt;&lt; &#34;done&#34;; }
+<span class="line_number">289</span>  );
+<span class="line_number">290</span>  // do something else
+<span class="line_number">291</span>  future.wait();
+<span class="line_number">292</span>  @endcode
+<span class="line_number">293</span>
+<span class="line_number">294</span>  This member function is thread-safe.
+<span class="line_number">295</span>  */
+<span class="line_number">296</span>  template&lt;typename C&gt;
+<span class="line_number">297</span>  tf::Future&lt;void&gt; run_n(Taskflow&amp;&amp; taskflow, size_t N, C&amp;&amp; callable);
+<span class="line_number">298</span>
+<span class="line_number">299</span>  /**
+<span class="line_number">300</span>  @brief runs a taskflow multiple times until the predicate becomes true
+<span class="line_number">301</span>
+<span class="line_number">302</span>  @param taskflow a tf::Taskflow
+<span class="line_number">303</span>  @param pred a boolean predicate to return @c true for stop
+<span class="line_number">304</span>
+<span class="line_number">305</span>  @return a tf::Future that holds the result of the execution
+<span class="line_number">306</span>
+<span class="line_number">307</span>  This member function executes the given taskflow multiple times until
+<span class="line_number">308</span>  the predicate returns @c true.
+<span class="line_number">309</span>  This member function returns a tf::Future object that
+<span class="line_number">310</span>  eventually holds the result of the execution.
+<span class="line_number">311</span>
+<span class="line_number">312</span>  @code{.cpp}
+<span class="line_number">313</span>  tf::Future&lt;void&gt; future = executor.run_until(
+<span class="line_number">314</span>    taskflow, [](){ return rand()%10 == 0 }
+<span class="line_number">315</span>  );
+<span class="line_number">316</span>  // do something else
+<span class="line_number">317</span>  future.wait();
+<span class="line_number">318</span>  @endcode
+<span class="line_number">319</span>
+<span class="line_number">320</span>  This member function is thread-safe.
+<span class="line_number">321</span>  */
+<span class="line_number">322</span>  template&lt;typename P&gt;
+<span class="line_number">323</span>  tf::Future&lt;void&gt; run_until(Taskflow&amp; taskflow, P&amp;&amp; pred);
+<span class="line_number">324</span>
+<span class="line_number">325</span>  /**
+<span class="line_number">326</span>  @brief runs a moved taskflow and keeps running it
+<span class="line_number">327</span>         until the predicate becomes true
+<span class="line_number">328</span>
+<span class="line_number">329</span>  @param taskflow a moved tf::Taskflow object
+<span class="line_number">330</span>  @param pred a boolean predicate to return @c true for stop
+<span class="line_number">331</span>
+<span class="line_number">332</span>  @return a tf::Future that holds the result of the execution
+<span class="line_number">333</span>
+<span class="line_number">334</span>  This member function executes a moved taskflow multiple times until
+<span class="line_number">335</span>  the predicate returns @c true.
+<span class="line_number">336</span>  This member function returns a tf::Future object that
+<span class="line_number">337</span>  eventually holds the result of the execution.
+<span class="line_number">338</span>  The executor will take care of the lifetime of the moved taskflow.
+<span class="line_number">339</span>
+<span class="line_number">340</span>  @code{.cpp}
+<span class="line_number">341</span>  tf::Future&lt;void&gt; future = executor.run_until(
+<span class="line_number">342</span>    std::move(taskflow), [](){ return rand()%10 == 0 }
+<span class="line_number">343</span>  );
+<span class="line_number">344</span>  // do something else
+<span class="line_number">345</span>  future.wait();
+<span class="line_number">346</span>  @endcode
+<span class="line_number">347</span>
+<span class="line_number">348</span>  This member function is thread-safe.
+<span class="line_number">349</span>  */
+<span class="line_number">350</span>  template&lt;typename P&gt;
+<span class="line_number">351</span>  tf::Future&lt;void&gt; run_until(Taskflow&amp;&amp; taskflow, P&amp;&amp; pred);
+<span class="line_number">352</span>
+<span class="line_number">353</span>  /**
+<span class="line_number">354</span>  @brief runs a taskflow multiple times until the predicate becomes true and
+<span class="line_number">355</span>         then invokes the callback
+<span class="line_number">356</span>
+<span class="line_number">357</span>  @param taskflow a tf::Taskflow
+<span class="line_number">358</span>  @param pred a boolean predicate to return @c true for stop
+<span class="line_number">359</span>  @param callable a callable object to be invoked after this run completes
+<span class="line_number">360</span>
+<span class="line_number">361</span>  @return a tf::Future that holds the result of the execution
+<span class="line_number">362</span>
+<span class="line_number">363</span>  This member function executes the given taskflow multiple times until
+<span class="line_number">364</span>  the predicate returns @c true and then invokes the given callable when
+<span class="line_number">365</span>  the execution completes.
+<span class="line_number">366</span>  This member function returns a tf::Future object that
+<span class="line_number">367</span>  eventually holds the result of the execution.
+<span class="line_number">368</span>
+<span class="line_number">369</span>  @code{.cpp}
+<span class="line_number">370</span>  tf::Future&lt;void&gt; future = executor.run_until(
+<span class="line_number">371</span>    taskflow, [](){ return rand()%10 == 0 }, [](){ std::cout &lt;&lt; &#34;done&#34;; }
+<span class="line_number">372</span>  );
+<span class="line_number">373</span>  // do something else
+<span class="line_number">374</span>  future.wait();
+<span class="line_number">375</span>  @endcode
+<span class="line_number">376</span>
+<span class="line_number">377</span>  This member function is thread-safe.
+<span class="line_number">378</span>  */
+<span class="line_number">379</span>  template&lt;typename P, typename C&gt;
+<span class="line_number">380</span>  tf::Future&lt;void&gt; run_until(Taskflow&amp; taskflow, P&amp;&amp; pred, C&amp;&amp; callable);
+<span class="line_number">381</span>
+<span class="line_number">382</span>  /**
+<span class="line_number">383</span>  @brief runs a moved taskflow and keeps running
+<span class="line_number">384</span>         it until the predicate becomes true and then invokes the callback
+<span class="line_number">385</span>
+<span class="line_number">386</span>  @param taskflow a moved tf::Taskflow
+<span class="line_number">387</span>  @param pred a boolean predicate to return @c true for stop
+<span class="line_number">388</span>  @param callable a callable object to be invoked after this run completes
+<span class="line_number">389</span>
+<span class="line_number">390</span>  @return a tf::Future that holds the result of the execution
+<span class="line_number">391</span>
+<span class="line_number">392</span>  This member function executes a moved taskflow multiple times until
+<span class="line_number">393</span>  the predicate returns @c true and then invokes the given callable when
+<span class="line_number">394</span>  the execution completes.
+<span class="line_number">395</span>  This member function returns a tf::Future object that
+<span class="line_number">396</span>  eventually holds the result of the execution.
+<span class="line_number">397</span>  The executor will take care of the lifetime of the moved taskflow.
+<span class="line_number">398</span>
+<span class="line_number">399</span>  @code{.cpp}
+<span class="line_number">400</span>  tf::Future&lt;void&gt; future = executor.run_until(
+<span class="line_number">401</span>    std::move(taskflow),
+<span class="line_number">402</span>    [](){ return rand()%10 == 0 }, [](){ std::cout &lt;&lt; &#34;done&#34;; }
+<span class="line_number">403</span>  );
+<span class="line_number">404</span>  // do something else
+<span class="line_number">405</span>  future.wait();
+<span class="line_number">406</span>  @endcode
+<span class="line_number">407</span>
+<span class="line_number">408</span>  This member function is thread-safe.
+<span class="line_number">409</span>  */
+<span class="line_number">410</span>  template&lt;typename P, typename C&gt;
+<span class="line_number">411</span>  tf::Future&lt;void&gt; run_until(Taskflow&amp;&amp; taskflow, P&amp;&amp; pred, C&amp;&amp; callable);
+<span class="line_number">412</span>
+<span class="line_number">413</span>  /**
+<span class="line_number">414</span>  @brief runs a target graph and waits until it completes using 
+<span class="line_number">415</span>         an internal worker of this executor
+<span class="line_number">416</span>  
+<span class="line_number">417</span>  @tparam T target type which has `tf::Graph&amp; T::graph()` defined
+<span class="line_number">418</span>  @param target the target task graph object
+<span class="line_number">419</span>
+<span class="line_number">420</span>  The method coruns a target graph cooperatively with other workers in the same executor
+<span class="line_number">421</span>  and block until the execution completes.
+<span class="line_number">422</span>  Under cooperative execution, a worker is not preempted. Instead, it continues 
+<span class="line_number">423</span>  participating in the work-stealing loop, executing available tasks alongside 
+<span class="line_number">424</span>  other workers.  
+<span class="line_number">425</span>  
+<span class="line_number">426</span>  @code{.cpp}
+<span class="line_number">427</span>  tf::Executor executor(2);
+<span class="line_number">428</span>  tf::Taskflow taskflow;
+<span class="line_number">429</span>  std::array&lt;tf::Taskflow, 1000&gt; others;
+<span class="line_number">430</span>  
+<span class="line_number">431</span>  std::atomic&lt;size_t&gt; counter{0};
+<span class="line_number">432</span>  
+<span class="line_number">433</span>  for(size_t n=0; n&lt;1000; n++) {
+<span class="line_number">434</span>    for(size_t i=0; i&lt;1000; i++) {
+<span class="line_number">435</span>      others[n].emplace([&amp;](){ counter++; });
+<span class="line_number">436</span>    }
+<span class="line_number">437</span>    taskflow.emplace([&amp;executor, &amp;tf=others[n]](){
+<span class="line_number">438</span>      executor.corun(tf);
+<span class="line_number">439</span>      //executor.run(tf).wait();  &lt;- blocking the worker without doing anything
+<span class="line_number">440</span>      //                             will introduce deadlock
+<span class="line_number">441</span>    });
+<span class="line_number">442</span>  }
+<span class="line_number">443</span>  executor.run(taskflow).wait();
+<span class="line_number">444</span>  @endcode 
+<span class="line_number">445</span>
+<span class="line_number">446</span>  The method is thread-safe as long as the target is not concurrently
+<span class="line_number">447</span>  ran by two or more threads.
+<span class="line_number">448</span>
+<span class="line_number">449</span>  @attention
+<span class="line_number">450</span>  You must call tf::Executor::corun from a worker of the calling executor
+<span class="line_number">451</span>  or an exception will be thrown.
+<span class="line_number">452</span>  */
+<span class="line_number">453</span>  template &lt;typename T&gt;
+<span class="line_number">454</span>  void corun(T&amp; target);
+<span class="line_number">455</span>
+<span class="line_number">456</span>  /**
+<span class="line_number">457</span>  @brief keeps running the work-stealing loop until the predicate returns `true`
+<span class="line_number">458</span>  
+<span class="line_number">459</span>  @tparam P predicate type
+<span class="line_number">460</span>  @param predicate a boolean predicate to indicate when to stop the loop
+<span class="line_number">461</span>
+<span class="line_number">462</span>  The method keeps the caller worker running in the work-stealing loop
+<span class="line_number">463</span>  until the stop predicate becomes true.
+<span class="line_number">464</span>
+<span class="line_number">465</span>  The method keeps the calling worker running available tasks cooperatively 
+<span class="line_number">466</span>  with other workers in the same executor and block until the predicate return `true`.
+<span class="line_number">467</span>  Under cooperative execution, a worker is not preempted. Instead, it continues 
+<span class="line_number">468</span>  participating in the work-stealing loop, executing available tasks alongside 
+<span class="line_number">469</span>  other workers.  
+<span class="line_number">470</span>
+<span class="line_number">471</span>  @code{.cpp}
+<span class="line_number">472</span>  taskflow.emplace([&amp;](){
+<span class="line_number">473</span>    std::future&lt;void&gt; fu = std::async([](){ std::sleep(100s); });
+<span class="line_number">474</span>    executor.corun_until([](){
+<span class="line_number">475</span>      return fu.wait_for(std::chrono::seconds(0)) == future_status::ready;
+<span class="line_number">476</span>    });
+<span class="line_number">477</span>  });
+<span class="line_number">478</span>  @endcode
+<span class="line_number">479</span>
+<span class="line_number">480</span>  @attention
+<span class="line_number">481</span>  You must call tf::Executor::corun_until from a worker of the calling executor
+<span class="line_number">482</span>  or an exception will be thrown.
+<span class="line_number">483</span>  */
+<span class="line_number">484</span>  template &lt;typename P&gt;
+<span class="line_number">485</span>  void corun_until(P&amp;&amp; predicate);
+<span class="line_number">486</span>
+<span class="line_number">487</span>  /**
+<span class="line_number">488</span>  @brief waits for all tasks to complete
+<span class="line_number">489</span>
+<span class="line_number">490</span>  This member function waits until all submitted tasks
+<span class="line_number">491</span>  (e.g., taskflows, asynchronous tasks) to finish.
+<span class="line_number">492</span>
+<span class="line_number">493</span>  @code{.cpp}
+<span class="line_number">494</span>  executor.run(taskflow1);
+<span class="line_number">495</span>  executor.run_n(taskflow2, 10);
+<span class="line_number">496</span>  executor.run_n(taskflow3, 100);
+<span class="line_number">497</span>  executor.wait_for_all();  // wait until the above submitted taskflows finish
+<span class="line_number">498</span>  @endcode
+<span class="line_number">499</span>  */
+<span class="line_number">500</span>  void wait_for_all();
+<span class="line_number">501</span>
+<span class="line_number">502</span>  /**
+<span class="line_number">503</span>  @brief queries the number of worker threads
+<span class="line_number">504</span>
+<span class="line_number">505</span>  Each worker represents a unique thread spawned by an executor upon its construction time.
+<span class="line_number">506</span>
+<span class="line_number">507</span>  @code{.cpp}
+<span class="line_number">508</span>  tf::Executor executor(4);
+<span class="line_number">509</span>  std::cout &lt;&lt; executor.num_workers();    // 4
+<span class="line_number">510</span>  @endcode
+<span class="line_number">511</span>  */
+<span class="line_number">512</span>  size_t num_workers() const noexcept;
+<span class="line_number">513</span>  
+<span class="line_number">514</span>  /**
+<span class="line_number">515</span>  @brief queries the number of workers that are in the waiting loop
+<span class="line_number">516</span>
+<span class="line_number">517</span>  A worker in the waiting loop has exhausted its local queue and made enough stealing attempts,
+<span class="line_number">518</span>  and is now ready to be preempted and enter the waiting state.
+<span class="line_number">519</span>  */
+<span class="line_number">520</span>  size_t num_waiters() const noexcept;
+<span class="line_number">521</span>  
+<span class="line_number">522</span>  /**
+<span class="line_number">523</span>  @brief queries the number of work-stealing queues used by the executor
+<span class="line_number">524</span>  */
+<span class="line_number">525</span>  size_t num_queues() const noexcept;
+<span class="line_number">526</span>
+<span class="line_number">527</span>  /**
+<span class="line_number">528</span>  @brief queries the number of running topologies at the time of this call
+<span class="line_number">529</span>
+<span class="line_number">530</span>  When a taskflow is submitted to an executor, a topology is created to store
+<span class="line_number">531</span>  runtime metadata of the running taskflow.
+<span class="line_number">532</span>  When the execution of the submitted taskflow finishes,
+<span class="line_number">533</span>  its corresponding topology will be removed from the executor.
+<span class="line_number">534</span>
+<span class="line_number">535</span>  @code{.cpp}
+<span class="line_number">536</span>  executor.run(taskflow);
+<span class="line_number">537</span>  std::cout &lt;&lt; executor.num_topologies();  // 0 or 1 (taskflow still running)
+<span class="line_number">538</span>  @endcode
+<span class="line_number">539</span>  */
+<span class="line_number">540</span>  size_t num_topologies() const;
+<span class="line_number">541</span>
+<span class="line_number">542</span>  /**
+<span class="line_number">543</span>  @brief queries pointer to the calling worker if it belongs to this executor, otherwise returns `nullptr`
+<span class="line_number">544</span>
+<span class="line_number">545</span>  Returns a pointer to the per-worker storage associated with this executor. 
+<span class="line_number">546</span>  If the calling thread is not a worker of this executor, the function returns `nullptr`.
+<span class="line_number">547</span>
+<span class="line_number">548</span>  @code{.cpp}
+<span class="line_number">549</span>  auto w = executor.this_worker();
+<span class="line_number">550</span>  tf::Taskflow taskflow;
+<span class="line_number">551</span>  tf::Executor executor;
+<span class="line_number">552</span>  executor.async([&amp;](){
+<span class="line_number">553</span>    assert(executor.this_worker() != nullptr);
+<span class="line_number">554</span>    assert(executor.this_worker()-&gt;executor() == &amp;executor);
+<span class="line_number">555</span>  });
+<span class="line_number">556</span>  @endcode
+<span class="line_number">557</span>  */
+<span class="line_number">558</span>  Worker* this_worker();
+<span class="line_number">559</span>  
+<span class="line_number">560</span>  /**
+<span class="line_number">561</span>  @brief queries the id of the caller thread within this executor
+<span class="line_number">562</span>
+<span class="line_number">563</span>  Each worker has an unique id in the range of @c 0 to @c N-1 associated with
+<span class="line_number">564</span>  its parent executor.
+<span class="line_number">565</span>  If the caller thread does not belong to the executor, @c -1 is returned.
+<span class="line_number">566</span>
+<span class="line_number">567</span>  @code{.cpp}
+<span class="line_number">568</span>  tf::Executor executor(4);   // 4 workers in the executor
+<span class="line_number">569</span>  executor.this_worker_id();  // -1 (main thread is not a worker)
+<span class="line_number">570</span>
+<span class="line_number">571</span>  taskflow.emplace([&amp;](){
+<span class="line_number">572</span>    std::cout &lt;&lt; executor.this_worker_id();  // 0, 1, 2, or 3
+<span class="line_number">573</span>  });
+<span class="line_number">574</span>  executor.run(taskflow);
+<span class="line_number">575</span>  @endcode
+<span class="line_number">576</span>  */
+<span class="line_number">577</span>  int this_worker_id() const;
+<span class="line_number">578</span> 
+<span class="line_number">579</span>  // --------------------------------------------------------------------------
+<span class="line_number">580</span>  // Observer methods
+<span class="line_number">581</span>  // --------------------------------------------------------------------------
+<span class="line_number">582</span>
+<span class="line_number">583</span>  /**
+<span class="line_number">584</span>  @brief constructs an observer to inspect the activities of worker threads
+<span class="line_number">585</span>
+<span class="line_number">586</span>  @tparam Observer observer type derived from tf::ObserverInterface
+<span class="line_number">587</span>  @tparam ArgsT argument parameter pack
+<span class="line_number">588</span>
+<span class="line_number">589</span>  @param args arguments to forward to the constructor of the observer
+<span class="line_number">590</span>
+<span class="line_number">591</span>  @return a shared pointer to the created observer
+<span class="line_number">592</span>
+<span class="line_number">593</span>  Each executor manages a list of observers with shared ownership with callers.
+<span class="line_number">594</span>  For each of these observers, the two member functions,
+<span class="line_number">595</span>  tf::ObserverInterface::on_entry and tf::ObserverInterface::on_exit
+<span class="line_number">596</span>  will be called before and after the execution of a task.
+<span class="line_number">597</span>
+<span class="line_number">598</span>  This member function is not thread-safe.
+<span class="line_number">599</span>  */
+<span class="line_number">600</span>  template &lt;typename Observer, typename... ArgsT&gt;
+<span class="line_number">601</span>  std::shared_ptr&lt;Observer&gt; make_observer(ArgsT&amp;&amp;... args);
+<span class="line_number">602</span>
+<span class="line_number">603</span>  /**
+<span class="line_number">604</span>  @brief removes an observer from the executor
+<span class="line_number">605</span>
+<span class="line_number">606</span>  This member function is not thread-safe.
+<span class="line_number">607</span>  */
+<span class="line_number">608</span>  template &lt;typename Observer&gt;
+<span class="line_number">609</span>  void remove_observer(std::shared_ptr&lt;Observer&gt; observer);
+<span class="line_number">610</span>
+<span class="line_number">611</span>  /**
+<span class="line_number">612</span>  @brief queries the number of observers
+<span class="line_number">613</span>  */
+<span class="line_number">614</span>  size_t num_observers() const noexcept;
+<span class="line_number">615</span>
+<span class="line_number">616</span>  // --------------------------------------------------------------------------
+<span class="line_number">617</span>  // Async Task Methods
+<span class="line_number">618</span>  // --------------------------------------------------------------------------
+<span class="line_number">619</span>  
+<span class="line_number">620</span>  /**
+<span class="line_number">621</span>  @brief creates a parameterized asynchronous task to run the given function
+<span class="line_number">622</span>
+<span class="line_number">623</span>  @tparam P task parameter type
+<span class="line_number">624</span>  @tparam F callable type
+<span class="line_number">625</span>
+<span class="line_number">626</span>  @param params task parameters
+<span class="line_number">627</span>  @param func callable object
+<span class="line_number">628</span>
+<span class="line_number">629</span>  @return a @std_future that will hold the result of the execution
+<span class="line_number">630</span>  
+<span class="line_number">631</span>  The method creates a parameterized asynchronous task 
+<span class="line_number">632</span>  to run the given function and return a @std_future object 
+<span class="line_number">633</span>  that eventually will hold the result of the execution.
+<span class="line_number">634</span>
+<span class="line_number">635</span>  @code{.cpp}
+<span class="line_number">636</span>  std::future&lt;int&gt; future = executor.async(&#34;name&#34;, [](){
+<span class="line_number">637</span>    std::cout &lt;&lt; &#34;create an asynchronous task with a name and returns 1\n&#34;;
+<span class="line_number">638</span>    return 1;
+<span class="line_number">639</span>  });
+<span class="line_number">640</span>  future.get();
+<span class="line_number">641</span>  @endcode
+<span class="line_number">642</span>
+<span class="line_number">643</span>  This member function is thread-safe.
+<span class="line_number">644</span>  */
+<span class="line_number">645</span>  template &lt;typename P, typename F&gt;
+<span class="line_number">646</span>  auto async(P&amp;&amp; params, F&amp;&amp; func);
+<span class="line_number">647</span>
+<span class="line_number">648</span>  /**
+<span class="line_number">649</span>  @brief runs a given function asynchronously
+<span class="line_number">650</span>
+<span class="line_number">651</span>  @tparam F callable type
+<span class="line_number">652</span>
+<span class="line_number">653</span>  @param func callable object
+<span class="line_number">654</span>
+<span class="line_number">655</span>  @return a @std_future that will hold the result of the execution
+<span class="line_number">656</span>
+<span class="line_number">657</span>  The method creates an asynchronous task to run the given function
+<span class="line_number">658</span>  and return a @std_future object that eventually will hold the result
+<span class="line_number">659</span>  of the return value.
+<span class="line_number">660</span>
+<span class="line_number">661</span>  @code{.cpp}
+<span class="line_number">662</span>  std::future&lt;int&gt; future = executor.async([](){
+<span class="line_number">663</span>    std::cout &lt;&lt; &#34;create an asynchronous task and returns 1\n&#34;;
+<span class="line_number">664</span>    return 1;
+<span class="line_number">665</span>  });
+<span class="line_number">666</span>  future.get();
+<span class="line_number">667</span>  @endcode
+<span class="line_number">668</span>
+<span class="line_number">669</span>  This member function is thread-safe.
+<span class="line_number">670</span>  */
+<span class="line_number">671</span>  template &lt;typename F&gt;
+<span class="line_number">672</span>  auto async(F&amp;&amp; func);
+<span class="line_number">673</span>
+<span class="line_number">674</span>  /**
+<span class="line_number">675</span>  @brief similar to tf::Executor::async but does not return a future object
+<span class="line_number">676</span>
+<span class="line_number">677</span>  @tparam F callable type
+<span class="line_number">678</span>
+<span class="line_number">679</span>  @param params task parameters
+<span class="line_number">680</span>  @param func callable object
+<span class="line_number">681</span>
+<span class="line_number">682</span>  The method creates a parameterized asynchronous task 
+<span class="line_number">683</span>  to run the given function without returning any @std_future object.
+<span class="line_number">684</span>  This member function is more efficient than tf::Executor::async 
+<span class="line_number">685</span>  and is encouraged to use when applications do not need a @std_future to acquire
+<span class="line_number">686</span>  the result or synchronize the execution.
+<span class="line_number">687</span>
+<span class="line_number">688</span>  @code{.cpp}
+<span class="line_number">689</span>  executor.silent_async(&#34;name&#34;, [](){
+<span class="line_number">690</span>    std::cout &lt;&lt; &#34;create an asynchronous task with a name and no return\n&#34;;
+<span class="line_number">691</span>  });
+<span class="line_number">692</span>  executor.wait_for_all();
+<span class="line_number">693</span>  @endcode
+<span class="line_number">694</span>
+<span class="line_number">695</span>  This member function is thread-safe.
+<span class="line_number">696</span>  */
+<span class="line_number">697</span>  template &lt;typename P, typename F&gt;
+<span class="line_number">698</span>  void silent_async(P&amp;&amp; params, F&amp;&amp; func);
+<span class="line_number">699</span>  
+<span class="line_number">700</span>  /**
+<span class="line_number">701</span>  @brief similar to tf::Executor::async but does not return a future object
+<span class="line_number">702</span>  
+<span class="line_number">703</span>  @tparam F callable type
+<span class="line_number">704</span>  
+<span class="line_number">705</span>  @param func callable object
+<span class="line_number">706</span>
+<span class="line_number">707</span>  The method creates an asynchronous task 
+<span class="line_number">708</span>  to run the given function without returning any @std_future object.
+<span class="line_number">709</span>  This member function is more efficient than tf::Executor::async 
+<span class="line_number">710</span>  and is encouraged to use when applications do not need a @std_future to acquire
+<span class="line_number">711</span>  the result or synchronize the execution.
+<span class="line_number">712</span>
+<span class="line_number">713</span>  @code{.cpp}
+<span class="line_number">714</span>  executor.silent_async([](){
+<span class="line_number">715</span>    std::cout &lt;&lt; &#34;create an asynchronous task with no return\n&#34;;
+<span class="line_number">716</span>  });
+<span class="line_number">717</span>  executor.wait_for_all();
+<span class="line_number">718</span>  @endcode
+<span class="line_number">719</span>
+<span class="line_number">720</span>  This member function is thread-safe.
+<span class="line_number">721</span>  */
+<span class="line_number">722</span>  template &lt;typename F&gt;
+<span class="line_number">723</span>  void silent_async(F&amp;&amp; func);
+<span class="line_number">724</span>
+<span class="line_number">725</span>  // --------------------------------------------------------------------------
+<span class="line_number">726</span>  // Silent Dependent Async Methods
+<span class="line_number">727</span>  // --------------------------------------------------------------------------
+<span class="line_number">728</span>  
+<span class="line_number">729</span>  /**
+<span class="line_number">730</span>  @brief runs the given function asynchronously 
+<span class="line_number">731</span>         when the given predecessors finish
+<span class="line_number">732</span>
+<span class="line_number">733</span>  @tparam F callable type
+<span class="line_number">734</span>  @tparam Tasks task types convertible to tf::AsyncTask
+<span class="line_number">735</span>
+<span class="line_number">736</span>  @param func callable object
+<span class="line_number">737</span>  @param tasks asynchronous tasks on which this execution depends
+<span class="line_number">738</span>  
+<span class="line_number">739</span>  @return a tf::AsyncTask handle 
+<span class="line_number">740</span>  
+<span class="line_number">741</span>  This member function is more efficient than tf::Executor::dependent_async
+<span class="line_number">742</span>  and is encouraged to use when you do not want a @std_future to
+<span class="line_number">743</span>  acquire the result or synchronize the execution.
+<span class="line_number">744</span>  The example below creates three asynchronous tasks, @c A, @c B, and @c C,
+<span class="line_number">745</span>  in which task @c C runs after task @c A and task @c B.
+<span class="line_number">746</span>
+<span class="line_number">747</span>  @code{.cpp}
+<span class="line_number">748</span>  tf::AsyncTask A = executor.silent_dependent_async([](){ printf(&#34;A\n&#34;); });
+<span class="line_number">749</span>  tf::AsyncTask B = executor.silent_dependent_async([](){ printf(&#34;B\n&#34;); });
+<span class="line_number">750</span>  executor.silent_dependent_async([](){ printf(&#34;C runs after A and B\n&#34;); }, A, B);
+<span class="line_number">751</span>  executor.wait_for_all();
+<span class="line_number">752</span>  @endcode
+<span class="line_number">753</span>
+<span class="line_number">754</span>  This member function is thread-safe.
+<span class="line_number">755</span>  */
+<span class="line_number">756</span>  template &lt;typename F, typename... Tasks,
+<span class="line_number">757</span>    std::enable_if_t&lt;all_same_v&lt;AsyncTask, std::decay_t&lt;Tasks&gt;...&gt;, void&gt;* = nullptr
+<span class="line_number">758</span>  &gt;
+<span class="line_number">759</span>  tf::AsyncTask silent_dependent_async(F&amp;&amp; func, Tasks&amp;&amp;... tasks);
+<span class="line_number">760</span>  
+<span class="line_number">761</span>  /**
+<span class="line_number">762</span>  @brief runs the given function asynchronously 
+<span class="line_number">763</span>         when the given predecessors finish
+<span class="line_number">764</span>  
+<span class="line_number">765</span>  @tparam F callable type
+<span class="line_number">766</span>  @tparam Tasks task types convertible to tf::AsyncTask
+<span class="line_number">767</span>
+<span class="line_number">768</span>  @param params task parameters
+<span class="line_number">769</span>  @param func callable object
+<span class="line_number">770</span>  @param tasks asynchronous tasks on which this execution depends
+<span class="line_number">771</span>  
+<span class="line_number">772</span>  @return a tf::AsyncTask handle 
+<span class="line_number">773</span>  
+<span class="line_number">774</span>  This member function is more efficient than tf::Executor::dependent_async
+<span class="line_number">775</span>  and is encouraged to use when you do not want a @std_future to
+<span class="line_number">776</span>  acquire the result or synchronize the execution.
+<span class="line_number">777</span>  The example below creates three asynchronous tasks, @c A, @c B, and @c C,
+<span class="line_number">778</span>  in which task @c C runs after task @c A and task @c B.
+<span class="line_number">779</span>  Assigned task names will appear in the observers of the executor.
+<span class="line_number">780</span>
+<span class="line_number">781</span>  @code{.cpp}
+<span class="line_number">782</span>  tf::AsyncTask A = executor.silent_dependent_async(&#34;A&#34;, [](){ printf(&#34;A\n&#34;); });
+<span class="line_number">783</span>  tf::AsyncTask B = executor.silent_dependent_async(&#34;B&#34;, [](){ printf(&#34;B\n&#34;); });
+<span class="line_number">784</span>  executor.silent_dependent_async(
+<span class="line_number">785</span>    &#34;C&#34;, [](){ printf(&#34;C runs after A and B\n&#34;); }, A, B
+<span class="line_number">786</span>  );
+<span class="line_number">787</span>  executor.wait_for_all();
+<span class="line_number">788</span>  @endcode
+<span class="line_number">789</span>
+<span class="line_number">790</span>  This member function is thread-safe.
+<span class="line_number">791</span>  */
+<span class="line_number">792</span>  template &lt;typename P, typename F, typename... Tasks,
+<span class="line_number">793</span>    std::enable_if_t&lt;is_task_params_v&lt;P&gt; &amp;&amp; all_same_v&lt;AsyncTask, std::decay_t&lt;Tasks&gt;...&gt;, void&gt;* = nullptr
+<span class="line_number">794</span>  &gt;
+<span class="line_number">795</span>  tf::AsyncTask silent_dependent_async(P&amp;&amp; params, F&amp;&amp; func, Tasks&amp;&amp;... tasks);
+<span class="line_number">796</span>  
+<span class="line_number">797</span>  /**
+<span class="line_number">798</span>  @brief runs the given function asynchronously 
+<span class="line_number">799</span>         when the given range of predecessors finish
+<span class="line_number">800</span>  
+<span class="line_number">801</span>  @tparam F callable type
+<span class="line_number">802</span>  @tparam I iterator type 
+<span class="line_number">803</span>
+<span class="line_number">804</span>  @param func callable object
+<span class="line_number">805</span>  @param first iterator to the beginning (inclusive)
+<span class="line_number">806</span>  @param last iterator to the end (exclusive)
+<span class="line_number">807</span>  
+<span class="line_number">808</span>  @return a tf::AsyncTask handle 
+<span class="line_number">809</span>  
+<span class="line_number">810</span>  This member function is more efficient than tf::Executor::dependent_async
+<span class="line_number">811</span>  and is encouraged to use when you do not want a @std_future to
+<span class="line_number">812</span>  acquire the result or synchronize the execution.
+<span class="line_number">813</span>  The example below creates three asynchronous tasks, @c A, @c B, and @c C,
+<span class="line_number">814</span>  in which task @c C runs after task @c A and task @c B.
+<span class="line_number">815</span>
+<span class="line_number">816</span>  @code{.cpp}
+<span class="line_number">817</span>  std::array&lt;tf::AsyncTask, 2&gt; array {
+<span class="line_number">818</span>    executor.silent_dependent_async([](){ printf(&#34;A\n&#34;); }),
+<span class="line_number">819</span>    executor.silent_dependent_async([](){ printf(&#34;B\n&#34;); })
+<span class="line_number">820</span>  };
+<span class="line_number">821</span>  executor.silent_dependent_async(
+<span class="line_number">822</span>    [](){ printf(&#34;C runs after A and B\n&#34;); }, array.begin(), array.end()
+<span class="line_number">823</span>  );
+<span class="line_number">824</span>  executor.wait_for_all();
+<span class="line_number">825</span>  @endcode
+<span class="line_number">826</span>
+<span class="line_number">827</span>  This member function is thread-safe.
+<span class="line_number">828</span>  */
+<span class="line_number">829</span>  template &lt;typename F, typename I, 
+<span class="line_number">830</span>    std::enable_if_t&lt;!std::is_same_v&lt;std::decay_t&lt;I&gt;, AsyncTask&gt;, void&gt;* = nullptr
+<span class="line_number">831</span>  &gt;
+<span class="line_number">832</span>  tf::AsyncTask silent_dependent_async(F&amp;&amp; func, I first, I last);
+<span class="line_number">833</span>  
+<span class="line_number">834</span>  /**
+<span class="line_number">835</span>  @brief runs the given function asynchronously 
+<span class="line_number">836</span>         when the given range of predecessors finish
+<span class="line_number">837</span>  
+<span class="line_number">838</span>  @tparam F callable type
+<span class="line_number">839</span>  @tparam I iterator type 
+<span class="line_number">840</span>
+<span class="line_number">841</span>  @param params tasks parameters
+<span class="line_number">842</span>  @param func callable object
+<span class="line_number">843</span>  @param first iterator to the beginning (inclusive)
+<span class="line_number">844</span>  @param last iterator to the end (exclusive)
+<span class="line_number">845</span>
+<span class="line_number">846</span>  @return a tf::AsyncTask handle 
+<span class="line_number">847</span>  
+<span class="line_number">848</span>  This member function is more efficient than tf::Executor::dependent_async
+<span class="line_number">849</span>  and is encouraged to use when you do not want a @std_future to
+<span class="line_number">850</span>  acquire the result or synchronize the execution.
+<span class="line_number">851</span>  The example below creates three asynchronous tasks, @c A, @c B, and @c C,
+<span class="line_number">852</span>  in which task @c C runs after task @c A and task @c B.
+<span class="line_number">853</span>  Assigned task names will appear in the observers of the executor.
+<span class="line_number">854</span>
+<span class="line_number">855</span>  @code{.cpp}
+<span class="line_number">856</span>  std::array&lt;tf::AsyncTask, 2&gt; array {
+<span class="line_number">857</span>    executor.silent_dependent_async(&#34;A&#34;, [](){ printf(&#34;A\n&#34;); }),
+<span class="line_number">858</span>    executor.silent_dependent_async(&#34;B&#34;, [](){ printf(&#34;B\n&#34;); })
+<span class="line_number">859</span>  };
+<span class="line_number">860</span>  executor.silent_dependent_async(
+<span class="line_number">861</span>    &#34;C&#34;, [](){ printf(&#34;C runs after A and B\n&#34;); }, array.begin(), array.end()
+<span class="line_number">862</span>  );
+<span class="line_number">863</span>  executor.wait_for_all();
+<span class="line_number">864</span>  @endcode
+<span class="line_number">865</span>
+<span class="line_number">866</span>  This member function is thread-safe.
+<span class="line_number">867</span>  */
+<span class="line_number">868</span>  template &lt;typename P, typename F, typename I, 
+<span class="line_number">869</span>    std::enable_if_t&lt;is_task_params_v&lt;P&gt; &amp;&amp; !std::is_same_v&lt;std::decay_t&lt;I&gt;, AsyncTask&gt;, void&gt;* = nullptr
+<span class="line_number">870</span>  &gt;
+<span class="line_number">871</span>  tf::AsyncTask silent_dependent_async(P&amp;&amp; params, F&amp;&amp; func, I first, I last);
+<span class="line_number">872</span>  
+<span class="line_number">873</span>  // --------------------------------------------------------------------------
+<span class="line_number">874</span>  // Dependent Async Methods
+<span class="line_number">875</span>  // --------------------------------------------------------------------------
+<span class="line_number">876</span>  
+<span class="line_number">877</span>  /**
+<span class="line_number">878</span>  @brief runs the given function asynchronously 
+<span class="line_number">879</span>         when the given predecessors finish
+<span class="line_number">880</span>  
+<span class="line_number">881</span>  @tparam F callable type
+<span class="line_number">882</span>  @tparam Tasks task types convertible to tf::AsyncTask
+<span class="line_number">883</span>
+<span class="line_number">884</span>  @param func callable object
+<span class="line_number">885</span>  @param tasks asynchronous tasks on which this execution depends
+<span class="line_number">886</span>  
+<span class="line_number">887</span>  @return a pair of a tf::AsyncTask handle and 
+<span class="line_number">888</span>                    a @std_future that holds the result of the execution
+<span class="line_number">889</span>  
+<span class="line_number">890</span>  The example below creates three asynchronous tasks, @c A, @c B, and @c C,
+<span class="line_number">891</span>  in which task @c C runs after task @c A and task @c B.
+<span class="line_number">892</span>  Task @c C returns a pair of its tf::AsyncTask handle and a std::future&lt;int&gt;
+<span class="line_number">893</span>  that eventually will hold the result of the execution.
+<span class="line_number">894</span>
+<span class="line_number">895</span>  @code{.cpp}
+<span class="line_number">896</span>  tf::AsyncTask A = executor.silent_dependent_async([](){ printf(&#34;A\n&#34;); });
+<span class="line_number">897</span>  tf::AsyncTask B = executor.silent_dependent_async([](){ printf(&#34;B\n&#34;); });
+<span class="line_number">898</span>  auto [C, fuC] = executor.dependent_async(
+<span class="line_number">899</span>    [](){ 
+<span class="line_number">900</span>      printf(&#34;C runs after A and B\n&#34;); 
+<span class="line_number">901</span>      return 1;
+<span class="line_number">902</span>    }, 
+<span class="line_number">903</span>    A, B
+<span class="line_number">904</span>  );
+<span class="line_number">905</span>  fuC.get();  // C finishes, which in turns means both A and B finish
+<span class="line_number">906</span>  @endcode
+<span class="line_number">907</span>
+<span class="line_number">908</span>  You can mix the use of tf::AsyncTask handles 
+<span class="line_number">909</span>  returned by tf::Executor::dependent_async and tf::Executor::silent_dependent_async
+<span class="line_number">910</span>  when specifying task dependencies.
+<span class="line_number">911</span>
+<span class="line_number">912</span>  This member function is thread-safe.
+<span class="line_number">913</span>  */
+<span class="line_number">914</span>  template &lt;typename F, typename... Tasks,
+<span class="line_number">915</span>    std::enable_if_t&lt;all_same_v&lt;AsyncTask, std::decay_t&lt;Tasks&gt;...&gt;, void&gt;* = nullptr
+<span class="line_number">916</span>  &gt;
+<span class="line_number">917</span>  auto dependent_async(F&amp;&amp; func, Tasks&amp;&amp;... tasks);
+<span class="line_number">918</span>  
+<span class="line_number">919</span>  /**
+<span class="line_number">920</span>  @brief runs the given function asynchronously
+<span class="line_number">921</span>         when the given predecessors finish
+<span class="line_number">922</span>  
+<span class="line_number">923</span>  @tparam P task parameters type
+<span class="line_number">924</span>  @tparam F callable type
+<span class="line_number">925</span>  @tparam Tasks task types convertible to tf::AsyncTask
+<span class="line_number">926</span>  
+<span class="line_number">927</span>  @param params task parameters
+<span class="line_number">928</span>  @param func callable object
+<span class="line_number">929</span>  @param tasks asynchronous tasks on which this execution depends
+<span class="line_number">930</span>  
+<span class="line_number">931</span>  @return a pair of a tf::AsyncTask handle and 
+<span class="line_number">932</span>                    a @std_future that holds the result of the execution
+<span class="line_number">933</span>  
+<span class="line_number">934</span>  The example below creates three named asynchronous tasks, @c A, @c B, and @c C,
+<span class="line_number">935</span>  in which task @c C runs after task @c A and task @c B.
+<span class="line_number">936</span>  Task @c C returns a pair of its tf::AsyncTask handle and a std::future&lt;int&gt;
+<span class="line_number">937</span>  that eventually will hold the result of the execution.
+<span class="line_number">938</span>  Assigned task names will appear in the observers of the executor.
+<span class="line_number">939</span>
+<span class="line_number">940</span>  @code{.cpp}
+<span class="line_number">941</span>  tf::AsyncTask A = executor.silent_dependent_async(&#34;A&#34;, [](){ printf(&#34;A\n&#34;); });
+<span class="line_number">942</span>  tf::AsyncTask B = executor.silent_dependent_async(&#34;B&#34;, [](){ printf(&#34;B\n&#34;); });
+<span class="line_number">943</span>  auto [C, fuC] = executor.dependent_async(
+<span class="line_number">944</span>    &#34;C&#34;,
+<span class="line_number">945</span>    [](){ 
+<span class="line_number">946</span>      printf(&#34;C runs after A and B\n&#34;); 
+<span class="line_number">947</span>      return 1;
+<span class="line_number">948</span>    }, 
+<span class="line_number">949</span>    A, B
+<span class="line_number">950</span>  );
+<span class="line_number">951</span>  assert(fuC.get()==1);  // C finishes, which in turns means both A and B finish
+<span class="line_number">952</span>  @endcode
+<span class="line_number">953</span>
+<span class="line_number">954</span>  You can mix the use of tf::AsyncTask handles 
+<span class="line_number">955</span>  returned by tf::Executor::dependent_async and tf::Executor::silent_dependent_async
+<span class="line_number">956</span>  when specifying task dependencies.
+<span class="line_number">957</span>
+<span class="line_number">958</span>  This member function is thread-safe.
+<span class="line_number">959</span>  */
+<span class="line_number">960</span>  template &lt;typename P, typename F, typename... Tasks,
+<span class="line_number">961</span>    std::enable_if_t&lt;is_task_params_v&lt;P&gt; &amp;&amp; all_same_v&lt;AsyncTask, std::decay_t&lt;Tasks&gt;...&gt;, void&gt;* = nullptr
+<span class="line_number">962</span>  &gt;
+<span class="line_number">963</span>  auto dependent_async(P&amp;&amp; params, F&amp;&amp; func, Tasks&amp;&amp;... tasks);
+<span class="line_number">964</span>  
+<span class="line_number">965</span>  /**
+<span class="line_number">966</span>  @brief runs the given function asynchronously 
+<span class="line_number">967</span>         when the given range of predecessors finish
+<span class="line_number">968</span>  
+<span class="line_number">969</span>  @tparam F callable type
+<span class="line_number">970</span>  @tparam I iterator type 
+<span class="line_number">971</span>
+<span class="line_number">972</span>  @param func callable object
+<span class="line_number">973</span>  @param first iterator to the beginning (inclusive)
+<span class="line_number">974</span>  @param last iterator to the end (exclusive)
+<span class="line_number">975</span>  
+<span class="line_number">976</span>  @return a pair of a tf::AsyncTask handle and 
+<span class="line_number">977</span>                    a @std_future that holds the result of the execution
+<span class="line_number">978</span>  
+<span class="line_number">979</span>  The example below creates three asynchronous tasks, @c A, @c B, and @c C,
+<span class="line_number">980</span>  in which task @c C runs after task @c A and task @c B.
+<span class="line_number">981</span>  Task @c C returns a pair of its tf::AsyncTask handle and a std::future&lt;int&gt;
+<span class="line_number">982</span>  that eventually will hold the result of the execution.
+<span class="line_number">983</span>
+<span class="line_number">984</span>  @code{.cpp}
+<span class="line_number">985</span>  std::array&lt;tf::AsyncTask, 2&gt; array {
+<span class="line_number">986</span>    executor.silent_dependent_async([](){ printf(&#34;A\n&#34;); }),
+<span class="line_number">987</span>    executor.silent_dependent_async([](){ printf(&#34;B\n&#34;); })
+<span class="line_number">988</span>  };
+<span class="line_number">989</span>  auto [C, fuC] = executor.dependent_async(
+<span class="line_number">990</span>    [](){ 
+<span class="line_number">991</span>      printf(&#34;C runs after A and B\n&#34;); 
+<span class="line_number">992</span>      return 1;
+<span class="line_number">993</span>    }, 
+<span class="line_number">994</span>    array.begin(), array.end()
+<span class="line_number">995</span>  );
+<span class="line_number">996</span>  assert(fuC.get()==1);  // C finishes, which in turns means both A and B finish
+<span class="line_number">997</span>  @endcode
+<span class="line_number">998</span>
+<span class="line_number">999</span>  You can mix the use of tf::AsyncTask handles 
+<span class="line_number">1000</span>  returned by tf::Executor::dependent_async and tf::Executor::silent_dependent_async
+<span class="line_number">1001</span>  when specifying task dependencies.
+<span class="line_number">1002</span>
+<span class="line_number">1003</span>  This member function is thread-safe.
+<span class="line_number">1004</span>  */
+<span class="line_number">1005</span>  template &lt;typename F, typename I,
+<span class="line_number">1006</span>    std::enable_if_t&lt;!std::is_same_v&lt;std::decay_t&lt;I&gt;, AsyncTask&gt;, void&gt;* = nullptr
+<span class="line_number">1007</span>  &gt;
+<span class="line_number">1008</span>  auto dependent_async(F&amp;&amp; func, I first, I last);
+<span class="line_number">1009</span>  
+<span class="line_number">1010</span>  /**
+<span class="line_number">1011</span>  @brief runs the given function asynchronously 
+<span class="line_number">1012</span>         when the given range of predecessors finish
+<span class="line_number">1013</span>  
+<span class="line_number">1014</span>  @tparam P task parameters type
+<span class="line_number">1015</span>  @tparam F callable type
+<span class="line_number">1016</span>  @tparam I iterator type 
+<span class="line_number">1017</span>  
+<span class="line_number">1018</span>  @param params task parameters
+<span class="line_number">1019</span>  @param func callable object
+<span class="line_number">1020</span>  @param first iterator to the beginning (inclusive)
+<span class="line_number">1021</span>  @param last iterator to the end (exclusive)
+<span class="line_number">1022</span>  
+<span class="line_number">1023</span>  @return a pair of a tf::AsyncTask handle and 
+<span class="line_number">1024</span>                    a @std_future that holds the result of the execution
+<span class="line_number">1025</span>  
+<span class="line_number">1026</span>  The example below creates three named asynchronous tasks, @c A, @c B, and @c C,
+<span class="line_number">1027</span>  in which task @c C runs after task @c A and task @c B.
+<span class="line_number">1028</span>  Task @c C returns a pair of its tf::AsyncTask handle and a std::future&lt;int&gt;
+<span class="line_number">1029</span>  that eventually will hold the result of the execution.
+<span class="line_number">1030</span>  Assigned task names will appear in the observers of the executor.
+<span class="line_number">1031</span>
+<span class="line_number">1032</span>  @code{.cpp}
+<span class="line_number">1033</span>  std::array&lt;tf::AsyncTask, 2&gt; array {
+<span class="line_number">1034</span>    executor.silent_dependent_async(&#34;A&#34;, [](){ printf(&#34;A\n&#34;); }),
+<span class="line_number">1035</span>    executor.silent_dependent_async(&#34;B&#34;, [](){ printf(&#34;B\n&#34;); })
+<span class="line_number">1036</span>  };
+<span class="line_number">1037</span>  auto [C, fuC] = executor.dependent_async(
+<span class="line_number">1038</span>    &#34;C&#34;,
+<span class="line_number">1039</span>    [](){ 
+<span class="line_number">1040</span>      printf(&#34;C runs after A and B\n&#34;); 
+<span class="line_number">1041</span>      return 1;
+<span class="line_number">1042</span>    }, 
+<span class="line_number">1043</span>    array.begin(), array.end()
+<span class="line_number">1044</span>  );
+<span class="line_number">1045</span>  assert(fuC.get()==1);  // C finishes, which in turns means both A and B finish
+<span class="line_number">1046</span>  @endcode
+<span class="line_number">1047</span>
+<span class="line_number">1048</span>  You can mix the use of tf::AsyncTask handles 
+<span class="line_number">1049</span>  returned by tf::Executor::dependent_async and tf::Executor::silent_dependent_async
+<span class="line_number">1050</span>  when specifying task dependencies.
+<span class="line_number">1051</span>
+<span class="line_number">1052</span>  This member function is thread-safe.
+<span class="line_number">1053</span>  */
+<span class="line_number">1054</span>  template &lt;typename P, typename F, typename I,
+<span class="line_number">1055</span>    std::enable_if_t&lt;is_task_params_v&lt;P&gt; &amp;&amp; !std::is_same_v&lt;std::decay_t&lt;I&gt;, AsyncTask&gt;, void&gt;* = nullptr
+<span class="line_number">1056</span>  &gt;
+<span class="line_number">1057</span>  auto dependent_async(P&amp;&amp; params, F&amp;&amp; func, I first, I last);
+<span class="line_number">1058</span>
+<span class="line_number">1059</span>  // ----------------------------------------------------------------------------------------------
+<span class="line_number">1060</span>  // Task Group
+<span class="line_number">1061</span>  // ----------------------------------------------------------------------------------------------
+<span class="line_number">1062</span>  
+<span class="line_number">1063</span>  /**
+<span class="line_number">1064</span>  @brief creates a task group that executes a collection of asynchronous tasks
+<span class="line_number">1065</span>  @return a tf::TaskGroup object associated with the current executor
+<span class="line_number">1066</span> 
+<span class="line_number">1067</span>  A TaskGroup allows submitting multiple asynchronous tasks to the executor
+<span class="line_number">1068</span>  and waiting for their completion collectively using `corun()`. Tasks added
+<span class="line_number">1069</span>  to the group can execute in parallel and may capture local variables by value
+<span class="line_number">1070</span>  or reference, depending on your needs. 
+<span class="line_number">1071</span>  This can be useful for divide-and-conquer
+<span class="line_number">1072</span>  algorithms, parallel loops, or any workflow that requires grouping related tasks.
+<span class="line_number">1073</span>  
+<span class="line_number">1074</span>  Example (computing Fibonacci numbers in parallel):
+<span class="line_number">1075</span>
+<span class="line_number">1076</span>  @code{.cpp}
+<span class="line_number">1077</span>  tf::Executor executor;
+<span class="line_number">1078</span>  
+<span class="line_number">1079</span>  size_t fibonacci(size_t N) {
+<span class="line_number">1080</span>
+<span class="line_number">1081</span>    if (N &lt; 2) return N;
+<span class="line_number">1082</span>  
+<span class="line_number">1083</span>    size_t res1, res2;
+<span class="line_number">1084</span>  
+<span class="line_number">1085</span>    // Create a task group from the current executor
+<span class="line_number">1086</span>    tf::TaskGroup tg = get_executor().task_group();
+<span class="line_number">1087</span>  
+<span class="line_number">1088</span>    // Submit asynchronous tasks to the group
+<span class="line_number">1089</span>    tg.silent_async([N, &amp;res1](){ res1 = fibonacci(N-1); });
+<span class="line_number">1090</span>    res2 = fibonacci(N-2);  // compute one branch synchronously
+<span class="line_number">1091</span>  
+<span class="line_number">1092</span>    // Wait for all tasks in the group to complete
+<span class="line_number">1093</span>    tg.corun();
+<span class="line_number">1094</span>  
+<span class="line_number">1095</span>    return res1 + res2;
+<span class="line_number">1096</span>  }
+<span class="line_number">1097</span>  
+<span class="line_number">1098</span>  int main() {
+<span class="line_number">1099</span>    return executor.async([](){ return fibonacci(30); }).get();
+<span class="line_number">1100</span>  }
+<span class="line_number">1101</span>  @endcode
+<span class="line_number">1102</span>  
+<span class="line_number">1103</span>  This member function is thread-safe.
+<span class="line_number">1104</span>
+<span class="line_number">1105</span>  @attention
+<span class="line_number">1106</span>  Due to cooperative execution, a task group can only be created by a worker of an executor.
+<span class="line_number">1107</span>  */
+<span class="line_number">1108</span>  TaskGroup task_group();
+<span class="line_number">1109</span>
+<span class="line_number">1110</span>  private:
+<span class="line_number">1111</span>  
+<span class="line_number">1112</span>  struct Buffer {
+<span class="line_number">1113</span>    std::mutex mutex;
+<span class="line_number">1114</span>    UnboundedWSQ&lt;Node*&gt; queue;
+<span class="line_number">1115</span>  };  
+<span class="line_number">1116</span>  
+<span class="line_number">1117</span>  std::vector&lt;Worker&gt; _workers;
+<span class="line_number">1118</span>  std::vector&lt;Buffer&gt; _buffers;
+<span class="line_number">1119</span>  
+<span class="line_number">1120</span>  // notifier&#39;s state variable and num_topologies should sit on different cachelines
+<span class="line_number">1121</span>  // or the false sharing can cause serious performance drop
+<span class="line_number">1122</span>  alignas(TF_CACHELINE_SIZE) DefaultNotifier _notifier;
+<span class="line_number">1123</span>  alignas(TF_CACHELINE_SIZE) std::atomic&lt;size_t&gt; _num_topologies {0};
+<span class="line_number">1124</span>  
+<span class="line_number">1125</span>  std::unordered_map&lt;std::thread::id, Worker*&gt; _t2w;
+<span class="line_number">1126</span>  std::unordered_set&lt;std::shared_ptr&lt;ObserverInterface&gt;&gt; _observers;
+<span class="line_number">1127</span>
+<span class="line_number">1128</span>  void _shutdown();
+<span class="line_number">1129</span>  void _observer_prologue(Worker&amp;, Node*);
+<span class="line_number">1130</span>  void _observer_epilogue(Worker&amp;, Node*);
+<span class="line_number">1131</span>  void _spawn(size_t, std::shared_ptr&lt;WorkerInterface&gt;);
+<span class="line_number">1132</span>  void _exploit_task(Worker&amp;, Node*&amp;);
+<span class="line_number">1133</span>  bool _explore_task(Worker&amp;, Node*&amp;);
+<span class="line_number">1134</span>  void _schedule(Worker&amp;, Node*);
+<span class="line_number">1135</span>  void _schedule(Node*);
+<span class="line_number">1136</span>  void _schedule_graph_with_parent(Worker&amp;, Graph&amp;, Topology*, NodeBase*);
+<span class="line_number">1137</span>  void _spill(Node*);
+<span class="line_number">1138</span>  void _set_up_topology(Worker*, Topology*);
+<span class="line_number">1139</span>  void _tear_down_topology(Worker&amp;, Topology*, Node*&amp;);
+<span class="line_number">1140</span>  void _tear_down_async(Worker&amp;, Node*, Node*&amp;);
+<span class="line_number">1141</span>  void _tear_down_dependent_async(Worker&amp;, Node*, Node*&amp;);
+<span class="line_number">1142</span>  void _tear_down_nonasync(Worker&amp;, Node*, Node*&amp;);
+<span class="line_number">1143</span>  void _tear_down_invoke(Worker&amp;, Node*, Node*&amp;);
+<span class="line_number">1144</span>  void _increment_topology();
+<span class="line_number">1145</span>  void _decrement_topology();
+<span class="line_number">1146</span>  void _invoke(Worker&amp;, Node*);
+<span class="line_number">1147</span>  void _invoke_static_task(Worker&amp;, Node*);
+<span class="line_number">1148</span>  void _invoke_nonpreemptive_runtime_task(Worker&amp;, Node*);
+<span class="line_number">1149</span>  void _invoke_condition_task(Worker&amp;, Node*, SmallVector&lt;int&gt;&amp;);
+<span class="line_number">1150</span>  void _invoke_multi_condition_task(Worker&amp;, Node*, SmallVector&lt;int&gt;&amp;);
+<span class="line_number">1151</span>  void _process_dependent_async(Node*, tf::AsyncTask&amp;, size_t&amp;);
+<span class="line_number">1152</span>  void _process_exception(Worker&amp;, Node*);
+<span class="line_number">1153</span>  void _update_cache(Worker&amp;, Node*&amp;, Node*);
+<span class="line_number">1154</span>  void _corun_graph(Worker&amp;, Graph&amp;, Topology*, NodeBase*);
+<span class="line_number">1155</span>
+<span class="line_number">1156</span>  bool _wait_for_task(Worker&amp;, Node*&amp;);
+<span class="line_number">1157</span>  bool _invoke_subflow_task(Worker&amp;, Node*);
+<span class="line_number">1158</span>  bool _invoke_module_task(Worker&amp;, Node*);
+<span class="line_number">1159</span>  bool _invoke_module_task_impl(Worker&amp;, Node*, Graph&amp;);
+<span class="line_number">1160</span>  bool _invoke_async_task(Worker&amp;, Node*);
+<span class="line_number">1161</span>  bool _invoke_dependent_async_task(Worker&amp;, Node*);
+<span class="line_number">1162</span>  bool _invoke_runtime_task(Worker&amp;, Node*);
+<span class="line_number">1163</span>  bool _invoke_runtime_task_impl(Worker&amp;, Node*, std::function&lt;void(Runtime&amp;)&gt;&amp;);
+<span class="line_number">1164</span>  bool _invoke_runtime_task_impl(Worker&amp;, Node*, std::function&lt;void(Runtime&amp;, bool)&gt;&amp;);
+<span class="line_number">1165</span>
+<span class="line_number">1166</span>  size_t _set_up_graph(Graph&amp;, Topology*, NodeBase*);
+<span class="line_number">1167</span>  
+<span class="line_number">1168</span>  template &lt;typename P&gt;
+<span class="line_number">1169</span>  void _corun_until(Worker&amp;, P&amp;&amp;);
+<span class="line_number">1170</span>
+<span class="line_number">1171</span>  template &lt;typename I&gt;
+<span class="line_number">1172</span>  void _bulk_schedule(Worker&amp;, I, size_t);
+<span class="line_number">1173</span>
+<span class="line_number">1174</span>  template &lt;typename I&gt;
+<span class="line_number">1175</span>  void _bulk_schedule(I, size_t);
+<span class="line_number">1176</span>
+<span class="line_number">1177</span>  template &lt;typename I&gt;
+<span class="line_number">1178</span>  void _bulk_spill(I, size_t);
+<span class="line_number">1179</span>
+<span class="line_number">1180</span>  template &lt;size_t N&gt;
+<span class="line_number">1181</span>  void _bulk_update_cache(Worker&amp;, Node*&amp;, Node*, std::array&lt;Node*, N&gt;&amp;, size_t&amp;);
+<span class="line_number">1182</span>
+<span class="line_number">1183</span>  template &lt;typename P, typename F&gt;
+<span class="line_number">1184</span>  auto _async(P&amp;&amp;, F&amp;&amp;, Topology*, NodeBase*);
+<span class="line_number">1185</span>
+<span class="line_number">1186</span>  template &lt;typename P, typename F&gt;
+<span class="line_number">1187</span>  void _silent_async(P&amp;&amp;, F&amp;&amp;, Topology*, NodeBase*);
+<span class="line_number">1188</span>
+<span class="line_number">1189</span>  template &lt;typename P, typename F, typename I,
+<span class="line_number">1190</span>    std::enable_if_t&lt;is_task_params_v&lt;P&gt; &amp;&amp; !std::is_same_v&lt;std::decay_t&lt;I&gt;, AsyncTask&gt;, void&gt;* = nullptr
+<span class="line_number">1191</span>  &gt;
+<span class="line_number">1192</span>  auto _dependent_async(P&amp;&amp;, F&amp;&amp;, I, I, Topology*, NodeBase*);
+<span class="line_number">1193</span>  
+<span class="line_number">1194</span>  template &lt;typename P, typename F, typename I, 
+<span class="line_number">1195</span>    std::enable_if_t&lt;is_task_params_v&lt;P&gt; &amp;&amp; !std::is_same_v&lt;std::decay_t&lt;I&gt;, AsyncTask&gt;, void&gt;* = nullptr
+<span class="line_number">1196</span>  &gt;
+<span class="line_number">1197</span>  auto _silent_dependent_async(P&amp;&amp;, F&amp;&amp;, I, I, Topology*, NodeBase*);
+<span class="line_number">1198</span>  
+<span class="line_number">1199</span>  template &lt;typename... ArgsT&gt;
+<span class="line_number">1200</span>  void _schedule_async_task(ArgsT&amp;&amp;...);
+<span class="line_number">1201</span>  
+<span class="line_number">1202</span>  template &lt;typename I, typename... ArgsT&gt;
+<span class="line_number">1203</span>  AsyncTask _schedule_dependent_async_task(I, I, size_t, ArgsT&amp;&amp;...);
+<span class="line_number">1204</span>};
+<span class="line_number">1205</span>
+<span class="line_number">1206</span>#ifndef DOXYGEN_GENERATING_OUTPUT
+<span class="line_number">1207</span>
+<span class="line_number">1208</span>// Constructor
+<span class="line_number">1209</span>inline Executor::Executor(size_t N, std::shared_ptr&lt;WorkerInterface&gt; wif) :
+<span class="line_number">1210</span>  _workers  (N),
+<span class="line_number">1211</span>  _buffers  (std::bit_width(N)), // Empirically, we find that log2(N) performs best.
+<span class="line_number">1212</span>  _notifier (N) {
+<span class="line_number">1213</span>
+<span class="line_number">1214</span>  if(N == 0) {
+<span class="line_number">1215</span>    TF_THROW(&#34;executor must define at least one worker&#34;);
+<span class="line_number">1216</span>  }
+<span class="line_number">1217</span>  
+<span class="line_number">1218</span>  // If spawning N threads fails, shut down any created threads before 
+<span class="line_number">1219</span>  // rethrowing the exception.
+<span class="line_number">1220</span>#ifndef TF_DISABLE_EXCEPTION_HANDLING
+<span class="line_number">1221</span>  try {
+<span class="line_number">1222</span>#endif
+<span class="line_number">1223</span>    _spawn(N, std::move(wif));
+<span class="line_number">1224</span>#ifndef TF_DISABLE_EXCEPTION_HANDLING
+<span class="line_number">1225</span>  }
+<span class="line_number">1226</span>  catch(...) {
+<span class="line_number">1227</span>    _shutdown();
+<span class="line_number">1228</span>    std::rethrow_exception(std::current_exception());
+<span class="line_number">1229</span>  }
+<span class="line_number">1230</span>#endif
+<span class="line_number">1231</span>
+<span class="line_number">1232</span>  // initialize the default observer if requested
+<span class="line_number">1233</span>  if(has_env(TF_ENABLE_PROFILER)) {
+<span class="line_number">1234</span>    TFProfManager::get()._manage(make_observer&lt;TFProfObserver&gt;());
+<span class="line_number">1235</span>  }
+<span class="line_number">1236</span>}
+<span class="line_number">1237</span>
+<span class="line_number">1238</span>// Destructor
+<span class="line_number">1239</span>inline Executor::~Executor() {
+<span class="line_number">1240</span>  _shutdown();
+<span class="line_number">1241</span>}
+<span class="line_number">1242</span>
+<span class="line_number">1243</span>// Function: _shutdown
+<span class="line_number">1244</span>inline void Executor::_shutdown() {
+<span class="line_number">1245</span>
+<span class="line_number">1246</span>  // wait for all topologies to complete
+<span class="line_number">1247</span>  wait_for_all();
+<span class="line_number">1248</span>
+<span class="line_number">1249</span>  // shut down the scheduler
+<span class="line_number">1250</span>  for(size_t i=0; i&lt;_workers.size(); ++i) {
+<span class="line_number">1251</span>    _workers[i]._done.test_and_set(std::memory_order_relaxed);
+<span class="line_number">1252</span>  }
+<span class="line_number">1253</span>  
+<span class="line_number">1254</span>  _notifier.notify_all();
+<span class="line_number">1255</span>  
+<span class="line_number">1256</span>  // Only join the thread if it is joinable, as std::thread construction 
+<span class="line_number">1257</span>  // may fail and throw an exception.
+<span class="line_number">1258</span>  for(auto&amp; w : _workers) {
+<span class="line_number">1259</span>    if(w._thread.joinable()) {
+<span class="line_number">1260</span>      w._thread.join();
+<span class="line_number">1261</span>    }
+<span class="line_number">1262</span>  }
+<span class="line_number">1263</span>}
+<span class="line_number">1264</span>
+<span class="line_number">1265</span>// Function: num_workers
+<span class="line_number">1266</span>inline size_t Executor::num_workers() const noexcept {
+<span class="line_number">1267</span>  return _workers.size();
+<span class="line_number">1268</span>}
+<span class="line_number">1269</span>
+<span class="line_number">1270</span>// Function: num_waiters
+<span class="line_number">1271</span>inline size_t Executor::num_waiters() const noexcept {
+<span class="line_number">1272</span>  return _notifier.num_waiters();
+<span class="line_number">1273</span>}
+<span class="line_number">1274</span>
+<span class="line_number">1275</span>// Function: num_queues
+<span class="line_number">1276</span>inline size_t Executor::num_queues() const noexcept {
+<span class="line_number">1277</span>  return _workers.size() + _buffers.size();
+<span class="line_number">1278</span>}
+<span class="line_number">1279</span>
+<span class="line_number">1280</span>// Function: num_topologies
+<span class="line_number">1281</span>inline size_t Executor::num_topologies() const {
+<span class="line_number">1282</span>  return _num_topologies.load(std::memory_order_relaxed);
+<span class="line_number">1283</span>}
+<span class="line_number">1284</span>
+<span class="line_number">1285</span>// Function: this_worker
+<span class="line_number">1286</span>inline Worker* Executor::this_worker() {
+<span class="line_number">1287</span>  auto itr = _t2w.find(std::this_thread::get_id());
+<span class="line_number">1288</span>  return itr == _t2w.end() ? nullptr : itr-&gt;second;
+<span class="line_number">1289</span>}
+<span class="line_number">1290</span>
+<span class="line_number">1291</span>// Function: this_worker_id
+<span class="line_number">1292</span>inline int Executor::this_worker_id() const {
+<span class="line_number">1293</span>  auto i = _t2w.find(std::this_thread::get_id());
+<span class="line_number">1294</span>  return i == _t2w.end() ? -1 : static_cast&lt;int&gt;(i-&gt;second-&gt;_id);
+<span class="line_number">1295</span>}
+<span class="line_number">1296</span>
+<span class="line_number">1297</span>// Procedure: _spawn
+<span class="line_number">1298</span>inline void Executor::_spawn(size_t N, std::shared_ptr&lt;WorkerInterface&gt; wif) {
+<span class="line_number">1299</span>
+<span class="line_number">1300</span>  for(size_t id=0; id&lt;N; ++id) {
+<span class="line_number">1301</span>    _workers[id]._thread = std::thread([&amp;, id, wif] () {
+<span class="line_number">1302</span>
+<span class="line_number">1303</span>      auto&amp; worker = _workers[id];
+<span class="line_number">1304</span>  
+<span class="line_number">1305</span>      worker._id = id;
+<span class="line_number">1306</span>      worker._sticky_victim = id;
+<span class="line_number">1307</span>      worker._rdgen.seed(static_cast&lt;uint32_t&gt;(std::hash&lt;std::thread::id&gt;()(std::this_thread::get_id())));
+<span class="line_number">1308</span>
+<span class="line_number">1309</span>      // before entering the work-stealing loop, call the scheduler prologue
+<span class="line_number">1310</span>      if(wif) {
+<span class="line_number">1311</span>        wif-&gt;scheduler_prologue(worker);
+<span class="line_number">1312</span>      }
+<span class="line_number">1313</span>
+<span class="line_number">1314</span>      Node* t = nullptr;
+<span class="line_number">1315</span>      std::exception_ptr ptr = nullptr;
+<span class="line_number">1316</span>
+<span class="line_number">1317</span>      // must use 1 as condition instead of !done because
+<span class="line_number">1318</span>      // the previous worker may stop while the following workers
+<span class="line_number">1319</span>      // are still preparing for entering the scheduling loop
+<span class="line_number">1320</span>#ifndef TF_DISABLE_EXCEPTION_HANDLING
+<span class="line_number">1321</span>      try {
+<span class="line_number">1322</span>#endif
+<span class="line_number">1323</span>        // work-stealing loop
+<span class="line_number">1324</span>        while(1) {
+<span class="line_number">1325</span>
+<span class="line_number">1326</span>          // drains out the local queue first
+<span class="line_number">1327</span>          _exploit_task(worker, t);
+<span class="line_number">1328</span>
+<span class="line_number">1329</span>          // steals and waits for tasks
+<span class="line_number">1330</span>          if(_wait_for_task(worker, t) == false) {
+<span class="line_number">1331</span>            break;
+<span class="line_number">1332</span>          }
+<span class="line_number">1333</span>        }
+<span class="line_number">1334</span>
+<span class="line_number">1335</span>#ifndef TF_DISABLE_EXCEPTION_HANDLING
+<span class="line_number">1336</span>      } 
+<span class="line_number">1337</span>      catch(...) {
+<span class="line_number">1338</span>        ptr = std::current_exception();
+<span class="line_number">1339</span>      }
+<span class="line_number">1340</span>#endif
+<span class="line_number">1341</span>      
+<span class="line_number">1342</span>      // call the user-specified epilogue function
+<span class="line_number">1343</span>      if(wif) {
+<span class="line_number">1344</span>        wif-&gt;scheduler_epilogue(worker, ptr);
+<span class="line_number">1345</span>      }
+<span class="line_number">1346</span>
+<span class="line_number">1347</span>    });
+<span class="line_number">1348</span>    
+<span class="line_number">1349</span>    // We avoid using thread-local storage to track the mapping between a thread
+<span class="line_number">1350</span>    // and its corresponding worker in an executor. On Windows, thread-local
+<span class="line_number">1351</span>    // storage can be unreliable in certain situations (see issue #727).
+<span class="line_number">1352</span>    //
+<span class="line_number">1353</span>    // Instead, we maintain a per-executor mapping from threads to workers.
+<span class="line_number">1354</span>    // This approach has an additional advantage: according to the C++ Standard,
+<span class="line_number">1355</span>    // std::thread::id uniquely identifies a thread object. Therefore, once the map
+<span class="line_number">1356</span>    // returns a valid worker, we can be certain that the worker belongs to this
+<span class="line_number">1357</span>    // executor. This eliminates the need for additional executor validation 
+<span class="line_number">1358</span>    // required by using thread-local storage.
+<span class="line_number">1359</span>    //
+<span class="line_number">1360</span>    // Example:
+<span class="line_number">1361</span>    //
+<span class="line_number">1362</span>    //   Worker* w = this_worker();
+<span class="line_number">1363</span>    //   // Using thread-local storage, we would need additional executor validation:
+<span class="line_number">1364</span>    //   if (w == nullptr || w-&gt;_executor != this) { /* caller is not a worker of this executor */ }
+<span class="line_number">1365</span>    //
+<span class="line_number">1366</span>    //   // Using per-executor mapping, it suffices to check:
+<span class="line_number">1367</span>    //   if (w == nullptr) { /* caller is not a worker of this executor */ }
+<span class="line_number">1368</span>    //
+<span class="line_number">1369</span>    _t2w.emplace(_workers[id]._thread.get_id(), &amp;_workers[id]);
+<span class="line_number">1370</span>  }
+<span class="line_number">1371</span>}
+<span class="line_number">1372</span>
+<span class="line_number">1373</span>// Function: _explore_task
+<span class="line_number">1374</span>inline bool Executor::_explore_task(Worker&amp; w, Node*&amp; t) {
+<span class="line_number">1375</span>  
+<span class="line_number">1376</span>  // Early pruning does not always give consistent performance gain.
+<span class="line_number">1377</span>  //if(_num_topologies.load(std::memory_order_acquire) == 0) {
+<span class="line_number">1378</span>  //  return !(w._done.test(std::memory_order_relaxed));
+<span class="line_number">1379</span>  //}
+<span class="line_number">1380</span>
+<span class="line_number">1381</span>  //assert(!t);
+<span class="line_number">1382</span>  const size_t MAX_VICTIM = num_queues();
+<span class="line_number">1383</span>  const size_t MAX_STEALS = ((MAX_VICTIM + 1) &lt;&lt; 1);
+<span class="line_number">1384</span>
+<span class="line_number">1385</span>  size_t num_steals = 0;
+<span class="line_number">1386</span>  size_t vtm = w._sticky_victim;
+<span class="line_number">1387</span>
+<span class="line_number">1388</span>  // Make the worker steal immediately from the assigned victim.
+<span class="line_number">1389</span>  while(true) {
+<span class="line_number">1390</span>    
+<span class="line_number">1391</span>    // If the worker&#39;s victim thread is within the worker pool, steal from the worker&#39;s queue.
+<span class="line_number">1392</span>    // Otherwise, steal from the buffer, adjusting the victim index based on the worker pool size.
+<span class="line_number">1393</span>    t = (vtm &lt; _workers.size())
+<span class="line_number">1394</span>      ? _workers[vtm]._wsq.steal()
+<span class="line_number">1395</span>      : _buffers[vtm - _workers.size()].queue.steal();
+<span class="line_number">1396</span>
+<span class="line_number">1397</span>    if(t) {
+<span class="line_number">1398</span>      w._sticky_victim = vtm;
+<span class="line_number">1399</span>      break;
+<span class="line_number">1400</span>    }
+<span class="line_number">1401</span>
+<span class="line_number">1402</span>    // Increment the steal count, and if it exceeds MAX_STEALS, yield the thread.
+<span class="line_number">1403</span>    // If the number of empty steals reaches MAX_STEALS, exit the loop.
+<span class="line_number">1404</span>    if (++num_steals &gt; MAX_STEALS) {
+<span class="line_number">1405</span>      std::this_thread::yield();
+<span class="line_number">1406</span>      if(num_steals &gt; 150 + MAX_STEALS) {
+<span class="line_number">1407</span>        break;
+<span class="line_number">1408</span>      }
+<span class="line_number">1409</span>    }
+<span class="line_number">1410</span>
+<span class="line_number">1411</span>    if(w._done.test(std::memory_order_relaxed)) {
+<span class="line_number">1412</span>      return false;
+<span class="line_number">1413</span>    } 
+<span class="line_number">1414</span>
+<span class="line_number">1415</span>    // Randomely generate a next victim.
+<span class="line_number">1416</span>    vtm = w._rdgen() % MAX_VICTIM;
+<span class="line_number">1417</span>  } 
+<span class="line_number">1418</span>  return true;
+<span class="line_number">1419</span>}
+<span class="line_number">1420</span>
+<span class="line_number">1421</span>// Procedure: _exploit_task
+<span class="line_number">1422</span>inline void Executor::_exploit_task(Worker&amp; w, Node*&amp; t) {
+<span class="line_number">1423</span>  while(t) {
+<span class="line_number">1424</span>    _invoke(w, t);
+<span class="line_number">1425</span>    t = w._wsq.pop();
+<span class="line_number">1426</span>  }
+<span class="line_number">1427</span>}
+<span class="line_number">1428</span>
+<span class="line_number">1429</span>// Function: _wait_for_task
+<span class="line_number">1430</span>inline bool Executor::_wait_for_task(Worker&amp; w, Node*&amp; t) {
+<span class="line_number">1431</span>
+<span class="line_number">1432</span>  explore_task:
+<span class="line_number">1433</span>
+<span class="line_number">1434</span>  if(_explore_task(w, t) == false) {
+<span class="line_number">1435</span>    return false;
+<span class="line_number">1436</span>  }
+<span class="line_number">1437</span>  
+<span class="line_number">1438</span>  // Go exploit the task if we successfully steal one.
+<span class="line_number">1439</span>  if(t) {
+<span class="line_number">1440</span>    return true;
+<span class="line_number">1441</span>  }
+<span class="line_number">1442</span>
+<span class="line_number">1443</span>  // Entering the 2PC guard as all queues are likely empty after many stealing attempts.
+<span class="line_number">1444</span>  _notifier.prepare_wait(w._id);
+<span class="line_number">1445</span>  
+<span class="line_number">1446</span>  // Condition #1: buffers should be empty
+<span class="line_number">1447</span>  for(size_t b=0; b&lt;_buffers.size(); ++b) {
+<span class="line_number">1448</span>    if(!_buffers[b].queue.empty()) {
+<span class="line_number">1449</span>      _notifier.cancel_wait(w._id);
+<span class="line_number">1450</span>      w._sticky_victim = b + _workers.size();
+<span class="line_number">1451</span>      goto explore_task;
+<span class="line_number">1452</span>    }
+<span class="line_number">1453</span>  }
+<span class="line_number">1454</span>  
+<span class="line_number">1455</span>  // Condition #2: worker queues should be empty
+<span class="line_number">1456</span>  // Note: We need to use index-based looping to avoid data race with _spawn
+<span class="line_number">1457</span>  // which initializes other worker data structure at the same time.
+<span class="line_number">1458</span>  // Also, due to the property of a work-stealing queue, we don&#39;t need to check 
+<span class="line_number">1459</span>  // this worker&#39;s work-stealing queue.
+<span class="line_number">1460</span>  for(size_t k=0; k&lt;_workers.size()-1; ++k) {
+<span class="line_number">1461</span>    if(size_t vtm = k + (k &gt;= w._id); !_workers[vtm]._wsq.empty()) {
+<span class="line_number">1462</span>      _notifier.cancel_wait(w._id);
+<span class="line_number">1463</span>      w._sticky_victim = vtm;
+<span class="line_number">1464</span>      goto explore_task;
+<span class="line_number">1465</span>    }
+<span class="line_number">1466</span>  }
+<span class="line_number">1467</span>  
+<span class="line_number">1468</span>  // Condition #3: worker should be alive
+<span class="line_number">1469</span>  if(w._done.test(std::memory_order_relaxed)) {
+<span class="line_number">1470</span>    _notifier.cancel_wait(w._id);
+<span class="line_number">1471</span>    return false;
+<span class="line_number">1472</span>  }
+<span class="line_number">1473</span>  
+<span class="line_number">1474</span>  // Now I really need to relinquish myself to others.
+<span class="line_number">1475</span>  _notifier.commit_wait(w._id);
+<span class="line_number">1476</span>  goto explore_task;
+<span class="line_number">1477</span>}
+<span class="line_number">1478</span>
+<span class="line_number">1479</span>// Function: make_observer
+<span class="line_number">1480</span>template&lt;typename Observer, typename... ArgsT&gt;
+<span class="line_number">1481</span>std::shared_ptr&lt;Observer&gt; Executor::make_observer(ArgsT&amp;&amp;... args) {
+<span class="line_number">1482</span>
+<span class="line_number">1483</span>  static_assert(
+<span class="line_number">1484</span>    std::is_base_of_v&lt;ObserverInterface, Observer&gt;,
+<span class="line_number">1485</span>    &#34;Observer must be derived from ObserverInterface&#34;
+<span class="line_number">1486</span>  );
+<span class="line_number">1487</span>
+<span class="line_number">1488</span>  // use a local variable to mimic the constructor
+<span class="line_number">1489</span>  auto ptr = std::make_shared&lt;Observer&gt;(std::forward&lt;ArgsT&gt;(args)...);
+<span class="line_number">1490</span>
+<span class="line_number">1491</span>  ptr-&gt;set_up(_workers.size());
+<span class="line_number">1492</span>
+<span class="line_number">1493</span>  _observers.emplace(std::static_pointer_cast&lt;ObserverInterface&gt;(ptr));
+<span class="line_number">1494</span>
+<span class="line_number">1495</span>  return ptr;
+<span class="line_number">1496</span>}
+<span class="line_number">1497</span>
+<span class="line_number">1498</span>// Procedure: remove_observer
+<span class="line_number">1499</span>template &lt;typename Observer&gt;
+<span class="line_number">1500</span>void Executor::remove_observer(std::shared_ptr&lt;Observer&gt; ptr) {
+<span class="line_number">1501</span>
+<span class="line_number">1502</span>  static_assert(
+<span class="line_number">1503</span>    std::is_base_of_v&lt;ObserverInterface, Observer&gt;,
+<span class="line_number">1504</span>    &#34;Observer must be derived from ObserverInterface&#34;
+<span class="line_number">1505</span>  );
+<span class="line_number">1506</span>
+<span class="line_number">1507</span>  _observers.erase(std::static_pointer_cast&lt;ObserverInterface&gt;(ptr));
+<span class="line_number">1508</span>}
+<span class="line_number">1509</span>
+<span class="line_number">1510</span>// Function: num_observers
+<span class="line_number">1511</span>inline size_t Executor::num_observers() const noexcept {
+<span class="line_number">1512</span>  return _observers.size();
+<span class="line_number">1513</span>}
+<span class="line_number">1514</span>
+<span class="line_number">1515</span>// Procedure: _spill
+<span class="line_number">1516</span>inline void Executor::_spill(Node* item) {
+<span class="line_number">1517</span>  // Since pointers are aligned to 8 bytes, we perform a simple hash to avoid 
+<span class="line_number">1518</span>  // contention caused by hashing to the same slot.
+<span class="line_number">1519</span>  auto b = (reinterpret_cast&lt;uintptr_t&gt;(item) &gt;&gt; 16) % _buffers.size();
+<span class="line_number">1520</span>  std::scoped_lock lock(_buffers[b].mutex);
+<span class="line_number">1521</span>  _buffers[b].queue.push(item);
+<span class="line_number">1522</span>}
+<span class="line_number">1523</span>
+<span class="line_number">1524</span>// Procedure: _bulk_spill
+<span class="line_number">1525</span>template &lt;typename I&gt;
+<span class="line_number">1526</span>void Executor::_bulk_spill(I first, size_t N) {
+<span class="line_number">1527</span>  // assert(N != 0);
+<span class="line_number">1528</span>  // Since pointers are aligned to 8 bytes, we perform a simple hash to avoid 
+<span class="line_number">1529</span>  // contention caused by hashing to the same slot.
+<span class="line_number">1530</span>  auto p = reinterpret_cast&lt;uintptr_t&gt;(*first) &gt;&gt; 16;
+<span class="line_number">1531</span>  auto b = (p ^ (N &lt;&lt; 6)) % _buffers.size();
+<span class="line_number">1532</span>  std::scoped_lock lock(_buffers[b].mutex);
+<span class="line_number">1533</span>  _buffers[b].queue.bulk_push(first, N);
+<span class="line_number">1534</span>}
+<span class="line_number">1535</span>
+<span class="line_number">1536</span>// Procedure: _schedule
+<span class="line_number">1537</span>inline void Executor::_schedule(Worker&amp; worker, Node* node) {
+<span class="line_number">1538</span>  // starting at v3.5 we do not use any complicated notification mechanism 
+<span class="line_number">1539</span>  // as the experimental result has shown no significant advantage.
+<span class="line_number">1540</span>  if(worker._wsq.try_push(node) == false) {
+<span class="line_number">1541</span>    _spill(node);
+<span class="line_number">1542</span>  }
+<span class="line_number">1543</span>  _notifier.notify_one();
+<span class="line_number">1544</span>}
+<span class="line_number">1545</span>
+<span class="line_number">1546</span>// Procedure: _schedule
+<span class="line_number">1547</span>inline void Executor::_schedule(Node* node) {
+<span class="line_number">1548</span>  _spill(node);
+<span class="line_number">1549</span>  _notifier.notify_one();
+<span class="line_number">1550</span>}
+<span class="line_number">1551</span>
+<span class="line_number">1552</span>// Procedure: _schedule
+<span class="line_number">1553</span>template &lt;typename I&gt;
+<span class="line_number">1554</span>void Executor::_bulk_schedule(Worker&amp; worker, I first, size_t num_nodes) {
+<span class="line_number">1555</span>
+<span class="line_number">1556</span>  if(num_nodes == 0) {
+<span class="line_number">1557</span>    return;
+<span class="line_number">1558</span>  }
+<span class="line_number">1559</span>
+<span class="line_number">1560</span>  // NOTE: We cannot use first/last in the for-loop (e.g., for(; first != last; ++first)).
+<span class="line_number">1561</span>  // This is because when a node v is inserted into the queue, v can run and finish 
+<span class="line_number">1562</span>  // immediately. If v is the last node in the graph, it will tear down the parent task vector
+<span class="line_number">1563</span>  // which cause the last ++first to fail. This problem is specific to MSVC which has a stricter
+<span class="line_number">1564</span>  // iterator implementation in std::vector than GCC/Clang.
+<span class="line_number">1565</span>  if(auto n = worker._wsq.try_bulk_push(first, num_nodes); n != num_nodes) {
+<span class="line_number">1566</span>    _bulk_spill(first, num_nodes - n);
+<span class="line_number">1567</span>  }
+<span class="line_number">1568</span>  _notifier.notify_n(num_nodes);
+<span class="line_number">1569</span>    
+<span class="line_number">1570</span>  // notify first before spilling to hopefully wake up workers earlier 
+<span class="line_number">1571</span>  // however, the experiment does not show any benefit for doing this.
+<span class="line_number">1572</span>  //auto n = worker._wsq.try_bulk_push(first, num_nodes);
+<span class="line_number">1573</span>  //_notifier.notify_n(n);
+<span class="line_number">1574</span>  //_bulk_schedule(first + n, num_nodes - n);
+<span class="line_number">1575</span>}
+<span class="line_number">1576</span>
+<span class="line_number">1577</span>// Procedure: _schedule
+<span class="line_number">1578</span>template &lt;typename I&gt;
+<span class="line_number">1579</span>inline void Executor::_bulk_schedule(I first, size_t num_nodes) {
+<span class="line_number">1580</span>  
+<span class="line_number">1581</span>  if(num_nodes == 0) {
+<span class="line_number">1582</span>    return;
+<span class="line_number">1583</span>  }
+<span class="line_number">1584</span>  
+<span class="line_number">1585</span>  // NOTE: We cannot use first/last in the for-loop (e.g., for(; first != last; ++first)).
+<span class="line_number">1586</span>  // This is because when a node v is inserted into the queue, v can run and finish 
+<span class="line_number">1587</span>  // immediately. If v is the last node in the graph, it will tear down the parent task vector
+<span class="line_number">1588</span>  // which cause the last ++first to fail. This problem is specific to MSVC which has a stricter
+<span class="line_number">1589</span>  // iterator implementation in std::vector than GCC/Clang.
+<span class="line_number">1590</span>  _bulk_spill(first, num_nodes);
+<span class="line_number">1591</span>  _notifier.notify_n(num_nodes);
+<span class="line_number">1592</span>}
+<span class="line_number">1593</span>
+<span class="line_number">1594</span>// Function: _update_cache
+<span class="line_number">1595</span>TF_FORCE_INLINE void Executor::_update_cache(Worker&amp; worker, Node*&amp; cache, Node* node) {
+<span class="line_number">1596</span>  if(cache) {
+<span class="line_number">1597</span>    _schedule(worker, cache);
+<span class="line_number">1598</span>  }
+<span class="line_number">1599</span>  cache = node;
+<span class="line_number">1600</span>}
+<span class="line_number">1601</span>
+<span class="line_number">1602</span>// Function: _bulk_update_cache
+<span class="line_number">1603</span>template &lt;size_t N&gt;
+<span class="line_number">1604</span>TF_FORCE_INLINE void Executor::_bulk_update_cache(
+<span class="line_number">1605</span>  Worker&amp; worker, Node*&amp; cache, Node* node, std::array&lt;Node*, N&gt;&amp; array, size_t&amp; n
+<span class="line_number">1606</span>) {
+<span class="line_number">1607</span>  // experimental results show no benefit of using bulk_update_cache
+<span class="line_number">1608</span>  if(cache) {
+<span class="line_number">1609</span>    array[n++] = cache;
+<span class="line_number">1610</span>    if(n == N) {
+<span class="line_number">1611</span>      _bulk_schedule(worker, array, n);
+<span class="line_number">1612</span>      n = 0;
+<span class="line_number">1613</span>    }
+<span class="line_number">1614</span>  }
+<span class="line_number">1615</span>  cache = node;
+<span class="line_number">1616</span>}
+<span class="line_number">1617</span>  
+<span class="line_number">1618</span>// Procedure: _invoke
+<span class="line_number">1619</span>inline void Executor::_invoke(Worker&amp; worker, Node* node) {
+<span class="line_number">1620</span>
+<span class="line_number">1621</span>  #define TF_INVOKE_CONTINUATION()  \
+<span class="line_number">1622</span>  if (cache) {                      \
+<span class="line_number">1623</span>    node = cache;                   \
+<span class="line_number">1624</span>    goto begin_invoke;              \
+<span class="line_number">1625</span>  }
+<span class="line_number">1626</span>
+<span class="line_number">1627</span>  begin_invoke:
+<span class="line_number">1628</span>
+<span class="line_number">1629</span>  Node* cache {nullptr};
+<span class="line_number">1630</span>  
+<span class="line_number">1631</span>  // if this is the second invoke due to preemption, directly jump to invoke task
+<span class="line_number">1632</span>  if(node-&gt;_nstate &amp; NSTATE::PREEMPTED) {
+<span class="line_number">1633</span>    goto invoke_task;
+<span class="line_number">1634</span>  }
+<span class="line_number">1635</span>
+<span class="line_number">1636</span>  // If the work has been cancelled, there is no need to continue.
+<span class="line_number">1637</span>  // Here, we do tear_down_invoke since async tasks may also get cancelled where
+<span class="line_number">1638</span>  // we need to recycle the node.
+<span class="line_number">1639</span>  if(node-&gt;_is_parent_cancelled()) {
+<span class="line_number">1640</span>    _tear_down_invoke(worker, node, cache);
+<span class="line_number">1641</span>    TF_INVOKE_CONTINUATION();
+<span class="line_number">1642</span>    return;
+<span class="line_number">1643</span>  }
+<span class="line_number">1644</span>
+<span class="line_number">1645</span>  // if acquiring semaphore(s) exists, acquire them first
+<span class="line_number">1646</span>  if(node-&gt;_semaphores &amp;&amp; !node-&gt;_semaphores-&gt;to_acquire.empty()) {
+<span class="line_number">1647</span>    SmallVector&lt;Node*&gt; waiters;
+<span class="line_number">1648</span>    if(!node-&gt;_acquire_all(waiters)) {
+<span class="line_number">1649</span>      _bulk_schedule(worker, waiters.begin(), waiters.size());
+<span class="line_number">1650</span>      return;
+<span class="line_number">1651</span>    }
+<span class="line_number">1652</span>  }
+<span class="line_number">1653</span>  
+<span class="line_number">1654</span>  invoke_task:
+<span class="line_number">1655</span>  
+<span class="line_number">1656</span>  SmallVector&lt;int&gt; conds;
+<span class="line_number">1657</span>
+<span class="line_number">1658</span>  // switch is faster than nested if-else due to jump table
+<span class="line_number">1659</span>  switch(node-&gt;_handle.index()) {
+<span class="line_number">1660</span>    // static task
+<span class="line_number">1661</span>    case Node::STATIC:{
+<span class="line_number">1662</span>      _invoke_static_task(worker, node);
+<span class="line_number">1663</span>    }
+<span class="line_number">1664</span>    break;
+<span class="line_number">1665</span>    
+<span class="line_number">1666</span>    // runtime task
+<span class="line_number">1667</span>    case Node::RUNTIME:{
+<span class="line_number">1668</span>      if(_invoke_runtime_task(worker, node)) {
+<span class="line_number">1669</span>        return;
+<span class="line_number">1670</span>      }
+<span class="line_number">1671</span>    }
+<span class="line_number">1672</span>    break;
+<span class="line_number">1673</span>    
+<span class="line_number">1674</span>    // non-preemptive runtime task
+<span class="line_number">1675</span>    case Node::NONPREEMPTIVE_RUNTIME:{
+<span class="line_number">1676</span>      _invoke_nonpreemptive_runtime_task(worker, node);
+<span class="line_number">1677</span>    }
+<span class="line_number">1678</span>    break;
+<span class="line_number">1679</span>
+<span class="line_number">1680</span>    // subflow task
+<span class="line_number">1681</span>    case Node::SUBFLOW: {
+<span class="line_number">1682</span>      if(_invoke_subflow_task(worker, node)) {
+<span class="line_number">1683</span>        return;
+<span class="line_number">1684</span>      }
+<span class="line_number">1685</span>    }
+<span class="line_number">1686</span>    break;
+<span class="line_number">1687</span>
+<span class="line_number">1688</span>    // condition task
+<span class="line_number">1689</span>    case Node::CONDITION: {
+<span class="line_number">1690</span>      _invoke_condition_task(worker, node, conds);
+<span class="line_number">1691</span>    }
+<span class="line_number">1692</span>    break;
+<span class="line_number">1693</span>
+<span class="line_number">1694</span>    // multi-condition task
+<span class="line_number">1695</span>    case Node::MULTI_CONDITION: {
+<span class="line_number">1696</span>      _invoke_multi_condition_task(worker, node, conds);
+<span class="line_number">1697</span>    }
+<span class="line_number">1698</span>    break;
+<span class="line_number">1699</span>
+<span class="line_number">1700</span>    // module task
+<span class="line_number">1701</span>    case Node::MODULE: {
+<span class="line_number">1702</span>      if(_invoke_module_task(worker, node)) {
+<span class="line_number">1703</span>        return;
+<span class="line_number">1704</span>      }
+<span class="line_number">1705</span>    }
+<span class="line_number">1706</span>    break;
+<span class="line_number">1707</span>
+<span class="line_number">1708</span>    // async task
+<span class="line_number">1709</span>    case Node::ASYNC: {
+<span class="line_number">1710</span>      if(_invoke_async_task(worker, node)) {
+<span class="line_number">1711</span>        return;
+<span class="line_number">1712</span>      }
+<span class="line_number">1713</span>      _tear_down_async(worker, node, cache);
+<span class="line_number">1714</span>      TF_INVOKE_CONTINUATION();
+<span class="line_number">1715</span>      return;
+<span class="line_number">1716</span>    }
+<span class="line_number">1717</span>    break;
+<span class="line_number">1718</span>
+<span class="line_number">1719</span>    // dependent async task
+<span class="line_number">1720</span>    case Node::DEPENDENT_ASYNC: {
+<span class="line_number">1721</span>      if(_invoke_dependent_async_task(worker, node)) {
+<span class="line_number">1722</span>        return;
+<span class="line_number">1723</span>      }
+<span class="line_number">1724</span>      _tear_down_dependent_async(worker, node, cache);
+<span class="line_number">1725</span>      TF_INVOKE_CONTINUATION();
+<span class="line_number">1726</span>      return;
+<span class="line_number">1727</span>    }
+<span class="line_number">1728</span>    break;
+<span class="line_number">1729</span>
+<span class="line_number">1730</span>    // monostate (placeholder)
+<span class="line_number">1731</span>    default:
+<span class="line_number">1732</span>    break;
+<span class="line_number">1733</span>  }
+<span class="line_number">1734</span>
+<span class="line_number">1735</span>  // if releasing semaphores exist, release them
+<span class="line_number">1736</span>  if(node-&gt;_semaphores &amp;&amp; !node-&gt;_semaphores-&gt;to_release.empty()) {
+<span class="line_number">1737</span>    SmallVector&lt;Node*&gt; waiters;
+<span class="line_number">1738</span>    node-&gt;_release_all(waiters);
+<span class="line_number">1739</span>    _bulk_schedule(worker, waiters.begin(), waiters.size());
+<span class="line_number">1740</span>  }
+<span class="line_number">1741</span>
+<span class="line_number">1742</span>  // Reset the join counter with strong dependencies to support cycles.
+<span class="line_number">1743</span>  // + We must do this before scheduling the successors to avoid race
+<span class="line_number">1744</span>  //   condition on _predecessors.
+<span class="line_number">1745</span>  // + We must use fetch_add instead of direct assigning
+<span class="line_number">1746</span>  //   because the user-level call on &#34;invoke&#34; may explicitly schedule 
+<span class="line_number">1747</span>  //   this task again (e.g., pipeline) which can access the join_counter.
+<span class="line_number">1748</span>  node-&gt;_join_counter.fetch_add(
+<span class="line_number">1749</span>    node-&gt;num_predecessors() - (node-&gt;_nstate &amp; ~NSTATE::MASK), std::memory_order_relaxed
+<span class="line_number">1750</span>  );
+<span class="line_number">1751</span>
+<span class="line_number">1752</span>  // Invoke the task based on the corresponding type
+<span class="line_number">1753</span>  switch(node-&gt;_handle.index()) {
+<span class="line_number">1754</span>
+<span class="line_number">1755</span>    // condition and multi-condition tasks
+<span class="line_number">1756</span>    case Node::CONDITION:
+<span class="line_number">1757</span>    case Node::MULTI_CONDITION: {
+<span class="line_number">1758</span>      for(auto cond : conds) {
+<span class="line_number">1759</span>        if(cond &gt;= 0 &amp;&amp; static_cast&lt;size_t&gt;(cond) &lt; node-&gt;_num_successors) {
+<span class="line_number">1760</span>          auto s = node-&gt;_edges[cond]; 
+<span class="line_number">1761</span>          // zeroing the join counter for invariant
+<span class="line_number">1762</span>          s-&gt;_join_counter.store(0, std::memory_order_relaxed);
+<span class="line_number">1763</span>          node-&gt;_parent-&gt;_join_counter.fetch_add(1, std::memory_order_relaxed);
+<span class="line_number">1764</span>          _update_cache(worker, cache, s);
+<span class="line_number">1765</span>        }
+<span class="line_number">1766</span>      }
+<span class="line_number">1767</span>    }
+<span class="line_number">1768</span>    break;
+<span class="line_number">1769</span>
+<span class="line_number">1770</span>    // non-condition task
+<span class="line_number">1771</span>    default: {
+<span class="line_number">1772</span>      for(size_t i=0; i&lt;node-&gt;_num_successors; ++i) {
+<span class="line_number">1773</span>        if(auto s = node-&gt;_edges[i]; s-&gt;_join_counter.fetch_sub(1, std::memory_order_acq_rel) == 1) {
+<span class="line_number">1774</span>          node-&gt;_parent-&gt;_join_counter.fetch_add(1, std::memory_order_relaxed);
+<span class="line_number">1775</span>          _update_cache(worker, cache, s);
+<span class="line_number">1776</span>        }
+<span class="line_number">1777</span>      }
+<span class="line_number">1778</span>    }
+<span class="line_number">1779</span>    break;
+<span class="line_number">1780</span>  }
+<span class="line_number">1781</span>
+<span class="line_number">1782</span>  // clean up the node after execution
+<span class="line_number">1783</span>  _tear_down_nonasync(worker, node, cache);
+<span class="line_number">1784</span>  TF_INVOKE_CONTINUATION();
+<span class="line_number">1785</span>}
+<span class="line_number">1786</span>
+<span class="line_number">1787</span>// Procedure: _tear_down_nonasync
+<span class="line_number">1788</span>inline void Executor::_tear_down_nonasync(Worker&amp; worker, Node* node, Node*&amp; cache) {
+<span class="line_number">1789</span>
+<span class="line_number">1790</span>  // we must check parent first before subtracting the join counter,
+<span class="line_number">1791</span>  // or it can introduce data race
+<span class="line_number">1792</span>  if(auto parent = node-&gt;_parent; parent == node-&gt;_topology) {
+<span class="line_number">1793</span>    if(parent-&gt;_join_counter.fetch_sub(1, std::memory_order_acq_rel) == 1) {
+<span class="line_number">1794</span>      _tear_down_topology(worker, node-&gt;_topology, cache);
+<span class="line_number">1795</span>    }
+<span class="line_number">1796</span>  }
+<span class="line_number">1797</span>  else {  
+<span class="line_number">1798</span>    // needs to fetch every data before join counter becomes zero at which
+<span class="line_number">1799</span>    // the node may be deleted
+<span class="line_number">1800</span>    auto state = parent-&gt;_nstate;
+<span class="line_number">1801</span>    if(parent-&gt;_join_counter.fetch_sub(1, std::memory_order_acq_rel) == 1) {
+<span class="line_number">1802</span>      // this task is spawned from a preempted parent, so we need to resume it
+<span class="line_number">1803</span>      if(state &amp; NSTATE::PREEMPTED) {
+<span class="line_number">1804</span>        _update_cache(worker, cache, static_cast&lt;Node*&gt;(parent));
+<span class="line_number">1805</span>      }
+<span class="line_number">1806</span>    }
+<span class="line_number">1807</span>  }
+<span class="line_number">1808</span>}
+<span class="line_number">1809</span>
+<span class="line_number">1810</span>// Procedure: _tear_down_invoke
+<span class="line_number">1811</span>inline void Executor::_tear_down_invoke(Worker&amp; worker, Node* node, Node*&amp; cache) {
+<span class="line_number">1812</span>  switch(node-&gt;_handle.index()) {
+<span class="line_number">1813</span>    case Node::ASYNC:
+<span class="line_number">1814</span>      _tear_down_async(worker, node, cache);
+<span class="line_number">1815</span>    break;
+<span class="line_number">1816</span>
+<span class="line_number">1817</span>    case Node::DEPENDENT_ASYNC:
+<span class="line_number">1818</span>      _tear_down_dependent_async(worker, node, cache);
+<span class="line_number">1819</span>    break;
+<span class="line_number">1820</span>
+<span class="line_number">1821</span>    default:
+<span class="line_number">1822</span>      _tear_down_nonasync(worker, node, cache);
+<span class="line_number">1823</span>    break;
+<span class="line_number">1824</span>  }
+<span class="line_number">1825</span>}
+<span class="line_number">1826</span>
+<span class="line_number">1827</span>// Procedure: _observer_prologue
+<span class="line_number">1828</span>inline void Executor::_observer_prologue(Worker&amp; worker, Node* node) {
+<span class="line_number">1829</span>  for(auto&amp; observer : _observers) {
+<span class="line_number">1830</span>    observer-&gt;on_entry(WorkerView(worker), TaskView(*node));
+<span class="line_number">1831</span>  }
+<span class="line_number">1832</span>}
+<span class="line_number">1833</span>
+<span class="line_number">1834</span>// Procedure: _observer_epilogue
+<span class="line_number">1835</span>inline void Executor::_observer_epilogue(Worker&amp; worker, Node* node) {
+<span class="line_number">1836</span>  for(auto&amp; observer : _observers) {
+<span class="line_number">1837</span>    observer-&gt;on_exit(WorkerView(worker), TaskView(*node));
+<span class="line_number">1838</span>  }
+<span class="line_number">1839</span>}
+<span class="line_number">1840</span>
+<span class="line_number">1841</span>// Procedure: _process_exception
+<span class="line_number">1842</span>inline void Executor::_process_exception(Worker&amp;, Node* node) {
+<span class="line_number">1843</span>
+<span class="line_number">1844</span>  // Finds the anchor and mark the entire path with exception, 
+<span class="line_number">1845</span>  // so recursive tasks can be cancelled properly.
+<span class="line_number">1846</span>  // Since exception can come from asynchronous task (with runtime), the node itself can be anchored.
+<span class="line_number">1847</span>  NodeBase* ea = node;     // explicit anchor
+<span class="line_number">1848</span>  NodeBase* ia = nullptr;  // implicit anchor
+<span class="line_number">1849</span>  
+<span class="line_number">1850</span>  while(ea &amp;&amp; (ea-&gt;_estate.load(std::memory_order_relaxed) &amp; ESTATE::EXPLICITLY_ANCHORED) == 0) {
+<span class="line_number">1851</span>    ea-&gt;_estate.fetch_or(ESTATE::EXCEPTION, std::memory_order_relaxed);
+<span class="line_number">1852</span>    // we only want the inner-most implicit anchor
+<span class="line_number">1853</span>    if(ia == nullptr &amp;&amp; (ea-&gt;_nstate &amp; NSTATE::IMPLICITLY_ANCHORED)) {
+<span class="line_number">1854</span>      ia = ea;
+<span class="line_number">1855</span>    }
+<span class="line_number">1856</span>    ea = ea-&gt;_parent;
+<span class="line_number">1857</span>  }
+<span class="line_number">1858</span>  
+<span class="line_number">1859</span>  // flag used to ensure execution is caught in a thread-safe manner
+<span class="line_number">1860</span>  constexpr static auto flag = ESTATE::EXCEPTION | ESTATE::CAUGHT;
+<span class="line_number">1861</span>
+<span class="line_number">1862</span>  // The exception occurs under a blocking call (e.g., corun, join).
+<span class="line_number">1863</span>  if(ea) {
+<span class="line_number">1864</span>    // multiple tasks may throw, and we only take the first thrown exception
+<span class="line_number">1865</span>    if((ea-&gt;_estate.fetch_or(flag, std::memory_order_relaxed) &amp; ESTATE::CAUGHT) == 0) {
+<span class="line_number">1866</span>      ea-&gt;_exception_ptr = std::current_exception();
+<span class="line_number">1867</span>      return;
+<span class="line_number">1868</span>    }
+<span class="line_number">1869</span>  }
+<span class="line_number">1870</span>  // Implicit anchor has the lowest priority
+<span class="line_number">1871</span>  else if(ia){
+<span class="line_number">1872</span>    if((ia-&gt;_estate.fetch_or(flag, std::memory_order_relaxed) &amp; ESTATE::CAUGHT) == 0) {
+<span class="line_number">1873</span>      ia-&gt;_exception_ptr = std::current_exception();
+<span class="line_number">1874</span>      return;
+<span class="line_number">1875</span>    }
+<span class="line_number">1876</span>  }
+<span class="line_number">1877</span>  
+<span class="line_number">1878</span>  // For now, we simply store the exception in this node; this can happen in an 
+<span class="line_number">1879</span>  // execution that does not have any external control to capture the exception,
+<span class="line_number">1880</span>  // such as silent async task without any parent.
+<span class="line_number">1881</span>  node-&gt;_exception_ptr = std::current_exception();
+<span class="line_number">1882</span>}
+<span class="line_number">1883</span>
+<span class="line_number">1884</span>// Procedure: _invoke_static_task
+<span class="line_number">1885</span>inline void Executor::_invoke_static_task(Worker&amp; worker, Node* node) {
+<span class="line_number">1886</span>  _observer_prologue(worker, node);
+<span class="line_number">1887</span>  TF_EXECUTOR_EXCEPTION_HANDLER(worker, node, {
+<span class="line_number">1888</span>    std::get_if&lt;Node::Static&gt;(&amp;node-&gt;_handle)-&gt;work();
+<span class="line_number">1889</span>  });
+<span class="line_number">1890</span>  _observer_epilogue(worker, node);
+<span class="line_number">1891</span>}
+<span class="line_number">1892</span>
+<span class="line_number">1893</span>// Procedure: _invoke_subflow_task
+<span class="line_number">1894</span>inline bool Executor::_invoke_subflow_task(Worker&amp; worker, Node* node) {
+<span class="line_number">1895</span>    
+<span class="line_number">1896</span>  auto&amp; h = *std::get_if&lt;Node::Subflow&gt;(&amp;node-&gt;_handle);
+<span class="line_number">1897</span>  auto&amp; g = h.subgraph;
+<span class="line_number">1898</span>
+<span class="line_number">1899</span>  if((node-&gt;_nstate &amp; NSTATE::PREEMPTED) == 0) {
+<span class="line_number">1900</span>    
+<span class="line_number">1901</span>    // set up the subflow
+<span class="line_number">1902</span>    Subflow sf(*this, worker, node, g);
+<span class="line_number">1903</span>
+<span class="line_number">1904</span>    // invoke the subflow callable
+<span class="line_number">1905</span>    _observer_prologue(worker, node);
+<span class="line_number">1906</span>    TF_EXECUTOR_EXCEPTION_HANDLER(worker, node, {
+<span class="line_number">1907</span>      h.work(sf);
+<span class="line_number">1908</span>    });
+<span class="line_number">1909</span>    _observer_epilogue(worker, node);
+<span class="line_number">1910</span>    
+<span class="line_number">1911</span>    // spawn the subflow if it is joinable and its graph is non-empty
+<span class="line_number">1912</span>    // implicit join is faster than Subflow::join as it does not involve corun
+<span class="line_number">1913</span>    if(sf.joinable() &amp;&amp; !g.empty()) {
+<span class="line_number">1914</span>
+<span class="line_number">1915</span>      // signal the executor to preempt this node
+<span class="line_number">1916</span>      node-&gt;_nstate |= NSTATE::PREEMPTED;
+<span class="line_number">1917</span>
+<span class="line_number">1918</span>      // set up and schedule the graph
+<span class="line_number">1919</span>      _schedule_graph_with_parent(worker, g, node-&gt;_topology, node);
+<span class="line_number">1920</span>      return true;
+<span class="line_number">1921</span>    }
+<span class="line_number">1922</span>  }
+<span class="line_number">1923</span>  else {
+<span class="line_number">1924</span>    node-&gt;_nstate &amp;= ~NSTATE::PREEMPTED;
+<span class="line_number">1925</span>  }
+<span class="line_number">1926</span>
+<span class="line_number">1927</span>  // The subflow has finished or joined.
+<span class="line_number">1928</span>  // By default, we clear the subflow storage as applications can perform recursive
+<span class="line_number">1929</span>  // subflow tasking which accumulates a huge amount of memory overhead, hampering 
+<span class="line_number">1930</span>  // the performance.
+<span class="line_number">1931</span>  if((node-&gt;_nstate &amp; NSTATE::RETAIN_SUBFLOW) == 0) {
+<span class="line_number">1932</span>    g.clear();
+<span class="line_number">1933</span>  }
+<span class="line_number">1934</span>
+<span class="line_number">1935</span>  return false;
+<span class="line_number">1936</span>}
+<span class="line_number">1937</span>
+<span class="line_number">1938</span>// Procedure: _invoke_condition_task
+<span class="line_number">1939</span>inline void Executor::_invoke_condition_task(
+<span class="line_number">1940</span>  Worker&amp; worker, Node* node, SmallVector&lt;int&gt;&amp; conds
+<span class="line_number">1941</span>) {
+<span class="line_number">1942</span>  _observer_prologue(worker, node);
+<span class="line_number">1943</span>  TF_EXECUTOR_EXCEPTION_HANDLER(worker, node, {
+<span class="line_number">1944</span>    auto&amp; work = std::get_if&lt;Node::Condition&gt;(&amp;node-&gt;_handle)-&gt;work;
+<span class="line_number">1945</span>    conds = { work() };
+<span class="line_number">1946</span>  });
+<span class="line_number">1947</span>  _observer_epilogue(worker, node);
+<span class="line_number">1948</span>}
+<span class="line_number">1949</span>
+<span class="line_number">1950</span>// Procedure: _invoke_multi_condition_task
+<span class="line_number">1951</span>inline void Executor::_invoke_multi_condition_task(
+<span class="line_number">1952</span>  Worker&amp; worker, Node* node, SmallVector&lt;int&gt;&amp; conds
+<span class="line_number">1953</span>) {
+<span class="line_number">1954</span>  _observer_prologue(worker, node);
+<span class="line_number">1955</span>  TF_EXECUTOR_EXCEPTION_HANDLER(worker, node, {
+<span class="line_number">1956</span>    conds = std::get_if&lt;Node::MultiCondition&gt;(&amp;node-&gt;_handle)-&gt;work();
+<span class="line_number">1957</span>  });
+<span class="line_number">1958</span>  _observer_epilogue(worker, node);
+<span class="line_number">1959</span>}
+<span class="line_number">1960</span>
+<span class="line_number">1961</span>// Procedure: _invoke_module_task
+<span class="line_number">1962</span>inline bool Executor::_invoke_module_task(Worker&amp; w, Node* node) {
+<span class="line_number">1963</span>  return _invoke_module_task_impl(w, node, std::get_if&lt;Node::Module&gt;(&amp;node-&gt;_handle)-&gt;graph);  
+<span class="line_number">1964</span>}
+<span class="line_number">1965</span>
+<span class="line_number">1966</span>// Procedure: _invoke_module_task_impl
+<span class="line_number">1967</span>inline bool Executor::_invoke_module_task_impl(Worker&amp; w, Node* node, Graph&amp; graph) {
+<span class="line_number">1968</span>
+<span class="line_number">1969</span>  // No need to do anything for empty graph
+<span class="line_number">1970</span>  if(graph.empty()) {
+<span class="line_number">1971</span>    return false;
+<span class="line_number">1972</span>  }
+<span class="line_number">1973</span>
+<span class="line_number">1974</span>  // first entry - not spawned yet
+<span class="line_number">1975</span>  if((node-&gt;_nstate &amp; NSTATE::PREEMPTED) == 0) {
+<span class="line_number">1976</span>    // observe module start
+<span class="line_number">1977</span>    //_observer_prologue(w, node);
+<span class="line_number">1978</span>
+<span class="line_number">1979</span>    // signal the executor to preempt this node
+<span class="line_number">1980</span>    node-&gt;_nstate |= NSTATE::PREEMPTED;
+<span class="line_number">1981</span>    _schedule_graph_with_parent(w, graph, node-&gt;_topology, node);
+<span class="line_number">1982</span>    return true;
+<span class="line_number">1983</span>  }
+<span class="line_number">1984</span>
+<span class="line_number">1985</span>  // observe module end
+<span class="line_number">1986</span>  //_observer_epilogue(w, node);
+<span class="line_number">1987</span>
+<span class="line_number">1988</span>  // second entry - already spawned
+<span class="line_number">1989</span>  node-&gt;_nstate &amp;= ~NSTATE::PREEMPTED;
+<span class="line_number">1990</span>
+<span class="line_number">1991</span>  return false;
+<span class="line_number">1992</span>}
+<span class="line_number">1993</span>
+<span class="line_number">1994</span>
+<span class="line_number">1995</span>// Procedure: _invoke_async_task
+<span class="line_number">1996</span>inline bool Executor::_invoke_async_task(Worker&amp; worker, Node* node) {
+<span class="line_number">1997</span>  auto&amp; work = std::get_if&lt;Node::Async&gt;(&amp;node-&gt;_handle)-&gt;work;
+<span class="line_number">1998</span>  switch(work.index()) {
+<span class="line_number">1999</span>    // void()
+<span class="line_number">2000</span>    case 0:
+<span class="line_number">2001</span>      _observer_prologue(worker, node);
+<span class="line_number">2002</span>      TF_EXECUTOR_EXCEPTION_HANDLER(worker, node, {
+<span class="line_number">2003</span>        std::get_if&lt;0&gt;(&amp;work)-&gt;operator()();
+<span class="line_number">2004</span>      });
+<span class="line_number">2005</span>      _observer_epilogue(worker, node);
+<span class="line_number">2006</span>    break;
+<span class="line_number">2007</span>    
+<span class="line_number">2008</span>    // void(Runtime&amp;)
+<span class="line_number">2009</span>    case 1:
+<span class="line_number">2010</span>      if(_invoke_runtime_task_impl(worker, node, *std::get_if&lt;1&gt;(&amp;work))) {
+<span class="line_number">2011</span>        return true;
+<span class="line_number">2012</span>      }
+<span class="line_number">2013</span>    break;
+<span class="line_number">2014</span>    
+<span class="line_number">2015</span>    // void(Runtime&amp;, bool)
+<span class="line_number">2016</span>    case 2:
+<span class="line_number">2017</span>      if(_invoke_runtime_task_impl(worker, node, *std::get_if&lt;2&gt;(&amp;work))) {
+<span class="line_number">2018</span>        return true;
+<span class="line_number">2019</span>      }
+<span class="line_number">2020</span>    break;
+<span class="line_number">2021</span>  }
+<span class="line_number">2022</span>
+<span class="line_number">2023</span>  return false;
+<span class="line_number">2024</span>}
+<span class="line_number">2025</span>
+<span class="line_number">2026</span>// Procedure: _invoke_dependent_async_task
+<span class="line_number">2027</span>inline bool Executor::_invoke_dependent_async_task(Worker&amp; worker, Node* node) {
+<span class="line_number">2028</span>  auto&amp; work = std::get_if&lt;Node::DependentAsync&gt;(&amp;node-&gt;_handle)-&gt;work;
+<span class="line_number">2029</span>  switch(work.index()) {
+<span class="line_number">2030</span>    // void()
+<span class="line_number">2031</span>    case 0:
+<span class="line_number">2032</span>      _observer_prologue(worker, node);
+<span class="line_number">2033</span>      TF_EXECUTOR_EXCEPTION_HANDLER(worker, node, {
+<span class="line_number">2034</span>        std::get_if&lt;0&gt;(&amp;work)-&gt;operator()();
+<span class="line_number">2035</span>      });
+<span class="line_number">2036</span>      _observer_epilogue(worker, node);
+<span class="line_number">2037</span>    break;
+<span class="line_number">2038</span>    
+<span class="line_number">2039</span>    // void(Runtime&amp;) - silent async
+<span class="line_number">2040</span>    case 1:
+<span class="line_number">2041</span>      if(_invoke_runtime_task_impl(worker, node, *std::get_if&lt;1&gt;(&amp;work))) {
+<span class="line_number">2042</span>        return true;
+<span class="line_number">2043</span>      }
+<span class="line_number">2044</span>    break;
+<span class="line_number">2045</span>
+<span class="line_number">2046</span>    // void(Runtime&amp;, bool) - async
+<span class="line_number">2047</span>    case 2:
+<span class="line_number">2048</span>      if(_invoke_runtime_task_impl(worker, node, *std::get_if&lt;2&gt;(&amp;work))) {
+<span class="line_number">2049</span>        return true;
+<span class="line_number">2050</span>      }
+<span class="line_number">2051</span>    break;
+<span class="line_number">2052</span>  }
+<span class="line_number">2053</span>  return false;
+<span class="line_number">2054</span>}
+<span class="line_number">2055</span>
+<span class="line_number">2056</span>// Function: run
+<span class="line_number">2057</span>inline tf::Future&lt;void&gt; Executor::run(Taskflow&amp; f) {
+<span class="line_number">2058</span>  return run_n(f, 1, [](){});
+<span class="line_number">2059</span>}
+<span class="line_number">2060</span>
+<span class="line_number">2061</span>// Function: run
+<span class="line_number">2062</span>inline tf::Future&lt;void&gt; Executor::run(Taskflow&amp;&amp; f) {
+<span class="line_number">2063</span>  return run_n(std::move(f), 1, [](){});
+<span class="line_number">2064</span>}
+<span class="line_number">2065</span>
+<span class="line_number">2066</span>// Function: run
+<span class="line_number">2067</span>template &lt;typename C&gt;
+<span class="line_number">2068</span>tf::Future&lt;void&gt; Executor::run(Taskflow&amp; f, C&amp;&amp; c) {
+<span class="line_number">2069</span>  return run_n(f, 1, std::forward&lt;C&gt;(c));
+<span class="line_number">2070</span>}
+<span class="line_number">2071</span>
+<span class="line_number">2072</span>// Function: run
+<span class="line_number">2073</span>template &lt;typename C&gt;
+<span class="line_number">2074</span>tf::Future&lt;void&gt; Executor::run(Taskflow&amp;&amp; f, C&amp;&amp; c) {
+<span class="line_number">2075</span>  return run_n(std::move(f), 1, std::forward&lt;C&gt;(c));
+<span class="line_number">2076</span>}
+<span class="line_number">2077</span>
+<span class="line_number">2078</span>// Function: run_n
+<span class="line_number">2079</span>inline tf::Future&lt;void&gt; Executor::run_n(Taskflow&amp; f, size_t repeat) {
+<span class="line_number">2080</span>  return run_n(f, repeat, [](){});
+<span class="line_number">2081</span>}
+<span class="line_number">2082</span>
+<span class="line_number">2083</span>// Function: run_n
+<span class="line_number">2084</span>inline tf::Future&lt;void&gt; Executor::run_n(Taskflow&amp;&amp; f, size_t repeat) {
+<span class="line_number">2085</span>  return run_n(std::move(f), repeat, [](){});
+<span class="line_number">2086</span>}
+<span class="line_number">2087</span>
+<span class="line_number">2088</span>// Function: run_n
+<span class="line_number">2089</span>template &lt;typename C&gt;
+<span class="line_number">2090</span>tf::Future&lt;void&gt; Executor::run_n(Taskflow&amp; f, size_t repeat, C&amp;&amp; c) {
+<span class="line_number">2091</span>  return run_until(
+<span class="line_number">2092</span>    f, [repeat]() mutable { return repeat-- == 0; }, std::forward&lt;C&gt;(c)
+<span class="line_number">2093</span>  );
+<span class="line_number">2094</span>}
+<span class="line_number">2095</span>
+<span class="line_number">2096</span>// Function: run_n
+<span class="line_number">2097</span>template &lt;typename C&gt;
+<span class="line_number">2098</span>tf::Future&lt;void&gt; Executor::run_n(Taskflow&amp;&amp; f, size_t repeat, C&amp;&amp; c) {
+<span class="line_number">2099</span>  return run_until(
+</code></pre>
+            <div class="issue">
+                <div>
+                    <span class="what">Possible data race during read of size 8 at 0x28BFEEB0 by thread #11</span>
+                    <div class="navigation">
+                        <button class="next_error">Next</button>
+                        <button class="prev_error">Previous</button>
+                    </div>
+                </div>
+                <div>
+                    <table class="call_stack">
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:61<br>
+                                    <code class="cpp">bool std::__invoke_impl&lt;bool, tf::Executor::run_n&lt;tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&gt;(tf::Taskflow&amp;&amp;, unsigned long, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&amp;&amp;)::{lambda()#1}&amp;&gt;(std::__invoke_other, tf::Executor::run_n&lt;tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&gt;(tf::Taskflow&amp;&amp;, unsigned long, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&amp;&amp;)::{lambda()#1}&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">58</span>  template&lt;typename _Res, typename _Fn, typename... _Args&gt;
+<span class="line_number">59</span>    constexpr _Res
+<span class="line_number">60</span>    __invoke_impl(__invoke_other, _Fn&amp;&amp; __f, _Args&amp;&amp;... __args)
+<span class="line_number">61</span><span class="error">    { return std::forward&lt;_Fn&gt;(__f)(std::forward&lt;_Args&gt;(__args)...); }
+</span><span class="line_number">62</span>
+<span class="line_number">63</span>  template&lt;typename _Res, typename _MemFun, typename _Tp, typename... _Args&gt;
+<span class="line_number">64</span>    constexpr _Res
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:114<br>
+                                    <code class="cpp">std::enable_if&lt;is_invocable_r_v&lt;bool, tf::Executor::run_n&lt;tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&gt;(tf::Taskflow&amp;&amp;, unsigned long, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&amp;&amp;)::{lambda()#1}&amp;&gt;, bool&gt;::type std::__invoke_r&lt;bool, tf::Executor::run_n&lt;tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&gt;(tf::Taskflow&amp;&amp;, unsigned long, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&amp;&amp;)::{lambda()#1}&amp;&gt;(tf::Executor::run_n&lt;tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&gt;(tf::Taskflow&amp;&amp;, unsigned long, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&amp;&amp;)::{lambda()#1}&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">111</span>	std::__invoke_impl&lt;__type&gt;(__tag{}, std::forward&lt;_Callable&gt;(__fn),
+<span class="line_number">112</span>					std::forward&lt;_Args&gt;(__args)...);
+<span class="line_number">113</span>      else
+<span class="line_number">114</span><span class="error">	return std::__invoke_impl&lt;__type&gt;(__tag{},
+</span><span class="line_number">115</span>					  std::forward&lt;_Callable&gt;(__fn),
+<span class="line_number">116</span>					  std::forward&lt;_Args&gt;(__args)...);
+<span class="line_number">117</span>    }
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/std_function.h:290<br>
+                                    <code class="cpp">std::_Function_handler&lt;bool (), tf::Executor::run_n&lt;tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&gt;(tf::Taskflow&amp;&amp;, unsigned long, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&amp;&amp;)::{lambda()#1}&gt;::_M_invoke(std::_Any_data const&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">287</span>      static _Res
+<span class="line_number">288</span>      _M_invoke(const _Any_data&amp; __functor, _ArgTypes&amp;&amp;... __args)
+<span class="line_number">289</span>      {
+<span class="line_number">290</span><span class="error">	return std::__invoke_r&lt;_Res&gt;(*_Base::_M_get_pointer(__functor),
+</span><span class="line_number">291</span>				     std::forward&lt;_ArgTypes&gt;(__args)...);
+<span class="line_number">292</span>      }
+<span class="line_number">293</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/std_function.h:591<br>
+                                    <code class="cpp">std::function&lt;bool ()&gt;::operator()() const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">588</span>      {
+<span class="line_number">589</span>	if (_M_empty())
+<span class="line_number">590</span>	  __throw_bad_function_call();
+<span class="line_number">591</span><span class="error">	return _M_invoker(_M_functor, std::forward&lt;_ArgTypes&gt;(__args)...);
+</span><span class="line_number">592</span>      }
+<span class="line_number">593</span>
+<span class="line_number">594</span>#if __cpp_rtti
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/executor.hpp:2317<br>
+                                    <code class="cpp">tf::Executor::_tear_down_topology(tf::Worker&amp;, tf::Topology*, tf::Node*&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">2314</span>
+<span class="line_number">2315</span>  // case 1: we still need to run the topology again
+<span class="line_number">2316</span>  //if(!tpg-&gt;_exception_ptr &amp;&amp; !tpg-&gt;cancelled() &amp;&amp; !tpg-&gt;predicate()) {
+<span class="line_number">2317</span><span class="error">  if(!tpg-&gt;cancelled() &amp;&amp; !tpg-&gt;_predicate()) {
+</span><span class="line_number">2318</span>    //assert(tpg-&gt;_join_counter == 0);
+<span class="line_number">2319</span>    //std::lock_guard&lt;std::mutex&gt; lock(f._mutex);
+<span class="line_number">2320</span>    _schedule_graph_with_parent(worker, tpg-&gt;_taskflow._graph, tpg, tpg);
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/executor.hpp:1794<br>
+                                    <code class="cpp">tf::Executor::_tear_down_nonasync(tf::Worker&amp;, tf::Node*, tf::Node*&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1791</span>  // or it can introduce data race
+<span class="line_number">1792</span>  if(auto parent = node-&gt;_parent; parent == node-&gt;_topology) {
+<span class="line_number">1793</span>    if(parent-&gt;_join_counter.fetch_sub(1, std::memory_order_acq_rel) == 1) {
+<span class="line_number">1794</span><span class="error">      _tear_down_topology(worker, node-&gt;_topology, cache);
+</span><span class="line_number">1795</span>    }
+<span class="line_number">1796</span>  }
+<span class="line_number">1797</span>  else {  
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/executor.hpp:1783<br>
+                                    <code class="cpp">tf::Executor::_invoke(tf::Worker&amp;, tf::Node*)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1780</span>  }
+<span class="line_number">1781</span>
+<span class="line_number">1782</span>  // clean up the node after execution
+<span class="line_number">1783</span><span class="error">  _tear_down_nonasync(worker, node, cache);
+</span><span class="line_number">1784</span>  TF_INVOKE_CONTINUATION();
+<span class="line_number">1785</span>}
+<span class="line_number">1786</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/executor.hpp:1424<br>
+                                    <code class="cpp">tf::Executor::_exploit_task(tf::Worker&amp;, tf::Node*&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1421</span>// Procedure: _exploit_task
+<span class="line_number">1422</span>inline void Executor::_exploit_task(Worker&amp; w, Node*&amp; t) {
+<span class="line_number">1423</span>  while(t) {
+<span class="line_number">1424</span><span class="error">    _invoke(w, t);
+</span><span class="line_number">1425</span>    t = w._wsq.pop();
+<span class="line_number">1426</span>  }
+<span class="line_number">1427</span>}
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/executor.hpp:1327<br>
+                                    <code class="cpp">tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}::operator()() const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1324</span>        while(1) {
+<span class="line_number">1325</span>
+<span class="line_number">1326</span>          // drains out the local queue first
+<span class="line_number">1327</span><span class="error">          _exploit_task(worker, t);
+</span><span class="line_number">1328</span>
+<span class="line_number">1329</span>          // steals and waits for tasks
+<span class="line_number">1330</span>          if(_wait_for_task(worker, t) == false) {
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:61<br>
+                                    <code class="cpp">void std::__invoke_impl&lt;void, tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}&gt;(std::__invoke_other, tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}&amp;&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">58</span>  template&lt;typename _Res, typename _Fn, typename... _Args&gt;
+<span class="line_number">59</span>    constexpr _Res
+<span class="line_number">60</span>    __invoke_impl(__invoke_other, _Fn&amp;&amp; __f, _Args&amp;&amp;... __args)
+<span class="line_number">61</span><span class="error">    { return std::forward&lt;_Fn&gt;(__f)(std::forward&lt;_Args&gt;(__args)...); }
+</span><span class="line_number">62</span>
+<span class="line_number">63</span>  template&lt;typename _Res, typename _MemFun, typename _Tp, typename... _Args&gt;
+<span class="line_number">64</span>    constexpr _Res
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:96<br>
+                                    <code class="cpp">std::__invoke_result&lt;tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}&gt;::type std::__invoke&lt;tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}&gt;(tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}&amp;&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">93</span>      using __result = __invoke_result&lt;_Callable, _Args...&gt;;
+<span class="line_number">94</span>      using __type = typename __result::type;
+<span class="line_number">95</span>      using __tag = typename __result::__invoke_type;
+<span class="line_number">96</span><span class="error">      return std::__invoke_impl&lt;__type&gt;(__tag{}, std::forward&lt;_Callable&gt;(__fn),
+</span><span class="line_number">97</span>					std::forward&lt;_Args&gt;(__args)...);
+<span class="line_number">98</span>    }
+<span class="line_number">99</span>
+</code></pre>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            <pre class="code">
+<code class="c++"><span class="line_number">2100</span><span class="error">    std::move(f), [repeat]() mutable { return repeat-- == 0; }, std::forward&lt;C&gt;(c)</span>
+<span class="line_number">2101</span>  );
+<span class="line_number">2102</span>}
+<span class="line_number">2103</span>
+<span class="line_number">2104</span>// Function: run_until
+<span class="line_number">2105</span>template&lt;typename P&gt;
+<span class="line_number">2106</span>tf::Future&lt;void&gt; Executor::run_until(Taskflow&amp; f, P&amp;&amp; pred) {
+<span class="line_number">2107</span>  return run_until(f, std::forward&lt;P&gt;(pred), [](){});
+<span class="line_number">2108</span>}
+<span class="line_number">2109</span>
+<span class="line_number">2110</span>// Function: run_until
+<span class="line_number">2111</span>template&lt;typename P&gt;
+<span class="line_number">2112</span>tf::Future&lt;void&gt; Executor::run_until(Taskflow&amp;&amp; f, P&amp;&amp; pred) {
+<span class="line_number">2113</span>  return run_until(std::move(f), std::forward&lt;P&gt;(pred), [](){});
+<span class="line_number">2114</span>}
+<span class="line_number">2115</span>
+<span class="line_number">2116</span>// Function: run_until
+<span class="line_number">2117</span>template &lt;typename P, typename C&gt;
+<span class="line_number">2118</span>tf::Future&lt;void&gt; Executor::run_until(Taskflow&amp; f, P&amp;&amp; p, C&amp;&amp; c) {
+<span class="line_number">2119</span>
+<span class="line_number">2120</span>  _increment_topology();
+<span class="line_number">2121</span>
+<span class="line_number">2122</span>  // No need to create a real topology but returns an dummy future for invariant.
+<span class="line_number">2123</span>  // Note that here we don&#39;t do std::async(std::launch::deferred, [](){}) because
+<span class="line_number">2124</span>  // the invariant requires the future to be ready before decrementing the topology,
+<span class="line_number">2125</span>  // rather than calling future.get() from the caller.
+<span class="line_number">2126</span>  if(f.empty() || p()) {
+<span class="line_number">2127</span>    c();
+<span class="line_number">2128</span>    std::promise&lt;void&gt; promise;
+<span class="line_number">2129</span>    promise.set_value();
+<span class="line_number">2130</span>    _decrement_topology();
+<span class="line_number">2131</span>    return tf::Future&lt;void&gt;(promise.get_future());
+<span class="line_number">2132</span>  }
+<span class="line_number">2133</span>
+<span class="line_number">2134</span>  // create a topology for this run
+<span class="line_number">2135</span>  auto t = std::make_shared&lt;Topology&gt;(f, std::forward&lt;P&gt;(p), std::forward&lt;C&gt;(c));
+<span class="line_number">2136</span>  //auto t = std::make_shared&lt;DerivedTopology&lt;P, C&gt;&gt;(f, std::forward&lt;P&gt;(p), std::forward&lt;C&gt;(c));
+<span class="line_number">2137</span>
+<span class="line_number">2138</span>  // need to create future before the topology got torn down quickly
+<span class="line_number">2139</span>  tf::Future&lt;void&gt; future(t-&gt;_promise.get_future(), t);
+<span class="line_number">2140</span>
+<span class="line_number">2141</span>  // modifying topology needs to be protected under the lock
+<span class="line_number">2142</span>  if(f._fetch_enqueue(t) == 0) {
+<span class="line_number">2143</span>    _set_up_topology(this_worker(), t.get());
+<span class="line_number">2144</span>  }
+<span class="line_number">2145</span>
+<span class="line_number">2146</span>  return future;
+<span class="line_number">2147</span>}
+<span class="line_number">2148</span>
+<span class="line_number">2149</span>
+<span class="line_number">2150</span>
+<span class="line_number">2151</span>// Function: corun_until
+<span class="line_number">2152</span>template &lt;typename P&gt;
+<span class="line_number">2153</span>void Executor::corun_until(P&amp;&amp; predicate) {
+<span class="line_number">2154</span>  
+<span class="line_number">2155</span>  Worker* w = this_worker();
+<span class="line_number">2156</span>  if(w == nullptr) {
+<span class="line_number">2157</span>    TF_THROW(&#34;corun_until must be called by a worker of the executor&#34;);
+<span class="line_number">2158</span>  }
+<span class="line_number">2159</span>
+<span class="line_number">2160</span>  _corun_until(*w, std::forward&lt;P&gt;(predicate));
+<span class="line_number">2161</span>}
+<span class="line_number">2162</span>
+<span class="line_number">2163</span>// Function: _corun_until
+<span class="line_number">2164</span>template &lt;typename P&gt;
+<span class="line_number">2165</span>void Executor::_corun_until(Worker&amp; w, P&amp;&amp; stop_predicate) {
+<span class="line_number">2166</span>
+<span class="line_number">2167</span>  const size_t MAX_VICTIM = num_queues();
+<span class="line_number">2168</span>  const size_t MAX_STEALS = ((MAX_VICTIM + 1) &lt;&lt; 1);
+<span class="line_number">2169</span>    
+<span class="line_number">2170</span>  exploit:
+<span class="line_number">2171</span>
+<span class="line_number">2172</span>  while(!stop_predicate()) {
+<span class="line_number">2173</span>    
+<span class="line_number">2174</span>    // here we don&#39;t do while-loop to drain out the local queue as it can
+<span class="line_number">2175</span>    // potentially enter a very deep recursive corun, cuasing stack overflow
+<span class="line_number">2176</span>    if(auto t = w._wsq.pop(); t) {
+<span class="line_number">2177</span>      _invoke(w, t);
+<span class="line_number">2178</span>    }
+<span class="line_number">2179</span>    else {
+<span class="line_number">2180</span>      size_t num_steals = 0;
+<span class="line_number">2181</span>      size_t vtm = w._sticky_victim;
+<span class="line_number">2182</span>
+<span class="line_number">2183</span>      explore:
+<span class="line_number">2184</span>
+<span class="line_number">2185</span>      t = (vtm &lt; _workers.size()) 
+<span class="line_number">2186</span>        ? _workers[vtm]._wsq.steal()
+<span class="line_number">2187</span>        : _buffers[vtm-_workers.size()].queue.steal();
+<span class="line_number">2188</span>
+<span class="line_number">2189</span>      if(t) {
+<span class="line_number">2190</span>        _invoke(w, t);
+<span class="line_number">2191</span>        w._sticky_victim = vtm;
+<span class="line_number">2192</span>        goto exploit;
+<span class="line_number">2193</span>      }
+<span class="line_number">2194</span>      else if(!stop_predicate()) {
+<span class="line_number">2195</span>        if(++num_steals &gt; MAX_STEALS) {
+<span class="line_number">2196</span>          std::this_thread::yield();
+<span class="line_number">2197</span>        }
+<span class="line_number">2198</span>        vtm = w._rdgen() % MAX_VICTIM;
+<span class="line_number">2199</span>        goto explore;
+<span class="line_number">2200</span>      }
+<span class="line_number">2201</span>      else {
+<span class="line_number">2202</span>        break;
+<span class="line_number">2203</span>      }
+<span class="line_number">2204</span>    }
+<span class="line_number">2205</span>  }
+<span class="line_number">2206</span>}
+<span class="line_number">2207</span>
+<span class="line_number">2208</span>// Function: corun
+<span class="line_number">2209</span>template &lt;typename T&gt;
+<span class="line_number">2210</span>void Executor::corun(T&amp; target) {
+<span class="line_number">2211</span>
+<span class="line_number">2212</span>  static_assert(has_graph_v&lt;T&gt;, &#34;target must define a member function &#39;Graph&amp; graph()&#39;&#34;);
+<span class="line_number">2213</span>  
+<span class="line_number">2214</span>  Worker* w = this_worker();
+<span class="line_number">2215</span>  if(w == nullptr) {
+<span class="line_number">2216</span>    TF_THROW(&#34;corun must be called by a worker of the executor&#34;);
+<span class="line_number">2217</span>  }
+<span class="line_number">2218</span>
+<span class="line_number">2219</span>  NodeBase anchor;
+<span class="line_number">2220</span>  _corun_graph(*w, target.graph(), nullptr, &amp;anchor);
+<span class="line_number">2221</span>}
+<span class="line_number">2222</span>
+<span class="line_number">2223</span>// Procedure: _corun_graph
+<span class="line_number">2224</span>inline void Executor::_corun_graph(Worker&amp; w, Graph&amp; g, Topology* tpg, NodeBase* p) {
+<span class="line_number">2225</span>
+<span class="line_number">2226</span>  // empty graph
+<span class="line_number">2227</span>  if(g.empty()) {
+<span class="line_number">2228</span>    return;
+<span class="line_number">2229</span>  }
+<span class="line_number">2230</span>  
+<span class="line_number">2231</span>  // anchor this parent as the blocking point
+<span class="line_number">2232</span>  {
+<span class="line_number">2233</span>    ExplicitAnchorGuard anchor(p);
+<span class="line_number">2234</span>    _schedule_graph_with_parent(w, g, tpg, p);
+<span class="line_number">2235</span>    _corun_until(w, [p] () -&gt; bool { 
+<span class="line_number">2236</span>      return p-&gt;_join_counter.load(std::memory_order_acquire) == 0; }
+<span class="line_number">2237</span>    );
+<span class="line_number">2238</span>  }
+<span class="line_number">2239</span>
+<span class="line_number">2240</span>  // rethrow the exception to the caller
+<span class="line_number">2241</span>  p-&gt;_rethrow_exception();
+<span class="line_number">2242</span>}
+<span class="line_number">2243</span>
+<span class="line_number">2244</span>// Procedure: _increment_topology
+<span class="line_number">2245</span>inline void Executor::_increment_topology() {
+<span class="line_number">2246</span>  _num_topologies.fetch_add(1, std::memory_order_relaxed);
+<span class="line_number">2247</span>}
+<span class="line_number">2248</span>
+<span class="line_number">2249</span>// Procedure: _decrement_topology
+<span class="line_number">2250</span>inline void Executor::_decrement_topology() {
+<span class="line_number">2251</span>  if(_num_topologies.fetch_sub(1, std::memory_order_acq_rel) == 1) {
+<span class="line_number">2252</span>    _num_topologies.notify_all();
+<span class="line_number">2253</span>  }
+<span class="line_number">2254</span>}
+<span class="line_number">2255</span>
+<span class="line_number">2256</span>// Procedure: wait_for_all
+<span class="line_number">2257</span>inline void Executor::wait_for_all() {
+<span class="line_number">2258</span>  size_t n = _num_topologies.load(std::memory_order_acquire);
+<span class="line_number">2259</span>  while(n != 0) {
+<span class="line_number">2260</span>    _num_topologies.wait(n, std::memory_order_acquire);
+<span class="line_number">2261</span>    n = _num_topologies.load(std::memory_order_acquire);
+<span class="line_number">2262</span>  }
+<span class="line_number">2263</span>}
+<span class="line_number">2264</span>  
+<span class="line_number">2265</span>// Function: _schedule_graph_with_parent
+<span class="line_number">2266</span>inline void Executor::_schedule_graph_with_parent(
+<span class="line_number">2267</span>  Worker&amp; worker, Graph&amp; graph, Topology* tpg, NodeBase* parent
+<span class="line_number">2268</span>) {
+<span class="line_number">2269</span>  size_t num_srcs = _set_up_graph(graph, tpg, parent);
+<span class="line_number">2270</span>  parent-&gt;_join_counter.fetch_add(num_srcs, std::memory_order_relaxed);
+<span class="line_number">2271</span>  _bulk_schedule(worker, graph.begin(), num_srcs);
+<span class="line_number">2272</span>}
+<span class="line_number">2273</span>
+<span class="line_number">2274</span>// Function: _set_up_topology
+<span class="line_number">2275</span>inline void Executor::_set_up_topology(Worker* w, Topology* tpg) {
+<span class="line_number">2276</span>  // ---- under taskflow lock ----
+<span class="line_number">2277</span>  auto&amp; g = tpg-&gt;_taskflow._graph;
+<span class="line_number">2278</span>  size_t num_srcs = _set_up_graph(g, tpg, tpg);
+<span class="line_number">2279</span>  tpg-&gt;_join_counter.store(num_srcs, std::memory_order_relaxed);
+<span class="line_number">2280</span>  w ? _bulk_schedule(*w, g.begin(), num_srcs) : _bulk_schedule(g.begin(), num_srcs);
+<span class="line_number">2281</span>}
+<span class="line_number">2282</span>
+<span class="line_number">2283</span>// Function: _set_up_graph
+<span class="line_number">2284</span>inline size_t Executor::_set_up_graph(Graph&amp; graph, Topology* tpg, NodeBase* parent) {
+<span class="line_number">2285</span>
+<span class="line_number">2286</span>  auto first = graph.begin();
+<span class="line_number">2287</span>  auto last  = graph.end();
+<span class="line_number">2288</span>  auto send  = first;
+<span class="line_number">2289</span>  for(; first != last; ++first) {
+<span class="line_number">2290</span>
+<span class="line_number">2291</span>    auto node = *first;
+<span class="line_number">2292</span>    node-&gt;_topology = tpg;
+</code></pre>
+            <div class="issue">
+                <div>
+                    <span class="what">Possible data race during write of size 8 at 0x2983F318 by thread #11</span>
+                    <div class="navigation">
+                        <button class="next_error">Next</button>
+                        <button class="prev_error">Previous</button>
+                    </div>
+                </div>
+                <div>
+                    <table class="call_stack">
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/algorithm/../core/executor.hpp:2269<br>
+                                    <code class="cpp">tf::Executor::_schedule_graph_with_parent(tf::Worker&amp;, tf::Graph&amp;, tf::Topology*, tf::NodeBase*)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">2266</span>inline void Executor::_schedule_graph_with_parent(
+<span class="line_number">2267</span>  Worker&amp; worker, Graph&amp; graph, Topology* tpg, NodeBase* parent
+<span class="line_number">2268</span>) {
+<span class="line_number">2269</span><span class="error">  size_t num_srcs = _set_up_graph(graph, tpg, parent);
+</span><span class="line_number">2270</span>  parent-&gt;_join_counter.fetch_add(num_srcs, std::memory_order_relaxed);
+<span class="line_number">2271</span>  _bulk_schedule(worker, graph.begin(), num_srcs);
+<span class="line_number">2272</span>}
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/algorithm/../core/runtime.hpp:995<br>
+                                    <code class="cpp">tf::Executor::run_until&lt;tf::Executor::run_n&lt;tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&gt;(tf::Taskflow&amp;&amp;, unsigned long, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&amp;&amp;)::{lambda()#1}, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&gt;(tf::Taskflow&amp;&amp;, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&amp;&amp;, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&amp;&amp;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">992</span>    t-&gt;_parent = rt._node;
+<span class="line_number">993</span>    t-&gt;_parent-&gt;_join_counter.fetch_add(1, std::memory_order_release);
+<span class="line_number">994</span>    if(g.object-&gt;_fetch_enqueue(t) == 0) {
+<span class="line_number">995</span><span class="error">      rt._executor._schedule_graph_with_parent(
+</span><span class="line_number">996</span>        rt._worker, g.object-&gt;_graph, t.get(), t.get()
+<span class="line_number">997</span>      );
+<span class="line_number">998</span>    }
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:61<br>
+                                    <code class="cpp">void std::__invoke_impl&lt;void, tf::Executor::run_until&lt;tf::Executor::run_n&lt;tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&gt;(tf::Taskflow&amp;&amp;, unsigned long, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&amp;&amp;)::{lambda()#1}, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&gt;(tf::Taskflow&amp;&amp;, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&amp;&amp;, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&amp;&amp;)::{lambda(tf::Runtime&amp;)#1}&amp;, tf::Runtime&amp;&gt;(std::__invoke_other, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&amp;&amp;, tf::Runtime&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">58</span>  template&lt;typename _Res, typename _Fn, typename... _Args&gt;
+<span class="line_number">59</span>    constexpr _Res
+<span class="line_number">60</span>    __invoke_impl(__invoke_other, _Fn&amp;&amp; __f, _Args&amp;&amp;... __args)
+<span class="line_number">61</span><span class="error">    { return std::forward&lt;_Fn&gt;(__f)(std::forward&lt;_Args&gt;(__args)...); }
+</span><span class="line_number">62</span>
+<span class="line_number">63</span>  template&lt;typename _Res, typename _MemFun, typename _Tp, typename... _Args&gt;
+<span class="line_number">64</span>    constexpr _Res
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:111<br>
+                                    <code class="cpp">std::enable_if&lt;is_invocable_r_v&lt;void, tf::Executor::run_until&lt;tf::Executor::run_n&lt;tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&gt;(tf::Taskflow&amp;&amp;, unsigned long, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&amp;&amp;)::{lambda()#1}, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&gt;(tf::Taskflow&amp;&amp;, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&amp;&amp;, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&amp;&amp;)::{lambda(tf::Runtime&amp;)#1}&amp;, tf::Runtime&amp;&gt;, void&gt;::type std::__invoke_r&lt;void, tf::Executor::run_until&lt;tf::Executor::run_n&lt;tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&gt;(tf::Taskflow&amp;&amp;, unsigned long, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&amp;&amp;)::{lambda()#1}, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&gt;(tf::Taskflow&amp;&amp;, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&amp;&amp;, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&amp;&amp;)::{lambda(tf::Runtime&amp;)#1}&amp;, tf::Runtime&amp;&gt;(tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&amp;&amp;, tf::Runtime&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">108</span>      using __type = typename __result::type;
+<span class="line_number">109</span>      using __tag = typename __result::__invoke_type;
+<span class="line_number">110</span>      if constexpr (is_void_v&lt;_Res&gt;)
+<span class="line_number">111</span><span class="error">	std::__invoke_impl&lt;__type&gt;(__tag{}, std::forward&lt;_Callable&gt;(__fn),
+</span><span class="line_number">112</span>					std::forward&lt;_Args&gt;(__args)...);
+<span class="line_number">113</span>      else
+<span class="line_number">114</span>	return std::__invoke_impl&lt;__type&gt;(__tag{},
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/std_function.h:290<br>
+                                    <code class="cpp">std::_Function_handler&lt;void (tf::Runtime&amp;), tf::Executor::run_until&lt;tf::Executor::run_n&lt;tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&gt;(tf::Taskflow&amp;&amp;, unsigned long, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&amp;&amp;)::{lambda()#1}, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&gt;(tf::Taskflow&amp;&amp;, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&amp;&amp;, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&amp;&amp;)::{lambda(tf::Runtime&amp;)#1}&gt;::_M_invoke(std::_Any_data const&amp;, tf::Runtime&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">287</span>      static _Res
+<span class="line_number">288</span>      _M_invoke(const _Any_data&amp; __functor, _ArgTypes&amp;&amp;... __args)
+<span class="line_number">289</span>      {
+<span class="line_number">290</span><span class="error">	return std::__invoke_r&lt;_Res&gt;(*_Base::_M_get_pointer(__functor),
+</span><span class="line_number">291</span>				     std::forward&lt;_ArgTypes&gt;(__args)...);
+<span class="line_number">292</span>      }
+<span class="line_number">293</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/std_function.h:591<br>
+                                    <code class="cpp">std::function&lt;void (tf::Runtime&amp;)&gt;::operator()(tf::Runtime&amp;) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">588</span>      {
+<span class="line_number">589</span>	if (_M_empty())
+<span class="line_number">590</span>	  __throw_bad_function_call();
+<span class="line_number">591</span><span class="error">	return _M_invoker(_M_functor, std::forward&lt;_ArgTypes&gt;(__args)...);
+</span><span class="line_number">592</span>      }
+<span class="line_number">593</span>
+<span class="line_number">594</span>#if __cpp_rtti
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/runtime.hpp:826<br>
+                                    <code class="cpp">tf::Executor::_invoke_runtime_task_impl(tf::Worker&amp;, tf::Node*, std::function&lt;void (tf::Runtime&amp;)&gt;&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">823</span>    node-&gt;_join_counter.fetch_add(1, std::memory_order_release);
+<span class="line_number">824</span>
+<span class="line_number">825</span>    _observer_prologue(worker, node);
+<span class="line_number">826</span><span class="error">    TF_EXECUTOR_EXCEPTION_HANDLER(worker, node, {
+</span><span class="line_number">827</span>      work(rt);
+<span class="line_number">828</span>    });
+<span class="line_number">829</span>    _observer_epilogue(worker, node);
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/executor.hpp:2010<br>
+                                    <code class="cpp">tf::Executor::_invoke_async_task(tf::Worker&amp;, tf::Node*)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">2007</span>    
+<span class="line_number">2008</span>    // void(Runtime&amp;)
+<span class="line_number">2009</span>    case 1:
+<span class="line_number">2010</span><span class="error">      if(_invoke_runtime_task_impl(worker, node, *std::get_if&lt;1&gt;(&amp;work))) {
+</span><span class="line_number">2011</span>        return true;
+<span class="line_number">2012</span>      }
+<span class="line_number">2013</span>    break;
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/executor.hpp:1710<br>
+                                    <code class="cpp">tf::Executor::_invoke(tf::Worker&amp;, tf::Node*)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1707</span>
+<span class="line_number">1708</span>    // async task
+<span class="line_number">1709</span>    case Node::ASYNC: {
+<span class="line_number">1710</span><span class="error">      if(_invoke_async_task(worker, node)) {
+</span><span class="line_number">1711</span>        return;
+<span class="line_number">1712</span>      }
+<span class="line_number">1713</span>      _tear_down_async(worker, node, cache);
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/executor.hpp:1424<br>
+                                    <code class="cpp">tf::Executor::_exploit_task(tf::Worker&amp;, tf::Node*&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1421</span>// Procedure: _exploit_task
+<span class="line_number">1422</span>inline void Executor::_exploit_task(Worker&amp; w, Node*&amp; t) {
+<span class="line_number">1423</span>  while(t) {
+<span class="line_number">1424</span><span class="error">    _invoke(w, t);
+</span><span class="line_number">1425</span>    t = w._wsq.pop();
+<span class="line_number">1426</span>  }
+<span class="line_number">1427</span>}
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/executor.hpp:1327<br>
+                                    <code class="cpp">tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}::operator()() const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1324</span>        while(1) {
+<span class="line_number">1325</span>
+<span class="line_number">1326</span>          // drains out the local queue first
+<span class="line_number">1327</span><span class="error">          _exploit_task(worker, t);
+</span><span class="line_number">1328</span>
+<span class="line_number">1329</span>          // steals and waits for tasks
+<span class="line_number">1330</span>          if(_wait_for_task(worker, t) == false) {
+</code></pre>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            <pre class="code">
+<code class="c++"><span class="line_number">2293</span><span class="error">    node-&gt;_parent = parent;</span>
+<span class="line_number">2294</span>    node-&gt;_nstate = NSTATE::NONE;
+<span class="line_number">2295</span>    node-&gt;_estate.store(ESTATE::NONE, std::memory_order_relaxed);
+<span class="line_number">2296</span>    node-&gt;_set_up_join_counter();
+<span class="line_number">2297</span>    node-&gt;_exception_ptr = nullptr;
+<span class="line_number">2298</span>
+<span class="line_number">2299</span>    // move source to the first partition
+<span class="line_number">2300</span>    // root, root, root, v1, v2, v3, v4, ...
+<span class="line_number">2301</span>    if(node-&gt;num_predecessors() == 0) {
+<span class="line_number">2302</span>      std::iter_swap(send++, first);
+<span class="line_number">2303</span>    }
+<span class="line_number">2304</span>  }
+<span class="line_number">2305</span>  return send - graph.begin();
+<span class="line_number">2306</span>}
+<span class="line_number">2307</span>
+<span class="line_number">2308</span>// Function: _tear_down_topology
+<span class="line_number">2309</span>inline void Executor::_tear_down_topology(Worker&amp; worker, Topology* tpg, Node*&amp; cache) {
+<span class="line_number">2310</span>
+<span class="line_number">2311</span>  auto &amp;f = tpg-&gt;_taskflow;
+<span class="line_number">2312</span>
+<span class="line_number">2313</span>  //assert(&amp;tpg == &amp;(f._topologies.front()));
+<span class="line_number">2314</span>
+<span class="line_number">2315</span>  // case 1: we still need to run the topology again
+<span class="line_number">2316</span>  //if(!tpg-&gt;_exception_ptr &amp;&amp; !tpg-&gt;cancelled() &amp;&amp; !tpg-&gt;predicate()) {
+<span class="line_number">2317</span>  if(!tpg-&gt;cancelled() &amp;&amp; !tpg-&gt;_predicate()) {
+<span class="line_number">2318</span>    //assert(tpg-&gt;_join_counter == 0);
+<span class="line_number">2319</span>    //std::lock_guard&lt;std::mutex&gt; lock(f._mutex);
+<span class="line_number">2320</span>    _schedule_graph_with_parent(worker, tpg-&gt;_taskflow._graph, tpg, tpg);
+<span class="line_number">2321</span>  }
+<span class="line_number">2322</span>  // case 2: the final run of this topology
+<span class="line_number">2323</span>  else {
+<span class="line_number">2324</span>
+<span class="line_number">2325</span>    // invoke the callback after each run
+<span class="line_number">2326</span>    tpg-&gt;_on_finish();
+<span class="line_number">2327</span>
+<span class="line_number">2328</span>    // there is another topologies to run
+<span class="line_number">2329</span>    if(std::unique_lock&lt;std::mutex&gt; lock(f._mutex); f._topologies.size()&gt;1) {
+<span class="line_number">2330</span>
+<span class="line_number">2331</span>      auto fetched_tpg {std::move(f._topologies.front())};
+<span class="line_number">2332</span>      //assert(fetched_tpg.get() == tpg);
+<span class="line_number">2333</span>
+<span class="line_number">2334</span>      f._topologies.pop();
+<span class="line_number">2335</span>      tpg = f._topologies.front().get();
+<span class="line_number">2336</span>
+<span class="line_number">2337</span>      lock.unlock();
+<span class="line_number">2338</span>      
+<span class="line_number">2339</span>      // Soon after we carry out the promise, the associate taskflow may got destroyed
+<span class="line_number">2340</span>      // from the user side, and we should never tough it again.
+<span class="line_number">2341</span>      fetched_tpg-&gt;_carry_out_promise();
+<span class="line_number">2342</span>
+<span class="line_number">2343</span>      // decrement the topology
+<span class="line_number">2344</span>      _decrement_topology();
+<span class="line_number">2345</span>
+<span class="line_number">2346</span>      _set_up_topology(&amp;worker, tpg);
+<span class="line_number">2347</span>    }
+<span class="line_number">2348</span>    else {
+<span class="line_number">2349</span>      //assert(f._topologies.size() == 1);
+<span class="line_number">2350</span>
+<span class="line_number">2351</span>      auto fetched_tpg {std::move(f._topologies.front())};
+<span class="line_number">2352</span>      //assert(fetched_tpg.get() == tpg);
+<span class="line_number">2353</span>
+<span class="line_number">2354</span>      f._topologies.pop();
+<span class="line_number">2355</span>
+<span class="line_number">2356</span>      lock.unlock();
+<span class="line_number">2357</span>      
+<span class="line_number">2358</span>      // Soon after we carry out the promise, the associate taskflow may got destroyed
+<span class="line_number">2359</span>      // from the user side, and we should never tough it again.
+<span class="line_number">2360</span>      fetched_tpg-&gt;_carry_out_promise();
+<span class="line_number">2361</span>
+<span class="line_number">2362</span>      _decrement_topology();
+<span class="line_number">2363</span>      
+<span class="line_number">2364</span>      // remove the parent that owns the moved taskflow so the storage can be freed
+<span class="line_number">2365</span>      if(auto parent = fetched_tpg-&gt;_parent; parent) {
+<span class="line_number">2366</span>        //auto state = parent-&gt;_nstate;
+<span class="line_number">2367</span>        if(parent-&gt;_join_counter.fetch_sub(1, std::memory_order_acq_rel) == 1) {
+<span class="line_number">2368</span>          // this async is spawned from a preempted parent, so we need to resume it
+<span class="line_number">2369</span>          //if(state &amp; NSTATE::PREEMPTED) { 
+<span class="line_number">2370</span>            _update_cache(worker, cache, static_cast&lt;Node*&gt;(parent));
+<span class="line_number">2371</span>          //}
+<span class="line_number">2372</span>        }
+<span class="line_number">2373</span>      }
+<span class="line_number">2374</span>    }
+<span class="line_number">2375</span>  }
+<span class="line_number">2376</span>}
+<span class="line_number">2377</span>
+<span class="line_number">2378</span>// ############################################################################
+<span class="line_number">2379</span>// Forward Declaration: Subflow
+<span class="line_number">2380</span>// ############################################################################
+<span class="line_number">2381</span>
+<span class="line_number">2382</span>inline void Subflow::join() {
+<span class="line_number">2383</span>
+<span class="line_number">2384</span>  if(!joinable()) {
+<span class="line_number">2385</span>    TF_THROW(&#34;subflow already joined&#34;);
+<span class="line_number">2386</span>  }
+<span class="line_number">2387</span>    
+<span class="line_number">2388</span>  _executor._corun_graph(_worker, _graph, _node-&gt;_topology, _node);
+<span class="line_number">2389</span>  
+<span class="line_number">2390</span>  // join here since corun graph may throw exception
+<span class="line_number">2391</span>  _node-&gt;_nstate |= NSTATE::JOINED_SUBFLOW;
+<span class="line_number">2392</span>}
+<span class="line_number">2393</span>
+<span class="line_number">2394</span>#endif
+<span class="line_number">2395</span>
+<span class="line_number">2396</span>
+<span class="line_number">2397</span>
+<span class="line_number">2398</span>
+<span class="line_number">2399</span>}  // end of namespace tf -----------------------------------------------------
+<span class="line_number">2400</span>
+<span class="line_number">2401</span>
+<span class="line_number">2402</span>
+<span class="line_number">2403</span>
+<span class="line_number">2404</span>
+<span class="line_number">2405</span>
+</code>
+            </pre>
+        </div>
+    </div>
+</body>
+
+</html>
