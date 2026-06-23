@@ -6,6 +6,18 @@ from stablebear.distance_matrix import DistanceMatrix
 from stablebear.symmetric_matrix import SymmetricMatrix
 
 
+def _distmat(v):
+    m = DistanceMatrix(3)
+    m[0, 1] = float(v)
+    return m
+
+
+def _symmat(v):
+    m = SymmetricMatrix(3)
+    m[0, 1] = float(v)
+    return m
+
+
 # ---------------------------------------------------------------------------
 # Bug #39: element assignment into PointCloud / DistanceMatrix / SymmetricMatrix
 # tensors shared the source's std::shared_ptr buffer (a shallow copy), so cells
@@ -91,8 +103,8 @@ def test_mutating_one_cell_leaves_others_untouched():
 @pytest.mark.parametrize(
     "dt, mk",
     [
-        pytest.param(sb.distmat64, lambda v: _distmat(v), id="distmat"),
-        pytest.param(sb.symmat64, lambda v: _symmat(v), id="symmat"),
+        pytest.param(sb.distmat64, _distmat, id="distmat"),
+        pytest.param(sb.symmat64, _symmat, id="symmat"),
     ],
 )
 def test_forward_overlap_self_assignment_independent(dt, mk):
@@ -110,8 +122,8 @@ def test_forward_overlap_self_assignment_independent(dt, mk):
 @pytest.mark.parametrize(
     "dt, mk",
     [
-        pytest.param(sb.distmat64, lambda v: _distmat(v), id="distmat"),
-        pytest.param(sb.symmat64, lambda v: _symmat(v), id="symmat"),
+        pytest.param(sb.distmat64, _distmat, id="distmat"),
+        pytest.param(sb.symmat64, _symmat, id="symmat"),
     ],
 )
 def test_reverse_self_assignment_independent(dt, mk):
@@ -123,15 +135,3 @@ def test_reverse_self_assignment_independent(dt, mk):
     assert t[1][0, 1] == 1.0
     t[0][0, 1] = 77.0                      # mutate one cell
     assert t[1][0, 1] == 1.0              # sibling unaffected
-
-
-def _distmat(v):
-    m = DistanceMatrix(3)
-    m[0, 1] = float(v)
-    return m
-
-
-def _symmat(v):
-    m = SymmetricMatrix(3)
-    m[0, 1] = float(v)
-    return m
