@@ -1,0 +1,2133 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>/home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/runtime.hpp</title>
+    <link href='valgrind.css' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+    <script src="https://code.jquery.com/jquery-3.4.1.js"></script>
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.0.0/styles/default.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.0.0/highlight.min.js"></script>
+    <script src="valgrind.js"></script>
+</head>
+
+<body>
+    <div class="global">
+        <div class="header">
+            <h1>/home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/runtime.hpp</h1>
+            <p><b>6</b> errors</p>
+            <button class="next_error">Goto First Error</button>
+        </div>
+        <div class="listing">
+            <pre class="code">
+<code class="c++"><span class="line_number">1</span>#pragma once
+<span class="line_number">2</span>
+<span class="line_number">3</span>#include &#34;executor.hpp&#34;
+<span class="line_number">4</span>
+<span class="line_number">5</span>namespace tf {
+<span class="line_number">6</span>
+<span class="line_number">7</span>// ------------------------------------------------------------------------------------------------
+<span class="line_number">8</span>// class: Runtime
+<span class="line_number">9</span>// ------------------------------------------------------------------------------------------------
+<span class="line_number">10</span>
+<span class="line_number">11</span>/**
+<span class="line_number">12</span>@class Runtime
+<span class="line_number">13</span>
+<span class="line_number">14</span>@brief class to create a runtime task
+<span class="line_number">15</span>
+<span class="line_number">16</span>A runtime object provides an interface for interacting with the scheduling system from within a task 
+<span class="line_number">17</span>(i.e., the parent task of this runtime). 
+<span class="line_number">18</span>It enables operations such as spawning asynchronous tasks, executing tasks cooperatively, 
+<span class="line_number">19</span>and implementing recursive parallelism. 
+<span class="line_number">20</span>The runtime guarantees an implicit join at the end of its scope, 
+<span class="line_number">21</span>so all spawned tasks will finish before the parent runtime task continues to its successors.
+<span class="line_number">22</span>
+<span class="line_number">23</span>@code{.cpp}
+<span class="line_number">24</span>tf::Executor executor(num_threads);
+<span class="line_number">25</span>tf::Taskflow taskflow;
+<span class="line_number">26</span>std::atomic&lt;size_t&gt; counter(0);
+<span class="line_number">27</span>
+<span class="line_number">28</span>tf::Task A = taskflow.emplace([&amp;](tf::Runtime&amp; rt){
+<span class="line_number">29</span>  // spawn 1000 asynchronous tasks from this runtime task
+<span class="line_number">30</span>  for(size_t i=0; i&lt;1000; i++) {
+<span class="line_number">31</span>    rt.silent_async([&amp;](){ counter.fetch_add(1, std::memory_order_relaxed); });
+<span class="line_number">32</span>  }
+<span class="line_number">33</span>  // implicit synchronization at the end of the runtime scope
+<span class="line_number">34</span>});
+<span class="line_number">35</span>tf::Task B = taskflow.emplace([&amp;](){
+<span class="line_number">36</span>  assert(counter.load(std::memory_order_relaxed) == 1000);
+<span class="line_number">37</span>});
+<span class="line_number">38</span>A.precede(B);
+<span class="line_number">39</span>
+<span class="line_number">40</span>executor.run(taskflow).wait();
+<span class="line_number">41</span>@endcode
+<span class="line_number">42</span>
+<span class="line_number">43</span>@note
+<span class="line_number">44</span>To understand how %Taskflow schedules a runtime task, please refer to @ref RuntimeTasking.
+<span class="line_number">45</span>
+<span class="line_number">46</span>*/
+<span class="line_number">47</span>class Runtime {
+<span class="line_number">48</span>
+<span class="line_number">49</span>  friend class Executor;
+<span class="line_number">50</span>  friend class FlowBuilder;
+<span class="line_number">51</span>  friend class PreemptionGuard;
+<span class="line_number">52</span>  friend class Algorithm;
+<span class="line_number">53</span>  
+<span class="line_number">54</span>  public:
+<span class="line_number">55</span>  
+<span class="line_number">56</span>  /**
+<span class="line_number">57</span>  @brief obtains the running executor
+<span class="line_number">58</span>
+<span class="line_number">59</span>  The running executor of a runtime task is the executor that runs
+<span class="line_number">60</span>  the parent taskflow of that runtime task.
+<span class="line_number">61</span>
+<span class="line_number">62</span>  @code{.cpp}
+<span class="line_number">63</span>  tf::Executor executor;
+<span class="line_number">64</span>  tf::Taskflow taskflow;
+<span class="line_number">65</span>  taskflow.emplace([&amp;](tf::Runtime&amp; rt){
+<span class="line_number">66</span>    assert(&amp;(rt.executor()) == &amp;executor);
+<span class="line_number">67</span>  });
+<span class="line_number">68</span>  executor.run(taskflow).wait();
+<span class="line_number">69</span>  @endcode
+<span class="line_number">70</span>  */
+<span class="line_number">71</span>  Executor&amp; executor();
+<span class="line_number">72</span>  
+<span class="line_number">73</span>  /**
+<span class="line_number">74</span>  @brief acquire a reference to the underlying worker
+<span class="line_number">75</span>  */
+<span class="line_number">76</span>  inline Worker&amp; worker();
+<span class="line_number">77</span>
+<span class="line_number">78</span>  /**
+<span class="line_number">79</span>  @brief schedules an active task immediately to the worker&#39;s queue
+<span class="line_number">80</span>
+<span class="line_number">81</span>  @param task the given active task to schedule immediately
+<span class="line_number">82</span>
+<span class="line_number">83</span>  This member function immediately schedules an active task to the
+<span class="line_number">84</span>  task queue of the associated worker in the runtime task.
+<span class="line_number">85</span>  An active task is a task in a running taskflow.
+<span class="line_number">86</span>  The task may or may not be running, and scheduling that task
+<span class="line_number">87</span>  will immediately put the task into the task queue of the worker
+<span class="line_number">88</span>  that is running the runtime task.
+<span class="line_number">89</span>  Consider the following example:
+<span class="line_number">90</span>
+<span class="line_number">91</span>  @code{.cpp}
+<span class="line_number">92</span>  tf::Task A, B, C, D;
+<span class="line_number">93</span>  std::tie(A, B, C, D) = taskflow.emplace(
+<span class="line_number">94</span>    [] () { return 0; },
+<span class="line_number">95</span>    [&amp;C] (tf::Runtime&amp; rt) {  // C must be captured by reference
+<span class="line_number">96</span>      std::cout &lt;&lt; &#34;B\n&#34;;
+<span class="line_number">97</span>      rt.schedule(C);
+<span class="line_number">98</span>    },
+<span class="line_number">99</span>    [] () { std::cout &lt;&lt; &#34;C\n&#34;; },
+<span class="line_number">100</span>    [] () { std::cout &lt;&lt; &#34;D\n&#34;; }
+<span class="line_number">101</span>  );
+<span class="line_number">102</span>  A.precede(B, C, D);
+<span class="line_number">103</span>  executor.run(taskflow).wait();
+<span class="line_number">104</span>  @endcode
+<span class="line_number">105</span>
+<span class="line_number">106</span>  The executor will first run the condition task @c A which returns @c 0
+<span class="line_number">107</span>  to inform the scheduler to go to the runtime task @c B.
+<span class="line_number">108</span>  During the execution of @c B, it directly schedules task @c C without
+<span class="line_number">109</span>  going through the normal taskflow graph scheduling process.
+<span class="line_number">110</span>  At this moment, task @c C is active because its parent taskflow is running.
+<span class="line_number">111</span>  When the taskflow finishes, we will see both @c B and @c C in the output.
+<span class="line_number">112</span>
+<span class="line_number">113</span>  @attention
+<span class="line_number">114</span>  This method can only be called by the parent worker of this runtime,
+<span class="line_number">115</span>  or the behavior is undefined.
+<span class="line_number">116</span>  Furthermore, we currently do not support scheduling a runtime task.
+<span class="line_number">117</span>  */
+<span class="line_number">118</span>  void schedule(Task task);
+<span class="line_number">119</span>
+<span class="line_number">120</span>  // ----------------------------------------------------------------------------------------------
+<span class="line_number">121</span>  // async methods
+<span class="line_number">122</span>  // ----------------------------------------------------------------------------------------------
+<span class="line_number">123</span>
+<span class="line_number">124</span>  /**
+<span class="line_number">125</span>  @brief runs the given callable asynchronously
+<span class="line_number">126</span>
+<span class="line_number">127</span>  @tparam F callable type
+<span class="line_number">128</span>  @param f callable object
+<span class="line_number">129</span>    
+<span class="line_number">130</span>  This method creates an asynchronous task that executes the given function with the specified arguments.
+<span class="line_number">131</span>  Unlike tf::Executor::async, the task created here is parented to the runtime object and 
+<span class="line_number">132</span>  is implicitly synchronized at the end of the runtime&#39;s scope.
+<span class="line_number">133</span>  Applications may also call tf::Runtime::corun explicitly to wait for all 
+<span class="line_number">134</span>  asynchronous tasks spawned from the runtime to complete.
+<span class="line_number">135</span>  For example:
+<span class="line_number">136</span>
+<span class="line_number">137</span>  @code{.cpp}
+<span class="line_number">138</span>  std::atomic&lt;int&gt; counter(0);
+<span class="line_number">139</span>  taskflow.emplace([&amp;](tf::Runtime&amp; rt){
+<span class="line_number">140</span>    auto fu1 = rt.async([&amp;](){ counter++; });
+<span class="line_number">141</span>    auto fu2 = rt.async([&amp;](){ counter++; });
+<span class="line_number">142</span>    fu1.get();
+<span class="line_number">143</span>    fu2.get();
+<span class="line_number">144</span>    assert(counter == 2);
+<span class="line_number">145</span>    // spawn 100 asynchronous tasks from the worker of the runtime
+<span class="line_number">146</span>    for(int i=0; i&lt;100; i++) {
+<span class="line_number">147</span>      rt.silent_async([&amp;](){ counter++; });
+<span class="line_number">148</span>    }
+<span class="line_number">149</span>    // corun until the 100 asynchronous tasks have completed
+<span class="line_number">150</span>    rt.corun();
+<span class="line_number">151</span>    assert(counter == 102);
+<span class="line_number">152</span>    // do something else afterwards ...
+<span class="line_number">153</span>  });
+<span class="line_number">154</span>  @endcode
+<span class="line_number">155</span>  */
+<span class="line_number">156</span>  template &lt;typename F&gt;
+<span class="line_number">157</span>  auto async(F&amp;&amp; f);
+<span class="line_number">158</span>  
+<span class="line_number">159</span>  /**
+<span class="line_number">160</span>  @brief runs the given callable asynchronously
+<span class="line_number">161</span>
+<span class="line_number">162</span>  @tparam F callable type
+<span class="line_number">163</span>  @tparam P task parameters type
+<span class="line_number">164</span>
+<span class="line_number">165</span>  @param params task parameters
+<span class="line_number">166</span>  @param f callable
+<span class="line_number">167</span>
+<span class="line_number">168</span>  Similar to tf::Runtime::async, but takes a parameter of type tf::TaskParams to initialize
+<span class="line_number">169</span>  the asynchronous task.
+<span class="line_number">170</span>
+<span class="line_number">171</span>  @code{.cpp}
+<span class="line_number">172</span>  taskflow.emplace([&amp;](tf::Runtime&amp; rt){
+<span class="line_number">173</span>    auto future = rt.async(&#34;my task&#34;, [](){ return 10; });
+<span class="line_number">174</span>    assert(future.get() == 10);
+<span class="line_number">175</span>  });
+<span class="line_number">176</span>  @endcode
+<span class="line_number">177</span>
+<span class="line_number">178</span>  */
+<span class="line_number">179</span>  template &lt;typename P, typename F&gt;
+<span class="line_number">180</span>  auto async(P&amp;&amp; params, F&amp;&amp; f);
+<span class="line_number">181</span>  
+<span class="line_number">182</span>  // ----------------------------------------------------------------------------------------------
+<span class="line_number">183</span>  // silent async methods
+<span class="line_number">184</span>  // ----------------------------------------------------------------------------------------------
+<span class="line_number">185</span>
+<span class="line_number">186</span>  /**
+<span class="line_number">187</span>  @brief runs the given function asynchronously without returning any future object
+<span class="line_number">188</span>
+<span class="line_number">189</span>  @tparam F callable type
+<span class="line_number">190</span>  @param f callable
+<span class="line_number">191</span>
+<span class="line_number">192</span>  This function is more efficient than tf::Runtime::async and is recommended when the result
+<span class="line_number">193</span>  of the asynchronous task does not need to be accessed via a std::future.
+<span class="line_number">194</span>
+<span class="line_number">195</span>  @code{.cpp}
+<span class="line_number">196</span>  std::atomic&lt;int&gt; counter(0);
+<span class="line_number">197</span>  taskflow.emplace([&amp;](tf::Runtime&amp; rt){
+<span class="line_number">198</span>    for(int i=0; i&lt;100; i++) {
+<span class="line_number">199</span>      rt.silent_async([&amp;](){ counter++; });
+<span class="line_number">200</span>    }
+<span class="line_number">201</span>    rt.corun();
+<span class="line_number">202</span>    assert(counter == 100);
+<span class="line_number">203</span>  });
+<span class="line_number">204</span>  @endcode
+<span class="line_number">205</span>  */
+<span class="line_number">206</span>  template &lt;typename F&gt;
+<span class="line_number">207</span>  void silent_async(F&amp;&amp; f);
+<span class="line_number">208</span>  
+<span class="line_number">209</span>  /**
+<span class="line_number">210</span>  @brief runs the given function asynchronously without returning any future object
+<span class="line_number">211</span>
+<span class="line_number">212</span>  @tparam F callable type
+<span class="line_number">213</span>  @param params task parameters
+<span class="line_number">214</span>  @param f callable
+<span class="line_number">215</span>
+<span class="line_number">216</span>  Similar to tf::Runtime::silent_async, but takes a parameter of type tf::TaskParams to initialize
+<span class="line_number">217</span>  the created asynchronous task.
+<span class="line_number">218</span>
+<span class="line_number">219</span>  @code{.cpp}
+<span class="line_number">220</span>  taskflow.emplace([&amp;](tf::Runtime&amp; rt){
+<span class="line_number">221</span>    rt.silent_async(&#34;my task&#34;, [](){});
+<span class="line_number">222</span>  });
+<span class="line_number">223</span>  @endcode
+<span class="line_number">224</span>  */
+<span class="line_number">225</span>  template &lt;typename P, typename F&gt;
+<span class="line_number">226</span>  void silent_async(P&amp;&amp; params, F&amp;&amp; f);
+<span class="line_number">227</span>  
+<span class="line_number">228</span>  // ----------------------------------------------------------------------------------------------
+<span class="line_number">229</span>  // dependent async methods
+<span class="line_number">230</span>  // ----------------------------------------------------------------------------------------------
+<span class="line_number">231</span>  
+<span class="line_number">232</span>  /**
+<span class="line_number">233</span>  @brief runs the given function asynchronously 
+<span class="line_number">234</span>         when the given predecessors finish
+<span class="line_number">235</span>  
+<span class="line_number">236</span>  @tparam F callable type
+<span class="line_number">237</span>  @tparam Tasks tasks of type tf::AsyncTask
+<span class="line_number">238</span>
+<span class="line_number">239</span>  @param func callable object
+<span class="line_number">240</span>  @param tasks asynchronous tasks on which this execution depends
+<span class="line_number">241</span>  
+<span class="line_number">242</span>  @return a pair of a tf::AsyncTask handle and 
+<span class="line_number">243</span>                    a @std_future that holds the result of the execution
+<span class="line_number">244</span>  
+<span class="line_number">245</span>  The example below creates three asynchronous tasks, @c A, @c B, and @c C,
+<span class="line_number">246</span>  in which task @c C runs after task @c A and task @c B.
+<span class="line_number">247</span>  Task @c C returns a pair of its tf::AsyncTask handle and a std::future&lt;int&gt;
+<span class="line_number">248</span>  that eventually will hold the result of the execution.
+<span class="line_number">249</span>
+<span class="line_number">250</span>  @code{.cpp}
+<span class="line_number">251</span>  taskflow.emplace([](tf::Runtime&amp; rt){
+<span class="line_number">252</span>    tf::AsyncTask A = rt.silent_dependent_async([](){ printf(&#34;A\n&#34;); });
+<span class="line_number">253</span>    tf::AsyncTask B = rt.silent_dependent_async([](){ printf(&#34;B\n&#34;); });
+<span class="line_number">254</span>    auto [C, fuC] = rt.dependent_async(
+<span class="line_number">255</span>      [](){ 
+<span class="line_number">256</span>        printf(&#34;C runs after A and B\n&#34;); 
+<span class="line_number">257</span>        return 1;
+<span class="line_number">258</span>      }, 
+<span class="line_number">259</span>      A, B
+<span class="line_number">260</span>    );
+<span class="line_number">261</span>    fuC.get();  // C finishes, which in turns means both A and B finish
+<span class="line_number">262</span>  });  // implicit synchronization of all tasks at the end of runtime&#39;s scope
+<span class="line_number">263</span>  executor.run(taskflow).wait();
+<span class="line_number">264</span>  @endcode
+<span class="line_number">265</span>  */
+<span class="line_number">266</span>  template &lt;typename F, typename... Tasks,
+<span class="line_number">267</span>    std::enable_if_t&lt;all_same_v&lt;AsyncTask, std::decay_t&lt;Tasks&gt;...&gt;, void&gt;* = nullptr
+<span class="line_number">268</span>  &gt;
+<span class="line_number">269</span>  auto dependent_async(F&amp;&amp; func, Tasks&amp;&amp;... tasks);
+<span class="line_number">270</span>  
+<span class="line_number">271</span>  /**
+<span class="line_number">272</span>  @brief runs the given function asynchronously
+<span class="line_number">273</span>         when the given predecessors finish
+<span class="line_number">274</span>  
+<span class="line_number">275</span>  @tparam P task parameters type
+<span class="line_number">276</span>  @tparam F callable type
+<span class="line_number">277</span>  @tparam Tasks tasks of type tf::AsyncTask
+<span class="line_number">278</span>  
+<span class="line_number">279</span>  @param params task parameters
+<span class="line_number">280</span>  @param func callable object
+<span class="line_number">281</span>  @param tasks asynchronous tasks on which this execution depends
+<span class="line_number">282</span>  
+<span class="line_number">283</span>  @return a pair of a tf::AsyncTask handle and 
+<span class="line_number">284</span>                    a @std_future that holds the result of the execution
+<span class="line_number">285</span>  
+<span class="line_number">286</span>  The example below creates three named asynchronous tasks, @c A, @c B, and @c C,
+<span class="line_number">287</span>  in which task @c C runs after task @c A and task @c B.
+<span class="line_number">288</span>  Task @c C returns a pair of its tf::AsyncTask handle and a std::future&lt;int&gt;
+<span class="line_number">289</span>  that eventually will hold the result of the execution.
+<span class="line_number">290</span>  Assigned task names will appear in the observers of the executor.
+<span class="line_number">291</span>
+<span class="line_number">292</span>  @code{.cpp}
+<span class="line_number">293</span>  taskflow.emplace([](tf::Runtime&amp; rt){
+<span class="line_number">294</span>    tf::AsyncTask A = rt.silent_dependent_async(&#34;A&#34;, [](){ printf(&#34;A\n&#34;); });
+<span class="line_number">295</span>    tf::AsyncTask B = rt.silent_dependent_async(&#34;B&#34;, [](){ printf(&#34;B\n&#34;); });
+<span class="line_number">296</span>    auto [C, fuC] = rt.dependent_async(
+<span class="line_number">297</span>      &#34;C&#34;,
+<span class="line_number">298</span>      [](){ 
+<span class="line_number">299</span>        printf(&#34;C runs after A and B\n&#34;); 
+<span class="line_number">300</span>        return 1;
+<span class="line_number">301</span>      }, 
+<span class="line_number">302</span>      A, B
+<span class="line_number">303</span>    );
+<span class="line_number">304</span>    assert(fuC.get()==1);  // C finishes, which in turns means both A and B finish
+<span class="line_number">305</span>  });  // implicit synchronization of all tasks at the end of runtime&#39;s scope
+<span class="line_number">306</span>  executor.run(taskflow).wait();
+<span class="line_number">307</span>  @endcode
+<span class="line_number">308</span>  */
+<span class="line_number">309</span>  template &lt;typename P, typename F, typename... Tasks,
+<span class="line_number">310</span>    std::enable_if_t&lt;is_task_params_v&lt;P&gt; &amp;&amp; all_same_v&lt;AsyncTask, std::decay_t&lt;Tasks&gt;...&gt;, void&gt;* = nullptr
+<span class="line_number">311</span>  &gt;
+<span class="line_number">312</span>  auto dependent_async(P&amp;&amp; params, F&amp;&amp; func, Tasks&amp;&amp;... tasks);
+<span class="line_number">313</span>  
+<span class="line_number">314</span>  /**
+<span class="line_number">315</span>  @brief runs the given function asynchronously 
+<span class="line_number">316</span>         when the given range of predecessors finish
+<span class="line_number">317</span>  
+<span class="line_number">318</span>  @tparam F callable type
+<span class="line_number">319</span>  @tparam I iterator type 
+<span class="line_number">320</span>
+<span class="line_number">321</span>  @param func callable object
+<span class="line_number">322</span>  @param first iterator to the beginning (inclusive)
+<span class="line_number">323</span>  @param last iterator to the end (exclusive)
+<span class="line_number">324</span>  
+<span class="line_number">325</span>  @return a pair of a tf::AsyncTask handle and 
+<span class="line_number">326</span>                    a @std_future that holds the result of the execution
+<span class="line_number">327</span>  
+<span class="line_number">328</span>  The example below creates three asynchronous tasks, @c A, @c B, and @c C,
+<span class="line_number">329</span>  in which task @c C runs after task @c A and task @c B.
+<span class="line_number">330</span>  Task @c C returns a pair of its tf::AsyncTask handle and a std::future&lt;int&gt;
+<span class="line_number">331</span>  that eventually will hold the result of the execution.
+<span class="line_number">332</span>
+<span class="line_number">333</span>  @code{.cpp}
+<span class="line_number">334</span>  taskflow.emplace([](tf::Runtime&amp; rt){
+<span class="line_number">335</span>    std::array&lt;tf::AsyncTask, 2&gt; array {
+<span class="line_number">336</span>      rt.silent_dependent_async([](){ printf(&#34;A\n&#34;); }),
+<span class="line_number">337</span>      rt.silent_dependent_async([](){ printf(&#34;B\n&#34;); })
+<span class="line_number">338</span>    };
+<span class="line_number">339</span>    auto [C, fuC] = rt.dependent_async(
+<span class="line_number">340</span>      [](){ 
+<span class="line_number">341</span>        printf(&#34;C runs after A and B\n&#34;); 
+<span class="line_number">342</span>        return 1;
+<span class="line_number">343</span>      }, 
+<span class="line_number">344</span>      array.begin(), array.end()
+<span class="line_number">345</span>    );
+<span class="line_number">346</span>    assert(fuC.get()==1);  // C finishes, which in turns means both A and B finish
+<span class="line_number">347</span>  });  // implicit synchronization of all tasks at the end of runtime&#39;s scope
+<span class="line_number">348</span>  executor.run(taskflow).wait();
+<span class="line_number">349</span>  @endcode
+<span class="line_number">350</span>  */
+<span class="line_number">351</span>  template &lt;typename F, typename I,
+<span class="line_number">352</span>    std::enable_if_t&lt;!std::is_same_v&lt;std::decay_t&lt;I&gt;, AsyncTask&gt;, void&gt;* = nullptr
+<span class="line_number">353</span>  &gt;
+<span class="line_number">354</span>  auto dependent_async(F&amp;&amp; func, I first, I last);
+<span class="line_number">355</span>  
+<span class="line_number">356</span>  /**
+<span class="line_number">357</span>  @brief runs the given function asynchronously 
+<span class="line_number">358</span>         when the given range of predecessors finish
+<span class="line_number">359</span>  
+<span class="line_number">360</span>  @tparam P task parameters type
+<span class="line_number">361</span>  @tparam F callable type
+<span class="line_number">362</span>  @tparam I iterator type 
+<span class="line_number">363</span>  
+<span class="line_number">364</span>  @param params task parameters
+<span class="line_number">365</span>  @param func callable object
+<span class="line_number">366</span>  @param first iterator to the beginning (inclusive)
+<span class="line_number">367</span>  @param last iterator to the end (exclusive)
+<span class="line_number">368</span>  
+<span class="line_number">369</span>  @return a pair of a tf::AsyncTask handle and 
+<span class="line_number">370</span>                    a @std_future that holds the result of the execution
+<span class="line_number">371</span>  
+<span class="line_number">372</span>  The example below creates three named asynchronous tasks, @c A, @c B, and @c C,
+<span class="line_number">373</span>  in which task @c C runs after task @c A and task @c B.
+<span class="line_number">374</span>  Task @c C returns a pair of its tf::AsyncTask handle and a std::future&lt;int&gt;
+<span class="line_number">375</span>  that eventually will hold the result of the execution.
+<span class="line_number">376</span>  Assigned task names will appear in the observers of the executor.
+<span class="line_number">377</span>
+<span class="line_number">378</span>  @code{.cpp}
+<span class="line_number">379</span>  taskflow.emplace([](tf::Runtime&amp; rt){
+<span class="line_number">380</span>    std::array&lt;tf::AsyncTask, 2&gt; array {
+<span class="line_number">381</span>      rt.silent_dependent_async(&#34;A&#34;, [](){ printf(&#34;A\n&#34;); }),
+<span class="line_number">382</span>      rt.silent_dependent_async(&#34;B&#34;, [](){ printf(&#34;B\n&#34;); })
+<span class="line_number">383</span>    };
+<span class="line_number">384</span>    auto [C, fuC] = rt.dependent_async(
+<span class="line_number">385</span>      &#34;C&#34;,
+<span class="line_number">386</span>      [](){ 
+<span class="line_number">387</span>        printf(&#34;C runs after A and B\n&#34;); 
+<span class="line_number">388</span>        return 1;
+<span class="line_number">389</span>      }, 
+<span class="line_number">390</span>      array.begin(), array.end()
+<span class="line_number">391</span>    );
+<span class="line_number">392</span>    assert(fuC.get()==1);  // C finishes, which in turns means both A and B finish
+<span class="line_number">393</span>  });  // implicit synchronization of all tasks at the end of runtime&#39;s scope
+<span class="line_number">394</span>  executor.run(taskflow).wait();
+<span class="line_number">395</span>  @endcode
+<span class="line_number">396</span>  */
+<span class="line_number">397</span>  template &lt;typename P, typename F, typename I,
+<span class="line_number">398</span>    std::enable_if_t&lt;is_task_params_v&lt;P&gt; &amp;&amp; !std::is_same_v&lt;std::decay_t&lt;I&gt;, AsyncTask&gt;, void&gt;* = nullptr
+<span class="line_number">399</span>  &gt;
+<span class="line_number">400</span>  auto dependent_async(P&amp;&amp; params, F&amp;&amp; func, I first, I last);
+<span class="line_number">401</span>  
+<span class="line_number">402</span>  // ----------------------------------------------------------------------------------------------
+<span class="line_number">403</span>  // silent dependent async methods
+<span class="line_number">404</span>  // ----------------------------------------------------------------------------------------------
+<span class="line_number">405</span>
+<span class="line_number">406</span>  /**
+<span class="line_number">407</span>  @brief runs the given function asynchronously 
+<span class="line_number">408</span>         when the given predecessors finish
+<span class="line_number">409</span>
+<span class="line_number">410</span>  @tparam F callable type
+<span class="line_number">411</span>  @tparam Tasks tasks of type tf::AsyncTask
+<span class="line_number">412</span>
+<span class="line_number">413</span>  @param func callable object
+<span class="line_number">414</span>  @param tasks asynchronous tasks on which this execution depends
+<span class="line_number">415</span>  
+<span class="line_number">416</span>  @return a tf::AsyncTask handle 
+<span class="line_number">417</span>  
+<span class="line_number">418</span>  This member function is more efficient than tf::Runtime::dependent_async
+<span class="line_number">419</span>  and is encouraged to use when you do not want a @std_future to
+<span class="line_number">420</span>  acquire the result or synchronize the execution.
+<span class="line_number">421</span>  The example below creates three asynchronous tasks, @c A, @c B, and @c C,
+<span class="line_number">422</span>  in which task @c C runs after task @c A and task @c B.
+<span class="line_number">423</span>
+<span class="line_number">424</span>  @code{.cpp}
+<span class="line_number">425</span>  taskflow.emplace([](tf::Runtime&amp; rt){
+<span class="line_number">426</span>    tf::AsyncTask A = rt.silent_dependent_async([](){ printf(&#34;A\n&#34;); });
+<span class="line_number">427</span>    tf::AsyncTask B = rt.silent_dependent_async([](){ printf(&#34;B\n&#34;); });
+<span class="line_number">428</span>    rt.silent_dependent_async([](){ printf(&#34;C runs after A and B\n&#34;); }, A, B);
+<span class="line_number">429</span>  });  // implicit synchronization of all tasks at the end of runtime&#39;s scope
+<span class="line_number">430</span>  executor.wait_for_all();
+<span class="line_number">431</span>  @endcode
+<span class="line_number">432</span>  */
+<span class="line_number">433</span>  template &lt;typename F, typename... Tasks,
+<span class="line_number">434</span>    std::enable_if_t&lt;all_same_v&lt;AsyncTask, std::decay_t&lt;Tasks&gt;...&gt;, void&gt;* = nullptr
+<span class="line_number">435</span>  &gt;
+<span class="line_number">436</span>  tf::AsyncTask silent_dependent_async(F&amp;&amp; func, Tasks&amp;&amp;... tasks);
+<span class="line_number">437</span>  
+<span class="line_number">438</span>  /**
+<span class="line_number">439</span>  @brief runs the given function asynchronously 
+<span class="line_number">440</span>         when the given predecessors finish
+<span class="line_number">441</span>  
+<span class="line_number">442</span>  @tparam F callable type
+<span class="line_number">443</span>  @tparam Tasks tasks of type tf::AsyncTask
+<span class="line_number">444</span>
+<span class="line_number">445</span>  @param params task parameters
+<span class="line_number">446</span>  @param func callable object
+<span class="line_number">447</span>  @param tasks asynchronous tasks on which this execution depends
+<span class="line_number">448</span>  
+<span class="line_number">449</span>  @return a tf::AsyncTask handle 
+<span class="line_number">450</span>  
+<span class="line_number">451</span>  This member function is more efficient than tf::Runtime::dependent_async
+<span class="line_number">452</span>  and is encouraged to use when you do not want a @std_future to
+<span class="line_number">453</span>  acquire the result or synchronize the execution.
+<span class="line_number">454</span>  The example below creates three asynchronous tasks, @c A, @c B, and @c C,
+<span class="line_number">455</span>  in which task @c C runs after task @c A and task @c B.
+<span class="line_number">456</span>  Assigned task names will appear in the observers of the executor.
+<span class="line_number">457</span>
+<span class="line_number">458</span>  @code{.cpp}
+<span class="line_number">459</span>  taskflow.emplace([](tf::Runtime&amp; rt){
+<span class="line_number">460</span>    tf::AsyncTask A = rt.silent_dependent_async(&#34;A&#34;, [](){ printf(&#34;A\n&#34;); });
+<span class="line_number">461</span>    tf::AsyncTask B = rt.silent_dependent_async(&#34;B&#34;, [](){ printf(&#34;B\n&#34;); });
+<span class="line_number">462</span>    rt.silent_dependent_async(
+<span class="line_number">463</span>      &#34;C&#34;, [](){ printf(&#34;C runs after A and B\n&#34;); }, A, B
+<span class="line_number">464</span>    );
+<span class="line_number">465</span>  });  // implicit synchronization of all tasks at the end of runtime&#39;s scope
+<span class="line_number">466</span>  executor.wait_for_all();
+<span class="line_number">467</span>  @endcode
+<span class="line_number">468</span>  */
+<span class="line_number">469</span>  template &lt;typename P, typename F, typename... Tasks,
+<span class="line_number">470</span>    std::enable_if_t&lt;is_task_params_v&lt;P&gt; &amp;&amp; all_same_v&lt;AsyncTask, std::decay_t&lt;Tasks&gt;...&gt;, void&gt;* = nullptr
+<span class="line_number">471</span>  &gt;
+<span class="line_number">472</span>  tf::AsyncTask silent_dependent_async(P&amp;&amp; params, F&amp;&amp; func, Tasks&amp;&amp;... tasks);
+<span class="line_number">473</span>  
+<span class="line_number">474</span>  /**
+<span class="line_number">475</span>  @brief runs the given function asynchronously 
+<span class="line_number">476</span>         when the given range of predecessors finish
+<span class="line_number">477</span>  
+<span class="line_number">478</span>  @tparam F callable type
+<span class="line_number">479</span>  @tparam I iterator type 
+<span class="line_number">480</span>
+<span class="line_number">481</span>  @param func callable object
+<span class="line_number">482</span>  @param first iterator to the beginning (inclusive)
+<span class="line_number">483</span>  @param last iterator to the end (exclusive)
+<span class="line_number">484</span>  
+<span class="line_number">485</span>  @return a tf::AsyncTask handle 
+<span class="line_number">486</span>  
+<span class="line_number">487</span>  This member function is more efficient than tf::Runtime::dependent_async
+<span class="line_number">488</span>  and is encouraged to use when you do not want a @std_future to
+<span class="line_number">489</span>  acquire the result or synchronize the execution.
+<span class="line_number">490</span>  The example below creates three asynchronous tasks, @c A, @c B, and @c C,
+<span class="line_number">491</span>  in which task @c C runs after task @c A and task @c B.
+<span class="line_number">492</span>
+<span class="line_number">493</span>  @code{.cpp}
+<span class="line_number">494</span>  Taskflow.emplace([&amp;](tf::Runtime&amp; rt){
+<span class="line_number">495</span>    std::array&lt;tf::AsyncTask, 2&gt; array {
+<span class="line_number">496</span>      rt.silent_dependent_async([](){ printf(&#34;A\n&#34;); }),
+<span class="line_number">497</span>      rt.silent_dependent_async([](){ printf(&#34;B\n&#34;); })
+<span class="line_number">498</span>    };
+<span class="line_number">499</span>    rt.silent_dependent_async(
+<span class="line_number">500</span>      [](){ printf(&#34;C runs after A and B\n&#34;); }, array.begin(), array.end()
+<span class="line_number">501</span>    );
+<span class="line_number">502</span>  });  // implicit synchronization of all tasks at the end of runtime&#39;s scope
+<span class="line_number">503</span>  executor.wait_for_all();
+<span class="line_number">504</span>  @endcode
+<span class="line_number">505</span>  */
+<span class="line_number">506</span>  template &lt;typename F, typename I, 
+<span class="line_number">507</span>    std::enable_if_t&lt;!std::is_same_v&lt;std::decay_t&lt;I&gt;, AsyncTask&gt;, void&gt;* = nullptr
+<span class="line_number">508</span>  &gt;
+<span class="line_number">509</span>  tf::AsyncTask silent_dependent_async(F&amp;&amp; func, I first, I last);
+<span class="line_number">510</span>  
+<span class="line_number">511</span>  /**
+<span class="line_number">512</span>  @brief runs the given function asynchronously 
+<span class="line_number">513</span>         when the given range of predecessors finish
+<span class="line_number">514</span>  
+<span class="line_number">515</span>  @tparam F callable type
+<span class="line_number">516</span>  @tparam I iterator type 
+<span class="line_number">517</span>
+<span class="line_number">518</span>  @param params tasks parameters
+<span class="line_number">519</span>  @param func callable object
+<span class="line_number">520</span>  @param first iterator to the beginning (inclusive)
+<span class="line_number">521</span>  @param last iterator to the end (exclusive)
+<span class="line_number">522</span>
+<span class="line_number">523</span>  @return a tf::AsyncTask handle 
+<span class="line_number">524</span>  
+<span class="line_number">525</span>  This member function is more efficient than tf::Runtime::dependent_async
+<span class="line_number">526</span>  and is encouraged to use when you do not want a @std_future to
+<span class="line_number">527</span>  acquire the result or synchronize the execution.
+<span class="line_number">528</span>  The example below creates three asynchronous tasks, @c A, @c B, and @c C,
+<span class="line_number">529</span>  in which task @c C runs after task @c A and task @c B.
+<span class="line_number">530</span>  Assigned task names will appear in the observers of the executor.
+<span class="line_number">531</span>
+<span class="line_number">532</span>  @code{.cpp}
+<span class="line_number">533</span>  taskflow.emplace([](tf::Runtime&amp; rt){
+<span class="line_number">534</span>    std::array&lt;tf::AsyncTask, 2&gt; array {
+<span class="line_number">535</span>      rt.silent_dependent_async(&#34;A&#34;, [](){ printf(&#34;A\n&#34;); }),
+<span class="line_number">536</span>      rt.silent_dependent_async(&#34;B&#34;, [](){ printf(&#34;B\n&#34;); })
+<span class="line_number">537</span>    };
+<span class="line_number">538</span>    rt.silent_dependent_async(
+<span class="line_number">539</span>      &#34;C&#34;, [](){ printf(&#34;C runs after A and B\n&#34;); }, array.begin(), array.end()
+<span class="line_number">540</span>    );
+<span class="line_number">541</span>  });  // implicit synchronization of all tasks at the end of runtime&#39;s scope
+<span class="line_number">542</span>  executor.run(taskflow).wait();
+<span class="line_number">543</span>  @endcode
+<span class="line_number">544</span>  */
+<span class="line_number">545</span>  template &lt;typename P, typename F, typename I, 
+<span class="line_number">546</span>    std::enable_if_t&lt;is_task_params_v&lt;P&gt; &amp;&amp; !std::is_same_v&lt;std::decay_t&lt;I&gt;, AsyncTask&gt;, void&gt;* = nullptr
+<span class="line_number">547</span>  &gt;
+<span class="line_number">548</span>  tf::AsyncTask silent_dependent_async(P&amp;&amp; params, F&amp;&amp; func, I first, I last);
+<span class="line_number">549</span>
+<span class="line_number">550</span>
+<span class="line_number">551</span>
+<span class="line_number">552</span>  // ----------------------------------------------------------------------------------------------
+<span class="line_number">553</span>  // cooperative execution methods
+<span class="line_number">554</span>  // ----------------------------------------------------------------------------------------------
+<span class="line_number">555</span>  
+<span class="line_number">556</span>  /**
+<span class="line_number">557</span>  @brief corun all tasks spawned by this runtime with other workers
+<span class="line_number">558</span>
+<span class="line_number">559</span>  Coruns all tasks spawned by this runtime cooperatively with other workers in
+<span class="line_number">560</span>  the same executor until all these tasks finish.
+<span class="line_number">561</span>  Under cooperative execution, a worker is not preempted. Instead, it continues 
+<span class="line_number">562</span>  participating in the work-stealing loop, executing available tasks alongside 
+<span class="line_number">563</span>  other workers.  
+<span class="line_number">564</span>
+<span class="line_number">565</span>  @code{.cpp}
+<span class="line_number">566</span>  std::atomic&lt;size_t&gt; counter{0};
+<span class="line_number">567</span>  taskflow.emplace([&amp;](tf::Runtime&amp; rt){
+<span class="line_number">568</span>    // spawn 100 async tasks and wait
+<span class="line_number">569</span>    for(int i=0; i&lt;100; i++) {
+<span class="line_number">570</span>      rt.silent_async([&amp;](){ counter++; });
+<span class="line_number">571</span>    }
+<span class="line_number">572</span>    rt.corun();
+<span class="line_number">573</span>    assert(counter == 100);
+<span class="line_number">574</span>    
+<span class="line_number">575</span>    // spawn another 100 async tasks and wait
+<span class="line_number">576</span>    for(int i=0; i&lt;100; i++) {
+<span class="line_number">577</span>      rt.silent_async([&amp;](){ counter++; });
+<span class="line_number">578</span>    }
+<span class="line_number">579</span>    rt.corun();
+<span class="line_number">580</span>    assert(counter == 200);
+<span class="line_number">581</span>  });
+<span class="line_number">582</span>  @endcode
+<span class="line_number">583</span>
+<span class="line_number">584</span>  Only the parent worker of this runtime is allowed to call this corun.
+<span class="line_number">585</span>  */
+<span class="line_number">586</span>  void corun();
+<span class="line_number">587</span>
+<span class="line_number">588</span>  /**
+<span class="line_number">589</span>  @brief equivalent to tf::Runtime::corun - just an alias for legacy purpose
+<span class="line_number">590</span>  */
+<span class="line_number">591</span>  void corun_all();
+<span class="line_number">592</span>
+<span class="line_number">593</span>  /**
+<span class="line_number">594</span>  @brief queries if this runtime task has been cancelled
+<span class="line_number">595</span>  */
+<span class="line_number">596</span>  bool is_cancelled();
+<span class="line_number">597</span>
+<span class="line_number">598</span>  private:
+<span class="line_number">599</span>
+<span class="line_number">600</span>  /**
+<span class="line_number">601</span>  @private
+<span class="line_number">602</span>  */
+<span class="line_number">603</span>  explicit Runtime(Executor&amp;, Worker&amp;, Node*);
+<span class="line_number">604</span>  
+<span class="line_number">605</span>  /**
+<span class="line_number">606</span>  @private
+<span class="line_number">607</span>  */
+<span class="line_number">608</span>  Executor&amp; _executor;
+<span class="line_number">609</span>  
+<span class="line_number">610</span>  /**
+<span class="line_number">611</span>  @private
+<span class="line_number">612</span>  */
+<span class="line_number">613</span>  Worker&amp; _worker;
+<span class="line_number">614</span>  
+<span class="line_number">615</span>  /**
+<span class="line_number">616</span>  @private
+<span class="line_number">617</span>  */
+<span class="line_number">618</span>  Node* _node;
+<span class="line_number">619</span>};
+<span class="line_number">620</span>
+<span class="line_number">621</span>// constructor
+<span class="line_number">622</span>inline Runtime::Runtime(Executor&amp; executor, Worker&amp; worker, Node* node) :
+<span class="line_number">623</span>  _executor {executor},
+<span class="line_number">624</span>  _worker   {worker},
+<span class="line_number">625</span>  _node     {node} {
+<span class="line_number">626</span>}
+<span class="line_number">627</span>
+<span class="line_number">628</span>// Function: executor
+<span class="line_number">629</span>inline Executor&amp; Runtime::executor() {
+<span class="line_number">630</span>  return _executor;
+<span class="line_number">631</span>}
+<span class="line_number">632</span>
+<span class="line_number">633</span>// Function: worker
+<span class="line_number">634</span>inline Worker&amp; Runtime::worker() {
+<span class="line_number">635</span>  return _worker;
+<span class="line_number">636</span>}
+<span class="line_number">637</span>
+<span class="line_number">638</span>// Procedure: schedule
+<span class="line_number">639</span>inline void Runtime::schedule(Task task) {
+<span class="line_number">640</span>
+<span class="line_number">641</span>  auto node = task._node;
+<span class="line_number">642</span>  // need to keep the invariant: when scheduling a task, the task must have
+<span class="line_number">643</span>  // zero dependency (join counter is 0)
+<span class="line_number">644</span>  // or we can encounter bug when inserting a nested flow (e.g., module task)
+<span class="line_number">645</span>  node-&gt;_join_counter.store(0, std::memory_order_relaxed);
+<span class="line_number">646</span>
+<span class="line_number">647</span>  auto&amp; j = node-&gt;_parent ? node-&gt;_parent-&gt;_join_counter :
+<span class="line_number">648</span>                            node-&gt;_topology-&gt;_join_counter;
+<span class="line_number">649</span>  j.fetch_add(1, std::memory_order_relaxed);
+<span class="line_number">650</span>  _executor._schedule(_worker, node);
+<span class="line_number">651</span>}
+<span class="line_number">652</span>
+<span class="line_number">653</span>// Function: corun
+<span class="line_number">654</span>inline void Runtime::corun() {
+<span class="line_number">655</span>  {
+<span class="line_number">656</span>    ExplicitAnchorGuard anchor(_node);
+<span class="line_number">657</span>    _executor._corun_until(_worker, [this] () -&gt; bool {
+<span class="line_number">658</span>      return _node-&gt;_join_counter.load(std::memory_order_acquire) == 1;
+<span class="line_number">659</span>    });
+<span class="line_number">660</span>  }
+<span class="line_number">661</span>  _node-&gt;_rethrow_exception();
+<span class="line_number">662</span>}
+<span class="line_number">663</span>
+<span class="line_number">664</span>// Function: corun_all
+<span class="line_number">665</span>inline void Runtime::corun_all() {
+<span class="line_number">666</span>  corun();
+<span class="line_number">667</span>}
+<span class="line_number">668</span>
+<span class="line_number">669</span>inline bool Runtime::is_cancelled() { 
+<span class="line_number">670</span>  return _node-&gt;_is_parent_cancelled(); 
+<span class="line_number">671</span>}
+<span class="line_number">672</span>
+<span class="line_number">673</span>// ------------------------------------------------------------------------------------------------
+<span class="line_number">674</span>// Runtime::silent_async
+<span class="line_number">675</span>// ------------------------------------------------------------------------------------------------
+<span class="line_number">676</span>
+<span class="line_number">677</span>// Function: silent_async
+<span class="line_number">678</span>template &lt;typename F&gt;
+<span class="line_number">679</span>void Runtime::silent_async(F&amp;&amp; f) {
+<span class="line_number">680</span>  silent_async(DefaultTaskParams{}, std::forward&lt;F&gt;(f));
+<span class="line_number">681</span>}
+<span class="line_number">682</span>
+<span class="line_number">683</span>// Function: silent_async
+<span class="line_number">684</span>template &lt;typename P, typename F&gt;
+<span class="line_number">685</span>void Runtime::silent_async(P&amp;&amp; params, F&amp;&amp; f) {
+<span class="line_number">686</span>  _node-&gt;_join_counter.fetch_add(1, std::memory_order_relaxed);
+</code></pre>
+            <div class="issue">
+                <div>
+                    <span class="what">Possible data race during read of size 8 at 0x2A904568 by thread #10</span>
+                    <div class="navigation">
+                        <button class="next_error">Next</button>
+                        <button class="prev_error">Previous</button>
+                    </div>
+                </div>
+                <div>
+                    <table class="call_stack">
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/runtime.hpp:680<br>
+                                    <code class="cpp">void tf::Runtime::silent_async&lt;tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt;, sb::parallel_dim_reduce&lt;sb::Pcf&lt;float, float&gt;, sb::Pcf&lt;float, float&gt;, sb::parallel_tensor_reduce&lt;sb::Pcf&lt;float, float&gt;, sb::mean&lt;sb::Pcf&lt;float, float&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::Executor&amp;)::{lambda(sb::Rectangle&lt;float, float&gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::mean&lt;sb::Pcf&lt;float, float&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::Executor&amp;)::{lambda(sb::Rectangle&lt;float, float&gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(auto:1, auto:2)#1}&gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::parallel_tensor_reduce&lt;sb::Pcf&lt;float, float&gt;, sb::mean&lt;sb::Pcf&lt;float, float&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::Executor&amp;)::{lambda(sb::Rectangle&lt;float, float&gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::mean&lt;sb::Pcf&lt;float, float&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::Executor&amp;)::{lambda(sb::Rectangle&lt;float, float&gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(auto:1, auto:2)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, sb::mean&lt;sb::Pcf&lt;float, float&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::Executor&amp;)::{lambda(sb::Rectangle&lt;float, float&gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, sb::mean&lt;sb::Pcf&lt;float, float&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::Executor&amp;)::{lambda(sb::Rectangle&lt;float, float&gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt;, sb::parallel_dim_reduce&lt;sb::Pcf&lt;float, float&gt;, sb::Pcf&lt;float, float&gt;, sb::parallel_tensor_reduce&lt;sb::Pcf&lt;float, float&gt;, sb::mean&lt;sb::Pcf&lt;float, float&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::Executor&amp;)::{lambda(sb::Rectangle&lt;float, float&gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::mean&lt;sb::Pcf&lt;float, float&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::Executor&amp;)::{lambda(sb::Rectangle&lt;float, float&gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(auto:1, auto:2)#1}&gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::parallel_tensor_reduce&lt;sb::Pcf&lt;float, float&gt;, sb::mean&lt;sb::Pcf&lt;float, float&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::Executor&amp;)::{lambda(sb::Rectangle&lt;float, float&gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::mean&lt;sb::Pcf&lt;float, float&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::Executor&amp;)::{lambda(sb::Rectangle&lt;float, float&gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(auto:1, auto:2)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, sb::mean&lt;sb::Pcf&lt;float, float&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::Executor&amp;)::{lambda(sb::Rectangle&lt;float, float&gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, sb::mean&lt;sb::Pcf&lt;float, float&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::Executor&amp;)::{lambda(sb::Rectangle&lt;float, float&gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}&amp;&gt;(tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt;, sb::parallel_dim_reduce&lt;sb::Pcf&lt;float, float&gt;, sb::Pcf&lt;float, float&gt;, sb::parallel_tensor_reduce&lt;sb::Pcf&lt;float, float&gt;, sb::mean&lt;sb::Pcf&lt;float, float&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::Executor&amp;)::{lambda(sb::Rectangle&lt;float, float&gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::mean&lt;sb::Pcf&lt;float, float&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::Executor&amp;)::{lambda(sb::Rectangle&lt;float, float&gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(auto:1, auto:2)#1}&gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::parallel_tensor_reduce&lt;sb::Pcf&lt;float, float&gt;, sb::mean&lt;sb::Pcf&lt;float, float&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::Executor&amp;)::{lambda(sb::Rectangle&lt;float, float&gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::mean&lt;sb::Pcf&lt;float, float&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::Executor&amp;)::{lambda(sb::Rectangle&lt;float, float&gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(auto:1, auto:2)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, sb::mean&lt;sb::Pcf&lt;float, float&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::Executor&amp;)::{lambda(sb::Rectangle&lt;float, float&gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, sb::mean&lt;sb::Pcf&lt;float, float&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::Executor&amp;)::{lambda(sb::Rectangle&lt;float, float&gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt;, sb::parallel_dim_reduce&lt;sb::Pcf&lt;float, float&gt;, sb::Pcf&lt;float, float&gt;, sb::parallel_tensor_reduce&lt;sb::Pcf&lt;float, float&gt;, sb::mean&lt;sb::Pcf&lt;float, float&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::Executor&amp;)::{lambda(sb::Rectangle&lt;float, float&gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::mean&lt;sb::Pcf&lt;float, float&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::Executor&amp;)::{lambda(sb::Rectangle&lt;float, float&gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(auto:1, auto:2)#1}&gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::parallel_tensor_reduce&lt;sb::Pcf&lt;float, float&gt;, sb::mean&lt;sb::Pcf&lt;float, float&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::Executor&amp;)::{lambda(sb::Rectangle&lt;float, float&gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::mean&lt;sb::Pcf&lt;float, float&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::Executor&amp;)::{lambda(sb::Rectangle&lt;float, float&gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(auto:1, auto:2)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, sb::mean&lt;sb::Pcf&lt;float, float&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::Executor&amp;)::{lambda(sb::Rectangle&lt;float, float&gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, sb::mean&lt;sb::Pcf&lt;float, float&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::Executor&amp;)::{lambda(sb::Rectangle&lt;float, float&gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">677</span>// Function: silent_async
+<span class="line_number">678</span>template &lt;typename F&gt;
+<span class="line_number">679</span>void Runtime::silent_async(F&amp;&amp; f) {
+<span class="line_number">680</span><span class="error">  silent_async(DefaultTaskParams{}, std::forward&lt;F&gt;(f));
+</span><span class="line_number">681</span>}
+<span class="line_number">682</span>
+<span class="line_number">683</span>// Function: silent_async
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/algorithm/for_each.hpp:138<br>
+                                    <code class="cpp">tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt;, sb::parallel_dim_reduce&lt;sb::Pcf&lt;float, float&gt;, sb::Pcf&lt;float, float&gt;, sb::parallel_tensor_reduce&lt;sb::Pcf&lt;float, float&gt;, sb::mean&lt;sb::Pcf&lt;float, float&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::Executor&amp;)::{lambda(sb::Rectangle&lt;float, float&gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::mean&lt;sb::Pcf&lt;float, float&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::Executor&amp;)::{lambda(sb::Rectangle&lt;float, float&gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(auto:1, auto:2)#1}&gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::parallel_tensor_reduce&lt;sb::Pcf&lt;float, float&gt;, sb::mean&lt;sb::Pcf&lt;float, float&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::Executor&amp;)::{lambda(sb::Rectangle&lt;float, float&gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::mean&lt;sb::Pcf&lt;float, float&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::Executor&amp;)::{lambda(sb::Rectangle&lt;float, float&gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(auto:1, auto:2)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, sb::mean&lt;sb::Pcf&lt;float, float&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::Executor&amp;)::{lambda(sb::Rectangle&lt;float, float&gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, sb::mean&lt;sb::Pcf&lt;float, float&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::Executor&amp;)::{lambda(sb::Rectangle&lt;float, float&gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt;, sb::parallel_dim_reduce&lt;sb::Pcf&lt;float, float&gt;, sb::Pcf&lt;float, float&gt;, sb::parallel_tensor_reduce&lt;sb::Pcf&lt;float, float&gt;, sb::mean&lt;sb::Pcf&lt;float, float&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::Executor&amp;)::{lambda(sb::Rectangle&lt;float, float&gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::mean&lt;sb::Pcf&lt;float, float&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::Executor&amp;)::{lambda(sb::Rectangle&lt;float, float&gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(auto:1, auto:2)#1}&gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::parallel_tensor_reduce&lt;sb::Pcf&lt;float, float&gt;, sb::mean&lt;sb::Pcf&lt;float, float&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::Executor&amp;)::{lambda(sb::Rectangle&lt;float, float&gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::mean&lt;sb::Pcf&lt;float, float&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::Executor&amp;)::{lambda(sb::Rectangle&lt;float, float&gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(auto:1, auto:2)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, sb::mean&lt;sb::Pcf&lt;float, float&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::Executor&amp;)::{lambda(sb::Rectangle&lt;float, float&gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, sb::mean&lt;sb::Pcf&lt;float, float&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::Executor&amp;)::{lambda(sb::Rectangle&lt;float, float&gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">135</span>            }
+<span class="line_number">136</span>          });
+<span class="line_number">137</span>        });
+<span class="line_number">138</span><span class="error">        (++w == W) ? task() : rt.silent_async(task);
+</span><span class="line_number">139</span>      }
+<span class="line_number">140</span>    }
+<span class="line_number">141</span>  };
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:61<br>
+                                    <code class="cpp">void std::__invoke_impl&lt;void, tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt;, sb::parallel_dim_reduce&lt;sb::Pcf&lt;float, float&gt;, sb::Pcf&lt;float, float&gt;, sb::parallel_tensor_reduce&lt;sb::Pcf&lt;float, float&gt;, sb::mean&lt;sb::Pcf&lt;float, float&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::Executor&amp;)::{lambda(sb::Rectangle&lt;float, float&gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::mean&lt;sb::Pcf&lt;float, float&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::Executor&amp;)::{lambda(sb::Rectangle&lt;float, float&gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(auto:1, auto:2)#1}&gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::parallel_tensor_reduce&lt;sb::Pcf&lt;float, float&gt;, sb::mean&lt;sb::Pcf&lt;float, float&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::Executor&amp;)::{lambda(sb::Rectangle&lt;float, float&gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::mean&lt;sb::Pcf&lt;float, float&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::Executor&amp;)::{lambda(sb::Rectangle&lt;float, float&gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(auto:1, auto:2)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, sb::mean&lt;sb::Pcf&lt;float, float&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::Executor&amp;)::{lambda(sb::Rectangle&lt;float, float&gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, sb::mean&lt;sb::Pcf&lt;float, float&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::Executor&amp;)::{lambda(sb::Rectangle&lt;float, float&gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt;, sb::parallel_dim_reduce&lt;sb::Pcf&lt;float, float&gt;, sb::Pcf&lt;float, float&gt;, sb::parallel_tensor_reduce&lt;sb::Pcf&lt;float, float&gt;, sb::mean&lt;sb::Pcf&lt;float, float&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::Executor&amp;)::{lambda(sb::Rectangle&lt;float, float&gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::mean&lt;sb::Pcf&lt;float, float&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::Executor&amp;)::{lambda(sb::Rectangle&lt;float, float&gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(auto:1, auto:2)#1}&gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::parallel_tensor_reduce&lt;sb::Pcf&lt;float, float&gt;, sb::mean&lt;sb::Pcf&lt;float, float&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::Executor&amp;)::{lambda(sb::Rectangle&lt;float, float&gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::mean&lt;sb::Pcf&lt;float, float&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::Executor&amp;)::{lambda(sb::Rectangle&lt;float, float&gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(auto:1, auto:2)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, sb::mean&lt;sb::Pcf&lt;float, float&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::Executor&amp;)::{lambda(sb::Rectangle&lt;float, float&gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, sb::mean&lt;sb::Pcf&lt;float, float&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::Executor&amp;)::{lambda(sb::Rectangle&lt;float, float&gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}&amp;, tf::Runtime&amp;&gt;(std::__invoke_other, sb::mean&lt;sb::Pcf&lt;float, float&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::Executor&amp;)::{lambda(sb::Rectangle&lt;float, float&gt; const&amp;)#1}&amp;&amp;, tf::Runtime&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">58</span>  template&lt;typename _Res, typename _Fn, typename... _Args&gt;
+<span class="line_number">59</span>    constexpr _Res
+<span class="line_number">60</span>    __invoke_impl(__invoke_other, _Fn&amp;&amp; __f, _Args&amp;&amp;... __args)
+<span class="line_number">61</span><span class="error">    { return std::forward&lt;_Fn&gt;(__f)(std::forward&lt;_Args&gt;(__args)...); }
+</span><span class="line_number">62</span>
+<span class="line_number">63</span>  template&lt;typename _Res, typename _MemFun, typename _Tp, typename... _Args&gt;
+<span class="line_number">64</span>    constexpr _Res
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:111<br>
+                                    <code class="cpp">_ZSt10__invoke_rIvRZN2tf24make_for_each_index_taskImmmZN2sb6detail18parallel_walk_implINS2_6TensorINS2_3PcfIffEEEEZNS2_19parallel_walk_asyncIS8_ZNS2_19parallel_dim_reduceIS7_S7_ZNS2_22parallel_tensor_reduceIS7_ZNS2_4meanIS7_EENS5_IT_EERKSE_mRNS2_8ExecutorEEUlRKNS2_9RectangleIffEEE_EESE_SG_mOT0_SI_EUlSD_SO_E_EESE_RKNS5_ISO_EEmOT1_SI_EUlRKSt6vectorImSaImEEE_EENS0_6FutureIvEERKSD_SP_SI_EUlS10_mE_EES13_S15_SP_SI_EUlmE0_NS0_17GuidedPartitionerINS0_21DefaultClosureWrapperEEEEEDaSD_SO_SU_T2_T3_EUlRNS0_7RuntimeEE_JS1E_EENSt9enable_ifIX16is_invocable_r_vISD_SO_DpT1_EESD_E4typeESP_DpOS1I_</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">108</span>      using __type = typename __result::type;
+<span class="line_number">109</span>      using __tag = typename __result::__invoke_type;
+<span class="line_number">110</span>      if constexpr (is_void_v&lt;_Res&gt;)
+<span class="line_number">111</span><span class="error">	std::__invoke_impl&lt;__type&gt;(__tag{}, std::forward&lt;_Callable&gt;(__fn),
+</span><span class="line_number">112</span>					std::forward&lt;_Args&gt;(__args)...);
+<span class="line_number">113</span>      else
+<span class="line_number">114</span>	return std::__invoke_impl&lt;__type&gt;(__tag{},
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/std_function.h:290<br>
+                                    <code class="cpp">std::_Function_handler&lt;void (tf::Runtime&amp;), tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt;, sb::parallel_dim_reduce&lt;sb::Pcf&lt;float, float&gt;, sb::Pcf&lt;float, float&gt;, sb::parallel_tensor_reduce&lt;sb::Pcf&lt;float, float&gt;, sb::mean&lt;sb::Pcf&lt;float, float&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::Executor&amp;)::{lambda(sb::Rectangle&lt;float, float&gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::mean&lt;sb::Pcf&lt;float, float&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::Executor&amp;)::{lambda(sb::Rectangle&lt;float, float&gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(auto:1, auto:2)#1}&gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::parallel_tensor_reduce&lt;sb::Pcf&lt;float, float&gt;, sb::mean&lt;sb::Pcf&lt;float, float&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::Executor&amp;)::{lambda(sb::Rectangle&lt;float, float&gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::mean&lt;sb::Pcf&lt;float, float&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::Executor&amp;)::{lambda(sb::Rectangle&lt;float, float&gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(auto:1, auto:2)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, sb::mean&lt;sb::Pcf&lt;float, float&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::Executor&amp;)::{lambda(sb::Rectangle&lt;float, float&gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, sb::mean&lt;sb::Pcf&lt;float, float&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::Executor&amp;)::{lambda(sb::Rectangle&lt;float, float&gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt;, sb::parallel_dim_reduce&lt;sb::Pcf&lt;float, float&gt;, sb::Pcf&lt;float, float&gt;, sb::parallel_tensor_reduce&lt;sb::Pcf&lt;float, float&gt;, sb::mean&lt;sb::Pcf&lt;float, float&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::Executor&amp;)::{lambda(sb::Rectangle&lt;float, float&gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::mean&lt;sb::Pcf&lt;float, float&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::Executor&amp;)::{lambda(sb::Rectangle&lt;float, float&gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(auto:1, auto:2)#1}&gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::parallel_tensor_reduce&lt;sb::Pcf&lt;float, float&gt;, sb::mean&lt;sb::Pcf&lt;float, float&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::Executor&amp;)::{lambda(sb::Rectangle&lt;float, float&gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::mean&lt;sb::Pcf&lt;float, float&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::Executor&amp;)::{lambda(sb::Rectangle&lt;float, float&gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(auto:1, auto:2)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, sb::mean&lt;sb::Pcf&lt;float, float&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::Executor&amp;)::{lambda(sb::Rectangle&lt;float, float&gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, sb::mean&lt;sb::Pcf&lt;float, float&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; const&amp;, unsigned long, sb::Executor&amp;)::{lambda(sb::Rectangle&lt;float, float&gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}&gt;::_M_invoke(std::_Any_data const&amp;, tf::Runtime&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">287</span>      static _Res
+<span class="line_number">288</span>      _M_invoke(const _Any_data&amp; __functor, _ArgTypes&amp;&amp;... __args)
+<span class="line_number">289</span>      {
+<span class="line_number">290</span><span class="error">	return std::__invoke_r&lt;_Res&gt;(*_Base::_M_get_pointer(__functor),
+</span><span class="line_number">291</span>				     std::forward&lt;_ArgTypes&gt;(__args)...);
+<span class="line_number">292</span>      }
+<span class="line_number">293</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/std_function.h:591<br>
+                                    <code class="cpp">std::function&lt;void (tf::Runtime&amp;)&gt;::operator()(tf::Runtime&amp;) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">588</span>      {
+<span class="line_number">589</span>	if (_M_empty())
+<span class="line_number">590</span>	  __throw_bad_function_call();
+<span class="line_number">591</span><span class="error">	return _M_invoker(_M_functor, std::forward&lt;_ArgTypes&gt;(__args)...);
+</span><span class="line_number">592</span>      }
+<span class="line_number">593</span>
+<span class="line_number">594</span>#if __cpp_rtti
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/runtime.hpp:826<br>
+                                    <code class="cpp">tf::Executor::_invoke_runtime_task_impl(tf::Worker&amp;, tf::Node*, std::function&lt;void (tf::Runtime&amp;)&gt;&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">823</span>    node-&gt;_join_counter.fetch_add(1, std::memory_order_release);
+<span class="line_number">824</span>
+<span class="line_number">825</span>    _observer_prologue(worker, node);
+<span class="line_number">826</span><span class="error">    TF_EXECUTOR_EXCEPTION_HANDLER(worker, node, {
+</span><span class="line_number">827</span>      work(rt);
+<span class="line_number">828</span>    });
+<span class="line_number">829</span>    _observer_epilogue(worker, node);
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/runtime.hpp:807<br>
+                                    <code class="cpp">tf::Executor::_invoke_runtime_task(tf::Worker&amp;, tf::Node*)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">804</span>
+<span class="line_number">805</span>// Procedure: _invoke_runtime_task
+<span class="line_number">806</span>inline bool Executor::_invoke_runtime_task(Worker&amp; worker, Node* node) {
+<span class="line_number">807</span><span class="error">  return _invoke_runtime_task_impl(
+</span><span class="line_number">808</span>    worker, node, std::get_if&lt;Node::Runtime&gt;(&amp;node-&gt;_handle)-&gt;work
+<span class="line_number">809</span>  );
+<span class="line_number">810</span>}
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/executor.hpp:1668<br>
+                                    <code class="cpp">tf::Executor::_invoke(tf::Worker&amp;, tf::Node*)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1665</span>    
+<span class="line_number">1666</span>    // runtime task
+<span class="line_number">1667</span>    case Node::RUNTIME:{
+<span class="line_number">1668</span><span class="error">      if(_invoke_runtime_task(worker, node)) {
+</span><span class="line_number">1669</span>        return;
+<span class="line_number">1670</span>      }
+<span class="line_number">1671</span>    }
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/executor.hpp:1424<br>
+                                    <code class="cpp">tf::Executor::_exploit_task(tf::Worker&amp;, tf::Node*&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1421</span>// Procedure: _exploit_task
+<span class="line_number">1422</span>inline void Executor::_exploit_task(Worker&amp; w, Node*&amp; t) {
+<span class="line_number">1423</span>  while(t) {
+<span class="line_number">1424</span><span class="error">    _invoke(w, t);
+</span><span class="line_number">1425</span>    t = w._wsq.pop();
+<span class="line_number">1426</span>  }
+<span class="line_number">1427</span>}
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/executor.hpp:1327<br>
+                                    <code class="cpp">tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}::operator()() const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1324</span>        while(1) {
+<span class="line_number">1325</span>
+<span class="line_number">1326</span>          // drains out the local queue first
+<span class="line_number">1327</span><span class="error">          _exploit_task(worker, t);
+</span><span class="line_number">1328</span>
+<span class="line_number">1329</span>          // steals and waits for tasks
+<span class="line_number">1330</span>          if(_wait_for_task(worker, t) == false) {
+</code></pre>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            <pre class="code">
+<code class="c++"><span class="line_number">687</span><span class="error">  _executor._silent_async(</span>
+<span class="line_number">688</span>    std::forward&lt;P&gt;(params), std::forward&lt;F&gt;(f), _node-&gt;_topology, _node
+<span class="line_number">689</span>  );
+<span class="line_number">690</span>}
+<span class="line_number">691</span>
+<span class="line_number">692</span>// ------------------------------------------------------------------------------------------------
+<span class="line_number">693</span>// Runtime::async 
+<span class="line_number">694</span>// ------------------------------------------------------------------------------------------------
+<span class="line_number">695</span>
+<span class="line_number">696</span>// Function: async
+<span class="line_number">697</span>template &lt;typename F&gt;
+<span class="line_number">698</span>auto Runtime::async(F&amp;&amp; f) {
+<span class="line_number">699</span>  return async(DefaultTaskParams{}, std::forward&lt;F&gt;(f));
+<span class="line_number">700</span>}
+<span class="line_number">701</span>
+<span class="line_number">702</span>// Function: async
+<span class="line_number">703</span>template &lt;typename P, typename F&gt;
+<span class="line_number">704</span>auto Runtime::async(P&amp;&amp; params, F&amp;&amp; f) {
+<span class="line_number">705</span>  _node-&gt;_join_counter.fetch_add(1, std::memory_order_relaxed);
+<span class="line_number">706</span>  return _executor._async(
+<span class="line_number">707</span>    std::forward&lt;P&gt;(params), std::forward&lt;F&gt;(f), _node-&gt;_topology, _node
+<span class="line_number">708</span>  );
+<span class="line_number">709</span>}
+<span class="line_number">710</span>
+<span class="line_number">711</span>// ------------------------------------------------------------------------------------------------
+<span class="line_number">712</span>// silent dependent async
+<span class="line_number">713</span>// ------------------------------------------------------------------------------------------------
+<span class="line_number">714</span>
+<span class="line_number">715</span>// Function: silent_dependent_async
+<span class="line_number">716</span>template &lt;typename F, typename... Tasks,
+<span class="line_number">717</span>  std::enable_if_t&lt;all_same_v&lt;AsyncTask, std::decay_t&lt;Tasks&gt;...&gt;, void&gt;*
+<span class="line_number">718</span>&gt;
+<span class="line_number">719</span>tf::AsyncTask Runtime::silent_dependent_async(F&amp;&amp; func, Tasks&amp;&amp;... tasks) {
+<span class="line_number">720</span>  return silent_dependent_async(
+<span class="line_number">721</span>    DefaultTaskParams{}, std::forward&lt;F&gt;(func), std::forward&lt;Tasks&gt;(tasks)...
+<span class="line_number">722</span>  );
+<span class="line_number">723</span>}
+<span class="line_number">724</span>
+<span class="line_number">725</span>// Function: silent_dependent_async
+<span class="line_number">726</span>template &lt;typename P, typename F, typename... Tasks,
+<span class="line_number">727</span>  std::enable_if_t&lt;is_task_params_v&lt;P&gt; &amp;&amp; all_same_v&lt;AsyncTask, std::decay_t&lt;Tasks&gt;...&gt;, void&gt;*
+<span class="line_number">728</span>&gt;
+<span class="line_number">729</span>tf::AsyncTask Runtime::silent_dependent_async(
+<span class="line_number">730</span>  P&amp;&amp; params, F&amp;&amp; func, Tasks&amp;&amp;... tasks 
+<span class="line_number">731</span>){
+<span class="line_number">732</span>  std::array&lt;AsyncTask, sizeof...(Tasks)&gt; array = { std::forward&lt;Tasks&gt;(tasks)... };
+<span class="line_number">733</span>  return silent_dependent_async(
+<span class="line_number">734</span>    std::forward&lt;P&gt;(params), std::forward&lt;F&gt;(func), array.begin(), array.end()
+<span class="line_number">735</span>  );
+<span class="line_number">736</span>}
+<span class="line_number">737</span>
+<span class="line_number">738</span>// Function: silent_dependent_async
+<span class="line_number">739</span>template &lt;typename F, typename I,
+<span class="line_number">740</span>  std::enable_if_t&lt;!std::is_same_v&lt;std::decay_t&lt;I&gt;, AsyncTask&gt;, void&gt;*
+<span class="line_number">741</span>&gt;
+<span class="line_number">742</span>tf::AsyncTask Runtime::silent_dependent_async(F&amp;&amp; func, I first, I last) {
+<span class="line_number">743</span>  return silent_dependent_async(DefaultTaskParams{}, std::forward&lt;F&gt;(func), first, last);
+<span class="line_number">744</span>}
+<span class="line_number">745</span>
+<span class="line_number">746</span>// Function: silent_dependent_async
+<span class="line_number">747</span>template &lt;typename P, typename F, typename I,
+<span class="line_number">748</span>  std::enable_if_t&lt;is_task_params_v&lt;P&gt; &amp;&amp; !std::is_same_v&lt;std::decay_t&lt;I&gt;, AsyncTask&gt;, void&gt;*
+<span class="line_number">749</span>&gt;
+<span class="line_number">750</span>tf::AsyncTask Runtime::silent_dependent_async(
+<span class="line_number">751</span>  P&amp;&amp; params, F&amp;&amp; func, I first, I last
+<span class="line_number">752</span>) {
+<span class="line_number">753</span>  _node-&gt;_join_counter.fetch_add(1, std::memory_order_relaxed);
+<span class="line_number">754</span>  return _executor._silent_dependent_async(
+<span class="line_number">755</span>    std::forward&lt;P&gt;(params), std::forward&lt;F&gt;(func), first, last, _node-&gt;_topology, _node
+<span class="line_number">756</span>  );
+<span class="line_number">757</span>}
+<span class="line_number">758</span>
+<span class="line_number">759</span>// ------------------------------------------------------------------------------------------------
+<span class="line_number">760</span>// dependent async
+<span class="line_number">761</span>// ------------------------------------------------------------------------------------------------
+<span class="line_number">762</span>
+<span class="line_number">763</span>// Function: dependent_async
+<span class="line_number">764</span>template &lt;typename F, typename... Tasks,
+<span class="line_number">765</span>  std::enable_if_t&lt;all_same_v&lt;AsyncTask, std::decay_t&lt;Tasks&gt;...&gt;, void&gt;*
+<span class="line_number">766</span>&gt;
+<span class="line_number">767</span>auto Runtime::dependent_async(F&amp;&amp; func, Tasks&amp;&amp;... tasks) {
+<span class="line_number">768</span>  return dependent_async(DefaultTaskParams{}, std::forward&lt;F&gt;(func), std::forward&lt;Tasks&gt;(tasks)...);
+<span class="line_number">769</span>}
+<span class="line_number">770</span>
+<span class="line_number">771</span>// Function: dependent_async
+<span class="line_number">772</span>template &lt;typename P, typename F, typename... Tasks,
+<span class="line_number">773</span>  std::enable_if_t&lt;is_task_params_v&lt;P&gt; &amp;&amp; all_same_v&lt;AsyncTask, std::decay_t&lt;Tasks&gt;...&gt;, void&gt;*
+<span class="line_number">774</span>&gt;
+<span class="line_number">775</span>auto Runtime::dependent_async(P&amp;&amp; params, F&amp;&amp; func, Tasks&amp;&amp;... tasks) {
+<span class="line_number">776</span>  std::array&lt;AsyncTask, sizeof...(Tasks)&gt; array = { std::forward&lt;Tasks&gt;(tasks)... };
+<span class="line_number">777</span>  return dependent_async(
+<span class="line_number">778</span>    std::forward&lt;P&gt;(params), std::forward&lt;F&gt;(func), array.begin(), array.end()
+<span class="line_number">779</span>  );
+<span class="line_number">780</span>}
+<span class="line_number">781</span>
+<span class="line_number">782</span>// Function: dependent_async
+<span class="line_number">783</span>template &lt;typename F, typename I,
+<span class="line_number">784</span>  std::enable_if_t&lt;!std::is_same_v&lt;std::decay_t&lt;I&gt;, AsyncTask&gt;, void&gt;*
+<span class="line_number">785</span>&gt;
+<span class="line_number">786</span>auto Runtime::dependent_async(F&amp;&amp; func, I first, I last) {
+<span class="line_number">787</span>  return dependent_async(DefaultTaskParams{}, std::forward&lt;F&gt;(func), first, last);
+<span class="line_number">788</span>}
+<span class="line_number">789</span>
+<span class="line_number">790</span>// Function: dependent_async
+<span class="line_number">791</span>template &lt;typename P, typename F, typename I,
+<span class="line_number">792</span>  std::enable_if_t&lt;is_task_params_v&lt;P&gt; &amp;&amp; !std::is_same_v&lt;std::decay_t&lt;I&gt;, AsyncTask&gt;, void&gt;*
+<span class="line_number">793</span>&gt;
+<span class="line_number">794</span>auto Runtime::dependent_async(P&amp;&amp; params, F&amp;&amp; func, I first, I last) {
+<span class="line_number">795</span>  _node-&gt;_join_counter.fetch_add(1, std::memory_order_relaxed);
+<span class="line_number">796</span>  return _executor._dependent_async(
+<span class="line_number">797</span>    std::forward&lt;P&gt;(params), std::forward&lt;F&gt;(func), first, last, _node-&gt;_topology, _node
+<span class="line_number">798</span>  );
+<span class="line_number">799</span>}
+<span class="line_number">800</span>
+<span class="line_number">801</span>// ----------------------------------------------------------------------------
+<span class="line_number">802</span>// Executor Forward Declaration
+<span class="line_number">803</span>// ----------------------------------------------------------------------------
+<span class="line_number">804</span>
+<span class="line_number">805</span>// Procedure: _invoke_runtime_task
+<span class="line_number">806</span>inline bool Executor::_invoke_runtime_task(Worker&amp; worker, Node* node) {
+<span class="line_number">807</span>  return _invoke_runtime_task_impl(
+<span class="line_number">808</span>    worker, node, std::get_if&lt;Node::Runtime&gt;(&amp;node-&gt;_handle)-&gt;work
+<span class="line_number">809</span>  );
+<span class="line_number">810</span>}
+<span class="line_number">811</span>
+<span class="line_number">812</span>// Function: _invoke_runtime_task_impl
+<span class="line_number">813</span>inline bool Executor::_invoke_runtime_task_impl(
+<span class="line_number">814</span>  Worker&amp; worker, Node* node, std::function&lt;void(Runtime&amp;)&gt;&amp; work
+<span class="line_number">815</span>) {
+<span class="line_number">816</span>  // first time
+</code></pre>
+            <div class="issue">
+                <div>
+                    <span class="what">Possible data race during read of size 4 at 0x2A85CB30 by thread #10</span>
+                    <div class="navigation">
+                        <button class="next_error">Next</button>
+                        <button class="prev_error">Previous</button>
+                    </div>
+                </div>
+                <div>
+                    <table class="call_stack">
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/runtime.hpp:807<br>
+                                    <code class="cpp">tf::Executor::_invoke_runtime_task(tf::Worker&amp;, tf::Node*)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">804</span>
+<span class="line_number">805</span>// Procedure: _invoke_runtime_task
+<span class="line_number">806</span>inline bool Executor::_invoke_runtime_task(Worker&amp; worker, Node* node) {
+<span class="line_number">807</span><span class="error">  return _invoke_runtime_task_impl(
+</span><span class="line_number">808</span>    worker, node, std::get_if&lt;Node::Runtime&gt;(&amp;node-&gt;_handle)-&gt;work
+<span class="line_number">809</span>  );
+<span class="line_number">810</span>}
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/executor.hpp:1668<br>
+                                    <code class="cpp">tf::Executor::_invoke(tf::Worker&amp;, tf::Node*)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1665</span>    
+<span class="line_number">1666</span>    // runtime task
+<span class="line_number">1667</span>    case Node::RUNTIME:{
+<span class="line_number">1668</span><span class="error">      if(_invoke_runtime_task(worker, node)) {
+</span><span class="line_number">1669</span>        return;
+<span class="line_number">1670</span>      }
+<span class="line_number">1671</span>    }
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/executor.hpp:1424<br>
+                                    <code class="cpp">tf::Executor::_exploit_task(tf::Worker&amp;, tf::Node*&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1421</span>// Procedure: _exploit_task
+<span class="line_number">1422</span>inline void Executor::_exploit_task(Worker&amp; w, Node*&amp; t) {
+<span class="line_number">1423</span>  while(t) {
+<span class="line_number">1424</span><span class="error">    _invoke(w, t);
+</span><span class="line_number">1425</span>    t = w._wsq.pop();
+<span class="line_number">1426</span>  }
+<span class="line_number">1427</span>}
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/executor.hpp:1327<br>
+                                    <code class="cpp">tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}::operator()() const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1324</span>        while(1) {
+<span class="line_number">1325</span>
+<span class="line_number">1326</span>          // drains out the local queue first
+<span class="line_number">1327</span><span class="error">          _exploit_task(worker, t);
+</span><span class="line_number">1328</span>
+<span class="line_number">1329</span>          // steals and waits for tasks
+<span class="line_number">1330</span>          if(_wait_for_task(worker, t) == false) {
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:61<br>
+                                    <code class="cpp">void std::__invoke_impl&lt;void, tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}&gt;(std::__invoke_other, tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}&amp;&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">58</span>  template&lt;typename _Res, typename _Fn, typename... _Args&gt;
+<span class="line_number">59</span>    constexpr _Res
+<span class="line_number">60</span>    __invoke_impl(__invoke_other, _Fn&amp;&amp; __f, _Args&amp;&amp;... __args)
+<span class="line_number">61</span><span class="error">    { return std::forward&lt;_Fn&gt;(__f)(std::forward&lt;_Args&gt;(__args)...); }
+</span><span class="line_number">62</span>
+<span class="line_number">63</span>  template&lt;typename _Res, typename _MemFun, typename _Tp, typename... _Args&gt;
+<span class="line_number">64</span>    constexpr _Res
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:96<br>
+                                    <code class="cpp">std::__invoke_result&lt;tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}&gt;::type std::__invoke&lt;tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}&gt;(tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}&amp;&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">93</span>      using __result = __invoke_result&lt;_Callable, _Args...&gt;;
+<span class="line_number">94</span>      using __type = typename __result::type;
+<span class="line_number">95</span>      using __tag = typename __result::__invoke_type;
+<span class="line_number">96</span><span class="error">      return std::__invoke_impl&lt;__type&gt;(__tag{}, std::forward&lt;_Callable&gt;(__fn),
+</span><span class="line_number">97</span>					std::forward&lt;_Args&gt;(__args)...);
+<span class="line_number">98</span>    }
+<span class="line_number">99</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/std_thread.h:292<br>
+                                    <code class="cpp">void std::thread::_Invoker&lt;std::tuple&lt;tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}&gt; &gt;::_M_invoke&lt;0ul&gt;(std::_Index_tuple&lt;0ul&gt;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">289</span>	template&lt;size_t... _Ind&gt;
+<span class="line_number">290</span>	  typename __result&lt;_Tuple&gt;::type
+<span class="line_number">291</span>	  _M_invoke(_Index_tuple&lt;_Ind...&gt;)
+<span class="line_number">292</span><span class="error">	  { return std::__invoke(std::get&lt;_Ind&gt;(std::move(_M_t))...); }
+</span><span class="line_number">293</span>
+<span class="line_number">294</span>	typename __result&lt;_Tuple&gt;::type
+<span class="line_number">295</span>	operator()()
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/std_thread.h:299<br>
+                                    <code class="cpp">std::thread::_Invoker&lt;std::tuple&lt;tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}&gt; &gt;::operator()()</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">296</span>	{
+<span class="line_number">297</span>	  using _Indices
+<span class="line_number">298</span>	    = typename _Build_index_tuple&lt;tuple_size&lt;_Tuple&gt;::value&gt;::__type;
+<span class="line_number">299</span><span class="error">	  return _M_invoke(_Indices());
+</span><span class="line_number">300</span>	}
+<span class="line_number">301</span>      };
+<span class="line_number">302</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/std_thread.h:244<br>
+                                    <code class="cpp">std::thread::_State_impl&lt;std::thread::_Invoker&lt;std::tuple&lt;tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}&gt; &gt; &gt;::_M_run()</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">241</span>	  { }
+<span class="line_number">242</span>
+<span class="line_number">243</span>	void
+<span class="line_number">244</span><span class="error">	_M_run() { _M_func(); }
+</span><span class="line_number">245</span>      };
+<span class="line_number">246</span>
+<span class="line_number">247</span>    void
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    None<br>
+                                    <code class="cpp">None</code>
+                                </div>
+                                <pre><code class="c++"></code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    None<br>
+                                    <code class="cpp">None</code>
+                                </div>
+                                <pre><code class="c++"></code></pre>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            <pre class="code">
+<code class="c++"><span class="line_number">817</span><span class="error">  if((node-&gt;_nstate &amp; NSTATE::PREEMPTED) == 0) {</span>
+<span class="line_number">818</span>
+<span class="line_number">819</span>    Runtime rt(*this, worker, node);
+<span class="line_number">820</span>
+</code></pre>
+            <div class="issue">
+                <div>
+                    <span class="what">Possible data race during write of size 4 at 0x29E2AA30 by thread #9</span>
+                    <div class="navigation">
+                        <button class="next_error">Next</button>
+                        <button class="prev_error">Previous</button>
+                    </div>
+                </div>
+                <div>
+                    <table class="call_stack">
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/executor.hpp:2010<br>
+                                    <code class="cpp">tf::Executor::_invoke_async_task(tf::Worker&amp;, tf::Node*)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">2007</span>    
+<span class="line_number">2008</span>    // void(Runtime&amp;)
+<span class="line_number">2009</span>    case 1:
+<span class="line_number">2010</span><span class="error">      if(_invoke_runtime_task_impl(worker, node, *std::get_if&lt;1&gt;(&amp;work))) {
+</span><span class="line_number">2011</span>        return true;
+<span class="line_number">2012</span>      }
+<span class="line_number">2013</span>    break;
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/executor.hpp:1710<br>
+                                    <code class="cpp">tf::Executor::_invoke(tf::Worker&amp;, tf::Node*)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1707</span>
+<span class="line_number">1708</span>    // async task
+<span class="line_number">1709</span>    case Node::ASYNC: {
+<span class="line_number">1710</span><span class="error">      if(_invoke_async_task(worker, node)) {
+</span><span class="line_number">1711</span>        return;
+<span class="line_number">1712</span>      }
+<span class="line_number">1713</span>      _tear_down_async(worker, node, cache);
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/executor.hpp:1424<br>
+                                    <code class="cpp">tf::Executor::_exploit_task(tf::Worker&amp;, tf::Node*&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1421</span>// Procedure: _exploit_task
+<span class="line_number">1422</span>inline void Executor::_exploit_task(Worker&amp; w, Node*&amp; t) {
+<span class="line_number">1423</span>  while(t) {
+<span class="line_number">1424</span><span class="error">    _invoke(w, t);
+</span><span class="line_number">1425</span>    t = w._wsq.pop();
+<span class="line_number">1426</span>  }
+<span class="line_number">1427</span>}
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/executor.hpp:1327<br>
+                                    <code class="cpp">tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}::operator()() const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1324</span>        while(1) {
+<span class="line_number">1325</span>
+<span class="line_number">1326</span>          // drains out the local queue first
+<span class="line_number">1327</span><span class="error">          _exploit_task(worker, t);
+</span><span class="line_number">1328</span>
+<span class="line_number">1329</span>          // steals and waits for tasks
+<span class="line_number">1330</span>          if(_wait_for_task(worker, t) == false) {
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:61<br>
+                                    <code class="cpp">void std::__invoke_impl&lt;void, tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}&gt;(std::__invoke_other, tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}&amp;&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">58</span>  template&lt;typename _Res, typename _Fn, typename... _Args&gt;
+<span class="line_number">59</span>    constexpr _Res
+<span class="line_number">60</span>    __invoke_impl(__invoke_other, _Fn&amp;&amp; __f, _Args&amp;&amp;... __args)
+<span class="line_number">61</span><span class="error">    { return std::forward&lt;_Fn&gt;(__f)(std::forward&lt;_Args&gt;(__args)...); }
+</span><span class="line_number">62</span>
+<span class="line_number">63</span>  template&lt;typename _Res, typename _MemFun, typename _Tp, typename... _Args&gt;
+<span class="line_number">64</span>    constexpr _Res
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:96<br>
+                                    <code class="cpp">std::__invoke_result&lt;tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}&gt;::type std::__invoke&lt;tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}&gt;(tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}&amp;&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">93</span>      using __result = __invoke_result&lt;_Callable, _Args...&gt;;
+<span class="line_number">94</span>      using __type = typename __result::type;
+<span class="line_number">95</span>      using __tag = typename __result::__invoke_type;
+<span class="line_number">96</span><span class="error">      return std::__invoke_impl&lt;__type&gt;(__tag{}, std::forward&lt;_Callable&gt;(__fn),
+</span><span class="line_number">97</span>					std::forward&lt;_Args&gt;(__args)...);
+<span class="line_number">98</span>    }
+<span class="line_number">99</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/std_thread.h:292<br>
+                                    <code class="cpp">void std::thread::_Invoker&lt;std::tuple&lt;tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}&gt; &gt;::_M_invoke&lt;0ul&gt;(std::_Index_tuple&lt;0ul&gt;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">289</span>	template&lt;size_t... _Ind&gt;
+<span class="line_number">290</span>	  typename __result&lt;_Tuple&gt;::type
+<span class="line_number">291</span>	  _M_invoke(_Index_tuple&lt;_Ind...&gt;)
+<span class="line_number">292</span><span class="error">	  { return std::__invoke(std::get&lt;_Ind&gt;(std::move(_M_t))...); }
+</span><span class="line_number">293</span>
+<span class="line_number">294</span>	typename __result&lt;_Tuple&gt;::type
+<span class="line_number">295</span>	operator()()
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/std_thread.h:299<br>
+                                    <code class="cpp">std::thread::_Invoker&lt;std::tuple&lt;tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}&gt; &gt;::operator()()</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">296</span>	{
+<span class="line_number">297</span>	  using _Indices
+<span class="line_number">298</span>	    = typename _Build_index_tuple&lt;tuple_size&lt;_Tuple&gt;::value&gt;::__type;
+<span class="line_number">299</span><span class="error">	  return _M_invoke(_Indices());
+</span><span class="line_number">300</span>	}
+<span class="line_number">301</span>      };
+<span class="line_number">302</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/std_thread.h:244<br>
+                                    <code class="cpp">std::thread::_State_impl&lt;std::thread::_Invoker&lt;std::tuple&lt;tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}&gt; &gt; &gt;::_M_run()</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">241</span>	  { }
+<span class="line_number">242</span>
+<span class="line_number">243</span>	void
+<span class="line_number">244</span><span class="error">	_M_run() { _M_func(); }
+</span><span class="line_number">245</span>      };
+<span class="line_number">246</span>
+<span class="line_number">247</span>    void
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    None<br>
+                                    <code class="cpp">None</code>
+                                </div>
+                                <pre><code class="c++"></code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    None<br>
+                                    <code class="cpp">None</code>
+                                </div>
+                                <pre><code class="c++"></code></pre>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            <pre class="code">
+<code class="c++"><span class="line_number">821</span><span class="error">    node-&gt;_nstate |= (NSTATE::PREEMPTED | NSTATE::IMPLICITLY_ANCHORED);</span>
+<span class="line_number">822</span>
+<span class="line_number">823</span>    node-&gt;_join_counter.fetch_add(1, std::memory_order_release);
+<span class="line_number">824</span>
+<span class="line_number">825</span>    _observer_prologue(worker, node);
+<span class="line_number">826</span>    TF_EXECUTOR_EXCEPTION_HANDLER(worker, node, {
+<span class="line_number">827</span>      work(rt);
+<span class="line_number">828</span>    });
+<span class="line_number">829</span>    _observer_epilogue(worker, node);
+<span class="line_number">830</span>    
+<span class="line_number">831</span>    // Last one to leave the runtime; no need to preempt this runtime.
+<span class="line_number">832</span>    if(node-&gt;_join_counter.fetch_sub(1, std::memory_order_acq_rel) == 1) {
+</code></pre>
+            <div class="issue">
+                <div>
+                    <span class="what">Possible data race during read of size 4 at 0x2A83B390 by thread #11</span>
+                    <div class="navigation">
+                        <button class="next_error">Next</button>
+                        <button class="prev_error">Previous</button>
+                    </div>
+                </div>
+                <div>
+                    <table class="call_stack">
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/runtime.hpp:807<br>
+                                    <code class="cpp">tf::Executor::_invoke_runtime_task(tf::Worker&amp;, tf::Node*)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">804</span>
+<span class="line_number">805</span>// Procedure: _invoke_runtime_task
+<span class="line_number">806</span>inline bool Executor::_invoke_runtime_task(Worker&amp; worker, Node* node) {
+<span class="line_number">807</span><span class="error">  return _invoke_runtime_task_impl(
+</span><span class="line_number">808</span>    worker, node, std::get_if&lt;Node::Runtime&gt;(&amp;node-&gt;_handle)-&gt;work
+<span class="line_number">809</span>  );
+<span class="line_number">810</span>}
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/executor.hpp:1668<br>
+                                    <code class="cpp">tf::Executor::_invoke(tf::Worker&amp;, tf::Node*)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1665</span>    
+<span class="line_number">1666</span>    // runtime task
+<span class="line_number">1667</span>    case Node::RUNTIME:{
+<span class="line_number">1668</span><span class="error">      if(_invoke_runtime_task(worker, node)) {
+</span><span class="line_number">1669</span>        return;
+<span class="line_number">1670</span>      }
+<span class="line_number">1671</span>    }
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/executor.hpp:1424<br>
+                                    <code class="cpp">tf::Executor::_exploit_task(tf::Worker&amp;, tf::Node*&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1421</span>// Procedure: _exploit_task
+<span class="line_number">1422</span>inline void Executor::_exploit_task(Worker&amp; w, Node*&amp; t) {
+<span class="line_number">1423</span>  while(t) {
+<span class="line_number">1424</span><span class="error">    _invoke(w, t);
+</span><span class="line_number">1425</span>    t = w._wsq.pop();
+<span class="line_number">1426</span>  }
+<span class="line_number">1427</span>}
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/executor.hpp:1327<br>
+                                    <code class="cpp">tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}::operator()() const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1324</span>        while(1) {
+<span class="line_number">1325</span>
+<span class="line_number">1326</span>          // drains out the local queue first
+<span class="line_number">1327</span><span class="error">          _exploit_task(worker, t);
+</span><span class="line_number">1328</span>
+<span class="line_number">1329</span>          // steals and waits for tasks
+<span class="line_number">1330</span>          if(_wait_for_task(worker, t) == false) {
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:61<br>
+                                    <code class="cpp">void std::__invoke_impl&lt;void, tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}&gt;(std::__invoke_other, tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}&amp;&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">58</span>  template&lt;typename _Res, typename _Fn, typename... _Args&gt;
+<span class="line_number">59</span>    constexpr _Res
+<span class="line_number">60</span>    __invoke_impl(__invoke_other, _Fn&amp;&amp; __f, _Args&amp;&amp;... __args)
+<span class="line_number">61</span><span class="error">    { return std::forward&lt;_Fn&gt;(__f)(std::forward&lt;_Args&gt;(__args)...); }
+</span><span class="line_number">62</span>
+<span class="line_number">63</span>  template&lt;typename _Res, typename _MemFun, typename _Tp, typename... _Args&gt;
+<span class="line_number">64</span>    constexpr _Res
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:96<br>
+                                    <code class="cpp">std::__invoke_result&lt;tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}&gt;::type std::__invoke&lt;tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}&gt;(tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}&amp;&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">93</span>      using __result = __invoke_result&lt;_Callable, _Args...&gt;;
+<span class="line_number">94</span>      using __type = typename __result::type;
+<span class="line_number">95</span>      using __tag = typename __result::__invoke_type;
+<span class="line_number">96</span><span class="error">      return std::__invoke_impl&lt;__type&gt;(__tag{}, std::forward&lt;_Callable&gt;(__fn),
+</span><span class="line_number">97</span>					std::forward&lt;_Args&gt;(__args)...);
+<span class="line_number">98</span>    }
+<span class="line_number">99</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/std_thread.h:292<br>
+                                    <code class="cpp">void std::thread::_Invoker&lt;std::tuple&lt;tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}&gt; &gt;::_M_invoke&lt;0ul&gt;(std::_Index_tuple&lt;0ul&gt;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">289</span>	template&lt;size_t... _Ind&gt;
+<span class="line_number">290</span>	  typename __result&lt;_Tuple&gt;::type
+<span class="line_number">291</span>	  _M_invoke(_Index_tuple&lt;_Ind...&gt;)
+<span class="line_number">292</span><span class="error">	  { return std::__invoke(std::get&lt;_Ind&gt;(std::move(_M_t))...); }
+</span><span class="line_number">293</span>
+<span class="line_number">294</span>	typename __result&lt;_Tuple&gt;::type
+<span class="line_number">295</span>	operator()()
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/std_thread.h:299<br>
+                                    <code class="cpp">std::thread::_Invoker&lt;std::tuple&lt;tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}&gt; &gt;::operator()()</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">296</span>	{
+<span class="line_number">297</span>	  using _Indices
+<span class="line_number">298</span>	    = typename _Build_index_tuple&lt;tuple_size&lt;_Tuple&gt;::value&gt;::__type;
+<span class="line_number">299</span><span class="error">	  return _M_invoke(_Indices());
+</span><span class="line_number">300</span>	}
+<span class="line_number">301</span>      };
+<span class="line_number">302</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/std_thread.h:244<br>
+                                    <code class="cpp">std::thread::_State_impl&lt;std::thread::_Invoker&lt;std::tuple&lt;tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}&gt; &gt; &gt;::_M_run()</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">241</span>	  { }
+<span class="line_number">242</span>
+<span class="line_number">243</span>	void
+<span class="line_number">244</span><span class="error">	_M_run() { _M_func(); }
+</span><span class="line_number">245</span>      };
+<span class="line_number">246</span>
+<span class="line_number">247</span>    void
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    None<br>
+                                    <code class="cpp">None</code>
+                                </div>
+                                <pre><code class="c++"></code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    None<br>
+                                    <code class="cpp">None</code>
+                                </div>
+                                <pre><code class="c++"></code></pre>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            <pre class="code">
+<code class="c++"><span class="line_number">833</span><span class="error">      node-&gt;_nstate &amp;= ~(NSTATE::PREEMPTED | NSTATE::IMPLICITLY_ANCHORED);</span>
+<span class="line_number">834</span>    }
+<span class="line_number">835</span>    // There are still child tasks running; need to preempt this runtime.
+<span class="line_number">836</span>    // Here, we cannot let caller check the state from node-&gt;_nstate due to data race,
+<span class="line_number">837</span>    // but return a stateless boolean to indicate preemption.
+<span class="line_number">838</span>    // Ex: if preempted, another task may finish real quck and insert this parent task
+<span class="line_number">839</span>    // again into the scheduling queue. When running this parent task, it will jump to
+<span class="line_number">840</span>    // else branch below and modify tne nstate, thus incuring data race.
+<span class="line_number">841</span>    else {
+<span class="line_number">842</span>      return true;
+<span class="line_number">843</span>    }
+<span class="line_number">844</span>  }
+<span class="line_number">845</span>  // second time - previously preempted
+<span class="line_number">846</span>  else {
+</code></pre>
+            <div class="issue">
+                <div>
+                    <span class="what">Possible data race during write of size 4 at 0x29E2AA30 by thread #9</span>
+                    <div class="navigation">
+                        <button class="next_error">Next</button>
+                        <button class="prev_error">Previous</button>
+                    </div>
+                </div>
+                <div>
+                    <table class="call_stack">
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/executor.hpp:2010<br>
+                                    <code class="cpp">tf::Executor::_invoke_async_task(tf::Worker&amp;, tf::Node*)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">2007</span>    
+<span class="line_number">2008</span>    // void(Runtime&amp;)
+<span class="line_number">2009</span>    case 1:
+<span class="line_number">2010</span><span class="error">      if(_invoke_runtime_task_impl(worker, node, *std::get_if&lt;1&gt;(&amp;work))) {
+</span><span class="line_number">2011</span>        return true;
+<span class="line_number">2012</span>      }
+<span class="line_number">2013</span>    break;
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/executor.hpp:1710<br>
+                                    <code class="cpp">tf::Executor::_invoke(tf::Worker&amp;, tf::Node*)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1707</span>
+<span class="line_number">1708</span>    // async task
+<span class="line_number">1709</span>    case Node::ASYNC: {
+<span class="line_number">1710</span><span class="error">      if(_invoke_async_task(worker, node)) {
+</span><span class="line_number">1711</span>        return;
+<span class="line_number">1712</span>      }
+<span class="line_number">1713</span>      _tear_down_async(worker, node, cache);
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/executor.hpp:1424<br>
+                                    <code class="cpp">tf::Executor::_exploit_task(tf::Worker&amp;, tf::Node*&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1421</span>// Procedure: _exploit_task
+<span class="line_number">1422</span>inline void Executor::_exploit_task(Worker&amp; w, Node*&amp; t) {
+<span class="line_number">1423</span>  while(t) {
+<span class="line_number">1424</span><span class="error">    _invoke(w, t);
+</span><span class="line_number">1425</span>    t = w._wsq.pop();
+<span class="line_number">1426</span>  }
+<span class="line_number">1427</span>}
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/executor.hpp:1327<br>
+                                    <code class="cpp">tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}::operator()() const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1324</span>        while(1) {
+<span class="line_number">1325</span>
+<span class="line_number">1326</span>          // drains out the local queue first
+<span class="line_number">1327</span><span class="error">          _exploit_task(worker, t);
+</span><span class="line_number">1328</span>
+<span class="line_number">1329</span>          // steals and waits for tasks
+<span class="line_number">1330</span>          if(_wait_for_task(worker, t) == false) {
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:61<br>
+                                    <code class="cpp">void std::__invoke_impl&lt;void, tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}&gt;(std::__invoke_other, tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}&amp;&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">58</span>  template&lt;typename _Res, typename _Fn, typename... _Args&gt;
+<span class="line_number">59</span>    constexpr _Res
+<span class="line_number">60</span>    __invoke_impl(__invoke_other, _Fn&amp;&amp; __f, _Args&amp;&amp;... __args)
+<span class="line_number">61</span><span class="error">    { return std::forward&lt;_Fn&gt;(__f)(std::forward&lt;_Args&gt;(__args)...); }
+</span><span class="line_number">62</span>
+<span class="line_number">63</span>  template&lt;typename _Res, typename _MemFun, typename _Tp, typename... _Args&gt;
+<span class="line_number">64</span>    constexpr _Res
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:96<br>
+                                    <code class="cpp">std::__invoke_result&lt;tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}&gt;::type std::__invoke&lt;tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}&gt;(tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}&amp;&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">93</span>      using __result = __invoke_result&lt;_Callable, _Args...&gt;;
+<span class="line_number">94</span>      using __type = typename __result::type;
+<span class="line_number">95</span>      using __tag = typename __result::__invoke_type;
+<span class="line_number">96</span><span class="error">      return std::__invoke_impl&lt;__type&gt;(__tag{}, std::forward&lt;_Callable&gt;(__fn),
+</span><span class="line_number">97</span>					std::forward&lt;_Args&gt;(__args)...);
+<span class="line_number">98</span>    }
+<span class="line_number">99</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/std_thread.h:292<br>
+                                    <code class="cpp">void std::thread::_Invoker&lt;std::tuple&lt;tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}&gt; &gt;::_M_invoke&lt;0ul&gt;(std::_Index_tuple&lt;0ul&gt;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">289</span>	template&lt;size_t... _Ind&gt;
+<span class="line_number">290</span>	  typename __result&lt;_Tuple&gt;::type
+<span class="line_number">291</span>	  _M_invoke(_Index_tuple&lt;_Ind...&gt;)
+<span class="line_number">292</span><span class="error">	  { return std::__invoke(std::get&lt;_Ind&gt;(std::move(_M_t))...); }
+</span><span class="line_number">293</span>
+<span class="line_number">294</span>	typename __result&lt;_Tuple&gt;::type
+<span class="line_number">295</span>	operator()()
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/std_thread.h:299<br>
+                                    <code class="cpp">std::thread::_Invoker&lt;std::tuple&lt;tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}&gt; &gt;::operator()()</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">296</span>	{
+<span class="line_number">297</span>	  using _Indices
+<span class="line_number">298</span>	    = typename _Build_index_tuple&lt;tuple_size&lt;_Tuple&gt;::value&gt;::__type;
+<span class="line_number">299</span><span class="error">	  return _M_invoke(_Indices());
+</span><span class="line_number">300</span>	}
+<span class="line_number">301</span>      };
+<span class="line_number">302</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/std_thread.h:244<br>
+                                    <code class="cpp">std::thread::_State_impl&lt;std::thread::_Invoker&lt;std::tuple&lt;tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}&gt; &gt; &gt;::_M_run()</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">241</span>	  { }
+<span class="line_number">242</span>
+<span class="line_number">243</span>	void
+<span class="line_number">244</span><span class="error">	_M_run() { _M_func(); }
+</span><span class="line_number">245</span>      };
+<span class="line_number">246</span>
+<span class="line_number">247</span>    void
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    None<br>
+                                    <code class="cpp">None</code>
+                                </div>
+                                <pre><code class="c++"></code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    None<br>
+                                    <code class="cpp">None</code>
+                                </div>
+                                <pre><code class="c++"></code></pre>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            <pre class="code">
+<code class="c++"><span class="line_number">847</span><span class="error">    node-&gt;_nstate &amp;= ~(NSTATE::PREEMPTED | NSTATE::IMPLICITLY_ANCHORED);</span>
+<span class="line_number">848</span>  }
+<span class="line_number">849</span>  return false;
+<span class="line_number">850</span>}
+<span class="line_number">851</span>
+<span class="line_number">852</span>// Function: _invoke_runtime_task_impl
+<span class="line_number">853</span>inline bool Executor::_invoke_runtime_task_impl(
+<span class="line_number">854</span>  Worker&amp; worker, Node* node, std::function&lt;void(Runtime&amp;, bool)&gt;&amp; work
+<span class="line_number">855</span>) {
+<span class="line_number">856</span>    
+<span class="line_number">857</span>  Runtime rt(*this, worker, node);
+<span class="line_number">858</span>
+<span class="line_number">859</span>  // first time
+<span class="line_number">860</span>  if((node-&gt;_nstate &amp; NSTATE::PREEMPTED) == 0) {
+<span class="line_number">861</span>    
+<span class="line_number">862</span>    node-&gt;_nstate |= (NSTATE::PREEMPTED | NSTATE::IMPLICITLY_ANCHORED);
+<span class="line_number">863</span>    node-&gt;_join_counter.fetch_add(1, std::memory_order_release);
+<span class="line_number">864</span>
+<span class="line_number">865</span>    _observer_prologue(worker, node);
+<span class="line_number">866</span>    TF_EXECUTOR_EXCEPTION_HANDLER(worker, node, {
+<span class="line_number">867</span>      work(rt, false);
+<span class="line_number">868</span>    });
+<span class="line_number">869</span>    _observer_epilogue(worker, node);
+<span class="line_number">870</span>    
+<span class="line_number">871</span>    // Last one to leave this runtime; no need to preempt this runtime
+<span class="line_number">872</span>    if(node-&gt;_join_counter.fetch_sub(1, std::memory_order_acq_rel) == 1) {
+<span class="line_number">873</span>      node-&gt;_nstate &amp;= ~(NSTATE::PREEMPTED | NSTATE::IMPLICITLY_ANCHORED);
+<span class="line_number">874</span>    }
+<span class="line_number">875</span>    // Here, we cannot let caller check the state from node-&gt;_nstate due to data race,
+<span class="line_number">876</span>    // but return a stateless boolean to indicate preemption.
+<span class="line_number">877</span>    // Ex: if preempted, another task may finish real quck and insert this parent task
+<span class="line_number">878</span>    // again into the scheduling queue. When running this parent task, it will jump to
+<span class="line_number">879</span>    // else branch below and modify tne nstate, thus incuring data race.
+<span class="line_number">880</span>    else {
+<span class="line_number">881</span>      return true;
+<span class="line_number">882</span>    }
+<span class="line_number">883</span>  }
+<span class="line_number">884</span>  // second time - previously preempted
+<span class="line_number">885</span>  else {
+<span class="line_number">886</span>    node-&gt;_nstate &amp;= ~(NSTATE::PREEMPTED | NSTATE::IMPLICITLY_ANCHORED);
+<span class="line_number">887</span>  }
+<span class="line_number">888</span>
+<span class="line_number">889</span>  // clean up outstanding work (e.g., exception)
+<span class="line_number">890</span>  work(rt, true);
+<span class="line_number">891</span>
+<span class="line_number">892</span>  return false;
+<span class="line_number">893</span>}
+<span class="line_number">894</span>
+<span class="line_number">895</span>// ------------------------------------------------------------------------------------------------
+<span class="line_number">896</span>// class: NonpreemptiveRuntime (internal use only)
+<span class="line_number">897</span>// ------------------------------------------------------------------------------------------------
+<span class="line_number">898</span>
+<span class="line_number">899</span>/**
+<span class="line_number">900</span>@private
+<span class="line_number">901</span>*/
+<span class="line_number">902</span>class NonpreemptiveRuntime {
+<span class="line_number">903</span>
+<span class="line_number">904</span>  friend class Executor;
+<span class="line_number">905</span>
+<span class="line_number">906</span>  public:
+<span class="line_number">907</span>  
+<span class="line_number">908</span>  /**
+<span class="line_number">909</span>  @private
+<span class="line_number">910</span>  */
+<span class="line_number">911</span>  void schedule(Task task);
+<span class="line_number">912</span>  
+<span class="line_number">913</span>  private:
+<span class="line_number">914</span>
+<span class="line_number">915</span>  /**
+<span class="line_number">916</span>  @private
+<span class="line_number">917</span>  */
+<span class="line_number">918</span>  explicit NonpreemptiveRuntime(Executor&amp; executor, Worker&amp; worker) :
+<span class="line_number">919</span>    _executor {executor}, _worker {worker}{
+<span class="line_number">920</span>  }
+<span class="line_number">921</span>  
+<span class="line_number">922</span>  /**
+<span class="line_number">923</span>  @private
+<span class="line_number">924</span>  */
+<span class="line_number">925</span>  Executor&amp; _executor;
+<span class="line_number">926</span>  
+<span class="line_number">927</span>  /**
+<span class="line_number">928</span>  @private
+<span class="line_number">929</span>  */
+<span class="line_number">930</span>  Worker&amp; _worker;
+<span class="line_number">931</span>};
+<span class="line_number">932</span>
+<span class="line_number">933</span>// Procedure: schedule
+<span class="line_number">934</span>inline void NonpreemptiveRuntime::schedule(Task task) {
+<span class="line_number">935</span>
+<span class="line_number">936</span>  auto node = task._node;
+<span class="line_number">937</span>  // need to keep the invariant: when scheduling a task, the task must have
+<span class="line_number">938</span>  // zero dependency (join counter is 0)
+<span class="line_number">939</span>  // or we can encounter bug when inserting a nested flow (e.g., module task)
+<span class="line_number">940</span>  node-&gt;_join_counter.store(0, std::memory_order_relaxed);
+<span class="line_number">941</span>
+<span class="line_number">942</span>  auto&amp; j = node-&gt;_parent ? node-&gt;_parent-&gt;_join_counter :
+<span class="line_number">943</span>                            node-&gt;_topology-&gt;_join_counter;
+<span class="line_number">944</span>  j.fetch_add(1, std::memory_order_relaxed);
+<span class="line_number">945</span>  _executor._schedule(_worker, node);
+<span class="line_number">946</span>}
+<span class="line_number">947</span>
+<span class="line_number">948</span>// ----------------------------------------------------------------------------
+<span class="line_number">949</span>// Executor Forward Declaration
+<span class="line_number">950</span>// ----------------------------------------------------------------------------
+<span class="line_number">951</span>
+<span class="line_number">952</span>// Procedure: _invoke_nonpreemptive_runtime_task
+<span class="line_number">953</span>inline void Executor::_invoke_nonpreemptive_runtime_task(Worker&amp; worker, Node* node) {
+<span class="line_number">954</span>  _observer_prologue(worker, node);
+<span class="line_number">955</span>  tf::NonpreemptiveRuntime nprt(*this, worker);
+<span class="line_number">956</span>  TF_EXECUTOR_EXCEPTION_HANDLER(worker, node, {
+<span class="line_number">957</span>    std::get_if&lt;Node::NonpreemptiveRuntime&gt;(&amp;node-&gt;_handle)-&gt;work(nprt);
+<span class="line_number">958</span>  });
+<span class="line_number">959</span>  _observer_epilogue(worker, node);
+<span class="line_number">960</span>}
+<span class="line_number">961</span>
+<span class="line_number">962</span>
+<span class="line_number">963</span>// Function: run_until
+<span class="line_number">964</span>template &lt;typename P, typename C&gt;
+<span class="line_number">965</span>tf::Future&lt;void&gt; Executor::run_until(Taskflow&amp;&amp; f, P&amp;&amp; p, C&amp;&amp; c) {
+<span class="line_number">966</span>
+<span class="line_number">967</span>  _increment_topology();
+<span class="line_number">968</span>
+<span class="line_number">969</span>  // No need to create a real topology but returns an dummy future for invariant.
+<span class="line_number">970</span>  // Note that here we don&#39;t do std::async(std::launch::deferred, [](){}) because
+<span class="line_number">971</span>  // the invariant requires the future to be ready before decrementing the topology,
+<span class="line_number">972</span>  // rather than calling future.get() from the caller.
+<span class="line_number">973</span>  if(f.empty() || p()) {
+<span class="line_number">974</span>    c();
+<span class="line_number">975</span>    std::promise&lt;void&gt; promise;
+<span class="line_number">976</span>    promise.set_value();
+<span class="line_number">977</span>    _decrement_topology();
+<span class="line_number">978</span>    return tf::Future&lt;void&gt;(promise.get_future());
+<span class="line_number">979</span>  }
+<span class="line_number">980</span>
+<span class="line_number">981</span>  auto g = std::make_unique&lt;Taskflow&gt;(std::move(f)); 
+<span class="line_number">982</span>
+<span class="line_number">983</span>  // creates a topology for this run
+<span class="line_number">984</span>  auto t = std::make_shared&lt;Topology&gt;(*g, std::forward&lt;P&gt;(p), std::forward&lt;C&gt;(c));
+<span class="line_number">985</span>  //auto t = std::make_shared&lt;DerivedTopology&lt;P, C&gt;&gt;(*g, std::forward&lt;P&gt;(p), std::forward&lt;C&gt;(c));
+<span class="line_number">986</span>
+<span class="line_number">987</span>  // need to create future before the topology got torn down quickly
+<span class="line_number">988</span>  tf::Future&lt;void&gt; future(t-&gt;_promise.get_future(), t);
+<span class="line_number">989</span>
+<span class="line_number">990</span>  // creates a silent-async that holds the taskflow
+<span class="line_number">991</span>  silent_async([g=MoC{std::move(g)}, t](tf::Runtime&amp; rt) mutable {
+</code></pre>
+            <div class="issue">
+                <div>
+                    <span class="what">Possible data race during write of size 8 at 0x29A006A8 by thread #9</span>
+                    <div class="navigation">
+                        <button class="next_error">Next</button>
+                        <button class="prev_error">Previous</button>
+                    </div>
+                </div>
+                <div>
+                    <table class="call_stack">
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:61<br>
+                                    <code class="cpp">void std::__invoke_impl&lt;void, tf::Executor::run_until&lt;tf::Executor::run_n&lt;tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&gt;(tf::Taskflow&amp;&amp;, unsigned long, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&amp;&amp;)::{lambda()#1}, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&gt;(tf::Taskflow&amp;&amp;, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&amp;&amp;, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&amp;&amp;)::{lambda(tf::Runtime&amp;)#1}&amp;, tf::Runtime&amp;&gt;(std::__invoke_other, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&amp;&amp;, tf::Runtime&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">58</span>  template&lt;typename _Res, typename _Fn, typename... _Args&gt;
+<span class="line_number">59</span>    constexpr _Res
+<span class="line_number">60</span>    __invoke_impl(__invoke_other, _Fn&amp;&amp; __f, _Args&amp;&amp;... __args)
+<span class="line_number">61</span><span class="error">    { return std::forward&lt;_Fn&gt;(__f)(std::forward&lt;_Args&gt;(__args)...); }
+</span><span class="line_number">62</span>
+<span class="line_number">63</span>  template&lt;typename _Res, typename _MemFun, typename _Tp, typename... _Args&gt;
+<span class="line_number">64</span>    constexpr _Res
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:111<br>
+                                    <code class="cpp">std::enable_if&lt;is_invocable_r_v&lt;void, tf::Executor::run_until&lt;tf::Executor::run_n&lt;tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&gt;(tf::Taskflow&amp;&amp;, unsigned long, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&amp;&amp;)::{lambda()#1}, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&gt;(tf::Taskflow&amp;&amp;, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&amp;&amp;, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&amp;&amp;)::{lambda(tf::Runtime&amp;)#1}&amp;, tf::Runtime&amp;&gt;, void&gt;::type std::__invoke_r&lt;void, tf::Executor::run_until&lt;tf::Executor::run_n&lt;tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&gt;(tf::Taskflow&amp;&amp;, unsigned long, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&amp;&amp;)::{lambda()#1}, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&gt;(tf::Taskflow&amp;&amp;, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&amp;&amp;, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&amp;&amp;)::{lambda(tf::Runtime&amp;)#1}&amp;, tf::Runtime&amp;&gt;(tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&amp;&amp;, tf::Runtime&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">108</span>      using __type = typename __result::type;
+<span class="line_number">109</span>      using __tag = typename __result::__invoke_type;
+<span class="line_number">110</span>      if constexpr (is_void_v&lt;_Res&gt;)
+<span class="line_number">111</span><span class="error">	std::__invoke_impl&lt;__type&gt;(__tag{}, std::forward&lt;_Callable&gt;(__fn),
+</span><span class="line_number">112</span>					std::forward&lt;_Args&gt;(__args)...);
+<span class="line_number">113</span>      else
+<span class="line_number">114</span>	return std::__invoke_impl&lt;__type&gt;(__tag{},
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/std_function.h:290<br>
+                                    <code class="cpp">std::_Function_handler&lt;void (tf::Runtime&amp;), tf::Executor::run_until&lt;tf::Executor::run_n&lt;tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&gt;(tf::Taskflow&amp;&amp;, unsigned long, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&amp;&amp;)::{lambda()#1}, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&gt;(tf::Taskflow&amp;&amp;, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&amp;&amp;, tf::Executor::run(tf::Taskflow&amp;&amp;)::{lambda()#1}&amp;&amp;)::{lambda(tf::Runtime&amp;)#1}&gt;::_M_invoke(std::_Any_data const&amp;, tf::Runtime&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">287</span>      static _Res
+<span class="line_number">288</span>      _M_invoke(const _Any_data&amp; __functor, _ArgTypes&amp;&amp;... __args)
+<span class="line_number">289</span>      {
+<span class="line_number">290</span><span class="error">	return std::__invoke_r&lt;_Res&gt;(*_Base::_M_get_pointer(__functor),
+</span><span class="line_number">291</span>				     std::forward&lt;_ArgTypes&gt;(__args)...);
+<span class="line_number">292</span>      }
+<span class="line_number">293</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/std_function.h:591<br>
+                                    <code class="cpp">std::function&lt;void (tf::Runtime&amp;)&gt;::operator()(tf::Runtime&amp;) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">588</span>      {
+<span class="line_number">589</span>	if (_M_empty())
+<span class="line_number">590</span>	  __throw_bad_function_call();
+<span class="line_number">591</span><span class="error">	return _M_invoker(_M_functor, std::forward&lt;_ArgTypes&gt;(__args)...);
+</span><span class="line_number">592</span>      }
+<span class="line_number">593</span>
+<span class="line_number">594</span>#if __cpp_rtti
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/runtime.hpp:826<br>
+                                    <code class="cpp">tf::Executor::_invoke_runtime_task_impl(tf::Worker&amp;, tf::Node*, std::function&lt;void (tf::Runtime&amp;)&gt;&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">823</span>    node-&gt;_join_counter.fetch_add(1, std::memory_order_release);
+<span class="line_number">824</span>
+<span class="line_number">825</span>    _observer_prologue(worker, node);
+<span class="line_number">826</span><span class="error">    TF_EXECUTOR_EXCEPTION_HANDLER(worker, node, {
+</span><span class="line_number">827</span>      work(rt);
+<span class="line_number">828</span>    });
+<span class="line_number">829</span>    _observer_epilogue(worker, node);
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/executor.hpp:2010<br>
+                                    <code class="cpp">tf::Executor::_invoke_async_task(tf::Worker&amp;, tf::Node*)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">2007</span>    
+<span class="line_number">2008</span>    // void(Runtime&amp;)
+<span class="line_number">2009</span>    case 1:
+<span class="line_number">2010</span><span class="error">      if(_invoke_runtime_task_impl(worker, node, *std::get_if&lt;1&gt;(&amp;work))) {
+</span><span class="line_number">2011</span>        return true;
+<span class="line_number">2012</span>      }
+<span class="line_number">2013</span>    break;
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/executor.hpp:1710<br>
+                                    <code class="cpp">tf::Executor::_invoke(tf::Worker&amp;, tf::Node*)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1707</span>
+<span class="line_number">1708</span>    // async task
+<span class="line_number">1709</span>    case Node::ASYNC: {
+<span class="line_number">1710</span><span class="error">      if(_invoke_async_task(worker, node)) {
+</span><span class="line_number">1711</span>        return;
+<span class="line_number">1712</span>      }
+<span class="line_number">1713</span>      _tear_down_async(worker, node, cache);
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/executor.hpp:1424<br>
+                                    <code class="cpp">tf::Executor::_exploit_task(tf::Worker&amp;, tf::Node*&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1421</span>// Procedure: _exploit_task
+<span class="line_number">1422</span>inline void Executor::_exploit_task(Worker&amp; w, Node*&amp; t) {
+<span class="line_number">1423</span>  while(t) {
+<span class="line_number">1424</span><span class="error">    _invoke(w, t);
+</span><span class="line_number">1425</span>    t = w._wsq.pop();
+<span class="line_number">1426</span>  }
+<span class="line_number">1427</span>}
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/executor.hpp:1327<br>
+                                    <code class="cpp">tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}::operator()() const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1324</span>        while(1) {
+<span class="line_number">1325</span>
+<span class="line_number">1326</span>          // drains out the local queue first
+<span class="line_number">1327</span><span class="error">          _exploit_task(worker, t);
+</span><span class="line_number">1328</span>
+<span class="line_number">1329</span>          // steals and waits for tasks
+<span class="line_number">1330</span>          if(_wait_for_task(worker, t) == false) {
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:61<br>
+                                    <code class="cpp">void std::__invoke_impl&lt;void, tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}&gt;(std::__invoke_other, tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}&amp;&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">58</span>  template&lt;typename _Res, typename _Fn, typename... _Args&gt;
+<span class="line_number">59</span>    constexpr _Res
+<span class="line_number">60</span>    __invoke_impl(__invoke_other, _Fn&amp;&amp; __f, _Args&amp;&amp;... __args)
+<span class="line_number">61</span><span class="error">    { return std::forward&lt;_Fn&gt;(__f)(std::forward&lt;_Args&gt;(__args)...); }
+</span><span class="line_number">62</span>
+<span class="line_number">63</span>  template&lt;typename _Res, typename _MemFun, typename _Tp, typename... _Args&gt;
+<span class="line_number">64</span>    constexpr _Res
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:96<br>
+                                    <code class="cpp">std::__invoke_result&lt;tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}&gt;::type std::__invoke&lt;tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}&gt;(tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}&amp;&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">93</span>      using __result = __invoke_result&lt;_Callable, _Args...&gt;;
+<span class="line_number">94</span>      using __type = typename __result::type;
+<span class="line_number">95</span>      using __tag = typename __result::__invoke_type;
+<span class="line_number">96</span><span class="error">      return std::__invoke_impl&lt;__type&gt;(__tag{}, std::forward&lt;_Callable&gt;(__fn),
+</span><span class="line_number">97</span>					std::forward&lt;_Args&gt;(__args)...);
+<span class="line_number">98</span>    }
+<span class="line_number">99</span>
+</code></pre>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            <pre class="code">
+<code class="c++"><span class="line_number">992</span><span class="error">    t-&gt;_parent = rt._node;</span>
+<span class="line_number">993</span>    t-&gt;_parent-&gt;_join_counter.fetch_add(1, std::memory_order_release);
+<span class="line_number">994</span>    if(g.object-&gt;_fetch_enqueue(t) == 0) {
+<span class="line_number">995</span>      rt._executor._schedule_graph_with_parent(
+<span class="line_number">996</span>        rt._worker, g.object-&gt;_graph, t.get(), t.get()
+<span class="line_number">997</span>      );
+<span class="line_number">998</span>    }
+<span class="line_number">999</span>  });
+<span class="line_number">1000</span>
+<span class="line_number">1001</span>  return future;
+<span class="line_number">1002</span>}
+<span class="line_number">1003</span>
+<span class="line_number">1004</span>}  // end of namespace tf -----------------------------------------------------
+<span class="line_number">1005</span>
+<span class="line_number">1006</span>
+<span class="line_number">1007</span>
+<span class="line_number">1008</span>
+<span class="line_number">1009</span>
+<span class="line_number">1010</span>
+<span class="line_number">1011</span>
+<span class="line_number">1012</span>
+<span class="line_number">1013</span>
+</code>
+            </pre>
+        </div>
+    </div>
+</body>
+
+</html>
