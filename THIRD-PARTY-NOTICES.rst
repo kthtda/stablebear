@@ -3,9 +3,10 @@
 License
 =======
 
-stablebear is Copyright 2024-2026 Bjorn H. Wehlin and is distributed under the Apache License, Version 2.0.
+stablebear is Copyright 2024-2026 Bjorn H. Wehlin and the stablebear contributors, and is distributed under the Apache 2 license (see below).
 
-In addition, the stablebear repository and source distributions bundle several third-party libraries under compatible licenses, listed below.
+In addition, the stablebear repository and source distributions bundle several libraries that are compatibly licensed.
+We list these packages and their corresponding licenses later in this file under the "Third-party licenses" header.
 
 
 stablebear license (Apache-2.0)

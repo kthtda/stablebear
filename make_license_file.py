@@ -1,19 +1,4 @@
 #!/usr/bin/env python3
-#
-# Copyright 2024-2026 Bjorn Wehlin
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#    http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
 """Generate LICENSE and THIRD-PARTY-NOTICES.rst from the project license and bundled 3rd-party licenses.
 
 ``LICENSE`` is the plain, verbatim Apache-2.0 text so GitHub (and other tools that
@@ -40,6 +25,25 @@ def _read_apache2_text() -> str:
     if len(sep_indices) < 2:
         raise RuntimeError("Could not find license text delimiters in sb.LICENSE.input")
     return "\n".join(lines[sep_indices[0] + 1 : sep_indices[1]]).strip()
+
+
+def _read_preamble_text() -> str:
+    """Read the preamble paragraphs above the license block from sb.LICENSE.input.
+
+    This is everything before the heading line (e.g. ``stablebear license``) that
+    titles the verbatim license text; that heading and the following separator are
+    dropped so only the introductory paragraphs remain.
+    """
+    lines = LICENSE_INPUT.read_text().splitlines()
+    sep_indices = [i for i, l in enumerate(lines) if l.startswith(_SEP)]
+    if not sep_indices:
+        raise RuntimeError("Could not find license text delimiters in sb.LICENSE.input")
+    head = lines[: sep_indices[0]]
+    while head and not head[-1].strip():
+        head.pop()  # trailing blank lines before the separator
+    if head:
+        head.pop()  # the heading line that titles the license block
+    return "\n".join(head).strip()
 
 # 3rd-party packages bundled in the repository.
 # Each entry: (display name, license file path relative to repo root, URL or None)
@@ -111,15 +115,7 @@ def build_rst() -> str:
     parts.append("")
     parts.append(rst_section("License"))
     parts.append("")
-    parts.append(
-        "stablebear is Copyright 2024-2026 Bjorn H. Wehlin and is distributed "
-        "under the Apache License, Version 2.0."
-    )
-    parts.append("")
-    parts.append(
-        "In addition, the stablebear repository and source distributions bundle "
-        "several third-party libraries under compatible licenses, listed below."
-    )
+    parts.append(_read_preamble_text())
 
     # -- stablebear license --
     parts.append("")
