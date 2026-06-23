@@ -880,5 +880,15 @@
     "py": 87.0,
     "cuda": null,
     "release_tag": null
+  },
+  {
+    "utc_iso": "2026-06-23T15:21:51Z",
+    "sha": "cf1552d",
+    "branch": "119/merge",
+    "detail_path": "reports/2026-06-23_15-21-51_cf1552d/report.html",
+    "cpp": 88.3,
+    "py": 87.0,
+    "cuda": null,
+    "release_tag": null
   }
 ]
