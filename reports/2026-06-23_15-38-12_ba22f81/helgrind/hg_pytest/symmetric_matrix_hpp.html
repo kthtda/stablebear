@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>/home/runner/work/stablebear/stablebear/include/sbear/symmetric_matrix.hpp</title>
+    <link href='valgrind.css' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+    <script src="https://code.jquery.com/jquery-3.4.1.js"></script>
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.0.0/styles/default.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.0.0/highlight.min.js"></script>
+    <script src="valgrind.js"></script>
+</head>
+
+<body>
+    <div class="global">
+        <div class="header">
+            <h1>/home/runner/work/stablebear/stablebear/include/sbear/symmetric_matrix.hpp</h1>
+            <p><b>1</b> errors</p>
+            <button class="next_error">Goto First Error</button>
+        </div>
+        <div class="listing">
+            <pre class="code">
+<code class="c++"><span class="line_number">1</span>#ifndef STABLEBEAR_SYMMETRIC_MATRIX_H
+<span class="line_number">2</span>#define STABLEBEAR_SYMMETRIC_MATRIX_H
+<span class="line_number">3</span>
+<span class="line_number">4</span>#include &#34;config.hpp&#34;
+<span class="line_number">5</span>#include &#34;concepts.hpp&#34;
+<span class="line_number">6</span>
+<span class="line_number">7</span>#include &lt;algorithm&gt;
+<span class="line_number">8</span>#include &lt;cstddef&gt;
+<span class="line_number">9</span>#include &lt;memory&gt;
+<span class="line_number">10</span>#include &lt;stdexcept&gt;
+<span class="line_number">11</span>#include &lt;sstream&gt;
+<span class="line_number">12</span>
+<span class="line_number">13</span>namespace sb
+<span class="line_number">14</span>{
+<span class="line_number">15</span>  namespace io::detail
+<span class="line_number">16</span>  {
+<span class="line_number">17</span>    template &lt;typename MatT&gt;
+<span class="line_number">18</span>    MatT read_compressed_matrix(std::istream&amp;);
+<span class="line_number">19</span>  }
+<span class="line_number">20</span>
+<span class="line_number">21</span>  /// Lower-triangular compressed symmetric matrix.
+<span class="line_number">22</span>  ///
+<span class="line_number">23</span>  /// Stores n*(n+1)/2 elements for an n×n symmetric matrix.
+<span class="line_number">24</span>  /// Element (i, j) maps to storage index max(i,j)*(max(i,j)+1)/2 + min(i,j).
+<span class="line_number">25</span>  template &lt;ArithmeticType T&gt;
+<span class="line_number">26</span>  class SymmetricMatrix
+<span class="line_number">27</span>  {
+<span class="line_number">28</span>  public:
+<span class="line_number">29</span>    using value_type = T;
+<span class="line_number">30</span>
+<span class="line_number">31</span>    explicit SymmetricMatrix(size_t n, const T&amp; init = {})
+<span class="line_number">32</span>      : m_data(std::make_shared&lt;T[]&gt;(storage_size(n)))
+<span class="line_number">33</span>      , m_size(n)
+<span class="line_number">34</span>    {
+<span class="line_number">35</span>      std::fill(m_data.get(), m_data.get() + storage_size(n), init);
+<span class="line_number">36</span>    }
+<span class="line_number">37</span>
+<span class="line_number">38</span>    SymmetricMatrix() : SymmetricMatrix(0) { }
+<span class="line_number">39</span>
+<span class="line_number">40</span>    [[nodiscard]] size_t size() const { return m_size; }
+<span class="line_number">41</span>    [[nodiscard]] size_t storage_count() const { return storage_size(m_size); }
+<span class="line_number">42</span>
+<span class="line_number">43</span>    [[nodiscard]] T&amp; operator()(size_t i, size_t j)
+<span class="line_number">44</span>    {
+<span class="line_number">45</span>      return m_data[compressed_index(i, j)];
+<span class="line_number">46</span>    }
+<span class="line_number">47</span>
+<span class="line_number">48</span>    [[nodiscard]] const T&amp; operator()(size_t i, size_t j) const
+<span class="line_number">49</span>    {
+<span class="line_number">50</span>      return m_data[compressed_index(i, j)];
+<span class="line_number">51</span>    }
+<span class="line_number">52</span>
+<span class="line_number">53</span>    [[nodiscard]] bool operator==(const SymmetricMatrix&amp; rhs) const
+<span class="line_number">54</span>    {
+<span class="line_number">55</span>      if (m_size != rhs.m_size)
+<span class="line_number">56</span>        return false;
+<span class="line_number">57</span>      return std::equal(m_data.get(), m_data.get() + storage_size(m_size), rhs.m_data.get());
+<span class="line_number">58</span>    }
+<span class="line_number">59</span>
+<span class="line_number">60</span>    [[nodiscard]] bool operator!=(const SymmetricMatrix&amp; rhs) const
+<span class="line_number">61</span>    {
+<span class="line_number">62</span>      if (m_size != rhs.m_size)
+<span class="line_number">63</span>        return true;
+<span class="line_number">64</span>      return std::mismatch(m_data.get(), m_data.get() + storage_size(m_size), rhs.m_data.get()).first
+<span class="line_number">65</span>        != m_data.get() + storage_size(m_size);
+<span class="line_number">66</span>    }
+<span class="line_number">67</span>
+<span class="line_number">68</span>    [[nodiscard]] const T* data() const { return m_data.get(); }
+<span class="line_number">69</span>
+<span class="line_number">70</span>    [[nodiscard]] static size_t storage_size(size_t n)
+<span class="line_number">71</span>    {
+<span class="line_number">72</span>      return n * (n + 1) / 2;
+<span class="line_number">73</span>    }
+<span class="line_number">74</span>
+<span class="line_number">75</span>  private:
+<span class="line_number">76</span>    [[nodiscard]] T* mutable_data() { return m_data.get(); }
+<span class="line_number">77</span>
+<span class="line_number">78</span>    template &lt;typename MatT&gt;
+<span class="line_number">79</span>    friend MatT io::detail::read_compressed_matrix(std::istream&amp;);
+<span class="line_number">80</span>
+<span class="line_number">81</span>    [[nodiscard]] size_t compressed_index(size_t i, size_t j) const
+<span class="line_number">82</span>    {
+</code></pre>
+            <div class="issue">
+                <div>
+                    <span class="what">Possible data race during read of size 8 at 0x2A8DA540 by thread #11</span>
+                    <div class="navigation">
+                        <button class="next_error">Next</button>
+                        <button class="prev_error">Previous</button>
+                    </div>
+                </div>
+                <div>
+                    <table class="call_stack">
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/symmetric_matrix.hpp:45<br>
+                                    <code class="cpp">sb::SymmetricMatrix&lt;float&gt;::operator()(unsigned long, unsigned long)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">42</span>
+<span class="line_number">43</span>    [[nodiscard]] T&amp; operator()(size_t i, size_t j)
+<span class="line_number">44</span>    {
+<span class="line_number">45</span><span class="error">      return m_data[compressed_index(i, j)];
+</span><span class="line_number">46</span>    }
+<span class="line_number">47</span>
+<span class="line_number">48</span>    [[nodiscard]] const T&amp; operator()(size_t i, size_t j) const
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/algorithms/functional/matrix_integrate.hpp:87<br>
+                                    <code class="cpp">sb::CpuPairwiseIntegrationTask&lt;sb::OperationL2InnerProduct&lt;float, float&gt;, sb::Tensor1dValueIterator&lt;sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; &gt;, sb::SymmetricMatrix&lt;float&gt;, true&gt;::compute_row(unsigned long)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">84</span>      for (size_t j = jStart; j &lt; sz; ++j)
+<span class="line_number">85</span>      {
+<span class="line_number">86</span>        auto val = m_op(integrate&lt;time_type, value_type&gt;(m_fs[i], m_fs[j], m_op, 0, std::numeric_limits&lt;time_type&gt;::max()));
+<span class="line_number">87</span><span class="error">        m_out(i, j) = val;
+</span><span class="line_number">88</span>      }
+<span class="line_number">89</span>      add_progress(sz - jStart);
+<span class="line_number">90</span>    }
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/algorithms/functional/matrix_integrate.hpp:74<br>
+                                    <code class="cpp">sb::CpuPairwiseIntegrationTask&lt;sb::OperationL2InnerProduct&lt;float, float&gt;, sb::Tensor1dValueIterator&lt;sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; &gt;, sb::SymmetricMatrix&lt;float&gt;, true&gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}::operator()(unsigned long) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">71</span>        {
+<span class="line_number">72</span>          return;
+<span class="line_number">73</span>        }
+<span class="line_number">74</span><span class="error">        compute_row(i);
+</span><span class="line_number">75</span>      });
+<span class="line_number">76</span>
+<span class="line_number">77</span>      return exec.cpu()-&gt;run(std::move(flow));
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/algorithm/for_each.hpp:134<br>
+                                    <code class="cpp">tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::CpuPairwiseIntegrationTask&lt;sb::OperationL2InnerProduct&lt;float, float&gt;, sb::Tensor1dValueIterator&lt;sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; &gt;, sb::SymmetricMatrix&lt;float&gt;, true&gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::CpuPairwiseIntegrationTask&lt;sb::OperationL2InnerProduct&lt;float, float&gt;, sb::Tensor1dValueIterator&lt;sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; &gt;, sb::SymmetricMatrix&lt;float&gt;, true&gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}::operator()()::{lambda(unsigned long, unsigned long)#1}::operator()(unsigned long, unsigned long)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">131</span>          part.loop(N, W, *next, [=] (size_t part_b, size_t part_e) mutable {
+<span class="line_number">132</span>            auto idx = static_cast&lt;B_t&gt;(part_b) * inc + beg;
+<span class="line_number">133</span>            for(size_t x=part_b; x&lt;part_e; x++, idx += inc) {
+<span class="line_number">134</span><span class="error">              c(idx);
+</span><span class="line_number">135</span>            }
+<span class="line_number">136</span>          });
+<span class="line_number">137</span>        });
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/../algorithm/partitioner.hpp:316<br>
+                                    <code class="cpp">void tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;::loop&lt;tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::CpuPairwiseIntegrationTask&lt;sb::OperationL2InnerProduct&lt;float, float&gt;, sb::Tensor1dValueIterator&lt;sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; &gt;, sb::SymmetricMatrix&lt;float&gt;, true&gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::CpuPairwiseIntegrationTask&lt;sb::OperationL2InnerProduct&lt;float, float&gt;, sb::Tensor1dValueIterator&lt;sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; &gt;, sb::SymmetricMatrix&lt;float&gt;, true&gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}::operator()()::{lambda(unsigned long, unsigned long)#1}, (void*)0&gt;(unsigned long, unsigned long, std::atomic&lt;unsigned long&gt;&amp;, tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::CpuPairwiseIntegrationTask&lt;sb::OperationL2InnerProduct&lt;float, float&gt;, sb::Tensor1dValueIterator&lt;sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; &gt;, sb::SymmetricMatrix&lt;float&gt;, true&gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::CpuPairwiseIntegrationTask&lt;sb::OperationL2InnerProduct&lt;float, float&gt;, sb::Tensor1dValueIterator&lt;sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; &gt;, sb::SymmetricMatrix&lt;float&gt;, true&gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}::operator()()::{lambda(unsigned long, unsigned long)#1}&amp;&amp;) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">313</span>          if(curr_b &gt;= N) {
+<span class="line_number">314</span>            return;
+<span class="line_number">315</span>          }
+<span class="line_number">316</span><span class="error">          func(curr_b, (std::min)(curr_b + chunk_size, N));
+</span><span class="line_number">317</span>        }
+<span class="line_number">318</span>        break;
+<span class="line_number">319</span>      }
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/algorithm/for_each.hpp:131<br>
+                                    <code class="cpp">tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::CpuPairwiseIntegrationTask&lt;sb::OperationL2InnerProduct&lt;float, float&gt;, sb::Tensor1dValueIterator&lt;sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; &gt;, sb::SymmetricMatrix&lt;float&gt;, true&gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::CpuPairwiseIntegrationTask&lt;sb::OperationL2InnerProduct&lt;float, float&gt;, sb::Tensor1dValueIterator&lt;sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; &gt;, sb::SymmetricMatrix&lt;float&gt;, true&gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}::operator()()</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">128</span>      auto next = std::make_shared&lt;std::atomic&lt;size_t&gt;&gt;(0);
+<span class="line_number">129</span>      for(size_t w=0; w&lt;W;) {
+<span class="line_number">130</span>        auto task = part([=] () mutable {
+<span class="line_number">131</span><span class="error">          part.loop(N, W, *next, [=] (size_t part_b, size_t part_e) mutable {
+</span><span class="line_number">132</span>            auto idx = static_cast&lt;B_t&gt;(part_b) * inc + beg;
+<span class="line_number">133</span>            for(size_t x=part_b; x&lt;part_e; x++, idx += inc) {
+<span class="line_number">134</span>              c(idx);
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/algorithm/for_each.hpp:138<br>
+                                    <code class="cpp">tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::CpuPairwiseIntegrationTask&lt;sb::OperationL2InnerProduct&lt;float, float&gt;, sb::Tensor1dValueIterator&lt;sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; &gt;, sb::SymmetricMatrix&lt;float&gt;, true&gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::CpuPairwiseIntegrationTask&lt;sb::OperationL2InnerProduct&lt;float, float&gt;, sb::Tensor1dValueIterator&lt;sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; &gt;, sb::SymmetricMatrix&lt;float&gt;, true&gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">135</span>            }
+<span class="line_number">136</span>          });
+<span class="line_number">137</span>        });
+<span class="line_number">138</span><span class="error">        (++w == W) ? task() : rt.silent_async(task);
+</span><span class="line_number">139</span>      }
+<span class="line_number">140</span>    }
+<span class="line_number">141</span>  };
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:61<br>
+                                    <code class="cpp">void std::__invoke_impl&lt;void, tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::CpuPairwiseIntegrationTask&lt;sb::OperationL2InnerProduct&lt;float, float&gt;, sb::Tensor1dValueIterator&lt;sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; &gt;, sb::SymmetricMatrix&lt;float&gt;, true&gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::CpuPairwiseIntegrationTask&lt;sb::OperationL2InnerProduct&lt;float, float&gt;, sb::Tensor1dValueIterator&lt;sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; &gt;, sb::SymmetricMatrix&lt;float&gt;, true&gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}&amp;, tf::Runtime&amp;&gt;(std::__invoke_other, tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::CpuPairwiseIntegrationTask&lt;sb::OperationL2InnerProduct&lt;float, float&gt;, sb::Tensor1dValueIterator&lt;sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; &gt;, sb::SymmetricMatrix&lt;float&gt;, true&gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::CpuPairwiseIntegrationTask&lt;sb::OperationL2InnerProduct&lt;float, float&gt;, sb::Tensor1dValueIterator&lt;sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; &gt;, sb::SymmetricMatrix&lt;float&gt;, true&gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}&amp;, tf::Runtime&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">58</span>  template&lt;typename _Res, typename _Fn, typename... _Args&gt;
+<span class="line_number">59</span>    constexpr _Res
+<span class="line_number">60</span>    __invoke_impl(__invoke_other, _Fn&amp;&amp; __f, _Args&amp;&amp;... __args)
+<span class="line_number">61</span><span class="error">    { return std::forward&lt;_Fn&gt;(__f)(std::forward&lt;_Args&gt;(__args)...); }
+</span><span class="line_number">62</span>
+<span class="line_number">63</span>  template&lt;typename _Res, typename _MemFun, typename _Tp, typename... _Args&gt;
+<span class="line_number">64</span>    constexpr _Res
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:111<br>
+                                    <code class="cpp">std::enable_if&lt;is_invocable_r_v&lt;void, tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::CpuPairwiseIntegrationTask&lt;sb::OperationL2InnerProduct&lt;float, float&gt;, sb::Tensor1dValueIterator&lt;sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; &gt;, sb::SymmetricMatrix&lt;float&gt;, true&gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::CpuPairwiseIntegrationTask&lt;sb::OperationL2InnerProduct&lt;float, float&gt;, sb::Tensor1dValueIterator&lt;sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; &gt;, sb::SymmetricMatrix&lt;float&gt;, true&gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}&amp;, tf::Runtime&amp;&gt;, void&gt;::type std::__invoke_r&lt;void, tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::CpuPairwiseIntegrationTask&lt;sb::OperationL2InnerProduct&lt;float, float&gt;, sb::Tensor1dValueIterator&lt;sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; &gt;, sb::SymmetricMatrix&lt;float&gt;, true&gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::CpuPairwiseIntegrationTask&lt;sb::OperationL2InnerProduct&lt;float, float&gt;, sb::Tensor1dValueIterator&lt;sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; &gt;, sb::SymmetricMatrix&lt;float&gt;, true&gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}&amp;, tf::Runtime&amp;&gt;(tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::CpuPairwiseIntegrationTask&lt;sb::OperationL2InnerProduct&lt;float, float&gt;, sb::Tensor1dValueIterator&lt;sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; &gt;, sb::SymmetricMatrix&lt;float&gt;, true&gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::CpuPairwiseIntegrationTask&lt;sb::OperationL2InnerProduct&lt;float, float&gt;, sb::Tensor1dValueIterator&lt;sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; &gt;, sb::SymmetricMatrix&lt;float&gt;, true&gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}&amp;, tf::Runtime&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">108</span>      using __type = typename __result::type;
+<span class="line_number">109</span>      using __tag = typename __result::__invoke_type;
+<span class="line_number">110</span>      if constexpr (is_void_v&lt;_Res&gt;)
+<span class="line_number">111</span><span class="error">	std::__invoke_impl&lt;__type&gt;(__tag{}, std::forward&lt;_Callable&gt;(__fn),
+</span><span class="line_number">112</span>					std::forward&lt;_Args&gt;(__args)...);
+<span class="line_number">113</span>      else
+<span class="line_number">114</span>	return std::__invoke_impl&lt;__type&gt;(__tag{},
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/std_function.h:290<br>
+                                    <code class="cpp">std::_Function_handler&lt;void (tf::Runtime&amp;), tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::CpuPairwiseIntegrationTask&lt;sb::OperationL2InnerProduct&lt;float, float&gt;, sb::Tensor1dValueIterator&lt;sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; &gt;, sb::SymmetricMatrix&lt;float&gt;, true&gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::CpuPairwiseIntegrationTask&lt;sb::OperationL2InnerProduct&lt;float, float&gt;, sb::Tensor1dValueIterator&lt;sb::Tensor&lt;sb::Pcf&lt;float, float&gt; &gt; &gt;, sb::SymmetricMatrix&lt;float&gt;, true&gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}&gt;::_M_invoke(std::_Any_data const&amp;, tf::Runtime&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">287</span>      static _Res
+<span class="line_number">288</span>      _M_invoke(const _Any_data&amp; __functor, _ArgTypes&amp;&amp;... __args)
+<span class="line_number">289</span>      {
+<span class="line_number">290</span><span class="error">	return std::__invoke_r&lt;_Res&gt;(*_Base::_M_get_pointer(__functor),
+</span><span class="line_number">291</span>				     std::forward&lt;_ArgTypes&gt;(__args)...);
+<span class="line_number">292</span>      }
+<span class="line_number">293</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/std_function.h:591<br>
+                                    <code class="cpp">std::function&lt;void (tf::Runtime&amp;)&gt;::operator()(tf::Runtime&amp;) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">588</span>      {
+<span class="line_number">589</span>	if (_M_empty())
+<span class="line_number">590</span>	  __throw_bad_function_call();
+<span class="line_number">591</span><span class="error">	return _M_invoker(_M_functor, std::forward&lt;_ArgTypes&gt;(__args)...);
+</span><span class="line_number">592</span>      }
+<span class="line_number">593</span>
+<span class="line_number">594</span>#if __cpp_rtti
+</code></pre>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            <pre class="code">
+<code class="c++"><span class="line_number">83</span><span class="error">      if (i &gt;= m_size || j &gt;= m_size)</span>
+<span class="line_number">84</span>      {
+<span class="line_number">85</span>        std::ostringstream oss;
+<span class="line_number">86</span>        oss &lt;&lt; &#34;SymmetricMatrix index (&#34; &lt;&lt; i &lt;&lt; &#34;, &#34; &lt;&lt; j &lt;&lt; &#34;) out of range for matrix of size &#34; &lt;&lt; m_size;
+<span class="line_number">87</span>        throw std::out_of_range(oss.str());
+<span class="line_number">88</span>      }
+<span class="line_number">89</span>
+<span class="line_number">90</span>      auto row = std::max(i, j);
+<span class="line_number">91</span>      auto col = std::min(i, j);
+<span class="line_number">92</span>      return row * (row + 1) / 2 + col;
+<span class="line_number">93</span>    }
+<span class="line_number">94</span>
+<span class="line_number">95</span>    std::shared_ptr&lt;T[]&gt; m_data;
+<span class="line_number">96</span>    size_t m_size;
+<span class="line_number">97</span>  };
+<span class="line_number">98</span>
+<span class="line_number">99</span>  template &lt;typename T&gt;
+<span class="line_number">100</span>  struct is_compressed_matrix&lt;SymmetricMatrix&lt;T&gt;&gt; : std::true_type {};
+<span class="line_number">101</span>
+<span class="line_number">102</span>}
+<span class="line_number">103</span>
+<span class="line_number">104</span>#endif // STABLEBEAR_SYMMETRIC_MATRIX_H
+</code>
+            </pre>
+        </div>
+    </div>
+</body>
+
+</html>

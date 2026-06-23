@@ -1,0 +1,70 @@
+/home/runner/work/_temp/SourceCode/./Include/internal/pycore_call.h:
+12 errors
+	line 168: Leak_PossiblyLost	(12 errors)
+/home/runner/work/_temp/SourceCode/./Include/internal/pycore_object_alloc.h:
+833 errors
+	line 46: Leak_PossiblyLost	(827 errors)
+	line 61: Leak_PossiblyLost	(6 errors)
+/home/runner/work/_temp/SourceCode/./Python/dynload_shlib.c:
+1 errors
+	line 80: Leak_DefinitelyLost	(1 errors)
+/home/runner/work/_temp/SourceCode/Objects/bytesobject.c:
+116 errors
+	line 123: Leak_PossiblyLost	(115 errors)
+	line 3213: Leak_PossiblyLost	(1 errors)
+/home/runner/work/_temp/SourceCode/Objects/codeobject.c:
+1 errors
+	line 350: Leak_PossiblyLost	(1 errors)
+/home/runner/work/_temp/SourceCode/Objects/complexobject.c:
+1 errors
+	line 232: Leak_PossiblyLost	(1 errors)
+/home/runner/work/_temp/SourceCode/Objects/dictobject.c:
+117 errors
+	line 823: Leak_PossiblyLost	(84 errors)
+	line 888: Leak_PossiblyLost	(5 errors)
+	line 977: Leak_PossiblyLost	(28 errors)
+/home/runner/work/_temp/SourceCode/Objects/floatobject.c:
+8 errors
+	line 147: Leak_PossiblyLost	(6 errors)
+	          Leak_DefinitelyLost	(2 errors)
+/home/runner/work/_temp/SourceCode/Objects/listobject.c:
+6 errors
+	line 181: Leak_PossiblyLost	(3 errors)
+	line 220: Leak_PossiblyLost	(1 errors)
+	line 298: Leak_PossiblyLost	(2 errors)
+/home/runner/work/_temp/SourceCode/Objects/longobject.c:
+16 errors
+	line 157: Leak_PossiblyLost	(7 errors)
+	line 209: Leak_PossiblyLost	(9 errors)
+/home/runner/work/_temp/SourceCode/Objects/methodobject.c:
+13 errors
+	line 440: Leak_PossiblyLost	(11 errors)
+	line 550: Leak_PossiblyLost	(2 errors)
+/home/runner/work/_temp/SourceCode/Objects/object.c:
+48 errors
+	line 534: Leak_PossiblyLost	(1 errors)
+	line 547: Leak_PossiblyLost	(47 errors)
+/home/runner/work/_temp/SourceCode/Objects/odictobject.c:
+2 errors
+	line 565: Leak_PossiblyLost	(1 errors)
+	line 694: Leak_PossiblyLost	(1 errors)
+/home/runner/work/_temp/SourceCode/Objects/setobject.c:
+3 errors
+	line 300: Leak_PossiblyLost	(3 errors)
+/home/runner/work/_temp/SourceCode/Objects/typeobject.c:
+11 errors
+	line 3851: Leak_PossiblyLost	(9 errors)
+	line 4540: Leak_PossiblyLost	(1 errors)
+	line 4582: Leak_PossiblyLost	(1 errors)
+/home/runner/work/_temp/SourceCode/Objects/unicodeobject.c:
+28 errors
+	line 1182: Leak_DefinitelyLost	(22 errors)
+	           Leak_PossiblyLost	(4 errors)
+	line 15000: Leak_PossiblyLost	(2 errors)
+/home/runner/work/_temp/SourceCode/Python/import.c:
+1 errors
+	line 791: Leak_PossiblyLost	(1 errors)
+/usr/include/c++/13/bits/new_allocator.h:
+1 errors
+	line 151: Leak_PossiblyLost	(1 errors)
+
