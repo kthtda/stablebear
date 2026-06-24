@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>/home/runner/work/stablebear/stablebear/include/sbear/walk.hpp</title>
+    <link href='valgrind.css' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+    <script src="https://code.jquery.com/jquery-3.4.1.js"></script>
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.0.0/styles/default.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.0.0/highlight.min.js"></script>
+    <script src="valgrind.js"></script>
+</head>
+
+<body>
+    <div class="global">
+        <div class="header">
+            <h1>/home/runner/work/stablebear/stablebear/include/sbear/walk.hpp</h1>
+            <p><b>1</b> errors</p>
+            <button class="next_error">Goto First Error</button>
+        </div>
+        <div class="listing">
+            <pre class="code">
+<code class="c++"><span class="line_number">1</span>#ifndef SB_WALK_H
+<span class="line_number">2</span>#define SB_WALK_H
+<span class="line_number">3</span>
+<span class="line_number">4</span>#include &#34;config.hpp&#34;
+<span class="line_number">5</span>#include &#34;concepts.hpp&#34;
+<span class="line_number">6</span>#include &#34;executor.hpp&#34;
+<span class="line_number">7</span>#include &#34;random_generator.hpp&#34;
+<span class="line_number">8</span>
+<span class="line_number">9</span>#include &lt;taskflow/algorithm/for_each.hpp&gt;
+<span class="line_number">10</span>
+<span class="line_number">11</span>namespace sb
+<span class="line_number">12</span>{
+<span class="line_number">13</span>
+<span class="line_number">14</span>  namespace detail
+<span class="line_number">15</span>  {
+<span class="line_number">16</span>    /**
+<span class="line_number">17</span>     * Core sequential walk: visits every index in row-major order, providing
+<span class="line_number">18</span>     * both the multi-index and the flat (row-major) counter to the callback.
+<span class="line_number">19</span>     * If f returns bool, walking stops when f returns false.
+<span class="line_number">20</span>     */
+<span class="line_number">21</span>    template &lt;IsTensor TTensor, typename Func&gt;
+<span class="line_number">22</span>    void walk_impl(const TTensor&amp; tensor, Func&amp;&amp; f)
+<span class="line_number">23</span>    {
+<span class="line_number">24</span>      auto shape_range = tensor.shape();
+<span class="line_number">25</span>      std::vector&lt;size_t&gt; shape(std::begin(shape_range), std::end(shape_range));
+<span class="line_number">26</span>
+<span class="line_number">27</span>      if (shape.empty() || std::any_of(shape.begin(), shape.end(), [](size_t n){ return n == 0; }))
+<span class="line_number">28</span>      {
+<span class="line_number">29</span>        return;
+<span class="line_number">30</span>      }
+<span class="line_number">31</span>
+<span class="line_number">32</span>      auto ndim = shape.size();
+<span class="line_number">33</span>      std::vector&lt;size_t&gt; cur(ndim, 0_uz);
+<span class="line_number">34</span>      size_t flat = 0;
+<span class="line_number">35</span>
+<span class="line_number">36</span>      while (true)
+<span class="line_number">37</span>      {
+<span class="line_number">38</span>        if constexpr (std::is_same_v&lt;decltype(f(cur, flat)), bool&gt;)
+<span class="line_number">39</span>        {
+<span class="line_number">40</span>          if (!f(cur, flat))
+<span class="line_number">41</span>          {
+<span class="line_number">42</span>            return;
+<span class="line_number">43</span>          }
+<span class="line_number">44</span>        }
+<span class="line_number">45</span>        else
+<span class="line_number">46</span>        {
+<span class="line_number">47</span>          f(cur, flat);
+<span class="line_number">48</span>        }
+<span class="line_number">49</span>
+<span class="line_number">50</span>        ++flat;
+<span class="line_number">51</span>
+<span class="line_number">52</span>        for (ptrdiff_t i = ndim - 1; i &gt;= 0; --i)
+<span class="line_number">53</span>        {
+<span class="line_number">54</span>          ++cur[i];
+<span class="line_number">55</span>
+<span class="line_number">56</span>          if (cur[i] &lt; shape[i])
+<span class="line_number">57</span>          {
+<span class="line_number">58</span>            break;
+<span class="line_number">59</span>          }
+<span class="line_number">60</span>
+<span class="line_number">61</span>          if (i == 0)
+<span class="line_number">62</span>          {
+<span class="line_number">63</span>            return;
+<span class="line_number">64</span>          }
+<span class="line_number">65</span>
+<span class="line_number">66</span>          cur[i] = 0;
+<span class="line_number">67</span>        }
+<span class="line_number">68</span>      }
+<span class="line_number">69</span>    }
+<span class="line_number">70</span>
+<span class="line_number">71</span>    /**
+<span class="line_number">72</span>     * Core parallel walk: distributes flat indices across threads, converting
+<span class="line_number">73</span>     * each to a multi-index. The callback receives both the multi-index and
+<span class="line_number">74</span>     * the flat index. Returns a tf::Future.
+<span class="line_number">75</span>     */
+<span class="line_number">76</span>    template &lt;IsTensor TTensor, typename Func&gt;
+<span class="line_number">77</span>    tf::Future&lt;void&gt; parallel_walk_impl(const TTensor&amp; tensor, Func&amp;&amp; f, Executor&amp; exec)
+<span class="line_number">78</span>    {
+<span class="line_number">79</span>      auto shape_range = tensor.shape();
+<span class="line_number">80</span>      std::vector&lt;size_t&gt; shape(std::begin(shape_range), std::end(shape_range));
+<span class="line_number">81</span>
+<span class="line_number">82</span>      if (shape.empty() || std::any_of(shape.begin(), shape.end(), [](size_t n){ return n == 0; }))
+<span class="line_number">83</span>      {
+<span class="line_number">84</span>        tf::Taskflow flow;
+<span class="line_number">85</span>        return exec.cpu()-&gt;run(std::move(flow));
+<span class="line_number">86</span>      }
+<span class="line_number">87</span>
+<span class="line_number">88</span>      auto ndim = shape.size();
+<span class="line_number">89</span>      size_t total = 1;
+<span class="line_number">90</span>      for (auto s : shape)
+<span class="line_number">91</span>        total *= s;
+<span class="line_number">92</span>
+<span class="line_number">93</span>      tf::Taskflow flow;
+<span class="line_number">94</span>      flow.for_each_index&lt;size_t, size_t, size_t&gt;(0ul, total, 1ul,
+</code></pre>
+            <div class="issue">
+                <div>
+                    <span class="what">Possible data race during read of size 8 at 0x2A4FA328 by thread #8</span>
+                    <div class="navigation">
+                        <button class="next_error">Next</button>
+                        <button class="prev_error">Previous</button>
+                    </div>
+                </div>
+                <div>
+                    <table class="call_stack">
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/algorithm/for_each.hpp:130<br>
+                                    <code class="cpp">tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt;, sb::ph::RipserTaskImpl&lt;sb::Tensor&lt;double&gt;, double&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt; const&amp;, sb::ph::RipserTaskImpl&lt;sb::Tensor&lt;double&gt;, double&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt; const&amp;, sb::ph::RipserTaskImpl&lt;sb::Tensor&lt;double&gt;, double&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt;, sb::ph::RipserTaskImpl&lt;sb::Tensor&lt;double&gt;, double&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt; const&amp;, sb::ph::RipserTaskImpl&lt;sb::Tensor&lt;double&gt;, double&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt; const&amp;, sb::ph::RipserTaskImpl&lt;sb::Tensor&lt;double&gt;, double&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">127</span>    else {
+<span class="line_number">128</span>      auto next = std::make_shared&lt;std::atomic&lt;size_t&gt;&gt;(0);
+<span class="line_number">129</span>      for(size_t w=0; w&lt;W;) {
+<span class="line_number">130</span><span class="error">        auto task = part([=] () mutable {
+</span><span class="line_number">131</span>          part.loop(N, W, *next, [=] (size_t part_b, size_t part_e) mutable {
+<span class="line_number">132</span>            auto idx = static_cast&lt;B_t&gt;(part_b) * inc + beg;
+<span class="line_number">133</span>            for(size_t x=part_b; x&lt;part_e; x++, idx += inc) {
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:61<br>
+                                    <code class="cpp">void std::__invoke_impl&lt;void, tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt;, sb::ph::RipserTaskImpl&lt;sb::Tensor&lt;double&gt;, double&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt; const&amp;, sb::ph::RipserTaskImpl&lt;sb::Tensor&lt;double&gt;, double&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt; const&amp;, sb::ph::RipserTaskImpl&lt;sb::Tensor&lt;double&gt;, double&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt;, sb::ph::RipserTaskImpl&lt;sb::Tensor&lt;double&gt;, double&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt; const&amp;, sb::ph::RipserTaskImpl&lt;sb::Tensor&lt;double&gt;, double&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt; const&amp;, sb::ph::RipserTaskImpl&lt;sb::Tensor&lt;double&gt;, double&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}&amp;, tf::Runtime&amp;&gt;(std::__invoke_other, sb::ph::RipserTaskImpl&lt;sb::Tensor&lt;double&gt;, double&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, tf::Runtime&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">58</span>  template&lt;typename _Res, typename _Fn, typename... _Args&gt;
+<span class="line_number">59</span>    constexpr _Res
+<span class="line_number">60</span>    __invoke_impl(__invoke_other, _Fn&amp;&amp; __f, _Args&amp;&amp;... __args)
+<span class="line_number">61</span><span class="error">    { return std::forward&lt;_Fn&gt;(__f)(std::forward&lt;_Args&gt;(__args)...); }
+</span><span class="line_number">62</span>
+<span class="line_number">63</span>  template&lt;typename _Res, typename _MemFun, typename _Tp, typename... _Args&gt;
+<span class="line_number">64</span>    constexpr _Res
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:111<br>
+                                    <code class="cpp">_ZSt10__invoke_rIvRZN2tf24make_for_each_index_taskImmmZN2sb6detail18parallel_walk_implINS2_6TensorINS5_IdEEEEZNS2_19parallel_walk_asyncIS7_ZNS2_2ph14RipserTaskImplIS6_dE9run_asyncERNS2_8ExecutorEEUlRKSt6vectorImSaImEEE_EENS0_6FutureIvEERKT_OT0_SD_EUlSI_mE_EESL_SO_SQ_SD_EUlmE0_NS0_17GuidedPartitionerINS0_21DefaultClosureWrapperEEEEEDaSM_SP_T1_T2_T3_EUlRNS0_7RuntimeEE_JS10_EENSt9enable_ifIX16is_invocable_r_vISM_SP_DpT1_EESM_E4typeESQ_DpOS14_</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">108</span>      using __type = typename __result::type;
+<span class="line_number">109</span>      using __tag = typename __result::__invoke_type;
+<span class="line_number">110</span>      if constexpr (is_void_v&lt;_Res&gt;)
+<span class="line_number">111</span><span class="error">	std::__invoke_impl&lt;__type&gt;(__tag{}, std::forward&lt;_Callable&gt;(__fn),
+</span><span class="line_number">112</span>					std::forward&lt;_Args&gt;(__args)...);
+<span class="line_number">113</span>      else
+<span class="line_number">114</span>	return std::__invoke_impl&lt;__type&gt;(__tag{},
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/std_function.h:290<br>
+                                    <code class="cpp">std::_Function_handler&lt;void (tf::Runtime&amp;), tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt;, sb::ph::RipserTaskImpl&lt;sb::Tensor&lt;double&gt;, double&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt; const&amp;, sb::ph::RipserTaskImpl&lt;sb::Tensor&lt;double&gt;, double&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt; const&amp;, sb::ph::RipserTaskImpl&lt;sb::Tensor&lt;double&gt;, double&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt;, sb::ph::RipserTaskImpl&lt;sb::Tensor&lt;double&gt;, double&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt; const&amp;, sb::ph::RipserTaskImpl&lt;sb::Tensor&lt;double&gt;, double&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt; const&amp;, sb::ph::RipserTaskImpl&lt;sb::Tensor&lt;double&gt;, double&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}&gt;::_M_invoke(std::_Any_data const&amp;, tf::Runtime&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">287</span>      static _Res
+<span class="line_number">288</span>      _M_invoke(const _Any_data&amp; __functor, _ArgTypes&amp;&amp;... __args)
+<span class="line_number">289</span>      {
+<span class="line_number">290</span><span class="error">	return std::__invoke_r&lt;_Res&gt;(*_Base::_M_get_pointer(__functor),
+</span><span class="line_number">291</span>				     std::forward&lt;_ArgTypes&gt;(__args)...);
+<span class="line_number">292</span>      }
+<span class="line_number">293</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/std_function.h:591<br>
+                                    <code class="cpp">std::function&lt;void (tf::Runtime&amp;)&gt;::operator()(tf::Runtime&amp;) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">588</span>      {
+<span class="line_number">589</span>	if (_M_empty())
+<span class="line_number">590</span>	  __throw_bad_function_call();
+<span class="line_number">591</span><span class="error">	return _M_invoker(_M_functor, std::forward&lt;_ArgTypes&gt;(__args)...);
+</span><span class="line_number">592</span>      }
+<span class="line_number">593</span>
+<span class="line_number">594</span>#if __cpp_rtti
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/runtime.hpp:826<br>
+                                    <code class="cpp">tf::Executor::_invoke_runtime_task_impl(tf::Worker&amp;, tf::Node*, std::function&lt;void (tf::Runtime&amp;)&gt;&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">823</span>    node-&gt;_join_counter.fetch_add(1, std::memory_order_release);
+<span class="line_number">824</span>
+<span class="line_number">825</span>    _observer_prologue(worker, node);
+<span class="line_number">826</span><span class="error">    TF_EXECUTOR_EXCEPTION_HANDLER(worker, node, {
+</span><span class="line_number">827</span>      work(rt);
+<span class="line_number">828</span>    });
+<span class="line_number">829</span>    _observer_epilogue(worker, node);
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/runtime.hpp:807<br>
+                                    <code class="cpp">tf::Executor::_invoke_runtime_task(tf::Worker&amp;, tf::Node*)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">804</span>
+<span class="line_number">805</span>// Procedure: _invoke_runtime_task
+<span class="line_number">806</span>inline bool Executor::_invoke_runtime_task(Worker&amp; worker, Node* node) {
+<span class="line_number">807</span><span class="error">  return _invoke_runtime_task_impl(
+</span><span class="line_number">808</span>    worker, node, std::get_if&lt;Node::Runtime&gt;(&amp;node-&gt;_handle)-&gt;work
+<span class="line_number">809</span>  );
+<span class="line_number">810</span>}
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/executor.hpp:1668<br>
+                                    <code class="cpp">tf::Executor::_invoke(tf::Worker&amp;, tf::Node*)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1665</span>    
+<span class="line_number">1666</span>    // runtime task
+<span class="line_number">1667</span>    case Node::RUNTIME:{
+<span class="line_number">1668</span><span class="error">      if(_invoke_runtime_task(worker, node)) {
+</span><span class="line_number">1669</span>        return;
+<span class="line_number">1670</span>      }
+<span class="line_number">1671</span>    }
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/executor.hpp:1424<br>
+                                    <code class="cpp">tf::Executor::_exploit_task(tf::Worker&amp;, tf::Node*&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1421</span>// Procedure: _exploit_task
+<span class="line_number">1422</span>inline void Executor::_exploit_task(Worker&amp; w, Node*&amp; t) {
+<span class="line_number">1423</span>  while(t) {
+<span class="line_number">1424</span><span class="error">    _invoke(w, t);
+</span><span class="line_number">1425</span>    t = w._wsq.pop();
+<span class="line_number">1426</span>  }
+<span class="line_number">1427</span>}
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/executor.hpp:1327<br>
+                                    <code class="cpp">tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}::operator()() const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1324</span>        while(1) {
+<span class="line_number">1325</span>
+<span class="line_number">1326</span>          // drains out the local queue first
+<span class="line_number">1327</span><span class="error">          _exploit_task(worker, t);
+</span><span class="line_number">1328</span>
+<span class="line_number">1329</span>          // steals and waits for tasks
+<span class="line_number">1330</span>          if(_wait_for_task(worker, t) == false) {
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:61<br>
+                                    <code class="cpp">void std::__invoke_impl&lt;void, tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}&gt;(std::__invoke_other, tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}&amp;&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">58</span>  template&lt;typename _Res, typename _Fn, typename... _Args&gt;
+<span class="line_number">59</span>    constexpr _Res
+<span class="line_number">60</span>    __invoke_impl(__invoke_other, _Fn&amp;&amp; __f, _Args&amp;&amp;... __args)
+<span class="line_number">61</span><span class="error">    { return std::forward&lt;_Fn&gt;(__f)(std::forward&lt;_Args&gt;(__args)...); }
+</span><span class="line_number">62</span>
+<span class="line_number">63</span>  template&lt;typename _Res, typename _MemFun, typename _Tp, typename... _Args&gt;
+<span class="line_number">64</span>    constexpr _Res
+</code></pre>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            <pre class="code">
+<code class="c++"><span class="line_number">95</span><span class="error">          [f, shape = std::move(shape), ndim](size_t flat) {</span>
+<span class="line_number">96</span>        thread_local std::vector&lt;size_t&gt; idx;
+<span class="line_number">97</span>        idx.resize(ndim);
+<span class="line_number">98</span>
+<span class="line_number">99</span>        size_t rem = flat;
+<span class="line_number">100</span>        for (ptrdiff_t i = ndim - 1; i &gt;= 0; --i)
+<span class="line_number">101</span>        {
+<span class="line_number">102</span>          idx[i] = rem % shape[i];
+<span class="line_number">103</span>          rem /= shape[i];
+<span class="line_number">104</span>        }
+<span class="line_number">105</span>
+<span class="line_number">106</span>        f(idx, flat);
+<span class="line_number">107</span>      });
+<span class="line_number">108</span>
+<span class="line_number">109</span>      return exec.cpu()-&gt;run(std::move(flow));
+<span class="line_number">110</span>    }
+<span class="line_number">111</span>  }
+<span class="line_number">112</span>
+<span class="line_number">113</span>  // ============================================================================
+<span class="line_number">114</span>  // Standard walk overloads
+<span class="line_number">115</span>  // ============================================================================
+<span class="line_number">116</span>
+<span class="line_number">117</span>  /**
+<span class="line_number">118</span>   * Visit every index of any IsTensor in row-major order, invoking f(idx) at each.
+<span class="line_number">119</span>   * If f returns bool, walking stops when f returns false.
+<span class="line_number">120</span>   */
+<span class="line_number">121</span>  template &lt;IsTensor TTensor, typename UnaryFunc&gt;
+<span class="line_number">122</span>#ifndef __CUDACC__
+<span class="line_number">123</span>  requires std::invocable&lt;UnaryFunc, std::vector&lt;size_t&gt;&gt;
+<span class="line_number">124</span>#endif
+<span class="line_number">125</span>  void walk(const TTensor&amp; tensor, UnaryFunc&amp;&amp; f)
+<span class="line_number">126</span>  {
+<span class="line_number">127</span>    detail::walk_impl(tensor, [&amp;f](const std::vector&lt;size_t&gt;&amp; idx, size_t) -&gt; decltype(auto) {
+<span class="line_number">128</span>      return f(idx);
+<span class="line_number">129</span>    });
+<span class="line_number">130</span>  }
+<span class="line_number">131</span>
+<span class="line_number">132</span>  /**
+<span class="line_number">133</span>   * Visit every index in parallel via the given Executor, invoking f(idx) at each.
+<span class="line_number">134</span>   * Does not support early termination. Returns a tf::Future.
+<span class="line_number">135</span>   */
+<span class="line_number">136</span>  template &lt;IsTensor TTensor, typename UnaryFunc&gt;
+<span class="line_number">137</span>#ifndef __CUDACC__
+<span class="line_number">138</span>  requires std::invocable&lt;UnaryFunc, std::vector&lt;size_t&gt;&gt;
+<span class="line_number">139</span>#endif
+<span class="line_number">140</span>  tf::Future&lt;void&gt; parallel_walk_async(const TTensor&amp; tensor, UnaryFunc&amp;&amp; f, Executor&amp; exec)
+<span class="line_number">141</span>  {
+<span class="line_number">142</span>    return detail::parallel_walk_impl(tensor, [f = std::forward&lt;UnaryFunc&gt;(f)](const std::vector&lt;size_t&gt;&amp; idx, size_t) {
+<span class="line_number">143</span>      f(idx);
+<span class="line_number">144</span>    }, exec);
+<span class="line_number">145</span>  }
+<span class="line_number">146</span>
+<span class="line_number">147</span>  /**
+<span class="line_number">148</span>   * Like parallel_walk_async(), but blocks until complete.
+<span class="line_number">149</span>   */
+<span class="line_number">150</span>  template &lt;IsTensor TTensor, typename UnaryFunc&gt;
+<span class="line_number">151</span>#ifndef __CUDACC__
+<span class="line_number">152</span>  requires std::invocable&lt;UnaryFunc, std::vector&lt;size_t&gt;&gt;
+<span class="line_number">153</span>#endif
+<span class="line_number">154</span>  void parallel_walk(const TTensor&amp; tensor, UnaryFunc&amp;&amp; f, Executor&amp; exec)
+<span class="line_number">155</span>  {
+<span class="line_number">156</span>    parallel_walk_async(tensor, std::forward&lt;UnaryFunc&gt;(f), exec).wait();
+<span class="line_number">157</span>  }
+<span class="line_number">158</span>
+<span class="line_number">159</span>  // ============================================================================
+<span class="line_number">160</span>  // Walk with random: deterministically-seeded engine at each element
+<span class="line_number">161</span>  // ============================================================================
+<span class="line_number">162</span>
+<span class="line_number">163</span>  /**
+<span class="line_number">164</span>   * Walk every index of a tensor, providing a deterministically-seeded random
+<span class="line_number">165</span>   * engine at each element. The lambda receives (idx, engine&amp;) where the engine
+<span class="line_number">166</span>   * is seeded from the generator and the element&#39;s flat (row-major) index.
+<span class="line_number">167</span>   */
+<span class="line_number">168</span>  template &lt;IsTensor TTensor, typename EngineT, typename BinaryFunc&gt;
+<span class="line_number">169</span>#ifndef __CUDACC__
+<span class="line_number">170</span>  requires std::invocable&lt;BinaryFunc, std::vector&lt;size_t&gt;, EngineT&amp;&gt;
+<span class="line_number">171</span>#endif
+<span class="line_number">172</span>  void walk(const TTensor&amp; tensor, RandomGenerator&lt;EngineT&gt;&amp; gen, BinaryFunc&amp;&amp; f)
+<span class="line_number">173</span>  {
+<span class="line_number">174</span>    auto block = gen.reserve(tensor.size());
+<span class="line_number">175</span>    detail::walk_impl(tensor, [block, &amp;f](const std::vector&lt;size_t&gt;&amp; idx, size_t flat) {
+<span class="line_number">176</span>      auto engine = block.sub_generator(flat);
+<span class="line_number">177</span>      f(idx, engine);
+<span class="line_number">178</span>    });
+<span class="line_number">179</span>  }
+<span class="line_number">180</span>
+<span class="line_number">181</span>  /**
+<span class="line_number">182</span>   * Like walk() with random, but distributes work across threads.
+<span class="line_number">183</span>   * Deterministic regardless of thread count or execution order. Returns a tf::Future.
+<span class="line_number">184</span>   */
+<span class="line_number">185</span>  template &lt;IsTensor TTensor, typename EngineT, typename BinaryFunc&gt;
+<span class="line_number">186</span>#ifndef __CUDACC__
+<span class="line_number">187</span>  requires std::invocable&lt;BinaryFunc, std::vector&lt;size_t&gt;, EngineT&amp;&gt;
+<span class="line_number">188</span>#endif
+<span class="line_number">189</span>  tf::Future&lt;void&gt; parallel_walk_async(const TTensor&amp; tensor, RandomGenerator&lt;EngineT&gt;&amp; gen,
+<span class="line_number">190</span>                                       BinaryFunc&amp;&amp; f, Executor&amp; exec)
+<span class="line_number">191</span>  {
+<span class="line_number">192</span>    auto block = gen.reserve(tensor.size());
+<span class="line_number">193</span>    return detail::parallel_walk_impl(tensor, [block, f = std::forward&lt;BinaryFunc&gt;(f)](const std::vector&lt;size_t&gt;&amp; idx, size_t flat) {
+<span class="line_number">194</span>      auto engine = block.sub_generator(flat);
+<span class="line_number">195</span>      f(idx, engine);
+<span class="line_number">196</span>    }, exec);
+<span class="line_number">197</span>  }
+<span class="line_number">198</span>
+<span class="line_number">199</span>  /**
+<span class="line_number">200</span>   * Like parallel_walk_async() with random, but blocks until complete.
+<span class="line_number">201</span>   */
+<span class="line_number">202</span>  template &lt;IsTensor TTensor, typename EngineT, typename BinaryFunc&gt;
+<span class="line_number">203</span>#ifndef __CUDACC__
+<span class="line_number">204</span>  requires std::invocable&lt;BinaryFunc, std::vector&lt;size_t&gt;, EngineT&amp;&gt;
+<span class="line_number">205</span>#endif
+<span class="line_number">206</span>  void parallel_walk(const TTensor&amp; tensor, RandomGenerator&lt;EngineT&gt;&amp; gen,
+<span class="line_number">207</span>                     BinaryFunc&amp;&amp; f, Executor&amp; exec)
+<span class="line_number">208</span>  {
+<span class="line_number">209</span>    parallel_walk_async(tensor, gen, std::forward&lt;BinaryFunc&gt;(f), exec).wait();
+<span class="line_number">210</span>  }
+<span class="line_number">211</span>
+<span class="line_number">212</span>}
+<span class="line_number">213</span>
+<span class="line_number">214</span>#endif
+</code>
+            </pre>
+        </div>
+    </div>
+</body>
+
+</html>
