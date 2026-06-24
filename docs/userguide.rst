@@ -13,6 +13,7 @@ User guide
    plotting
    saving
    distances
+   sampling
    persistence
    point_processes
    gpu

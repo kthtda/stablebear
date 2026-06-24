@@ -314,6 +314,42 @@ def plot_poisson_samples(color="steelblue"):
 # -- docs snippet end poisson_samples --
 
 
+# -- docs snippet start subsample_weights --
+def plot_subsample_weights(query_color="red", cmap="viridis"):
+    import stablebear as sb
+
+    # A reference cloud and a single query point to view it from.
+    gen = np.random.default_rng(0)
+    reference = gen.standard_normal((400, 2))
+    query = np.array([1.0, 0.5])
+
+    # The default filter is Euclidean distance to the query point.
+    dist = np.linalg.norm(reference - query, axis=1)
+
+    # Each distribution turns those distances into sampling weights.
+    distributions = [
+        ("Gaussian(mean=0, sigma=0.4)", sb.Gaussian(mean=0.0, sigma=0.4)),
+        ("Uniform(inner=1.0, outer=1.8)", sb.Uniform(inner=1.0, outer=1.8)),
+    ]
+
+    fig, axes = plt.subplots(1, 2, figsize=(9, 4), sharex=True, sharey=True)
+    for ax, (title, distribution) in zip(axes, distributions):
+        weights = distribution(dist)
+        sc = ax.scatter(reference[:, 0], reference[:, 1], c=weights,
+                        cmap=cmap, s=18, edgecolors="none")
+        ax.scatter(query[0], query[1], marker="*", s=260, color=query_color,
+                   edgecolors="black", linewidths=0.6, label="query point", zorder=3)
+        fig.colorbar(sc, ax=ax, label="sampling weight", shrink=0.85)
+        ax.set_title(title, fontsize=10)
+        ax.set_xlabel("$x_1$")
+        ax.set_aspect("equal")
+    axes[0].set_ylabel("$x_2$")
+    axes[0].legend(loc="upper left", fontsize=8)
+    fig.tight_layout()
+    return fig
+# -- docs snippet end subsample_weights --
+
+
 # -- Generate light and dark variants --
 def _save_themed(plot_func, style, bg_color, fg_color, line_color, outfile):
     with plt.style.context(style), \
@@ -350,6 +386,7 @@ if __name__ == "__main__":
         ("gallery_apf", lambda: plot_apf_example("steelblue", "orangered")),
         ("gallery_apf_max_death", lambda: plot_apf_max_death("steelblue", "orangered")),
         ("gallery_poisson_samples", lambda: plot_poisson_samples("steelblue")),
+        ("gallery_subsample_weights", lambda: plot_subsample_weights("red")),
     ]
     gallery_dark = [
         ("gallery_single_pcf", lambda: plot_single_pcf()),
@@ -362,6 +399,7 @@ if __name__ == "__main__":
         ("gallery_apf", lambda: plot_apf_example("#5dade2", "#ff6b6b")),
         ("gallery_apf_max_death", lambda: plot_apf_max_death("#5dade2", "#ff6b6b")),
         ("gallery_poisson_samples", lambda: plot_poisson_samples("#5dade2")),
+        ("gallery_subsample_weights", lambda: plot_subsample_weights("#ff6b6b")),
     ]
     for (name, func), (_, func_dark) in zip(gallery, gallery_dark):
         _save_themed(func, *LIGHT, HERE / f"{name}_light.png")

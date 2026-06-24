@@ -97,8 +97,12 @@ def subsample(
     ----------
     reference : array_like or FloatTensor
         The reference point cloud :math:`R`, shape ``(n_reference, dim)``.
-    query : array_like or FloatTensor
-        The query points, shape ``(n_query, dim)``.
+    query : array_like or FloatTensor, optional
+        The query points, shape ``(n_query, dim)``. If ``None`` (the default),
+        the reference cloud is used as its own query points. When the
+        distribution weights every reference point equally (e.g. a fully-open
+        :class:`Uniform`), the query points do not affect the sampling
+        probability, so a single query point suffices.
     sample_size : int
         Number of points per subsample (``s`` in the paper).
     n_instances : int

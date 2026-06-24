@@ -31,7 +31,8 @@ class Uniform(_BuiltinDistribution):
     * a **circle**/annulus between radii :math:`r_1` and :math:`r_2` —
       ``Uniform(inner=r1, outer=r2)``;
     * plain uniform sampling of the whole reference cloud — ``Uniform()``
-      (the default, ``inner=0``, ``outer=`` :math:`\infty`).
+      (the default, ``inner=0``, ``outer=`` :math:`\infty`). This case is
+      independent of the query point, so a single query point suffices.
 
     Parameters
     ----------
