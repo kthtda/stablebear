@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>/home/runner/work/stablebear/stablebear/include/sbear/io/tensor_io.hpp</title>
+    <link href='valgrind.css' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+    <script src="https://code.jquery.com/jquery-3.4.1.js"></script>
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.0.0/styles/default.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.0.0/highlight.min.js"></script>
+    <script src="valgrind.js"></script>
+</head>
+
+<body>
+    <div class="global">
+        <div class="header">
+            <h1>/home/runner/work/stablebear/stablebear/include/sbear/io/tensor_io.hpp</h1>
+            <p><b>2</b> errors</p>
+            <button class="next_error">Goto First Error</button>
+        </div>
+        <div class="listing">
+            <pre class="code">
+<code class="c++"><span class="line_number">1</span>#ifndef STABLEBEAR_TENSOR_IO_H
+<span class="line_number">2</span>#define STABLEBEAR_TENSOR_IO_H
+<span class="line_number">3</span>
+<span class="line_number">4</span>#include &#34;io_stream_base.hpp&#34;
+<span class="line_number">5</span>#include &#34;barcode_io.hpp&#34;
+<span class="line_number">6</span>#include &#34;compressed_matrix_io.hpp&#34;
+<span class="line_number">7</span>#include &#34;../tensor.hpp&#34;
+<span class="line_number">8</span>#include &#34;../point_cloud.hpp&#34;
+<span class="line_number">9</span>#include &#34;../functional/pcf.hpp&#34;
+<span class="line_number">10</span>#include &#34;../persistence/barcode.hpp&#34;
+<span class="line_number">11</span>
+<span class="line_number">12</span>#include &lt;unordered_map&gt;
+<span class="line_number">13</span>#include &lt;vector&gt;
+<span class="line_number">14</span>
+<span class="line_number">15</span>namespace sb::io::detail
+<span class="line_number">16</span>{
+<span class="line_number">17</span>  template &lt;typename T&gt;
+<span class="line_number">18</span>  struct is_barcode : std::false_type {};
+<span class="line_number">19</span>
+<span class="line_number">20</span>  template &lt;typename T&gt;
+<span class="line_number">21</span>  struct is_barcode&lt;ph::Barcode&lt;T&gt;&gt; : std::true_type { using scalar_type = T; };
+<span class="line_number">22</span>
+<span class="line_number">23</span>  template &lt;typename T&gt;
+<span class="line_number">24</span>  inline constexpr bool is_barcode_v = is_barcode&lt;T&gt;::value;
+<span class="line_number">25</span>
+<span class="line_number">26</span>  template &lt;typename T&gt;
+<span class="line_number">27</span>  struct is_compressed_matrix : std::false_type {};
+<span class="line_number">28</span>
+<span class="line_number">29</span>  template &lt;typename T&gt;
+<span class="line_number">30</span>  struct is_compressed_matrix&lt;SymmetricMatrix&lt;T&gt;&gt; : std::true_type {};
+<span class="line_number">31</span>
+<span class="line_number">32</span>  template &lt;typename T&gt;
+<span class="line_number">33</span>  struct is_compressed_matrix&lt;DistanceMatrix&lt;T&gt;&gt; : std::true_type {};
+<span class="line_number">34</span>
+<span class="line_number">35</span>  template &lt;typename T&gt;
+<span class="line_number">36</span>  inline constexpr bool is_compressed_matrix_v = is_compressed_matrix&lt;T&gt;::value;
+<span class="line_number">37</span>
+<span class="line_number">38</span>  template &lt;typename T&gt;
+<span class="line_number">39</span>  struct is_point_cloud : std::false_type {};
+<span class="line_number">40</span>
+<span class="line_number">41</span>  template &lt;typename T&gt;
+<span class="line_number">42</span>  struct is_point_cloud&lt;PointCloud&lt;T&gt;&gt; : std::true_type { using scalar_type = T; };
+<span class="line_number">43</span>
+<span class="line_number">44</span>  template &lt;typename T&gt;
+<span class="line_number">45</span>  inline constexpr bool is_point_cloud_v = is_point_cloud&lt;T&gt;::value;
+<span class="line_number">46</span>
+<span class="line_number">47</span>  using StreamableTensor = std::variant&lt;
+<span class="line_number">48</span>      Tensor&lt;float32_t&gt;,
+<span class="line_number">49</span>      Tensor&lt;float64_t&gt;,
+<span class="line_number">50</span>
+<span class="line_number">51</span>      Tensor&lt;int32_t&gt;,
+<span class="line_number">52</span>      Tensor&lt;int64_t&gt;,
+<span class="line_number">53</span>      Tensor&lt;uint32_t&gt;,
+<span class="line_number">54</span>      Tensor&lt;uint64_t&gt;,
+<span class="line_number">55</span>      Tensor&lt;bool&gt;,
+<span class="line_number">56</span>
+<span class="line_number">57</span>      Tensor&lt;Pcf&lt;float32_t, float32_t&gt;&gt;,
+<span class="line_number">58</span>      Tensor&lt;Pcf&lt;float64_t, float64_t&gt;&gt;,
+<span class="line_number">59</span>
+<span class="line_number">60</span>      Tensor&lt;Pcf&lt;int32_t, int32_t&gt;&gt;,
+<span class="line_number">61</span>      Tensor&lt;Pcf&lt;int64_t, int64_t&gt;&gt;,
+<span class="line_number">62</span>
+<span class="line_number">63</span>      Tensor&lt;PointCloud&lt;float32_t&gt;&gt;,
+<span class="line_number">64</span>      Tensor&lt;PointCloud&lt;float64_t&gt;&gt;,
+<span class="line_number">65</span>
+<span class="line_number">66</span>      Tensor&lt;ph::Barcode&lt;float32_t&gt;&gt;,
+<span class="line_number">67</span>      Tensor&lt;ph::Barcode&lt;float64_t&gt;&gt;,
+<span class="line_number">68</span>
+<span class="line_number">69</span>      Tensor&lt;SymmetricMatrix&lt;float32_t&gt;&gt;,
+<span class="line_number">70</span>      Tensor&lt;SymmetricMatrix&lt;float64_t&gt;&gt;,
+<span class="line_number">71</span>
+<span class="line_number">72</span>      Tensor&lt;DistanceMatrix&lt;float32_t&gt;&gt;,
+<span class="line_number">73</span>      Tensor&lt;DistanceMatrix&lt;float64_t&gt;&gt;
+<span class="line_number">74</span>      &gt;;
+<span class="line_number">75</span>
+<span class="line_number">76</span>  using StreamableObject = std::variant&lt;
+<span class="line_number">77</span>      Pcf&lt;float32_t, float32_t&gt;,
+<span class="line_number">78</span>      Pcf&lt;float64_t, float64_t&gt;,
+<span class="line_number">79</span>
+<span class="line_number">80</span>      Pcf&lt;int32_t, int32_t&gt;,
+<span class="line_number">81</span>      Pcf&lt;int64_t, int64_t&gt;,
+<span class="line_number">82</span>
+<span class="line_number">83</span>      ph::Barcode&lt;float32_t&gt;,
+<span class="line_number">84</span>      ph::Barcode&lt;float64_t&gt;,
+<span class="line_number">85</span>
+<span class="line_number">86</span>      SymmetricMatrix&lt;float32_t&gt;,
+<span class="line_number">87</span>      SymmetricMatrix&lt;float64_t&gt;,
+<span class="line_number">88</span>
+<span class="line_number">89</span>      DistanceMatrix&lt;float32_t&gt;,
+<span class="line_number">90</span>      DistanceMatrix&lt;float64_t&gt;
+<span class="line_number">91</span>      &gt;;
+<span class="line_number">92</span>
+<span class="line_number">93</span>  struct TensorFormat
+<span class="line_number">94</span>  {
+<span class="line_number">95</span>    std::int32_t baseFormat;
+<span class="line_number">96</span>    std::int32_t subFormat;
+<span class="line_number">97</span>
+<span class="line_number">98</span>    std::string toString() const
+<span class="line_number">99</span>    {
+<span class="line_number">100</span>      return &#34;(&#34; + std::to_string(baseFormat) + &#34;, &#34; + std::to_string(subFormat) + &#34;)&#34;;
+<span class="line_number">101</span>    }
+<span class="line_number">102</span>
+<span class="line_number">103</span>    bool operator==(const TensorFormat&amp;) const = default;
+<span class="line_number">104</span>    bool operator!=(const TensorFormat&amp;) const = default;
+<span class="line_number">105</span>  };
+<span class="line_number">106</span>
+<span class="line_number">107</span>  template &lt;typename U&gt;
+<span class="line_number">108</span>  TensorFormat tensorFormat()
+<span class="line_number">109</span>  {
+<span class="line_number">110</span>    using namespace std::string_literals;
+<span class="line_number">111</span>    using T = std::decay_t&lt;U&gt;;
+<span class="line_number">112</span>
+<span class="line_number">113</span>    if      constexpr (std::is_same_v&lt;T, float32_t&gt;) { return TensorFormat{ .baseFormat = 1, .subFormat = 32 }; }
+<span class="line_number">114</span>    else if constexpr (std::is_same_v&lt;T, float64_t&gt;) { return TensorFormat{ .baseFormat = 1, .subFormat = 64 }; }
+<span class="line_number">115</span>
+<span class="line_number">116</span>    else if constexpr (std::is_same_v&lt;T, int32_t&gt;)  { return TensorFormat{ .baseFormat = 2, .subFormat = 32 }; }
+<span class="line_number">117</span>    else if constexpr (std::is_same_v&lt;T, int64_t&gt;)  { return TensorFormat{ .baseFormat = 2, .subFormat = 64 }; }
+<span class="line_number">118</span>
+<span class="line_number">119</span>    else if constexpr (std::is_same_v&lt;T, uint32_t&gt;) { return TensorFormat{ .baseFormat = 3, .subFormat = 32 }; }
+<span class="line_number">120</span>    else if constexpr (std::is_same_v&lt;T, uint64_t&gt;) { return TensorFormat{ .baseFormat = 3, .subFormat = 64 }; }
+<span class="line_number">121</span>
+<span class="line_number">122</span>    else if constexpr (std::is_same_v&lt;T, bool&gt;)     { return TensorFormat{ .baseFormat = 4, .subFormat = 8 }; }
+<span class="line_number">123</span>
+<span class="line_number">124</span>    else if constexpr (std::is_same_v&lt;T, Pcf&lt;float32_t, float32_t&gt;&gt;) { return TensorFormat{ .baseFormat = 100, .subFormat = 32 }; }
+<span class="line_number">125</span>    else if constexpr (std::is_same_v&lt;T, Pcf&lt;float64_t, float64_t&gt;&gt;) { return TensorFormat{ .baseFormat = 100, .subFormat = 64 }; }
+<span class="line_number">126</span>
+<span class="line_number">127</span>    else if constexpr (std::is_same_v&lt;T, Pcf&lt;int32_t, int32_t&gt;&gt;) { return TensorFormat{ .baseFormat = 101, .subFormat = 32 }; }
+<span class="line_number">128</span>    else if constexpr (std::is_same_v&lt;T, Pcf&lt;int64_t, int64_t&gt;&gt;) { return TensorFormat{ .baseFormat = 101, .subFormat = 64 }; }
+<span class="line_number">129</span>
+<span class="line_number">130</span>    // baseFormat 1000 is the legacy point cloud format (every element stored as a
+<span class="line_number">131</span>    // full nested tensor); 1001 is the current format that stores each distinct
+<span class="line_number">132</span>    // source coordinate buffer once plus per-element (source id, indices).
+<span class="line_number">133</span>    else if constexpr (std::is_same_v&lt;T, PointCloud&lt;float32_t&gt;&gt;) { return TensorFormat{ .baseFormat = 1001, .subFormat = 32 }; }
+<span class="line_number">134</span>    else if constexpr (std::is_same_v&lt;T, PointCloud&lt;float64_t&gt;&gt;) { return TensorFormat{ .baseFormat = 1001, .subFormat = 64 }; }
+<span class="line_number">135</span>
+<span class="line_number">136</span>    else if constexpr (std::is_same_v&lt;T, SymmetricMatrix&lt;float32_t&gt;&gt;) { return TensorFormat{ .baseFormat = 1100, .subFormat = 32 }; }
+<span class="line_number">137</span>    else if constexpr (std::is_same_v&lt;T, SymmetricMatrix&lt;float64_t&gt;&gt;) { return TensorFormat{ .baseFormat = 1100, .subFormat = 64 }; }
+<span class="line_number">138</span>
+<span class="line_number">139</span>    else if constexpr (std::is_same_v&lt;T, DistanceMatrix&lt;float32_t&gt;&gt;) { return TensorFormat{ .baseFormat = 1120, .subFormat = 32 }; }
+<span class="line_number">140</span>    else if constexpr (std::is_same_v&lt;T, DistanceMatrix&lt;float64_t&gt;&gt;) { return TensorFormat{ .baseFormat = 1120, .subFormat = 64 }; }
+<span class="line_number">141</span>
+<span class="line_number">142</span>    else if constexpr (std::is_same_v&lt;T, ph::Barcode&lt;float32_t&gt;&gt;) { return TensorFormat{ .baseFormat = 10000, .subFormat = 32 }; }
+<span class="line_number">143</span>    else if constexpr (std::is_same_v&lt;T, ph::Barcode&lt;float64_t&gt;&gt;) { return TensorFormat{ .baseFormat = 10000, .subFormat = 64 }; }
+<span class="line_number">144</span>
+<span class="line_number">145</span>    throw std::runtime_error(&#34;Tensor type &#34;s + sb::detail::unmangled_typename&lt;T&gt;() +  &#34; not supported.&#34;);
+<span class="line_number">146</span>  }
+<span class="line_number">147</span>
+<span class="line_number">148</span>  inline TensorFormat getTensorFormat(const StreamableTensor&amp; tensor)
+<span class="line_number">149</span>  {
+<span class="line_number">150</span>    return std::visit([](auto&amp;&amp; arg) -&gt; TensorFormat {
+<span class="line_number">151</span>      using TensorT = std::decay_t&lt;decltype(arg)&gt;;
+<span class="line_number">152</span>      using T = typename TensorT::value_type;
+<span class="line_number">153</span>      return tensorFormat&lt;T&gt;();
+<span class="line_number">154</span>    }, tensor);
+<span class="line_number">155</span>  }
+<span class="line_number">156</span>
+<span class="line_number">157</span>  template &lt;IsTensor TensorT&gt;
+<span class="line_number">158</span>  void write_tensor(std::ostream&amp; os, const TensorT&amp; tensor);
+<span class="line_number">159</span>
+<span class="line_number">160</span>  template &lt;typename T&gt;
+<span class="line_number">161</span>  void write_element(std::ostream&amp; os, const sb::Tensor&lt;T&gt;&amp; t)
+<span class="line_number">162</span>  {
+<span class="line_number">163</span>    io::detail::write_tensor(os, t);
+<span class="line_number">164</span>  }
+<span class="line_number">165</span>
+<span class="line_number">166</span>  template &lt;typename T&gt;
+<span class="line_number">167</span>  Tensor&lt;T&gt; read_tensor(std::istream&amp; is);
+<span class="line_number">168</span>
+<span class="line_number">169</span>  inline TensorFormat read_tensor_format(std::istream&amp; is)
+<span class="line_number">170</span>  {
+<span class="line_number">171</span>    TensorFormat format;
+<span class="line_number">172</span>    format.baseFormat = read_bytes&lt;std::int32_t&gt;(is);
+<span class="line_number">173</span>    format.subFormat  = read_bytes&lt;std::int32_t&gt;(is);
+<span class="line_number">174</span>    return format;
+<span class="line_number">175</span>  }
+<span class="line_number">176</span>
+<span class="line_number">177</span>  template &lt;IsTensor TensorT&gt;
+<span class="line_number">178</span>  TensorT read_element(std::istream&amp; is)
+<span class="line_number">179</span>  {
+<span class="line_number">180</span>    auto format = read_tensor_format(is);
+<span class="line_number">181</span>    auto expectedFormat = tensorFormat&lt;typename TensorT::value_type&gt;();
+<span class="line_number">182</span>    if (format != expectedFormat)
+<span class="line_number">183</span>    {
+<span class="line_number">184</span>      throw std::runtime_error(&#34;Unexpected tensor of type &#34; + format.toString() + &#34; where &#34; + expectedFormat.toString() + &#34; was expected.&#34;);
+<span class="line_number">185</span>    }
+<span class="line_number">186</span>    return io::detail::read_tensor&lt;typename TensorT::value_type&gt;(is);
+<span class="line_number">187</span>  }
+<span class="line_number">188</span>
+<span class="line_number">189</span>  // Serialize the elements of a tensor of point clouds by storing each distinct
+<span class="line_number">190</span>  // source coordinate buffer once (point clouds that share a source — e.g. the
+<span class="line_number">191</span>  // indexed subsamples from stablebear.sampling — are deduplicated), followed by
+<span class="line_number">192</span>  // every element as a source id plus, for indexed views, its index array.
+<span class="line_number">193</span>  template &lt;typename ScalarT&gt;
+<span class="line_number">194</span>  void write_point_cloud_elements(std::ostream&amp; os, const Tensor&lt;PointCloud&lt;ScalarT&gt;&gt;&amp; tensor)
+<span class="line_number">195</span>  {
+<span class="line_number">196</span>    std::unordered_map&lt;const void*, uint64_t&gt; idOf;
+<span class="line_number">197</span>    std::vector&lt;const PointCloud&lt;ScalarT&gt;*&gt; sources;
+<span class="line_number">198</span>
+<span class="line_number">199</span>    auto sz = tensor.size();
+<span class="line_number">200</span>    const auto* data = tensor.data();
+<span class="line_number">201</span>    std::vector&lt;uint64_t&gt; sourceId(sz);
+<span class="line_number">202</span>    for (auto k = 0_uz; k &lt; sz; ++k)
+<span class="line_number">203</span>    {
+<span class="line_number">204</span>      const PointCloud&lt;ScalarT&gt;&amp; elem = data[k];
+<span class="line_number">205</span>      const void* key = static_cast&lt;const void*&gt;(elem.data());
+<span class="line_number">206</span>      auto [it, inserted] = idOf.try_emplace(key, static_cast&lt;uint64_t&gt;(sources.size()));
+<span class="line_number">207</span>      if (inserted)
+<span class="line_number">208</span>        sources.push_back(&amp;elem);
+<span class="line_number">209</span>      sourceId[k] = it-&gt;second;
+<span class="line_number">210</span>    }
+<span class="line_number">211</span>
+<span class="line_number">212</span>    write_bytes&lt;uint64_t&gt;(os, static_cast&lt;uint64_t&gt;(sources.size()));
+<span class="line_number">213</span>    for (const PointCloud&lt;ScalarT&gt;* src : sources)
+<span class="line_number">214</span>      write_tensor(os, static_cast&lt;const Tensor&lt;ScalarT&gt;&amp;&gt;(*src));
+<span class="line_number">215</span>
+<span class="line_number">216</span>    for (auto k = 0_uz; k &lt; sz; ++k)
+<span class="line_number">217</span>    {
+<span class="line_number">218</span>      write_bytes&lt;uint64_t&gt;(os, sourceId[k]);
+<span class="line_number">219</span>      const PointCloud&lt;ScalarT&gt;&amp; elem = data[k];
+<span class="line_number">220</span>      write_bytes&lt;uint8_t&gt;(os, elem.is_indexed() ? uint8_t{1} : uint8_t{0});
+<span class="line_number">221</span>      if (elem.is_indexed())
+<span class="line_number">222</span>        write_tensor(os, elem.indices());
+<span class="line_number">223</span>    }
+<span class="line_number">224</span>  }
+<span class="line_number">225</span>
+<span class="line_number">226</span>  template &lt;IsTensor TensorT&gt;
+<span class="line_number">227</span>    void write_contiguous_tensor(std::ostream&amp; os, const TensorT&amp; tensor)
+<span class="line_number">228</span>  {
+<span class="line_number">229</span>    auto format = getTensorFormat(tensor);
+<span class="line_number">230</span>    write_bytes&lt;std::int32_t&gt;(os, format.baseFormat);
+<span class="line_number">231</span>    write_bytes&lt;std::int32_t&gt;(os, format.subFormat);
+<span class="line_number">232</span>
+<span class="line_number">233</span>    write_bytes&lt;std::uint64_t&gt;(os, tensor.shape().size());
+<span class="line_number">234</span>    for (auto i = 0_uz; i &lt; tensor.shape().size(); ++i)
+<span class="line_number">235</span>    {
+<span class="line_number">236</span>      write_bytes&lt;std::uint64_t&gt;(os, tensor.shape()[i]);
+<span class="line_number">237</span>      // Safe: write_tensor() guarantees contiguous input, so strides are always positive
+</code></pre>
+            <div class="issue">
+                <div>
+                    <span class="what">Possible data race during read of size 8 at 0x2A7240C0 by thread #1</span>
+                    <div class="navigation">
+                        <button class="next_error">Next</button>
+                        <button class="prev_error">Previous</button>
+                    </div>
+                </div>
+                <div>
+                    <table class="call_stack">
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/io/tensor_io.hpp:269<br>
+                                    <code class="cpp">void sb::io::detail::write_tensor&lt;sb::Tensor&lt;double&gt; &gt;(std::ostream&amp;, sb::Tensor&lt;double&gt; const&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">266</span>      write_tensor(os, copy);
+<span class="line_number">267</span>      return;
+<span class="line_number">268</span>    }
+<span class="line_number">269</span><span class="error">    write_contiguous_tensor(os, tensor);
+</span><span class="line_number">270</span>  }
+<span class="line_number">271</span>
+<span class="line_number">272</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/io/tensor_io.hpp:214<br>
+                                    <code class="cpp">void sb::io::detail::write_point_cloud_elements&lt;double&gt;(std::ostream&amp;, sb::Tensor&lt;sb::PointCloud&lt;double&gt; &gt; const&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">211</span>
+<span class="line_number">212</span>    write_bytes&lt;uint64_t&gt;(os, static_cast&lt;uint64_t&gt;(sources.size()));
+<span class="line_number">213</span>    for (const PointCloud&lt;ScalarT&gt;* src : sources)
+<span class="line_number">214</span><span class="error">      write_tensor(os, static_cast&lt;const Tensor&lt;ScalarT&gt;&amp;&gt;(*src));
+</span><span class="line_number">215</span>
+<span class="line_number">216</span>    for (auto k = 0_uz; k &lt; sz; ++k)
+<span class="line_number">217</span>    {
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/io/tensor_io.hpp:244<br>
+                                    <code class="cpp">void sb::io::detail::write_contiguous_tensor&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt; &gt; &gt;(std::ostream&amp;, sb::Tensor&lt;sb::PointCloud&lt;double&gt; &gt; const&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">241</span>    using value_type = typename TensorT::value_type;
+<span class="line_number">242</span>    if constexpr (is_point_cloud_v&lt;value_type&gt;)
+<span class="line_number">243</span>    {
+<span class="line_number">244</span><span class="error">      write_point_cloud_elements&lt;typename is_point_cloud&lt;value_type&gt;::scalar_type&gt;(os, tensor);
+</span><span class="line_number">245</span>      return;
+<span class="line_number">246</span>    }
+<span class="line_number">247</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/io/tensor_io.hpp:269<br>
+                                    <code class="cpp">void sb::io::detail::write_tensor&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt; &gt; &gt;(std::ostream&amp;, sb::Tensor&lt;sb::PointCloud&lt;double&gt; &gt; const&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">266</span>      write_tensor(os, copy);
+<span class="line_number">267</span>      return;
+<span class="line_number">268</span>    }
+<span class="line_number">269</span><span class="error">    write_contiguous_tensor(os, tensor);
+</span><span class="line_number">270</span>  }
+<span class="line_number">271</span>
+<span class="line_number">272</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/io.hpp:193<br>
+                                    <code class="cpp">void sb::write&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt; &gt; &gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt; &gt; const&amp;, std::ostream&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">190</span>  {
+<span class="line_number">191</span>    io::detail::write_header(os);
+<span class="line_number">192</span>    io::detail::write_bytes&lt;uint32_t&gt;(os, static_cast&lt;uint32_t&gt;(FormatType::SingleTensor)); // &#34;t&#34; is single tensor
+<span class="line_number">193</span><span class="error">    io::detail::write_tensor(os, tensor);
+</span><span class="line_number">194</span>  }
+<span class="line_number">195</span>
+<span class="line_number">196</span>  template &lt;IsTensor TensorT&gt;
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/src/python/py_io.cpp:22<br>
+                                    <code class="cpp">void (anonymous namespace)::IoOps::save_tensor_to_file&lt;sb::PointCloud&lt;double&gt; &gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt; &gt; const&amp;, pybind11::object)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">19</span>    {
+<span class="line_number">20</span>      sb_py::PythonOStreamBuf buf(file);
+<span class="line_number">21</span>      std::ostream os(&amp;buf);
+<span class="line_number">22</span><span class="error">      sb::write(tensor, os);
+</span><span class="line_number">23</span>    }
+<span class="line_number">24</span>
+<span class="line_number">25</span>    static sb::io::detail::StreamableTensor load_tensor_from_file(py::object file)
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/pybind11/include/pybind11/cast.h:2187<br>
+                                    <code class="cpp">void pybind11::detail::argument_loader&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt; &gt; const&amp;, pybind11::object&gt;::call_impl&lt;void, void (*&amp;)(sb::Tensor&lt;sb::PointCloud&lt;double&gt; &gt; const&amp;, pybind11::object), 0ul, 1ul, pybind11::detail::void_type&gt;(void (*&amp;)(sb::Tensor&lt;sb::PointCloud&lt;double&gt; &gt; const&amp;, pybind11::object), std::integer_sequence&lt;unsigned long, 0ul, 1ul&gt;, pybind11::detail::void_type&amp;&amp;) &amp;&amp;</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">2184</span>
+<span class="line_number">2185</span>    template &lt;typename Return, typename Func, size_t... Is, typename Guard&gt;
+<span class="line_number">2186</span>    Return call_impl(Func &amp;&amp;f, index_sequence&lt;Is...&gt;, Guard &amp;&amp;) &amp;&amp; {
+<span class="line_number">2187</span><span class="error">        return std::forward&lt;Func&gt;(f)(cast_op&lt;Args&gt;(std::move(std::get&lt;Is&gt;(argcasters)))...);
+</span><span class="line_number">2188</span>    }
+<span class="line_number">2189</span>
+<span class="line_number">2190</span>    std::tuple&lt;make_caster&lt;Args&gt;...&gt; argcasters;
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/pybind11/include/pybind11/cast.h:2155<br>
+                                    <code class="cpp">std::enable_if&lt;std::is_void&lt;void&gt;::value, pybind11::detail::void_type&gt;::type pybind11::detail::argument_loader&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt; &gt; const&amp;, pybind11::object&gt;::call&lt;void, pybind11::detail::void_type, void (*&amp;)(sb::Tensor&lt;sb::PointCloud&lt;double&gt; &gt; const&amp;, pybind11::object)&gt;(void (*&amp;)(sb::Tensor&lt;sb::PointCloud&lt;double&gt; &gt; const&amp;, pybind11::object)) &amp;&amp;</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">2152</span>
+<span class="line_number">2153</span>    template &lt;typename Return, typename Guard, typename Func&gt;
+<span class="line_number">2154</span>    enable_if_t&lt;std::is_void&lt;Return&gt;::value, void_type&gt; call(Func &amp;&amp;f) &amp;&amp; {
+<span class="line_number">2155</span><span class="error">        std::move(*this).template call_impl&lt;remove_cv_t&lt;Return&gt;&gt;(
+</span><span class="line_number">2156</span>            std::forward&lt;Func&gt;(f), indices{}, Guard{});
+<span class="line_number">2157</span>        return void_type();
+<span class="line_number">2158</span>    }
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/pybind11/include/pybind11/pybind11.h:480<br>
+                                    <code class="cpp">pybind11::cpp_function::initialize&lt;void (*&amp;)(sb::Tensor&lt;sb::PointCloud&lt;double&gt; &gt; const&amp;, pybind11::object), void, sb::Tensor&lt;sb::PointCloud&lt;double&gt; &gt; const&amp;, pybind11::object, pybind11::name, pybind11::scope, pybind11::sibling&gt;(void (*&amp;)(sb::Tensor&lt;sb::PointCloud&lt;double&gt; &gt; const&amp;, pybind11::object), void (*)(sb::Tensor&lt;sb::PointCloud&lt;double&gt; &gt; const&amp;, pybind11::object), pybind11::name const&amp;, pybind11::scope const&amp;, pybind11::sibling const&amp;)::{lambda(pybind11::detail::function_call&amp;)#1}::operator()(pybind11::detail::function_call&amp;) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">477</span>                result = none().release();
+<span class="line_number">478</span>            } else {
+<span class="line_number">479</span>                result = cast_out::cast(
+<span class="line_number">480</span><span class="error">                    std::move(args_converter).template call&lt;Return, Guard&gt;(cap-&gt;f),
+</span><span class="line_number">481</span>                    policy,
+<span class="line_number">482</span>                    call.parent);
+<span class="line_number">483</span>            }
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/pybind11/include/pybind11/pybind11.h:450<br>
+                                    <code class="cpp">pybind11::cpp_function::initialize&lt;void (*&amp;)(sb::Tensor&lt;sb::PointCloud&lt;double&gt; &gt; const&amp;, pybind11::object), void, sb::Tensor&lt;sb::PointCloud&lt;double&gt; &gt; const&amp;, pybind11::object, pybind11::name, pybind11::scope, pybind11::sibling&gt;(void (*&amp;)(sb::Tensor&lt;sb::PointCloud&lt;double&gt; &gt; const&amp;, pybind11::object), void (*)(sb::Tensor&lt;sb::PointCloud&lt;double&gt; &gt; const&amp;, pybind11::object), pybind11::name const&amp;, pybind11::scope const&amp;, pybind11::sibling const&amp;)::{lambda(pybind11::detail::function_call&amp;)#1}::_FUN(pybind11::detail::function_call&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">447</span>            &#34;The number of argument annotations does not match the number of function arguments&#34;);
+<span class="line_number">448</span>
+<span class="line_number">449</span>        /* Dispatch code which converts function arguments and performs the actual function call */
+<span class="line_number">450</span><span class="error">        rec-&gt;impl = [](function_call &amp;call) -&gt; handle {
+</span><span class="line_number">451</span>            cast_in args_converter;
+<span class="line_number">452</span>
+<span class="line_number">453</span>            /* Try to cast the function arguments into the C++ domain */
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/pybind11/include/pybind11/pybind11.h:1119<br>
+                                    <code class="cpp">pybind11::cpp_function::dispatcher(_object*, _object* const*, unsigned long, _object*)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1116</span>                // 6. Call the function.
+<span class="line_number">1117</span>                try {
+<span class="line_number">1118</span>                    loader_life_support guard{};
+<span class="line_number">1119</span><span class="error">                    result = func.impl(call);
+</span><span class="line_number">1120</span>                } catch (reference_cast_error &amp;) {
+<span class="line_number">1121</span>                    result = PYBIND11_TRY_NEXT_OVERLOAD;
+<span class="line_number">1122</span>                }
+</code></pre>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            <pre class="code">
+<code class="c++"><span class="line_number">238</span><span class="error">      write_bytes&lt;std::uint64_t&gt;(os, static_cast&lt;uint64_t&gt;(tensor.strides()[i]));</span>
+<span class="line_number">239</span>    }
+<span class="line_number">240</span>
+<span class="line_number">241</span>    using value_type = typename TensorT::value_type;
+<span class="line_number">242</span>    if constexpr (is_point_cloud_v&lt;value_type&gt;)
+<span class="line_number">243</span>    {
+<span class="line_number">244</span>      write_point_cloud_elements&lt;typename is_point_cloud&lt;value_type&gt;::scalar_type&gt;(os, tensor);
+<span class="line_number">245</span>      return;
+<span class="line_number">246</span>    }
+<span class="line_number">247</span>
+<span class="line_number">248</span>    auto sz = tensor.size();
+<span class="line_number">249</span>    for (auto const * elem = tensor.data(); elem != tensor.data() + sz; ++elem)
+<span class="line_number">250</span>    {
+</code></pre>
+            <div class="issue">
+                <div>
+                    <span class="what">Possible data race during read of size 8 at 0x2AC22560 by thread #1</span>
+                    <div class="navigation">
+                        <button class="next_error">Next</button>
+                        <button class="prev_error">Previous</button>
+                    </div>
+                </div>
+                <div>
+                    <table class="call_stack">
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/io/tensor_io.hpp:269<br>
+                                    <code class="cpp">void sb::io::detail::write_tensor&lt;sb::Tensor&lt;unsigned long&gt; &gt;(std::ostream&amp;, sb::Tensor&lt;unsigned long&gt; const&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">266</span>      write_tensor(os, copy);
+<span class="line_number">267</span>      return;
+<span class="line_number">268</span>    }
+<span class="line_number">269</span><span class="error">    write_contiguous_tensor(os, tensor);
+</span><span class="line_number">270</span>  }
+<span class="line_number">271</span>
+<span class="line_number">272</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/io/tensor_io.hpp:222<br>
+                                    <code class="cpp">void sb::io::detail::write_point_cloud_elements&lt;double&gt;(std::ostream&amp;, sb::Tensor&lt;sb::PointCloud&lt;double&gt; &gt; const&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">219</span>      const PointCloud&lt;ScalarT&gt;&amp; elem = data[k];
+<span class="line_number">220</span>      write_bytes&lt;uint8_t&gt;(os, elem.is_indexed() ? uint8_t{1} : uint8_t{0});
+<span class="line_number">221</span>      if (elem.is_indexed())
+<span class="line_number">222</span><span class="error">        write_tensor(os, elem.indices());
+</span><span class="line_number">223</span>    }
+<span class="line_number">224</span>  }
+<span class="line_number">225</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/io/tensor_io.hpp:244<br>
+                                    <code class="cpp">void sb::io::detail::write_contiguous_tensor&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt; &gt; &gt;(std::ostream&amp;, sb::Tensor&lt;sb::PointCloud&lt;double&gt; &gt; const&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">241</span>    using value_type = typename TensorT::value_type;
+<span class="line_number">242</span>    if constexpr (is_point_cloud_v&lt;value_type&gt;)
+<span class="line_number">243</span>    {
+<span class="line_number">244</span><span class="error">      write_point_cloud_elements&lt;typename is_point_cloud&lt;value_type&gt;::scalar_type&gt;(os, tensor);
+</span><span class="line_number">245</span>      return;
+<span class="line_number">246</span>    }
+<span class="line_number">247</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/io/tensor_io.hpp:269<br>
+                                    <code class="cpp">void sb::io::detail::write_tensor&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt; &gt; &gt;(std::ostream&amp;, sb::Tensor&lt;sb::PointCloud&lt;double&gt; &gt; const&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">266</span>      write_tensor(os, copy);
+<span class="line_number">267</span>      return;
+<span class="line_number">268</span>    }
+<span class="line_number">269</span><span class="error">    write_contiguous_tensor(os, tensor);
+</span><span class="line_number">270</span>  }
+<span class="line_number">271</span>
+<span class="line_number">272</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/io.hpp:193<br>
+                                    <code class="cpp">void sb::write&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt; &gt; &gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt; &gt; const&amp;, std::ostream&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">190</span>  {
+<span class="line_number">191</span>    io::detail::write_header(os);
+<span class="line_number">192</span>    io::detail::write_bytes&lt;uint32_t&gt;(os, static_cast&lt;uint32_t&gt;(FormatType::SingleTensor)); // &#34;t&#34; is single tensor
+<span class="line_number">193</span><span class="error">    io::detail::write_tensor(os, tensor);
+</span><span class="line_number">194</span>  }
+<span class="line_number">195</span>
+<span class="line_number">196</span>  template &lt;IsTensor TensorT&gt;
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/src/python/py_io.cpp:22<br>
+                                    <code class="cpp">void (anonymous namespace)::IoOps::save_tensor_to_file&lt;sb::PointCloud&lt;double&gt; &gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt; &gt; const&amp;, pybind11::object)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">19</span>    {
+<span class="line_number">20</span>      sb_py::PythonOStreamBuf buf(file);
+<span class="line_number">21</span>      std::ostream os(&amp;buf);
+<span class="line_number">22</span><span class="error">      sb::write(tensor, os);
+</span><span class="line_number">23</span>    }
+<span class="line_number">24</span>
+<span class="line_number">25</span>    static sb::io::detail::StreamableTensor load_tensor_from_file(py::object file)
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/pybind11/include/pybind11/cast.h:2187<br>
+                                    <code class="cpp">void pybind11::detail::argument_loader&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt; &gt; const&amp;, pybind11::object&gt;::call_impl&lt;void, void (*&amp;)(sb::Tensor&lt;sb::PointCloud&lt;double&gt; &gt; const&amp;, pybind11::object), 0ul, 1ul, pybind11::detail::void_type&gt;(void (*&amp;)(sb::Tensor&lt;sb::PointCloud&lt;double&gt; &gt; const&amp;, pybind11::object), std::integer_sequence&lt;unsigned long, 0ul, 1ul&gt;, pybind11::detail::void_type&amp;&amp;) &amp;&amp;</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">2184</span>
+<span class="line_number">2185</span>    template &lt;typename Return, typename Func, size_t... Is, typename Guard&gt;
+<span class="line_number">2186</span>    Return call_impl(Func &amp;&amp;f, index_sequence&lt;Is...&gt;, Guard &amp;&amp;) &amp;&amp; {
+<span class="line_number">2187</span><span class="error">        return std::forward&lt;Func&gt;(f)(cast_op&lt;Args&gt;(std::move(std::get&lt;Is&gt;(argcasters)))...);
+</span><span class="line_number">2188</span>    }
+<span class="line_number">2189</span>
+<span class="line_number">2190</span>    std::tuple&lt;make_caster&lt;Args&gt;...&gt; argcasters;
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/pybind11/include/pybind11/cast.h:2155<br>
+                                    <code class="cpp">std::enable_if&lt;std::is_void&lt;void&gt;::value, pybind11::detail::void_type&gt;::type pybind11::detail::argument_loader&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt; &gt; const&amp;, pybind11::object&gt;::call&lt;void, pybind11::detail::void_type, void (*&amp;)(sb::Tensor&lt;sb::PointCloud&lt;double&gt; &gt; const&amp;, pybind11::object)&gt;(void (*&amp;)(sb::Tensor&lt;sb::PointCloud&lt;double&gt; &gt; const&amp;, pybind11::object)) &amp;&amp;</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">2152</span>
+<span class="line_number">2153</span>    template &lt;typename Return, typename Guard, typename Func&gt;
+<span class="line_number">2154</span>    enable_if_t&lt;std::is_void&lt;Return&gt;::value, void_type&gt; call(Func &amp;&amp;f) &amp;&amp; {
+<span class="line_number">2155</span><span class="error">        std::move(*this).template call_impl&lt;remove_cv_t&lt;Return&gt;&gt;(
+</span><span class="line_number">2156</span>            std::forward&lt;Func&gt;(f), indices{}, Guard{});
+<span class="line_number">2157</span>        return void_type();
+<span class="line_number">2158</span>    }
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/pybind11/include/pybind11/pybind11.h:480<br>
+                                    <code class="cpp">pybind11::cpp_function::initialize&lt;void (*&amp;)(sb::Tensor&lt;sb::PointCloud&lt;double&gt; &gt; const&amp;, pybind11::object), void, sb::Tensor&lt;sb::PointCloud&lt;double&gt; &gt; const&amp;, pybind11::object, pybind11::name, pybind11::scope, pybind11::sibling&gt;(void (*&amp;)(sb::Tensor&lt;sb::PointCloud&lt;double&gt; &gt; const&amp;, pybind11::object), void (*)(sb::Tensor&lt;sb::PointCloud&lt;double&gt; &gt; const&amp;, pybind11::object), pybind11::name const&amp;, pybind11::scope const&amp;, pybind11::sibling const&amp;)::{lambda(pybind11::detail::function_call&amp;)#1}::operator()(pybind11::detail::function_call&amp;) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">477</span>                result = none().release();
+<span class="line_number">478</span>            } else {
+<span class="line_number">479</span>                result = cast_out::cast(
+<span class="line_number">480</span><span class="error">                    std::move(args_converter).template call&lt;Return, Guard&gt;(cap-&gt;f),
+</span><span class="line_number">481</span>                    policy,
+<span class="line_number">482</span>                    call.parent);
+<span class="line_number">483</span>            }
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/pybind11/include/pybind11/pybind11.h:450<br>
+                                    <code class="cpp">pybind11::cpp_function::initialize&lt;void (*&amp;)(sb::Tensor&lt;sb::PointCloud&lt;double&gt; &gt; const&amp;, pybind11::object), void, sb::Tensor&lt;sb::PointCloud&lt;double&gt; &gt; const&amp;, pybind11::object, pybind11::name, pybind11::scope, pybind11::sibling&gt;(void (*&amp;)(sb::Tensor&lt;sb::PointCloud&lt;double&gt; &gt; const&amp;, pybind11::object), void (*)(sb::Tensor&lt;sb::PointCloud&lt;double&gt; &gt; const&amp;, pybind11::object), pybind11::name const&amp;, pybind11::scope const&amp;, pybind11::sibling const&amp;)::{lambda(pybind11::detail::function_call&amp;)#1}::_FUN(pybind11::detail::function_call&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">447</span>            &#34;The number of argument annotations does not match the number of function arguments&#34;);
+<span class="line_number">448</span>
+<span class="line_number">449</span>        /* Dispatch code which converts function arguments and performs the actual function call */
+<span class="line_number">450</span><span class="error">        rec-&gt;impl = [](function_call &amp;call) -&gt; handle {
+</span><span class="line_number">451</span>            cast_in args_converter;
+<span class="line_number">452</span>
+<span class="line_number">453</span>            /* Try to cast the function arguments into the C++ domain */
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/pybind11/include/pybind11/pybind11.h:1119<br>
+                                    <code class="cpp">pybind11::cpp_function::dispatcher(_object*, _object* const*, unsigned long, _object*)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1116</span>                // 6. Call the function.
+<span class="line_number">1117</span>                try {
+<span class="line_number">1118</span>                    loader_life_support guard{};
+<span class="line_number">1119</span><span class="error">                    result = func.impl(call);
+</span><span class="line_number">1120</span>                } catch (reference_cast_error &amp;) {
+<span class="line_number">1121</span>                    result = PYBIND11_TRY_NEXT_OVERLOAD;
+<span class="line_number">1122</span>                }
+</code></pre>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            <pre class="code">
+<code class="c++"><span class="line_number">251</span><span class="error">      write_element(os, *elem);</span>
+<span class="line_number">252</span>    }
+<span class="line_number">253</span>  }
+<span class="line_number">254</span>
+<span class="line_number">255</span>  template &lt;IsTensor TensorT&gt;
+<span class="line_number">256</span>  void write_tensor(std::ostream&amp; os, const TensorT&amp; tensor)
+<span class="line_number">257</span>  {
+<span class="line_number">258</span>    if (!tensor.is_contiguous())
+<span class="line_number">259</span>    {
+<span class="line_number">260</span>      auto copy = tensor.copy();
+<span class="line_number">261</span>      if (!copy.is_contiguous())
+<span class="line_number">262</span>      {
+<span class="line_number">263</span>        // To avoid infinite loop
+<span class="line_number">264</span>        throw std::runtime_error(&#34;Tensor copy is non-contiguous/non-zero-offset (this is a bug, please report it!).&#34;);
+<span class="line_number">265</span>      }
+<span class="line_number">266</span>      write_tensor(os, copy);
+<span class="line_number">267</span>      return;
+<span class="line_number">268</span>    }
+<span class="line_number">269</span>    write_contiguous_tensor(os, tensor);
+<span class="line_number">270</span>  }
+<span class="line_number">271</span>
+<span class="line_number">272</span>
+<span class="line_number">273</span>
+<span class="line_number">274</span>  template &lt;typename T&gt;
+<span class="line_number">275</span>  Tensor&lt;T&gt; read_tensor(std::istream&amp; is)
+<span class="line_number">276</span>  {
+<span class="line_number">277</span>    auto shapeSz = read_bytes&lt;std::uint64_t&gt;(is);
+<span class="line_number">278</span>    std::vector&lt;size_t&gt; shape(shapeSz);
+<span class="line_number">279</span>    std::vector&lt;ptrdiff_t&gt; strides(shapeSz);
+<span class="line_number">280</span>    for (auto i = 0_uz; i &lt; shapeSz; ++i)
+<span class="line_number">281</span>    {
+<span class="line_number">282</span>      shape[i] = read_bytes&lt;std::uint64_t&gt;(is);
+<span class="line_number">283</span>      strides[i] = static_cast&lt;ptrdiff_t&gt;(read_bytes&lt;std::uint64_t&gt;(is));
+<span class="line_number">284</span>    }
+<span class="line_number">285</span>
+<span class="line_number">286</span>    Tensor&lt;T&gt; ret(shape);
+<span class="line_number">287</span>    if (ret.strides() != strides)
+<span class="line_number">288</span>    {
+<span class="line_number">289</span>      throw std::runtime_error(&#34;Incorrect strides in saved data (expected &#34; + index_to_string(ret.strides()) + &#34; but got &#34; + index_to_string(strides) + &#34;)&#34;);
+<span class="line_number">290</span>    }
+<span class="line_number">291</span>
+<span class="line_number">292</span>    auto sz = ret.size();
+<span class="line_number">293</span>    for (auto * elem = ret.data(); elem != ret.data() + sz; ++elem)
+<span class="line_number">294</span>    {
+<span class="line_number">295</span>      if constexpr (is_barcode_v&lt;T&gt;)
+<span class="line_number">296</span>        *elem = read_barcode&lt;typename is_barcode&lt;T&gt;::scalar_type&gt;(is);
+<span class="line_number">297</span>      else if constexpr (is_compressed_matrix_v&lt;T&gt;)
+<span class="line_number">298</span>        *elem = read_compressed_matrix&lt;T&gt;(is);
+<span class="line_number">299</span>      else
+<span class="line_number">300</span>        *elem = read_element&lt;T&gt;(is);
+<span class="line_number">301</span>    }
+<span class="line_number">302</span>
+<span class="line_number">303</span>    return ret;
+<span class="line_number">304</span>  }
+<span class="line_number">305</span>
+<span class="line_number">306</span>  // Read the current (baseFormat 1001) point cloud tensor format: distinct source
+<span class="line_number">307</span>  // coordinate buffers stored once, then per-element (source id, optional indices).
+<span class="line_number">308</span>  // Elements that reference the same source share its coordinate buffer.
+<span class="line_number">309</span>  template &lt;typename ScalarT&gt;
+<span class="line_number">310</span>  Tensor&lt;PointCloud&lt;ScalarT&gt;&gt; read_indexed_point_cloud_tensor(std::istream&amp; is)
+<span class="line_number">311</span>  {
+<span class="line_number">312</span>    auto shapeSz = read_bytes&lt;std::uint64_t&gt;(is);
+<span class="line_number">313</span>    std::vector&lt;size_t&gt; shape(shapeSz);
+<span class="line_number">314</span>    std::vector&lt;ptrdiff_t&gt; strides(shapeSz);
+<span class="line_number">315</span>    for (auto i = 0_uz; i &lt; shapeSz; ++i)
+<span class="line_number">316</span>    {
+<span class="line_number">317</span>      shape[i] = read_bytes&lt;std::uint64_t&gt;(is);
+<span class="line_number">318</span>      strides[i] = static_cast&lt;ptrdiff_t&gt;(read_bytes&lt;std::uint64_t&gt;(is));
+<span class="line_number">319</span>    }
+<span class="line_number">320</span>
+<span class="line_number">321</span>    Tensor&lt;PointCloud&lt;ScalarT&gt;&gt; ret(shape);
+<span class="line_number">322</span>    if (ret.strides() != strides)
+<span class="line_number">323</span>    {
+<span class="line_number">324</span>      throw std::runtime_error(&#34;Incorrect strides in saved data (expected &#34; + index_to_string(ret.strides()) + &#34; but got &#34; + index_to_string(strides) + &#34;)&#34;);
+<span class="line_number">325</span>    }
+<span class="line_number">326</span>
+<span class="line_number">327</span>    auto numSources = read_bytes&lt;std::uint64_t&gt;(is);
+<span class="line_number">328</span>    std::vector&lt;Tensor&lt;ScalarT&gt;&gt; sources;
+<span class="line_number">329</span>    sources.reserve(numSources);
+<span class="line_number">330</span>    for (auto i = 0_uz; i &lt; numSources; ++i)
+<span class="line_number">331</span>      sources.push_back(read_element&lt;Tensor&lt;ScalarT&gt;&gt;(is));
+<span class="line_number">332</span>
+<span class="line_number">333</span>    auto sz = ret.size();
+<span class="line_number">334</span>    for (auto * elem = ret.data(); elem != ret.data() + sz; ++elem)
+<span class="line_number">335</span>    {
+<span class="line_number">336</span>      auto id = read_bytes&lt;std::uint64_t&gt;(is);
+<span class="line_number">337</span>      auto indexed = read_bytes&lt;std::uint8_t&gt;(is);
+<span class="line_number">338</span>      if (indexed)
+<span class="line_number">339</span>        *elem = PointCloud&lt;ScalarT&gt;(sources[id], read_element&lt;Tensor&lt;uint64_t&gt;&gt;(is));
+<span class="line_number">340</span>      else
+<span class="line_number">341</span>        *elem = PointCloud&lt;ScalarT&gt;(sources[id]);
+<span class="line_number">342</span>    }
+<span class="line_number">343</span>
+<span class="line_number">344</span>    return ret;
+<span class="line_number">345</span>  }
+<span class="line_number">346</span>}
+<span class="line_number">347</span>
+<span class="line_number">348</span>#endif // STABLEBEAR_TENSOR_IO_H
+</code>
+            </pre>
+        </div>
+    </div>
+</body>
+
+</html>

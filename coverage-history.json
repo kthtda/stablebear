@@ -1020,5 +1020,15 @@
     "py": 87.0,
     "cuda": null,
     "release_tag": null
+  },
+  {
+    "utc_iso": "2026-06-24T10:20:24Z",
+    "sha": "db6a24e",
+    "branch": "relative-subsampling",
+    "detail_path": "reports/2026-06-24_10-20-24_db6a24e/report.html",
+    "cpp": 88.7,
+    "py": 87.0,
+    "cuda": null,
+    "release_tag": null
   }
 ]
