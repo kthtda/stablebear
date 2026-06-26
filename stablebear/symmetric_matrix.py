@@ -77,6 +77,18 @@ class SymmetricMatrix:
     def storage_count(self) -> int:
         return self._data.storage_count
 
+    @property
+    def shape(self) -> tuple[int, int]:
+        """The matrix shape ``(n, n)``."""
+        return (self.size, self.size)
+
+    def __len__(self) -> int:
+        return self.size
+
+    def diagonal(self) -> np.ndarray:
+        """Return the stored diagonal entries as a 1-D numpy array."""
+        return np.array([self._data[i, i] for i in range(self.size)])
+
     def _resolve_ij(self, ij):
         i, j = ij
         n = self._data.size
@@ -89,29 +101,36 @@ class SymmetricMatrix:
                 f"index ({ij[0]}, {ij[1]}) is out of bounds for a {n}x{n} matrix")
         return i, j
 
-    def __getitem__(self, ij):
-        """Return the entry at ``(i, j)``.
+    def __getitem__(self, index):
+        """Return an entry, row, column, or sub-array.
 
-        Access is symmetric (``m[i, j] == m[j, i]``). Negative indices count
-        from the end, as in NumPy.
+        A plain ``(i, j)`` pair of ints returns the scalar entry, with symmetric
+        access (``m[i, j] == m[j, i]``) and NumPy-style negative indices. Any
+        other index (a bare ``int``, a ``slice``, or a tuple containing a slice)
+        is applied to the dense matrix, so ``m[i]`` / ``m[i, :]`` yield a row,
+        ``m[:, j]`` a column, and ``m[a:b, c:d]`` a sub-array, as in NumPy.
 
         Parameters
         ----------
-        ij : tuple of int
-            A ``(row, column)`` pair.
+        index : tuple of int, int, slice, or tuple
+            A ``(row, column)`` pair for scalar access, or any NumPy-style index.
 
         Returns
         -------
-        float
-            The stored value at ``(i, j)``.
+        float or numpy.ndarray
+            The stored value at ``(i, j)`` for an int pair, otherwise a NumPy
+            view/array.
 
         Raises
         ------
         IndexError
             If ``i`` or ``j`` is out of range for the matrix size.
         """
-        i, j = self._resolve_ij(ij)
-        return self._data[i, j]
+        if (isinstance(index, tuple) and len(index) == 2
+                and all(isinstance(k, (int, np.integer)) for k in index)):
+            i, j = self._resolve_ij(index)
+            return self._data[i, j]
+        return self.to_dense()[index]
 
     def __setitem__(self, ij, value):
         """Set the entry at ``(i, j)`` (and, symmetrically, ``(j, i)``).

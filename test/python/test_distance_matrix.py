@@ -129,3 +129,68 @@ class TestFromDense:
         arr = np.array([[0, 1], [1, 0]], dtype=np.int32)
         with pytest.raises(TypeError):
             DistanceMatrix.from_dense(arr)
+
+
+class TestShapeLenDiagonal:
+    def test_shape(self, dtype):
+        dm = DistanceMatrix(4, dtype=dtype)
+        assert dm.shape == (4, 4)
+
+    def test_len(self, dtype):
+        dm = DistanceMatrix(4, dtype=dtype)
+        assert len(dm) == 4
+
+    def test_diagonal_all_zero(self, dtype):
+        np_float = np.float32 if dtype is float32 else np.float64
+        arr = np.array([
+            [0, 1, 2],
+            [1, 0, 3],
+            [2, 3, 0],
+        ], dtype=np_float)
+        dm = DistanceMatrix.from_dense(arr)
+        diag = dm.diagonal()
+        np.testing.assert_array_equal(diag, np.zeros(3))
+        assert diag.dtype == np_float
+
+    def test_empty_shape_len_diagonal(self, dtype):
+        dm = DistanceMatrix(0, dtype=dtype)
+        assert dm.shape == (0, 0)
+        assert len(dm) == 0
+        assert dm.diagonal().shape == (0,)
+
+
+class TestRowSliceIndexing:
+    def _matrix(self, dtype):
+        np_float = np.float32 if dtype is float32 else np.float64
+        arr = np.array([
+            [0, 1, 2, 4],
+            [1, 0, 3, 5],
+            [2, 3, 0, 6],
+            [4, 5, 6, 0],
+        ], dtype=np_float)
+        return DistanceMatrix.from_dense(arr), arr
+
+    def test_row_bare_int(self, dtype):
+        dm, arr = self._matrix(dtype)
+        np.testing.assert_array_equal(dm[1], arr[1])
+
+    def test_row_int_slice(self, dtype):
+        dm, arr = self._matrix(dtype)
+        np.testing.assert_array_equal(dm[1, :], arr[1, :])
+
+    def test_column(self, dtype):
+        dm, arr = self._matrix(dtype)
+        np.testing.assert_array_equal(dm[:, 2], arr[:, 2])
+
+    def test_subarray(self, dtype):
+        dm, arr = self._matrix(dtype)
+        np.testing.assert_array_equal(dm[0:2, 1:3], arr[0:2, 1:3])
+
+    def test_negative_row(self, dtype):
+        dm, arr = self._matrix(dtype)
+        np.testing.assert_array_equal(dm[-1], arr[-1])
+
+    def test_int_pair_still_scalar(self, dtype):
+        dm, arr = self._matrix(dtype)
+        assert dm[1, 2] == arr[1, 2]
+        assert np.isscalar(dm[1, 2])
