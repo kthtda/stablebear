@@ -115,6 +115,35 @@ dispatches to the right constructor based on ``dtype``::
    dmats = sb.tensor(distances, dtype=sb.distmat64)  # DistanceMatrixTensor
 
 
+Exporting back to NumPy
+-----------------------
+
+The non-numeric tensor families can be read back out as dense NumPy arrays, the
+inverse of the constructors above. A :py:class:`~stablebear.PointCloudTensor` of
+equal-sized clouds and a :py:class:`~stablebear.DistanceMatrixTensor` or
+:py:class:`~stablebear.SymmetricMatrixTensor` all provide
+``to_dense()``/``to_numpy()`` and work with :py:func:`numpy.asarray`::
+
+   pc = sb.PointCloudTensor(np.random.rand(3, 5, 4, 2))
+   dense = pc.to_dense()          # (3, 5, 4, 2)
+   same = np.asarray(pc)          # equivalent
+
+   dmats = sb.DistanceMatrixTensor.from_numpy(np.zeros((6, 4, 4)))
+   stack = dmats.to_dense()       # (6, 4, 4)
+
+Point clouds must all have the same shape and matrices the same size; a ragged
+point-cloud tensor or a tensor of differently sized matrices raises
+``ValueError`` (index the tensor and convert each element separately in that
+case). The matrix tensors also accept ``from_dense`` as an alias of
+``from_numpy``, completing the ``from_dense``/``to_dense`` pair.
+
+Barcodes are inherently ragged (each cell may hold a different number of bars),
+so a :py:class:`~stablebear.persistence.BarcodeTensor` cannot become a single
+dense array. It instead provides ``to_numpy()`` (an ``object`` array whose cells
+are the per-cell ``(n_i, 2)`` arrays) and ``tolist()`` (the same as a nested
+list); see :doc:`persistence`.
+
+
 From serialized NumPy data
 ---------------------------
 

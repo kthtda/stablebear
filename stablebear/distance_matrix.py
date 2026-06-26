@@ -189,6 +189,31 @@ def _matrix_dtype_for(arr_dtype, dtype, dtype32, dtype64, name):
     return dtype32 if np.dtype(arr_dtype) == np.float32 else dtype64
 
 
+def _matrix_tensor_to_dense(tensor) -> np.ndarray:
+    """Densify a distance/symmetric matrix tensor to ``(*tensor_shape, n, n)``.
+
+    Each element is materialized via its ``.to_dense()``; all matrices must
+    share the same size ``n`` or a ``ValueError`` is raised. An empty tensor
+    (a zero-length axis) has no matrix to infer ``n`` from and also raises
+    ``ValueError``.
+    """
+    shape = tuple(tensor.shape)
+    mats = [
+        tensor._represent_element(tensor._data._get_element(list(idx))).to_dense()
+        for idx in np.ndindex(*shape)
+    ]
+    if not mats:
+        raise ValueError(
+            f"cannot densify a matrix tensor with an empty axis (shape {shape}): "
+            "there is no matrix to infer the size from")
+    n = mats[0].shape[0]
+    if any(m.shape != (n, n) for m in mats):
+        raise ValueError(
+            "cannot densify a matrix tensor whose matrices have differing sizes; "
+            "index the tensor and convert each matrix separately instead")
+    return np.stack(mats).reshape(shape + (n, n))
+
+
 def _matrix_tensor_cpp_from_array(arr, dtype, scalar_cls, dtype32, dtype64):
     """Build a C++ matrix tensor from an ``(*tensor_shape, n, n)`` ndarray.
 
@@ -246,6 +271,34 @@ class DistanceMatrixTensor(Tensor):
         leading axes form the tensor shape.
         """
         return cls(np.asarray(array), dtype=dtype)
+
+    @classmethod
+    def from_dense(cls, array, dtype=None):
+        """Build a tensor of distance matrices from a dense array.
+
+        Alias for :meth:`from_numpy`, completing the ``from_dense``/``to_dense``
+        pair.
+        """
+        return cls.from_numpy(array, dtype=dtype)
+
+    def to_dense(self) -> np.ndarray:
+        """Return the matrices as a dense ``(*tensor_shape, n, n)`` array.
+
+        All matrices must share the same size ``n``; otherwise (or for an
+        empty tensor) a ``ValueError`` is raised.
+        """
+        return _matrix_tensor_to_dense(self)
+
+    def to_numpy(self) -> np.ndarray:
+        """Return the dense ``(*tensor_shape, n, n)`` array. Alias for :meth:`to_dense`."""
+        return self.to_dense()
+
+    def __array__(self, dtype=None, copy=None):
+        """Return the dense ``(*tensor_shape, n, n)`` array so ``np.asarray`` works."""
+        arr = self.to_dense()
+        if dtype is not None:
+            arr = arr.astype(dtype, copy=False)
+        return arr
 
     def _to_py_tensor(self, data):
         return DistanceMatrixTensor(data)
