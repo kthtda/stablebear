@@ -558,3 +558,49 @@ class TestFloat32TensorBroadcast:
         a = np.array([[1.0, 2.0], [3.0, 4.0]], dtype=np.float32)
         b = np.array([10.0, 20.0], dtype=np.float32)
         _check_broadcast_op(a, b, lambda x, y: x + y, sb.FloatTensor)
+
+
+class TestMixedDtypeArithmeticRaisesClean:
+    """Bug #64: tensor-tensor arithmetic between mismatched dtypes leaked the
+    raw pybind overload dump. It now raises a clear TypeError naming the dtypes
+    (there is no implicit promotion), like the clean ``Pcf + Pcf`` error."""
+
+    @pytest.mark.parametrize("op", [operator.add, operator.sub, operator.mul,
+                                    operator.truediv])
+    def test_pcf_dtype_mismatch_raises(self, op):
+        a = sb.zeros((2,), dtype=sb.pcf32)
+        b = sb.zeros((2,), dtype=sb.pcf64)
+        with pytest.raises(TypeError, match="same dtype"):
+            op(a, b)
+
+    def test_pcf_float_int_mismatch_raises(self):
+        with pytest.raises(TypeError, match="same dtype"):
+            sb.zeros((2,), dtype=sb.pcf32) + sb.zeros((2,), dtype=sb.pcf32i)
+
+    def test_numeric_dtype_mismatch_raises(self):
+        a = sb.FloatTensor(np.arange(2.0, dtype=np.float32))
+        b = sb.FloatTensor(np.arange(2.0, dtype=np.float64))
+        with pytest.raises(TypeError, match="same dtype"):
+            a + b
+
+    def test_inplace_dtype_mismatch_raises(self):
+        a = sb.zeros((2,), dtype=sb.pcf64)
+        b = sb.zeros((2,), dtype=sb.pcf32)
+        with pytest.raises(TypeError, match="same dtype"):
+            a += b
+
+    def test_mismatch_error_is_not_pybind_dump(self):
+        try:
+            sb.zeros((2,), dtype=sb.pcf32) + sb.zeros((2,), dtype=sb.pcf64)
+        except TypeError as e:
+            assert "incompatible function arguments" not in str(e)
+
+    def test_same_dtype_arithmetic_still_works(self):
+        a = sb.FloatTensor([1.0, 2.0])
+        b = sb.FloatTensor([3.0, 4.0])
+        npt.assert_array_equal(np.asarray(a + b), np.array([4.0, 6.0]))
+
+    def test_scalar_pcf_rhs_still_broadcasts(self):
+        t = sb.zeros((2,), dtype=sb.pcf64)
+        p = sb.Pcf(np.array([[0.0, 1.0], [1.0, 2.0]]))
+        assert type(t + p).__name__ == "PcfTensor"
