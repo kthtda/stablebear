@@ -1,3 +1,5 @@
+import numpy as np
+
 from . import _sb_cpp as cpp
 from .functional.pcf import Pcf
 from .base_tensor import (
@@ -7,6 +9,11 @@ from .base_tensor import (
     _resolve_pcf_inputs,
 )
 from .typing import pcf32, pcf64
+
+# ``numpy.AxisError`` moved under ``numpy.exceptions`` in NumPy 2; it remains a
+# subclass of both ``IndexError`` and ``ValueError``, so raising it keeps
+# existing ``IndexError``/``ValueError`` handlers working.
+AxisError = getattr(np.exceptions, "AxisError", None) or np.AxisError
 
 
 _REDUCTIONS_BACKEND_MAP = {pcf32: cpp.Reductions_f32_f32, pcf64: cpp.Reductions_f64_f64}
@@ -28,14 +35,12 @@ def _resolve_dim(dim: int, ndim: int) -> int:
 
     Negative ``dim`` counts from the last axis (``dim=-1`` is the last axis),
     matching NumPy and the rest of the tensor API (``t[-1]``, ``stack(axis=-1)``).
-    Raises ``IndexError`` when ``dim`` is out of range for a tensor of rank
-    ``ndim``.
+    Raises ``numpy.AxisError`` (a subclass of ``IndexError``) when ``dim`` is out
+    of range for a tensor of rank ``ndim``.
     """
     resolved = dim + ndim if dim < 0 else dim
     if not 0 <= resolved < ndim:
-        raise IndexError(
-            f"dim {dim} is out of range for tensor with {ndim} dimension(s)"
-        )
+        raise AxisError(dim, ndim)
     return resolved
 
 
@@ -69,8 +74,9 @@ def mean(fs: PcfContainerLike, dim: int = 0):
 
     Raises
     ------
-    IndexError
+    numpy.AxisError
         If ``dim`` is out of range for the input tensor's number of dimensions.
+        ``numpy.AxisError`` is a subclass of ``IndexError``.
     """
     backend, tensor = _resolve_pcf_inputs(_REDUCTIONS_BACKEND_MAP, fs)
     return _to_tensor(backend.mean(tensor._data, _resolve_dim(dim, tensor.ndim)))
@@ -107,8 +113,9 @@ def max_time(fs: PcfContainerLike, dim: int = 0):
 
     Raises
     ------
-    IndexError
+    numpy.AxisError
         If ``dim`` is out of range for the input tensor's number of dimensions.
+        ``numpy.AxisError`` is a subclass of ``IndexError``.
     ValueError
         If the reduction dimension is empty (size 0). ``max`` has no identity
         over an empty range, so there is no value to return.

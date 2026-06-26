@@ -184,7 +184,7 @@ tensor.
 ``dim`` follows NumPy axis conventions: it may be negative to count from the
 last axis (``dim=-1`` is the last axis, ``dim=-2`` the second-to-last). For a
 ``k``-dimensional tensor the valid values are ``-k`` through ``k - 1``; an
-out-of-range ``dim`` raises ``IndexError``.
+out-of-range ``dim`` raises ``numpy.AxisError`` (a subclass of ``IndexError``).
 
 mean
 ----
