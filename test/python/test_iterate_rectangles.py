@@ -186,6 +186,48 @@ def test_start_and_end_bounds(pcf_dtype, rect_plot):
     _assert_rect(rects[2], l=4, r=4.5, fv=5, gv=2)
 
 
+# --- Integer PCFs: dtype-aware default bounds (#13) ---
+
+
+@pytest.mark.parametrize("npdt", [np.int32, np.int64])
+def test_int_pcf_default_bounds(npdt):
+    # Default a/b used to be float 0.0/inf, which would not bind to the
+    # integer-typed C++ overload; the call raised a raw pybind TypeError.
+    f = sb.Pcf(np.array([[0, 3], [1, 2]], dtype=npdt))
+    g = sb.Pcf(np.array([[0, 2], [1, 4]], dtype=npdt))
+
+    rects = sb.iterate_rectangles(f, g)
+
+    assert len(rects) == 2
+    _assert_rect(rects[0], l=0, r=1, fv=3, gv=2)
+    # the unbounded right edge is the dtype maximum (the integer analogue of inf)
+    last = rects[1]
+    assert last.left == 1 and last.f_value == 2 and last.g_value == 4
+    assert last.right == np.iinfo(npdt).max
+
+
+@pytest.mark.parametrize("npdt", [np.int32, np.int64])
+def test_int_pcf_explicit_bounds(npdt):
+    f = sb.Pcf(np.array([[0, 3], [1, 2]], dtype=npdt))
+    g = sb.Pcf(np.array([[0, 2], [1, 4]], dtype=npdt))
+
+    rects = sb.iterate_rectangles(f, g, 0, 10)
+
+    assert len(rects) == 2
+    _assert_rect(rects[0], l=0, r=1, fv=3, gv=2)
+    _assert_rect(rects[1], l=1, r=10, fv=2, gv=4)
+
+
+@pytest.mark.parametrize("npdt", [np.int32, np.int64])
+def test_int_pcf_explicit_inf_maps_to_dtype_max(npdt):
+    f = sb.Pcf(np.array([[0, 3], [1, 2]], dtype=npdt))
+    g = sb.Pcf(np.array([[0, 2], [1, 4]], dtype=npdt))
+
+    rects = sb.iterate_rectangles(f, g, b=float("inf"))
+
+    assert rects[-1].right == np.iinfo(npdt).max
+
+
 if __name__ == "__main__":
     if not os.environ.get("SB_SHOW_PLOTS"):
         os.environ["SB_SHOW_PLOTS"] = "1"
