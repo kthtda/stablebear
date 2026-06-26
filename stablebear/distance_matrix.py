@@ -179,6 +179,28 @@ class DistanceMatrix:
         return repr(self._data)
 
 
+def _check_matrix_tensor_setitem(self, val, tensor_cls, element_cls, tensor_to_float):
+    """Reject a matrix element / tensor RHS whose precision differs from ``self``.
+
+    The base ``_validate_setitem_dtype`` has already confirmed the *type* of
+    ``val``; this additionally requires the 32/64-bit precision to match, so a
+    mismatch raises a clear ``TypeError`` naming the dtypes instead of leaking
+    the raw pybind ``_set_element`` / ``__setitem__`` overload error. The matrix
+    wrappers store an exact element type and do not silently cast (issue #42).
+    """
+    if isinstance(val, tensor_cls):
+        if val.dtype is not self.dtype:
+            raise TypeError(
+                f"cannot assign a {val.dtype.name} {tensor_cls.__name__} into a "
+                f"{self.dtype.name} {tensor_cls.__name__}: precisions differ")
+    elif isinstance(val, element_cls):
+        expected = tensor_to_float[self.dtype]
+        if val.dtype is not expected:
+            raise TypeError(
+                f"cannot assign a {val.dtype.name} {element_cls.__name__} into a "
+                f"{self.dtype.name} {tensor_cls.__name__}: precisions differ")
+
+
 def _matrix_dtype_for(arr_dtype, dtype, dtype32, dtype64, name):
     if dtype is not None:
         if dtype not in (dtype32, dtype64):
@@ -258,3 +280,9 @@ class DistanceMatrixTensor(Tensor):
 
     def _get_valid_setitem_dtypes(self):
         return [DistanceMatrix, DistanceMatrixTensor]
+
+    def _validate_setitem_dtype(self, val):
+        super()._validate_setitem_dtype(val)
+        _check_matrix_tensor_setitem(
+            self, val, DistanceMatrixTensor, DistanceMatrix,
+            {distmat32: float32, distmat64: float64})
