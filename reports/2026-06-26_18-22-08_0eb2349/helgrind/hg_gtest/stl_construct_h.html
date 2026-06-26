@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>/usr/include/c++/13/bits/stl_construct.h</title>
+    <link href='valgrind.css' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+    <script src="https://code.jquery.com/jquery-3.4.1.js"></script>
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.0.0/styles/default.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.0.0/highlight.min.js"></script>
+    <script src="valgrind.js"></script>
+</head>
+
+<body>
+    <div class="global">
+        <div class="header">
+            <h1>/usr/include/c++/13/bits/stl_construct.h</h1>
+            <p><b>2</b> errors</p>
+            <button class="next_error">Goto First Error</button>
+        </div>
+        <div class="listing">
+            <pre class="code">
+<code class="c++"><span class="line_number">1</span>// nonstandard construct and destroy functions -*- C++ -*-
+<span class="line_number">2</span>
+<span class="line_number">3</span>// Copyright (C) 2001-2023 Free Software Foundation, Inc.
+<span class="line_number">4</span>//
+<span class="line_number">5</span>// This file is part of the GNU ISO C++ Library.  This library is free
+<span class="line_number">6</span>// software; you can redistribute it and/or modify it under the
+<span class="line_number">7</span>// terms of the GNU General Public License as published by the
+<span class="line_number">8</span>// Free Software Foundation; either version 3, or (at your option)
+<span class="line_number">9</span>// any later version.
+<span class="line_number">10</span>
+<span class="line_number">11</span>// This library is distributed in the hope that it will be useful,
+<span class="line_number">12</span>// but WITHOUT ANY WARRANTY; without even the implied warranty of
+<span class="line_number">13</span>// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+<span class="line_number">14</span>// GNU General Public License for more details.
+<span class="line_number">15</span>
+<span class="line_number">16</span>// Under Section 7 of GPL version 3, you are granted additional
+<span class="line_number">17</span>// permissions described in the GCC Runtime Library Exception, version
+<span class="line_number">18</span>// 3.1, as published by the Free Software Foundation.
+<span class="line_number">19</span>
+<span class="line_number">20</span>// You should have received a copy of the GNU General Public License and
+<span class="line_number">21</span>// a copy of the GCC Runtime Library Exception along with this program;
+<span class="line_number">22</span>// see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
+<span class="line_number">23</span>// &lt;http://www.gnu.org/licenses/&gt;.
+<span class="line_number">24</span>
+<span class="line_number">25</span>/*
+<span class="line_number">26</span> *
+<span class="line_number">27</span> * Copyright (c) 1994
+<span class="line_number">28</span> * Hewlett-Packard Company
+<span class="line_number">29</span> *
+<span class="line_number">30</span> * Permission to use, copy, modify, distribute and sell this software
+<span class="line_number">31</span> * and its documentation for any purpose is hereby granted without fee,
+<span class="line_number">32</span> * provided that the above copyright notice appear in all copies and
+<span class="line_number">33</span> * that both that copyright notice and this permission notice appear
+<span class="line_number">34</span> * in supporting documentation.  Hewlett-Packard Company makes no
+<span class="line_number">35</span> * representations about the suitability of this software for any
+<span class="line_number">36</span> * purpose.  It is provided &#34;as is&#34; without express or implied warranty.
+<span class="line_number">37</span> *
+<span class="line_number">38</span> *
+<span class="line_number">39</span> * Copyright (c) 1996,1997
+<span class="line_number">40</span> * Silicon Graphics Computer Systems, Inc.
+<span class="line_number">41</span> *
+<span class="line_number">42</span> * Permission to use, copy, modify, distribute and sell this software
+<span class="line_number">43</span> * and its documentation for any purpose is hereby granted without fee,
+<span class="line_number">44</span> * provided that the above copyright notice appear in all copies and
+<span class="line_number">45</span> * that both that copyright notice and this permission notice appear
+<span class="line_number">46</span> * in supporting documentation.  Silicon Graphics makes no
+<span class="line_number">47</span> * representations about the suitability of this software for any
+<span class="line_number">48</span> * purpose.  It is provided &#34;as is&#34; without express or implied warranty.
+<span class="line_number">49</span> */
+<span class="line_number">50</span>
+<span class="line_number">51</span>/** @file bits/stl_construct.h
+<span class="line_number">52</span> *  This is an internal header file, included by other library headers.
+<span class="line_number">53</span> *  Do not attempt to use it directly. @headername{memory}
+<span class="line_number">54</span> */
+<span class="line_number">55</span>
+<span class="line_number">56</span>#ifndef _STL_CONSTRUCT_H
+<span class="line_number">57</span>#define _STL_CONSTRUCT_H 1
+<span class="line_number">58</span>
+<span class="line_number">59</span>#include &lt;new&gt;
+<span class="line_number">60</span>#include &lt;bits/move.h&gt;
+<span class="line_number">61</span>#include &lt;bits/stl_iterator_base_types.h&gt; // for iterator_traits
+<span class="line_number">62</span>#include &lt;bits/stl_iterator_base_funcs.h&gt; // for advance
+<span class="line_number">63</span>
+<span class="line_number">64</span>/* This file provides the C++17 functions std::destroy_at, std::destroy, and
+<span class="line_number">65</span> * std::destroy_n, and the C++20 function std::construct_at.
+<span class="line_number">66</span> * It also provides std::_Construct, std::_Destroy,and std::_Destroy_n functions
+<span class="line_number">67</span> * which are defined in all standard modes and so can be used in C++98-14 code.
+<span class="line_number">68</span> * The _Destroy functions will dispatch to destroy_at during constant
+<span class="line_number">69</span> * evaluation, because calls to that function are intercepted by the compiler
+<span class="line_number">70</span> * to allow use in constant expressions.
+<span class="line_number">71</span> */
+<span class="line_number">72</span>
+<span class="line_number">73</span>namespace std _GLIBCXX_VISIBILITY(default)
+<span class="line_number">74</span>{
+<span class="line_number">75</span>_GLIBCXX_BEGIN_NAMESPACE_VERSION
+<span class="line_number">76</span>
+<span class="line_number">77</span>#if __cplusplus &gt;= 201703L
+<span class="line_number">78</span>  template &lt;typename _Tp&gt;
+<span class="line_number">79</span>    _GLIBCXX20_CONSTEXPR inline void
+<span class="line_number">80</span>    destroy_at(_Tp* __location)
+<span class="line_number">81</span>    {
+<span class="line_number">82</span>      if constexpr (__cplusplus &gt; 201703L &amp;&amp; is_array_v&lt;_Tp&gt;)
+<span class="line_number">83</span>	{
+<span class="line_number">84</span>	  for (auto&amp; __x : *__location)
+<span class="line_number">85</span>	    std::destroy_at(std::__addressof(__x));
+<span class="line_number">86</span>	}
+<span class="line_number">87</span>      else
+</code></pre>
+            <div class="issue">
+                <div>
+                    <span class="what">Possible data race during read of size 8 at 0x4E8FA50 by thread #2</span>
+                    <div class="navigation">
+                        <button class="next_error">Next</button>
+                        <button class="prev_error">Previous</button>
+                    </div>
+                </div>
+                <div>
+                    <table class="call_stack">
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/stl_construct.h:149<br>
+                                    <code class="cpp">void std::_Destroy&lt;std::__future_base::_State_baseV2&gt;(std::__future_base::_State_baseV2*)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">146</span>    _Destroy(_Tp* __pointer)
+<span class="line_number">147</span>    {
+<span class="line_number">148</span>#if __cplusplus &gt; 201703L
+<span class="line_number">149</span><span class="error">      std::destroy_at(__pointer);
+</span><span class="line_number">150</span>#else
+<span class="line_number">151</span>      __pointer-&gt;~_Tp();
+<span class="line_number">152</span>#endif
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/alloc_traits.h:675<br>
+                                    <code class="cpp">destroy&lt;std::__future_base::_State_baseV2&gt;</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">672</span>	static _GLIBCXX20_CONSTEXPR void
+<span class="line_number">673</span>	destroy(allocator_type&amp;, _Up* __p)
+<span class="line_number">674</span>	noexcept(is_nothrow_destructible&lt;_Up&gt;::value)
+<span class="line_number">675</span><span class="error">	{ std::_Destroy(__p); }
+</span><span class="line_number">676</span>
+<span class="line_number">677</span>      /// max_size is ill-formed for allocator&lt;void&gt;
+<span class="line_number">678</span>      static size_type
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/shared_ptr_base.h:613<br>
+                                    <code class="cpp">std::_Sp_counted_ptr_inplace&lt;std::__future_base::_State_baseV2, std::allocator&lt;void&gt;, (__gnu_cxx::_Lock_policy)2&gt;::_M_dispose()</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">610</span>      virtual void
+<span class="line_number">611</span>      _M_dispose() noexcept
+<span class="line_number">612</span>      {
+<span class="line_number">613</span><span class="error">	allocator_traits&lt;_Alloc&gt;::destroy(_M_impl._M_alloc(), _M_ptr());
+</span><span class="line_number">614</span>      }
+<span class="line_number">615</span>
+<span class="line_number">616</span>      // Override because the allocator needs to know the dynamic type
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/shared_ptr_base.h:346<br>
+                                    <code class="cpp">std::_Sp_counted_base&lt;(__gnu_cxx::_Lock_policy)2&gt;::_M_release()</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">343</span>	      _M_weak_count = _M_use_count = 0;
+<span class="line_number">344</span>	      _GLIBCXX_SYNCHRONIZATION_HAPPENS_AFTER(&amp;_M_use_count);
+<span class="line_number">345</span>	      _GLIBCXX_SYNCHRONIZATION_HAPPENS_AFTER(&amp;_M_weak_count);
+<span class="line_number">346</span><span class="error">	      _M_dispose();
+</span><span class="line_number">347</span>	      _M_destroy();
+<span class="line_number">348</span>	      return;
+<span class="line_number">349</span>	    }
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/shared_ptr_base.h:1071<br>
+                                    <code class="cpp">std::__shared_count&lt;(__gnu_cxx::_Lock_policy)2&gt;::~__shared_count()</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1068</span>      ~__shared_count() noexcept
+<span class="line_number">1069</span>      {
+<span class="line_number">1070</span>	if (_M_pi != nullptr)
+<span class="line_number">1071</span><span class="error">	  _M_pi-&gt;_M_release();
+</span><span class="line_number">1072</span>      }
+<span class="line_number">1073</span>
+<span class="line_number">1074</span>      __shared_count(const __shared_count&amp; __r) noexcept
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/shared_ptr_base.h:1524<br>
+                                    <code class="cpp">std::__shared_ptr&lt;std::__future_base::_State_baseV2, (__gnu_cxx::_Lock_policy)2&gt;::~__shared_ptr()</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1521</span>
+<span class="line_number">1522</span>      __shared_ptr(const __shared_ptr&amp;) noexcept = default;
+<span class="line_number">1523</span>      __shared_ptr&amp; operator=(const __shared_ptr&amp;) noexcept = default;
+<span class="line_number">1524</span><span class="error">      ~__shared_ptr() = default;
+</span><span class="line_number">1525</span>
+<span class="line_number">1526</span>      template&lt;typename _Yp, typename = _Compatible&lt;_Yp&gt;&gt;
+<span class="line_number">1527</span>	__shared_ptr(const __shared_ptr&lt;_Yp, _Lp&gt;&amp; __r) noexcept
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/shared_ptr.h:175<br>
+                                    <code class="cpp">std::shared_ptr&lt;std::__future_base::_State_baseV2&gt;::~shared_ptr()</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">172</span>   * pointer see `std::shared_ptr::owner_before` and `std::owner_less`.
+<span class="line_number">173</span>  */
+<span class="line_number">174</span>  template&lt;typename _Tp&gt;
+<span class="line_number">175</span><span class="error">    class shared_ptr : public __shared_ptr&lt;_Tp&gt;
+</span><span class="line_number">176</span>    {
+<span class="line_number">177</span>      template&lt;typename... _Args&gt;
+<span class="line_number">178</span>	using _Constructible = typename enable_if&lt;
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/future:1347<br>
+                                    <code class="cpp">std::promise&lt;void&gt;::~promise()</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1344</span>      {
+<span class="line_number">1345</span>        if (static_cast&lt;bool&gt;(_M_future) &amp;&amp; !_M_future.unique())
+<span class="line_number">1346</span>          _M_future-&gt;_M_break_promise(std::move(_M_storage));
+<span class="line_number">1347</span><span class="error">      }
+</span><span class="line_number">1348</span>
+<span class="line_number">1349</span>      // Assignment
+<span class="line_number">1350</span>      promise&amp;
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/graph.hpp:242<br>
+                                    <code class="cpp">tf::Topology::~Topology()</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">239</span>/**
+<span class="line_number">240</span>@private
+<span class="line_number">241</span>*/
+<span class="line_number">242</span><span class="error">class Topology : public NodeBase {
+</span><span class="line_number">243</span>
+<span class="line_number">244</span>  friend class Executor;
+<span class="line_number">245</span>  friend class Subflow;
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/stl_construct.h:88<br>
+                                    <code class="cpp">void std::destroy_at&lt;tf::Topology&gt;(tf::Topology*)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">85</span>	    std::destroy_at(std::__addressof(__x));
+<span class="line_number">86</span>	}
+<span class="line_number">87</span>      else
+<span class="line_number">88</span><span class="error">	__location-&gt;~_Tp();
+</span><span class="line_number">89</span>    }
+<span class="line_number">90</span>
+<span class="line_number">91</span>#if __cplusplus &gt;= 202002L
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/stl_construct.h:149<br>
+                                    <code class="cpp">void std::_Destroy&lt;tf::Topology&gt;(tf::Topology*)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">146</span>    _Destroy(_Tp* __pointer)
+<span class="line_number">147</span>    {
+<span class="line_number">148</span>#if __cplusplus &gt; 201703L
+<span class="line_number">149</span><span class="error">      std::destroy_at(__pointer);
+</span><span class="line_number">150</span>#else
+<span class="line_number">151</span>      __pointer-&gt;~_Tp();
+<span class="line_number">152</span>#endif
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/alloc_traits.h:675<br>
+                                    <code class="cpp">destroy&lt;tf::Topology&gt;</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">672</span>	static _GLIBCXX20_CONSTEXPR void
+<span class="line_number">673</span>	destroy(allocator_type&amp;, _Up* __p)
+<span class="line_number">674</span>	noexcept(is_nothrow_destructible&lt;_Up&gt;::value)
+<span class="line_number">675</span><span class="error">	{ std::_Destroy(__p); }
+</span><span class="line_number">676</span>
+<span class="line_number">677</span>      /// max_size is ill-formed for allocator&lt;void&gt;
+<span class="line_number">678</span>      static size_type
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/shared_ptr_base.h:613<br>
+                                    <code class="cpp">std::_Sp_counted_ptr_inplace&lt;tf::Topology, std::allocator&lt;void&gt;, (__gnu_cxx::_Lock_policy)2&gt;::_M_dispose()</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">610</span>      virtual void
+<span class="line_number">611</span>      _M_dispose() noexcept
+<span class="line_number">612</span>      {
+<span class="line_number">613</span><span class="error">	allocator_traits&lt;_Alloc&gt;::destroy(_M_impl._M_alloc(), _M_ptr());
+</span><span class="line_number">614</span>      }
+<span class="line_number">615</span>
+<span class="line_number">616</span>      // Override because the allocator needs to know the dynamic type
+</code></pre>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            <pre class="code">
+<code class="c++"><span class="line_number">88</span><span class="error">	__location-&gt;~_Tp();</span>
+<span class="line_number">89</span>    }
+<span class="line_number">90</span>
+<span class="line_number">91</span>#if __cplusplus &gt;= 202002L
+<span class="line_number">92</span>  template&lt;typename _Tp, typename... _Args&gt;
+<span class="line_number">93</span>    constexpr auto
+<span class="line_number">94</span>    construct_at(_Tp* __location, _Args&amp;&amp;... __args)
+<span class="line_number">95</span>    noexcept(noexcept(::new((void*)0) _Tp(std::declval&lt;_Args&gt;()...)))
+<span class="line_number">96</span>    -&gt; decltype(::new((void*)0) _Tp(std::declval&lt;_Args&gt;()...))
+<span class="line_number">97</span>    { return ::new((void*)__location) _Tp(std::forward&lt;_Args&gt;(__args)...); }
+<span class="line_number">98</span>#endif // C++20
+<span class="line_number">99</span>#endif// C++17
+<span class="line_number">100</span>
+<span class="line_number">101</span>  /**
+<span class="line_number">102</span>   * Constructs an object in existing memory by invoking an allocated
+<span class="line_number">103</span>   * object&#39;s constructor with an initializer.
+<span class="line_number">104</span>   */
+<span class="line_number">105</span>#if __cplusplus &gt;= 201103L
+<span class="line_number">106</span>  template&lt;typename _Tp, typename... _Args&gt;
+<span class="line_number">107</span>    _GLIBCXX20_CONSTEXPR
+<span class="line_number">108</span>    inline void
+<span class="line_number">109</span>    _Construct(_Tp* __p, _Args&amp;&amp;... __args)
+<span class="line_number">110</span>    {
+<span class="line_number">111</span>#if __cplusplus &gt;= 202002L
+<span class="line_number">112</span>      if (std::__is_constant_evaluated())
+<span class="line_number">113</span>	{
+<span class="line_number">114</span>	  // Allow std::_Construct to be used in constant expressions.
+<span class="line_number">115</span>	  std::construct_at(__p, std::forward&lt;_Args&gt;(__args)...);
+<span class="line_number">116</span>	  return;
+<span class="line_number">117</span>	}
+<span class="line_number">118</span>#endif
+</code></pre>
+            <div class="issue">
+                <div>
+                    <span class="what">Possible data race during read of size 8 at 0x4E8EDC0 by thread #5</span>
+                    <div class="navigation">
+                        <button class="next_error">Next</button>
+                        <button class="prev_error">Previous</button>
+                    </div>
+                </div>
+                <div>
+                    <table class="call_stack">
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/stl_uninitialized.h:120<br>
+                                    <code class="cpp">sb::TimePoint&lt;float, float&gt;* std::__do_uninit_copy&lt;__gnu_cxx::__normal_iterator&lt;sb::TimePoint&lt;float, float&gt; const*, std::vector&lt;sb::TimePoint&lt;float, float&gt;, std::allocator&lt;sb::TimePoint&lt;float, float&gt; &gt; &gt; &gt;, sb::TimePoint&lt;float, float&gt;*&gt;(__gnu_cxx::__normal_iterator&lt;sb::TimePoint&lt;float, float&gt; const*, std::vector&lt;sb::TimePoint&lt;float, float&gt;, std::allocator&lt;sb::TimePoint&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;sb::TimePoint&lt;float, float&gt; const*, std::vector&lt;sb::TimePoint&lt;float, float&gt;, std::allocator&lt;sb::TimePoint&lt;float, float&gt; &gt; &gt; &gt;, sb::TimePoint&lt;float, float&gt;*)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">117</span>      __try
+<span class="line_number">118</span>	{
+<span class="line_number">119</span>	  for (; __first != __last; ++__first, (void)++__cur)
+<span class="line_number">120</span><span class="error">	    std::_Construct(std::__addressof(*__cur), *__first);
+</span><span class="line_number">121</span>	  return __cur;
+<span class="line_number">122</span>	}
+<span class="line_number">123</span>      __catch(...)
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/stl_uninitialized.h:137<br>
+                                    <code class="cpp">sb::TimePoint&lt;float, float&gt;* std::__uninitialized_copy&lt;false&gt;::__uninit_copy&lt;__gnu_cxx::__normal_iterator&lt;sb::TimePoint&lt;float, float&gt; const*, std::vector&lt;sb::TimePoint&lt;float, float&gt;, std::allocator&lt;sb::TimePoint&lt;float, float&gt; &gt; &gt; &gt;, sb::TimePoint&lt;float, float&gt;*&gt;(__gnu_cxx::__normal_iterator&lt;sb::TimePoint&lt;float, float&gt; const*, std::vector&lt;sb::TimePoint&lt;float, float&gt;, std::allocator&lt;sb::TimePoint&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;sb::TimePoint&lt;float, float&gt; const*, std::vector&lt;sb::TimePoint&lt;float, float&gt;, std::allocator&lt;sb::TimePoint&lt;float, float&gt; &gt; &gt; &gt;, sb::TimePoint&lt;float, float&gt;*)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">134</span>        static _ForwardIterator
+<span class="line_number">135</span>        __uninit_copy(_InputIterator __first, _InputIterator __last,
+<span class="line_number">136</span>		      _ForwardIterator __result)
+<span class="line_number">137</span><span class="error">	{ return std::__do_uninit_copy(__first, __last, __result); }
+</span><span class="line_number">138</span>    };
+<span class="line_number">139</span>
+<span class="line_number">140</span>  template&lt;&gt;
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/stl_uninitialized.h:185<br>
+                                    <code class="cpp">sb::TimePoint&lt;float, float&gt;* std::uninitialized_copy&lt;__gnu_cxx::__normal_iterator&lt;sb::TimePoint&lt;float, float&gt; const*, std::vector&lt;sb::TimePoint&lt;float, float&gt;, std::allocator&lt;sb::TimePoint&lt;float, float&gt; &gt; &gt; &gt;, sb::TimePoint&lt;float, float&gt;*&gt;(__gnu_cxx::__normal_iterator&lt;sb::TimePoint&lt;float, float&gt; const*, std::vector&lt;sb::TimePoint&lt;float, float&gt;, std::allocator&lt;sb::TimePoint&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;sb::TimePoint&lt;float, float&gt; const*, std::vector&lt;sb::TimePoint&lt;float, float&gt;, std::allocator&lt;sb::TimePoint&lt;float, float&gt; &gt; &gt; &gt;, sb::TimePoint&lt;float, float&gt;*)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">182</span>	= _GLIBCXX_USE_ASSIGN_FOR_INIT(_ValueType2, _From);
+<span class="line_number">183</span>
+<span class="line_number">184</span>      return std::__uninitialized_copy&lt;__can_memmove &amp;&amp; __assignable&gt;::
+<span class="line_number">185</span><span class="error">	__uninit_copy(__first, __last, __result);
+</span><span class="line_number">186</span>    }
+<span class="line_number">187</span>
+<span class="line_number">188</span>  /// @cond undocumented
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/stl_uninitialized.h:373<br>
+                                    <code class="cpp">sb::TimePoint&lt;float, float&gt;* std::__uninitialized_copy_a&lt;__gnu_cxx::__normal_iterator&lt;sb::TimePoint&lt;float, float&gt; const*, std::vector&lt;sb::TimePoint&lt;float, float&gt;, std::allocator&lt;sb::TimePoint&lt;float, float&gt; &gt; &gt; &gt;, sb::TimePoint&lt;float, float&gt;*, sb::TimePoint&lt;float, float&gt; &gt;(__gnu_cxx::__normal_iterator&lt;sb::TimePoint&lt;float, float&gt; const*, std::vector&lt;sb::TimePoint&lt;float, float&gt;, std::allocator&lt;sb::TimePoint&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;sb::TimePoint&lt;float, float&gt; const*, std::vector&lt;sb::TimePoint&lt;float, float&gt;, std::allocator&lt;sb::TimePoint&lt;float, float&gt; &gt; &gt; &gt;, sb::TimePoint&lt;float, float&gt;*, std::allocator&lt;sb::TimePoint&lt;float, float&gt; &gt;&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">370</span>      if (std::is_constant_evaluated())
+<span class="line_number">371</span>	return std::__do_uninit_copy(__first, __last, __result);
+<span class="line_number">372</span>#endif
+<span class="line_number">373</span><span class="error">      return std::uninitialized_copy(__first, __last, __result);
+</span><span class="line_number">374</span>    }
+<span class="line_number">375</span>#endif
+<span class="line_number">376</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/stl_vector.h:1622<br>
+                                    <code class="cpp">sb::TimePoint&lt;float, float&gt;* std::vector&lt;sb::TimePoint&lt;float, float&gt;, std::allocator&lt;sb::TimePoint&lt;float, float&gt; &gt; &gt;::_M_allocate_and_copy&lt;__gnu_cxx::__normal_iterator&lt;sb::TimePoint&lt;float, float&gt; const*, std::vector&lt;sb::TimePoint&lt;float, float&gt;, std::allocator&lt;sb::TimePoint&lt;float, float&gt; &gt; &gt; &gt; &gt;(unsigned long, __gnu_cxx::__normal_iterator&lt;sb::TimePoint&lt;float, float&gt; const*, std::vector&lt;sb::TimePoint&lt;float, float&gt;, std::allocator&lt;sb::TimePoint&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;sb::TimePoint&lt;float, float&gt; const*, std::vector&lt;sb::TimePoint&lt;float, float&gt;, std::allocator&lt;sb::TimePoint&lt;float, float&gt; &gt; &gt; &gt;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1619</span>	  pointer __result = this-&gt;_M_allocate(__n);
+<span class="line_number">1620</span>	  __try
+<span class="line_number">1621</span>	    {
+<span class="line_number">1622</span><span class="error">	      std::__uninitialized_copy_a(__first, __last, __result,
+</span><span class="line_number">1623</span>					  _M_get_Tp_allocator());
+<span class="line_number">1624</span>	      return __result;
+<span class="line_number">1625</span>	    }
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/vector.tcc:238<br>
+                                    <code class="cpp">std::vector&lt;sb::TimePoint&lt;float, float&gt;, std::allocator&lt;sb::TimePoint&lt;float, float&gt; &gt; &gt;::operator=(std::vector&lt;sb::TimePoint&lt;float, float&gt;, std::allocator&lt;sb::TimePoint&lt;float, float&gt; &gt; &gt; const&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">235</span>	  const size_type __xlen = __x.size();
+<span class="line_number">236</span>	  if (__xlen &gt; capacity())
+<span class="line_number">237</span>	    {
+<span class="line_number">238</span><span class="error">	      pointer __tmp = _M_allocate_and_copy(__xlen, __x.begin(),
+</span><span class="line_number">239</span>						   __x.end());
+<span class="line_number">240</span>	      std::_Destroy(this-&gt;_M_impl._M_start, this-&gt;_M_impl._M_finish,
+<span class="line_number">241</span>			    _M_get_Tp_allocator());
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/functional/../algorithms/functional/reduce.hpp:95<br>
+                                    <code class="cpp">sb::Accumulator&lt;sb::Pcf&lt;float, float&gt; &gt;::operator+=(sb::Pcf&lt;float, float&gt; const&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">92</span>    {
+<span class="line_number">93</span>      if (m_pts.empty())
+<span class="line_number">94</span>      {
+<span class="line_number">95</span><span class="error">        m_pts = f.points();
+</span><span class="line_number">96</span>        return *this;
+<span class="line_number">97</span>      }
+<span class="line_number">98</span>      combine_with_(f.points());
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/functional/../algorithms/functional/reduce.hpp:218<br>
+                                    <code class="cpp">sb::parallel_reduce&lt;__gnu_cxx::__normal_iterator&lt;sb::Pcf&lt;float, float&gt; const*, std::vector&lt;sb::Pcf&lt;float, float&gt;, std::allocator&lt;sb::Pcf&lt;float, float&gt; &gt; &gt; &gt; &gt;(__gnu_cxx::__normal_iterator&lt;sb::Pcf&lt;float, float&gt; const*, std::vector&lt;sb::Pcf&lt;float, float&gt;, std::allocator&lt;sb::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;sb::Pcf&lt;float, float&gt; const*, std::vector&lt;sb::Pcf&lt;float, float&gt;, std::allocator&lt;sb::Pcf&lt;float, float&gt; &gt; &gt; &gt;, std::function&lt;std::iterator_traits&lt;__gnu_cxx::__normal_iterator&lt;sb::Pcf&lt;float, float&gt; const*, std::vector&lt;sb::Pcf&lt;float, float&gt;, std::allocator&lt;sb::Pcf&lt;float, float&gt; &gt; &gt; &gt; &gt;::value_type::value_type (std::iterator_traits&lt;__gnu_cxx::__normal_iterator&lt;sb::Pcf&lt;float, float&gt; const*, std::vector&lt;sb::Pcf&lt;float, float&gt;, std::allocator&lt;sb::Pcf&lt;float, float&gt; &gt; &gt; &gt; &gt;::value_type::rectangle_type const&amp;)&gt;, unsigned long, sb::Executor&amp;)::{lambda()#1}::operator()() const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">215</span>      topLevelTasks[iBlock].task = taskflow.emplace([iBlock, block, &amp;accumulators, begin](){
+<span class="line_number">216</span>        for (auto i = block.first; i &lt;= block.second; ++i)
+<span class="line_number">217</span>        {
+<span class="line_number">218</span><span class="error">          accumulators[iBlock] += *(begin + i); // TODO: FwdIt
+</span><span class="line_number">219</span>        }
+<span class="line_number">220</span>      });
+<span class="line_number">221</span>    }
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:61<br>
+                                    <code class="cpp">void std::__invoke_impl&lt;void, sb::parallel_reduce&lt;__gnu_cxx::__normal_iterator&lt;sb::Pcf&lt;float, float&gt; const*, std::vector&lt;sb::Pcf&lt;float, float&gt;, std::allocator&lt;sb::Pcf&lt;float, float&gt; &gt; &gt; &gt; &gt;(__gnu_cxx::__normal_iterator&lt;sb::Pcf&lt;float, float&gt; const*, std::vector&lt;sb::Pcf&lt;float, float&gt;, std::allocator&lt;sb::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;sb::Pcf&lt;float, float&gt; const*, std::vector&lt;sb::Pcf&lt;float, float&gt;, std::allocator&lt;sb::Pcf&lt;float, float&gt; &gt; &gt; &gt;, std::function&lt;std::iterator_traits&lt;__gnu_cxx::__normal_iterator&lt;sb::Pcf&lt;float, float&gt; const*, std::vector&lt;sb::Pcf&lt;float, float&gt;, std::allocator&lt;sb::Pcf&lt;float, float&gt; &gt; &gt; &gt; &gt;::value_type::value_type (std::iterator_traits&lt;__gnu_cxx::__normal_iterator&lt;sb::Pcf&lt;float, float&gt; const*, std::vector&lt;sb::Pcf&lt;float, float&gt;, std::allocator&lt;sb::Pcf&lt;float, float&gt; &gt; &gt; &gt; &gt;::value_type::rectangle_type const&amp;)&gt;, unsigned long, sb::Executor&amp;)::{lambda()#1}&amp;&gt;(std::__invoke_other, sb::parallel_reduce&lt;__gnu_cxx::__normal_iterator&lt;sb::Pcf&lt;float, float&gt; const*, std::vector&lt;sb::Pcf&lt;float, float&gt;, std::allocator&lt;sb::Pcf&lt;float, float&gt; &gt; &gt; &gt; &gt;(__gnu_cxx::__normal_iterator&lt;sb::Pcf&lt;float, float&gt; const*, std::vector&lt;sb::Pcf&lt;float, float&gt;, std::allocator&lt;sb::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;sb::Pcf&lt;float, float&gt; const*, std::vector&lt;sb::Pcf&lt;float, float&gt;, std::allocator&lt;sb::Pcf&lt;float, float&gt; &gt; &gt; &gt;, std::function&lt;std::iterator_traits&lt;__gnu_cxx::__normal_iterator&lt;sb::Pcf&lt;float, float&gt; const*, std::vector&lt;sb::Pcf&lt;float, float&gt;, std::allocator&lt;sb::Pcf&lt;float, float&gt; &gt; &gt; &gt; &gt;::value_type::value_type (std::iterator_traits&lt;__gnu_cxx::__normal_iterator&lt;sb::Pcf&lt;float, float&gt; const*, std::vector&lt;sb::Pcf&lt;float, float&gt;, std::allocator&lt;sb::Pcf&lt;float, float&gt; &gt; &gt; &gt; &gt;::value_type::rectangle_type const&amp;)&gt;, unsigned long, sb::Executor&amp;)::{lambda()#1}&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">58</span>  template&lt;typename _Res, typename _Fn, typename... _Args&gt;
+<span class="line_number">59</span>    constexpr _Res
+<span class="line_number">60</span>    __invoke_impl(__invoke_other, _Fn&amp;&amp; __f, _Args&amp;&amp;... __args)
+<span class="line_number">61</span><span class="error">    { return std::forward&lt;_Fn&gt;(__f)(std::forward&lt;_Args&gt;(__args)...); }
+</span><span class="line_number">62</span>
+<span class="line_number">63</span>  template&lt;typename _Res, typename _MemFun, typename _Tp, typename... _Args&gt;
+<span class="line_number">64</span>    constexpr _Res
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:111<br>
+                                    <code class="cpp">std::enable_if&lt;is_invocable_r_v&lt;void, sb::parallel_reduce&lt;__gnu_cxx::__normal_iterator&lt;sb::Pcf&lt;float, float&gt; const*, std::vector&lt;sb::Pcf&lt;float, float&gt;, std::allocator&lt;sb::Pcf&lt;float, float&gt; &gt; &gt; &gt; &gt;(__gnu_cxx::__normal_iterator&lt;sb::Pcf&lt;float, float&gt; const*, std::vector&lt;sb::Pcf&lt;float, float&gt;, std::allocator&lt;sb::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;sb::Pcf&lt;float, float&gt; const*, std::vector&lt;sb::Pcf&lt;float, float&gt;, std::allocator&lt;sb::Pcf&lt;float, float&gt; &gt; &gt; &gt;, std::function&lt;std::iterator_traits&lt;__gnu_cxx::__normal_iterator&lt;sb::Pcf&lt;float, float&gt; const*, std::vector&lt;sb::Pcf&lt;float, float&gt;, std::allocator&lt;sb::Pcf&lt;float, float&gt; &gt; &gt; &gt; &gt;::value_type::value_type (std::iterator_traits&lt;__gnu_cxx::__normal_iterator&lt;sb::Pcf&lt;float, float&gt; const*, std::vector&lt;sb::Pcf&lt;float, float&gt;, std::allocator&lt;sb::Pcf&lt;float, float&gt; &gt; &gt; &gt; &gt;::value_type::rectangle_type const&amp;)&gt;, unsigned long, sb::Executor&amp;)::{lambda()#1}&amp;&gt;, void&gt;::type std::__invoke_r&lt;void, sb::parallel_reduce&lt;__gnu_cxx::__normal_iterator&lt;sb::Pcf&lt;float, float&gt; const*, std::vector&lt;sb::Pcf&lt;float, float&gt;, std::allocator&lt;sb::Pcf&lt;float, float&gt; &gt; &gt; &gt; &gt;(__gnu_cxx::__normal_iterator&lt;sb::Pcf&lt;float, float&gt; const*, std::vector&lt;sb::Pcf&lt;float, float&gt;, std::allocator&lt;sb::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;sb::Pcf&lt;float, float&gt; const*, std::vector&lt;sb::Pcf&lt;float, float&gt;, std::allocator&lt;sb::Pcf&lt;float, float&gt; &gt; &gt; &gt;, std::function&lt;std::iterator_traits&lt;__gnu_cxx::__normal_iterator&lt;sb::Pcf&lt;float, float&gt; const*, std::vector&lt;sb::Pcf&lt;float, float&gt;, std::allocator&lt;sb::Pcf&lt;float, float&gt; &gt; &gt; &gt; &gt;::value_type::value_type (std::iterator_traits&lt;__gnu_cxx::__normal_iterator&lt;sb::Pcf&lt;float, float&gt; const*, std::vector&lt;sb::Pcf&lt;float, float&gt;, std::allocator&lt;sb::Pcf&lt;float, float&gt; &gt; &gt; &gt; &gt;::value_type::rectangle_type const&amp;)&gt;, unsigned long, sb::Executor&amp;)::{lambda()#1}&amp;&gt;(sb::parallel_reduce&lt;__gnu_cxx::__normal_iterator&lt;sb::Pcf&lt;float, float&gt; const*, std::vector&lt;sb::Pcf&lt;float, float&gt;, std::allocator&lt;sb::Pcf&lt;float, float&gt; &gt; &gt; &gt; &gt;(__gnu_cxx::__normal_iterator&lt;sb::Pcf&lt;float, float&gt; const*, std::vector&lt;sb::Pcf&lt;float, float&gt;, std::allocator&lt;sb::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;sb::Pcf&lt;float, float&gt; const*, std::vector&lt;sb::Pcf&lt;float, float&gt;, std::allocator&lt;sb::Pcf&lt;float, float&gt; &gt; &gt; &gt;, std::function&lt;std::iterator_traits&lt;__gnu_cxx::__normal_iterator&lt;sb::Pcf&lt;float, float&gt; const*, std::vector&lt;sb::Pcf&lt;float, float&gt;, std::allocator&lt;sb::Pcf&lt;float, float&gt; &gt; &gt; &gt; &gt;::value_type::value_type (std::iterator_traits&lt;__gnu_cxx::__normal_iterator&lt;sb::Pcf&lt;float, float&gt; const*, std::vector&lt;sb::Pcf&lt;float, float&gt;, std::allocator&lt;sb::Pcf&lt;float, float&gt; &gt; &gt; &gt; &gt;::value_type::rectangle_type const&amp;)&gt;, unsigned long, sb::Executor&amp;)::{lambda()#1}&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">108</span>      using __type = typename __result::type;
+<span class="line_number">109</span>      using __tag = typename __result::__invoke_type;
+<span class="line_number">110</span>      if constexpr (is_void_v&lt;_Res&gt;)
+<span class="line_number">111</span><span class="error">	std::__invoke_impl&lt;__type&gt;(__tag{}, std::forward&lt;_Callable&gt;(__fn),
+</span><span class="line_number">112</span>					std::forward&lt;_Args&gt;(__args)...);
+<span class="line_number">113</span>      else
+<span class="line_number">114</span>	return std::__invoke_impl&lt;__type&gt;(__tag{},
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/std_function.h:290<br>
+                                    <code class="cpp">std::_Function_handler&lt;void (), sb::parallel_reduce&lt;__gnu_cxx::__normal_iterator&lt;sb::Pcf&lt;float, float&gt; const*, std::vector&lt;sb::Pcf&lt;float, float&gt;, std::allocator&lt;sb::Pcf&lt;float, float&gt; &gt; &gt; &gt; &gt;(__gnu_cxx::__normal_iterator&lt;sb::Pcf&lt;float, float&gt; const*, std::vector&lt;sb::Pcf&lt;float, float&gt;, std::allocator&lt;sb::Pcf&lt;float, float&gt; &gt; &gt; &gt;, __gnu_cxx::__normal_iterator&lt;sb::Pcf&lt;float, float&gt; const*, std::vector&lt;sb::Pcf&lt;float, float&gt;, std::allocator&lt;sb::Pcf&lt;float, float&gt; &gt; &gt; &gt;, std::function&lt;std::iterator_traits&lt;__gnu_cxx::__normal_iterator&lt;sb::Pcf&lt;float, float&gt; const*, std::vector&lt;sb::Pcf&lt;float, float&gt;, std::allocator&lt;sb::Pcf&lt;float, float&gt; &gt; &gt; &gt; &gt;::value_type::value_type (std::iterator_traits&lt;__gnu_cxx::__normal_iterator&lt;sb::Pcf&lt;float, float&gt; const*, std::vector&lt;sb::Pcf&lt;float, float&gt;, std::allocator&lt;sb::Pcf&lt;float, float&gt; &gt; &gt; &gt; &gt;::value_type::rectangle_type const&amp;)&gt;, unsigned long, sb::Executor&amp;)::{lambda()#1}&gt;::_M_invoke(std::_Any_data const&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">287</span>      static _Res
+<span class="line_number">288</span>      _M_invoke(const _Any_data&amp; __functor, _ArgTypes&amp;&amp;... __args)
+<span class="line_number">289</span>      {
+<span class="line_number">290</span><span class="error">	return std::__invoke_r&lt;_Res&gt;(*_Base::_M_get_pointer(__functor),
+</span><span class="line_number">291</span>				     std::forward&lt;_ArgTypes&gt;(__args)...);
+<span class="line_number">292</span>      }
+<span class="line_number">293</span>
+</code></pre>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            <pre class="code">
+<code class="c++"><span class="line_number">119</span><span class="error">      ::new((void*)__p) _Tp(std::forward&lt;_Args&gt;(__args)...);</span>
+<span class="line_number">120</span>    }
+<span class="line_number">121</span>#else
+<span class="line_number">122</span>  template&lt;typename _T1, typename _T2&gt;
+<span class="line_number">123</span>    inline void
+<span class="line_number">124</span>    _Construct(_T1* __p, const _T2&amp; __value)
+<span class="line_number">125</span>    {
+<span class="line_number">126</span>      // _GLIBCXX_RESOLVE_LIB_DEFECTS
+<span class="line_number">127</span>      // 402. wrong new expression in [some_]allocator::construct
+<span class="line_number">128</span>      ::new(static_cast&lt;void*&gt;(__p)) _T1(__value);
+<span class="line_number">129</span>    }
+<span class="line_number">130</span>#endif
+<span class="line_number">131</span>
+<span class="line_number">132</span>  template&lt;typename _T1&gt;
+<span class="line_number">133</span>    inline void
+<span class="line_number">134</span>    _Construct_novalue(_T1* __p)
+<span class="line_number">135</span>    { ::new((void*)__p) _T1; }
+<span class="line_number">136</span>
+<span class="line_number">137</span>  template&lt;typename _ForwardIterator&gt;
+<span class="line_number">138</span>    _GLIBCXX20_CONSTEXPR void
+<span class="line_number">139</span>    _Destroy(_ForwardIterator __first, _ForwardIterator __last);
+<span class="line_number">140</span>
+<span class="line_number">141</span>  /**
+<span class="line_number">142</span>   * Destroy the object pointed to by a pointer type.
+<span class="line_number">143</span>   */
+<span class="line_number">144</span>  template&lt;typename _Tp&gt;
+<span class="line_number">145</span>    _GLIBCXX14_CONSTEXPR inline void
+<span class="line_number">146</span>    _Destroy(_Tp* __pointer)
+<span class="line_number">147</span>    {
+<span class="line_number">148</span>#if __cplusplus &gt; 201703L
+<span class="line_number">149</span>      std::destroy_at(__pointer);
+<span class="line_number">150</span>#else
+<span class="line_number">151</span>      __pointer-&gt;~_Tp();
+<span class="line_number">152</span>#endif
+<span class="line_number">153</span>    }
+<span class="line_number">154</span>
+<span class="line_number">155</span>  template&lt;bool&gt;
+<span class="line_number">156</span>    struct _Destroy_aux
+<span class="line_number">157</span>    {
+<span class="line_number">158</span>      template&lt;typename _ForwardIterator&gt;
+<span class="line_number">159</span>	static _GLIBCXX20_CONSTEXPR void
+<span class="line_number">160</span>	__destroy(_ForwardIterator __first, _ForwardIterator __last)
+<span class="line_number">161</span>	{
+<span class="line_number">162</span>	  for (; __first != __last; ++__first)
+<span class="line_number">163</span>	    std::_Destroy(std::__addressof(*__first));
+<span class="line_number">164</span>	}
+<span class="line_number">165</span>    };
+<span class="line_number">166</span>
+<span class="line_number">167</span>  template&lt;&gt;
+<span class="line_number">168</span>    struct _Destroy_aux&lt;true&gt;
+<span class="line_number">169</span>    {
+<span class="line_number">170</span>      template&lt;typename _ForwardIterator&gt;
+<span class="line_number">171</span>        static void
+<span class="line_number">172</span>        __destroy(_ForwardIterator, _ForwardIterator) { }
+<span class="line_number">173</span>    };
+<span class="line_number">174</span>
+<span class="line_number">175</span>  /**
+<span class="line_number">176</span>   * Destroy a range of objects.  If the value_type of the object has
+<span class="line_number">177</span>   * a trivial destructor, the compiler should optimize all of this
+<span class="line_number">178</span>   * away, otherwise the objects&#39; destructors must be invoked.
+<span class="line_number">179</span>   */
+<span class="line_number">180</span>  template&lt;typename _ForwardIterator&gt;
+<span class="line_number">181</span>    _GLIBCXX20_CONSTEXPR inline void
+<span class="line_number">182</span>    _Destroy(_ForwardIterator __first, _ForwardIterator __last)
+<span class="line_number">183</span>    {
+<span class="line_number">184</span>      typedef typename iterator_traits&lt;_ForwardIterator&gt;::value_type
+<span class="line_number">185</span>                       _Value_type;
+<span class="line_number">186</span>#if __cplusplus &gt;= 201103L
+<span class="line_number">187</span>      // A deleted destructor is trivial, this ensures we reject such types:
+<span class="line_number">188</span>      static_assert(is_destructible&lt;_Value_type&gt;::value,
+<span class="line_number">189</span>		    &#34;value type is destructible&#34;);
+<span class="line_number">190</span>#endif
+<span class="line_number">191</span>#if __cplusplus &gt;= 202002L
+<span class="line_number">192</span>      if (std::__is_constant_evaluated())
+<span class="line_number">193</span>	return std::_Destroy_aux&lt;false&gt;::__destroy(__first, __last);
+<span class="line_number">194</span>#endif
+<span class="line_number">195</span>      std::_Destroy_aux&lt;__has_trivial_destructor(_Value_type)&gt;::
+<span class="line_number">196</span>	__destroy(__first, __last);
+<span class="line_number">197</span>    }
+<span class="line_number">198</span>
+<span class="line_number">199</span>  template&lt;bool&gt;
+<span class="line_number">200</span>    struct _Destroy_n_aux
+<span class="line_number">201</span>    {
+<span class="line_number">202</span>      template&lt;typename _ForwardIterator, typename _Size&gt;
+<span class="line_number">203</span>	static _GLIBCXX20_CONSTEXPR _ForwardIterator
+<span class="line_number">204</span>	__destroy_n(_ForwardIterator __first, _Size __count)
+<span class="line_number">205</span>	{
+<span class="line_number">206</span>	  for (; __count &gt; 0; (void)++__first, --__count)
+<span class="line_number">207</span>	    std::_Destroy(std::__addressof(*__first));
+<span class="line_number">208</span>	  return __first;
+<span class="line_number">209</span>	}
+<span class="line_number">210</span>    };
+<span class="line_number">211</span>
+<span class="line_number">212</span>  template&lt;&gt;
+<span class="line_number">213</span>    struct _Destroy_n_aux&lt;true&gt;
+<span class="line_number">214</span>    {
+<span class="line_number">215</span>      template&lt;typename _ForwardIterator, typename _Size&gt;
+<span class="line_number">216</span>        static _ForwardIterator
+<span class="line_number">217</span>        __destroy_n(_ForwardIterator __first, _Size __count)
+<span class="line_number">218</span>	{
+<span class="line_number">219</span>	  std::advance(__first, __count);
+<span class="line_number">220</span>	  return __first;
+<span class="line_number">221</span>	}
+<span class="line_number">222</span>    };
+<span class="line_number">223</span>
+<span class="line_number">224</span>  /**
+<span class="line_number">225</span>   * Destroy a range of objects.  If the value_type of the object has
+<span class="line_number">226</span>   * a trivial destructor, the compiler should optimize all of this
+<span class="line_number">227</span>   * away, otherwise the objects&#39; destructors must be invoked.
+<span class="line_number">228</span>   */
+<span class="line_number">229</span>  template&lt;typename _ForwardIterator, typename _Size&gt;
+<span class="line_number">230</span>    _GLIBCXX20_CONSTEXPR inline _ForwardIterator
+<span class="line_number">231</span>    _Destroy_n(_ForwardIterator __first, _Size __count)
+<span class="line_number">232</span>    {
+<span class="line_number">233</span>      typedef typename iterator_traits&lt;_ForwardIterator&gt;::value_type
+<span class="line_number">234</span>                       _Value_type;
+<span class="line_number">235</span>#if __cplusplus &gt;= 201103L
+<span class="line_number">236</span>      // A deleted destructor is trivial, this ensures we reject such types:
+<span class="line_number">237</span>      static_assert(is_destructible&lt;_Value_type&gt;::value,
+<span class="line_number">238</span>		    &#34;value type is destructible&#34;);
+<span class="line_number">239</span>#endif
+<span class="line_number">240</span>#if __cplusplus &gt;= 202002L
+<span class="line_number">241</span>      if (std::__is_constant_evaluated())
+<span class="line_number">242</span>	return std::_Destroy_n_aux&lt;false&gt;::__destroy_n(__first, __count);
+<span class="line_number">243</span>#endif
+<span class="line_number">244</span>      return std::_Destroy_n_aux&lt;__has_trivial_destructor(_Value_type)&gt;::
+<span class="line_number">245</span>	__destroy_n(__first, __count);
+<span class="line_number">246</span>    }
+<span class="line_number">247</span>
+<span class="line_number">248</span>#if __cplusplus &gt;= 201703L
+<span class="line_number">249</span>  template &lt;typename _ForwardIterator&gt;
+<span class="line_number">250</span>    _GLIBCXX20_CONSTEXPR inline void
+<span class="line_number">251</span>    destroy(_ForwardIterator __first, _ForwardIterator __last)
+<span class="line_number">252</span>    {
+<span class="line_number">253</span>      std::_Destroy(__first, __last);
+<span class="line_number">254</span>    }
+<span class="line_number">255</span>
+<span class="line_number">256</span>  template &lt;typename _ForwardIterator, typename _Size&gt;
+<span class="line_number">257</span>    _GLIBCXX20_CONSTEXPR inline _ForwardIterator
+<span class="line_number">258</span>    destroy_n(_ForwardIterator __first, _Size __count)
+<span class="line_number">259</span>    {
+<span class="line_number">260</span>      return std::_Destroy_n(__first, __count);
+<span class="line_number">261</span>    }
+<span class="line_number">262</span>#endif // C++17
+<span class="line_number">263</span>
+<span class="line_number">264</span>_GLIBCXX_END_NAMESPACE_VERSION
+<span class="line_number">265</span>} // namespace std
+<span class="line_number">266</span>
+<span class="line_number">267</span>#endif /* _STL_CONSTRUCT_H */
+</code>
+            </pre>
+        </div>
+    </div>
+</body>
+
+</html>
