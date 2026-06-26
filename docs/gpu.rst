@@ -59,6 +59,8 @@ To change the problem-size threshold at which computations move from CPU to GPU:
    # Use GPU for all matrix computations (threshold of 1)
    sb.system.set_cuda_threshold(1)
 
+The threshold must be ``>= 0``; a negative value raises ``ValueError``.
+
 Limiting CPU threads
 ---------------------
 
@@ -67,7 +69,7 @@ By default, stablebear uses all available hardware threads. To restrict this::
    # Use at most 4 CPU threads
    sb.system.limit_cpus(4)
 
-This can be useful in multi-user environments or when running multiple processes in parallel.
+This can be useful in multi-user environments or when running multiple processes in parallel. The count must be ``>= 1``; to run CPU-only, use :func:`~stablebear.system.force_cpu` instead.
 
 Limiting GPU count
 -------------------
@@ -77,6 +79,8 @@ If you have multiple GPUs but want stablebear to use only some of them::
    # Use at most 1 GPU
    sb.system.limit_gpus(1)
 
+The count must be ``>= 1``; to run CPU-only, use :func:`~stablebear.system.force_cpu` instead.
+
 Setting CUDA block size
 ------------------------
 
@@ -84,7 +88,7 @@ For expert users, the CUDA block dimensions for matrix computations can be tuned
 
    sb.system.set_block_size(16, 16)
 
-The optimal block size depends on your GPU architecture and problem characteristics. The default values work well for most cases.
+The optimal block size depends on your GPU architecture and problem characteristics. The default values work well for most cases. Each dimension must be ``>= 1``.
 
 Verbose device logging
 -----------------------
