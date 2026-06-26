@@ -760,12 +760,41 @@ class Tensor(ABC):
         axis2 = _resolve_axis(axis2, self.ndim)
         return self._to_py_tensor(self._data.swapaxes(axis1, axis2))
 
-    def squeeze(self, axis=None):
+    def squeeze(self, axis: int | tuple[int, ...] | list[int] | None = None):
         if axis is None:
+            return self._to_py_tensor(self._data.squeeze())
+        if isinstance(axis, (tuple, list)):
+            resolved = [_resolve_axis(a, self.ndim) for a in axis]
+            if len(set(resolved)) != len(resolved):
+                raise ValueError("duplicate axes given to squeeze")
+            for a in resolved:
+                if self.shape[a] != 1:
+                    raise ValueError(
+                        "cannot select an axis to squeeze out which has size "
+                        "not equal to one"
+                    )
+            data = self._data
+            # Remove in descending order so earlier removals don't renumber
+            # the axes that remain to be squeezed.
+            for a in sorted(resolved, reverse=True):
+                data = data.squeeze(a)
+            return self._to_py_tensor(data)
+        # A 0-d tensor accepts axis 0 or -1 as a no-op (NumPy parity).
+        if self.ndim == 0 and operator.index(axis) in (0, -1):
             return self._to_py_tensor(self._data.squeeze())
         return self._to_py_tensor(self._data.squeeze(_resolve_axis(axis, self.ndim)))
 
-    def expand_dims(self, axis):
+    def expand_dims(self, axis: int | tuple[int, ...] | list[int]):
+        if isinstance(axis, (tuple, list)):
+            out_ndim = self.ndim + len(axis)
+            resolved = [_resolve_axis(a, out_ndim) for a in axis]
+            if len(set(resolved)) != len(resolved):
+                raise ValueError("duplicate axes given to expand_dims")
+            data = self._data
+            # Insert in ascending order to match numpy.expand_dims.
+            for a in sorted(resolved):
+                data = data.expand_dims(a)
+            return self._to_py_tensor(data)
         axis = _resolve_axis(axis, self.ndim + 1)
         return self._to_py_tensor(self._data.expand_dims(axis))
 

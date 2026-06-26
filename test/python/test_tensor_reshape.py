@@ -290,6 +290,47 @@ class TestSqueeze:
         with pytest.raises((ValueError, RuntimeError)):
             t.squeeze(0)
 
+    def test_squeeze_tuple(self, TensorType, np_dtype):
+        _assert_squeeze(np.arange(6, dtype=np_dtype).reshape(1, 6, 1), (0, 2), TensorType)
+
+    def test_squeeze_tuple_negative(self, TensorType, np_dtype):
+        _assert_squeeze(np.arange(6, dtype=np_dtype).reshape(1, 6, 1), (-1, 0), TensorType)
+
+    def test_squeeze_list(self, TensorType, np_dtype):
+        np_arr = np.arange(6, dtype=np_dtype).reshape(1, 1, 6)
+        t = TensorType(np_arr)
+        result = np.asarray(t.squeeze([0, 1]))
+        expected = np_arr.squeeze((0, 1))
+        np.testing.assert_array_equal(result, expected)
+        assert result.shape == expected.shape
+
+    def test_squeeze_tuple_non_size1_raises(self, TensorType, np_dtype):
+        t = TensorType(np.arange(6, dtype=np_dtype).reshape(1, 6, 1))
+        with pytest.raises(ValueError):
+            t.squeeze((1,))
+
+    def test_squeeze_tuple_duplicate_raises(self, TensorType, np_dtype):
+        t = TensorType(np.arange(6, dtype=np_dtype).reshape(1, 6, 1))
+        with pytest.raises(ValueError):
+            t.squeeze((0, 0))
+        with pytest.raises(ValueError):
+            t.squeeze((0, -3))
+
+    def test_squeeze_0d(self, TensorType, np_dtype):
+        np_arr = np.array(3, dtype=np_dtype)
+        t = TensorType(np_arr)
+        for axis in (0, -1):
+            # NumPy parity: squeezing axis 0/-1 of a 0-d array is a no-op.
+            result = t.squeeze(axis)
+            expected = np_arr.squeeze(axis)
+            assert result.shape == expected.shape == ()
+            assert result.ndim == 0
+
+    def test_squeeze_0d_out_of_range_raises(self, TensorType, np_dtype):
+        t = TensorType(np.array(3, dtype=np_dtype))
+        with pytest.raises(IndexError):
+            t.squeeze(1)
+
 
 # --- expand_dims ---
 
@@ -339,6 +380,25 @@ class TestExpandDims:
             t.expand_dims(3)
         with pytest.raises((ValueError, RuntimeError, IndexError)):
             t.expand_dims(-3)
+
+    def test_expand_tuple(self, TensorType, np_dtype):
+        _assert_expand_dims(np.arange(6, dtype=np_dtype), (0, 2), TensorType)
+
+    def test_expand_tuple_negative(self, TensorType, np_dtype):
+        _assert_expand_dims(np.arange(6, dtype=np_dtype), (0, -1), TensorType)
+
+    def test_expand_list(self, TensorType, np_dtype):
+        np_arr = np.arange(12, dtype=np_dtype).reshape(3, 4)
+        t = TensorType(np_arr)
+        result = np.asarray(t.expand_dims([1, 3]))
+        expected = np.expand_dims(np_arr, (1, 3))
+        np.testing.assert_array_equal(result, expected)
+        assert result.shape == expected.shape
+
+    def test_expand_tuple_duplicate_raises(self, TensorType, np_dtype):
+        t = TensorType(np.arange(6, dtype=np_dtype))
+        with pytest.raises(ValueError):
+            t.expand_dims((0, 0))
 
 
 # --- astype ---
