@@ -360,6 +360,47 @@ class PointCloudTensor(Tensor):
         """Return the lone cloud of a 0-d tensor as a ``(n_points, dim)`` FloatTensor."""
         return self._represent_element(self._data._get_element([]))
 
+    def to_dense(self) -> np.ndarray:
+        """Return the clouds as one dense ``(*tensor_shape, n_points, dim)`` array.
+
+        A 0-d tensor (a single cloud) yields just its ``(n_points, dim)`` array.
+        Every cloud must have the same shape: ragged tensors (clouds with
+        differing point counts) cannot be packed into a single dense array and
+        raise ``ValueError`` — index the tensor and convert each cloud
+        separately in that case.
+        """
+        if self.ndim == 0:
+            return np.asarray(self._single_cloud())
+        shape = tuple(self.shape)
+        clouds = [np.asarray(self[idx]) for idx in np.ndindex(*shape)]
+        if not clouds:
+            raise ValueError(
+                f"cannot densify a PointCloudTensor with an empty axis (shape "
+                f"{shape}): there is no cloud to infer the (n_points, dim) shape from")
+        cloud_shape = clouds[0].shape
+        if any(c.shape != cloud_shape for c in clouds):
+            raise ValueError(
+                "cannot densify a PointCloudTensor with ragged clouds (clouds "
+                "have differing shapes); index the tensor and convert each cloud "
+                "separately instead")
+        return np.stack(clouds).reshape(shape + cloud_shape)
+
+    def to_numpy(self) -> np.ndarray:
+        """Return the clouds as a dense array. Alias for :meth:`to_dense`."""
+        return self.to_dense()
+
+    def __array__(self, dtype=None, copy=None):
+        """Return the dense cloud array so ``np.asarray(pc)`` works.
+
+        Equal-sized clouds materialize as a real numeric array (not an object
+        array); ragged clouds raise a helpful ``ValueError`` (see
+        :meth:`to_dense`).
+        """
+        arr = self.to_dense()
+        if dtype is not None:
+            arr = arr.astype(dtype, copy=False)
+        return arr
+
     def __getitem__(self, index):
         """Index the tensor of clouds, or — when this is a single cloud — the cloud itself.
 
