@@ -73,12 +73,15 @@ def test_fsc_multidim():
 
     assert X.shape == (3, 2)
 
-    assert X[0, 0] == sb.Pcf(content[enumeration[0, 0, 0] : enumeration[0, 0, 1]])
-    assert X[0, 1] == sb.Pcf(content[enumeration[0, 1, 0] : enumeration[0, 1, 1]])
-    assert X[1, 0] == sb.Pcf(content[enumeration[1, 0, 0] : enumeration[1, 0, 1]])
-    assert X[1, 1] == sb.Pcf(content[enumeration[1, 1, 0] : enumeration[1, 1, 1]])
-    assert X[2, 0] == sb.Pcf(content[enumeration[2, 0, 0] : enumeration[2, 0, 1]])
-    assert X[2, 1] == sb.Pcf(content[enumeration[2, 1, 0] : enumeration[2, 1, 1]])
+    # from_serial_content is a loose deserialization constructor and may produce
+    # PCFs with duplicate breakpoint times (e.g. the [5:9] / [13:15] slices here
+    # are all t=0), which the strict public Pcf(array) constructor rejects. Test
+    # the slicing by comparing the produced PCF's breakpoints to the source
+    # slice directly, rather than rebuilding the expected value via Pcf(...).
+    for i in range(3):
+        for j in range(2):
+            start, stop = enumeration[i, j, 0], enumeration[i, j, 1]
+            np.testing.assert_array_equal(np.asarray(X[i, j]), content[start:stop])
 
 
 def test_fsc_stop_le_start_throws():

@@ -41,8 +41,11 @@ namespace sb
       py::buffer_info buf = arr.request();
       if (buf.size == 0)
       {
-        points.emplace_back(static_cast<Tt>(0), static_cast<Tv>(0));
-        return sb::Pcf<Tt, Tv>(std::move(points));
+        // A PCF must have at least one breakpoint at t=0; an empty input array
+        // cannot represent one. (Use Pcf() for the all-zero constant PCF.)
+        throw std::invalid_argument(
+          "Cannot construct a Pcf from an empty array; a PCF must have at "
+          "least one breakpoint at t=0.");
       }
 
       if (buf.ndim != 2)
@@ -77,6 +80,18 @@ namespace sb
       {
         throw std::invalid_argument(
           "Breakpoints must be given in non-decreasing time order.");
+      }
+
+      // Times must be strictly increasing (t_0 < t_1 < ...): a duplicate time
+      // is ambiguous (two values at the same breakpoint) and is rejected
+      // rather than silently kept.
+      if (std::adjacent_find(points.begin(), points.end(),
+            [](const point_type& a, const point_type& b){ return a.t == b.t; })
+          != points.end())
+      {
+        throw std::invalid_argument(
+          "Breakpoints must have strictly increasing times (a duplicate time "
+          "was supplied).");
       }
 
       // PCFs are defined on [0, inf), so the first (smallest) breakpoint time

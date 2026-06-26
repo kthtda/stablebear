@@ -5,8 +5,10 @@ import stablebear._sb_cpp as cpp
 
 
 def test_np_to_pcf_has_correct_type():
-    X32 = np.zeros((2, 2), dtype=np.float32)
-    X64 = np.zeros((2, 2), dtype=np.float64)
+    # Strictly-increasing breakpoint times (t=0, 1); the test only checks dtype
+    # inference, but the times must be valid for the strict Pcf constructor.
+    X32 = np.array([[0.0, 0.0], [1.0, 0.0]], dtype=np.float32)
+    X64 = np.array([[0.0, 0.0], [1.0, 0.0]], dtype=np.float64)
 
     f32 = sb.Pcf(X32)
     assert isinstance(f32._data, cpp.Pcf_f32_f32)
