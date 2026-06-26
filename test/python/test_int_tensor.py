@@ -148,3 +148,87 @@ def test_repr():
     t = IntTensor(arr)
     r = repr(t)
     assert "1" in r and "2" in r and "3" in r
+
+
+# ---------------------------------------------------------------------------
+# Bug #7: a Python-float scalar / slice assignment into an IntTensor raised a
+# raw pybind TypeError. It now truncates toward zero, as in NumPy.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("np_dtype, sb_dtype",
+                         [pytest.param(np.int32, sb.int32, id="int32"),
+                          pytest.param(np.int64, sb.int64, id="int64")])
+class TestIntTensorFloatAssignTruncates:
+    def test_scalar_assignment_truncates(self, np_dtype, sb_dtype):
+        t = sb.IntTensor(np.array([1, 2, 3], dtype=np_dtype))
+        ref = np.array([1, 2, 3], dtype=np_dtype)
+        t[0] = 7.9
+        ref[0] = 7.9
+        np.testing.assert_array_equal(np.asarray(t), ref)
+
+    def test_slice_assignment_truncates(self, np_dtype, sb_dtype):
+        t = sb.IntTensor(np.array([1, 2, 3, 4], dtype=np_dtype))
+        t[0:2] = 7.9
+        np.testing.assert_array_equal(np.asarray(t)[:2], np.array([7, 7]))
+
+    def test_negative_float_truncates_toward_zero(self, np_dtype, sb_dtype):
+        if sb_dtype in (sb.int32, sb.int64):
+            t = sb.IntTensor(np.array([1, 2, 3], dtype=np_dtype))
+            t[0] = -7.9
+            assert int(np.asarray(t)[0]) == -7
+
+    def test_np_float64_scalar_truncates(self, np_dtype, sb_dtype):
+        t = sb.IntTensor(np.array([1, 2, 3], dtype=np_dtype))
+        t[0] = np.float64(5.7)
+        assert int(np.asarray(t)[0]) == 5
+
+
+# ---------------------------------------------------------------------------
+# Bug #65: a fractional exponent on an IntTensor raised a raw pybind error, and
+# a negative integer exponent silently truncated to 0. Fractional exponents now
+# promote to float64 and a negative integer exponent raises ValueError, both as
+# in NumPy.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("np_dtype, sb_dtype", _INT_DTYPES)
+class TestIntTensorPow:
+    def test_fractional_exponent_promotes_to_float(self, np_dtype, sb_dtype):
+        t = sb.IntTensor(np.array([4, 9, 16], dtype=np_dtype))
+        result = t ** 0.5
+        assert isinstance(result, sb.FloatTensor)
+        assert result.dtype == sb.float64
+        np.testing.assert_allclose(
+            np.asarray(result), np.array([4, 9, 16], dtype=np_dtype) ** 0.5)
+
+    def test_whole_float_exponent_promotes_to_float(self, np_dtype, sb_dtype):
+        t = sb.IntTensor(np.array([2, 3], dtype=np_dtype))
+        result = t ** 2.0
+        assert isinstance(result, sb.FloatTensor)
+        np.testing.assert_allclose(np.asarray(result), np.array([4.0, 9.0]))
+
+    def test_nonnegative_int_exponent_stays_int(self, np_dtype, sb_dtype):
+        t = sb.IntTensor(np.array([2, 3], dtype=np_dtype))
+        result = t ** 2
+        assert isinstance(result, sb.IntTensor)
+        np.testing.assert_array_equal(np.asarray(result), np.array([4, 9]))
+
+    def test_inplace_fractional_exponent_raises(self, np_dtype, sb_dtype):
+        t = sb.IntTensor(np.array([4, 9], dtype=np_dtype))
+        with pytest.raises(TypeError):
+            t **= 0.5
+
+    def test_inplace_int_exponent_works(self, np_dtype, sb_dtype):
+        t = sb.IntTensor(np.array([2, 3], dtype=np_dtype))
+        t **= 3
+        np.testing.assert_array_equal(np.asarray(t), np.array([8, 27]))
+
+
+@pytest.mark.parametrize("np_dtype, sb_dtype",
+                         [pytest.param(np.int32, sb.int32, id="int32"),
+                          pytest.param(np.int64, sb.int64, id="int64")])
+def test_negative_integer_exponent_raises(np_dtype, sb_dtype):
+    t = sb.IntTensor(np.array([2, 3], dtype=np_dtype))
+    with pytest.raises(ValueError, match="negative integer powers"):
+        t ** -1

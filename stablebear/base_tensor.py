@@ -176,6 +176,14 @@ class IntTensor(NumericTensor):
     def _to_py_tensor(self, data):
         return IntTensor(data)
 
+    def _decay_value(self, val):
+        # A Python/NumPy float assigned to an integer cell or slice is truncated
+        # toward zero (NumPy semantics), instead of leaking the C++ int
+        # constructor's "incompatible function arguments" error (issue #7).
+        if isinstance(val, (float, np.floating)):
+            return int(val)
+        return val
+
     def _as_float64(self):
         """Convert to float64 FloatTensor, matching NumPy int division promotion."""
         return FloatTensor(np.asarray(self).astype(np.float64))
@@ -194,6 +202,29 @@ class IntTensor(NumericTensor):
         raise TypeError(
             "In-place true division is not supported for IntTensor "
             "(result is float). Use `x = x / y` instead."
+        )
+
+    def __pow__(self, exponent):
+        # A fractional (non-integral) exponent promotes to float64, as in NumPy;
+        # a negative integer exponent is rejected (NumPy raises the same error),
+        # rather than leaking a pybind error or silently truncating to 0
+        # (issue #65). A non-negative integer exponent keeps the integer path.
+        if isinstance(exponent, (int, np.integer)):
+            if exponent < 0:
+                raise ValueError(
+                    "Integers to negative integer powers are not allowed.")
+            return super().__pow__(exponent)
+        return self._as_float64() ** exponent
+
+    def __ipow__(self, exponent):
+        if isinstance(exponent, (int, np.integer)):
+            if exponent < 0:
+                raise ValueError(
+                    "Integers to negative integer powers are not allowed.")
+            return super().__ipow__(exponent)
+        raise TypeError(
+            "In-place power with a fractional exponent is not supported for "
+            "IntTensor (result is float). Use `x = x ** y` instead."
         )
 
     def __neg__(self):
