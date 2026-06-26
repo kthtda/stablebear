@@ -44,7 +44,9 @@ namespace sb
 
       EntryProxy& operator=(const T& value)
       {
-        if (value < T{})
+        // Reject negatives AND NaN (NaN < 0 is false, so a plain `< 0` check
+        // would let NaN through); +inf stays allowed.
+        if (!(value >= T{}))
           throw std::invalid_argument("Distance matrix entries must be nonnegative");
         if (!m_ptr)
         {
@@ -64,7 +66,7 @@ namespace sb
       : m_data(std::make_shared<T[]>(storage_size(n)))
       , m_size(n)
     {
-      if (init < T{})
+      if (!(init >= T{}))
         throw std::invalid_argument("Distance matrix entries must be nonnegative");
       std::fill(m_data.get(), m_data.get() + storage_size(n), init);
     }

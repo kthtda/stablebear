@@ -64,7 +64,7 @@ namespace sb_py
         {
           for (size_t j = i + 1; j < n; ++j)
           {
-            if (r(i, j) < T{})
+            if (!(r(i, j) >= T{}))
               throw std::invalid_argument("Entries must be nonnegative");
             if (r(i, j) != r(j, i))
               throw std::invalid_argument("Matrix must be symmetric");
