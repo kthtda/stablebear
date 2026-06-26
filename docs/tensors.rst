@@ -67,6 +67,14 @@ This works the same way for ``IntPcfTensor`` and ``BarcodeTensor``.
 The precision (32- or 64-bit) is inferred from the elements.
 An empty list produces a shape ``(0,)`` tensor.
 
+A :py:class:`~stablebear.persistence.BarcodeTensor` also accepts raw ``(n, 2)``
+NumPy barcode arrays as its leaves, wrapping each in a ``Barcode`` for you::
+
+   import numpy as np
+
+   t = sb.persistence.BarcodeTensor(
+       [np.array([[0.0, 1.0]]), np.array([[0.0, 2.0], [1.0, 3.0]])])  # shape (2,)
+
 
 From NumPy arrays
 -----------------

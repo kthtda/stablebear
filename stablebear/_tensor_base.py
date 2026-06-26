@@ -72,21 +72,53 @@ def _infer_shape_and_flatten(data):
     return tuple(shape), flat
 
 
-def _tensor_from_nested(data, elem_to_tensor, default_ctor=None):
+def _friendly_elem_dtype_name(elem_cpp_type) -> str:
+    """Return a user-facing dtype name for a C++ element type (for errors)."""
+    names = {
+        cpp.Pcf_f32_f32: "pcf32",
+        cpp.Pcf_f64_f64: "pcf64",
+        cpp.Pcf_i32_i32: "pcf32i",
+        cpp.Pcf_i64_i64: "pcf64i",
+        cpp.persistence.Barcode32: "barcode32",
+        cpp.persistence.Barcode64: "barcode64",
+    }
+    return names.get(elem_cpp_type, elem_cpp_type.__name__)
+
+
+def _tensor_from_nested(data, elem_to_tensor, default_ctor=None, wrap=None):
     """Build a C++ tensor from a nested list/tuple of elements with ``._data``.
 
     *elem_to_tensor* maps C++ element type to C++ tensor constructor,
     e.g. ``{cpp.Pcf_f32_f32: cpp.Pcf32Tensor}``.
     *default_ctor* is used when the list is empty (no element to infer from).
+    *wrap*, when given, is applied to every flattened element first, so raw
+    leaves (e.g. ``(n, 2)`` ndarrays) can be wrapped into the element type
+    (e.g. ``Barcode``); already-wrapped elements pass through unchanged.
     """
     shape, flat = _infer_shape_and_flatten(data)
     if not flat:
         if default_ctor is None:
             default_ctor = next(iter(elem_to_tensor.values()))
         return default_ctor(cpp.Shape(list(shape or (0,))))
-    tensor_ctor = elem_to_tensor.get(type(flat[0]._data))
-    if tensor_ctor is None:
-        raise TypeError(f"Unsupported element type {type(flat[0])}")
+    if wrap is not None:
+        flat = [wrap(e) for e in flat]
+    # Validate every element up front so bad or mixed-precision input gives a
+    # clear error instead of an AttributeError or a raw pybind overload dump.
+    ctors = []
+    for i, elem in enumerate(flat):
+        if not hasattr(elem, "_data"):
+            raise TypeError(
+                f"element {i} has type {type(elem).__name__}, which is not a "
+                "valid tensor element")
+        ctor = elem_to_tensor.get(type(elem._data))
+        if ctor is None:
+            raise TypeError(f"Unsupported element type {type(elem)}")
+        ctors.append(ctor)
+    if len(set(ctors)) > 1:
+        names = sorted({_friendly_elem_dtype_name(type(e._data)) for e in flat})
+        raise TypeError(
+            f"All elements must have the same dtype (got {', '.join(names)}).")
+    tensor_ctor = ctors[0]
     t = tensor_ctor(cpp.Shape([len(flat)]))
     for i, elem in enumerate(flat):
         t._set_element([i], elem._data)

@@ -62,6 +62,12 @@ def test_construct_bad_type():
         IntTensor("not a tensor")
 
 
+def test_construct_bad_dtype_raises_typeerror():
+    # Previously raised a bare KeyError (issue #55).
+    with pytest.raises(TypeError):
+        IntTensor([1, 2], dtype=sb.float64)
+
+
 def test_numpy_roundtrip_large_uint64():
     arr = np.array([0, 2**32, 2**40], dtype=np.uint64)
     t = IntTensor(arr)
