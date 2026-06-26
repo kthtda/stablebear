@@ -1,0 +1,1662 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>/usr/include/c++/13/bits/stl_function.h</title>
+    <link href='valgrind.css' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+    <script src="https://code.jquery.com/jquery-3.4.1.js"></script>
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.0.0/styles/default.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.0.0/highlight.min.js"></script>
+    <script src="valgrind.js"></script>
+</head>
+
+<body>
+    <div class="global">
+        <div class="header">
+            <h1>/usr/include/c++/13/bits/stl_function.h</h1>
+            <p><b>1</b> errors</p>
+            <button class="next_error">Goto First Error</button>
+        </div>
+        <div class="listing">
+            <pre class="code">
+<code class="c++"><span class="line_number">1</span>// Functor implementations -*- C++ -*-
+<span class="line_number">2</span>
+<span class="line_number">3</span>// Copyright (C) 2001-2023 Free Software Foundation, Inc.
+<span class="line_number">4</span>//
+<span class="line_number">5</span>// This file is part of the GNU ISO C++ Library.  This library is free
+<span class="line_number">6</span>// software; you can redistribute it and/or modify it under the
+<span class="line_number">7</span>// terms of the GNU General Public License as published by the
+<span class="line_number">8</span>// Free Software Foundation; either version 3, or (at your option)
+<span class="line_number">9</span>// any later version.
+<span class="line_number">10</span>
+<span class="line_number">11</span>// This library is distributed in the hope that it will be useful,
+<span class="line_number">12</span>// but WITHOUT ANY WARRANTY; without even the implied warranty of
+<span class="line_number">13</span>// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+<span class="line_number">14</span>// GNU General Public License for more details.
+<span class="line_number">15</span>
+<span class="line_number">16</span>// Under Section 7 of GPL version 3, you are granted additional
+<span class="line_number">17</span>// permissions described in the GCC Runtime Library Exception, version
+<span class="line_number">18</span>// 3.1, as published by the Free Software Foundation.
+<span class="line_number">19</span>
+<span class="line_number">20</span>// You should have received a copy of the GNU General Public License and
+<span class="line_number">21</span>// a copy of the GCC Runtime Library Exception along with this program;
+<span class="line_number">22</span>// see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
+<span class="line_number">23</span>// &lt;http://www.gnu.org/licenses/&gt;.
+<span class="line_number">24</span>
+<span class="line_number">25</span>/*
+<span class="line_number">26</span> *
+<span class="line_number">27</span> * Copyright (c) 1994
+<span class="line_number">28</span> * Hewlett-Packard Company
+<span class="line_number">29</span> *
+<span class="line_number">30</span> * Permission to use, copy, modify, distribute and sell this software
+<span class="line_number">31</span> * and its documentation for any purpose is hereby granted without fee,
+<span class="line_number">32</span> * provided that the above copyright notice appear in all copies and
+<span class="line_number">33</span> * that both that copyright notice and this permission notice appear
+<span class="line_number">34</span> * in supporting documentation.  Hewlett-Packard Company makes no
+<span class="line_number">35</span> * representations about the suitability of this software for any
+<span class="line_number">36</span> * purpose.  It is provided &#34;as is&#34; without express or implied warranty.
+<span class="line_number">37</span> *
+<span class="line_number">38</span> *
+<span class="line_number">39</span> * Copyright (c) 1996-1998
+<span class="line_number">40</span> * Silicon Graphics Computer Systems, Inc.
+<span class="line_number">41</span> *
+<span class="line_number">42</span> * Permission to use, copy, modify, distribute and sell this software
+<span class="line_number">43</span> * and its documentation for any purpose is hereby granted without fee,
+<span class="line_number">44</span> * provided that the above copyright notice appear in all copies and
+<span class="line_number">45</span> * that both that copyright notice and this permission notice appear
+<span class="line_number">46</span> * in supporting documentation.  Silicon Graphics makes no
+<span class="line_number">47</span> * representations about the suitability of this software for any
+<span class="line_number">48</span> * purpose.  It is provided &#34;as is&#34; without express or implied warranty.
+<span class="line_number">49</span> */
+<span class="line_number">50</span>
+<span class="line_number">51</span>/** @file bits/stl_function.h
+<span class="line_number">52</span> *  This is an internal header file, included by other library headers.
+<span class="line_number">53</span> *  Do not attempt to use it directly. @headername{functional}
+<span class="line_number">54</span> */
+<span class="line_number">55</span>
+<span class="line_number">56</span>#ifndef _STL_FUNCTION_H
+<span class="line_number">57</span>#define _STL_FUNCTION_H 1
+<span class="line_number">58</span>
+<span class="line_number">59</span>#if __cplusplus &gt; 201103L
+<span class="line_number">60</span>#include &lt;bits/move.h&gt;
+<span class="line_number">61</span>#endif
+<span class="line_number">62</span>
+<span class="line_number">63</span>namespace std _GLIBCXX_VISIBILITY(default)
+<span class="line_number">64</span>{
+<span class="line_number">65</span>_GLIBCXX_BEGIN_NAMESPACE_VERSION
+<span class="line_number">66</span>
+<span class="line_number">67</span>  // 20.3.1 base classes
+<span class="line_number">68</span>  /** @defgroup functors Function Objects
+<span class="line_number">69</span>   *  @ingroup utilities
+<span class="line_number">70</span>   *
+<span class="line_number">71</span>   *  Function objects, or _functors_, are objects with an `operator()`
+<span class="line_number">72</span>   *  defined and accessible.  They can be passed as arguments to algorithm
+<span class="line_number">73</span>   *  templates and used in place of a function pointer.  Not only is the
+<span class="line_number">74</span>   *  resulting expressiveness of the library increased, but the generated
+<span class="line_number">75</span>   *  code can be more efficient than what you might write by hand.  When we
+<span class="line_number">76</span>   *  refer to _functors_, then, generally we include function pointers in
+<span class="line_number">77</span>   *  the description as well.
+<span class="line_number">78</span>   *
+<span class="line_number">79</span>   *  Often, functors are only created as temporaries passed to algorithm
+<span class="line_number">80</span>   *  calls, rather than being created as named variables.
+<span class="line_number">81</span>   *
+<span class="line_number">82</span>   *  Two examples taken from the standard itself follow.  To perform a
+<span class="line_number">83</span>   *  by-element addition of two vectors `a` and `b` containing `double`,
+<span class="line_number">84</span>   *  and put the result in `a`, use
+<span class="line_number">85</span>   *  \code
+<span class="line_number">86</span>   *  transform (a.begin(), a.end(), b.begin(), a.begin(), plus&lt;double&gt;());
+<span class="line_number">87</span>   *  \endcode
+<span class="line_number">88</span>   *  To negate every element in `a`, use
+<span class="line_number">89</span>   *  \code
+<span class="line_number">90</span>   *  transform(a.begin(), a.end(), a.begin(), negate&lt;double&gt;());
+<span class="line_number">91</span>   *  \endcode
+<span class="line_number">92</span>   *  The addition and negation functions will usually be inlined directly.
+<span class="line_number">93</span>   *
+<span class="line_number">94</span>   *  An _adaptable function object_ is one which provides nested typedefs
+<span class="line_number">95</span>   *  `result_type` and either `argument_type` (for a unary function) or
+<span class="line_number">96</span>   *  `first_argument_type` and `second_argument_type` (for a binary function).
+<span class="line_number">97</span>   *  Those typedefs are used by function object adaptors such as `bind2nd`.
+<span class="line_number">98</span>   *  The standard library provides two class templates, `unary_function` and
+<span class="line_number">99</span>   *  `binary_function`, which define those typedefs and so can be used as
+<span class="line_number">100</span>   *  base classes of adaptable function objects.
+<span class="line_number">101</span>   *
+<span class="line_number">102</span>   *  Since C++11 the use of function object adaptors has been superseded by
+<span class="line_number">103</span>   *  more powerful tools such as lambda expressions, `function&lt;&gt;`, and more
+<span class="line_number">104</span>   *  powerful type deduction (using `auto` and `decltype`). The helpers for
+<span class="line_number">105</span>   *  defining adaptable function objects are deprecated since C++11, and no
+<span class="line_number">106</span>   *  longer part of the standard library since C++17. However, they are still
+<span class="line_number">107</span>   *  defined and used by libstdc++ after C++17, as a conforming extension.
+<span class="line_number">108</span>   *
+<span class="line_number">109</span>   *  @{
+<span class="line_number">110</span>   */
+<span class="line_number">111</span>
+<span class="line_number">112</span>  /**
+<span class="line_number">113</span>   *  Helper for defining adaptable unary function objects.
+<span class="line_number">114</span>   *  @deprecated Deprecated in C++11, no longer in the standard since C++17.
+<span class="line_number">115</span>   */
+<span class="line_number">116</span>  template&lt;typename _Arg, typename _Result&gt;
+<span class="line_number">117</span>    struct unary_function
+<span class="line_number">118</span>    {
+<span class="line_number">119</span>      /// @c argument_type is the type of the argument
+<span class="line_number">120</span>      typedef _Arg 	argument_type;   
+<span class="line_number">121</span>
+<span class="line_number">122</span>      /// @c result_type is the return type
+<span class="line_number">123</span>      typedef _Result 	result_type;  
+<span class="line_number">124</span>    } _GLIBCXX11_DEPRECATED;
+<span class="line_number">125</span>
+<span class="line_number">126</span>  /**
+<span class="line_number">127</span>   *  Helper for defining adaptable binary function objects.
+<span class="line_number">128</span>   *  @deprecated Deprecated in C++11, no longer in the standard since C++17.
+<span class="line_number">129</span>   */
+<span class="line_number">130</span>  template&lt;typename _Arg1, typename _Arg2, typename _Result&gt;
+<span class="line_number">131</span>    struct binary_function
+<span class="line_number">132</span>    {
+<span class="line_number">133</span>      /// @c first_argument_type is the type of the first argument
+<span class="line_number">134</span>      typedef _Arg1 	first_argument_type; 
+<span class="line_number">135</span>
+<span class="line_number">136</span>      /// @c second_argument_type is the type of the second argument
+<span class="line_number">137</span>      typedef _Arg2 	second_argument_type;
+<span class="line_number">138</span>
+<span class="line_number">139</span>      /// @c result_type is the return type
+<span class="line_number">140</span>      typedef _Result 	result_type;
+<span class="line_number">141</span>    } _GLIBCXX11_DEPRECATED;
+<span class="line_number">142</span>  /** @}  */
+<span class="line_number">143</span>
+<span class="line_number">144</span>  // 20.3.2 arithmetic
+<span class="line_number">145</span>
+<span class="line_number">146</span>  /** @defgroup arithmetic_functors Arithmetic Function Object Classes
+<span class="line_number">147</span>   *  @ingroup functors
+<span class="line_number">148</span>   *
+<span class="line_number">149</span>   *  The library provides function objects for basic arithmetic operations.
+<span class="line_number">150</span>   *  See the documentation for @link functors function objects @endlink
+<span class="line_number">151</span>   *  for examples of their use.
+<span class="line_number">152</span>   *
+<span class="line_number">153</span>   *  @{
+<span class="line_number">154</span>   */
+<span class="line_number">155</span>
+<span class="line_number">156</span>#if __cplusplus &gt; 201103L
+<span class="line_number">157</span>  struct __is_transparent;  // undefined
+<span class="line_number">158</span>
+<span class="line_number">159</span>  template&lt;typename _Tp = void&gt;
+<span class="line_number">160</span>    struct plus;
+<span class="line_number">161</span>
+<span class="line_number">162</span>  template&lt;typename _Tp = void&gt;
+<span class="line_number">163</span>    struct minus;
+<span class="line_number">164</span>
+<span class="line_number">165</span>  template&lt;typename _Tp = void&gt;
+<span class="line_number">166</span>    struct multiplies;
+<span class="line_number">167</span>
+<span class="line_number">168</span>  template&lt;typename _Tp = void&gt;
+<span class="line_number">169</span>    struct divides;
+<span class="line_number">170</span>
+<span class="line_number">171</span>  template&lt;typename _Tp = void&gt;
+<span class="line_number">172</span>    struct modulus;
+<span class="line_number">173</span>
+<span class="line_number">174</span>  template&lt;typename _Tp = void&gt;
+<span class="line_number">175</span>    struct negate;
+<span class="line_number">176</span>#endif
+<span class="line_number">177</span>
+<span class="line_number">178</span>// Ignore warnings about unary_function and binary_function.
+<span class="line_number">179</span>#pragma GCC diagnostic push
+<span class="line_number">180</span>#pragma GCC diagnostic ignored &#34;-Wdeprecated-declarations&#34;
+<span class="line_number">181</span>
+<span class="line_number">182</span>  /// One of the @link arithmetic_functors math functors@endlink.
+<span class="line_number">183</span>  template&lt;typename _Tp&gt;
+<span class="line_number">184</span>    struct plus : public binary_function&lt;_Tp, _Tp, _Tp&gt;
+<span class="line_number">185</span>    {
+<span class="line_number">186</span>      /// Returns the sum
+<span class="line_number">187</span>      _GLIBCXX14_CONSTEXPR
+<span class="line_number">188</span>      _Tp
+<span class="line_number">189</span>      operator()(const _Tp&amp; __x, const _Tp&amp; __y) const
+<span class="line_number">190</span>      { return __x + __y; }
+<span class="line_number">191</span>    };
+<span class="line_number">192</span>
+<span class="line_number">193</span>  /// One of the @link arithmetic_functors math functors@endlink.
+<span class="line_number">194</span>  template&lt;typename _Tp&gt;
+<span class="line_number">195</span>    struct minus : public binary_function&lt;_Tp, _Tp, _Tp&gt;
+<span class="line_number">196</span>    {
+<span class="line_number">197</span>      _GLIBCXX14_CONSTEXPR
+<span class="line_number">198</span>      _Tp
+<span class="line_number">199</span>      operator()(const _Tp&amp; __x, const _Tp&amp; __y) const
+<span class="line_number">200</span>      { return __x - __y; }
+<span class="line_number">201</span>    };
+<span class="line_number">202</span>
+<span class="line_number">203</span>  /// One of the @link arithmetic_functors math functors@endlink.
+<span class="line_number">204</span>  template&lt;typename _Tp&gt;
+<span class="line_number">205</span>    struct multiplies : public binary_function&lt;_Tp, _Tp, _Tp&gt;
+<span class="line_number">206</span>    {
+<span class="line_number">207</span>      _GLIBCXX14_CONSTEXPR
+<span class="line_number">208</span>      _Tp
+<span class="line_number">209</span>      operator()(const _Tp&amp; __x, const _Tp&amp; __y) const
+<span class="line_number">210</span>      { return __x * __y; }
+<span class="line_number">211</span>    };
+<span class="line_number">212</span>
+<span class="line_number">213</span>  /// One of the @link arithmetic_functors math functors@endlink.
+<span class="line_number">214</span>  template&lt;typename _Tp&gt;
+<span class="line_number">215</span>    struct divides : public binary_function&lt;_Tp, _Tp, _Tp&gt;
+<span class="line_number">216</span>    {
+<span class="line_number">217</span>      _GLIBCXX14_CONSTEXPR
+<span class="line_number">218</span>      _Tp
+<span class="line_number">219</span>      operator()(const _Tp&amp; __x, const _Tp&amp; __y) const
+<span class="line_number">220</span>      { return __x / __y; }
+<span class="line_number">221</span>    };
+<span class="line_number">222</span>
+<span class="line_number">223</span>  /// One of the @link arithmetic_functors math functors@endlink.
+<span class="line_number">224</span>  template&lt;typename _Tp&gt;
+<span class="line_number">225</span>    struct modulus : public binary_function&lt;_Tp, _Tp, _Tp&gt;
+<span class="line_number">226</span>    {
+<span class="line_number">227</span>      _GLIBCXX14_CONSTEXPR
+<span class="line_number">228</span>      _Tp
+<span class="line_number">229</span>      operator()(const _Tp&amp; __x, const _Tp&amp; __y) const
+<span class="line_number">230</span>      { return __x % __y; }
+<span class="line_number">231</span>    };
+<span class="line_number">232</span>
+<span class="line_number">233</span>  /// One of the @link arithmetic_functors math functors@endlink.
+<span class="line_number">234</span>  template&lt;typename _Tp&gt;
+<span class="line_number">235</span>    struct negate : public unary_function&lt;_Tp, _Tp&gt;
+<span class="line_number">236</span>    {
+<span class="line_number">237</span>      _GLIBCXX14_CONSTEXPR
+<span class="line_number">238</span>      _Tp
+<span class="line_number">239</span>      operator()(const _Tp&amp; __x) const
+<span class="line_number">240</span>      { return -__x; }
+<span class="line_number">241</span>    };
+<span class="line_number">242</span>#pragma GCC diagnostic pop
+<span class="line_number">243</span>
+<span class="line_number">244</span>#if __cplusplus &gt; 201103L
+<span class="line_number">245</span>
+<span class="line_number">246</span>#define __cpp_lib_transparent_operators 201510L
+<span class="line_number">247</span>
+<span class="line_number">248</span>  template&lt;&gt;
+<span class="line_number">249</span>    struct plus&lt;void&gt;
+<span class="line_number">250</span>    {
+<span class="line_number">251</span>      template &lt;typename _Tp, typename _Up&gt;
+<span class="line_number">252</span>	_GLIBCXX14_CONSTEXPR
+<span class="line_number">253</span>	auto
+<span class="line_number">254</span>	operator()(_Tp&amp;&amp; __t, _Up&amp;&amp; __u) const
+<span class="line_number">255</span>	noexcept(noexcept(std::forward&lt;_Tp&gt;(__t) + std::forward&lt;_Up&gt;(__u)))
+<span class="line_number">256</span>	-&gt; decltype(std::forward&lt;_Tp&gt;(__t) + std::forward&lt;_Up&gt;(__u))
+<span class="line_number">257</span>	{ return std::forward&lt;_Tp&gt;(__t) + std::forward&lt;_Up&gt;(__u); }
+<span class="line_number">258</span>
+<span class="line_number">259</span>      typedef __is_transparent is_transparent;
+<span class="line_number">260</span>    };
+<span class="line_number">261</span>
+<span class="line_number">262</span>  /// One of the @link arithmetic_functors math functors@endlink.
+<span class="line_number">263</span>  template&lt;&gt;
+<span class="line_number">264</span>    struct minus&lt;void&gt;
+<span class="line_number">265</span>    {
+<span class="line_number">266</span>      template &lt;typename _Tp, typename _Up&gt;
+<span class="line_number">267</span>	_GLIBCXX14_CONSTEXPR
+<span class="line_number">268</span>	auto
+<span class="line_number">269</span>	operator()(_Tp&amp;&amp; __t, _Up&amp;&amp; __u) const
+<span class="line_number">270</span>	noexcept(noexcept(std::forward&lt;_Tp&gt;(__t) - std::forward&lt;_Up&gt;(__u)))
+<span class="line_number">271</span>	-&gt; decltype(std::forward&lt;_Tp&gt;(__t) - std::forward&lt;_Up&gt;(__u))
+<span class="line_number">272</span>	{ return std::forward&lt;_Tp&gt;(__t) - std::forward&lt;_Up&gt;(__u); }
+<span class="line_number">273</span>
+<span class="line_number">274</span>      typedef __is_transparent is_transparent;
+<span class="line_number">275</span>    };
+<span class="line_number">276</span>
+<span class="line_number">277</span>  /// One of the @link arithmetic_functors math functors@endlink.
+<span class="line_number">278</span>  template&lt;&gt;
+<span class="line_number">279</span>    struct multiplies&lt;void&gt;
+<span class="line_number">280</span>    {
+<span class="line_number">281</span>      template &lt;typename _Tp, typename _Up&gt;
+<span class="line_number">282</span>	_GLIBCXX14_CONSTEXPR
+<span class="line_number">283</span>	auto
+<span class="line_number">284</span>	operator()(_Tp&amp;&amp; __t, _Up&amp;&amp; __u) const
+<span class="line_number">285</span>	noexcept(noexcept(std::forward&lt;_Tp&gt;(__t) * std::forward&lt;_Up&gt;(__u)))
+<span class="line_number">286</span>	-&gt; decltype(std::forward&lt;_Tp&gt;(__t) * std::forward&lt;_Up&gt;(__u))
+<span class="line_number">287</span>	{ return std::forward&lt;_Tp&gt;(__t) * std::forward&lt;_Up&gt;(__u); }
+<span class="line_number">288</span>
+<span class="line_number">289</span>      typedef __is_transparent is_transparent;
+<span class="line_number">290</span>    };
+<span class="line_number">291</span>
+<span class="line_number">292</span>  /// One of the @link arithmetic_functors math functors@endlink.
+<span class="line_number">293</span>  template&lt;&gt;
+<span class="line_number">294</span>    struct divides&lt;void&gt;
+<span class="line_number">295</span>    {
+<span class="line_number">296</span>      template &lt;typename _Tp, typename _Up&gt;
+<span class="line_number">297</span>	_GLIBCXX14_CONSTEXPR
+<span class="line_number">298</span>	auto
+<span class="line_number">299</span>	operator()(_Tp&amp;&amp; __t, _Up&amp;&amp; __u) const
+<span class="line_number">300</span>	noexcept(noexcept(std::forward&lt;_Tp&gt;(__t) / std::forward&lt;_Up&gt;(__u)))
+<span class="line_number">301</span>	-&gt; decltype(std::forward&lt;_Tp&gt;(__t) / std::forward&lt;_Up&gt;(__u))
+<span class="line_number">302</span>	{ return std::forward&lt;_Tp&gt;(__t) / std::forward&lt;_Up&gt;(__u); }
+<span class="line_number">303</span>
+<span class="line_number">304</span>      typedef __is_transparent is_transparent;
+<span class="line_number">305</span>    };
+<span class="line_number">306</span>
+<span class="line_number">307</span>  /// One of the @link arithmetic_functors math functors@endlink.
+<span class="line_number">308</span>  template&lt;&gt;
+<span class="line_number">309</span>    struct modulus&lt;void&gt;
+<span class="line_number">310</span>    {
+<span class="line_number">311</span>      template &lt;typename _Tp, typename _Up&gt;
+<span class="line_number">312</span>	_GLIBCXX14_CONSTEXPR
+<span class="line_number">313</span>	auto
+<span class="line_number">314</span>	operator()(_Tp&amp;&amp; __t, _Up&amp;&amp; __u) const
+<span class="line_number">315</span>	noexcept(noexcept(std::forward&lt;_Tp&gt;(__t) % std::forward&lt;_Up&gt;(__u)))
+<span class="line_number">316</span>	-&gt; decltype(std::forward&lt;_Tp&gt;(__t) % std::forward&lt;_Up&gt;(__u))
+<span class="line_number">317</span>	{ return std::forward&lt;_Tp&gt;(__t) % std::forward&lt;_Up&gt;(__u); }
+<span class="line_number">318</span>
+<span class="line_number">319</span>      typedef __is_transparent is_transparent;
+<span class="line_number">320</span>    };
+<span class="line_number">321</span>
+<span class="line_number">322</span>  /// One of the @link arithmetic_functors math functors@endlink.
+<span class="line_number">323</span>  template&lt;&gt;
+<span class="line_number">324</span>    struct negate&lt;void&gt;
+<span class="line_number">325</span>    {
+<span class="line_number">326</span>      template &lt;typename _Tp&gt;
+<span class="line_number">327</span>	_GLIBCXX14_CONSTEXPR
+<span class="line_number">328</span>	auto
+<span class="line_number">329</span>	operator()(_Tp&amp;&amp; __t) const
+<span class="line_number">330</span>	noexcept(noexcept(-std::forward&lt;_Tp&gt;(__t)))
+<span class="line_number">331</span>	-&gt; decltype(-std::forward&lt;_Tp&gt;(__t))
+<span class="line_number">332</span>	{ return -std::forward&lt;_Tp&gt;(__t); }
+<span class="line_number">333</span>
+<span class="line_number">334</span>      typedef __is_transparent is_transparent;
+<span class="line_number">335</span>    };
+<span class="line_number">336</span>#endif
+<span class="line_number">337</span>  /** @}  */
+<span class="line_number">338</span>
+<span class="line_number">339</span>  // 20.3.3 comparisons
+<span class="line_number">340</span>  /** @defgroup comparison_functors Comparison Classes
+<span class="line_number">341</span>   *  @ingroup functors
+<span class="line_number">342</span>   *
+<span class="line_number">343</span>   *  The library provides six wrapper functors for all the basic comparisons
+<span class="line_number">344</span>   *  in C++, like @c &lt;.
+<span class="line_number">345</span>   *
+<span class="line_number">346</span>   *  @{
+<span class="line_number">347</span>   */
+<span class="line_number">348</span>#if __cplusplus &gt; 201103L
+<span class="line_number">349</span>  template&lt;typename _Tp = void&gt;
+<span class="line_number">350</span>    struct equal_to;
+<span class="line_number">351</span>
+<span class="line_number">352</span>  template&lt;typename _Tp = void&gt;
+<span class="line_number">353</span>    struct not_equal_to;
+<span class="line_number">354</span>
+<span class="line_number">355</span>  template&lt;typename _Tp = void&gt;
+<span class="line_number">356</span>    struct greater;
+<span class="line_number">357</span>
+<span class="line_number">358</span>  template&lt;typename _Tp = void&gt;
+<span class="line_number">359</span>    struct less;
+<span class="line_number">360</span>
+<span class="line_number">361</span>  template&lt;typename _Tp = void&gt;
+<span class="line_number">362</span>    struct greater_equal;
+<span class="line_number">363</span>
+<span class="line_number">364</span>  template&lt;typename _Tp = void&gt;
+<span class="line_number">365</span>    struct less_equal;
+<span class="line_number">366</span>#endif
+<span class="line_number">367</span>
+<span class="line_number">368</span>#pragma GCC diagnostic push
+<span class="line_number">369</span>#pragma GCC diagnostic ignored &#34;-Wdeprecated-declarations&#34;
+<span class="line_number">370</span>
+<span class="line_number">371</span>  /// One of the @link comparison_functors comparison functors@endlink.
+<span class="line_number">372</span>  template&lt;typename _Tp&gt;
+<span class="line_number">373</span>    struct equal_to : public binary_function&lt;_Tp, _Tp, bool&gt;
+<span class="line_number">374</span>    {
+<span class="line_number">375</span>      _GLIBCXX14_CONSTEXPR
+<span class="line_number">376</span>      bool
+<span class="line_number">377</span>      operator()(const _Tp&amp; __x, const _Tp&amp; __y) const
+</code></pre>
+            <div class="issue">
+                <div>
+                    <span class="what">Possible data race during read of size 8 at 0x2A8938F8 by thread #10</span>
+                    <div class="navigation">
+                        <button class="next_error">Next</button>
+                        <button class="prev_error">Previous</button>
+                    </div>
+                </div>
+                <div>
+                    <table class="call_stack">
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/hashtable_policy.h:1715<br>
+                                    <code class="cpp">std::__detail::_Hashtable_base&lt;std::thread::id, std::pair&lt;std::thread::id const, tf::Worker*&gt;, std::__detail::_Select1st, std::equal_to&lt;std::thread::id&gt;, std::hash&lt;std::thread::id&gt;, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Hashtable_traits&lt;false, false, true&gt; &gt;::_M_key_equals(std::thread::id const&amp;, std::__detail::_Hash_node_value&lt;std::pair&lt;std::thread::id const, tf::Worker*&gt;, false&gt; const&amp;) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1712</span>	static_assert(__is_invocable&lt;const _Equal&amp;, const _Key&amp;, const _Key&amp;&gt;{},
+<span class="line_number">1713</span>	  &#34;key equality predicate must be invocable with two arguments of &#34;
+<span class="line_number">1714</span>	  &#34;key type&#34;);
+<span class="line_number">1715</span><span class="error">	return _M_eq()(__k, _ExtractKey{}(__n._M_v()));
+</span><span class="line_number">1716</span>      }
+<span class="line_number">1717</span>
+<span class="line_number">1718</span>      template&lt;typename _Kt&gt;
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/hashtable_policy.h:1734<br>
+                                    <code class="cpp">std::__detail::_Hashtable_base&lt;std::thread::id, std::pair&lt;std::thread::id const, tf::Worker*&gt;, std::__detail::_Select1st, std::equal_to&lt;std::thread::id&gt;, std::hash&lt;std::thread::id&gt;, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Hashtable_traits&lt;false, false, true&gt; &gt;::_M_equals(std::thread::id const&amp;, unsigned long, std::__detail::_Hash_node_value&lt;std::pair&lt;std::thread::id const, tf::Worker*&gt;, false&gt; const&amp;) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1731</span>      bool
+<span class="line_number">1732</span>      _M_equals(const _Key&amp; __k, __hash_code __c,
+<span class="line_number">1733</span>		const _Hash_node_value&lt;_Value, __hash_cached::value&gt;&amp; __n) const
+<span class="line_number">1734</span><span class="error">      { return _S_equals(__c, __n) &amp;&amp; _M_key_equals(__k, __n); }
+</span><span class="line_number">1735</span>
+<span class="line_number">1736</span>      template&lt;typename _Kt&gt;
+<span class="line_number">1737</span>	bool
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/hashtable.h:1961<br>
+                                    <code class="cpp">std::_Hashtable&lt;std::thread::id, std::pair&lt;std::thread::id const, tf::Worker*&gt;, std::allocator&lt;std::pair&lt;std::thread::id const, tf::Worker*&gt; &gt;, std::__detail::_Select1st, std::equal_to&lt;std::thread::id&gt;, std::hash&lt;std::thread::id&gt;, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits&lt;false, false, true&gt; &gt;::_M_find_before_node(unsigned long, std::thread::id const&amp;, unsigned long) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1958</span>      for (__node_ptr __p = static_cast&lt;__node_ptr&gt;(__prev_p-&gt;_M_nxt);;
+<span class="line_number">1959</span>	   __p = __p-&gt;_M_next())
+<span class="line_number">1960</span>	{
+<span class="line_number">1961</span><span class="error">	  if (this-&gt;_M_equals(__k, __code, *__p))
+</span><span class="line_number">1962</span>	    return __prev_p;
+<span class="line_number">1963</span>
+<span class="line_number">1964</span>	  if (!__p-&gt;_M_nxt || _M_bucket_index(*__p-&gt;_M_next()) != __bkt)
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/hashtable.h:815<br>
+                                    <code class="cpp">std::_Hashtable&lt;std::thread::id, std::pair&lt;std::thread::id const, tf::Worker*&gt;, std::allocator&lt;std::pair&lt;std::thread::id const, tf::Worker*&gt; &gt;, std::__detail::_Select1st, std::equal_to&lt;std::thread::id&gt;, std::hash&lt;std::thread::id&gt;, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits&lt;false, false, true&gt; &gt;::_M_find_node(unsigned long, std::thread::id const&amp;, unsigned long) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">812</span>      _M_find_node(size_type __bkt, const key_type&amp; __key,
+<span class="line_number">813</span>		   __hash_code __c) const
+<span class="line_number">814</span>      {
+<span class="line_number">815</span><span class="error">	__node_base_ptr __before_n = _M_find_before_node(__bkt, __key, __c);
+</span><span class="line_number">816</span>	if (__before_n)
+<span class="line_number">817</span>	  return static_cast&lt;__node_ptr&gt;(__before_n-&gt;_M_nxt);
+<span class="line_number">818</span>	return nullptr;
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/hashtable.h:1679<br>
+                                    <code class="cpp">std::_Hashtable&lt;std::thread::id, std::pair&lt;std::thread::id const, tf::Worker*&gt;, std::allocator&lt;std::pair&lt;std::thread::id const, tf::Worker*&gt; &gt;, std::__detail::_Select1st, std::equal_to&lt;std::thread::id&gt;, std::hash&lt;std::thread::id&gt;, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits&lt;false, false, true&gt; &gt;::find(std::thread::id const&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1676</span>
+<span class="line_number">1677</span>      __hash_code __code = this-&gt;_M_hash_code(__k);
+<span class="line_number">1678</span>      std::size_t __bkt = _M_bucket_index(__code);
+<span class="line_number">1679</span><span class="error">      return iterator(_M_find_node(__bkt, __k, __code));
+</span><span class="line_number">1680</span>    }
+<span class="line_number">1681</span>
+<span class="line_number">1682</span>  template&lt;typename _Key, typename _Value, typename _Alloc,
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/unordered_map.h:876<br>
+                                    <code class="cpp">std::unordered_map&lt;std::thread::id, tf::Worker*, std::hash&lt;std::thread::id&gt;, std::equal_to&lt;std::thread::id&gt;, std::allocator&lt;std::pair&lt;std::thread::id const, tf::Worker*&gt; &gt; &gt;::find(std::thread::id const&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">873</span>       */
+<span class="line_number">874</span>      iterator
+<span class="line_number">875</span>      find(const key_type&amp; __x)
+<span class="line_number">876</span><span class="error">      { return _M_h.find(__x); }
+</span><span class="line_number">877</span>
+<span class="line_number">878</span>#if __cplusplus &gt; 201703L
+<span class="line_number">879</span>      template&lt;typename _Kt&gt;
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/algorithm/../core/executor.hpp:1287<br>
+                                    <code class="cpp">tf::Executor::this_worker()</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1284</span>
+<span class="line_number">1285</span>// Function: this_worker
+<span class="line_number">1286</span>inline Worker* Executor::this_worker() {
+<span class="line_number">1287</span><span class="error">  auto itr = _t2w.find(std::this_thread::get_id());
+</span><span class="line_number">1288</span>  return itr == _t2w.end() ? nullptr : itr-&gt;second;
+<span class="line_number">1289</span>}
+<span class="line_number">1290</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/async.hpp:16<br>
+                                    <code class="cpp">void tf::Executor::_schedule_async_task&lt;int const&amp;, int const&amp;, tf::DefaultTaskParams, tf::Topology*&amp;, tf::NodeBase*&amp;, int, std::in_place_type_t&lt;tf::Node::Async&gt;, tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt;, sb::ph::RipserTaskImpl&lt;sb::Tensor&lt;double&gt;, double&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt; const&amp;, sb::ph::RipserTaskImpl&lt;sb::Tensor&lt;double&gt;, double&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt; const&amp;, sb::ph::RipserTaskImpl&lt;sb::Tensor&lt;double&gt;, double&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt;, sb::ph::RipserTaskImpl&lt;sb::Tensor&lt;double&gt;, double&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt; const&amp;, sb::ph::RipserTaskImpl&lt;sb::Tensor&lt;double&gt;, double&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt; const&amp;, sb::ph::RipserTaskImpl&lt;sb::Tensor&lt;double&gt;, double&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}&amp;&gt;(int const&amp;, int const&amp;, tf::DefaultTaskParams&amp;&amp;, tf::Topology*&amp;, tf::NodeBase*&amp;, int&amp;&amp;, std::in_place_type_t&lt;tf::Node::Async&gt;&amp;&amp;, tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt;, sb::ph::RipserTaskImpl&lt;sb::Tensor&lt;double&gt;, double&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt; const&amp;, sb::ph::RipserTaskImpl&lt;sb::Tensor&lt;double&gt;, double&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt; const&amp;, sb::ph::RipserTaskImpl&lt;sb::Tensor&lt;double&gt;, double&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt;, sb::ph::RipserTaskImpl&lt;sb::Tensor&lt;double&gt;, double&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt; const&amp;, sb::ph::RipserTaskImpl&lt;sb::Tensor&lt;double&gt;, double&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt; const&amp;, sb::ph::RipserTaskImpl&lt;sb::Tensor&lt;double&gt;, double&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">13</span>template &lt;typename... ArgsT&gt;
+<span class="line_number">14</span>void Executor::_schedule_async_task(ArgsT&amp;&amp;... args) {  
+<span class="line_number">15</span>  // caller is a worker of the executor
+<span class="line_number">16</span><span class="error">  if(auto w = this_worker(); w) {
+</span><span class="line_number">17</span>    // We don&#39;t do per-worker cache as it can cause bugs in corun that are very difficult to 
+<span class="line_number">18</span>    // track. For example, when a worker invokes an async task and then immediately enter corun,
+<span class="line_number">19</span>    // it becomes very difficult to get the task out of its cache correctly.
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/async.hpp:177<br>
+                                    <code class="cpp">void tf::Executor::_silent_async&lt;tf::DefaultTaskParams, tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt;, sb::ph::RipserTaskImpl&lt;sb::Tensor&lt;double&gt;, double&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt; const&amp;, sb::ph::RipserTaskImpl&lt;sb::Tensor&lt;double&gt;, double&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt; const&amp;, sb::ph::RipserTaskImpl&lt;sb::Tensor&lt;double&gt;, double&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt;, sb::ph::RipserTaskImpl&lt;sb::Tensor&lt;double&gt;, double&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt; const&amp;, sb::ph::RipserTaskImpl&lt;sb::Tensor&lt;double&gt;, double&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt; const&amp;, sb::ph::RipserTaskImpl&lt;sb::Tensor&lt;double&gt;, double&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}&amp;&gt;(tf::DefaultTaskParams&amp;&amp;, sb::ph::RipserTaskImpl&lt;sb::Tensor&lt;double&gt;, double&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, tf::Topology*, tf::NodeBase*)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">174</span>void Executor::_silent_async(P&amp;&amp; params, F&amp;&amp; f, Topology* tpg, NodeBase* parent) {
+<span class="line_number">175</span>  // silent task 
+<span class="line_number">176</span>  if constexpr (is_runtime_task_v&lt;F&gt; || is_static_task_v&lt;F&gt;) {
+<span class="line_number">177</span><span class="error">    _schedule_async_task(
+</span><span class="line_number">178</span>      NSTATE::NONE, ESTATE::NONE, std::forward&lt;P&gt;(params), tpg, parent, 0,
+<span class="line_number">179</span>      std::in_place_type_t&lt;Node::Async&gt;{}, std::forward&lt;F&gt;(f)
+<span class="line_number">180</span>    );
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/runtime.hpp:687<br>
+                                    <code class="cpp">void tf::Runtime::silent_async&lt;tf::DefaultTaskParams, tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt;, sb::ph::RipserTaskImpl&lt;sb::Tensor&lt;double&gt;, double&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt; const&amp;, sb::ph::RipserTaskImpl&lt;sb::Tensor&lt;double&gt;, double&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt; const&amp;, sb::ph::RipserTaskImpl&lt;sb::Tensor&lt;double&gt;, double&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt;, sb::ph::RipserTaskImpl&lt;sb::Tensor&lt;double&gt;, double&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt; const&amp;, sb::ph::RipserTaskImpl&lt;sb::Tensor&lt;double&gt;, double&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt; const&amp;, sb::ph::RipserTaskImpl&lt;sb::Tensor&lt;double&gt;, double&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}&amp;&gt;(tf::DefaultTaskParams&amp;&amp;, sb::ph::RipserTaskImpl&lt;sb::Tensor&lt;double&gt;, double&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">684</span>template &lt;typename P, typename F&gt;
+<span class="line_number">685</span>void Runtime::silent_async(P&amp;&amp; params, F&amp;&amp; f) {
+<span class="line_number">686</span>  _node-&gt;_join_counter.fetch_add(1, std::memory_order_relaxed);
+<span class="line_number">687</span><span class="error">  _executor._silent_async(
+</span><span class="line_number">688</span>    std::forward&lt;P&gt;(params), std::forward&lt;F&gt;(f), _node-&gt;_topology, _node
+<span class="line_number">689</span>  );
+<span class="line_number">690</span>}
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/runtime.hpp:680<br>
+                                    <code class="cpp">void tf::Runtime::silent_async&lt;tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt;, sb::ph::RipserTaskImpl&lt;sb::Tensor&lt;double&gt;, double&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt; const&amp;, sb::ph::RipserTaskImpl&lt;sb::Tensor&lt;double&gt;, double&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt; const&amp;, sb::ph::RipserTaskImpl&lt;sb::Tensor&lt;double&gt;, double&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt;, sb::ph::RipserTaskImpl&lt;sb::Tensor&lt;double&gt;, double&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt; const&amp;, sb::ph::RipserTaskImpl&lt;sb::Tensor&lt;double&gt;, double&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt; const&amp;, sb::ph::RipserTaskImpl&lt;sb::Tensor&lt;double&gt;, double&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}&amp;&gt;(tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt;, sb::ph::RipserTaskImpl&lt;sb::Tensor&lt;double&gt;, double&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt; const&amp;, sb::ph::RipserTaskImpl&lt;sb::Tensor&lt;double&gt;, double&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt; const&amp;, sb::ph::RipserTaskImpl&lt;sb::Tensor&lt;double&gt;, double&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt;, sb::ph::RipserTaskImpl&lt;sb::Tensor&lt;double&gt;, double&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt; const&amp;, sb::ph::RipserTaskImpl&lt;sb::Tensor&lt;double&gt;, double&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt; const&amp;, sb::ph::RipserTaskImpl&lt;sb::Tensor&lt;double&gt;, double&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">677</span>// Function: silent_async
+<span class="line_number">678</span>template &lt;typename F&gt;
+<span class="line_number">679</span>void Runtime::silent_async(F&amp;&amp; f) {
+<span class="line_number">680</span><span class="error">  silent_async(DefaultTaskParams{}, std::forward&lt;F&gt;(f));
+</span><span class="line_number">681</span>}
+<span class="line_number">682</span>
+<span class="line_number">683</span>// Function: silent_async
+</code></pre>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            <pre class="code">
+<code class="c++"><span class="line_number">378</span><span class="error">      { return __x == __y; }</span>
+<span class="line_number">379</span>    };
+<span class="line_number">380</span>
+<span class="line_number">381</span>  /// One of the @link comparison_functors comparison functors@endlink.
+<span class="line_number">382</span>  template&lt;typename _Tp&gt;
+<span class="line_number">383</span>    struct not_equal_to : public binary_function&lt;_Tp, _Tp, bool&gt;
+<span class="line_number">384</span>    {
+<span class="line_number">385</span>      _GLIBCXX14_CONSTEXPR
+<span class="line_number">386</span>      bool
+<span class="line_number">387</span>      operator()(const _Tp&amp; __x, const _Tp&amp; __y) const
+<span class="line_number">388</span>      { return __x != __y; }
+<span class="line_number">389</span>    };
+<span class="line_number">390</span>
+<span class="line_number">391</span>  /// One of the @link comparison_functors comparison functors@endlink.
+<span class="line_number">392</span>  template&lt;typename _Tp&gt;
+<span class="line_number">393</span>    struct greater : public binary_function&lt;_Tp, _Tp, bool&gt;
+<span class="line_number">394</span>    {
+<span class="line_number">395</span>      _GLIBCXX14_CONSTEXPR
+<span class="line_number">396</span>      bool
+<span class="line_number">397</span>      operator()(const _Tp&amp; __x, const _Tp&amp; __y) const
+<span class="line_number">398</span>      { return __x &gt; __y; }
+<span class="line_number">399</span>    };
+<span class="line_number">400</span>
+<span class="line_number">401</span>  /// One of the @link comparison_functors comparison functors@endlink.
+<span class="line_number">402</span>  template&lt;typename _Tp&gt;
+<span class="line_number">403</span>    struct less : public binary_function&lt;_Tp, _Tp, bool&gt;
+<span class="line_number">404</span>    {
+<span class="line_number">405</span>      _GLIBCXX14_CONSTEXPR
+<span class="line_number">406</span>      bool
+<span class="line_number">407</span>      operator()(const _Tp&amp; __x, const _Tp&amp; __y) const
+<span class="line_number">408</span>      { return __x &lt; __y; }
+<span class="line_number">409</span>    };
+<span class="line_number">410</span>
+<span class="line_number">411</span>  /// One of the @link comparison_functors comparison functors@endlink.
+<span class="line_number">412</span>  template&lt;typename _Tp&gt;
+<span class="line_number">413</span>    struct greater_equal : public binary_function&lt;_Tp, _Tp, bool&gt;
+<span class="line_number">414</span>    {
+<span class="line_number">415</span>      _GLIBCXX14_CONSTEXPR
+<span class="line_number">416</span>      bool
+<span class="line_number">417</span>      operator()(const _Tp&amp; __x, const _Tp&amp; __y) const
+<span class="line_number">418</span>      { return __x &gt;= __y; }
+<span class="line_number">419</span>    };
+<span class="line_number">420</span>
+<span class="line_number">421</span>  /// One of the @link comparison_functors comparison functors@endlink.
+<span class="line_number">422</span>  template&lt;typename _Tp&gt;
+<span class="line_number">423</span>    struct less_equal : public binary_function&lt;_Tp, _Tp, bool&gt;
+<span class="line_number">424</span>    {
+<span class="line_number">425</span>      _GLIBCXX14_CONSTEXPR
+<span class="line_number">426</span>      bool
+<span class="line_number">427</span>      operator()(const _Tp&amp; __x, const _Tp&amp; __y) const
+<span class="line_number">428</span>      { return __x &lt;= __y; }
+<span class="line_number">429</span>    };
+<span class="line_number">430</span>
+<span class="line_number">431</span>  // Partial specialization of std::greater for pointers.
+<span class="line_number">432</span>  template&lt;typename _Tp&gt;
+<span class="line_number">433</span>    struct greater&lt;_Tp*&gt; : public binary_function&lt;_Tp*, _Tp*, bool&gt;
+<span class="line_number">434</span>    {
+<span class="line_number">435</span>      _GLIBCXX14_CONSTEXPR bool
+<span class="line_number">436</span>      operator()(_Tp* __x, _Tp* __y) const _GLIBCXX_NOTHROW
+<span class="line_number">437</span>      {
+<span class="line_number">438</span>#if __cplusplus &gt;= 201402L
+<span class="line_number">439</span>	if (std::__is_constant_evaluated())
+<span class="line_number">440</span>	  return __x &gt; __y;
+<span class="line_number">441</span>#endif
+<span class="line_number">442</span>	return (__UINTPTR_TYPE__)__x &gt; (__UINTPTR_TYPE__)__y;
+<span class="line_number">443</span>      }
+<span class="line_number">444</span>    };
+<span class="line_number">445</span>
+<span class="line_number">446</span>  // Partial specialization of std::less for pointers.
+<span class="line_number">447</span>  template&lt;typename _Tp&gt;
+<span class="line_number">448</span>    struct less&lt;_Tp*&gt; : public binary_function&lt;_Tp*, _Tp*, bool&gt;
+<span class="line_number">449</span>    {
+<span class="line_number">450</span>      _GLIBCXX14_CONSTEXPR bool
+<span class="line_number">451</span>      operator()(_Tp* __x, _Tp* __y) const _GLIBCXX_NOTHROW
+<span class="line_number">452</span>      {
+<span class="line_number">453</span>#if __cplusplus &gt;= 201402L
+<span class="line_number">454</span>	if (std::__is_constant_evaluated())
+<span class="line_number">455</span>	  return __x &lt; __y;
+<span class="line_number">456</span>#endif
+<span class="line_number">457</span>	return (__UINTPTR_TYPE__)__x &lt; (__UINTPTR_TYPE__)__y;
+<span class="line_number">458</span>      }
+<span class="line_number">459</span>    };
+<span class="line_number">460</span>
+<span class="line_number">461</span>  // Partial specialization of std::greater_equal for pointers.
+<span class="line_number">462</span>  template&lt;typename _Tp&gt;
+<span class="line_number">463</span>    struct greater_equal&lt;_Tp*&gt; : public binary_function&lt;_Tp*, _Tp*, bool&gt;
+<span class="line_number">464</span>    {
+<span class="line_number">465</span>      _GLIBCXX14_CONSTEXPR bool
+<span class="line_number">466</span>      operator()(_Tp* __x, _Tp* __y) const _GLIBCXX_NOTHROW
+<span class="line_number">467</span>      {
+<span class="line_number">468</span>#if __cplusplus &gt;= 201402L
+<span class="line_number">469</span>	if (std::__is_constant_evaluated())
+<span class="line_number">470</span>	  return __x &gt;= __y;
+<span class="line_number">471</span>#endif
+<span class="line_number">472</span>	return (__UINTPTR_TYPE__)__x &gt;= (__UINTPTR_TYPE__)__y;
+<span class="line_number">473</span>      }
+<span class="line_number">474</span>    };
+<span class="line_number">475</span>
+<span class="line_number">476</span>  // Partial specialization of std::less_equal for pointers.
+<span class="line_number">477</span>  template&lt;typename _Tp&gt;
+<span class="line_number">478</span>    struct less_equal&lt;_Tp*&gt; : public binary_function&lt;_Tp*, _Tp*, bool&gt;
+<span class="line_number">479</span>    {
+<span class="line_number">480</span>      _GLIBCXX14_CONSTEXPR bool
+<span class="line_number">481</span>      operator()(_Tp* __x, _Tp* __y) const _GLIBCXX_NOTHROW
+<span class="line_number">482</span>      {
+<span class="line_number">483</span>#if __cplusplus &gt;= 201402L
+<span class="line_number">484</span>	if (std::__is_constant_evaluated())
+<span class="line_number">485</span>	  return __x &lt;= __y;
+<span class="line_number">486</span>#endif
+<span class="line_number">487</span>	return (__UINTPTR_TYPE__)__x &lt;= (__UINTPTR_TYPE__)__y;
+<span class="line_number">488</span>      }
+<span class="line_number">489</span>    };
+<span class="line_number">490</span>#pragma GCC diagnostic pop
+<span class="line_number">491</span>
+<span class="line_number">492</span>#if __cplusplus &gt;= 201402L
+<span class="line_number">493</span>  /// One of the @link comparison_functors comparison functors@endlink.
+<span class="line_number">494</span>  template&lt;&gt;
+<span class="line_number">495</span>    struct equal_to&lt;void&gt;
+<span class="line_number">496</span>    {
+<span class="line_number">497</span>      template &lt;typename _Tp, typename _Up&gt;
+<span class="line_number">498</span>	constexpr auto
+<span class="line_number">499</span>	operator()(_Tp&amp;&amp; __t, _Up&amp;&amp; __u) const
+<span class="line_number">500</span>	noexcept(noexcept(std::forward&lt;_Tp&gt;(__t) == std::forward&lt;_Up&gt;(__u)))
+<span class="line_number">501</span>	-&gt; decltype(std::forward&lt;_Tp&gt;(__t) == std::forward&lt;_Up&gt;(__u))
+<span class="line_number">502</span>	{ return std::forward&lt;_Tp&gt;(__t) == std::forward&lt;_Up&gt;(__u); }
+<span class="line_number">503</span>
+<span class="line_number">504</span>      typedef __is_transparent is_transparent;
+<span class="line_number">505</span>    };
+<span class="line_number">506</span>
+<span class="line_number">507</span>  /// One of the @link comparison_functors comparison functors@endlink.
+<span class="line_number">508</span>  template&lt;&gt;
+<span class="line_number">509</span>    struct not_equal_to&lt;void&gt;
+<span class="line_number">510</span>    {
+<span class="line_number">511</span>      template &lt;typename _Tp, typename _Up&gt;
+<span class="line_number">512</span>	constexpr auto
+<span class="line_number">513</span>	operator()(_Tp&amp;&amp; __t, _Up&amp;&amp; __u) const
+<span class="line_number">514</span>	noexcept(noexcept(std::forward&lt;_Tp&gt;(__t) != std::forward&lt;_Up&gt;(__u)))
+<span class="line_number">515</span>	-&gt; decltype(std::forward&lt;_Tp&gt;(__t) != std::forward&lt;_Up&gt;(__u))
+<span class="line_number">516</span>	{ return std::forward&lt;_Tp&gt;(__t) != std::forward&lt;_Up&gt;(__u); }
+<span class="line_number">517</span>
+<span class="line_number">518</span>      typedef __is_transparent is_transparent;
+<span class="line_number">519</span>    };
+<span class="line_number">520</span>
+<span class="line_number">521</span>  /// One of the @link comparison_functors comparison functors@endlink.
+<span class="line_number">522</span>  template&lt;&gt;
+<span class="line_number">523</span>    struct greater&lt;void&gt;
+<span class="line_number">524</span>    {
+<span class="line_number">525</span>      template &lt;typename _Tp, typename _Up&gt;
+<span class="line_number">526</span>	constexpr auto
+<span class="line_number">527</span>	operator()(_Tp&amp;&amp; __t, _Up&amp;&amp; __u) const
+<span class="line_number">528</span>	noexcept(noexcept(std::forward&lt;_Tp&gt;(__t) &gt; std::forward&lt;_Up&gt;(__u)))
+<span class="line_number">529</span>	-&gt; decltype(std::forward&lt;_Tp&gt;(__t) &gt; std::forward&lt;_Up&gt;(__u))
+<span class="line_number">530</span>	{
+<span class="line_number">531</span>	  return _S_cmp(std::forward&lt;_Tp&gt;(__t), std::forward&lt;_Up&gt;(__u),
+<span class="line_number">532</span>			__ptr_cmp&lt;_Tp, _Up&gt;{});
+<span class="line_number">533</span>	}
+<span class="line_number">534</span>
+<span class="line_number">535</span>      template&lt;typename _Tp, typename _Up&gt;
+<span class="line_number">536</span>	constexpr bool
+<span class="line_number">537</span>	operator()(_Tp* __t, _Up* __u) const noexcept
+<span class="line_number">538</span>	{ return greater&lt;common_type_t&lt;_Tp*, _Up*&gt;&gt;{}(__t, __u); }
+<span class="line_number">539</span>
+<span class="line_number">540</span>      typedef __is_transparent is_transparent;
+<span class="line_number">541</span>
+<span class="line_number">542</span>    private:
+<span class="line_number">543</span>      template &lt;typename _Tp, typename _Up&gt;
+<span class="line_number">544</span>	static constexpr decltype(auto)
+<span class="line_number">545</span>	_S_cmp(_Tp&amp;&amp; __t, _Up&amp;&amp; __u, false_type)
+<span class="line_number">546</span>	{ return std::forward&lt;_Tp&gt;(__t) &gt; std::forward&lt;_Up&gt;(__u); }
+<span class="line_number">547</span>
+<span class="line_number">548</span>      template &lt;typename _Tp, typename _Up&gt;
+<span class="line_number">549</span>	static constexpr bool
+<span class="line_number">550</span>	_S_cmp(_Tp&amp;&amp; __t, _Up&amp;&amp; __u, true_type) noexcept
+<span class="line_number">551</span>	{
+<span class="line_number">552</span>	  return greater&lt;const volatile void*&gt;{}(
+<span class="line_number">553</span>	      static_cast&lt;const volatile void*&gt;(std::forward&lt;_Tp&gt;(__t)),
+<span class="line_number">554</span>	      static_cast&lt;const volatile void*&gt;(std::forward&lt;_Up&gt;(__u)));
+<span class="line_number">555</span>	}
+<span class="line_number">556</span>
+<span class="line_number">557</span>      // True if there is no viable operator&gt; member function.
+<span class="line_number">558</span>      template&lt;typename _Tp, typename _Up, typename = void&gt;
+<span class="line_number">559</span>	struct __not_overloaded2 : true_type { };
+<span class="line_number">560</span>
+<span class="line_number">561</span>      // False if we can call T.operator&gt;(U)
+<span class="line_number">562</span>      template&lt;typename _Tp, typename _Up&gt;
+<span class="line_number">563</span>	struct __not_overloaded2&lt;_Tp, _Up, __void_t&lt;
+<span class="line_number">564</span>	  decltype(std::declval&lt;_Tp&gt;().operator&gt;(std::declval&lt;_Up&gt;()))&gt;&gt;
+<span class="line_number">565</span>	: false_type { };
+<span class="line_number">566</span>
+<span class="line_number">567</span>      // True if there is no overloaded operator&gt; for these operands.
+<span class="line_number">568</span>      template&lt;typename _Tp, typename _Up, typename = void&gt;
+<span class="line_number">569</span>	struct __not_overloaded : __not_overloaded2&lt;_Tp, _Up&gt; { };
+<span class="line_number">570</span>
+<span class="line_number">571</span>      // False if we can call operator&gt;(T,U)
+<span class="line_number">572</span>      template&lt;typename _Tp, typename _Up&gt;
+<span class="line_number">573</span>	struct __not_overloaded&lt;_Tp, _Up, __void_t&lt;
+<span class="line_number">574</span>	  decltype(operator&gt;(std::declval&lt;_Tp&gt;(), std::declval&lt;_Up&gt;()))&gt;&gt;
+<span class="line_number">575</span>	: false_type { };
+<span class="line_number">576</span>
+<span class="line_number">577</span>      template&lt;typename _Tp, typename _Up&gt;
+<span class="line_number">578</span>	using __ptr_cmp = __and_&lt;__not_overloaded&lt;_Tp, _Up&gt;,
+<span class="line_number">579</span>	      is_convertible&lt;_Tp, const volatile void*&gt;,
+<span class="line_number">580</span>	      is_convertible&lt;_Up, const volatile void*&gt;&gt;;
+<span class="line_number">581</span>    };
+<span class="line_number">582</span>
+<span class="line_number">583</span>  /// One of the @link comparison_functors comparison functors@endlink.
+<span class="line_number">584</span>  template&lt;&gt;
+<span class="line_number">585</span>    struct less&lt;void&gt;
+<span class="line_number">586</span>    {
+<span class="line_number">587</span>      template &lt;typename _Tp, typename _Up&gt;
+<span class="line_number">588</span>	constexpr auto
+<span class="line_number">589</span>	operator()(_Tp&amp;&amp; __t, _Up&amp;&amp; __u) const
+<span class="line_number">590</span>	noexcept(noexcept(std::forward&lt;_Tp&gt;(__t) &lt; std::forward&lt;_Up&gt;(__u)))
+<span class="line_number">591</span>	-&gt; decltype(std::forward&lt;_Tp&gt;(__t) &lt; std::forward&lt;_Up&gt;(__u))
+<span class="line_number">592</span>	{
+<span class="line_number">593</span>	  return _S_cmp(std::forward&lt;_Tp&gt;(__t), std::forward&lt;_Up&gt;(__u),
+<span class="line_number">594</span>			__ptr_cmp&lt;_Tp, _Up&gt;{});
+<span class="line_number">595</span>	}
+<span class="line_number">596</span>
+<span class="line_number">597</span>      template&lt;typename _Tp, typename _Up&gt;
+<span class="line_number">598</span>	constexpr bool
+<span class="line_number">599</span>	operator()(_Tp* __t, _Up* __u) const noexcept
+<span class="line_number">600</span>	{ return less&lt;common_type_t&lt;_Tp*, _Up*&gt;&gt;{}(__t, __u); }
+<span class="line_number">601</span>
+<span class="line_number">602</span>      typedef __is_transparent is_transparent;
+<span class="line_number">603</span>
+<span class="line_number">604</span>    private:
+<span class="line_number">605</span>      template &lt;typename _Tp, typename _Up&gt;
+<span class="line_number">606</span>	static constexpr decltype(auto)
+<span class="line_number">607</span>	_S_cmp(_Tp&amp;&amp; __t, _Up&amp;&amp; __u, false_type)
+<span class="line_number">608</span>	{ return std::forward&lt;_Tp&gt;(__t) &lt; std::forward&lt;_Up&gt;(__u); }
+<span class="line_number">609</span>
+<span class="line_number">610</span>      template &lt;typename _Tp, typename _Up&gt;
+<span class="line_number">611</span>	static constexpr bool
+<span class="line_number">612</span>	_S_cmp(_Tp&amp;&amp; __t, _Up&amp;&amp; __u, true_type) noexcept
+<span class="line_number">613</span>	{
+<span class="line_number">614</span>	  return less&lt;const volatile void*&gt;{}(
+<span class="line_number">615</span>	      static_cast&lt;const volatile void*&gt;(std::forward&lt;_Tp&gt;(__t)),
+<span class="line_number">616</span>	      static_cast&lt;const volatile void*&gt;(std::forward&lt;_Up&gt;(__u)));
+<span class="line_number">617</span>	}
+<span class="line_number">618</span>
+<span class="line_number">619</span>      // True if there is no viable operator&lt; member function.
+<span class="line_number">620</span>      template&lt;typename _Tp, typename _Up, typename = void&gt;
+<span class="line_number">621</span>	struct __not_overloaded2 : true_type { };
+<span class="line_number">622</span>
+<span class="line_number">623</span>      // False if we can call T.operator&lt;(U)
+<span class="line_number">624</span>      template&lt;typename _Tp, typename _Up&gt;
+<span class="line_number">625</span>	struct __not_overloaded2&lt;_Tp, _Up, __void_t&lt;
+<span class="line_number">626</span>	  decltype(std::declval&lt;_Tp&gt;().operator&lt;(std::declval&lt;_Up&gt;()))&gt;&gt;
+<span class="line_number">627</span>	: false_type { };
+<span class="line_number">628</span>
+<span class="line_number">629</span>      // True if there is no overloaded operator&lt; for these operands.
+<span class="line_number">630</span>      template&lt;typename _Tp, typename _Up, typename = void&gt;
+<span class="line_number">631</span>	struct __not_overloaded : __not_overloaded2&lt;_Tp, _Up&gt; { };
+<span class="line_number">632</span>
+<span class="line_number">633</span>      // False if we can call operator&lt;(T,U)
+<span class="line_number">634</span>      template&lt;typename _Tp, typename _Up&gt;
+<span class="line_number">635</span>	struct __not_overloaded&lt;_Tp, _Up, __void_t&lt;
+<span class="line_number">636</span>	  decltype(operator&lt;(std::declval&lt;_Tp&gt;(), std::declval&lt;_Up&gt;()))&gt;&gt;
+<span class="line_number">637</span>	: false_type { };
+<span class="line_number">638</span>
+<span class="line_number">639</span>      template&lt;typename _Tp, typename _Up&gt;
+<span class="line_number">640</span>	using __ptr_cmp = __and_&lt;__not_overloaded&lt;_Tp, _Up&gt;,
+<span class="line_number">641</span>	      is_convertible&lt;_Tp, const volatile void*&gt;,
+<span class="line_number">642</span>	      is_convertible&lt;_Up, const volatile void*&gt;&gt;;
+<span class="line_number">643</span>    };
+<span class="line_number">644</span>
+<span class="line_number">645</span>  /// One of the @link comparison_functors comparison functors@endlink.
+<span class="line_number">646</span>  template&lt;&gt;
+<span class="line_number">647</span>    struct greater_equal&lt;void&gt;
+<span class="line_number">648</span>    {
+<span class="line_number">649</span>      template &lt;typename _Tp, typename _Up&gt;
+<span class="line_number">650</span>	constexpr auto
+<span class="line_number">651</span>	operator()(_Tp&amp;&amp; __t, _Up&amp;&amp; __u) const
+<span class="line_number">652</span>	noexcept(noexcept(std::forward&lt;_Tp&gt;(__t) &gt;= std::forward&lt;_Up&gt;(__u)))
+<span class="line_number">653</span>	-&gt; decltype(std::forward&lt;_Tp&gt;(__t) &gt;= std::forward&lt;_Up&gt;(__u))
+<span class="line_number">654</span>	{
+<span class="line_number">655</span>	  return _S_cmp(std::forward&lt;_Tp&gt;(__t), std::forward&lt;_Up&gt;(__u),
+<span class="line_number">656</span>			__ptr_cmp&lt;_Tp, _Up&gt;{});
+<span class="line_number">657</span>	}
+<span class="line_number">658</span>
+<span class="line_number">659</span>      template&lt;typename _Tp, typename _Up&gt;
+<span class="line_number">660</span>	constexpr bool
+<span class="line_number">661</span>	operator()(_Tp* __t, _Up* __u) const noexcept
+<span class="line_number">662</span>	{ return greater_equal&lt;common_type_t&lt;_Tp*, _Up*&gt;&gt;{}(__t, __u); }
+<span class="line_number">663</span>
+<span class="line_number">664</span>      typedef __is_transparent is_transparent;
+<span class="line_number">665</span>
+<span class="line_number">666</span>    private:
+<span class="line_number">667</span>      template &lt;typename _Tp, typename _Up&gt;
+<span class="line_number">668</span>	static constexpr decltype(auto)
+<span class="line_number">669</span>	_S_cmp(_Tp&amp;&amp; __t, _Up&amp;&amp; __u, false_type)
+<span class="line_number">670</span>	{ return std::forward&lt;_Tp&gt;(__t) &gt;= std::forward&lt;_Up&gt;(__u); }
+<span class="line_number">671</span>
+<span class="line_number">672</span>      template &lt;typename _Tp, typename _Up&gt;
+<span class="line_number">673</span>	static constexpr bool
+<span class="line_number">674</span>	_S_cmp(_Tp&amp;&amp; __t, _Up&amp;&amp; __u, true_type) noexcept
+<span class="line_number">675</span>	{
+<span class="line_number">676</span>	  return greater_equal&lt;const volatile void*&gt;{}(
+<span class="line_number">677</span>	      static_cast&lt;const volatile void*&gt;(std::forward&lt;_Tp&gt;(__t)),
+<span class="line_number">678</span>	      static_cast&lt;const volatile void*&gt;(std::forward&lt;_Up&gt;(__u)));
+<span class="line_number">679</span>	}
+<span class="line_number">680</span>
+<span class="line_number">681</span>      // True if there is no viable operator&gt;= member function.
+<span class="line_number">682</span>      template&lt;typename _Tp, typename _Up, typename = void&gt;
+<span class="line_number">683</span>	struct __not_overloaded2 : true_type { };
+<span class="line_number">684</span>
+<span class="line_number">685</span>      // False if we can call T.operator&gt;=(U)
+<span class="line_number">686</span>      template&lt;typename _Tp, typename _Up&gt;
+<span class="line_number">687</span>	struct __not_overloaded2&lt;_Tp, _Up, __void_t&lt;
+<span class="line_number">688</span>	  decltype(std::declval&lt;_Tp&gt;().operator&gt;=(std::declval&lt;_Up&gt;()))&gt;&gt;
+<span class="line_number">689</span>	: false_type { };
+<span class="line_number">690</span>
+<span class="line_number">691</span>      // True if there is no overloaded operator&gt;= for these operands.
+<span class="line_number">692</span>      template&lt;typename _Tp, typename _Up, typename = void&gt;
+<span class="line_number">693</span>	struct __not_overloaded : __not_overloaded2&lt;_Tp, _Up&gt; { };
+<span class="line_number">694</span>
+<span class="line_number">695</span>      // False if we can call operator&gt;=(T,U)
+<span class="line_number">696</span>      template&lt;typename _Tp, typename _Up&gt;
+<span class="line_number">697</span>	struct __not_overloaded&lt;_Tp, _Up, __void_t&lt;
+<span class="line_number">698</span>	  decltype(operator&gt;=(std::declval&lt;_Tp&gt;(), std::declval&lt;_Up&gt;()))&gt;&gt;
+<span class="line_number">699</span>	: false_type { };
+<span class="line_number">700</span>
+<span class="line_number">701</span>      template&lt;typename _Tp, typename _Up&gt;
+<span class="line_number">702</span>	using __ptr_cmp = __and_&lt;__not_overloaded&lt;_Tp, _Up&gt;,
+<span class="line_number">703</span>	      is_convertible&lt;_Tp, const volatile void*&gt;,
+<span class="line_number">704</span>	      is_convertible&lt;_Up, const volatile void*&gt;&gt;;
+<span class="line_number">705</span>    };
+<span class="line_number">706</span>
+<span class="line_number">707</span>  /// One of the @link comparison_functors comparison functors@endlink.
+<span class="line_number">708</span>  template&lt;&gt;
+<span class="line_number">709</span>    struct less_equal&lt;void&gt;
+<span class="line_number">710</span>    {
+<span class="line_number">711</span>      template &lt;typename _Tp, typename _Up&gt;
+<span class="line_number">712</span>	constexpr auto
+<span class="line_number">713</span>	operator()(_Tp&amp;&amp; __t, _Up&amp;&amp; __u) const
+<span class="line_number">714</span>	noexcept(noexcept(std::forward&lt;_Tp&gt;(__t) &lt;= std::forward&lt;_Up&gt;(__u)))
+<span class="line_number">715</span>	-&gt; decltype(std::forward&lt;_Tp&gt;(__t) &lt;= std::forward&lt;_Up&gt;(__u))
+<span class="line_number">716</span>	{
+<span class="line_number">717</span>	  return _S_cmp(std::forward&lt;_Tp&gt;(__t), std::forward&lt;_Up&gt;(__u),
+<span class="line_number">718</span>			__ptr_cmp&lt;_Tp, _Up&gt;{});
+<span class="line_number">719</span>	}
+<span class="line_number">720</span>
+<span class="line_number">721</span>      template&lt;typename _Tp, typename _Up&gt;
+<span class="line_number">722</span>	constexpr bool
+<span class="line_number">723</span>	operator()(_Tp* __t, _Up* __u) const noexcept
+<span class="line_number">724</span>	{ return less_equal&lt;common_type_t&lt;_Tp*, _Up*&gt;&gt;{}(__t, __u); }
+<span class="line_number">725</span>
+<span class="line_number">726</span>      typedef __is_transparent is_transparent;
+<span class="line_number">727</span>
+<span class="line_number">728</span>    private:
+<span class="line_number">729</span>      template &lt;typename _Tp, typename _Up&gt;
+<span class="line_number">730</span>	static constexpr decltype(auto)
+<span class="line_number">731</span>	_S_cmp(_Tp&amp;&amp; __t, _Up&amp;&amp; __u, false_type)
+<span class="line_number">732</span>	{ return std::forward&lt;_Tp&gt;(__t) &lt;= std::forward&lt;_Up&gt;(__u); }
+<span class="line_number">733</span>
+<span class="line_number">734</span>      template &lt;typename _Tp, typename _Up&gt;
+<span class="line_number">735</span>	static constexpr bool
+<span class="line_number">736</span>	_S_cmp(_Tp&amp;&amp; __t, _Up&amp;&amp; __u, true_type) noexcept
+<span class="line_number">737</span>	{
+<span class="line_number">738</span>	  return less_equal&lt;const volatile void*&gt;{}(
+<span class="line_number">739</span>	      static_cast&lt;const volatile void*&gt;(std::forward&lt;_Tp&gt;(__t)),
+<span class="line_number">740</span>	      static_cast&lt;const volatile void*&gt;(std::forward&lt;_Up&gt;(__u)));
+<span class="line_number">741</span>	}
+<span class="line_number">742</span>
+<span class="line_number">743</span>      // True if there is no viable operator&lt;= member function.
+<span class="line_number">744</span>      template&lt;typename _Tp, typename _Up, typename = void&gt;
+<span class="line_number">745</span>	struct __not_overloaded2 : true_type { };
+<span class="line_number">746</span>
+<span class="line_number">747</span>      // False if we can call T.operator&lt;=(U)
+<span class="line_number">748</span>      template&lt;typename _Tp, typename _Up&gt;
+<span class="line_number">749</span>	struct __not_overloaded2&lt;_Tp, _Up, __void_t&lt;
+<span class="line_number">750</span>	  decltype(std::declval&lt;_Tp&gt;().operator&lt;=(std::declval&lt;_Up&gt;()))&gt;&gt;
+<span class="line_number">751</span>	: false_type { };
+<span class="line_number">752</span>
+<span class="line_number">753</span>      // True if there is no overloaded operator&lt;= for these operands.
+<span class="line_number">754</span>      template&lt;typename _Tp, typename _Up, typename = void&gt;
+<span class="line_number">755</span>	struct __not_overloaded : __not_overloaded2&lt;_Tp, _Up&gt; { };
+<span class="line_number">756</span>
+<span class="line_number">757</span>      // False if we can call operator&lt;=(T,U)
+<span class="line_number">758</span>      template&lt;typename _Tp, typename _Up&gt;
+<span class="line_number">759</span>	struct __not_overloaded&lt;_Tp, _Up, __void_t&lt;
+<span class="line_number">760</span>	  decltype(operator&lt;=(std::declval&lt;_Tp&gt;(), std::declval&lt;_Up&gt;()))&gt;&gt;
+<span class="line_number">761</span>	: false_type { };
+<span class="line_number">762</span>
+<span class="line_number">763</span>      template&lt;typename _Tp, typename _Up&gt;
+<span class="line_number">764</span>	using __ptr_cmp = __and_&lt;__not_overloaded&lt;_Tp, _Up&gt;,
+<span class="line_number">765</span>	      is_convertible&lt;_Tp, const volatile void*&gt;,
+<span class="line_number">766</span>	      is_convertible&lt;_Up, const volatile void*&gt;&gt;;
+<span class="line_number">767</span>    };
+<span class="line_number">768</span>#endif // C++14
+<span class="line_number">769</span>  /** @}  */
+<span class="line_number">770</span>
+<span class="line_number">771</span>  // 20.3.4 logical operations
+<span class="line_number">772</span>  /** @defgroup logical_functors Boolean Operations Classes
+<span class="line_number">773</span>   *  @ingroup functors
+<span class="line_number">774</span>   *
+<span class="line_number">775</span>   *  The library provides function objects for the logical operations:
+<span class="line_number">776</span>   *  `&amp;&amp;`, `||`, and `!`.
+<span class="line_number">777</span>   *
+<span class="line_number">778</span>   *  @{
+<span class="line_number">779</span>   */
+<span class="line_number">780</span>#if __cplusplus &gt; 201103L
+<span class="line_number">781</span>  template&lt;typename _Tp = void&gt;
+<span class="line_number">782</span>    struct logical_and;
+<span class="line_number">783</span>
+<span class="line_number">784</span>  template&lt;typename _Tp = void&gt;
+<span class="line_number">785</span>    struct logical_or;
+<span class="line_number">786</span>
+<span class="line_number">787</span>  template&lt;typename _Tp = void&gt;
+<span class="line_number">788</span>    struct logical_not;
+<span class="line_number">789</span>#endif
+<span class="line_number">790</span>
+<span class="line_number">791</span>#pragma GCC diagnostic push
+<span class="line_number">792</span>#pragma GCC diagnostic ignored &#34;-Wdeprecated-declarations&#34;
+<span class="line_number">793</span>
+<span class="line_number">794</span>  /// One of the @link logical_functors Boolean operations functors@endlink.
+<span class="line_number">795</span>  template&lt;typename _Tp&gt;
+<span class="line_number">796</span>    struct logical_and : public binary_function&lt;_Tp, _Tp, bool&gt;
+<span class="line_number">797</span>    {
+<span class="line_number">798</span>      _GLIBCXX14_CONSTEXPR
+<span class="line_number">799</span>      bool
+<span class="line_number">800</span>      operator()(const _Tp&amp; __x, const _Tp&amp; __y) const
+<span class="line_number">801</span>      { return __x &amp;&amp; __y; }
+<span class="line_number">802</span>    };
+<span class="line_number">803</span>
+<span class="line_number">804</span>  /// One of the @link logical_functors Boolean operations functors@endlink.
+<span class="line_number">805</span>  template&lt;typename _Tp&gt;
+<span class="line_number">806</span>    struct logical_or : public binary_function&lt;_Tp, _Tp, bool&gt;
+<span class="line_number">807</span>    {
+<span class="line_number">808</span>      _GLIBCXX14_CONSTEXPR
+<span class="line_number">809</span>      bool
+<span class="line_number">810</span>      operator()(const _Tp&amp; __x, const _Tp&amp; __y) const
+<span class="line_number">811</span>      { return __x || __y; }
+<span class="line_number">812</span>    };
+<span class="line_number">813</span>
+<span class="line_number">814</span>  /// One of the @link logical_functors Boolean operations functors@endlink.
+<span class="line_number">815</span>  template&lt;typename _Tp&gt;
+<span class="line_number">816</span>    struct logical_not : public unary_function&lt;_Tp, bool&gt;
+<span class="line_number">817</span>    {
+<span class="line_number">818</span>      _GLIBCXX14_CONSTEXPR
+<span class="line_number">819</span>      bool
+<span class="line_number">820</span>      operator()(const _Tp&amp; __x) const
+<span class="line_number">821</span>      { return !__x; }
+<span class="line_number">822</span>    };
+<span class="line_number">823</span>#pragma GCC diagnostic pop
+<span class="line_number">824</span>
+<span class="line_number">825</span>#if __cplusplus &gt; 201103L
+<span class="line_number">826</span>  /// One of the @link logical_functors Boolean operations functors@endlink.
+<span class="line_number">827</span>  template&lt;&gt;
+<span class="line_number">828</span>    struct logical_and&lt;void&gt;
+<span class="line_number">829</span>    {
+<span class="line_number">830</span>      template &lt;typename _Tp, typename _Up&gt;
+<span class="line_number">831</span>	_GLIBCXX14_CONSTEXPR
+<span class="line_number">832</span>	auto
+<span class="line_number">833</span>	operator()(_Tp&amp;&amp; __t, _Up&amp;&amp; __u) const
+<span class="line_number">834</span>	noexcept(noexcept(std::forward&lt;_Tp&gt;(__t) &amp;&amp; std::forward&lt;_Up&gt;(__u)))
+<span class="line_number">835</span>	-&gt; decltype(std::forward&lt;_Tp&gt;(__t) &amp;&amp; std::forward&lt;_Up&gt;(__u))
+<span class="line_number">836</span>	{ return std::forward&lt;_Tp&gt;(__t) &amp;&amp; std::forward&lt;_Up&gt;(__u); }
+<span class="line_number">837</span>
+<span class="line_number">838</span>      typedef __is_transparent is_transparent;
+<span class="line_number">839</span>    };
+<span class="line_number">840</span>
+<span class="line_number">841</span>  /// One of the @link logical_functors Boolean operations functors@endlink.
+<span class="line_number">842</span>  template&lt;&gt;
+<span class="line_number">843</span>    struct logical_or&lt;void&gt;
+<span class="line_number">844</span>    {
+<span class="line_number">845</span>      template &lt;typename _Tp, typename _Up&gt;
+<span class="line_number">846</span>	_GLIBCXX14_CONSTEXPR
+<span class="line_number">847</span>	auto
+<span class="line_number">848</span>	operator()(_Tp&amp;&amp; __t, _Up&amp;&amp; __u) const
+<span class="line_number">849</span>	noexcept(noexcept(std::forward&lt;_Tp&gt;(__t) || std::forward&lt;_Up&gt;(__u)))
+<span class="line_number">850</span>	-&gt; decltype(std::forward&lt;_Tp&gt;(__t) || std::forward&lt;_Up&gt;(__u))
+<span class="line_number">851</span>	{ return std::forward&lt;_Tp&gt;(__t) || std::forward&lt;_Up&gt;(__u); }
+<span class="line_number">852</span>
+<span class="line_number">853</span>      typedef __is_transparent is_transparent;
+<span class="line_number">854</span>    };
+<span class="line_number">855</span>
+<span class="line_number">856</span>  /// One of the @link logical_functors Boolean operations functors@endlink.
+<span class="line_number">857</span>  template&lt;&gt;
+<span class="line_number">858</span>    struct logical_not&lt;void&gt;
+<span class="line_number">859</span>    {
+<span class="line_number">860</span>      template &lt;typename _Tp&gt;
+<span class="line_number">861</span>	_GLIBCXX14_CONSTEXPR
+<span class="line_number">862</span>	auto
+<span class="line_number">863</span>	operator()(_Tp&amp;&amp; __t) const
+<span class="line_number">864</span>	noexcept(noexcept(!std::forward&lt;_Tp&gt;(__t)))
+<span class="line_number">865</span>	-&gt; decltype(!std::forward&lt;_Tp&gt;(__t))
+<span class="line_number">866</span>	{ return !std::forward&lt;_Tp&gt;(__t); }
+<span class="line_number">867</span>
+<span class="line_number">868</span>      typedef __is_transparent is_transparent;
+<span class="line_number">869</span>    };
+<span class="line_number">870</span>#endif
+<span class="line_number">871</span>  /** @}  */
+<span class="line_number">872</span>
+<span class="line_number">873</span>#if __cplusplus &gt; 201103L
+<span class="line_number">874</span>  template&lt;typename _Tp = void&gt;
+<span class="line_number">875</span>    struct bit_and;
+<span class="line_number">876</span>
+<span class="line_number">877</span>  template&lt;typename _Tp = void&gt;
+<span class="line_number">878</span>    struct bit_or;
+<span class="line_number">879</span>
+<span class="line_number">880</span>  template&lt;typename _Tp = void&gt;
+<span class="line_number">881</span>    struct bit_xor;
+<span class="line_number">882</span>
+<span class="line_number">883</span>  template&lt;typename _Tp = void&gt;
+<span class="line_number">884</span>    struct bit_not;
+<span class="line_number">885</span>#endif
+<span class="line_number">886</span>
+<span class="line_number">887</span>#pragma GCC diagnostic push
+<span class="line_number">888</span>#pragma GCC diagnostic ignored &#34;-Wdeprecated-declarations&#34;
+<span class="line_number">889</span>
+<span class="line_number">890</span>  // _GLIBCXX_RESOLVE_LIB_DEFECTS
+<span class="line_number">891</span>  // DR 660. Missing Bitwise Operations.
+<span class="line_number">892</span>  template&lt;typename _Tp&gt;
+<span class="line_number">893</span>    struct bit_and : public binary_function&lt;_Tp, _Tp, _Tp&gt;
+<span class="line_number">894</span>    {
+<span class="line_number">895</span>      _GLIBCXX14_CONSTEXPR
+<span class="line_number">896</span>      _Tp
+<span class="line_number">897</span>      operator()(const _Tp&amp; __x, const _Tp&amp; __y) const
+<span class="line_number">898</span>      { return __x &amp; __y; }
+<span class="line_number">899</span>    };
+<span class="line_number">900</span>
+<span class="line_number">901</span>  template&lt;typename _Tp&gt;
+<span class="line_number">902</span>    struct bit_or : public binary_function&lt;_Tp, _Tp, _Tp&gt;
+<span class="line_number">903</span>    {
+<span class="line_number">904</span>      _GLIBCXX14_CONSTEXPR
+<span class="line_number">905</span>      _Tp
+<span class="line_number">906</span>      operator()(const _Tp&amp; __x, const _Tp&amp; __y) const
+<span class="line_number">907</span>      { return __x | __y; }
+<span class="line_number">908</span>    };
+<span class="line_number">909</span>
+<span class="line_number">910</span>  template&lt;typename _Tp&gt;
+<span class="line_number">911</span>    struct bit_xor : public binary_function&lt;_Tp, _Tp, _Tp&gt;
+<span class="line_number">912</span>    {
+<span class="line_number">913</span>      _GLIBCXX14_CONSTEXPR
+<span class="line_number">914</span>      _Tp
+<span class="line_number">915</span>      operator()(const _Tp&amp; __x, const _Tp&amp; __y) const
+<span class="line_number">916</span>      { return __x ^ __y; }
+<span class="line_number">917</span>    };
+<span class="line_number">918</span>
+<span class="line_number">919</span>  template&lt;typename _Tp&gt;
+<span class="line_number">920</span>    struct bit_not : public unary_function&lt;_Tp, _Tp&gt;
+<span class="line_number">921</span>    {
+<span class="line_number">922</span>    _GLIBCXX14_CONSTEXPR
+<span class="line_number">923</span>      _Tp
+<span class="line_number">924</span>      operator()(const _Tp&amp; __x) const
+<span class="line_number">925</span>      { return ~__x; }
+<span class="line_number">926</span>    };
+<span class="line_number">927</span>#pragma GCC diagnostic pop
+<span class="line_number">928</span>
+<span class="line_number">929</span>#if __cplusplus &gt; 201103L
+<span class="line_number">930</span>  template &lt;&gt;
+<span class="line_number">931</span>    struct bit_and&lt;void&gt;
+<span class="line_number">932</span>    {
+<span class="line_number">933</span>      template &lt;typename _Tp, typename _Up&gt;
+<span class="line_number">934</span>	_GLIBCXX14_CONSTEXPR
+<span class="line_number">935</span>	auto
+<span class="line_number">936</span>	operator()(_Tp&amp;&amp; __t, _Up&amp;&amp; __u) const
+<span class="line_number">937</span>	noexcept(noexcept(std::forward&lt;_Tp&gt;(__t) &amp; std::forward&lt;_Up&gt;(__u)))
+<span class="line_number">938</span>	-&gt; decltype(std::forward&lt;_Tp&gt;(__t) &amp; std::forward&lt;_Up&gt;(__u))
+<span class="line_number">939</span>	{ return std::forward&lt;_Tp&gt;(__t) &amp; std::forward&lt;_Up&gt;(__u); }
+<span class="line_number">940</span>
+<span class="line_number">941</span>      typedef __is_transparent is_transparent;
+<span class="line_number">942</span>    };
+<span class="line_number">943</span>
+<span class="line_number">944</span>  template &lt;&gt;
+<span class="line_number">945</span>    struct bit_or&lt;void&gt;
+<span class="line_number">946</span>    {
+<span class="line_number">947</span>      template &lt;typename _Tp, typename _Up&gt;
+<span class="line_number">948</span>	_GLIBCXX14_CONSTEXPR
+<span class="line_number">949</span>	auto
+<span class="line_number">950</span>	operator()(_Tp&amp;&amp; __t, _Up&amp;&amp; __u) const
+<span class="line_number">951</span>	noexcept(noexcept(std::forward&lt;_Tp&gt;(__t) | std::forward&lt;_Up&gt;(__u)))
+<span class="line_number">952</span>	-&gt; decltype(std::forward&lt;_Tp&gt;(__t) | std::forward&lt;_Up&gt;(__u))
+<span class="line_number">953</span>	{ return std::forward&lt;_Tp&gt;(__t) | std::forward&lt;_Up&gt;(__u); }
+<span class="line_number">954</span>
+<span class="line_number">955</span>      typedef __is_transparent is_transparent;
+<span class="line_number">956</span>    };
+<span class="line_number">957</span>
+<span class="line_number">958</span>  template &lt;&gt;
+<span class="line_number">959</span>    struct bit_xor&lt;void&gt;
+<span class="line_number">960</span>    {
+<span class="line_number">961</span>      template &lt;typename _Tp, typename _Up&gt;
+<span class="line_number">962</span>	_GLIBCXX14_CONSTEXPR
+<span class="line_number">963</span>	auto
+<span class="line_number">964</span>	operator()(_Tp&amp;&amp; __t, _Up&amp;&amp; __u) const
+<span class="line_number">965</span>	noexcept(noexcept(std::forward&lt;_Tp&gt;(__t) ^ std::forward&lt;_Up&gt;(__u)))
+<span class="line_number">966</span>	-&gt; decltype(std::forward&lt;_Tp&gt;(__t) ^ std::forward&lt;_Up&gt;(__u))
+<span class="line_number">967</span>	{ return std::forward&lt;_Tp&gt;(__t) ^ std::forward&lt;_Up&gt;(__u); }
+<span class="line_number">968</span>
+<span class="line_number">969</span>      typedef __is_transparent is_transparent;
+<span class="line_number">970</span>    };
+<span class="line_number">971</span>
+<span class="line_number">972</span>  template &lt;&gt;
+<span class="line_number">973</span>    struct bit_not&lt;void&gt;
+<span class="line_number">974</span>    {
+<span class="line_number">975</span>      template &lt;typename _Tp&gt;
+<span class="line_number">976</span>	_GLIBCXX14_CONSTEXPR
+<span class="line_number">977</span>	auto
+<span class="line_number">978</span>	operator()(_Tp&amp;&amp; __t) const
+<span class="line_number">979</span>	noexcept(noexcept(~std::forward&lt;_Tp&gt;(__t)))
+<span class="line_number">980</span>	-&gt; decltype(~std::forward&lt;_Tp&gt;(__t))
+<span class="line_number">981</span>	{ return ~std::forward&lt;_Tp&gt;(__t); }
+<span class="line_number">982</span>
+<span class="line_number">983</span>      typedef __is_transparent is_transparent;
+<span class="line_number">984</span>    };
+<span class="line_number">985</span>#endif // C++14
+<span class="line_number">986</span>
+<span class="line_number">987</span>#pragma GCC diagnostic push
+<span class="line_number">988</span>#pragma GCC diagnostic ignored &#34;-Wdeprecated-declarations&#34;
+<span class="line_number">989</span>
+<span class="line_number">990</span>  // 20.3.5 negators
+<span class="line_number">991</span>  /** @defgroup negators Negators
+<span class="line_number">992</span>   *  @ingroup functors
+<span class="line_number">993</span>   *
+<span class="line_number">994</span>   *  The function templates `not1` and `not2` are function object adaptors,
+<span class="line_number">995</span>   *  which each take a predicate functor and wrap it in an instance of
+<span class="line_number">996</span>   *  `unary_negate` or `binary_negate`, respectively.  Those classes are
+<span class="line_number">997</span>   *  functors whose `operator()` evaluates the wrapped predicate function
+<span class="line_number">998</span>   *  and then returns the negation of the result.
+<span class="line_number">999</span>   *
+<span class="line_number">1000</span>   *  For example, given a vector of integers and a trivial predicate,
+<span class="line_number">1001</span>   *  \code
+<span class="line_number">1002</span>   *  struct IntGreaterThanThree
+<span class="line_number">1003</span>   *    : public std::unary_function&lt;int, bool&gt;
+<span class="line_number">1004</span>   *  {
+<span class="line_number">1005</span>   *      bool operator() (int x) const { return x &gt; 3; }
+<span class="line_number">1006</span>   *  };
+<span class="line_number">1007</span>   *
+<span class="line_number">1008</span>   *  std::find_if (v.begin(), v.end(), not1(IntGreaterThanThree()));
+<span class="line_number">1009</span>   *  \endcode
+<span class="line_number">1010</span>   *  The call to `find_if` will locate the first index (i) of `v` for which
+<span class="line_number">1011</span>   *  `!(v[i] &gt; 3)` is true.
+<span class="line_number">1012</span>   *
+<span class="line_number">1013</span>   *  The not1/unary_negate combination works on predicates taking a single
+<span class="line_number">1014</span>   *  argument.  The not2/binary_negate combination works on predicates taking
+<span class="line_number">1015</span>   *  two arguments.
+<span class="line_number">1016</span>   *
+<span class="line_number">1017</span>   *  @deprecated Deprecated in C++17, no longer in the standard since C++20.
+<span class="line_number">1018</span>   *  Use `not_fn` instead.
+<span class="line_number">1019</span>   *
+<span class="line_number">1020</span>   *  @{
+<span class="line_number">1021</span>   */
+<span class="line_number">1022</span>  /// One of the @link negators negation functors@endlink.
+<span class="line_number">1023</span>  template&lt;typename _Predicate&gt;
+<span class="line_number">1024</span>    class _GLIBCXX17_DEPRECATED unary_negate
+<span class="line_number">1025</span>    : public unary_function&lt;typename _Predicate::argument_type, bool&gt;
+<span class="line_number">1026</span>    {
+<span class="line_number">1027</span>    protected:
+<span class="line_number">1028</span>      _Predicate _M_pred;
+<span class="line_number">1029</span>
+<span class="line_number">1030</span>    public:
+<span class="line_number">1031</span>      _GLIBCXX14_CONSTEXPR
+<span class="line_number">1032</span>      explicit
+<span class="line_number">1033</span>      unary_negate(const _Predicate&amp; __x) : _M_pred(__x) { }
+<span class="line_number">1034</span>
+<span class="line_number">1035</span>      _GLIBCXX14_CONSTEXPR
+<span class="line_number">1036</span>      bool
+<span class="line_number">1037</span>      operator()(const typename _Predicate::argument_type&amp; __x) const
+<span class="line_number">1038</span>      { return !_M_pred(__x); }
+<span class="line_number">1039</span>    };
+<span class="line_number">1040</span>
+<span class="line_number">1041</span>  /// One of the @link negators negation functors@endlink.
+<span class="line_number">1042</span>  template&lt;typename _Predicate&gt;
+<span class="line_number">1043</span>    _GLIBCXX17_DEPRECATED_SUGGEST(&#34;std::not_fn&#34;)
+<span class="line_number">1044</span>    _GLIBCXX14_CONSTEXPR
+<span class="line_number">1045</span>    inline unary_negate&lt;_Predicate&gt;
+<span class="line_number">1046</span>    not1(const _Predicate&amp; __pred)
+<span class="line_number">1047</span>    { return unary_negate&lt;_Predicate&gt;(__pred); }
+<span class="line_number">1048</span>
+<span class="line_number">1049</span>  /// One of the @link negators negation functors@endlink.
+<span class="line_number">1050</span>  template&lt;typename _Predicate&gt;
+<span class="line_number">1051</span>    class _GLIBCXX17_DEPRECATED binary_negate
+<span class="line_number">1052</span>    : public binary_function&lt;typename _Predicate::first_argument_type,
+<span class="line_number">1053</span>			     typename _Predicate::second_argument_type, bool&gt;
+<span class="line_number">1054</span>    {
+<span class="line_number">1055</span>    protected:
+<span class="line_number">1056</span>      _Predicate _M_pred;
+<span class="line_number">1057</span>
+<span class="line_number">1058</span>    public:
+<span class="line_number">1059</span>      _GLIBCXX14_CONSTEXPR
+<span class="line_number">1060</span>      explicit
+<span class="line_number">1061</span>      binary_negate(const _Predicate&amp; __x) : _M_pred(__x) { }
+<span class="line_number">1062</span>
+<span class="line_number">1063</span>      _GLIBCXX14_CONSTEXPR
+<span class="line_number">1064</span>      bool
+<span class="line_number">1065</span>      operator()(const typename _Predicate::first_argument_type&amp; __x,
+<span class="line_number">1066</span>		 const typename _Predicate::second_argument_type&amp; __y) const
+<span class="line_number">1067</span>      { return !_M_pred(__x, __y); }
+<span class="line_number">1068</span>    };
+<span class="line_number">1069</span>
+<span class="line_number">1070</span>  /// One of the @link negators negation functors@endlink.
+<span class="line_number">1071</span>  template&lt;typename _Predicate&gt;
+<span class="line_number">1072</span>    _GLIBCXX17_DEPRECATED_SUGGEST(&#34;std::not_fn&#34;)
+<span class="line_number">1073</span>    _GLIBCXX14_CONSTEXPR
+<span class="line_number">1074</span>    inline binary_negate&lt;_Predicate&gt;
+<span class="line_number">1075</span>    not2(const _Predicate&amp; __pred)
+<span class="line_number">1076</span>    { return binary_negate&lt;_Predicate&gt;(__pred); }
+<span class="line_number">1077</span>  /** @}  */
+<span class="line_number">1078</span>
+<span class="line_number">1079</span>  // 20.3.7 adaptors pointers functions
+<span class="line_number">1080</span>  /** @defgroup pointer_adaptors Adaptors for pointers to functions
+<span class="line_number">1081</span>   *  @ingroup functors
+<span class="line_number">1082</span>   *
+<span class="line_number">1083</span>   *  The advantage of function objects over pointers to functions is that
+<span class="line_number">1084</span>   *  the objects in the standard library declare nested typedefs describing
+<span class="line_number">1085</span>   *  their argument and result types with uniform names (e.g., `result_type`
+<span class="line_number">1086</span>   *  from the base classes `unary_function` and `binary_function`).
+<span class="line_number">1087</span>   *  Sometimes those typedefs are required, not just optional.
+<span class="line_number">1088</span>   *
+<span class="line_number">1089</span>   *  Adaptors are provided to turn pointers to unary (single-argument) and
+<span class="line_number">1090</span>   *  binary (double-argument) functions into function objects.  The
+<span class="line_number">1091</span>   *  long-winded functor `pointer_to_unary_function` is constructed with a
+<span class="line_number">1092</span>   *  function pointer `f`, and its `operator()` called with argument `x`
+<span class="line_number">1093</span>   *  returns `f(x)`.  The functor `pointer_to_binary_function` does the same
+<span class="line_number">1094</span>   *  thing, but with a double-argument `f` and `operator()`.
+<span class="line_number">1095</span>   *
+<span class="line_number">1096</span>   *  The function `ptr_fun` takes a pointer-to-function `f` and constructs
+<span class="line_number">1097</span>   *  an instance of the appropriate functor.
+<span class="line_number">1098</span>   *
+<span class="line_number">1099</span>   *  @deprecated Deprecated in C++11, no longer in the standard since C++17.
+<span class="line_number">1100</span>   *
+<span class="line_number">1101</span>   *  @{
+<span class="line_number">1102</span>   */
+<span class="line_number">1103</span>  /// One of the @link pointer_adaptors adaptors for function pointers@endlink.
+<span class="line_number">1104</span>  template&lt;typename _Arg, typename _Result&gt;
+<span class="line_number">1105</span>    class pointer_to_unary_function : public unary_function&lt;_Arg, _Result&gt;
+<span class="line_number">1106</span>    {
+<span class="line_number">1107</span>    protected:
+<span class="line_number">1108</span>      _Result (*_M_ptr)(_Arg);
+<span class="line_number">1109</span>
+<span class="line_number">1110</span>    public:
+<span class="line_number">1111</span>      pointer_to_unary_function() { }
+<span class="line_number">1112</span>
+<span class="line_number">1113</span>      explicit
+<span class="line_number">1114</span>      pointer_to_unary_function(_Result (*__x)(_Arg))
+<span class="line_number">1115</span>      : _M_ptr(__x) { }
+<span class="line_number">1116</span>
+<span class="line_number">1117</span>      _Result
+<span class="line_number">1118</span>      operator()(_Arg __x) const
+<span class="line_number">1119</span>      { return _M_ptr(__x); }
+<span class="line_number">1120</span>    } _GLIBCXX11_DEPRECATED;
+<span class="line_number">1121</span>
+<span class="line_number">1122</span>  /// One of the @link pointer_adaptors adaptors for function pointers@endlink.
+<span class="line_number">1123</span>  template&lt;typename _Arg, typename _Result&gt;
+<span class="line_number">1124</span>    _GLIBCXX11_DEPRECATED_SUGGEST(&#34;std::function&#34;)
+<span class="line_number">1125</span>    inline pointer_to_unary_function&lt;_Arg, _Result&gt;
+<span class="line_number">1126</span>    ptr_fun(_Result (*__x)(_Arg))
+<span class="line_number">1127</span>    { return pointer_to_unary_function&lt;_Arg, _Result&gt;(__x); }
+<span class="line_number">1128</span>
+<span class="line_number">1129</span>  /// One of the @link pointer_adaptors adaptors for function pointers@endlink.
+<span class="line_number">1130</span>  template&lt;typename _Arg1, typename _Arg2, typename _Result&gt;
+<span class="line_number">1131</span>    class pointer_to_binary_function
+<span class="line_number">1132</span>    : public binary_function&lt;_Arg1, _Arg2, _Result&gt;
+<span class="line_number">1133</span>    {
+<span class="line_number">1134</span>    protected:
+<span class="line_number">1135</span>      _Result (*_M_ptr)(_Arg1, _Arg2);
+<span class="line_number">1136</span>
+<span class="line_number">1137</span>    public:
+<span class="line_number">1138</span>      pointer_to_binary_function() { }
+<span class="line_number">1139</span>
+<span class="line_number">1140</span>      explicit
+<span class="line_number">1141</span>      pointer_to_binary_function(_Result (*__x)(_Arg1, _Arg2))
+<span class="line_number">1142</span>      : _M_ptr(__x) { }
+<span class="line_number">1143</span>
+<span class="line_number">1144</span>      _Result
+<span class="line_number">1145</span>      operator()(_Arg1 __x, _Arg2 __y) const
+<span class="line_number">1146</span>      { return _M_ptr(__x, __y); }
+<span class="line_number">1147</span>    } _GLIBCXX11_DEPRECATED;
+<span class="line_number">1148</span>
+<span class="line_number">1149</span>  /// One of the @link pointer_adaptors adaptors for function pointers@endlink.
+<span class="line_number">1150</span>  template&lt;typename _Arg1, typename _Arg2, typename _Result&gt;
+<span class="line_number">1151</span>    _GLIBCXX11_DEPRECATED_SUGGEST(&#34;std::function&#34;)
+<span class="line_number">1152</span>    inline pointer_to_binary_function&lt;_Arg1, _Arg2, _Result&gt;
+<span class="line_number">1153</span>    ptr_fun(_Result (*__x)(_Arg1, _Arg2))
+<span class="line_number">1154</span>    { return pointer_to_binary_function&lt;_Arg1, _Arg2, _Result&gt;(__x); }
+<span class="line_number">1155</span>  /** @}  */
+<span class="line_number">1156</span>
+<span class="line_number">1157</span>  template&lt;typename _Tp&gt;
+<span class="line_number">1158</span>    struct _Identity
+<span class="line_number">1159</span>    : public unary_function&lt;_Tp, _Tp&gt;
+<span class="line_number">1160</span>    {
+<span class="line_number">1161</span>      _Tp&amp;
+<span class="line_number">1162</span>      operator()(_Tp&amp; __x) const
+<span class="line_number">1163</span>      { return __x; }
+<span class="line_number">1164</span>
+<span class="line_number">1165</span>      const _Tp&amp;
+<span class="line_number">1166</span>      operator()(const _Tp&amp; __x) const
+<span class="line_number">1167</span>      { return __x; }
+<span class="line_number">1168</span>    };
+<span class="line_number">1169</span>
+<span class="line_number">1170</span>  // Partial specialization, avoids confusing errors in e.g. std::set&lt;const T&gt;.
+<span class="line_number">1171</span>  template&lt;typename _Tp&gt; struct _Identity&lt;const _Tp&gt; : _Identity&lt;_Tp&gt; { };
+<span class="line_number">1172</span>
+<span class="line_number">1173</span>  template&lt;typename _Pair&gt;
+<span class="line_number">1174</span>    struct _Select1st
+<span class="line_number">1175</span>    : public unary_function&lt;_Pair, typename _Pair::first_type&gt;
+<span class="line_number">1176</span>    {
+<span class="line_number">1177</span>      typename _Pair::first_type&amp;
+<span class="line_number">1178</span>      operator()(_Pair&amp; __x) const
+<span class="line_number">1179</span>      { return __x.first; }
+<span class="line_number">1180</span>
+<span class="line_number">1181</span>      const typename _Pair::first_type&amp;
+<span class="line_number">1182</span>      operator()(const _Pair&amp; __x) const
+<span class="line_number">1183</span>      { return __x.first; }
+<span class="line_number">1184</span>
+<span class="line_number">1185</span>#if __cplusplus &gt;= 201103L
+<span class="line_number">1186</span>      template&lt;typename _Pair2&gt;
+<span class="line_number">1187</span>        typename _Pair2::first_type&amp;
+<span class="line_number">1188</span>        operator()(_Pair2&amp; __x) const
+<span class="line_number">1189</span>        { return __x.first; }
+<span class="line_number">1190</span>
+<span class="line_number">1191</span>      template&lt;typename _Pair2&gt;
+<span class="line_number">1192</span>        const typename _Pair2::first_type&amp;
+<span class="line_number">1193</span>        operator()(const _Pair2&amp; __x) const
+<span class="line_number">1194</span>        { return __x.first; }
+<span class="line_number">1195</span>#endif
+<span class="line_number">1196</span>    };
+<span class="line_number">1197</span>
+<span class="line_number">1198</span>  template&lt;typename _Pair&gt;
+<span class="line_number">1199</span>    struct _Select2nd
+<span class="line_number">1200</span>    : public unary_function&lt;_Pair, typename _Pair::second_type&gt;
+<span class="line_number">1201</span>    {
+<span class="line_number">1202</span>      typename _Pair::second_type&amp;
+<span class="line_number">1203</span>      operator()(_Pair&amp; __x) const
+<span class="line_number">1204</span>      { return __x.second; }
+<span class="line_number">1205</span>
+<span class="line_number">1206</span>      const typename _Pair::second_type&amp;
+<span class="line_number">1207</span>      operator()(const _Pair&amp; __x) const
+<span class="line_number">1208</span>      { return __x.second; }
+<span class="line_number">1209</span>    };
+<span class="line_number">1210</span>
+<span class="line_number">1211</span>  // 20.3.8 adaptors pointers members
+<span class="line_number">1212</span>  /** @defgroup ptrmem_adaptors Adaptors for pointers to members
+<span class="line_number">1213</span>   *  @ingroup functors
+<span class="line_number">1214</span>   *
+<span class="line_number">1215</span>   *  There are a total of 8 = 2^3 function objects in this family.
+<span class="line_number">1216</span>   *   (1) Member functions taking no arguments vs member functions taking
+<span class="line_number">1217</span>   *        one argument.
+<span class="line_number">1218</span>   *   (2) Call through pointer vs call through reference.
+<span class="line_number">1219</span>   *   (3) Const vs non-const member function.
+<span class="line_number">1220</span>   *
+<span class="line_number">1221</span>   *  All of this complexity is in the function objects themselves.  You can
+<span class="line_number">1222</span>   *   ignore it by using the helper function `mem_fun` and `mem_fun_ref`,
+<span class="line_number">1223</span>   *   which create whichever type of adaptor is appropriate.
+<span class="line_number">1224</span>   *
+<span class="line_number">1225</span>   *  @deprecated Deprecated in C++11, no longer in the standard since C++17.
+<span class="line_number">1226</span>   *  Use `mem_fn` instead.
+<span class="line_number">1227</span>   *
+<span class="line_number">1228</span>   *  @{
+<span class="line_number">1229</span>   */
+<span class="line_number">1230</span>  /// One of the @link ptrmem_adaptors adaptors for member pointers@endlink.
+<span class="line_number">1231</span>  template&lt;typename _Ret, typename _Tp&gt;
+<span class="line_number">1232</span>    class mem_fun_t : public unary_function&lt;_Tp*, _Ret&gt;
+<span class="line_number">1233</span>    {
+<span class="line_number">1234</span>    public:
+<span class="line_number">1235</span>      explicit
+<span class="line_number">1236</span>      mem_fun_t(_Ret (_Tp::*__pf)())
+<span class="line_number">1237</span>      : _M_f(__pf) { }
+<span class="line_number">1238</span>
+<span class="line_number">1239</span>      _Ret
+<span class="line_number">1240</span>      operator()(_Tp* __p) const
+<span class="line_number">1241</span>      { return (__p-&gt;*_M_f)(); }
+<span class="line_number">1242</span>
+<span class="line_number">1243</span>    private:
+<span class="line_number">1244</span>      _Ret (_Tp::*_M_f)();
+<span class="line_number">1245</span>    } _GLIBCXX11_DEPRECATED;
+<span class="line_number">1246</span>
+<span class="line_number">1247</span>  /// One of the @link ptrmem_adaptors adaptors for member pointers@endlink.
+<span class="line_number">1248</span>  template&lt;typename _Ret, typename _Tp&gt;
+<span class="line_number">1249</span>    class const_mem_fun_t : public unary_function&lt;const _Tp*, _Ret&gt;
+<span class="line_number">1250</span>    {
+<span class="line_number">1251</span>    public:
+<span class="line_number">1252</span>      explicit
+<span class="line_number">1253</span>      const_mem_fun_t(_Ret (_Tp::*__pf)() const)
+<span class="line_number">1254</span>      : _M_f(__pf) { }
+<span class="line_number">1255</span>
+<span class="line_number">1256</span>      _Ret
+<span class="line_number">1257</span>      operator()(const _Tp* __p) const
+<span class="line_number">1258</span>      { return (__p-&gt;*_M_f)(); }
+<span class="line_number">1259</span>
+<span class="line_number">1260</span>    private:
+<span class="line_number">1261</span>      _Ret (_Tp::*_M_f)() const;
+<span class="line_number">1262</span>    } _GLIBCXX11_DEPRECATED;
+<span class="line_number">1263</span>
+<span class="line_number">1264</span>  /// One of the @link ptrmem_adaptors adaptors for member pointers@endlink.
+<span class="line_number">1265</span>  template&lt;typename _Ret, typename _Tp&gt;
+<span class="line_number">1266</span>    class mem_fun_ref_t : public unary_function&lt;_Tp, _Ret&gt;
+<span class="line_number">1267</span>    {
+<span class="line_number">1268</span>    public:
+<span class="line_number">1269</span>      explicit
+<span class="line_number">1270</span>      mem_fun_ref_t(_Ret (_Tp::*__pf)())
+<span class="line_number">1271</span>      : _M_f(__pf) { }
+<span class="line_number">1272</span>
+<span class="line_number">1273</span>      _Ret
+<span class="line_number">1274</span>      operator()(_Tp&amp; __r) const
+<span class="line_number">1275</span>      { return (__r.*_M_f)(); }
+<span class="line_number">1276</span>
+<span class="line_number">1277</span>    private:
+<span class="line_number">1278</span>      _Ret (_Tp::*_M_f)();
+<span class="line_number">1279</span>    } _GLIBCXX11_DEPRECATED;
+<span class="line_number">1280</span>
+<span class="line_number">1281</span>  /// One of the @link ptrmem_adaptors adaptors for member pointers@endlink.
+<span class="line_number">1282</span>  template&lt;typename _Ret, typename _Tp&gt;
+<span class="line_number">1283</span>    class const_mem_fun_ref_t : public unary_function&lt;_Tp, _Ret&gt;
+<span class="line_number">1284</span>    {
+<span class="line_number">1285</span>    public:
+<span class="line_number">1286</span>      explicit
+<span class="line_number">1287</span>      const_mem_fun_ref_t(_Ret (_Tp::*__pf)() const)
+<span class="line_number">1288</span>      : _M_f(__pf) { }
+<span class="line_number">1289</span>
+<span class="line_number">1290</span>      _Ret
+<span class="line_number">1291</span>      operator()(const _Tp&amp; __r) const
+<span class="line_number">1292</span>      { return (__r.*_M_f)(); }
+<span class="line_number">1293</span>
+<span class="line_number">1294</span>    private:
+<span class="line_number">1295</span>      _Ret (_Tp::*_M_f)() const;
+<span class="line_number">1296</span>    } _GLIBCXX11_DEPRECATED;
+<span class="line_number">1297</span>
+<span class="line_number">1298</span>  /// One of the @link ptrmem_adaptors adaptors for member pointers@endlink.
+<span class="line_number">1299</span>  template&lt;typename _Ret, typename _Tp, typename _Arg&gt;
+<span class="line_number">1300</span>    class mem_fun1_t : public binary_function&lt;_Tp*, _Arg, _Ret&gt;
+<span class="line_number">1301</span>    {
+<span class="line_number">1302</span>    public:
+<span class="line_number">1303</span>      explicit
+<span class="line_number">1304</span>      mem_fun1_t(_Ret (_Tp::*__pf)(_Arg))
+<span class="line_number">1305</span>      : _M_f(__pf) { }
+<span class="line_number">1306</span>
+<span class="line_number">1307</span>      _Ret
+<span class="line_number">1308</span>      operator()(_Tp* __p, _Arg __x) const
+<span class="line_number">1309</span>      { return (__p-&gt;*_M_f)(__x); }
+<span class="line_number">1310</span>
+<span class="line_number">1311</span>    private:
+<span class="line_number">1312</span>      _Ret (_Tp::*_M_f)(_Arg);
+<span class="line_number">1313</span>    } _GLIBCXX11_DEPRECATED;
+<span class="line_number">1314</span>
+<span class="line_number">1315</span>  /// One of the @link ptrmem_adaptors adaptors for member pointers@endlink.
+<span class="line_number">1316</span>  template&lt;typename _Ret, typename _Tp, typename _Arg&gt;
+<span class="line_number">1317</span>    class const_mem_fun1_t : public binary_function&lt;const _Tp*, _Arg, _Ret&gt;
+<span class="line_number">1318</span>    {
+<span class="line_number">1319</span>    public:
+<span class="line_number">1320</span>      explicit
+<span class="line_number">1321</span>      const_mem_fun1_t(_Ret (_Tp::*__pf)(_Arg) const)
+<span class="line_number">1322</span>      : _M_f(__pf) { }
+<span class="line_number">1323</span>
+<span class="line_number">1324</span>      _Ret
+<span class="line_number">1325</span>      operator()(const _Tp* __p, _Arg __x) const
+<span class="line_number">1326</span>      { return (__p-&gt;*_M_f)(__x); }
+<span class="line_number">1327</span>
+<span class="line_number">1328</span>    private:
+<span class="line_number">1329</span>      _Ret (_Tp::*_M_f)(_Arg) const;
+<span class="line_number">1330</span>    } _GLIBCXX11_DEPRECATED;
+<span class="line_number">1331</span>
+<span class="line_number">1332</span>  /// One of the @link ptrmem_adaptors adaptors for member pointers@endlink.
+<span class="line_number">1333</span>  template&lt;typename _Ret, typename _Tp, typename _Arg&gt;
+<span class="line_number">1334</span>    class mem_fun1_ref_t : public binary_function&lt;_Tp, _Arg, _Ret&gt;
+<span class="line_number">1335</span>    {
+<span class="line_number">1336</span>    public:
+<span class="line_number">1337</span>      explicit
+<span class="line_number">1338</span>      mem_fun1_ref_t(_Ret (_Tp::*__pf)(_Arg))
+<span class="line_number">1339</span>      : _M_f(__pf) { }
+<span class="line_number">1340</span>
+<span class="line_number">1341</span>      _Ret
+<span class="line_number">1342</span>      operator()(_Tp&amp; __r, _Arg __x) const
+<span class="line_number">1343</span>      { return (__r.*_M_f)(__x); }
+<span class="line_number">1344</span>
+<span class="line_number">1345</span>    private:
+<span class="line_number">1346</span>      _Ret (_Tp::*_M_f)(_Arg);
+<span class="line_number">1347</span>    } _GLIBCXX11_DEPRECATED;
+<span class="line_number">1348</span>
+<span class="line_number">1349</span>  /// One of the @link ptrmem_adaptors adaptors for member pointers@endlink.
+<span class="line_number">1350</span>  template&lt;typename _Ret, typename _Tp, typename _Arg&gt;
+<span class="line_number">1351</span>    class const_mem_fun1_ref_t : public binary_function&lt;_Tp, _Arg, _Ret&gt;
+<span class="line_number">1352</span>    {
+<span class="line_number">1353</span>    public:
+<span class="line_number">1354</span>      explicit
+<span class="line_number">1355</span>      const_mem_fun1_ref_t(_Ret (_Tp::*__pf)(_Arg) const)
+<span class="line_number">1356</span>      : _M_f(__pf) { }
+<span class="line_number">1357</span>
+<span class="line_number">1358</span>      _Ret
+<span class="line_number">1359</span>      operator()(const _Tp&amp; __r, _Arg __x) const
+<span class="line_number">1360</span>      { return (__r.*_M_f)(__x); }
+<span class="line_number">1361</span>
+<span class="line_number">1362</span>    private:
+<span class="line_number">1363</span>      _Ret (_Tp::*_M_f)(_Arg) const;
+<span class="line_number">1364</span>    } _GLIBCXX11_DEPRECATED;
+<span class="line_number">1365</span>
+<span class="line_number">1366</span>  // Mem_fun adaptor helper functions.  There are only two:
+<span class="line_number">1367</span>  // mem_fun and mem_fun_ref.
+<span class="line_number">1368</span>  template&lt;typename _Ret, typename _Tp&gt;
+<span class="line_number">1369</span>    _GLIBCXX11_DEPRECATED_SUGGEST(&#34;std::mem_fn&#34;)
+<span class="line_number">1370</span>    inline mem_fun_t&lt;_Ret, _Tp&gt;
+<span class="line_number">1371</span>    mem_fun(_Ret (_Tp::*__f)())
+<span class="line_number">1372</span>    { return mem_fun_t&lt;_Ret, _Tp&gt;(__f); }
+<span class="line_number">1373</span>
+<span class="line_number">1374</span>  template&lt;typename _Ret, typename _Tp&gt;
+<span class="line_number">1375</span>    _GLIBCXX11_DEPRECATED_SUGGEST(&#34;std::mem_fn&#34;)
+<span class="line_number">1376</span>    inline const_mem_fun_t&lt;_Ret, _Tp&gt;
+<span class="line_number">1377</span>    mem_fun(_Ret (_Tp::*__f)() const)
+<span class="line_number">1378</span>    { return const_mem_fun_t&lt;_Ret, _Tp&gt;(__f); }
+<span class="line_number">1379</span>
+<span class="line_number">1380</span>  template&lt;typename _Ret, typename _Tp&gt;
+<span class="line_number">1381</span>    _GLIBCXX11_DEPRECATED_SUGGEST(&#34;std::mem_fn&#34;)
+<span class="line_number">1382</span>    inline mem_fun_ref_t&lt;_Ret, _Tp&gt;
+<span class="line_number">1383</span>    mem_fun_ref(_Ret (_Tp::*__f)())
+<span class="line_number">1384</span>    { return mem_fun_ref_t&lt;_Ret, _Tp&gt;(__f); }
+<span class="line_number">1385</span>
+<span class="line_number">1386</span>  template&lt;typename _Ret, typename _Tp&gt;
+<span class="line_number">1387</span>    _GLIBCXX11_DEPRECATED_SUGGEST(&#34;std::mem_fn&#34;)
+<span class="line_number">1388</span>    inline const_mem_fun_ref_t&lt;_Ret, _Tp&gt;
+<span class="line_number">1389</span>    mem_fun_ref(_Ret (_Tp::*__f)() const)
+<span class="line_number">1390</span>    { return const_mem_fun_ref_t&lt;_Ret, _Tp&gt;(__f); }
+<span class="line_number">1391</span>
+<span class="line_number">1392</span>  template&lt;typename _Ret, typename _Tp, typename _Arg&gt;
+<span class="line_number">1393</span>    _GLIBCXX11_DEPRECATED_SUGGEST(&#34;std::mem_fn&#34;)
+<span class="line_number">1394</span>    inline mem_fun1_t&lt;_Ret, _Tp, _Arg&gt;
+<span class="line_number">1395</span>    mem_fun(_Ret (_Tp::*__f)(_Arg))
+<span class="line_number">1396</span>    { return mem_fun1_t&lt;_Ret, _Tp, _Arg&gt;(__f); }
+<span class="line_number">1397</span>
+<span class="line_number">1398</span>  template&lt;typename _Ret, typename _Tp, typename _Arg&gt;
+<span class="line_number">1399</span>    _GLIBCXX11_DEPRECATED_SUGGEST(&#34;std::mem_fn&#34;)
+<span class="line_number">1400</span>    inline const_mem_fun1_t&lt;_Ret, _Tp, _Arg&gt;
+<span class="line_number">1401</span>    mem_fun(_Ret (_Tp::*__f)(_Arg) const)
+<span class="line_number">1402</span>    { return const_mem_fun1_t&lt;_Ret, _Tp, _Arg&gt;(__f); }
+<span class="line_number">1403</span>
+<span class="line_number">1404</span>  template&lt;typename _Ret, typename _Tp, typename _Arg&gt;
+<span class="line_number">1405</span>    _GLIBCXX11_DEPRECATED_SUGGEST(&#34;std::mem_fn&#34;)
+<span class="line_number">1406</span>    inline mem_fun1_ref_t&lt;_Ret, _Tp, _Arg&gt;
+<span class="line_number">1407</span>    mem_fun_ref(_Ret (_Tp::*__f)(_Arg))
+<span class="line_number">1408</span>    { return mem_fun1_ref_t&lt;_Ret, _Tp, _Arg&gt;(__f); }
+<span class="line_number">1409</span>
+<span class="line_number">1410</span>  template&lt;typename _Ret, typename _Tp, typename _Arg&gt;
+<span class="line_number">1411</span>    _GLIBCXX11_DEPRECATED_SUGGEST(&#34;std::mem_fn&#34;)
+<span class="line_number">1412</span>    inline const_mem_fun1_ref_t&lt;_Ret, _Tp, _Arg&gt;
+<span class="line_number">1413</span>    mem_fun_ref(_Ret (_Tp::*__f)(_Arg) const)
+<span class="line_number">1414</span>    { return const_mem_fun1_ref_t&lt;_Ret, _Tp, _Arg&gt;(__f); }
+<span class="line_number">1415</span>#pragma GCC diagnostic pop
+<span class="line_number">1416</span>
+<span class="line_number">1417</span>  /** @}  */
+<span class="line_number">1418</span>
+<span class="line_number">1419</span>#if __cplusplus &gt;= 201402L
+<span class="line_number">1420</span>  template&lt;typename _Func, typename _SfinaeType, typename = __void_t&lt;&gt;&gt;
+<span class="line_number">1421</span>    struct __has_is_transparent
+<span class="line_number">1422</span>    { };
+<span class="line_number">1423</span>
+<span class="line_number">1424</span>  template&lt;typename _Func, typename _SfinaeType&gt;
+<span class="line_number">1425</span>    struct __has_is_transparent&lt;_Func, _SfinaeType,
+<span class="line_number">1426</span>				__void_t&lt;typename _Func::is_transparent&gt;&gt;
+<span class="line_number">1427</span>    { typedef void type; };
+<span class="line_number">1428</span>
+<span class="line_number">1429</span>  template&lt;typename _Func, typename _SfinaeType&gt;
+<span class="line_number">1430</span>    using __has_is_transparent_t
+<span class="line_number">1431</span>      = typename __has_is_transparent&lt;_Func, _SfinaeType&gt;::type;
+<span class="line_number">1432</span>#endif
+<span class="line_number">1433</span>
+<span class="line_number">1434</span>_GLIBCXX_END_NAMESPACE_VERSION
+<span class="line_number">1435</span>} // namespace
+<span class="line_number">1436</span>
+<span class="line_number">1437</span>#if (__cplusplus &lt; 201103L) || _GLIBCXX_USE_DEPRECATED
+<span class="line_number">1438</span># include &lt;backward/binders.h&gt;
+<span class="line_number">1439</span>#endif
+<span class="line_number">1440</span>
+<span class="line_number">1441</span>#endif /* _STL_FUNCTION_H */
+</code>
+            </pre>
+        </div>
+    </div>
+</body>
+
+</html>
