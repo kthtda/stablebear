@@ -1683,18 +1683,32 @@ namespace sb
     return result;
   }
 
-  // Follows the numpy convention: |a - b| <= atol + rtol * |b|
+  // Per-element closeness with the numpy convention |a - b| <= atol + rtol*|b|,
+  // handling infinities exactly: equal (same-sign) infinities are close,
+  // finite-vs-inf and opposite-sign infinities are not, and NaN is never close
+  // (equal_nan=False). Without the inf special-case, |inf - inf| is NaN and the
+  // comparison wrongly reports +inf != +inf (issue #51).
+  template <typename T>
+  inline bool scalar_allclose(T a, T b, T atol, T rtol)
+  {
+    if (std::isinf(a) || std::isinf(b))
+      return a == b;
+    return std::abs(a - b) <= atol + rtol * std::abs(b);
+  }
+
   template <FloatType T>
   bool allclose(const Tensor<T>& a, const Tensor<T>& b, T atol, T rtol)
   {
-    if (a.shape() != b.shape())
-      return false;
+    // Broadcast like the elementwise operators do; incompatible shapes raise
+    // std::invalid_argument (-> ValueError) instead of silently returning false
+    // (issue #52).
+    auto out = broadcast_shapes(a.shape(), b.shape());
+    auto av = a.broadcast_to(out);
+    auto bv = b.broadcast_to(out);
 
     bool close = true;
-    walk(a, [&close, &a, &b, atol, rtol](const std::vector<size_t>& idx) {
-      auto aval = a(idx);
-      auto bval = b(idx);
-      return (close = (std::abs(aval - bval) <= atol + rtol * std::abs(bval)));
+    walk(av, [&close, &av, &bv, atol, rtol](const std::vector<size_t>& idx) {
+      return (close = scalar_allclose(av(idx), bv(idx), atol, rtol));
     });
     return close;
   }
@@ -1709,9 +1723,7 @@ namespace sb
 
     for (size_t i = 0; i < a.storage_count(); ++i)
     {
-      auto aval = a.data()[i];
-      auto bval = b.data()[i];
-      if (std::abs(aval - bval) > atol + rtol * std::abs(bval))
+      if (!scalar_allclose(a.data()[i], b.data()[i], atol, rtol))
         return false;
     }
     return true;
