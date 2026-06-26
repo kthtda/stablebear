@@ -1,0 +1,1053 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>/home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/../algorithm/partitioner.hpp</title>
+    <link href='valgrind.css' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+    <script src="https://code.jquery.com/jquery-3.4.1.js"></script>
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.0.0/styles/default.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.0.0/highlight.min.js"></script>
+    <script src="valgrind.js"></script>
+</head>
+
+<body>
+    <div class="global">
+        <div class="header">
+            <h1>/home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/../algorithm/partitioner.hpp</h1>
+            <p><b>1</b> errors</p>
+            <button class="next_error">Goto First Error</button>
+        </div>
+        <div class="listing">
+            <pre class="code">
+<code class="c++"><span class="line_number">1</span>// reference:
+<span class="line_number">2</span>// - gomp: https://github.com/gcc-mirror/gcc/blob/master/libgomp/iter.c
+<span class="line_number">3</span>// - komp: https://github.com/llvm-mirror/openmp/blob/master/runtime/src/kmp_dispatch.cpp
+<span class="line_number">4</span>
+<span class="line_number">5</span>#pragma once
+<span class="line_number">6</span>
+<span class="line_number">7</span>/**
+<span class="line_number">8</span>@file partitioner.hpp
+<span class="line_number">9</span>@brief partitioner include file
+<span class="line_number">10</span>*/
+<span class="line_number">11</span>
+<span class="line_number">12</span>namespace tf {
+<span class="line_number">13</span>
+<span class="line_number">14</span>/**
+<span class="line_number">15</span>@enum PartitionerType
+<span class="line_number">16</span>
+<span class="line_number">17</span>@brief enumeration of all partitioner types
+<span class="line_number">18</span>*/  
+<span class="line_number">19</span>enum class PartitionerType : int {
+<span class="line_number">20</span>  /** @brief static partitioner type */
+<span class="line_number">21</span>  STATIC,
+<span class="line_number">22</span>  /** @brief dynamic partitioner type */
+<span class="line_number">23</span>  DYNAMIC
+<span class="line_number">24</span>};
+<span class="line_number">25</span>
+<span class="line_number">26</span>
+<span class="line_number">27</span>//template &lt;typename C&gt;
+<span class="line_number">28</span>//class PartitionInvoker : public PartitionerBase {
+<span class="line_number">29</span>//
+<span class="line_number">30</span>//  protected
+<span class="line_number">31</span>//
+<span class="line_number">32</span>//  C _closure;
+<span class="line_number">33</span>//
+<span class="line_number">34</span>//  template &lt;typename... ArgsT&gt;
+<span class="line_number">35</span>//  auto operator()(ArgsT&amp;&amp;... args) {
+<span class="line_number">36</span>//    return std::invoke(closure, std::forward&lt;ArgsT&gt;(args)...);
+<span class="line_number">37</span>//  }
+<span class="line_number">38</span>//
+<span class="line_number">39</span>//  template &lt;typename... ArgsT&gt;
+<span class="line_number">40</span>//  auto operator()(ArgsT&amp;&amp;... args) const {
+<span class="line_number">41</span>//    return std::invoke(closure, std::forward&lt;ArgsT&gt;(args)...);
+<span class="line_number">42</span>//  }
+<span class="line_number">43</span>//
+<span class="line_number">44</span>//};
+<span class="line_number">45</span>
+<span class="line_number">46</span>/**
+<span class="line_number">47</span>@class DefaultClosureWrapper
+<span class="line_number">48</span>
+<span class="line_number">49</span>@brief class to create a default closure wrapper
+<span class="line_number">50</span>*/
+<span class="line_number">51</span>class DefaultClosureWrapper {};
+<span class="line_number">52</span>
+<span class="line_number">53</span>/**
+<span class="line_number">54</span>@private
+<span class="line_number">55</span>*/
+<span class="line_number">56</span>struct IsPartitioner {
+<span class="line_number">57</span>};
+<span class="line_number">58</span>
+<span class="line_number">59</span>// ----------------------------------------------------------------------------
+<span class="line_number">60</span>// Partitioner Base
+<span class="line_number">61</span>// ----------------------------------------------------------------------------
+<span class="line_number">62</span>
+<span class="line_number">63</span>/**
+<span class="line_number">64</span>@class PartitionerBase
+<span class="line_number">65</span>
+<span class="line_number">66</span>@brief class to derive a partitioner for scheduling parallel algorithms
+<span class="line_number">67</span>
+<span class="line_number">68</span>@tparam C closure wrapper type
+<span class="line_number">69</span>
+<span class="line_number">70</span>The class provides base methods to derive a partitioner that can be used
+<span class="line_number">71</span>to schedule parallel iterations (e.g., tf::Taskflow::for_each).
+<span class="line_number">72</span>
+<span class="line_number">73</span>An partitioner defines the scheduling method for running parallel algorithms,
+<span class="line_number">74</span>such tf::Taskflow::for_each, tf::Taskflow::reduce, and so on.
+<span class="line_number">75</span>By default, we provide the following partitioners: 
+<span class="line_number">76</span>
+<span class="line_number">77</span>+ tf::GuidedPartitioner  to enable guided scheduling algorithm of adaptive chunk size
+<span class="line_number">78</span>+ tf::DynamicPartitioner to enable dynamic scheduling algorithm of equal chunk size
+<span class="line_number">79</span>+ tf::StaticPartitioner  to enable static scheduling algorithm of static chunk size
+<span class="line_number">80</span>+ tf::RandomPartitioner  to enable random scheduling algorithm of random chunk size
+<span class="line_number">81</span>
+<span class="line_number">82</span>Depending on applications, partitioning algorithms can impact the performance
+<span class="line_number">83</span>a lot. 
+<span class="line_number">84</span>For example, if a parallel-iteration workload contains a regular work unit per
+<span class="line_number">85</span>iteration, tf::StaticPartitioner can deliver the best performance.
+<span class="line_number">86</span>On the other hand, if the work unit per iteration is irregular and unbalanced,
+<span class="line_number">87</span>tf::GuidedPartitioner or tf::DynamicPartitioner can outperform tf::StaticPartitioner.
+<span class="line_number">88</span>In most situations, tf::GuidedPartitioner can deliver decent performance and
+<span class="line_number">89</span>is thus used as our default partitioner.
+<span class="line_number">90</span>
+<span class="line_number">91</span>@attention
+<span class="line_number">92</span>Giving the partition size of 0 lets the %Taskflow runtime automatically determines
+<span class="line_number">93</span>the partition size for the given partitioner.
+<span class="line_number">94</span>
+<span class="line_number">95</span>
+<span class="line_number">96</span>In addition to partition size, the application can specify a closure wrapper
+<span class="line_number">97</span>for a partitioner.
+<span class="line_number">98</span>A closure wrapper allows the application to wrap a partitioned task 
+<span class="line_number">99</span>(i.e., closure) with a custom function object that performs additional tasks.
+<span class="line_number">100</span>For example:
+<span class="line_number">101</span>
+<span class="line_number">102</span>@code{.cpp}
+<span class="line_number">103</span>std::atomic&lt;int&gt; count = 0;
+<span class="line_number">104</span>tf::Taskflow taskflow;
+<span class="line_number">105</span>taskflow.for_each_index(0, 100, 1, 
+<span class="line_number">106</span>  [](){                 
+<span class="line_number">107</span>    printf(&#34;%d\n&#34;, i); 
+<span class="line_number">108</span>  },
+<span class="line_number">109</span>  tf::StaticPartitioner(0, [](auto&amp;&amp; closure){
+<span class="line_number">110</span>    // do something before invoking the partitioned task
+<span class="line_number">111</span>    // ...
+<span class="line_number">112</span>    
+<span class="line_number">113</span>    // invoke the partitioned task
+<span class="line_number">114</span>    closure();
+<span class="line_number">115</span>
+<span class="line_number">116</span>    // do something else after invoking the partitioned task
+<span class="line_number">117</span>    // ...
+<span class="line_number">118</span>  }
+<span class="line_number">119</span>);
+<span class="line_number">120</span>executor.run(taskflow).wait();
+<span class="line_number">121</span>@endcode
+<span class="line_number">122</span>
+<span class="line_number">123</span>@attention
+<span class="line_number">124</span>The default closure wrapper (tf::DefaultClosureWrapper) does nothing but invoke
+<span class="line_number">125</span>the partitioned task (closure).
+<span class="line_number">126</span>
+<span class="line_number">127</span>*/
+<span class="line_number">128</span>template &lt;typename C = DefaultClosureWrapper&gt;
+<span class="line_number">129</span>class PartitionerBase : public IsPartitioner {
+<span class="line_number">130</span>
+<span class="line_number">131</span>  public:
+<span class="line_number">132</span>  
+<span class="line_number">133</span>  /**
+<span class="line_number">134</span>  @brief indicating if the given closure wrapper is a default wrapper (i.e., empty)
+<span class="line_number">135</span>  */
+<span class="line_number">136</span>  constexpr static bool is_default_wrapper_v = std::is_same_v&lt;C, DefaultClosureWrapper&gt;;
+<span class="line_number">137</span>  
+<span class="line_number">138</span>  /** 
+<span class="line_number">139</span>  @brief the closure type
+<span class="line_number">140</span>  */
+<span class="line_number">141</span>  using closure_wrapper_type = C;
+<span class="line_number">142</span>
+<span class="line_number">143</span>  /**
+<span class="line_number">144</span>  @brief default constructor
+<span class="line_number">145</span>  */
+<span class="line_number">146</span>  PartitionerBase() = default;
+<span class="line_number">147</span>
+<span class="line_number">148</span>  /**
+<span class="line_number">149</span>  @brief construct a partitioner with the given chunk size
+<span class="line_number">150</span>  */
+<span class="line_number">151</span>  explicit PartitionerBase(size_t chunk_size) : _chunk_size {chunk_size} {}
+<span class="line_number">152</span>  
+<span class="line_number">153</span>  /**
+<span class="line_number">154</span>  @brief construct a partitioner with the given chunk size and closure wrapper
+<span class="line_number">155</span>  */
+<span class="line_number">156</span>  PartitionerBase(size_t chunk_size, C&amp;&amp; closure_wrapper) :
+<span class="line_number">157</span>    _chunk_size {chunk_size},
+<span class="line_number">158</span>    _closure_wrapper {std::forward&lt;C&gt;(closure_wrapper)} {
+<span class="line_number">159</span>  }
+<span class="line_number">160</span>
+<span class="line_number">161</span>  /**
+<span class="line_number">162</span>  @brief query the chunk size of this partitioner
+<span class="line_number">163</span>  */
+</code></pre>
+            <div class="issue">
+                <div>
+                    <span class="what">Possible data race during read of size 8 at 0x29FC9EA8 by thread #11</span>
+                    <div class="navigation">
+                        <button class="next_error">Next</button>
+                        <button class="prev_error">Previous</button>
+                    </div>
+                </div>
+                <div>
+                    <table class="call_stack">
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/algorithm/for_each.hpp:98<br>
+                                    <code class="cpp">tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt;, sb::ph::RipserTaskImpl&lt;sb::Tensor&lt;double&gt;, double&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt; const&amp;, sb::ph::RipserTaskImpl&lt;sb::Tensor&lt;double&gt;, double&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt; const&amp;, sb::ph::RipserTaskImpl&lt;sb::Tensor&lt;double&gt;, double&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt;, sb::ph::RipserTaskImpl&lt;sb::Tensor&lt;double&gt;, double&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt; const&amp;, sb::ph::RipserTaskImpl&lt;sb::Tensor&lt;double&gt;, double&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt; const&amp;, sb::ph::RipserTaskImpl&lt;sb::Tensor&lt;double&gt;, double&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">95</span>    size_t N = distance(beg, end, inc);
+<span class="line_number">96</span>
+<span class="line_number">97</span>    // only myself - no need to spawn another graph
+<span class="line_number">98</span><span class="error">    if(W &lt;= 1 || N &lt;= part.chunk_size()) {
+</span><span class="line_number">99</span>      part([=]() mutable {
+<span class="line_number">100</span>        for(size_t x=0; x&lt;N; x++, beg+=inc) {
+<span class="line_number">101</span>          c(beg);
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:61<br>
+                                    <code class="cpp">void std::__invoke_impl&lt;void, tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt;, sb::ph::RipserTaskImpl&lt;sb::Tensor&lt;double&gt;, double&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt; const&amp;, sb::ph::RipserTaskImpl&lt;sb::Tensor&lt;double&gt;, double&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt; const&amp;, sb::ph::RipserTaskImpl&lt;sb::Tensor&lt;double&gt;, double&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt;, sb::ph::RipserTaskImpl&lt;sb::Tensor&lt;double&gt;, double&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt; const&amp;, sb::ph::RipserTaskImpl&lt;sb::Tensor&lt;double&gt;, double&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt; const&amp;, sb::ph::RipserTaskImpl&lt;sb::Tensor&lt;double&gt;, double&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}&amp;, tf::Runtime&amp;&gt;(std::__invoke_other, sb::ph::RipserTaskImpl&lt;sb::Tensor&lt;double&gt;, double&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, tf::Runtime&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">58</span>  template&lt;typename _Res, typename _Fn, typename... _Args&gt;
+<span class="line_number">59</span>    constexpr _Res
+<span class="line_number">60</span>    __invoke_impl(__invoke_other, _Fn&amp;&amp; __f, _Args&amp;&amp;... __args)
+<span class="line_number">61</span><span class="error">    { return std::forward&lt;_Fn&gt;(__f)(std::forward&lt;_Args&gt;(__args)...); }
+</span><span class="line_number">62</span>
+<span class="line_number">63</span>  template&lt;typename _Res, typename _MemFun, typename _Tp, typename... _Args&gt;
+<span class="line_number">64</span>    constexpr _Res
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:111<br>
+                                    <code class="cpp">_ZSt10__invoke_rIvRZN2tf24make_for_each_index_taskImmmZN2sb6detail18parallel_walk_implINS2_6TensorINS5_IdEEEEZNS2_19parallel_walk_asyncIS7_ZNS2_2ph14RipserTaskImplIS6_dE9run_asyncERNS2_8ExecutorEEUlRKSt6vectorImSaImEEE_EENS0_6FutureIvEERKT_OT0_SD_EUlSI_mE_EESL_SO_SQ_SD_EUlmE0_NS0_17GuidedPartitionerINS0_21DefaultClosureWrapperEEEEEDaSM_SP_T1_T2_T3_EUlRNS0_7RuntimeEE_JS10_EENSt9enable_ifIX16is_invocable_r_vISM_SP_DpT1_EESM_E4typeESQ_DpOS14_</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">108</span>      using __type = typename __result::type;
+<span class="line_number">109</span>      using __tag = typename __result::__invoke_type;
+<span class="line_number">110</span>      if constexpr (is_void_v&lt;_Res&gt;)
+<span class="line_number">111</span><span class="error">	std::__invoke_impl&lt;__type&gt;(__tag{}, std::forward&lt;_Callable&gt;(__fn),
+</span><span class="line_number">112</span>					std::forward&lt;_Args&gt;(__args)...);
+<span class="line_number">113</span>      else
+<span class="line_number">114</span>	return std::__invoke_impl&lt;__type&gt;(__tag{},
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/std_function.h:290<br>
+                                    <code class="cpp">std::_Function_handler&lt;void (tf::Runtime&amp;), tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt;, sb::ph::RipserTaskImpl&lt;sb::Tensor&lt;double&gt;, double&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt; const&amp;, sb::ph::RipserTaskImpl&lt;sb::Tensor&lt;double&gt;, double&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt; const&amp;, sb::ph::RipserTaskImpl&lt;sb::Tensor&lt;double&gt;, double&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt;, sb::ph::RipserTaskImpl&lt;sb::Tensor&lt;double&gt;, double&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt; const&amp;, sb::ph::RipserTaskImpl&lt;sb::Tensor&lt;double&gt;, double&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::Tensor&lt;double&gt; &gt; const&amp;, sb::ph::RipserTaskImpl&lt;sb::Tensor&lt;double&gt;, double&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}&gt;::_M_invoke(std::_Any_data const&amp;, tf::Runtime&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">287</span>      static _Res
+<span class="line_number">288</span>      _M_invoke(const _Any_data&amp; __functor, _ArgTypes&amp;&amp;... __args)
+<span class="line_number">289</span>      {
+<span class="line_number">290</span><span class="error">	return std::__invoke_r&lt;_Res&gt;(*_Base::_M_get_pointer(__functor),
+</span><span class="line_number">291</span>				     std::forward&lt;_ArgTypes&gt;(__args)...);
+<span class="line_number">292</span>      }
+<span class="line_number">293</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/std_function.h:591<br>
+                                    <code class="cpp">std::function&lt;void (tf::Runtime&amp;)&gt;::operator()(tf::Runtime&amp;) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">588</span>      {
+<span class="line_number">589</span>	if (_M_empty())
+<span class="line_number">590</span>	  __throw_bad_function_call();
+<span class="line_number">591</span><span class="error">	return _M_invoker(_M_functor, std::forward&lt;_ArgTypes&gt;(__args)...);
+</span><span class="line_number">592</span>      }
+<span class="line_number">593</span>
+<span class="line_number">594</span>#if __cpp_rtti
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/runtime.hpp:826<br>
+                                    <code class="cpp">tf::Executor::_invoke_runtime_task_impl(tf::Worker&amp;, tf::Node*, std::function&lt;void (tf::Runtime&amp;)&gt;&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">823</span>    node-&gt;_join_counter.fetch_add(1, std::memory_order_release);
+<span class="line_number">824</span>
+<span class="line_number">825</span>    _observer_prologue(worker, node);
+<span class="line_number">826</span><span class="error">    TF_EXECUTOR_EXCEPTION_HANDLER(worker, node, {
+</span><span class="line_number">827</span>      work(rt);
+<span class="line_number">828</span>    });
+<span class="line_number">829</span>    _observer_epilogue(worker, node);
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/runtime.hpp:807<br>
+                                    <code class="cpp">tf::Executor::_invoke_runtime_task(tf::Worker&amp;, tf::Node*)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">804</span>
+<span class="line_number">805</span>// Procedure: _invoke_runtime_task
+<span class="line_number">806</span>inline bool Executor::_invoke_runtime_task(Worker&amp; worker, Node* node) {
+<span class="line_number">807</span><span class="error">  return _invoke_runtime_task_impl(
+</span><span class="line_number">808</span>    worker, node, std::get_if&lt;Node::Runtime&gt;(&amp;node-&gt;_handle)-&gt;work
+<span class="line_number">809</span>  );
+<span class="line_number">810</span>}
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/executor.hpp:1668<br>
+                                    <code class="cpp">tf::Executor::_invoke(tf::Worker&amp;, tf::Node*)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1665</span>    
+<span class="line_number">1666</span>    // runtime task
+<span class="line_number">1667</span>    case Node::RUNTIME:{
+<span class="line_number">1668</span><span class="error">      if(_invoke_runtime_task(worker, node)) {
+</span><span class="line_number">1669</span>        return;
+<span class="line_number">1670</span>      }
+<span class="line_number">1671</span>    }
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/executor.hpp:1424<br>
+                                    <code class="cpp">tf::Executor::_exploit_task(tf::Worker&amp;, tf::Node*&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1421</span>// Procedure: _exploit_task
+<span class="line_number">1422</span>inline void Executor::_exploit_task(Worker&amp; w, Node*&amp; t) {
+<span class="line_number">1423</span>  while(t) {
+<span class="line_number">1424</span><span class="error">    _invoke(w, t);
+</span><span class="line_number">1425</span>    t = w._wsq.pop();
+<span class="line_number">1426</span>  }
+<span class="line_number">1427</span>}
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/executor.hpp:1327<br>
+                                    <code class="cpp">tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}::operator()() const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1324</span>        while(1) {
+<span class="line_number">1325</span>
+<span class="line_number">1326</span>          // drains out the local queue first
+<span class="line_number">1327</span><span class="error">          _exploit_task(worker, t);
+</span><span class="line_number">1328</span>
+<span class="line_number">1329</span>          // steals and waits for tasks
+<span class="line_number">1330</span>          if(_wait_for_task(worker, t) == false) {
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:61<br>
+                                    <code class="cpp">void std::__invoke_impl&lt;void, tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}&gt;(std::__invoke_other, tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}&amp;&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">58</span>  template&lt;typename _Res, typename _Fn, typename... _Args&gt;
+<span class="line_number">59</span>    constexpr _Res
+<span class="line_number">60</span>    __invoke_impl(__invoke_other, _Fn&amp;&amp; __f, _Args&amp;&amp;... __args)
+<span class="line_number">61</span><span class="error">    { return std::forward&lt;_Fn&gt;(__f)(std::forward&lt;_Args&gt;(__args)...); }
+</span><span class="line_number">62</span>
+<span class="line_number">63</span>  template&lt;typename _Res, typename _MemFun, typename _Tp, typename... _Args&gt;
+<span class="line_number">64</span>    constexpr _Res
+</code></pre>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            <pre class="code">
+<code class="c++"><span class="line_number">164</span><span class="error">  size_t chunk_size() const { return _chunk_size; }</span>
+<span class="line_number">165</span>  
+<span class="line_number">166</span>  /**
+<span class="line_number">167</span>  @brief update the chunk size of this partitioner
+<span class="line_number">168</span>  */
+<span class="line_number">169</span>  void chunk_size(size_t cz) { _chunk_size = cz; }
+<span class="line_number">170</span>
+<span class="line_number">171</span>  /**
+<span class="line_number">172</span>  @brief acquire an immutable access to the closure wrapper object
+<span class="line_number">173</span>  */
+<span class="line_number">174</span>  const C&amp; closure_wrapper() const { return _closure_wrapper; }
+<span class="line_number">175</span>
+<span class="line_number">176</span>  /**
+<span class="line_number">177</span>  @brief acquire a mutable access to the closure wrapper object
+<span class="line_number">178</span>  */
+<span class="line_number">179</span>  C&amp; closure_wrapper() { return _closure_wrapper; }
+<span class="line_number">180</span>
+<span class="line_number">181</span>  /**
+<span class="line_number">182</span>  @brief modify the closure wrapper object
+<span class="line_number">183</span>  */
+<span class="line_number">184</span>  template &lt;typename F&gt;
+<span class="line_number">185</span>  void closure_wrapper(F&amp;&amp; fn) { _closure_wrapper = std::forward&lt;F&gt;(fn); }
+<span class="line_number">186</span>
+<span class="line_number">187</span>  /**
+<span class="line_number">188</span>  @brief wraps the given callable with the associated closure wrapper
+<span class="line_number">189</span>  */
+<span class="line_number">190</span>  template &lt;typename F&gt;
+<span class="line_number">191</span>  TF_FORCE_INLINE decltype(auto) operator () (F&amp;&amp; callable) {
+<span class="line_number">192</span>    if constexpr(is_default_wrapper_v) {
+<span class="line_number">193</span>      return std::forward&lt;F&gt;(callable);
+<span class="line_number">194</span>    }
+<span class="line_number">195</span>    else {
+<span class="line_number">196</span>      // closure wrapper is stateful - capture it by reference
+<span class="line_number">197</span>      return [this, c=std::forward&lt;F&gt;(callable)]() mutable { _closure_wrapper(c); };
+<span class="line_number">198</span>    }
+<span class="line_number">199</span>  }
+<span class="line_number">200</span>
+<span class="line_number">201</span>  protected:
+<span class="line_number">202</span>  
+<span class="line_number">203</span>  /**
+<span class="line_number">204</span>  @brief chunk size 
+<span class="line_number">205</span>  */
+<span class="line_number">206</span>  size_t _chunk_size{0};
+<span class="line_number">207</span>
+<span class="line_number">208</span>  /**
+<span class="line_number">209</span>  @brief closure wrapper
+<span class="line_number">210</span>  */
+<span class="line_number">211</span>  C _closure_wrapper;
+<span class="line_number">212</span>};
+<span class="line_number">213</span>
+<span class="line_number">214</span>// ----------------------------------------------------------------------------
+<span class="line_number">215</span>// Guided Partitioner
+<span class="line_number">216</span>// ----------------------------------------------------------------------------
+<span class="line_number">217</span>
+<span class="line_number">218</span>/**
+<span class="line_number">219</span>@class GuidedPartitioner
+<span class="line_number">220</span>
+<span class="line_number">221</span>@tparam C closure wrapper type (default tf::DefaultClosureWrapper)
+<span class="line_number">222</span>
+<span class="line_number">223</span>@brief class to create a guided partitioner for scheduling parallel algorithms
+<span class="line_number">224</span>
+<span class="line_number">225</span>The size of a partition is proportional to the number of unassigned iterations 
+<span class="line_number">226</span>divided by the number of workers, 
+<span class="line_number">227</span>and the size will gradually decrease to the given chunk size.
+<span class="line_number">228</span>The last partition may be smaller than the chunk size.
+<span class="line_number">229</span>
+<span class="line_number">230</span>In addition to partition size, the application can specify a closure wrapper
+<span class="line_number">231</span>for a guided partitioner.
+<span class="line_number">232</span>A closure wrapper allows the application to wrap a partitioned task 
+<span class="line_number">233</span>(i.e., closure) with a custom function object that performs additional tasks.
+<span class="line_number">234</span>For example:
+<span class="line_number">235</span>
+<span class="line_number">236</span>@code{.cpp}
+<span class="line_number">237</span>std::atomic&lt;int&gt; count = 0;
+<span class="line_number">238</span>tf::Taskflow taskflow;
+<span class="line_number">239</span>taskflow.for_each_index(0, 100, 1, 
+<span class="line_number">240</span>  [](){                 
+<span class="line_number">241</span>    printf(&#34;%d\n&#34;, i); 
+<span class="line_number">242</span>  },
+<span class="line_number">243</span>  tf::GuidedPartitioner(0, [](auto&amp;&amp; closure){
+<span class="line_number">244</span>    // do something before invoking the partitioned task
+<span class="line_number">245</span>    // ...
+<span class="line_number">246</span>    
+<span class="line_number">247</span>    // invoke the partitioned task
+<span class="line_number">248</span>    closure();
+<span class="line_number">249</span>
+<span class="line_number">250</span>    // do something else after invoking the partitioned task
+<span class="line_number">251</span>    // ...
+<span class="line_number">252</span>  }
+<span class="line_number">253</span>);
+<span class="line_number">254</span>executor.run(taskflow).wait();
+<span class="line_number">255</span>@endcode
+<span class="line_number">256</span>*/
+<span class="line_number">257</span>template &lt;typename C = DefaultClosureWrapper&gt;
+<span class="line_number">258</span>class GuidedPartitioner : public PartitionerBase&lt;C&gt; {
+<span class="line_number">259</span>
+<span class="line_number">260</span>  public:
+<span class="line_number">261</span>  
+<span class="line_number">262</span>  /**
+<span class="line_number">263</span>  @brief queries the partition type (dynamic)
+<span class="line_number">264</span>  */
+<span class="line_number">265</span>  static constexpr PartitionerType type() { return PartitionerType::DYNAMIC; }
+<span class="line_number">266</span>  
+<span class="line_number">267</span>  /**
+<span class="line_number">268</span>  @brief default constructor
+<span class="line_number">269</span>  */
+<span class="line_number">270</span>  GuidedPartitioner() = default;
+<span class="line_number">271</span>
+<span class="line_number">272</span>  /**
+<span class="line_number">273</span>  @brief construct a guided partitioner with the given chunk size
+<span class="line_number">274</span>
+<span class="line_number">275</span>  */
+<span class="line_number">276</span>  explicit GuidedPartitioner(size_t sz) : PartitionerBase&lt;C&gt; (sz) {}
+<span class="line_number">277</span> 
+<span class="line_number">278</span>  /**
+<span class="line_number">279</span>  @brief construct a guided partitioner with the given chunk size and the closure
+<span class="line_number">280</span>  */ 
+<span class="line_number">281</span>  explicit GuidedPartitioner(size_t sz, C&amp;&amp; closure) :
+<span class="line_number">282</span>    PartitionerBase&lt;C&gt;(sz, std::forward&lt;C&gt;(closure)) {
+<span class="line_number">283</span>  }
+<span class="line_number">284</span>  
+<span class="line_number">285</span>  // --------------------------------------------------------------------------
+<span class="line_number">286</span>  // scheduling methods
+<span class="line_number">287</span>  // --------------------------------------------------------------------------
+<span class="line_number">288</span>  
+<span class="line_number">289</span>  /**
+<span class="line_number">290</span>  @private
+<span class="line_number">291</span>  */
+<span class="line_number">292</span>  template &lt;typename F, 
+<span class="line_number">293</span>    std::enable_if_t&lt;std::is_invocable_r_v&lt;void, F, size_t, size_t&gt;, void&gt;* = nullptr
+<span class="line_number">294</span>  &gt;
+<span class="line_number">295</span>  void loop(
+<span class="line_number">296</span>    size_t N, size_t W, std::atomic&lt;size_t&gt;&amp; next, F&amp;&amp; func
+<span class="line_number">297</span>  ) const {
+<span class="line_number">298</span>
+<span class="line_number">299</span>    size_t chunk_size = (this-&gt;_chunk_size == 0) ? size_t{1} : this-&gt;_chunk_size;
+<span class="line_number">300</span>
+<span class="line_number">301</span>    size_t p1 = 2 * W * (chunk_size + 1);
+<span class="line_number">302</span>    float  p2 = 0.5f / static_cast&lt;float&gt;(W);
+<span class="line_number">303</span>    size_t curr_b = next.load(std::memory_order_relaxed);
+<span class="line_number">304</span>
+<span class="line_number">305</span>    while(curr_b &lt; N) {
+<span class="line_number">306</span>
+<span class="line_number">307</span>      size_t r = N - curr_b;
+<span class="line_number">308</span>
+<span class="line_number">309</span>      // fine-grained
+<span class="line_number">310</span>      if(r &lt; p1) {
+<span class="line_number">311</span>        while(1) {
+<span class="line_number">312</span>          curr_b = next.fetch_add(chunk_size, std::memory_order_relaxed);
+<span class="line_number">313</span>          if(curr_b &gt;= N) {
+<span class="line_number">314</span>            return;
+<span class="line_number">315</span>          }
+<span class="line_number">316</span>          func(curr_b, (std::min)(curr_b + chunk_size, N));
+<span class="line_number">317</span>        }
+<span class="line_number">318</span>        break;
+<span class="line_number">319</span>      }
+<span class="line_number">320</span>      // coarse-grained
+<span class="line_number">321</span>      else {
+<span class="line_number">322</span>        size_t q = static_cast&lt;size_t&gt;(p2 * r);
+<span class="line_number">323</span>        if(q &lt; chunk_size) {
+<span class="line_number">324</span>          q = chunk_size;
+<span class="line_number">325</span>        }
+<span class="line_number">326</span>        //size_t curr_e = (q &lt;= r) ? curr_b + q : N;
+<span class="line_number">327</span>        size_t curr_e = (std::min)(curr_b + q, N);
+<span class="line_number">328</span>        if(next.compare_exchange_strong(curr_b, curr_e, std::memory_order_relaxed,
+<span class="line_number">329</span>                                                        std::memory_order_relaxed)) {
+<span class="line_number">330</span>          func(curr_b, curr_e);
+<span class="line_number">331</span>          curr_b = next.load(std::memory_order_relaxed);
+<span class="line_number">332</span>        }
+<span class="line_number">333</span>      }
+<span class="line_number">334</span>    }
+<span class="line_number">335</span>  }
+<span class="line_number">336</span>  
+<span class="line_number">337</span>  /**
+<span class="line_number">338</span>  @private
+<span class="line_number">339</span>  */
+<span class="line_number">340</span>  template &lt;typename F, 
+<span class="line_number">341</span>    std::enable_if_t&lt;std::is_invocable_r_v&lt;bool, F, size_t, size_t&gt;, void&gt;* = nullptr
+<span class="line_number">342</span>  &gt;
+<span class="line_number">343</span>  void loop_until(
+<span class="line_number">344</span>    size_t N, size_t W, std::atomic&lt;size_t&gt;&amp; next, F&amp;&amp; func
+<span class="line_number">345</span>  ) const {
+<span class="line_number">346</span>
+<span class="line_number">347</span>    size_t chunk_size = (this-&gt;_chunk_size == 0) ? size_t{1} : this-&gt;_chunk_size;
+<span class="line_number">348</span>
+<span class="line_number">349</span>    size_t p1 = 2 * W * (chunk_size + 1);
+<span class="line_number">350</span>    float  p2 = 0.5f / static_cast&lt;float&gt;(W);
+<span class="line_number">351</span>    size_t curr_b = next.load(std::memory_order_relaxed);
+<span class="line_number">352</span>
+<span class="line_number">353</span>    while(curr_b &lt; N) {
+<span class="line_number">354</span>
+<span class="line_number">355</span>      size_t r = N - curr_b;
+<span class="line_number">356</span>
+<span class="line_number">357</span>      // fine-grained
+<span class="line_number">358</span>      if(r &lt; p1) {
+<span class="line_number">359</span>        while(1) {
+<span class="line_number">360</span>          curr_b = next.fetch_add(chunk_size, std::memory_order_relaxed);
+<span class="line_number">361</span>          if(curr_b &gt;= N) {
+<span class="line_number">362</span>            return;
+<span class="line_number">363</span>          }
+<span class="line_number">364</span>          if(func(curr_b, (std::min)(curr_b + chunk_size, N))) {
+<span class="line_number">365</span>            return;
+<span class="line_number">366</span>          }
+<span class="line_number">367</span>        }
+<span class="line_number">368</span>        break;
+<span class="line_number">369</span>      }
+<span class="line_number">370</span>      // coarse-grained
+<span class="line_number">371</span>      else {
+<span class="line_number">372</span>        size_t q = static_cast&lt;size_t&gt;(p2 * r);
+<span class="line_number">373</span>        if(q &lt; chunk_size) {
+<span class="line_number">374</span>          q = chunk_size;
+<span class="line_number">375</span>        }
+<span class="line_number">376</span>        //size_t curr_e = (q &lt;= r) ? curr_b + q : N;
+<span class="line_number">377</span>        size_t curr_e = (std::min)(curr_b + q, N);
+<span class="line_number">378</span>        if(next.compare_exchange_strong(curr_b, curr_e, std::memory_order_relaxed,
+<span class="line_number">379</span>                                                        std::memory_order_relaxed)) {
+<span class="line_number">380</span>          if(func(curr_b, curr_e)) {
+<span class="line_number">381</span>            return;
+<span class="line_number">382</span>          }
+<span class="line_number">383</span>          curr_b = next.load(std::memory_order_relaxed);
+<span class="line_number">384</span>        }
+<span class="line_number">385</span>      }
+<span class="line_number">386</span>    }
+<span class="line_number">387</span>  }
+<span class="line_number">388</span>
+<span class="line_number">389</span>};
+<span class="line_number">390</span>
+<span class="line_number">391</span>// ----------------------------------------------------------------------------
+<span class="line_number">392</span>// Dynamic Partitioner
+<span class="line_number">393</span>// ----------------------------------------------------------------------------
+<span class="line_number">394</span>
+<span class="line_number">395</span>/**
+<span class="line_number">396</span>@class DynamicPartitioner
+<span class="line_number">397</span>
+<span class="line_number">398</span>@brief class to create a dynamic partitioner for scheduling parallel algorithms
+<span class="line_number">399</span>
+<span class="line_number">400</span>@tparam C closure wrapper type (default tf::DefaultClosureWrapper)
+<span class="line_number">401</span>
+<span class="line_number">402</span>The partitioner splits iterations into many partitions each of size equal to 
+<span class="line_number">403</span>the given chunk size.
+<span class="line_number">404</span>Different partitions are distributed dynamically to workers 
+<span class="line_number">405</span>without any specific order.
+<span class="line_number">406</span>
+<span class="line_number">407</span>In addition to partition size, the application can specify a closure wrapper
+<span class="line_number">408</span>for a dynamic partitioner.
+<span class="line_number">409</span>A closure wrapper allows the application to wrap a partitioned task 
+<span class="line_number">410</span>(i.e., closure) with a custom function object that performs additional tasks.
+<span class="line_number">411</span>For example:
+<span class="line_number">412</span>
+<span class="line_number">413</span>@code{.cpp}
+<span class="line_number">414</span>std::atomic&lt;int&gt; count = 0;
+<span class="line_number">415</span>tf::Taskflow taskflow;
+<span class="line_number">416</span>taskflow.for_each_index(0, 100, 1, 
+<span class="line_number">417</span>  [](){                 
+<span class="line_number">418</span>    printf(&#34;%d\n&#34;, i); 
+<span class="line_number">419</span>  },
+<span class="line_number">420</span>  tf::DynamicPartitioner(0, [](auto&amp;&amp; closure){
+<span class="line_number">421</span>    // do something before invoking the partitioned task
+<span class="line_number">422</span>    // ...
+<span class="line_number">423</span>    
+<span class="line_number">424</span>    // invoke the partitioned task
+<span class="line_number">425</span>    closure();
+<span class="line_number">426</span>
+<span class="line_number">427</span>    // do something else after invoking the partitioned task
+<span class="line_number">428</span>    // ...
+<span class="line_number">429</span>  }
+<span class="line_number">430</span>);
+<span class="line_number">431</span>executor.run(taskflow).wait();
+<span class="line_number">432</span>@endcode
+<span class="line_number">433</span>*/
+<span class="line_number">434</span>template &lt;typename C = DefaultClosureWrapper&gt;
+<span class="line_number">435</span>class DynamicPartitioner : public PartitionerBase&lt;C&gt; {
+<span class="line_number">436</span>
+<span class="line_number">437</span>  public:
+<span class="line_number">438</span>  
+<span class="line_number">439</span>  /**
+<span class="line_number">440</span>  @brief queries the partition type (dynamic)
+<span class="line_number">441</span>  */
+<span class="line_number">442</span>  static constexpr PartitionerType type() { return PartitionerType::DYNAMIC; }
+<span class="line_number">443</span>
+<span class="line_number">444</span>  /**
+<span class="line_number">445</span>  @brief default constructor
+<span class="line_number">446</span>  */
+<span class="line_number">447</span>  DynamicPartitioner() = default;
+<span class="line_number">448</span>  
+<span class="line_number">449</span>  /**
+<span class="line_number">450</span>  @brief construct a dynamic partitioner with the given chunk size
+<span class="line_number">451</span>  */
+<span class="line_number">452</span>  explicit DynamicPartitioner(size_t sz) : PartitionerBase&lt;C&gt;(sz) {}
+<span class="line_number">453</span>  
+<span class="line_number">454</span>  /**
+<span class="line_number">455</span>  @brief construct a dynamic partitioner with the given chunk size and the closure
+<span class="line_number">456</span>  */ 
+<span class="line_number">457</span>  explicit DynamicPartitioner(size_t sz, C&amp;&amp; closure) :
+<span class="line_number">458</span>    PartitionerBase&lt;C&gt;(sz, std::forward&lt;C&gt;(closure)) {
+<span class="line_number">459</span>  }
+<span class="line_number">460</span>  
+<span class="line_number">461</span>  // --------------------------------------------------------------------------
+<span class="line_number">462</span>  // scheduling methods
+<span class="line_number">463</span>  // --------------------------------------------------------------------------
+<span class="line_number">464</span>
+<span class="line_number">465</span>  /**
+<span class="line_number">466</span>  @private
+<span class="line_number">467</span>  */
+<span class="line_number">468</span>  template &lt;typename F, 
+<span class="line_number">469</span>    std::enable_if_t&lt;std::is_invocable_r_v&lt;void, F, size_t, size_t&gt;, void&gt;* = nullptr
+<span class="line_number">470</span>  &gt;
+<span class="line_number">471</span>  void loop(
+<span class="line_number">472</span>    size_t N, size_t, std::atomic&lt;size_t&gt;&amp; next, F&amp;&amp; func
+<span class="line_number">473</span>  ) const {
+<span class="line_number">474</span>
+<span class="line_number">475</span>    size_t chunk_size = (this-&gt;_chunk_size == 0) ? size_t{1} : this-&gt;_chunk_size;
+<span class="line_number">476</span>    size_t curr_b = next.fetch_add(chunk_size, std::memory_order_relaxed);
+<span class="line_number">477</span>
+<span class="line_number">478</span>    while(curr_b &lt; N) {
+<span class="line_number">479</span>      func(curr_b, (std::min)(curr_b + chunk_size, N));
+<span class="line_number">480</span>      curr_b = next.fetch_add(chunk_size, std::memory_order_relaxed);
+<span class="line_number">481</span>    }
+<span class="line_number">482</span>  }
+<span class="line_number">483</span>  
+<span class="line_number">484</span>  /**
+<span class="line_number">485</span>  @private
+<span class="line_number">486</span>  */
+<span class="line_number">487</span>  template &lt;typename F, 
+<span class="line_number">488</span>    std::enable_if_t&lt;std::is_invocable_r_v&lt;bool, F, size_t, size_t&gt;, void&gt;* = nullptr
+<span class="line_number">489</span>  &gt;
+<span class="line_number">490</span>  void loop_until(
+<span class="line_number">491</span>    size_t N, size_t, std::atomic&lt;size_t&gt;&amp; next, F&amp;&amp; func
+<span class="line_number">492</span>  ) const {
+<span class="line_number">493</span>
+<span class="line_number">494</span>    size_t chunk_size = (this-&gt;_chunk_size == 0) ? size_t{1} : this-&gt;_chunk_size;
+<span class="line_number">495</span>    size_t curr_b = next.fetch_add(chunk_size, std::memory_order_relaxed);
+<span class="line_number">496</span>
+<span class="line_number">497</span>    while(curr_b &lt; N) {
+<span class="line_number">498</span>      if(func(curr_b, (std::min)(curr_b + chunk_size, N))) {
+<span class="line_number">499</span>        return;
+<span class="line_number">500</span>      }
+<span class="line_number">501</span>      curr_b = next.fetch_add(chunk_size, std::memory_order_relaxed);
+<span class="line_number">502</span>    }
+<span class="line_number">503</span>  }
+<span class="line_number">504</span>
+<span class="line_number">505</span>};
+<span class="line_number">506</span>
+<span class="line_number">507</span>// ----------------------------------------------------------------------------
+<span class="line_number">508</span>// Static Partitioner
+<span class="line_number">509</span>// ----------------------------------------------------------------------------
+<span class="line_number">510</span>
+<span class="line_number">511</span>/**
+<span class="line_number">512</span>@class StaticPartitioner
+<span class="line_number">513</span>
+<span class="line_number">514</span>@brief class to construct a static partitioner for scheduling parallel algorithms
+<span class="line_number">515</span>
+<span class="line_number">516</span>@tparam C closure wrapper type (default tf::DefaultClosureWrapper)
+<span class="line_number">517</span>
+<span class="line_number">518</span>The partitioner divides iterations into chunks and distributes chunks 
+<span class="line_number">519</span>to workers in order.
+<span class="line_number">520</span>If the chunk size is not specified (default @c 0), the partitioner resorts to a chunk size
+<span class="line_number">521</span>that equally distributes iterations into workers.
+<span class="line_number">522</span>
+<span class="line_number">523</span>@code{.cpp}
+<span class="line_number">524</span>std::vector&lt;int&gt; data = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
+<span class="line_number">525</span>taskflow.for_each(
+<span class="line_number">526</span>  data.begin(), data.end(), [](int i){}, StaticPartitioner(0)
+<span class="line_number">527</span>);
+<span class="line_number">528</span>executor.run(taskflow).run();
+<span class="line_number">529</span>@endcode
+<span class="line_number">530</span>
+<span class="line_number">531</span>In addition to partition size, the application can specify a closure wrapper
+<span class="line_number">532</span>for a static partitioner.
+<span class="line_number">533</span>A closure wrapper allows the application to wrap a partitioned task 
+<span class="line_number">534</span>(i.e., closure) with a custom function object that performs additional tasks.
+<span class="line_number">535</span>For example:
+<span class="line_number">536</span>
+<span class="line_number">537</span>@code{.cpp}
+<span class="line_number">538</span>std::atomic&lt;int&gt; count = 0;
+<span class="line_number">539</span>tf::Taskflow taskflow;
+<span class="line_number">540</span>taskflow.for_each_index(0, 100, 1, 
+<span class="line_number">541</span>  [](){                 
+<span class="line_number">542</span>    printf(&#34;%d\n&#34;, i); 
+<span class="line_number">543</span>  },
+<span class="line_number">544</span>  tf::StaticPartitioner(0, [](auto&amp;&amp; closure){
+<span class="line_number">545</span>    // do something before invoking the partitioned task
+<span class="line_number">546</span>    // ...
+<span class="line_number">547</span>    
+<span class="line_number">548</span>    // invoke the partitioned task
+<span class="line_number">549</span>    closure();
+<span class="line_number">550</span>
+<span class="line_number">551</span>    // do something else after invoking the partitioned task
+<span class="line_number">552</span>    // ...
+<span class="line_number">553</span>  }
+<span class="line_number">554</span>);
+<span class="line_number">555</span>executor.run(taskflow).wait();
+<span class="line_number">556</span>@endcode
+<span class="line_number">557</span>*/
+<span class="line_number">558</span>template &lt;typename C = DefaultClosureWrapper&gt;
+<span class="line_number">559</span>class StaticPartitioner : public PartitionerBase&lt;C&gt; {
+<span class="line_number">560</span>
+<span class="line_number">561</span>  public:
+<span class="line_number">562</span>  
+<span class="line_number">563</span>  /**
+<span class="line_number">564</span>  @brief queries the partition type (static)
+<span class="line_number">565</span>  */
+<span class="line_number">566</span>  static constexpr PartitionerType type() { return PartitionerType::STATIC; }
+<span class="line_number">567</span>
+<span class="line_number">568</span>  /**
+<span class="line_number">569</span>  @brief default constructor
+<span class="line_number">570</span>  */
+<span class="line_number">571</span>  StaticPartitioner() = default;
+<span class="line_number">572</span>  
+<span class="line_number">573</span>  /**
+<span class="line_number">574</span>  @brief construct a static partitioner with the given chunk size
+<span class="line_number">575</span>  */
+<span class="line_number">576</span>  explicit StaticPartitioner(size_t sz) : PartitionerBase&lt;C&gt;(sz) {}
+<span class="line_number">577</span>  
+<span class="line_number">578</span>  /**
+<span class="line_number">579</span>  @brief construct a static partitioner with the given chunk size and the closure
+<span class="line_number">580</span>  */ 
+<span class="line_number">581</span>  explicit StaticPartitioner(size_t sz, C&amp;&amp; closure) :
+<span class="line_number">582</span>    PartitionerBase&lt;C&gt;(sz, std::forward&lt;C&gt;(closure)) {
+<span class="line_number">583</span>  }
+<span class="line_number">584</span>  
+<span class="line_number">585</span>  /**
+<span class="line_number">586</span>  @brief queries the adjusted chunk size
+<span class="line_number">587</span>  
+<span class="line_number">588</span>  Returns the given chunk size if it is not zero, or returns
+<span class="line_number">589</span>  &lt;tt&gt;N/W + (w &lt; N%W)&lt;/tt&gt;, where @c N is the number of iterations,
+<span class="line_number">590</span>  @c W is the number of workers, and @c w is the worker ID.
+<span class="line_number">591</span>  */
+<span class="line_number">592</span>  size_t adjusted_chunk_size(size_t N, size_t W, size_t w) const {
+<span class="line_number">593</span>    return this-&gt;_chunk_size ? this-&gt;_chunk_size : N/W + (w &lt; N%W);
+<span class="line_number">594</span>  }
+<span class="line_number">595</span>  
+<span class="line_number">596</span>  // --------------------------------------------------------------------------
+<span class="line_number">597</span>  // scheduling methods
+<span class="line_number">598</span>  // --------------------------------------------------------------------------
+<span class="line_number">599</span>  
+<span class="line_number">600</span>  /**
+<span class="line_number">601</span>  @private
+<span class="line_number">602</span>  */
+<span class="line_number">603</span>  template &lt;typename F, 
+<span class="line_number">604</span>    std::enable_if_t&lt;std::is_invocable_r_v&lt;void, F, size_t, size_t&gt;, void&gt;* = nullptr
+<span class="line_number">605</span>  &gt;
+<span class="line_number">606</span>  void loop(
+<span class="line_number">607</span>    size_t N, size_t W, size_t curr_b, size_t chunk_size, F&amp;&amp; func
+<span class="line_number">608</span>  ) {
+<span class="line_number">609</span>    size_t stride = W * chunk_size;
+<span class="line_number">610</span>    while(curr_b &lt; N) {
+<span class="line_number">611</span>      size_t curr_e = (std::min)(curr_b + chunk_size, N);
+<span class="line_number">612</span>      func(curr_b, curr_e);
+<span class="line_number">613</span>      curr_b += stride;
+<span class="line_number">614</span>    }
+<span class="line_number">615</span>  }
+<span class="line_number">616</span>  
+<span class="line_number">617</span>  /**
+<span class="line_number">618</span>  @private
+<span class="line_number">619</span>  */
+<span class="line_number">620</span>  template &lt;typename F, 
+<span class="line_number">621</span>    std::enable_if_t&lt;std::is_invocable_r_v&lt;bool, F, size_t, size_t&gt;, void&gt;* = nullptr
+<span class="line_number">622</span>  &gt;
+<span class="line_number">623</span>  void loop_until(
+<span class="line_number">624</span>    size_t N, size_t W, size_t curr_b, size_t chunk_size, F&amp;&amp; func
+<span class="line_number">625</span>  ) {
+<span class="line_number">626</span>    size_t stride = W * chunk_size;
+<span class="line_number">627</span>    while(curr_b &lt; N) {
+<span class="line_number">628</span>      size_t curr_e = (std::min)(curr_b + chunk_size, N);
+<span class="line_number">629</span>      if(func(curr_b, curr_e)) {
+<span class="line_number">630</span>        return;
+<span class="line_number">631</span>      }
+<span class="line_number">632</span>      curr_b += stride;
+<span class="line_number">633</span>    }
+<span class="line_number">634</span>  }
+<span class="line_number">635</span>};
+<span class="line_number">636</span>
+<span class="line_number">637</span>// ----------------------------------------------------------------------------
+<span class="line_number">638</span>// RandomPartitioner
+<span class="line_number">639</span>// ----------------------------------------------------------------------------
+<span class="line_number">640</span>
+<span class="line_number">641</span>/**
+<span class="line_number">642</span>@class RandomPartitioner
+<span class="line_number">643</span>
+<span class="line_number">644</span>@brief class to construct a random partitioner for scheduling parallel algorithms
+<span class="line_number">645</span>
+<span class="line_number">646</span>@tparam C closure wrapper type (default tf::DefaultClosureWrapper)
+<span class="line_number">647</span>
+<span class="line_number">648</span>Similar to tf::DynamicPartitioner, 
+<span class="line_number">649</span>the partitioner splits iterations into many partitions but each with a random
+<span class="line_number">650</span>chunk size in the range, &lt;tt&gt;c = [alpha * N * W, beta * N * W]&lt;/tt&gt;.
+<span class="line_number">651</span>By default, @c alpha is &lt;tt&gt;0.01&lt;/tt&gt; and @c beta is &lt;tt&gt;0.5&lt;/tt&gt;, respectively.
+<span class="line_number">652</span>
+<span class="line_number">653</span>In addition to partition size, the application can specify a closure wrapper
+<span class="line_number">654</span>for a random partitioner.
+<span class="line_number">655</span>A closure wrapper allows the application to wrap a partitioned task 
+<span class="line_number">656</span>(i.e., closure) with a custom function object that performs additional tasks.
+<span class="line_number">657</span>For example:
+<span class="line_number">658</span>
+<span class="line_number">659</span>@code{.cpp}
+<span class="line_number">660</span>std::atomic&lt;int&gt; count = 0;
+<span class="line_number">661</span>tf::Taskflow taskflow;
+<span class="line_number">662</span>taskflow.for_each_index(0, 100, 1, 
+<span class="line_number">663</span>  [](){                 
+<span class="line_number">664</span>    printf(&#34;%d\n&#34;, i); 
+<span class="line_number">665</span>  },
+<span class="line_number">666</span>  tf::RandomPartitioner(0, [](auto&amp;&amp; closure){
+<span class="line_number">667</span>    // do something before invoking the partitioned task
+<span class="line_number">668</span>    // ...
+<span class="line_number">669</span>    
+<span class="line_number">670</span>    // invoke the partitioned task
+<span class="line_number">671</span>    closure();
+<span class="line_number">672</span>
+<span class="line_number">673</span>    // do something else after invoking the partitioned task
+<span class="line_number">674</span>    // ...
+<span class="line_number">675</span>  }
+<span class="line_number">676</span>);
+<span class="line_number">677</span>executor.run(taskflow).wait();
+<span class="line_number">678</span>@endcode
+<span class="line_number">679</span>*/
+<span class="line_number">680</span>template &lt;typename C = DefaultClosureWrapper&gt;
+<span class="line_number">681</span>class RandomPartitioner : public PartitionerBase&lt;C&gt; {
+<span class="line_number">682</span>
+<span class="line_number">683</span>  public:
+<span class="line_number">684</span>  
+<span class="line_number">685</span>  /**
+<span class="line_number">686</span>  @brief queries the partition type (dynamic)
+<span class="line_number">687</span>  */
+<span class="line_number">688</span>  static constexpr PartitionerType type() { return PartitionerType::DYNAMIC; }
+<span class="line_number">689</span>
+<span class="line_number">690</span>  /**
+<span class="line_number">691</span>  @brief default constructor
+<span class="line_number">692</span>  */
+<span class="line_number">693</span>  RandomPartitioner() = default;
+<span class="line_number">694</span>  
+<span class="line_number">695</span>  /**
+<span class="line_number">696</span>  @brief construct a dynamic partitioner with the given chunk size
+<span class="line_number">697</span>  */
+<span class="line_number">698</span>  explicit RandomPartitioner(size_t sz) : PartitionerBase&lt;C&gt;(sz) {}
+<span class="line_number">699</span>  
+<span class="line_number">700</span>  /**
+<span class="line_number">701</span>  @brief construct a random partitioner with the given chunk size and the closure
+<span class="line_number">702</span>  */ 
+<span class="line_number">703</span>  explicit RandomPartitioner(size_t sz, C&amp;&amp; closure) :
+<span class="line_number">704</span>    PartitionerBase&lt;C&gt;(sz, std::forward&lt;C&gt;(closure)) {
+<span class="line_number">705</span>  }
+<span class="line_number">706</span>  
+<span class="line_number">707</span>  /**
+<span class="line_number">708</span>  @brief constructs a random partitioner with the given parameters
+<span class="line_number">709</span>  */
+<span class="line_number">710</span>  RandomPartitioner(float alpha, float beta) : _alpha{alpha}, _beta{beta} {}
+<span class="line_number">711</span>
+<span class="line_number">712</span>  /**
+<span class="line_number">713</span>  @brief constructs a random partitioner with the given parameters and the closure
+<span class="line_number">714</span>  */
+<span class="line_number">715</span>  RandomPartitioner(float alpha, float beta, C&amp;&amp; closure) : 
+<span class="line_number">716</span>    _alpha {alpha}, _beta {beta}, 
+<span class="line_number">717</span>    PartitionerBase&lt;C&gt;(0, std::forward&lt;C&gt;(closure)) {
+<span class="line_number">718</span>  }
+<span class="line_number">719</span>
+<span class="line_number">720</span>  /**
+<span class="line_number">721</span>  @brief queries the @c alpha value
+<span class="line_number">722</span>  */
+<span class="line_number">723</span>  float alpha() const { return _alpha; }
+<span class="line_number">724</span>  
+<span class="line_number">725</span>  /**
+<span class="line_number">726</span>  @brief queries the @c beta value
+<span class="line_number">727</span>  */
+<span class="line_number">728</span>  float beta() const { return _beta; }
+<span class="line_number">729</span>  
+<span class="line_number">730</span>  /**
+<span class="line_number">731</span>  @brief queries the range of chunk size
+<span class="line_number">732</span>  
+<span class="line_number">733</span>  @param N number of iterations
+<span class="line_number">734</span>  @param W number of workers
+<span class="line_number">735</span>  */
+<span class="line_number">736</span>  std::pair&lt;size_t, size_t&gt; chunk_size_range(size_t N, size_t W) const {
+<span class="line_number">737</span>    
+<span class="line_number">738</span>    size_t b1 = static_cast&lt;size_t&gt;(_alpha * N * W);
+<span class="line_number">739</span>    size_t b2 = static_cast&lt;size_t&gt;(_beta  * N * W);
+<span class="line_number">740</span>
+<span class="line_number">741</span>    if(b1 &gt; b2) {
+<span class="line_number">742</span>      std::swap(b1, b2);
+<span class="line_number">743</span>    }
+<span class="line_number">744</span>
+<span class="line_number">745</span>    b1 = (std::max)(b1, size_t{1});
+<span class="line_number">746</span>    b2 = (std::max)(b2, b1 + 1);
+<span class="line_number">747</span>
+<span class="line_number">748</span>    return {b1, b2};
+<span class="line_number">749</span>  }
+<span class="line_number">750</span>
+<span class="line_number">751</span>  // --------------------------------------------------------------------------
+<span class="line_number">752</span>  // scheduling methods
+<span class="line_number">753</span>  // --------------------------------------------------------------------------
+<span class="line_number">754</span>  
+<span class="line_number">755</span>  /**
+<span class="line_number">756</span>  @private
+<span class="line_number">757</span>  */
+<span class="line_number">758</span>  template &lt;typename F, 
+<span class="line_number">759</span>    std::enable_if_t&lt;std::is_invocable_r_v&lt;void, F, size_t, size_t&gt;, void&gt;* = nullptr
+<span class="line_number">760</span>  &gt;
+<span class="line_number">761</span>  void loop(
+<span class="line_number">762</span>    size_t N, size_t W, std::atomic&lt;size_t&gt;&amp; next, F&amp;&amp; func
+<span class="line_number">763</span>  ) const {
+<span class="line_number">764</span>
+<span class="line_number">765</span>    auto [b1, b2] = chunk_size_range(N, W); 
+<span class="line_number">766</span>    
+<span class="line_number">767</span>    std::default_random_engine engine {std::random_device{}()};
+<span class="line_number">768</span>    std::uniform_int_distribution&lt;size_t&gt; dist(b1, b2);
+<span class="line_number">769</span>    
+<span class="line_number">770</span>    size_t chunk_size = dist(engine);
+<span class="line_number">771</span>    size_t curr_b = next.fetch_add(chunk_size, std::memory_order_relaxed);
+<span class="line_number">772</span>
+<span class="line_number">773</span>    while(curr_b &lt; N) {
+<span class="line_number">774</span>      func(curr_b, (std::min)(curr_b + chunk_size, N));
+<span class="line_number">775</span>      chunk_size = dist(engine);
+<span class="line_number">776</span>      curr_b = next.fetch_add(chunk_size, std::memory_order_relaxed);
+<span class="line_number">777</span>    }
+<span class="line_number">778</span>  }
+<span class="line_number">779</span>
+<span class="line_number">780</span>  /**
+<span class="line_number">781</span>  @private
+<span class="line_number">782</span>  */
+<span class="line_number">783</span>  template &lt;typename F, 
+<span class="line_number">784</span>    std::enable_if_t&lt;std::is_invocable_r_v&lt;bool, F, size_t, size_t&gt;, void&gt;* = nullptr
+<span class="line_number">785</span>  &gt;
+<span class="line_number">786</span>  void loop_until(
+<span class="line_number">787</span>    size_t N, size_t W, std::atomic&lt;size_t&gt;&amp; next, F&amp;&amp; func
+<span class="line_number">788</span>  ) const {
+<span class="line_number">789</span>
+<span class="line_number">790</span>    auto [b1, b2] = chunk_size_range(N, W); 
+<span class="line_number">791</span>    
+<span class="line_number">792</span>    std::default_random_engine engine {std::random_device{}()};
+<span class="line_number">793</span>    std::uniform_int_distribution&lt;size_t&gt; dist(b1, b2);
+<span class="line_number">794</span>    
+<span class="line_number">795</span>    size_t chunk_size = dist(engine);
+<span class="line_number">796</span>    size_t curr_b = next.fetch_add(chunk_size, std::memory_order_relaxed);
+<span class="line_number">797</span>
+<span class="line_number">798</span>    while(curr_b &lt; N) {
+<span class="line_number">799</span>      if(func(curr_b, (std::min)(curr_b + chunk_size, N))){
+<span class="line_number">800</span>        return;
+<span class="line_number">801</span>      }
+<span class="line_number">802</span>      chunk_size = dist(engine);
+<span class="line_number">803</span>      curr_b = next.fetch_add(chunk_size, std::memory_order_relaxed);
+<span class="line_number">804</span>    }
+<span class="line_number">805</span>  }
+<span class="line_number">806</span>
+<span class="line_number">807</span>  private:
+<span class="line_number">808</span>
+<span class="line_number">809</span>  float _alpha {0.01f};
+<span class="line_number">810</span>  float _beta  {0.50f};
+<span class="line_number">811</span>};
+<span class="line_number">812</span>
+<span class="line_number">813</span>/**
+<span class="line_number">814</span>@brief default partitioner set to tf::GuidedPartitioner
+<span class="line_number">815</span>
+<span class="line_number">816</span>Guided partitioning algorithm can achieve stable and decent performance
+<span class="line_number">817</span>for most parallel algorithms.
+<span class="line_number">818</span>*/
+<span class="line_number">819</span>using DefaultPartitioner = GuidedPartitioner&lt;&gt;;
+<span class="line_number">820</span>
+<span class="line_number">821</span>/**
+<span class="line_number">822</span>@brief determines if a type is a partitioner 
+<span class="line_number">823</span>
+<span class="line_number">824</span>A partitioner is a derived type from tf::PartitionerBase.
+<span class="line_number">825</span>*/
+<span class="line_number">826</span>template &lt;typename P&gt;
+<span class="line_number">827</span>inline constexpr bool is_partitioner_v = std::is_base_of&lt;IsPartitioner, P&gt;::value;
+<span class="line_number">828</span>
+<span class="line_number">829</span>}  // end of namespace tf -----------------------------------------------------
+<span class="line_number">830</span>
+<span class="line_number">831</span>
+<span class="line_number">832</span>
+</code>
+            </pre>
+        </div>
+    </div>
+</body>
+
+</html>

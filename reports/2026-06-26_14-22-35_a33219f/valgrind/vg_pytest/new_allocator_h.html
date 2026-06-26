@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>/usr/include/c++/13/bits/new_allocator.h</title>
+    <link href='valgrind.css' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+    <script src="https://code.jquery.com/jquery-3.4.1.js"></script>
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.0.0/styles/default.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.0.0/highlight.min.js"></script>
+    <script src="valgrind.js"></script>
+</head>
+
+<body>
+    <div class="global">
+        <div class="header">
+            <h1>/usr/include/c++/13/bits/new_allocator.h</h1>
+            <p><b>1</b> errors</p>
+            <button class="next_error">Goto First Error</button>
+        </div>
+        <div class="listing">
+            <pre class="code">
+<code class="c++"><span class="line_number">1</span>// Allocator that wraps operator new -*- C++ -*-
+<span class="line_number">2</span>
+<span class="line_number">3</span>// Copyright (C) 2001-2023 Free Software Foundation, Inc.
+<span class="line_number">4</span>//
+<span class="line_number">5</span>// This file is part of the GNU ISO C++ Library.  This library is free
+<span class="line_number">6</span>// software; you can redistribute it and/or modify it under the
+<span class="line_number">7</span>// terms of the GNU General Public License as published by the
+<span class="line_number">8</span>// Free Software Foundation; either version 3, or (at your option)
+<span class="line_number">9</span>// any later version.
+<span class="line_number">10</span>
+<span class="line_number">11</span>// This library is distributed in the hope that it will be useful,
+<span class="line_number">12</span>// but WITHOUT ANY WARRANTY; without even the implied warranty of
+<span class="line_number">13</span>// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+<span class="line_number">14</span>// GNU General Public License for more details.
+<span class="line_number">15</span>
+<span class="line_number">16</span>// Under Section 7 of GPL version 3, you are granted additional
+<span class="line_number">17</span>// permissions described in the GCC Runtime Library Exception, version
+<span class="line_number">18</span>// 3.1, as published by the Free Software Foundation.
+<span class="line_number">19</span>
+<span class="line_number">20</span>// You should have received a copy of the GNU General Public License and
+<span class="line_number">21</span>// a copy of the GCC Runtime Library Exception along with this program;
+<span class="line_number">22</span>// see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
+<span class="line_number">23</span>// &lt;http://www.gnu.org/licenses/&gt;.
+<span class="line_number">24</span>
+<span class="line_number">25</span>/** @file bits/new_allocator.h
+<span class="line_number">26</span> *  This is an internal header file, included by other library headers.
+<span class="line_number">27</span> *  Do not attempt to use it directly. @headername{memory}
+<span class="line_number">28</span> */
+<span class="line_number">29</span>
+<span class="line_number">30</span>#ifndef _STD_NEW_ALLOCATOR_H
+<span class="line_number">31</span>#define _STD_NEW_ALLOCATOR_H 1
+<span class="line_number">32</span>
+<span class="line_number">33</span>#include &lt;bits/c++config.h&gt;
+<span class="line_number">34</span>#include &lt;new&gt;
+<span class="line_number">35</span>#include &lt;bits/functexcept.h&gt;
+<span class="line_number">36</span>#include &lt;bits/move.h&gt;
+<span class="line_number">37</span>#if __cplusplus &gt;= 201103L
+<span class="line_number">38</span>#include &lt;type_traits&gt;
+<span class="line_number">39</span>#endif
+<span class="line_number">40</span>
+<span class="line_number">41</span>namespace std _GLIBCXX_VISIBILITY(default)
+<span class="line_number">42</span>{
+<span class="line_number">43</span>_GLIBCXX_BEGIN_NAMESPACE_VERSION
+<span class="line_number">44</span>
+<span class="line_number">45</span>  /**
+<span class="line_number">46</span>   * @brief  An allocator that uses global `new`, as per C++03 [20.4.1].
+<span class="line_number">47</span>   * @ingroup allocators
+<span class="line_number">48</span>   *
+<span class="line_number">49</span>   * This is precisely the allocator defined in the C++ Standard.
+<span class="line_number">50</span>   *   - all allocation calls `operator new`
+<span class="line_number">51</span>   *   - all deallocation calls `operator delete`
+<span class="line_number">52</span>   *
+<span class="line_number">53</span>   * This is the default base-class implementation of `std::allocator`,
+<span class="line_number">54</span>   * and is also the base-class of the `__gnu_cxx::new_allocator` extension.
+<span class="line_number">55</span>   * You should use either `std::allocator` or `__gnu_cxx::new_allocator`
+<span class="line_number">56</span>   * instead of using this directly.
+<span class="line_number">57</span>   *
+<span class="line_number">58</span>   * @tparam  _Tp  Type of allocated object.
+<span class="line_number">59</span>   *
+<span class="line_number">60</span>   * @headerfile memory
+<span class="line_number">61</span>   */
+<span class="line_number">62</span>  template&lt;typename _Tp&gt;
+<span class="line_number">63</span>    class __new_allocator
+<span class="line_number">64</span>    {
+<span class="line_number">65</span>    public:
+<span class="line_number">66</span>      typedef _Tp        value_type;
+<span class="line_number">67</span>      typedef std::size_t     size_type;
+<span class="line_number">68</span>      typedef std::ptrdiff_t  difference_type;
+<span class="line_number">69</span>#if __cplusplus &lt;= 201703L
+<span class="line_number">70</span>      typedef _Tp*       pointer;
+<span class="line_number">71</span>      typedef const _Tp* const_pointer;
+<span class="line_number">72</span>      typedef _Tp&amp;       reference;
+<span class="line_number">73</span>      typedef const _Tp&amp; const_reference;
+<span class="line_number">74</span>
+<span class="line_number">75</span>      template&lt;typename _Tp1&gt;
+<span class="line_number">76</span>	struct rebind
+<span class="line_number">77</span>	{ typedef __new_allocator&lt;_Tp1&gt; other; };
+<span class="line_number">78</span>#endif
+<span class="line_number">79</span>
+<span class="line_number">80</span>#if __cplusplus &gt;= 201103L
+<span class="line_number">81</span>      // _GLIBCXX_RESOLVE_LIB_DEFECTS
+<span class="line_number">82</span>      // 2103. propagate_on_container_move_assignment
+<span class="line_number">83</span>      typedef std::true_type propagate_on_container_move_assignment;
+<span class="line_number">84</span>#endif
+<span class="line_number">85</span>
+<span class="line_number">86</span>      __attribute__((__always_inline__))
+<span class="line_number">87</span>      _GLIBCXX20_CONSTEXPR
+<span class="line_number">88</span>      __new_allocator() _GLIBCXX_USE_NOEXCEPT { }
+<span class="line_number">89</span>
+<span class="line_number">90</span>      __attribute__((__always_inline__))
+<span class="line_number">91</span>      _GLIBCXX20_CONSTEXPR
+<span class="line_number">92</span>      __new_allocator(const __new_allocator&amp;) _GLIBCXX_USE_NOEXCEPT { }
+<span class="line_number">93</span>
+<span class="line_number">94</span>      template&lt;typename _Tp1&gt;
+<span class="line_number">95</span>	__attribute__((__always_inline__))
+<span class="line_number">96</span>	_GLIBCXX20_CONSTEXPR
+<span class="line_number">97</span>	__new_allocator(const __new_allocator&lt;_Tp1&gt;&amp;) _GLIBCXX_USE_NOEXCEPT { }
+<span class="line_number">98</span>
+<span class="line_number">99</span>#if __cplusplus &gt;= 201103L
+<span class="line_number">100</span>      __new_allocator&amp; operator=(const __new_allocator&amp;) = default;
+<span class="line_number">101</span>#endif
+<span class="line_number">102</span>
+<span class="line_number">103</span>#if __cplusplus &lt;= 201703L
+<span class="line_number">104</span>      ~__new_allocator() _GLIBCXX_USE_NOEXCEPT { }
+<span class="line_number">105</span>
+<span class="line_number">106</span>      pointer
+<span class="line_number">107</span>      address(reference __x) const _GLIBCXX_NOEXCEPT
+<span class="line_number">108</span>      { return std::__addressof(__x); }
+<span class="line_number">109</span>
+<span class="line_number">110</span>      const_pointer
+<span class="line_number">111</span>      address(const_reference __x) const _GLIBCXX_NOEXCEPT
+<span class="line_number">112</span>      { return std::__addressof(__x); }
+<span class="line_number">113</span>#endif
+<span class="line_number">114</span>
+<span class="line_number">115</span>#if __has_builtin(__builtin_operator_new) &gt;= 201802L
+<span class="line_number">116</span># define _GLIBCXX_OPERATOR_NEW __builtin_operator_new
+<span class="line_number">117</span># define _GLIBCXX_OPERATOR_DELETE __builtin_operator_delete
+<span class="line_number">118</span>#else
+<span class="line_number">119</span># define _GLIBCXX_OPERATOR_NEW ::operator new
+<span class="line_number">120</span># define _GLIBCXX_OPERATOR_DELETE ::operator delete
+<span class="line_number">121</span>#endif
+<span class="line_number">122</span>
+<span class="line_number">123</span>      // NB: __n is permitted to be 0.  The C++ standard says nothing
+<span class="line_number">124</span>      // about what the return value is when __n == 0.
+<span class="line_number">125</span>      _GLIBCXX_NODISCARD _Tp*
+<span class="line_number">126</span>      allocate(size_type __n, const void* = static_cast&lt;const void*&gt;(0))
+<span class="line_number">127</span>      {
+<span class="line_number">128</span>#if __cplusplus &gt;= 201103L
+<span class="line_number">129</span>	// _GLIBCXX_RESOLVE_LIB_DEFECTS
+<span class="line_number">130</span>	// 3308. std::allocator&lt;void&gt;().allocate(n)
+<span class="line_number">131</span>	static_assert(sizeof(_Tp) != 0, &#34;cannot allocate incomplete types&#34;);
+<span class="line_number">132</span>#endif
+<span class="line_number">133</span>
+<span class="line_number">134</span>	if (__builtin_expect(__n &gt; this-&gt;_M_max_size(), false))
+<span class="line_number">135</span>	  {
+<span class="line_number">136</span>	    // _GLIBCXX_RESOLVE_LIB_DEFECTS
+<span class="line_number">137</span>	    // 3190. allocator::allocate sometimes returns too little storage
+<span class="line_number">138</span>	    if (__n &gt; (std::size_t(-1) / sizeof(_Tp)))
+<span class="line_number">139</span>	      std::__throw_bad_array_new_length();
+<span class="line_number">140</span>	    std::__throw_bad_alloc();
+<span class="line_number">141</span>	  }
+<span class="line_number">142</span>
+<span class="line_number">143</span>#if __cpp_aligned_new
+<span class="line_number">144</span>	if (alignof(_Tp) &gt; __STDCPP_DEFAULT_NEW_ALIGNMENT__)
+<span class="line_number">145</span>	  {
+<span class="line_number">146</span>	    std::align_val_t __al = std::align_val_t(alignof(_Tp));
+<span class="line_number">147</span>	    return static_cast&lt;_Tp*&gt;(_GLIBCXX_OPERATOR_NEW(__n * sizeof(_Tp),
+<span class="line_number">148</span>							   __al));
+<span class="line_number">149</span>	  }
+<span class="line_number">150</span>#endif
+</code></pre>
+            <div class="issue">
+                <div>
+                    <span class="what">32 bytes in 1 blocks are possibly lost in loss record 2,572 of 14,226</span>
+                    <div class="navigation">
+                        <button class="next_error">Next</button>
+                        <button class="prev_error">Previous</button>
+                    </div>
+                </div>
+                <div>
+                    <table class="call_stack">
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/allocator.h:198<br>
+                                    <code class="cpp">allocate</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">195</span>	    return static_cast&lt;_Tp*&gt;(::operator new(__n));
+<span class="line_number">196</span>	  }
+<span class="line_number">197</span>
+<span class="line_number">198</span><span class="error">	return __allocator_base&lt;_Tp&gt;::allocate(__n, 0);
+</span><span class="line_number">199</span>      }
+<span class="line_number">200</span>
+<span class="line_number">201</span>      [[__gnu__::__always_inline__]]
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/alloc_traits.h:482<br>
+                                    <code class="cpp">allocate</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">479</span>      [[__nodiscard__,__gnu__::__always_inline__]]
+<span class="line_number">480</span>      static _GLIBCXX20_CONSTEXPR pointer
+<span class="line_number">481</span>      allocate(allocator_type&amp; __a, size_type __n)
+<span class="line_number">482</span><span class="error">      { return __a.allocate(__n); }
+</span><span class="line_number">483</span>
+<span class="line_number">484</span>      /**
+<span class="line_number">485</span>       *  @brief  Allocate memory.
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/stl_vector.h:381<br>
+                                    <code class="cpp">std::_Vector_base&lt;pybind11::detail::argument_record, std::allocator&lt;pybind11::detail::argument_record&gt; &gt;::_M_allocate(unsigned long)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">378</span>      _M_allocate(size_t __n)
+<span class="line_number">379</span>      {
+<span class="line_number">380</span>	typedef __gnu_cxx::__alloc_traits&lt;_Tp_alloc_type&gt; _Tr;
+<span class="line_number">381</span><span class="error">	return __n != 0 ? _Tr::allocate(_M_impl, __n) : pointer();
+</span><span class="line_number">382</span>      }
+<span class="line_number">383</span>
+<span class="line_number">384</span>      _GLIBCXX20_CONSTEXPR
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/vector.tcc:459<br>
+                                    <code class="cpp">void std::vector&lt;pybind11::detail::argument_record, std::allocator&lt;pybind11::detail::argument_record&gt; &gt;::_M_realloc_insert&lt;char const (&amp;) [5], decltype(nullptr), pybind11::handle, bool, bool&gt;(__gnu_cxx::__normal_iterator&lt;pybind11::detail::argument_record*, std::vector&lt;pybind11::detail::argument_record, std::allocator&lt;pybind11::detail::argument_record&gt; &gt; &gt;, char const (&amp;) [5], decltype(nullptr)&amp;&amp;, pybind11::handle&amp;&amp;, bool&amp;&amp;, bool&amp;&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">456</span>      pointer __old_start = this-&gt;_M_impl._M_start;
+<span class="line_number">457</span>      pointer __old_finish = this-&gt;_M_impl._M_finish;
+<span class="line_number">458</span>      const size_type __elems_before = __position - begin();
+<span class="line_number">459</span><span class="error">      pointer __new_start(this-&gt;_M_allocate(__len));
+</span><span class="line_number">460</span>      pointer __new_finish(__new_start);
+<span class="line_number">461</span>      __try
+<span class="line_number">462</span>	{
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/vector.tcc:123<br>
+                                    <code class="cpp">pybind11::detail::argument_record&amp; std::vector&lt;pybind11::detail::argument_record, std::allocator&lt;pybind11::detail::argument_record&gt; &gt;::emplace_back&lt;char const (&amp;) [5], decltype(nullptr), pybind11::handle, bool, bool&gt;(char const (&amp;) [5], decltype(nullptr)&amp;&amp;, pybind11::handle&amp;&amp;, bool&amp;&amp;, bool&amp;&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">120</span>	    _GLIBCXX_ASAN_ANNOTATE_GREW(1);
+<span class="line_number">121</span>	  }
+<span class="line_number">122</span>	else
+<span class="line_number">123</span><span class="error">	  _M_realloc_insert(end(), std::forward&lt;_Args&gt;(__args)...);
+</span><span class="line_number">124</span>#if __cplusplus &gt; 201402L
+<span class="line_number">125</span>	return back();
+<span class="line_number">126</span>#endif
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/pybind11/include/pybind11/attr.h:494<br>
+                                    <code class="cpp">pybind11::detail::append_self_arg_if_needed(pybind11::detail::function_record*)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">491</span>
+<span class="line_number">492</span>inline void append_self_arg_if_needed(function_record *r) {
+<span class="line_number">493</span>    if (r-&gt;is_method &amp;&amp; r-&gt;args.empty()) {
+<span class="line_number">494</span><span class="error">        r-&gt;args.emplace_back(&#34;self&#34;, nullptr, handle(), /*convert=*/true, /*none=*/false);
+</span><span class="line_number">495</span>    }
+<span class="line_number">496</span>}
+<span class="line_number">497</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/pybind11/include/pybind11/attr.h:567<br>
+                                    <code class="cpp">pybind11::detail::process_attribute&lt;pybind11::pos_only, void&gt;::init(pybind11::pos_only const&amp;, pybind11::detail::function_record*)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">564</span>template &lt;&gt;
+<span class="line_number">565</span>struct process_attribute&lt;pos_only&gt; : process_attribute_default&lt;pos_only&gt; {
+<span class="line_number">566</span>    static void init(const pos_only &amp;, function_record *r) {
+<span class="line_number">567</span><span class="error">        append_self_arg_if_needed(r);
+</span><span class="line_number">568</span>        r-&gt;nargs_pos_only = static_cast&lt;std::uint16_t&gt;(r-&gt;args.size());
+<span class="line_number">569</span>        if (r-&gt;nargs_pos_only &gt; r-&gt;nargs_pos) {
+<span class="line_number">570</span>            pybind11_fail(&#34;pos_only(): cannot follow a py::args() argument&#34;);
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/pybind11/include/pybind11/attr.h:681<br>
+                                    <code class="cpp">pybind11::detail::process_attributes&lt;pybind11::is_method, pybind11::return_value_policy, pybind11::pos_only&gt;::init(pybind11::is_method const&amp;, pybind11::return_value_policy const&amp;, pybind11::pos_only const&amp;, pybind11::detail::function_record*)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">678</span>        PYBIND11_WORKAROUND_INCORRECT_GCC_UNUSED_BUT_SET_PARAMETER(r);
+<span class="line_number">679</span>        using expander = int[];
+<span class="line_number">680</span>        (void) expander{
+<span class="line_number">681</span><span class="error">            0, ((void) process_attribute&lt;typename std::decay&lt;Args&gt;::type&gt;::init(args, r), 0)...};
+</span><span class="line_number">682</span>    }
+<span class="line_number">683</span>    static void init(const Args &amp;...args, type_record *r) {
+<span class="line_number">684</span>        PYBIND11_WORKAROUND_INCORRECT_MSVC_C4100(r);
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/pybind11/include/pybind11/pybind11.h:2470<br>
+                                    <code class="cpp">pybind11::class_&lt;std::future_status&gt;&amp; pybind11::class_&lt;std::future_status&gt;::def_property_static&lt;pybind11::is_method, pybind11::return_value_policy, pybind11::pos_only&gt;(char const*, pybind11::cpp_function const&amp;, pybind11::cpp_function const&amp;, pybind11::is_method const&amp;, pybind11::return_value_policy const&amp;, pybind11::pos_only const&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">2467</span>        if (rec_fget) {
+<span class="line_number">2468</span>            char *doc_prev = rec_fget-&gt;doc; /* &#39;extra&#39; field may include a property-specific
+<span class="line_number">2469</span>                                               documentation string */
+<span class="line_number">2470</span><span class="error">            detail::process_attributes&lt;Extra...&gt;::init(extra..., rec_fget);
+</span><span class="line_number">2471</span>            if (rec_fget-&gt;doc &amp;&amp; rec_fget-&gt;doc != doc_prev) {
+<span class="line_number">2472</span>                std::free(doc_prev);
+<span class="line_number">2473</span>                rec_fget-&gt;doc = PYBIND11_COMPAT_STRDUP(rec_fget-&gt;doc);
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/pybind11/include/pybind11/pybind11.h:2438<br>
+                                    <code class="cpp">pybind11::class_&lt;std::future_status&gt;&amp; pybind11::class_&lt;std::future_status&gt;::def_property&lt;pybind11::return_value_policy, pybind11::pos_only&gt;(char const*, pybind11::cpp_function const&amp;, pybind11::cpp_function const&amp;, pybind11::return_value_policy const&amp;, pybind11::pos_only const&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">2435</span>                         const cpp_function &amp;fget,
+<span class="line_number">2436</span>                         const cpp_function &amp;fset,
+<span class="line_number">2437</span>                         const Extra &amp;...extra) {
+<span class="line_number">2438</span><span class="error">        return def_property_static(name, fget, fset, is_method(*this), extra...);
+</span><span class="line_number">2439</span>    }
+<span class="line_number">2440</span>
+<span class="line_number">2441</span>    /// Uses return_value_policy::reference by default
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/pybind11/include/pybind11/pybind11.h:2417<br>
+                                    <code class="cpp">pybind11::class_&lt;std::future_status&gt;&amp; pybind11::class_&lt;std::future_status&gt;::def_property&lt;pybind11::cpp_function, decltype(nullptr), pybind11::return_value_policy, pybind11::pos_only&gt;(char const*, pybind11::cpp_function const&amp;, decltype(nullptr) const&amp;, pybind11::return_value_policy const&amp;, pybind11::pos_only const&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">2414</span>    template &lt;typename Getter, typename Setter, typename... Extra&gt;
+<span class="line_number">2415</span>    class_ &amp;
+<span class="line_number">2416</span>    def_property(const char *name, const Getter &amp;fget, const Setter &amp;fset, const Extra &amp;...extra) {
+<span class="line_number">2417</span><span class="error">        return def_property(
+</span><span class="line_number">2418</span>            name, fget, cpp_function(method_adaptor&lt;type&gt;(fset), is_setter()), extra...);
+<span class="line_number">2419</span>    }
+<span class="line_number">2420</span>    template &lt;typename Getter, typename... Extra&gt;
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/pybind11/include/pybind11/pybind11.h:2394<br>
+                                    <code class="cpp">pybind11::class_&lt;std::future_status&gt;&amp; pybind11::class_&lt;std::future_status&gt;::def_property_readonly&lt;pybind11::return_value_policy, pybind11::pos_only&gt;(char const*, pybind11::cpp_function const&amp;, pybind11::return_value_policy const&amp;, pybind11::pos_only const&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">2391</span>    template &lt;typename... Extra&gt;
+<span class="line_number">2392</span>    class_ &amp;
+<span class="line_number">2393</span>    def_property_readonly(const char *name, const cpp_function &amp;fget, const Extra &amp;...extra) {
+<span class="line_number">2394</span><span class="error">        return def_property(name, fget, nullptr, extra...);
+</span><span class="line_number">2395</span>    }
+<span class="line_number">2396</span>
+<span class="line_number">2397</span>    /// Uses return_value_policy::reference by default
+</code></pre>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            <pre class="code">
+<code class="c++"><span class="line_number">151</span><span class="error">	return static_cast&lt;_Tp*&gt;(_GLIBCXX_OPERATOR_NEW(__n * sizeof(_Tp)));</span>
+<span class="line_number">152</span>      }
+<span class="line_number">153</span>
+<span class="line_number">154</span>      // __p is not permitted to be a null pointer.
+<span class="line_number">155</span>      void
+<span class="line_number">156</span>      deallocate(_Tp* __p, size_type __n __attribute__ ((__unused__)))
+<span class="line_number">157</span>      {
+<span class="line_number">158</span>#if __cpp_sized_deallocation
+<span class="line_number">159</span># define _GLIBCXX_SIZED_DEALLOC(p, n) (p), (n) * sizeof(_Tp)
+<span class="line_number">160</span>#else
+<span class="line_number">161</span># define _GLIBCXX_SIZED_DEALLOC(p, n) (p)
+<span class="line_number">162</span>#endif
+<span class="line_number">163</span>
+<span class="line_number">164</span>#if __cpp_aligned_new
+<span class="line_number">165</span>	if (alignof(_Tp) &gt; __STDCPP_DEFAULT_NEW_ALIGNMENT__)
+<span class="line_number">166</span>	  {
+<span class="line_number">167</span>	    _GLIBCXX_OPERATOR_DELETE(_GLIBCXX_SIZED_DEALLOC(__p, __n),
+<span class="line_number">168</span>				     std::align_val_t(alignof(_Tp)));
+<span class="line_number">169</span>	    return;
+<span class="line_number">170</span>	  }
+<span class="line_number">171</span>#endif
+<span class="line_number">172</span>	_GLIBCXX_OPERATOR_DELETE(_GLIBCXX_SIZED_DEALLOC(__p, __n));
+<span class="line_number">173</span>      }
+<span class="line_number">174</span>
+<span class="line_number">175</span>#undef _GLIBCXX_SIZED_DEALLOC
+<span class="line_number">176</span>#undef _GLIBCXX_OPERATOR_DELETE
+<span class="line_number">177</span>#undef _GLIBCXX_OPERATOR_NEW
+<span class="line_number">178</span>
+<span class="line_number">179</span>#if __cplusplus &lt;= 201703L
+<span class="line_number">180</span>      __attribute__((__always_inline__))
+<span class="line_number">181</span>      size_type
+<span class="line_number">182</span>      max_size() const _GLIBCXX_USE_NOEXCEPT
+<span class="line_number">183</span>      { return _M_max_size(); }
+<span class="line_number">184</span>
+<span class="line_number">185</span>#if __cplusplus &gt;= 201103L
+<span class="line_number">186</span>      template&lt;typename _Up, typename... _Args&gt;
+<span class="line_number">187</span>	__attribute__((__always_inline__))
+<span class="line_number">188</span>	void
+<span class="line_number">189</span>	construct(_Up* __p, _Args&amp;&amp;... __args)
+<span class="line_number">190</span>	noexcept(std::is_nothrow_constructible&lt;_Up, _Args...&gt;::value)
+<span class="line_number">191</span>	{ ::new((void *)__p) _Up(std::forward&lt;_Args&gt;(__args)...); }
+<span class="line_number">192</span>
+<span class="line_number">193</span>      template&lt;typename _Up&gt;
+<span class="line_number">194</span>	__attribute__((__always_inline__))
+<span class="line_number">195</span>	void
+<span class="line_number">196</span>	destroy(_Up* __p)
+<span class="line_number">197</span>	noexcept(std::is_nothrow_destructible&lt;_Up&gt;::value)
+<span class="line_number">198</span>	{ __p-&gt;~_Up(); }
+<span class="line_number">199</span>#else
+<span class="line_number">200</span>      // _GLIBCXX_RESOLVE_LIB_DEFECTS
+<span class="line_number">201</span>      // 402. wrong new expression in [some_] allocator::construct
+<span class="line_number">202</span>      __attribute__((__always_inline__))
+<span class="line_number">203</span>      void
+<span class="line_number">204</span>      construct(pointer __p, const _Tp&amp; __val)
+<span class="line_number">205</span>      { ::new((void *)__p) _Tp(__val); }
+<span class="line_number">206</span>
+<span class="line_number">207</span>      __attribute__((__always_inline__))
+<span class="line_number">208</span>      void
+<span class="line_number">209</span>      destroy(pointer __p) { __p-&gt;~_Tp(); }
+<span class="line_number">210</span>#endif
+<span class="line_number">211</span>#endif // ! C++20
+<span class="line_number">212</span>
+<span class="line_number">213</span>      template&lt;typename _Up&gt;
+<span class="line_number">214</span>	friend __attribute__((__always_inline__)) _GLIBCXX20_CONSTEXPR bool
+<span class="line_number">215</span>	operator==(const __new_allocator&amp;, const __new_allocator&lt;_Up&gt;&amp;)
+<span class="line_number">216</span>	_GLIBCXX_NOTHROW
+<span class="line_number">217</span>	{ return true; }
+<span class="line_number">218</span>
+<span class="line_number">219</span>#if __cpp_impl_three_way_comparison &lt; 201907L
+<span class="line_number">220</span>      template&lt;typename _Up&gt;
+<span class="line_number">221</span>	friend __attribute__((__always_inline__)) _GLIBCXX20_CONSTEXPR bool
+<span class="line_number">222</span>	operator!=(const __new_allocator&amp;, const __new_allocator&lt;_Up&gt;&amp;)
+<span class="line_number">223</span>	_GLIBCXX_NOTHROW
+<span class="line_number">224</span>	{ return false; }
+<span class="line_number">225</span>#endif
+<span class="line_number">226</span>
+<span class="line_number">227</span>    private:
+<span class="line_number">228</span>      __attribute__((__always_inline__))
+<span class="line_number">229</span>      _GLIBCXX_CONSTEXPR size_type
+<span class="line_number">230</span>      _M_max_size() const _GLIBCXX_USE_NOEXCEPT
+<span class="line_number">231</span>      {
+<span class="line_number">232</span>#if __PTRDIFF_MAX__ &lt; __SIZE_MAX__
+<span class="line_number">233</span>	return std::size_t(__PTRDIFF_MAX__) / sizeof(_Tp);
+<span class="line_number">234</span>#else
+<span class="line_number">235</span>	return std::size_t(-1) / sizeof(_Tp);
+<span class="line_number">236</span>#endif
+<span class="line_number">237</span>      }
+<span class="line_number">238</span>    };
+<span class="line_number">239</span>
+<span class="line_number">240</span>_GLIBCXX_END_NAMESPACE_VERSION
+<span class="line_number">241</span>} // namespace
+<span class="line_number">242</span>
+<span class="line_number">243</span>#endif
+</code>
+            </pre>
+        </div>
+    </div>
+</body>
+
+</html>
