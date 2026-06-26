@@ -88,9 +88,22 @@ class NumericTensor(Tensor, ArithmeticTensorMixin):
     def __ne__(self, other):
         return self._compare(other, operator.ne, "!=")
 
+    def _compare(self, rhs, op, symbol):
+        # Two numeric tensors of differing dtype share no C++ comparison
+        # overload, so the same-type pybind binding would leak an "incompatible
+        # function arguments" error. Promote via NumPy (result_type rules) so
+        # e.g. float==int and int32==int64 compare by value, matching NumPy
+        # (issue #49). Same-dtype tensors keep the C++ fast path.
+        if isinstance(rhs, NumericTensor) and rhs.dtype is not self.dtype:
+            from .base_tensor import BoolTensor
+            return BoolTensor(np.asarray(op(np.asarray(self), np.asarray(rhs))))
+        return super()._compare(rhs, op, symbol)
+
     def array_equal(self, other) -> bool:
         if isinstance(other, np.ndarray):
             return np.array_equal(np.asarray(self), other)
+        if isinstance(other, NumericTensor) and other.dtype is not self.dtype:
+            return bool(np.array_equal(np.asarray(self), np.asarray(other)))
         return super().array_equal(other)
 
     def __floordiv__(self, rhs):
