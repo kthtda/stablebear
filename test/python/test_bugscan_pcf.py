@@ -54,3 +54,48 @@ def test_eval_negative_time_array_raises():
     f = Pcf(np.array([[0.0, 1.0], [2.0, 2.0]], dtype=np.float64))
     with pytest.raises(Exception, match="time 0"):
         f(np.array([-0.5, 0.5]))
+
+
+# ---------------------------------------------------------------------------
+# Bug #12: Pcf.__pow__ and tensor __pow__ called PyErr_WarnEx and ignored its
+# return code. Under `-W error` (warnings escalated to exceptions) the warning
+# becomes a pending Python exception, but the binding still returned a value, so
+# pybind11 raised a confusing SystemError. The bindings must now propagate the
+# RuntimeWarning-as-error instead.
+# ---------------------------------------------------------------------------
+
+
+def test_pcf_pow_propagates_warning_as_error():
+    import warnings
+    f = Pcf(np.array([[0.0, -2.0], [1.0, 4.0]], dtype=np.float64))
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        with pytest.raises(RuntimeWarning):
+            f ** 0.5
+
+
+def test_tensor_pow_propagates_warning_as_error():
+    import warnings
+    t = sb.FloatTensor(np.array([-2.0, 4.0], dtype=np.float64))
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        with pytest.raises(RuntimeWarning):
+            t ** 0.5
+
+
+def test_pcf_pow_warning_still_emitted_by_default():
+    import warnings
+    f = Pcf(np.array([[0.0, -2.0], [1.0, 4.0]], dtype=np.float64))
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        _ = f ** 0.5
+    assert any(issubclass(w.category, RuntimeWarning) for w in caught)
+
+
+def test_pcf_pow_no_warning_for_finite_result():
+    import warnings
+    f = Pcf(np.array([[0.0, 4.0], [1.0, 9.0]], dtype=np.float64))
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        g = f ** 0.5  # all-positive base -> finite, no warning
+    assert g(0.5) == 2.0
