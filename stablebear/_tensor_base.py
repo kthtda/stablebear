@@ -448,6 +448,24 @@ class Tensor(ABC):
             return val.astype(self.dtype)
         return val
 
+    def _ensure_writeable(self):
+        """Reject writes into a broadcast view.
+
+        ``broadcast_to`` expands axes by setting their stride to 0, so several
+        logical positions along such an axis map to the same physical cell.
+        Writing through the view would silently scatter a single assignment
+        across those positions and corrupt the shared source storage (and
+        in-place arithmetic would double-write each cell). NumPy marks broadcast
+        views read-only for exactly this reason; mirror that by refusing the
+        write. Call ``.copy()`` first to obtain a writeable tensor.
+        """
+        for length, stride in zip(self.shape, self.strides):
+            if stride == 0 and length > 1:
+                raise ValueError(
+                    "assignment destination is read-only: cannot write through "
+                    "a broadcast view (an axis with stride 0); call .copy() first"
+                )
+
     def __setitem__(self, slices, val):
         """Assign into the tensor using NumPy-style indexing.
 
@@ -478,6 +496,7 @@ class Tensor(ABC):
         TypeError
             If ``val`` has a type that cannot be assigned to this tensor.
         """
+        self._ensure_writeable()
         entries, inserts = self._normalize_index(slices)
         # A scalar-boolean ``False`` (or any zero-length newaxis) selects nothing.
         if any(length == 0 for _, length in inserts):
@@ -692,6 +711,12 @@ class Tensor(ABC):
         dimensions also get stride 0. No data is copied — the result shares
         the underlying storage.
 
+        The result is **read-only**, like ``numpy.broadcast_to``: because the
+        expanded axes have stride 0, several logical positions alias the same
+        cell, so writing through the view (item assignment or in-place
+        arithmetic) would corrupt the shared source. Such writes raise
+        ``ValueError``; call ``.copy()`` for a writeable tensor.
+
         Parameters
         ----------
         shape : tuple of int
@@ -701,7 +726,7 @@ class Tensor(ABC):
         Returns
         -------
         Tensor
-            A non-contiguous view of this tensor with the target shape.
+            A non-contiguous, read-only view of this tensor with the target shape.
 
         Raises
         ------
@@ -875,6 +900,7 @@ class ArithmeticTensorMixin:
         return self._to_py_tensor(self._decay_operand(lhs) + self._data)
 
     def __iadd__(self, rhs):
+        self._ensure_writeable()
         self._data += self._decay_operand(rhs)
         return self
 
@@ -885,6 +911,7 @@ class ArithmeticTensorMixin:
         return self._to_py_tensor(self._decay_operand(lhs) - self._data)
 
     def __isub__(self, rhs):
+        self._ensure_writeable()
         self._data -= self._decay_operand(rhs)
         return self
 
@@ -895,6 +922,7 @@ class ArithmeticTensorMixin:
         return self._to_py_tensor(self._decay_operand(lhs) * self._data)
 
     def __imul__(self, rhs):
+        self._ensure_writeable()
         self._data *= self._decay_operand(rhs)
         return self
 
@@ -908,6 +936,7 @@ class ArithmeticTensorMixin:
         return self._to_py_tensor(self._decay_operand(lhs) / self._data)
 
     def __itruediv__(self, rhs):
+        self._ensure_writeable()
         self._data /= self._decay_operand(rhs)
         return self
 
@@ -942,5 +971,6 @@ class ArithmeticTensorMixin:
         -------
         self
         """
+        self._ensure_writeable()
         self._data.__ipow__(exponent)
         return self
