@@ -111,9 +111,13 @@ _DTYPE_TAG = {
     float32: "f32", float64: "f64",
     int32: "i32", int64: "i64",
     uint32: "u32", uint64: "u64",
+    boolean: "bool",
     pcf32: "pcf32", pcf64: "pcf64",
     pcf32i: "pcf32i", pcf64i: "pcf64i",
     pcloud32: "pcloud32", pcloud64: "pcloud64",
+    distmat32: "distmat32", distmat64: "distmat64",
+    symmat32: "symmat32", symmat64: "symmat64",
+    barcode32: "barcode32", barcode64: "barcode64",
 }
 
 
@@ -124,12 +128,20 @@ _DTYPE_TO_WRAPPER = {}
 def _init_dtype_wrappers():
     if _DTYPE_TO_WRAPPER:
         return
-    from .base_tensor import FloatTensor, IntTensor, PcfTensor, IntPcfTensor, PointCloudTensor
+    from .base_tensor import (
+        BoolTensor, FloatTensor, IntTensor, PcfTensor, IntPcfTensor, PointCloudTensor)
+    from .distance_matrix import DistanceMatrixTensor
+    from .symmetric_matrix import SymmetricMatrixTensor
+    from .persistence.ph_tensor import BarcodeTensor
     _DTYPE_TO_WRAPPER.update({
         float32: FloatTensor, float64: FloatTensor,
         int32: IntTensor, int64: IntTensor,
         uint32: IntTensor, uint64: IntTensor,
+        boolean: BoolTensor,
         pcf32: PcfTensor, pcf64: PcfTensor,
         pcf32i: IntPcfTensor, pcf64i: IntPcfTensor,
         pcloud32: PointCloudTensor, pcloud64: PointCloudTensor,
+        distmat32: DistanceMatrixTensor, distmat64: DistanceMatrixTensor,
+        symmat32: SymmetricMatrixTensor, symmat64: SymmetricMatrixTensor,
+        barcode32: BarcodeTensor, barcode64: BarcodeTensor,
     })

@@ -37,6 +37,18 @@ namespace sb
 
     SymmetricMatrix() : SymmetricMatrix(0) { }
 
+    /// Converting constructor: copy a symmetric matrix of a different element
+    /// precision, static_casting each stored entry from the compressed buffer.
+    template <typename U>
+    explicit SymmetricMatrix(const SymmetricMatrix<U>& other)
+      : m_data(std::make_shared<T[]>(storage_size(other.size())))
+      , m_size(other.size())
+    {
+      const U* src = other.data();
+      for (size_t i = 0; i < storage_size(m_size); ++i)
+        m_data[i] = static_cast<T>(src[i]);
+    }
+
     /// Return an independent deep copy. The implicit copy shares the
     /// std::shared_ptr buffer (view-like), which is relied on internally; this
     /// is used when a matrix must not alias its source (e.g. a tensor cell).
