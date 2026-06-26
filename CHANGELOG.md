@@ -13,6 +13,8 @@
 ### New features
 
 * **SciPy linkage conversion** — `persistence.linkage_to_barcode` converts a linkage matrix to a `Barcode`, with optional reduced homology and no SciPy runtime dependency. ([#221](https://github.com/kthtda/stablebear/issues/221))
+* **Non-numeric tensors export back to NumPy** — `PointCloudTensor` (of equal-sized clouds) and `DistanceMatrixTensor`/`SymmetricMatrixTensor` now provide `to_dense()`/`to_numpy()` (and work with `np.asarray`), and `BarcodeTensor` provides `to_numpy()`/`tolist()` returning the per-cell barcode arrays — instead of only a per-element loop. Ragged point clouds / non-uniform matrices raise a clear `ValueError`. ([#85](https://github.com/kthtda/stablebear/issues/85), [#93](https://github.com/kthtda/stablebear/issues/93), [#94](https://github.com/kthtda/stablebear/issues/94))
+
 
 ### Bug fixes
 
