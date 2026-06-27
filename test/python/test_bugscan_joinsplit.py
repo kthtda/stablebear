@@ -74,6 +74,28 @@ def test_concatenate_out_of_range_negative_axis_raises():
         sb.concatenate([a, a], axis=-5)
 
 
+@pytest.mark.parametrize("axis", [0, 1, 2, -1, -2, -3])
+def test_stack_axis_resolves_like_numpy(axis):
+    # stack inserts a *new* axis, so the valid range is [-(ndim+1), ndim].
+    # Both the appended position (axis == ndim) and negative axes must match
+    # numpy.stack.
+    a = sb.FloatTensor(np.arange(6.0).reshape(2, 3))
+    b = sb.FloatTensor(np.arange(6.0, 12.0).reshape(2, 3))
+    got = np.asarray(sb.stack([a, b], axis=axis))
+    ref = np.stack([np.asarray(a), np.asarray(b)], axis=axis)
+    np.testing.assert_array_equal(got, ref)
+    assert got.shape == ref.shape
+
+
+@pytest.mark.parametrize("axis", [3, -4])
+def test_stack_out_of_range_axis_raises(axis):
+    # An axis outside [-(ndim+1), ndim] raises a clean IndexError, consistent
+    # with concatenate/split rather than a raw C++ ValueError.
+    a = sb.FloatTensor(np.arange(6.0).reshape(2, 3))
+    with pytest.raises(IndexError):
+        sb.stack([a, a], axis=axis)
+
+
 # ---------------------------------------------------------------------------
 # Bug #21: a negative split-index entry raised a low-level pybind TypeError
 # (split_indices takes unsigned indices). Negative entries now offset from the

@@ -199,10 +199,19 @@ def concatenate(tensors, axis=0):
 
 
 def stack(tensors, axis=0):
-    """Stack tensors along a new axis. All tensors must have the same shape."""
+    """Stack tensors along a new axis. All tensors must have the same shape.
+
+    *axis* indexes the new dimension and may be negative (counting from the
+    end), as in NumPy; its valid range is ``[-(ndim + 1), ndim]``. Resolving it
+    here keeps ``stack`` consistent with :func:`concatenate` and raises a clean
+    ``IndexError`` (rather than a C++ ``ValueError``) when it is out of range.
+    """
     if not tensors:
         raise ValueError("need at least one tensor to stack")
     _require_same_dtype(tensors, "stack")
+    # The new axis can sit at position ``ndim`` (appended), so resolve against
+    # ``ndim + 1`` rather than ``ndim``.
+    axis = _resolve_axis(axis, tensors[0].ndim + 1)
     cpp_tensors = [t._data for t in tensors]
     result = type(cpp_tensors[0]).stack(cpp_tensors, axis)
     return tensors[0]._to_py_tensor(result)
