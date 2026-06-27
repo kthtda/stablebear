@@ -1,0 +1,24 @@
+==3926== Memcheck, a memory error detector
+==3926== Copyright (C) 2002-2022, and GNU GPL'd, by Julian Seward et al.
+==3926== Using Valgrind-3.22.0 and LibVEX; rerun with -h for copyright info
+==3926== Command: python -m pytest . -vv -s
+==3926== Parent PID: 3925
+==3926== 
+==3926== 
+==3926== HEAP SUMMARY:
+==3926==     in use at exit: 8,622,666 bytes in 91,205 blocks
+==3926==   total heap usage: 7,535,611 allocs, 7,444,406 frees, 833,734,953 bytes allocated
+==3926== 
+==3926== LEAK SUMMARY:
+==3926==    definitely lost: 45,160 bytes in 793 blocks
+==3926==    indirectly lost: 6,344 bytes in 56 blocks
+==3926==      possibly lost: 1,072,927 bytes in 7,011 blocks
+==3926==    still reachable: 243,474 bytes in 1,069 blocks
+==3926==                       of which reachable via heuristic:
+==3926==                         stdstring          : 576 bytes in 8 blocks
+==3926==                         newarray           : 96 bytes in 6 blocks
+==3926==         suppressed: 7,254,761 bytes in 82,276 blocks
+==3926== Rerun with --leak-check=full to see details of leaked memory
+==3926== 
+==3926== For lists of detected and suppressed errors, rerun with: -s
+==3926== ERROR SUMMARY: 0 errors from 0 contexts (suppressed: 0 from 0)
