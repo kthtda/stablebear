@@ -1270,5 +1270,15 @@
     "py": 87.0,
     "cuda": null,
     "release_tag": null
+  },
+  {
+    "utc_iso": "2026-06-27T18:40:18Z",
+    "sha": "eddaaab",
+    "branch": "136/merge",
+    "detail_path": "reports/2026-06-27_18-40-18_eddaaab/report.html",
+    "cpp": 88.4,
+    "py": 87.0,
+    "cuda": null,
+    "release_tag": null
   }
 ]
