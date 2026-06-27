@@ -200,13 +200,16 @@ namespace
     EXPECT_EQ(count, 4);
   }
 
-  TYPED_TEST(TensorTppTyped, WalkEmptyShapeDoesNothing)
+  TYPED_TEST(TensorTppTyped, WalkRank0ShapeVisitsSingleElement)
   {
     using T = TypeParam;
+    // A default-constructed (rank-0, shape ()) tensor holds exactly one
+    // element, so walk must visit it once with an empty index. Only a
+    // zero-size extent is skipped (see WalkZeroDimensionDoesNothing).
     sb::Tensor<T> t;
     int count = 0;
-    sb::walk(t, [&count](const std::vector<size_t>&) { ++count; });
-    EXPECT_EQ(count, 0);
+    sb::walk(t, [&count](const std::vector<size_t>& idx) { ++count; EXPECT_TRUE(idx.empty()); });
+    EXPECT_EQ(count, 1);
   }
 
   TYPED_TEST(TensorTppTyped, WalkZeroDimensionDoesNothing)
