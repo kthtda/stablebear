@@ -65,6 +65,15 @@ def test_split_out_of_range_axis_raises():
         sb.split(m, 1, axis=5)
 
 
+def test_concatenate_out_of_range_negative_axis_raises():
+    # An out-of-range *negative* axis (axis + ndim is still < 0) is resolved by
+    # the shared _resolve_axis helper, which raises a clean IndexError rather
+    # than leaking the raw pybind "incompatible function arguments" error.
+    a = sb.FloatTensor(np.arange(6.0).reshape(2, 3))
+    with pytest.raises(IndexError):
+        sb.concatenate([a, a], axis=-5)
+
+
 # ---------------------------------------------------------------------------
 # Bug #21: a negative split-index entry raised a low-level pybind TypeError
 # (split_indices takes unsigned indices). Negative entries now offset from the
@@ -76,6 +85,18 @@ def test_split_out_of_range_axis_raises():
                          [(sb.split, np.split), (sb.array_split, np.array_split)])
 @pytest.mark.parametrize("indices", [[-2], [-7], [2, -1], [-3, -1]])
 def test_negative_split_indices_offset_like_numpy(splitter, np_splitter, indices):
+    base = np.arange(7.0)
+    got = [list(np.asarray(p).ravel()) for p in splitter(sb.FloatTensor(base), indices)]
+    ref = [list(x) for x in np_splitter(base, indices)]
+    assert got == ref
+
+
+@pytest.mark.parametrize("splitter, np_splitter",
+                         [(sb.split, np.split), (sb.array_split, np.array_split)])
+@pytest.mark.parametrize("indices", [[100], [4, 100], [100, 200]])
+def test_overflow_split_indices_clamp_like_numpy(splitter, np_splitter, indices):
+    # A split index larger than the axis size is clamped to axis_size by the
+    # C++ layer, yielding empty trailing parts, exactly as numpy does.
     base = np.arange(7.0)
     got = [list(np.asarray(p).ravel()) for p in splitter(sb.FloatTensor(base), indices)]
     ref = [list(x) for x in np_splitter(base, indices)]
