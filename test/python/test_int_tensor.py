@@ -68,6 +68,12 @@ def test_construct_bad_dtype_raises_typeerror():
         IntTensor([1, 2], dtype=sb.float64)
 
 
+def test_construct_bad_dtype_ndarray_raises_typeerror():
+    # The dtype guard also covers the ndarray branch (issue #55).
+    with pytest.raises(TypeError):
+        IntTensor(np.array([1, 2]), dtype=sb.float64)
+
+
 def test_numpy_roundtrip_large_uint64():
     arr = np.array([0, 2**32, 2**40], dtype=np.uint64)
     t = IntTensor(arr)

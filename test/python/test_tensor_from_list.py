@@ -201,6 +201,13 @@ def test_l2_kernel_mixed_precision_raises():
         sb.l2_kernel([_make_pcf(0, np.float32), _make_pcf(1, np.float64)])
 
 
+def test_barcode_tensor_mixed_precision_raises():
+    # BarcodeTensor now routes through _tensor_from_nested, so a mixed-precision
+    # list raises the same "same dtype" TypeError as PcfTensor (issue #80).
+    with pytest.raises(TypeError, match="same dtype"):
+        BarcodeTensor([_make_barcode(0, np.float32), _make_barcode(1, np.float64)])
+
+
 def test_barcode_tensor_from_ndarray_list_1d():
     # BarcodeTensor from raw (n, 2) ndarrays (issue #83).
     bcs = [np.array([[0.0, 1.0]], dtype=np.float32),
