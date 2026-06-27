@@ -443,3 +443,31 @@ class TestSize1TensorRhsBroadcast:
         mask = BoolTensor(np.array([True, False, True, False, True]))
         with pytest.raises(ValueError):
             t[mask] = FloatTensor(np.array([10.0, 20.0], dtype=np.float32))
+
+    def test_cross_dtype_size1_rhs_is_cast(self):
+        # A size-1 tensor RHS of a different numeric dtype is cast through
+        # _coerce_rhs (int -> float) before its lone element is broadcast.
+        arr = np.arange(5, dtype=np.float32)
+        mask = arr > 1.0
+        t = _sb(arr.copy())
+        t[BoolTensor(mask)] = sb.IntTensor(np.array([5]))
+        arr[mask] = 5.0
+        np.testing.assert_array_equal(np.asarray(t), arr)
+
+    def test_cross_dtype_size1_rhs_int_index(self):
+        # Same cross-dtype cast (int -> float) through an integer-index target.
+        arr = np.arange(5, dtype=np.float32)
+        idx = np.array([1, 3])
+        t = _sb(arr.copy())
+        t[sb.IntTensor(idx)] = sb.IntTensor(np.array([5]))
+        arr[idx] = 5.0
+        np.testing.assert_array_equal(np.asarray(t), arr)
+
+    def test_basic_slice_size1_rhs_broadcasts(self):
+        # A basic-slice target with a size-1 tensor RHS routes through the new
+        # size-1 broadcast branch and fills every selected cell with the value.
+        arr = np.arange(5, dtype=np.float32)
+        t = _sb(arr.copy())
+        t[1:3] = FloatTensor(np.array([7.0], dtype=np.float32))
+        arr[1:3] = 7.0
+        np.testing.assert_array_equal(np.asarray(t), arr)
