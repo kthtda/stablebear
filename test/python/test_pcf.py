@@ -320,6 +320,16 @@ class TestArrayAccessors:
         assert f.t_min == arr[0, 0]
         assert f.t_max == arr[-1, 0]
 
+    @pytest.mark.parametrize("np_dtype", [np.int32, np.int64])
+    def test_times_values_integer_dtype(self, np_dtype):
+        arr = np.array([[0, 1], [2, 3], [4, 5]], dtype=np_dtype)
+        f = Pcf(arr)
+        npt.assert_array_equal(f.times, arr[:, 0])
+        npt.assert_array_equal(f.values, arr[:, 1])
+        npt.assert_array_equal(f.breakpoints, arr)
+        assert f.t_min == arr[0, 0]
+        assert f.t_max == arr[-1, 0]
+
 
 class TestFromArrays:
     def test_basic(self):
@@ -341,7 +351,20 @@ class TestFromArrays:
         with pytest.raises(ValueError, match="1-D"):
             Pcf.from_arrays([[0.0, 1.0]], [1.0, 2.0])
 
+    def test_non_1d_values_raises(self):
+        # The 1-D check guards *both* arguments; a 2-D ``values`` must be
+        # rejected just like a 2-D ``times``.
+        with pytest.raises(ValueError, match="1-D"):
+            Pcf.from_arrays([0.0, 1.0], [[1.0], [2.0]])
+
     def test_bad_first_time_raises(self):
         with pytest.raises(ValueError, match="t=0"):
             Pcf.from_arrays([1.0, 2.0], [1.0, 2.0])
+
+    @pytest.mark.parametrize("dtype", [sb.pcf32i, sb.pcf64i])
+    def test_integer_dtype_honored(self, dtype):
+        f = Pcf.from_arrays([0, 2, 4], [1, 2, 0], dtype=dtype)
+        assert f.dtype is dtype
+        npt.assert_array_equal(f.times, [0, 2, 4])
+        npt.assert_array_equal(f.values, [1, 2, 0])
 
