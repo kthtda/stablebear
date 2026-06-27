@@ -115,3 +115,25 @@ def test_barcode_precision_roundtrip():
 def test_astype_to_same_dtype_is_copy():
     t = sb.FloatTensor([1.0, 2.0, 3.0])
     assert t.astype(sb.float64).dtype is sb.float64
+
+
+# ---------------------------------------------------------------------------
+# Genuinely undefined casts still raise a clear TypeError.
+#
+# astype builds a C++ binding name cast_{src_tag}_{dst_tag}; when no such
+# binding exists it raises TypeError (_tensor_base.py:796-798). Casts between
+# unrelated families were never registered, so they remain undefined.
+# ---------------------------------------------------------------------------
+
+
+def test_numeric_to_pcf_cast_is_undefined():
+    t = sb.FloatTensor(np.array([1.0, 2.0, 3.0], dtype=np.float64))
+    with pytest.raises(TypeError):
+        t.astype(sb.pcf32)
+
+
+def test_distmat_to_symmat_cast_is_undefined():
+    base = np.array([[[0.0, 1.0, 2.0], [1.0, 0.0, 3.0], [2.0, 3.0, 0.0]]])
+    t = sb.DistanceMatrixTensor.from_numpy(base)
+    with pytest.raises(TypeError):
+        t.astype(sb.symmat32)
