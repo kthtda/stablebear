@@ -228,6 +228,42 @@ def test_int_pcf_explicit_inf_maps_to_dtype_max(npdt):
     assert rects[-1].right == np.iinfo(npdt).max
 
 
+@pytest.mark.parametrize("npdt", [np.int32, np.int64])
+def test_int_pcf_explicit_float_bound_truncated_to_int(npdt):
+    # On an integer PCF, a non-inf float bound is truncated to int (the
+    # docstring: "any other value is truncated to int"), so b=3.7 == b=3.
+    f = sb.Pcf(np.array([[0, 3], [1, 2]], dtype=npdt))
+    g = sb.Pcf(np.array([[0, 2], [1, 4]], dtype=npdt))
+
+    rects_float = sb.iterate_rectangles(f, g, b=3.7)
+    rects_int = sb.iterate_rectangles(f, g, b=3)
+
+    assert len(rects_float) == len(rects_int)
+    for r1, r2 in zip(rects_float, rects_int):
+        assert r1.left == pytest.approx(r2.left)
+        assert r1.right == pytest.approx(r2.right)
+        assert r1.f_value == pytest.approx(r2.f_value)
+        assert r1.g_value == pytest.approx(r2.g_value)
+
+
+@pytest.mark.parametrize("npdt", [np.int32, np.int64])
+def test_int_pcf_negative_inf_maps_to_dtype_min(npdt):
+    # On an integer PCF, a=-inf maps to the dtype's iinfo.min (the integer
+    # analogue of -inf), matching an explicit np.iinfo(npdt).min bound.
+    f = sb.Pcf(np.array([[0, 3], [1, 2]], dtype=npdt))
+    g = sb.Pcf(np.array([[0, 2], [1, 4]], dtype=npdt))
+
+    rects_neg_inf = sb.iterate_rectangles(f, g, a=float("-inf"))
+    rects_min = sb.iterate_rectangles(f, g, a=int(np.iinfo(npdt).min))
+
+    assert len(rects_neg_inf) == len(rects_min)
+    for r1, r2 in zip(rects_neg_inf, rects_min):
+        assert r1.left == pytest.approx(r2.left)
+        assert r1.right == pytest.approx(r2.right)
+        assert r1.f_value == pytest.approx(r2.f_value)
+        assert r1.g_value == pytest.approx(r2.g_value)
+
+
 if __name__ == "__main__":
     if not os.environ.get("SB_SHOW_PLOTS"):
         os.environ["SB_SHOW_PLOTS"] = "1"
