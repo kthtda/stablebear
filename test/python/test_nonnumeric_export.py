@@ -142,6 +142,12 @@ def test_distance_matrix_tensor_empty_to_dense_raises():
         dt.to_dense()
 
 
+def test_symmetric_matrix_tensor_empty_to_dense_raises():
+    sm = sb.zeros((0,), dtype=sb.symmat64)
+    with pytest.raises(ValueError, match="empty axis"):
+        sm.to_dense()
+
+
 # --- BarcodeTensor (#85) ---
 
 
