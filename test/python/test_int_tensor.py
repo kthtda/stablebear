@@ -183,6 +183,42 @@ class TestIntTensorFloatAssignTruncates:
         t[0] = np.float64(5.7)
         assert int(np.asarray(t)[0]) == 5
 
+    def test_bool_mask_assignment_truncates(self, np_dtype, sb_dtype):
+        t = sb.IntTensor(np.array([1, -2, 3], dtype=np_dtype))
+        t[t > 0] = 7.9
+        ref = np.array([1, -2, 3], dtype=np_dtype)
+        ref[ref > 0] = 7
+        np.testing.assert_array_equal(np.asarray(t), ref)
+
+    def test_fancy_index_assignment_truncates(self, np_dtype, sb_dtype):
+        t = sb.IntTensor(np.array([1, 2, 3, 4], dtype=np_dtype))
+        t[[0, 2]] = 7.9
+        ref = np.array([1, 2, 3, 4], dtype=np_dtype)
+        ref[[0, 2]] = 7
+        np.testing.assert_array_equal(np.asarray(t), ref)
+
+
+@pytest.mark.parametrize("np_dtype, sb_dtype",
+                         [pytest.param(np.uint32, sb.uint32, id="uint32"),
+                          pytest.param(np.uint64, sb.uint64, id="uint64")])
+class TestUintFloatAssignTruncates:
+    def test_positive_float_scalar_truncates(self, np_dtype, sb_dtype):
+        t = sb.IntTensor(np.array([1, 2, 3], dtype=np_dtype))
+        t[0] = 7.9
+        assert int(np.asarray(t)[0]) == 7
+
+    def test_positive_float_slice_truncates(self, np_dtype, sb_dtype):
+        t = sb.IntTensor(np.array([1, 2, 3, 4], dtype=np_dtype))
+        t[0:2] = 7.9
+        np.testing.assert_array_equal(np.asarray(t)[:2], np.array([7, 7]))
+
+    def test_positive_float_fancy_index_truncates(self, np_dtype, sb_dtype):
+        t = sb.IntTensor(np.array([1, 2, 3, 4], dtype=np_dtype))
+        t[[0, 2]] = 7.9
+        ref = np.array([1, 2, 3, 4], dtype=np_dtype)
+        ref[[0, 2]] = 7
+        np.testing.assert_array_equal(np.asarray(t), ref)
+
 
 # ---------------------------------------------------------------------------
 # Bug #65: a fractional exponent on an IntTensor raised a raw pybind error, and
@@ -223,6 +259,12 @@ class TestIntTensorPow:
         t = sb.IntTensor(np.array([2, 3], dtype=np_dtype))
         t **= 3
         np.testing.assert_array_equal(np.asarray(t), np.array([8, 27]))
+
+    def test_np_integer_exponent_stays_int(self, np_dtype, sb_dtype):
+        t = sb.IntTensor(np.array([2, 3], dtype=np_dtype))
+        result = t ** np.int64(2)
+        assert isinstance(result, sb.IntTensor)
+        np.testing.assert_array_equal(np.asarray(result), np.array([4, 9]))
 
 
 @pytest.mark.parametrize("np_dtype, sb_dtype",
