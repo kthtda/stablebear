@@ -142,3 +142,41 @@ class TestAllcloseInterop:
 
     def test_tensor_vs_ndarray(self):
         assert sb.allclose(sb.FloatTensor([1.0, 2.0]), np.array([1.0, 2.0]))
+
+
+class TestAllcloseMatrixInterop:
+    # Bug #100: differing-precision matrices have no shared C++ overload, so
+    # allclose falls back to comparing their dense forms via numpy.
+    def test_distance_matrix_float32_vs_float64_close(self):
+        a = sb.DistanceMatrix(3, dtype=sb.float32)
+        b = sb.DistanceMatrix(3, dtype=sb.float64)
+        a[0, 1] = 1.0
+        b[0, 1] = 1.0
+        assert sb.allclose(a, b)
+
+    def test_distance_matrix_float32_vs_float64_not_close(self):
+        a = sb.DistanceMatrix(3, dtype=sb.float32)
+        b = sb.DistanceMatrix(3, dtype=sb.float64)
+        a[0, 1] = 1.0
+        b[0, 1] = 2.0
+        assert not sb.allclose(a, b)
+
+    def test_symmetric_matrix_float32_vs_float64_close(self):
+        a = sb.SymmetricMatrix(3, dtype=sb.float32)
+        b = sb.SymmetricMatrix(3, dtype=sb.float64)
+        a[0, 1] = 1.0
+        b[0, 1] = 1.0
+        assert sb.allclose(a, b)
+
+    def test_symmetric_matrix_float32_vs_float64_not_close(self):
+        a = sb.SymmetricMatrix(3, dtype=sb.float32)
+        b = sb.SymmetricMatrix(3, dtype=sb.float64)
+        a[0, 1] = 1.0
+        b[0, 1] = 2.0
+        assert not sb.allclose(a, b)
+
+    def test_distance_matrix_vs_symmetric_matrix_raises(self):
+        a = sb.DistanceMatrix(3, dtype=sb.float64)
+        b = sb.SymmetricMatrix(3, dtype=sb.float64)
+        with pytest.raises(TypeError, match="matrix type"):
+            sb.allclose(a, b)
