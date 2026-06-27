@@ -194,3 +194,13 @@ class TestRowSliceIndexing:
         dm, arr = self._matrix(dtype)
         assert dm[1, 2] == arr[1, 2]
         assert np.isscalar(dm[1, 2])
+
+    def test_np_integer_pair_matches_int_pair(self, dtype):
+        dm, arr = self._matrix(dtype)
+        assert dm[np.int64(1), np.int64(2)] == dm[1, 2]
+        assert np.isscalar(dm[np.int64(1), np.int64(2)])
+
+    def test_out_of_range_row_raises(self, dtype):
+        dm, arr = self._matrix(dtype)
+        with pytest.raises(IndexError):
+            _ = dm[10]
