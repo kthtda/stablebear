@@ -84,6 +84,24 @@ def test_matrix_tensor_assign_dtype_mismatch_clean(dst_dtype, src_dtype):
 
 
 @pytest.mark.parametrize(
+    "dst_dtype, src_dtype",
+    [
+        (sb.distmat32, sb.distmat64),
+        (sb.symmat32, sb.symmat64),
+    ],
+)
+def test_matrix_tensor_assign_dtype_mismatch_clean_reverse(dst_dtype, src_dtype):
+    dst = sb.zeros((2,), dtype=dst_dtype)
+    src = sb.zeros((2,), dtype=src_dtype)
+    with pytest.raises(TypeError) as excinfo:
+        dst[:] = src
+    msg = str(excinfo.value)
+    assert "incompatible function arguments" not in msg
+    assert "__setitem__" not in msg
+    assert dst_dtype.name in msg and src_dtype.name in msg
+
+
+@pytest.mark.parametrize(
     "tensor_dtype, elem_dtype, elem_cls",
     [
         (sb.distmat64, sb.float64, DistanceMatrix),
