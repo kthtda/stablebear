@@ -331,6 +331,24 @@ class TestSqueeze:
         with pytest.raises(IndexError):
             t.squeeze(1)
 
+    def test_squeeze_tuple_descending_removal_order(self, TensorType, np_dtype):
+        # Multiple size-1 axes at different positions: removals happen in
+        # descending order so earlier removals don't renumber later axes.
+        _assert_squeeze(
+            np.arange(12, dtype=np_dtype).reshape(1, 3, 1, 4, 1),
+            (0, 2, 4),
+            TensorType,
+        )
+
+    def test_squeeze_tuple_unsorted_order(self, TensorType, np_dtype):
+        # The same axes given in non-sorted order must yield the same (3, 4)
+        # result; sorting before removal is what guarantees this.
+        _assert_squeeze(
+            np.arange(12, dtype=np_dtype).reshape(1, 3, 1, 4, 1),
+            (4, 2, 0),
+            TensorType,
+        )
+
 
 # --- expand_dims ---
 
@@ -399,6 +417,15 @@ class TestExpandDims:
         t = TensorType(np.arange(6, dtype=np_dtype))
         with pytest.raises(ValueError):
             t.expand_dims((0, 0))
+
+    def test_expand_tuple_out_of_range_raises(self, TensorType, np_dtype):
+        # An out-of-range axis inside a tuple resolves via _resolve_axis
+        # against the output rank, just like the scalar path.
+        t = TensorType(np.arange(6, dtype=np_dtype))
+        with pytest.raises((ValueError, RuntimeError, IndexError)):
+            t.expand_dims((0, 5))
+        with pytest.raises((ValueError, RuntimeError, IndexError)):
+            t.expand_dims((0, -5))
 
 
 # --- astype ---
