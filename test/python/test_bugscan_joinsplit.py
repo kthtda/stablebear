@@ -35,3 +35,117 @@ def test_split_zero_sections_explicit_axis_raises():
 def test_array_split_zero_sections_still_raises():
     with pytest.raises(ValueError):
         sb.array_split(sb.FloatTensor(np.arange(6.0)), 0)
+
+
+# ---------------------------------------------------------------------------
+# Bug #20 / #73: concatenate / split / array_split rejected a negative axis
+# with a raw pybind "incompatible function arguments" error (the bindings take
+# an unsigned axis). Negative axes now resolve from the end, as in NumPy.
+# ---------------------------------------------------------------------------
+
+
+def test_concatenate_negative_axis_resolves_like_numpy():
+    a = sb.FloatTensor(np.arange(6.0).reshape(2, 3))
+    got = np.asarray(sb.concatenate([a, a], axis=-1))
+    ref = np.concatenate([np.asarray(a), np.asarray(a)], axis=-1)
+    np.testing.assert_array_equal(got, ref)
+    assert got.shape == (2, 6)
+
+
+@pytest.mark.parametrize("splitter", [sb.split, sb.array_split])
+def test_split_negative_axis_resolves_like_numpy(splitter):
+    m = sb.FloatTensor(np.arange(12.0).reshape(2, 6))
+    parts = splitter(m, 3, axis=-1)
+    assert [tuple(p.shape) for p in parts] == [(2, 2), (2, 2), (2, 2)]
+
+
+def test_split_out_of_range_axis_raises():
+    m = sb.FloatTensor(np.arange(6.0).reshape(2, 3))
+    with pytest.raises(IndexError):
+        sb.split(m, 1, axis=5)
+
+
+def test_concatenate_out_of_range_negative_axis_raises():
+    # An out-of-range *negative* axis (axis + ndim is still < 0) is resolved by
+    # the shared _resolve_axis helper, which raises a clean IndexError rather
+    # than leaking the raw pybind "incompatible function arguments" error.
+    a = sb.FloatTensor(np.arange(6.0).reshape(2, 3))
+    with pytest.raises(IndexError):
+        sb.concatenate([a, a], axis=-5)
+
+
+@pytest.mark.parametrize("axis", [0, 1, 2, -1, -2, -3])
+def test_stack_axis_resolves_like_numpy(axis):
+    # stack inserts a *new* axis, so the valid range is [-(ndim+1), ndim].
+    # Both the appended position (axis == ndim) and negative axes must match
+    # numpy.stack.
+    a = sb.FloatTensor(np.arange(6.0).reshape(2, 3))
+    b = sb.FloatTensor(np.arange(6.0, 12.0).reshape(2, 3))
+    got = np.asarray(sb.stack([a, b], axis=axis))
+    ref = np.stack([np.asarray(a), np.asarray(b)], axis=axis)
+    np.testing.assert_array_equal(got, ref)
+    assert got.shape == ref.shape
+
+
+@pytest.mark.parametrize("axis", [3, -4])
+def test_stack_out_of_range_axis_raises(axis):
+    # An axis outside [-(ndim+1), ndim] raises a clean IndexError, consistent
+    # with concatenate/split rather than a raw C++ ValueError.
+    a = sb.FloatTensor(np.arange(6.0).reshape(2, 3))
+    with pytest.raises(IndexError):
+        sb.stack([a, a], axis=axis)
+
+
+# ---------------------------------------------------------------------------
+# Bug #21: a negative split-index entry raised a low-level pybind TypeError
+# (split_indices takes unsigned indices). Negative entries now offset from the
+# end (clamped at 0), matching numpy.split / numpy.array_split.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("splitter, np_splitter",
+                         [(sb.split, np.split), (sb.array_split, np.array_split)])
+@pytest.mark.parametrize("indices", [[-2], [-7], [2, -1], [-3, -1]])
+def test_negative_split_indices_offset_like_numpy(splitter, np_splitter, indices):
+    base = np.arange(7.0)
+    got = [list(np.asarray(p).ravel()) for p in splitter(sb.FloatTensor(base), indices)]
+    ref = [list(x) for x in np_splitter(base, indices)]
+    assert got == ref
+
+
+@pytest.mark.parametrize("splitter, np_splitter",
+                         [(sb.split, np.split), (sb.array_split, np.array_split)])
+@pytest.mark.parametrize("indices", [[100], [4, 100], [100, 200]])
+def test_overflow_split_indices_clamp_like_numpy(splitter, np_splitter, indices):
+    # A split index larger than the axis size is clamped to axis_size by the
+    # C++ layer, yielding empty trailing parts, exactly as numpy does.
+    base = np.arange(7.0)
+    got = [list(np.asarray(p).ravel()) for p in splitter(sb.FloatTensor(base), indices)]
+    ref = [list(x) for x in np_splitter(base, indices)]
+    assert got == ref
+
+
+# ---------------------------------------------------------------------------
+# Bug #74: joining tensors of different dtype/precision leaked the raw pybind
+# overload dump. There is no implicit upcasting, so report a clear error.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("op", [sb.concatenate, sb.stack])
+def test_join_mismatched_dtype_raises_clean(op):
+    f32 = sb.FloatTensor(np.arange(3.0, dtype=np.float32))
+    f64 = sb.FloatTensor(np.arange(3.0, dtype=np.float64))
+    with pytest.raises(TypeError) as excinfo:
+        op([f32, f64])
+    msg = str(excinfo.value)
+    assert "incompatible function arguments" not in msg
+    assert "same dtype" in msg
+
+
+@pytest.mark.parametrize("op", [sb.concatenate, sb.stack])
+def test_join_cross_family_raises_clean(op):
+    f = sb.FloatTensor(np.arange(3.0))
+    p = sb.zeros((3,), dtype=sb.pcf64)
+    with pytest.raises(TypeError) as excinfo:
+        op([f, p])
+    assert "same dtype" in str(excinfo.value)

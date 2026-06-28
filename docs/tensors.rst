@@ -235,7 +235,9 @@ Joining tensors
    B = sb.FloatTensor(np.array([[5, 6]], dtype=np.float32))          # (1, 2)
    sb.concatenate((A, B), axis=0)   # (3, 2)
 
-All tensors must have the same shape except along the join axis.
+All tensors must have the same shape except along the join axis, and must
+share a dtype — joining mixed dtypes raises ``TypeError`` (cast with
+``astype`` first). ``axis`` may be negative, counting from the last axis.
 
 ``stack`` joins tensors along a new axis (all shapes must match)::
 
@@ -261,7 +263,8 @@ splits, or a list of indices for custom split points::
 
 The returned parts are views sharing data with the original tensor. An equal
 split raises ``ValueError`` if the axis size is not divisible by the number of
-sections.
+sections. ``axis`` may be negative, and negative split indices count from the
+end of the axis (clamped at 0), matching NumPy.
 
 ``array_split`` works the same way but allows uneven divisions — the first
 sections get one extra element when the size is not evenly divisible::

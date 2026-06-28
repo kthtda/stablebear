@@ -1,5 +1,5 @@
 from . import _sb_cpp as cpp
-from ._tensor_base import Shape, ShapeLike
+from ._tensor_base import Shape, ShapeLike, _resolve_axis
 from .base_tensor import (
     BoolTensor,
     FloatTensor,
@@ -158,19 +158,60 @@ def tensor(data, dtype: Dtype = None):
     return wrapper(data)
 
 
+def _require_same_dtype(tensors, op):
+    """Raise a clear error if *tensors* do not all share one dtype.
+
+    Joining tensors of mixed dtype/precision otherwise leaked the raw pybind
+    overload error; there is no implicit upcasting, so report the mismatch and
+    point at ``astype`` (issue #74).
+    """
+    dtypes = [t.dtype for t in tensors]
+    if len(set(dtypes)) > 1:
+        names = ", ".join(d.name for d in dtypes)
+        raise TypeError(
+            f"all tensors passed to {op}() must have the same dtype (got {names}); "
+            "cast with .astype() first")
+
+
+def _normalize_split_indices(indices, axis_size):
+    """Resolve negative split indices NumPy-style.
+
+    A negative index counts from the end (``idx + axis_size``) and is clamped to
+    0 if still negative; positive overflow is left for the C++ layer to clamp to
+    ``axis_size`` (issue #21).
+    """
+    return [max(int(idx) + axis_size if int(idx) < 0 else int(idx), 0)
+            for idx in indices]
+
+
 def concatenate(tensors, axis=0):
-    """Concatenate tensors along an existing axis (outer indexing)."""
+    """Concatenate tensors along an existing axis (outer indexing).
+
+    *axis* may be negative (counting from the last axis), as in NumPy.
+    """
     if not tensors:
         raise ValueError("need at least one tensor to concatenate")
+    _require_same_dtype(tensors, "concatenate")
+    axis = _resolve_axis(axis, tensors[0].ndim)
     cpp_tensors = [t._data for t in tensors]
     result = type(cpp_tensors[0]).concatenate(cpp_tensors, axis)
     return tensors[0]._to_py_tensor(result)
 
 
 def stack(tensors, axis=0):
-    """Stack tensors along a new axis. All tensors must have the same shape."""
+    """Stack tensors along a new axis. All tensors must have the same shape.
+
+    *axis* indexes the new dimension and may be negative (counting from the
+    end), as in NumPy; its valid range is ``[-(ndim + 1), ndim]``. Resolving it
+    here keeps ``stack`` consistent with :func:`concatenate` and raises a clean
+    ``IndexError`` (rather than a C++ ``ValueError``) when it is out of range.
+    """
     if not tensors:
         raise ValueError("need at least one tensor to stack")
+    _require_same_dtype(tensors, "stack")
+    # The new axis can sit at position ``ndim`` (appended), so resolve against
+    # ``ndim + 1`` rather than ``ndim``.
+    axis = _resolve_axis(axis, tensors[0].ndim + 1)
     cpp_tensors = [t._data for t in tensors]
     result = type(cpp_tensors[0]).stack(cpp_tensors, axis)
     return tensors[0]._to_py_tensor(result)
@@ -185,9 +226,10 @@ def split(tensor, indices_or_sections, axis=0):
         The tensor to split.
     indices_or_sections : int or list of int
         If an int, the tensor is split into that many equal parts.
-        If a list, it gives the indices where splits occur.
+        If a list, it gives the indices where splits occur. Negative indices
+        count from the end of the axis, as in NumPy.
     axis : int
-        The axis along which to split (default 0).
+        The axis along which to split (default 0). May be negative.
 
     Returns
     -------
@@ -199,10 +241,12 @@ def split(tensor, indices_or_sections, axis=0):
     array_split : Split allowing uneven divisions.
     """
     cpp_data = tensor._data
+    axis = _resolve_axis(axis, tensor.ndim)
     if isinstance(indices_or_sections, int):
         parts = type(cpp_data).split_sections(cpp_data, indices_or_sections, axis)
     else:
-        parts = type(cpp_data).split_indices(cpp_data, list(indices_or_sections), axis)
+        indices = _normalize_split_indices(indices_or_sections, tensor.shape[axis])
+        parts = type(cpp_data).split_indices(cpp_data, indices, axis)
     return [tensor._to_py_tensor(p) for p in parts]
 
 
@@ -219,8 +263,9 @@ def array_split(tensor, indices_or_sections, axis=0):
     indices_or_sections : int or list of int
         If an int, the tensor is split into that many parts (uneven allowed).
         If a list, it gives the indices where splits occur (same as ``split``).
+        Negative indices count from the end of the axis, as in NumPy.
     axis : int
-        The axis along which to split (default 0).
+        The axis along which to split (default 0). May be negative.
 
     Returns
     -------
@@ -232,8 +277,10 @@ def array_split(tensor, indices_or_sections, axis=0):
     split : Split requiring equal divisions.
     """
     cpp_data = tensor._data
+    axis = _resolve_axis(axis, tensor.ndim)
     if isinstance(indices_or_sections, int):
         parts = type(cpp_data).array_split(cpp_data, indices_or_sections, axis)
     else:
-        parts = type(cpp_data).split_indices(cpp_data, list(indices_or_sections), axis)
+        indices = _normalize_split_indices(indices_or_sections, tensor.shape[axis])
+        parts = type(cpp_data).split_indices(cpp_data, indices, axis)
     return [tensor._to_py_tensor(p) for p in parts]
