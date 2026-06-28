@@ -90,6 +90,43 @@ def test_out_of_range_dim_raises_index_error(bad_dim):
             fn(A, dim=bad_dim)
 
 
+# ---------------------------------------------------------------------------
+# Bug #82: an out-of-range reduction dim now raises numpy.AxisError. AxisError
+# subclasses BOTH IndexError and ValueError, so the existing
+# pytest.raises(IndexError) tests above keep passing.
+# ---------------------------------------------------------------------------
+
+# numpy.AxisError moved under numpy.exceptions in NumPy 2 (and was dropped from
+# the top-level namespace), so prefer that location and fall back for NumPy 1.
+_AxisError = getattr(np.exceptions, "AxisError", None) or getattr(np, "AxisError")
+
+
+@pytest.mark.parametrize("bad_dim", [2, 3, 5, 100, -3, -4, -100])
+def test_out_of_range_dim_raises_axis_error(bad_dim):
+    """Too-large and too-negative dims raise numpy.AxisError for both reductions."""
+    A = sb.zeros((3, 4))
+    for fn in (sb.mean, sb.max_time):
+        with pytest.raises(_AxisError) as excinfo:
+            fn(A, dim=bad_dim)
+        # Backward compatibility: AxisError is still catchable as IndexError.
+        assert issubclass(type(excinfo.value), IndexError)
+
+
+def test_axis_error_is_subclass_of_index_error():
+    """Sanity: numpy.AxisError stays a subclass of IndexError (and ValueError)."""
+    assert issubclass(_AxisError, IndexError)
+    assert issubclass(_AxisError, ValueError)
+
+
+def test_valid_negative_dim_unchanged_by_axis_error():
+    """The AxisError change must not regress valid negative-dim reductions."""
+    A = sb.zeros((3, 4))
+    assert sb.mean(A, dim=-1).shape == (3,)
+    assert sb.mean(A, dim=-2).shape == (4,)
+    assert sb.max_time(A, dim=-1).shape == (3,)
+    assert sb.max_time(A, dim=-2).shape == (4,)
+
+
 def test_max_time_empty_reduced_axis_raises_not_segfault():
     """max_time over a size-0 reduced axis must raise cleanly, never SIGSEGV.
 
