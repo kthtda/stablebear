@@ -344,17 +344,32 @@ class Rectangle:
                 f"f_value={self.f_value}, g_value={self.g_value})")
 
 
-def iterate_rectangles(f: Pcf, g: Pcf, a=0.0, b=float('inf')):
+def _coerce_int_bound(x, np_t):
+    """Coerce an integration bound for an integer-time PCF.
+
+    A ``float`` infinity (the "no bound" sentinel) maps to the dtype's max/min;
+    any other value is truncated to a Python ``int``.
+    """
+    if isinstance(x, float) and np.isinf(x):
+        info = np.iinfo(np_t)
+        return int(info.max if x > 0 else info.min)
+    return int(x)
+
+
+def iterate_rectangles(f: Pcf, g: Pcf, a=None, b=None):
     """Iterate over the rectangles formed by two PCFs.
 
     Parameters
     ----------
     f, g : Pcf
-        The two piecewise constant functions.
-    a : float, optional
-        Left integration bound (default 0).
-    b : float, optional
-        Right integration bound (default infinity).
+        The two piecewise constant functions (which must share a dtype).
+    a : int or float, optional
+        Left integration bound. Defaults to 0 in the PCF's time dtype.
+    b : int or float, optional
+        Right integration bound. Defaults to "no upper bound": ``inf`` for a
+        float-typed PCF and the integer dtype's maximum for an integer-typed
+        PCF. For an integer-typed PCF an explicit ``inf`` bound is mapped to the
+        dtype's maximum and any other value is truncated to ``int``.
 
     Returns
     -------
@@ -370,5 +385,16 @@ def iterate_rectangles(f: Pcf, g: Pcf, a=0.0, b=float('inf')):
         raise TypeError(
             "iterate_rectangles is not supported for this PCF type."
         )
+
+    # The C++ overload is typed on the PCF's time type, so integer PCFs need
+    # integer bounds; the float defaults (0.0 / inf) would not bind (issue #13).
+    np_t = _SB_TO_NP[f.ttype]
+    if np.issubdtype(np_t, np.integer):
+        a = 0 if a is None else _coerce_int_bound(a, np_t)
+        b = int(np.iinfo(np_t).max) if b is None else _coerce_int_bound(b, np_t)
+    else:
+        a = 0.0 if a is None else float(a)
+        b = float('inf') if b is None else float(b)
+
     cpp_rects = backend.iterate_rectangles(f._data, g._data, a, b)
     return [Rectangle(r) for r in cpp_rects]
