@@ -191,18 +191,21 @@ To remove size-1 dimensions, use ``squeeze``. With no argument it removes all
 of them; with an axis argument it removes only that one::
 
    X = sb.FloatTensor(np.arange(6, dtype=np.float32).reshape(1, 6, 1))
-   X.squeeze()      # shape (6,)
-   X.squeeze(0)     # shape (6, 1)
+   X.squeeze()        # shape (6,)
+   X.squeeze(0)       # shape (6, 1)
+   X.squeeze((0, 2))  # shape (6,) — a tuple/list of axes is also accepted
 
 Squeeze always returns a view. Squeezing an axis whose size is not 1 raises
-``ValueError``.
+``ValueError``, as does passing a tuple with duplicate axes. Matching NumPy,
+squeezing axis 0 or -1 of a 0-d tensor is a no-op and returns it unchanged.
 
 The inverse operation, ``expand_dims``, inserts a size-1 dimension at the given
 position (negative indexing supported)::
 
    Y = sb.FloatTensor(np.arange(6, dtype=np.float32))
-   Y.expand_dims(0)    # shape (1, 6)
-   Y.expand_dims(-1)   # shape (6, 1)
+   Y.expand_dims(0)       # shape (1, 6)
+   Y.expand_dims(-1)      # shape (6, 1)
+   Y.expand_dims((0, 2))  # shape (1, 6, 1) — a tuple/list of axes is also accepted
 
 Expand dims also returns a view.
 
