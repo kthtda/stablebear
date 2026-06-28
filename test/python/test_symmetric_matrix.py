@@ -124,6 +124,77 @@ class TestToDense:
         assert m.to_dense().shape == (0, 0)
 
 
+class TestShapeLenDiagonal:
+    def test_shape(self, dtype):
+        m = sb.SymmetricMatrix(4, dtype=dtype)
+        assert m.shape == (4, 4)
+
+    def test_len(self, dtype):
+        m = sb.SymmetricMatrix(4, dtype=dtype)
+        assert len(m) == 4
+
+    def test_diagonal(self, dtype):
+        arr = np.array([
+            [10.0, 1.0, 2.0],
+            [1.0, 20.0, 3.0],
+            [2.0, 3.0, 30.0],
+        ], dtype=NP_DTYPES[dtype])
+        m = sb.SymmetricMatrix.from_dense(arr)
+        np.testing.assert_array_equal(m.diagonal(), [10.0, 20.0, 30.0])
+
+    def test_empty_shape_len_diagonal(self, dtype):
+        m = sb.SymmetricMatrix(0, dtype=dtype)
+        assert m.shape == (0, 0)
+        assert len(m) == 0
+        assert m.diagonal().shape == (0,)
+
+
+class TestRowSliceIndexing:
+    def _matrix(self, dtype):
+        arr = np.array([
+            [10.0, 1.0, 2.0, 4.0],
+            [1.0, 20.0, 3.0, 5.0],
+            [2.0, 3.0, 30.0, 6.0],
+            [4.0, 5.0, 6.0, 40.0],
+        ], dtype=NP_DTYPES[dtype])
+        return sb.SymmetricMatrix.from_dense(arr), arr
+
+    def test_row_bare_int(self, dtype):
+        m, arr = self._matrix(dtype)
+        np.testing.assert_array_equal(m[1], arr[1])
+
+    def test_row_int_slice(self, dtype):
+        m, arr = self._matrix(dtype)
+        np.testing.assert_array_equal(m[1, :], arr[1, :])
+
+    def test_column(self, dtype):
+        m, arr = self._matrix(dtype)
+        np.testing.assert_array_equal(m[:, 2], arr[:, 2])
+
+    def test_subarray(self, dtype):
+        m, arr = self._matrix(dtype)
+        np.testing.assert_array_equal(m[0:2, 1:3], arr[0:2, 1:3])
+
+    def test_negative_row(self, dtype):
+        m, arr = self._matrix(dtype)
+        np.testing.assert_array_equal(m[-1], arr[-1])
+
+    def test_int_pair_still_scalar(self, dtype):
+        m, arr = self._matrix(dtype)
+        assert m[1, 2] == arr[1, 2]
+        assert np.isscalar(m[1, 2])
+
+    def test_np_integer_pair_matches_int_pair(self, dtype):
+        m, arr = self._matrix(dtype)
+        assert m[np.int64(1), np.int64(2)] == m[1, 2]
+        assert np.isscalar(m[np.int64(1), np.int64(2)])
+
+    def test_out_of_range_row_raises(self, dtype):
+        m, arr = self._matrix(dtype)
+        with pytest.raises(IndexError):
+            _ = m[10]
+
+
 class TestRepr:
     def test_contains_size(self, dtype):
         m = sb.SymmetricMatrix(5, dtype=dtype)

@@ -152,6 +152,11 @@ To convert to a full NumPy array::
 
    dense = m.to_dense()   # shape (100, 100), dtype float32
 
+Besides scalar ``m[i, j]`` access, the matrix exposes ``m.shape`` (``(n, n)``),
+``len(m)`` (``n``), and ``m.diagonal()`` (all zeros for a distance matrix). Any
+non-``(i, j)`` index is applied to the dense matrix, so ``m[i]`` / ``m[i, :]``
+give a row, ``m[:, j]`` a column, and ``m[a:b, c:d]`` a sub-array (NumPy arrays).
+
 Tensors of distance matrices
 ------------------------------
 
@@ -198,6 +203,11 @@ Symmetric matrices
 To convert to a full NumPy array::
 
    dense = m.to_dense()   # shape (100, 100), dtype float32
+
+As for :py:class:`~stablebear.DistanceMatrix`, the matrix exposes ``m.shape``
+(``(n, n)``), ``len(m)`` (``n``), and ``m.diagonal()`` (the stored diagonal).
+Any non-``(i, j)`` index is applied to the dense matrix, so ``m[i]`` /
+``m[i, :]`` give a row, ``m[:, j]`` a column, and ``m[a:b, c:d]`` a sub-array.
 
 Tensors of symmetric matrices use the ``symmat32`` or ``symmat64`` dtypes::
 
