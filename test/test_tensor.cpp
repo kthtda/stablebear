@@ -679,12 +679,36 @@ namespace
     EXPECT_TRUE(sb::allclose(a, a));
   }
 
-  TYPED_TEST(AllcloseTensorTyped, ShapeMismatch)
+  TYPED_TEST(AllcloseTensorTyped, IncompatibleShapesThrow)
   {
     using T = TypeParam;
     sb::Tensor<T> a({2, 3}, T(1));
     sb::Tensor<T> b({3, 2}, T(1));
-    EXPECT_FALSE(sb::allclose(a, b));
+    // Genuinely incompatible shapes raise (matching the elementwise operators),
+    // instead of silently returning false (issue #52).
+    EXPECT_THROW((void)sb::allclose(a, b), std::invalid_argument);
+  }
+
+  TYPED_TEST(AllcloseTensorTyped, BroadcastCompatibleShapes)
+  {
+    using T = TypeParam;
+    sb::Tensor<T> a({2, 3}, T(1));
+    sb::Tensor<T> row({3}, T(1));          // broadcasts against (2, 3)
+    EXPECT_TRUE(sb::allclose(a, row));
+    sb::Tensor<T> col({1, 3}, T(2));
+    EXPECT_FALSE(sb::allclose(a, col));    // broadcast-compatible but unequal
+  }
+
+  TYPED_TEST(AllcloseTensorTyped, InfinityComparison)
+  {
+    using T = TypeParam;
+    const T inf = std::numeric_limits<T>::infinity();
+    sb::Tensor<T> a({2}, inf);
+    EXPECT_TRUE(sb::allclose(a, a));       // +inf vs +inf is close (reflexive)
+    sb::Tensor<T> neg({2}, -inf);
+    EXPECT_FALSE(sb::allclose(a, neg));    // +inf vs -inf is not close
+    sb::Tensor<T> finite({2}, T(1));
+    EXPECT_FALSE(sb::allclose(a, finite)); // inf vs finite is not close
   }
 
   TYPED_TEST(AllcloseTensorTyped, SmallPerturbationWithinTolerance)
