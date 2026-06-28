@@ -3,6 +3,7 @@
 ### Breaking changes
 
 * **`Pcf` no longer sorts breakpoints; unsorted, negative, and offset times are rejected** — `Pcf` construction used to silently sort the supplied `(time, value)` rows and checked the `t=0` requirement on the unsorted input row 0, so out-of-order breakpoints were accepted and a negative time on a later row could be reordered to the front into a malformed PCF that then evaluated at negative times. Breakpoints must now be supplied in non-decreasing time order (out-of-order input raises `ValueError` instead of being silently sorted), and the first time must be 0 — so any input whose first time is not 0, in particular any negative time, raises `ValueError`. `Pcf` evaluation also rejects `t < 0` directly (it previously compared against the first breakpoint rather than 0). ([#11](https://github.com/kthtda/stablebear/issues/11))
+* **`Pcf` requires strictly increasing breakpoint times and rejects empty input** — completing the `Pcf` validation above: a duplicate breakpoint time previously slipped past the `non-decreasing` check despite the documented strictly-increasing contract, and is now rejected with `ValueError`. Constructing a `Pcf` from an empty `(0, 2)` array (which used to silently fabricate a single `(0, 0)` breakpoint) now raises `ValueError`; use `Pcf()` for the all-zero constant PCF. ([#56](https://github.com/kthtda/stablebear/issues/56))
 
 ### Bug fixes
 

@@ -54,3 +54,30 @@ def test_eval_negative_time_array_raises():
     f = Pcf(np.array([[0.0, 1.0], [2.0, 2.0]], dtype=np.float64))
     with pytest.raises(Exception, match="time 0"):
         f(np.array([-0.5, 0.5]))
+
+
+# ---------------------------------------------------------------------------
+# Bug #56: Pcf construction silently accepted duplicate breakpoint times
+# (contradicting the strictly-increasing contract) and turned an empty (0, 2)
+# input array into a fabricated 1-point PCF. Both are now rejected.
+# ---------------------------------------------------------------------------
+
+
+def test_pcf_rejects_duplicate_times():
+    with pytest.raises(ValueError, match="strictly increasing"):
+        Pcf(np.array([[0.0, 5.0], [1.0, 6.0], [1.0, 7.0]]))
+
+
+def test_pcf_rejects_duplicate_first_times():
+    with pytest.raises(ValueError, match="strictly increasing"):
+        Pcf(np.array([[0.0, 5.0], [0.0, 6.0]]))
+
+
+def test_pcf_rejects_empty_array():
+    with pytest.raises(ValueError, match="empty"):
+        Pcf(np.zeros((0, 2)))
+
+
+def test_pcf_strictly_increasing_still_constructs():
+    f = Pcf(np.array([[0.0, 1.0], [1.0, 2.0], [3.0, 0.0]]))
+    assert f.size == 3
