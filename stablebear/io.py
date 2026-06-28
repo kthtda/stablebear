@@ -218,6 +218,17 @@ def _load_any(file):
     buf = _io.BytesIO(data)
     try:
         return _load(buf)
-    except RuntimeError:
+    except RuntimeError as e:
+        # Only fall back to the single-object path when the tensor-load error
+        # is specifically a format-type mismatch saying the file really is a
+        # SingleObject (the C++ reader raises "...but got format type
+        # SingleObject" in that case). For any other RuntimeError -- e.g. a
+        # genuine corruption/EOF error such as "Incorrect number of bytes
+        # returned (file may be corrupted)" -- re-raise the original error so
+        # the real cause surfaces instead of the misleading "Expected format
+        # type SingleObject ... but got format type SingleTensor" that the
+        # object path would otherwise produce.
+        if "format type SingleObject" not in str(e):
+            raise
         buf.seek(0)
         return _load_object(buf)
