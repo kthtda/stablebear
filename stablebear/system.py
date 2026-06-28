@@ -18,11 +18,15 @@ def set_block_size(x: int, y: int):
     Parameters
     ----------
     x : int
-      Horizontal block size
+      Horizontal block size (must be >= 1)
 
     y : int
-      Vertical block size
+      Vertical block size (must be >= 1)
     """
+    if x < 1:
+        raise ValueError(f"set_block_size: x must be >= 1 (got {x})")
+    if y < 1:
+        raise ValueError(f"set_block_size: y must be >= 1 (got {y})")
     cpp.set_block_dim(x, y)
 
 
@@ -34,8 +38,10 @@ def limit_cpus(n: int):
     Parameters
     ----------
     n : int
-      Number of CPU threads to use
+      Number of CPU threads to use (must be >= 1; to run CPU-only use :func:`force_cpu`)
     """
+    if n < 1:
+        raise ValueError(f"limit_cpus: n must be >= 1 (got {n})")
     cpp.limit_cpus(n)
 
 
@@ -47,8 +53,10 @@ def limit_gpus(n: int):
     Parameters
     ----------
     n : int
-      Number of GPUs to use
+      Number of GPUs to use (must be >= 1; to run CPU-only use :func:`force_cpu`)
     """
+    if n < 1:
+        raise ValueError(f"limit_gpus: n must be >= 1 (got {n})")
     cpp.limit_gpus(n)
 
 
@@ -58,8 +66,10 @@ def set_cuda_threshold(n: int):
     Parameters
     ----------
     n : int
-      Number of PCFs required before (supported) matrix computations are moved to GPU
+      Number of PCFs required before (supported) matrix computations are moved to GPU (must be >= 0)
     """
+    if n < 0:
+        raise ValueError(f"set_cuda_threshold: n must be >= 0 (got {n})")
     cpp.set_cuda_threshold(n)
 
 
@@ -73,8 +83,10 @@ def set_parallel_eval_threshold(n: int):
     Parameters
     ----------
     n : int
-      Minimum number of elements to trigger parallel evaluation.
+      Minimum number of elements to trigger parallel evaluation (must be >= 0).
     """
+    if n < 0:
+        raise ValueError(f"set_parallel_eval_threshold: n must be >= 0 (got {n})")
     cpp.set_parallel_eval_threshold(n)
 
 
@@ -106,8 +118,10 @@ def set_min_block_side(n: int):
     Parameters
     ----------
     n : int
-      Minimum block side length. 0 = auto-detect from GPU hardware.
+      Minimum block side length (must be >= 0). 0 = auto-detect from GPU hardware.
     """
+    if n < 0:
+        raise ValueError(f"set_min_block_side: n must be >= 0 (got {n})")
     cpp.set_min_block_side(n)
 
 
