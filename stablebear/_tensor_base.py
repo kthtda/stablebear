@@ -886,7 +886,20 @@ class ArithmeticTensorMixin:
     """
 
     def _decay_operand(self, val):
+        if isinstance(val, Tensor):
+            # Two tensors must share a dtype: mismatched precision or family has
+            # no common C++ operator overload, so passing it through would leak
+            # a raw pybind "incompatible function arguments" error. Report it
+            # cleanly instead (issue #64).
+            if getattr(val, "dtype", None) is not getattr(self, "dtype", None):
+                raise TypeError(
+                    f"All inputs must have the same dtype "
+                    f"(got {self.dtype.name}, {val.dtype.name})."
+                )
+            return val._data
         if hasattr(val, "_data"):
+            # A non-Tensor element such as a scalar Pcf, which the C++ operator
+            # broadcasts across the tensor.
             return val._data
         import numpy as np
         if isinstance(val, (np.ndarray, list, tuple)):
