@@ -57,9 +57,27 @@ An individual PCF is represented by :py:class:`~stablebear.Pcf`. You create one 
    # From a list (defaults to float32)
    g = sb.Pcf([[0, 1], [2, 3], [5, 0]])
 
+You can also build a ``Pcf`` from separate time and value arrays with
+:py:meth:`~stablebear.Pcf.from_arrays` (the same breakpoint validation applies)::
+
+   f = sb.Pcf.from_arrays([0.0, 2.0, 5.0], [1.0, 3.0, 0.0])
+
 You can convert a ``Pcf`` back to a NumPy array with :py:meth:`~stablebear.Pcf.to_numpy`::
 
    arr = f.to_numpy()  # shape (3, 2), dtype float32
+
+A ``Pcf`` exposes read-only accessors for its breakpoints and domain. The
+``dtype`` property reports the PCF-level dtype (``pcf32``, ``pcf64``, ``pcf32i``,
+or ``pcf64i``); ``times`` and ``values`` return the 1-D time and value arrays;
+``breakpoints`` returns the full ``(n, 2)`` array; and ``t_min`` / ``t_max`` give
+the first and last breakpoint times (``t_max`` is the last breakpoint, not
+infinity)::
+
+   f.dtype         # e.g. pcf32
+   f.times         # array of breakpoint times
+   f.values        # array of values
+   f.breakpoints   # the (n, 2) array
+   f.t_min, f.t_max
 
 Individual PCFs support arithmetic (``+``, ``-``, ``*``, ``/``, ``**``) with
 other PCFs and with scalars::

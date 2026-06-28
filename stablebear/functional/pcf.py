@@ -103,6 +103,56 @@ class Pcf:
                 f"Tried to create PCF from unsupported input data of type {type(arr)}."
             )
 
+    @classmethod
+    def from_arrays(cls, times, values, dtype=None) -> "Pcf":
+        """Construct a PCF from separate time and value arrays.
+
+        The two 1-D arrays are stacked column-wise into the ``(n, 2)`` array of
+        ``(time, value)`` rows expected by the constructor, so the usual
+        validation (first time :math:`t_0 = 0`, strictly increasing times) still
+        applies.
+
+        Parameters
+        ----------
+        times : array_like
+            1-D sequence of breakpoint times. Must start at ``0`` and be
+            strictly increasing.
+        values : array_like
+            1-D sequence of values, the same length as ``times``.
+        dtype : type, optional
+            Data type for the PCF (``pcf32``, ``pcf64``, ``pcf32i``, or
+            ``pcf64i``). If ``None``, inferred from the stacked array.
+
+        Returns
+        -------
+        Pcf
+            A new PCF with the given breakpoints.
+
+        Raises
+        ------
+        ValueError
+            If ``times`` or ``values`` is not 1-D, if they differ in length, or
+            if the breakpoints are invalid (e.g. first time is not ``0``).
+
+        Examples
+        --------
+        >>> import stablebear as sb
+        >>> f = sb.Pcf.from_arrays([0.0, 1.0, 3.0], [1.0, 2.0, 0.0])
+        >>> f.size
+        3
+        """
+        times = np.asarray(times)
+        values = np.asarray(values)
+        if times.ndim != 1 or values.ndim != 1:
+            raise ValueError("times and values must be 1-D arrays")
+        if times.shape[0] != values.shape[0]:
+            raise ValueError(
+                f"times and values must have the same length "
+                f"(got {times.shape[0]} and {values.shape[0]})"
+            )
+        stacked = np.column_stack((times, values))
+        return cls(stacked, dtype=dtype)
+
     def _get_time_type(self):
         return self._data.get_time_type()
 
@@ -262,6 +312,43 @@ class Pcf:
         """Number of breakpoints (time-value pairs) in this PCF."""
         return self._data.size()
 
+    _VTYPE_TO_DTYPE = {
+        float32: pcf32,
+        float64: pcf64,
+        int32: pcf32i,
+        int64: pcf64i,
+    }
+
+    @property
+    def dtype(self):
+        """PCF-level dtype (``pcf32``, ``pcf64``, ``pcf32i``, or ``pcf64i``)."""
+        return self._VTYPE_TO_DTYPE[self.vtype]
+
+    @property
+    def times(self) -> np.ndarray:
+        """1-D array of breakpoint times."""
+        return self.to_numpy()[:, 0]
+
+    @property
+    def values(self) -> np.ndarray:
+        """1-D array of breakpoint values."""
+        return self.to_numpy()[:, 1]
+
+    @property
+    def breakpoints(self) -> np.ndarray:
+        """The full ``(n, 2)`` array of ``(time, value)`` breakpoints."""
+        return self.to_numpy()
+
+    @property
+    def t_min(self) -> float:
+        """First breakpoint time (always ``0``; PCFs are defined on :math:`[0, \\infty)`)."""
+        return self.times[0]
+
+    @property
+    def t_max(self) -> float:
+        """Last breakpoint time (the end of the support, not infinity)."""
+        return self.times[-1]
+
     _VTYPE_NAMES = {
         float32: "float32",
         float64: "float64",
@@ -272,6 +359,9 @@ class Pcf:
     def __str__(self):
         dtname = self._VTYPE_NAMES.get(self.vtype, str(self.vtype))
         return f"<PCF size={self._data.size()}, dtype={dtname}>"
+
+    def __repr__(self):
+        return self.__str__()
 
     def __array__(self, dtype=None, copy=None):
         arr = np.asarray(self._data)

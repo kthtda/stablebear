@@ -276,3 +276,95 @@ class TestEquality:
         g = Pcf(np.array([[0.0, 1.0], [2.0, 9.0]], dtype=np.float32))
         assert not (f == g)
 
+
+class TestRepr:
+    def test_repr_matches_str(self):
+        f = Pcf(np.array([[0.0, 1.0], [2.0, 3.0]], dtype=np.float32))
+        assert repr(f) == str(f)
+
+    def test_repr_contents(self):
+        f = Pcf(np.array([[0.0, 1.0], [2.0, 3.0]], dtype=np.float32))
+        r = repr(f)
+        assert "PCF" in r
+        assert "size=2" in r
+
+
+class TestDtype:
+    @pytest.mark.parametrize("np_dtype,expected", [
+        (np.float32, sb.pcf32),
+        (np.float64, sb.pcf64),
+        (np.int32, sb.pcf32i),
+        (np.int64, sb.pcf64i),
+    ])
+    def test_dtype(self, np_dtype, expected):
+        f = Pcf(np.array([[0, 1], [2, 3]], dtype=np_dtype))
+        assert f.dtype is expected
+
+
+class TestArrayAccessors:
+    def test_times_values_breakpoints(self):
+        arr = np.array([[0.0, 1.0], [2.0, 3.0], [4.0, 5.0]], dtype=np.float64)
+        f = Pcf(arr)
+        npt.assert_array_equal(f.times, arr[:, 0])
+        npt.assert_array_equal(f.values, arr[:, 1])
+        npt.assert_array_equal(f.breakpoints, f.to_numpy())
+
+    def test_breakpoints_full_array(self):
+        arr = np.array([[0.0, 1.0], [2.0, 3.0]], dtype=np.float32)
+        f = Pcf(arr)
+        npt.assert_array_equal(f.breakpoints, arr)
+
+    def test_t_min_t_max(self):
+        arr = np.array([[0.0, 1.0], [2.0, 3.0], [4.0, 5.0]], dtype=np.float64)
+        f = Pcf(arr)
+        assert f.t_min == arr[0, 0]
+        assert f.t_max == arr[-1, 0]
+
+    @pytest.mark.parametrize("np_dtype", [np.int32, np.int64])
+    def test_times_values_integer_dtype(self, np_dtype):
+        arr = np.array([[0, 1], [2, 3], [4, 5]], dtype=np_dtype)
+        f = Pcf(arr)
+        npt.assert_array_equal(f.times, arr[:, 0])
+        npt.assert_array_equal(f.values, arr[:, 1])
+        npt.assert_array_equal(f.breakpoints, arr)
+        assert f.t_min == arr[0, 0]
+        assert f.t_max == arr[-1, 0]
+
+
+class TestFromArrays:
+    def test_basic(self):
+        times = [0.0, 1.0, 3.0]
+        values = [1.0, 2.0, 0.0]
+        f = Pcf.from_arrays(times, values)
+        expected = Pcf(np.column_stack((times, values)))
+        npt.assert_array_equal(f.to_numpy(), expected.to_numpy())
+
+    def test_dtype_honored(self):
+        f = Pcf.from_arrays([0.0, 1.0], [1.0, 2.0], dtype=sb.pcf32)
+        assert f.dtype is sb.pcf32
+
+    def test_length_mismatch_raises(self):
+        with pytest.raises(ValueError, match="same length"):
+            Pcf.from_arrays([0.0, 1.0, 2.0], [1.0, 2.0])
+
+    def test_non_1d_raises(self):
+        with pytest.raises(ValueError, match="1-D"):
+            Pcf.from_arrays([[0.0, 1.0]], [1.0, 2.0])
+
+    def test_non_1d_values_raises(self):
+        # The 1-D check guards *both* arguments; a 2-D ``values`` must be
+        # rejected just like a 2-D ``times``.
+        with pytest.raises(ValueError, match="1-D"):
+            Pcf.from_arrays([0.0, 1.0], [[1.0], [2.0]])
+
+    def test_bad_first_time_raises(self):
+        with pytest.raises(ValueError, match="t=0"):
+            Pcf.from_arrays([1.0, 2.0], [1.0, 2.0])
+
+    @pytest.mark.parametrize("dtype", [sb.pcf32i, sb.pcf64i])
+    def test_integer_dtype_honored(self, dtype):
+        f = Pcf.from_arrays([0, 2, 4], [1, 2, 0], dtype=dtype)
+        assert f.dtype is dtype
+        npt.assert_array_equal(f.times, [0, 2, 4])
+        npt.assert_array_equal(f.values, [1, 2, 0])
+
