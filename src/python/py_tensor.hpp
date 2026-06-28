@@ -444,11 +444,12 @@ namespace sb_py
           else
             return std::isnan(elem) || std::isinf(elem);
         });
-        if (warned)
-        {
-          PyErr_WarnEx(PyExc_RuntimeWarning,
-            "invalid or infinite value encountered in pow", 1);
-        }
+        // PyErr_WarnEx returns -1 when the warning is escalated to an exception
+        // (e.g. under `-W error`); propagate it instead of returning normally
+        // and letting pybind11 raise SystemError.
+        if (warned && PyErr_WarnEx(PyExc_RuntimeWarning,
+              "invalid or infinite value encountered in pow", 1) != 0)
+          throw py::error_already_set();
         return result;
       });
 

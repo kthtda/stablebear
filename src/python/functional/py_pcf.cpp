@@ -134,15 +134,22 @@ namespace
         .def("__neg__", [](const TPcf& self) -> TPcf { return -self; })
         .def("__pow__", [](const TPcf& self, Tv c) -> TPcf {
           auto result = sb::pow(self, c);
+          bool warn = false;
           for (const auto& pt : result.points())
           {
             if (std::isnan(pt.v) || std::isinf(pt.v))
             {
-              PyErr_WarnEx(PyExc_RuntimeWarning,
-                "invalid or infinite value encountered in pcf pow", 1);
+              warn = true;
               break;
             }
           }
+          // PyErr_WarnEx returns -1 when the warning is escalated to an
+          // exception (e.g. under `-W error` / simplefilter('error')); in that
+          // case a Python exception is pending, so propagate it instead of
+          // returning normally and letting pybind11 raise SystemError.
+          if (warn && PyErr_WarnEx(PyExc_RuntimeWarning,
+                "invalid or infinite value encountered in pcf pow", 1) != 0)
+            throw py::error_already_set();
           return result;
         })
         .def("__call__", [](const TPcf& self, Tt t) -> Tv { return self.evaluate(t); })
