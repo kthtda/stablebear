@@ -334,6 +334,21 @@ You can also convert a single barcode to a stable rank::
    sr = barcode_to_stable_rank(bc)
    # sr is a Pcf
 
+Exporting a tensor of barcodes
+==============================
+
+Because barcodes are ragged (each cell may contain a different number of bars),
+a :py:class:`~stablebear.persistence.BarcodeTensor` cannot be packed into a
+single dense array. It instead exposes ``to_numpy()`` and ``tolist()`` that
+return the per-cell barcode arrays::
+
+   bcs = persistence.compute_persistent_homology(pclouds, max_dim=1)
+
+   arr = bcs.to_numpy()      # object ndarray of bcs.shape; arr[i, j] is (n, 2)
+   nested = bcs.tolist()     # the same data as a nested Python list
+
+For a 0-d ``BarcodeTensor`` both methods return the single ``(n, 2)`` array.
+
 
 References
 ==========
