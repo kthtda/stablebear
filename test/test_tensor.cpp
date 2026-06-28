@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <limits>
+
 #include <sbear/tensor.hpp>
 #include <sbear/walk.hpp>
 #include <sbear/distance_matrix.hpp>
@@ -730,6 +732,30 @@ namespace
     auto b = make_sequential<T>({2, 3});
     b({0, 1}) = b({0, 1}) + T(1e-9);
     EXPECT_EQ(a.allclose(b), sb::allclose(a, b));
+  }
+
+// ============================================================================
+// DistanceMatrix nonnegativity rejects NaN as well as negatives (issue #43)
+// ============================================================================
+
+  template <typename T>
+  class DistanceMatrixNonnegTyped : public ::testing::Test {};
+  using DistanceMatrixScalarTypes = ::testing::Types<float, double>;
+  TYPED_TEST_SUITE(DistanceMatrixNonnegTyped, DistanceMatrixScalarTypes);
+
+  TYPED_TEST(DistanceMatrixNonnegTyped, RejectsNanAndNegativeAllowsInf)
+  {
+    using T = TypeParam;
+    sb::DistanceMatrix<T> dm(3);
+    EXPECT_THROW(dm(0, 1) = std::numeric_limits<T>::quiet_NaN(),
+                 std::invalid_argument);
+    EXPECT_THROW(dm(0, 1) = T(-1), std::invalid_argument);
+    // +inf is a valid (infinite) distance and must stay allowed.
+    EXPECT_NO_THROW(dm(0, 1) = std::numeric_limits<T>::infinity());
+    EXPECT_EQ(static_cast<T>(dm(0, 1)), std::numeric_limits<T>::infinity());
+    // A NaN fill value in the (n, init) constructor is likewise rejected.
+    EXPECT_THROW((sb::DistanceMatrix<T>(2, std::numeric_limits<T>::quiet_NaN())),
+                 std::invalid_argument);
   }
 
 // ============================================================================

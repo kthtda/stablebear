@@ -64,6 +64,26 @@ class TestAccess:
         with pytest.raises(ValueError):
             dm[0, 1] = -1.0
 
+    def test_reject_nan_entry(self, dtype):
+        # Bug #43: NaN < 0 is false, so the old `value < 0` guard let NaN
+        # through despite the documented "nonnegative" contract.
+        dm = DistanceMatrix(3, dtype=dtype)
+        with pytest.raises(ValueError, match="nonnegative"):
+            dm[0, 1] = np.nan
+
+    def test_reject_nan_from_dense(self, dtype):
+        np_float = np.float32 if dtype is float32 else np.float64
+        arr = np.zeros((3, 3), dtype=np_float)
+        arr[0, 1] = arr[1, 0] = np.nan
+        with pytest.raises(ValueError, match="nonnegative"):
+            DistanceMatrix.from_dense(arr)
+
+    def test_accepts_positive_infinity(self, dtype):
+        # +inf is a meaningful distance (disconnected) and must stay allowed.
+        dm = DistanceMatrix(3, dtype=dtype)
+        dm[0, 1] = np.inf
+        assert dm[0, 1] == np.inf
+
     def test_reject_nonzero_diagonal(self, dtype):
         dm = DistanceMatrix(3, dtype=dtype)
         with pytest.raises(ValueError):
