@@ -1,6 +1,34 @@
 import numpy as np
+import pytest
 
 import stablebear as sb
+
+
+# ---------------------------------------------------------------------------
+# Bug #44: a fresh zeros(dtype=pcloud*) cell read back as a 0-d scalar 0.0
+# (the C++ default-constructed Tensor) instead of the documented "empty point
+# cloud". The sibling matrix/barcode dtypes already normalize their fresh cells,
+# so a never-assigned point-cloud cell must read back as an empty (0, 2) cloud.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("dtype, np_float", [(sb.pcloud64, np.float64),
+                                             (sb.pcloud32, np.float32)])
+def test_fresh_pcloud_cell_is_empty_cloud(dtype, np_float):
+    t = sb.zeros((2,), dtype=dtype)
+    fresh = t[0]
+    assert fresh.shape == (0, 2)
+    assert np.asarray(fresh).dtype == np_float
+    # equals an explicitly-assigned empty cloud
+    t[1] = np.zeros((0, 2), dtype=np_float)
+    assert fresh.array_equal(t[1])
+
+
+def test_fresh_pcloud_cell_does_not_mask_real_cloud():
+    t = sb.zeros((2,), dtype=sb.pcloud64)
+    t[0] = np.arange(6.0).reshape(3, 2)
+    assert t[0].shape == (3, 2)
+    assert t[1].shape == (0, 2)   # the still-unassigned cell
 
 
 def test_can_create_point_clouds():

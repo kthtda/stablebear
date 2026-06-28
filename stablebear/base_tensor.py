@@ -354,7 +354,16 @@ class PointCloudTensor(Tensor):
         return PointCloudTensor(data)
 
     def _represent_element(self, element):
-        return FloatTensor(element)
+        cloud = FloatTensor(element)
+        if cloud.ndim == 0:
+            # A default-constructed (never-assigned) cell is a C++ 0-d scalar.
+            # Present it as an empty (0, 2) point cloud, matching the documented
+            # "empty point cloud" and the sibling matrix/barcode dtypes, instead
+            # of reading back as scalar 0.0 (issue #44). A real cloud is always
+            # 2-D, so this sentinel never masks assigned data.
+            float_dtype = _PCLOUD_TO_FLOAT_DTYPE[self.dtype]
+            return FloatTensor(np.zeros((0, 2)), dtype=float_dtype)
+        return cloud
 
     def _single_cloud(self):
         """Return the lone cloud of a 0-d tensor as a ``(n_points, dim)`` FloatTensor."""
