@@ -22,7 +22,7 @@ class BarcodeTensor(Tensor):
             data = _tensor_from_nested(data, {
                 cpp_p.Barcode32: cpp_p.Barcode32Tensor,
                 cpp_p.Barcode64: cpp_p.Barcode64Tensor,
-            })
+            }, wrap=Barcode)
         elif not isinstance(data, (cpp_p.Barcode32Tensor, cpp_p.Barcode64Tensor)):
             raise TypeError(f"Cannot create BarcodeTensor from {type(data)}")
         self._data = data

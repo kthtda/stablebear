@@ -165,3 +165,61 @@ def test_mixed_depth_scalar_among_lists_raises():
     """A non-sequence sibling where a sub-list is expected is also ragged."""
     with pytest.raises(ValueError, match="Ragged nested list"):
         sb.PcfTensor([[_make_pcf(0), _make_pcf(1)], _make_pcf(2)])
+
+
+# ---------------------------------------------------------------------------
+# Construction error quality (issues #54, #55, #80) and building a
+# BarcodeTensor directly from raw barcode ndarrays (issue #83).
+# ---------------------------------------------------------------------------
+
+
+def test_float_tensor_explicit_numpy_dtype():
+    # FloatTensor used to silently ignore the requested dtype (issue #54).
+    assert sb.FloatTensor([1.0], dtype=np.float32).dtype == sb.float32
+    assert sb.FloatTensor([1.0], dtype=np.float64).dtype == sb.float64
+
+
+def test_float_tensor_bad_dtype_raises():
+    with pytest.raises(TypeError):
+        sb.FloatTensor([1.0], dtype=sb.int32)
+
+
+def test_pcf_tensor_plain_element_raises():
+    # A non-element item used to leak an AttributeError (issue #80).
+    with pytest.raises(TypeError, match="float"):
+        sb.PcfTensor([_make_pcf(0), 3.0])
+
+
+def test_pcf_tensor_mixed_precision_raises():
+    # A mixed-precision list used to dump the raw pybind overloads (issue #80).
+    with pytest.raises(TypeError, match="same dtype"):
+        sb.PcfTensor([_make_pcf(0, np.float32), _make_pcf(1, np.float64)])
+
+
+def test_l2_kernel_mixed_precision_raises():
+    with pytest.raises(TypeError, match="same dtype"):
+        sb.l2_kernel([_make_pcf(0, np.float32), _make_pcf(1, np.float64)])
+
+
+def test_barcode_tensor_mixed_precision_raises():
+    # BarcodeTensor now routes through _tensor_from_nested, so a mixed-precision
+    # list raises the same "same dtype" TypeError as PcfTensor (issue #80).
+    with pytest.raises(TypeError, match="same dtype"):
+        BarcodeTensor([_make_barcode(0, np.float32), _make_barcode(1, np.float64)])
+
+
+def test_barcode_tensor_from_ndarray_list_1d():
+    # BarcodeTensor from raw (n, 2) ndarrays (issue #83).
+    bcs = [np.array([[0.0, 1.0]], dtype=np.float32),
+           np.array([[0.0, 2.0], [1.0, 3.0]], dtype=np.float32)]
+    t = BarcodeTensor(bcs)
+    assert t.shape == (2,)
+    assert t.dtype == sb.barcode32
+
+
+def test_barcode_tensor_from_ndarray_list_2d():
+    bcs = [[np.array([[0.0, 1.0]], dtype=np.float64)],
+           [np.array([[0.0, 2.0]], dtype=np.float64)]]
+    t = BarcodeTensor(bcs)
+    assert t.shape == (2, 1)
+    assert t.dtype == sb.barcode64

@@ -9,6 +9,7 @@ from ._tensor_base import ArithmeticTensorMixin, FunctionTensorMixin, Tensor, _t
 from .functional.pcf import Pcf
 from .typing import (
     _NP_TO_SB,
+    _assert_valid_dtype,
     _validate_dtype,
     boolean,
     float32,
@@ -121,6 +122,15 @@ class FloatTensor(NumericTensor):
                     dtype = float32
                 else:
                     dtype = float64
+            else:
+                dtype = _NP_TO_SB.get(dtype, dtype)
+                if dtype not in (float32, float64):
+                    # Map a numpy dtype / scalar type (e.g. np.dtype('float32')).
+                    try:
+                        dtype = _NP_TO_SB.get(np.dtype(dtype).type, dtype)
+                    except TypeError:
+                        pass
+                _assert_valid_dtype(dtype, (float32, float64))
             if dtype == float32:
                 data = cpp.ndarray_to_tensor_32(np.asarray(data, dtype=np.float32))
             else:
@@ -160,6 +170,7 @@ class IntTensor(NumericTensor):
         elif isinstance(data, np.ndarray):
             if dtype is None:
                 dtype = _NP_TO_SB.get(data.dtype.type, int64)
+            _assert_valid_dtype(dtype, [int32, int64, uint32, uint64])
             convert = {
                 int32: lambda d: cpp.ndarray_to_tensor_i32(np.asarray(d, dtype=np.int32)),
                 int64: lambda d: cpp.ndarray_to_tensor_i64(np.asarray(d, dtype=np.int64)),
