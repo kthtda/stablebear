@@ -176,3 +176,28 @@ def test_pcf_tensor_array_equal():
     a = sb.random.noisy_sin((3,))
     b = a.copy()
     assert a.array_equal(b)
+
+
+# ---------------------------------------------------------------------------
+# Bug #96: BoolTensor had no __repr__/__str__, so it printed as
+# "<...BoolTensor object at 0x...>" in the REPL / notebooks. It now mirrors the
+# numeric tensors and shows the underlying boolean array.
+# ---------------------------------------------------------------------------
+
+
+def test_bool_tensor_repr_shows_values():
+    t = sb.BoolTensor(np.array([True, False, True]))
+    assert "True" in repr(t) and "False" in repr(t)
+    assert "object at 0x" not in repr(t)
+    assert repr(t) == repr(np.asarray(t))
+
+
+def test_bool_tensor_str_shows_values():
+    t = sb.BoolTensor(np.array([True, False]))
+    assert str(t) == str(np.asarray(t))
+
+
+def test_bool_tensor_from_comparison_repr():
+    t = sb.FloatTensor([1.0, 2.0, 3.0]) > 2.0
+    assert isinstance(t, sb.BoolTensor)
+    assert "True" in repr(t)

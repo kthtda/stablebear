@@ -433,6 +433,12 @@ class BoolTensor(Tensor):
             arr = arr.astype(dtype, copy=False)
         return arr
 
+    def __repr__(self):
+        return np.asarray(self).__repr__()
+
+    def __str__(self):
+        return np.asarray(self).__str__()
+
 
 PcfContainerLike = Tensor | list[Pcf] | Pcf
 
