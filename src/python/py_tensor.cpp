@@ -2,6 +2,9 @@
 
 #include <sbear/tensor.hpp>
 #include <sbear/functional/pcf.hpp>
+#include <sbear/distance_matrix.hpp>
+#include <sbear/symmetric_matrix.hpp>
+#include <sbear/persistence/barcode.hpp>
 
 #include <sstream>
 
@@ -113,6 +116,40 @@ namespace
     m.def("cast_pcloud64_pcloud32", [](const sb::Tensor<sb::PointCloud<sb::float64_t>>& src) {
       return sb::pcloud_cast<sb::float32_t>(src);
     });
+
+    // Float <-> UInt
+    tc.template operator()<uint32_t, sb::float32_t>("cast_f32_u32");
+    tc.template operator()<uint64_t, sb::float32_t>("cast_f32_u64");
+    tc.template operator()<uint32_t, sb::float64_t>("cast_f64_u32");
+    tc.template operator()<uint64_t, sb::float64_t>("cast_f64_u64");
+    tc.template operator()<sb::float32_t, uint32_t>("cast_u32_f32");
+    tc.template operator()<sb::float64_t, uint32_t>("cast_u32_f64");
+    tc.template operator()<sb::float32_t, uint64_t>("cast_u64_f32");
+    tc.template operator()<sb::float64_t, uint64_t>("cast_u64_f64");
+
+    // Bool <-> numeric (True/False <-> 1/0; nonzero -> True)
+    tc.template operator()<sb::int32_t, bool>("cast_bool_i32");
+    tc.template operator()<sb::int64_t, bool>("cast_bool_i64");
+    tc.template operator()<uint32_t, bool>("cast_bool_u32");
+    tc.template operator()<uint64_t, bool>("cast_bool_u64");
+    tc.template operator()<sb::float32_t, bool>("cast_bool_f32");
+    tc.template operator()<sb::float64_t, bool>("cast_bool_f64");
+    tc.template operator()<bool, sb::int32_t>("cast_i32_bool");
+    tc.template operator()<bool, sb::int64_t>("cast_i64_bool");
+    tc.template operator()<bool, uint32_t>("cast_u32_bool");
+    tc.template operator()<bool, uint64_t>("cast_u64_bool");
+    tc.template operator()<bool, sb::float32_t>("cast_f32_bool");
+    tc.template operator()<bool, sb::float64_t>("cast_f64_bool");
+
+    // DistanceMatrix / SymmetricMatrix precision
+    tc.template operator()<sb::DistanceMatrix<sb::float64_t>, sb::DistanceMatrix<sb::float32_t>>("cast_distmat32_distmat64");
+    tc.template operator()<sb::DistanceMatrix<sb::float32_t>, sb::DistanceMatrix<sb::float64_t>>("cast_distmat64_distmat32");
+    tc.template operator()<sb::SymmetricMatrix<sb::float64_t>, sb::SymmetricMatrix<sb::float32_t>>("cast_symmat32_symmat64");
+    tc.template operator()<sb::SymmetricMatrix<sb::float32_t>, sb::SymmetricMatrix<sb::float64_t>>("cast_symmat64_symmat32");
+
+    // Barcode precision (Barcode<T> already has a converting constructor)
+    tc.template operator()<sb::ph::Barcode<sb::float64_t>, sb::ph::Barcode<sb::float32_t>>("cast_barcode32_barcode64");
+    tc.template operator()<sb::ph::Barcode<sb::float32_t>, sb::ph::Barcode<sb::float64_t>>("cast_barcode64_barcode32");
 
   }
 

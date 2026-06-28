@@ -210,15 +210,20 @@ Expand dims also returns a view.
 Type casting
 ============
 
-``astype`` converts a tensor to a different dtype. Same-family precision changes
-(e.g. float32 to float64) and numeric cross-family casts (e.g. int to float)
-are supported::
+``astype`` converts a tensor to a different dtype. Numeric cross-casts cover the
+whole float / signed-int / unsigned-int / bool grid (e.g. int to float, float to
+uint, bool to/from any numeric, where ``True``/``False`` map to ``1``/``0`` and
+any nonzero value maps to ``True``)::
 
    X = sb.FloatTensor(np.array([1.5, 2.5, 3.5], dtype=np.float32))
    X.astype(sb.float64)    # FloatTensor, float64
    X.astype(sb.int32)      # IntTensor, int32 (truncates)
+   X.astype(sb.uint32)     # IntTensor, uint32
+   sb.BoolTensor([True, False]).astype(sb.int64)   # [1, 0]
 
-PCF and point cloud tensors support precision changes within their family::
+The non-numeric tensor families support precision changes within their family
+(32-bit to/from 64-bit) for PCF, point cloud, distance matrix, symmetric matrix,
+and barcode tensors::
 
    F = sb.zeros((5,), dtype=sb.pcf32)
    F.astype(sb.pcf64)      # PcfTensor, pcf64
