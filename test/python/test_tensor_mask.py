@@ -386,3 +386,88 @@ class TestMixedBoolSliceSetitem:
         t[row_mask, col_mask] = -1.0
         np_arr[np.ix_(row_mask, col_mask)] = -1.0
         np.testing.assert_array_equal(np.asarray(t), np_arr)
+
+
+# =============================================================================
+# Size-1 tensor RHS broadcasts like a scalar (issue #60)
+# =============================================================================
+
+
+class TestSize1TensorRhsBroadcast:
+    def test_bool_mask_assign(self):
+        arr = np.arange(5, dtype=np.float32)
+        mask = arr > 1.0
+        t = _sb(arr.copy())
+        t[BoolTensor(mask)] = FloatTensor(np.array([99.0], dtype=np.float32))
+        arr[mask] = 99.0
+        np.testing.assert_array_equal(np.asarray(t), arr)
+
+    def test_int_index_assign(self):
+        arr = np.arange(5, dtype=np.float32)
+        idx = np.array([1, 3])
+        t = _sb(arr.copy())
+        t[sb.IntTensor(idx)] = FloatTensor(np.array([99.0], dtype=np.float32))
+        arr[idx] = 99.0
+        np.testing.assert_array_equal(np.asarray(t), arr)
+
+    def test_outer_assign(self):
+        arr = np.arange(12, dtype=np.float32).reshape(3, 4)
+        rows = np.array([0, 2])
+        cols = np.array([1, 3])
+        t = _sb(arr.copy())
+        t[sb.IntTensor(rows), sb.IntTensor(cols)] = FloatTensor(
+            np.array([7.0], dtype=np.float32))
+        arr[np.ix_(rows, cols)] = 7.0
+        np.testing.assert_array_equal(np.asarray(t), arr)
+
+    def test_zero_d_rhs_broadcasts_uniformly(self):
+        # A 0-d numeric tensor reads back unreliably through numpy, so only
+        # assert the assignment succeeds and fills every selected cell with a
+        # single uniform value (whatever it decays to).
+        arr = np.arange(5, dtype=np.float32)
+        mask = arr > 1.0
+        t = _sb(arr.copy())
+        t[BoolTensor(mask)] = FloatTensor(np.array(99.0, dtype=np.float32))
+        filled = np.asarray(t)[mask]
+        assert np.all(filled == filled[0])
+
+    def test_all_false_mask_writes_nothing(self):
+        arr = np.arange(5, dtype=np.float32)
+        mask = arr > 100.0
+        t = _sb(arr.copy())
+        t[BoolTensor(mask)] = FloatTensor(np.array([99.0], dtype=np.float32))
+        np.testing.assert_array_equal(np.asarray(t), arr)
+
+    def test_multi_element_mismatch_still_raises(self):
+        t = _sb(np.arange(5, dtype=np.float32))
+        mask = BoolTensor(np.array([True, False, True, False, True]))
+        with pytest.raises(ValueError):
+            t[mask] = FloatTensor(np.array([10.0, 20.0], dtype=np.float32))
+
+    def test_cross_dtype_size1_rhs_is_cast(self):
+        # A size-1 tensor RHS of a different numeric dtype is cast through
+        # _coerce_rhs (int -> float) before its lone element is broadcast.
+        arr = np.arange(5, dtype=np.float32)
+        mask = arr > 1.0
+        t = _sb(arr.copy())
+        t[BoolTensor(mask)] = sb.IntTensor(np.array([5]))
+        arr[mask] = 5.0
+        np.testing.assert_array_equal(np.asarray(t), arr)
+
+    def test_cross_dtype_size1_rhs_int_index(self):
+        # Same cross-dtype cast (int -> float) through an integer-index target.
+        arr = np.arange(5, dtype=np.float32)
+        idx = np.array([1, 3])
+        t = _sb(arr.copy())
+        t[sb.IntTensor(idx)] = sb.IntTensor(np.array([5]))
+        arr[idx] = 5.0
+        np.testing.assert_array_equal(np.asarray(t), arr)
+
+    def test_basic_slice_size1_rhs_broadcasts(self):
+        # A basic-slice target with a size-1 tensor RHS routes through the new
+        # size-1 broadcast branch and fills every selected cell with the value.
+        arr = np.arange(5, dtype=np.float32)
+        t = _sb(arr.copy())
+        t[1:3] = FloatTensor(np.array([7.0], dtype=np.float32))
+        arr[1:3] = 7.0
+        np.testing.assert_array_equal(np.asarray(t), arr)

@@ -477,8 +477,11 @@ class Tensor(ABC):
         may be:
 
         * a scalar or element, broadcast across the whole selected region; or
-        * a tensor, broadcast to the selected shape. A numeric tensor whose
-          dtype differs from this tensor's is cast (e.g. int to float).
+        * a size-1 tensor, broadcast across the whole selected region like a
+          scalar; or
+        * a multi-element tensor, whose shape must match the selected region.
+          A numeric tensor whose dtype differs from this tensor's is cast
+          (e.g. int to float).
 
         Basic-slice and single-integer targets are views, so the assignment
         writes through to the original tensor.
@@ -511,6 +514,15 @@ class Tensor(ABC):
     def _setitem_entries(self, entries, val):
         """Assign using normalized entries (int/slice/IntTensor/BoolTensor)."""
         from .base_tensor import BoolTensor, IntTensor
+
+        # A size-1 tensor RHS broadcasts like a scalar (NumPy semantics): pull
+        # out its lone element so it flows through the broadcasting ``*_fill``
+        # path instead of the count-checking ``*_assign`` path. Multi-element
+        # tensors are left untouched so genuine shape mismatches still raise.
+        if isinstance(val, Tensor) and val.size == 1:
+            coerced = self._coerce_rhs(val)
+            val = coerced._represent_element(
+                coerced._data._get_element([0] * coerced.ndim))
 
         # Single full-shape boolean mask: flat masked assign/fill.
         if len(entries) == 1 and isinstance(entries[0], BoolTensor):
