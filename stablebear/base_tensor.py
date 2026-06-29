@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import operator
+
 import numpy as np
 
 from . import _sb_cpp as cpp
@@ -81,9 +83,10 @@ class NumericTensor(Tensor, ArithmeticTensorMixin):
         return arr
 
     def __eq__(self, other):
-        if isinstance(other, np.ndarray):
-            other = type(self)(other)
-        return super().__eq__(other)
+        return self._compare(other, operator.eq, "==")
+
+    def __ne__(self, other):
+        return self._compare(other, operator.ne, "!=")
 
     def array_equal(self, other) -> bool:
         if isinstance(other, np.ndarray):
@@ -264,6 +267,11 @@ class PointCloud:
     rows through an index array (the memory-frugal output of
     :func:`stablebear.sampling.subsample_relative`). All operations work directly on the view;
     the coordinates are only copied when the cloud is converted to NumPy.
+
+    A cloud that *owns* its coordinates is mutable: ``pc[i, j] = value`` writes a
+    coordinate in place. An *indexed view* is read-only (writing to it would
+    corrupt the shared source cloud); call :meth:`materialize` to obtain a
+    writable owning copy.
     """
 
     def __init__(self, data):
@@ -295,6 +303,22 @@ class PointCloud:
         ``pc[:, 0]`` / ``pc[:, 1]`` (e.g. for plotting) works directly on a cloud.
         """
         return self.materialize()[index]
+
+    def __setitem__(self, index, value):
+        """Write a coordinate in place: ``pc[i, j] = value``.
+
+        Only an owning cloud is mutable. An indexed view shares its source
+        cloud's coordinates, so writing would corrupt every cloud that shares the
+        source; it raises instead — call :meth:`materialize` for a writable copy.
+        """
+        if self.is_indexed:
+            raise TypeError(
+                "indexed point-cloud views are read-only; call .materialize() "
+                "for a writable copy."
+            )
+        # An owning cloud's materialize() shares its coordinate buffer (it is not
+        # an indexed view), so writing through it mutates the cloud in place.
+        self.materialize()[index] = value
 
     def to_numpy(self):
         return np.asarray(self._data.materialize())

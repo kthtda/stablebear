@@ -88,12 +88,15 @@ TEST(TensorWalk, WalkEmptyTensor)
   EXPECT_EQ(count, 0);
 }
 
-TEST(TensorWalk, WalkEmptyShape)
+TEST(TensorWalk, WalkRank0ShapeVisitsOnce)
 {
+  // shape () is a rank-0 scalar with exactly one element, so walk visits it
+  // once with an empty index. (A zero-size extent like {0} is the empty case
+  // -- see WalkEmptyDimension.)
   sb::Tensor<int> x(std::vector<size_t>{});
   size_t count = 0;
-  sb::walk(x, [&](const std::vector<size_t>&) { ++count; });
-  EXPECT_EQ(count, 0);
+  sb::walk(x, [&](const std::vector<size_t>& idx) { ++count; EXPECT_TRUE(idx.empty()); });
+  EXPECT_EQ(count, 1);
 }
 
 TEST(TensorWalk, WalkBoolEarlyTermination)

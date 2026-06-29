@@ -235,7 +235,7 @@ namespace sb_py
 
       .def("_set_element", [](TTensor& self, const std::vector<size_t>& index, const T& val) {
           assert_valid_index(self, index);
-          self(index) = val;
+          self(index) = sb::detail::store_copy(val);
         })
 
       .def("copy", &TTensor::copy)
@@ -273,7 +273,9 @@ namespace sb_py
       using ScalarT = typename T::value_type;
       cls.def("_set_element", [](TTensor& self, const std::vector<size_t>& index, const sb::Tensor<ScalarT>& val) {
         assert_valid_index(self, index);
-        self(index) = T(val);
+        // T(val) shares val's coordinate buffer; store_copy makes the stored cell
+        // independent (matches the generic _set_element above and main's #39 fix).
+        self(index) = sb::detail::store_copy(T(val));
       });
     }
 

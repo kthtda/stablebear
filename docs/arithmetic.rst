@@ -142,6 +142,16 @@ virtually repeated without copying data::
    view = X.broadcast_to((4, 3))                         # shape (4, 3)
    # Every row of view is [1, 2, 3]; view shares data with X
 
+Because the view shares one copy of the data, it is **read-only**. A single
+source value shows up in many places in the view, so writing to it (item
+assignment or in-place arithmetic such as ``view += 1``) would change all of
+them at once — to avoid that surprise, writing raises ``ValueError``. Call
+:py:meth:`~stablebear._tensor_base.Tensor.copy` first if you need a writeable
+tensor::
+
+   writeable = X.broadcast_to((4, 3)).copy()
+   writeable[0, 0] = 99.0   # OK — independent storage
+
 
 Comparisons
 ===========

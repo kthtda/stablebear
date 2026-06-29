@@ -64,7 +64,26 @@
         "ms-vscode.cmake-tools",
         "llvm-vs-code-extensions.vscode-clangd",
         "anthropic.claude-code"
-      ]
+      ],
+      "settings": {
+        // Python deps live in a venv outside the workspace folder (see
+        // Dockerfile: VIRTUAL_ENV=/opt/venv). The Python extension only
+        // auto-discovers .venv/venv *inside* the workspace, so without this it
+        // falls back to the bare system python3 and flags numpy, pytest, etc.
+        // as unresolved. Pin the interpreter so a rebuild needs no manual fix.
+        "python.defaultInterpreterPath": "/opt/venv/bin/python",
+        // The venv is already first on PATH (Dockerfile: ENV PATH=$VIRTUAL_ENV/bin:$PATH),
+        // so terminal activation is redundant. Worse, the extension injects
+        // `source /opt/venv/bin/activate` into each new terminal a beat after it
+        // opens -- if Claude Code (a TUI) already owns that terminal, the text
+        // lands in Claude's input prompt instead of the shell. Disable it.
+        "python.terminal.activateEnvironment": false,
+        // Tests must run from test/ so the source-tree stablebear/ dir doesn't
+        // shadow the installed/built extension (see CLAUDE.md > Testing).
+        "python.testing.pytestEnabled": true,
+        "python.testing.cwd": "${workspaceFolder}/test",
+        "python.testing.pytestArgs": ["python"]
+      }
     }
   }
 }

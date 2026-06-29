@@ -58,6 +58,19 @@ namespace sb
     /// The attached indices (rank-1 when indexed, empty otherwise).
     const Tensor<uint64_t>& indices() const { return m_indices; }
 
+    /// Deep copy that preserves the indexed-view nature. Tensor cells route
+    /// stores through detail::store_copy, which prefers copy(); the inherited
+    /// Tensor::copy() would slice off m_indices and turn an indexed view into a
+    /// full materialized clone of the source, so override it here. The shared
+    /// source coordinates stay shared (immutable, the point of indexed views);
+    /// only the index array is copied so cells don't alias.
+    PointCloud copy() const
+    {
+      if (is_indexed())
+        return PointCloud(static_cast<const Tensor<T>&>(*this), m_indices.copy());
+      return PointCloud(static_cast<const Tensor<T>&>(*this).copy());
+    }
+
     /// Materialize the selected points into a contiguous coordinate tensor.
     /// Returns the coordinates as-is when not indexed.
     Tensor<T> materialize() const

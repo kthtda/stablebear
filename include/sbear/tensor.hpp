@@ -387,6 +387,23 @@ namespace sb
     return result;
   }
 
+  namespace detail
+  {
+    // Deep-copy a value about to be stored in a tensor cell, so the cell never
+    // aliases the source. Element types that hold a shared buffer (Tensor /
+    // PointCloud, DistanceMatrix, SymmetricMatrix) expose a deep copy() that is
+    // preferred; all other element types (float, Pcf, ...) already copy deeply
+    // by value, so they are returned unchanged.
+    template <typename T>
+    [[nodiscard]] T store_copy(const T& v)
+    {
+      if constexpr (requires { v.copy(); })
+        return v.copy();
+      else
+        return v;
+    }
+  }
+
   template <typename T, typename UnaryPred>
 #ifndef __CUDACC__
   requires std::invocable<UnaryPred, const T&>

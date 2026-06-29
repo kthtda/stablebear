@@ -27,6 +27,8 @@ In stablebear, a PCF is represented as an :math:`n \times 2` array of ``(time, v
 
 The value at each breakpoint is the value on the interval starting at that time and continuing until the next breakpoint (or until the end of the function's domain).
 
+The breakpoints must be listed in non-decreasing order of time, and the first time must be ``0`` (PCFs are defined on :math:`[0, \infty)`). Breakpoints given out of order, a first time other than ``0``, or any negative time raise a ``ValueError``.
+
 Why PCFs?
 ---------
 

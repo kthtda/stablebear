@@ -317,6 +317,40 @@ def test_subsamples_are_indexed_views():
     assert np.array_equal(el.to_numpy(), R[idx])
 
 
+def test_indexed_subsample_is_read_only():
+    # An indexed view shares the reference cloud's coordinates, so writing to it
+    # would corrupt the source; it must reject in-place assignment. materialize()
+    # gives an independent, writable copy.
+    R = np.random.default_rng(0).standard_normal((40, 3))
+    X = np.random.default_rng(1).standard_normal((2, 3))
+
+    subs = subsample_relative(R, X, sample_size=8, n_instances=3,
+                              generator=sb.random.Generator(0))
+    el = subs[0, 0]
+    assert el.is_indexed
+
+    with pytest.raises(TypeError):
+        el[0, 0] = 1.0
+
+    # A writable copy: mutating it leaves the source reference cloud untouched.
+    m = el.materialize()
+    m[0, 0] = 123.0
+    assert float(m[0, 0]) == 123.0
+    assert not np.any(R == 123.0)
+
+
+def test_owning_pointcloud_is_mutable():
+    # A cloud that owns its coordinates (not an indexed view) is mutable, and the
+    # write lands on the stored cell.
+    t = sb.zeros((1,), dtype=sb.pcloud64)
+    t[0] = sb.FloatTensor(np.zeros((3, 2)))
+    el = t[0]
+    assert not el.is_indexed
+
+    el[0, 0] = 7.0
+    assert float(t[0][0, 0]) == 7.0
+
+
 def test_pipeline_to_relative_stable_rank():
     R = np.random.default_rng(0).standard_normal((200, 2))
     X = np.random.default_rng(1).standard_normal((4, 2))

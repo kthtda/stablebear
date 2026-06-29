@@ -39,30 +39,34 @@ def _infer_shape_and_flatten(data):
     Recursion stops at any element that is not a list or tuple.
     Validates that the structure is rectangular.
     """
+    # Infer the expected shape from the first branch at each depth.
     shape: list[int] = []
-
-    def _probe(obj, depth):
-        if not isinstance(obj, (list, tuple)):
-            return
-        if depth == len(shape):
-            shape.append(len(obj))
-        elif shape[depth] != len(obj):
-            raise ValueError(
-                f"Ragged nested list: expected length {shape[depth]} at depth {depth}, got {len(obj)}"
-            )
-        if obj:
-            _probe(obj[0], depth + 1)
-
-    _probe(data, 0)
+    node = data
+    while isinstance(node, (list, tuple)):
+        shape.append(len(node))
+        node = node[0] if node else None
 
     flat: list = []
 
     def _collect(obj, depth):
+        # At the leaf depth, ``obj`` is an element; collect it.
         if depth == len(shape):
             flat.append(obj)
-        else:
-            for item in obj:
-                _collect(item, depth + 1)
+            return
+        # Otherwise every sibling branch must be a sequence of the expected
+        # length -- validate each one (not just the first), so ragged input is
+        # rejected instead of being silently flattened into a wrong shape.
+        if not isinstance(obj, (list, tuple)):
+            raise ValueError(
+                f"Ragged nested list: expected a sequence of length {shape[depth]} "
+                f"at depth {depth}, got a non-sequence element"
+            )
+        if len(obj) != shape[depth]:
+            raise ValueError(
+                f"Ragged nested list: expected length {shape[depth]} at depth {depth}, got {len(obj)}"
+            )
+        for item in obj:
+            _collect(item, depth + 1)
 
     _collect(data, 0)
     return tuple(shape), flat
@@ -448,6 +452,24 @@ class Tensor(ABC):
             return val.astype(self.dtype)
         return val
 
+    def _ensure_writeable(self):
+        """Reject writes into a broadcast view.
+
+        ``broadcast_to`` expands axes by setting their stride to 0, so several
+        logical positions along such an axis map to the same physical cell.
+        Writing through the view would silently scatter a single assignment
+        across those positions and corrupt the shared source storage (and
+        in-place arithmetic would double-write each cell). NumPy marks broadcast
+        views read-only for exactly this reason; mirror that by refusing the
+        write. Call ``.copy()`` first to obtain a writeable tensor.
+        """
+        for length, stride in zip(self.shape, self.strides):
+            if stride == 0 and length > 1:
+                raise ValueError(
+                    "assignment destination is read-only: cannot write through "
+                    "a broadcast view (an axis with stride 0); call .copy() first"
+                )
+
     def __setitem__(self, slices, val):
         """Assign into the tensor using NumPy-style indexing.
 
@@ -478,6 +500,7 @@ class Tensor(ABC):
         TypeError
             If ``val`` has a type that cannot be assigned to this tensor.
         """
+        self._ensure_writeable()
         entries, inserts = self._normalize_index(slices)
         # A scalar-boolean ``False`` (or any zero-length newaxis) selects nothing.
         if any(length == 0 for _, length in inserts):
@@ -540,7 +563,7 @@ class Tensor(ABC):
     def _basic_setitem(self, entries, val):
         """Assign using only ints and slices (negatives resolved, bounds checked)."""
         import numpy as np
-        from .base_tensor import NumericTensor
+        from .base_tensor import FloatTensor, NumericTensor, PointCloudTensor
 
         if (len(entries) == self.ndim
                 and all(isinstance(s, int) for s in entries)):
@@ -555,7 +578,19 @@ class Tensor(ABC):
             else:
                 cpp_slices.append(_slice_to_cpp(s))
 
-        if isinstance(val, Tensor):
+        if isinstance(self, PointCloudTensor) and isinstance(val, (np.ndarray, FloatTensor)):
+            # Distribute the RHS across the selected cells: a PointCloudTensor
+            # reads its trailing axes as each cloud and the leading axes as the
+            # tensor shape, so one cloud lands per cell. Without this the scalar
+            # branch below would store the whole array as a single cloud in
+            # every selected cell. A FloatTensor RHS carries the same layout as
+            # a raw ndarray (FloatTensor is a valid PointCloudTensor setitem
+            # dtype), so convert and distribute it the same way rather than
+            # letting the generic tensor-assign path below reject Float* against
+            # PointCloud*.
+            arr = val if isinstance(val, np.ndarray) else np.asarray(val)
+            self._data[cpp_slices] = type(self)(arr, dtype=self.dtype)._data
+        elif isinstance(val, Tensor):
             self._data[cpp_slices] = self._coerce_rhs(val)._data
         elif isinstance(val, np.ndarray) and isinstance(self, NumericTensor):
             # Element-wise array RHS: wrap as a same-dtype tensor and broadcast.
@@ -680,6 +715,12 @@ class Tensor(ABC):
         dimensions also get stride 0. No data is copied — the result shares
         the underlying storage.
 
+        The result is **read-only**, like ``numpy.broadcast_to``: because the
+        expanded axes have stride 0, several logical positions alias the same
+        cell, so writing through the view (item assignment or in-place
+        arithmetic) would corrupt the shared source. Such writes raise
+        ``ValueError``; call ``.copy()`` for a writeable tensor.
+
         Parameters
         ----------
         shape : tuple of int
@@ -689,7 +730,7 @@ class Tensor(ABC):
         Returns
         -------
         Tensor
-            A non-contiguous view of this tensor with the target shape.
+            A non-contiguous, read-only view of this tensor with the target shape.
 
         Raises
         ------
@@ -863,6 +904,7 @@ class ArithmeticTensorMixin:
         return self._to_py_tensor(self._decay_operand(lhs) + self._data)
 
     def __iadd__(self, rhs):
+        self._ensure_writeable()
         self._data += self._decay_operand(rhs)
         return self
 
@@ -873,6 +915,7 @@ class ArithmeticTensorMixin:
         return self._to_py_tensor(self._decay_operand(lhs) - self._data)
 
     def __isub__(self, rhs):
+        self._ensure_writeable()
         self._data -= self._decay_operand(rhs)
         return self
 
@@ -883,6 +926,7 @@ class ArithmeticTensorMixin:
         return self._to_py_tensor(self._decay_operand(lhs) * self._data)
 
     def __imul__(self, rhs):
+        self._ensure_writeable()
         self._data *= self._decay_operand(rhs)
         return self
 
@@ -896,6 +940,7 @@ class ArithmeticTensorMixin:
         return self._to_py_tensor(self._decay_operand(lhs) / self._data)
 
     def __itruediv__(self, rhs):
+        self._ensure_writeable()
         self._data /= self._decay_operand(rhs)
         return self
 
@@ -930,5 +975,6 @@ class ArithmeticTensorMixin:
         -------
         self
         """
+        self._ensure_writeable()
         self._data.__ipow__(exponent)
         return self

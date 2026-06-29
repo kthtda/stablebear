@@ -71,6 +71,16 @@ namespace sb
 
     DistanceMatrix() : DistanceMatrix(0) { }
 
+    /// Return an independent deep copy. The implicit copy shares the
+    /// std::shared_ptr buffer (view-like), which is relied on internally; this
+    /// is used when a matrix must not alias its source (e.g. a tensor cell).
+    [[nodiscard]] DistanceMatrix copy() const
+    {
+      DistanceMatrix result(m_size);
+      std::copy(m_data.get(), m_data.get() + storage_size(m_size), result.m_data.get());
+      return result;
+    }
+
     [[nodiscard]] size_t size() const { return m_size; }
     [[nodiscard]] size_t storage_count() const { return storage_size(m_size); }
 
