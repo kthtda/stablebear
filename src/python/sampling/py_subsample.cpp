@@ -2,8 +2,7 @@
 
 #include <sbear/sampling/subsample.hpp>
 
-#include <pybind11/stl.h>
-
+#include <string>
 #include <utility>
 
 namespace py = pybind11;
@@ -15,95 +14,89 @@ namespace
   class PySubsampleBindings
   {
   public:
-    using PointCloudT = sb::PointCloud<T>;
     using TensorT = sb::Tensor<T>;
+    using Gen = sb::DefaultRandomGenerator;
 
-    // The runtime "which built-in distribution" choice lives here: each method
-    // picks the matching functor and delegates to the core sampler, which
-    // launches a stoppable draw task. Each returns a (task, samples) tuple;
-    // samples is a (n_query, n_instances) tensor of indexed subsamples sharing
-    // R, filled asynchronously by the task.
-
-    // reference/query arrive as scalar Tensor<T> (a FloatTensor's data) and
-    // convert implicitly to PointCloud<T>.
-    static py::tuple sample_subsets_distance_gaussian(const TensorT& reference, const TensorT& query,
-                                                      T mean, T sigma, size_t sampleSize,
-                                                      size_t nInstances, bool replace,
-                                                      const sb::DefaultRandomGenerator* gen)
+    static py::tuple sample_subsets_gaussian(const TensorT& reference, const TensorT& query, T mean,
+                                             T sigma, size_t sampleSize, size_t nInstances,
+                                             bool replace, const Gen* gen)
     {
-      sb::sampling::SubsampleHandle<T> handle = sb::sampling::sample_subsets(
-          PointCloudT(reference), PointCloudT(query),
-          sb::sampling::EuclideanDistance<T>{}, sb::sampling::Gaussian<T>{mean, sigma},
-          sampleSize, nInstances, replace, pick(gen), sb::default_executor());
-      return to_tuple(std::move(handle));
+      return sample_subsets_impl(reference, query, sb::sampling::Gaussian<T>{mean, sigma}, sampleSize,
+                                 nInstances, replace, gen);
     }
 
-    static py::tuple sample_subsets_distance_uniform(const TensorT& reference, const TensorT& query,
-                                                     T inner, T outer, size_t sampleSize,
-                                                     size_t nInstances, bool replace,
-                                                     const sb::DefaultRandomGenerator* gen)
+    static py::tuple sample_subsets_uniform(const TensorT& reference, const TensorT& query, T low,
+                                            T high, size_t sampleSize, size_t nInstances,
+                                            bool replace, const Gen* gen)
     {
-      sb::sampling::SubsampleHandle<T> handle = sb::sampling::sample_subsets(
-          PointCloudT(reference), PointCloudT(query),
-          sb::sampling::EuclideanDistance<T>{}, sb::sampling::Uniform<T>{inner, outer},
-          sampleSize, nInstances, replace, pick(gen), sb::default_executor());
-      return to_tuple(std::move(handle));
+      return sample_subsets_impl(reference, query, sb::sampling::Uniform<T>{low, high}, sampleSize,
+                                 nInstances, replace, gen);
     }
 
     static py::tuple sample_subsets_from_probabilities(const TensorT& reference,
-                                                       const TensorT& probabilities,
-                                                       size_t sampleSize, size_t nInstances,
-                                                       bool replace,
-                                                       const sb::DefaultRandomGenerator* gen)
+                                                       const TensorT& probabilities, size_t sampleSize,
+                                                       size_t nInstances, bool replace, const Gen* gen)
     {
-      sb::sampling::SubsampleHandle<T> handle = sb::sampling::sample_subsets_from_probabilities(
-          PointCloudT(reference), probabilities,
-          sampleSize, nInstances, replace, pick(gen), sb::default_executor());
-      return to_tuple(std::move(handle));
+      return to_tuple(sb::sampling::sample_subsets_from_probabilities(
+          sb::PointCloud<T>(reference), probabilities, sampleSize, nInstances, replace, pick(gen),
+          sb::default_executor()));
     }
 
-    static void register_bindings(py::handle m, const std::string& suffix)
+    // (n_query, n_reference) matrix of Euclidean distances; the custom-distribution
+    // path applies its distribution to this in Python.
+    static TensorT distance_values(const TensorT& reference, const TensorT& query)
     {
-      py::class_<PySubsampleBindings> cls(m, ("Subsample" + suffix).c_str());
+      return sb::sampling::filter_values(sb::PointCloud<T>(reference), sb::PointCloud<T>(query),
+                                         sb::sampling::EuclideanDistance<T>{}, sb::default_executor());
+    }
 
-      cls
-          .def_static("sample_subsets_distance_gaussian",
-                      &PySubsampleBindings::sample_subsets_distance_gaussian,
-                      py::arg("reference"), py::arg("query"),
-                      py::arg("mean"), py::arg("sigma"), py::arg("sample_size"),
+    static void register_bindings(py::module_& m, const std::string& suffix)
+    {
+      py::class_<PySubsampleBindings>(m, ("Subsample" + suffix).c_str())
+          .def_static("sample_subsets_gaussian", &sample_subsets_gaussian, py::arg("reference"),
+                      py::arg("query"), py::arg("mean"), py::arg("sigma"), py::arg("sample_size"),
                       py::arg("n_instances"), py::arg("replace"),
                       py::arg("generator").none(true) = py::none())
-          .def_static("sample_subsets_distance_uniform",
-                      &PySubsampleBindings::sample_subsets_distance_uniform,
-                      py::arg("reference"), py::arg("query"),
-                      py::arg("inner"), py::arg("outer"), py::arg("sample_size"),
+          .def_static("sample_subsets_uniform", &sample_subsets_uniform, py::arg("reference"),
+                      py::arg("query"), py::arg("low"), py::arg("high"), py::arg("sample_size"),
                       py::arg("n_instances"), py::arg("replace"),
                       py::arg("generator").none(true) = py::none())
-          .def_static("sample_subsets_from_probabilities",
-                      &PySubsampleBindings::sample_subsets_from_probabilities,
-                      py::arg("reference"), py::arg("probabilities"),
-                      py::arg("sample_size"), py::arg("n_instances"), py::arg("replace"),
+          .def_static("sample_subsets_from_probabilities", &sample_subsets_from_probabilities,
+                      py::arg("reference"), py::arg("probabilities"), py::arg("sample_size"),
+                      py::arg("n_instances"), py::arg("replace"),
                       py::arg("generator").none(true) = py::none())
-          ;
+          .def_static("distance_values", &distance_values, py::arg("reference"), py::arg("query"));
     }
 
   private:
-    // Unpack a launched run into the (task, samples) tuple Python expects.
+    static const Gen& pick(const Gen* gen) { return gen ? *gen : sb::default_generator(); }
+
     static py::tuple to_tuple(sb::sampling::SubsampleHandle<T> handle)
     {
       return py::make_tuple(std::move(handle.task), std::move(handle.samples));
     }
 
-    static const sb::DefaultRandomGenerator& pick(const sb::DefaultRandomGenerator* gen)
+    // Templated over the distribution functor (the "templated distribution"), like
+    // pdist_impl<TOperation> in py_distance.cpp: pair the Euclidean filter with
+    // @p distribution and launch the core stoppable sampler.
+    template <typename DistF>
+    static py::tuple sample_subsets_impl(const TensorT& reference, const TensorT& query,
+                                         DistF distribution, size_t sampleSize, size_t nInstances,
+                                         bool replace, const Gen* gen)
     {
-      return gen ? *gen : sb::default_generator();
+      return to_tuple(sb::sampling::sample_subsets(
+          sb::PointCloud<T>(reference), sb::PointCloud<T>(query), sb::sampling::EuclideanDistance<T>{},
+          distribution, sampleSize, nInstances, replace, pick(gen), sb::default_executor()));
     }
   };
 
 }
 
-void sb_py::register_sampling_subsample(py::module_& m)
+namespace sb_py
 {
-  PySubsampleBindings<sb::float32_t>::register_bindings(m, "32");
-  PySubsampleBindings<sb::float64_t>::register_bindings(m, "64");
+  void register_sampling_subsample(py::module_& m)
+  {
+    PySubsampleBindings<sb::float32_t>::register_bindings(m, "32");
+    PySubsampleBindings<sb::float64_t>::register_bindings(m, "64");
+  }
 }

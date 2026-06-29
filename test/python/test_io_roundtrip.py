@@ -3,7 +3,7 @@ import io
 import numpy as np
 
 import stablebear as sb
-from stablebear.sampling import Gaussian, subsample
+from stablebear.sampling import Gaussian, subsample_relative
 
 
 def _roundtrip(tensor):
@@ -113,7 +113,7 @@ def test_barcode32_tensor_empty():
 def test_indexed_subsamples_roundtrip():
     R = np.random.default_rng(0).standard_normal((150, 6))
     X = np.random.default_rng(1).standard_normal((3, 6))
-    subs = subsample(R, X, sample_size=12, n_instances=7,
+    subs = subsample_relative(R, X, sample_size=12, n_instances=7,
                      distribution=Gaussian(0.0, 1.0), generator=sb.random.Generator(0))
 
     before = [[np.asarray(subs[i, j]) for j in range(7)] for i in range(3)]

@@ -262,7 +262,7 @@ class PointCloud:
 
     May be an *indexed view* that shares another cloud's coordinates and selects
     rows through an index array (the memory-frugal output of
-    :func:`stablebear.sampling.subsample`). All operations work directly on the view;
+    :func:`stablebear.sampling.subsample_relative`). All operations work directly on the view;
     the coordinates are only copied when the cloud is converted to NumPy.
     """
 

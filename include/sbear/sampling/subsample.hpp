@@ -31,13 +31,14 @@ namespace sb::sampling
   // ===========================================================================
 
   /// Euclidean distance between query point @p i of @p X and reference point @p r of @p R.
+  /// Callers are responsible for validating that @p X and @p R share a dimension
+  /// (the samplers below do, once, before the per-pair walk) so this hot-path
+  /// operator stays branch-free.
   template <typename T>
   struct EuclideanDistance
   {
     T operator()(const PointCloud<T>& X, size_t i, const PointCloud<T>& R, size_t r) const
     {
-      if (X.dim() != R.dim())
-        throw std::invalid_argument("query and reference points must have the same dimension");
       T acc = T(0);
       for (size_t k = 0; k < X.dim(); ++k)
       {
@@ -244,6 +245,30 @@ namespace sb::sampling
   // ===========================================================================
   // Samplers
   // ===========================================================================
+
+  /// Evaluate @p filter for every (query point, reference point) pair into an
+  /// (n_query, n_reference) matrix. This is the filter-value matrix the
+  /// custom-distribution path needs: the filter is computed once, in parallel
+  /// C++ — the single implementation of each filter, shared in spirit with the
+  /// fused @ref sample_subsets path — and the distribution is applied afterwards
+  /// (in Python) to the returned matrix.
+  template <typename T, typename FilterF>
+  Tensor<T> filter_values(const PointCloud<T>& R, const PointCloud<T>& X, FilterF filter,
+                          Executor& exec)
+  {
+    if (R.rank() != 2)
+      throw std::invalid_argument("reference must be a 2-D (n_points, dim) point cloud");
+    if (X.rank() != 2)
+      throw std::invalid_argument("query must be a 2-D (n_points, dim) point cloud");
+    if (X.dim() != R.dim())
+      throw std::invalid_argument("reference and query must have the same dimension");
+
+    Tensor<T> values({X.n_points(), R.n_points()});
+    parallel_walk(values, [&values, &R, &X, filter](const std::vector<size_t>& idx) {
+      values(idx) = filter(X, idx[0], R, idx[1]);
+    }, exec);
+    return values;
+  }
 
   /// Per-query-point subsampling of a reference point cloud, with sampling
   /// weights given by @p distribution applied to @p filter of each

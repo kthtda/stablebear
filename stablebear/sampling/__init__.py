@@ -1,7 +1,7 @@
 __before = set(dir())
 
 from .distributions import Gaussian, Uniform
-from .subsample import subsample
+from .subsample import subsample_relative
 
 import types as _types
 __all__ = sorted(

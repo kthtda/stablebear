@@ -3,18 +3,20 @@ import numpy as np
 from .. import _sb_cpp as cpp
 from ..async_task import _run_task
 from ..base_tensor import FloatTensor, PointCloudTensor
-from ..typing import float32, float64, pcloud32, pcloud64
-from .distributions import Gaussian, _BuiltinDistribution
+from ..typing import float32
+from .distributions import Gaussian, Uniform
 
 cpp_samp = cpp.sampling
 
-_FLOAT_TO_PCLOUD = {float32: pcloud32, float64: pcloud64}
+# Built-in distributions own a fully fused C++ "distance" fast path. For any
+# other (custom callable) distribution the distance still runs in C++; only the
+# distribution itself is applied in Python before the draw.
+_BUILTIN_DISTRIBUTIONS = (Gaussian, Uniform)
 
 
-def _get_backend(pcloud_dtype):
-    if pcloud_dtype == pcloud32:
-        return cpp_samp.Subsample32
-    return cpp_samp.Subsample64
+def _backend(dtype):
+    """The precision-specific C++ subsampling backend for a FloatTensor dtype."""
+    return cpp_samp.Subsample32 if dtype == float32 else cpp_samp.Subsample64
 
 
 def _as_float_tensor(data, dtype=None):
@@ -26,47 +28,38 @@ def _as_float_tensor(data, dtype=None):
     return FloatTensor(data, dtype=dtype)
 
 
-def _filter_values(filter_fn, p, reference_np):
-    """Filter values of a single query point ``p`` against all reference points."""
-    if isinstance(filter_fn, str):
-        if filter_fn == "distance":
-            return np.linalg.norm(reference_np - p, axis=1)
-        raise ValueError(f"Unknown built-in filter {filter_fn!r}; expected 'distance'.")
-    return np.asarray(filter_fn(p, reference_np))
+def _distance_weights(backend, R, X, distribution, np_float):
+    """Weight matrix for the custom-distribution path.
 
-
-def _compute_probabilities(reference_np, query_np, filter_fn, distribution, np_float):
-    n_query = query_np.shape[0]
-    n_ref = reference_np.shape[0]
-    prob = np.empty((n_query, n_ref), dtype=np_float)
-
-    for i in range(n_query):
-        values = _filter_values(filter_fn, query_np[i], reference_np)
-        weights = np.asarray(distribution(values), dtype=np_float)
-        if weights.shape != (n_ref,):
-            raise ValueError(
-                "filter/distribution must produce one weight per reference point "
-                f"(expected shape ({n_ref},), got {weights.shape})."
-            )
-        prob[i] = weights
-
-    if np.any(prob < 0):
-        raise ValueError("filter/distribution produced negative sampling weights.")
-    if np.any(prob.sum(axis=1) <= 0):
+    The Euclidean distances are computed once, in parallel C++ — the single
+    source of truth, shared with the fused built-in path — into an
+    ``(n_query, n_reference)`` matrix. The custom ``distribution`` is then
+    applied to that whole matrix at once (it must act element-wise on the
+    distances) to give the sampling weights.
+    """
+    values = np.asarray(FloatTensor(backend.distance_values(R._data, X._data)))
+    weights = np.asarray(distribution(values), dtype=np_float)
+    if weights.shape != values.shape:
         raise ValueError(
-            "filter/distribution produced all-zero weights for at least one query point."
+            "distribution must produce one weight per reference point "
+            f"(expected shape {values.shape}, got {weights.shape})."
+        )
+    if np.any(weights < 0):
+        raise ValueError("distribution produced negative sampling weights.")
+    if np.any(weights.sum(axis=1) <= 0):
+        raise ValueError(
+            "distribution produced all-zero weights for at least one query point."
         )
 
-    return prob
+    return weights
 
 
-def subsample(
+def subsample_relative(
     reference,
     query=None,
     *,
     sample_size,
     n_instances,
-    filter_fn="distance",
     distribution=None,
     replace=True,
     generator=None,
@@ -76,19 +69,19 @@ def subsample(
 
     This is the front end of the relative-approach pipeline of Agerberg,
     Chacholski & Ramanujam (2023). For each query point :math:`p` in *query*, a
-    probability over the *reference* point cloud :math:`R` is formed by applying
-    a *filter* to each pair :math:`(p, r)` and passing the result through a
-    *distribution* :math:`D`,
+    probability over the *reference* point cloud :math:`R` is formed from the
+    Euclidean distance :math:`\lVert p - r\rVert` to each reference point,
+    passed through a *distribution* :math:`D`,
 
     .. math::
-        \mathrm{prob}(r) \propto D\big(\mathrm{filter}(p, r)\big),\quad r \in R,
+        \mathrm{prob}(r) \propto D\big(\lVert p - r\rVert\big),\quad r \in R,
 
     and ``n_instances`` subsamples of ``sample_size`` points are then drawn from
     :math:`R` according to that probability.
 
     The result feeds directly into the rest of the package::
 
-        subs = subsample(reference, query, sample_size=30, n_instances=2000)
+        subs = subsample_relative(reference, query, sample_size=30, n_instances=2000)
         bcs  = compute_persistent_homology(subs, max_dim=1)
         srs  = barcode_to_stable_rank(bcs)
         rel  = mean(srs, dim=1)   # one relative stable rank per query point
@@ -107,15 +100,13 @@ def subsample(
         Number of points per subsample (``s`` in the paper).
     n_instances : int
         Number of subsamples drawn per query point (``n`` in the paper).
-    filter_fn : str or callable, optional
-        Either the built-in ``"distance"`` (Euclidean :math:`\lVert p - r\rVert`,
-        evaluated in parallel C++), or a callable ``filter_fn(p, reference) -> (n_reference,)``
-        mapping a single query point and the reference array to per-reference
-        values. By default ``"distance"``.
     distribution : distribution spec or callable, optional
         A built-in spec (:class:`Gaussian`, :class:`Uniform`) or a callable
-        ``distribution(values) -> (n_reference,)`` returning non-negative
-        weights. By default :class:`Gaussian` with ``mean=0``, ``sigma=1``.
+        mapping distances to non-negative weights. The callable is applied
+        element-wise to the whole ``(n_query, n_reference)`` matrix of distances
+        and must return an array of the same shape (so any NumPy element-wise
+        expression works). By default :class:`Gaussian` with ``mean=0``,
+        ``sigma=1``.
     replace : bool, optional
         Whether each subsample is drawn with replacement, by default True
         (as in the paper).
@@ -146,22 +137,22 @@ def subsample(
     if R.shape[1] != X.shape[1]:
         raise ValueError("reference and query must have the same dimension.")
 
-    pcloud_dtype = _FLOAT_TO_PCLOUD[R.dtype]
-    backend = _get_backend(pcloud_dtype)
+    backend = _backend(R.dtype)
     gen = generator._gen if generator is not None else None
 
-    if filter_fn == "distance" and isinstance(distribution, _BuiltinDistribution):
-        task, result = distribution._fused_call(
+    if isinstance(distribution, _BUILTIN_DISTRIBUTIONS):
+        # Fully fused C++ draw: distances + built-in distribution.
+        task, result = distribution._sample_subsets(
             backend, R._data, X._data, sample_size, n_instances, replace, gen
         )
     else:
+        # Custom distribution: the distances are computed in C++, the
+        # distribution is applied in Python, then the draw runs in C++.
         np_float = np.float32 if R.dtype == float32 else np.float64
-        prob = _compute_probabilities(
-            np.asarray(R), np.asarray(X), filter_fn, distribution, np_float
-        )
-        prob_tensor = FloatTensor(prob, dtype=R.dtype)
+        weights = _distance_weights(backend, R, X, distribution, np_float)
+        weights_tensor = FloatTensor(weights, dtype=R.dtype)
         task, result = backend.sample_subsets_from_probabilities(
-            R._data, prob_tensor._data, sample_size, n_instances, replace, gen
+            R._data, weights_tensor._data, sample_size, n_instances, replace, gen
         )
 
     _run_task(lambda: task, verbose=verbose)

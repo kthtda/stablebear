@@ -323,13 +323,13 @@ def plot_subsample_weights(query_color="red", cmap="viridis"):
     reference = gen.standard_normal((400, 2))
     query = np.array([1.0, 0.5])
 
-    # The default filter is Euclidean distance to the query point.
+    # Score each reference point by its Euclidean distance to the query point.
     dist = np.linalg.norm(reference - query, axis=1)
 
     # Each distribution turns those distances into sampling weights.
     distributions = [
         ("Gaussian(mean=0, sigma=0.4)", sb.Gaussian(mean=0.0, sigma=0.4)),
-        ("Uniform(inner=1.0, outer=1.8)", sb.Uniform(inner=1.0, outer=1.8)),
+        ("Uniform(low=1.0, high=1.8)", sb.Uniform(low=1.0, high=1.8)),
     ]
 
     fig, axes = plt.subplots(1, 2, figsize=(9, 4), sharex=True, sharey=True)

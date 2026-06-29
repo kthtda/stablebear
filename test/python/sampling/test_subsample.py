@@ -4,7 +4,7 @@ import pytest
 import stablebear as sb
 from stablebear.persistence import barcode_to_stable_rank, compute_persistent_homology
 from stablebear.reductions import mean
-from stablebear.sampling import Gaussian, Uniform, subsample
+from stablebear.sampling import Gaussian, Uniform, subsample_relative
 
 
 @pytest.fixture(params=[(np.float32, sb.pcloud32), (np.float64, sb.pcloud64)],
@@ -26,7 +26,7 @@ def test_output_shape_and_dtype(float_kind):
     R = np.random.default_rng(0).standard_normal((50, 3)).astype(np_float)
     X = np.random.default_rng(1).standard_normal((4, 3)).astype(np_float)
 
-    subs = subsample(R, X, sample_size=12, n_instances=7,
+    subs = subsample_relative(R, X, sample_size=12, n_instances=7,
                      generator=sb.random.Generator(0))
 
     assert isinstance(subs, sb.PointCloudTensor)
@@ -43,7 +43,7 @@ def test_zero_weight_points_never_sampled():
     X = np.array([[0.0]])
     cutoff = 5.5
 
-    subs = subsample(R, X, sample_size=8, n_instances=50,
+    subs = subsample_relative(R, X, sample_size=8, n_instances=50,
                      distribution=lambda v: (np.asarray(v) < cutoff).astype(float),
                      generator=sb.random.Generator(0))
 
@@ -62,7 +62,7 @@ def test_gaussian_concentrates_on_nearest():
     R = (np.arange(30, dtype=np.float64)).reshape(-1, 1)
     X = np.array([[7.0]])  # exactly reference point index 7
 
-    subs = subsample(R, X, sample_size=20, n_instances=200,
+    subs = subsample_relative(R, X, sample_size=20, n_instances=200,
                      distribution=Gaussian(0.0, 0.3),
                      generator=sb.random.Generator(0))
 
@@ -79,7 +79,7 @@ def test_per_query_point_probabilities_differ():
     R = (np.arange(30, dtype=np.float64)).reshape(-1, 1)
     X = np.array([[3.0], [25.0]])
 
-    subs = subsample(R, X, sample_size=20, n_instances=100,
+    subs = subsample_relative(R, X, sample_size=20, n_instances=100,
                      distribution=Gaussian(0.0, 1.0),
                      generator=sb.random.Generator(0))
 
@@ -100,9 +100,9 @@ def test_reproducible_with_seed(float_kind):
     R = np.random.default_rng(2).standard_normal((40, 2)).astype(np_float)
     X = np.random.default_rng(3).standard_normal((3, 2)).astype(np_float)
 
-    a = subsample(R, X, sample_size=10, n_instances=5, generator=sb.random.Generator(7))
-    b = subsample(R, X, sample_size=10, n_instances=5, generator=sb.random.Generator(7))
-    c = subsample(R, X, sample_size=10, n_instances=5, generator=sb.random.Generator(8))
+    a = subsample_relative(R, X, sample_size=10, n_instances=5, generator=sb.random.Generator(7))
+    b = subsample_relative(R, X, sample_size=10, n_instances=5, generator=sb.random.Generator(7))
+    c = subsample_relative(R, X, sample_size=10, n_instances=5, generator=sb.random.Generator(8))
 
     for i in range(3):
         for j in range(5):
@@ -121,9 +121,9 @@ def test_verbose_matches_nonverbose():
     R = np.random.default_rng(6).standard_normal((40, 2))
     X = np.random.default_rng(7).standard_normal((3, 2))
 
-    quiet = subsample(R, X, sample_size=10, n_instances=5,
+    quiet = subsample_relative(R, X, sample_size=10, n_instances=5,
                       generator=sb.random.Generator(11), verbose=False)
-    loud = subsample(R, X, sample_size=10, n_instances=5,
+    loud = subsample_relative(R, X, sample_size=10, n_instances=5,
                      generator=sb.random.Generator(11), verbose=True)
 
     assert isinstance(loud, sb.PointCloudTensor)
@@ -137,11 +137,10 @@ def test_callable_path_matches_builtin():
     R = np.random.default_rng(4).standard_normal((60, 2))
     X = np.random.default_rng(5).standard_normal((3, 2))
 
-    fused = subsample(R, X, sample_size=8, n_instances=4,
+    fused = subsample_relative(R, X, sample_size=8, n_instances=4,
                       distribution=Gaussian(0.0, 1.0),
                       generator=sb.random.Generator(3))
-    callable_ = subsample(R, X, sample_size=8, n_instances=4,
-                          filter_fn=lambda p, ref: np.linalg.norm(ref - p, axis=1),
+    callable_ = subsample_relative(R, X, sample_size=8, n_instances=4,
                           distribution=lambda v: np.exp(-0.5 * np.asarray(v) ** 2),
                           generator=sb.random.Generator(3))
 
@@ -155,10 +154,10 @@ def test_uniform_fused_matches_callable():
     R = np.random.default_rng(6).standard_normal((50, 2))
     X = np.random.default_rng(7).standard_normal((3, 2))
 
-    fused = subsample(R, X, sample_size=8, n_instances=4,
+    fused = subsample_relative(R, X, sample_size=8, n_instances=4,
                       distribution=Uniform(),
                       generator=sb.random.Generator(2))
-    callable_ = subsample(R, X, sample_size=8, n_instances=4,
+    callable_ = subsample_relative(R, X, sample_size=8, n_instances=4,
                           distribution=lambda v: np.ones_like(np.asarray(v)),
                           generator=sb.random.Generator(2))
 
@@ -172,7 +171,7 @@ def test_uniform_samples_all_reference_points():
     R = (np.arange(20, dtype=np.float64)).reshape(-1, 1)
     X = np.array([[100.0]])  # far from R: a distance-based distribution would skew
 
-    subs = subsample(R, X, sample_size=5, n_instances=400,
+    subs = subsample_relative(R, X, sample_size=5, n_instances=400,
                      distribution=Uniform(), generator=sb.random.Generator(0))
 
     idx_map = _ref_index_map(R)
@@ -183,14 +182,14 @@ def test_uniform_samples_all_reference_points():
 
 
 def test_uniform_disk_samples_only_within_radius():
-    # Uniform(outer=r) is a disk: only reference points within distance r of the
+    # Uniform(high=r) is a disk: only reference points within distance r of the
     # query may be drawn, and all of them should be (eventually).
     R = (np.arange(20, dtype=np.float64)).reshape(-1, 1)
     X = np.array([[7.0]])  # reference index 7
     radius = 3.0
 
-    subs = subsample(R, X, sample_size=5, n_instances=400,
-                     distribution=Uniform(outer=radius),
+    subs = subsample_relative(R, X, sample_size=5, n_instances=400,
+                     distribution=Uniform(high=radius),
                      generator=sb.random.Generator(0))
 
     idx_map = _ref_index_map(R)
@@ -202,14 +201,14 @@ def test_uniform_disk_samples_only_within_radius():
 
 
 def test_uniform_annulus_samples_only_within_band():
-    # Uniform(inner, outer) is a ring: only points whose distance to the query
-    # falls in [inner, outer] may be drawn.
+    # Uniform(low, high) is a ring: only points whose distance to the query
+    # falls in [low, high] may be drawn.
     R = (np.arange(30, dtype=np.float64)).reshape(-1, 1)
     X = np.array([[15.0]])  # reference index 15
-    inner, outer = 4.0, 8.0
+    low, high = 4.0, 8.0
 
-    subs = subsample(R, X, sample_size=5, n_instances=500,
-                     distribution=Uniform(inner=inner, outer=outer),
+    subs = subsample_relative(R, X, sample_size=5, n_instances=500,
+                     distribution=Uniform(low=low, high=high),
                      generator=sb.random.Generator(0))
 
     idx_map = _ref_index_map(R)
@@ -217,7 +216,7 @@ def test_uniform_annulus_samples_only_within_band():
     for j in range(subs.shape[1]):
         seen.update(_sampled_indices(subs[0, j], idx_map))
 
-    assert seen == {i for i in range(30) if inner <= abs(R[i, 0] - 15.0) <= outer}
+    assert seen == {i for i in range(30) if low <= abs(R[i, 0] - 15.0) <= high}
 
 
 def test_uniform_disk_fused_matches_callable():
@@ -225,10 +224,10 @@ def test_uniform_disk_fused_matches_callable():
     R = np.random.default_rng(6).standard_normal((60, 2))
     X = np.random.default_rng(7).standard_normal((3, 2))
 
-    fused = subsample(R, X, sample_size=8, n_instances=4,
-                      distribution=Uniform(inner=0.5, outer=2.0),
+    fused = subsample_relative(R, X, sample_size=8, n_instances=4,
+                      distribution=Uniform(low=0.5, high=2.0),
                       generator=sb.random.Generator(2))
-    callable_ = subsample(R, X, sample_size=8, n_instances=4,
+    callable_ = subsample_relative(R, X, sample_size=8, n_instances=4,
                           distribution=lambda v: ((np.asarray(v) >= 0.5)
                                                   & (np.asarray(v) <= 2.0)).astype(float),
                           generator=sb.random.Generator(2))
@@ -238,9 +237,9 @@ def test_uniform_disk_fused_matches_callable():
             assert np.array_equal(np.asarray(fused[i, j]), np.asarray(callable_[i, j]))
 
 
-@pytest.mark.parametrize("kwargs", [{"inner": -1.0}, {"outer": 0.0},
-                                    {"inner": 2.0, "outer": 1.0},
-                                    {"inner": 1.0, "outer": 1.0}])
+@pytest.mark.parametrize("kwargs", [{"low": -1.0}, {"high": 0.0},
+                                    {"low": 2.0, "high": 1.0},
+                                    {"low": 1.0, "high": 1.0}])
 def test_uniform_invalid_radii_raise(kwargs):
     with pytest.raises(ValueError):
         Uniform(**kwargs)
@@ -250,7 +249,7 @@ def test_without_replacement_gives_distinct_points():
     R = (np.arange(15, dtype=np.float64)).reshape(-1, 1)
     X = np.array([[0.0]])
 
-    subs = subsample(R, X, sample_size=10, n_instances=20,
+    subs = subsample_relative(R, X, sample_size=10, n_instances=20,
                      distribution=Uniform(), replace=False,
                      generator=sb.random.Generator(0))
 
@@ -264,21 +263,21 @@ def test_without_replacement_too_large_raises():
     R = np.zeros((5, 2))
     X = np.zeros((1, 2))
     with pytest.raises(ValueError):
-        subsample(R, X, sample_size=6, n_instances=1, replace=False)
+        subsample_relative(R, X, sample_size=6, n_instances=1, replace=False)
 
 
 def test_dimension_mismatch_raises():
     R = np.zeros((10, 3))
     X = np.zeros((2, 2))
     with pytest.raises(ValueError):
-        subsample(R, X, sample_size=3, n_instances=1)
+        subsample_relative(R, X, sample_size=3, n_instances=1)
 
 
 def test_negative_weights_raise():
     R = np.zeros((10, 2))
     X = np.zeros((1, 2))
     with pytest.raises(ValueError):
-        subsample(R, X, sample_size=3, n_instances=1,
+        subsample_relative(R, X, sample_size=3, n_instances=1,
                   distribution=lambda v: -np.ones_like(np.asarray(v)))
 
 
@@ -286,7 +285,7 @@ def test_all_zero_weights_raise():
     R = np.zeros((10, 2))
     X = np.zeros((1, 2))
     with pytest.raises(ValueError):
-        subsample(R, X, sample_size=3, n_instances=1,
+        subsample_relative(R, X, sample_size=3, n_instances=1,
                   distribution=lambda v: np.zeros_like(np.asarray(v)))
 
 
@@ -295,16 +294,16 @@ def test_invalid_counts_raise(bad):
     R = np.zeros((10, 2))
     X = np.zeros((1, 2))
     with pytest.raises(ValueError):
-        subsample(R, X, sample_size=bad, n_instances=1)
+        subsample_relative(R, X, sample_size=bad, n_instances=1)
     with pytest.raises(ValueError):
-        subsample(R, X, sample_size=3, n_instances=bad)
+        subsample_relative(R, X, sample_size=3, n_instances=bad)
 
 
 def test_subsamples_are_indexed_views():
     R = np.random.default_rng(0).standard_normal((100, 8))
     X = np.random.default_rng(1).standard_normal((3, 8))
 
-    subs = subsample(R, X, sample_size=10, n_instances=5,
+    subs = subsample_relative(R, X, sample_size=10, n_instances=5,
                      distribution=Gaussian(0.0, 1.0), generator=sb.random.Generator(0))
 
     el = subs[0, 0]
@@ -322,7 +321,7 @@ def test_pipeline_to_relative_stable_rank():
     R = np.random.default_rng(0).standard_normal((200, 2))
     X = np.random.default_rng(1).standard_normal((4, 2))
 
-    subs = subsample(R, X, sample_size=25, n_instances=30,
+    subs = subsample_relative(R, X, sample_size=25, n_instances=30,
                      distribution=Gaussian(0.0, 1.0),
                      generator=sb.random.Generator(0))
 
