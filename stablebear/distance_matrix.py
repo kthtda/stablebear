@@ -77,6 +77,23 @@ class DistanceMatrix:
     def storage_count(self) -> int:
         return self._data.storage_count
 
+    @property
+    def is_indexed(self) -> bool:
+        """Whether this is an indexed view of a subsampled source matrix."""
+        return self._data.is_indexed
+
+    @property
+    def indices(self):
+        """The selected source-row indices, or ``None`` when not an indexed view."""
+        if not self._data.is_indexed:
+            return None
+        from .base_tensor import IntTensor
+        return IntTensor(self._data.indices)
+
+    def materialize(self) -> DistanceMatrix:
+        """Return an owning ``DistanceMatrix`` of the (selected) principal submatrix."""
+        return DistanceMatrix(self._data.materialize())
+
     def _resolve_ij(self, ij):
         i, j = ij
         n = self._data.size

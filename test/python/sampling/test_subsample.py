@@ -351,6 +351,31 @@ def test_owning_pointcloud_is_mutable():
     assert float(t[0][0, 0]) == 7.0
 
 
+def test_query_by_index_matches_coordinates():
+    # Selecting query points by their order in the reference must match passing
+    # those reference coordinates directly.
+    R = np.random.default_rng(0).standard_normal((50, 3))
+    idx = np.array([1, 3, 10, 25])
+
+    by_index = subsample_relative(R, idx, sample_size=8, n_instances=5,
+                                  distribution=Gaussian(0.0, 1.0),
+                                  generator=sb.random.Generator(0))
+    by_coords = subsample_relative(R, R[idx], sample_size=8, n_instances=5,
+                                   distribution=Gaussian(0.0, 1.0),
+                                   generator=sb.random.Generator(0))
+
+    assert by_index.shape == (4, 5)
+    for i in range(4):
+        for j in range(5):
+            assert np.array_equal(np.asarray(by_index[i, j]), np.asarray(by_coords[i, j]))
+
+
+def test_query_index_out_of_range_raises():
+    R = np.zeros((10, 2))
+    with pytest.raises(ValueError):
+        subsample_relative(R, np.array([10]), sample_size=3, n_instances=1)
+
+
 def test_pipeline_to_relative_stable_rank():
     R = np.random.default_rng(0).standard_normal((200, 2))
     X = np.random.default_rng(1).standard_normal((4, 2))

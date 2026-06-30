@@ -63,6 +63,11 @@ class Uniform:
             reference, query, self.low, self.high, sample_size, n_instances, replace, gen
         )
 
+    def _sample_subsets_distmat(self, backend, source, query, sample_size, n_instances, replace, gen):
+        return backend.sample_subsets_distmat_uniform(
+            source, query, self.low, self.high, sample_size, n_instances, replace, gen
+        )
+
 
 
 class Gaussian:
@@ -95,5 +100,10 @@ class Gaussian:
     def _sample_subsets(self, backend, reference, query, sample_size, n_instances, replace, gen):
         return backend.sample_subsets_gaussian(
             reference, query, self.mean, self.sigma, sample_size, n_instances, replace, gen
+        )
+
+    def _sample_subsets_distmat(self, backend, source, query, sample_size, n_instances, replace, gen):
+        return backend.sample_subsets_distmat_gaussian(
+            source, query, self.mean, self.sigma, sample_size, n_instances, replace, gen
         )
 __all__ = ["Gaussian", "Uniform"]
