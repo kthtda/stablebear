@@ -22,29 +22,27 @@ class Barcode:
     """
 
     def __init__(self, bc):
-        fail = False
         if isinstance(bc, Barcode):
             self._data = bc._data
         elif isinstance(bc, cpp_p.Barcode32 | cpp_p.Barcode64):
             self._data = bc
-        elif isinstance(bc, np.ndarray):
-            if bc.dtype == np.float32:
-                self._data = cpp_p.Barcode32(bc)
-            elif bc.dtype == np.float64:
-                self._data = cpp_p.Barcode64(bc)
-            else:
-                fail = True
+        elif isinstance(bc, np.ndarray) and bc.dtype == np.float32:
+            self._data = cpp_p.Barcode32(bc)
+        elif isinstance(bc, np.ndarray) and bc.dtype == np.float64:
+            self._data = cpp_p.Barcode64(bc)
         else:
-            fail = True
+            # No self._data assignment may happen before this raise: the
+            # dtype dispatch below would otherwise turn a bad input into an
+            # AttributeError instead of this TypeError.
+            raise TypeError(
+                f"Barcode cannot be constructed with object of type {type(bc)}"
+            )
 
         if isinstance(self._data, cpp_p.Barcode32):
             self.dtype = barcode32
         elif isinstance(self._data, cpp_p.Barcode64):
             self.dtype = barcode64
         else:
-            fail = True
-
-        if fail:
             raise TypeError(
                 f"Barcode cannot be constructed with object of type {type(bc)}"
             )

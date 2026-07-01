@@ -223,3 +223,18 @@ def test_barcode_tensor_from_ndarray_list_2d():
     t = BarcodeTensor(bcs)
     assert t.shape == (2, 1)
     assert t.dtype == sb.barcode64
+
+
+def test_barcode_tensor_invalid_leaf_dtype_raises_typeerror():
+    # An unsupported leaf (e.g. an int-dtype barcode array) must surface the
+    # Barcode constructor's TypeError, not an AttributeError from a
+    # half-initialized Barcode.
+    with pytest.raises(TypeError, match="Barcode cannot be constructed"):
+        BarcodeTensor([np.array([[0, 1]], dtype=np.int64)])
+
+
+def test_barcode_invalid_input_raises_typeerror():
+    with pytest.raises(TypeError, match="Barcode cannot be constructed"):
+        Barcode(np.array([[0, 1]], dtype=np.int64))
+    with pytest.raises(TypeError, match="Barcode cannot be constructed"):
+        Barcode([[0.0, 1.0]])
