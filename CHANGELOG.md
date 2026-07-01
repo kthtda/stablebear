@@ -6,6 +6,7 @@
 
 ### Bug fixes
 
+* **Persistence functions keep a genuine length-1 batch axis** — `compute_persistent_homology` and the barcode-to-PCF summaries no longer drop a length-1 leading axis, so a one-element batch stays a batch; only the scalar-convenience inputs (a single NumPy array, `FloatTensor`, `DistanceMatrix`, or `Barcode`) still return an unbatched result. ([#28](https://github.com/kthtda/stablebear/issues/28), [#29](https://github.com/kthtda/stablebear/issues/29))
 * **A single point cloud is now subscriptable** — a 0-d `PointCloudTensor` indexes as its underlying array, so `pc[:, 0]` / `pc[:, 1]` plotting works directly instead of raising `IndexError`. ([#133](https://github.com/kthtda/stablebear/issues/133))
 * **Storing a matrix or point cloud in a tensor cell now copies it** — `t[i] = m` / `t[0:2] = src` copy the element instead of sharing its buffer, so later mutation of the source no longer corrupts stored cells. Matches NumPy object-array assignment. ([#39](https://github.com/kthtda/stablebear/issues/39), [#129](https://github.com/kthtda/stablebear/issues/129))
 * **Self-aliasing slice assignment no longer corrupts data** — `a[:] = a[::-1]` and `a[1:] = a[:-1]` now reverse/shift correctly (the right-hand side is materialized first when it overlaps the destination), for both numeric and object-element tensors. ([#6](https://github.com/kthtda/stablebear/issues/6), [#129](https://github.com/kthtda/stablebear/issues/129))

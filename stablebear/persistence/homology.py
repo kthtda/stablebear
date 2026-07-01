@@ -86,10 +86,17 @@ def compute_persistent_homology(
     from ..tensor_create import zeros
     from .ripser import _compute_barcodes_distmat_ripser, _compute_barcodes_euclidean_pcloud_ripser
 
+    # A single DistanceMatrix / FloatTensor / ndarray is a scalar-convenience
+    # input wrapped into a length-1 batch; its leading axis is dropped on return.
+    # A genuine PointCloudTensor / DistanceMatrixTensor keeps its batch shape,
+    # even when that shape happens to be (1,).
+    was_scalar_input = False
+
     # --- Distance matrix input path ---
     if isinstance(X, (DistanceMatrix, DistanceMatrixTensor)):
         if isinstance(X, DistanceMatrix):
             # Wrap single DistanceMatrix into a 1-element tensor
+            was_scalar_input = True
             if isinstance(X._data, cpp.DistanceMatrix_f32):
                 dmX = zeros((1,), dtype=distmat32)
             else:
@@ -106,7 +113,7 @@ def compute_persistent_homology(
         task = _compute_barcodes_distmat_ripser(X, out, max_dim, reduced)
         _run_task(lambda: task, verbose=verbose)
 
-        if len(out.shape) == 2 and out.shape[0] == 1:
+        if was_scalar_input:
             out = out[0, :]
 
         return out
@@ -117,6 +124,7 @@ def compute_persistent_homology(
 
     out = None
     if isinstance(X, FloatTensor):
+        was_scalar_input = True
         pcloud_dtype = _FLOAT_TO_PCLOUD_DTYPE[X.dtype]
         pcX = zeros((1,), dtype=pcloud_dtype)
         pcX[0] = X
@@ -140,7 +148,7 @@ def compute_persistent_homology(
 
     _run_task(lambda: task, verbose=verbose)
 
-    if len(out.shape) == 2 and out.shape[0] == 1:
+    if was_scalar_input:
         out = out[0, :]
 
     return out
