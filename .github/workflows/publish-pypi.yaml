@@ -65,6 +65,7 @@ jobs:
     permissions:
       contents: write
     uses: ./.github/workflows/analysis.yaml
+    secrets: inherit
     needs: check_version
 
   publish:

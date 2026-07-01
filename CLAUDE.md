@@ -33,7 +33,7 @@ This works when `SKBUILD` is off (plain CMake). Builds `_sb_cpu` (always) and `_
 
 ## Testing
 
-**Important**: Always `cd test` before running pytest. Running from the repo root causes the local `stablebear/` directory to shadow the installed package. You must also build and install first.
+**Important**: Tests require `pytest` and `scipy` (`pip install pytest scipy`). Always `cd test` before running pytest. Running from the repo root causes the local `stablebear/` directory to shadow the installed package. You must also build and install first.
 
 ### Python tests
 ```bash
@@ -60,31 +60,34 @@ cd test && ../cmake-build-debug/sb_test  # run from test/ directory
 - **`stablebear/_sb_cpp.py`** is the runtime backend selector. It detects GPU availability, preloads libcudart if needed, and imports `_sb_cuda{12,13}` or falls back to `_sb_cpu`. All other Python code imports through this module.
 - **`src/python/`** contains pybind11 bindings. Each `py_*.cpp` wraps a corresponding C++ subsystem.
 - **`src/gpu_detect/`** is a separate pybind11 module (`_gpu_detect`) with no CUDA dependency — used to detect GPUs without requiring the CUDA toolkit.
-- NumPy array ↔ C++ tensor conversion happens in `py_np_tensor_convert.{h,cpp}` (zero-copy where possible).
+- NumPy array ↔ C++ tensor conversion happens in `py_np_tensor_convert.{hpp,cpp}` (zero-copy where possible).
 
 ### C++ core (`include/sbear/`)
-- **`pcf.h`** — `Pcf<TimeT, ValueT>` template, the fundamental piecewise constant function type
-- **`tensor.h` / `tensor.tpp`** — N-dimensional tensor template (stores PCFs, floats, point clouds, or barcodes)
-- **`algorithms/`** — core algorithms: `matrix_integrate.h` (distance matrices), `reduce.h`, `iterate_rectangles.h`, `subdivide.h`, `apply_functional.h`
+- **`functional/pcf.hpp`** — `Pcf<TimeT, ValueT>` template, the fundamental piecewise constant function type
+- **`tensor.hpp` / `tensor.tpp`** — N-dimensional tensor template (stores PCFs, floats, point clouds, or barcodes)
+- **`algorithms/`** — core algorithms: `subdivide.hpp`, `tensor_eval.hpp`, and under `algorithms/functional/`: `matrix_integrate.hpp` (distance matrices), `reduce.hpp`, `iterate_rectangles.hpp`, `apply_functional.hpp`, `matrix_reduce.hpp`, `lp_distance.hpp`
 - **`persistence/`** — TDA: ripser algorithm, barcodes, stable rank
 - **`cuda/`** — CUDA kernels for matrix operations
-- **`executor.h`** — taskflow-based parallel task dispatch (CPU)
+- **`executor.hpp`** — taskflow-based parallel task dispatch (CPU)
 
 ### Type system
 Each tensor class supports multiple precisions via a `dtype` parameter: `PcfTensor` (dtype=pcf32/pcf64), `IntPcfTensor` (dtype=pcf32i/pcf64i), `FloatTensor` (dtype=float32/float64), `PointCloudTensor` (dtype=pcloud32/pcloud64), `BarcodeTensor` (dtype=barcode32/barcode64), `DistanceMatrixTensor` (dtype=distmat32/distmat64), `SymmetricMatrixTensor` (dtype=symmat32/symmat64). Dtype sentinels live in `stablebear/typing.py`. The C++ layer still has separate types per precision (e.g. `cpp.Float32Tensor`, `cpp.Float64Tensor`); the Python classes dispatch internally.
 
 ### Python module layers
 1. **Low**: `_sb_cpp` (backend dispatch) → `_sb_cpu` / `_sb_cudaXX` (pybind11)
-2. **Mid**: `pcf.py`, `tensor.py`, `_tensor_base.py` (Python wrappers)
+2. **Mid**: `functional/pcf.py`, `base_tensor.py`, `_tensor_base.py` (Python wrappers)
 3. **High**: `distance.py` (`pdist`), `reductions.py` (`mean`, `max_time`), `norms.py`, `persistence/`
 
 ### GPU/CPU runtime control (`stablebear/system.py`)
 `force_cpu()`, `limit_cpus()`, `limit_gpus()`, `set_cuda_threshold()`, `set_device_verbose()` — all configure the backend at runtime.
 
-## Third-party submodules (`3rd/`)
+## Third-party code (`3rd/`)
+Git submodules (run `git submodule update --init` after a non-recursive clone, or the build fails at `add_subdirectory(3rd/pybind11)`):
 - **pybind11** — Python/C++ bindings
 - **taskflow** — CPU task parallelism (header-only, included directly)
 - **googletest** — C++ unit tests
+
+Vendored directly (not submodules): **ripser** (persistent homology), **xoroshiro** / **splitmix64** (RNG), **cuda**, **gcc-runtime**, **msvc-runtime** (runtime support headers).
 
 ## Documentation (`docs/`)
 - Sphinx docs live in `docs/`, built with `make html` from that directory.

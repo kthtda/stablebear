@@ -207,7 +207,7 @@ Tensors of symmetric matrices use the ``symmat32`` or ``symmat64`` dtypes::
 Norms
 =====
 
-:py:func:`~stablebear.lp_norm` computes the :math:`L_p` norm of every PCF in a tensor, returning a NumPy array of the same shape.
+:py:func:`~stablebear.lp_norm` computes the :math:`L_p` norm of every PCF in a tensor, returning a :py:class:`~stablebear.FloatTensor` of the same shape.
 
 ::
 

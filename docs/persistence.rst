@@ -14,7 +14,7 @@ The output is a **persistence barcode**: a collection of intervals :math:`[b_i, 
 
 stablebear provides three functional summaries of persistence barcodes, all of which are piecewise constant functions:
 
-- The (1d) **stable rank** counts, for each threshold :math:`t`, how many bars have length at least :math:`t` :footcite:`Chacholski2020,Gafvert2017,Scolamiero2017`.
+- The (1d) **stable rank** counts, for each threshold :math:`t`, how many bars have length strictly greater than :math:`t` :footcite:`Chacholski2020,Gafvert2017,Scolamiero2017`.
 - The **Betti curve** counts, for each filtration value :math:`t`, how many bars are alive at :math:`t` (see, e.g., :footcite:`Umeda2017,Chazal2021`).
 - The **accumulated persistence function** (APF) sums, for each mean age :math:`m`, the lifetimes of all bars whose midpoint is at most :math:`m` :footcite:`Biscio2019`.
 

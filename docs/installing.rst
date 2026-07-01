@@ -36,7 +36,7 @@ To build a specific branch or tag from a Git checkout::
     cd stablebear
 
     # optional: select a specific tagged version to build
-    git checkout tags/v0.4.1
+    git checkout tags/v0.4.4
 
     pip install .
 

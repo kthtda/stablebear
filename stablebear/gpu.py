@@ -5,7 +5,7 @@ falling back to a pure-Python implementation using subprocess.
 """
 
 try:
-    from _gpu_detect import detect_nvidia_gpus, has_nvidia_gpu, nvidia_gpu_count
+    from ._gpu_detect import detect_nvidia_gpus, has_nvidia_gpu, nvidia_gpu_count
 except ImportError:
     import os
     import platform
@@ -42,6 +42,10 @@ except ImportError:
         drm_path = "/sys/class/drm"
         if os.path.isdir(drm_path):
             for entry in os.listdir(drm_path):
+                # Each GPU exposes several drm nodes (cardN, renderDN,
+                # connectors); count only primary card nodes.
+                if not re.fullmatch(r"card\d+", entry):
+                    continue
                 vendor_file = os.path.join(drm_path, entry, "device", "vendor")
                 if os.path.isfile(vendor_file):
                     try:

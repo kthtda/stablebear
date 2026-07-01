@@ -12,6 +12,8 @@ name: CI
 #   - analysis.yaml   with use_github_runners: true  (skips the cuda_test job)
 
 on:
+  push:
+    branches: [main]
   pull_request:
   workflow_dispatch:
 
@@ -65,5 +67,6 @@ jobs:
     permissions:
       contents: write
     uses: ./.github/workflows/analysis.yaml
+    secrets: inherit
     with:
       use_github_runners: true

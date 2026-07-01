@@ -7,5 +7,6 @@ permissions:
 jobs:
   analysis:
     uses: ./.github/workflows/analysis.yaml
+    secrets: inherit
     with:
       use_github_runners: true
