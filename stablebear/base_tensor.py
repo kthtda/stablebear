@@ -93,6 +93,17 @@ class NumericTensor(Tensor, ArithmeticTensorMixin):
             return np.array_equal(np.asarray(self), other)
         return super().array_equal(other)
 
+    def allclose(self, other, rtol=1e-05, atol=1e-08, equal_nan=False) -> bool:
+        """Returns True if two arrays are element-wise equal within a tolerance (following numpy's allclose with broadcasting)."""
+        import numpy as np
+        a = np.asarray(self)
+        b = np.asarray(other) if isinstance(other, Tensor) else other
+        try:
+            return np.allclose(a, b, rtol=rtol, atol=atol, equal_nan=equal_nan)
+        except ValueError:
+            # numpy raises on incompatible shapes, propagate
+            raise
+
     def __floordiv__(self, rhs):
         rhs_arr = np.asarray(rhs) if isinstance(rhs, NumericTensor) else rhs
         return self._to_py_tensor(np.asarray(self) // rhs_arr)
