@@ -1,0 +1,1190 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>/usr/include/c++/13/mutex</title>
+    <link href='valgrind.css' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+    <script src="https://code.jquery.com/jquery-3.4.1.js"></script>
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.0.0/styles/default.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.0.0/highlight.min.js"></script>
+    <script src="valgrind.js"></script>
+</head>
+
+<body>
+    <div class="global">
+        <div class="header">
+            <h1>/usr/include/c++/13/mutex</h1>
+            <p><b>1</b> errors</p>
+            <button class="next_error">Goto First Error</button>
+        </div>
+        <div class="listing">
+            <pre class="code">
+<code class="c++"><span class="line_number">1</span>// &lt;mutex&gt; -*- C++ -*-
+<span class="line_number">2</span>
+<span class="line_number">3</span>// Copyright (C) 2003-2023 Free Software Foundation, Inc.
+<span class="line_number">4</span>//
+<span class="line_number">5</span>// This file is part of the GNU ISO C++ Library.  This library is free
+<span class="line_number">6</span>// software; you can redistribute it and/or modify it under the
+<span class="line_number">7</span>// terms of the GNU General Public License as published by the
+<span class="line_number">8</span>// Free Software Foundation; either version 3, or (at your option)
+<span class="line_number">9</span>// any later version.
+<span class="line_number">10</span>
+<span class="line_number">11</span>// This library is distributed in the hope that it will be useful,
+<span class="line_number">12</span>// but WITHOUT ANY WARRANTY; without even the implied warranty of
+<span class="line_number">13</span>// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+<span class="line_number">14</span>// GNU General Public License for more details.
+<span class="line_number">15</span>
+<span class="line_number">16</span>// Under Section 7 of GPL version 3, you are granted additional
+<span class="line_number">17</span>// permissions described in the GCC Runtime Library Exception, version
+<span class="line_number">18</span>// 3.1, as published by the Free Software Foundation.
+<span class="line_number">19</span>
+<span class="line_number">20</span>// You should have received a copy of the GNU General Public License and
+<span class="line_number">21</span>// a copy of the GCC Runtime Library Exception along with this program;
+<span class="line_number">22</span>// see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
+<span class="line_number">23</span>// &lt;http://www.gnu.org/licenses/&gt;.
+<span class="line_number">24</span>
+<span class="line_number">25</span>/** @file include/mutex
+<span class="line_number">26</span> *  This is a Standard C++ Library header.
+<span class="line_number">27</span> */
+<span class="line_number">28</span>
+<span class="line_number">29</span>#ifndef _GLIBCXX_MUTEX
+<span class="line_number">30</span>#define _GLIBCXX_MUTEX 1
+<span class="line_number">31</span>
+<span class="line_number">32</span>#pragma GCC system_header
+<span class="line_number">33</span>
+<span class="line_number">34</span>#include &lt;bits/requires_hosted.h&gt; // concurrency
+<span class="line_number">35</span>
+<span class="line_number">36</span>#if __cplusplus &lt; 201103L
+<span class="line_number">37</span># include &lt;bits/c++0x_warning.h&gt;
+<span class="line_number">38</span>#else
+<span class="line_number">39</span>
+<span class="line_number">40</span>#include &lt;tuple&gt;
+<span class="line_number">41</span>#include &lt;exception&gt;
+<span class="line_number">42</span>#include &lt;type_traits&gt;
+<span class="line_number">43</span>#include &lt;bits/chrono.h&gt;
+<span class="line_number">44</span>#include &lt;bits/error_constants.h&gt;
+<span class="line_number">45</span>#include &lt;bits/std_mutex.h&gt;
+<span class="line_number">46</span>#include &lt;bits/unique_lock.h&gt;
+<span class="line_number">47</span>#if ! _GTHREAD_USE_MUTEX_TIMEDLOCK
+<span class="line_number">48</span># include &lt;condition_variable&gt;
+<span class="line_number">49</span># include &lt;thread&gt;
+<span class="line_number">50</span>#endif
+<span class="line_number">51</span>#include &lt;ext/atomicity.h&gt;     // __gnu_cxx::__is_single_threaded
+<span class="line_number">52</span>
+<span class="line_number">53</span>#if defined _GLIBCXX_HAS_GTHREADS &amp;&amp; ! defined _GLIBCXX_HAVE_TLS
+<span class="line_number">54</span># include &lt;bits/std_function.h&gt;  // std::function
+<span class="line_number">55</span>#endif
+<span class="line_number">56</span>
+<span class="line_number">57</span>namespace std _GLIBCXX_VISIBILITY(default)
+<span class="line_number">58</span>{
+<span class="line_number">59</span>_GLIBCXX_BEGIN_NAMESPACE_VERSION
+<span class="line_number">60</span>
+<span class="line_number">61</span>  /**
+<span class="line_number">62</span>   * @addtogroup mutexes
+<span class="line_number">63</span>   * @{
+<span class="line_number">64</span>   */
+<span class="line_number">65</span>
+<span class="line_number">66</span>#ifdef _GLIBCXX_HAS_GTHREADS
+<span class="line_number">67</span>  /// @cond undocumented
+<span class="line_number">68</span>
+<span class="line_number">69</span>  // Common base class for std::recursive_mutex and std::recursive_timed_mutex
+<span class="line_number">70</span>  class __recursive_mutex_base
+<span class="line_number">71</span>  {
+<span class="line_number">72</span>  protected:
+<span class="line_number">73</span>    typedef __gthread_recursive_mutex_t		__native_type;
+<span class="line_number">74</span>
+<span class="line_number">75</span>    __recursive_mutex_base(const __recursive_mutex_base&amp;) = delete;
+<span class="line_number">76</span>    __recursive_mutex_base&amp; operator=(const __recursive_mutex_base&amp;) = delete;
+<span class="line_number">77</span>
+<span class="line_number">78</span>#ifdef __GTHREAD_RECURSIVE_MUTEX_INIT
+<span class="line_number">79</span>    __native_type  _M_mutex = __GTHREAD_RECURSIVE_MUTEX_INIT;
+<span class="line_number">80</span>
+<span class="line_number">81</span>    __recursive_mutex_base() = default;
+<span class="line_number">82</span>#else
+<span class="line_number">83</span>    __native_type  _M_mutex;
+<span class="line_number">84</span>
+<span class="line_number">85</span>    __recursive_mutex_base()
+<span class="line_number">86</span>    {
+<span class="line_number">87</span>      // XXX EAGAIN, ENOMEM, EPERM, EBUSY(may), EINVAL(may)
+<span class="line_number">88</span>      __GTHREAD_RECURSIVE_MUTEX_INIT_FUNCTION(&amp;_M_mutex);
+<span class="line_number">89</span>    }
+<span class="line_number">90</span>
+<span class="line_number">91</span>    ~__recursive_mutex_base()
+<span class="line_number">92</span>    { __gthread_recursive_mutex_destroy(&amp;_M_mutex); }
+<span class="line_number">93</span>#endif
+<span class="line_number">94</span>  };
+<span class="line_number">95</span>  /// @endcond
+<span class="line_number">96</span>
+<span class="line_number">97</span>  /** The standard recursive mutex type.
+<span class="line_number">98</span>   *
+<span class="line_number">99</span>   * A recursive mutex can be locked more than once by the same thread.
+<span class="line_number">100</span>   * Other threads cannot lock the mutex until the owning thread unlocks it
+<span class="line_number">101</span>   * as many times as it was locked.
+<span class="line_number">102</span>   *
+<span class="line_number">103</span>   * @headerfile mutex
+<span class="line_number">104</span>   * @since C++11
+<span class="line_number">105</span>   */
+<span class="line_number">106</span>  class recursive_mutex : private __recursive_mutex_base
+<span class="line_number">107</span>  {
+<span class="line_number">108</span>  public:
+<span class="line_number">109</span>    typedef __native_type* 			native_handle_type;
+<span class="line_number">110</span>
+<span class="line_number">111</span>    recursive_mutex() = default;
+<span class="line_number">112</span>    ~recursive_mutex() = default;
+<span class="line_number">113</span>
+<span class="line_number">114</span>    recursive_mutex(const recursive_mutex&amp;) = delete;
+<span class="line_number">115</span>    recursive_mutex&amp; operator=(const recursive_mutex&amp;) = delete;
+<span class="line_number">116</span>
+<span class="line_number">117</span>    void
+<span class="line_number">118</span>    lock()
+<span class="line_number">119</span>    {
+<span class="line_number">120</span>      int __e = __gthread_recursive_mutex_lock(&amp;_M_mutex);
+<span class="line_number">121</span>
+<span class="line_number">122</span>      // EINVAL, EAGAIN, EBUSY, EINVAL, EDEADLK(may)
+<span class="line_number">123</span>      if (__e)
+<span class="line_number">124</span>	__throw_system_error(__e);
+<span class="line_number">125</span>    }
+<span class="line_number">126</span>
+<span class="line_number">127</span>    _GLIBCXX_NODISCARD
+<span class="line_number">128</span>    bool
+<span class="line_number">129</span>    try_lock() noexcept
+<span class="line_number">130</span>    {
+<span class="line_number">131</span>      // XXX EINVAL, EAGAIN, EBUSY
+<span class="line_number">132</span>      return !__gthread_recursive_mutex_trylock(&amp;_M_mutex);
+<span class="line_number">133</span>    }
+<span class="line_number">134</span>
+<span class="line_number">135</span>    void
+<span class="line_number">136</span>    unlock()
+<span class="line_number">137</span>    {
+<span class="line_number">138</span>      // XXX EINVAL, EAGAIN, EBUSY
+<span class="line_number">139</span>      __gthread_recursive_mutex_unlock(&amp;_M_mutex);
+<span class="line_number">140</span>    }
+<span class="line_number">141</span>
+<span class="line_number">142</span>    native_handle_type
+<span class="line_number">143</span>    native_handle() noexcept
+<span class="line_number">144</span>    { return &amp;_M_mutex; }
+<span class="line_number">145</span>  };
+<span class="line_number">146</span>
+<span class="line_number">147</span>#if _GTHREAD_USE_MUTEX_TIMEDLOCK
+<span class="line_number">148</span>  /// @cond undocumented
+<span class="line_number">149</span>
+<span class="line_number">150</span>  template&lt;typename _Derived&gt;
+<span class="line_number">151</span>    class __timed_mutex_impl
+<span class="line_number">152</span>    {
+<span class="line_number">153</span>    protected:
+<span class="line_number">154</span>      template&lt;typename _Rep, typename _Period&gt;
+<span class="line_number">155</span>	bool
+<span class="line_number">156</span>	_M_try_lock_for(const chrono::duration&lt;_Rep, _Period&gt;&amp; __rtime)
+<span class="line_number">157</span>	{
+<span class="line_number">158</span>#if _GLIBCXX_USE_PTHREAD_MUTEX_CLOCKLOCK
+<span class="line_number">159</span>	  using __clock = chrono::steady_clock;
+<span class="line_number">160</span>#else
+<span class="line_number">161</span>	  using __clock = chrono::system_clock;
+<span class="line_number">162</span>#endif
+<span class="line_number">163</span>
+<span class="line_number">164</span>	  auto __rt = chrono::duration_cast&lt;__clock::duration&gt;(__rtime);
+<span class="line_number">165</span>	  if (ratio_greater&lt;__clock::period, _Period&gt;())
+<span class="line_number">166</span>	    ++__rt;
+<span class="line_number">167</span>	  return _M_try_lock_until(__clock::now() + __rt);
+<span class="line_number">168</span>	}
+<span class="line_number">169</span>
+<span class="line_number">170</span>      template&lt;typename _Duration&gt;
+<span class="line_number">171</span>	bool
+<span class="line_number">172</span>	_M_try_lock_until(const chrono::time_point&lt;chrono::system_clock,
+<span class="line_number">173</span>						   _Duration&gt;&amp; __atime)
+<span class="line_number">174</span>	{
+<span class="line_number">175</span>	  auto __s = chrono::time_point_cast&lt;chrono::seconds&gt;(__atime);
+<span class="line_number">176</span>	  auto __ns = chrono::duration_cast&lt;chrono::nanoseconds&gt;(__atime - __s);
+<span class="line_number">177</span>
+<span class="line_number">178</span>	  __gthread_time_t __ts = {
+<span class="line_number">179</span>	    static_cast&lt;std::time_t&gt;(__s.time_since_epoch().count()),
+<span class="line_number">180</span>	    static_cast&lt;long&gt;(__ns.count())
+<span class="line_number">181</span>	  };
+<span class="line_number">182</span>
+<span class="line_number">183</span>	  return static_cast&lt;_Derived*&gt;(this)-&gt;_M_timedlock(__ts);
+<span class="line_number">184</span>	}
+<span class="line_number">185</span>
+<span class="line_number">186</span>#ifdef _GLIBCXX_USE_PTHREAD_MUTEX_CLOCKLOCK
+<span class="line_number">187</span>      template&lt;typename _Duration&gt;
+<span class="line_number">188</span>	bool
+<span class="line_number">189</span>	_M_try_lock_until(const chrono::time_point&lt;chrono::steady_clock,
+<span class="line_number">190</span>						   _Duration&gt;&amp; __atime)
+<span class="line_number">191</span>	{
+<span class="line_number">192</span>	  auto __s = chrono::time_point_cast&lt;chrono::seconds&gt;(__atime);
+<span class="line_number">193</span>	  auto __ns = chrono::duration_cast&lt;chrono::nanoseconds&gt;(__atime - __s);
+<span class="line_number">194</span>
+<span class="line_number">195</span>	  __gthread_time_t __ts = {
+<span class="line_number">196</span>	    static_cast&lt;std::time_t&gt;(__s.time_since_epoch().count()),
+<span class="line_number">197</span>	    static_cast&lt;long&gt;(__ns.count())
+<span class="line_number">198</span>	  };
+<span class="line_number">199</span>
+<span class="line_number">200</span>	  return static_cast&lt;_Derived*&gt;(this)-&gt;_M_clocklock(CLOCK_MONOTONIC,
+<span class="line_number">201</span>							    __ts);
+<span class="line_number">202</span>	}
+<span class="line_number">203</span>#endif
+<span class="line_number">204</span>
+<span class="line_number">205</span>      template&lt;typename _Clock, typename _Duration&gt;
+<span class="line_number">206</span>	bool
+<span class="line_number">207</span>	_M_try_lock_until(const chrono::time_point&lt;_Clock, _Duration&gt;&amp; __atime)
+<span class="line_number">208</span>	{
+<span class="line_number">209</span>#if __cplusplus &gt; 201703L
+<span class="line_number">210</span>	  static_assert(chrono::is_clock_v&lt;_Clock&gt;);
+<span class="line_number">211</span>#endif
+<span class="line_number">212</span>	  // The user-supplied clock may not tick at the same rate as
+<span class="line_number">213</span>	  // steady_clock, so we must loop in order to guarantee that
+<span class="line_number">214</span>	  // the timeout has expired before returning false.
+<span class="line_number">215</span>	  auto __now = _Clock::now();
+<span class="line_number">216</span>	  do {
+<span class="line_number">217</span>	    auto __rtime = __atime - __now;
+<span class="line_number">218</span>	    if (_M_try_lock_for(__rtime))
+<span class="line_number">219</span>	      return true;
+<span class="line_number">220</span>	    __now = _Clock::now();
+<span class="line_number">221</span>	  } while (__atime &gt; __now);
+<span class="line_number">222</span>	  return false;
+<span class="line_number">223</span>	}
+<span class="line_number">224</span>    };
+<span class="line_number">225</span>  /// @endcond
+<span class="line_number">226</span>
+<span class="line_number">227</span>  /** The standard timed mutex type.
+<span class="line_number">228</span>   *
+<span class="line_number">229</span>   * A non-recursive mutex that supports a timeout when trying to acquire the
+<span class="line_number">230</span>   * lock.
+<span class="line_number">231</span>   *
+<span class="line_number">232</span>   * @headerfile mutex
+<span class="line_number">233</span>   * @since C++11
+<span class="line_number">234</span>   */
+<span class="line_number">235</span>  class timed_mutex
+<span class="line_number">236</span>  : private __mutex_base, public __timed_mutex_impl&lt;timed_mutex&gt;
+<span class="line_number">237</span>  {
+<span class="line_number">238</span>  public:
+<span class="line_number">239</span>    typedef __native_type* 		  	native_handle_type;
+<span class="line_number">240</span>
+<span class="line_number">241</span>    timed_mutex() = default;
+<span class="line_number">242</span>    ~timed_mutex() = default;
+<span class="line_number">243</span>
+<span class="line_number">244</span>    timed_mutex(const timed_mutex&amp;) = delete;
+<span class="line_number">245</span>    timed_mutex&amp; operator=(const timed_mutex&amp;) = delete;
+<span class="line_number">246</span>
+<span class="line_number">247</span>    void
+<span class="line_number">248</span>    lock()
+<span class="line_number">249</span>    {
+<span class="line_number">250</span>      int __e = __gthread_mutex_lock(&amp;_M_mutex);
+<span class="line_number">251</span>
+<span class="line_number">252</span>      // EINVAL, EAGAIN, EBUSY, EINVAL, EDEADLK(may)
+<span class="line_number">253</span>      if (__e)
+<span class="line_number">254</span>	__throw_system_error(__e);
+<span class="line_number">255</span>    }
+<span class="line_number">256</span>
+<span class="line_number">257</span>    _GLIBCXX_NODISCARD
+<span class="line_number">258</span>    bool
+<span class="line_number">259</span>    try_lock() noexcept
+<span class="line_number">260</span>    {
+<span class="line_number">261</span>      // XXX EINVAL, EAGAIN, EBUSY
+<span class="line_number">262</span>      return !__gthread_mutex_trylock(&amp;_M_mutex);
+<span class="line_number">263</span>    }
+<span class="line_number">264</span>
+<span class="line_number">265</span>    template &lt;class _Rep, class _Period&gt;
+<span class="line_number">266</span>      _GLIBCXX_NODISCARD
+<span class="line_number">267</span>      bool
+<span class="line_number">268</span>      try_lock_for(const chrono::duration&lt;_Rep, _Period&gt;&amp; __rtime)
+<span class="line_number">269</span>      { return _M_try_lock_for(__rtime); }
+<span class="line_number">270</span>
+<span class="line_number">271</span>    template &lt;class _Clock, class _Duration&gt;
+<span class="line_number">272</span>      _GLIBCXX_NODISCARD
+<span class="line_number">273</span>      bool
+<span class="line_number">274</span>      try_lock_until(const chrono::time_point&lt;_Clock, _Duration&gt;&amp; __atime)
+<span class="line_number">275</span>      { return _M_try_lock_until(__atime); }
+<span class="line_number">276</span>
+<span class="line_number">277</span>    void
+<span class="line_number">278</span>    unlock()
+<span class="line_number">279</span>    {
+<span class="line_number">280</span>      // XXX EINVAL, EAGAIN, EBUSY
+<span class="line_number">281</span>      __gthread_mutex_unlock(&amp;_M_mutex);
+<span class="line_number">282</span>    }
+<span class="line_number">283</span>
+<span class="line_number">284</span>    native_handle_type
+<span class="line_number">285</span>    native_handle() noexcept
+<span class="line_number">286</span>    { return &amp;_M_mutex; }
+<span class="line_number">287</span>
+<span class="line_number">288</span>    private:
+<span class="line_number">289</span>      friend class __timed_mutex_impl&lt;timed_mutex&gt;;
+<span class="line_number">290</span>
+<span class="line_number">291</span>      bool
+<span class="line_number">292</span>      _M_timedlock(const __gthread_time_t&amp; __ts)
+<span class="line_number">293</span>      { return !__gthread_mutex_timedlock(&amp;_M_mutex, &amp;__ts); }
+<span class="line_number">294</span>
+<span class="line_number">295</span>#if _GLIBCXX_USE_PTHREAD_MUTEX_CLOCKLOCK
+<span class="line_number">296</span>      bool
+<span class="line_number">297</span>      _M_clocklock(clockid_t __clockid, const __gthread_time_t&amp; __ts)
+<span class="line_number">298</span>      { return !pthread_mutex_clocklock(&amp;_M_mutex, __clockid, &amp;__ts); }
+<span class="line_number">299</span>#endif
+<span class="line_number">300</span>  };
+<span class="line_number">301</span>
+<span class="line_number">302</span>  /** The standard recursive timed mutex type.
+<span class="line_number">303</span>   *
+<span class="line_number">304</span>   * A recursive mutex that supports a timeout when trying to acquire the
+<span class="line_number">305</span>   * lock. A recursive mutex can be locked more than once by the same thread.
+<span class="line_number">306</span>   * Other threads cannot lock the mutex until the owning thread unlocks it
+<span class="line_number">307</span>   * as many times as it was locked.
+<span class="line_number">308</span>   *
+<span class="line_number">309</span>   * @headerfile mutex
+<span class="line_number">310</span>   * @since C++11
+<span class="line_number">311</span>   */
+<span class="line_number">312</span>  class recursive_timed_mutex
+<span class="line_number">313</span>  : private __recursive_mutex_base,
+<span class="line_number">314</span>    public __timed_mutex_impl&lt;recursive_timed_mutex&gt;
+<span class="line_number">315</span>  {
+<span class="line_number">316</span>  public:
+<span class="line_number">317</span>    typedef __native_type* 			native_handle_type;
+<span class="line_number">318</span>
+<span class="line_number">319</span>    recursive_timed_mutex() = default;
+<span class="line_number">320</span>    ~recursive_timed_mutex() = default;
+<span class="line_number">321</span>
+<span class="line_number">322</span>    recursive_timed_mutex(const recursive_timed_mutex&amp;) = delete;
+<span class="line_number">323</span>    recursive_timed_mutex&amp; operator=(const recursive_timed_mutex&amp;) = delete;
+<span class="line_number">324</span>
+<span class="line_number">325</span>    void
+<span class="line_number">326</span>    lock()
+<span class="line_number">327</span>    {
+<span class="line_number">328</span>      int __e = __gthread_recursive_mutex_lock(&amp;_M_mutex);
+<span class="line_number">329</span>
+<span class="line_number">330</span>      // EINVAL, EAGAIN, EBUSY, EINVAL, EDEADLK(may)
+<span class="line_number">331</span>      if (__e)
+<span class="line_number">332</span>	__throw_system_error(__e);
+<span class="line_number">333</span>    }
+<span class="line_number">334</span>
+<span class="line_number">335</span>    _GLIBCXX_NODISCARD
+<span class="line_number">336</span>    bool
+<span class="line_number">337</span>    try_lock() noexcept
+<span class="line_number">338</span>    {
+<span class="line_number">339</span>      // XXX EINVAL, EAGAIN, EBUSY
+<span class="line_number">340</span>      return !__gthread_recursive_mutex_trylock(&amp;_M_mutex);
+<span class="line_number">341</span>    }
+<span class="line_number">342</span>
+<span class="line_number">343</span>    template &lt;class _Rep, class _Period&gt;
+<span class="line_number">344</span>      _GLIBCXX_NODISCARD
+<span class="line_number">345</span>      bool
+<span class="line_number">346</span>      try_lock_for(const chrono::duration&lt;_Rep, _Period&gt;&amp; __rtime)
+<span class="line_number">347</span>      { return _M_try_lock_for(__rtime); }
+<span class="line_number">348</span>
+<span class="line_number">349</span>    template &lt;class _Clock, class _Duration&gt;
+<span class="line_number">350</span>      _GLIBCXX_NODISCARD
+<span class="line_number">351</span>      bool
+<span class="line_number">352</span>      try_lock_until(const chrono::time_point&lt;_Clock, _Duration&gt;&amp; __atime)
+<span class="line_number">353</span>      { return _M_try_lock_until(__atime); }
+<span class="line_number">354</span>
+<span class="line_number">355</span>    void
+<span class="line_number">356</span>    unlock()
+<span class="line_number">357</span>    {
+<span class="line_number">358</span>      // XXX EINVAL, EAGAIN, EBUSY
+<span class="line_number">359</span>      __gthread_recursive_mutex_unlock(&amp;_M_mutex);
+<span class="line_number">360</span>    }
+<span class="line_number">361</span>
+<span class="line_number">362</span>    native_handle_type
+<span class="line_number">363</span>    native_handle() noexcept
+<span class="line_number">364</span>    { return &amp;_M_mutex; }
+<span class="line_number">365</span>
+<span class="line_number">366</span>    private:
+<span class="line_number">367</span>      friend class __timed_mutex_impl&lt;recursive_timed_mutex&gt;;
+<span class="line_number">368</span>
+<span class="line_number">369</span>      bool
+<span class="line_number">370</span>      _M_timedlock(const __gthread_time_t&amp; __ts)
+<span class="line_number">371</span>      { return !__gthread_recursive_mutex_timedlock(&amp;_M_mutex, &amp;__ts); }
+<span class="line_number">372</span>
+<span class="line_number">373</span>#ifdef _GLIBCXX_USE_PTHREAD_MUTEX_CLOCKLOCK
+<span class="line_number">374</span>      bool
+<span class="line_number">375</span>      _M_clocklock(clockid_t __clockid, const __gthread_time_t&amp; __ts)
+<span class="line_number">376</span>      { return !pthread_mutex_clocklock(&amp;_M_mutex, __clockid, &amp;__ts); }
+<span class="line_number">377</span>#endif
+<span class="line_number">378</span>  };
+<span class="line_number">379</span>
+<span class="line_number">380</span>#else // !_GTHREAD_USE_MUTEX_TIMEDLOCK
+<span class="line_number">381</span>
+<span class="line_number">382</span>  /// timed_mutex
+<span class="line_number">383</span>  class timed_mutex
+<span class="line_number">384</span>  {
+<span class="line_number">385</span>    mutex		_M_mut;
+<span class="line_number">386</span>    condition_variable	_M_cv;
+<span class="line_number">387</span>    bool		_M_locked = false;
+<span class="line_number">388</span>
+<span class="line_number">389</span>  public:
+<span class="line_number">390</span>
+<span class="line_number">391</span>    timed_mutex() = default;
+<span class="line_number">392</span>    ~timed_mutex() { __glibcxx_assert( !_M_locked ); }
+<span class="line_number">393</span>
+<span class="line_number">394</span>    timed_mutex(const timed_mutex&amp;) = delete;
+<span class="line_number">395</span>    timed_mutex&amp; operator=(const timed_mutex&amp;) = delete;
+<span class="line_number">396</span>
+<span class="line_number">397</span>    void
+<span class="line_number">398</span>    lock()
+<span class="line_number">399</span>    {
+<span class="line_number">400</span>      unique_lock&lt;mutex&gt; __lk(_M_mut);
+<span class="line_number">401</span>      _M_cv.wait(__lk, [&amp;]{ return !_M_locked; });
+<span class="line_number">402</span>      _M_locked = true;
+<span class="line_number">403</span>    }
+<span class="line_number">404</span>
+<span class="line_number">405</span>    _GLIBCXX_NODISCARD
+<span class="line_number">406</span>    bool
+<span class="line_number">407</span>    try_lock()
+<span class="line_number">408</span>    {
+<span class="line_number">409</span>      lock_guard&lt;mutex&gt; __lk(_M_mut);
+<span class="line_number">410</span>      if (_M_locked)
+<span class="line_number">411</span>	return false;
+<span class="line_number">412</span>      _M_locked = true;
+<span class="line_number">413</span>      return true;
+<span class="line_number">414</span>    }
+<span class="line_number">415</span>
+<span class="line_number">416</span>    template&lt;typename _Rep, typename _Period&gt;
+<span class="line_number">417</span>      _GLIBCXX_NODISCARD
+<span class="line_number">418</span>      bool
+<span class="line_number">419</span>      try_lock_for(const chrono::duration&lt;_Rep, _Period&gt;&amp; __rtime)
+<span class="line_number">420</span>      {
+<span class="line_number">421</span>	unique_lock&lt;mutex&gt; __lk(_M_mut);
+<span class="line_number">422</span>	if (!_M_cv.wait_for(__lk, __rtime, [&amp;]{ return !_M_locked; }))
+<span class="line_number">423</span>	  return false;
+<span class="line_number">424</span>	_M_locked = true;
+<span class="line_number">425</span>	return true;
+<span class="line_number">426</span>      }
+<span class="line_number">427</span>
+<span class="line_number">428</span>    template&lt;typename _Clock, typename _Duration&gt;
+<span class="line_number">429</span>      _GLIBCXX_NODISCARD
+<span class="line_number">430</span>      bool
+<span class="line_number">431</span>      try_lock_until(const chrono::time_point&lt;_Clock, _Duration&gt;&amp; __atime)
+<span class="line_number">432</span>      {
+<span class="line_number">433</span>	unique_lock&lt;mutex&gt; __lk(_M_mut);
+<span class="line_number">434</span>	if (!_M_cv.wait_until(__lk, __atime, [&amp;]{ return !_M_locked; }))
+<span class="line_number">435</span>	  return false;
+<span class="line_number">436</span>	_M_locked = true;
+<span class="line_number">437</span>	return true;
+<span class="line_number">438</span>      }
+<span class="line_number">439</span>
+<span class="line_number">440</span>    void
+<span class="line_number">441</span>    unlock()
+<span class="line_number">442</span>    {
+<span class="line_number">443</span>      lock_guard&lt;mutex&gt; __lk(_M_mut);
+<span class="line_number">444</span>      __glibcxx_assert( _M_locked );
+<span class="line_number">445</span>      _M_locked = false;
+<span class="line_number">446</span>      _M_cv.notify_one();
+<span class="line_number">447</span>    }
+<span class="line_number">448</span>  };
+<span class="line_number">449</span>
+<span class="line_number">450</span>  /// recursive_timed_mutex
+<span class="line_number">451</span>  class recursive_timed_mutex
+<span class="line_number">452</span>  {
+<span class="line_number">453</span>    mutex		_M_mut;
+<span class="line_number">454</span>    condition_variable	_M_cv;
+<span class="line_number">455</span>    thread::id		_M_owner;
+<span class="line_number">456</span>    unsigned		_M_count = 0;
+<span class="line_number">457</span>
+<span class="line_number">458</span>    // Predicate type that tests whether the current thread can lock a mutex.
+<span class="line_number">459</span>    struct _Can_lock
+<span class="line_number">460</span>    {
+<span class="line_number">461</span>      // Returns true if the mutex is unlocked or is locked by _M_caller.
+<span class="line_number">462</span>      bool
+<span class="line_number">463</span>      operator()() const noexcept
+<span class="line_number">464</span>      { return _M_mx-&gt;_M_count == 0 || _M_mx-&gt;_M_owner == _M_caller; }
+<span class="line_number">465</span>
+<span class="line_number">466</span>      const recursive_timed_mutex* _M_mx;
+<span class="line_number">467</span>      thread::id _M_caller;
+<span class="line_number">468</span>    };
+<span class="line_number">469</span>
+<span class="line_number">470</span>  public:
+<span class="line_number">471</span>
+<span class="line_number">472</span>    recursive_timed_mutex() = default;
+<span class="line_number">473</span>    ~recursive_timed_mutex() { __glibcxx_assert( _M_count == 0 ); }
+<span class="line_number">474</span>
+<span class="line_number">475</span>    recursive_timed_mutex(const recursive_timed_mutex&amp;) = delete;
+<span class="line_number">476</span>    recursive_timed_mutex&amp; operator=(const recursive_timed_mutex&amp;) = delete;
+<span class="line_number">477</span>
+<span class="line_number">478</span>    void
+<span class="line_number">479</span>    lock()
+<span class="line_number">480</span>    {
+<span class="line_number">481</span>      auto __id = this_thread::get_id();
+<span class="line_number">482</span>      _Can_lock __can_lock{this, __id};
+<span class="line_number">483</span>      unique_lock&lt;mutex&gt; __lk(_M_mut);
+<span class="line_number">484</span>      _M_cv.wait(__lk, __can_lock);
+<span class="line_number">485</span>      if (_M_count == -1u)
+<span class="line_number">486</span>	__throw_system_error(EAGAIN); // [thread.timedmutex.recursive]/3
+<span class="line_number">487</span>      _M_owner = __id;
+<span class="line_number">488</span>      ++_M_count;
+<span class="line_number">489</span>    }
+<span class="line_number">490</span>
+<span class="line_number">491</span>    _GLIBCXX_NODISCARD
+<span class="line_number">492</span>    bool
+<span class="line_number">493</span>    try_lock()
+<span class="line_number">494</span>    {
+<span class="line_number">495</span>      auto __id = this_thread::get_id();
+<span class="line_number">496</span>      _Can_lock __can_lock{this, __id};
+<span class="line_number">497</span>      lock_guard&lt;mutex&gt; __lk(_M_mut);
+<span class="line_number">498</span>      if (!__can_lock())
+<span class="line_number">499</span>	return false;
+<span class="line_number">500</span>      if (_M_count == -1u)
+<span class="line_number">501</span>	return false;
+<span class="line_number">502</span>      _M_owner = __id;
+<span class="line_number">503</span>      ++_M_count;
+<span class="line_number">504</span>      return true;
+<span class="line_number">505</span>    }
+<span class="line_number">506</span>
+<span class="line_number">507</span>    template&lt;typename _Rep, typename _Period&gt;
+<span class="line_number">508</span>      _GLIBCXX_NODISCARD
+<span class="line_number">509</span>      bool
+<span class="line_number">510</span>      try_lock_for(const chrono::duration&lt;_Rep, _Period&gt;&amp; __rtime)
+<span class="line_number">511</span>      {
+<span class="line_number">512</span>	auto __id = this_thread::get_id();
+<span class="line_number">513</span>	_Can_lock __can_lock{this, __id};
+<span class="line_number">514</span>	unique_lock&lt;mutex&gt; __lk(_M_mut);
+<span class="line_number">515</span>	if (!_M_cv.wait_for(__lk, __rtime, __can_lock))
+<span class="line_number">516</span>	  return false;
+<span class="line_number">517</span>	if (_M_count == -1u)
+<span class="line_number">518</span>	  return false;
+<span class="line_number">519</span>	_M_owner = __id;
+<span class="line_number">520</span>	++_M_count;
+<span class="line_number">521</span>	return true;
+<span class="line_number">522</span>      }
+<span class="line_number">523</span>
+<span class="line_number">524</span>    template&lt;typename _Clock, typename _Duration&gt;
+<span class="line_number">525</span>      _GLIBCXX_NODISCARD
+<span class="line_number">526</span>      bool
+<span class="line_number">527</span>      try_lock_until(const chrono::time_point&lt;_Clock, _Duration&gt;&amp; __atime)
+<span class="line_number">528</span>      {
+<span class="line_number">529</span>	auto __id = this_thread::get_id();
+<span class="line_number">530</span>	_Can_lock __can_lock{this, __id};
+<span class="line_number">531</span>	unique_lock&lt;mutex&gt; __lk(_M_mut);
+<span class="line_number">532</span>	if (!_M_cv.wait_until(__lk, __atime, __can_lock))
+<span class="line_number">533</span>	  return false;
+<span class="line_number">534</span>	if (_M_count == -1u)
+<span class="line_number">535</span>	  return false;
+<span class="line_number">536</span>	_M_owner = __id;
+<span class="line_number">537</span>	++_M_count;
+<span class="line_number">538</span>	return true;
+<span class="line_number">539</span>      }
+<span class="line_number">540</span>
+<span class="line_number">541</span>    void
+<span class="line_number">542</span>    unlock()
+<span class="line_number">543</span>    {
+<span class="line_number">544</span>      lock_guard&lt;mutex&gt; __lk(_M_mut);
+<span class="line_number">545</span>      __glibcxx_assert( _M_owner == this_thread::get_id() );
+<span class="line_number">546</span>      __glibcxx_assert( _M_count &gt; 0 );
+<span class="line_number">547</span>      if (--_M_count == 0)
+<span class="line_number">548</span>	{
+<span class="line_number">549</span>	  _M_owner = {};
+<span class="line_number">550</span>	  _M_cv.notify_one();
+<span class="line_number">551</span>	}
+<span class="line_number">552</span>    }
+<span class="line_number">553</span>  };
+<span class="line_number">554</span>
+<span class="line_number">555</span>#endif
+<span class="line_number">556</span>#endif // _GLIBCXX_HAS_GTHREADS
+<span class="line_number">557</span>
+<span class="line_number">558</span>  /// @cond undocumented
+<span class="line_number">559</span>  namespace __detail
+<span class="line_number">560</span>  {
+<span class="line_number">561</span>    // Lock the last lockable, after all previous ones are locked.
+<span class="line_number">562</span>    template&lt;typename _Lockable&gt;
+<span class="line_number">563</span>      inline int
+<span class="line_number">564</span>      __try_lock_impl(_Lockable&amp; __l)
+<span class="line_number">565</span>      {
+<span class="line_number">566</span>	if (unique_lock&lt;_Lockable&gt; __lock{__l, try_to_lock})
+<span class="line_number">567</span>	  {
+<span class="line_number">568</span>	    __lock.release();
+<span class="line_number">569</span>	    return -1;
+<span class="line_number">570</span>	  }
+<span class="line_number">571</span>	else
+<span class="line_number">572</span>	  return 0;
+<span class="line_number">573</span>      }
+<span class="line_number">574</span>
+<span class="line_number">575</span>    // Lock each lockable in turn.
+<span class="line_number">576</span>    // Use iteration if all lockables are the same type, recursion otherwise.
+<span class="line_number">577</span>    template&lt;typename _L0, typename... _Lockables&gt;
+<span class="line_number">578</span>      inline int
+<span class="line_number">579</span>      __try_lock_impl(_L0&amp; __l0, _Lockables&amp;... __lockables)
+<span class="line_number">580</span>      {
+<span class="line_number">581</span>#if __cplusplus &gt;= 201703L
+<span class="line_number">582</span>	if constexpr ((is_same_v&lt;_L0, _Lockables&gt; &amp;&amp; ...))
+<span class="line_number">583</span>	  {
+<span class="line_number">584</span>	    constexpr int _Np = 1 + sizeof...(_Lockables);
+<span class="line_number">585</span>	    unique_lock&lt;_L0&gt; __locks[_Np] = {
+<span class="line_number">586</span>		{__l0, defer_lock}, {__lockables, defer_lock}...
+<span class="line_number">587</span>	    };
+<span class="line_number">588</span>	    for (int __i = 0; __i &lt; _Np; ++__i)
+<span class="line_number">589</span>	      {
+<span class="line_number">590</span>		if (!__locks[__i].try_lock())
+<span class="line_number">591</span>		  {
+<span class="line_number">592</span>		    const int __failed = __i;
+<span class="line_number">593</span>		    while (__i--)
+<span class="line_number">594</span>		      __locks[__i].unlock();
+<span class="line_number">595</span>		    return __failed;
+<span class="line_number">596</span>		  }
+<span class="line_number">597</span>	      }
+<span class="line_number">598</span>	    for (auto&amp; __l : __locks)
+<span class="line_number">599</span>	      __l.release();
+<span class="line_number">600</span>	    return -1;
+<span class="line_number">601</span>	  }
+<span class="line_number">602</span>	else
+<span class="line_number">603</span>#endif
+<span class="line_number">604</span>	if (unique_lock&lt;_L0&gt; __lock{__l0, try_to_lock})
+<span class="line_number">605</span>	  {
+<span class="line_number">606</span>	    int __idx = __detail::__try_lock_impl(__lockables...);
+<span class="line_number">607</span>	    if (__idx == -1)
+<span class="line_number">608</span>	      {
+<span class="line_number">609</span>		__lock.release();
+<span class="line_number">610</span>		return -1;
+<span class="line_number">611</span>	      }
+<span class="line_number">612</span>	    return __idx + 1;
+<span class="line_number">613</span>	  }
+<span class="line_number">614</span>	else
+<span class="line_number">615</span>	  return 0;
+<span class="line_number">616</span>      }
+<span class="line_number">617</span>
+<span class="line_number">618</span>  } // namespace __detail
+<span class="line_number">619</span>  /// @endcond
+<span class="line_number">620</span>
+<span class="line_number">621</span>  /** @brief Generic try_lock.
+<span class="line_number">622</span>   *  @param __l1 Meets Lockable requirements (try_lock() may throw).
+<span class="line_number">623</span>   *  @param __l2 Meets Lockable requirements (try_lock() may throw).
+<span class="line_number">624</span>   *  @param __l3 Meets Lockable requirements (try_lock() may throw).
+<span class="line_number">625</span>   *  @return Returns -1 if all try_lock() calls return true. Otherwise returns
+<span class="line_number">626</span>   *          a 0-based index corresponding to the argument that returned false.
+<span class="line_number">627</span>   *  @post Either all arguments are locked, or none will be.
+<span class="line_number">628</span>   *
+<span class="line_number">629</span>   *  Sequentially calls try_lock() on each argument.
+<span class="line_number">630</span>   */
+<span class="line_number">631</span>  template&lt;typename _L1, typename _L2, typename... _L3&gt;
+<span class="line_number">632</span>    _GLIBCXX_NODISCARD
+<span class="line_number">633</span>    inline int
+<span class="line_number">634</span>    try_lock(_L1&amp; __l1, _L2&amp; __l2, _L3&amp;... __l3)
+<span class="line_number">635</span>    {
+<span class="line_number">636</span>      return __detail::__try_lock_impl(__l1, __l2, __l3...);
+<span class="line_number">637</span>    }
+<span class="line_number">638</span>
+<span class="line_number">639</span>  /// @cond undocumented
+<span class="line_number">640</span>  namespace __detail
+<span class="line_number">641</span>  {
+<span class="line_number">642</span>    // This function can recurse up to N levels deep, for N = 1+sizeof...(L1).
+<span class="line_number">643</span>    // On each recursion the lockables are rotated left one position,
+<span class="line_number">644</span>    // e.g. depth 0: l0, l1, l2; depth 1: l1, l2, l0; depth 2: l2, l0, l1.
+<span class="line_number">645</span>    // When a call to l_i.try_lock() fails it recurses/returns to depth=i
+<span class="line_number">646</span>    // so that l_i is the first argument, and then blocks until l_i is locked.
+<span class="line_number">647</span>    template&lt;typename _L0, typename... _L1&gt;
+<span class="line_number">648</span>      void
+<span class="line_number">649</span>      __lock_impl(int&amp; __i, int __depth, _L0&amp; __l0, _L1&amp;... __l1)
+<span class="line_number">650</span>      {
+<span class="line_number">651</span>	while (__i &gt;= __depth)
+<span class="line_number">652</span>	  {
+<span class="line_number">653</span>	    if (__i == __depth)
+<span class="line_number">654</span>	      {
+<span class="line_number">655</span>		int __failed = 1; // index that couldn&#39;t be locked
+<span class="line_number">656</span>		{
+<span class="line_number">657</span>		  unique_lock&lt;_L0&gt; __first(__l0);
+<span class="line_number">658</span>		  __failed += __detail::__try_lock_impl(__l1...);
+<span class="line_number">659</span>		  if (!__failed)
+<span class="line_number">660</span>		    {
+<span class="line_number">661</span>		      __i = -1; // finished
+<span class="line_number">662</span>		      __first.release();
+<span class="line_number">663</span>		      return;
+<span class="line_number">664</span>		    }
+<span class="line_number">665</span>		}
+<span class="line_number">666</span>#if defined _GLIBCXX_HAS_GTHREADS &amp;&amp; defined _GLIBCXX_USE_SCHED_YIELD
+<span class="line_number">667</span>		__gthread_yield();
+<span class="line_number">668</span>#endif
+<span class="line_number">669</span>		constexpr auto __n = 1 + sizeof...(_L1);
+<span class="line_number">670</span>		__i = (__depth + __failed) % __n;
+<span class="line_number">671</span>	      }
+<span class="line_number">672</span>	    else // rotate left until l_i is first.
+<span class="line_number">673</span>	      __detail::__lock_impl(__i, __depth + 1, __l1..., __l0);
+<span class="line_number">674</span>	  }
+<span class="line_number">675</span>      }
+<span class="line_number">676</span>
+<span class="line_number">677</span>  } // namespace __detail
+<span class="line_number">678</span>  /// @endcond
+<span class="line_number">679</span>
+<span class="line_number">680</span>  /** @brief Generic lock.
+<span class="line_number">681</span>   *  @param __l1 Meets Lockable requirements (try_lock() may throw).
+<span class="line_number">682</span>   *  @param __l2 Meets Lockable requirements (try_lock() may throw).
+<span class="line_number">683</span>   *  @param __l3 Meets Lockable requirements (try_lock() may throw).
+<span class="line_number">684</span>   *  @throw An exception thrown by an argument&#39;s lock() or try_lock() member.
+<span class="line_number">685</span>   *  @post All arguments are locked.
+<span class="line_number">686</span>   *
+<span class="line_number">687</span>   *  All arguments are locked via a sequence of calls to lock(), try_lock()
+<span class="line_number">688</span>   *  and unlock().  If this function exits via an exception any locks that
+<span class="line_number">689</span>   *  were obtained will be released.
+<span class="line_number">690</span>   */
+<span class="line_number">691</span>  template&lt;typename _L1, typename _L2, typename... _L3&gt;
+<span class="line_number">692</span>    void
+<span class="line_number">693</span>    lock(_L1&amp; __l1, _L2&amp; __l2, _L3&amp;... __l3)
+<span class="line_number">694</span>    {
+<span class="line_number">695</span>#if __cplusplus &gt;= 201703L
+<span class="line_number">696</span>      if constexpr (is_same_v&lt;_L1, _L2&gt; &amp;&amp; (is_same_v&lt;_L1, _L3&gt; &amp;&amp; ...))
+<span class="line_number">697</span>	{
+<span class="line_number">698</span>	  constexpr int _Np = 2 + sizeof...(_L3);
+<span class="line_number">699</span>	  unique_lock&lt;_L1&gt; __locks[] = {
+<span class="line_number">700</span>	      {__l1, defer_lock}, {__l2, defer_lock}, {__l3, defer_lock}...
+<span class="line_number">701</span>	  };
+<span class="line_number">702</span>	  int __first = 0;
+<span class="line_number">703</span>	  do {
+<span class="line_number">704</span>	    __locks[__first].lock();
+<span class="line_number">705</span>	    for (int __j = 1; __j &lt; _Np; ++__j)
+<span class="line_number">706</span>	      {
+<span class="line_number">707</span>		const int __idx = (__first + __j) % _Np;
+<span class="line_number">708</span>		if (!__locks[__idx].try_lock())
+<span class="line_number">709</span>		  {
+<span class="line_number">710</span>		    for (int __k = __j; __k != 0; --__k)
+<span class="line_number">711</span>		      __locks[(__first + __k - 1) % _Np].unlock();
+<span class="line_number">712</span>		    __first = __idx;
+<span class="line_number">713</span>		    break;
+<span class="line_number">714</span>		  }
+<span class="line_number">715</span>	      }
+<span class="line_number">716</span>	  } while (!__locks[__first].owns_lock());
+<span class="line_number">717</span>
+<span class="line_number">718</span>	  for (auto&amp; __l : __locks)
+<span class="line_number">719</span>	    __l.release();
+<span class="line_number">720</span>	}
+<span class="line_number">721</span>      else
+<span class="line_number">722</span>#endif
+<span class="line_number">723</span>	{
+<span class="line_number">724</span>	  int __i = 0;
+<span class="line_number">725</span>	  __detail::__lock_impl(__i, 0, __l1, __l2, __l3...);
+<span class="line_number">726</span>	}
+<span class="line_number">727</span>    }
+<span class="line_number">728</span>
+<span class="line_number">729</span>#if __cplusplus &gt;= 201703L
+<span class="line_number">730</span>#define __cpp_lib_scoped_lock 201703L
+<span class="line_number">731</span>  /** @brief A scoped lock type for multiple lockable objects.
+<span class="line_number">732</span>   *
+<span class="line_number">733</span>   * A scoped_lock controls mutex ownership within a scope, releasing
+<span class="line_number">734</span>   * ownership in the destructor.
+<span class="line_number">735</span>   *
+<span class="line_number">736</span>   * @headerfile mutex
+<span class="line_number">737</span>   * @since C++17
+<span class="line_number">738</span>   */
+<span class="line_number">739</span>  template&lt;typename... _MutexTypes&gt;
+<span class="line_number">740</span>    class scoped_lock
+<span class="line_number">741</span>    {
+<span class="line_number">742</span>    public:
+<span class="line_number">743</span>      explicit scoped_lock(_MutexTypes&amp;... __m) : _M_devices(std::tie(__m...))
+<span class="line_number">744</span>      { std::lock(__m...); }
+<span class="line_number">745</span>
+<span class="line_number">746</span>      explicit scoped_lock(adopt_lock_t, _MutexTypes&amp;... __m) noexcept
+<span class="line_number">747</span>      : _M_devices(std::tie(__m...))
+<span class="line_number">748</span>      { } // calling thread owns mutex
+<span class="line_number">749</span>
+<span class="line_number">750</span>      ~scoped_lock()
+<span class="line_number">751</span>      { std::apply([](auto&amp;... __m) { (__m.unlock(), ...); }, _M_devices); }
+<span class="line_number">752</span>
+<span class="line_number">753</span>      scoped_lock(const scoped_lock&amp;) = delete;
+<span class="line_number">754</span>      scoped_lock&amp; operator=(const scoped_lock&amp;) = delete;
+<span class="line_number">755</span>
+<span class="line_number">756</span>    private:
+<span class="line_number">757</span>      tuple&lt;_MutexTypes&amp;...&gt; _M_devices;
+<span class="line_number">758</span>    };
+<span class="line_number">759</span>
+<span class="line_number">760</span>  template&lt;&gt;
+<span class="line_number">761</span>    class scoped_lock&lt;&gt;
+<span class="line_number">762</span>    {
+<span class="line_number">763</span>    public:
+<span class="line_number">764</span>      explicit scoped_lock() = default;
+<span class="line_number">765</span>      explicit scoped_lock(adopt_lock_t) noexcept { }
+<span class="line_number">766</span>      ~scoped_lock() = default;
+<span class="line_number">767</span>
+<span class="line_number">768</span>      scoped_lock(const scoped_lock&amp;) = delete;
+<span class="line_number">769</span>      scoped_lock&amp; operator=(const scoped_lock&amp;) = delete;
+<span class="line_number">770</span>    };
+<span class="line_number">771</span>
+<span class="line_number">772</span>  template&lt;typename _Mutex&gt;
+<span class="line_number">773</span>    class scoped_lock&lt;_Mutex&gt;
+<span class="line_number">774</span>    {
+<span class="line_number">775</span>    public:
+<span class="line_number">776</span>      using mutex_type = _Mutex;
+<span class="line_number">777</span>
+<span class="line_number">778</span>      explicit scoped_lock(mutex_type&amp; __m) : _M_device(__m)
+<span class="line_number">779</span>      { _M_device.lock(); }
+<span class="line_number">780</span>
+<span class="line_number">781</span>      explicit scoped_lock(adopt_lock_t, mutex_type&amp; __m) noexcept
+<span class="line_number">782</span>      : _M_device(__m)
+<span class="line_number">783</span>      { } // calling thread owns mutex
+<span class="line_number">784</span>
+<span class="line_number">785</span>      ~scoped_lock()
+<span class="line_number">786</span>      { _M_device.unlock(); }
+<span class="line_number">787</span>
+<span class="line_number">788</span>      scoped_lock(const scoped_lock&amp;) = delete;
+<span class="line_number">789</span>      scoped_lock&amp; operator=(const scoped_lock&amp;) = delete;
+<span class="line_number">790</span>
+<span class="line_number">791</span>    private:
+<span class="line_number">792</span>      mutex_type&amp;  _M_device;
+<span class="line_number">793</span>    };
+<span class="line_number">794</span>#endif // C++17
+<span class="line_number">795</span>
+<span class="line_number">796</span>#ifdef _GLIBCXX_HAS_GTHREADS
+<span class="line_number">797</span>  /// Flag type used by std::call_once
+<span class="line_number">798</span>  struct once_flag
+<span class="line_number">799</span>  {
+<span class="line_number">800</span>    constexpr once_flag() noexcept = default;
+<span class="line_number">801</span>
+<span class="line_number">802</span>    /// Deleted copy constructor
+<span class="line_number">803</span>    once_flag(const once_flag&amp;) = delete;
+<span class="line_number">804</span>    /// Deleted assignment operator
+<span class="line_number">805</span>    once_flag&amp; operator=(const once_flag&amp;) = delete;
+<span class="line_number">806</span>
+<span class="line_number">807</span>  private:
+<span class="line_number">808</span>    // For gthreads targets a pthread_once_t is used with pthread_once, but
+<span class="line_number">809</span>    // for most targets this doesn&#39;t work correctly for exceptional executions.
+<span class="line_number">810</span>    __gthread_once_t _M_once = __GTHREAD_ONCE_INIT;
+<span class="line_number">811</span>
+<span class="line_number">812</span>    struct _Prepare_execution;
+<span class="line_number">813</span>
+<span class="line_number">814</span>    template&lt;typename _Callable, typename... _Args&gt;
+<span class="line_number">815</span>      friend void
+<span class="line_number">816</span>      call_once(once_flag&amp; __once, _Callable&amp;&amp; __f, _Args&amp;&amp;... __args);
+<span class="line_number">817</span>  };
+<span class="line_number">818</span>
+<span class="line_number">819</span>  /// @cond undocumented
+<span class="line_number">820</span># ifdef _GLIBCXX_HAVE_TLS
+<span class="line_number">821</span>  // If TLS is available use thread-local state for the type-erased callable
+<span class="line_number">822</span>  // that is being run by std::call_once in the current thread.
+<span class="line_number">823</span>  extern __thread void* __once_callable;
+<span class="line_number">824</span>  extern __thread void (*__once_call)();
+<span class="line_number">825</span>
+<span class="line_number">826</span>  // RAII type to set up state for pthread_once call.
+<span class="line_number">827</span>  struct once_flag::_Prepare_execution
+<span class="line_number">828</span>  {
+<span class="line_number">829</span>    template&lt;typename _Callable&gt;
+<span class="line_number">830</span>      explicit
+<span class="line_number">831</span>      _Prepare_execution(_Callable&amp; __c)
+<span class="line_number">832</span>      {
+<span class="line_number">833</span>	// Store address in thread-local pointer:
+</code></pre>
+            <div class="issue">
+                <div>
+                    <span class="what">32 bytes in 1 blocks are possibly lost in loss record 2,576 of 14,256</span>
+                    <div class="navigation">
+                        <button class="next_error">Next</button>
+                        <button class="prev_error">Previous</button>
+                    </div>
+                </div>
+                <div>
+                    <table class="call_stack">
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/mutex:904<br>
+                                    <code class="cpp">void std::call_once&lt;pybind11::gil_safe_call_once_and_store&lt;pybind11::detail::npy_api&gt;::call_once_and_store_result&lt;pybind11::detail::npy_api (&amp;)()&gt;(pybind11::detail::npy_api (&amp;)(), void (*)(pybind11::detail::npy_api&amp;))::{lambda()#1}&gt;(std::once_flag&amp;, pybind11::detail::npy_api (&amp;)())</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">901</span>			std::forward&lt;_Args&gt;(__args)...);
+<span class="line_number">902</span>      };
+<span class="line_number">903</span>
+<span class="line_number">904</span><span class="error">      once_flag::_Prepare_execution __exec(__callable);
+</span><span class="line_number">905</span>
+<span class="line_number">906</span>      // XXX pthread_once does not reset the flag if an exception is thrown.
+<span class="line_number">907</span>      if (int __e = __gthread_once(&amp;__once._M_once, &amp;__once_proxy))
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/pybind11/include/pybind11/gil_safe_call_once.h:189<br>
+                                    <code class="cpp">pybind11::gil_safe_call_once_and_store&lt;pybind11::detail::npy_api&gt;&amp; pybind11::gil_safe_call_once_and_store&lt;pybind11::detail::npy_api&gt;::call_once_and_store_result&lt;pybind11::detail::npy_api (&amp;)()&gt;(pybind11::detail::npy_api (&amp;)(), void (*)(pybind11::detail::npy_api&amp;))</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">186</span>                value = get_or_create_storage_in_state_dict();
+<span class="line_number">187</span>            }
+<span class="line_number">188</span>            assert(value != nullptr);
+<span class="line_number">189</span><span class="error">            std::call_once(value-&gt;once_flag, [&amp;] {
+</span><span class="line_number">190</span>                // Only one thread will ever enter here.
+<span class="line_number">191</span>                gil_scoped_acquire gil_acq;
+<span class="line_number">192</span>                // fn may release, but will reacquire, the GIL.
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/pybind11/include/pybind11/numpy.h:281<br>
+                                    <code class="cpp">pybind11::detail::npy_api::get()</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">278</span>
+<span class="line_number">279</span>    static npy_api &amp;get() {
+<span class="line_number">280</span>        PYBIND11_CONSTINIT static gil_safe_call_once_and_store&lt;npy_api&gt; storage;
+<span class="line_number">281</span><span class="error">        return storage.call_once_and_store_result(lookup).get_stored();
+</span><span class="line_number">282</span>    }
+<span class="line_number">283</span>
+<span class="line_number">284</span>    bool PyArray_Check_(PyObject *obj) const {
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/pybind11/include/pybind11/numpy.h:866<br>
+                                    <code class="cpp">pybind11::dtype::dtype(int)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">863</span>    /// Return dtype for the given typenum (one of the NPY_TYPES).
+<span class="line_number">864</span>    /// https://numpy.org/devdocs/reference/c-api/array.html#c.PyArray_DescrFromType
+<span class="line_number">865</span>    explicit dtype(int typenum)
+<span class="line_number">866</span><span class="error">        : object(detail::npy_api::get().PyArray_DescrFromType_(typenum), stolen_t{}) {
+</span><span class="line_number">867</span>        if (m_ptr == nullptr) {
+<span class="line_number">868</span>            throw error_already_set();
+<span class="line_number">869</span>        }
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/pybind11/include/pybind11/numpy.h:1613<br>
+                                    <code class="cpp">pybind11::detail::npy_format_descriptor&lt;double, void&gt;::dtype()</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1610</span>public:
+<span class="line_number">1611</span>    static constexpr int value = values[detail::is_fmt_numeric&lt;T&gt;::index];
+<span class="line_number">1612</span>
+<span class="line_number">1613</span><span class="error">    static pybind11::dtype dtype() { return pybind11::dtype(/*typenum*/ value); }
+</span><span class="line_number">1614</span>};
+<span class="line_number">1615</span>
+<span class="line_number">1616</span>template &lt;typename T&gt;
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/pybind11/include/pybind11/numpy.h:884<br>
+                                    <code class="cpp">pybind11::dtype pybind11::dtype::of&lt;double&gt;()</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">881</span>    /// Return dtype associated with a C++ type.
+<span class="line_number">882</span>    template &lt;typename T&gt;
+<span class="line_number">883</span>    static dtype of() {
+<span class="line_number">884</span><span class="error">        return detail::npy_format_descriptor&lt;typename std::remove_cv&lt;T&gt;::type&gt;::dtype();
+</span><span class="line_number">885</span>    }
+<span class="line_number">886</span>
+<span class="line_number">887</span>    /// Return the type number associated with a C++ type.
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/pybind11/include/pybind11/numpy.h:1112<br>
+                                    <code class="cpp">pybind11::array::array&lt;double&gt;(pybind11::detail::any_container&lt;long&gt;, pybind11::detail::any_container&lt;long&gt;, double const*, pybind11::handle)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1109</span>                std::move(shape),
+<span class="line_number">1110</span>                std::move(strides),
+<span class="line_number">1111</span>                reinterpret_cast&lt;const void *&gt;(ptr),
+<span class="line_number">1112</span><span class="error">                base) {}
+</span><span class="line_number">1113</span>
+<span class="line_number">1114</span>    template &lt;typename T&gt;
+<span class="line_number">1115</span>    array(ShapeContainer shape, const T *ptr, handle base = handle())
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/pybind11/include/pybind11/numpy.h:1120<br>
+                                    <code class="cpp">pybind11::array::array&lt;double&gt;(long, double const*, pybind11::handle)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1117</span>
+<span class="line_number">1118</span>    template &lt;typename T&gt;
+<span class="line_number">1119</span>    explicit array(ssize_t count, const T *ptr, handle base = handle())
+<span class="line_number">1120</span><span class="error">        : array({count}, {}, ptr, base) {}
+</span><span class="line_number">1121</span>
+<span class="line_number">1122</span>    explicit array(const buffer_info &amp;info, handle base = handle())
+<span class="line_number">1123</span>        : array(pybind11::dtype(info), info.shape, info.strides, info.ptr, base) {}
+</code></pre>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            <pre class="code">
+<code class="c++"><span class="line_number">834</span><span class="error">	__once_callable = std::__addressof(__c);</span>
+<span class="line_number">835</span>	// Trampoline function to invoke the closure via thread-local pointer:
+<span class="line_number">836</span>	__once_call = [] { (*static_cast&lt;_Callable*&gt;(__once_callable))(); };
+<span class="line_number">837</span>      }
+<span class="line_number">838</span>
+<span class="line_number">839</span>    ~_Prepare_execution()
+<span class="line_number">840</span>    {
+<span class="line_number">841</span>      // PR libstdc++/82481
+<span class="line_number">842</span>      __once_callable = nullptr;
+<span class="line_number">843</span>      __once_call = nullptr;
+<span class="line_number">844</span>    }
+<span class="line_number">845</span>
+<span class="line_number">846</span>    _Prepare_execution(const _Prepare_execution&amp;) = delete;
+<span class="line_number">847</span>    _Prepare_execution&amp; operator=(const _Prepare_execution&amp;) = delete;
+<span class="line_number">848</span>  };
+<span class="line_number">849</span>
+<span class="line_number">850</span># else
+<span class="line_number">851</span>  // Without TLS use a global std::mutex and store the callable in a
+<span class="line_number">852</span>  // global std::function.
+<span class="line_number">853</span>  extern function&lt;void()&gt; __once_functor;
+<span class="line_number">854</span>
+<span class="line_number">855</span>  extern void
+<span class="line_number">856</span>  __set_once_functor_lock_ptr(unique_lock&lt;mutex&gt;*);
+<span class="line_number">857</span>
+<span class="line_number">858</span>  extern mutex&amp;
+<span class="line_number">859</span>  __get_once_mutex();
+<span class="line_number">860</span>
+<span class="line_number">861</span>  // RAII type to set up state for pthread_once call.
+<span class="line_number">862</span>  struct once_flag::_Prepare_execution
+<span class="line_number">863</span>  {
+<span class="line_number">864</span>    template&lt;typename _Callable&gt;
+<span class="line_number">865</span>      explicit
+<span class="line_number">866</span>      _Prepare_execution(_Callable&amp; __c)
+<span class="line_number">867</span>      {
+<span class="line_number">868</span>	// Store the callable in the global std::function
+<span class="line_number">869</span>	__once_functor = __c;
+<span class="line_number">870</span>	__set_once_functor_lock_ptr(&amp;_M_functor_lock);
+<span class="line_number">871</span>      }
+<span class="line_number">872</span>
+<span class="line_number">873</span>    ~_Prepare_execution()
+<span class="line_number">874</span>    {
+<span class="line_number">875</span>      if (_M_functor_lock)
+<span class="line_number">876</span>	__set_once_functor_lock_ptr(nullptr);
+<span class="line_number">877</span>    }
+<span class="line_number">878</span>
+<span class="line_number">879</span>  private:
+<span class="line_number">880</span>    // XXX This deadlocks if used recursively (PR 97949)
+<span class="line_number">881</span>    unique_lock&lt;mutex&gt; _M_functor_lock{__get_once_mutex()};
+<span class="line_number">882</span>
+<span class="line_number">883</span>    _Prepare_execution(const _Prepare_execution&amp;) = delete;
+<span class="line_number">884</span>    _Prepare_execution&amp; operator=(const _Prepare_execution&amp;) = delete;
+<span class="line_number">885</span>  };
+<span class="line_number">886</span># endif
+<span class="line_number">887</span>  /// @endcond
+<span class="line_number">888</span>
+<span class="line_number">889</span>  // This function is passed to pthread_once by std::call_once.
+<span class="line_number">890</span>  // It runs __once_call() or __once_functor().
+<span class="line_number">891</span>  extern &#34;C&#34; void __once_proxy(void);
+<span class="line_number">892</span>
+<span class="line_number">893</span>  /// Invoke a callable and synchronize with other calls using the same flag
+<span class="line_number">894</span>  template&lt;typename _Callable, typename... _Args&gt;
+<span class="line_number">895</span>    void
+<span class="line_number">896</span>    call_once(once_flag&amp; __once, _Callable&amp;&amp; __f, _Args&amp;&amp;... __args)
+<span class="line_number">897</span>    {
+<span class="line_number">898</span>      // Closure type that runs the function
+<span class="line_number">899</span>      auto __callable = [&amp;] {
+<span class="line_number">900</span>	  std::__invoke(std::forward&lt;_Callable&gt;(__f),
+<span class="line_number">901</span>			std::forward&lt;_Args&gt;(__args)...);
+<span class="line_number">902</span>      };
+<span class="line_number">903</span>
+<span class="line_number">904</span>      once_flag::_Prepare_execution __exec(__callable);
+<span class="line_number">905</span>
+<span class="line_number">906</span>      // XXX pthread_once does not reset the flag if an exception is thrown.
+<span class="line_number">907</span>      if (int __e = __gthread_once(&amp;__once._M_once, &amp;__once_proxy))
+<span class="line_number">908</span>	__throw_system_error(__e);
+<span class="line_number">909</span>    }
+<span class="line_number">910</span>
+<span class="line_number">911</span>#else // _GLIBCXX_HAS_GTHREADS
+<span class="line_number">912</span>
+<span class="line_number">913</span>  /// Flag type used by std::call_once
+<span class="line_number">914</span>  struct once_flag
+<span class="line_number">915</span>  {
+<span class="line_number">916</span>    constexpr once_flag() noexcept = default;
+<span class="line_number">917</span>
+<span class="line_number">918</span>    /// Deleted copy constructor
+<span class="line_number">919</span>    once_flag(const once_flag&amp;) = delete;
+<span class="line_number">920</span>    /// Deleted assignment operator
+<span class="line_number">921</span>    once_flag&amp; operator=(const once_flag&amp;) = delete;
+<span class="line_number">922</span>
+<span class="line_number">923</span>  private:
+<span class="line_number">924</span>    // There are two different std::once_flag interfaces, abstracting four
+<span class="line_number">925</span>    // different implementations.
+<span class="line_number">926</span>    // The single-threaded interface uses the _M_activate() and _M_finish(bool)
+<span class="line_number">927</span>    // functions, which start and finish an active execution respectively.
+<span class="line_number">928</span>    // See [thread.once.callonce] in C++11 for the definition of
+<span class="line_number">929</span>    // active/passive/returning/exceptional executions.
+<span class="line_number">930</span>    enum _Bits : int { _Init = 0, _Active = 1, _Done = 2 };
+<span class="line_number">931</span>
+<span class="line_number">932</span>    int _M_once = _Bits::_Init;
+<span class="line_number">933</span>
+<span class="line_number">934</span>    // Check to see if all executions will be passive now.
+<span class="line_number">935</span>    bool
+<span class="line_number">936</span>    _M_passive() const noexcept;
+<span class="line_number">937</span>
+<span class="line_number">938</span>    // Attempts to begin an active execution.
+<span class="line_number">939</span>    bool _M_activate();
+<span class="line_number">940</span>
+<span class="line_number">941</span>    // Must be called to complete an active execution.
+<span class="line_number">942</span>    // The argument is true if the active execution was a returning execution,
+<span class="line_number">943</span>    // false if it was an exceptional execution.
+<span class="line_number">944</span>    void _M_finish(bool __returning) noexcept;
+<span class="line_number">945</span>
+<span class="line_number">946</span>    // RAII helper to call _M_finish.
+<span class="line_number">947</span>    struct _Active_execution
+<span class="line_number">948</span>    {
+<span class="line_number">949</span>      explicit _Active_execution(once_flag&amp; __flag) : _M_flag(__flag) { }
+<span class="line_number">950</span>
+<span class="line_number">951</span>      ~_Active_execution() { _M_flag._M_finish(_M_returning); }
+<span class="line_number">952</span>
+<span class="line_number">953</span>      _Active_execution(const _Active_execution&amp;) = delete;
+<span class="line_number">954</span>      _Active_execution&amp; operator=(const _Active_execution&amp;) = delete;
+<span class="line_number">955</span>
+<span class="line_number">956</span>      once_flag&amp; _M_flag;
+<span class="line_number">957</span>      bool _M_returning = false;
+<span class="line_number">958</span>    };
+<span class="line_number">959</span>
+<span class="line_number">960</span>    template&lt;typename _Callable, typename... _Args&gt;
+<span class="line_number">961</span>      friend void
+<span class="line_number">962</span>      call_once(once_flag&amp; __once, _Callable&amp;&amp; __f, _Args&amp;&amp;... __args);
+<span class="line_number">963</span>  };
+<span class="line_number">964</span>
+<span class="line_number">965</span>  // Inline definitions of std::once_flag members for single-threaded targets.
+<span class="line_number">966</span>
+<span class="line_number">967</span>  inline bool
+<span class="line_number">968</span>  once_flag::_M_passive() const noexcept
+<span class="line_number">969</span>  { return _M_once == _Bits::_Done; }
+<span class="line_number">970</span>
+<span class="line_number">971</span>  inline bool
+<span class="line_number">972</span>  once_flag::_M_activate()
+<span class="line_number">973</span>  {
+<span class="line_number">974</span>    if (_M_once == _Bits::_Init) [[__likely__]]
+<span class="line_number">975</span>      {
+<span class="line_number">976</span>	_M_once = _Bits::_Active;
+<span class="line_number">977</span>	return true;
+<span class="line_number">978</span>      }
+<span class="line_number">979</span>    else if (_M_passive()) // Caller should have checked this already.
+<span class="line_number">980</span>      return false;
+<span class="line_number">981</span>    else
+<span class="line_number">982</span>      __throw_system_error(EDEADLK);
+<span class="line_number">983</span>  }
+<span class="line_number">984</span>
+<span class="line_number">985</span>  inline void
+<span class="line_number">986</span>  once_flag::_M_finish(bool __returning) noexcept
+<span class="line_number">987</span>  { _M_once = __returning ? _Bits::_Done : _Bits::_Init; }
+<span class="line_number">988</span>
+<span class="line_number">989</span>  /// Invoke a callable and synchronize with other calls using the same flag
+<span class="line_number">990</span>  template&lt;typename _Callable, typename... _Args&gt;
+<span class="line_number">991</span>    inline void
+<span class="line_number">992</span>    call_once(once_flag&amp; __once, _Callable&amp;&amp; __f, _Args&amp;&amp;... __args)
+<span class="line_number">993</span>    {
+<span class="line_number">994</span>      if (__once._M_passive())
+<span class="line_number">995</span>	return;
+<span class="line_number">996</span>      else if (__once._M_activate())
+<span class="line_number">997</span>	{
+<span class="line_number">998</span>	  once_flag::_Active_execution __exec(__once);
+<span class="line_number">999</span>
+<span class="line_number">1000</span>	  // _GLIBCXX_RESOLVE_LIB_DEFECTS
+<span class="line_number">1001</span>	  // 2442. call_once() shouldn&#39;t DECAY_COPY()
+<span class="line_number">1002</span>	  std::__invoke(std::forward&lt;_Callable&gt;(__f),
+<span class="line_number">1003</span>			std::forward&lt;_Args&gt;(__args)...);
+<span class="line_number">1004</span>
+<span class="line_number">1005</span>	  // __f(__args...) did not throw
+<span class="line_number">1006</span>	  __exec._M_returning = true;
+<span class="line_number">1007</span>	}
+<span class="line_number">1008</span>    }
+<span class="line_number">1009</span>#endif // _GLIBCXX_HAS_GTHREADS
+<span class="line_number">1010</span>
+<span class="line_number">1011</span>  /// @} group mutexes
+<span class="line_number">1012</span>_GLIBCXX_END_NAMESPACE_VERSION
+<span class="line_number">1013</span>} // namespace
+<span class="line_number">1014</span>
+<span class="line_number">1015</span>#endif // C++11
+<span class="line_number">1016</span>
+<span class="line_number">1017</span>#endif // _GLIBCXX_MUTEX
+</code>
+            </pre>
+        </div>
+    </div>
+</body>
+
+</html>
