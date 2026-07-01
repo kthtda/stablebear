@@ -223,3 +223,10 @@ class SymmetricMatrixTensor(Tensor):
 
     def _get_valid_setitem_dtypes(self):
         return [SymmetricMatrix, SymmetricMatrixTensor]
+
+    def _validate_setitem_dtype(self, val):
+        super()._validate_setitem_dtype(val)
+        from .distance_matrix import _check_matrix_tensor_setitem
+        _check_matrix_tensor_setitem(
+            self, val, SymmetricMatrixTensor, SymmetricMatrix,
+            {symmat32: float32, symmat64: float64})
