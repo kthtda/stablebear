@@ -183,6 +183,13 @@ namespace sb
 
     [[nodiscard]] value_type evaluate(time_type t) const
     {
+      // PCFs are defined on [0, inf); reject negative times against 0 directly
+      // rather than against the first breakpoint's time.
+      if (t < static_cast<time_type>(0))
+      {
+        throw std::domain_error("Cannot evaluate PCF before time 0.");
+      }
+
       auto it = std::upper_bound(m_points.begin(), m_points.end(), t,
         [](time_type time, const point_type& pt) { return time < pt.t; });
 
@@ -205,7 +212,9 @@ namespace sb
       {
         auto t = sorted_times(i);
 
-        if (t < m_points.front().t)
+        // PCFs are defined on [0, inf); guard against 0, not the first
+        // breakpoint's time (which the t=0 construction invariant pins to 0).
+        if (t < static_cast<time_type>(0))
         {
           throw std::domain_error("Cannot evaluate PCF before time 0.");
         }

@@ -1051,6 +1051,9 @@ namespace sb
       throw std::invalid_argument("split: axis " + std::to_string(axis) +
         " out of range for " + std::to_string(ndim) + "-D tensor");
 
+    if (n_sections == 0)
+      throw std::invalid_argument("split: number of sections must be > 0");
+
     auto axis_size = tensor.shape()[axis];
     if (axis_size % n_sections != 0)
       throw std::invalid_argument("split: tensor of size " +
