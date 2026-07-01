@@ -1,19 +1,11 @@
 """Built-in sampling distributions.
 
-A distribution maps a distance to a non-negative sampling weight. Each class
-holds its parameters and forwards to the matching precision-specific C++ sampler
-for the fused fast path. They are also callable — ``Gaussian(0, 0.4)(distances)``
-returns the weights — so a built-in behaves like the custom callables accepted by
-:func:`stablebear.sampling.subsample_relative`. See it for how they are used.
-
-NOTE (revisit before merging to main): callability is a convenience that mirrors
-the C++ functor's formula in Python (a second copy of the math, used only when a
-built-in is evaluated directly rather than via the fused C++ path). It is
-optional and may be removed — decide before merge. If kept, consider a small
-test pinning ``Distribution(...)(d)`` to the fused result so the two can't drift.
+A distribution is a lightweight spec: it holds its parameters and forwards them
+to the matching precision-specific C++ sampler for the fused fast path used by
+:func:`stablebear.sampling.subsample_relative`, which only accepts these
+built-ins. The distance-to-weight math lives solely in the C++ functor; these
+classes carry no Python copy of it.
 """
-
-import numpy as np
 
 
 class Uniform:
@@ -54,10 +46,6 @@ class Uniform:
         self.low = low
         self.high = high
 
-    def __call__(self, values):
-        v = np.asarray(values)
-        return ((v >= self.low) & (v <= self.high)).astype(v.dtype)
-
     def _sample_subsets(self, backend, reference, query, sample_size, n_instances, replace, gen):
         return backend.sample_subsets_uniform(
             reference, query, self.low, self.high, sample_size, n_instances, replace, gen
@@ -92,10 +80,6 @@ class Gaussian:
             raise ValueError("sigma must be positive.")
         self.mean = float(mean)
         self.sigma = float(sigma)
-
-    def __call__(self, values):
-        z = (np.asarray(values) - self.mean) / self.sigma
-        return np.exp(-0.5 * z * z)
 
     def _sample_subsets(self, backend, reference, query, sample_size, n_instances, replace, gen):
         return backend.sample_subsets_gaussian(

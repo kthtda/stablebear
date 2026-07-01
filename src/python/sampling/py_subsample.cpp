@@ -33,23 +33,6 @@ namespace
                                  nInstances, replace, gen);
     }
 
-    static py::tuple sample_subsets_from_probabilities(const TensorT& reference,
-                                                       const TensorT& probabilities, size_t sampleSize,
-                                                       size_t nInstances, bool replace, const Gen* gen)
-    {
-      return to_tuple(sb::sampling::sample_subsets_from_probabilities(
-          sb::PointCloud<T>(reference), probabilities, sampleSize, nInstances, replace, pick(gen),
-          sb::default_executor()));
-    }
-
-    // (n_query, n_reference) matrix of Euclidean distances; the custom-distribution
-    // path applies its distribution to this in Python.
-    static TensorT distance_values(const TensorT& reference, const TensorT& query)
-    {
-      return sb::sampling::filter_values(sb::PointCloud<T>(reference), sb::PointCloud<T>(query),
-                                         sb::sampling::EuclideanDistance<T>{}, sb::default_executor());
-    }
-
     // ----- distance-matrix input: query is a tensor of reference row indices -----
 
     static py::tuple sample_subsets_distmat_gaussian(const sb::DistanceMatrix<T>& source,
@@ -70,23 +53,6 @@ namespace
                                          nInstances, replace, gen);
     }
 
-    static py::tuple sample_subsets_from_probabilities_distmat(const sb::DistanceMatrix<T>& source,
-                                                               const TensorT& probabilities,
-                                                               size_t sampleSize, size_t nInstances,
-                                                               bool replace, const Gen* gen)
-    {
-      return to_tuple(sb::sampling::sample_subsets_from_probabilities_distmat(
-          source, probabilities, sampleSize, nInstances, replace, pick(gen), sb::default_executor()));
-    }
-
-    // (n_query, n_reference) matrix of source(query_row, j); the custom-distribution
-    // path applies its distribution to this in Python.
-    static TensorT distance_matrix_values(const sb::DistanceMatrix<T>& source,
-                                          const sb::Tensor<uint64_t>& query)
-    {
-      return sb::sampling::distance_matrix_values(source, query, sb::default_executor());
-    }
-
     static void register_bindings(py::module_& m, const std::string& suffix)
     {
       py::class_<PySubsampleBindings>(m, ("Subsample" + suffix).c_str())
@@ -98,11 +64,6 @@ namespace
                       py::arg("query"), py::arg("low"), py::arg("high"), py::arg("sample_size"),
                       py::arg("n_instances"), py::arg("replace"),
                       py::arg("generator").none(true) = py::none())
-          .def_static("sample_subsets_from_probabilities", &sample_subsets_from_probabilities,
-                      py::arg("reference"), py::arg("probabilities"), py::arg("sample_size"),
-                      py::arg("n_instances"), py::arg("replace"),
-                      py::arg("generator").none(true) = py::none())
-          .def_static("distance_values", &distance_values, py::arg("reference"), py::arg("query"))
           .def_static("sample_subsets_distmat_gaussian", &sample_subsets_distmat_gaussian,
                       py::arg("source"), py::arg("query"), py::arg("mean"), py::arg("sigma"),
                       py::arg("sample_size"), py::arg("n_instances"), py::arg("replace"),
@@ -110,13 +71,7 @@ namespace
           .def_static("sample_subsets_distmat_uniform", &sample_subsets_distmat_uniform,
                       py::arg("source"), py::arg("query"), py::arg("low"), py::arg("high"),
                       py::arg("sample_size"), py::arg("n_instances"), py::arg("replace"),
-                      py::arg("generator").none(true) = py::none())
-          .def_static("sample_subsets_from_probabilities_distmat",
-                      &sample_subsets_from_probabilities_distmat, py::arg("source"),
-                      py::arg("probabilities"), py::arg("sample_size"), py::arg("n_instances"),
-                      py::arg("replace"), py::arg("generator").none(true) = py::none())
-          .def_static("distance_matrix_values", &distance_matrix_values, py::arg("source"),
-                      py::arg("query"));
+                      py::arg("generator").none(true) = py::none());
     }
 
   private:

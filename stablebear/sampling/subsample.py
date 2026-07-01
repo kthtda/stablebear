@@ -9,9 +9,9 @@ from .distributions import Gaussian, Uniform
 
 cpp_samp = cpp.sampling
 
-# Built-in distributions own a fully fused C++ "distance" fast path. For any
-# other (custom callable) distribution the distance still runs in C++; only the
-# distribution itself is applied in Python before the draw.
+# The only accepted distributions. Each owns a fully fused C++ fast path
+# (distances + weighting + draw) for both point-cloud and distance-matrix
+# references; arbitrary callables are intentionally not supported.
 _BUILTIN_DISTRIBUTIONS = (Gaussian, Uniform)
 
 
@@ -27,35 +27,6 @@ def _as_float_tensor(data, dtype=None):
             return FloatTensor(np.asarray(data), dtype=dtype)
         return data
     return FloatTensor(data, dtype=dtype)
-
-
-def _weights_from_distribution(distribution, values, np_float):
-    """Apply a custom ``distribution`` element-wise to the ``(n_query,
-    n_reference)`` value matrix and validate the resulting sampling weights."""
-    weights = np.asarray(distribution(values), dtype=np_float)
-    if weights.shape != values.shape:
-        raise ValueError(
-            "distribution must produce one weight per reference point "
-            f"(expected shape {values.shape}, got {weights.shape})."
-        )
-    if np.any(weights < 0):
-        raise ValueError("distribution produced negative sampling weights.")
-    if np.any(weights.sum(axis=1) <= 0):
-        raise ValueError(
-            "distribution produced all-zero weights for at least one query point."
-        )
-    return weights
-
-
-def _distance_weights(backend, R, X, distribution, np_float):
-    """Weight matrix for the custom-distribution path (point-cloud reference).
-
-    The Euclidean distances are computed once, in parallel C++ — the single
-    source of truth, shared with the fused built-in path — then the custom
-    ``distribution`` is applied to the whole ``(n_query, n_reference)`` matrix.
-    """
-    values = np.asarray(FloatTensor(backend.distance_values(R._data, X._data)))
-    return _weights_from_distribution(distribution, values, np_float)
 
 
 def _as_distance_matrix(reference):
@@ -95,17 +66,6 @@ def _reference_indices(query, n):
     return q
 
 
-def _distance_matrix_weights(backend, source, query, distribution, np_float):
-    """Weight matrix for the custom-distribution path (distance-matrix reference).
-
-    The per-query distance rows ``source(query[qi], j)`` are gathered once in
-    parallel C++, then the custom ``distribution`` is applied to the whole
-    ``(n_query, n_reference)`` matrix.
-    """
-    values = np.asarray(FloatTensor(backend.distance_matrix_values(source._data, query._data)))
-    return _weights_from_distribution(distribution, values, np_float)
-
-
 def _subsample_distmat(reference, query, *, sample_size, n_instances, distribution,
                        replace, generator, verbose):
     """Distance-matrix path of :func:`subsample_relative` (see its docstring)."""
@@ -119,20 +79,44 @@ def _subsample_distmat(reference, query, *, sample_size, n_instances, distributi
     backend = _backend(source.dtype)
     gen = generator._gen if generator is not None else None
 
-    if isinstance(distribution, _BUILTIN_DISTRIBUTIONS):
-        task, result = distribution._sample_subsets_distmat(
-            backend, source._data, q._data, sample_size, n_instances, replace, gen
-        )
-    else:
-        np_float = np.float32 if source.dtype == float32 else np.float64
-        weights = _distance_matrix_weights(backend, source, q, distribution, np_float)
-        weights_tensor = FloatTensor(weights, dtype=source.dtype)
-        task, result = backend.sample_subsets_from_probabilities_distmat(
-            source._data, weights_tensor._data, sample_size, n_instances, replace, gen
-        )
-
+    # Fully fused C++ draw: precomputed distances + built-in distribution.
+    task, result = distribution._sample_subsets_distmat(
+        backend, source._data, q._data, sample_size, n_instances, replace, gen
+    )
     _run_task(lambda: task, verbose=verbose)
     return DistanceMatrixTensor(result)
+
+
+def _subsample_pointcloud(reference, query, *, sample_size, n_instances, distribution,
+                          replace, generator, verbose):
+    """Point-cloud path of :func:`subsample_relative` (see its docstring)."""
+    R = _as_float_tensor(reference)
+    if query is None:
+        X = R
+    elif _query_is_indices(query):
+        # Query points selected by their order in the reference cloud.
+        idx = _reference_indices(query, R.shape[0])
+        X = _as_float_tensor(np.asarray(R)[idx], dtype=R.dtype)
+    else:
+        X = _as_float_tensor(query, dtype=R.dtype)
+        if X.ndim != 2:
+            raise ValueError(
+                "query must be a 2-D (n_query, dim) array of coordinates or a 1-D "
+                "integer array of reference indices."
+            )
+
+    if R.shape[1] != X.shape[1]:
+        raise ValueError("reference and query must have the same dimension.")
+
+    backend = _backend(R.dtype)
+    gen = generator._gen if generator is not None else None
+
+    # Fully fused C++ draw: distances + built-in distribution.
+    task, result = distribution._sample_subsets(
+        backend, R._data, X._data, sample_size, n_instances, replace, gen
+    )
+    _run_task(lambda: task, verbose=verbose)
+    return PointCloudTensor(result)
 
 
 def subsample_relative(
@@ -200,12 +184,10 @@ def subsample_relative(
         Number of points per subsample (``s`` in the paper).
     n_instances : int
         Number of subsamples drawn per query point (``n`` in the paper).
-    distribution : distribution spec or callable, optional
-        A built-in spec (:class:`Gaussian`, :class:`Uniform`) or a callable
-        mapping distances to non-negative weights. The callable is applied
-        element-wise to the whole ``(n_query, n_reference)`` matrix of distances
-        and must return an array of the same shape (so any NumPy element-wise
-        expression works). By default :class:`Gaussian` with ``mean=0``,
+    distribution : Gaussian or Uniform, optional
+        A built-in distribution spec (:class:`Gaussian` or :class:`Uniform`)
+        mapping distances to non-negative sampling weights, applied on the fully
+        fused C++ fast path. By default :class:`Gaussian` with ``mean=0``,
         ``sigma=1``.
     replace : bool, optional
         Whether each subsample is drawn with replacement, by default True
@@ -230,9 +212,13 @@ def subsample_relative(
         raise ValueError("sample_size must be positive.")
     if n_instances <= 0:
         raise ValueError("n_instances must be positive.")
-
     if distribution is None:
         distribution = Gaussian(0.0, 1.0)
+    if not isinstance(distribution, _BUILTIN_DISTRIBUTIONS):
+        raise ValueError(
+            "distribution must be a built-in distribution "
+            f"({' or '.join(d.__name__ for d in _BUILTIN_DISTRIBUTIONS)}) or None."
+        )
 
     # Distance-matrix input: weight by precomputed distances, return sub-matrices.
     if isinstance(reference, (DistanceMatrix, DistanceMatrixTensor)):
@@ -240,42 +226,8 @@ def subsample_relative(
             reference, query, sample_size=sample_size, n_instances=n_instances,
             distribution=distribution, replace=replace, generator=generator, verbose=verbose,
         )
-
-    R = _as_float_tensor(reference)
-    if query is None:
-        X = R
-    elif _query_is_indices(query):
-        # Query points selected by their order in the reference cloud.
-        idx = _reference_indices(query, R.shape[0])
-        X = _as_float_tensor(np.asarray(R)[idx], dtype=R.dtype)
-    else:
-        X = _as_float_tensor(query, dtype=R.dtype)
-        if X.ndim != 2:
-            raise ValueError(
-                "query must be a 2-D (n_query, dim) array of coordinates or a 1-D "
-                "integer array of reference indices."
-            )
-
-    if R.shape[1] != X.shape[1]:
-        raise ValueError("reference and query must have the same dimension.")
-
-    backend = _backend(R.dtype)
-    gen = generator._gen if generator is not None else None
-
-    if isinstance(distribution, _BUILTIN_DISTRIBUTIONS):
-        # Fully fused C++ draw: distances + built-in distribution.
-        task, result = distribution._sample_subsets(
-            backend, R._data, X._data, sample_size, n_instances, replace, gen
-        )
-    else:
-        # Custom distribution: the distances are computed in C++, the
-        # distribution is applied in Python, then the draw runs in C++.
-        np_float = np.float32 if R.dtype == float32 else np.float64
-        weights = _distance_weights(backend, R, X, distribution, np_float)
-        weights_tensor = FloatTensor(weights, dtype=R.dtype)
-        task, result = backend.sample_subsets_from_probabilities(
-            R._data, weights_tensor._data, sample_size, n_instances, replace, gen
-        )
-
-    _run_task(lambda: task, verbose=verbose)
-    return PointCloudTensor(result)
+    # Pointcloud input: 
+    return _subsample_pointcloud(
+        reference, query, sample_size=sample_size, n_instances=n_instances,
+        distribution=distribution, replace=replace, generator=generator, verbose=verbose,
+    )

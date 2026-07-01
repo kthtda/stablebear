@@ -60,28 +60,9 @@ def test_distmat_subsamples_are_indexed_views():
     assert np.allclose(el.materialize().to_dense(), D[np.ix_(idx, idx)])
 
 
-def test_distmat_callable_path_matches_builtin():
-    # The fused C++ Gaussian and an equivalent Python callable must draw the same
-    # subsamples for a fixed seed.
-    D = _ref_distmat(60)
-    dm = sb.DistanceMatrix.from_dense(D)
-
-    fused = subsample_relative(dm, sample_size=8, n_instances=4,
-                               distribution=Gaussian(0.0, 1.0),
-                               generator=sb.random.Generator(3))
-    callable_ = subsample_relative(dm, sample_size=8, n_instances=4,
-                                   distribution=lambda v: np.exp(-0.5 * np.asarray(v) ** 2),
-                                   generator=sb.random.Generator(3))
-
-    for i in range(fused.shape[0]):
-        for j in range(4):
-            assert np.array_equal(np.asarray(fused[i, j].indices),
-                                  np.asarray(callable_[i, j].indices))
-
-
 def test_distmat_zero_weight_points_never_sampled():
-    # A hard distance cutoff: reference points farther than the cutoff from the
-    # query row must never appear in any subsample.
+    # A hard distance cutoff (Uniform disk): reference points farther than the
+    # cutoff from the query row must never appear in any subsample.
     D = _ref_distmat(40, seed=1)
     dm = sb.DistanceMatrix.from_dense(D)
     q = 7
@@ -89,14 +70,14 @@ def test_distmat_zero_weight_points_never_sampled():
 
     subs = subsample_relative(dm, np.array([q], dtype=np.uint64),
                               sample_size=5, n_instances=80,
-                              distribution=lambda v: (np.asarray(v) < cutoff).astype(float),
+                              distribution=Uniform(high=cutoff),
                               generator=sb.random.Generator(0))
 
     seen = set()
     for j in range(subs.shape[1]):
         seen.update(int(i) for i in np.asarray(subs[0, j].indices))
     assert seen
-    assert all(D[q, i] < cutoff for i in seen)
+    assert all(D[q, i] <= cutoff for i in seen)
 
 
 def test_distmat_per_query_points_differ():

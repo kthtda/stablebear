@@ -36,26 +36,6 @@ def test_output_shape_and_dtype(float_kind):
     assert subs[3, 6].shape == (12, 3)
 
 
-def test_zero_weight_points_never_sampled():
-    # Distance filter + a hard cutoff distribution: reference points farther than
-    # the cutoff get weight 0 and must never appear in any subsample.
-    R = (np.arange(20, dtype=np.float64)).reshape(-1, 1)
-    X = np.array([[0.0]])
-    cutoff = 5.5
-
-    subs = subsample_relative(R, X, sample_size=8, n_instances=50,
-                     distribution=lambda v: (np.asarray(v) < cutoff).astype(float),
-                     generator=sb.random.Generator(0))
-
-    idx_map = _ref_index_map(R)
-    seen = set()
-    for j in range(subs.shape[1]):
-        seen.update(_sampled_indices(subs[0, j], idx_map))
-
-    assert seen, "expected some points to be sampled"
-    assert all(R[i, 0] < cutoff for i in seen)
-
-
 def test_gaussian_concentrates_on_nearest():
     # A small-sigma Gaussian over distance should sample the nearest reference
     # point far more than any other.
@@ -133,39 +113,6 @@ def test_verbose_matches_nonverbose():
             assert np.array_equal(np.asarray(loud[i, j]), np.asarray(quiet[i, j]))
 
 
-def test_callable_path_matches_builtin():
-    R = np.random.default_rng(4).standard_normal((60, 2))
-    X = np.random.default_rng(5).standard_normal((3, 2))
-
-    fused = subsample_relative(R, X, sample_size=8, n_instances=4,
-                      distribution=Gaussian(0.0, 1.0),
-                      generator=sb.random.Generator(3))
-    callable_ = subsample_relative(R, X, sample_size=8, n_instances=4,
-                          distribution=lambda v: np.exp(-0.5 * np.asarray(v) ** 2),
-                          generator=sb.random.Generator(3))
-
-    for i in range(3):
-        for j in range(4):
-            assert np.array_equal(np.asarray(fused[i, j]), np.asarray(callable_[i, j]))
-
-
-def test_uniform_fused_matches_callable():
-    # The fused C++ Uniform path and a constant Python distribution must agree.
-    R = np.random.default_rng(6).standard_normal((50, 2))
-    X = np.random.default_rng(7).standard_normal((3, 2))
-
-    fused = subsample_relative(R, X, sample_size=8, n_instances=4,
-                      distribution=Uniform(),
-                      generator=sb.random.Generator(2))
-    callable_ = subsample_relative(R, X, sample_size=8, n_instances=4,
-                          distribution=lambda v: np.ones_like(np.asarray(v)),
-                          generator=sb.random.Generator(2))
-
-    for i in range(3):
-        for j in range(4):
-            assert np.array_equal(np.asarray(fused[i, j]), np.asarray(callable_[i, j]))
-
-
 def test_uniform_samples_all_reference_points():
     # With equal weights every reference point should eventually be drawn.
     R = (np.arange(20, dtype=np.float64)).reshape(-1, 1)
@@ -219,24 +166,6 @@ def test_uniform_annulus_samples_only_within_band():
     assert seen == {i for i in range(30) if low <= abs(R[i, 0] - 15.0) <= high}
 
 
-def test_uniform_disk_fused_matches_callable():
-    # The fused C++ band and the equivalent Python distribution must agree.
-    R = np.random.default_rng(6).standard_normal((60, 2))
-    X = np.random.default_rng(7).standard_normal((3, 2))
-
-    fused = subsample_relative(R, X, sample_size=8, n_instances=4,
-                      distribution=Uniform(low=0.5, high=2.0),
-                      generator=sb.random.Generator(2))
-    callable_ = subsample_relative(R, X, sample_size=8, n_instances=4,
-                          distribution=lambda v: ((np.asarray(v) >= 0.5)
-                                                  & (np.asarray(v) <= 2.0)).astype(float),
-                          generator=sb.random.Generator(2))
-
-    for i in range(3):
-        for j in range(4):
-            assert np.array_equal(np.asarray(fused[i, j]), np.asarray(callable_[i, j]))
-
-
 @pytest.mark.parametrize("kwargs", [{"low": -1.0}, {"high": 0.0},
                                     {"low": 2.0, "high": 1.0},
                                     {"low": 1.0, "high": 1.0}])
@@ -273,20 +202,14 @@ def test_dimension_mismatch_raises():
         subsample_relative(R, X, sample_size=3, n_instances=1)
 
 
-def test_negative_weights_raise():
+@pytest.mark.parametrize("bad", [lambda v: np.asarray(v), object(), 3.0])
+def test_custom_distribution_rejected(bad):
+    # Only the built-in specs (Gaussian, Uniform) are accepted; arbitrary
+    # callables and other objects must be rejected.
     R = np.zeros((10, 2))
     X = np.zeros((1, 2))
     with pytest.raises(ValueError):
-        subsample_relative(R, X, sample_size=3, n_instances=1,
-                  distribution=lambda v: -np.ones_like(np.asarray(v)))
-
-
-def test_all_zero_weights_raise():
-    R = np.zeros((10, 2))
-    X = np.zeros((1, 2))
-    with pytest.raises(ValueError):
-        subsample_relative(R, X, sample_size=3, n_instances=1,
-                  distribution=lambda v: np.zeros_like(np.asarray(v)))
+        subsample_relative(R, X, sample_size=3, n_instances=1, distribution=bad)
 
 
 @pytest.mark.parametrize("bad", [0, -1])

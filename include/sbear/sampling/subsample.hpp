@@ -279,46 +279,6 @@ namespace sb::sampling
   // Samplers
   // ===========================================================================
 
-  /// Evaluate @p filter for every (query point, reference point) pair into an
-  /// (n_query, n_reference) matrix. This is the filter-value matrix the
-  /// custom-distribution path needs: the filter is computed once, in parallel
-  /// C++ — the single implementation of each filter, shared in spirit with the
-  /// fused @ref sample_subsets path — and the distribution is applied afterwards
-  /// (in Python) to the returned matrix.
-  template <typename T, typename FilterF>
-  Tensor<T> filter_values(const PointCloud<T>& R, const PointCloud<T>& X, FilterF filter,
-                          Executor& exec)
-  {
-    if (R.rank() != 2)
-      throw std::invalid_argument("reference must be a 2-D (n_points, dim) point cloud");
-    if (X.rank() != 2)
-      throw std::invalid_argument("query must be a 2-D (n_points, dim) point cloud");
-    if (X.dim() != R.dim())
-      throw std::invalid_argument("reference and query must have the same dimension");
-
-    Tensor<T> values({X.n_points(), R.n_points()});
-    parallel_walk(values, [&values, &R, &X, filter](const std::vector<size_t>& idx) {
-      values(idx) = filter(X, idx[0], R, idx[1]);
-    }, exec);
-    return values;
-  }
-
-  /// Per-query-row distance values of a reference distance matrix: row qi gives
-  /// source(query[qi], j) for every reference point j — the analogue of
-  /// filter_values for the precomputed-distance path. The custom distribution is
-  /// applied afterwards (in Python) to the returned (n_query, n_reference) matrix.
-  template <typename T>
-  Tensor<T> distance_matrix_values(const DistanceMatrix<T>& source, const Tensor<uint64_t>& query,
-                                   Executor& exec)
-  {
-    Tensor<T> values({query.shape(0), source.size()});
-    parallel_walk(values, [&values, &source, &query](const std::vector<size_t>& idx) {
-      const size_t qrow = static_cast<size_t>(query({idx[0]}));
-      values(idx) = source(qrow, idx[1]);
-    }, exec);
-    return values;
-  }
-
   /// Per-query-point subsampling of a reference point cloud, with sampling
   /// weights given by @p distribution applied to @p filter of each
   /// (query point, reference point) pair.
@@ -347,26 +307,6 @@ namespace sb::sampling
                                                             nInstances, replace, std::move(gen), exec);
   }
 
-  /// Per-query-point subsampling from precomputed sampling weights over a point
-  /// cloud reference. @p probabilities has shape (n_query, n_reference).
-  template <typename T>
-  SubsampleHandle<PointCloud<T>> sample_subsets_from_probabilities(const PointCloud<T>& R,
-                                                                   Tensor<T> probabilities,
-                                                                   size_t sampleSize, size_t nInstances,
-                                                                   bool replace,
-                                                                   DefaultRandomGenerator gen,
-                                                                   Executor& exec)
-  {
-    detail::validate_reference(R, sampleSize, replace);
-    if (probabilities.rank() != 2)
-      throw std::invalid_argument("probabilities must be a 2-D (n_query, n_reference) array");
-    if (probabilities.shape(1) != R.n_points())
-      throw std::invalid_argument("probabilities must have one column per reference point");
-
-    return detail::draw_subsets_from_weights<PointCloud<T>>(R, std::move(probabilities), sampleSize,
-                                                            nInstances, replace, std::move(gen), exec);
-  }
-
   /// Per-query-point subsampling of a reference distance matrix. For each query
   /// row index in @p query, weights over the reference points are
   /// @p distribution(source(query_row, j)); @p sampleSize indices are drawn and
@@ -383,24 +323,6 @@ namespace sb::sampling
     Tensor<T> weights = detail::compute_weights_distmat(source, query, distribution, exec);
     return detail::draw_subsets_from_weights<DistanceMatrix<T>>(source, std::move(weights), sampleSize,
                                                                 nInstances, replace, std::move(gen), exec);
-  }
-
-  /// Per-query-point subsampling of a reference distance matrix from precomputed
-  /// weights. @p probabilities has shape (n_query, n_reference).
-  template <typename T>
-  SubsampleHandle<DistanceMatrix<T>> sample_subsets_from_probabilities_distmat(
-      const DistanceMatrix<T>& source, Tensor<T> probabilities, size_t sampleSize, size_t nInstances,
-      bool replace, DefaultRandomGenerator gen, Executor& exec)
-  {
-    detail::validate_distmat(source, sampleSize, replace);
-    if (probabilities.rank() != 2)
-      throw std::invalid_argument("probabilities must be a 2-D (n_query, n_reference) array");
-    if (probabilities.shape(1) != source.size())
-      throw std::invalid_argument("probabilities must have one column per reference point");
-
-    return detail::draw_subsets_from_weights<DistanceMatrix<T>>(source, std::move(probabilities),
-                                                                sampleSize, nInstances, replace,
-                                                                std::move(gen), exec);
   }
 
 }

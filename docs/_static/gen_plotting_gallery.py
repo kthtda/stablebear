@@ -316,8 +316,6 @@ def plot_poisson_samples(color="steelblue"):
 
 # -- docs snippet start subsample_weights --
 def plot_subsample_weights(query_color="red", cmap="viridis"):
-    import stablebear as sb
-
     # A reference cloud and a single query point to view it from.
     gen = np.random.default_rng(0)
     reference = gen.standard_normal((400, 2))
@@ -326,15 +324,16 @@ def plot_subsample_weights(query_color="red", cmap="viridis"):
     # Score each reference point by its Euclidean distance to the query point.
     dist = np.linalg.norm(reference - query, axis=1)
 
-    # Each distribution turns those distances into sampling weights.
+    # Each distribution turns those distances into sampling weights, exactly as
+    # the built-in specs do on the fused C++ path: Gaussian(mean=0, sigma=0.4)
+    # and Uniform(low=1.0, high=1.8).
     distributions = [
-        ("Gaussian(mean=0, sigma=0.4)", sb.Gaussian(mean=0.0, sigma=0.4)),
-        ("Uniform(low=1.0, high=1.8)", sb.Uniform(low=1.0, high=1.8)),
+        ("Gaussian(mean=0, sigma=0.4)", np.exp(-0.5 * (dist / 0.4) ** 2)),
+        ("Uniform(low=1.0, high=1.8)", ((dist >= 1.0) & (dist <= 1.8)).astype(float)),
     ]
 
     fig, axes = plt.subplots(1, 2, figsize=(9, 4), sharex=True, sharey=True)
-    for ax, (title, distribution) in zip(axes, distributions):
-        weights = distribution(dist)
+    for ax, (title, weights) in zip(axes, distributions):
         sc = ax.scatter(reference[:, 0], reference[:, 1], c=weights,
                         cmap=cmap, s=18, edgecolors="none")
         ax.scatter(query[0], query[1], marker="*", s=260, color=query_color,

@@ -74,8 +74,10 @@ Distributions
 The reference points are scored by their Euclidean distance
 :math:`\lVert p - r \rVert` to the query point (computed in parallel in C++),
 and the distribution turns that distance into a non-negative sampling weight.
-Pass a built-in spec or a callable via the ``distribution`` keyword; the default
-is ``Gaussian(mean=0.0, sigma=1.0)``.
+Pass one of the built-in specs (:class:`~stablebear.Gaussian` or
+:class:`~stablebear.Uniform`) via the ``distribution`` keyword; the default is
+``Gaussian(mean=0.0, sigma=1.0)``. The whole probability-and-draw computation
+then runs in a single fused C++ pass.
 
 .. note::
 
@@ -164,30 +166,6 @@ by distance to the query point:
    tensor shapes the downstream code expects. (A *banded* ``Uniform(low,
    high)`` does depend on the query point, so this caveat applies only to the
    fully-open default.)
-
-Custom callable
----------------
-
-Any callable returning non-negative weights works too. It is applied
-element-wise to the whole ``(n_query, n_reference)`` matrix of filter values
-and must return an array of the same shape (so any NumPy element-wise
-expression works). For instance, a hard distance cutoff::
-
-   subs = sb.subsample_relative(reference, query, sample_size=30, n_instances=2000,
-                                distribution=lambda v: (v < 2.0).astype(float))
-
-The weights need not be normalized -- they are treated as relative
-probabilities. ``subsample_relative`` raises if any weight is negative, or if
-every reference point gets weight zero for some query point.
-
-.. note::
-
-   When the distribution is a built-in :class:`~stablebear.Gaussian` or
-   :class:`~stablebear.Uniform`, the whole probability-and-draw computation runs
-   in a single fused C++ pass. A custom callable distribution is instead
-   applied in Python to the filter values (still computed in C++), and the
-   draw then runs in C++.
-
 
 Drawing controls
 ================
