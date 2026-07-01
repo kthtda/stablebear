@@ -99,6 +99,7 @@ jobs:
             --cov-config=../pyproject.toml \
             --cov-report=html:../covreport/python \
             --cov-report=json:../covreport/python/coverage.json \
+            --cov-report=xml:../covreport/python/coverage.xml \
             --cov-report=term
           touch ../covreport/python/.keep
           if [ ! -f "../covreport/python/index.html" ]; then
@@ -106,6 +107,9 @@ jobs:
           fi
           if [ ! -f "../covreport/python/coverage.json" ]; then
             python -m coverage json -o ../covreport/python/coverage.json || true
+          fi
+          if [ ! -f "../covreport/python/coverage.xml" ]; then
+            python -m coverage xml -o ../covreport/python/coverage.xml || true
           fi
           touch ../covreport/python/.keep
 
@@ -142,6 +146,11 @@ jobs:
               > covreport/cpp/llvm-cov-summary.json
           python3 .github/scripts/llvm_cov_summary.py \
               covreport/cpp/llvm-cov-summary.json covreport/cpp/coverage-summary.json
+          # Full lcov export for Codecov ingestion
+          llvm-cov export $FIRST_OBJ $EXTRA_OBJS \
+              $INSTR_PROFILE $IGNORE \
+              -format=lcov \
+              > covreport/cpp/coverage.lcov
           # Human-readable table in the step summary
           llvm-cov report $FIRST_OBJ $EXTRA_OBJS $INSTR_PROFILE $IGNORE >> $GITHUB_STEP_SUMMARY
 
@@ -151,6 +160,22 @@ jobs:
           name: coverage
           path: covreport/
           retention-days: 1
+
+      - name: Upload Python coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          files: ./covreport/python/coverage.xml
+          flags: python
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
+
+      - name: Upload C++ coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          files: ./covreport/cpp/coverage.lcov
+          flags: cpp
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
 
   memory_check:
     name: Memory check (Valgrind + Helgrind)
@@ -419,6 +444,14 @@ jobs:
           name: cuda-coverage
           path: covreport/cuda/
           retention-days: 1
+
+      - name: Upload CUDA coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          files: ./covreport/cuda/cuda.info
+          flags: cuda
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
 
   publish:
     name: Publish reports to GitHub Pages

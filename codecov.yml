@@ -1,0 +1,26 @@
+coverage:
+  status:
+    project:
+      default:
+        target: auto
+        threshold: 1%
+    patch:
+      default:
+        target: auto
+        threshold: 1%
+
+# Coverage is produced by three separate jobs/runners and merged by commit SHA.
+# carryforward keeps the last known value for a flag on runs where its job does
+# not execute (e.g. the CPU-only / use_github_runners CI path skips cuda_test),
+# so the combined percentage does not drop.
+flags:
+  python:
+    carryforward: true
+  cpp:
+    carryforward: true
+  cuda:
+    carryforward: true
+
+ignore:
+  - "3rd/"
+  - "test/"
