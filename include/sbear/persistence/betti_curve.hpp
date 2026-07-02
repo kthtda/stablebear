@@ -55,7 +55,10 @@ namespace sb::ph
     std::vector<PcfPointT> points;
 
     T count = 0;
-    T lastTime = T{0};
+    // Start at the earliest event when it is negative (sublevel-set
+    // filtrations); starting at 0 would emit a (0, 0) breakpoint followed by
+    // earlier times -- an unsorted PCF.
+    T lastTime = std::min(T{0}, events.front().time);
 
     for (auto const& event : events)
     {

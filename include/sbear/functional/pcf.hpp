@@ -37,7 +37,13 @@ namespace sb
     explicit Pcf(std::vector<TimePoint<Tt, Tv>>&& pts)
       : m_points(std::move(pts))
     {
-
+      // evaluate and iterate_rectangles dereference the first point
+      // unconditionally; an empty PCF is UB there, so reject it here with a
+      // catchable error (e.g. a truncated file reaching io read_element).
+      if (m_points.empty())
+      {
+        throw std::invalid_argument("A PCF requires at least one point");
+      }
     }
 
     /// Converting constructor: convert from a Pcf with different precision.
