@@ -45,6 +45,17 @@ namespace
     }
   }
 
+  TEST(Subdivide, NoItems)
+  {
+    // Regression: nItems == 0 used to clamp the first block's end to
+    // nItems - 1, wrapping to SIZE_MAX (issue #186).
+    for (size_t bs = 1; bs <= 5; ++bs)
+    {
+      auto blocks = sb::subdivide(bs, 0);
+      EXPECT_TRUE(blocks.empty());
+    }
+  }
+
   TEST(Subdivide, SingleItem)
   {
     auto blocks = sb::subdivide(5, 1);
