@@ -11,6 +11,13 @@ namespace sb
   subdivide(size_t blockSize, size_t nItems)
   {
     std::vector<std::pair<size_t, size_t>> boundaries;
+    if (nItems == 0)
+    {
+      // Blocks are inclusive [first, second] ranges, so there is no way to
+      // express an empty block -- and the clamp below would wrap
+      // nItems - 1 to SIZE_MAX. No items means no blocks.
+      return boundaries;
+    }
     for (size_t i = 0ul;; i += blockSize)
     {
       if (!boundaries.empty() && boundaries.back().second == nItems - 1)
