@@ -434,6 +434,21 @@ namespace sb
         throw std::invalid_argument("Cannot broadcast in-place: output shape " +
             shape_to_string(out_shape) + " differs from LHS shape " + shape_to_string(lhs.shape()));
       auto rhs_view = rhs.broadcast_to(out_shape);
+
+      // If the RHS aliases the LHS storage (e.g. a[1:] += a[:-1], where both
+      // sides are views of the same buffer), the walk below would read
+      // elements it has already updated. Materialize an independent copy of
+      // the RHS first, matching NumPy and assign_from; data() includes the
+      // view offset, so compare the buffer base (data() - offset()).
+      if (lhs.data() - lhs.offset() == rhs.data() - rhs.offset())
+      {
+        Tensor<T> rhs_copy = rhs_view.copy();
+        sb::walk(lhs, [&](const std::vector<size_t>& idx) {
+          lhs(idx) = op(lhs(idx), rhs_copy(idx));
+        });
+        return lhs;
+      }
+
       sb::walk(lhs, [&](const std::vector<size_t>& idx) {
         lhs(idx) = op(lhs(idx), rhs_view(idx));
       });
