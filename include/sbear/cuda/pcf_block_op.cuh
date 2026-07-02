@@ -181,7 +181,8 @@ namespace sb
 
         CudaBlockPipeline<value_type, block_op_t, ResultWriter> pipeline(
             m_cudaThreads, blockOp, scheduler, m_writer,
-            [this](size_t n) { add_progress(n); });
+            [this](size_t n) { add_progress(n); },
+            [this] { return stop_requested(); });
 
         if (stop_requested()) return;
         pipeline.execute(blockDim);
@@ -263,7 +264,8 @@ namespace sb
 
         CudaBlockPipeline<value_type, block_op_t, ResultWriter> pipeline(
             m_cudaThreads, blockOp, scheduler, m_writer,
-            [this](size_t n) { add_progress(n); });
+            [this](size_t n) { add_progress(n); },
+            [this] { return stop_requested(); });
 
         if (stop_requested()) return;
         pipeline.execute(blockDim);
