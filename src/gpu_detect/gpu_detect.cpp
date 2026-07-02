@@ -8,6 +8,9 @@
 #include <dirent.h>
 #include <fstream>
 #include <sstream>
+#include <cctype>
+#include <cstring>
+#include <unistd.h>
 #elif defined(_WIN32)
 #include <windows.h>
 #include <dxgi.h>
@@ -30,7 +33,22 @@ struct GpuInfo
 
 #ifdef __linux__
 
-std::vector<GpuInfo> detect_gpus()
+// Each physical GPU exposes several /sys/class/drm nodes (cardN, renderDN,
+// and per-connector nodes that resolve to the same device). Count only the
+// cardN nodes so one GPU is reported once.
+bool is_drm_card_entry(const char* name)
+{
+  if (std::strncmp(name, "card", 4) != 0 || name[4] == '\0')
+    return false;
+  for (const char* p = name + 4; *p != '\0'; ++p)
+  {
+    if (!std::isdigit(static_cast<unsigned char>(*p)))
+      return false;
+  }
+  return true;
+}
+
+std::vector<GpuInfo> detect_gpus_drm()
 {
   std::vector<GpuInfo> gpus;
 
@@ -41,6 +59,9 @@ std::vector<GpuInfo> detect_gpus()
   const struct dirent* entry;
   while ((entry = readdir(drm)) != nullptr)
   {
+    if (!is_drm_card_entry(entry->d_name))
+      continue;
+
     std::string base = "/sys/class/drm/";
     base += entry->d_name;
     std::string device_path = base + "/device/";
@@ -95,6 +116,94 @@ std::vector<GpuInfo> detect_gpus()
 
   closedir(drm);
   return gpus;
+}
+
+// The driver's procfs has one directory per GPU. Covers slim containers
+// with no lspci and no NVIDIA PCI drm entries.
+std::vector<GpuInfo> detect_gpus_proc_driver()
+{
+  std::vector<GpuInfo> gpus;
+
+  DIR* dir = opendir("/proc/driver/nvidia/gpus");
+  if (!dir)
+    return gpus;
+
+  const struct dirent* entry;
+  while ((entry = readdir(dir)) != nullptr)
+  {
+    std::string name = entry->d_name;
+    if (name == "." || name == "..")
+      continue;
+
+    GpuInfo gpu;
+    gpu.vendor_id = NVIDIA_VENDOR_ID;
+    gpu.device_id = 0;
+    gpu.name = "NVIDIA GPU [" + name + "]";
+
+    std::ifstream info_file("/proc/driver/nvidia/gpus/" + name + "/information");
+    std::string line;
+    while (std::getline(info_file, line))
+    {
+      if (line.rfind("Model:", 0) == 0)
+      {
+        auto pos = line.find_first_not_of(" \t", 6);
+        if (pos != std::string::npos)
+        {
+          gpu.name = line.substr(pos);
+        }
+        break;
+      }
+    }
+
+    gpus.push_back(std::move(gpu));
+  }
+
+  closedir(dir);
+  return gpus;
+}
+
+// WSL2 exposes the GPU through /dev/dxg with no NVIDIA PCI drm nodes.
+// /dev/dxg alone could be any vendor, so require the WSL NVIDIA driver
+// libraries as well.
+std::vector<GpuInfo> detect_gpus_wsl()
+{
+  std::vector<GpuInfo> gpus;
+
+  if (access("/dev/dxg", F_OK) != 0)
+    return gpus;
+
+  const char* wsl_markers[] = {
+    "/usr/lib/wsl/lib/libcuda.so.1",
+    "/usr/lib/wsl/lib/libcuda.so",
+    "/usr/lib/wsl/lib/nvidia-smi",
+  };
+  for (const char* marker : wsl_markers)
+  {
+    if (access(marker, F_OK) == 0)
+    {
+      GpuInfo gpu;
+      gpu.vendor_id = NVIDIA_VENDOR_ID;
+      gpu.device_id = 0;
+      gpu.name = "NVIDIA GPU (WSL2)";
+      gpus.push_back(std::move(gpu));
+      break;
+    }
+  }
+
+  return gpus;
+}
+
+std::vector<GpuInfo> detect_gpus()
+{
+  auto gpus = detect_gpus_drm();
+  if (!gpus.empty())
+    return gpus;
+
+  gpus = detect_gpus_proc_driver();
+  if (!gpus.empty())
+    return gpus;
+
+  return detect_gpus_wsl();
 }
 
 #elif defined(_WIN32)
