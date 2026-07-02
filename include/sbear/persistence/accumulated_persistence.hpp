@@ -5,6 +5,8 @@
 #include "barcode.hpp"
 #include "barcode_summary.hpp"
 
+#include <algorithm>
+
 namespace sb::ph
 {
   /**
@@ -71,7 +73,10 @@ namespace sb::ph
     std::vector<PcfPointT> points;
 
     T cumSum = T{0};
-    T lastMidpoint = T{0};
+    // Start at the earliest midpoint when it is negative (sublevel-set
+    // filtrations), mirroring barcode_to_betti_curve -- starting at 0 would
+    // emit an unsorted PCF.
+    T lastMidpoint = std::min(T{0}, entries.front().midpoint);
 
     for (auto const& entry : entries)
     {

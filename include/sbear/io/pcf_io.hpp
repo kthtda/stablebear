@@ -17,6 +17,18 @@ namespace sb::io::detail
   {
     using point_type = PcfT::point_type;
     auto pts = read_vector<point_type>(is);
+
+    // Validate the invariants downstream algorithms rely on, so a truncated
+    // or corrupted file yields a clean error instead of UB later. Emptiness
+    // is checked by the Pcf constructor itself.
+    for (size_t i = 1; i < pts.size(); ++i)
+    {
+      if (pts[i].t <= pts[i - 1].t)
+      {
+        throw std::runtime_error("Corrupt PCF data: breakpoint times are not strictly increasing");
+      }
+    }
+
     return PcfT(std::move(pts));
   }
 }

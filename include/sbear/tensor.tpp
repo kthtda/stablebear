@@ -1201,10 +1201,10 @@ namespace sb
   template <typename T>
   [[nodiscard]] size_t Tensor<T>::size() const noexcept
   {
-    if (m_shape.empty())
-    {
-      return 0_uz;
-    }
+    // A rank-0 tensor holds exactly one element (numpy convention): walk()
+    // visits it and get_total_size() returns 1, so size() must agree --
+    // returning 0 made the randomized walk reserve too few RNG slots and
+    // progress/threshold logic miscount.
     return std::accumulate(m_shape.begin(), m_shape.end(), 1_uz, std::multiplies<size_t>());
   }
 
