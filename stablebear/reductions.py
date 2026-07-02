@@ -71,6 +71,9 @@ def mean(fs: PcfContainerLike, dim: int = 0):
     ------
     IndexError
         If ``dim`` is out of range for the input tensor's number of dimensions.
+    ValueError
+        If the reduced dimension has size 0 (the mean of zero functions is
+        undefined).
     """
     backend, tensor = _resolve_pcf_inputs(_REDUCTIONS_BACKEND_MAP, fs)
     return _to_tensor(backend.mean(tensor._data, _resolve_dim(dim, tensor.ndim)))

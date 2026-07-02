@@ -99,6 +99,16 @@ namespace sb
   template <typename PcfT>
   Tensor<PcfT> mean(const Tensor<PcfT>& in, size_t dim, Executor& exec = default_executor())
   {
+    // Same guard as max_element below: reducing a zero-length dimension would
+    // otherwise divide by zero and silently produce all-NaN PCFs.
+    check_reduce_dim(dim, in.shape().size());
+    if (in.shape()[dim] == 0)
+    {
+      std::ostringstream oss;
+      oss << "Cannot reduce an empty dimension: dimension " << dim << " has size 0";
+      throw std::invalid_argument(oss.str());
+    }
+
     auto ret = parallel_tensor_reduce(in, dim, [](const typename PcfT::rectangle_type& rect) {
       return rect.f_value + rect.g_value;
     }, exec);

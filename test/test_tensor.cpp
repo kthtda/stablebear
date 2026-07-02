@@ -108,11 +108,22 @@ namespace
 
 // size()
 
-  TYPED_TEST(TensorTppTyped, SizeOfEmptyTensor)
+  TYPED_TEST(TensorTppTyped, SizeOfRankZeroTensorIsOne)
   {
+    // A rank-0 tensor holds exactly one element (numpy convention); size()
+    // must agree with walk() and get_total_size() (issue #196).
     using T = TypeParam;
     sb::Tensor<T> t;
+    EXPECT_EQ(t.size(), 1u);
+  }
+
+  TYPED_TEST(TensorTppTyped, SizeOfZeroExtentTensorIsZero)
+  {
+    using T = TypeParam;
+    sb::Tensor<T> t({ 0 });
     EXPECT_EQ(t.size(), 0u);
+    sb::Tensor<T> t2({ 3, 0 });
+    EXPECT_EQ(t2.size(), 0u);
   }
 
   TYPED_TEST(TensorTppTyped, Size1d)

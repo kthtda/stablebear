@@ -880,6 +880,7 @@ if (BUILD_TESTER)
       test/test_offset_data_manager.cpp
       test/test_walk_random.cpp
       test/test_subdivide.cpp
+      test/test_bugscan_core.cpp
   )
 
   if (BUILD_CUDA_TESTER)
