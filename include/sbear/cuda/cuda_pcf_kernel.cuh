@@ -31,8 +31,35 @@ namespace sb
       TriangleSkipMode skipMode;
     };
 
+    /// Index of the last breakpoint with t <= a (device analogue of the
+    /// host-side max_time_iterator_prior_to). Points are sorted by time.
+    template <typename Tt, typename Tv>
+    __device__ size_t cuda_max_time_index_prior_to(
+        const SimplePoint<Tt, Tv>* pts, size_t n, Tt a)
+    {
+      // upper_bound: first index with pts[i].t > a
+      size_t lo = 0;
+      size_t hi = n;
+      while (lo < hi)
+      {
+        size_t mid = lo + (hi - lo) / 2;
+        if (pts[mid].t <= a)
+        {
+          lo = mid + 1;
+        }
+        else
+        {
+          hi = mid;
+        }
+      }
+      return lo == 0 ? 0 : lo - 1;
+    }
+
     /// Walk two PCFs simultaneously through their breakpoints,
     /// calling cb(left, right, fValue, gValue) for each rectangle.
+    /// Mirrors the host-side iterate_rectangles (iterate_rectangles.hpp);
+    /// the two must stay in lockstep so CPU and GPU results agree for any
+    /// integration bounds [a, b].
     template<typename Tt, typename Tv, typename RectangleCallback>
     __device__ void cuda_pcf_iterate_rectangles(
         const SimplePoint<Tt, Tv>* rowPoints, size_t fOffset, size_t fsz,
@@ -45,11 +72,14 @@ namespace sb
       Tv fv;
       Tv gv;
 
-      size_t fi = 0;
-      size_t gi = 0;
-
       const SimplePoint<Tt, Tv>* fpts = rowPoints + fOffset;
       const SimplePoint<Tt, Tv>* gpts = colPoints + gOffset;
+
+      // Start at the last breakpoint <= a, like the CPU path -- starting at
+      // index 0 emits wrong values (and a negative-width leading rectangle)
+      // when there are breakpoints in (0, a].
+      size_t fi = cuda_max_time_index_prior_to(fpts, fsz, a);
+      size_t gi = cuda_max_time_index_prior_to(gpts, gsz, a);
 
       while (t < b)
       {
@@ -86,7 +116,9 @@ namespace sb
           }
         }
 
-        t = max(fpts[fi].t, gpts[gi].t);
+        // Clamp to b like the CPU path so the final rectangle does not
+        // integrate past a finite upper bound.
+        t = min(max(fpts[fi].t, gpts[gi].t), b);
         cb(tprev, t, fv, gv);
       }
     }

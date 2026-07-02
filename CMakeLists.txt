@@ -887,6 +887,7 @@ if (BUILD_TESTER)
         test/test_block_matrix_support.cu
         test/test_l1_dist.cu
         test/test_block_integrate.cu
+        test/test_block_integrate_bounds.cu
         test/test_norms.cu
         ${SB_TEST_SOURCES_COMMON}
     )
