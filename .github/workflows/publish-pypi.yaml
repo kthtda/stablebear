@@ -66,6 +66,8 @@ jobs:
       contents: write
     uses: ./.github/workflows/analysis.yaml
     needs: check_version
+    secrets:
+      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
   publish:
     runs-on: ubuntu-latest
