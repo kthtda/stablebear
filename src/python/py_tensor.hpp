@@ -158,8 +158,11 @@ namespace sb_py
           std::transform(self.strides().begin(), self.strides().end(), strides.begin(),
               [](ptrdiff_t v) { return static_cast<pybind11::ssize_t>(v * sizeof(T)); });
 
+          // data() already includes the view offset; adding offset() again
+          // would read past the start of the view (latent until contiguous
+          // zero-copy views land, see tensor.tpp extract()).
           return pybind11::buffer_info(
-              static_cast<void*>(self.data() + self.offset()),
+              static_cast<void*>(self.data()),
               sizeof(T),
               pybind11::format_descriptor<T>::format(),
               self.rank(),
