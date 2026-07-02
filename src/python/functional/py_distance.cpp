@@ -52,7 +52,12 @@ namespace
       auto end = sb::end1dValues(fs);
 
 #ifdef BUILD_WITH_CUDA
+      // default_executor().cuda() is null when the CUDA module loaded but no
+      // usable device exists at runtime (e.g. driver mismatch or
+      // CUDA_VISIBLE_DEVICES=""); fall back to the CPU path instead of
+      // dereferencing it in the factory.
       if (cudaFactory && !sb::settings().forceCpu
+          && sb::default_executor().cuda() != nullptr
           && static_cast<size_t>(std::distance(begin, end)) >= sb::settings().cudaThreshold)
       {
         if (sb::settings().deviceVerbose)
@@ -170,6 +175,7 @@ namespace
 
 #ifdef BUILD_WITH_CUDA
       if (cudaFactory && !sb::settings().forceCpu
+          && sb::default_executor().cuda() != nullptr
           && xTotal * yTotal >= sb::settings().cudaThreshold * sb::settings().cudaThreshold)
       {
         if (sb::settings().deviceVerbose)
