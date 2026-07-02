@@ -284,7 +284,7 @@ if (PROJECT_BODY MATCHES [[version[ \t]*=[ \t]*"([^"]+)"]])
 
   set(PROJ_VERSION "${PROJ_VERSION_NUMERIC}")
 else ()
-  message(FATAL "Could not detect version number from pyproject.toml!")
+  message(FATAL_ERROR "Could not detect version number from pyproject.toml!")
 endif ()
 
 project(${PROJ_NAME} VERSION ${PROJ_VERSION_NUMERIC} LANGUAGES CXX ${LANG_CUDA})
@@ -528,6 +528,8 @@ add_subdirectory(3rd/pybind11)
 # Adapted from https://community.gigperformer.com/t/getting-cmake-variables-from-c/17711
 string(TIMESTAMP TODAY "%d/%m/%Y")
 set(PROJECT_BUILD_DATE ${TODAY})
+# Consumed by version.cpp.in (sb::PROJECT_TITLE was always empty before).
+set(PROJECT_TITLE "${PROJ_NAME}")
 configure_file(version.cpp.in ${CMAKE_CURRENT_BINARY_DIR}/version.cpp @ONLY)
 
 SET(SB_LIB_SOURCES_CUDA
@@ -757,7 +759,7 @@ foreach(MOD_NAME IN LISTS CPP_MODULE_NAMES)
   target_include_directories(${MOD_NAME} PRIVATE ${SB_PRIVATE_INCLUDES})
   target_include_directories(${MOD_NAME} PUBLIC ${SB_PUBLIC_INCLUDES})
   target_link_libraries(${MOD_NAME} PRIVATE pybind11::headers)
-  target_compile_definitions(${MOD_NAME} PRIVATE VERSION_INFO=${PROJECT_VERSION_FULL})
+  target_compile_definitions(${MOD_NAME} PRIVATE VERSION_INFO=${PROJ_VERSION_FULL})
   sb_apply_cpu_arch_flags(${MOD_NAME})
 endforeach()
 
@@ -991,7 +993,9 @@ foreach(MOD_NAME IN LISTS CPP_MODULE_NAMES)
 endforeach()
 
 if (NOT MSVC)
-  set(CMAKE_CXX_FLAGS "-Wall -Wextra -Werror=return-type")
+  # Append rather than overwrite so user/packager-supplied CXXFLAGS
+  # (hardening flags, -march=..., ...) are not silently discarded.
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Werror=return-type")
 endif ()
 
 if (POLICY CMP0177)
@@ -1213,7 +1217,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND BUILD_TESTER)
   target_link_libraries(sb_test PRIVATE valgrind_flags)
 endif()
 
-message(STATUS "!!! Stub file:          ${STUB_FILE}")
+message(STATUS "!!! Skip stubgen:       ${SKIP_STUBGEN}")
 message(STATUS "!!! Install target:     ${INSTALL_TARGET}")
 
 message(STATUS "!!! C compiler:         ${CMAKE_C_COMPILER}")
