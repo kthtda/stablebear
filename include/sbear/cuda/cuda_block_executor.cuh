@@ -140,8 +140,10 @@ namespace sb
         exec_block(blocks[i], blockDim);
       });
 
-      m_gpuThreads.run(std::move(flow));
-      m_gpuThreads.wait_for_all();
+      // wait_for_all() discards task exceptions; get() rethrows the first
+      // CHK_CUDA failure (OOM, bad launch, ...) so it reaches the caller
+      // instead of silently leaving the remaining blocks zeroed.
+      m_gpuThreads.run(std::move(flow)).get();
 
       // Flush any pending scatter on each GPU
       for (size_t iGpu = 0; iGpu < m_nGpus; ++iGpu)
