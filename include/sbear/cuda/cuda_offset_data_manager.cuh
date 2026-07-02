@@ -33,18 +33,17 @@ namespace sb
       size_t baseOffset = hostData.offsets[start];
       size_t nElements = hostData.offsets[start + count] - baseOffset;
 
-      m_localOffsets.resize(count + 1);
+      // Local scratch: one manager instance is shared by all GPU worker
+      // threads, so this must not be shared mutable state.
+      std::vector<size_t> localOffsets(count + 1);
       for (size_t i = 0; i <= count; ++i)
       {
-        m_localOffsets[i] = hostData.offsets[start + i] - baseOffset;
+        localOffsets[i] = hostData.offsets[start + i] - baseOffset;
       }
 
-      deviceOffsets.toDevice(m_localOffsets.data(), count + 1);
+      deviceOffsets.toDevice(localOffsets.data(), count + 1);
       deviceElements.toDevice(hostData.elements.data() + baseOffset, nElements);
     }
-
-  private:
-    mutable std::vector<size_t> m_localOffsets;
   };
 }
 
