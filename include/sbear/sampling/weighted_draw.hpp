@@ -49,17 +49,12 @@ namespace sb::sampling::detail
 
     const auto it = std::upper_bound(cdf.begin(), cdf.end(), target);
     const size_t idx = static_cast<size_t>(it - cdf.begin());
-    return std::min(idx, cdf.size() - 1);
+    return std::min(idx, cdf.size() - 1);  // uniform() may round up to cdf.back(), where upper_bound returns end()
   }
 
-  /// Per-query preparation of a weight row, done once and reused by all of
-  /// the query's subsamples: validate every weight (rejecting negatives here
-  /// rather than counting them as merely ineligible, which could turn an
-  /// invalid row into a silent empty draw) and count the eligible (strictly
-  /// positive) ones. When @p toCdf is set — sampling with replacement, where
-  /// the distribution never changes between draws — the row is additionally
-  /// replaced in place by its prefix sums, so the CDF is built once per query
-  /// instead of once per subsample. Returns the eligible count.
+  /// Validate a weight row and return its eligible (strictly positive)
+  /// count; with @p toCdf, also replace it in place by its prefix sums.
+  /// Called once per query point, reused by all of the query's subsamples.
   template <typename T>
   size_t prepare_weight_row(std::span<T> row, bool toCdf)
   {
@@ -67,13 +62,15 @@ namespace sb::sampling::detail
     T total = T(0);
     for (T& w : row)
     {
+      // Reject negatives rather than counting them ineligible: an invalid
+      // row must not become a silent empty draw.
       if (w < T(0))
         throw std::invalid_argument("sampling weights must be non-negative");
       if (w > T(0))
         ++nEligible;
       total += w;
       if (toCdf)
-        w = total;
+        w = total;  // with replacement the CDF never changes: build it once
     }
     // A row with eligible weights but no positive total (NaN weights) can
     // not be drawn from; an all-zero row is a valid empty region.
@@ -94,8 +91,7 @@ namespace sb::sampling::detail
     return drawn;
   }
 
-  /// Draw @p nDraws *distinct* reference indices from a raw weight row: zero
-  /// a weight once chosen and rebuild the CDF for the remaining points.
+  /// Draw @p nDraws *distinct* reference indices from a raw weight row.
   /// Requires nDraws <= the row's eligible count, which keeps the CDF total
   /// positive throughout.
   template <typename T, typename EngineT>
@@ -110,15 +106,13 @@ namespace sb::sampling::detail
       build_cdf(cdf, remaining);
       const size_t refIdx = draw_one(std::span<const T>(cdf), engine);
       drawn({drawIdx}) = static_cast<uint64_t>(refIdx);
-      remaining[refIdx] = T(0);
+      remaining[refIdx] = T(0);  // a drawn point cannot be drawn again
     }
     return drawn;
   }
 
-  /// Pick the reference indices of one subsample from a prepared row (the row
-  /// CDF with replacement, validated raw weights without — see
-  /// prepare_weight_row). @p sampleSize is a maximum: the drawn index tensor
-  /// has length
+  /// The reference indices of one subsample, drawn from a prepared row.
+  /// @p sampleSize is a maximum — the result has length
   ///   - 0 when @p nEligible is 0 (the query's region holds no points),
   ///   - min(sampleSize, nEligible) without replacement,
   ///   - sampleSize with replacement (repeats fill the sample).
@@ -133,9 +127,8 @@ namespace sb::sampling::detail
         : draw_without_replacement(row, std::min(sampleSize, nEligible), engine);
   }
 
-  /// The contiguous row of one query point in a (n_query, n_reference) weight
-  /// matrix. Callers are responsible for the matrix being contiguous
-  /// (prepare_weight_matrix normalizes it once).
+  /// The contiguous row of one query point in a (n_query, n_reference)
+  /// weight matrix (prepare_weight_matrix normalizes contiguity once).
   template <typename T>
   std::span<T> weight_row(const Tensor<T>& weights, size_t queryIdx)
   {
