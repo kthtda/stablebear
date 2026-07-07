@@ -4,6 +4,7 @@
 #include "../tensor.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <random>
 #include <span>
@@ -40,16 +41,26 @@ namespace sb::sampling::detail
       throw std::invalid_argument("sampling weights must have a positive sum");
   }
 
+  /// Map a @p target in [0, cdf.back()] to the index whose CDF interval
+  /// contains it. uniform_real_distribution may round up to exactly
+  /// cdf.back() (LWG 2524); such a target is pulled back inside the range,
+  /// so the draw lands on the last positive-weight interval — never past it
+  /// onto a trailing zero-weight (ineligible) point.
+  template <typename T>
+  size_t index_for_target(std::span<const T> cdf, T target)
+  {
+    if (target >= cdf.back())
+      target = std::nextafter(cdf.back(), T(0));
+    const auto it = std::upper_bound(cdf.begin(), cdf.end(), target);
+    return static_cast<size_t>(it - cdf.begin());
+  }
+
   /// Draw a single reference index from a CDF via binary search.
   template <typename T, typename EngineT>
   size_t draw_one(std::span<const T> cdf, EngineT& engine)
   {
     std::uniform_real_distribution<T> uniform(T(0), cdf.back());
-    const T target = uniform(engine);
-
-    const auto it = std::upper_bound(cdf.begin(), cdf.end(), target);
-    const size_t idx = static_cast<size_t>(it - cdf.begin());
-    return std::min(idx, cdf.size() - 1);  // uniform() may round up to cdf.back(), where upper_bound returns end()
+    return index_for_target(cdf, uniform(engine));
   }
 
   /// Validate a weight row and return its eligible (strictly positive)
