@@ -102,16 +102,27 @@ edit `devcontainer.json` and narrow the first mount to
 
 ## GitHub CLI auth
 
-`gh` is preinstalled; auth passes through from the host two ways:
+`gh` is preinstalled. Before container creation/start, `initializeCommand` runs
+`.devcontainer/prepare-gh.sh` as your host user. It stages `hosts.yml` and
+`config.yml` from `${GH_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/gh}` in the
+Git-ignored `.devcontainer/.local/gh/` directory, with private permissions.
+The Dockerfile copies these files into `/home/ubuntu/.config/gh` with ownership
+set to `ubuntu`. Docker does not need to bind-mount your host credential directory,
+so this also works when that directory is on AFS.
 
-- `~/.config/gh` is bind-mounted, which carries the token when the host stores
-  it in `hosts.yml` (gh's fallback when no OS keyring is available). Run
-  `gh auth login` on the host first -- or once inside the container, which
-  persists back to the host config.
-- `GH_TOKEN` is forwarded from the host environment (`${localEnv:GH_TOKEN}`),
-  for hosts where gh keeps the token in the OS keyring (macOS Keychain, GNOME
-  Keyring) and `hosts.yml` has no token. Export it on the host before starting
-  the container, e.g. `export GH_TOKEN=$(gh auth token)`.
+Existing file-based host logins carry over automatically. Rebuild the container
+after changing host credentials; restarting alone does not update the image.
+Container-side changes do not sync back to the host. Credentials are included in
+the built image and its build cache, so the resulting image is personal.
+The credential copy is the last build layer to avoid reinstalling dependencies
+when credentials change. Direct `docker build` invocations must first run
+`bash .devcontainer/prepare-gh.sh .devcontainer/.local` from the repository root;
+the Dev Containers workflow runs this automatically. The host needs Bash.
+
+For credentials held in an OS keyring, `GH_TOKEN` is still forwarded from the
+host environment. Export it before launching VS Code, for example
+`export GH_TOKEN=$(gh auth token)`. Copying config files does not copy keyring
+credentials.
 
 Note: git push/pull over SSH already works via the forwarded SSH agent; the
 token is only needed for gh's API operations (issues, PRs, etc.).

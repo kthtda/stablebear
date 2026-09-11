@@ -16,10 +16,13 @@
   "containerEnv": {
     "BUILD_WITH_CUDA": "0",
     // gh token passthrough for hosts that keep it in the OS keyring rather
-    // than hosts.yml (where the ~/.config/gh mount alone wouldn't carry it).
+    // than hosts.yml (where copying the config alone would not carry it).
     // Empty when unset on the host; gh treats that as absent.
     "GH_TOKEN": "${localEnv:GH_TOKEN}"
   },
+
+  // Stage gh config for the image build as the host user (works with AFS).
+  "initializeCommand": ["bash", "${localWorkspaceFolder}/.devcontainer/prepare-gh.sh", "${localWorkspaceFolder}/.devcontainer/.local"],
 
   "remoteUser": "ubuntu",
 
@@ -27,9 +30,6 @@
     // Persist Claude Code auth/config across rebuilds.
     "source=${localEnv:HOME}/.claude,target=/home/ubuntu/.claude,type=bind,consistency=cached",
     "source=${localEnv:HOME}/.claude.json,target=/home/ubuntu/.claude.json,type=bind,consistency=cached",
-    // Share gh CLI auth/config with the host (requires `gh auth login` on the
-    // host first, or once in the container -- it persists back to the host).
-    "source=${localEnv:HOME}/.config/gh,target=/home/ubuntu/.config/gh,type=bind,consistency=cached",
     // Container-private build dir (shadows the host's host-path CMakeCache.txt).
     "source=stablebear-cpu-build,target=${containerWorkspaceFolder}/cmake-build-debug,type=volume"
   ],
@@ -47,7 +47,8 @@
         "ms-vscode.cpptools",
         "ms-vscode.cmake-tools",
         "llvm-vs-code-extensions.vscode-clangd",
-        "anthropic.claude-code"
+        "anthropic.claude-code",
+        "openai.chatgpt"
       ]
     }
   }

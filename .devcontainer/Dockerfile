@@ -49,8 +49,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN ssh-keyscan -t rsa,ecdsa,ed25519 github.com >> /etc/ssh/ssh_known_hosts 2>/dev/null || true
 
 # GitHub CLI (gh) from the official apt repo (not in Ubuntu's archives). Auth
-# comes from the host: devcontainer.json bind-mounts ~/.config/gh and forwards
-# GH_TOKEN, so no in-container login is needed when the host is set up.
+# is copied from the host at the end of this build. devcontainer.json also
+# forwards GH_TOKEN for hosts using an OS keyring.
 RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
         -o /usr/share/keyrings/githubcli-archive-keyring.gpg \
     && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
@@ -136,3 +136,7 @@ COPY --chown=ubuntu docs/requirements.txt /tmp/build/docs-requirements.txt
 RUN pip install tomli \
     && python3 -c "import tomli; d=tomli.load(open('/tmp/build/pyproject.toml','rb')); print('\n'.join(d['project']['dependencies'] + d.get('tool',{}).get('cibuildwheel',{}).get('test-requires',[])))" > /tmp/build/pyproject-deps.txt \
     && pip install -r /tmp/build/pyproject-deps.txt -r /tmp/build/docs-requirements.txt
+
+# Host credentials staged by initializeCommand. Keep this last so credential
+# changes only rebuild this layer. The copied credentials are part of the image.
+COPY --chown=ubuntu:ubuntu .devcontainer/.local/gh/ /home/ubuntu/.config/gh/
