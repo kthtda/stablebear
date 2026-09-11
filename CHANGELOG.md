@@ -2,6 +2,8 @@
 
 ### New features
 
+* **SciPy linkage conversion** — `persistence.linkage_to_barcode` converts a linkage matrix to a `Barcode`, with optional reduced homology and no SciPy runtime dependency. ([#221](https://github.com/kthtda/stablebear/issues/221))
+
 * **Homological kernels for paired point clouds and distance matrices** — `persistence.compute_homological_kernel(X, Y)` computes the 0-dimensional relative-persistence barcode describing where a smaller distance `Y` merges components before a larger distance `X`. It accepts individual NumPy point clouds, `FloatTensor`s, `DistanceMatrix` instances, or matching `PointCloudTensor`/`DistanceMatrixTensor` batches; batched computations run in parallel. Point clouds use Euclidean distance, while precomputed distance matrices support other metrics. The result is a `BarcodeTensor` with one barcode per pair. Only `dim=0` is currently supported. ([#217](https://github.com/kthtda/stablebear/pull/217))
 * **Guide for homological kernels** — the documentation now explains the method, paired-input requirements, point-cloud and distance-matrix workflows, and how to summarize the resulting barcodes as correlation-style scores.
 * **`plot_barcode` accepts NumPy bar arrays** — pass an `(n, 2)` integer or floating-point NumPy array of `(birth, death)` pairs directly. ([#159](https://github.com/kthtda/stablebear/issues/159))

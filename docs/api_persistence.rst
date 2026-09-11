@@ -14,6 +14,12 @@ barcode
    :undoc-members:
    :show-inheritance:
 
+linkage
+-------
+
+.. automodule:: stablebear.persistence.linkage
+   :members:
+
 ph_tensor
 ---------
 

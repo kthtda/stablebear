@@ -8,6 +8,7 @@ from .barcode_summary import (
 )
 from .homological_kernel import compute_homological_kernel
 from .homology import ComplexType, DistanceType, compute_persistent_homology
+from .linkage import linkage_to_barcode
 from .ph_tensor import BarcodeTensor
 
 import types as _types
