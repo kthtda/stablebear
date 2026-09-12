@@ -382,7 +382,11 @@ class PointCloudTensor(Tensor):
         return t._data
 
     def _get_valid_setitem_dtypes(self):
-        return [FloatTensor, np.ndarray, float, int]
+        # A point-cloud cell is an ``(n_points, dim)`` array, so only an array
+        # (or FloatTensor) is a meaningful right-hand side. Scalars are rejected
+        # up front with a clear message instead of leaking the FloatTensor
+        # constructor error from ``_decay_value`` (issue #41).
+        return [FloatTensor, np.ndarray]
 
 
 class BoolTensor(Tensor):
