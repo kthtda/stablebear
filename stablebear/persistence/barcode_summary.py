@@ -33,9 +33,9 @@ def _barcode_to_pcf(bc, single_method, task_method, verbose=False, **kwargs):
             verbose=verbose,
         )
 
-        if len(out.shape) == 2 and out.shape[0] == 1:
-            out = out[0, :]
-
+        # The backend writes a result of the same shape as the input tensor;
+        # the single-Barcode convenience case is handled by the branch above,
+        # so the batch shape (including a genuine leading-1 axis) is preserved.
         return out
 
 
