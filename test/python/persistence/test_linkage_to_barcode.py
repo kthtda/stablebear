@@ -61,6 +61,12 @@ class TestLinkageToBarcode:
 
         assert_linkage_barcode(linkage, expected, reduced=reduced)
 
+    def test_all_zero_length_bars_are_omitted(self, dtype, reduced):
+        linkage = np.array([[0, 1, 0.0, 2], [2, 3, 0.0, 3]], dtype=dtype)
+        expected = []
+
+        assert_linkage_barcode(linkage, expected, reduced=reduced)
+
     @pytest.mark.parametrize(
         "shape",
         [(), (4,), (0,), (1, 0), (1, 3), (1, 5), (0, 3), (0, 5), (1, 1, 4)],
