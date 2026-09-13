@@ -124,6 +124,34 @@ class TestLinkageToBarcode:
         with pytest.raises(ValueError, match="distinct"):
             linkage_to_barcode(linkage, reduced=reduced)
 
+    @pytest.mark.parametrize("count", [-1, 0, 1, 3, 2.5])
+    def test_incorrect_observation_merge_count(self, dtype, reduced, count):
+        linkage = np.array([[0, 1, 1.0, count]], dtype=dtype)
+
+        with pytest.raises(ValueError, match="cluster count"):
+            linkage_to_barcode(linkage, reduced=reduced)
+
+    @pytest.mark.parametrize("count", [2, 3, 5])
+    def test_incorrect_cluster_merge_count(self, dtype, reduced, count):
+        linkage = np.array(
+            [[0, 1, 1.0, 2], [2, 3, 1.0, 2], [4, 5, 2.0, count]],
+            dtype=dtype,
+        )
+
+        with pytest.raises(ValueError, match="cluster count"):
+            linkage_to_barcode(linkage, reduced=reduced)
+
+    @pytest.mark.parametrize(
+        "count",
+        [np.nan, np.inf, -np.inf],
+        ids=["nan", "positive_infinity", "negative_infinity"],
+    )
+    def test_nonfinite_cluster_count(self, dtype, reduced, count):
+        linkage = np.array([[0, 1, 1.0, count]], dtype=dtype)
+
+        with pytest.raises(ValueError, match="finite"):
+            linkage_to_barcode(linkage, reduced=reduced)
+
     @pytest.mark.parametrize(
         "shape",
         [(), (4,), (0,), (1, 0), (1, 3), (1, 5), (0, 3), (0, 5), (1, 1, 4)],
