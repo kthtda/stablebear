@@ -16,6 +16,7 @@ def assert_linkage_barcode(linkage, expected_reduced, *, reduced):
     barcode = linkage_to_barcode(linkage, reduced=reduced)
     np.testing.assert_array_equal(linkage, original)
     assert isinstance(barcode, Barcode)
+    assert barcode.to_numpy().dtype == linkage.dtype
     assert barcode.is_isomorphic_to(expected)
 
 
