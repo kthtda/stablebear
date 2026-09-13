@@ -49,6 +49,18 @@ class TestLinkageToBarcode:
 
         assert_linkage_barcode(linkage, expected, reduced=reduced)
 
+    def test_zero_height_merge_followed_by_positive_merge(self, dtype, reduced):
+        linkage = np.array([[0, 1, 0.0, 2], [2, 3, 1.0, 3]], dtype=dtype)
+        expected = [[0, 1.0]]
+
+        assert_linkage_barcode(linkage, expected, reduced=reduced)
+
+    def test_three_way_merge_at_positive_height(self, dtype, reduced):
+        linkage = np.array([[0, 1, 1.0, 2], [2, 3, 1.0, 3]], dtype=dtype)
+        expected = [[0, 1.0], [0, 1.0]]
+
+        assert_linkage_barcode(linkage, expected, reduced=reduced)
+
     @pytest.mark.parametrize(
         "shape",
         [(), (4,), (0,), (1, 0), (1, 3), (1, 5), (0, 3), (0, 5), (1, 1, 4)],
