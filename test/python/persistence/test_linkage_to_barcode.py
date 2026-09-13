@@ -213,6 +213,15 @@ class TestLinkageToBarcode:
 
         assert_linkage_barcode(linkage, expected, reduced=reduced)
 
+    def test_output_independent_of_input(self, dtype, reduced):
+        linkage = np.array([[0, 1, 1.0, 2], [2, 3, 2.0, 3]], dtype=dtype)
+        barcode = linkage_to_barcode(linkage, reduced=reduced)
+        original_bars = barcode.to_numpy().copy()
+
+        linkage[:] = -1
+
+        np.testing.assert_array_equal(barcode.to_numpy(), original_bars)
+
     def test_readonly_input(self, dtype, reduced):
         linkage = np.array([[0, 1, 1.0, 2], [2, 3, 2.0, 3]], dtype=dtype)
         linkage.flags.writeable = False
