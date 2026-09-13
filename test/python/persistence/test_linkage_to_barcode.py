@@ -68,6 +68,29 @@ class TestLinkageToBarcode:
         assert_linkage_barcode(linkage, expected, reduced=reduced)
 
     @pytest.mark.parametrize(
+        "height",
+        [-1.0, np.nan, np.inf, -np.inf],
+        ids=["negative", "nan", "positive_infinity", "negative_infinity"],
+    )
+    def test_invalid_height(self, dtype, reduced, height):
+        linkage = np.array([[0, 1, height, 2]], dtype=dtype)
+
+        with pytest.raises(ValueError):
+            linkage_to_barcode(linkage, reduced=reduced)
+
+    def test_parent_merge_before_child(self, dtype, reduced):
+        # A minimal inversion like SciPy's median-linkage example: the final
+        # merge must wait until both child clusters exist, at time 3.5.
+        # https://docs.scipy.org/doc/scipy/reference/generated/scipy.cluster.hierarchy.is_monotonic.html
+        linkage = np.array(
+            [[0, 1, 3.0, 2], [2, 3, 3.5, 2], [4, 5, 3.25, 4]],
+            dtype=dtype,
+        )
+        expected = [[0, 3.0], [0, 3.5], [0, 3.5]]
+
+        assert_linkage_barcode(linkage, expected, reduced=reduced)
+
+    @pytest.mark.parametrize(
         "shape",
         [(), (4,), (0,), (1, 0), (1, 3), (1, 5), (0, 3), (0, 5), (1, 1, 4)],
     )
