@@ -12,7 +12,9 @@ def assert_linkage_barcode(linkage, expected_reduced, *, reduced):
         bars.append([0, np.inf])
     expected = Barcode(np.array(bars, dtype=linkage.dtype).reshape(-1, 2))
 
+    original = linkage.copy()
     barcode = linkage_to_barcode(linkage, reduced=reduced)
+    np.testing.assert_array_equal(linkage, original)
     assert isinstance(barcode, Barcode)
     assert barcode.is_isomorphic_to(expected)
 
@@ -151,6 +153,29 @@ class TestLinkageToBarcode:
 
         with pytest.raises(ValueError, match="finite"):
             linkage_to_barcode(linkage, reduced=reduced)
+
+    def test_noncontiguous_view(self, dtype, reduced):
+        storage = np.zeros((2, 8), dtype=dtype)
+        linkage = storage[:, ::2]
+        linkage[:] = [[0, 1, 1.0, 2], [2, 3, 2.0, 3]]
+        expected = [[0, 1.0], [0, 2.0]]
+
+        assert_linkage_barcode(linkage, expected, reduced=reduced)
+
+    def test_negative_strides(self, dtype, reduced):
+        storage = np.array([[3, 2.0, 3, 2], [2, 1.0, 1, 0]], dtype=dtype)
+        linkage = storage[::-1, ::-1]
+        expected = [[0, 1.0], [0, 2.0]]
+
+        assert_linkage_barcode(linkage, expected, reduced=reduced)
+
+    def test_readonly_input(self, dtype, reduced):
+        linkage = np.array([[0, 1, 1.0, 2], [2, 3, 2.0, 3]], dtype=dtype)
+        linkage.flags.writeable = False
+        expected = [[0, 1.0], [0, 2.0]]
+
+        assert_linkage_barcode(linkage, expected, reduced=reduced)
+        assert not linkage.flags.writeable
 
     @pytest.mark.parametrize(
         "shape",
