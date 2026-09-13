@@ -13,7 +13,8 @@
 
 namespace sb::ph
 {
-  // Convert a SciPy-format linkage tensor. Empty input produces an empty barcode.
+  // Convert a SciPy-format linkage tensor. SciPy rejects inputs with fewer than two observations;
+  // we extend the n - 1 row convention to treat an empty (0, 4) matrix as one observation.
   template <IsTensor TensorT>
   Barcode<typename TensorT::value_type> linkage_to_barcode(const TensorT& matrix, bool reduced = false)
   {
@@ -21,8 +22,6 @@ namespace sb::ph
     if (matrix.rank() != 2 || matrix.shape(1) != 4)
       throw std::invalid_argument("Z must have shape (n - 1, 4)");
     const auto rows = matrix.shape(0);
-    if (rows == 0)
-      return Barcode<T>{};
     if (rows > (std::numeric_limits<std::size_t>::max() - 1) / 2)
       throw std::invalid_argument("Linkage matrix is too large");
 

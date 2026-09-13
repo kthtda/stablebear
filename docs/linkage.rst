@@ -21,8 +21,8 @@ Only the example's clustering step requires SciPy; conversion and validation run
 
 Input must be an ``(n - 1, 4)`` NumPy array with float32 or float64 precision,
 which is preserved in the output. The input is not modified. Empty ``(0, 4)``
-input produces an empty barcode regardless of ``reduced``.
-Invalid cluster references or counts, non-finite
+input represents a single observation, producing one infinite interval (or an
+empty barcode in reduced mode). Invalid cluster references or counts, non-finite
 entries, negative heights, and decreasing heights raise ``ValueError``.
 In particular, centroid/median linkage results with height inversions are
 rejected; heights are never silently sorted or repaired.

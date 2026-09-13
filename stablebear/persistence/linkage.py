@@ -23,7 +23,7 @@ def linkage_to_barcode(Z: np.ndarray, *, reduced: bool = False) -> Barcode:
         two active cluster indices, a finite nonnegative merge height, and
         the number of observations in the new cluster. Heights must be
         nondecreasing. The output preserves the input precision.
-        An empty ``(0, 4)`` matrix produces an empty barcode.
+        An empty ``(0, 4)`` matrix represents one observation.
     reduced : bool, optional
         Omit the essential ``[0, inf)`` interval when True (default False).
 
@@ -32,8 +32,8 @@ def linkage_to_barcode(Z: np.ndarray, *, reduced: bool = False) -> Barcode:
     Barcode
         Intervals born at zero and dying at the positive merge heights,
         plus one essential interval unless reduced. Zero-length bars are
-        omitted. Empty input always returns an empty barcode. The input is
-        not modified.
+        omitted. Empty input returns an empty barcode if reduced, otherwise
+        one ``[0, inf)`` interval. The input is not modified.
 
     Raises
     ------
