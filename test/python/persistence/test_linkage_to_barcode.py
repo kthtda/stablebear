@@ -127,15 +127,26 @@ class TestLinkageToBarcode:
 
     @pytest.mark.parametrize("column", [0, 1], ids=["left", "right"])
     @pytest.mark.parametrize(
-        "reference",
-        [0.5, -1, 2, 10],
-        ids=["fractional", "negative", "not_yet_created", "out_of_range"],
+        "reference, error",
+        [
+            (0.5, "existing clusters"),
+            (-1, "existing clusters"),
+            (2, "existing clusters"),
+            (10, "existing clusters"),
+            (np.nan, "finite"),
+            (np.inf, "finite"),
+            (-np.inf, "finite"),
+        ],
+        ids=[
+            "fractional", "negative", "not_yet_created", "out_of_range",
+            "nan", "positive_infinity", "negative_infinity",
+        ],
     )
-    def test_invalid_cluster_reference(self, dtype, reduced, column, reference):
+    def test_invalid_cluster_reference(self, dtype, reduced, column, reference, error):
         linkage = np.array([[0, 1, 1.0, 2]], dtype=dtype)
         linkage[0, column] = reference
 
-        with pytest.raises(ValueError, match="existing clusters"):
+        with pytest.raises(ValueError, match=error):
             linkage_to_barcode(linkage, reduced=reduced)
 
     def test_reused_observation(self, dtype, reduced):
