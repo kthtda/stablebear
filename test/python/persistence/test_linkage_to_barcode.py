@@ -81,6 +81,15 @@ class TestLinkageToBarcode:
         with pytest.raises(ValueError):
             linkage_to_barcode(linkage, reduced=reduced)
 
+    def test_cascading_inversions(self, dtype, reduced):
+        linkage = np.array(
+            [[0, 1, 3.0, 2], [2, 4, 2.0, 3], [3, 5, 1.0, 4]],
+            dtype=dtype,
+        )
+        expected = [[0, 3.0], [0, 3.0], [0, 3.0]]
+
+        assert_linkage_barcode(linkage, expected, reduced=reduced)
+
     def test_parent_merge_before_child(self, dtype, reduced):
         # A minimal inversion like SciPy's median-linkage example: the final
         # merge must wait until both child clusters exist, at time 3.5.
