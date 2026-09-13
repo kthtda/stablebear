@@ -40,6 +40,15 @@ class TestLinkageToBarcode:
 
         assert_linkage_barcode(linkage, expected, reduced=reduced)
 
+    def test_four_observations_with_simultaneous_merges(self, dtype, reduced):
+        linkage = np.array(
+            [[0, 1, 1.0, 2], [2, 3, 1.0, 2], [4, 5, 2.0, 4]],
+            dtype=dtype,
+        )
+        expected = [[0, 1.0], [0, 1.0], [0, 2.0]]
+
+        assert_linkage_barcode(linkage, expected, reduced=reduced)
+
     @pytest.mark.parametrize(
         "shape",
         [(), (4,), (0,), (1, 0), (1, 3), (1, 5), (0, 3), (0, 5), (1, 1, 4)],
