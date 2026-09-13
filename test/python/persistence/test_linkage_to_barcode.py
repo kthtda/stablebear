@@ -90,6 +90,40 @@ class TestLinkageToBarcode:
 
         assert_linkage_barcode(linkage, expected, reduced=reduced)
 
+    @pytest.mark.parametrize("column", [0, 1], ids=["left", "right"])
+    @pytest.mark.parametrize(
+        "reference",
+        [0.5, -1, 2, 10],
+        ids=["fractional", "negative", "not_yet_created", "out_of_range"],
+    )
+    def test_invalid_cluster_reference(self, dtype, reduced, column, reference):
+        linkage = np.array([[0, 1, 1.0, 2]], dtype=dtype)
+        linkage[0, column] = reference
+
+        with pytest.raises(ValueError, match="existing clusters"):
+            linkage_to_barcode(linkage, reduced=reduced)
+
+    def test_reused_observation(self, dtype, reduced):
+        linkage = np.array([[0, 1, 1.0, 2], [0, 2, 2.0, 2]], dtype=dtype)
+
+        with pytest.raises(ValueError, match="active"):
+            linkage_to_barcode(linkage, reduced=reduced)
+
+    def test_reused_cluster(self, dtype, reduced):
+        linkage = np.array(
+            [[0, 1, 1.0, 2], [2, 4, 2.0, 3], [3, 4, 3.0, 3]],
+            dtype=dtype,
+        )
+
+        with pytest.raises(ValueError, match="active"):
+            linkage_to_barcode(linkage, reduced=reduced)
+
+    def test_cluster_merged_with_itself(self, dtype, reduced):
+        linkage = np.array([[0, 0, 1.0, 2]], dtype=dtype)
+
+        with pytest.raises(ValueError, match="distinct"):
+            linkage_to_barcode(linkage, reduced=reduced)
+
     @pytest.mark.parametrize(
         "shape",
         [(), (4,), (0,), (1, 0), (1, 3), (1, 5), (0, 3), (0, 5), (1, 1, 4)],
