@@ -21,8 +21,8 @@ def linkage_to_barcode(Z: np.ndarray, *, reduced: bool = False) -> Barcode:
     Z : numpy.ndarray
         An ``(n - 1, 4)`` float32 or float64 linkage matrix. Each row contains
         two active cluster indices, a finite nonnegative merge height, and
-        the number of observations in the new cluster. Heights must be
-        nondecreasing. The output preserves the input precision.
+        the number of observations in the new cluster. The output preserves
+        the input precision.
         An empty ``(0, 4)`` matrix represents one observation.
     reduced : bool, optional
         Omit the essential ``[0, inf)`` interval when True (default False).
@@ -30,7 +30,7 @@ def linkage_to_barcode(Z: np.ndarray, *, reduced: bool = False) -> Barcode:
     Returns
     -------
     Barcode
-        Intervals born at zero and dying at the positive merge heights,
+        Intervals born at zero and dying at the positive effective merge heights,
         plus one essential interval unless reduced. Zero-length bars are
         omitted. Empty input returns an empty barcode if reduced, otherwise
         one ``[0, inf)`` interval. The input is not modified.
@@ -41,13 +41,14 @@ def linkage_to_barcode(Z: np.ndarray, *, reduced: bool = False) -> Barcode:
         If Z is not a float32/float64 NumPy array.
     ValueError
         If the shape, cluster references, counts, or heights are invalid.
-        Non-monotone linkage matrices, including inversions from centroid
-        or median linkage, are rejected rather than repaired.
 
     Notes
     -----
-    SciPy is not required for conversion. Merge heights and tie-breaking
-    results are used as supplied; clustering is not recomputed.
+    SciPy is not required for conversion. Each effective merge height is
+    the maximum of the supplied height and the effective heights of its
+    two children. This delays inverted parent merges until both children
+    exist, including inversions from centroid or median linkage. Cluster
+    relationships are preserved; clustering is not recomputed.
 
     Examples
     --------

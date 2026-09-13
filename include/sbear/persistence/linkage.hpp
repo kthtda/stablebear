@@ -4,6 +4,7 @@
 #include "barcode.hpp"
 #include <sbear/concepts.hpp>
 
+#include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <limits>
@@ -29,7 +30,7 @@ namespace sb::ph
     std::vector<std::size_t> sizes(2 * rows + 1, 1);
     std::vector<PersistencePair<T>> bars;
     bars.reserve(rows + !reduced);
-    T previousHeight = 0;
+    std::vector<T> mergeHeights(2 * rows + 1, T{0});
 
     for (std::size_t i = 0; i < rows; ++i)
     {
@@ -40,9 +41,8 @@ namespace sb::ph
       if (!std::isfinite(left) || !std::isfinite(right) ||
           !std::isfinite(height) || !std::isfinite(count))
         throw std::invalid_argument("Z must contain only finite values");
-      if (height < previousHeight)
-        throw std::invalid_argument("Merge heights must be nonnegative and nondecreasing");
-      previousHeight = height;
+      if (height < 0)
+        throw std::invalid_argument("Merge heights must be nonnegative");
 
       const auto limit = n + i;
       const auto validIndex = [limit](T index) {
@@ -61,8 +61,11 @@ namespace sb::ph
         throw std::invalid_argument(prefix() + "cluster count must equal " + std::to_string(size));
       sizes[limit] = size;
       sizes[a] = sizes[b] = 0;
-      if (height > 0)
-        bars.emplace_back(T{0}, height);
+      // A parent cannot form before either of its children, even for inverted linkage heights.
+      const T effectiveHeight = std::max({height, mergeHeights[a], mergeHeights[b]});
+      mergeHeights[limit] = effectiveHeight;
+      if (effectiveHeight > 0)
+        bars.emplace_back(T{0}, effectiveHeight);
     }
     if (!reduced)
       bars.emplace_back(T{0}, std::numeric_limits<T>::infinity());
