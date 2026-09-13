@@ -33,3 +33,36 @@ class TestLinkageToBarcode:
         expected = [[0, 1.0]]
 
         assert_linkage_barcode(linkage, expected, reduced=reduced)
+
+    @pytest.mark.parametrize(
+        "shape",
+        [(), (4,), (0,), (1, 0), (1, 3), (1, 5), (0, 3), (0, 5), (1, 1, 4)],
+    )
+    def test_wrong_shape(self, dtype, reduced, shape):
+        linkage = np.zeros(shape, dtype=dtype)
+
+        with pytest.raises(ValueError, match="shape"):
+            linkage_to_barcode(linkage, reduced=reduced)
+
+
+@pytest.mark.parametrize("reduced", [False, True])
+class TestInvalidLinkageTypes:
+    @pytest.mark.parametrize(
+        "dtype",
+        [np.bool_, np.int32, np.int64, np.uint64, np.float16,
+         np.complex64, np.complex128, object, np.str_],
+    )
+    def test_unsupported_dtype(self, reduced, dtype):
+        linkage = np.array([[0, 1, 1.0, 2]], dtype=dtype)
+
+        with pytest.raises(TypeError):
+            linkage_to_barcode(linkage, reduced=reduced)
+
+    @pytest.mark.parametrize(
+        "linkage",
+        [None, 1.0, [[0, 1, 1.0, 2]], ((0, 1, 1.0, 2),)],
+        ids=["none", "scalar", "list", "tuple"],
+    )
+    def test_non_array_input(self, reduced, linkage):
+        with pytest.raises(TypeError):
+            linkage_to_barcode(linkage, reduced=reduced)
