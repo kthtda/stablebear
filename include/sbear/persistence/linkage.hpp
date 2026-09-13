@@ -16,9 +16,13 @@ namespace sb::ph
 {
   // Convert a SciPy-format linkage tensor. SciPy rejects inputs with fewer than two observations;
   // we extend the n - 1 row convention to treat an empty (0, 4) matrix as one observation.
+  // If supplied, hasNonMonotoneHeights reports whether input merge heights decrease between consecutive rows.
   template <IsTensor TensorT>
-  Barcode<typename TensorT::value_type> linkage_to_barcode(const TensorT& matrix, bool reduced = false)
+  Barcode<typename TensorT::value_type> linkage_to_barcode(const TensorT& matrix, bool reduced = false,
+                                                         bool* hasNonMonotoneHeights = nullptr)
   {
+    if (hasNonMonotoneHeights != nullptr)
+      *hasNonMonotoneHeights = false;
     using T = typename TensorT::value_type;
     if (matrix.rank() != 2 || matrix.shape(1) != 4)
       throw std::invalid_argument("Z must have shape (n - 1, 4)");
@@ -34,15 +38,18 @@ namespace sb::ph
 
     for (std::size_t i = 0; i < rows; ++i)
     {
-      const T left = matrix(i, 0);
-      const T right = matrix(i, 1);
-      const T height = matrix(i, 2);
-      const T count = matrix(i, 3);
+      const T left = matrix({i, 0});
+      const T right = matrix({i, 1});
+      const T height = matrix({i, 2});
+      const T count = matrix({i, 3});
       if (!std::isfinite(left) || !std::isfinite(right) ||
           !std::isfinite(height) || !std::isfinite(count))
         throw std::invalid_argument("Z must contain only finite values");
       if (height < 0)
         throw std::invalid_argument("Merge heights must be nonnegative");
+
+      if (hasNonMonotoneHeights != nullptr && i > 0 && height < matrix({i - 1, 2}))
+        *hasNonMonotoneHeights = true;
 
       const auto limit = n + i;
       const auto validIndex = [limit](T index) {

@@ -31,3 +31,8 @@ height is the maximum of its supplied height and its children's effective
 heights. For example, child merges at 3.0 and 3.5 followed by a parent merge
 at 3.25 produce finite bars ending at 3.0, 3.5, and 3.5. Heights are not
 sorted, and unrelated branches do not delay one another.
+
+Conversion emits one ``UserWarning`` when input merge heights are non-monotone:
+a row's height is lower than the preceding row's height. This includes decreases
+on independent branches, even when no parent height needs adjustment. Equal
+heights are allowed and do not trigger a warning.

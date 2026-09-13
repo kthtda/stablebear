@@ -1,5 +1,7 @@
 """Conversion of hierarchical clustering results to barcodes."""
 
+import warnings
+
 import numpy as np
 
 from .. import _sb_cpp as cpp
@@ -42,6 +44,12 @@ def linkage_to_barcode(Z: np.ndarray, *, reduced: bool = False) -> Barcode:
     ValueError
         If the shape, cluster references, counts, or heights are invalid.
 
+    Warns
+    -----
+    UserWarning
+        If input merge heights decrease between consecutive rows, including
+        independent branches. One warning is emitted per conversion.
+
     Notes
     -----
     SciPy is not required for conversion. Each effective merge height is
@@ -62,4 +70,11 @@ def linkage_to_barcode(Z: np.ndarray, *, reduced: bool = False) -> Barcode:
         raise TypeError("Z must be a float32 or float64 NumPy array")
     dtype = _validate_dtype(Z.dtype.type, _BACKEND_MAP)
     backend = _BACKEND_MAP[dtype]
-    return Barcode(backend.linkage_to_barcode(Z, reduced))
+    barcode, has_non_monotone_heights = backend.linkage_to_barcode(Z, reduced)
+    if has_non_monotone_heights:
+        warnings.warn(
+            "Linkage matrix has non-monotone merge heights.",
+            UserWarning,
+            stacklevel=2,
+        )
+    return Barcode(barcode)

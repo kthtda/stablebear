@@ -5,6 +5,7 @@
 #include <sbear/persistence/linkage.hpp>
 
 #include <pybind11/numpy.h>
+#include <utility>
 
 namespace py = pybind11;
 
@@ -14,11 +15,15 @@ namespace
   class PyLinkageBindings
   {
   public:
-    static sb::ph::Barcode<T> linkage_to_barcode(py::array_t<T, 0> input, bool reduced)
+    static py::tuple linkage_to_barcode(py::array_t<T, 0> input, bool reduced)
     {
       const NumpyTensor<T> matrix(input);
-      py::gil_scoped_release release;
-      return sb::ph::linkage_to_barcode(matrix, reduced);
+      bool hasNonMonotoneHeights = false;
+      auto barcode = [&] {
+        py::gil_scoped_release release;
+        return sb::ph::linkage_to_barcode(matrix, reduced, &hasNonMonotoneHeights);
+      }();
+      return py::make_tuple(std::move(barcode), hasNonMonotoneHeights);
     }
 
     static void register_bindings(py::module_& m, const std::string& suffix)

@@ -1,5 +1,7 @@
 """Tests for converting linkage matrices to barcodes."""
 
+import warnings
+
 import numpy as np
 import pytest
 
@@ -50,7 +52,10 @@ class TestLinkageToBarcode:
         )
         expected = [[0, 1.0], [0, 1.0], [0, 2.0]]
 
-        assert_linkage_barcode(linkage, expected, reduced=reduced)
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            assert_linkage_barcode(linkage, expected, reduced=reduced)
+        assert not caught
 
     def test_zero_height_merge_followed_by_positive_merge(self, dtype, reduced):
         linkage = np.array([[0, 1, 0.0, 2], [2, 3, 1.0, 3]], dtype=dtype)
@@ -88,7 +93,10 @@ class TestLinkageToBarcode:
         )
         expected = [[0, 3.0], [0, 1.0], [0, 4.0]]
 
-        assert_linkage_barcode(linkage, expected, reduced=reduced)
+        with pytest.warns(UserWarning, match="non-monotone") as caught:
+            assert_linkage_barcode(linkage, expected, reduced=reduced)
+        assert len(caught) == 1
+        assert caught[0].filename == __file__
 
     def test_inversion_does_not_raise_independent_branch(self, dtype, reduced):
         linkage = np.array(
@@ -102,7 +110,10 @@ class TestLinkageToBarcode:
         )
         expected = [[0, 3.0], [0, 3.0], [0, 1.0], [0, 4.0]]
 
-        assert_linkage_barcode(linkage, expected, reduced=reduced)
+        with pytest.warns(UserWarning, match="non-monotone") as caught:
+            assert_linkage_barcode(linkage, expected, reduced=reduced)
+        assert len(caught) == 1
+        assert caught[0].filename == __file__
 
     def test_cascading_inversions(self, dtype, reduced):
         linkage = np.array(
@@ -111,7 +122,10 @@ class TestLinkageToBarcode:
         )
         expected = [[0, 3.0], [0, 3.0], [0, 3.0]]
 
-        assert_linkage_barcode(linkage, expected, reduced=reduced)
+        with pytest.warns(UserWarning, match="non-monotone") as caught:
+            assert_linkage_barcode(linkage, expected, reduced=reduced)
+        assert len(caught) == 1
+        assert caught[0].filename == __file__
 
     def test_parent_merge_before_child(self, dtype, reduced):
         # A minimal inversion like SciPy's median-linkage example: the final
@@ -123,7 +137,10 @@ class TestLinkageToBarcode:
         )
         expected = [[0, 3.0], [0, 3.5], [0, 3.5]]
 
-        assert_linkage_barcode(linkage, expected, reduced=reduced)
+        with pytest.warns(UserWarning, match="non-monotone") as caught:
+            assert_linkage_barcode(linkage, expected, reduced=reduced)
+        assert len(caught) == 1
+        assert caught[0].filename == __file__
 
     @pytest.mark.parametrize("column", [0, 1], ids=["left", "right"])
     @pytest.mark.parametrize(
