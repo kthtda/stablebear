@@ -81,6 +81,15 @@ class TestLinkageToBarcode:
         with pytest.raises(ValueError):
             linkage_to_barcode(linkage, reduced=reduced)
 
+    def test_independent_branches_with_decreasing_heights(self, dtype, reduced):
+        linkage = np.array(
+            [[0, 1, 3.0, 2], [2, 3, 1.0, 2], [4, 5, 4.0, 4]],
+            dtype=dtype,
+        )
+        expected = [[0, 3.0], [0, 1.0], [0, 4.0]]
+
+        assert_linkage_barcode(linkage, expected, reduced=reduced)
+
     def test_cascading_inversions(self, dtype, reduced):
         linkage = np.array(
             [[0, 1, 3.0, 2], [2, 4, 2.0, 3], [3, 5, 1.0, 4]],
