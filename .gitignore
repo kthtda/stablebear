@@ -210,3 +210,5 @@ test/run_vg_pytest.sh
 
 # Host credentials staged for the private devcontainer image build
 /.devcontainer/.local/
+
+scratch/
