@@ -14,16 +14,131 @@ into a single ``Barcode``::
    reduced_bc = linkage_to_barcode(Z, reduced=True)
    # Intervals: [0, 1), [0, 3).
 
-All births are zero; positive effective merge heights become finite death times.
-Zero-length intervals are omitted, and ``reduced=True`` removes the essential
-infinite interval. Cluster relationships and tie-breaking results are preserved.
-Only the example's clustering step requires SciPy; conversion and validation run in C++ with the Python GIL released.
+Only the clustering step requires SciPy. ``linkage_to_barcode`` converts the
+merges already recorded in ``Z``; it does not recompute the clustering.
+
+Reading a dendrogram as a barcode
+==================================
+
+A :term:`dendrogram` draws the clustering as a tree. In the figures below,
+read it from left to right: observations start at scale zero, and each
+vertical join marks the scale at which two clusters become one. Both panels
+use the same scale increasing to the right. The barcode records these reductions in
+the number of clusters. All bars start at zero, and one bar ends at each
+merge height. One bar continues forever because a single cluster remains
+after all the merges. For now, assume the merge heights are positive and
+nondecreasing.
+
+Three observations, two merges
+-------------------------------
+
+The example above uses single linkage on three points on a line:
+``A = 0``, ``B = 1``, and ``C = 4``. First, A and B merge at height 1.
+Their cluster then merges with C at height 3, the distance from B to C.
+The two finite barcode intervals therefore end at 1 and 3. Matching colors
+in the figure connect each merge height to its bar endpoint.
+
+.. image:: _static/linkage_three_points_light.png
+   :width: 100%
+   :align: center
+   :class: only-light
+   :alt: Dendrogram of A=0, B=1, C=4, with A and B merging at height 1 and joining C at height 3. Beside it, the resulting barcode has intervals [0,1), [0,3), and [0,infinity).
+
+.. image:: _static/linkage_three_points_dark.png
+   :width: 100%
+   :align: center
+   :class: only-dark
+   :alt: Dendrogram of A=0, B=1, C=4, with A and B merging at height 1 and joining C at height 3. Beside it, the resulting barcode has intervals [0,1), [0,3), and [0,infinity).
+
+.. dropdown:: Show code
+   :color: secondary
+
+   .. literalinclude:: _static/gen_linkage_figs.py
+      :language: python
+      :start-after: docs snippet start linkage_plot --
+      :end-before: docs snippet end linkage_plot --
+
+   .. literalinclude:: _static/gen_linkage_figs.py
+      :language: python
+      :start-after: docs snippet start linkage_three_points --
+      :end-before: docs snippet end linkage_three_points --
+
+   .. code-block:: python
+
+      plot_three_points()
+      plt.show()
+
+At any scale, count the bars that have not yet ended to recover the number
+of clusters. Here there are three clusters below 1, two from 1 up to
+(but not including) 3, and one from 3 onwards. The finite intervals exclude their right endpoints:
+at a merge height, the merge has already happened and the corresponding
+bar is no longer present.
+
+Several merges at the same height
+----------------------------------
+
+Now add a fourth point, ``D = 5``. A and B merge at height 1, and so do C
+and D. The two pairs merge at height 3. This produces **two copies** of
+``[0, 1)``, followed by ``[0, 3)`` and ``[0, inf)``. Equal merge heights
+therefore appear as repeated intervals; they are not combined into a
+single bar.
+
+.. image:: _static/linkage_tied_merges_light.png
+   :width: 100%
+   :align: center
+   :class: only-light
+   :alt: Dendrogram of A=0, B=1, C=4, D=5. Each neighboring pair merges at height 1, then the pairs merge at height 3. The barcode contains two [0,1) intervals, one [0,3), and one infinite interval.
+
+.. image:: _static/linkage_tied_merges_dark.png
+   :width: 100%
+   :align: center
+   :class: only-dark
+   :alt: Dendrogram of A=0, B=1, C=4, D=5. Each neighboring pair merges at height 1, then the pairs merge at height 3. The barcode contains two [0,1) intervals, one [0,3), and one infinite interval.
+
+.. dropdown:: Show code
+   :color: secondary
+
+   .. literalinclude:: _static/gen_linkage_figs.py
+      :language: python
+      :start-after: docs snippet start linkage_plot --
+      :end-before: docs snippet end linkage_plot --
+
+   .. literalinclude:: _static/gen_linkage_figs.py
+      :language: python
+      :start-after: docs snippet start linkage_tied_merges --
+      :end-before: docs snippet end linkage_tied_merges --
+
+   .. code-block:: python
+
+      plot_tied_merges()
+      plt.show()
+
+At height 1 the number of clusters drops from four to two, so two bars
+end together. Although the linkage matrix records these as two separate
+rows, both merges take place at the same scale.
+
+In either example, ``reduced=True`` removes just the infinite interval.
+The finite bars and their endpoints stay the same. The barcode records
+when the cluster count drops, but does not retain which observations
+merged: different trees can have the same barcode. Its rows are intervals,
+not labels for particular observations.
+
+Input and validation
+=====================
 
 Input must be an ``(n - 1, 4)`` NumPy array with float32 or float64 precision,
 which is preserved in the output. The input is not modified. Empty ``(0, 4)``
 input represents a single observation, producing one infinite interval (or an
 empty barcode in reduced mode). Invalid cluster references or counts, non-finite
 entries, and negative heights raise ``ValueError``.
+
+Zero-length intervals are omitted: observations that merge at height zero
+are already together at the starting scale. Conversion preserves the input
+clustering and its tie-breaking choices, and validation and conversion run
+in C++ with the Python GIL released.
+
+Non-monotone merge heights
+===========================
 
 Inversions, such as those from centroid or median linkage, are handled by
 delaying each parent merge until both child clusters exist. Its effective
