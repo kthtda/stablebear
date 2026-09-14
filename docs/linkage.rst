@@ -17,8 +17,8 @@ into a single ``Barcode``::
 Only the clustering step requires SciPy. ``linkage_to_barcode`` converts the
 merges already recorded in ``Z``; it does not recompute the clustering.
 
-Reading a dendrogram as a barcode
-==================================
+Converting a dendrogram to a barcode
+=====================================
 
 A :term:`dendrogram` draws the clustering as a tree. In the figures below,
 read it from left to right: observations start at scale zero, and each
