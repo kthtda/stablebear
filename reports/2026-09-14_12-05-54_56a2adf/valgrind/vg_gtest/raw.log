@@ -1,0 +1,15 @@
+==1670== Memcheck, a memory error detector
+==1670== Copyright (C) 2002-2022, and GNU GPL'd, by Julian Seward et al.
+==1670== Using Valgrind-3.22.0 and LibVEX; rerun with -h for copyright info
+==1670== Command: ../build/sb_test
+==1670== Parent PID: 1574
+==1670== 
+==1670== 
+==1670== HEAP SUMMARY:
+==1670==     in use at exit: 0 bytes in 0 blocks
+==1670==   total heap usage: 38,217 allocs, 38,217 frees, 3,143,536 bytes allocated
+==1670== 
+==1670== All heap blocks were freed -- no leaks are possible
+==1670== 
+==1670== For lists of detected and suppressed errors, rerun with: -s
+==1670== ERROR SUMMARY: 0 errors from 0 contexts (suppressed: 0 from 0)
