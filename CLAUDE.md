@@ -88,6 +88,7 @@ Each tensor class supports multiple precisions via a `dtype` parameter: `PcfTens
 
 ## Documentation (`docs/`)
 - Sphinx docs live in `docs/`, built with `make html` from that directory.
+- HTML builds require TeX Live (`texlive-latex-extra`, `texlive-pictures`) and `pdf2svg` for TikZ diagrams, plus Pandoc for notebook pages. These tools are included in the devcontainer. TikZ diagrams use `sphinxcontrib.tikz` with `tikz-cd` and are rendered to SVG during the build.
 - **Keep docs in sync with code changes.** When renaming parameters, changing defaults, or modifying public API behavior, update the corresponding `.rst` files and docstrings in the same commit.
 - **Document new public functionality.** New public APIs, features, or user-visible behavior changes should be documented in the appropriate `.rst` file unless purely internal.
 - **Plots with code dropdowns.** When adding plots/figures to docs, always include a `.. dropdown:: Show code` with a `.. literalinclude::` referencing snippet markers in the plot generation script. Plot generation scripts live in `docs/_static/`.

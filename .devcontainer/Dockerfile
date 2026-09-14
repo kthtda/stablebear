@@ -36,6 +36,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         sudo \
         less \
         ripgrep \
+        texlive-latex-extra \
+        texlive-pictures \
+        pdf2svg \
+        pandoc \
     && rm -rf /var/lib/apt/lists/* \
     && update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-13 100 \
          --slave /usr/bin/g++ g++ /usr/bin/g++-13 \

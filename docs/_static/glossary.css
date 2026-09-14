@@ -1,0 +1,29 @@
+.tippy-box[data-theme~="glossary"] {
+    background-color: var(--pst-color-surface);
+    color: var(--pst-color-text-base);
+    border: 1px solid var(--pst-color-border);
+    box-shadow: 0 2px 8px var(--pst-color-shadow);
+    font-size: 0.95rem;
+    line-height: 1.5;
+}
+
+.tippy-box[data-theme~="glossary"] .tippy-content {
+    padding: 0.75rem 1rem;
+}
+
+.tippy-box[data-theme~="glossary"] dt {
+    font-weight: bold;
+    margin-bottom: 0.35rem;
+}
+
+.tippy-box[data-theme~="glossary"] dd {
+    margin: 0;
+}
+
+.tippy-box[data-theme~="glossary"] p:last-child {
+    margin-bottom: 0;
+}
+
+.tippy-box[data-theme~="glossary"] .tippy-arrow {
+    color: var(--pst-color-surface);
+}

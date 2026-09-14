@@ -1,10 +1,12 @@
 pydata-sphinx-theme
 sphinx-design
+sphinx-tippy==0.4.3
 numpy
 tqdm
 matplotlib
 sphinxcontrib-youtube
 sphinxcontrib-mermaid
+sphinxcontrib-tikz==0.4.20
 sphinxcontrib-bibtex
 myst-parser
 nbsphinx

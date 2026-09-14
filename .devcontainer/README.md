@@ -87,7 +87,9 @@ CUDA-off build: `cmake --preset debug-nocuda`.
 
 ## Docs (Sphinx)
 
-Deps are already in the image. Build:
+The image includes the Sphinx dependencies, TeX Live with `tikz-cd`,
+`pdf2svg` for rendering TikZ diagrams as SVG, and Pandoc for notebook pages.
+Rebuild existing devcontainers to pick up these tools. Build:
 
 ```bash
 cd docs && make html   # output in docs/_build/html

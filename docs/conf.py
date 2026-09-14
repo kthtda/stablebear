@@ -35,9 +35,26 @@ extensions = [
     "myst_parser",
     "nbsphinx",
     "sphinx_design",
+    "sphinx_tippy",
     "sphinxcontrib.mermaid",
+    "sphinxcontrib.tikz",
     "sphinxcontrib.bibtex",
 ]
+
+# Build glossary previews into the HTML so they also work outside Read the Docs.
+tippy_anchor_parent_selector = "article.bd-article"
+tippy_skip_urls = [r"^(?!([^#]*/)?glossary\.html#term-|#term-).*"]
+tippy_enable_wikitips = False
+tippy_enable_doitips = False
+tippy_enable_mathjax = True
+# Load the UMD libraries before nbsphinx installs RequireJS, so their browser
+# globals are available to sphinx-tippy. Its default deferred loading conflicts.
+tippy_js = ()
+tippy_props = {"theme": "glossary", "maxWidth": 420, "interactive": True}
+
+# Compile TikZ diagrams to SVG for HTML documentation.
+tikz_proc_suite = "pdf2svg"
+tikz_latex_preamble = r"\usepackage{tikz-cd}"
 
 bibtex_bibfiles = ["references.bib"]
 bibtex_default_style = "alpha"
@@ -88,7 +105,7 @@ html_theme_options = {
     "header_links_before_dropdown": 4,
 }
 html_static_path = ["_static"]
-html_css_files = ["lightbox.css"]
+html_css_files = ["lightbox.css", "diagrams.css", "glossary.css"]
 html_js_files = ["lightbox.js"]
 
 # --- Create a temporary bundle of 'stablebear' with a stub C++ backend from the Python source in ../stablebear. This is only for documentation purposes (so that we don't have to keep reinstalling, including recompiling, stablebear everytime we want to update the docs). The setup has been tested on Linux and should probably work on OSX. It is unclear if it'll work on Windows.
@@ -142,3 +159,14 @@ else:
     os.symlink(cpp_src, cpp_dest)
 
 sys.path.insert(0, temp_mod_dir)
+
+
+def setup(app):
+    app.add_js_file(
+        "https://unpkg.com/@popperjs/core@2.11.8/dist/umd/popper.min.js",
+        priority=100,
+    )
+    app.add_js_file(
+        "https://unpkg.com/tippy.js@6.3.7/dist/tippy-bundle.umd.min.js",
+        priority=101,
+    )
