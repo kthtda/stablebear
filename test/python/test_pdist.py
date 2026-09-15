@@ -110,36 +110,36 @@ def test_pdist_lp_returns_distance_matrix():
     assert isinstance(D, DistanceMatrix)
 
 
-def test_from_dense_valid():
+def test_construct_from_squareform_valid():
     dense = np.array([[0.0, 1.0, 2.0],
                        [1.0, 0.0, 3.0],
                        [2.0, 3.0, 0.0]])
-    dm = DistanceMatrix.from_dense(dense)
+    dm = DistanceMatrix(dense)
     assert dm.size == 3
     assert dm[0, 1] == 1.0
     assert dm[0, 2] == 2.0
     assert dm[1, 2] == 3.0
 
 
-def test_from_dense_rejects_nonzero_diagonal():
+def test_squareform_rejects_nonzero_diagonal():
     dense = np.array([[1.0, 0.0],
                        [0.0, 0.0]])
     with pytest.raises(ValueError, match="Diagonal"):
-        DistanceMatrix.from_dense(dense)
+        DistanceMatrix(dense)
 
 
-def test_from_dense_rejects_negative():
+def test_squareform_rejects_negative():
     dense = np.array([[0.0, -1.0],
                        [-1.0, 0.0]])
     with pytest.raises(ValueError, match="nonnegative"):
-        DistanceMatrix.from_dense(dense)
+        DistanceMatrix(dense)
 
 
-def test_from_dense_rejects_asymmetric():
+def test_squareform_rejects_asymmetric():
     dense = np.array([[0.0, 1.0],
                        [2.0, 0.0]])
     with pytest.raises(ValueError, match="symmetric"):
-        DistanceMatrix.from_dense(dense)
+        DistanceMatrix(dense)
 
 
 # --- Tests for PcfContainerLike acceptance (list / single Pcf) ---

@@ -138,10 +138,47 @@ Distance matrices
 
 :py:class:`~stablebear.DistanceMatrix` provides a compressed storage format for distance matrices. Since a distance matrix is symmetric with zeros on the diagonal, it stores only the strict lower triangle — :math:`n(n-1)/2` elements instead of :math:`n^2`. Entries are enforced to be nonnegative, and writes to the diagonal are rejected unless the value is zero.
 
-::
+Construct a matrix from either a full square NumPy array or a one-dimensional
+compact array::
 
+   import numpy as np
    from stablebear import DistanceMatrix
    from stablebear.typing import float32
+
+   square = np.array([
+       [0.0, 1.0, 2.0, 3.0],
+       [1.0, 0.0, 4.0, 5.0],
+       [2.0, 4.0, 0.0, 6.0],
+       [3.0, 5.0, 6.0, 0.0],
+   ])
+   m = DistanceMatrix(square)
+
+   # SciPy condensed order: (0,1), (0,2), (0,3), (1,2), (1,3), (2,3)
+   compact = np.array([1.0, 2.0, 3.0, 4.0, 5.0, 6.0])
+   m = DistanceMatrix(compact)
+
+For a matrix ``D``, compact input follows SciPy condensed order: the strict
+upper triangle is read row by row::
+
+   [D[0, 1], D[0, 2], D[0, 3], D[1, 2], D[1, 3], D[2, 3]]
+
+The diagonal is omitted. More generally, the entries are ordered first by
+``i`` and then by ``j`` for ``i < j``. Compact input must be one-dimensional;
+a two-dimensional triangular array with the other half omitted or zeroed is
+not a compact representation.
+
+Square input must be exactly symmetric, nonnegative, and have a zero diagonal.
+Compact input has an implicit zero diagonal. NaN is rejected; positive infinity
+is allowed. An empty compact array represents a 1×1 distance matrix, matching
+SciPy's convention. Use an empty ``(0, 0)`` array for a size-zero matrix.
+
+Without an explicit ``dtype``, input arrays must have dtype ``float32`` or
+``float64``. Pass ``dtype=float32`` or ``dtype=float64`` to convert other array
+dtypes before construction. Construction copies the values, including from
+non-contiguous views. The older ``DistanceMatrix.from_dense(array)`` method
+is deprecated since 0.4.7; pass square arrays to the constructor.
+
+Matrices can also be allocated by size::
 
    m = DistanceMatrix(100, dtype=float32)
    m[3, 7] = 2.5
@@ -186,10 +223,43 @@ Symmetric matrices
 
 :py:class:`~stablebear.SymmetricMatrix` provides a more general compressed storage format for symmetric matrices without the distance matrix constraints. It stores the lower triangle including the diagonal — :math:`n(n+1)/2` elements instead of :math:`n^2`.
 
-::
+Construct a matrix from either a full square NumPy array or a one-dimensional
+compact array::
 
+   import numpy as np
    from stablebear import SymmetricMatrix
    from stablebear.typing import float32
+
+   square = np.array([
+       [1.0, 2.0, 4.0],
+       [2.0, 3.0, 5.0],
+       [4.0, 5.0, 6.0],
+   ])
+   m = SymmetricMatrix(square)
+
+   # Upper triangle in row-major order: (0,0), (0,1), (0,2), (1,1), ...
+   compact = np.array([1.0, 2.0, 4.0, 3.0, 5.0, 6.0])
+   m = SymmetricMatrix(compact)
+
+For a matrix ``A``, compact order is the upper triangle, including the
+diagonal, read row by row::
+
+   [A[0, 0], A[0, 1], A[0, 2], A[1, 1], A[1, 2], A[2, 2]]
+
+This extends SciPy condensed order by retaining the diagonal. More generally,
+the entries are ordered first by ``i`` and then by ``j`` for ``i <= j``.
+Compact input must be one-dimensional; a two-dimensional
+triangular array with the other half omitted or zeroed is not a compact
+representation.
+
+Square input must be exactly symmetric. Both forms preserve diagonal entries
+and allow positive or negative infinity; NaN is rejected. An empty compact or
+``(0, 0)`` square array represents a size-zero matrix. Dtype inference,
+explicit conversion, copying, and non-contiguous input behave as for
+``DistanceMatrix``. The older ``SymmetricMatrix.from_dense(array)``
+method is deprecated since 0.4.7.
+
+Matrices can also be allocated by size::
 
    m = SymmetricMatrix(100, dtype=float32)
    m[3, 7] = 2.5
