@@ -54,7 +54,7 @@ An individual PCF is represented by :py:class:`~stablebear.Pcf`. You create one 
                      [5.0, 0.0]], dtype=np.float32)
    f = sb.Pcf(data)
 
-   # From a list (defaults to float32)
+   # From a list (defaults to float64)
    g = sb.Pcf([[0, 1], [2, 3], [5, 0]])
 
 You can convert a ``Pcf`` back to a NumPy array with :py:meth:`~stablebear.Pcf.to_numpy`::
