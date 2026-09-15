@@ -107,6 +107,9 @@ variant, otherwise 64-bit) and can be overridden with ``dtype=``. These
 batch constructors are the natural entry point for computing persistent
 homology across many clouds or distance matrices in one parallel call.
 
+Using the tensor factory
+------------------------
+
 The :py:func:`~stablebear.tensor` factory is a NumPy-like front end that
 dispatches to the right constructor based on ``dtype``::
 
