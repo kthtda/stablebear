@@ -7,6 +7,8 @@ from .base_tensor import (
     IntTensor,
     PcfTensor,
     PointCloudTensor,
+    _first_pcf,
+    _to_tensor_pcf,
 )
 from .typing import (
     Dtype,
@@ -128,14 +130,18 @@ def tensor(data, dtype: Dtype = None):
         interpreted by the corresponding constructor (see those classes).
     dtype : Dtype, optional
         Target element dtype. When ``None``, a numeric dtype is inferred from
-        the array (bool/int/float); non-numeric tensors require an explicit
-        dtype.
+        the array (bool/int/float), while a collection of ``Pcf`` objects is
+        inferred as a ``PcfTensor`` or ``IntPcfTensor``. Other non-numeric
+        tensors require an explicit dtype.
 
     Returns
     -------
     Tensor
     """
     if dtype is None:
+        if _first_pcf(data) is not None:
+            return _to_tensor_pcf(data)
+
         import numpy as np
         arr = np.asarray(data)
         if arr.dtype == np.bool_:

@@ -211,6 +211,27 @@ def test_tensor_factory_numeric_inference():
     assert isinstance(sb.tensor([1.0, 2.0]), sb.FloatTensor)
 
 
+@pytest.mark.parametrize(
+    ("np_dtype", "sb_dtype"),
+    [
+        (np.float32, sb.pcf32),
+        (np.float64, sb.pcf64),
+    ],
+)
+def test_tensor_factory_equal_length_float_pcfs(np_dtype, sb_dtype):
+    arrays = [
+        np.array([[0.0, 1.0], [1.0, 2.0]], dtype=np_dtype),
+        np.array([[0.0, 3.0], [2.0, 4.0]], dtype=np_dtype),
+    ]
+    tensor = sb.tensor([sb.Pcf(array) for array in arrays])
+
+    assert isinstance(tensor, sb.PcfTensor)
+    assert tensor.shape == (2,)
+    assert tensor.dtype == sb_dtype
+    for i, expected in enumerate(arrays):
+        npt.assert_array_equal(tensor[i].to_numpy(), expected)
+
+
 def test_tensor_factory_pointcloud():
     arr = np.zeros((2, 3, 2))
     pc = sb.tensor(arr, dtype=sb.pcloud64)

@@ -4,7 +4,7 @@ import numpy as np
 from .persistence.barcode import Barcode
 from .persistence.ph_tensor import BarcodeTensor
 from .reductions import max_time as max_time_reduction
-from .base_tensor import PcfContainerLike, PcfTensor
+from .base_tensor import IntPcfTensor, PcfContainerLike, PcfTensor, _to_tensor_pcf
 
 
 def plot(f: PcfContainerLike, fmt="", ax=None, auto_label=False, max_time=None, **kwargs):
@@ -13,7 +13,7 @@ def plot(f: PcfContainerLike, fmt="", ax=None, auto_label=False, max_time=None, 
     Parameters
     ----------
     f : PcfContainerLike
-        A single ``Pcf`` or a 1-D ``PcfTensor``.
+        A single ``Pcf``, a list of ``Pcf`` objects, or a 1-D PCF tensor.
     fmt : str, optional
         A matplotlib format string (e.g. ``'r--'``), by default ``''``.
     ax : matplotlib axes, optional
@@ -42,7 +42,10 @@ def plot(f: PcfContainerLike, fmt="", ax=None, auto_label=False, max_time=None, 
             X = np.vstack((X, [maxtime, X[-1, 1]]))
         ax.step(X[:, 0], X[:, 1], fmt, where="post", **kwargs, **kwargs1)
 
-    if isinstance(f, PcfTensor):
+    if isinstance(f, (list, tuple)):
+        f = _to_tensor_pcf(f)
+
+    if isinstance(f, (PcfTensor, IntPcfTensor)):
         if len(f.shape) != 1:
             squeezed = f.squeeze()
             if len(squeezed.shape) != 1:
@@ -53,7 +56,12 @@ def plot(f: PcfContainerLike, fmt="", ax=None, auto_label=False, max_time=None, 
             # reducing with max_time, which has no identity over an empty range
             # and would otherwise raise on the (vacuous) reduction.
             return
-        mt = max_time if max_time is not None else float(max_time_reduction(f))
+        if max_time is not None:
+            mt = max_time
+        elif isinstance(f, PcfTensor):
+            mt = float(max_time_reduction(f))
+        else:
+            mt = max(float(np.asarray(f[i])[-1, 0]) for i in range(f.shape[0]))
         for i in range(f.shape[0]):
             kw = {"label": f"f{i}"} if auto_label else {}
             plot_single_(f[i], mt, **kw)
