@@ -35,10 +35,16 @@ def _symmetric_batch(shape, n, seed=0):
 # --- PointCloudTensor (#93) ---
 
 
-@pytest.mark.parametrize("shape", [(3, 5, 2), (2, 3, 4, 2), (6, 4, 2)])
+@pytest.mark.parametrize(
+    "shape", [(3, 5, 2), (2, 3, 4, 2), (6, 4, 2), (2, 3, 4, 5, 2)]
+)
 def test_pointcloud_to_dense_roundtrip(shape):
     arr = np.arange(int(np.prod(shape)), dtype=np.float64).reshape(shape)
     pc = sb.PointCloudTensor(arr)
+    tensor_shape = tuple(pc.shape)
+    assert tensor_shape == arr.shape[:-2]
+    for idx in np.ndindex(*tensor_shape):
+        npt.assert_allclose(np.asarray(pc[idx]), arr[idx])
     dense = pc.to_dense()
     assert dense.shape == arr.shape
     assert dense.dtype != object
@@ -103,6 +109,10 @@ def test_distance_matrix_tensor_to_dense_roundtrip():
 def test_distance_matrix_tensor_to_dense_multidim():
     stack = _symmetric_zero_diag_batch(24, 3).reshape(2, 3, 4, 3, 3)
     dt = sb.DistanceMatrixTensor(stack)
+    tensor_shape = tuple(dt.shape)
+    assert tensor_shape == stack.shape[:-2]
+    for idx in np.ndindex(*tensor_shape):
+        npt.assert_allclose(dt[idx].to_dense(), stack[idx], atol=1e-6)
     dense = dt.to_dense()
     assert dense.shape == (2, 3, 4, 3, 3)
     npt.assert_allclose(dense, stack, atol=1e-6)
@@ -121,6 +131,10 @@ def test_symmetric_matrix_tensor_to_dense_roundtrip():
 def test_symmetric_matrix_tensor_to_dense_multidim():
     stack = _symmetric_batch((2, 3, 5), 4)
     sm = sb.SymmetricMatrixTensor(stack)
+    tensor_shape = tuple(sm.shape)
+    assert tensor_shape == stack.shape[:-2]
+    for idx in np.ndindex(*tensor_shape):
+        npt.assert_allclose(sm[idx].to_dense(), stack[idx], atol=1e-6)
     dense = sm.to_dense()
     assert dense.shape == (2, 3, 5, 4, 4)
     npt.assert_allclose(dense, stack, atol=1e-6)
