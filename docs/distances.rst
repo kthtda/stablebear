@@ -157,6 +157,20 @@ compact array::
    compact = np.array([1.0, 2.0, 3.0, 4.0, 5.0, 6.0])
    m = DistanceMatrix(compact)
 
+For a matrix ``D``, condensed order is::
+
+   [D[0, 1], D[0, 2], D[0, 3], D[1, 2], D[1, 3], D[2, 3]]
+
+Since ``D`` is symmetric, this is equivalently the strict lower triangle read
+column by column::
+
+   [D[1, 0], D[2, 0], D[3, 0], D[2, 1], D[3, 1], D[3, 2]]
+
+The diagonal is omitted. More generally, the entries are ordered first by
+``i`` and then by ``j`` for ``i < j``. Compact input must be one-dimensional;
+a two-dimensional triangular array with the other half omitted or zeroed is
+not a compact representation.
+
 Square input must be exactly symmetric, nonnegative, and have a zero diagonal.
 Compact input has an implicit zero diagonal. NaN is rejected; positive infinity
 is allowed. An empty compact array represents a 1×1 distance matrix, matching
@@ -230,6 +244,16 @@ compact array::
    # Lower triangle in row-major order: (0,0), (1,0), (1,1), ...
    compact = np.array([1.0, 2.0, 3.0, 4.0, 5.0, 6.0])
    m = SymmetricMatrix(compact)
+
+For a matrix ``A``, compact order is the lower triangle, including the
+diagonal, read row by row::
+
+   [A[0, 0], A[1, 0], A[1, 1], A[2, 0], A[2, 1], A[2, 2]]
+
+More generally, the entries are ordered first by ``i`` and then by ``j`` for
+``j <= i``. Compact input must be one-dimensional; a two-dimensional
+triangular array with the other half omitted or zeroed is not a compact
+representation.
 
 Square input must be exactly symmetric. Both forms preserve diagonal entries
 and allow positive or negative infinity; NaN is rejected. An empty compact or
