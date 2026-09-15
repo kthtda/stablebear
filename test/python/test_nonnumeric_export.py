@@ -101,10 +101,10 @@ def test_distance_matrix_tensor_to_dense_roundtrip():
 
 
 def test_distance_matrix_tensor_to_dense_multidim():
-    stack = _symmetric_zero_diag_batch(6, 3).reshape(2, 3, 3, 3)
+    stack = _symmetric_zero_diag_batch(24, 3).reshape(2, 3, 4, 3, 3)
     dt = sb.DistanceMatrixTensor(stack)
     dense = dt.to_dense()
-    assert dense.shape == (2, 3, 3, 3)
+    assert dense.shape == (2, 3, 4, 3, 3)
     npt.assert_allclose(dense, stack, atol=1e-6)
 
 
@@ -119,10 +119,10 @@ def test_symmetric_matrix_tensor_to_dense_roundtrip():
 
 
 def test_symmetric_matrix_tensor_to_dense_multidim():
-    stack = _symmetric_batch((2, 3), 4)
+    stack = _symmetric_batch((2, 3, 5), 4)
     sm = sb.SymmetricMatrixTensor(stack)
     dense = sm.to_dense()
-    assert dense.shape == (2, 3, 4, 4)
+    assert dense.shape == (2, 3, 5, 4, 4)
     npt.assert_allclose(dense, stack, atol=1e-6)
 
 
