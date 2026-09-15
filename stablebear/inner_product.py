@@ -45,6 +45,6 @@ def l2_kernel(fs: PcfContainerLike, verbose=False) -> SymmetricMatrix:
     _run_task(lambda: task, verbose=verbose)
 
     if isinstance(sm_or_dense, np.ndarray):
-        return SymmetricMatrix.from_dense(sm_or_dense)
+        return SymmetricMatrix(sm_or_dense)
     else:
         return SymmetricMatrix(sm_or_dense)

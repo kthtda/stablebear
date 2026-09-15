@@ -9,12 +9,62 @@
 #include <sbear/symmetric_matrix.hpp>
 #include <sbear/tensor.hpp>
 
+#include "py_np_matrix_convert.hpp"
 #include "py_np_support.hpp"
 
+#include <cmath>
 #include <sstream>
 
 namespace sb_py
 {
+
+  namespace detail
+  {
+    template <typename T>
+    struct NumpyMatrixTraits<sb::SymmetricMatrix<T>>
+    {
+      static size_t compact_matrix_size(size_t storageCount)
+      {
+        size_t n = 0;
+        size_t nextRowSize = 1;
+        size_t remaining = storageCount;
+        while (remaining >= nextRowSize)
+        {
+          remaining -= nextRowSize;
+          ++n;
+          ++nextRowSize;
+        }
+        if (remaining != 0)
+        {
+          throw std::invalid_argument(
+            "Compact symmetric matrix length must equal n*(n+1)/2 for some n; got "
+            + std::to_string(storageCount));
+        }
+        return n;
+      }
+
+      static void validate_value(T value)
+      {
+        if (std::isnan(value))
+          throw std::invalid_argument("Symmetric matrix entries must not be NaN");
+      }
+
+      static void validate_diagonal(T value)
+      {
+        validate_value(value);
+      }
+
+      template <typename Fn>
+      static void for_each_compact_index(size_t n, Fn&& fn)
+      {
+        for (size_t i = 0; i < n; ++i)
+        {
+          for (size_t j = 0; j <= i; ++j)
+            fn(i, j);
+        }
+      }
+    };
+  }
 
   void register_symmetric_matrix(pybind11::module_& m);
 
@@ -59,26 +109,8 @@ namespace sb_py
         }
         return out;
       })
-      .def_static("from_dense", [](py::array_t<T> dense) {
-        if (dense.ndim() != 2)
-          throw std::invalid_argument("Expected a 2-D array");
-        auto n = static_cast<size_t>(dense.shape(0));
-        if (static_cast<size_t>(dense.shape(1)) != n)
-          throw std::invalid_argument("Expected a square array");
-        auto r = dense.template unchecked<2>();
-        MatT sm(n);
-        for (size_t i = 0; i < n; ++i)
-        {
-          sm(i, i) = r(i, i);
-          for (size_t j = i + 1; j < n; ++j)
-          {
-            if (r(i, j) != r(j, i))
-              throw std::invalid_argument("Matrix must be symmetric");
-            sm(i, j) = r(i, j);
-          }
-        }
-        return sm;
-      })
+      .def_static("from_numpy", &detail::matrix_from_numpy<MatT>)
+      .def_static("from_dense", &detail::matrix_from_numpy_dense<MatT>)
       .def("allclose", [](const MatT& self, const MatT& rhs, double atol, double rtol){
         return sb::allclose(self, rhs, T(atol), T(rtol));
       }, py::arg("other"), py::arg("atol") = 1e-8, py::arg("rtol") = 1e-5)

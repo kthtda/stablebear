@@ -1,15 +1,12 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+import warnings
 
 import numpy as np
 
 from . import _sb_cpp as cpp
 from ._tensor_base import Tensor
 from .typing import float32, float64, distmat32, distmat64
-
-if TYPE_CHECKING:
-    CppDistanceMatrix = cpp.DistanceMatrix_f32 | cpp.DistanceMatrix_f64
 
 _dtype_to_cpp = {
     float32: cpp.DistanceMatrix_f32,
@@ -37,18 +34,24 @@ class DistanceMatrix:
 
     Parameters
     ----------
-    n_or_data : int | DistanceMatrix | CppDistanceMatrix
+    n_or_data : int | numpy.ndarray | DistanceMatrix
         If an int, creates a zero-initialized matrix of that size.
-        If a DistanceMatrix or C++ distance matrix, wraps it directly.
+        A two-dimensional NumPy array supplies the full square matrix. A
+        one-dimensional array supplies the strict upper triangle in SciPy
+        condensed order: ``(0, 1), (0, 2), ..., (n-2, n-1)``.
+        If a DistanceMatrix, wraps it directly.
     dtype : float32 | float64 | None, optional
         Element precision. ``float32`` stores entries as 32-bit floats,
         ``float64`` as 64-bit floats. Defaults to ``float64`` when
-        ``n_or_data`` is an int. Ignored otherwise.
+        ``n_or_data`` is an int. For array input, ``float32`` and ``float64``
+        are inferred; other array dtypes require an explicit dtype. An
+        explicit dtype converts the array before construction. Ignored for
+        existing matrix objects.
     """
 
     def __init__(
         self,
-        n_or_data: int | DistanceMatrix | CppDistanceMatrix,
+        n_or_data: int | np.ndarray | DistanceMatrix,
         dtype: float32 | float64 | None = None,
     ):
         if isinstance(n_or_data, DistanceMatrix):
@@ -61,8 +64,12 @@ class DistanceMatrix:
             if dtype not in _dtype_to_cpp:
                 raise TypeError(f"Unsupported dtype {dtype}; use float32 or float64")
             self._data = _dtype_to_cpp[dtype](n_or_data)
+        elif isinstance(n_or_data, np.ndarray):
+            self._data = _distance_matrix_from_array(n_or_data, dtype)
         else:
-            raise TypeError(f"Expected int, DistanceMatrix, or C++ DistanceMatrix; got {type(n_or_data)}")
+            raise TypeError(
+                "Expected int, numpy.ndarray, or DistanceMatrix; "
+                f"got {type(n_or_data)}")
 
     @property
     def dtype(self):
@@ -167,16 +174,45 @@ class DistanceMatrix:
 
     @classmethod
     def from_dense(cls, array):
-        """Create a DistanceMatrix from a dense n×n numpy array."""
-        if array.dtype == np.float32:
-            return cls(cpp.DistanceMatrix_f32.from_dense(array))
-        elif array.dtype == np.float64:
-            return cls(cpp.DistanceMatrix_f64.from_dense(array))
-        else:
+        """Create a DistanceMatrix from a dense n×n NumPy array.
+
+        .. deprecated:: 0.4.7
+           Pass the array to ``DistanceMatrix(array)`` instead.
+        """
+        warnings.warn(
+            "DistanceMatrix.from_dense() is deprecated since 0.4.7; pass the array to "
+            "DistanceMatrix(array) instead",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        if array.dtype not in (np.float32, np.float64):
             raise TypeError(f"Unsupported dtype {array.dtype}")
+        return cls(array)
 
     def __repr__(self):
         return repr(self._data)
+
+
+def _array_dtype(array, dtype):
+    if dtype is not None:
+        if dtype not in _dtype_to_cpp:
+            raise TypeError(f"Unsupported dtype {dtype}; use float32 or float64")
+        return dtype
+    _validate_matrix_array_dtype(array)
+    return float32 if array.dtype == np.float32 else float64
+
+
+def _validate_matrix_array_dtype(array):
+    if array.dtype not in (np.float32, np.float64):
+        raise TypeError(
+            f"Unsupported array dtype {array.dtype}; use float32 or float64")
+
+
+def _distance_matrix_from_array(array, dtype):
+    dt = _array_dtype(array, dtype)
+    np_dtype = np.float32 if dt is float32 else np.float64
+    array = np.asarray(array, dtype=np_dtype)
+    return _dtype_to_cpp[dt].from_numpy(array)
 
 
 def _matrix_dtype_for(arr_dtype, dtype, dtype32, dtype64, name):
@@ -209,7 +245,7 @@ def _matrix_tensor_cpp_from_array(arr, dtype, scalar_cls, dtype32, dtype64):
     tensor_shape = arr.shape[:-2]
     t = zeros(tensor_shape, dtype=dt)
     for idx in np.ndindex(*tensor_shape):
-        t[idx] = scalar_cls.from_dense(arr[idx])
+        t[idx] = scalar_cls(arr[idx])
     return t._data
 
 
