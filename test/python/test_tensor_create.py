@@ -61,6 +61,29 @@ class TestTensorFactoryPcfInference:
         for i, expected in enumerate(arrays):
             npt.assert_array_equal(tensor[i].to_numpy(), expected)
 
+    def test_nested_shape(self, np_dtype, tensor_type, sb_dtype):
+        arrays = [
+            [
+                np.array([[0.0, 1.0], [1.0, 2.0]], dtype=np_dtype),
+                np.array([[0.0, 3.0], [2.0, 4.0]], dtype=np_dtype),
+            ],
+            [
+                np.array([[0.0, 5.0], [3.0, 6.0]], dtype=np_dtype),
+                np.array([[0.0, 7.0], [4.0, 8.0]], dtype=np_dtype),
+            ],
+        ]
+        tensor = sb.tensor([
+            [sb.Pcf(array) for array in row]
+            for row in arrays
+        ])
+
+        assert isinstance(tensor, tensor_type)
+        assert tensor.shape == (2, 2)
+        assert tensor.dtype == sb_dtype
+        for i, row in enumerate(arrays):
+            for j, expected in enumerate(row):
+                npt.assert_array_equal(tensor[i, j].to_numpy(), expected)
+
 
 def test_tensor_factory_pointcloud():
     arr = np.zeros((2, 3, 2))
