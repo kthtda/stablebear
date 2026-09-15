@@ -114,6 +114,10 @@ dispatches to the right constructor based on ``dtype``::
    pc = sb.tensor(arr, dtype=sb.pcloud64)          # PointCloudTensor
    dmats = sb.tensor(distances, dtype=sb.distmat64)  # DistanceMatrixTensor
 
+When passed a ``Pcf`` or a nested collection of PCFs, the factory infers a
+:py:class:`~stablebear.PcfTensor` or :py:class:`~stablebear.IntPcfTensor` from
+the PCF value dtype. A single ``Pcf`` becomes a one-element tensor.
+
 
 From serialized NumPy data
 ---------------------------
