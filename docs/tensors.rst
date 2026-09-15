@@ -107,12 +107,19 @@ variant, otherwise 64-bit) and can be overridden with ``dtype=``. These
 batch constructors are the natural entry point for computing persistent
 homology across many clouds or distance matrices in one parallel call.
 
+Using the tensor factory
+------------------------
+
 The :py:func:`~stablebear.tensor` factory is a NumPy-like front end that
 dispatches to the right constructor based on ``dtype``::
 
    X = sb.tensor([1.0, 2.0, 3.0])                  # FloatTensor (inferred)
    pc = sb.tensor(arr, dtype=sb.pcloud64)          # PointCloudTensor
    dmats = sb.tensor(distances, dtype=sb.distmat64)  # DistanceMatrixTensor
+
+When passed a ``Pcf`` or a nested collection of PCFs, the factory infers a
+:py:class:`~stablebear.PcfTensor` or :py:class:`~stablebear.IntPcfTensor` from
+the PCF value dtype. A single ``Pcf`` becomes a one-element tensor.
 
 
 From serialized NumPy data

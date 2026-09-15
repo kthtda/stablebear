@@ -437,18 +437,30 @@ class BoolTensor(Tensor):
 PcfContainerLike = Tensor | list[Pcf] | Pcf
 
 
+def _first_pcf(fs):
+    """Return the first leaf when *fs* is a nested collection of PCFs."""
+    first = fs
+    while isinstance(first, (list, tuple)):
+        if not first:
+            return None
+        first = first[0]
+    return first if isinstance(first, Pcf) else None
+
+
 def _to_tensor_pcf(fs: PcfContainerLike):
     if isinstance(fs, _PcfTensorBase):
         return fs
 
     if isinstance(fs, Pcf):
+        if fs.vtype in (int32, int64):
+            return IntPcfTensor([fs])
         return PcfTensor([fs])
 
     if isinstance(fs, (list, tuple)):
         if not fs:
             return PcfTensor(fs)
-        first = fs[0] if not isinstance(fs[0], (list, tuple)) else fs[0][0]
-        if isinstance(first, Pcf):
+        first = _first_pcf(fs)
+        if first is not None:
             if first.vtype in (int32, int64):
                 return IntPcfTensor(fs)
             return PcfTensor(fs)
