@@ -4,6 +4,10 @@
 
 * **SciPy linkage conversion** — `persistence.linkage_to_barcode` converts a linkage matrix to a `Barcode`, with optional reduced homology and no SciPy runtime dependency. ([#221](https://github.com/kthtda/stablebear/issues/221))
 
+### Bug fixes
+
+* **PCF collections dispatch correctly in `tensor()` and `plotting.plot()`** — `tensor()` now detects lists, tuples, and nested collections of floating or integer `Pcf` objects before NumPy dtype inference, preserving collection shape and avoiding ragged-array failures for unequal breakpoint counts. A single `Pcf` becomes a one-element tensor, and `plotting.plot()` accepts PCF lists and tuples directly. ([#224](https://github.com/kthtda/stablebear/issues/224))
+
 ## 0.4.5
 
 ### New features
