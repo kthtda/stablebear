@@ -18,7 +18,7 @@ def _symmetric_zero_diag_batch(N, n, seed=0):
     return out
 
 
-_NUMERIC_DTYPE_INFO = {
+_DTYPE_INFO = {
     np.bool_: (sb.BoolTensor, sb.boolean),
     np.int32: (sb.IntTensor, sb.int32),
     np.int64: (sb.IntTensor, sb.int64),
@@ -32,12 +32,26 @@ _NUMERIC_DTYPE_INFO = {
 def _assert_numeric_tensor_inference(values, np_dtype):
     expected = np.asarray(values, dtype=np_dtype)
     tensor = sb.tensor(values)
-    tensor_type, sb_dtype = _NUMERIC_DTYPE_INFO[np_dtype]
+    tensor_type, sb_dtype = _DTYPE_INFO[np_dtype]
 
     assert isinstance(tensor, tensor_type)
     assert tensor.shape == expected.shape
     assert tensor.dtype == sb_dtype
     npt.assert_array_equal(np.asarray(tensor), expected)
+
+
+def test_tensor_factory_numpy_bool_array_inference():
+    values = np.array([[True, False], [False, True]], dtype=np.bool_)
+    _assert_numeric_tensor_inference(values, np.bool_)
+
+
+@pytest.mark.parametrize(
+    "np_dtype",
+    [np.int32, np.int64, np.uint32, np.uint64, np.float32, np.float64],
+)
+def test_tensor_factory_numpy_array_inference(np_dtype):
+    values = np.array([[0, 1], [2, 3]], dtype=np_dtype)
+    _assert_numeric_tensor_inference(values, np_dtype)
 
 
 def test_tensor_factory_bool_inference():
