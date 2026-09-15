@@ -235,15 +235,6 @@ class SymmetricMatrixTensor(Tensor):
         """
         return cls(np.asarray(array), dtype=dtype)
 
-    @classmethod
-    def from_dense(cls, array, dtype=None):
-        """Build a tensor of symmetric matrices from a dense array.
-
-        Alias for :meth:`from_numpy`, completing the ``from_dense``/``to_dense``
-        pair.
-        """
-        return cls.from_numpy(array, dtype=dtype)
-
     def to_dense(self) -> np.ndarray:
         """Return the matrices as a dense ``(*tensor_shape, n, n)`` array.
 
