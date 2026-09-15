@@ -452,6 +452,8 @@ def _to_tensor_pcf(fs: PcfContainerLike):
         return fs
 
     if isinstance(fs, Pcf):
+        if fs.vtype in (int32, int64):
+            return IntPcfTensor([fs])
         return PcfTensor([fs])
 
     if isinstance(fs, (list, tuple)):

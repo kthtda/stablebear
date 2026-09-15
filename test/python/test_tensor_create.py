@@ -84,6 +84,15 @@ class TestTensorFactoryPcfInference:
             for j, expected in enumerate(row):
                 npt.assert_array_equal(tensor[i, j].to_numpy(), expected)
 
+    def test_single_pcf(self, np_dtype, tensor_type, sb_dtype):
+        array = np.array([[0.0, 1.0], [1.0, 2.0]], dtype=np_dtype)
+        tensor = sb.tensor(sb.Pcf(array))
+
+        assert isinstance(tensor, tensor_type)
+        assert tensor.shape == (1,)
+        assert tensor.dtype == sb_dtype
+        npt.assert_array_equal(tensor[0].to_numpy(), array)
+
 
 def test_tensor_factory_pointcloud():
     arr = np.zeros((2, 3, 2))
