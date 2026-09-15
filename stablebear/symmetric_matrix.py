@@ -37,8 +37,8 @@ class SymmetricMatrix:
     n_or_data : int | numpy.ndarray | SymmetricMatrix
         If an int, creates a zero-initialized matrix of that size.
         A two-dimensional NumPy array supplies the full square matrix. A
-        one-dimensional array supplies the lower triangle, including the
-        diagonal, in row-major order: ``(0, 0), (1, 0), (1, 1), ...``.
+        one-dimensional array supplies the upper triangle, including the
+        diagonal, in row-major order: ``(0, 0), (0, 1), ..., (1, 1), ...``.
         If a SymmetricMatrix, wraps it directly.
     dtype : float32 | float64 | None, optional
         Element precision. ``float32`` stores entries as 32-bit floats,

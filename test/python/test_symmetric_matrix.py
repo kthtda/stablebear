@@ -69,14 +69,14 @@ class TestArrayConstruction:
         assert matrix.dtype is sb_dtype
         np.testing.assert_array_equal(matrix.to_dense(), array)
 
-    def test_compact_uses_lower_triangle_row_major_order(self):
+    def test_compact_uses_upper_triangle_row_major_order(self):
         compact = np.array([1, 2, 3, 4, 5, 6], dtype=np.float64)
         matrix = sb.SymmetricMatrix(compact)
 
         expected = np.array([
-            [1, 2, 4],
-            [2, 3, 5],
-            [4, 5, 6],
+            [1, 2, 3],
+            [2, 4, 5],
+            [3, 5, 6],
         ], dtype=np.float64)
         np.testing.assert_array_equal(matrix.to_dense(), expected)
 
@@ -103,7 +103,7 @@ class TestArrayConstruction:
         assert not compact.flags.c_contiguous
         np.testing.assert_array_equal(
             sb.SymmetricMatrix(compact).to_dense(),
-            np.array([[1, 3, 7], [3, 5, 9], [7, 9, 11]], dtype=np.float32),
+            np.array([[1, 3, 5], [3, 7, 9], [5, 9, 11]], dtype=np.float32),
         )
 
     def test_input_is_copied(self):
