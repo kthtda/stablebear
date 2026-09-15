@@ -90,10 +90,9 @@ def test_pointcloud_empty_axis_to_dense_raises():
 # --- DistanceMatrixTensor / SymmetricMatrixTensor (#94) ---
 
 
-@pytest.mark.parametrize("build", ["from_numpy", "from_dense"])
-def test_distance_matrix_tensor_to_dense_roundtrip(build):
+def test_distance_matrix_tensor_to_dense_roundtrip():
     stack = _symmetric_zero_diag_batch(4, 5)
-    dt = getattr(sb.DistanceMatrixTensor, build)(stack)
+    dt = sb.DistanceMatrixTensor(stack)
     dense = dt.to_dense()
     assert dense.shape == (4, 5, 5)
     npt.assert_allclose(dense, stack, atol=1e-6)
@@ -103,16 +102,15 @@ def test_distance_matrix_tensor_to_dense_roundtrip(build):
 
 def test_distance_matrix_tensor_to_dense_multidim():
     stack = _symmetric_zero_diag_batch(6, 3).reshape(2, 3, 3, 3)
-    dt = sb.DistanceMatrixTensor.from_numpy(stack)
+    dt = sb.DistanceMatrixTensor(stack)
     dense = dt.to_dense()
     assert dense.shape == (2, 3, 3, 3)
     npt.assert_allclose(dense, stack, atol=1e-6)
 
 
-@pytest.mark.parametrize("build", ["from_numpy", "from_dense"])
-def test_symmetric_matrix_tensor_to_dense_roundtrip(build):
+def test_symmetric_matrix_tensor_to_dense_roundtrip():
     stack = _symmetric_batch((3,), 4)
-    sm = getattr(sb.SymmetricMatrixTensor, build)(stack)
+    sm = sb.SymmetricMatrixTensor(stack)
     dense = sm.to_dense()
     assert dense.shape == (3, 4, 4)
     npt.assert_allclose(dense, stack, atol=1e-6)
@@ -122,7 +120,7 @@ def test_symmetric_matrix_tensor_to_dense_roundtrip(build):
 
 def test_symmetric_matrix_tensor_to_dense_multidim():
     stack = _symmetric_batch((2, 3), 4)
-    sm = sb.SymmetricMatrixTensor.from_numpy(stack)
+    sm = sb.SymmetricMatrixTensor(stack)
     dense = sm.to_dense()
     assert dense.shape == (2, 3, 4, 4)
     npt.assert_allclose(dense, stack, atol=1e-6)
@@ -130,7 +128,7 @@ def test_symmetric_matrix_tensor_to_dense_multidim():
 
 def test_matrix_tensor_asarray_dtype_argument():
     stack = _symmetric_zero_diag_batch(2, 4)
-    dt = sb.DistanceMatrixTensor.from_numpy(stack)
+    dt = sb.DistanceMatrixTensor(stack)
     out = np.asarray(dt, dtype=np.float32)
     assert out.dtype == np.float32
     npt.assert_allclose(out, stack, atol=1e-6)
@@ -146,6 +144,24 @@ def test_symmetric_matrix_tensor_empty_to_dense_raises():
     sm = sb.zeros((0,), dtype=sb.symmat64)
     with pytest.raises(ValueError, match="empty axis"):
         sm.to_dense()
+
+
+@pytest.mark.parametrize(
+    ("tensor_cls", "tensor_dtype", "matrix_cls"),
+    [
+        (sb.DistanceMatrixTensor, sb.distmat64, sb.DistanceMatrix),
+        (sb.SymmetricMatrixTensor, sb.symmat64, sb.SymmetricMatrix),
+    ],
+)
+def test_matrix_tensor_mixed_sizes_to_dense_raises(
+    tensor_cls, tensor_dtype, matrix_cls
+):
+    matrices = sb.zeros((2,), dtype=tensor_dtype)
+    assert isinstance(matrices, tensor_cls)
+    matrices[0] = matrix_cls(3)
+    matrices[1] = matrix_cls(4)
+    with pytest.raises(ValueError, match="differing sizes"):
+        matrices.to_dense()
 
 
 # --- BarcodeTensor (#85) ---

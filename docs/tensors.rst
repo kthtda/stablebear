@@ -135,14 +135,14 @@ equal-sized clouds and a :py:class:`~stablebear.DistanceMatrixTensor` or
    dense = pc.to_dense()          # (3, 5, 4, 2)
    same = np.asarray(pc)          # equivalent
 
-   dmats = sb.DistanceMatrixTensor.from_numpy(np.zeros((6, 4, 4)))
+   dmats = sb.DistanceMatrixTensor(np.zeros((6, 4, 4)))
    stack = dmats.to_dense()       # (6, 4, 4)
 
 Point clouds must all have the same shape and matrices the same size; a ragged
 point-cloud tensor or a tensor of differently sized matrices raises
 ``ValueError`` (index the tensor and convert each element separately in that
-case). The matrix tensors also accept ``from_dense`` as an alias of
-``from_numpy``, completing the ``from_dense``/``to_dense`` pair.
+case). Dense NumPy arrays can be passed directly to the matrix tensor constructors;
+the existing ``from_numpy`` class methods remain available for compatibility.
 
 Barcodes are inherently ragged (each cell may hold a different number of bars),
 so a :py:class:`~stablebear.persistence.BarcodeTensor` cannot become a single
