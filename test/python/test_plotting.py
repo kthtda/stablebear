@@ -7,6 +7,7 @@ import pytest
 from plot_helpers import FigureGallery, gallery_fixture, ax_fixture, SHOW
 
 import stablebear as sb
+import stablebear.plotting as plotting_module
 from stablebear.persistence import Barcode, BarcodeTensor
 from stablebear.plotting import plot, plot_barcode
 
@@ -29,6 +30,38 @@ class TestPlot:
         line = ax.lines[0]
         np.testing.assert_array_equal(line.get_xdata(), [0, 1, 2])
         np.testing.assert_array_equal(line.get_ydata(), [1, 3, 0])
+
+    @pytest.mark.parametrize("container_type", [list, tuple])
+    @pytest.mark.parametrize(
+        ("np_dtype", "tensor_type", "sb_dtype"),
+        [
+            pytest.param(np.float32, sb.PcfTensor, sb.pcf32, id="float"),
+            pytest.param(np.int32, sb.IntPcfTensor, sb.pcf32i, id="int"),
+        ],
+    )
+    def test_collection_is_normalized_to_tensor(
+        self, ax, monkeypatch, container_type, np_dtype, tensor_type, sb_dtype
+    ):
+        functions = [
+            _make_pcf([[0, 1], [1, 2]], dtype=np_dtype),
+            _make_pcf([[0, 3], [2, 4]], dtype=np_dtype),
+        ]
+        converted = []
+        convert = plotting_module._to_tensor_pcf
+
+        def capture_conversion(value):
+            tensor = convert(value)
+            converted.append(tensor)
+            return tensor
+
+        monkeypatch.setattr(plotting_module, "_to_tensor_pcf", capture_conversion)
+        plot(container_type(functions), ax=ax)
+
+        assert len(converted) == 1
+        tensor = converted[0]
+        assert isinstance(tensor, tensor_type)
+        assert tensor.shape == (2,)
+        assert tensor.dtype == sb_dtype
 
     def test_tensor_plots_all_functions(self, ax):
         t = sb.PcfTensor([
