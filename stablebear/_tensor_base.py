@@ -362,13 +362,17 @@ class Tensor(ABC):
         basic = [slice(None) if isinstance(s, (BoolTensor, IntTensor)) else s
                  for s in entries]
         result = self._basic_getitem(basic, allow_scalar=False)
+        axis_shift = 0
         for orig_pos, idx in advanced:
             dims_dropped = sum(1 for j in range(orig_pos) if isinstance(entries[j], int))
-            axis = orig_pos - dims_dropped
+            axis = orig_pos - dims_dropped + axis_shift
             if isinstance(idx, BoolTensor):
                 result = self._to_py_tensor(result._data.axis_select(axis, idx._data))  # type: ignore[arg-type]
             else:
                 result = self._index_select_nd(result, axis, idx)
+                # A rank-r index array replaces the selected axis with r axes,
+                # so later advanced indices sit r - 1 positions further right.
+                axis_shift += max(idx.ndim, 1) - 1
         return result
 
     def _basic_getitem(self, entries, allow_scalar=True):
