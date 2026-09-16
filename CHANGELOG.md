@@ -1,3 +1,13 @@
+## 0.4.7
+
+### New features
+
+* **NumPy constructors for compressed matrices** — `DistanceMatrix` and `SymmetricMatrix` can now be constructed directly from either a full square NumPy array or a one-dimensional compact array. `DistanceMatrix` compact input follows SciPy condensed order; `SymmetricMatrix` compact input contains the upper triangle, including the diagonal, in row-major order. Array dtype is inferred for `float32` and `float64`, or can be converted explicitly with `dtype=`. ([#228](https://github.com/kthtda/stablebear/pull/228))
+
+### Deprecations
+
+* **`DistanceMatrix.from_dense` and `SymmetricMatrix.from_dense` are deprecated** — pass a square array directly to the corresponding constructor instead. The methods remain available for compatibility and emit `DeprecationWarning`. ([#228](https://github.com/kthtda/stablebear/pull/228))
+
 ## 0.4.6
 
 ### New features
