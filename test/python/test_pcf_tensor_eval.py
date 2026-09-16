@@ -130,6 +130,29 @@ class TestPcfTensorEvalArray:
         assert result.shape == (2, 2)
         npt.assert_array_almost_equal(result, [[1, 5], [3, 1]])
 
+    def test_empty_times_array(self, dtypes):
+        # Regression for issue #192: an empty evaluation grid used to hit
+        # undefined behavior instead of returning an empty result.
+        pcf_dtype, np_dtype = dtypes
+        X = make_1d_tensor(pcf_dtype, np_dtype)
+        result = X(np.array([], dtype=np_dtype))
+        assert isinstance(result, np.ndarray)
+        assert result.shape == (2, 0)
+
+    def test_empty_times_list(self, dtypes):
+        pcf_dtype, np_dtype = dtypes
+        X = make_2d_tensor(pcf_dtype, np_dtype)
+        result = X([])
+        assert result.shape == (2, 2, 0)
+
+    @pytest.mark.parametrize("float_dtype", [np.float32, np.float64])
+    def test_empty_float_tensor_input(self, dtypes, float_dtype):
+        pcf_dtype, np_dtype = dtypes
+        X = make_1d_tensor(pcf_dtype, np_dtype)
+        t = sb.FloatTensor(np.array([], dtype=float_dtype))
+        result = X(t)
+        assert result.shape == (2, 0)
+
 
 class TestPcfTensorEvalParallel:
     """Verify that parallel tensor_eval produces correct results.
