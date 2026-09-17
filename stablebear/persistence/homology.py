@@ -113,15 +113,14 @@ def compute_persistent_homology(
         return out
 
     # --- Point cloud input path ---
-    if isinstance(X, PointCloud):
-        # A single (possibly indexed) cloud — materialize to a coordinate tensor.
-        X = X.materialize()
-
     if isinstance(X, np.ndarray):
         X = FloatTensor(X)
 
     out = None
-    if isinstance(X, FloatTensor):
+    # Wrap a single cloud or coordinate tensor into a 1-element tensor. An
+    # indexed view is stored as the view it is, so its coordinates are never
+    # materialized.
+    if isinstance(X, (FloatTensor, PointCloud)):
         pcloud_dtype = _FLOAT_TO_PCLOUD_DTYPE[X.dtype]
         pcX = zeros((1,), dtype=pcloud_dtype)
         pcX[0] = X

@@ -379,6 +379,12 @@ class PointCloudTensor(Tensor):
 
     def _decay_value(self, val):
         float_dtype = _PCLOUD_TO_FLOAT_DTYPE[self.dtype]
+        # A same-precision PointCloud is already the element type; store it as is so
+        # an indexed view stays indexed (the store copies only its index array).
+        if isinstance(val, PointCloud) and val.dtype is float_dtype:
+            return val._data
+        if isinstance(val, PointCloud):
+            val = np.asarray(val)  # other precision: convert through coordinates
         t = FloatTensor(val, dtype=float_dtype)
         if t.ndim != 2:
             raise ValueError(
@@ -387,7 +393,7 @@ class PointCloudTensor(Tensor):
         return t._data
 
     def _get_valid_setitem_dtypes(self):
-        return [FloatTensor, np.ndarray, float, int]
+        return [PointCloud, FloatTensor, np.ndarray, float, int]
 
 
 class BoolTensor(Tensor):
