@@ -129,9 +129,11 @@ Pass one of the built-in specs (:class:`~stablebear.Gaussian` or
 ``Gaussian(mean=0.0, sigma=1.0)``. The whole probability-and-draw computation
 then runs in a single fused C++ pass.
 
-Distribution parameters are **keyword-only** — ``Uniform(high=3.0)``, never
-``Uniform(3.0)`` — so which region a spec describes is always explicit at the
-call site and a lone value cannot silently be taken for the wrong parameter.
+Distribution parameters may be given positionally (``Uniform(1.0, 3.0)`` binds
+``low`` then ``high``; ``Gaussian(2.0, 0.5)`` binds ``mean`` then ``sigma``) or
+by keyword. Naming them -- ``Uniform(high=3.0)`` -- makes which region a spec
+describes explicit at the call site, which is worth doing when only one of the
+two band edges is supplied.
 
 .. note::
 

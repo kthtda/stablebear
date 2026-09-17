@@ -10,9 +10,9 @@ from ..distance_matrix import (
 )
 from ..base_tensor import (
     FloatTensor,
-    PointCloud,
     PointCloudTensor,
 )
+from ..point_cloud import PointCloud
 from ..typing import barcode32, barcode64, distmat32, distmat64, float32, float64, pcloud32, pcloud64
 from .ph_tensor import BarcodeTensor
 

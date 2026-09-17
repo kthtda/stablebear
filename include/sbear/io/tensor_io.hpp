@@ -425,6 +425,50 @@ namespace sb::io::detail
     return read_shared_source_tensor<DistanceMatrix<ScalarT>, DistanceMatrix<ScalarT>>(
         is, [](std::istream& s) { return read_compressed_matrix<DistanceMatrix<ScalarT>>(s); });
   }
+
+  /// The format an earlier version wrote this element type as, for the two types
+  /// whose tensor layout changed (1000 -> 1001, 1120 -> 1121). Equal to
+  /// tensorFormat<T>() for every other type.
+  template <typename T>
+  TensorFormat legacyTensorFormat()
+  {
+    if constexpr (is_point_cloud_v<T>)
+    {
+      return TensorFormat{ .baseFormat = 1000, .subFormat = tensorFormat<T>().subFormat };
+    }
+    else if constexpr (is_distance_matrix_v<T>)
+    {
+      return TensorFormat{ .baseFormat = 1120, .subFormat = tensorFormat<T>().subFormat };
+    }
+    else
+    {
+      return tensorFormat<T>();
+    }
+  }
+
+  /// Read a tensor body for element type T, routing on the format already read
+  /// from the stream: the shared-source layout for the current point-cloud and
+  /// distance-matrix formats, element-wise for legacy and unchanged formats.
+  /// Both read entry points go through here so they cannot drift apart.
+  template <typename T>
+  Tensor<T> read_tensor_for_format(std::istream& is, TensorFormat format)
+  {
+    if constexpr (is_point_cloud_v<T>)
+    {
+      if (format == tensorFormat<T>())
+      {
+        return read_indexed_point_cloud_tensor<typename is_point_cloud<T>::scalar_type>(is);
+      }
+    }
+    else if constexpr (is_distance_matrix_v<T>)
+    {
+      if (format == tensorFormat<T>())
+      {
+        return read_indexed_distance_matrix_tensor<typename is_distance_matrix<T>::scalar_type>(is);
+      }
+    }
+    return read_tensor<T>(is);
+  }
 }
 
 #endif // STABLEBEAR_TENSOR_IO_H

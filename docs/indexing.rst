@@ -12,7 +12,7 @@ Indexing with all integers returns the element at that position::
    X = sb.zeros((10, 5))
    f = X[3, 2]   # returns a Pcf object
 
-For a ``PcfTensor``, the returned element is a :py:class:`~stablebear.Pcf`. For a ``FloatTensor``, it is a Python float. For a ``PointCloudTensor``, it is a ``FloatTensor`` (representing the point cloud as a numeric array).
+For a ``PcfTensor``, the returned element is a :py:class:`~stablebear.Pcf`. For a ``FloatTensor``, it is a Python float. For a ``PointCloudTensor``, it is a :py:class:`~stablebear.PointCloud`, which may be an indexed view sharing another cloud's coordinates.
 
 Negative integers count from the end, as in NumPy, and an out-of-range
 integer raises ``IndexError``::

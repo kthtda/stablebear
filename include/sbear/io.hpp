@@ -29,7 +29,9 @@ namespace sb
     constexpr const std::string_view HeaderIdBytes = "\1MPCF";
 
     // This should change as soon as an older version would not be able to read the data produced by the current version.
-    constexpr const int FormatVersion = 2;
+    // Bumped to 3 for the shared-source point-cloud (1000 -> 1001) and distance-matrix (1120 -> 1121) tensor layouts;
+    // versions 1 and 2 remain readable (read_header accepts the whole range).
+    constexpr const int FormatVersion = 3;
 
     inline void write_endianness(std::ostream& os)
     {
@@ -210,13 +212,19 @@ namespace sb
     format.baseFormat = io::detail::read_bytes<std::int32_t>(is);
     format.subFormat = io::detail::read_bytes<std::int32_t>(is);
 
-    auto expectedFormat = io::detail::tensorFormat<typename TensorT::value_type>();
-    if (format != expectedFormat)
+    using ElemT = typename TensorT::value_type;
+
+    // Point-cloud and distance-matrix tensors have both a current and a legacy
+    // layout; accept either, as read_any_tensor does. For every other type the
+    // two formats coincide and this is the plain equality check it replaces.
+    auto expectedFormat = io::detail::tensorFormat<ElemT>();
+    auto legacyFormat = io::detail::legacyTensorFormat<ElemT>();
+    if (format != expectedFormat && format != legacyFormat)
     {
       throw std::runtime_error("Unexpected tensor format " + format.toString() + " where " + expectedFormat.toString() + " was expected.");
     }
 
-    return io::detail::read_tensor<typename TensorT::value_type>(is);
+    return io::detail::read_tensor_for_format<ElemT>(is, format);
   }
 
   inline io::detail::StreamableTensor read_any_tensor(std::istream& is)
@@ -249,22 +257,22 @@ namespace sb
     else if (format == io::detail::tensorFormat<Pcf<int32_t, int32_t>>()) { return io::detail::read_tensor<Pcf<int32_t, int32_t>>(is); }
     else if (format == io::detail::tensorFormat<Pcf<int64_t, int64_t>>()) { return io::detail::read_tensor<Pcf<int64_t, int64_t>>(is); }
 
-    // Legacy point cloud format (every element a full nested tensor) — read as materialized clouds.
-    else if (format == io::detail::TensorFormat{1000, 32}) { return io::detail::read_tensor<PointCloud<float32_t>>(is); }
-    else if (format == io::detail::TensorFormat{1000, 64}) { return io::detail::read_tensor<PointCloud<float64_t>>(is); }
-    // Current point cloud format (shared-source dedup).
-    else if (format == io::detail::tensorFormat<PointCloud<float32_t>>()) { return io::detail::read_indexed_point_cloud_tensor<float32_t>(is); }
-    else if (format == io::detail::tensorFormat<PointCloud<float64_t>>()) { return io::detail::read_indexed_point_cloud_tensor<float64_t>(is); }
+    // Point clouds: legacy (1000, every element a full nested tensor, read as
+    // materialized clouds) and current (1001, shared-source dedup).
+    else if (format == io::detail::legacyTensorFormat<PointCloud<float32_t>>()
+             || format == io::detail::tensorFormat<PointCloud<float32_t>>()) { return io::detail::read_tensor_for_format<PointCloud<float32_t>>(is, format); }
+    else if (format == io::detail::legacyTensorFormat<PointCloud<float64_t>>()
+             || format == io::detail::tensorFormat<PointCloud<float64_t>>()) { return io::detail::read_tensor_for_format<PointCloud<float64_t>>(is, format); }
 
     else if (format == io::detail::tensorFormat<SymmetricMatrix<float32_t>>()) { return io::detail::read_tensor<SymmetricMatrix<float32_t>>(is); }
     else if (format == io::detail::tensorFormat<SymmetricMatrix<float64_t>>()) { return io::detail::read_tensor<SymmetricMatrix<float64_t>>(is); }
 
-    // Legacy distance-matrix format (every element a full compressed matrix).
-    else if (format == io::detail::TensorFormat{1120, 32}) { return io::detail::read_tensor<DistanceMatrix<float32_t>>(is); }
-    else if (format == io::detail::TensorFormat{1120, 64}) { return io::detail::read_tensor<DistanceMatrix<float64_t>>(is); }
-    // Current distance-matrix format (shared-source dedup).
-    else if (format == io::detail::tensorFormat<DistanceMatrix<float32_t>>()) { return io::detail::read_indexed_distance_matrix_tensor<float32_t>(is); }
-    else if (format == io::detail::tensorFormat<DistanceMatrix<float64_t>>()) { return io::detail::read_indexed_distance_matrix_tensor<float64_t>(is); }
+    // Distance matrices: legacy (1120, every element a full compressed matrix)
+    // and current (1121, shared-source dedup).
+    else if (format == io::detail::legacyTensorFormat<DistanceMatrix<float32_t>>()
+             || format == io::detail::tensorFormat<DistanceMatrix<float32_t>>()) { return io::detail::read_tensor_for_format<DistanceMatrix<float32_t>>(is, format); }
+    else if (format == io::detail::legacyTensorFormat<DistanceMatrix<float64_t>>()
+             || format == io::detail::tensorFormat<DistanceMatrix<float64_t>>()) { return io::detail::read_tensor_for_format<DistanceMatrix<float64_t>>(is, format); }
 
     else if (format == io::detail::tensorFormat<ph::Barcode<float32_t>>()) { return io::detail::read_tensor<ph::Barcode<float32_t>>(is); }
     else if (format == io::detail::tensorFormat<ph::Barcode<float64_t>>()) { return io::detail::read_tensor<ph::Barcode<float64_t>>(is); }

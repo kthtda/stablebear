@@ -5,10 +5,18 @@ import numpy as np
 
 from .. import _sb_cpp as cpp
 from ..async_task import _run_task
-from ..base_tensor import FloatTensor, IntTensor, PointCloudTensor
+from ..base_tensor import FloatTensor, IntTensor, _get_backend
 from ..distance_matrix import DistanceMatrix, DistanceMatrixTensor
 from ..random import _unwrap
-from ..typing import distmat32, distmat64, float32, pcloud32, pcloud64, uint64
+from ..typing import (
+    distmat32,
+    distmat64,
+    float32,
+    float64,
+    pcloud32,
+    pcloud64,
+    uint64,
+)
 from .distributions import Gaussian, Uniform
 
 cpp_samp = cpp.sampling
@@ -18,10 +26,10 @@ cpp_samp = cpp.sampling
 # references; arbitrary callables are intentionally not supported.
 _BUILTIN_DISTRIBUTIONS = (Gaussian, Uniform)
 
-
-def _backend(dtype):
-    """The precision-specific C++ subsampling backend for a FloatTensor dtype."""
-    return cpp_samp.Subsample32 if dtype == float32 else cpp_samp.Subsample64
+_SUBSAMPLE_BACKEND_MAP = {
+    float32: cpp_samp.Subsample32,
+    float64: cpp_samp.Subsample64,
+}
 
 
 def _as_float_tensor(data, dtype=None):
@@ -137,7 +145,7 @@ def _subsample_distmat(reference, query, *, sample_size, n_instances, distributi
             "array of reference row indices (or None for all rows)."
         )
     query_indices = IntTensor(_reference_indices(query, source.size), dtype=uint64)
-    backend = _backend(source.dtype)
+    backend, _ = _get_backend(source, _SUBSAMPLE_BACKEND_MAP)
 
     # The task fills `out` in place (allocated to (n_query, n_instances) when it
     # runs); pass a placeholder and read it back, as the Ripser pipeline does.
@@ -147,7 +155,7 @@ def _subsample_distmat(reference, query, *, sample_size, n_instances, distributi
     # Fully fused C++ draw: precomputed distances + built-in distribution.
     task = backend.spawn_subsample_distmat_task(
         source._data, query_indices._data, out._data,
-        distribution._descriptor(backend), sample_size, n_instances, replace,
+        distribution._native(backend), sample_size, n_instances, replace,
         _unwrap(generator)
     )
     _run_task(lambda: task, verbose=verbose)
@@ -189,7 +197,7 @@ def _subsample_pointcloud(reference, query, *, sample_size, n_instances, distrib
         if reference_cloud.shape[1] != query_tensor.shape[1]:
             raise ValueError("reference and query must have the same dimension.")
 
-    backend = _backend(reference_cloud.dtype)
+    backend, _ = _get_backend(reference_cloud, _SUBSAMPLE_BACKEND_MAP)
 
     # The task fills `out` in place (allocated to (n_query, n_instances) when it
     # runs); pass a placeholder and read it back, as the Ripser pipeline does.
@@ -199,7 +207,7 @@ def _subsample_pointcloud(reference, query, *, sample_size, n_instances, distrib
     # Fully fused C++ draw: distances + built-in distribution.
     task = backend.spawn_subsample_pcloud_task(
         reference_cloud._data, query_tensor._data, out._data, backend.Euclidean(),
-        distribution._descriptor(backend), sample_size, n_instances, replace,
+        distribution._native(backend), sample_size, n_instances, replace,
         _unwrap(generator)
     )
     _run_task(lambda: task, verbose=verbose)

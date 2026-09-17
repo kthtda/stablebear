@@ -1,7 +1,7 @@
 """Built-in sampling distributions.
 
 A distribution is a lightweight spec: it holds its parameters and builds the
-matching precision-specific C++ descriptor for the fused fast path used by
+matching precision-specific C++ object for the fused fast path used by
 :func:`stablebear.sampling.subsample_relative`, which only accepts these
 built-ins. The distance-to-weight math lives solely in the C++ functor; these
 classes carry no Python copy of it.
@@ -18,32 +18,19 @@ class Uniform:
                              0 & \text{otherwise.} \end{cases}
 
     Applied to the Euclidean distance, this samples uniformly from a region
-    defined by distance to the query point:
-
-    * a **disk** of radius :math:`r` (every reference point within :math:`r` of the
-      query equally likely) -- ``Uniform(high=r)``;
-    * an **annulus** between radii :math:`r_1` and :math:`r_2` --
-      ``Uniform(low=r1, high=r2)``;
-    * everything **beyond** distance :math:`r` -- ``Uniform(low=r)``;
-    * plain uniform sampling of the whole reference cloud -- ``Uniform()`` (the
-      default, ``low=0``, ``high=`` :math:`\infty`). This case is independent of
-      the query point, so a single query point suffices.
-
-    Both parameters are keyword-only: which band edge is meant is always
-    explicit at the call site, so a lone radius cannot silently pick the
-    wrong region.
+    defined by distance to the query point.
 
     Parameters
     ----------
-    low : float, optional, keyword-only
+    low : float, optional
         Lower band edge :math:`\text{low} \ge 0`, by default 0.0.
-    high : float, optional, keyword-only
+    high : float, optional
         Upper band edge. If ``None`` (the default) it is :math:`+\infty`, so every
         point at distance :math:`\ge` ``low`` is included. Must be strictly greater
         than ``low``.
     """
 
-    def __init__(self, *, low=0.0, high=None):
+    def __init__(self, low=0.0, high=None):
         # Inverted comparisons so that NaN parameters fail validation too.
         low = float(low)
         if not (low >= 0):
@@ -54,10 +41,9 @@ class Uniform:
         self.low = low
         self.high = high
 
-    def _descriptor(self, backend):
-        """The matching C++ descriptor for the given precision backend."""
+    def _native(self, backend):
+        """The matching C++ object for the given precision backend."""
         return backend.Uniform(self.low, self.high)
-
 
 
 class Gaussian:
@@ -69,20 +55,16 @@ class Gaussian:
     Applied to the Euclidean distance, this concentrates sampling probability on
     reference points whose distance to the query point is near :math:`\mu`.
 
-    Both parameters are keyword-only: ``Gaussian(sigma=0.3)`` samples tightly
-    around each query point, ``Gaussian(mean=2.0, sigma=0.3)`` a shell at
-    distance 2 -- an unnamed value cannot be mistaken for the other parameter.
-
     Parameters
     ----------
-    mean : float, optional, keyword-only
+    mean : float, optional
         Center :math:`\mu`, by default 0.0. Must be finite.
-    sigma : float, optional, keyword-only
+    sigma : float, optional
         Standard deviation :math:`\sigma`, by default 1.0. Must be positive
         and finite.
     """
 
-    def __init__(self, *, mean=0.0, sigma=1.0):
+    def __init__(self, mean=0.0, sigma=1.0):
         mean = float(mean)
         sigma = float(sigma)
         # Non-finite parameters would not error downstream — they silently
@@ -96,7 +78,9 @@ class Gaussian:
         self.mean = mean
         self.sigma = sigma
 
-    def _descriptor(self, backend):
-        """The matching C++ descriptor for the given precision backend."""
+    def _native(self, backend):
+        """The matching C++ object for the given precision backend."""
         return backend.Gaussian(self.mean, self.sigma)
+
+
 __all__ = ["Gaussian", "Uniform"]
