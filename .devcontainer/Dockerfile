@@ -141,6 +141,13 @@ RUN pip install tomli \
     && python3 -c "import tomli; d=tomli.load(open('/tmp/build/pyproject.toml','rb')); print('\n'.join(d['project']['dependencies'] + d.get('tool',{}).get('cibuildwheel',{}).get('test-requires',[])))" > /tmp/build/pyproject-deps.txt \
     && pip install -r /tmp/build/pyproject-deps.txt -r /tmp/build/docs-requirements.txt
 
+# Codex runs inside the devcontainer, so a second OS sandbox is unnecessary
+# and may fail on container kernels that disable unprivileged user namespaces.
+# This user-level config applies to both the CLI and the VS Code extension.
+RUN mkdir -p /home/ubuntu/.codex/rules
+COPY --chown=ubuntu:ubuntu .devcontainer/codex-config.toml /home/ubuntu/.codex/config.toml
+COPY --chown=ubuntu:ubuntu .devcontainer/codex-rules/ /home/ubuntu/.codex/rules/
+
 # Host credentials staged by initializeCommand. Keep this last so credential
 # changes only rebuild this layer. The copied credentials are part of the image.
 COPY --chown=ubuntu:ubuntu .devcontainer/.local/gh/ /home/ubuntu/.config/gh/

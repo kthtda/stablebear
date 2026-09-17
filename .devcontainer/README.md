@@ -22,6 +22,10 @@ an NVIDIA GPU). Everything below is shared unless noted.
     `[tool.cibuildwheel].test-requires`), read via `tomli`;
   - Sphinx docs deps from `docs/requirements.txt`.
 - **Node 20** + `@anthropic-ai/claude-code` (run `claude` in the terminal).
+- **Codex**: the CLI and VS Code extension trust `/workspaces/stablebear` and
+  use `danger-full-access` inside the container, avoiding a redundant nested
+  OS sandbox. State-changing Git commands still require explicit user
+  approval.
 - **GPU** (cuda config only): passed through via `--gpus all`. Builds `_sb_cuda12`, arch auto-detected (`native` -> sm_89 for the RTX 4070 Ti).
 
 ## Host prerequisites
@@ -101,6 +105,26 @@ cd docs && make html   # output in docs/_build/html
 persist across rebuilds. To share **credentials only** (not full host config/hooks),
 edit `devcontainer.json` and narrow the first mount to
 `~/.claude/.credentials.json`.
+
+## Codex sandbox
+
+The image copies `.devcontainer/codex-config.toml` to
+`/home/ubuntu/.codex/config.toml`. It sets
+`sandbox_mode = "danger-full-access"` because the devcontainer itself is the
+intended isolation boundary and some container kernels cannot start Codex's
+nested OS sandbox. It also marks `/workspaces/stablebear` as trusted so
+project-scoped Codex configuration can load.
+
+Interactive approvals remain enabled and are routed to the user. The rules in
+`.devcontainer/codex-rules/default.rules` require approval for state-changing
+Git commands such as `git add`, `commit`, `push`, `reset`, `clean`,
+`restore`, `rebase`, and `merge`. Read-only commands such as `git status`,
+`diff`, `log`, and `show` continue without a prompt. Codex loads the rules
+from `/home/ubuntu/.codex/rules/` at startup.
+
+This grants Codex full filesystem and network access *inside the container*;
+the container's mounts and runtime configuration remain the boundary to the
+host. Rebuild the devcontainer after changing this file.
 
 ## GitHub CLI auth
 

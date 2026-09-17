@@ -1,0 +1,34 @@
+# Require explicit user approval for Git commands that change repository,
+# working-tree, index, or remote state. Read-only inspection commands remain
+# unaffected.
+prefix_rule(
+    pattern = [
+        ["git", "/usr/bin/git"],
+        [
+            "add",
+            "am",
+            "apply",
+            "bisect",
+            "branch",
+            "checkout",
+            "cherry-pick",
+            "clean",
+            "commit",
+            "merge",
+            "mv",
+            "pull",
+            "push",
+            "rebase",
+            "reset",
+            "restore",
+            "revert",
+            "rm",
+            "stash",
+            "switch",
+            "tag",
+            "worktree",
+        ],
+    ],
+    decision = "prompt",
+    justification = "This Git command changes local or remote repository state.",
+)

@@ -1,0 +1,9 @@
+# Codex already runs inside the devcontainer's isolation boundary. Avoid
+# nesting its OS sandbox, which is unsupported by some container kernels and
+# can prevent otherwise ordinary commands from running.
+approval_policy = "on-request"
+approvals_reviewer = "user"
+sandbox_mode = "danger-full-access"
+
+[projects."/workspaces/stablebear"]
+trust_level = "trusted"
