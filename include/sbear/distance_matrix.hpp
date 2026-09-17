@@ -32,7 +32,9 @@ namespace sb
   /// a tensor of subsampled distance matrices store one shared source plus small
   /// index arrays instead of re-storing every sub-matrix. Access through
   /// size()/operator() is transparent to indexing, so consumers need no special
-  /// case. An indexed view is read-only. Tensors of matrices serialize views
+  /// case. Writing to an indexed view is copy-on-write: the view detaches by
+  /// materializing in place first, leaving the shared source untouched.
+  /// Tensors of matrices serialize views
   /// natively (each distinct source stored once, see tensor_io.hpp); a
   /// *standalone* view is written as its materialization.
   template <ArithmeticType T>
@@ -93,14 +95,23 @@ namespace sb
     /// The selected source indices (rank-1 when indexed, empty otherwise).
     [[nodiscard]] const Tensor<uint64_t>& indices() const { return m_indices; }
 
-    /// Return an independent value. An owning matrix is deep-copied; an indexed
-    /// view keeps sharing the (immutable) source buffer but copies its index
-    /// array, so the result never aliases another cell's indices. Tensor cells
-    /// route stores through store_copy, which prefers copy().
-    [[nodiscard]] DistanceMatrix copy() const
+    /// Return an independent value. An owning matrix is deep-copied. An indexed
+    /// view copies its index array (so the result never aliases another cell's
+    /// indices) and, by default (@p keepSource), keeps sharing the source
+    /// buffer; with @p keepSource false it also deep-copies the source,
+    /// yielding a view that aliases nothing — a completely clean slate on
+    /// request. @p keepSource is moot for an owning matrix, which never shares.
+    /// Tensor cells route stores through store_copy, which prefers copy().
+    [[nodiscard]] DistanceMatrix copy(bool keepSource = true) const
     {
       if (is_indexed())
-        return DistanceMatrix(*this, m_indices.copy());
+      {
+        if (keepSource)
+          return DistanceMatrix(*this, m_indices.copy());
+        DistanceMatrix sourceCopy(m_size);
+        std::copy(m_data.get(), m_data.get() + storage_size(m_size), sourceCopy.m_data.get());
+        return DistanceMatrix(sourceCopy, m_indices.copy());
+      }
       DistanceMatrix result(m_size);
       std::copy(m_data.get(), m_data.get() + storage_size(m_size), result.m_data.get());
       return result;
@@ -133,8 +144,10 @@ namespace sb
 
     [[nodiscard]] EntryProxy operator()(size_t i, size_t j)
     {
+      // Copy-on-write: a write detaches an indexed view by materializing it in
+      // place first, so the shared source buffer is never touched.
       if (is_indexed())
-        throw std::logic_error("cannot write to an indexed distance-matrix view");
+        *this = materialize();
       bounds_check(i, j);
       if (i == j)
         return EntryProxy(nullptr);

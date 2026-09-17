@@ -98,15 +98,21 @@ namespace sb
     }
 
     /// Deep copy. Tensor cells route stores through detail::store_copy, which
-    /// prefers copy(). An indexed view keeps sharing the source coordinates
-    /// (immutable by convention, the point of indexed views); only the index
-    /// array is copied so cells don't alias. An owning cloud copies its
-    /// coordinates.
-    [[nodiscard]] PointCloud copy() const
+    /// prefers copy(). An owning cloud copies its coordinates. An indexed view
+    /// copies its index array (so cells don't alias) and, by default
+    /// (@p keepSource), keeps sharing the source coordinates — immutable by
+    /// convention, the point of indexed views; with @p keepSource false it also
+    /// deep-copies the source, yielding a view that aliases nothing.
+    /// @p keepSource is moot for an owning cloud, which never shares.
+    [[nodiscard]] PointCloud copy(bool keepSource = true) const
     {
       if (is_indexed())
       {
-        return PointCloud(m_coords, m_indices.copy());
+        if (keepSource)
+        {
+          return PointCloud(m_coords, m_indices.copy());
+        }
+        return PointCloud(m_coords.copy(), m_indices.copy());
       }
       return PointCloud(m_coords.copy());
     }

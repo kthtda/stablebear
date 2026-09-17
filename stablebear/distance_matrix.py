@@ -101,6 +101,24 @@ class DistanceMatrix:
         """Return an owning ``DistanceMatrix`` of the (selected) principal submatrix."""
         return DistanceMatrix(self._data.materialize())
 
+    def copy(self, keep_source: bool = True) -> DistanceMatrix:
+        """Return an independent copy.
+
+        An owning matrix is deep-copied. For an indexed view, ``keep_source=True``
+        (the default) copies only the index array and keeps sharing the source
+        buffer; ``keep_source=False`` also deep-copies the source, yielding a view
+        that shares nothing with the original. The copy of an indexed view is
+        itself an indexed view either way — use :meth:`materialize` to obtain an
+        owning matrix.
+
+        Parameters
+        ----------
+        keep_source : bool, optional
+            Whether to keep sharing the source buffer of an indexed view, by
+            default True. Moot for an owning matrix, which never shares.
+        """
+        return DistanceMatrix(self._data.copy(keep_source))
+
     def _resolve_ij(self, ij):
         i, j = ij
         n = self._data.size
@@ -142,6 +160,9 @@ class DistanceMatrix:
 
         Negative indices count from the end. Writes to the diagonal are
         rejected unless the value is zero, and entries must be nonnegative.
+        Writing to an indexed view is copy-on-write: the view first detaches
+        into an owning copy of its selected submatrix, so the shared source
+        matrix is never touched.
 
         Parameters
         ----------

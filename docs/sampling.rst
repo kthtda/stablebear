@@ -113,7 +113,11 @@ something different (Euclidean distances *between the matrix rows*) at
 :class:`~stablebear.DistanceMatrix` stores its symmetric, zero-diagonal matrix
 in compressed form -- :math:`n(n-1)/2` entries instead of :math:`n^2` (see
 :doc:`distances`) -- and each subsample is an index view sharing the reference
-matrix's entries rather than copying them. At scale, prefer building the
+matrix's entries rather than copying them. The sharing is safe: writing to a
+view is copy-on-write (it detaches into an owning copy, leaving the reference
+untouched), and ``copy(keep_source=False)`` returns a copy that shares nothing
+with the reference; both also hold for point-cloud subsamples. At scale,
+prefer building the
 ``DistanceMatrix`` directly over round-tripping through a dense ``(n, n)``
 array with :meth:`~stablebear.DistanceMatrix.from_dense`.
 

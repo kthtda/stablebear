@@ -134,7 +134,8 @@ namespace
         .def_property_readonly("is_indexed", &PC::is_indexed)
         .def_property_readonly("indices", &PC::indices)
         .def_property_readonly("coords", &PC::coords)
-        .def("materialize", &PC::materialize);
+        .def("materialize", &PC::materialize)
+        .def("copy", &PC::copy, py::arg("keep_source") = true);
   }
 
 }
