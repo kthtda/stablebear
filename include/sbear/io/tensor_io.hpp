@@ -9,7 +9,7 @@
 #include "../functional/pcf.hpp"
 #include "../persistence/barcode.hpp"
 
-#include <unordered_map>
+#include <map>
 #include <vector>
 
 namespace sb::io::detail
@@ -37,14 +37,6 @@ namespace sb::io::detail
 
   // Point clouds are identified via sb::is_point_cloud (point_cloud.hpp).
 
-  template <typename T>
-  struct is_distance_matrix : std::false_type {};
-
-  template <typename T>
-  struct is_distance_matrix<DistanceMatrix<T>> : std::true_type { using scalar_type = T; };
-
-  template <typename T>
-  inline constexpr bool is_distance_matrix_v = is_distance_matrix<T>::value;
 
   using StreamableTensor = std::variant<
       Tensor<float32_t>,
@@ -138,12 +130,8 @@ namespace sb::io::detail
     else if constexpr (std::is_same_v<T, SymmetricMatrix<float32_t>>) { return TensorFormat{ .baseFormat = 1100, .subFormat = 32 }; }
     else if constexpr (std::is_same_v<T, SymmetricMatrix<float64_t>>) { return TensorFormat{ .baseFormat = 1100, .subFormat = 64 }; }
 
-    // baseFormat 1120 is the legacy distance-matrix format (every tensor element
-    // a full compressed matrix); 1121 is the current format that stores each
-    // distinct source buffer once plus per-element (source id, indices) — the
-    // distance-matrix analogue of the 1000 -> 1001 point cloud change above.
-    else if constexpr (std::is_same_v<T, DistanceMatrix<float32_t>>) { return TensorFormat{ .baseFormat = 1121, .subFormat = 32 }; }
-    else if constexpr (std::is_same_v<T, DistanceMatrix<float64_t>>) { return TensorFormat{ .baseFormat = 1121, .subFormat = 64 }; }
+    else if constexpr (std::is_same_v<T, DistanceMatrix<float32_t>>) { return TensorFormat{ .baseFormat = 1120, .subFormat = 32 }; }
+    else if constexpr (std::is_same_v<T, DistanceMatrix<float64_t>>) { return TensorFormat{ .baseFormat = 1120, .subFormat = 64 }; }
 
     else if constexpr (std::is_same_v<T, ph::Barcode<float32_t>>) { return TensorFormat{ .baseFormat = 10000, .subFormat = 32 }; }
     else if constexpr (std::is_same_v<T, ph::Barcode<float64_t>>) { return TensorFormat{ .baseFormat = 10000, .subFormat = 64 }; }
@@ -193,9 +181,9 @@ namespace sb::io::detail
   }
 
   // Shared writer for tensors whose elements may be indexed views over a
-  // source buffer (PointCloud / DistanceMatrix): each distinct source is
+  // source coordinate buffer (PointCloud): each distinct source is
   // stored once (deduplicated by buffer address — elements sharing a source,
-  // e.g. the indexed subsamples from stablebear.sampling, are written once),
+  // e.g. indexed subsamples, are written once),
   // then every element as its source id plus, for indexed views, its index
   // array. @p sourceKey maps an element to its source buffer address;
   // @p writeSource writes one element's source.
@@ -209,7 +197,7 @@ namespace sb::io::detail
     const auto* data = tensor.data();
 
     // Assign each distinct source an id in first-appearance order...
-    std::unordered_map<KeyT, uint64_t> idOf;
+    std::map<KeyT, uint64_t, std::owner_less<KeyT>> idOf;
     std::vector<const ElemT*> sources;
     for (auto k = 0_uz; k < sz; ++k)
     {
@@ -245,31 +233,10 @@ namespace sb::io::detail
   {
     write_shared_source_elements(
         os, tensor,
-        [](const PointCloud<ScalarT>& elem) { return elem.coords().data(); },
+        [](const PointCloud<ScalarT>& elem) { return elem.coords().storage_owner(); },
         [](std::ostream& o, const PointCloud<ScalarT>& src) { write_tensor(o, src.coords()); });
   }
 
-  // Distance matrix sources are full compressed matrices (uint64 size +
-  // entries, the read_compressed_matrix layout). This is what lets subsampled
-  // sub-matrices be saved without either duplicating the source per element
-  // or desynchronizing on size()/storage_count().
-  template <typename ScalarT>
-  void write_distance_matrix_elements(std::ostream& os, const Tensor<DistanceMatrix<ScalarT>>& tensor)
-  {
-    write_shared_source_elements(
-        os, tensor,
-        [](const DistanceMatrix<ScalarT>& elem) { return elem.source_data(); },
-        [](std::ostream& o, const DistanceMatrix<ScalarT>& src) {
-          // The full shared buffer: source_size(), not size(), which for an
-          // indexed view reports the selected submatrix instead.
-          const uint64_t n = src.source_size();
-          write_bytes<uint64_t>(o, n);
-          for (size_t i = 0; i < DistanceMatrix<ScalarT>::storage_size(n); ++i)
-          {
-            write_bytes<ScalarT>(o, src.source_data()[i]);
-          }
-        });
-  }
 
   template <IsTensor TensorT>
     void write_contiguous_tensor(std::ostream& os, const TensorT& tensor)
@@ -290,10 +257,6 @@ namespace sb::io::detail
     if constexpr (is_point_cloud_v<value_type>)
     {
       write_point_cloud_elements<typename is_point_cloud<value_type>::scalar_type>(os, tensor);
-    }
-    else if constexpr (is_distance_matrix_v<value_type>)
-    {
-      write_distance_matrix_elements<typename is_distance_matrix<value_type>::scalar_type>(os, tensor);
     }
     else
     {
@@ -389,22 +352,45 @@ namespace sb::io::detail
     sources.reserve(numSources);
     for (auto i = 0_uz; i < numSources; ++i)
     {
-      sources.push_back(readSource(is));
+      SourceT source = readSource(is);
+      if constexpr (is_point_cloud_v<ElemT>)
+      {
+        if (source.rank() != 0 && source.rank() != 2)
+        {
+          throw std::runtime_error("Invalid point-cloud coordinate rank in saved data");
+        }
+      }
+      sources.push_back(std::move(source));
     }
 
     auto sz = ret.size();
     for (auto* elem = ret.data(); elem != ret.data() + sz; ++elem)
     {
       auto id = read_bytes<std::uint64_t>(is);
+      if (id >= sources.size())
+      {
+        throw std::runtime_error("Invalid shared-source reference in saved data");
+      }
       const bool indexed = read_bytes<bool>(is);
       if (indexed)
       {
-        *elem = ElemT(sources[id], read_element<Tensor<uint64_t>>(is));
+        Tensor<uint64_t> indices = read_element<Tensor<uint64_t>>(is);
+        if (indices.rank() != 1)
+        {
+          throw std::runtime_error("Invalid point-cloud index rank in saved data");
+        }
+        for (size_t i = 0; i < indices.size(); ++i)
+        {
+          if (indices(i) >= sources[id].shape(0))
+          {
+            throw std::runtime_error("Point-cloud index out of bounds in saved data");
+          }
+        }
+        *elem = ElemT(sources[id], std::move(indices));
       }
       else
       {
-        // Sharing, not copying: PointCloud wraps the coordinate tensor,
-        // DistanceMatrix's copy shares the source buffer (shared_ptr).
+        // Sharing, not copying: PointCloud wraps the coordinate tensor.
         *elem = ElemT(sources[id]);
       }
     }
@@ -420,16 +406,8 @@ namespace sb::io::detail
         is, [](std::istream& s) { return read_element<Tensor<ScalarT>>(s); });
   }
 
-  // Read the current (baseFormat 1121) distance-matrix tensor format.
-  template <typename ScalarT>
-  Tensor<DistanceMatrix<ScalarT>> read_indexed_distance_matrix_tensor(std::istream& is)
-  {
-    return read_shared_source_tensor<DistanceMatrix<ScalarT>, DistanceMatrix<ScalarT>>(
-        is, [](std::istream& s) { return read_compressed_matrix<DistanceMatrix<ScalarT>>(s); });
-  }
 
-  /// The format an earlier version wrote this element type as, for the two types
-  /// whose tensor layout changed (1000 -> 1001, 1120 -> 1121). Equal to
+  /// The format an earlier version wrote this element type as, for the point-cloud type whose tensor layout changed (1000 -> 1001). Equal to
   /// tensorFormat<T>() for every other type.
   template <typename T>
   TensorFormat legacyTensorFormat()
@@ -438,10 +416,6 @@ namespace sb::io::detail
     {
       return TensorFormat{ .baseFormat = 1000, .subFormat = tensorFormat<T>().subFormat };
     }
-    else if constexpr (is_distance_matrix_v<T>)
-    {
-      return TensorFormat{ .baseFormat = 1120, .subFormat = tensorFormat<T>().subFormat };
-    }
     else
     {
       return tensorFormat<T>();
@@ -449,8 +423,7 @@ namespace sb::io::detail
   }
 
   /// Read a tensor body for element type T, routing on the format already read
-  /// from the stream: the shared-source layout for the current point-cloud and
-  /// distance-matrix formats, element-wise for legacy and unchanged formats.
+  /// from the stream: the shared-source layout for the current point-cloud format, element-wise for legacy and unchanged formats.
   /// Both read entry points go through here so they cannot drift apart.
   template <typename T>
   Tensor<T> read_tensor_for_format(std::istream& is, TensorFormat format)
@@ -460,13 +433,6 @@ namespace sb::io::detail
       if (format == tensorFormat<T>())
       {
         return read_indexed_point_cloud_tensor<typename is_point_cloud<T>::scalar_type>(is);
-      }
-    }
-    else if constexpr (is_distance_matrix_v<T>)
-    {
-      if (format == tensorFormat<T>())
-      {
-        return read_indexed_distance_matrix_tensor<typename is_distance_matrix<T>::scalar_type>(is);
       }
     }
     return read_tensor<T>(is);

@@ -179,6 +179,11 @@ namespace sb
     [[nodiscard]] ptrdiff_t offset() const noexcept { return m_offset; }
     [[nodiscard]] value_type* data() const noexcept { return m_data.get() + m_offset; }
 
+    [[nodiscard]] std::shared_ptr<const void> storage_owner() const noexcept
+    {
+      return std::shared_ptr<const void>(m_data, static_cast<const void*>(m_data.get()));
+    }
+
     template <typename SliceVector>
     [[nodiscard]] Tensor operator[](SliceVector sliceVector) const;
 

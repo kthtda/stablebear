@@ -189,25 +189,26 @@ namespace sb::ph
       auto const &pc = pclouds(index);           // the PointCloud<T> for this instance
       auto const &pcPrime = pcloudsPrime(index); // its aligned d′ counterpart
 
-      if (pc.shape() != pcPrime.shape())
+      if (pc.coords().rank() != 2 || pcPrime.coords().rank() != 2)
+      {
+        throw std::runtime_error(
+            "homological kernel: point cloud at index " + index_to_string(index) +
+            " must have shape (m, n)");
+      }
+
+      if (pc.n_points() != pcPrime.n_points() || pc.dim() != pcPrime.dim())
       {
         throw std::runtime_error(
             "homological kernel: point clouds at index " + index_to_string(index) + " have mismatched shapes " +
-            shape_to_string(pc.shape()) + " and " + shape_to_string(pcPrime.shape()));
-      }
-
-      if (pc.rank() != 2)
-      {
-        throw std::runtime_error(
-            "homological kernel: point cloud at index " + index_to_string(index) + " has unexpected shape " +
-            shape_to_string(pc.shape()) + " (should be (m, n))");
+            shape_to_string(std::vector<size_t>{pc.n_points(), pc.dim()}) + " and " +
+            shape_to_string(std::vector<size_t>{pcPrime.n_points(), pcPrime.dim()}));
       }
 
       // Every rank-2 cloud flows through: 0 or 1 points give an empty barcode
       // via the n <= 1 early-outs, and a zero-dimensional cloud (n, 0) induces
       // the all-zero metric, yielding n-1 zero-length bars exactly like the
       // distance-matrix route does for the equivalent all-zero matrix.
-      SquaredEuclideanDistance<T> dDist(pc); // captures pointer+strides, computes d^2 on demand
+      SquaredEuclideanDistance<T> dDist(pc); // uses logical coordinates, computes d^2 on demand
       SquaredEuclideanDistance<T> dPrimeDist(pcPrime);
 
       detail::homological_kernel_single_impl(dDist, dPrimeDist, retBarcodes(index), [](T v) { return std::sqrt(v); });

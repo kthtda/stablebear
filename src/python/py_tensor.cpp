@@ -117,17 +117,16 @@ namespace
 
   }
 
-  // The element type of a PointCloud tensor; an element may be an indexed
-  // view sharing a source cloud (materialized lazily — see stablebear.tensor.PointCloud).
+  // Internal binding for point-cloud tensor elements. Python PointCloudTensor
+  // indexing still materializes and returns FloatTensor, preserving the public API.
   template <typename T>
   void register_point_cloud_element(py::module_& m, const std::string& suffix)
   {
     using PC = sb::PointCloud<T>;
     py::class_<PC>(m, ("PointCloud" + suffix).c_str())
         .def(py::init<const sb::Tensor<T>&>())
-        // Indexed view over `source`'s rows. Indices address source storage, so
-        // slicing a view must compose them against the source (see PointCloud
-        // in stablebear/point_cloud.py).
+        // Indexed view over source rows. This class is an internal caster; the
+        // public PointCloudTensor indexing API still returns FloatTensor.
         .def(py::init<const sb::Tensor<T>&, sb::Tensor<sb::uint64_t>>())
         .def_property_readonly("n_points", &PC::n_points)
         .def_property_readonly("n_dims", &PC::dim)

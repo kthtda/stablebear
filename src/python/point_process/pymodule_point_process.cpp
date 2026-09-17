@@ -1,6 +1,7 @@
 #include "pymodule_point_process.hpp"
 
 #include "py_poisson.hpp"
+#include "py_subsample.hpp"
 
 namespace py = pybind11;
 
@@ -11,5 +12,6 @@ namespace sb_py
     auto sm = m.def_submodule("point_process");
 
     register_point_process_poisson(sm);
+    register_point_process_subsample(sm);
   }
 }

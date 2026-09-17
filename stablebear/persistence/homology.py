@@ -12,7 +12,6 @@ from ..base_tensor import (
     FloatTensor,
     PointCloudTensor,
 )
-from ..point_cloud import PointCloud
 from ..typing import barcode32, barcode64, distmat32, distmat64, float32, float64, pcloud32, pcloud64
 from .ph_tensor import BarcodeTensor
 
@@ -117,10 +116,7 @@ def compute_persistent_homology(
         X = FloatTensor(X)
 
     out = None
-    # Wrap a single cloud or coordinate tensor into a 1-element tensor. An
-    # indexed view is stored as the view it is, so its coordinates are never
-    # materialized.
-    if isinstance(X, (FloatTensor, PointCloud)):
+    if isinstance(X, FloatTensor):
         pcloud_dtype = _FLOAT_TO_PCLOUD_DTYPE[X.dtype]
         pcX = zeros((1,), dtype=pcloud_dtype)
         pcX[0] = X

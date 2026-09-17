@@ -19,14 +19,6 @@ base_tensor
    :undoc-members:
    :show-inheritance:
 
-point_cloud
------------
-
-.. automodule:: stablebear.point_cloud
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
 tensor_create
 -------------
 

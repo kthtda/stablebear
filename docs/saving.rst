@@ -54,3 +54,15 @@ The returned tensor will be of the same type and dtype as what was saved. As wit
 
    with open('my_pcfs.sb', 'rb') as f:
        X = sb.load(f)
+
+Point-cloud storage format
+==========================
+
+Point-cloud tensors use tensor subtype ``1001`` (with subformat ``32`` or
+``64`` for the coordinate precision). The payload first stores each distinct
+coordinate tensor once. Every point-cloud element then stores a source ID, a
+flag indicating whether it is indexed, and, for indexed clouds, its row-index
+tensor. This preserves shared backing storage across a save/load round trip.
+
+The loader continues to accept the legacy point-cloud tensor subtype ``1000``,
+whose elements each contain a complete coordinate tensor.

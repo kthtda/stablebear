@@ -29,7 +29,7 @@ namespace sb
     constexpr const std::string_view HeaderIdBytes = "\1MPCF";
 
     // This should change as soon as an older version would not be able to read the data produced by the current version.
-    // Bumped to 3 for the shared-source point-cloud (1000 -> 1001) and distance-matrix (1120 -> 1121) tensor layouts;
+    // Bumped to 3 for the shared-source point-cloud tensor layout (1000 -> 1001);
     // versions 1 and 2 remain readable (read_header accepts the whole range).
     constexpr const int FormatVersion = 3;
 
@@ -214,7 +214,7 @@ namespace sb
 
     using ElemT = typename TensorT::value_type;
 
-    // Point-cloud and distance-matrix tensors have both a current and a legacy
+    // Point-cloud tensors have both a current and a legacy
     // layout; accept either, as read_any_tensor does. For every other type the
     // two formats coincide and this is the plain equality check it replaces.
     auto expectedFormat = io::detail::tensorFormat<ElemT>();
@@ -267,12 +267,8 @@ namespace sb
     else if (format == io::detail::tensorFormat<SymmetricMatrix<float32_t>>()) { return io::detail::read_tensor<SymmetricMatrix<float32_t>>(is); }
     else if (format == io::detail::tensorFormat<SymmetricMatrix<float64_t>>()) { return io::detail::read_tensor<SymmetricMatrix<float64_t>>(is); }
 
-    // Distance matrices: legacy (1120, every element a full compressed matrix)
-    // and current (1121, shared-source dedup).
-    else if (format == io::detail::legacyTensorFormat<DistanceMatrix<float32_t>>()
-             || format == io::detail::tensorFormat<DistanceMatrix<float32_t>>()) { return io::detail::read_tensor_for_format<DistanceMatrix<float32_t>>(is, format); }
-    else if (format == io::detail::legacyTensorFormat<DistanceMatrix<float64_t>>()
-             || format == io::detail::tensorFormat<DistanceMatrix<float64_t>>()) { return io::detail::read_tensor_for_format<DistanceMatrix<float64_t>>(is, format); }
+    else if (format == io::detail::tensorFormat<DistanceMatrix<float32_t>>()) { return io::detail::read_tensor<DistanceMatrix<float32_t>>(is); }
+    else if (format == io::detail::tensorFormat<DistanceMatrix<float64_t>>()) { return io::detail::read_tensor<DistanceMatrix<float64_t>>(is); }
 
     else if (format == io::detail::tensorFormat<ph::Barcode<float32_t>>()) { return io::detail::read_tensor<ph::Barcode<float32_t>>(is); }
     else if (format == io::detail::tensorFormat<ph::Barcode<float64_t>>()) { return io::detail::read_tensor<ph::Barcode<float64_t>>(is); }
@@ -320,10 +316,6 @@ namespace sb
     else if (format == io::detail::tensorFormat<SymmetricMatrix<float32_t>>()) { return io::detail::read_compressed_matrix<SymmetricMatrix<float32_t>>(is); }
     else if (format == io::detail::tensorFormat<SymmetricMatrix<float64_t>>()) { return io::detail::read_compressed_matrix<SymmetricMatrix<float64_t>>(is); }
 
-    // Standalone matrices use the same compressed layout in the legacy (1120)
-    // and current (1121) formats — only tensors of matrices changed layout.
-    else if (format == io::detail::TensorFormat{1120, 32}) { return io::detail::read_compressed_matrix<DistanceMatrix<float32_t>>(is); }
-    else if (format == io::detail::TensorFormat{1120, 64}) { return io::detail::read_compressed_matrix<DistanceMatrix<float64_t>>(is); }
     else if (format == io::detail::tensorFormat<DistanceMatrix<float32_t>>()) { return io::detail::read_compressed_matrix<DistanceMatrix<float32_t>>(is); }
     else if (format == io::detail::tensorFormat<DistanceMatrix<float64_t>>()) { return io::detail::read_compressed_matrix<DistanceMatrix<float64_t>>(is); }
 

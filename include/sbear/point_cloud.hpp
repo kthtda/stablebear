@@ -8,7 +8,7 @@
 #include "tensor.hpp"
 
 #include <type_traits>
-#include <unordered_map>
+#include <map>
 #include <vector>
 
 namespace sb
@@ -34,8 +34,36 @@ namespace sb
     using value_type = T;
 
     PointCloud() = default;
+    explicit PointCloud(const std::vector<size_t>& shape) : m_coords(shape) { }
     PointCloud(const Tensor<T>& coords) : m_coords(coords) { }
     PointCloud(Tensor<T>&& coords) : m_coords(std::move(coords)) { }
+
+    // Compatibility with the former PointCloud = Tensor<T> alias. For an
+    // indexed cloud, shape() describes the selected logical coordinates.
+    [[nodiscard]] size_t rank() const noexcept { return m_coords.rank(); }
+
+    [[nodiscard]] std::vector<size_t> shape() const
+    {
+      if (is_indexed())
+      {
+        return {n_points(), dim()};
+      }
+      return m_coords.shape();
+    }
+
+    [[nodiscard]] size_t shape(size_t axis) const
+    {
+      if (is_indexed() && axis == 0)
+      {
+        return n_points();
+      }
+      return m_coords.shape(axis);
+    }
+
+    [[nodiscard]] size_t size() const
+    {
+      return is_indexed() ? n_points() * dim() : m_coords.size();
+    }
 
     /// Indexed view: shares @p source's coordinates and selects rows via @p indices.
     PointCloud(const Tensor<T>& source, Tensor<uint64_t> indices)
@@ -50,10 +78,20 @@ namespace sb
     [[nodiscard]] bool is_indexed() const { return m_indices.rank() == 1; }
 
     /// Number of points: selected rows when indexed, otherwise stored rows.
-    [[nodiscard]] size_t n_points() const { return is_indexed() ? m_indices.shape(0) : m_coords.shape(0); }
+    [[nodiscard]] size_t n_points() const
+    {
+      if (m_coords.rank() == 0)
+      {
+        return 0;
+      }
+      return is_indexed() ? m_indices.shape(0) : m_coords.shape(0);
+    }
 
-    /// Point dimension.
-    [[nodiscard]] size_t dim() const { return m_coords.shape(1); }
+    /// Point dimension. A default-constructed empty cloud has dimension zero.
+    [[nodiscard]] size_t dim() const
+    {
+      return m_coords.rank() < 2 ? 0 : m_coords.shape(1);
+    }
 
     /// The attached indices (rank-1 when indexed, empty otherwise).
     [[nodiscard]] const Tensor<uint64_t>& indices() const { return m_indices; }
@@ -62,12 +100,37 @@ namespace sb
     /// the cloud-level members for the selected points.
     [[nodiscard]] const Tensor<T>& coords() const { return m_coords; }
 
-    /// Coordinate @p j of point @p i, transparent to indexing. (Read-only;
-    /// writes go through materialize().)
+    /// Coordinate @p j of point @p i, transparent to indexing. A mutable
+    /// access first detaches an indexed cloud from its shared source.
     const T& operator()(size_t i, size_t j) const
     {
       const size_t row = is_indexed() ? static_cast<size_t>(m_indices(i)) : i;
       return m_coords({row, j});
+    }
+
+    T& operator()(size_t i, size_t j)
+    {
+      materialize_local();
+      return m_coords({i, j});
+    }
+
+    const T& operator()(const std::vector<size_t>& index) const
+    {
+      if (!is_indexed())
+      {
+        return m_coords(index);
+      }
+      if (index.size() != 2)
+      {
+        throw std::invalid_argument("Point-cloud coordinate index must have rank 2");
+      }
+      return (*this)(index[0], index[1]);
+    }
+
+    T& operator()(const std::vector<size_t>& index)
+    {
+      materialize_local();
+      return m_coords(index);
     }
 
     /// View-transparent equality: two clouds are equal when they present the
@@ -141,6 +204,16 @@ namespace sb
       return out;
     }
 
+    [[nodiscard]] Tensor<T> materialize_local()
+    {
+      if (is_indexed())
+      {
+        m_coords = materialize();
+        m_indices = Tensor<uint64_t>();
+      }
+      return m_coords;
+    }
+
   private:
     Tensor<T> m_coords;         // (n_source_points, dim), possibly shared
     Tensor<uint64_t> m_indices; // rank-1 when an indexed view, empty otherwise
@@ -162,7 +235,7 @@ namespace sb
    * (Tensor<PointCloud<T>>), converting each point cloud's coordinates.
    *
    * Sharing carries over: each distinct coordinate buffer is cast once
-   * (deduplicated by buffer address, as in the io layer) and indexed views are
+   * (deduplicated by storage identity, as in the io layer) and indexed views are
    * rebuilt on top of the cast source with their own index arrays. Casting cell
    * by cell through materialize() would instead expand every view into a full
    * private copy of its source -- exactly the storage blow-up that indexed
@@ -175,19 +248,19 @@ namespace sb
     Tensor<PointCloud<T>> result(src.shape());
 
     // Cast each distinct source buffer once...
-    std::unordered_map<const U*, Tensor<T>> castSources;
+    std::map<std::shared_ptr<const void>, Tensor<T>, std::owner_less<std::shared_ptr<const void>>> castSources;
     walk(src, [&](const std::vector<size_t>& idx) {
       const Tensor<U>& coords = src(idx).coords();
-      if (!castSources.contains(coords.data()))
+      if (!castSources.contains(coords.storage_owner()))
       {
-        castSources.emplace(coords.data(), tensor_cast<T>(coords));
+        castSources.emplace(coords.storage_owner(), tensor_cast<T>(coords));
       }
     });
 
     // ...then rebuild every cell on its shared cast source.
     walk(src, [&](const std::vector<size_t>& idx) {
       const PointCloud<U>& cloud = src(idx);
-      const Tensor<T>& source = castSources.at(cloud.coords().data());
+      const Tensor<T>& source = castSources.at(cloud.coords().storage_owner());
       if (cloud.is_indexed())
       {
         result(idx) = PointCloud<T>(source, cloud.indices().copy());

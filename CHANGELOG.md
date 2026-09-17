@@ -1,3 +1,9 @@
+## Unreleased
+
+### New features
+
+* **Uniform point-cloud subsampling** — `point_process.subsample` draws one or more uniform samples, with or without replacement, from every cloud in a `PointCloudTensor`. Samples share one fresh coordinate copy per input cloud through indexed point-cloud storage, support partial draws and coordinate-level duplicate removal, remain isolated from later source mutations, and round-trip through the new shared-storage point-cloud serialization subtype. ([#229](https://github.com/kthtda/stablebear/issues/229))
+
 ## 0.4.7
 
 ### New features
@@ -35,13 +41,6 @@
 ### Breaking changes
 
 * **`Pcf` no longer sorts breakpoints** — breakpoints must be supplied in non-decreasing time order and the first time must be 0; out-of-order, negative, or offset start times now raise `ValueError` instead of being silently reordered. Evaluation at `t < 0` also raises. ([#11](https://github.com/kthtda/stablebear/issues/11))
-
-### New features
-
-* **New `stablebear.sampling` subpackage** — implements the front end of the relative-approach pipeline of Agerberg, Chacholski & Ramanujam (2023). `stablebear.sampling.subsample_relative(reference, query, sample_size=..., n_instances=...)` draws, for each query point, `n_instances` subsamples of up to `sample_size` points from a reference point cloud (or a precomputed `DistanceMatrix`), with per-query-point sampling probabilities formed from the Euclidean distance (or the stored distance) to each reference point passed through a built-in distribution — `Gaussian` (concentrate sampling near a target distance) or `Uniform` (sample uniformly from a disk or annulus around the query point) — entirely in parallel C++. `sample_size` is a maximum: without replacement a subsample shrinks to the number of reference points with positive weight, and a query point whose region holds no reference points at all yields empty subsamples (reported as a `UserWarning` when `verbose=True`). The result is a `(n_query, n_instances)` `PointCloudTensor` (or `DistanceMatrixTensor`) that feeds directly into `compute_persistent_homology` → `barcode_to_stable_rank` → `mean` to obtain a relative stable rank per query point.
-* **Indexed point clouds** — subsamples are returned as *indexed views* that share the reference cloud's coordinates and store only the chosen row indices, rather than re-storing every (possibly high-dimensional) point. A single `PointCloud` element exposes `.is_indexed`, `.indices`, `.shape`, and `.materialize()`; its coordinates are only copied when it is converted to NumPy. Persistent homology consumes indexed subsamples directly, so the full sampling → persistence pipeline never materializes all subsamples at once. Point clouds are now first-class (rank-2 `(n_points, dim)`) objects backed by `sb::PointCloud`.
-* **Point cloud serialization** — `save`/`load` of a point cloud tensor now stores each distinct source coordinate buffer once, followed by each element as a source id plus (for indexed views) its index array, so a tensor of shared-source subsamples no longer duplicates coordinates on disk. Point cloud files written by earlier versions remain readable (they load as materialized clouds).
-* **Distance matrix serialization** — `save`/`load` of a distance matrix tensor uses the same shared-source layout, so tensors of subsampled sub-matrices round-trip with their buffer sharing intact (previously saving them corrupted the stream). A *standalone* indexed sub-matrix cannot be saved on its own and raises `ValueError` asking for `.materialize()`. Files written by earlier versions remain readable.
 
 ### Bug fixes
 

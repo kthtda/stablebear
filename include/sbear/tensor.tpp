@@ -913,6 +913,17 @@ namespace sb
     return result;
   }
 
+  template <typename T, typename U>
+  requires std::is_constructible_v<T, U>
+  Tensor<Tensor<T>> pcloud_cast(const Tensor<Tensor<U>>& src)
+  {
+    Tensor<Tensor<T>> result(src.shape());
+    walk(src, [&](const std::vector<size_t>& idx) {
+      result(idx) = tensor_cast<T>(src(idx));
+    });
+    return result;
+  }
+
   // ============================================================================
   // Joining operations
   // ============================================================================
@@ -1693,22 +1704,16 @@ namespace sb
   bool allclose(const MatT& a, const MatT& b,
                 typename MatT::value_type atol, typename MatT::value_type rtol)
   {
-    // size() and operator()(i, j) are transparent to indexed views (they
-    // report the principal submatrix), so elementwise comparison needs no
-    // knowledge of indexing. The diagonal is included for the symmetric
-    // case; a distance matrix reads zero there on both sides.
-    if (a.size() != b.size())
+    if (a.storage_count() != b.storage_count())
       return false;
 
-    const size_t n = a.size();
-    for (size_t i = 0; i < n; ++i)
-      for (size_t j = i; j < n; ++j)
-      {
-        auto aval = a(i, j);
-        auto bval = b(i, j);
-        if (std::abs(aval - bval) > atol + rtol * std::abs(bval))
-          return false;
-      }
+    for (size_t i = 0; i < a.storage_count(); ++i)
+    {
+      auto aval = a.data()[i];
+      auto bval = b.data()[i];
+      if (std::abs(aval - bval) > atol + rtol * std::abs(bval))
+        return false;
+    }
     return true;
   }
 

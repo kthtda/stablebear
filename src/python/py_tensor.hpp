@@ -211,14 +211,20 @@ namespace sb_py
           return self == rhs;
         })
 
-      .def("_get_element", [](const TTensor& self, const std::vector<size_t>& index) {
+      .def("_get_element", [](TTensor& self, const std::vector<size_t>& index) {
           assert_valid_index(self, index);
-          return self(index);
+          if constexpr (sb::is_point_cloud_v<T>)
+            return self(index).materialize_local();
+          else
+            return self(index);
         })
 
       .def("_get_element", [](TTensor& self, size_t index) {
           assert_valid_index(self, index);
-          return self(index);
+          if constexpr (sb::is_point_cloud_v<T>)
+            return self(index).materialize_local();
+          else
+            return self(index);
         })
 
       .def("_set_element", [](TTensor& self, const std::vector<size_t>& index, const T& val) {
@@ -253,9 +259,8 @@ namespace sb_py
     ;
 
     // For a tensor of point clouds, assigning a plain coordinate tensor wraps it
-    // as a (materialized) PointCloud element. Reading elements goes through the
-    // generic _get_element, which returns the PointCloud as-is (kept lazy: an
-    // indexed view is only materialized on the Python side when numpy is needed).
+    // as a materialized PointCloud element. Element reads above detach indexed
+    // storage locally and return its coordinates as the existing FloatTensor API.
     if constexpr (sb::is_point_cloud_v<T>)
     {
       using ScalarT = typename T::value_type;

@@ -3,7 +3,6 @@
 
 #include "config.hpp"
 #include "concepts.hpp"
-#include "tensor.hpp"
 
 #include <algorithm>
 #include <cstddef>
@@ -25,18 +24,6 @@ namespace sb
   /// implicit zeros on the diagonal.
   /// For i != j, element (i, j) maps to storage index
   /// max(i,j)*(max(i,j)-1)/2 + min(i,j).
-  ///
-  /// A matrix may also be an *indexed view*: it shares another matrix's buffer
-  /// and selects a subset of points through an attached index set, so size() and
-  /// operator()(i, j) report the principal submatrix over those indices. This lets
-  /// a tensor of subsampled distance matrices store one shared source plus small
-  /// index arrays instead of re-storing every sub-matrix. Access through
-  /// size()/operator() is transparent to indexing, so consumers need no special
-  /// case. Writing to an indexed view is copy-on-write: the view detaches by
-  /// materializing in place first, leaving the shared source untouched.
-  /// Tensors of matrices serialize views
-  /// natively (each distinct source stored once, see tensor_io.hpp); a
-  /// *standalone* view is written as its materialization.
   template <ArithmeticType T>
   class DistanceMatrix
   {
@@ -84,72 +71,21 @@ namespace sb
 
     DistanceMatrix() : DistanceMatrix(0) { }
 
-    /// Indexed view: shares @p source's compressed buffer and selects the
-    /// principal submatrix over @p indices (rows/cols of @p source).
-    DistanceMatrix(const DistanceMatrix& source, Tensor<uint64_t> indices)
-      : m_indices(std::move(indices)), m_data(source.m_data), m_size(source.m_size) { }
-
-    /// Whether this is an indexed view rather than owning its full buffer.
-    [[nodiscard]] bool is_indexed() const { return m_indices.rank() == 1; }
-
-    /// The selected source indices (rank-1 when indexed, empty otherwise).
-    [[nodiscard]] const Tensor<uint64_t>& indices() const { return m_indices; }
-
-    /// Return an independent value. An owning matrix is deep-copied. An indexed
-    /// view copies its index array (so the result never aliases another cell's
-    /// indices) and, by default (@p keepSource), keeps sharing the source
-    /// buffer; with @p keepSource false it also deep-copies the source,
-    /// yielding a view that aliases nothing — a completely clean slate on
-    /// request. @p keepSource is moot for an owning matrix, which never shares.
-    /// Tensor cells route stores through store_copy, which prefers copy().
-    [[nodiscard]] DistanceMatrix copy(bool keepSource = true) const
+    /// Return an independent deep copy. The implicit copy shares the
+    /// std::shared_ptr buffer (view-like), which is relied on internally; this
+    /// is used when a matrix must not alias its source (e.g. a tensor cell).
+    [[nodiscard]] DistanceMatrix copy() const
     {
-      if (is_indexed())
-      {
-        if (keepSource)
-          return DistanceMatrix(*this, m_indices.copy());
-        DistanceMatrix sourceCopy(m_size);
-        std::copy(m_data.get(), m_data.get() + storage_size(m_size), sourceCopy.m_data.get());
-        return DistanceMatrix(sourceCopy, m_indices.copy());
-      }
       DistanceMatrix result(m_size);
       std::copy(m_data.get(), m_data.get() + storage_size(m_size), result.m_data.get());
       return result;
     }
 
-    /// Materialize the (selected) entries into an owning DistanceMatrix; returns
-    /// the matrix as-is when not indexed.
-    [[nodiscard]] DistanceMatrix materialize() const
-    {
-      if (!is_indexed())
-        return *this;
-      const size_t n = size();
-      DistanceMatrix out(n);
-      for (size_t i = 0; i < n; ++i)
-        for (size_t j = i + 1; j < n; ++j)
-          out(i, j) = (*this)(i, j);
-      return out;
-    }
-
-    /// Number of points: selected indices when indexed, otherwise the full size.
-    [[nodiscard]] size_t size() const { return is_indexed() ? m_indices.shape(0) : m_size; }
-
-    /// Number of points in the (possibly shared) source buffer — equals size()
-    /// unless indexed. This is the matrix data() spans, used when serializing
-    /// the shared source of indexed views.
-    [[nodiscard]] size_t source_size() const { return m_size; }
-
-    /// Number of compressed entries of the matrix as observed: for an indexed
-    /// view, the entry count of its principal submatrix. The physical shared
-    /// source buffer spans storage_size(source_size()) entries.
-    [[nodiscard]] size_t storage_count() const { return storage_size(size()); }
+    [[nodiscard]] size_t size() const { return m_size; }
+    [[nodiscard]] size_t storage_count() const { return storage_size(m_size); }
 
     [[nodiscard]] EntryProxy operator()(size_t i, size_t j)
     {
-      // Copy-on-write: a write detaches an indexed view by materializing it in
-      // place first, so the shared source buffer is never touched.
-      if (is_indexed())
-        *this = materialize();
       bounds_check(i, j);
       if (i == j)
         return EntryProxy(nullptr);
@@ -159,51 +95,27 @@ namespace sb
     [[nodiscard]] T operator()(size_t i, size_t j) const
     {
       bounds_check(i, j);
-      // Map view indices to source indices; equal source indices (the diagonal,
-      // or a point drawn twice with replacement) are distance zero.
-      const size_t a = source_index(i);
-      const size_t b = source_index(j);
-      if (a == b)
+      if (i == j)
         return T{};
-      return m_data[compressed_index(a, b)];
+      return m_data[compressed_index(i, j)];
     }
 
     [[nodiscard]] bool operator==(const DistanceMatrix& rhs) const
     {
-      if (size() != rhs.size())
+      if (m_size != rhs.m_size)
         return false;
-      if (!is_indexed() && !rhs.is_indexed())
-        return std::equal(m_data.get(), m_data.get() + storage_size(m_size), rhs.m_data.get());
-      const size_t n = size();
-      for (size_t i = 0; i < n; ++i)
-        for (size_t j = i + 1; j < n; ++j)
-          if ((*this)(i, j) != rhs(i, j))
-            return false;
-      return true;
+      return std::equal(m_data.get(), m_data.get() + storage_size(m_size), rhs.m_data.get());
     }
 
-    [[nodiscard]] bool operator!=(const DistanceMatrix& rhs) const { return !(*this == rhs); }
-
-    /// Raw compressed buffer of an owning matrix. An indexed view throws:
-    /// its buffer is the full shared source, not the principal submatrix
-    /// that size()/storage_count() describe — reading it as this matrix's
-    /// entries is the exact mismatch that corrupts serialization. Call
-    /// materialize() for the submatrix, or source_data() to read the shared
-    /// source deliberately.
-    [[nodiscard]] const T* data() const
+    [[nodiscard]] bool operator!=(const DistanceMatrix& rhs) const
     {
-      if (is_indexed())
-        throw std::logic_error(
-            "an indexed distance-matrix view has no buffer of its own; use "
-            "materialize() for the submatrix or source_data() for the shared source");
-      return m_data.get();
+      if (m_size != rhs.m_size)
+        return true;
+      return std::mismatch(m_data.get(), m_data.get() + storage_size(m_size), rhs.m_data.get()).first
+        != m_data.get() + storage_size(m_size);
     }
 
-    /// The (possibly shared) source buffer, spanning
-    /// storage_size(source_size()) entries — equals data() unless indexed.
-    /// For code that deliberately reads through the view's indexing, e.g.
-    /// serializing the shared source once (pairs with source_size()).
-    [[nodiscard]] const T* source_data() const { return m_data.get(); }
+    [[nodiscard]] const T* data() const { return m_data.get(); }
 
     [[nodiscard]] static size_t storage_size(size_t n)
     {
@@ -216,18 +128,12 @@ namespace sb
     template <typename MatT>
     friend MatT io::detail::read_compressed_matrix(std::istream&);
 
-    [[nodiscard]] size_t source_index(size_t k) const
-    {
-      return is_indexed() ? static_cast<size_t>(m_indices({k})) : k;
-    }
-
     void bounds_check(size_t i, size_t j) const
     {
-      const size_t n = size();
-      if (i >= n || j >= n)
+      if (i >= m_size || j >= m_size)
       {
         std::ostringstream oss;
-        oss << "DistanceMatrix index (" << i << ", " << j << ") out of range for matrix of size " << n;
+        oss << "DistanceMatrix index (" << i << ", " << j << ") out of range for matrix of size " << m_size;
         throw std::out_of_range(oss.str());
       }
     }
@@ -239,10 +145,8 @@ namespace sb
       return row * (row - 1) / 2 + col;
     }
 
-    // Members ordered large-to-small for layout.
-    Tensor<uint64_t> m_indices;    // rank-1 when an indexed view, empty otherwise
     std::shared_ptr<T[]> m_data;
-    size_t m_size;                 // size of the (shared) source buffer
+    size_t m_size;
   };
 
   template <typename T>

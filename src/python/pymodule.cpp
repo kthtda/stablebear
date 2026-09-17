@@ -19,7 +19,6 @@
 
 #include "persistence/pymodule_persistence.hpp"
 #include "point_process/pymodule_point_process.hpp"
-#include "sampling/pymodule_sampling.hpp"
 
 #ifdef BUILD_WITH_CUDA
 #include <cuda_runtime.h>
@@ -177,5 +176,4 @@ PYBIND11_MODULE(SB_MODULE_NAME, m) {
 
   sb_py::register_module_persistence(m);
   sb_py::register_module_point_process(m);
-  sb_py::register_module_sampling(m);
 }

@@ -7,7 +7,6 @@ import numpy as np
 from . import _sb_cpp as cpp
 from ._tensor_base import ArithmeticTensorMixin, FunctionTensorMixin, Tensor, _tensor_from_nested
 from .functional.pcf import Pcf
-from .point_cloud import PointCloud
 from .typing import (
     _NP_TO_SB,
     _validate_dtype,
@@ -355,10 +354,10 @@ class PointCloudTensor(Tensor):
         return PointCloudTensor(data)
 
     def _represent_element(self, element):
-        return PointCloud(element)
+        return FloatTensor(element)
 
     def _single_cloud(self):
-        """Return the lone cloud of a 0-d tensor as a ``(n_points, dim)`` ``PointCloud``."""
+        """Return the lone cloud of a 0-d tensor as a ``(n_points, dim)`` FloatTensor."""
         return self._represent_element(self._data._get_element([]))
 
     def __getitem__(self, index):
@@ -371,7 +370,7 @@ class PointCloudTensor(Tensor):
             plt.scatter(pc[:, 0], pc[:, 1])
 
         For tensors of rank >= 1, indexing selects clouds as usual (a full
-        integer index returns one cloud as a ``PointCloud``).
+        integer index returns one cloud as a ``FloatTensor``).
         """
         if self.ndim == 0:
             return self._single_cloud()[index]
@@ -379,21 +378,11 @@ class PointCloudTensor(Tensor):
 
     def _decay_value(self, val):
         float_dtype = _PCLOUD_TO_FLOAT_DTYPE[self.dtype]
-        # A same-precision PointCloud is already the element type; store it as is so
-        # an indexed view stays indexed (the store copies only its index array).
-        if isinstance(val, PointCloud) and val.dtype is float_dtype:
-            return val._data
-        if isinstance(val, PointCloud):
-            val = np.asarray(val)  # other precision: convert through coordinates
         t = FloatTensor(val, dtype=float_dtype)
-        if t.ndim != 2:
-            raise ValueError(
-                f"A point cloud must be 2-D (n_points, dim); got shape {tuple(t.shape)}."
-            )
         return t._data
 
     def _get_valid_setitem_dtypes(self):
-        return [PointCloud, FloatTensor, np.ndarray, float, int]
+        return [FloatTensor, np.ndarray, float, int]
 
 
 class BoolTensor(Tensor):
