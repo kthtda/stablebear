@@ -119,9 +119,42 @@ namespace
           SpawnPcloudTaskCall{reference, query, out, sampleSize, nInstances, replace, gen}, filter, distribution);
     }
 
+    struct SpawnPcloudIndexQueryTaskCall
+    {
+      const TensorT &reference;
+      const sb::Tensor<uint64_t> &query;
+      sb::Tensor<sb::PointCloud<T>> &out;
+      size_t sampleSize = 0;
+      size_t nInstances = 0;
+      bool replace = false;
+      Gen *gen = nullptr;
+
+      template <typename FilterF, typename DistF>
+      TaskPtr operator()(const FilterF &filter, const DistF &distribution) const
+      {
+        using Task = sb::sampling::SubsampleIndexQueryTask<T, FilterF, DistF>;
+        return sb_py::execute_stoppable_task<Task>(
+            sb::PointCloud<T>(reference), query, filter, distribution, out, sampleSize, nInstances, replace,
+            resolve_generator(gen));
+      }
+    };
+
+    /// Point-cloud input with the query given as reference row indices (query
+    /// point q is reference row query(q)) — the coordinates never leave C++.
+    /// Overloads the coordinate-query spawn above.
+    static TaskPtr spawn_subsample_pcloud_task(
+        const TensorT &reference, const sb::Tensor<uint64_t> &query, sb::Tensor<sb::PointCloud<T>> &out,
+        const FilterVariant<T> &filter, const DistVariant<T> &distribution, size_t sampleSize, size_t nInstances,
+        bool replace, Gen *gen)
+    {
+      return std::visit(
+          SpawnPcloudIndexQueryTaskCall{reference, query, out, sampleSize, nInstances, replace, gen}, filter,
+          distribution);
+    }
+
     struct SpawnDistmatTaskCall
     {
-      const sb::DistanceMatrix<T> &source;
+      const sb::DistanceMatrix<T> &reference;
       const sb::Tensor<uint64_t> &query;
       sb::Tensor<sb::DistanceMatrix<T>> &out;
       size_t sampleSize = 0;
@@ -134,7 +167,7 @@ namespace
       {
         using Task = sb::sampling::SubsampleDistMatTask<T, DistF>;
         return sb_py::execute_stoppable_task<Task>(
-            source, query, NoFilter{}, distribution, out, sampleSize, nInstances, replace, resolve_generator(gen));
+            reference, query, NoFilter{}, distribution, out, sampleSize, nInstances, replace, resolve_generator(gen));
       }
     };
 
@@ -142,21 +175,34 @@ namespace
     /// The "filter" is inherently the stored distance, so there is no filter
     /// argument. Same output contract as the point-cloud spawn.
     static TaskPtr spawn_subsample_distmat_task(
-        const sb::DistanceMatrix<T> &source, const sb::Tensor<uint64_t> &query, sb::Tensor<sb::DistanceMatrix<T>> &out,
+        const sb::DistanceMatrix<T> &reference, const sb::Tensor<uint64_t> &query, sb::Tensor<sb::DistanceMatrix<T>> &out,
         const DistVariant<T> &distribution, size_t sampleSize, size_t nInstances, bool replace, Gen *gen)
     {
-      return std::visit(SpawnDistmatTaskCall{source, query, out, sampleSize, nInstances, replace, gen}, distribution);
+      return std::visit(SpawnDistmatTaskCall{reference, query, out, sampleSize, nInstances, replace, gen}, distribution);
     }
 
     static void register_entry_points(PyClass &cls)
     {
       cls.def_static(
-          "spawn_subsample_pcloud_task", &PySubsampleBindings::spawn_subsample_pcloud_task, py::arg("reference"),
-          py::arg("query"), py::arg("out"), py::arg("filter"), py::arg("distribution"), py::arg("sample_size"),
-          py::arg("n_instances"), py::arg("replace"), py::arg("generator").none(true) = py::none());
+          "spawn_subsample_pcloud_task",
+          py::overload_cast<
+              const TensorT &, const TensorT &, sb::Tensor<sb::PointCloud<T>> &, const FilterVariant<T> &,
+              const DistVariant<T> &, size_t, size_t, bool, Gen *>(&PySubsampleBindings::spawn_subsample_pcloud_task),
+          py::arg("reference"), py::arg("query"), py::arg("out"), py::arg("filter"), py::arg("distribution"),
+          py::arg("sample_size"), py::arg("n_instances"), py::arg("replace"),
+          py::arg("generator").none(true) = py::none());
 
       cls.def_static(
-          "spawn_subsample_distmat_task", &PySubsampleBindings::spawn_subsample_distmat_task, py::arg("source"),
+          "spawn_subsample_pcloud_task",
+          py::overload_cast<
+              const TensorT &, const sb::Tensor<uint64_t> &, sb::Tensor<sb::PointCloud<T>> &, const FilterVariant<T> &,
+              const DistVariant<T> &, size_t, size_t, bool, Gen *>(&PySubsampleBindings::spawn_subsample_pcloud_task),
+          py::arg("reference"), py::arg("query"), py::arg("out"), py::arg("filter"), py::arg("distribution"),
+          py::arg("sample_size"), py::arg("n_instances"), py::arg("replace"),
+          py::arg("generator").none(true) = py::none());
+
+      cls.def_static(
+          "spawn_subsample_distmat_task", &PySubsampleBindings::spawn_subsample_distmat_task, py::arg("reference"),
           py::arg("query"), py::arg("out"), py::arg("distribution"), py::arg("sample_size"), py::arg("n_instances"),
           py::arg("replace"), py::arg("generator").none(true) = py::none());
     }

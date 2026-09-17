@@ -14,15 +14,17 @@ namespace sb::io::detail
     requires requires { mat.size(); mat.storage_count(); mat.data(); }
   {
     // An indexed view's size() (selected points) disagrees with its
-    // storage_count()/data() (the full shared source buffer): writing it here
+    // storage_count()/data() (the full shared source buffer): writing it raw
     // would desynchronize the stream. Views inside tensors are handled by the
-    // shared-source format in tensor_io.hpp; a standalone view must be
-    // materialized by the caller.
-    if constexpr (requires { mat.is_indexed(); })
+    // shared-source format in tensor_io.hpp; a standalone view is written as
+    // its materialization (indistinguishable on read).
+    if constexpr (requires { mat.is_indexed(); mat.materialize(); })
     {
       if (mat.is_indexed())
-        throw std::invalid_argument(
-            "cannot serialize an indexed distance-matrix view on its own; materialize() it first");
+      {
+        write_element(os, mat.materialize());
+        return;
+      }
     }
     write_bytes<uint64_t>(os, mat.size());
     for (size_t i = 0; i < mat.storage_count(); ++i)

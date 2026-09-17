@@ -9,6 +9,7 @@
 #include <pybind11/numpy.h>
 
 #include <sbear/tensor.hpp>
+#include <sbear/point_cloud.hpp>
 #include <sbear/concepts.hpp>
 #include <sbear/functional/pcf.hpp>
 #include "functional/py_pcf_tensor_eval.hpp"
@@ -20,19 +21,6 @@
 namespace sb_py
 {
   void register_tensor_bindings(pybind11::module_& m);
-
-  // A point cloud element is any type derived from Tensor<scalar> (i.e. PointCloud<T>),
-  // which may be an indexed view and so must be materialized before crossing to Python.
-  template <typename T, typename = void>
-  struct is_point_cloud : std::false_type {};
-
-  template <typename T>
-  struct is_point_cloud<T, std::void_t<typename T::value_type>>
-    : std::bool_constant<std::is_base_of_v<sb::Tensor<typename T::value_type>, T>
-                         && !std::is_same_v<sb::Tensor<typename T::value_type>, T>> {};
-
-  template <typename T>
-  inline constexpr bool is_point_cloud_v = is_point_cloud<T>::value;
 
   template <typename T>
   struct scalar_of
@@ -268,7 +256,7 @@ namespace sb_py
     // as a (materialized) PointCloud element. Reading elements goes through the
     // generic _get_element, which returns the PointCloud as-is (kept lazy: an
     // indexed view is only materialized on the Python side when numpy is needed).
-    if constexpr (is_point_cloud_v<T>)
+    if constexpr (sb::is_point_cloud_v<T>)
     {
       using ScalarT = typename T::value_type;
       cls.def("_set_element", [](TTensor& self, const std::vector<size_t>& index, const sb::Tensor<ScalarT>& val) {

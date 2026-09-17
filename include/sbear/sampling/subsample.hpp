@@ -71,17 +71,17 @@ namespace sb::sampling
     }
 
     /// As weight_query_row_pcloud, with filter values read from the precomputed
-    /// distance matrix @p source; @p query holds reference row indices. The
+    /// distance matrix @p reference; @p query holds reference row indices. The
     /// distance-matrix analogue.
     template <typename T, typename DistF>
     size_t weight_query_row_distmat(
-        const DistanceMatrix<T> &source, const Tensor<uint64_t> &query, size_t q, const DistF &distribution, bool toCdf,
-        std::span<T> row)
+        const DistanceMatrix<T> &reference, const Tensor<uint64_t> &query, size_t q, const DistF &distribution,
+        bool toCdf, std::span<T> row)
     {
       const auto queryRow = static_cast<size_t>(query(q));
       for (size_t r = 0; r < row.size(); ++r)
       {
-        row[r] = weight_entry(distribution, source(queryRow, r));
+        row[r] = weight_entry(distribution, reference(queryRow, r));
       }
       if constexpr (has_log_weight<DistF, T>)
       {
@@ -108,6 +108,7 @@ namespace sb::sampling
   {
     using T = typename ElemT::value_type;
     static constexpr bool is_pcloud = std::is_same_v<ElemT, PointCloud<T>>;
+    static constexpr bool query_is_indices = std::is_same_v<QueryT, Tensor<uint64_t>>;
 
   public:
     /// @p out is filled in place (allocated to (n_query, n_instances) when the
@@ -115,9 +116,9 @@ namespace sb::sampling
     /// synchronous prologue of run_async, to reserve the draw's seed block
     /// before the caller's next draw.
     SubsampleTaskImpl(
-        ElemT source, QueryT query, FilterF filter, DistF distribution, Tensor<ElemT> &out, size_t sampleSize,
+        ElemT reference, QueryT query, FilterF filter, DistF distribution, Tensor<ElemT> &out, size_t sampleSize,
         size_t nInstances, bool replace, DefaultRandomGenerator &gen)
-        : m_source(std::move(source)), m_query(std::move(query)), m_filter(std::move(filter)),
+        : m_reference(std::move(reference)), m_query(std::move(query)), m_filter(std::move(filter)),
           m_distribution(std::move(distribution)), m_out(out), m_sampleSize(sampleSize), m_nInstances(nInstances),
           m_replace(replace), m_gen(gen)
     {
@@ -176,7 +177,7 @@ namespace sb::sampling
               // regardless of how the walk is scheduled across threads.
               auto engine = seedBlock.sub_generator((q * nInstances) + i);
               Tensor<uint64_t> indices = detail::draw_indices(drawRow, nEligible, sampleSize, replace, engine);
-              m_out({q, i}) = ElemT(m_source, std::move(indices));
+              m_out({q, i}) = ElemT(m_reference, std::move(indices));
             }
             add_progress(nInstances);
           },
@@ -186,13 +187,13 @@ namespace sb::sampling
     /// Number of query points to walk.
     size_t query_count() const
     {
-      if constexpr (is_pcloud)
+      if constexpr (query_is_indices)
       {
-        return m_query.n_points();
+        return m_query.shape(0);
       }
       else
       {
-        return m_query.shape(0);
+        return m_query.n_points();
       }
     }
 
@@ -201,24 +202,31 @@ namespace sb::sampling
     {
       if constexpr (is_pcloud)
       {
-        return m_source.n_points();
+        return m_reference.n_points();
       }
       else
       {
-        return m_source.size();
+        return m_reference.size();
       }
     }
 
     /// Compute + prepare query @p q's weight row, dispatching on the input kind.
     size_t weight_query_row(size_t q, bool toCdf, std::span<T> row) const
     {
-      if constexpr (is_pcloud)
+      if constexpr (!is_pcloud)
       {
-        return detail::weight_query_row_pcloud(m_source, m_query, q, m_filter, m_distribution, toCdf, row);
+        return detail::weight_query_row_distmat(m_reference, m_query, q, m_distribution, toCdf, row);
+      }
+      else if constexpr (query_is_indices)
+      {
+        // Query points selected from the reference itself: the query point is
+        // reference row m_query(q), so the reference doubles as the query cloud.
+        return detail::weight_query_row_pcloud(
+            m_reference, m_reference, static_cast<size_t>(m_query(q)), m_filter, m_distribution, toCdf, row);
       }
       else
       {
-        return detail::weight_query_row_distmat(m_source, m_query, q, m_distribution, toCdf, row);
+        return detail::weight_query_row_pcloud(m_reference, m_query, q, m_filter, m_distribution, toCdf, row);
       }
     }
 
@@ -228,24 +236,27 @@ namespace sb::sampling
     {
       if constexpr (is_pcloud)
       {
-        if (m_source.rank() != 2)
+        if (m_reference.coords().rank() != 2)
         {
           throw std::invalid_argument("reference must be a 2-D (n_points, dim) point cloud");
         }
-        if (m_query.rank() != 2)
+        if constexpr (!query_is_indices)
         {
-          throw std::invalid_argument("query must be a 2-D (n_points, dim) point cloud");
-        }
-        if (m_query.dim() != m_source.dim())
-        {
-          throw std::invalid_argument("reference and query must have the same dimension");
+          if (m_query.coords().rank() != 2)
+          {
+            throw std::invalid_argument("query must be a 2-D (n_points, dim) point cloud");
+          }
+          if (m_query.dim() != m_reference.dim())
+          {
+            throw std::invalid_argument("reference and query must have the same dimension");
+          }
         }
       }
       else
       {
-        if (m_source.size() == 0)
+        if (m_reference.size() == 0)
         {
-          throw std::invalid_argument("reference distance matrix must be non-empty");
+          throw std::invalid_argument("reference distance matrix must be nonempty");
         }
       }
       if (m_sampleSize == 0)
@@ -254,7 +265,7 @@ namespace sb::sampling
       }
     }
 
-    ElemT m_source;   ///< reference whose buffer the indexed subsamples share
+    ElemT m_reference; ///< reference whose buffer the indexed subsamples share
     QueryT m_query;   ///< query points (coordinates) or reference indices
     FilterF m_filter; ///< NoFilter for the distance-matrix path
     DistF m_distribution;
@@ -271,7 +282,12 @@ namespace sb::sampling
   template <typename T, typename FilterF, typename DistF>
   using SubsampleTask = SubsampleTaskImpl<PointCloud<T>, PointCloud<T>, FilterF, DistF>;
 
-  /// Distance-matrix subsampling: distances come from the precomputed source
+  /// Point-cloud subsampling with the query points given as reference row
+  /// indices instead of coordinates (query point q is reference row query(q)).
+  template <typename T, typename FilterF, typename DistF>
+  using SubsampleIndexQueryTask = SubsampleTaskImpl<PointCloud<T>, Tensor<uint64_t>, FilterF, DistF>;
+
+  /// Distance-matrix subsampling: distances come from the precomputed reference
   /// matrix, the query holds reference row indices, and there is no filter.
   template <typename T, typename DistF>
   using SubsampleDistMatTask = SubsampleTaskImpl<DistanceMatrix<T>, Tensor<uint64_t>, NoFilter, DistF>;

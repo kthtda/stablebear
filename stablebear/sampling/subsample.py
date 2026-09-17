@@ -172,23 +172,22 @@ def _subsample_pointcloud(reference, query, *, sample_size, n_instances, distrib
     if not explicit_cloud:
         _reject_ambiguous_square_reference(reference_cloud)
     if query is None:
-        query_cloud = reference_cloud
+        query_tensor = reference_cloud
     elif _query_is_indices(query):
-        # Query points selected by their order in the reference cloud.
+        # Query points selected by their order in the reference cloud. The
+        # validated indices go to C++ as-is (the C++ task reads the query
+        # coordinates from the reference); only index normalization happens here.
         row_indices = _reference_indices(query, reference_cloud.shape[0])
-        query_cloud = _as_float_tensor(
-            np.asarray(reference_cloud)[row_indices], dtype=reference_cloud.dtype
-        )
+        query_tensor = IntTensor(row_indices, dtype=uint64)
     else:
-        query_cloud = _as_float_tensor(query, dtype=reference_cloud.dtype)
-        if query_cloud.ndim != 2:
+        query_tensor = _as_float_tensor(query, dtype=reference_cloud.dtype)
+        if query_tensor.ndim != 2:
             raise ValueError(
                 "query must be a 2-D (n_query, dim) array of coordinates or a 1-D "
                 "integer array of reference indices."
             )
-
-    if reference_cloud.shape[1] != query_cloud.shape[1]:
-        raise ValueError("reference and query must have the same dimension.")
+        if reference_cloud.shape[1] != query_tensor.shape[1]:
+            raise ValueError("reference and query must have the same dimension.")
 
     backend = _backend(reference_cloud.dtype)
 
@@ -199,7 +198,7 @@ def _subsample_pointcloud(reference, query, *, sample_size, n_instances, distrib
 
     # Fully fused C++ draw: distances + built-in distribution.
     task = backend.spawn_subsample_pcloud_task(
-        reference_cloud._data, query_cloud._data, out._data, backend.Euclidean(),
+        reference_cloud._data, query_tensor._data, out._data, backend.Euclidean(),
         distribution._descriptor(backend), sample_size, n_instances, replace,
         _unwrap(generator)
     )

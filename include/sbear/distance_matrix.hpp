@@ -7,7 +7,6 @@
 
 #include <algorithm>
 #include <cstddef>
-#include <cstdint>
 #include <memory>
 #include <stdexcept>
 #include <sstream>
@@ -31,11 +30,11 @@ namespace sb
   /// and selects a subset of points through an attached index set, so size() and
   /// operator()(i, j) report the principal submatrix over those indices. This lets
   /// a tensor of subsampled distance matrices store one shared source plus small
-  /// index arrays instead of re-storing every sub-matrix. Access is transparent,
-  /// so Ripser (which uses only size()/operator()) needs no special case. An
-  /// indexed view is read-only. Tensors of matrices serialize views natively
-  /// (each distinct source stored once, see tensor_io.hpp); a *standalone*
-  /// indexed view cannot be serialized — materialize() it first.
+  /// index arrays instead of re-storing every sub-matrix. Access through
+  /// size()/operator() is transparent to indexing, so consumers need no special
+  /// case. An indexed view is read-only. Tensors of matrices serialize views
+  /// natively (each distinct source stored once, see tensor_io.hpp); a
+  /// *standalone* view is written as its materialization.
   template <ArithmeticType T>
   class DistanceMatrix
   {
@@ -86,7 +85,7 @@ namespace sb
     /// Indexed view: shares @p source's compressed buffer and selects the
     /// principal submatrix over @p indices (rows/cols of @p source).
     DistanceMatrix(const DistanceMatrix& source, Tensor<uint64_t> indices)
-      : m_data(source.m_data), m_size(source.m_size), m_indices(std::move(indices)) { }
+      : m_indices(std::move(indices)), m_data(source.m_data), m_size(source.m_size) { }
 
     /// Whether this is an indexed view rather than owning its full buffer.
     [[nodiscard]] bool is_indexed() const { return m_indices.rank() == 1; }
@@ -225,9 +224,10 @@ namespace sb
       return row * (row - 1) / 2 + col;
     }
 
+    // Members ordered large-to-small for layout.
+    Tensor<uint64_t> m_indices;    // rank-1 when an indexed view, empty otherwise
     std::shared_ptr<T[]> m_data;
     size_t m_size;                 // size of the (shared) source buffer
-    Tensor<uint64_t> m_indices;    // rank-1 when an indexed view, empty otherwise
   };
 
   template <typename T>

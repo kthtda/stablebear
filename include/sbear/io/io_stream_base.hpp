@@ -5,6 +5,7 @@
 #include "../config.hpp"
 
 #include <cstddef>
+#include <cstdint>
 #include <vector>
 #include <iostream>
 #include <string_view>
@@ -74,6 +75,21 @@ namespace sb::io::detail
     std::cout << v << '\n';
 #endif
     return v;
+  }
+
+  /// bool is serialized as one canonical byte (0 or 1): the raw memory of a
+  /// bool can technically hold any value 0-255, so it must not be written or
+  /// reinterpreted bitwise.
+  template <>
+  inline void write_bytes<bool>(std::ostream& os, const bool& v)
+  {
+    write_bytes<uint8_t>(os, v ? uint8_t{1} : uint8_t{0});
+  }
+
+  template <>
+  inline bool read_bytes<bool>(std::istream& is)
+  {
+    return read_bytes<uint8_t>(is) != 0;
   }
 
   template <std::forward_iterator FwdIt>

@@ -276,7 +276,7 @@ class PointCloud:
 
     def __init__(self, data):
         self._data = data
-        self.dtype = float64 if isinstance(data, cpp.Float64Tensor) else float32
+        self.dtype = float64 if isinstance(data, cpp.PointCloud64) else float32
 
     @property
     def shape(self):

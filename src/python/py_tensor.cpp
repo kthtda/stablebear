@@ -117,19 +117,19 @@ namespace
 
   }
 
-  // The element type of a PointCloud tensor. Registered as a subclass of the
-  // scalar Tensor<T> so it can be returned to Python; an element may be an indexed
+  // The element type of a PointCloud tensor; an element may be an indexed
   // view sharing a source cloud (materialized lazily — see stablebear.tensor.PointCloud).
   template <typename T>
   void register_point_cloud_element(py::module_& m, const std::string& suffix)
   {
     using PC = sb::PointCloud<T>;
-    py::class_<PC, sb::Tensor<T>>(m, ("PointCloud" + suffix + "_inner").c_str())
+    py::class_<PC>(m, ("PointCloud" + suffix).c_str())
         .def(py::init<const sb::Tensor<T>&>())
         .def_property_readonly("n_points", &PC::n_points)
         .def_property_readonly("n_dims", &PC::dim)
         .def_property_readonly("is_indexed", &PC::is_indexed)
         .def_property_readonly("indices", &PC::indices)
+        .def_property_readonly("coords", &PC::coords)
         .def("materialize", &PC::materialize);
   }
 

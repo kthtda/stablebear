@@ -35,23 +35,16 @@ namespace sb::io::detail
   template <typename T>
   inline constexpr bool is_compressed_matrix_v = is_compressed_matrix<T>::value;
 
-  template <typename T>
-  struct is_point_cloud : std::false_type {};
+  // Point clouds are identified via sb::is_point_cloud (point_cloud.hpp).
 
   template <typename T>
-  struct is_point_cloud<PointCloud<T>> : std::true_type { using scalar_type = T; };
+  struct is_distance_matrix : std::false_type {};
 
   template <typename T>
-  inline constexpr bool is_point_cloud_v = is_point_cloud<T>::value;
+  struct is_distance_matrix<DistanceMatrix<T>> : std::true_type { using scalar_type = T; };
 
   template <typename T>
-  struct is_dist_matrix : std::false_type {};
-
-  template <typename T>
-  struct is_dist_matrix<DistanceMatrix<T>> : std::true_type { using scalar_type = T; };
-
-  template <typename T>
-  inline constexpr bool is_dist_matrix_v = is_dist_matrix<T>::value;
+  inline constexpr bool is_distance_matrix_v = is_distance_matrix<T>::value;
 
   using StreamableTensor = std::variant<
       Tensor<float32_t>,
@@ -199,87 +192,81 @@ namespace sb::io::detail
     return io::detail::read_tensor<typename TensorT::value_type>(is);
   }
 
-  // Serialize the elements of a tensor of point clouds by storing each distinct
-  // source coordinate buffer once (point clouds that share a source — e.g. the
-  // indexed subsamples from stablebear.sampling — are deduplicated), followed by
-  // every element as a source id plus, for indexed views, its index array.
-  template <typename ScalarT>
-  void write_point_cloud_elements(std::ostream& os, const Tensor<PointCloud<ScalarT>>& tensor)
+  // Shared writer for tensors whose elements may be indexed views over a
+  // source buffer (PointCloud / DistanceMatrix): each distinct source is
+  // stored once (deduplicated by buffer address — elements sharing a source,
+  // e.g. the indexed subsamples from stablebear.sampling, are written once),
+  // then every element as its source id plus, for indexed views, its index
+  // array. @p sourceKey maps an element to its source buffer address;
+  // @p writeSource writes one element's source.
+  template <typename ElemT, typename SourceKeyF, typename WriteSourceF>
+  void write_shared_source_elements(
+      std::ostream& os, const Tensor<ElemT>& tensor, SourceKeyF sourceKey, WriteSourceF writeSource)
   {
-    std::unordered_map<const void*, uint64_t> idOf;
-    std::vector<const PointCloud<ScalarT>*> sources;
+    using KeyT = decltype(sourceKey(std::declval<const ElemT&>()));
+    std::unordered_map<KeyT, uint64_t> idOf;
+    std::vector<const ElemT*> sources;
 
     auto sz = tensor.size();
     const auto* data = tensor.data();
     std::vector<uint64_t> sourceId(sz);
     for (auto k = 0_uz; k < sz; ++k)
     {
-      const PointCloud<ScalarT>& elem = data[k];
-      const void* key = static_cast<const void*>(elem.data());
-      auto [it, inserted] = idOf.try_emplace(key, static_cast<uint64_t>(sources.size()));
+      auto [it, inserted] = idOf.try_emplace(sourceKey(data[k]), static_cast<uint64_t>(sources.size()));
       if (inserted)
-        sources.push_back(&elem);
+      {
+        sources.push_back(&data[k]);
+      }
       sourceId[k] = it->second;
     }
 
     write_bytes<uint64_t>(os, static_cast<uint64_t>(sources.size()));
-    for (const PointCloud<ScalarT>* src : sources)
-      write_tensor(os, static_cast<const Tensor<ScalarT>&>(*src));
+    for (const ElemT* src : sources)
+    {
+      writeSource(os, *src);
+    }
 
     for (auto k = 0_uz; k < sz; ++k)
     {
       write_bytes<uint64_t>(os, sourceId[k]);
-      const PointCloud<ScalarT>& elem = data[k];
-      write_bytes<uint8_t>(os, elem.is_indexed() ? uint8_t{1} : uint8_t{0});
-      if (elem.is_indexed())
-        write_tensor(os, elem.indices());
+      write_bytes<bool>(os, data[k].is_indexed());
+      if (data[k].is_indexed())
+      {
+        write_tensor(os, data[k].indices());
+      }
     }
   }
 
-  // As write_point_cloud_elements, for tensors of distance matrices: each
-  // distinct source buffer is stored once as a full compressed matrix
-  // (uint64 size + entries, the read_compressed_matrix layout), then every
-  // element as a source id plus, for indexed views, its index array. This is
-  // what lets subsampled sub-matrices be saved without either duplicating the
-  // source per element or desynchronizing on size()/storage_count().
+  // Point cloud sources are their coordinate tensors.
+  template <typename ScalarT>
+  void write_point_cloud_elements(std::ostream& os, const Tensor<PointCloud<ScalarT>>& tensor)
+  {
+    write_shared_source_elements(
+        os, tensor,
+        [](const PointCloud<ScalarT>& elem) { return elem.coords().data(); },
+        [](std::ostream& o, const PointCloud<ScalarT>& src) { write_tensor(o, src.coords()); });
+  }
+
+  // Distance matrix sources are full compressed matrices (uint64 size +
+  // entries, the read_compressed_matrix layout). This is what lets subsampled
+  // sub-matrices be saved without either duplicating the source per element
+  // or desynchronizing on size()/storage_count().
   template <typename ScalarT>
   void write_distance_matrix_elements(std::ostream& os, const Tensor<DistanceMatrix<ScalarT>>& tensor)
   {
-    std::unordered_map<const void*, uint64_t> idOf;
-    std::vector<const DistanceMatrix<ScalarT>*> sources;
-
-    auto sz = tensor.size();
-    const auto* data = tensor.data();
-    std::vector<uint64_t> sourceId(sz);
-    for (auto k = 0_uz; k < sz; ++k)
-    {
-      const DistanceMatrix<ScalarT>& elem = data[k];
-      const void* key = static_cast<const void*>(elem.source_data());
-      auto [it, inserted] = idOf.try_emplace(key, static_cast<uint64_t>(sources.size()));
-      if (inserted)
-        sources.push_back(&elem);
-      sourceId[k] = it->second;
-    }
-
-    write_bytes<uint64_t>(os, static_cast<uint64_t>(sources.size()));
-    for (const DistanceMatrix<ScalarT>* src : sources)
-    {
-      // The full shared buffer: source_size(), not size(), which for an
-      // indexed view reports the selected submatrix instead.
-      const uint64_t n = src->source_size();
-      write_bytes<uint64_t>(os, n);
-      for (size_t i = 0; i < DistanceMatrix<ScalarT>::storage_size(n); ++i)
-        write_bytes<ScalarT>(os, src->source_data()[i]);
-    }
-
-    for (auto k = 0_uz; k < sz; ++k)
-    {
-      write_bytes<uint64_t>(os, sourceId[k]);
-      const DistanceMatrix<ScalarT>& elem = data[k];
-      write_bytes<uint8_t>(os, elem.is_indexed() ? uint8_t{1} : uint8_t{0});
-      if (elem.is_indexed())
-        write_tensor(os, elem.indices());
-    }
+    write_shared_source_elements(
+        os, tensor,
+        [](const DistanceMatrix<ScalarT>& elem) { return elem.source_data(); },
+        [](std::ostream& o, const DistanceMatrix<ScalarT>& src) {
+          // The full shared buffer: source_size(), not size(), which for an
+          // indexed view reports the selected submatrix instead.
+          const uint64_t n = src.source_size();
+          write_bytes<uint64_t>(o, n);
+          for (size_t i = 0; i < DistanceMatrix<ScalarT>::storage_size(n); ++i)
+          {
+            write_bytes<ScalarT>(o, src.source_data()[i]);
+          }
+        });
   }
 
   template <IsTensor TensorT>
@@ -301,18 +288,18 @@ namespace sb::io::detail
     if constexpr (is_point_cloud_v<value_type>)
     {
       write_point_cloud_elements<typename is_point_cloud<value_type>::scalar_type>(os, tensor);
-      return;
     }
-    if constexpr (is_dist_matrix_v<value_type>)
+    else if constexpr (is_distance_matrix_v<value_type>)
     {
-      write_distance_matrix_elements<typename is_dist_matrix<value_type>::scalar_type>(os, tensor);
-      return;
+      write_distance_matrix_elements<typename is_distance_matrix<value_type>::scalar_type>(os, tensor);
     }
-
-    auto sz = tensor.size();
-    for (auto const * elem = tensor.data(); elem != tensor.data() + sz; ++elem)
+    else
     {
-      write_element(os, *elem);
+      auto sz = tensor.size();
+      for (auto const * elem = tensor.data(); elem != tensor.data() + sz; ++elem)
+      {
+        write_element(os, *elem);
+      }
     }
   }
 
@@ -360,6 +347,10 @@ namespace sb::io::detail
         *elem = read_barcode<typename is_barcode<T>::scalar_type>(is);
       else if constexpr (is_compressed_matrix_v<T>)
         *elem = read_compressed_matrix<T>(is);
+      else if constexpr (is_point_cloud_v<T>)
+        // Legacy (baseFormat 1000) point cloud tensors: every element is a full
+        // nested coordinate tensor.
+        *elem = T(read_element<Tensor<typename is_point_cloud<T>::scalar_type>>(is));
       else
         *elem = read_element<T>(is);
     }
@@ -367,11 +358,14 @@ namespace sb::io::detail
     return ret;
   }
 
-  // Read the current (baseFormat 1001) point cloud tensor format: distinct source
-  // coordinate buffers stored once, then per-element (source id, optional indices).
-  // Elements that reference the same source share its coordinate buffer.
-  template <typename ScalarT>
-  Tensor<PointCloud<ScalarT>> read_indexed_point_cloud_tensor(std::istream& is)
+  // Shared reader for the shared-source tensor formats (see
+  // write_shared_source_elements): distinct sources stored once, then
+  // per-element (source id, indexed flag, optional indices). Elements that
+  // reference the same source share its buffer, as before saving.
+  // @p readSource reads one source of type SourceT; elements are built as
+  // ElemT(source) or ElemT(source, indices).
+  template <typename ElemT, typename SourceT, typename ReadSourceF>
+  Tensor<ElemT> read_shared_source_tensor(std::istream& is, ReadSourceF readSource)
   {
     auto shapeSz = read_bytes<std::uint64_t>(is);
     std::vector<size_t> shape(shapeSz);
@@ -382,71 +376,54 @@ namespace sb::io::detail
       strides[i] = static_cast<ptrdiff_t>(read_bytes<std::uint64_t>(is));
     }
 
-    Tensor<PointCloud<ScalarT>> ret(shape);
+    Tensor<ElemT> ret(shape);
     if (ret.strides() != strides)
     {
       throw std::runtime_error("Incorrect strides in saved data (expected " + index_to_string(ret.strides()) + " but got " + index_to_string(strides) + ")");
     }
 
     auto numSources = read_bytes<std::uint64_t>(is);
-    std::vector<Tensor<ScalarT>> sources;
+    std::vector<SourceT> sources;
     sources.reserve(numSources);
     for (auto i = 0_uz; i < numSources; ++i)
-      sources.push_back(read_element<Tensor<ScalarT>>(is));
+    {
+      sources.push_back(readSource(is));
+    }
 
     auto sz = ret.size();
-    for (auto * elem = ret.data(); elem != ret.data() + sz; ++elem)
+    for (auto* elem = ret.data(); elem != ret.data() + sz; ++elem)
     {
       auto id = read_bytes<std::uint64_t>(is);
-      auto indexed = read_bytes<std::uint8_t>(is);
+      const bool indexed = read_bytes<bool>(is);
       if (indexed)
-        *elem = PointCloud<ScalarT>(sources[id], read_element<Tensor<uint64_t>>(is));
+      {
+        *elem = ElemT(sources[id], read_element<Tensor<uint64_t>>(is));
+      }
       else
-        *elem = PointCloud<ScalarT>(sources[id]);
+      {
+        // Sharing, not copying: PointCloud wraps the coordinate tensor,
+        // DistanceMatrix's copy shares the source buffer (shared_ptr).
+        *elem = ElemT(sources[id]);
+      }
     }
 
     return ret;
   }
 
-  // Read the current (baseFormat 1121) distance-matrix tensor format: distinct
-  // source matrices stored once, then per-element (source id, optional indices).
-  // Elements referencing the same source share its buffer, as before saving.
+  // Read the current (baseFormat 1001) point cloud tensor format.
+  template <typename ScalarT>
+  Tensor<PointCloud<ScalarT>> read_indexed_point_cloud_tensor(std::istream& is)
+  {
+    return read_shared_source_tensor<PointCloud<ScalarT>, Tensor<ScalarT>>(
+        is, [](std::istream& s) { return read_element<Tensor<ScalarT>>(s); });
+  }
+
+  // Read the current (baseFormat 1121) distance-matrix tensor format.
   template <typename ScalarT>
   Tensor<DistanceMatrix<ScalarT>> read_indexed_distance_matrix_tensor(std::istream& is)
   {
-    auto shapeSz = read_bytes<std::uint64_t>(is);
-    std::vector<size_t> shape(shapeSz);
-    std::vector<ptrdiff_t> strides(shapeSz);
-    for (auto i = 0_uz; i < shapeSz; ++i)
-    {
-      shape[i] = read_bytes<std::uint64_t>(is);
-      strides[i] = static_cast<ptrdiff_t>(read_bytes<std::uint64_t>(is));
-    }
-
-    Tensor<DistanceMatrix<ScalarT>> ret(shape);
-    if (ret.strides() != strides)
-    {
-      throw std::runtime_error("Incorrect strides in saved data (expected " + index_to_string(ret.strides()) + " but got " + index_to_string(strides) + ")");
-    }
-
-    auto numSources = read_bytes<std::uint64_t>(is);
-    std::vector<DistanceMatrix<ScalarT>> sources;
-    sources.reserve(numSources);
-    for (auto i = 0_uz; i < numSources; ++i)
-      sources.push_back(read_compressed_matrix<DistanceMatrix<ScalarT>>(is));
-
-    auto sz = ret.size();
-    for (auto * elem = ret.data(); elem != ret.data() + sz; ++elem)
-    {
-      auto id = read_bytes<std::uint64_t>(is);
-      auto indexed = read_bytes<std::uint8_t>(is);
-      if (indexed)
-        *elem = DistanceMatrix<ScalarT>(sources[id], read_element<Tensor<uint64_t>>(is));
-      else
-        *elem = sources[id];  // copy shares the source buffer (shared_ptr)
-    }
-
-    return ret;
+    return read_shared_source_tensor<DistanceMatrix<ScalarT>, DistanceMatrix<ScalarT>>(
+        is, [](std::istream& s) { return read_compressed_matrix<DistanceMatrix<ScalarT>>(s); });
   }
 }
 

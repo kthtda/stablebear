@@ -128,15 +128,25 @@ namespace sb::ph
       auto pcIdx = std::vector<size_t>(index.begin(), std::prev(index.end()));
       auto const & points = pclouds(pcIdx);
 
-      if (points.rank() == 0 || std::any_of(points.shape().begin(), points.shape().end(), [](size_t v){ return v == 0; }))
+      auto const & coords = points.coords();
+
+      // Skip empty cells: default-constructed (rank-0 coords), no points
+      // selected/stored, or zero-dimensional points. Rank order matters:
+      // n_points()/dim() read coords.shape(0)/shape(1), which throw on lower ranks.
+      if (coords.rank() == 0 || points.n_points() == 0)
       {
         return;
       }
 
-      if (points.rank() != 2)
+      if (coords.rank() != 2)
       {
         throw std::runtime_error("Point cloud at index " + index_to_string(pcIdx) + " has unexpected shape " +
-                                 shape_to_string(points.shape()) + " (should be (m, n))");
+                                 shape_to_string(coords.shape()) + " (should be (m, n))");
+      }
+
+      if (points.dim() == 0)
+      {
+        return;
       }
 
       run_euclidean_ripser(points, ret, maxDim, index, reducedHomology);
