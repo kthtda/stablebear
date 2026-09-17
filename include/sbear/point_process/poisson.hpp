@@ -2,6 +2,7 @@
 #define SB_POINT_PROCESS_POISSON_H
 
 #include "../tensor.hpp"
+#include "../point_cloud.hpp"
 #include "../walk.hpp"
 
 #include <cmath>

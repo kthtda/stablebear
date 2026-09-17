@@ -4,6 +4,8 @@ Persistent Homology
 
 This guide covers the persistent homology pipeline in stablebear: going from point cloud data to persistence barcodes to stable rank functions, and using those functions for downstream analysis.
 
+For the *relative approach* -- drawing subsamples of a reference point cloud around chosen query points before computing persistent homology -- see the :doc:`subsampling guide <sampling>`.
+
 
 Background
 ==========

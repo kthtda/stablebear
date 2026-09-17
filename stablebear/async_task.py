@@ -45,6 +45,8 @@ def _run_task(task_fn, verbose=True):
                 # Cleanup drain: make sure the workers have actually stopped
                 # before the task is destroyed. Don't let an error surfaced here
                 # mask the exception (or KeyboardInterrupt) that triggered it.
-                _wait_for_task(task, verbose=verbose)
+                # The work is already finished (normal path) or being cancelled
+                # (error path), so suppress the redundant progress bar.
+                _wait_for_task(task, verbose=False)
             except BaseException:
                 pass

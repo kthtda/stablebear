@@ -387,9 +387,6 @@ namespace sb
     return result;
   }
 
-  template <ArithmeticType T>
-  using PointCloud = Tensor<T>;
-
   namespace detail
   {
     // Deep-copy a value about to be stored in a tensor cell, so the cell never
@@ -549,14 +546,6 @@ namespace sb
   template <typename T, typename U>
   requires std::is_constructible_v<T, U>
   [[nodiscard]] Tensor<T> tensor_cast(const Tensor<U>& src);
-
-  /**
-   * Cast a tensor of point clouds (Tensor<Tensor<U>>) to a different precision
-   * (Tensor<Tensor<T>>), converting each inner tensor's elements.
-   */
-  template <typename T, typename U>
-  requires std::is_constructible_v<T, U>
-  [[nodiscard]] Tensor<Tensor<T>> pcloud_cast(const Tensor<Tensor<U>>& src);
 
   // ============================================================================
   // Joining operations
