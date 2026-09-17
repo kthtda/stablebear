@@ -139,8 +139,10 @@ namespace sb
     /// the shared source of indexed views.
     [[nodiscard]] size_t source_size() const { return m_size; }
 
-    /// Number of stored compressed entries (owning matrices only).
-    [[nodiscard]] size_t storage_count() const { return storage_size(m_size); }
+    /// Number of compressed entries of the matrix as observed: for an indexed
+    /// view, the entry count of its principal submatrix. The physical shared
+    /// source buffer spans storage_size(source_size()) entries.
+    [[nodiscard]] size_t storage_count() const { return storage_size(size()); }
 
     [[nodiscard]] EntryProxy operator()(size_t i, size_t j)
     {

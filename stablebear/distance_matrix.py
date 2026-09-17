@@ -82,6 +82,8 @@ class DistanceMatrix:
 
     @property
     def storage_count(self) -> int:
+        """Number of compressed entries as observed: for an indexed view, the
+        entry count of its principal submatrix."""
         return self._data.storage_count
 
     @property

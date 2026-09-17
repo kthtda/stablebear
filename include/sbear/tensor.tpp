@@ -1693,37 +1693,22 @@ namespace sb
   bool allclose(const MatT& a, const MatT& b,
                 typename MatT::value_type atol, typename MatT::value_type rtol)
   {
-    // An indexed view's raw buffer is the full shared source, not its
-    // principal submatrix, so views compare elementwise (like operator==).
-    if constexpr (requires { a.is_indexed(); })
-    {
-      if (a.is_indexed() || b.is_indexed())
-      {
-        if (a.size() != b.size())
-          return false;
-        const size_t n = a.size();
-        for (size_t i = 0; i < n; ++i)
-          for (size_t j = i + 1; j < n; ++j)
-          {
-            auto aval = a(i, j);
-            auto bval = b(i, j);
-            if (std::abs(aval - bval) > atol + rtol * std::abs(bval))
-              return false;
-          }
-        return true;
-      }
-    }
-
-    if (a.storage_count() != b.storage_count())
+    // size() and operator()(i, j) are transparent to indexed views (they
+    // report the principal submatrix), so elementwise comparison needs no
+    // knowledge of indexing. The diagonal is included for the symmetric
+    // case; a distance matrix reads zero there on both sides.
+    if (a.size() != b.size())
       return false;
 
-    for (size_t i = 0; i < a.storage_count(); ++i)
-    {
-      auto aval = a.data()[i];
-      auto bval = b.data()[i];
-      if (std::abs(aval - bval) > atol + rtol * std::abs(bval))
-        return false;
-    }
+    const size_t n = a.size();
+    for (size_t i = 0; i < n; ++i)
+      for (size_t j = i; j < n; ++j)
+      {
+        auto aval = a(i, j);
+        auto bval = b(i, j);
+        if (std::abs(aval - bval) > atol + rtol * std::abs(bval))
+          return false;
+      }
     return true;
   }
 
