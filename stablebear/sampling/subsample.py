@@ -206,7 +206,8 @@ def _subsample_pointcloud(reference, query, *, sample_size, n_instances, distrib
 
     # None or a 1-D integer array selects reference rows (the C++ task reads
     # their coordinates from the reference); a 2-D array gives query coordinates.
-    if query is None or _query_is_indices(query):
+    query_is_indices = query is None or _query_is_indices(query)
+    if query_is_indices:
         query_tensor = IntTensor(_reference_indices(query, reference_cloud.shape[0]), dtype=uint64)
     else:
         query_tensor = _as_float_tensor(query, dtype=reference_cloud.dtype)
@@ -225,7 +226,9 @@ def _subsample_pointcloud(reference, query, *, sample_size, n_instances, distrib
     out = zeros((1,), dtype=pcloud32 if reference_cloud.dtype == float32 else pcloud64)
 
     # Fully fused C++ draw: distances + built-in distribution.
-    task = backend.spawn_subsample_pcloud_task(
+    spawn = (backend.spawn_subsample_pcloud_index_query_task if query_is_indices
+             else backend.spawn_subsample_pcloud_task)
+    task = spawn(
         reference_cloud._data, query_tensor._data, out._data, backend.Euclidean(),
         distribution._native(backend), sample_size, n_instances, replace,
         _unwrap(generator)

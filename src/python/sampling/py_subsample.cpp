@@ -141,8 +141,7 @@ namespace
 
     /// Point-cloud input with the query given as reference row indices (query
     /// point q is reference row query(q)) — the coordinates never leave C++.
-    /// Overloads the coordinate-query spawn above.
-    static TaskPtr spawn_subsample_pcloud_task(
+    static TaskPtr spawn_subsample_pcloud_index_query_task(
         const TensorT &reference, const sb::Tensor<uint64_t> &query, sb::Tensor<sb::PointCloud<T>> &out,
         const FilterVariant<T> &filter, const DistVariant<T> &distribution, size_t sampleSize, size_t nInstances,
         bool replace, Gen *gen)
@@ -184,19 +183,12 @@ namespace
     static void register_entry_points(PyClass &cls)
     {
       cls.def_static(
-          "spawn_subsample_pcloud_task",
-          py::overload_cast<
-              const TensorT &, const TensorT &, sb::Tensor<sb::PointCloud<T>> &, const FilterVariant<T> &,
-              const DistVariant<T> &, size_t, size_t, bool, Gen *>(&PySubsampleBindings::spawn_subsample_pcloud_task),
-          py::arg("reference"), py::arg("query"), py::arg("out"), py::arg("filter"), py::arg("distribution"),
-          py::arg("sample_size"), py::arg("n_instances"), py::arg("replace"),
-          py::arg("generator").none(true) = py::none());
+          "spawn_subsample_pcloud_task", &PySubsampleBindings::spawn_subsample_pcloud_task, py::arg("reference"),
+          py::arg("query"), py::arg("out"), py::arg("filter"), py::arg("distribution"), py::arg("sample_size"),
+          py::arg("n_instances"), py::arg("replace"), py::arg("generator").none(true) = py::none());
 
       cls.def_static(
-          "spawn_subsample_pcloud_task",
-          py::overload_cast<
-              const TensorT &, const sb::Tensor<uint64_t> &, sb::Tensor<sb::PointCloud<T>> &, const FilterVariant<T> &,
-              const DistVariant<T> &, size_t, size_t, bool, Gen *>(&PySubsampleBindings::spawn_subsample_pcloud_task),
+          "spawn_subsample_pcloud_index_query_task", &PySubsampleBindings::spawn_subsample_pcloud_index_query_task,
           py::arg("reference"), py::arg("query"), py::arg("out"), py::arg("filter"), py::arg("distribution"),
           py::arg("sample_size"), py::arg("n_instances"), py::arg("replace"),
           py::arg("generator").none(true) = py::none());
