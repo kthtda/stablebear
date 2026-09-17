@@ -5,14 +5,15 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from . import _sb_cpp as cpp
+from ._indexable import Indexable
 from ._tensor_base import Shape
-from .typing import float32, float64
+from .typing import float32, float64, uint64
 
 if TYPE_CHECKING:
     from .base_tensor import FloatTensor
 
 
-class PointCloud:
+class PointCloud(Indexable):
     """A single (rank-2) point cloud, of shape ``(n_points, dim)``.
 
     May be an *indexed view* that shares another cloud's coordinates and selects
@@ -53,12 +54,37 @@ class PointCloud:
         return FloatTensor(self._data.materialize())
 
     def __getitem__(self, index):
-        """Index into the cloud's ``(n_points, dim)`` coordinates as a ``FloatTensor``.
+        """Index into the cloud's ``(n_points, dim)`` coordinates.
 
-        The (selected) coordinates are materialized, so the natural NumPy idiom
-        ``pc[:, 0]`` / ``pc[:, 1]`` (e.g. for plotting) works directly on a cloud.
+        Selecting whole points -- a slice, an integer array, or a boolean mask
+        over the leading axis -- returns a :class:`PointCloud` that *shares*
+        these coordinates and selects through an index array, so slicing a cloud
+        costs no copy of the coordinates however large they are::
+
+            near = pc[:100]         # a PointCloud view, no coordinates copied
+            picked = pc[[3, 17, 42]]
+
+        Every other index materializes the selected coordinates into a
+        ``FloatTensor``: an integer (which drops the point axis, as in NumPy) and
+        anything reaching the coordinate axis, so the natural plotting idiom
+        ``pc[:, 0]`` / ``pc[:, 1]`` keeps working and still yields numbers::
+
+            first = pc[0]           # FloatTensor of shape (dim,)
+            xs = pc[:, 0]           # FloatTensor of the x coordinates
         """
-        return self.materialize()[index]
+        rows = self._row_selection(index, self.shape[0])
+        if rows is None:
+            return self.materialize()[index]
+
+        # Indices address the source coordinates, so selecting rows of a view
+        # must compose through the view's own indices rather than reuse them.
+        if self.is_indexed:
+            rows = np.asarray(self._data.indices, dtype=np.uint64)[rows]
+
+        from .base_tensor import IntTensor
+        cpp_cloud = type(self._data)(
+            self._data.coords, IntTensor(np.ascontiguousarray(rows), dtype=uint64)._data)
+        return PointCloud(cpp_cloud)
 
     def __setitem__(self, index, value):
         """Write a coordinate in place: ``pc[i, j] = value``.

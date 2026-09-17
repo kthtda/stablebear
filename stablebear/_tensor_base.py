@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import operator
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from typing import Union
 
 from . import _sb_cpp as cpp
+from ._indexable import Indexable
 
 Shape = cpp.Shape
 
@@ -147,7 +148,7 @@ def _resolve_axis(axis: int, ndim: int) -> int:
     return resolved
 
 
-class Tensor(ABC):
+class Tensor(Indexable):
     _data: CppTensor
 
     __array_ufunc__ = None

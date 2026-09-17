@@ -36,9 +36,24 @@ idiom for plotting works directly::
    plt.scatter(pc[:, 0], pc[:, 1])  # x and y coordinate columns
    first_point = pc[0]              # shape (2,)
 
+Selecting whole *points* -- a slice, an integer array, or a boolean mask over
+the leading axis -- returns a :py:class:`~stablebear.PointCloud` that shares the
+original coordinates and selects through an index array, so it costs no copy of
+the coordinates however large they are::
+
+   near = pc[:100]                  # a PointCloud view, no coordinates copied
+   picked = pc[[3, 17, 42]]
+   picked.is_indexed                # True
+
+This is the same representation :func:`~stablebear.sampling.subsample_relative`
+returns, so a sliced cloud feeds straight into persistent homology without ever
+being materialized. Every other index yields numbers: an integer drops the point
+axis (as in NumPy), and anything reaching the coordinate axis materializes the
+selected coordinates into a ``FloatTensor``.
+
 Tensors of clouds (rank ≥ 1) index over the clouds instead: ``X[i]`` returns
-the ``i``-th cloud as a ``FloatTensor`` (see above), which then supports the
-same column indexing.
+the ``i``-th cloud as a :py:class:`~stablebear.PointCloud`, which then supports
+the indexing described above.
 
 Slicing
 -------

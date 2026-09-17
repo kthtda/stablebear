@@ -125,6 +125,10 @@ namespace
     using PC = sb::PointCloud<T>;
     py::class_<PC>(m, ("PointCloud" + suffix).c_str())
         .def(py::init<const sb::Tensor<T>&>())
+        // Indexed view over `source`'s rows. Indices address source storage, so
+        // slicing a view must compose them against the source (see PointCloud
+        // in stablebear/point_cloud.py).
+        .def(py::init<const sb::Tensor<T>&, sb::Tensor<sb::uint64_t>>())
         .def_property_readonly("n_points", &PC::n_points)
         .def_property_readonly("n_dims", &PC::dim)
         .def_property_readonly("is_indexed", &PC::is_indexed)
