@@ -1,11 +1,12 @@
 #include "py_subsample.hpp"
+#include "../py_async_support.hpp"
 
 #include <sbear/sampling/subsample.hpp>
 
-#include <pybind11/stl.h>  // std::variant caster
+#include <pybind11/stl.h> // std::variant caster
 
+#include <memory>
 #include <string>
-#include <utility>
 #include <variant>
 
 namespace py = pybind11;
@@ -15,6 +16,7 @@ namespace
 
   using sb::sampling::EuclideanDistance;
   using sb::sampling::Gaussian;
+  using sb::sampling::NoFilter;
   using sb::sampling::Uniform;
 
   // ===========================================================================
@@ -22,10 +24,10 @@ namespace
   //
   // The entry points accept exactly these functors, passed from Python as
   // descriptor objects. pybind11's variant caster converts the descriptor to
-  // the matching alternative and std::visit dispatches to the core call
-  // instantiated for that combination. Adding a built-in = add the core
-  // functor, list it here, and register its descriptor class in
-  // register_descriptors.
+  // the matching alternative and std::visit spawns the task type instantiated
+  // for that combination, so the built-in weighting inlines into the draw
+  // path. Adding a built-in = add the core functor, list it here, and register
+  // its descriptor class in register_filters / register_distributions.
   // ===========================================================================
 
   template <typename T>
@@ -44,151 +46,142 @@ namespace
     using TensorT = sb::Tensor<T>;
     using Gen = sb::DefaultRandomGenerator;
     using PyClass = py::class_<PySubsampleBindings>;
+    using TaskPtr = std::unique_ptr<sb::StoppableTask<void>>;
 
-    static void register_bindings(py::module_& m, const std::string& suffix)
+    static void register_bindings(py::module_ &m, const std::string &suffix)
     {
       PyClass cls(m, ("Subsample" + suffix).c_str());
-      register_descriptors(cls);
+      register_filters(cls);
+      register_distributions(cls);
       register_entry_points(cls);
     }
 
   private:
     // -------------------------------------------------------------------------
     // Descriptor classes, nested under the precision namespace
-    // (Subsample32.Gaussian etc.). The descriptors are the core functors
-    // themselves, constructed member-by-member; parameter validation lives in
-    // the Python spec classes.
+    // (Subsample32.Euclidean, Subsample32.Gaussian etc.). The descriptors are
+    // the core functors themselves, constructed member-by-member; parameter
+    // validation lives in the Python spec classes.
     // -------------------------------------------------------------------------
-    static void register_descriptors(PyClass& cls)
+
+    static void register_filters(PyClass &cls)
     {
-      py::class_<EuclideanDistance<T>>(cls, "Euclidean")
-          .def(py::init<>());
-      py::class_<Gaussian<T>>(cls, "Gaussian")
-          .def(py::init<T, T>(), py::arg("mean"), py::arg("sigma"));
-      py::class_<Uniform<T>>(cls, "Uniform")
-          .def(py::init<T, T>(), py::arg("low"), py::arg("high"));
+      py::class_<EuclideanDistance<T>>(cls, "Euclidean").def(py::init<>());
+    }
+
+    static void register_distributions(PyClass &cls)
+    {
+      py::class_<Gaussian<T>>(cls, "Gaussian").def(py::init<T, T>(), py::arg("mean"), py::arg("sigma"));
+      py::class_<Uniform<T>>(cls, "Uniform").def(py::init<T, T>(), py::arg("low"), py::arg("high"));
     }
 
     // -------------------------------------------------------------------------
-    // Entry points: named static functions taking the functor variants. Each
-    // visitor holds the non-variant arguments; std::visit instantiates its
-    // call operator once per functor combination.
+    // Entry points: spawn functions taking the functor variants, mirroring the
+    // Ripser spawn_*_task bindings. Each visitor holds the non-variant
+    // arguments; std::visit instantiates its call operator once per functor
+    // combination. Spawning is cheap — only the task's synchronous prologue
+    // (validation, output allocation, seed-block reservation) runs on this
+    // thread; the draws run on executor threads, which never touch Python, so
+    // no GIL release is needed here.
     // -------------------------------------------------------------------------
 
-    struct SampleSubsetsCall
+    struct SpawnPcloudTaskCall
     {
-      const TensorT& reference;
-      const TensorT& query;
-      size_t sampleSize;
-      size_t nInstances;
-      bool replace;
-      Gen* gen;
+      const TensorT &reference;
+      const TensorT &query;
+      sb::Tensor<sb::PointCloud<T>> &out;
+      size_t sampleSize = 0;
+      size_t nInstances = 0;
+      bool replace = false;
+      Gen *gen = nullptr;
 
       template <typename FilterF, typename DistF>
-      py::tuple operator()(const FilterF& filter, const DistF& distribution) const
+      TaskPtr operator()(const FilterF &filter, const DistF &distribution) const
       {
-        // The weighting/preparation phases block this thread in pure C++ for
-        // O(n_query * n_reference); release the GIL so other Python threads
-        // keep running. Reacquired before to_tuple builds Python objects.
-        auto handle = [&] {
-          py::gil_scoped_release release;
-          return sb::sampling::sample_subsets(
-              sb::PointCloud<T>(reference), sb::PointCloud<T>(query), filter, distribution,
-              sampleSize, nInstances, replace, resolve_generator(gen), sb::default_executor());
-        }();
-        return to_tuple(std::move(handle));
+        using Task = sb::sampling::SubsampleTask<T, FilterF, DistF>;
+        return sb_py::execute_stoppable_task<Task>(
+            sb::PointCloud<T>(reference), sb::PointCloud<T>(query), filter, distribution, out, sampleSize, nInstances,
+            replace, resolve_generator(gen));
       }
     };
 
-    /// Point-cloud input: subsample @p reference relative to each point of
-    /// @p query, weighting by @p distribution of @p filter of each point pair.
-    static py::tuple sample_subsets(const TensorT& reference, const TensorT& query,
-                                    const FilterVariant<T>& filter,
-                                    const DistVariant<T>& distribution, size_t sampleSize,
-                                    size_t nInstances, bool replace, Gen* gen)
+    /// Point-cloud input: spawn the task subsampling @p reference relative to
+    /// each point of @p query, weighting by @p distribution of @p filter of
+    /// each point pair. The task reallocates @p out to (n_query, n_instances)
+    /// in its prologue and fills it in place; the caller keeps @p out and the
+    /// returned task alive until the task completes.
+    static TaskPtr spawn_subsample_pcloud_task(
+        const TensorT &reference, const TensorT &query, sb::Tensor<sb::PointCloud<T>> &out,
+        const FilterVariant<T> &filter, const DistVariant<T> &distribution, size_t sampleSize, size_t nInstances,
+        bool replace, Gen *gen)
     {
       return std::visit(
-          SampleSubsetsCall{reference, query, sampleSize, nInstances, replace, gen},
-          filter, distribution);
+          SpawnPcloudTaskCall{reference, query, out, sampleSize, nInstances, replace, gen}, filter, distribution);
     }
 
-    struct SampleSubsetsDistmatCall
+    struct SpawnDistmatTaskCall
     {
-      const sb::DistanceMatrix<T>& source;
-      const sb::Tensor<uint64_t>& query;
-      size_t sampleSize;
-      size_t nInstances;
-      bool replace;
-      Gen* gen;
+      const sb::DistanceMatrix<T> &source;
+      const sb::Tensor<uint64_t> &query;
+      sb::Tensor<sb::DistanceMatrix<T>> &out;
+      size_t sampleSize = 0;
+      size_t nInstances = 0;
+      bool replace = false;
+      Gen *gen = nullptr;
 
       template <typename DistF>
-      py::tuple operator()(const DistF& distribution) const
+      TaskPtr operator()(const DistF &distribution) const
       {
-        // Same GIL story as SampleSubsetsCall above.
-        auto handle = [&] {
-          py::gil_scoped_release release;
-          return sb::sampling::sample_subsets_distmat(
-              source, query, distribution, sampleSize, nInstances, replace,
-              resolve_generator(gen), sb::default_executor());
-        }();
-        return to_tuple(std::move(handle));
+        using Task = sb::sampling::SubsampleDistMatTask<T, DistF>;
+        return sb_py::execute_stoppable_task<Task>(
+            source, query, NoFilter{}, distribution, out, sampleSize, nInstances, replace, resolve_generator(gen));
       }
     };
 
     /// Distance-matrix input: @p query is a tensor of reference row indices.
     /// The "filter" is inherently the stored distance, so there is no filter
-    /// argument.
-    static py::tuple sample_subsets_distmat(const sb::DistanceMatrix<T>& source,
-                                            const sb::Tensor<uint64_t>& query,
-                                            const DistVariant<T>& distribution,
-                                            size_t sampleSize, size_t nInstances, bool replace,
-                                            Gen* gen)
+    /// argument. Same output contract as the point-cloud spawn.
+    static TaskPtr spawn_subsample_distmat_task(
+        const sb::DistanceMatrix<T> &source, const sb::Tensor<uint64_t> &query, sb::Tensor<sb::DistanceMatrix<T>> &out,
+        const DistVariant<T> &distribution, size_t sampleSize, size_t nInstances, bool replace, Gen *gen)
     {
-      return std::visit(
-          SampleSubsetsDistmatCall{source, query, sampleSize, nInstances, replace, gen},
-          distribution);
+      return std::visit(SpawnDistmatTaskCall{source, query, out, sampleSize, nInstances, replace, gen}, distribution);
     }
 
-    static void register_entry_points(PyClass& cls)
+    static void register_entry_points(PyClass &cls)
     {
-      cls.def_static("sample_subsets", &PySubsampleBindings::sample_subsets,
-          py::arg("reference"), py::arg("query"), py::arg("filter"), py::arg("distribution"),
-          py::arg("sample_size"), py::arg("n_instances"), py::arg("replace"),
-          py::arg("generator").none(true) = py::none());
+      cls.def_static(
+          "spawn_subsample_pcloud_task", &PySubsampleBindings::spawn_subsample_pcloud_task, py::arg("reference"),
+          py::arg("query"), py::arg("out"), py::arg("filter"), py::arg("distribution"), py::arg("sample_size"),
+          py::arg("n_instances"), py::arg("replace"), py::arg("generator").none(true) = py::none());
 
-      cls.def_static("sample_subsets_distmat", &PySubsampleBindings::sample_subsets_distmat,
-          py::arg("source"), py::arg("query"), py::arg("distribution"),
-          py::arg("sample_size"), py::arg("n_instances"), py::arg("replace"),
-          py::arg("generator").none(true) = py::none());
+      cls.def_static(
+          "spawn_subsample_distmat_task", &PySubsampleBindings::spawn_subsample_distmat_task, py::arg("source"),
+          py::arg("query"), py::arg("out"), py::arg("distribution"), py::arg("sample_size"), py::arg("n_instances"),
+          py::arg("replace"), py::arg("generator").none(true) = py::none());
     }
 
     // -------------------------------------------------------------------------
-    // Argument/result adapters
+    // Argument adapters
     // -------------------------------------------------------------------------
 
     /// Resolve the nullable generator argument (Python None -> nullptr) to a
     /// concrete generator, falling back to the global default. Mutable: the
-    /// draw reserves its seed block from the resolved generator, advancing it.
-    static Gen& resolve_generator(Gen* gen)
+    /// spawn reserves the draw's seed block from the resolved generator,
+    /// advancing it.
+    static Gen &resolve_generator(Gen *gen)
     {
-      return gen ? *gen : sb::default_generator();
-    }
-
-    /// Unpack a SubsampleHandle into the (task, samples) pair returned to Python.
-    template <typename ElemT>
-    static py::tuple to_tuple(sb::sampling::SubsampleHandle<ElemT> handle)
-    {
-      return py::make_tuple(std::move(handle.task), std::move(handle.samples));
+      return (gen != nullptr) ? *gen : sb::default_generator();
     }
   };
 
-}
+} // namespace
 
 namespace sb_py
 {
-  void register_sampling_subsample(py::module_& m)
+  void register_sampling_subsample(py::module_ &m)
   {
     PySubsampleBindings<sb::float32_t>::register_bindings(m, "32");
     PySubsampleBindings<sb::float64_t>::register_bindings(m, "64");
   }
-}
+} // namespace sb_py

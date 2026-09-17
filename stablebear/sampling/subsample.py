@@ -8,7 +8,7 @@ from ..async_task import _run_task
 from ..base_tensor import FloatTensor, IntTensor, PointCloudTensor
 from ..distance_matrix import DistanceMatrix, DistanceMatrixTensor
 from ..random import _unwrap
-from ..typing import float32, uint64
+from ..typing import distmat32, distmat64, float32, pcloud32, pcloud64, uint64
 from .distributions import Gaussian, Uniform
 
 cpp_samp = cpp.sampling
@@ -139,16 +139,22 @@ def _subsample_distmat(reference, query, *, sample_size, n_instances, distributi
     query_indices = IntTensor(_reference_indices(query, source.size), dtype=uint64)
     backend = _backend(source.dtype)
 
+    # The task fills `out` in place (allocated to (n_query, n_instances) when it
+    # runs); pass a placeholder and read it back, as the Ripser pipeline does.
+    from ..tensor_create import zeros
+    out = zeros((1,), dtype=distmat32 if source.dtype == float32 else distmat64)
+
     # Fully fused C++ draw: precomputed distances + built-in distribution.
-    task, result = backend.sample_subsets_distmat(
-        source._data, query_indices._data, distribution._descriptor(backend),
-        sample_size, n_instances, replace, _unwrap(generator)
+    task = backend.spawn_subsample_distmat_task(
+        source._data, query_indices._data, out._data,
+        distribution._descriptor(backend), sample_size, n_instances, replace,
+        _unwrap(generator)
     )
     _run_task(lambda: task, verbose=verbose)
 
     if verbose:
-        return _warn_empty_queries(DistanceMatrixTensor(result))
-    return DistanceMatrixTensor(result)
+        return _warn_empty_queries(out)
+    return out
 
 
 def _subsample_pointcloud(reference, query, *, sample_size, n_instances, distribution,
@@ -186,16 +192,21 @@ def _subsample_pointcloud(reference, query, *, sample_size, n_instances, distrib
 
     backend = _backend(reference_cloud.dtype)
 
+    # The task fills `out` in place (allocated to (n_query, n_instances) when it
+    # runs); pass a placeholder and read it back, as the Ripser pipeline does.
+    from ..tensor_create import zeros
+    out = zeros((1,), dtype=pcloud32 if reference_cloud.dtype == float32 else pcloud64)
+
     # Fully fused C++ draw: distances + built-in distribution.
-    task, result = backend.sample_subsets(
-        reference_cloud._data, query_cloud._data, backend.Euclidean(),
+    task = backend.spawn_subsample_pcloud_task(
+        reference_cloud._data, query_cloud._data, out._data, backend.Euclidean(),
         distribution._descriptor(backend), sample_size, n_instances, replace,
         _unwrap(generator)
     )
     _run_task(lambda: task, verbose=verbose)
     if verbose:
-        return _warn_empty_queries(PointCloudTensor(result))
-    return PointCloudTensor(result)
+        return _warn_empty_queries(out)
+    return out
 
 
 def subsample_relative(
