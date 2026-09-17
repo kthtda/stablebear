@@ -5,8 +5,9 @@ import numpy as np
 
 from .. import _sb_cpp as cpp
 from ..async_task import _run_task
-from ..base_tensor import FloatTensor, IntTensor, _get_backend
+from ..base_tensor import FloatTensor, IntTensor, PointCloudTensor, _get_backend
 from ..distance_matrix import DistanceMatrix, DistanceMatrixTensor
+from ..point_cloud import PointCloud
 from ..random import _unwrap
 from ..typing import (
     distmat32,
@@ -18,6 +19,7 @@ from ..typing import (
     uint64,
 )
 from .distributions import Gaussian, Uniform
+from ..tensor_create import zeros
 
 cpp_samp = cpp.sampling
 
@@ -39,6 +41,37 @@ def _as_float_tensor(data, dtype=None):
             return FloatTensor(np.asarray(data), dtype=dtype)
         return data
     return FloatTensor(data, dtype=dtype)
+
+
+def _resolve_reference_cloud(reference):
+    """Resolve a point-cloud reference to a validated 2-D :class:`FloatTensor`.
+
+    A :class:`PointCloud` (including a subsample's indexed view) or a
+    single-cloud :class:`PointCloudTensor` materializes to its coordinates.
+    These, like an explicit ``FloatTensor``, are unambiguously points, so only a
+    raw square ``(n, n)`` array is screened by the square-array ambiguity guard.
+    """
+    explicit_cloud = isinstance(reference, (FloatTensor, PointCloud, PointCloudTensor))
+    if isinstance(reference, PointCloudTensor):
+        if reference.size != 1:
+            raise ValueError(
+                "point-cloud subsampling needs a single reference cloud, but got a "
+                f"PointCloudTensor with {reference.size} clouds."
+            )
+        # Reduce to the lone cloud: a PointCloud (rank >= 1) or, for a 0-d
+        # tensor, already a FloatTensor of its coordinates.
+        reference = reference[(0,) * reference.ndim]
+    if isinstance(reference, PointCloud):
+        reference = reference.materialize()
+    cloud = _as_float_tensor(reference)
+    if cloud.ndim != 2:
+        raise ValueError(
+            "reference must be a 2-D (n_reference, dim) point cloud, but got "
+            f"{cloud.ndim} dimension(s)."
+        )
+    if not explicit_cloud:
+        _reject_ambiguous_square_reference(cloud)
+    return cloud
 
 
 def _as_distance_matrix(reference):
@@ -149,7 +182,6 @@ def _subsample_distmat(reference, query, *, sample_size, n_instances, distributi
 
     # The task fills `out` in place (allocated to (n_query, n_instances) when it
     # runs); pass a placeholder and read it back, as the Ripser pipeline does.
-    from ..tensor_create import zeros
     out = zeros((1,), dtype=distmat32 if source.dtype == float32 else distmat64)
 
     # Fully fused C++ draw: precomputed distances + built-in distribution.
@@ -168,25 +200,14 @@ def _subsample_distmat(reference, query, *, sample_size, n_instances, distributi
 def _subsample_pointcloud(reference, query, *, sample_size, n_instances, distribution,
                           replace, generator, verbose):
     """Point-cloud path of :func:`subsample_relative` (see its docstring)."""
-    # An explicit FloatTensor declares "rows are points"; only raw arrays are
-    # screened by the square-array ambiguity guard.
-    explicit_cloud = isinstance(reference, FloatTensor)
-    reference_cloud = _as_float_tensor(reference)
-    if reference_cloud.ndim != 2:
-        raise ValueError(
-            "reference must be a 2-D (n_reference, dim) point cloud, but got "
-            f"{reference_cloud.ndim} dimension(s)."
-        )
-    if not explicit_cloud:
-        _reject_ambiguous_square_reference(reference_cloud)
-    if query is None:
-        query_tensor = reference_cloud
-    elif _query_is_indices(query):
-        # Query points selected by their order in the reference cloud. The
-        # validated indices go to C++ as-is (the C++ task reads the query
-        # coordinates from the reference); only index normalization happens here.
-        row_indices = _reference_indices(query, reference_cloud.shape[0])
-        query_tensor = IntTensor(row_indices, dtype=uint64)
+    # A PointCloud or single-cloud PointCloudTensor (e.g. a subsample fed back
+    # in) resolves to a 2-D FloatTensor of coordinates.
+    reference_cloud = _resolve_reference_cloud(reference)
+
+    # None or a 1-D integer array selects reference rows (the C++ task reads
+    # their coordinates from the reference); a 2-D array gives query coordinates.
+    if query is None or _query_is_indices(query):
+        query_tensor = IntTensor(_reference_indices(query, reference_cloud.shape[0]), dtype=uint64)
     else:
         query_tensor = _as_float_tensor(query, dtype=reference_cloud.dtype)
         if query_tensor.ndim != 2:
@@ -201,7 +222,6 @@ def _subsample_pointcloud(reference, query, *, sample_size, n_instances, distrib
 
     # The task fills `out` in place (allocated to (n_query, n_instances) when it
     # runs); pass a placeholder and read it back, as the Ripser pipeline does.
-    from ..tensor_create import zeros
     out = zeros((1,), dtype=pcloud32 if reference_cloud.dtype == float32 else pcloud64)
 
     # Fully fused C++ draw: distances + built-in distribution.
@@ -244,11 +264,15 @@ def subsample_relative(
 
     Parameters
     ----------
-    reference : array_like, FloatTensor, DistanceMatrix, or DistanceMatrixTensor
+    reference : array_like, FloatTensor, PointCloud, PointCloudTensor, DistanceMatrix, or DistanceMatrixTensor
         The reference point cloud, shape ``(n_reference, dim)``, or a
-        precomputed distance matrix over the reference points. A raw square
-        ``(n, n)`` array is ambiguous between the two and is rejected: wrap
-        it in :class:`~stablebear.DistanceMatrix` (or a one-element
+        precomputed distance matrix over the reference points. A
+        :class:`~stablebear.PointCloud` (or a one-element
+        :class:`~stablebear.PointCloudTensor`) is taken as a point cloud —
+        so a subsample can be fed straight back in as the reference. A raw
+        square ``(n, n)`` array is ambiguous between a point cloud and a
+        distance matrix and is rejected: wrap it in
+        :class:`~stablebear.DistanceMatrix` (or a one-element
         :class:`~stablebear.DistanceMatrixTensor`) to subsample by stored
         distances, or in :class:`~stablebear.FloatTensor` to subsample its
         rows as points.
