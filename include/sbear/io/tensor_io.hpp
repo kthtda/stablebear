@@ -204,31 +204,33 @@ namespace sb::io::detail
       std::ostream& os, const Tensor<ElemT>& tensor, SourceKeyF sourceKey, WriteSourceF writeSource)
   {
     using KeyT = decltype(sourceKey(std::declval<const ElemT&>()));
-    std::unordered_map<KeyT, uint64_t> idOf;
-    std::vector<const ElemT*> sources;
 
     auto sz = tensor.size();
     const auto* data = tensor.data();
-    std::vector<uint64_t> sourceId(sz);
+
+    // Assign each distinct source an id in first-appearance order...
+    std::unordered_map<KeyT, uint64_t> idOf;
+    std::vector<const ElemT*> sources;
     for (auto k = 0_uz; k < sz; ++k)
     {
-      auto [it, inserted] = idOf.try_emplace(sourceKey(data[k]), static_cast<uint64_t>(sources.size()));
-      if (inserted)
+      if (!idOf.contains(sourceKey(data[k])))
       {
+        idOf.emplace(sourceKey(data[k]), static_cast<uint64_t>(sources.size()));
         sources.push_back(&data[k]);
       }
-      sourceId[k] = it->second;
     }
 
+    // ...write the source block...
     write_bytes<uint64_t>(os, static_cast<uint64_t>(sources.size()));
     for (const ElemT* src : sources)
     {
       writeSource(os, *src);
     }
 
+    // ...then every element as a reference to its source.
     for (auto k = 0_uz; k < sz; ++k)
     {
-      write_bytes<uint64_t>(os, sourceId[k]);
+      write_bytes<uint64_t>(os, idOf.at(sourceKey(data[k])));
       write_bytes<bool>(os, data[k].is_indexed());
       if (data[k].is_indexed())
       {

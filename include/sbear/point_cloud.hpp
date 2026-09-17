@@ -8,6 +8,7 @@
 #include "tensor.hpp"
 
 #include <type_traits>
+#include <unordered_map>
 #include <vector>
 
 namespace sb
@@ -159,14 +160,42 @@ namespace sb
   /**
    * Cast a tensor of point clouds (Tensor<PointCloud<U>>) to a different precision
    * (Tensor<PointCloud<T>>), converting each point cloud's coordinates.
+   *
+   * Sharing carries over: each distinct coordinate buffer is cast once
+   * (deduplicated by buffer address, as in the io layer) and indexed views are
+   * rebuilt on top of the cast source with their own index arrays. Casting cell
+   * by cell through materialize() would instead expand every view into a full
+   * private copy of its source -- exactly the storage blow-up that indexed
+   * subsample tensors exist to avoid.
    */
   template <typename T, typename U>
   requires std::is_constructible_v<T, U>
   [[nodiscard]] Tensor<PointCloud<T>> pcloud_cast(const Tensor<PointCloud<U>>& src)
   {
     Tensor<PointCloud<T>> result(src.shape());
+
+    // Cast each distinct source buffer once...
+    std::unordered_map<const U*, Tensor<T>> castSources;
     walk(src, [&](const std::vector<size_t>& idx) {
-      result(idx) = PointCloud<T>(tensor_cast<T>(src(idx).materialize()));
+      const Tensor<U>& coords = src(idx).coords();
+      if (!castSources.contains(coords.data()))
+      {
+        castSources.emplace(coords.data(), tensor_cast<T>(coords));
+      }
+    });
+
+    // ...then rebuild every cell on its shared cast source.
+    walk(src, [&](const std::vector<size_t>& idx) {
+      const PointCloud<U>& cloud = src(idx);
+      const Tensor<T>& source = castSources.at(cloud.coords().data());
+      if (cloud.is_indexed())
+      {
+        result(idx) = PointCloud<T>(source, cloud.indices().copy());
+      }
+      else
+      {
+        result(idx) = PointCloud<T>(source);
+      }
     });
     return result;
   }
