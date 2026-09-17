@@ -46,6 +46,27 @@ def _as_distance_matrix(reference):
     return reference[(0,) * reference.ndim]
 
 
+def _reject_ambiguous_square_reference(reference_cloud):
+    """Raise if an implicit point-cloud reference is a square (n, n) array.
+
+    A square array is ambiguous: n points in n dimensions, or a precomputed
+    distance matrix over n points. Reading a distance matrix as a point cloud
+    silently computes something different (Euclidean distances *between the
+    matrix rows*) at O(n^3) cost, so square references must declare their
+    meaning via one of the two wrappers named in the error.
+    """
+    n_points, dim = reference_cloud.shape
+    if n_points != dim:
+        return
+    raise ValueError(
+        f"reference is a square ({n_points}, {n_points}) array, which is "
+        "ambiguous: it could be a point cloud or a precomputed distance "
+        "matrix. Wrap it in stablebear.DistanceMatrix.from_dense(...) to "
+        "subsample by the stored distances, or in stablebear.FloatTensor(...) "
+        "to subsample its rows as points."
+    )
+
+
 def _query_is_indices(query):
     """Whether ``query`` is a 1-D integer array of reference indices (vs 2-D
     coordinates). ``None`` (all reference points) is not indices."""
@@ -133,12 +154,17 @@ def _subsample_distmat(reference, query, *, sample_size, n_instances, distributi
 def _subsample_pointcloud(reference, query, *, sample_size, n_instances, distribution,
                           replace, generator, verbose):
     """Point-cloud path of :func:`subsample_relative` (see its docstring)."""
+    # An explicit FloatTensor declares "rows are points"; only raw arrays are
+    # screened by the square-array ambiguity guard.
+    explicit_cloud = isinstance(reference, FloatTensor)
     reference_cloud = _as_float_tensor(reference)
     if reference_cloud.ndim != 2:
         raise ValueError(
             "reference must be a 2-D (n_reference, dim) point cloud, but got "
             f"{reference_cloud.ndim} dimension(s)."
         )
+    if not explicit_cloud:
+        _reject_ambiguous_square_reference(reference_cloud)
     if query is None:
         query_cloud = reference_cloud
     elif _query_is_indices(query):
@@ -202,7 +228,12 @@ def subsample_relative(
     ----------
     reference : array_like, FloatTensor, DistanceMatrix, or DistanceMatrixTensor
         The reference point cloud, shape ``(n_reference, dim)``, or a
-        precomputed distance matrix over the reference points.
+        precomputed distance matrix over the reference points. A raw square
+        ``(n, n)`` array is ambiguous between the two and is rejected: wrap
+        it in :class:`~stablebear.DistanceMatrix` (or a one-element
+        :class:`~stablebear.DistanceMatrixTensor`) to subsample by stored
+        distances, or in :class:`~stablebear.FloatTensor` to subsample its
+        rows as points.
     query : array_like, optional
         A 1-D integer array of reference indices (negative indices count from
         the end, as in NumPy), or a 2-D ``(n_query, dim)`` array of

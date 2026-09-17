@@ -99,6 +99,17 @@ result is a :class:`~stablebear.DistanceMatrixTensor`, which the
 :doc:`persistent homology pipeline <persistence>` accepts just like point
 clouds.
 
+The wrapper is not optional: a raw square :math:`(n, n)` array passed as the
+reference is rejected with a :class:`ValueError`, because it is ambiguous --
+:math:`n` points in :math:`n` dimensions, or a distance matrix over :math:`n`
+points? Reading a distance matrix as a point cloud silently computes
+something different (Euclidean distances *between the matrix rows*) at
+:math:`O(n^3)` cost, so a square reference must declare its meaning::
+
+   sb.subsample_relative(D, ...)                # ValueError: ambiguous
+   sb.subsample_relative(sb.DistanceMatrix.from_dense(D), ...)  # distances
+   sb.subsample_relative(sb.FloatTensor(D), ...)                # coordinates
+
 :class:`~stablebear.DistanceMatrix` stores its symmetric, zero-diagonal matrix
 in compressed form -- :math:`n(n-1)/2` entries instead of :math:`n^2` (see
 :doc:`distances`) -- and each subsample is an index view sharing the reference
