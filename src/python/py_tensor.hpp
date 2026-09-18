@@ -264,6 +264,16 @@ namespace sb_py
     if constexpr (sb::is_point_cloud_v<T>)
     {
       using ScalarT = typename T::value_type;
+      // Internal structural access that preserves indexed storage. Public
+      // PointCloudTensor element access continues to materialize coordinates.
+      cls.def("_get_point_cloud", [](const TTensor& self, const std::vector<size_t>& index) -> const T& {
+        assert_valid_index(self, index);
+        return self(index);
+      }, pybind11::return_value_policy::reference_internal);
+      cls.def("_get_point_cloud", [](const TTensor& self, size_t index) -> const T& {
+        assert_valid_index(self, index);
+        return self(index);
+      }, pybind11::return_value_policy::reference_internal);
       cls.def("_set_element", [](TTensor& self, const std::vector<size_t>& index, const sb::Tensor<ScalarT>& val) {
         assert_valid_index(self, index);
         // T(val) shares val's coordinate buffer; store_copy makes the stored cell

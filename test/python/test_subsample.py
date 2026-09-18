@@ -1,6 +1,7 @@
 """Acceptance tests for uniform point-cloud subsampling (issue #229)."""
 
 import numpy as np
+import numpy.testing as npt
 import pytest
 
 import stablebear as sb
@@ -156,6 +157,15 @@ class TestSubsample:
             n_samples=2,
             generator=sb.random.Generator(seed=229),
         )
+
+        for index in np.ndindex(*actual.shape):
+            sampled = actual._data._get_point_cloud(list(index))
+            assert sampled.is_indexed
+
+            indices = np.asarray(sampled.indices).copy()
+            coordinates = np.asarray(sampled.coords).copy()
+            npt.assert_array_equal(coordinates, clouds[index[0]])
+            npt.assert_array_equal(np.asarray(actual[index]), coordinates[indices])
 
         assert_point_cloud_tensor_sizes(
             points,
