@@ -1,7 +1,6 @@
 #include "py_tensor.hpp"
 
 #include <sbear/tensor.hpp>
-#include <sbear/point_cloud.hpp>
 #include <sbear/functional/pcf.hpp>
 
 #include <sstream>
@@ -107,34 +106,21 @@ namespace
     tc.template operator()<sb::Pcf_i64, sb::Pcf_i32>("cast_pcf32i_pcf64i");
     tc.template operator()<sb::Pcf_i32, sb::Pcf_i64>("cast_pcf64i_pcf32i");
 
-    // PointCloud precision: Tensor<Tensor<float>> <-> Tensor<Tensor<double>>
-    m.def("cast_pcloud32_pcloud64", [](const sb::Tensor<sb::PointCloud<sb::float32_t>>& src) {
-      return sb::pcloud_cast<sb::float64_t>(src);
-    });
-    m.def("cast_pcloud64_pcloud32", [](const sb::Tensor<sb::PointCloud<sb::float64_t>>& src) {
-      return sb::pcloud_cast<sb::float32_t>(src);
-    });
-
   }
 
-  // Internal binding for point-cloud tensor elements. Python PointCloudTensor
-  // indexing still materializes and returns FloatTensor, preserving the public API.
   template <typename T>
-  void register_point_cloud_element(py::module_& m, const std::string& suffix)
+  void register_nested_tensor_element(py::module_& m, const std::string& suffix)
   {
-    using PC = sb::PointCloud<T>;
-    py::class_<PC>(m, ("PointCloud" + suffix).c_str())
+    using Nested = sb::NestedTensor<T>;
+    py::class_<Nested>(m, ("Nested" + suffix).c_str())
         .def(py::init<const sb::Tensor<T>&>())
-        // Indexed view over source rows. This class is an internal caster; the
-        // public PointCloudTensor indexing API still returns FloatTensor.
-        .def(py::init<const sb::Tensor<T>&, sb::Tensor<sb::uint64_t>>())
-        .def_property_readonly("n_points", &PC::n_points)
-        .def_property_readonly("n_dims", &PC::dim)
-        .def_property_readonly("is_indexed", &PC::is_indexed)
-        .def_property_readonly("indices", &PC::indices)
-        .def_property_readonly("coords", &PC::coords)
-        .def("materialize", &PC::materialize)
-        .def("copy", &PC::copy, py::arg("keep_source") = true);
+        .def(py::init<const typename Nested::nested_tensor_type&, size_t>(),
+             py::arg("tensor"), py::arg("child_depth") = 0)
+        .def_property_readonly("is_leaf", &Nested::is_leaf)
+        .def_property_readonly("depth", &Nested::depth)
+        .def_property_readonly("leaf", &Nested::leaf)
+        .def_property_readonly("nested", &Nested::nested)
+        .def("copy", &Nested::copy);
   }
 
 }
@@ -154,17 +140,24 @@ namespace sb_py
     register_typed_tensor_bindings<sb::int64_t>(m, "Int64", "");
     register_typed_tensor_bindings<uint32_t>(m, "Uint32", "");
     register_typed_tensor_bindings<uint64_t>(m, "Uint64", "");
-    register_typed_tensor_bindings<sb::Tensor<uint64_t>>(m, "Index", "");
+
+    register_nested_tensor_element<sb::float32_t>(m, "Float32");
+    register_typed_tensor_bindings<sb::NestedTensor<sb::float32_t>>(m, "NestedFloat32", "");
+    register_nested_tensor_element<sb::float64_t>(m, "Float64");
+    register_typed_tensor_bindings<sb::NestedTensor<sb::float64_t>>(m, "NestedFloat64", "");
+    register_nested_tensor_element<sb::int32_t>(m, "Int32");
+    register_typed_tensor_bindings<sb::NestedTensor<sb::int32_t>>(m, "NestedInt32", "");
+    register_nested_tensor_element<sb::int64_t>(m, "Int64");
+    register_typed_tensor_bindings<sb::NestedTensor<sb::int64_t>>(m, "NestedInt64", "");
+    register_nested_tensor_element<uint32_t>(m, "Uint32");
+    register_typed_tensor_bindings<sb::NestedTensor<uint32_t>>(m, "NestedUint32", "");
+    register_nested_tensor_element<uint64_t>(m, "Uint64");
+    register_typed_tensor_bindings<sb::NestedTensor<uint64_t>>(m, "NestedUint64", "");
 
     register_typed_tensor_bindings<sb::Pcf_f32>(m, "Pcf32", "");
     register_typed_tensor_bindings<sb::Pcf_f64>(m, "Pcf64", "");
     register_typed_tensor_bindings<sb::Pcf_i32>(m, "Pcf32i", "");
     register_typed_tensor_bindings<sb::Pcf_i64>(m, "Pcf64i", "");
 
-    register_typed_tensor_bindings<sb::PointCloud<sb::float32_t>>(m, "PointCloud32", "");
-    register_typed_tensor_bindings<sb::PointCloud<sb::float64_t>>(m, "PointCloud64", "");
-
-    register_point_cloud_element<sb::float32_t>(m, "32");
-    register_point_cloud_element<sb::float64_t>(m, "64");
   }
 }

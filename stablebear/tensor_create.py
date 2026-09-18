@@ -1,15 +1,16 @@
 from . import _sb_cpp as cpp
-from ._tensor_base import Shape, ShapeLike
+from ._tensor_base import Shape, ShapeLike, Tensor
 from .base_tensor import (
     BoolTensor,
     FloatTensor,
     IntPcfTensor,
     IntTensor,
     PcfTensor,
-    PointCloudTensor,
     _first_pcf,
     _to_tensor_pcf,
 )
+from .nested_tensor import NestedTensor
+from .point_cloud import PointCloudTensor
 from .typing import (
     Dtype,
     _assert_valid_dtype,
@@ -138,6 +139,16 @@ def tensor(data, dtype: Dtype = None):
     -------
     Tensor
     """
+    def contains_tensor(value):
+        if isinstance(value, Tensor):
+            return True
+        return isinstance(value, (list, tuple)) and any(
+            contains_tensor(child) for child in value
+        )
+
+    if isinstance(data, (list, tuple)) and contains_tensor(data):
+        return NestedTensor(data, dtype=dtype)
+
     if dtype is None:
         if _first_pcf(data) is not None:
             return _to_tensor_pcf(data)

@@ -5,6 +5,7 @@
 #include "barcode_io.hpp"
 #include "compressed_matrix_io.hpp"
 #include "../tensor.hpp"
+#include "../nested_tensor.hpp"
 #include "../point_cloud.hpp"
 #include "../functional/pcf.hpp"
 #include "../persistence/barcode.hpp"
@@ -48,7 +49,12 @@ namespace sb::io::detail
       Tensor<uint64_t>,
       Tensor<bool>,
 
-      Tensor<Tensor<uint64_t>>,
+      Tensor<NestedTensor<float32_t>>,
+      Tensor<NestedTensor<float64_t>>,
+      Tensor<NestedTensor<int32_t>>,
+      Tensor<NestedTensor<int64_t>>,
+      Tensor<NestedTensor<uint32_t>>,
+      Tensor<NestedTensor<uint64_t>>,
 
       Tensor<Pcf<float32_t, float32_t>>,
       Tensor<Pcf<float64_t, float64_t>>,
@@ -117,7 +123,16 @@ namespace sb::io::detail
 
     else if constexpr (std::is_same_v<T, bool>)     { return TensorFormat{ .baseFormat = 4, .subFormat = 8 }; }
 
-    else if constexpr (std::is_same_v<T, Tensor<uint64_t>>) { return TensorFormat{ .baseFormat = 5, .subFormat = 64 }; }
+    // (5, 64) is the original uint64 nested-tensor tag and remains unchanged.
+    // New nested leaf types use 500 + the leaf tensor's base format so their
+    // signedness/kind and width are both represented without a format-version
+    // change (for example, nested float32 is (501, 32)).
+    else if constexpr (std::is_same_v<T, NestedTensor<uint64_t>>) { return TensorFormat{ .baseFormat = 5, .subFormat = 64 }; }
+    else if constexpr (is_nested_tensor_v<T>)
+    {
+      const auto leafFormat = tensorFormat<typename is_nested_tensor<T>::leaf_type>();
+      return TensorFormat{ .baseFormat = 500 + leafFormat.baseFormat, .subFormat = leafFormat.subFormat };
+    }
 
     else if constexpr (std::is_same_v<T, Pcf<float32_t, float32_t>>) { return TensorFormat{ .baseFormat = 100, .subFormat = 32 }; }
     else if constexpr (std::is_same_v<T, Pcf<float64_t, float64_t>>) { return TensorFormat{ .baseFormat = 100, .subFormat = 64 }; }
@@ -163,6 +178,24 @@ namespace sb::io::detail
 
   template <typename T>
   Tensor<T> read_tensor(std::istream& is);
+
+  template <typename T>
+  NestedTensor<T> read_nested_tensor_element(std::istream& is);
+
+  template <typename T>
+  void write_element(std::ostream& os, const NestedTensor<T>& value)
+  {
+    write_bytes<uint64_t>(os, static_cast<uint64_t>(value.depth()));
+    write_bytes<bool>(os, value.is_leaf());
+    if (value.is_leaf())
+    {
+      write_tensor(os, value.leaf());
+    }
+    else
+    {
+      write_tensor(os, value.nested());
+    }
+  }
 
   inline TensorFormat read_tensor_format(std::istream& is)
   {
@@ -244,9 +277,9 @@ namespace sb::io::detail
   template <typename T>
   size_t serialized_tensor_size(const Tensor<T>& tensor)
   {
-    if constexpr (std::is_same_v<T, Tensor<uint64_t>>)
+    if constexpr (is_nested_tensor_v<T>)
     {
-      // A scalar IndexTensor has one selection even though Tensor::size()
+      // A scalar nested tensor has one element even though Tensor::size()
       // reports zero for a rank-0 tensor.
       if (tensor.shape().empty())
       {
@@ -282,13 +315,6 @@ namespace sb::io::detail
       auto sz = serialized_tensor_size(tensor);
       for (auto const * elem = tensor.data(); elem != tensor.data() + sz; ++elem)
       {
-        if constexpr (std::is_same_v<value_type, Tensor<uint64_t>>)
-        {
-          if (elem->rank() != 1)
-          {
-            throw std::runtime_error("IndexTensor selections must have rank 1");
-          }
-        }
         write_element(os, *elem);
       }
     }
@@ -342,20 +368,41 @@ namespace sb::io::detail
         // Legacy (baseFormat 1000) point cloud tensors: every element is a full
         // nested coordinate tensor.
         *elem = T(read_element<Tensor<typename is_point_cloud<T>::scalar_type>>(is));
+      else if constexpr (is_nested_tensor_v<T>)
+        *elem = read_nested_tensor_element<typename is_nested_tensor<T>::leaf_type>(is);
       else
       {
         *elem = read_element<T>(is);
-        if constexpr (std::is_same_v<T, Tensor<uint64_t>>)
-        {
-          if (elem->rank() != 1)
-          {
-            throw std::runtime_error("IndexTensor selections must have rank 1");
-          }
-        }
       }
     }
 
     return ret;
+  }
+
+  template <typename T>
+  NestedTensor<T> read_nested_tensor_element(std::istream& is)
+  {
+    const size_t depth = static_cast<size_t>(read_bytes<uint64_t>(is));
+    const bool isLeaf = read_bytes<bool>(is);
+    if (isLeaf)
+    {
+      if (depth != 1)
+      {
+        throw std::runtime_error("Invalid leaf depth in nested tensor");
+      }
+      return NestedTensor<T>(read_element<Tensor<T>>(is));
+    }
+    if (depth < 2)
+    {
+      throw std::runtime_error("Invalid nested tensor depth");
+    }
+    auto children = read_element<Tensor<NestedTensor<T>>>(is);
+    NestedTensor<T> result(std::move(children), depth - 1);
+    if (result.depth() != depth)
+    {
+      throw std::runtime_error("Nested tensor depth does not match its children");
+    }
+    return result;
   }
 
   // Shared reader for the shared-source tensor formats (see

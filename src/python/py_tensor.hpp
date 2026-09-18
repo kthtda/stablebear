@@ -9,6 +9,7 @@
 #include <pybind11/numpy.h>
 
 #include <sbear/tensor.hpp>
+#include <sbear/nested_tensor.hpp>
 #include <sbear/point_cloud.hpp>
 #include <sbear/concepts.hpp>
 #include <sbear/functional/pcf.hpp>
@@ -134,6 +135,78 @@ namespace sb_py
     }
   }
 
+  template <typename TTensor>
+  void bind_tensor_view_operations(pybind11::class_<TTensor>& cls)
+  {
+    cls
+      .def_property_readonly("shape", [](const TTensor& self){ return Shape{self.shape()}; })
+      .def_property_readonly("strides", [](const TTensor& self){ return self.strides(); })
+      .def_property_readonly("offset", [](const TTensor& self) {
+        if constexpr (TTensor::IsIndexed)
+          return ptrdiff_t{0};
+        else
+          return self.offset();
+      })
+      .def("__getitem__", [](const TTensor& self, const std::vector<sb::Slice>& slices) {
+        return self[slices];
+      })
+      .def("copy", &TTensor::copy)
+      .def("flatten", &TTensor::flatten)
+      .def("reshape", &TTensor::reshape)
+      .def("transpose", &TTensor::transpose, pybind11::arg("axes") = std::vector<size_t>{})
+      .def("swapaxes", &TTensor::swapaxes, pybind11::arg("axis1"), pybind11::arg("axis2"))
+      .def("squeeze", [](const TTensor& self) { return self.squeeze(); })
+      .def("squeeze", [](const TTensor& self, size_t axis) { return self.squeeze(axis); }, pybind11::arg("axis"))
+      .def("expand_dims", &TTensor::expand_dims, pybind11::arg("axis"))
+      .def("broadcast_to", [](const TTensor& self, const std::vector<size_t>& shape) {
+        return self.broadcast_to(shape);
+      })
+      .def("is_contiguous", &TTensor::is_contiguous);
+  }
+
+  template <typename T, sb::TensorProperties Properties>
+  requires sb::IndexedTensorProperties<Properties> && sb::IndexableTensorElement<T>
+  void register_indexed_tensor_bindings(pybind11::module_& m, const std::string& name)
+  {
+    using TTensor = sb::Tensor<T, Properties>;
+    pybind11::class_<TTensor> cls(m, name.c_str());
+    bind_tensor_view_operations(cls);
+
+    cls
+      .def("_get_element", [](const TTensor& self, const std::vector<size_t>& index) {
+        assert_valid_index(self, index);
+        if constexpr (sb::is_point_cloud_v<T>)
+          return self(index).materialize().copy();
+        else
+          return self(index);
+      })
+      .def("_get_element", [](const TTensor& self, size_t index) {
+        assert_valid_index(self, index);
+        if constexpr (sb::is_point_cloud_v<T>)
+          return self(index).materialize().copy();
+        else
+          return self(index);
+      })
+      .def("materialize", &TTensor::materialize);
+
+    if constexpr (sb::is_point_cloud_v<T>)
+    {
+      cls
+        .def("_get_point_cloud", [](const TTensor& self, const std::vector<size_t>& index) {
+          assert_valid_index(self, index);
+          return self(index);
+        })
+        .def("_get_point_cloud", [](const TTensor& self, size_t index) {
+          assert_valid_index(self, index);
+          return self(index);
+        })
+        .def("_index_points", [](const TTensor& self,
+            const sb::Tensor<sb::NestedTensor<uint64_t>>& selections) {
+          return sb::make_indexed_tensor(self.materialize(), selections);
+        });
+    }
+  }
+
   template <typename T>
   void register_typed_tensor_bindings(pybind11::module_& m, const std::string& prefix, const std::string& suffix)
   {
@@ -178,6 +251,8 @@ namespace sb_py
       }
     }();
 
+    bind_tensor_view_operations(cls);
+
     cls
       .def(pybind11::init([](const Shape& shape)
         {
@@ -188,14 +263,6 @@ namespace sb_py
         {
           return TTensor(shape.data, init);
         }))
-
-      .def_property_readonly("shape", [](const TTensor& self){ return Shape{self.shape()}; })
-      .def_property_readonly("strides", [](const TTensor& self){ return self.strides(); })
-      .def_property_readonly("offset", [](const TTensor& self){ return self.offset(); })
-
-      .def("__getitem__", [](const TTensor& self, const std::vector<sb::Slice>& slices) {
-          return self[slices];
-        })
 
       .def("__setitem__", [](TTensor& self, const std::vector<sb::Slice>& slices, const TTensor& vals) {
           self[slices].assign_from(vals);
@@ -232,14 +299,6 @@ namespace sb_py
           self(index) = sb::detail::store_copy(val);
         })
 
-      .def("copy", &TTensor::copy)
-      .def("flatten", &TTensor::flatten)
-      .def("reshape", &TTensor::reshape)
-      .def("transpose", &TTensor::transpose, pybind11::arg("axes") = std::vector<size_t>{})
-      .def("swapaxes", &TTensor::swapaxes, pybind11::arg("axis1"), pybind11::arg("axis2"))
-      .def("squeeze", [](const TTensor& self) { return self.squeeze(); })
-      .def("squeeze", [](const TTensor& self, size_t axis) { return self.squeeze(axis); }, pybind11::arg("axis"))
-      .def("expand_dims", &TTensor::expand_dims, pybind11::arg("axis"))
       .def_static("concatenate", [](const std::vector<TTensor>& tensors, size_t axis) {
         return sb::concatenate(tensors, axis);
       }, pybind11::arg("tensors"), pybind11::arg("axis") = 0)
@@ -255,17 +314,16 @@ namespace sb_py
       .def_static("array_split", [](const TTensor& tensor, size_t n_sections, size_t axis) {
         return sb::array_split(tensor, n_sections, axis);
       }, pybind11::arg("tensor"), pybind11::arg("n_sections"), pybind11::arg("axis") = 0)
-      .def("is_contiguous", &TTensor::is_contiguous)
     ;
 
     // For a tensor of point clouds, assigning a plain coordinate tensor wraps it
-    // as a materialized PointCloud element. Element reads above detach indexed
-    // storage locally and return its coordinates as the existing FloatTensor API.
+    // as a materialized PointCloud element. The generic element-read overloads
+    // remain available to code paths that explicitly request coordinates.
     if constexpr (sb::is_point_cloud_v<T>)
     {
       using ScalarT = typename T::value_type;
-      // Internal structural access that preserves indexed storage. Public
-      // PointCloudTensor element access continues to materialize coordinates.
+      // Structural access for the Python PointCloud facade. This preserves an
+      // indexed cloud until the facade actually reads or writes coordinates.
       cls.def("_get_point_cloud", [](const TTensor& self, const std::vector<size_t>& index) -> const T& {
         assert_valid_index(self, index);
         return self(index);
@@ -274,6 +332,9 @@ namespace sb_py
         assert_valid_index(self, index);
         return self(index);
       }, pybind11::return_value_policy::reference_internal);
+      cls.def("_index_points", [](const TTensor& self, const sb::Tensor<sb::NestedTensor<uint64_t>>& selections) {
+        return sb::make_indexed_tensor(self, selections);
+      });
       cls.def("_set_element", [](TTensor& self, const std::vector<size_t>& index, const sb::Tensor<ScalarT>& val) {
         assert_valid_index(self, index);
         // T(val) shares val's coordinate buffer; store_copy makes the stored cell
@@ -338,8 +399,6 @@ namespace sb_py
         .def("__itruediv__", [](TTensor& self, const TTensor& rhs) -> TTensor& { self /= rhs; return self; })
       ;
     }
-
-    cls.def("broadcast_to", [](const TTensor& self, const std::vector<size_t>& shape){ return self.broadcast_to(shape); });
 
     // Masked operations
     cls.def("masked_select", [](const TTensor& self, const sb::Tensor<bool>& mask) {

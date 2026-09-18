@@ -23,13 +23,20 @@ CppTensor = Union[
     cpp.Int64Tensor,
     cpp.Uint32Tensor,
     cpp.Uint64Tensor,
-    cpp.IndexTensor,
+    cpp.NestedFloat32Tensor,
+    cpp.NestedFloat64Tensor,
+    cpp.NestedInt32Tensor,
+    cpp.NestedInt64Tensor,
+    cpp.NestedUint32Tensor,
+    cpp.NestedUint64Tensor,
     cpp.Pcf32Tensor,
     cpp.Pcf64Tensor,
     cpp.Pcf32iTensor,
     cpp.Pcf64iTensor,
     cpp.PointCloud32Tensor,
     cpp.PointCloud64Tensor,
+    cpp._IndexedPointCloud32Tensor,
+    cpp._IndexedPointCloud64Tensor,
     cpp.BoolTensor,
 ]
 
@@ -564,7 +571,8 @@ class Tensor(ABC):
     def _basic_setitem(self, entries, val):
         """Assign using only ints and slices (negatives resolved, bounds checked)."""
         import numpy as np
-        from .base_tensor import FloatTensor, NumericTensor, PointCloudTensor
+        from .base_tensor import FloatTensor, NumericTensor
+        from .point_cloud import PointCloudTensor
 
         if (len(entries) == self.ndim
                 and all(isinstance(s, int) for s in entries)):

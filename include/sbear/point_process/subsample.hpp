@@ -7,6 +7,7 @@
 #include "../walk.hpp"
 
 #include <algorithm>
+#include <functional>
 #include <numeric>
 #include <random>
 #include <stdexcept>
@@ -107,7 +108,7 @@ namespace sb::pp
   }
 
   template <ArithmeticType T>
-  Tensor<PointCloud<T>> subsample(
+  Tensor<PointCloud<T>, TensorProperty::Indexed> subsample(
       const Tensor<PointCloud<T>>& points, size_t nPoints, size_t nSamples, bool replace, bool allowPartial,
       bool discardDuplicates, DefaultRandomGenerator& gen, Executor& exec)
   {
@@ -139,12 +140,17 @@ namespace sb::pp
 
     std::vector<size_t> outputShape(points.shape().begin(), points.shape().end());
     outputShape.push_back(nSamples);
-    Tensor<PointCloud<T>> result(outputShape);
-    const auto seedBlock = gen.reserve(result.size());
+    Tensor<PointCloud<T>> source(points.shape());
+    Tensor<NestedTensor<uint64_t>> selections(outputShape);
+    const size_t nOutputs = std::accumulate(
+      outputShape.begin(), outputShape.end(), size_t{1}, std::multiplies<size_t>());
+    const auto seedBlock = gen.reserve(nOutputs);
 
     parallel_walk(points, [&](const std::vector<size_t>& inputIndex) {
       const PointCloud<T>& input = points(inputIndex);
       Tensor<T> coordinates = detail::copy_logical_coordinates(input);
+      source(inputIndex) = PointCloud<T>(std::move(coordinates));
+      const Tensor<T>& sourceCoordinates = source(inputIndex).coords();
       const size_t available = input.n_points();
       const size_t count = replace
           ? (available == 0 ? size_t(0) : nPoints)
@@ -164,14 +170,14 @@ namespace sb::pp
         Tensor<uint64_t> indices = detail::draw_uniform_indices(available, count, replace, engine);
         if (discardDuplicates)
         {
-          indices = detail::discard_duplicate_coordinates(coordinates, indices);
+          indices = detail::discard_duplicate_coordinates(sourceCoordinates, indices);
         }
         outputIndex.back() = sample;
-        result(outputIndex) = PointCloud<T>(coordinates, std::move(indices));
+        selections(outputIndex) = NestedTensor<uint64_t>(std::move(indices));
       }
     }, exec);
 
-    return result;
+    return make_indexed_tensor(source, selections);
   }
 }
 

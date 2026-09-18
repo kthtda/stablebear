@@ -3,6 +3,7 @@
 #include <string_view>
 
 #include <sbear/tensor.hpp>
+#include <sbear/nested_tensor.hpp>
 #include <sbear/io.hpp>
 
 #include <pybind11/stl.h>
@@ -61,7 +62,12 @@ namespace sb_py
         .def_static("save_uint32_tensor",        &IoOps::save_tensor_to_file<sb::uint32_t>)
         .def_static("save_uint64_tensor",        &IoOps::save_tensor_to_file<sb::uint64_t>)
         .def_static("save_bool_tensor",          &IoOps::save_tensor_to_file<bool>)
-        .def_static("save_index_tensor",         &IoOps::save_tensor_to_file<sb::Tensor<sb::uint64_t>>)
+        .def_static("save_nested_float32_tensor", &IoOps::save_tensor_to_file<sb::NestedTensor<sb::float32_t>>)
+        .def_static("save_nested_float64_tensor", &IoOps::save_tensor_to_file<sb::NestedTensor<sb::float64_t>>)
+        .def_static("save_nested_int32_tensor", &IoOps::save_tensor_to_file<sb::NestedTensor<sb::int32_t>>)
+        .def_static("save_nested_int64_tensor", &IoOps::save_tensor_to_file<sb::NestedTensor<sb::int64_t>>)
+        .def_static("save_nested_uint32_tensor", &IoOps::save_tensor_to_file<sb::NestedTensor<sb::uint32_t>>)
+        .def_static("save_nested_uint64_tensor", &IoOps::save_tensor_to_file<sb::NestedTensor<sb::uint64_t>>)
 
         .def_static("save_pcf32_tensor",         &IoOps::save_tensor_to_file<sb::Pcf<sb::float32_t, sb::float32_t>>)
         .def_static("save_pcf64_tensor",         &IoOps::save_tensor_to_file<sb::Pcf<sb::float64_t, sb::float64_t>>)

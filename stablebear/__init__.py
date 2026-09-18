@@ -15,12 +15,12 @@ from .symmetric_matrix import SymmetricMatrix, SymmetricMatrixTensor
 from .base_tensor import (
     BoolTensor,
     FloatTensor,
-    IndexTensor,
     IntPcfTensor,
     IntTensor,
     PcfTensor,
-    PointCloudTensor,
 )
+from .nested_tensor import NestedTensor
+from .point_cloud import PointCloud, PointCloudTensor
 from .tensor_create import array_split, concatenate, split, stack, tensor, zeros
 from .typing import (
     dtype,

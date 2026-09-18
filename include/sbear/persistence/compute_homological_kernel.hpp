@@ -186,8 +186,8 @@ namespace sb::ph
         const Tensor<PointCloud<T>> &pclouds, const Tensor<PointCloud<T>> &pcloudsPrime,
         Tensor<Barcode<T>> &retBarcodes, const std::vector<size_t> &index)
     {
-      auto const &pc = pclouds(index);           // the PointCloud<T> for this instance
-      auto const &pcPrime = pcloudsPrime(index); // its aligned d′ counterpart
+      auto const &pc = pclouds(index);
+      auto const &pcPrime = pcloudsPrime(index);
 
       if (pc.coords().rank() != 2 || pcPrime.coords().rank() != 2)
       {
@@ -211,7 +211,8 @@ namespace sb::ph
       SquaredEuclideanDistance<T> dDist(pc); // uses logical coordinates, computes d^2 on demand
       SquaredEuclideanDistance<T> dPrimeDist(pcPrime);
 
-      detail::homological_kernel_single_impl(dDist, dPrimeDist, retBarcodes(index), [](T v) { return std::sqrt(v); });
+      detail::homological_kernel_single_impl(
+          dDist, dPrimeDist, retBarcodes(index), [](T v) { return std::sqrt(v); });
     }
 
   } // namespace detail
@@ -220,8 +221,8 @@ namespace sb::ph
   class HomologicalKernelImpl : public StoppableTask<void>
   {
   public:
-    HomologicalKernelImpl(const Tensor<ElemT> &input, const Tensor<ElemT> &inputPrime, Tensor<Barcode<T>> &ret)
-        : m_input(input), m_inputPrime(inputPrime), m_ret(ret)
+    HomologicalKernelImpl(Tensor<ElemT> input, Tensor<ElemT> inputPrime, Tensor<Barcode<T>> &ret)
+        : m_input(std::move(input)), m_inputPrime(std::move(inputPrime)), m_ret(ret)
     {
     }
 
@@ -263,8 +264,8 @@ namespace sb::ph
           },
           exec);
     }
-    const Tensor<ElemT> &m_input;
-    const Tensor<ElemT> &m_inputPrime;
+    Tensor<ElemT> m_input;
+    Tensor<ElemT> m_inputPrime;
     Tensor<Barcode<T>> &m_ret;
   };
 

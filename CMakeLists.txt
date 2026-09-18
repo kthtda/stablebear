@@ -635,6 +635,7 @@ SET(SB_PY_SOURCES
     functional/py_norms.hpp functional/py_norms.cpp
     functional/py_reductions.hpp functional/py_reductions.cpp
     py_tensor.hpp py_tensor.cpp
+    py_point_cloud.hpp py_point_cloud.cpp
     py_io.hpp py_io.cpp
     py_symmetric_matrix.hpp py_symmetric_matrix.cpp
     py_distance_matrix.hpp py_distance_matrix.cpp

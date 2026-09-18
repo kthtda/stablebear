@@ -6,9 +6,11 @@
 #define STABLEBEAR_POINT_CLOUD_H
 
 #include "tensor.hpp"
+#include "nested_tensor.hpp"
 
-#include <type_traits>
 #include <map>
+#include <stdexcept>
+#include <type_traits>
 #include <vector>
 
 namespace sb
@@ -32,6 +34,7 @@ namespace sb
   {
   public:
     using value_type = T;
+    using index_type = NestedTensor<uint64_t>;
 
     PointCloud() = default;
     explicit PointCloud(const std::vector<size_t>& shape) : m_coords(shape) { }
@@ -179,6 +182,54 @@ namespace sb
         return PointCloud(m_coords.copy(), m_indices.copy());
       }
       return PointCloud(m_coords.copy());
+    }
+
+    /// Apply a row selection without copying coordinates. The returned value
+    /// is a lightweight logical element produced on demand by an indexed
+    /// tensor; indexed state is not stored in the tensor's source elements.
+    [[nodiscard]] PointCloud index_into(const index_type& selection) const
+    {
+      if (!selection.is_leaf())
+      {
+        throw std::invalid_argument("Point-cloud selections must contain uint64 tensors directly");
+      }
+      if (m_coords.rank() != 2)
+      {
+        throw std::invalid_argument("Point-cloud coordinates must have rank 2");
+      }
+
+      const Tensor<uint64_t>& requested = selection.leaf();
+      if (requested.rank() != 1)
+      {
+        throw std::invalid_argument("Point-cloud selections must have rank 1");
+      }
+
+      for (size_t i = 0; i < requested.shape(0); ++i)
+      {
+        if (requested(i) >= n_points())
+        {
+          throw std::out_of_range("Point-cloud index out of bounds");
+        }
+      }
+
+      if (!is_indexed())
+      {
+        return PointCloud(m_coords, requested);
+      }
+
+      Tensor<uint64_t> resolved({requested.shape(0)});
+      for (size_t i = 0; i < requested.shape(0); ++i)
+      {
+        const uint64_t logicalIndex = requested(i);
+        resolved(i) = m_indices(static_cast<size_t>(logicalIndex));
+      }
+      return PointCloud(m_coords, std::move(resolved));
+    }
+
+    /// Return an owning value containing exactly the logical coordinates.
+    [[nodiscard]] PointCloud materialized_copy() const
+    {
+      return is_indexed() ? PointCloud(materialize()) : PointCloud(m_coords.copy());
     }
 
     /// Materialize the selected points into a contiguous coordinate tensor.

@@ -14,6 +14,7 @@
 
 #include <iostream>
 #include <type_traits>
+#include <utility>
 
 namespace sb::ph
 {
@@ -177,8 +178,8 @@ namespace sb::ph
   class RipserTaskImpl : public StoppableTask<void>
   {
   public:
-    RipserTaskImpl(const Tensor<ElemT>& input, Tensor<Barcode<T>>& ret, size_t maxDim = 1, bool reducedHomology = false)
-      : m_input(input), m_ret(ret), m_maxDim(maxDim), m_reducedHomology(reducedHomology)
+    RipserTaskImpl(Tensor<ElemT> input, Tensor<Barcode<T>>& ret, size_t maxDim = 1, bool reducedHomology = false)
+      : m_input(std::move(input)), m_ret(ret), m_maxDim(maxDim), m_reducedHomology(reducedHomology)
     { }
 
   private:
@@ -207,7 +208,7 @@ namespace sb::ph
       }, exec);
     }
 
-    const Tensor<ElemT>& m_input;
+    Tensor<ElemT> m_input;
     Tensor<Barcode<T>>& m_ret;
     size_t m_maxDim;
     bool m_reducedHomology;

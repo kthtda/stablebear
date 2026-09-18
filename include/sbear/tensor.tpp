@@ -22,8 +22,9 @@ namespace sb
 #endif
   void parallel_walk(const TTensor& tensor, UnaryFunc&& f, Executor& exec);
 
-  template <typename T>
-  Tensor<T>::Tensor(const std::vector<size_t>& shape, const T& init)
+  template <typename T, TensorProperties Properties>
+  Tensor<T, Properties>::Tensor(const std::vector<size_t>& shape, const T& init)
+    requires (!Tensor<T, Properties>::IsIndexed)
     : m_shape(shape)
   {
     auto sz = get_total_size();
@@ -40,16 +41,52 @@ namespace sb
     }
   }
 
-  template <typename T>
-  Tensor<T>& Tensor<T>::operator=(const T& val)
+  template <typename T, TensorProperties Properties>
+  Tensor<T, Properties>::Tensor(source_tensor_type source, index_tensor_type indices)
+    requires Tensor<T, Properties>::IsIndexed && IndexableTensorElement<T>
+    : m_source(std::move(source)), m_indices(std::move(indices))
+  {
+    if (m_source.shape() != m_indices.shape())
+    {
+      throw std::invalid_argument(
+        "Indexed tensor source and index views must have the same shape");
+    }
+  }
+
+  template <typename T, TensorProperties Properties>
+  requires IndexableTensorElement<T> && (!IndexedTensorProperties<Properties>)
+  Tensor<T, Properties | TensorProperty::Indexed> make_indexed_tensor(
+    const Tensor<T, Properties>& source,
+    const Tensor<typename T::index_type>& indices)
+  {
+    const std::vector<size_t>& sourceShape = source.shape();
+    const std::vector<size_t>& indexShape = indices.shape();
+    if (sourceShape.size() > indexShape.size()
+        || !std::equal(sourceShape.begin(), sourceShape.end(), indexShape.begin()))
+    {
+      throw std::invalid_argument("Source tensor shape must be a prefix of index tensor shape");
+    }
+
+    Tensor<T, Properties> sourceView = source;
+    for (size_t axis = source.rank(); axis < indices.rank(); ++axis)
+    {
+      sourceView = sourceView.expand_dims(-1);
+    }
+
+    return Tensor<T, Properties | TensorProperty::Indexed>(
+      sourceView.broadcast_to(indexShape), indices);
+  }
+
+  template <typename T, TensorProperties Properties>
+  Tensor<T, Properties>& Tensor<T, Properties>::operator=(const T& val)
   {
     apply([&val](T& element){ element = val; });
     return *this;
   }
 
-  template <typename T>
+  template <typename T, TensorProperties Properties>
   template <typename U> requires std::equality_comparable_with<U, T>
-  bool Tensor<T>::operator==(const Tensor<U>& rhs) const
+  bool Tensor<T, Properties>::operator==(const Tensor<U>& rhs) const
   {
     if (m_shape != rhs.shape())
     {
@@ -64,9 +101,9 @@ namespace sb
     return equal;
   }
 
-  template <typename T>
+  template <typename T, TensorProperties Properties>
   template <typename U> requires std::equality_comparable_with<U, T>
-  bool Tensor<T>::operator!=(const Tensor<U>& rhs) const
+  bool Tensor<T, Properties>::operator!=(const Tensor<U>& rhs) const
   {
     if (m_shape != rhs.shape())
     {
@@ -78,53 +115,68 @@ namespace sb
     });
   }
 
-  template <typename T>
+  template <typename T, TensorProperties Properties>
   template <typename SliceVector>
-  Tensor<T> Tensor<T>::operator[](SliceVector sliceVector) const
+  Tensor<T, Properties> Tensor<T, Properties>::operator[](SliceVector sliceVector) const
   {
-    return extract(sliceVector);
+    if constexpr (IsIndexed)
+      return Tensor(m_source[sliceVector], m_indices[sliceVector]);
+    else
+      return extract(sliceVector);
   }
 
-  template <typename T>
-  const T& Tensor<T>::operator()(const std::vector<size_t>& index) const
+  template <typename T, TensorProperties Properties>
+  decltype(auto) Tensor<T, Properties>::operator()(const std::vector<size_t>& index) const
+  {
+    if constexpr (IsIndexed)
+      return m_source(index).index_into(m_indices(index));
+    else
+      return index_to_ref(index);
+  }
+
+  template <typename T, TensorProperties Properties>
+  T& Tensor<T, Properties>::operator()(const std::vector<size_t>& index)
+    requires (!Tensor<T, Properties>::IsIndexed)
   {
     return index_to_ref(index);
   }
 
-  template <typename T>
-  T& Tensor<T>::operator()(const std::vector<size_t>& index)
+  template <typename T, TensorProperties Properties>
+  decltype(auto) Tensor<T, Properties>::operator()(size_t index) const
   {
-    return index_to_ref(index);
+    if constexpr (IsIndexed)
+      return m_source(index).index_into(m_indices(index));
+    else
+      return index_to_ref({ index });
   }
 
-  template <typename T>
-  const T& Tensor<T>::operator()(size_t index) const
-  {
-    return index_to_ref({ index });
-  }
-
-  template <typename T>
-  T& Tensor<T>::operator()(size_t index)
+  template <typename T, TensorProperties Properties>
+  T& Tensor<T, Properties>::operator()(size_t index)
+    requires (!Tensor<T, Properties>::IsIndexed)
   {
     return index_to_ref({ index });
   }
 
-  template <typename T>
-  const T& Tensor<T>::flat(size_t index) const
+  template <typename T, TensorProperties Properties>
+  decltype(auto) Tensor<T, Properties>::flat(size_t index) const
+  {
+    if constexpr (IsIndexed)
+      return m_source.flat(index).index_into(m_indices.flat(index));
+    else
+      return index_to_ref(flat_to_multi_index(index, {m_shape.begin(), m_shape.end()}));
+  }
+
+  template <typename T, TensorProperties Properties>
+  T& Tensor<T, Properties>::flat(size_t index)
+    requires (!Tensor<T, Properties>::IsIndexed)
   {
     return index_to_ref(flat_to_multi_index(index, {m_shape.begin(), m_shape.end()}));
   }
 
-  template <typename T>
-  T& Tensor<T>::flat(size_t index)
-  {
-    return index_to_ref(flat_to_multi_index(index, {m_shape.begin(), m_shape.end()}));
-  }
-
-  template <typename T>
+  template <typename T, TensorProperties Properties>
   template <typename U>
   requires std::is_constructible_v<T, U>
-  void Tensor<T>::assign_from(const Tensor<U>& rhs)
+  void Tensor<T, Properties>::assign_from(const Tensor<U>& rhs)
   {
     auto target = shape();
     auto out_shape = broadcast_shapes(target, rhs.shape());
@@ -166,10 +218,10 @@ namespace sb
     });
   }
 
-  template <typename T>
+  template <typename T, TensorProperties Properties>
   template <typename U>
   requires CanDivideTo<T, T, U>
-  Tensor<T>& Tensor<T>::operator/=(const U& u)
+  Tensor<T, Properties>& Tensor<T, Properties>::operator/=(const U& u)
   {
     apply([&u](T& val){
       val /= u;
@@ -178,20 +230,20 @@ namespace sb
     return *this;
   }
 
-  template <typename T>
+  template <typename T, TensorProperties Properties>
   template <typename U>
   requires CanDivideTo<T, T, U>
-  Tensor<T> Tensor<T>::operator/(const U& u) const
+  Tensor<T, Properties> Tensor<T, Properties>::operator/(const U& u) const
   {
-    Tensor<T> ret = copy();
+    Tensor<T, Properties> ret = copy();
     ret /= u;
     return ret;
   }
 
-  template <typename T>
+  template <typename T, TensorProperties Properties>
   template <typename U>
   requires CanMultiplyTo<T, T, U>
-  Tensor<T>& Tensor<T>::operator*=(const U& u)
+  Tensor<T, Properties>& Tensor<T, Properties>::operator*=(const U& u)
   {
     apply([&u](T& val){
       if constexpr (std::is_same_v<T, bool>)
@@ -203,20 +255,20 @@ namespace sb
     return *this;
   }
 
-  template <typename T>
+  template <typename T, TensorProperties Properties>
   template <typename U>
   requires CanMultiplyTo<T, T, U>
-  Tensor<T> Tensor<T>::operator*(const U& u) const
+  Tensor<T, Properties> Tensor<T, Properties>::operator*(const U& u) const
   {
-    Tensor<T> ret = copy();
+    Tensor<T, Properties> ret = copy();
     ret *= u;
     return ret;
   }
 
-  template <typename T>
+  template <typename T, TensorProperties Properties>
   template <typename U>
   requires CanAddTo<T, T, U>
-  Tensor<T>& Tensor<T>::operator+=(const U& u)
+  Tensor<T, Properties>& Tensor<T, Properties>::operator+=(const U& u)
   {
     apply([&u](T& val){
       val += u;
@@ -225,20 +277,20 @@ namespace sb
     return *this;
   }
 
-  template <typename T>
+  template <typename T, TensorProperties Properties>
   template <typename U>
   requires CanAddTo<T, T, U>
-  Tensor<T> Tensor<T>::operator+(const U& u) const
+  Tensor<T, Properties> Tensor<T, Properties>::operator+(const U& u) const
   {
-    Tensor<T> ret = copy();
+    Tensor<T, Properties> ret = copy();
     ret += u;
     return ret;
   }
 
-  template <typename T>
+  template <typename T, TensorProperties Properties>
   template <typename U>
   requires CanSubtractTo<T, T, U>
-  Tensor<T>& Tensor<T>::operator-=(const U& u)
+  Tensor<T, Properties>& Tensor<T, Properties>::operator-=(const U& u)
   {
     apply([&u](T& val){
       val -= u;
@@ -247,20 +299,20 @@ namespace sb
     return *this;
   }
 
-  template <typename T>
+  template <typename T, TensorProperties Properties>
   template <typename U>
   requires CanSubtractTo<T, T, U>
-  Tensor<T> Tensor<T>::operator-(const U& u) const
+  Tensor<T, Properties> Tensor<T, Properties>::operator-(const U& u) const
   {
-    Tensor<T> ret = copy();
+    Tensor<T, Properties> ret = copy();
     ret -= u;
     return ret;
   }
 
-  template <typename T>
-  Tensor<T> Tensor<T>::operator-() const requires CanNegate<T>
+  template <typename T, TensorProperties Properties>
+  Tensor<T, Properties> Tensor<T, Properties>::operator-() const requires CanNegate<T>
   {
-    Tensor<T> ret = copy();
+    Tensor<T, Properties> ret = copy();
     ret.apply([](T& val){
       val = -val;
     });
@@ -357,53 +409,60 @@ namespace sb
   // Broadcasting
   // ============================================================================
 
-  template <typename T>
-  Tensor<T> Tensor<T>::broadcast_to(const std::vector<size_t>& target_shape) const
+  template <typename T, TensorProperties Properties>
+  Tensor<T, Properties> Tensor<T, Properties>::broadcast_to(const std::vector<size_t>& target_shape) const
   {
-    size_t ndim = target_shape.size();
-    size_t src_ndim = m_shape.size();
-
-    if (ndim < src_ndim)
+    if constexpr (IsIndexed)
     {
-      throw std::invalid_argument("Cannot broadcast shape " +
-          shape_to_string(m_shape) + " to " + shape_to_string(target_shape) +
-          ": target has fewer dimensions");
+      return Tensor(m_source.broadcast_to(target_shape), m_indices.broadcast_to(target_shape));
     }
-
-    Tensor ret;
-    ret.m_data = m_data;
-    ret.m_offset = m_offset;
-    ret.m_shape = target_shape;
-    ret.m_strides.resize(ndim);
-    ret.m_isContiguous = false;
-
-    size_t prepended = ndim - src_ndim;
-    for (size_t i = 0; i < ndim; ++i)
+    else
     {
-      if (i < prepended)
+      size_t ndim = target_shape.size();
+      size_t src_ndim = m_shape.size();
+
+      if (ndim < src_ndim)
       {
-        ret.m_strides[i] = 0;
+        throw std::invalid_argument("Cannot broadcast shape " +
+            shape_to_string(m_shape) + " to " + shape_to_string(target_shape) +
+            ": target has fewer dimensions");
       }
-      else
+
+      Tensor ret;
+      ret.m_data = m_data;
+      ret.m_offset = m_offset;
+      ret.m_shape = target_shape;
+      ret.m_strides.resize(ndim);
+      ret.m_isContiguous = false;
+
+      size_t prepended = ndim - src_ndim;
+      for (size_t i = 0; i < ndim; ++i)
       {
-        size_t si = i - prepended;
-        if (m_shape[si] == target_shape[i])
-        {
-          ret.m_strides[i] = m_strides[si];
-        }
-        else if (m_shape[si] == 1)
+        if (i < prepended)
         {
           ret.m_strides[i] = 0;
         }
         else
         {
-          throw std::invalid_argument("Cannot broadcast shape " +
-              shape_to_string(m_shape) + " to " + shape_to_string(target_shape));
+          size_t si = i - prepended;
+          if (m_shape[si] == target_shape[i])
+          {
+            ret.m_strides[i] = m_strides[si];
+          }
+          else if (m_shape[si] == 1)
+          {
+            ret.m_strides[i] = 0;
+          }
+          else
+          {
+            throw std::invalid_argument("Cannot broadcast shape " +
+                shape_to_string(m_shape) + " to " + shape_to_string(target_shape));
+          }
         }
       }
-    }
 
-    return ret;
+      return ret;
+    }
   }
 
   // Tensor-Tensor arithmetic with broadcasting
@@ -441,16 +500,16 @@ namespace sb
     }
   }
 
-  template <typename T>
-  Tensor<T> Tensor<T>::operator+(const Tensor& rhs) const
+  template <typename T, TensorProperties Properties>
+  Tensor<T, Properties> Tensor<T, Properties>::operator+(const Tensor& rhs) const
   { return detail::broadcast_binop(*this, rhs, [](const T& a, const T& b) -> T { return a + b; }); }
 
-  template <typename T>
-  Tensor<T> Tensor<T>::operator-(const Tensor& rhs) const
+  template <typename T, TensorProperties Properties>
+  Tensor<T, Properties> Tensor<T, Properties>::operator-(const Tensor& rhs) const
   { return detail::broadcast_binop(*this, rhs, [](const T& a, const T& b) -> T { return a - b; }); }
 
-  template <typename T>
-  Tensor<T> Tensor<T>::operator*(const Tensor& rhs) const
+  template <typename T, TensorProperties Properties>
+  Tensor<T, Properties> Tensor<T, Properties>::operator*(const Tensor& rhs) const
   {
     if constexpr (std::is_same_v<T, bool>)
       return detail::broadcast_binop(*this, rhs, [](const T& a, const T& b) -> T { return a && b; });
@@ -458,24 +517,24 @@ namespace sb
       return detail::broadcast_binop(*this, rhs, [](const T& a, const T& b) -> T { return a * b; });
   }
 
-  template <typename T>
-  Tensor<T> Tensor<T>::operator/(const Tensor& rhs) const
+  template <typename T, TensorProperties Properties>
+  Tensor<T, Properties> Tensor<T, Properties>::operator/(const Tensor& rhs) const
   { return detail::broadcast_binop(*this, rhs, [](const T& a, const T& b) -> T { return a / b; }); }
 
-  template <typename T>
-  Tensor<T>& Tensor<T>::operator+=(const Tensor& rhs)
+  template <typename T, TensorProperties Properties>
+  Tensor<T, Properties>& Tensor<T, Properties>::operator+=(const Tensor& rhs)
   { return detail::broadcast_binop_inplace(*this, rhs, [](const T& a, const T& b){ return a + b; }); }
 
-  template <typename T>
-  Tensor<T>& Tensor<T>::operator-=(const Tensor& rhs)
+  template <typename T, TensorProperties Properties>
+  Tensor<T, Properties>& Tensor<T, Properties>::operator-=(const Tensor& rhs)
   { return detail::broadcast_binop_inplace(*this, rhs, [](const T& a, const T& b){ return a - b; }); }
 
-  template <typename T>
-  Tensor<T>& Tensor<T>::operator*=(const Tensor& rhs)
+  template <typename T, TensorProperties Properties>
+  Tensor<T, Properties>& Tensor<T, Properties>::operator*=(const Tensor& rhs)
   { return detail::broadcast_binop_inplace(*this, rhs, [](const T& a, const T& b){ return a * b; }); }
 
-  template <typename T>
-  Tensor<T>& Tensor<T>::operator/=(const Tensor& rhs)
+  template <typename T, TensorProperties Properties>
+  Tensor<T, Properties>& Tensor<T, Properties>::operator/=(const Tensor& rhs)
   { return detail::broadcast_binop_inplace(*this, rhs, [](const T& a, const T& b){ return a / b; }); }
 
   // Elementwise comparison with broadcasting (returns Tensor<bool>)
@@ -1183,262 +1242,345 @@ namespace sb
     }
   }
 
-  template <typename T>
-  [[nodiscard]] size_t Tensor<T>::size() const noexcept
+  template <typename T, TensorProperties Properties>
+  [[nodiscard]] size_t Tensor<T, Properties>::size() const noexcept
   {
-    if (m_shape.empty())
+    if constexpr (IsIndexed)
+    {
+      return m_indices.size();
+    }
+    else if (m_shape.empty())
     {
       return 0_uz;
     }
     return std::accumulate(m_shape.begin(), m_shape.end(), 1_uz, std::multiplies<size_t>());
   }
 
-  template <typename T>
-  Tensor<T> Tensor<T>::copy() const
+  template <typename T, TensorProperties Properties>
+  auto Tensor<T, Properties>::copy() const
   {
-    Tensor<T> ret(shape());
-
-    sb::walk(*this, [&ret, this](const std::vector<size_t>& idx){
-      ret(idx) = (*this)(idx);
-    });
-
-    return ret;
-  }
-
-  template <typename T>
-  Tensor<T> Tensor<T>::flatten() const
-  {
-    Tensor ret;
-    if (m_isContiguous)
+    if constexpr (IsIndexed)
     {
-      ret = *this;
+      return materialize();
     }
     else
     {
-      ret = copy();
-    }
+      Tensor<T, Properties> ret(shape());
 
-    ret.m_viewType = ViewType::Flattened;
-    ret.m_shape = { get_total_size() };
-    ret.m_strides = { ptrdiff_t{1} };
-    return ret;
+      sb::walk(*this, [&ret, this](const std::vector<size_t>& idx){
+        ret(idx) = (*this)(idx);
+      });
+
+      return ret;
+    }
   }
 
-  template <typename T>
-  Tensor<T> Tensor<T>::reshape(const std::vector<ptrdiff_t>& new_shape) const
+  template <typename T, TensorProperties Properties>
+  typename Tensor<T, Properties>::source_tensor_type Tensor<T, Properties>::materialize() const
+    requires Tensor<T, Properties>::IsIndexed
   {
-    auto total = get_total_size();
-
-    // Resolve -1 dimension
-    std::vector<size_t> resolved(new_shape.size());
-    ptrdiff_t infer_idx = -1;
-    size_t known_product = 1;
-    for (size_t i = 0; i < new_shape.size(); ++i)
+    source_tensor_type result(shape());
+    const size_t count = shape().empty()
+      ? size_t{1}
+      : std::accumulate(shape().begin(), shape().end(), size_t{1}, std::multiplies<size_t>());
+    for (size_t i = 0; i < count; ++i)
     {
-      if (new_shape[i] == -1)
+      value_type value = flat(i);
+      if constexpr (requires { value.materialized_copy(); })
       {
-        if (infer_idx >= 0)
-          throw std::invalid_argument("Only one dimension can be inferred (-1)");
-        infer_idx = static_cast<ptrdiff_t>(i);
-      }
-      else if (new_shape[i] < 0)
-      {
-        throw std::invalid_argument("Invalid dimension size: " + std::to_string(new_shape[i]));
+        result.flat(i) = value.materialized_copy();
       }
       else
       {
-        resolved[i] = static_cast<size_t>(new_shape[i]);
-        known_product *= resolved[i];
+        result.flat(i) = value;
       }
     }
-
-    if (infer_idx >= 0)
-    {
-      if (known_product == 0 || total % known_product != 0)
-        throw std::invalid_argument("Cannot infer dimension: total size " +
-          std::to_string(total) + " is not divisible by " + std::to_string(known_product));
-      resolved[infer_idx] = total / known_product;
-    }
-
-    // Validate total size
-    size_t new_total = 1;
-    for (auto d : resolved) new_total *= d;
-    if (new_total != total)
-      throw std::invalid_argument("Cannot reshape tensor of size " +
-        std::to_string(total) + " into shape " + shape_to_string(resolved));
-
-    // Use contiguous source (copy if needed)
-    Tensor<T> src = m_isContiguous ? *this : copy();
-
-    Tensor<T> ret;
-    ret.m_data = src.m_data;
-    ret.m_offset = src.m_offset;
-    ret.m_shape = resolved;
-    ret.m_isContiguous = true;
-    ret.m_viewType = ViewType::Base;
-
-    // Compute row-major strides
-    ret.m_strides.resize(resolved.size());
-    if (!resolved.empty())
-    {
-      ret.m_strides.back() = 1;
-      for (auto i = static_cast<ptrdiff_t>(resolved.size()) - 2; i >= 0; --i)
-        ret.m_strides[i] = ret.m_strides[i + 1] * static_cast<ptrdiff_t>(resolved[i + 1]);
-    }
-
-    return ret;
+    return result;
   }
 
-  template <typename T>
-  Tensor<T> Tensor<T>::squeeze() const
+  template <typename T, TensorProperties Properties>
+  Tensor<T, Properties> Tensor<T, Properties>::flatten() const
   {
-    Tensor<T> ret;
-    ret.m_data = m_data;
-    ret.m_offset = m_offset;
-    ret.m_isContiguous = m_isContiguous;
-    ret.m_viewType = ViewType::Base;
-
-    for (size_t i = 0; i < m_shape.size(); ++i)
+    if constexpr (IsIndexed)
     {
-      if (m_shape[i] != 1)
-      {
-        ret.m_shape.push_back(m_shape[i]);
-        ret.m_strides.push_back(m_strides[i]);
-      }
-    }
-
-    return ret;
-  }
-
-  template <typename T>
-  Tensor<T> Tensor<T>::squeeze(size_t axis) const
-  {
-    if (axis >= m_shape.size())
-      throw std::invalid_argument("squeeze: axis " + std::to_string(axis) +
-        " out of range for tensor with " + std::to_string(m_shape.size()) + " dimensions");
-    if (m_shape[axis] != 1)
-      throw std::invalid_argument("squeeze: cannot squeeze axis " + std::to_string(axis) +
-        " with size " + std::to_string(m_shape[axis]));
-
-    Tensor<T> ret;
-    ret.m_data = m_data;
-    ret.m_offset = m_offset;
-    ret.m_isContiguous = m_isContiguous;
-    ret.m_viewType = ViewType::Base;
-
-    for (size_t i = 0; i < m_shape.size(); ++i)
-    {
-      if (i != axis)
-      {
-        ret.m_shape.push_back(m_shape[i]);
-        ret.m_strides.push_back(m_strides[i]);
-      }
-    }
-
-    return ret;
-  }
-
-  template <typename T>
-  Tensor<T> Tensor<T>::expand_dims(ptrdiff_t axis) const
-  {
-    auto ndim = static_cast<ptrdiff_t>(m_shape.size());
-    // Resolve negative axis; valid range is [-(ndim+1), ndim]
-    if (axis < 0)
-      axis += ndim + 1;
-    if (axis < 0 || axis > ndim)
-      throw std::invalid_argument("expand_dims: axis " + std::to_string(axis) +
-        " out of range for tensor with " + std::to_string(ndim) + " dimensions");
-
-    auto pos = static_cast<size_t>(axis);
-
-    Tensor<T> ret;
-    ret.m_data = m_data;
-    ret.m_offset = m_offset;
-    ret.m_isContiguous = m_isContiguous;
-    ret.m_viewType = ViewType::Base;
-    ret.m_shape = m_shape;
-    ret.m_strides = m_strides;
-    ret.m_shape.insert(ret.m_shape.begin() + pos, 1);
-    ret.m_strides.insert(ret.m_strides.begin() + pos, pos < m_strides.size() ? m_strides[pos] : 1);
-
-    return ret;
-  }
-
-  template <typename T>
-  Tensor<T> Tensor<T>::transpose(const std::vector<size_t>& axes) const
-  {
-    auto ndim = m_shape.size();
-
-    std::vector<size_t> perm;
-    if (axes.empty())
-    {
-      perm.resize(ndim);
-      std::iota(perm.rbegin(), perm.rend(), 0_uz);
+      return Tensor(m_source.flatten(), m_indices.flatten());
     }
     else
     {
-      if (axes.size() != ndim)
-        throw std::invalid_argument("transpose: axes must have length " +
-          std::to_string(ndim) + ", got " + std::to_string(axes.size()));
-
-      std::vector<bool> seen(ndim, false);
-      for (auto a : axes)
+      Tensor ret;
+      if (m_isContiguous)
       {
-        if (a >= ndim)
-          throw std::invalid_argument("transpose: axis " + std::to_string(a) + " out of range");
-        if (seen[a])
-          throw std::invalid_argument("transpose: repeated axis " + std::to_string(a));
-        seen[a] = true;
+        ret = *this;
       }
-      perm = axes;
-    }
+      else
+      {
+        ret = copy();
+      }
 
-    Tensor<T> ret;
-    ret.m_data = m_data;
-    ret.m_offset = m_offset;
-    ret.m_shape.resize(ndim);
-    ret.m_strides.resize(ndim);
-    for (size_t i = 0; i < ndim; ++i)
-    {
-      ret.m_shape[i] = m_shape[perm[i]];
-      ret.m_strides[i] = m_strides[perm[i]];
+      ret.m_viewType = ViewType::Flattened;
+      ret.m_shape = { get_total_size() };
+      ret.m_strides = { ptrdiff_t{1} };
+      return ret;
     }
-    ret.m_isContiguous = false;
-    ret.m_viewType = ViewType::Base;
-
-    return ret;
   }
 
-  template <typename T>
-  Tensor<T> Tensor<T>::swapaxes(size_t axis1, size_t axis2) const
+  template <typename T, TensorProperties Properties>
+  Tensor<T, Properties> Tensor<T, Properties>::reshape(const std::vector<ptrdiff_t>& new_shape) const
   {
-    auto ndim = m_shape.size();
-    if (axis1 >= ndim || axis2 >= ndim)
-      throw std::invalid_argument("swapaxes: axis out of range for tensor with " +
-        std::to_string(ndim) + " dimensions");
+    if constexpr (IsIndexed)
+    {
+      return Tensor(m_source.reshape(new_shape), m_indices.reshape(new_shape));
+    }
+    else
+    {
+      auto total = get_total_size();
 
-    std::vector<size_t> perm(ndim);
-    std::iota(perm.begin(), perm.end(), 0_uz);
-    std::swap(perm[axis1], perm[axis2]);
-    return transpose(perm);
+      // Resolve -1 dimension
+      std::vector<size_t> resolved(new_shape.size());
+      ptrdiff_t infer_idx = -1;
+      size_t known_product = 1;
+      for (size_t i = 0; i < new_shape.size(); ++i)
+      {
+        if (new_shape[i] == -1)
+        {
+          if (infer_idx >= 0)
+            throw std::invalid_argument("Only one dimension can be inferred (-1)");
+          infer_idx = static_cast<ptrdiff_t>(i);
+        }
+        else if (new_shape[i] < 0)
+        {
+          throw std::invalid_argument("Invalid dimension size: " + std::to_string(new_shape[i]));
+        }
+        else
+        {
+          resolved[i] = static_cast<size_t>(new_shape[i]);
+          known_product *= resolved[i];
+        }
+      }
+
+      if (infer_idx >= 0)
+      {
+        if (known_product == 0 || total % known_product != 0)
+          throw std::invalid_argument("Cannot infer dimension: total size " +
+            std::to_string(total) + " is not divisible by " + std::to_string(known_product));
+        resolved[infer_idx] = total / known_product;
+      }
+
+      // Validate total size
+      size_t new_total = 1;
+      for (auto d : resolved) new_total *= d;
+      if (new_total != total)
+        throw std::invalid_argument("Cannot reshape tensor of size " +
+          std::to_string(total) + " into shape " + shape_to_string(resolved));
+
+      // Use contiguous source (copy if needed)
+      Tensor<T, Properties> src = m_isContiguous ? *this : copy();
+
+      Tensor<T, Properties> ret;
+      ret.m_data = src.m_data;
+      ret.m_offset = src.m_offset;
+      ret.m_shape = resolved;
+      ret.m_isContiguous = true;
+      ret.m_viewType = ViewType::Base;
+
+      // Compute row-major strides
+      ret.m_strides.resize(resolved.size());
+      if (!resolved.empty())
+      {
+        ret.m_strides.back() = 1;
+        for (auto i = static_cast<ptrdiff_t>(resolved.size()) - 2; i >= 0; --i)
+          ret.m_strides[i] = ret.m_strides[i + 1] * static_cast<ptrdiff_t>(resolved[i + 1]);
+      }
+
+      return ret;
+    }
   }
 
-  template <typename T>
+  template <typename T, TensorProperties Properties>
+  Tensor<T, Properties> Tensor<T, Properties>::squeeze() const
+  {
+    if constexpr (IsIndexed)
+    {
+      return Tensor(m_source.squeeze(), m_indices.squeeze());
+    }
+    else
+    {
+      Tensor<T, Properties> ret;
+      ret.m_data = m_data;
+      ret.m_offset = m_offset;
+      ret.m_isContiguous = m_isContiguous;
+      ret.m_viewType = ViewType::Base;
+
+      for (size_t i = 0; i < m_shape.size(); ++i)
+      {
+        if (m_shape[i] != 1)
+        {
+          ret.m_shape.push_back(m_shape[i]);
+          ret.m_strides.push_back(m_strides[i]);
+        }
+      }
+
+      return ret;
+    }
+  }
+
+  template <typename T, TensorProperties Properties>
+  Tensor<T, Properties> Tensor<T, Properties>::squeeze(size_t axis) const
+  {
+    if constexpr (IsIndexed)
+    {
+      return Tensor(m_source.squeeze(axis), m_indices.squeeze(axis));
+    }
+    else
+    {
+      if (axis >= m_shape.size())
+        throw std::invalid_argument("squeeze: axis " + std::to_string(axis) +
+          " out of range for tensor with " + std::to_string(m_shape.size()) + " dimensions");
+      if (m_shape[axis] != 1)
+        throw std::invalid_argument("squeeze: cannot squeeze axis " + std::to_string(axis) +
+          " with size " + std::to_string(m_shape[axis]));
+
+      Tensor<T, Properties> ret;
+      ret.m_data = m_data;
+      ret.m_offset = m_offset;
+      ret.m_isContiguous = m_isContiguous;
+      ret.m_viewType = ViewType::Base;
+
+      for (size_t i = 0; i < m_shape.size(); ++i)
+      {
+        if (i != axis)
+        {
+          ret.m_shape.push_back(m_shape[i]);
+          ret.m_strides.push_back(m_strides[i]);
+        }
+      }
+
+      return ret;
+    }
+  }
+
+  template <typename T, TensorProperties Properties>
+  Tensor<T, Properties> Tensor<T, Properties>::expand_dims(ptrdiff_t axis) const
+  {
+    if constexpr (IsIndexed)
+    {
+      return Tensor(m_source.expand_dims(axis), m_indices.expand_dims(axis));
+    }
+    else
+    {
+      auto ndim = static_cast<ptrdiff_t>(m_shape.size());
+      // Resolve negative axis; valid range is [-(ndim+1), ndim]
+      if (axis < 0)
+        axis += ndim + 1;
+      if (axis < 0 || axis > ndim)
+        throw std::invalid_argument("expand_dims: axis " + std::to_string(axis) +
+          " out of range for tensor with " + std::to_string(ndim) + " dimensions");
+
+      auto pos = static_cast<size_t>(axis);
+
+      Tensor<T, Properties> ret;
+      ret.m_data = m_data;
+      ret.m_offset = m_offset;
+      ret.m_isContiguous = m_isContiguous;
+      ret.m_viewType = ViewType::Base;
+      ret.m_shape = m_shape;
+      ret.m_strides = m_strides;
+      ret.m_shape.insert(ret.m_shape.begin() + pos, 1);
+      ret.m_strides.insert(ret.m_strides.begin() + pos, pos < m_strides.size() ? m_strides[pos] : 1);
+
+      return ret;
+    }
+  }
+
+  template <typename T, TensorProperties Properties>
+  Tensor<T, Properties> Tensor<T, Properties>::transpose(const std::vector<size_t>& axes) const
+  {
+    if constexpr (IsIndexed)
+    {
+      return Tensor(m_source.transpose(axes), m_indices.transpose(axes));
+    }
+    else
+    {
+      auto ndim = m_shape.size();
+
+      std::vector<size_t> perm;
+      if (axes.empty())
+      {
+        perm.resize(ndim);
+        std::iota(perm.rbegin(), perm.rend(), 0_uz);
+      }
+      else
+      {
+        if (axes.size() != ndim)
+          throw std::invalid_argument("transpose: axes must have length " +
+            std::to_string(ndim) + ", got " + std::to_string(axes.size()));
+
+        std::vector<bool> seen(ndim, false);
+        for (auto a : axes)
+        {
+          if (a >= ndim)
+            throw std::invalid_argument("transpose: axis " + std::to_string(a) + " out of range");
+          if (seen[a])
+            throw std::invalid_argument("transpose: repeated axis " + std::to_string(a));
+          seen[a] = true;
+        }
+        perm = axes;
+      }
+
+      Tensor<T, Properties> ret;
+      ret.m_data = m_data;
+      ret.m_offset = m_offset;
+      ret.m_shape.resize(ndim);
+      ret.m_strides.resize(ndim);
+      for (size_t i = 0; i < ndim; ++i)
+      {
+        ret.m_shape[i] = m_shape[perm[i]];
+        ret.m_strides[i] = m_strides[perm[i]];
+      }
+      ret.m_isContiguous = false;
+      ret.m_viewType = ViewType::Base;
+
+      return ret;
+    }
+  }
+
+  template <typename T, TensorProperties Properties>
+  Tensor<T, Properties> Tensor<T, Properties>::swapaxes(size_t axis1, size_t axis2) const
+  {
+    if constexpr (IsIndexed)
+    {
+      return Tensor(m_source.swapaxes(axis1, axis2), m_indices.swapaxes(axis1, axis2));
+    }
+    else
+    {
+      auto ndim = m_shape.size();
+      if (axis1 >= ndim || axis2 >= ndim)
+        throw std::invalid_argument("swapaxes: axis out of range for tensor with " +
+          std::to_string(ndim) + " dimensions");
+
+      std::vector<size_t> perm(ndim);
+      std::iota(perm.begin(), perm.end(), 0_uz);
+      std::swap(perm[axis1], perm[axis2]);
+      return transpose(perm);
+    }
+  }
+
+  template <typename T, TensorProperties Properties>
   template <typename UnaryFunc>
 #ifndef __CUDACC__
   requires std::invocable<UnaryFunc, const T&>
 #endif
-  bool Tensor<T>::any_of(UnaryFunc&& f) const
+  bool Tensor<T, Properties>::any_of(UnaryFunc&& f) const
   {
     return sb::any_of(*this, std::forward<UnaryFunc>(f));
   }
 
-  template <typename T>
+  template <typename T, TensorProperties Properties>
   template <typename UnaryFunc>
 #ifndef __CUDACC__
   requires std::invocable<UnaryFunc, std::vector<size_t>>
 #endif
-  bool Tensor<T>::any_of_idx(UnaryFunc&& f) const
+  bool Tensor<T, Properties>::any_of_idx(UnaryFunc&& f) const
   {
     bool match = false;
 
@@ -1457,22 +1599,22 @@ namespace sb
 
   }
 
-  template <typename T>
-  bool Tensor<T>::allclose(const Tensor& rhs, T atol, T rtol) const requires FloatType<T>
+  template <typename T, TensorProperties Properties>
+  bool Tensor<T, Properties>::allclose(const Tensor& rhs, T atol, T rtol) const requires FloatType<T>
   {
     return sb::allclose(*this, rhs, atol, rtol);
   }
 
-  template <typename T>
+  template <typename T, TensorProperties Properties>
   template <typename UnaryFunc> requires std::invocable<UnaryFunc, T&>
-  void Tensor<T>::apply(UnaryFunc&& f)
+  void Tensor<T, Properties>::apply(UnaryFunc&& f)
   {
     sb::walk(*this, [&f, this](const std::vector<size_t>& idx){ f((*this)(idx)); });
   }
 
-  template <typename T>
+  template <typename T, TensorProperties Properties>
   template <typename SliceVector>
-  Tensor<T> Tensor<T>::extract(SliceVector sliceVector) const
+  Tensor<T, Properties> Tensor<T, Properties>::extract(SliceVector sliceVector) const
   {
     Tensor ret;
 
@@ -1608,14 +1750,14 @@ namespace sb
   }
 
 
-  template <typename T>
-  size_t Tensor<T>::get_total_size() const
+  template <typename T, TensorProperties Properties>
+  size_t Tensor<T, Properties>::get_total_size() const
   {
     return std::accumulate(m_shape.begin(), m_shape.end(), 1_uz, std::multiplies<>());
   }
 
-  template <typename T>
-  ptrdiff_t Tensor<T>::index_to_data_index(const std::vector<size_t>& index) const
+  template <typename T, TensorProperties Properties>
+  ptrdiff_t Tensor<T, Properties>::index_to_data_index(const std::vector<size_t>& index) const
   {
     ptrdiff_t ret = 0;
     switch (m_viewType)
@@ -1644,14 +1786,14 @@ namespace sb
     throw std::runtime_error("Unhandled view type!");
   }
 
-  template <typename T>
-  const T& Tensor<T>::index_to_ref(const std::vector<size_t>& index) const
+  template <typename T, TensorProperties Properties>
+  const T& Tensor<T, Properties>::index_to_ref(const std::vector<size_t>& index) const
   {
     return m_data[index_to_data_index(index)];
   }
 
-  template <typename T>
-  T& Tensor<T>::index_to_ref(const std::vector<size_t>& index)
+  template <typename T, TensorProperties Properties>
+  T& Tensor<T, Properties>::index_to_ref(const std::vector<size_t>& index)
   {
     return m_data[index_to_data_index(index)];
   }

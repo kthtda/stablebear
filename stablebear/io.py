@@ -8,15 +8,23 @@ from .functional.pcf import Pcf
 from .base_tensor import (
     BoolTensor,
     FloatTensor,
-    IndexTensor,
     IntPcfTensor,
     IntTensor,
     PcfTensor,
-    PointCloudTensor,
     Tensor,
 )
+from .nested_tensor import NestedTensor
+from .point_cloud import PointCloudTensor
+
+
 def _save(item: Tensor, file):
     cpp_p = cpp.persistence
+    data = item._data
+    if isinstance(
+        data,
+        (cpp._IndexedPointCloud32Tensor, cpp._IndexedPointCloud64Tensor),
+    ):
+        data = data.materialize()
     _SAVE_DISPATCH = {
         cpp.Float32Tensor: cpp.IoOps.save_float32_tensor,
         cpp.Float64Tensor: cpp.IoOps.save_float64_tensor,
@@ -25,7 +33,12 @@ def _save(item: Tensor, file):
         cpp.Uint32Tensor: cpp.IoOps.save_uint32_tensor,
         cpp.Uint64Tensor: cpp.IoOps.save_uint64_tensor,
         cpp.BoolTensor: cpp.IoOps.save_bool_tensor,
-        cpp.IndexTensor: cpp.IoOps.save_index_tensor,
+        cpp.NestedFloat32Tensor: cpp.IoOps.save_nested_float32_tensor,
+        cpp.NestedFloat64Tensor: cpp.IoOps.save_nested_float64_tensor,
+        cpp.NestedInt32Tensor: cpp.IoOps.save_nested_int32_tensor,
+        cpp.NestedInt64Tensor: cpp.IoOps.save_nested_int64_tensor,
+        cpp.NestedUint32Tensor: cpp.IoOps.save_nested_uint32_tensor,
+        cpp.NestedUint64Tensor: cpp.IoOps.save_nested_uint64_tensor,
         cpp.Pcf32Tensor: cpp.IoOps.save_pcf32_tensor,
         cpp.Pcf64Tensor: cpp.IoOps.save_pcf64_tensor,
         cpp.Pcf32iTensor: cpp.IoOps.save_pcf32i_tensor,
@@ -40,10 +53,10 @@ def _save(item: Tensor, file):
         cpp.DistanceMatrix64Tensor: cpp.IoOps.save_distance_matrix64_tensor,
     }
 
-    fn = _SAVE_DISPATCH.get(type(item._data))
+    fn = _SAVE_DISPATCH.get(type(data))
     if fn is None:
-        raise TypeError(f"Unsupported tensor type {type(item._data)}")
-    fn(item._data, file)
+        raise TypeError(f"Unsupported tensor type {type(data)}")
+    fn(data, file)
 
 
 def _load(file):
@@ -57,7 +70,6 @@ def _load(file):
         cpp.Uint32Tensor: IntTensor,
         cpp.Uint64Tensor: IntTensor,
         cpp.BoolTensor: BoolTensor,
-        cpp.IndexTensor: IndexTensor,
         cpp.Pcf32Tensor: PcfTensor,
         cpp.Pcf64Tensor: PcfTensor,
         cpp.Pcf32iTensor: IntPcfTensor,
@@ -73,6 +85,9 @@ def _load(file):
     }
 
     cpp_tensor = cpp.IoOps.load_tensor_from_file(file)
+    if NestedTensor._is_cpp_nested_tensor(cpp_tensor):
+        return NestedTensor._from_cpp(cpp_tensor)
+
     ctor = _LOAD_DISPATCH.get(type(cpp_tensor))
     if ctor is None:
         raise TypeError(f"File contains unsupported tensor of type {type(cpp_tensor)}")

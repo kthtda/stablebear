@@ -10,7 +10,7 @@ namespace py = pybind11;
 namespace
 {
   template <typename T>
-  sb::Tensor<sb::PointCloud<T>> subsample(
+  sb::Tensor<sb::PointCloud<T>, sb::TensorProperty::Indexed> subsample(
       const sb::Tensor<sb::PointCloud<T>>& points, size_t nPoints, size_t nSamples, bool replace,
       bool allowPartial, bool discardDuplicates, sb::DefaultRandomGenerator* gen)
   {

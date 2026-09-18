@@ -7,9 +7,11 @@
 #include <numeric>
 #include <algorithm>
 #include <concepts>
+#include <functional>
 #include <optional>
 #include <stdexcept>
 #include <sstream>
+#include <type_traits>
 
 #include <iostream>
 
@@ -20,6 +22,44 @@
 namespace sb
 {
   class Executor;
+
+  using TensorProperties = int;
+
+  struct TensorProperty
+  {
+    static constexpr TensorProperties None = 0;
+    static constexpr TensorProperties Indexed = 1 << 0;
+  };
+
+  [[nodiscard]] constexpr bool has_property(
+    TensorProperties properties, TensorProperties property) noexcept
+  {
+    return (properties & property) != 0;
+  }
+
+  template <TensorProperties Properties>
+  concept IndexedTensorProperties = has_property(Properties, TensorProperty::Indexed);
+
+  template <typename T>
+  concept IndexableTensorElement = requires(const T& value, const typename T::index_type& indices)
+  {
+    { value.index_into(indices) } -> std::same_as<T>;
+  };
+
+  namespace detail
+  {
+    template <typename T>
+    struct TensorIndexType
+    {
+      using type = std::monostate;
+    };
+
+    template <IndexableTensorElement T>
+    struct TensorIndexType<T>
+    {
+      using type = typename T::index_type;
+    };
+  }
 
   struct SliceAll { };
 
@@ -49,11 +89,20 @@ namespace sb
     return Slice{SliceRange{ .start = start, .stop = stop, .step = step }};
   }
 
-  template <typename T>
+  template <typename T, TensorProperties Properties = TensorProperty::None>
   class Tensor
   {
   public:
+    static constexpr bool IsIndexed = IndexedTensorProperties<Properties>;
+    static constexpr TensorProperties SourceProperties =
+      IsIndexed ? Properties & ~TensorProperty::Indexed : TensorProperty::None;
+
     using value_type = T;
+    using index_type = typename detail::TensorIndexType<T>::type;
+    using source_tensor_type = Tensor<T, SourceProperties>;
+    using index_tensor_type = Tensor<index_type>;
+    using source_storage_type = std::conditional_t<IsIndexed, source_tensor_type, std::monostate>;
+    using index_storage_type = std::conditional_t<IsIndexed, index_tensor_type, std::monostate>;
 
     enum class ViewType
     {
@@ -61,8 +110,10 @@ namespace sb
       Flattened       // Flattened view (1-d indexing)
     };
 
-    explicit Tensor(const std::vector<size_t>& shape, const T& init = {});
-    Tensor() : Tensor({}, {}) { }
+    explicit Tensor(const std::vector<size_t>& shape, const T& init = {}) requires (!IsIndexed);
+    Tensor() requires (!IsIndexed) : Tensor({}, {}) { }
+    Tensor(source_tensor_type source, index_tensor_type indices)
+      requires IsIndexed && IndexableTensorElement<T>;
 
     /// Assign val to every element of the Tensor
     Tensor& operator=(const T& val);
@@ -162,11 +213,41 @@ namespace sb
     Tensor& operator*=(const Tensor& rhs);
     Tensor& operator/=(const Tensor& rhs);
 
-    [[nodiscard]] const std::vector<ptrdiff_t>& strides() const noexcept { return m_strides; }
-    [[nodiscard]] ptrdiff_t stride(size_t idx) const noexcept { return m_strides[idx]; }
-    [[nodiscard]] const std::vector<size_t>& shape() const noexcept { return m_shape; }
-    [[nodiscard]] size_t shape(size_t dim) const noexcept { return m_shape[dim]; }
-    [[nodiscard]] size_t rank() const noexcept { return m_shape.size(); }
+    [[nodiscard]] const std::vector<ptrdiff_t>& strides() const noexcept
+    {
+      if constexpr (IsIndexed)
+        return m_indices.strides();
+      else
+        return m_strides;
+    }
+    [[nodiscard]] ptrdiff_t stride(size_t idx) const noexcept
+    {
+      if constexpr (IsIndexed)
+        return m_indices.stride(idx);
+      else
+        return m_strides[idx];
+    }
+    [[nodiscard]] const std::vector<size_t>& shape() const noexcept
+    {
+      if constexpr (IsIndexed)
+        return m_indices.shape();
+      else
+        return m_shape;
+    }
+    [[nodiscard]] size_t shape(size_t dim) const noexcept
+    {
+      if constexpr (IsIndexed)
+        return m_indices.shape(dim);
+      else
+        return m_shape[dim];
+    }
+    [[nodiscard]] size_t rank() const noexcept
+    {
+      if constexpr (IsIndexed)
+        return m_indices.rank();
+      else
+        return m_shape.size();
+    }
 
     /**
      * Compute the total number of elements in the tensor.
@@ -174,12 +255,21 @@ namespace sb
      */
     [[nodiscard]] size_t size() const noexcept;
 
-    [[nodiscard]] bool is_contiguous() const noexcept { return m_isContiguous; }
+    [[nodiscard]] bool is_contiguous() const noexcept
+    {
+      if constexpr (IsIndexed)
+        return m_source.is_contiguous() && m_indices.is_contiguous();
+      else
+        return m_isContiguous;
+    }
 
-    [[nodiscard]] ptrdiff_t offset() const noexcept { return m_offset; }
-    [[nodiscard]] value_type* data() const noexcept { return m_data.get() + m_offset; }
+    [[nodiscard]] ptrdiff_t offset() const noexcept requires (!IsIndexed) { return m_offset; }
+    [[nodiscard]] value_type* data() const noexcept requires (!IsIndexed)
+    {
+      return m_data.get() + m_offset;
+    }
 
-    [[nodiscard]] std::shared_ptr<const void> storage_owner() const noexcept
+    [[nodiscard]] std::shared_ptr<const void> storage_owner() const noexcept requires (!IsIndexed)
     {
       return std::shared_ptr<const void>(m_data, static_cast<const void*>(m_data.get()));
     }
@@ -188,16 +278,16 @@ namespace sb
     [[nodiscard]] Tensor operator[](SliceVector sliceVector) const;
 
     /// Direct element access
-    [[nodiscard]] const T& operator()(const std::vector<size_t>& index) const;
-    [[nodiscard]] T& operator()(const std::vector<size_t>& index);
+    [[nodiscard]] decltype(auto) operator()(const std::vector<size_t>& index) const;
+    [[nodiscard]] T& operator()(const std::vector<size_t>& index) requires (!IsIndexed);
     // Direct element access (1d)
-    [[nodiscard]] const T& operator()(size_t index) const;
-    [[nodiscard]] T& operator()(size_t index);
+    [[nodiscard]] decltype(auto) operator()(size_t index) const;
+    [[nodiscard]] T& operator()(size_t index) requires (!IsIndexed);
 
     /// Flat (linear) element access — treats the tensor as if flattened in
     /// row-major order.  Works for any tensor, including sliced views.
-    [[nodiscard]] const T& flat(size_t index) const;
-    [[nodiscard]] T& flat(size_t index);
+    [[nodiscard]] decltype(auto) flat(size_t index) const;
+    [[nodiscard]] T& flat(size_t index) requires (!IsIndexed);
 
     //T& operator()(const std::vector<size_t>& index);
     //const T& operator()(const std::vector<size_t>& index) const;
@@ -241,7 +331,17 @@ namespace sb
      * Make a deep copy of the tensor. The new tensor will be a contiguous version of the original tensor.
      * @return Deep copy of the tensor
      */
-    Tensor copy() const;
+    auto copy() const;
+    [[nodiscard]] source_tensor_type materialize() const requires IsIndexed;
+
+    [[nodiscard]] const source_tensor_type& source_view() const noexcept requires IsIndexed
+    {
+      return m_source;
+    }
+    [[nodiscard]] const index_tensor_type& indices_view() const noexcept requires IsIndexed
+    {
+      return m_indices;
+    }
 
     template <typename UnaryPred>
 #ifndef __CUDACC__
@@ -308,7 +408,18 @@ namespace sb
 
     ViewType m_viewType = ViewType::Base;
     bool m_isContiguous = true;
+    [[no_unique_address]] source_storage_type m_source;
+    [[no_unique_address]] index_storage_type m_indices;
   };
+
+  /// Create a lazy indexed tensor by associating each logical element with an
+  /// element-specific index. The source shape must be a prefix of the index
+  /// tensor shape; additional index axes broadcast the source without copying.
+  template <typename T, TensorProperties Properties>
+  requires IndexableTensorElement<T> && (!IndexedTensorProperties<Properties>)
+  [[nodiscard]] Tensor<T, Properties | TensorProperty::Indexed> make_indexed_tensor(
+    const Tensor<T, Properties>& source,
+    const Tensor<typename T::index_type>& indices);
 
   template <typename U, typename T>
   requires CanMultiplyTo<T, U, T>

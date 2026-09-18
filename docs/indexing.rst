@@ -12,7 +12,9 @@ Indexing with all integers returns the element at that position::
    X = sb.zeros((10, 5))
    f = X[3, 2]   # returns a Pcf object
 
-For a ``PcfTensor``, the returned element is a :py:class:`~stablebear.Pcf`. For a ``FloatTensor``, it is a Python float. For a ``PointCloudTensor``, it is a ``FloatTensor`` (representing the point cloud as a numeric array).
+For a ``PcfTensor``, the returned element is a :py:class:`~stablebear.Pcf`.
+For a ``FloatTensor``, it is a Python float. For a ``PointCloudTensor``, it is
+a rank-2 :py:class:`~stablebear.PointCloud` view.
 
 Negative integers count from the end, as in NumPy, and an out-of-range
 integer raises ``IndexError``::
@@ -37,8 +39,35 @@ idiom for plotting works directly::
    first_point = pc[0]              # shape (2,)
 
 Tensors of clouds (rank ≥ 1) index over the clouds instead: ``X[i]`` returns
-the ``i``-th cloud as a ``FloatTensor`` (see above), which then supports the
-same column indexing.
+the ``i``-th cloud as a ``PointCloud``, which supports the same row and column
+indexing.
+
+Selecting different rows from each point cloud
+------------------------------------------------
+
+A ``NestedTensor`` whose elements are rank-one ``uint64`` tensors selects rows
+independently from point clouds::
+
+   u64 = lambda values: sb.tensor(values, dtype=sb.uint64)
+   selections = sb.tensor([u64([3, 3, 7]), u64([1]), u64([])])
+
+   selected = single_cloud[selections]
+   selected.shape  # (3,)
+
+The point-cloud tensor shape must be a prefix of ``selections.shape``. The
+result has ``selections.shape``; each child tensor controls the number and
+order of points in that output cloud. Repeated rows are preserved and an empty
+child produces an empty cloud with the original coordinate dimension.
+
+The result is an indexed tensor view. It retains one aligned view of the source
+``PointCloudTensor`` and one view of ``selections``; it does not construct and
+store a separate indexed point-cloud object at every output position. Slicing,
+reshaping, and transposing the result transform both views together. Accessing
+an output cloud applies the corresponding selection to the corresponding
+source cloud. Reading one complete output cloud returns a ``PointCloud`` view
+without materializing the indexed tensor. Writing through that view, or
+assigning through the ``PointCloudTensor``, materializes the indexed tensor
+before applying the change.
 
 Slicing
 -------

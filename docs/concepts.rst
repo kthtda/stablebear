@@ -198,9 +198,9 @@ There are several concrete tensor types, each corresponding to a dtype:
    * - ``IntTensor``
      - ``int32`` / ``int64`` / ``uint32`` / ``uint64``
      - Integer scalars
-   * - ``IndexTensor``
-     - ``uint64``
-     - Variable-length index selections
+   * - ``NestedTensor``
+     - ``float32`` / ``float64`` / ``int32`` / ``int64`` / ``uint32`` / ``uint64``
+     - Recursively nested tensors with a uniform leaf dtype
    * - ``PointCloudTensor``
      - ``pcloud32`` / ``pcloud64``
      - Point clouds

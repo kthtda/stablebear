@@ -1,7 +1,7 @@
 import operator
 
 from .. import _sb_cpp as cpp
-from ..base_tensor import PointCloudTensor
+from ..point_cloud import PointCloudTensor
 from ..random import Generator, _unwrap
 from ..typing import pcloud32
 
@@ -75,9 +75,15 @@ def subsample(
         raise TypeError("generator must be a stablebear.random.Generator or None")
 
     backend = cpp.point_process.subsample32 if points.dtype == pcloud32 else cpp.point_process.subsample64
+    data = points._data
+    if isinstance(
+        data,
+        (cpp._IndexedPointCloud32Tensor, cpp._IndexedPointCloud64Tensor),
+    ):
+        data = data.materialize()
     return PointCloudTensor(
         backend(
-            points._data,
+            data,
             n_points,
             n_samples,
             replace,

@@ -67,33 +67,45 @@ This works the same way for ``IntPcfTensor`` and ``BarcodeTensor``.
 The precision (32- or 64-bit) is inferred from the elements.
 An empty list produces a shape ``(0,)`` tensor.
 
-``IndexTensor`` stores a rectangular outer tensor whose elements are
-variable-length, one-dimensional unsigned index tensors. A flat integer list
-or tuple represents one index tensor; nested lists define outer dimensions::
+``NestedTensor`` stores a rectangular outer tensor whose elements are tensors.
+Construct the child tensors explicitly; their shapes may differ, but every
+child must have the same leaf dtype and nesting depth::
 
-   selections = sb.IndexTensor([
-       [3, 3, 7],
-       [1],
-       [],
+   u64 = lambda values: sb.tensor(values, dtype=sb.uint64)
+
+   selections = sb.tensor([
+       u64([3, 3, 7]),
+       u64([1]),
+       u64([]),
    ])
 
    selections.shape       # (3,)
    selections[0].shape    # (3,)
    selections[1].shape    # (1,)
+   repr(selections)        # 'Tensor<Tensor<uint64>>'
 
 The outer tensor can have multiple dimensions::
 
-   selections = sb.IndexTensor([
-       [[3, 2], [2, 6, 7]],
-       [[4], [9, 6]],
+   selections = sb.tensor([
+       [u64([3, 2]), u64([2, 6, 7])],
+       [u64([4]), u64([9, 6])],
    ])
 
    selections.shape       # (2, 2)
    selections[0, 1]       # array([2, 6, 7], dtype=uint64)
 
-Each selection is stored as a one-dimensional ``uint64`` tensor. Values must
-be nonnegative integers. NumPy arrays and ``IntTensor`` objects can be used in
-place of Python lists. An empty list or tuple represents an empty selection.
+Nesting can continue to any depth at runtime::
+
+   deeper = sb.tensor([selections, selections.copy()])
+   repr(deeper)  # 'Tensor<Tensor<Tensor<uint64>>>'
+
+Numeric leaf tensors may use ``float32``, ``float64``, ``int32``, ``int64``,
+``uint32``, or ``uint64``. All leaves in one nested tensor must have the same
+dtype. Use an explicit empty child tensor for an empty element. Since neither
+the leaf dtype nor nesting depth can be inferred from an empty outer tensor,
+provide both explicitly::
+
+   empty = sb.NestedTensor([], dtype=sb.float32, depth=2)
 
 
 From NumPy arrays
@@ -103,9 +115,9 @@ Point-cloud, distance-matrix, and symmetric-matrix tensors can be built
 directly from a single NumPy array, avoiding an explicit element-assignment
 loop.
 
-For a :py:class:`~stablebear.PointCloudTensor`, the trailing ``cloud_ndim``
-axes (2 by default) form each ``(n_points, dim)`` cloud and the leading axes
-form the tensor shape::
+For a :py:class:`~stablebear.PointCloudTensor`, the trailing two axes form each
+``(n_points, dim)`` cloud and the leading axes form the tensor shape. Point
+clouds always have rank 2::
 
    import numpy as np
    import stablebear as sb
@@ -120,6 +132,20 @@ A list of cloud arrays (which may have differing numbers of points) builds a
 1-D tensor::
 
    ragged = sb.PointCloudTensor([np.random.rand(3, 2), np.random.rand(5, 2)])
+
+Selecting one element returns a ``PointCloud`` façade. It is always rank 2 and
+supports normal row and column indexing, NumPy conversion, copying, and
+assignment::
+
+   cloud = ragged[0]
+   cloud.shape             # (3, 2)
+   cloud[:, 0]             # first coordinate of each point
+   cloud[0, 1] = 4.0       # updates ragged[0]
+
+``PointCloud`` intentionally omits rank-changing tensor operations such as
+``squeeze`` and ``reshape``. Use ``cloud.materialize()`` to obtain a standalone
+``FloatTensor`` when general tensor operations are needed. A standalone cloud
+can also be constructed directly with ``sb.PointCloud(coordinates)``.
 
 For matrix tensors, the trailing two axes of the array form each ``n x n``
 matrix and the leading axes form the tensor shape::
