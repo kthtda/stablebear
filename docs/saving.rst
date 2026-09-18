@@ -2,7 +2,7 @@
 Saving and loading
 ==================
 
-stablebear provides a binary format for efficiently saving and loading tensors. All tensor types are supported, including PCF, numeric, point cloud, barcode, symmetric matrix tensors, etc.
+stablebear provides a binary format for efficiently saving and loading tensors. All tensor types are supported, including PCF, numeric, index, point cloud, barcode, and symmetric matrix tensors.
 
 Saving
 ======

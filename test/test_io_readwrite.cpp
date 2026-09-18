@@ -103,6 +103,52 @@ namespace
     EXPECT_EQ(tensor, retTensor);
   }
 
+  TEST(IoReadWriteTest, IndexTensorRoundtrip)
+  {
+    using Selection = sb::Tensor<uint64_t>;
+    using TensorT = sb::Tensor<Selection>;
+
+    TensorT tensor({ 2, 2 });
+    tensor({ 0, 0 }) = Selection({ 2 });
+    tensor({ 0, 0 })(0) = 3;
+    tensor({ 0, 0 })(1) = 3;
+    tensor({ 0, 1 }) = Selection({ 0 });
+    tensor({ 1, 0 }) = Selection({ 1 });
+    tensor({ 1, 0 })(0) = 4;
+    tensor({ 1, 1 }) = Selection({ 3 });
+    tensor({ 1, 1 })(0) = 9;
+    tensor({ 1, 1 })(1) = 6;
+    tensor({ 1, 1 })(2) = 7;
+
+    std::stringstream ss;
+    sb::write(tensor, ss);
+
+    std::istringstream iss(ss.str());
+    auto retTensor = sb::read<TensorT>(iss);
+
+    EXPECT_EQ(tensor, retTensor);
+
+    TensorT scalar(std::vector<size_t>{});
+    const std::vector<size_t> scalarIndex;
+    scalar(scalarIndex) = Selection({ 3 });
+    scalar(scalarIndex)(0) = 3;
+    scalar(scalarIndex)(1) = 3;
+    scalar(scalarIndex)(2) = 7;
+
+    std::stringstream scalarStream;
+    sb::write(scalar, scalarStream);
+
+    std::istringstream scalarInput(scalarStream.str());
+    auto scalarRoundtrip = sb::read<TensorT>(scalarInput);
+
+    EXPECT_EQ(scalar, scalarRoundtrip);
+
+    TensorT invalid({ 1 });
+    invalid(0) = Selection({ 1, 2 });
+    std::stringstream invalidStream;
+    EXPECT_THROW(sb::write(invalid, invalidStream), std::runtime_error);
+  }
+
 // ============================================================================
 // Empty (scalar/0-d) tensor roundtrip
 // ============================================================================

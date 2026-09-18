@@ -1,3 +1,4 @@
+import io
 import pickle
 
 import numpy as np
@@ -28,22 +29,37 @@ def assert_index_tensor(actual, expected, shape):
         )
 
 
+_INDEX_TENSOR_CASES = [
+    pytest.param([3, 3, 7], (), id="scalar"),
+    pytest.param([], (), id="empty-scalar"),
+    pytest.param([[3, 3, 7], [1], []], (3,), id="ragged"),
+    pytest.param([[], []], (2,), id="empty-selections"),
+    pytest.param(
+        [[[3, 2], [2, 6, 7]], [[4], [9, 6]]],
+        (2, 2),
+        id="multidimensional",
+    ),
+]
+
+
 @pytest.mark.parametrize(
     ("values", "shape"),
-    [
-        pytest.param([3, 3, 7], (), id="scalar"),
-        pytest.param([], (), id="empty-scalar"),
-        pytest.param([[3, 3, 7], [1], []], (3,), id="ragged"),
-        pytest.param([[], []], (2,), id="empty-selections"),
-        pytest.param(
-            [[[3, 2], [2, 6, 7]], [[4], [9, 6]]],
-            (2, 2),
-            id="multidimensional",
-        ),
-    ],
+    _INDEX_TENSOR_CASES,
 )
 def test_index_tensor_from_lists(values, shape):
     assert_index_tensor(sb.IndexTensor(values), values, shape)
+
+
+@pytest.mark.parametrize(("values", "shape"), _INDEX_TENSOR_CASES)
+def test_index_tensor_io_roundtrip(values, shape):
+    buffer = io.BytesIO()
+    sb.save(sb.IndexTensor(values), buffer)
+
+    buffer.seek(0)
+    restored = sb.load(buffer)
+
+    assert isinstance(restored, sb.IndexTensor)
+    assert_index_tensor(restored, values, shape)
 
 
 def test_index_tensor_slicing():
@@ -57,12 +73,26 @@ def test_index_tensor_slicing():
         (2, 2),
     )
 
+    buffer = io.BytesIO()
+    sb.save(reversed_rows, buffer)
+    buffer.seek(0)
+    assert_index_tensor(
+        sb.load(buffer),
+        [[[4], [9, 6]], [[3, 2], [2, 6, 7]]],
+        (2, 2),
+    )
+
 
 def test_empty_outer_index_tensor():
     tensor = sb.IndexTensor([[], []])
     empty_outer = tensor[:0]
     assert_index_tensor(empty_outer, [], (0,))
     assert_index_tensor(empty_outer.copy(), [], (0,))
+
+    buffer = io.BytesIO()
+    sb.save(empty_outer, buffer)
+    buffer.seek(0)
+    assert_index_tensor(sb.load(buffer), [], (0,))
 
 
 def test_index_tensor_copies_selections_on_construction_and_assignment():

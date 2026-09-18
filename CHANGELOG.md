@@ -3,7 +3,7 @@
 ### New features
 
 * **Uniform point-cloud subsampling** — `point_process.subsample` draws one or more uniform samples, with or without replacement, from every cloud in a `PointCloudTensor`. Samples share one fresh coordinate copy per input cloud through indexed point-cloud storage, support partial draws and coordinate-level duplicate removal, remain isolated from later source mutations, and round-trip through the new shared-storage point-cloud serialization subtype. ([#229](https://github.com/kthtda/stablebear/issues/229))
-* **Ragged index tensors** — `IndexTensor` stores an arbitrary-dimensional outer tensor of variable-length `uint64` index selections without padding them to a common length. ([#229](https://github.com/kthtda/stablebear/issues/229))
+* **Ragged index tensors** — `IndexTensor` stores an arbitrary-dimensional outer tensor of variable-length `uint64` index selections without padding them to a common length and supports binary save/load round-trips. ([#229](https://github.com/kthtda/stablebear/issues/229))
 
 ## 0.4.7
 

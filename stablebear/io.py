@@ -8,61 +8,41 @@ from .functional.pcf import Pcf
 from .base_tensor import (
     BoolTensor,
     FloatTensor,
+    IndexTensor,
     IntPcfTensor,
     IntTensor,
     PcfTensor,
     PointCloudTensor,
     Tensor,
 )
-from .typing import (
-    barcode32,
-    barcode64,
-    boolean,
-    distmat32,
-    distmat64,
-    float32,
-    float64,
-    int32,
-    int64,
-    pcf32,
-    pcf32i,
-    pcf64,
-    pcf64i,
-    pcloud32,
-    pcloud64,
-    symmat32,
-    symmat64,
-    uint32,
-    uint64,
-)
-
-
 def _save(item: Tensor, file):
+    cpp_p = cpp.persistence
     _SAVE_DISPATCH = {
-        float32: cpp.IoOps.save_float32_tensor,
-        float64: cpp.IoOps.save_float64_tensor,
-        int32: cpp.IoOps.save_int32_tensor,
-        int64: cpp.IoOps.save_int64_tensor,
-        uint32: cpp.IoOps.save_uint32_tensor,
-        uint64: cpp.IoOps.save_uint64_tensor,
-        boolean: cpp.IoOps.save_bool_tensor,
-        pcf32: cpp.IoOps.save_pcf32_tensor,
-        pcf64: cpp.IoOps.save_pcf64_tensor,
-        pcf32i: cpp.IoOps.save_pcf32i_tensor,
-        pcf64i: cpp.IoOps.save_pcf64i_tensor,
-        pcloud32: cpp.IoOps.save_point_cloud32_tensor,
-        pcloud64: cpp.IoOps.save_point_cloud64_tensor,
-        barcode32: cpp.IoOps.save_barcode32_tensor,
-        barcode64: cpp.IoOps.save_barcode64_tensor,
-        symmat32: cpp.IoOps.save_symmetric_matrix32_tensor,
-        symmat64: cpp.IoOps.save_symmetric_matrix64_tensor,
-        distmat32: cpp.IoOps.save_distance_matrix32_tensor,
-        distmat64: cpp.IoOps.save_distance_matrix64_tensor,
+        cpp.Float32Tensor: cpp.IoOps.save_float32_tensor,
+        cpp.Float64Tensor: cpp.IoOps.save_float64_tensor,
+        cpp.Int32Tensor: cpp.IoOps.save_int32_tensor,
+        cpp.Int64Tensor: cpp.IoOps.save_int64_tensor,
+        cpp.Uint32Tensor: cpp.IoOps.save_uint32_tensor,
+        cpp.Uint64Tensor: cpp.IoOps.save_uint64_tensor,
+        cpp.BoolTensor: cpp.IoOps.save_bool_tensor,
+        cpp.IndexTensor: cpp.IoOps.save_index_tensor,
+        cpp.Pcf32Tensor: cpp.IoOps.save_pcf32_tensor,
+        cpp.Pcf64Tensor: cpp.IoOps.save_pcf64_tensor,
+        cpp.Pcf32iTensor: cpp.IoOps.save_pcf32i_tensor,
+        cpp.Pcf64iTensor: cpp.IoOps.save_pcf64i_tensor,
+        cpp.PointCloud32Tensor: cpp.IoOps.save_point_cloud32_tensor,
+        cpp.PointCloud64Tensor: cpp.IoOps.save_point_cloud64_tensor,
+        cpp_p.Barcode32Tensor: cpp.IoOps.save_barcode32_tensor,
+        cpp_p.Barcode64Tensor: cpp.IoOps.save_barcode64_tensor,
+        cpp.SymmetricMatrix32Tensor: cpp.IoOps.save_symmetric_matrix32_tensor,
+        cpp.SymmetricMatrix64Tensor: cpp.IoOps.save_symmetric_matrix64_tensor,
+        cpp.DistanceMatrix32Tensor: cpp.IoOps.save_distance_matrix32_tensor,
+        cpp.DistanceMatrix64Tensor: cpp.IoOps.save_distance_matrix64_tensor,
     }
 
-    fn = _SAVE_DISPATCH.get(item.dtype)
+    fn = _SAVE_DISPATCH.get(type(item._data))
     if fn is None:
-        raise TypeError(f"Unsupported tensor dtype {item.dtype}")
+        raise TypeError(f"Unsupported tensor type {type(item._data)}")
     fn(item._data, file)
 
 
@@ -77,6 +57,7 @@ def _load(file):
         cpp.Uint32Tensor: IntTensor,
         cpp.Uint64Tensor: IntTensor,
         cpp.BoolTensor: BoolTensor,
+        cpp.IndexTensor: IndexTensor,
         cpp.Pcf32Tensor: PcfTensor,
         cpp.Pcf64Tensor: PcfTensor,
         cpp.Pcf32iTensor: IntPcfTensor,

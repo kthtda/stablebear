@@ -251,6 +251,8 @@ namespace sb
 
     else if (format == io::detail::tensorFormat<bool>())     { return io::detail::read_tensor<bool>(is); }
 
+    else if (format == io::detail::tensorFormat<Tensor<uint64_t>>()) { return io::detail::read_tensor<Tensor<uint64_t>>(is); }
+
     else if (format == io::detail::tensorFormat<Pcf<float32_t, float32_t>>()) { return io::detail::read_tensor<Pcf<float32_t, float32_t>>(is); }
     else if (format == io::detail::tensorFormat<Pcf<float64_t, float64_t>>()) { return io::detail::read_tensor<Pcf<float64_t, float64_t>>(is); }
 

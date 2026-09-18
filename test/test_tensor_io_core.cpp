@@ -35,6 +35,11 @@ namespace
       EXPECT_EQ(64, fmt.subFormat);
     }
     {
+      auto fmt = tensorFormat<sb::Tensor<uint64_t>>();
+      EXPECT_EQ(5, fmt.baseFormat);
+      EXPECT_EQ(64, fmt.subFormat);
+    }
+    {
       auto fmt = tensorFormat<sb::Pcf<float32_t, float32_t>>();
       EXPECT_EQ(100, fmt.baseFormat);
       EXPECT_EQ(32, fmt.subFormat);
@@ -46,12 +51,12 @@ namespace
     }
     {
       auto fmt = tensorFormat<sb::PointCloud<float32_t>>();
-      EXPECT_EQ(1000, fmt.baseFormat);
+      EXPECT_EQ(1001, fmt.baseFormat);
       EXPECT_EQ(32, fmt.subFormat);
     }
     {
       auto fmt = tensorFormat<sb::PointCloud<float64_t>>();
-      EXPECT_EQ(1000, fmt.baseFormat);
+      EXPECT_EQ(1001, fmt.baseFormat);
       EXPECT_EQ(64, fmt.subFormat);
     }
     {
@@ -167,4 +172,3 @@ namespace
   }
 
 } // namespace
-

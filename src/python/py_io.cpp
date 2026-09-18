@@ -61,6 +61,7 @@ namespace sb_py
         .def_static("save_uint32_tensor",        &IoOps::save_tensor_to_file<sb::uint32_t>)
         .def_static("save_uint64_tensor",        &IoOps::save_tensor_to_file<sb::uint64_t>)
         .def_static("save_bool_tensor",          &IoOps::save_tensor_to_file<bool>)
+        .def_static("save_index_tensor",         &IoOps::save_tensor_to_file<sb::Tensor<sb::uint64_t>>)
 
         .def_static("save_pcf32_tensor",         &IoOps::save_tensor_to_file<sb::Pcf<sb::float32_t, sb::float32_t>>)
         .def_static("save_pcf64_tensor",         &IoOps::save_tensor_to_file<sb::Pcf<sb::float64_t, sb::float64_t>>)

@@ -48,6 +48,8 @@ namespace sb::io::detail
       Tensor<uint64_t>,
       Tensor<bool>,
 
+      Tensor<Tensor<uint64_t>>,
+
       Tensor<Pcf<float32_t, float32_t>>,
       Tensor<Pcf<float64_t, float64_t>>,
 
@@ -114,6 +116,8 @@ namespace sb::io::detail
     else if constexpr (std::is_same_v<T, uint64_t>) { return TensorFormat{ .baseFormat = 3, .subFormat = 64 }; }
 
     else if constexpr (std::is_same_v<T, bool>)     { return TensorFormat{ .baseFormat = 4, .subFormat = 8 }; }
+
+    else if constexpr (std::is_same_v<T, Tensor<uint64_t>>) { return TensorFormat{ .baseFormat = 5, .subFormat = 64 }; }
 
     else if constexpr (std::is_same_v<T, Pcf<float32_t, float32_t>>) { return TensorFormat{ .baseFormat = 100, .subFormat = 32 }; }
     else if constexpr (std::is_same_v<T, Pcf<float64_t, float64_t>>) { return TensorFormat{ .baseFormat = 100, .subFormat = 64 }; }
@@ -237,6 +241,21 @@ namespace sb::io::detail
         [](std::ostream& o, const PointCloud<ScalarT>& src) { write_tensor(o, src.coords()); });
   }
 
+  template <typename T>
+  size_t serialized_tensor_size(const Tensor<T>& tensor)
+  {
+    if constexpr (std::is_same_v<T, Tensor<uint64_t>>)
+    {
+      // A scalar IndexTensor has one selection even though Tensor::size()
+      // reports zero for a rank-0 tensor.
+      if (tensor.shape().empty())
+      {
+        return 1;
+      }
+    }
+    return tensor.size();
+  }
+
 
   template <IsTensor TensorT>
     void write_contiguous_tensor(std::ostream& os, const TensorT& tensor)
@@ -260,9 +279,16 @@ namespace sb::io::detail
     }
     else
     {
-      auto sz = tensor.size();
+      auto sz = serialized_tensor_size(tensor);
       for (auto const * elem = tensor.data(); elem != tensor.data() + sz; ++elem)
       {
+        if constexpr (std::is_same_v<value_type, Tensor<uint64_t>>)
+        {
+          if (elem->rank() != 1)
+          {
+            throw std::runtime_error("IndexTensor selections must have rank 1");
+          }
+        }
         write_element(os, *elem);
       }
     }
@@ -305,7 +331,7 @@ namespace sb::io::detail
       throw std::runtime_error("Incorrect strides in saved data (expected " + index_to_string(ret.strides()) + " but got " + index_to_string(strides) + ")");
     }
 
-    auto sz = ret.size();
+    auto sz = serialized_tensor_size(ret);
     for (auto * elem = ret.data(); elem != ret.data() + sz; ++elem)
     {
       if constexpr (is_barcode_v<T>)
@@ -317,7 +343,16 @@ namespace sb::io::detail
         // nested coordinate tensor.
         *elem = T(read_element<Tensor<typename is_point_cloud<T>::scalar_type>>(is));
       else
+      {
         *elem = read_element<T>(is);
+        if constexpr (std::is_same_v<T, Tensor<uint64_t>>)
+        {
+          if (elem->rank() != 1)
+          {
+            throw std::runtime_error("IndexTensor selections must have rank 1");
+          }
+        }
+      }
     }
 
     return ret;
