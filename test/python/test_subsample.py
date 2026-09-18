@@ -17,6 +17,17 @@ def point_cloud(n_pts, dim, dtype):
     return np.arange(n_pts * dim, dtype=dtype).reshape(n_pts, dim)
 
 
+def size_case(*, shape, n_points, replace, allow_partial, expected_n_pts, id):
+    return pytest.param(
+        shape,
+        n_points,
+        replace,
+        allow_partial,
+        expected_n_pts,
+        id=id,
+    )
+
+
 class PointCloudTensorSizes:
     def __init__(self, clouds, dtype):
         self.clouds = clouds
@@ -71,7 +82,68 @@ def assert_point_cloud_tensor_sizes(actual, expected):
 
 @pytest.mark.parametrize(("pcloud_dtype", "np_dtype"), _PCLOUD_DTYPES)
 class TestSubsample:
-    def test_sizes(self, pcloud_dtype, np_dtype):
+    @pytest.mark.parametrize(
+        ("shape", "n_points", "replace", "allow_partial", "expected_n_pts"),
+        [
+            size_case(shape=(0, 0), n_points=3, replace=False, allow_partial=True,
+                      expected_n_pts=0, id="empty-zero-dimensional", ),
+            size_case(shape=(0, 3), n_points=3, replace=False, allow_partial=True,
+                      expected_n_pts=0, id="empty", ),
+            size_case(shape=(0, 3), n_points=3, replace=True, allow_partial=True,
+                      expected_n_pts=0, id="empty-replacement", ),
+            size_case(shape=(1, 1), n_points=1, replace=False, allow_partial=False,
+                      expected_n_pts=1, id="singleton", ),
+            size_case(shape=(1, 3), n_points=4, replace=True, allow_partial=False,
+                      expected_n_pts=4, id="singleton-replacement", ),
+            size_case(shape=(3, 0), n_points=2, replace=False, allow_partial=False,
+                      expected_n_pts=2, id="zero-dimensional", ),
+            size_case(shape=(4, 3), n_points=1, replace=False, allow_partial=False,
+                      expected_n_pts=1, id="below-population", ),
+            size_case(shape=(4, 3), n_points=4, replace=False, allow_partial=False,
+                      expected_n_pts=4, id="full-population", ),
+            size_case(shape=(4, 3), n_points=7, replace=True, allow_partial=False,
+                      expected_n_pts=7, id="above-population-replacement", ),
+            size_case(shape=(7, 32), n_points=4, replace=False, allow_partial=False,
+                      expected_n_pts=4, id="large-dimension", ),
+        ],
+    )
+    def test_scalar_sizes(
+        self,
+        pcloud_dtype,
+        np_dtype,
+        shape,
+        n_points,
+        replace,
+        allow_partial,
+        expected_n_pts,
+    ):
+        points = sb.PointCloudTensor(
+            point_cloud(*shape, dtype=np_dtype),
+            dtype=pcloud_dtype,
+        )
+
+        actual = subsample(
+            points,
+            n_points=n_points,
+            n_samples=2,
+            replace=replace,
+            allow_partial=allow_partial,
+            generator=sb.random.Generator(seed=229),
+        )
+
+        assert_point_cloud_tensor_sizes(
+            points,
+            PointCloudTensorSizes(shape, pcloud_dtype),
+        )
+        assert_point_cloud_tensor_sizes(
+            actual,
+            PointCloudTensorSizes(
+                [(expected_n_pts, shape[1]), (expected_n_pts, shape[1])],
+                pcloud_dtype,
+            ),
+        )
+
+    def test_ragged_sizes(self, pcloud_dtype, np_dtype):
         clouds = [
             point_cloud(4, 3, np_dtype),
             point_cloud(5, 3, np_dtype) + 100,
