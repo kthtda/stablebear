@@ -15,6 +15,7 @@ from .symmetric_matrix import SymmetricMatrix, SymmetricMatrixTensor
 from .base_tensor import (
     BoolTensor,
     FloatTensor,
+    IndexTensor,
     IntPcfTensor,
     IntTensor,
     PcfTensor,

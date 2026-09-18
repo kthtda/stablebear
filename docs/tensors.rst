@@ -67,6 +67,34 @@ This works the same way for ``IntPcfTensor`` and ``BarcodeTensor``.
 The precision (32- or 64-bit) is inferred from the elements.
 An empty list produces a shape ``(0,)`` tensor.
 
+``IndexTensor`` stores a rectangular outer tensor whose elements are
+variable-length, one-dimensional unsigned index tensors. A flat integer list
+or tuple represents one index tensor; nested lists define outer dimensions::
+
+   selections = sb.IndexTensor([
+       [3, 3, 7],
+       [1],
+       [],
+   ])
+
+   selections.shape       # (3,)
+   selections[0].shape    # (3,)
+   selections[1].shape    # (1,)
+
+The outer tensor can have multiple dimensions::
+
+   selections = sb.IndexTensor([
+       [[3, 2], [2, 6, 7]],
+       [[4], [9, 6]],
+   ])
+
+   selections.shape       # (2, 2)
+   selections[0, 1]       # array([2, 6, 7], dtype=uint64)
+
+Each selection is stored as a one-dimensional ``uint64`` tensor. Values must
+be nonnegative integers. NumPy arrays and ``IntTensor`` objects can be used in
+place of Python lists. An empty list or tuple represents an empty selection.
+
 
 From NumPy arrays
 -----------------

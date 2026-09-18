@@ -5,7 +5,13 @@ import operator
 import numpy as np
 
 from . import _sb_cpp as cpp
-from ._tensor_base import ArithmeticTensorMixin, FunctionTensorMixin, Tensor, _tensor_from_nested
+from ._tensor_base import (
+    ArithmeticTensorMixin,
+    FunctionTensorMixin,
+    Tensor,
+    _infer_shape_and_flatten,
+    _tensor_from_nested,
+)
 from .functional.pcf import Pcf
 from .typing import (
     _NP_TO_SB,
@@ -206,6 +212,105 @@ class IntTensor(NumericTensor):
 
     def __str__(self):
         return np.asarray(self).__str__()
+
+
+def _index_selection(data):
+    if isinstance(data, IntTensor):
+        values = np.asarray(data)
+    elif isinstance(data, np.ndarray):
+        values = data
+    else:
+        raise TypeError(
+            "IndexTensor selections must be one-dimensional NumPy arrays or IntTensor objects"
+        )
+    if values.ndim != 1:
+        raise ValueError("IndexTensor selections must have rank 1")
+    if not np.issubdtype(values.dtype, np.integer):
+        raise TypeError("IndexTensor values must be integers")
+    if np.issubdtype(values.dtype, np.signedinteger) and np.any(values < 0):
+        raise ValueError("IndexTensor values must be nonnegative")
+    return IntTensor(values, dtype=uint64)
+
+
+def _normalize_index_tensor_structure(data):
+    if isinstance(data, (np.ndarray, IntTensor)):
+        return _index_selection(data)
+    if isinstance(data, (list, tuple)):
+        if all(
+            isinstance(value, (int, np.integer))
+            and not isinstance(value, (bool, np.bool_))
+            for value in data
+        ):
+            values = np.asarray(data) if data else np.asarray(data, dtype=np.uint64)
+            return _index_selection(values)
+        return type(data)(_normalize_index_tensor_structure(value) for value in data)
+    raise TypeError(
+        "IndexTensor selections must be flat integer sequences, one-dimensional "
+        "NumPy arrays, or IntTensor objects"
+    )
+
+
+def _reconstruct_index_tensor(shape, selections):
+    tensor = cpp.IndexTensor(cpp.Shape(list(shape)))
+    for index, selection in zip(np.ndindex(*shape), selections):
+        tensor._set_element(list(index), IntTensor(selection, dtype=uint64)._data)
+    return IndexTensor(tensor)
+
+
+class IndexTensor(Tensor):
+    """Tensor of variable-length uint64 index selections."""
+
+    def __init__(self, data):
+        super().__init__()
+        if isinstance(data, IndexTensor):
+            data = data._data
+        elif isinstance(data, (np.ndarray, IntTensor)):
+            selection = _index_selection(data)
+            tensor = cpp.IndexTensor(cpp.Shape([]))
+            tensor._set_element([], selection._data)
+            data = tensor
+        elif isinstance(data, (list, tuple)):
+            normalized = _normalize_index_tensor_structure(data)
+            if isinstance(normalized, IntTensor):
+                tensor = cpp.IndexTensor(cpp.Shape([]))
+                tensor._set_element([], normalized._data)
+                data = tensor
+            else:
+                shape, selections = _infer_shape_and_flatten(normalized)
+                tensor = cpp.IndexTensor(cpp.Shape([len(selections)]))
+                for i, selection in enumerate(selections):
+                    tensor._set_element([i], selection._data)
+                data = tensor.reshape(list(shape)) if shape != (len(selections),) else tensor
+        elif not isinstance(data, cpp.IndexTensor):
+            raise TypeError(f"Cannot create IndexTensor from {type(data)}")
+
+        self._data = data
+        self.dtype = uint64
+
+    def _to_py_tensor(self, data):
+        return IndexTensor(data)
+
+    def _represent_element(self, element):
+        return IntTensor(element)
+
+    def _decay_value(self, val):
+        return _index_selection(val)._data
+
+    def _get_valid_setitem_dtypes(self):
+        return [IndexTensor, IntTensor, np.ndarray]
+
+    def copy(self):
+        shape = tuple(self.shape)
+        selections = [np.asarray(self[index]).copy() for index in np.ndindex(*shape)]
+        return _reconstruct_index_tensor(shape, selections)
+
+    def __deepcopy__(self, memodict=None):
+        return self.copy()
+
+    def __reduce__(self):
+        shape = tuple(self.shape)
+        selections = [np.asarray(self[index]).copy() for index in np.ndindex(*shape)]
+        return _reconstruct_index_tensor, (shape, selections)
 
 
 class _PcfTensorBase(Tensor, ArithmeticTensorMixin, FunctionTensorMixin):

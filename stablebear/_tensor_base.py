@@ -23,6 +23,7 @@ CppTensor = Union[
     cpp.Int64Tensor,
     cpp.Uint32Tensor,
     cpp.Uint64Tensor,
+    cpp.IndexTensor,
     cpp.Pcf32Tensor,
     cpp.Pcf64Tensor,
     cpp.Pcf32iTensor,

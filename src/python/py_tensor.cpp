@@ -154,6 +154,7 @@ namespace sb_py
     register_typed_tensor_bindings<sb::int64_t>(m, "Int64", "");
     register_typed_tensor_bindings<uint32_t>(m, "Uint32", "");
     register_typed_tensor_bindings<uint64_t>(m, "Uint64", "");
+    register_typed_tensor_bindings<sb::Tensor<uint64_t>>(m, "Index", "");
 
     register_typed_tensor_bindings<sb::Pcf_f32>(m, "Pcf32", "");
     register_typed_tensor_bindings<sb::Pcf_f64>(m, "Pcf64", "");
