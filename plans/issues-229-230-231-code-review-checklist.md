@@ -25,7 +25,7 @@ identify review work, not test-plan items. The broader test plan still applies.
 
 ## A. Storage ownership and view semantics
 
-- [ ] **A1. [P1] Materialize the shared indexed backing state.**
+- [x] **A1. [P1] Materialize the shared indexed backing state.**
 
   **Finding:** `PointCloudTensor._ensure_writeable()` replaces only the calling
   wrapper's `_data`. Given `view = samples[:1]`, writing
@@ -44,6 +44,10 @@ identify review work, not test-plan items. The broader test plan still applies.
 
   Source: [point_cloud.py](../stablebear/point_cloud.py), `_ensure_writeable()`
   and `astype()`. Verification: test plan A4, E2–E3.
+
+  **Completed:** Fixed by `33acda7fc`. Verified with the full Python suite
+  (2,219 passed), the full C++ suite (472 passed), and focused point-cloud and
+  subsampling tests on both the default and forced-CPU backends.
 
 - [ ] **A2. [P1] Preserve nested outer views instead of deep-copying them.**
 
