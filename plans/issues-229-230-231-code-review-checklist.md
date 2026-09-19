@@ -75,7 +75,7 @@ identify review work, not test-plan items. The broader test plan still applies.
   on both the default and forced-CPU backends, and explicit construction,
   assignment, outer-view, empty-view, `copy()`, and `deepcopy()` coverage.
 
-- [ ] **A3. [P1] Own point-cloud selections independently of the caller.**
+- [x] **A3. [P1] Own point-cloud selections independently of the caller.**
 
   **Finding:** After `selected = points[selections]`, changing
   `selections[0][0]` changes the selected coordinates. Replacing the child
@@ -92,6 +92,12 @@ identify review work, not test-plan items. The broader test plan still applies.
 
   Source: [tensor.tpp](../include/sbear/tensor.tpp), `make_indexed_tensor()`.
   Verification: test plan C2, E1–E2.
+
+  **Completed:** Fixed by `9b31341a4`. Verified with the full Python suite
+  (2,226 passed), the full C++ suite (474 passed), focused point-cloud selection
+  tests on both the default and forced-CPU backends, and explicit coverage for
+  caller mutation, child replacement, caller deletion, shared result views,
+  retained source-view behavior, coordinate-rank validation, and IO round trips.
 
 ## B. Indexed tensor API and downstream algorithms
 
