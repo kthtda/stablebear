@@ -24,7 +24,7 @@ namespace sb
 
   template <typename T, TensorProperties Properties>
   Tensor<T, Properties>::Tensor(const std::vector<size_t>& shape, const T& init)
-    requires (!Tensor<T, Properties>::IsIndexed)
+    requires (!IsIndexed)
     : m_shape(shape)
   {
     auto sz = get_total_size();
@@ -43,7 +43,7 @@ namespace sb
 
   template <typename T, TensorProperties Properties>
   Tensor<T, Properties>::Tensor(source_tensor_type source, index_tensor_type indices)
-    requires Tensor<T, Properties>::IsIndexed && IndexableTensorElement<T>
+    requires IsIndexed && IndexableTensorElement<T>
     : m_source(std::move(source)), m_indices(std::move(indices))
   {
     if (m_source.shape() != m_indices.shape())
@@ -137,7 +137,7 @@ namespace sb
 
   template <typename T, TensorProperties Properties>
   T& Tensor<T, Properties>::operator()(const std::vector<size_t>& index)
-    requires (!Tensor<T, Properties>::IsIndexed)
+    requires (!IsIndexed)
   {
     return index_to_ref(index);
   }
@@ -153,7 +153,7 @@ namespace sb
 
   template <typename T, TensorProperties Properties>
   T& Tensor<T, Properties>::operator()(size_t index)
-    requires (!Tensor<T, Properties>::IsIndexed)
+    requires (!IsIndexed)
   {
     return index_to_ref({ index });
   }
@@ -169,7 +169,7 @@ namespace sb
 
   template <typename T, TensorProperties Properties>
   T& Tensor<T, Properties>::flat(size_t index)
-    requires (!Tensor<T, Properties>::IsIndexed)
+    requires (!IsIndexed)
   {
     return index_to_ref(flat_to_multi_index(index, {m_shape.begin(), m_shape.end()}));
   }
@@ -1278,7 +1278,7 @@ namespace sb
 
   template <typename T, TensorProperties Properties>
   typename Tensor<T, Properties>::source_tensor_type Tensor<T, Properties>::materialize() const
-    requires Tensor<T, Properties>::IsIndexed
+    requires IsIndexed
   {
     source_tensor_type result(shape());
     const size_t count = shape().empty()
