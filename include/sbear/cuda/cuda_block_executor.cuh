@@ -114,12 +114,14 @@ namespace sb
         BlockOp& blockOp,
         const CudaBlockScheduler& scheduler,
         ResultWriter& writer,
-        std::function<void(size_t)> progressCb = [](size_t) {})
+        std::function<void(size_t)> progressCb = [](size_t) {},
+        std::function<bool()> stopRequested = [] { return false; })
       : m_gpuThreads(gpuThreads)
       , m_blockOp(blockOp)
       , m_scheduler(scheduler)
       , m_writer(writer)
       , m_progressCb(progressCb)
+      , m_stopRequested(stopRequested)
       , m_nGpus(gpuThreads.num_workers())
     {
       m_canceled.store(false);
@@ -133,15 +135,20 @@ namespace sb
 
       tf::Taskflow flow;
       flow.for_each_index<size_t, size_t, size_t>(0ul, blocks.size(), 1ul, [this, &blocks, blockDim](size_t i) {
-        if (m_canceled.load())
+        // Checked per block so a stop request (e.g. Ctrl-C via
+        // StoppableTask::request_stop) interrupts a running computation at
+        // block granularity instead of after the whole matrix.
+        if (m_canceled.load() || m_stopRequested())
         {
           return;
         }
         exec_block(blocks[i], blockDim);
       });
 
-      m_gpuThreads.run(std::move(flow));
-      m_gpuThreads.wait_for_all();
+      // wait_for_all() discards task exceptions; get() rethrows the first
+      // CHK_CUDA failure (OOM, bad launch, ...) so it reaches the caller
+      // instead of silently leaving the remaining blocks zeroed.
+      m_gpuThreads.run(std::move(flow)).get();
 
       // Flush any pending scatter on each GPU
       for (size_t iGpu = 0; iGpu < m_nGpus; ++iGpu)
@@ -334,6 +341,7 @@ namespace sb
     const CudaBlockScheduler& m_scheduler;
     ResultWriter& m_writer;
     std::function<void(size_t)> m_progressCb;
+    std::function<bool()> m_stopRequested;
     size_t m_nGpus;
 
     std::vector<GpuBlockStorage> m_gpuStorages;

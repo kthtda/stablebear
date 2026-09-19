@@ -45,7 +45,10 @@ namespace
       auto end = sb::end1dValues(fs);
 
 #ifdef BUILD_WITH_CUDA
-      if (!sb::settings().forceCpu && static_cast<size_t>(std::distance(begin, end)) >= sb::settings().cudaThreshold)
+      // See pdist_impl: cuda() is null when the CUDA module loaded but no
+      // usable device exists at runtime -- take the CPU path instead.
+      if (!sb::settings().forceCpu && sb::default_executor().cuda() != nullptr
+          && static_cast<size_t>(std::distance(begin, end)) >= sb::settings().cudaThreshold)
       {
         if (sb::settings().deviceVerbose)
         {
