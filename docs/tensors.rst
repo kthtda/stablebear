@@ -147,6 +147,12 @@ assignment::
 ``FloatTensor`` when general tensor operations are needed. A standalone cloud
 can also be constructed directly with ``sb.PointCloud(coordinates)``.
 
+Point selection and subsampling may return a ``PointCloudTensor`` backed by
+shared coordinates and per-cloud row indices. Use ``clouds.to_dense()`` when
+an independent tensor with ordinary point-cloud storage is required. The
+original indexed tensor and its views remain indexed and unchanged. Calling
+``to_dense()`` on an already-dense tensor returns an independent copy.
+
 For matrix tensors, the trailing two axes of the array form each ``n x n``
 matrix and the leading axes form the tensor shape::
 

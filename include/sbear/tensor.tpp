@@ -1314,7 +1314,7 @@ namespace sb
       Tensor<T, Properties> ret(shape());
 
       sb::walk(*this, [&ret, this](const std::vector<size_t>& idx){
-        ret(idx) = (*this)(idx);
+        ret(idx) = detail::store_copy((*this)(idx));
       });
 
       return ret;

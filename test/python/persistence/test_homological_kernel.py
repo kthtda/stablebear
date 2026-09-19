@@ -41,6 +41,34 @@ def _diag(points):
     return np.broadcast_to(m, pts.shape).copy()
 
 
+def _assert_barcode_tensors_isomorphic(actual, expected):
+    assert actual.shape == expected.shape
+    assert actual.dtype == expected.dtype
+    for index in np.ndindex(*actual.shape):
+        assert actual[index].is_isomorphic_to(expected[index])
+
+
+def _indexed_kernel_inputs(pcloud_dtype, np_dtype):
+    points_array = np.asarray(
+        [FLAGSHIP_POINTS, np.asarray(FLAGSHIP_POINTS) + 10], dtype=np_dtype
+    )
+    projected_array = np.asarray(
+        [FLAGSHIP_PROJECTED, np.asarray(FLAGSHIP_PROJECTED) + 10],
+        dtype=np_dtype,
+    )
+    leaf = lambda rows: sb.tensor(rows, dtype=sb.uint64)
+    selections = sb.NestedTensor(
+        [
+            [leaf([3, 0, 2, 1]), leaf([1, 1, 0, 3]), leaf([2, 0, 2, 3])],
+            [leaf([0, 3, 1, 2]), leaf([2, 2, 1, 0]), leaf([3, 1, 0, 2])],
+        ]
+    )
+    return (
+        sb.PointCloudTensor(points_array, dtype=pcloud_dtype)[selections],
+        sb.PointCloudTensor(projected_array, dtype=pcloud_dtype)[selections],
+    )
+
+
 # --- Hand-computed 2D cases for the diagonal projection ---
 
 # All points on the diagonal are fixed by the projection, so d' = d and
@@ -88,19 +116,37 @@ def test_diagonal_projection_gives_hand_computed_barcode(points, expected):
     assert bcs[0].is_isomorphic_to(_bc(expected))
 
 
-def test_kernel_uses_indexed_point_clouds_without_materializing_owners():
-    selection = sb.NestedTensor(sb.tensor([3, 0, 2, 1], dtype=sb.uint64))
-    points = sb.PointCloudTensor(np.asarray(FLAGSHIP_POINTS))[selection]
-    projected = sb.PointCloudTensor(np.asarray(FLAGSHIP_PROJECTED))[selection]
-    point_storage_type = type(points._data)
-    projected_storage_type = type(projected._data)
+@pytest.mark.parametrize(
+    "pcloud_dtype,np_dtype",
+    [(sb.pcloud32, np.float32), (sb.pcloud64, np.float64)],
+)
+def test_kernel_accepts_whole_indexed_tensors_outer_views_and_mixed_storage(
+    pcloud_dtype, np_dtype
+):
+    points, projected = _indexed_kernel_inputs(pcloud_dtype, np_dtype)
 
-    bcs = pers.compute_homological_kernel(points[()], projected[()])
+    for indexed_points, indexed_projected in (
+        (points, projected),
+        (points[1:, 1:], projected[1:, 1:]),
+    ):
+        points_storage_type = type(indexed_points._data)
+        projected_storage_type = type(indexed_projected._data)
+        dense_points = indexed_points.to_dense()
+        dense_projected = indexed_projected.to_dense()
+        expected = pers.compute_homological_kernel(
+            dense_points, dense_projected
+        )
 
-    assert type(points._data) is point_storage_type
-    assert type(projected._data) is projected_storage_type
-    assert bcs.shape == (1,)
-    assert bcs[0].is_isomorphic_to(_bc(FLAGSHIP_BARS))
+        for left, right in (
+            (indexed_points, indexed_projected),
+            (indexed_points, dense_projected),
+            (dense_points, indexed_projected),
+        ):
+            actual = pers.compute_homological_kernel(left, right)
+            _assert_barcode_tensors_isomorphic(actual, expected)
+
+        assert type(indexed_points._data) is points_storage_type
+        assert type(indexed_projected._data) is projected_storage_type
 
 
 def test_coordinate_projection_gives_hand_computed_barcode():

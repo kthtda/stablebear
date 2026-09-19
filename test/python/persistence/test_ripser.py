@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 
 import stablebear as sb
 import stablebear.persistence as pers
@@ -70,6 +71,28 @@ def _make_rectangle_point_cloud():
     X[2, :] = [3.0, 0.0]
     X[3, :] = [3.0, 4.0]
     return X
+
+
+def _assert_barcode_tensors_isomorphic(actual, expected):
+    assert actual.shape == expected.shape
+    assert actual.dtype == expected.dtype
+    for index in np.ndindex(*actual.shape):
+        assert actual[index].is_isomorphic_to(expected[index])
+
+
+def _indexed_rectangle_tensors(pcloud_dtype, np_dtype):
+    rectangle = _make_rectangle_point_cloud().astype(np_dtype)
+    leaf = lambda rows: sb.tensor(rows, dtype=sb.uint64)
+    selections = sb.NestedTensor(
+        [
+            [leaf([3, 0, 2, 1]), leaf([1, 1, 0, 3]), leaf([2, 0, 2, 3])],
+            [leaf([0, 3, 1, 2]), leaf([2, 2, 1, 0]), leaf([3, 1, 0, 2])],
+        ]
+    )
+    source = sb.PointCloudTensor(
+        [rectangle, rectangle * np_dtype(2)], dtype=pcloud_dtype
+    )
+    return source[selections]
 
 
 def test_persistence_ripser_unreduced_homology():
@@ -150,17 +173,26 @@ def test_persistence_ripser_compute_euclidean_barcode_on_tensor():
                 assert Y[i, j, k, 1].is_isomorphic_to(xbc[1])
 
 
-def test_persistence_uses_indexed_point_cloud_without_materializing_owner():
-    source = sb.PointCloudTensor(_make_rectangle_point_cloud())
-    selection = sb.NestedTensor(sb.tensor([3, 0, 2, 1], dtype=sb.uint64))
-    indexed = source[selection]
-    indexed_storage_type = type(indexed._data)
+@pytest.mark.parametrize(
+    "pcloud_dtype,np_dtype",
+    [(sb.pcloud32, np.float32), (sb.pcloud64, np.float64)],
+)
+@pytest.mark.parametrize("reduced", [False, True])
+def test_persistence_accepts_whole_indexed_tensors_and_outer_views(
+    pcloud_dtype, np_dtype, reduced
+):
+    indexed_tensor = _indexed_rectangle_tensors(pcloud_dtype, np_dtype)
 
-    actual = pers.compute_persistent_homology(indexed[()], max_dim=2)
-    expected = pers.compute_persistent_homology(
-        _make_rectangle_point_cloud()[[3, 0, 2, 1]], max_dim=2
-    )
+    for indexed in (indexed_tensor, indexed_tensor[1:, 1:]):
+        indexed_storage_type = type(indexed._data)
+        dense = indexed.to_dense()
 
-    assert type(indexed._data) is indexed_storage_type
-    for dim in range(3):
-        assert actual[dim].is_isomorphic_to(expected[dim])
+        actual = pers.compute_persistent_homology(
+            indexed, max_dim=2, reduced=reduced
+        )
+        expected = pers.compute_persistent_homology(
+            dense, max_dim=2, reduced=reduced
+        )
+
+        assert type(indexed._data) is indexed_storage_type
+        _assert_barcode_tensors_isomorphic(actual, expected)

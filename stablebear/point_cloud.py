@@ -266,6 +266,15 @@ class PointCloudTensor(Tensor):
             self._data._ensure_materialized()
         super()._ensure_writeable()
 
+    def to_dense(self):
+        """Return an independent tensor with ordinary point-cloud storage.
+
+        Indexed tensors resolve their logical row selections without changing
+        the source tensor or any views that share its indexed backing. Calling
+        this on an already-dense tensor still returns an independent copy.
+        """
+        return PointCloudTensor(self._data.copy())
+
     def astype(self, dtype):
         if isinstance(self._data, _INDEXED_PCLOUD_CPP_TYPES):
             # Casting is an out-of-place operation. Materialize a temporary

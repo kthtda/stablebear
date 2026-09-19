@@ -157,3 +157,29 @@ def test_point_selection_owns_indices_but_retains_source_view(dtype, np_dtype):
     expected[0, 0] = 99
     npt.assert_array_equal(np.asarray(selected[0]), expected)
     npt.assert_array_equal(np.asarray(sibling[0]), expected)
+
+
+@pytest.mark.parametrize(
+    ("dtype", "np_dtype"),
+    [(sb.pcloud32, np.float32), (sb.pcloud64, np.float64)],
+)
+def test_to_dense_returns_independent_ordinary_storage(dtype, np_dtype):
+    coordinates = np.asarray([[10], [20], [30]], dtype=np_dtype)
+    points = sb.PointCloudTensor([coordinates], dtype=dtype)
+    selections = sb.NestedTensor([sb.tensor([2, 0], dtype=sb.uint64)])
+    selected = points[selections]
+
+    dense = selected.to_dense()
+
+    assert type(dense._data) is type(points._data)
+    npt.assert_array_equal(np.asarray(dense[0]), coordinates[[2, 0]])
+
+    points[0][2, 0] = 99
+    assert dense[0][0, 0] == 30
+
+    dense[0][1, 0] = 88
+    assert selected[0][1, 0] == 10
+
+    dense_copy = dense.to_dense()
+    dense_copy[0][0, 0] = 77
+    assert dense[0][0, 0] == 30

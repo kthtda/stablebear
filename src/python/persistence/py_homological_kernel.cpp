@@ -18,15 +18,18 @@ namespace
   class PyHomologicalKernelBindings
   {
   public:
+    template <sb::TensorProperties Properties, sb::TensorProperties PrimeProperties>
     static std::unique_ptr<sb::StoppableTask<void>> spawn_homological_kernel_pcloud_task(
-        const sb::Tensor<sb::PointCloud<T>> &pclouds, const sb::Tensor<sb::PointCloud<T>> &pcloudsPrime,
+        const sb::Tensor<sb::PointCloud<T>, Properties> &pclouds,
+        const sb::Tensor<sb::PointCloud<T>, PrimeProperties> &pcloudsPrime,
         sb::Tensor<sb::ph::Barcode<T>> &out)
     {
-      return sb_py::execute_stoppable_task<sb::ph::HomologicalKernelImpl<sb::PointCloud<T>, T>>(
+      return sb_py::execute_stoppable_task<sb::ph::HomologicalKernelImpl<
+          sb::PointCloud<T>, T, Properties, PrimeProperties>>(
           pclouds, pcloudsPrime, out);
     }
 
-    static std::unique_ptr<sb::StoppableTask<void>> spawn_homological_kernel_pcloud_task(
+    static std::unique_ptr<sb::StoppableTask<void>> spawn_homological_kernel_single_pcloud_task(
         const sb::PointCloud<T> &pointCloud, const sb::PointCloud<T> &pointCloudPrime,
         sb::Tensor<sb::ph::Barcode<T>> &out)
     {
@@ -51,17 +54,27 @@ namespace
       py::class_<PyHomologicalKernelBindings>(m, ("HomologicalKernel" + suffix).c_str())
           .def_static(
               "spawn_homological_kernel_pcloud_task",
-              py::overload_cast<
-                  const sb::Tensor<sb::PointCloud<T>> &, const sb::Tensor<sb::PointCloud<T>> &,
-                  sb::Tensor<sb::ph::Barcode<T>> &
-                  >(&PyHomologicalKernelBindings::spawn_homological_kernel_pcloud_task)
+              &PyHomologicalKernelBindings::template spawn_homological_kernel_pcloud_task<
+                  sb::TensorProperty::None, sb::TensorProperty::None>
           )
           .def_static(
               "spawn_homological_kernel_pcloud_task",
-              py::overload_cast<
-                  const sb::PointCloud<T> &, const sb::PointCloud<T> &,
-                  sb::Tensor<sb::ph::Barcode<T>> &
-                  >(&PyHomologicalKernelBindings::spawn_homological_kernel_pcloud_task)
+              &PyHomologicalKernelBindings::template spawn_homological_kernel_pcloud_task<
+                  sb::TensorProperty::Indexed, sb::TensorProperty::Indexed>
+          )
+          .def_static(
+              "spawn_homological_kernel_pcloud_task",
+              &PyHomologicalKernelBindings::template spawn_homological_kernel_pcloud_task<
+                  sb::TensorProperty::Indexed, sb::TensorProperty::None>
+          )
+          .def_static(
+              "spawn_homological_kernel_pcloud_task",
+              &PyHomologicalKernelBindings::template spawn_homological_kernel_pcloud_task<
+                  sb::TensorProperty::None, sb::TensorProperty::Indexed>
+          )
+          .def_static(
+              "spawn_homological_kernel_pcloud_task",
+              &PyHomologicalKernelBindings::spawn_homological_kernel_single_pcloud_task
           )
           .def_static(
               "spawn_homological_kernel_distmat_task",

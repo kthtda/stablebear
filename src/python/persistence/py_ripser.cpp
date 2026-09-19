@@ -15,9 +15,20 @@ namespace
   class PyRipserBindings
   {
   public:
+    using PointCloudTensor = sb::Tensor<sb::PointCloud<T>>;
+    using IndexedPointCloudTensor = sb::Tensor<sb::PointCloud<T>, sb::TensorProperty::Indexed>;
+
     static std::unique_ptr<sb::StoppableTask<void>> spawn_ripser_pcloud_euclidean_task(const sb::Tensor<sb::PointCloud<T>>& pclouds, sb::Tensor<sb::ph::Barcode<T>>& out, size_t maxDim, bool reducedHomology)
     {
       return sb_py::execute_stoppable_task<sb::ph::RipserTask<T>>(pclouds, out, maxDim, reducedHomology);
+    }
+
+    static std::unique_ptr<sb::StoppableTask<void>> spawn_ripser_pcloud_euclidean_task(
+        const IndexedPointCloudTensor& pclouds, sb::Tensor<sb::ph::Barcode<T>>& out, size_t maxDim,
+        bool reducedHomology)
+    {
+      return sb_py::execute_stoppable_task<sb::ph::RipserTask<T, sb::TensorProperty::Indexed>>(
+          pclouds, out, maxDim, reducedHomology);
     }
 
     static std::unique_ptr<sb::StoppableTask<void>> spawn_ripser_pcloud_euclidean_task(const sb::PointCloud<T>& pointCloud, sb::Tensor<sb::ph::Barcode<T>>& out, size_t maxDim, bool reducedHomology)
@@ -39,6 +50,10 @@ namespace
         .def_static(
           "spawn_ripser_pcloud_euclidean_task",
           py::overload_cast<const sb::Tensor<sb::PointCloud<T>>&, sb::Tensor<sb::ph::Barcode<T>>&, size_t, bool>(
+            &PyRipserBindings::spawn_ripser_pcloud_euclidean_task))
+        .def_static(
+          "spawn_ripser_pcloud_euclidean_task",
+          py::overload_cast<const IndexedPointCloudTensor&, sb::Tensor<sb::ph::Barcode<T>>&, size_t, bool>(
             &PyRipserBindings::spawn_ripser_pcloud_euclidean_task))
         .def_static(
           "spawn_ripser_pcloud_euclidean_task",

@@ -189,6 +189,10 @@ namespace sb
     /// @p keepSource is moot for an owning cloud, which never shares.
     [[nodiscard]] PointCloud copy(bool keepSource = true) const
     {
+      if (m_coords.rank() == 0)
+      {
+        return PointCloud();
+      }
       if (is_indexed())
       {
         if (keepSource)
@@ -241,6 +245,10 @@ namespace sb
     /// Return an owning value containing exactly the logical coordinates.
     [[nodiscard]] PointCloud materialized_copy() const
     {
+      if (m_coords.rank() == 0)
+      {
+        return PointCloud();
+      }
       return is_indexed() ? PointCloud(materialize()) : PointCloud(m_coords.copy());
     }
 

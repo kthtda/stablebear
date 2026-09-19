@@ -181,9 +181,10 @@ namespace sb::ph
       detail::homological_kernel_single_impl(dm, dmPrime, retBarcodes(index));
     }
 
-    template <typename T>
+    template <typename T, TensorProperties Properties, TensorProperties PrimeProperties>
     void homological_kernel_pcloud_single_impl(
-        const Tensor<PointCloud<T>> &pclouds, const Tensor<PointCloud<T>> &pcloudsPrime,
+        const Tensor<PointCloud<T>, Properties> &pclouds,
+        const Tensor<PointCloud<T>, PrimeProperties> &pcloudsPrime,
         Tensor<Barcode<T>> &retBarcodes, const std::vector<size_t> &index)
     {
       auto const &pc = pclouds(index);
@@ -217,11 +218,14 @@ namespace sb::ph
 
   } // namespace detail
 
-  template <typename ElemT, typename T>
+  template <
+      typename ElemT, typename T, TensorProperties Properties = TensorProperty::None,
+      TensorProperties PrimeProperties = Properties>
   class HomologicalKernelImpl : public StoppableTask<void>
   {
   public:
-    HomologicalKernelImpl(Tensor<ElemT> input, Tensor<ElemT> inputPrime, Tensor<Barcode<T>> &ret)
+    HomologicalKernelImpl(
+        Tensor<ElemT, Properties> input, Tensor<ElemT, PrimeProperties> inputPrime, Tensor<Barcode<T>> &ret)
         : m_input(std::move(input)), m_inputPrime(std::move(inputPrime)), m_ret(ret)
     {
     }
@@ -264,8 +268,8 @@ namespace sb::ph
           },
           exec);
     }
-    Tensor<ElemT> m_input;
-    Tensor<ElemT> m_inputPrime;
+    Tensor<ElemT, Properties> m_input;
+    Tensor<ElemT, PrimeProperties> m_inputPrime;
     Tensor<Barcode<T>> &m_ret;
   };
 
