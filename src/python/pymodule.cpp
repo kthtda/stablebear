@@ -145,6 +145,11 @@ PYBIND11_MODULE(SB_MODULE_NAME, m) {
   m.def("set_min_block_side", [](size_t n){ sb::settings().minBlockSide = n; });
 #ifdef BUILD_WITH_CUDA
   m.def("limit_gpus", [](size_t n){ sb::default_executor().limit_cuda_workers(n); });
+#else
+  // No-op on CPU-only builds, per the Python docstring ("only has an effect
+  // if compiled with GPU support") -- omitting it entirely made
+  // stablebear.system.limit_gpus raise AttributeError instead.
+  m.def("limit_gpus", [](size_t) { });
 #endif
   m.def("get_ngpus", &getNumGpus);
 
