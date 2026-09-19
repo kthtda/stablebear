@@ -191,7 +191,8 @@ class NestedTensor(Tensor):
 
     def _to_py_tensor(self, data):
         node_type, _ = _NESTED_CPP_TYPES[self.dtype]
-        return NestedTensor(node_type(data, self.depth - 1))
+        root = node_type._from_outer_view(data, self.depth - 1)
+        return NestedTensor(root)
 
     def _represent_element(self, element):
         from .base_tensor import FloatTensor, IntTensor

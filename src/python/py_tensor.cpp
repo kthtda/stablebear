@@ -116,6 +116,8 @@ namespace
         .def(py::init<const sb::Tensor<T>&>())
         .def(py::init<const typename Nested::nested_tensor_type&, size_t>(),
              py::arg("tensor"), py::arg("child_depth") = 0)
+        .def_static("_from_outer_view", &Nested::from_outer_view,
+             py::arg("tensor"), py::arg("child_depth"))
         .def_property_readonly("is_leaf", &Nested::is_leaf)
         .def_property_readonly("depth", &Nested::depth)
         .def_property_readonly("leaf", &Nested::leaf)

@@ -67,6 +67,30 @@ namespace
     EXPECT_EQ(empty.shape(), (std::vector<size_t>{ 0 }));
   }
 
+  TEST(NestedTensor, DistinguishesValueConstructionFromOuterViewWrapping)
+  {
+    using Nested = sb::NestedTensor<uint64_t>;
+
+    sb::Tensor<uint64_t> firstLeaf({ 1 });
+    firstLeaf(0) = 1;
+    sb::Tensor<Nested> children({ 1 });
+    children(0) = Nested(firstLeaf);
+
+    const Nested value(children, 1);
+    const Nested view = Nested::from_outer_view(children.flatten(), 1);
+
+    firstLeaf(0) = 9;
+    EXPECT_EQ(std::get<uint64_t>(value.nested()(0)({ 0 })), 1);
+    EXPECT_EQ(std::get<uint64_t>(view.nested()(0)({ 0 })), 9);
+
+    sb::Tensor<uint64_t> replacement({ 1 });
+    replacement(0) = 7;
+    children(0) = Nested(replacement);
+
+    EXPECT_EQ(std::get<uint64_t>(value.nested()(0)({ 0 })), 1);
+    EXPECT_EQ(std::get<uint64_t>(view.nested()(0)({ 0 })), 7);
+  }
+
   struct IndexableValue
   {
     using index_type = size_t;

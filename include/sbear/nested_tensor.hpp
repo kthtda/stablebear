@@ -60,6 +60,15 @@ namespace sb
       m_depth = inferredDepth + 1;
     }
 
+    /// Wrap outer tensor view metadata without recursively copying its children.
+    /// The caller must already own the child values; public value construction
+    /// through the const-reference constructor intentionally copies them.
+    [[nodiscard]] static NestedTensor from_outer_view(
+      nested_tensor_type view, size_t childDepth)
+    {
+      return NestedTensor(std::move(view), childDepth);
+    }
+
     [[nodiscard]] bool is_leaf() const noexcept
     {
       return std::holds_alternative<Tensor<LeafT>>(*m_storage);
