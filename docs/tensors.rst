@@ -122,6 +122,35 @@ When passed a ``Pcf`` or a nested collection of PCFs, the factory infers a
 the PCF value dtype. A single ``Pcf`` becomes a one-element tensor.
 
 
+Exporting back to NumPy
+-----------------------
+
+The non-numeric tensor families can be read back out as dense NumPy arrays, the
+inverse of the constructors above. A :py:class:`~stablebear.PointCloudTensor` of
+equal-sized clouds and a :py:class:`~stablebear.DistanceMatrixTensor` or
+:py:class:`~stablebear.SymmetricMatrixTensor` all provide
+``to_dense()``/``to_numpy()`` and work with :py:func:`numpy.asarray`::
+
+   pc = sb.PointCloudTensor(np.random.rand(3, 5, 4, 2))
+   dense = pc.to_dense()          # (3, 5, 4, 2)
+   same = np.asarray(pc)          # equivalent
+
+   dmats = sb.DistanceMatrixTensor(np.zeros((6, 4, 4)))
+   stack = dmats.to_dense()       # (6, 4, 4)
+
+Point clouds must all have the same shape and matrices the same size; a ragged
+point-cloud tensor or a tensor of differently sized matrices raises
+``ValueError`` (index the tensor and convert each element separately in that
+case). Dense NumPy arrays can be passed directly to the matrix tensor constructors;
+the existing ``from_numpy`` class methods remain available for compatibility.
+
+Barcodes are inherently ragged (each cell may hold a different number of bars),
+so a :py:class:`~stablebear.persistence.BarcodeTensor` cannot become a single
+dense array. It instead provides ``to_numpy()`` (an ``object`` array whose cells
+are the per-cell ``(n_i, 2)`` arrays) and ``tolist()`` (the same as a nested
+list); see :doc:`persistence`.
+
+
 From serialized NumPy data
 ---------------------------
 

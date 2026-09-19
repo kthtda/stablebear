@@ -235,6 +235,26 @@ class SymmetricMatrixTensor(Tensor):
         """
         return cls(np.asarray(array), dtype=dtype)
 
+    def to_dense(self) -> np.ndarray:
+        """Return the matrices as a dense ``(*tensor_shape, n, n)`` array.
+
+        All matrices must share the same size ``n``; otherwise (or for an
+        empty tensor) a ``ValueError`` is raised.
+        """
+        from .distance_matrix import _matrix_tensor_to_dense
+        return _matrix_tensor_to_dense(self)
+
+    def to_numpy(self) -> np.ndarray:
+        """Return the dense ``(*tensor_shape, n, n)`` array. Alias for :meth:`to_dense`."""
+        return self.to_dense()
+
+    def __array__(self, dtype=None, copy=None):
+        """Return the dense ``(*tensor_shape, n, n)`` array so ``np.asarray`` works."""
+        arr = self.to_dense()
+        if dtype is not None:
+            arr = arr.astype(dtype, copy=False)
+        return arr
+
     def _to_py_tensor(self, data):
         return SymmetricMatrixTensor(data)
 
