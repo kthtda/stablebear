@@ -49,7 +49,7 @@ identify review work, not test-plan items. The broader test plan still applies.
   (2,219 passed), the full C++ suite (472 passed), and focused point-cloud and
   subsampling tests on both the default and forced-CPU backends.
 
-- [ ] **A2. [P1] Preserve nested outer views instead of deep-copying them.**
+- [x] **A2. [P1] Preserve nested outer views instead of deep-copying them.**
 
   **Finding:** Python wraps outer views through a C++ constructor that
   recursively copies children. Modifying `nested[:1][0][0]` leaves the parent
@@ -69,6 +69,11 @@ identify review work, not test-plan items. The broader test plan still applies.
   Sources: [nested_tensor.py](../stablebear/nested_tensor.py), `_to_py_tensor()`;
   [nested_tensor.hpp](../include/sbear/nested_tensor.hpp), the const-reference
   constructor and `copy_nested()`. Verification: test plan B3–B4.
+
+  **Completed:** Fixed by `ef3d1620f`. Verified with the full Python suite
+  (2,224 passed), the full C++ suite (473 passed), focused nested-tensor tests
+  on both the default and forced-CPU backends, and explicit construction,
+  assignment, outer-view, empty-view, `copy()`, and `deepcopy()` coverage.
 
 - [ ] **A3. [P1] Own point-cloud selections independently of the caller.**
 
