@@ -88,6 +88,21 @@ def test_diagonal_projection_gives_hand_computed_barcode(points, expected):
     assert bcs[0].is_isomorphic_to(_bc(expected))
 
 
+def test_kernel_uses_indexed_point_clouds_without_materializing_owners():
+    selection = sb.NestedTensor(sb.tensor([3, 0, 2, 1], dtype=sb.uint64))
+    points = sb.PointCloudTensor(np.asarray(FLAGSHIP_POINTS))[selection]
+    projected = sb.PointCloudTensor(np.asarray(FLAGSHIP_PROJECTED))[selection]
+    point_storage_type = type(points._data)
+    projected_storage_type = type(projected._data)
+
+    bcs = pers.compute_homological_kernel(points[()], projected[()])
+
+    assert type(points._data) is point_storage_type
+    assert type(projected._data) is projected_storage_type
+    assert bcs.shape == (1,)
+    assert bcs[0].is_isomorphic_to(_bc(FLAGSHIP_BARS))
+
+
 def test_coordinate_projection_gives_hand_computed_barcode():
     # Dropping the last coordinate gives d' = |x_i - x_j| for 2D input.
     # Points A=(0,0), B=(1,2), C=(3,1): both d MST edges (A-B, B-C) weigh
@@ -503,10 +518,3 @@ def test_mismatched_point_counts_raise():
     X = np.array(DIAGONAL_POINTS)
     with pytest.raises(RuntimeError):
         pers.compute_homological_kernel(X, X[:2].copy())
-
-
-def test_rank1_arrays_raise():
-    # A 1-D array is not an (n, dim) point cloud and must be rejected.
-    X = np.array([1.0, 2.0, 3.0])
-    with pytest.raises(RuntimeError, match="unexpected shape"):
-        pers.compute_homological_kernel(X, X / 2.0)

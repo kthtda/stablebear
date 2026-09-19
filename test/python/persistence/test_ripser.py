@@ -148,3 +148,19 @@ def test_persistence_ripser_compute_euclidean_barcode_on_tensor():
 
                 assert Y[i, j, k, 0].is_isomorphic_to(xbc[0])
                 assert Y[i, j, k, 1].is_isomorphic_to(xbc[1])
+
+
+def test_persistence_uses_indexed_point_cloud_without_materializing_owner():
+    source = sb.PointCloudTensor(_make_rectangle_point_cloud())
+    selection = sb.NestedTensor(sb.tensor([3, 0, 2, 1], dtype=sb.uint64))
+    indexed = source[selection]
+    indexed_storage_type = type(indexed._data)
+
+    actual = pers.compute_persistent_homology(indexed[()], max_dim=2)
+    expected = pers.compute_persistent_homology(
+        _make_rectangle_point_cloud()[[3, 0, 2, 1]], max_dim=2
+    )
+
+    assert type(indexed._data) is indexed_storage_type
+    for dim in range(3):
+        assert actual[dim].is_isomorphic_to(expected[dim])
