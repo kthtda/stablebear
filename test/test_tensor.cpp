@@ -150,6 +150,33 @@ namespace
     EXPECT_EQ(indexed({ 1, 1 }).value, 25);
   }
 
+  TEST(TensorProperties, IndexedViewsReplaceSharedSourceWhenMaterialized)
+  {
+    sb::Tensor<IndexableValue> source({ 2 });
+    source(0) = { 10 };
+    source(1) = { 20 };
+    sb::Tensor<size_t> indices({ 2 });
+    indices(0) = 1;
+    indices(1) = 2;
+
+    auto indexed = sb::make_indexed_tensor(source, indices);
+    auto view = indexed.flatten();
+
+    view.ensure_materialized();
+
+    EXPECT_THROW((void)indexed.indices_view(), std::logic_error);
+    EXPECT_EQ(indexed.source_view()(0).value, 11);
+    EXPECT_EQ(indexed.source_view()(1).value, 22);
+
+    view.writable_at(0).value = 99;
+    EXPECT_EQ(indexed(0).value, 99);
+    EXPECT_EQ(source(0).value, 10);
+
+    // A second transition is a no-op and must not restore the lazy source.
+    indexed.ensure_materialized();
+    EXPECT_EQ(view(0).value, 99);
+  }
+
   TEST(TensorProperties, TensorValuedIndicesUseNestedTensorStorage)
   {
     using PointCloud = sb::PointCloud<float>;
@@ -177,6 +204,9 @@ namespace
     const PointCloud selected = indexed(0);
     EXPECT_EQ(selected(0, 0), 30);
     EXPECT_EQ(selected(1, 0), 10);
+
+    PointCloud mutableSelected = indexed(0);
+    EXPECT_THROW(mutableSelected(0, 0) = 99, std::logic_error);
   }
 
   TEST(TensorProperties, MakeIndexedTensorRejectsNonBroadcastableSourceShape)

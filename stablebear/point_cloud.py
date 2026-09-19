@@ -20,6 +20,8 @@ _INDEXED_PCLOUD_CPP_TYPES = (
     cpp._IndexedPointCloud64Tensor,
 )
 
+_POINT_CLOUD_CPP_TYPES = (cpp.PointCloud32, cpp.PointCloud64)
+
 _PCLOUD_TO_FLOAT_DTYPE = {pcloud32: float32, pcloud64: float64}
 
 
@@ -38,24 +40,32 @@ class PointCloud:
         self._outer_index = _outer_index
 
         if _owner is None:
-            if dtype in _PCLOUD_TO_FLOAT_DTYPE:
-                dtype = _PCLOUD_TO_FLOAT_DTYPE[dtype]
-            self._detached = FloatTensor(data, dtype=dtype)
-            if self._detached.ndim != 2:
+            if isinstance(data, _POINT_CLOUD_CPP_TYPES):
+                self._value = data
+                tensor = data.coords
+            else:
+                if dtype in _PCLOUD_TO_FLOAT_DTYPE:
+                    dtype = _PCLOUD_TO_FLOAT_DTYPE[dtype]
+                tensor = FloatTensor(data, dtype=dtype)
+                cpp_type = (
+                    cpp.PointCloud32 if tensor.dtype == float32 else cpp.PointCloud64
+                )
+                self._value = cpp_type(tensor._data)
+            if len(tensor.shape) != 2:
                 raise ValueError(
-                    f"PointCloud must have rank 2, got rank {self._detached.ndim}"
+                    "PointCloud must have 2 dimensions, "
+                    f"got {len(tensor.shape)}"
                 )
         else:
-            self._detached = None
+            self._value = None
             if tuple(data.coords.shape) != () and len(data.coords.shape) != 2:
                 raise ValueError(
-                    f"PointCloud must have rank 2, got rank {len(data.coords.shape)}"
+                    "PointCloud must have 2 dimensions, "
+                    f"got {len(data.coords.shape)}"
                 )
 
     @property
     def shape(self):
-        if self._detached is not None:
-            return self._detached.shape
         point_cloud = self._current_point_cloud()
         return (point_cloud.n_points, point_cloud.n_dims)
 
@@ -65,44 +75,43 @@ class PointCloud:
 
     @property
     def dtype(self):
-        if self._detached is not None:
-            return self._detached.dtype
-        return _PCLOUD_TO_FLOAT_DTYPE[self._owner.dtype]
+        if self._owner is not None:
+            return _PCLOUD_TO_FLOAT_DTYPE[self._owner.dtype]
+        return float32 if isinstance(self._value, cpp.PointCloud32) else float64
 
     def _current_point_cloud(self):
+        if self._owner is None:
+            return self._value
         return self._owner._data._get_point_cloud(self._outer_index)
 
     def _cpp_point_cloud(self):
-        if self._detached is not None:
-            cpp_type = (
-                cpp.PointCloud32 if self.dtype == float32 else cpp.PointCloud64
-            )
-            return cpp_type(self._detached._data)
         return self._current_point_cloud()
 
-    def _read_tensor(self):
+    def _readable_coords(self):
         from .base_tensor import FloatTensor
 
-        if self._detached is not None:
-            return self._detached
         return FloatTensor(self._current_point_cloud().materialize())
 
-    def _write_tensor(self):
+    def _writable_coords(self):
         from .base_tensor import FloatTensor
 
-        if self._detached is not None:
-            return self._detached
-        self._owner._ensure_writeable()
-        return FloatTensor(self._owner._data._get_element(self._outer_index))
+        if self._owner is not None:
+            self._owner._ensure_writeable()
+            point_cloud = self._owner._data._get_writeable_element(
+                self._outer_index
+            )
+        else:
+            point_cloud = self._value
+        return FloatTensor(point_cloud._mutable_coords())
 
     def __getitem__(self, index):
-        return self._read_tensor()[index]
+        return self._readable_coords()[index]
 
     def __setitem__(self, index, value):
-        self._write_tensor()[index] = value
+        self._writable_coords()[index] = value
 
     def __array__(self, dtype=None, copy=None):
-        array = np.asarray(self._read_tensor(), dtype=dtype)
+        array = np.asarray(self._readable_coords(), dtype=dtype)
         if copy:
             return array.copy()
         return array
@@ -112,7 +121,7 @@ class PointCloud:
 
     def materialize(self):
         """Return this point cloud as a standalone ``FloatTensor``."""
-        return self._read_tensor().copy()
+        return self._readable_coords().copy()
 
     def copy(self):
         return PointCloud(self.materialize())
@@ -136,7 +145,9 @@ def _pointcloud_cpp_from_array(arr, cloud_ndim, dtype):
 
     arr = np.asarray(arr)
     if cloud_ndim != 2:
-        raise ValueError("PointCloud elements must have rank 2; cloud_ndim must be 2")
+        raise ValueError(
+            "PointCloud elements must have 2 dimensions; cloud_ndim must be 2"
+        )
     if arr.ndim < cloud_ndim:
         raise ValueError(
             f"array with {arr.ndim} dimension(s) is too small for cloud_ndim={cloud_ndim}")
@@ -164,7 +175,9 @@ def _pointcloud_cpp_from_list(seq, dtype):
     t = zeros((len(clouds),), dtype=dt)
     for i, cloud in enumerate(clouds):
         if cloud.ndim != 2:
-            raise ValueError(f"PointCloud must have rank 2, got rank {cloud.ndim}")
+            raise ValueError(
+                f"PointCloud must have 2 dimensions, got {cloud.ndim}"
+            )
         if dtype is None and _pcloud_dtype_for(cloud.dtype, None) != dt:
             raise TypeError(
                 f"point clouds have differing dtypes "
@@ -213,7 +226,7 @@ class PointCloudTensor(Tensor):
         return PointCloud(element, _owner=self, _outer_index=index)
 
     def _single_cloud(self):
-        return self._represent_element(self._data._get_element([]))
+        return self._point_cloud([])
 
     def __getitem__(self, index):
         """Select clouds, or points when this tensor contains one cloud.
@@ -250,12 +263,15 @@ class PointCloudTensor(Tensor):
 
     def _ensure_writeable(self):
         if isinstance(self._data, _INDEXED_PCLOUD_CPP_TYPES):
-            self._data = self._data.materialize()
+            self._data._ensure_materialized()
         super()._ensure_writeable()
 
     def astype(self, dtype):
         if isinstance(self._data, _INDEXED_PCLOUD_CPP_TYPES):
-            self._data = self._data.materialize()
+            # Casting is an out-of-place operation. Materialize a temporary
+            # value rather than detaching only this wrapper from the indexed
+            # backing shared by its parent and sibling views.
+            return PointCloudTensor(self._data.materialize()).astype(dtype)
         return super().astype(dtype)
 
     def _decay_value(self, val):
@@ -266,7 +282,9 @@ class PointCloudTensor(Tensor):
             val = np.asarray(val)
         tensor = FloatTensor(val, dtype=float_dtype)
         if tensor.ndim != 2:
-            raise ValueError(f"PointCloud must have rank 2, got rank {tensor.ndim}")
+            raise ValueError(
+                f"PointCloud must have 2 dimensions, got {tensor.ndim}"
+            )
         return tensor._data
 
     def _get_valid_setitem_dtypes(self):

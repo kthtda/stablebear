@@ -27,14 +27,14 @@ def test_point_cloud_is_a_rank_two_facade(dtype, np_dtype):
 
 @pytest.mark.parametrize("shape", [(3,), (2, 3, 4)])
 def test_point_cloud_rejects_non_rank_two_data(shape):
-    with pytest.raises(ValueError, match="rank 2"):
+    with pytest.raises(ValueError, match="2 dimensions"):
         sb.PointCloud(np.zeros(shape))
 
 
 @pytest.mark.parametrize("shape", [(3,), (2, 3, 4)])
 def test_point_cloud_tensor_rejects_non_rank_two_assignment(shape):
     tensor = sb.zeros((1,), dtype=sb.pcloud64)
-    with pytest.raises(ValueError, match="rank 2"):
+    with pytest.raises(ValueError, match="2 dimensions"):
         tensor[0] = np.zeros(shape)
 
 

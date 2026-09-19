@@ -125,7 +125,7 @@ namespace sb::pp
       const auto& cloud = points(index);
       if (cloud.coords().rank() != 0 && cloud.coords().rank() != 2)
       {
-        throw std::invalid_argument("point clouds must have rank 2");
+        throw std::invalid_argument("point clouds must have 2 dimensions");
       }
       const size_t available = cloud.n_points();
       if (!replace && !allowPartial && available < nPoints)

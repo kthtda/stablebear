@@ -135,6 +135,15 @@ namespace sb_py
     }
   }
 
+  template <typename TTensor, typename Index>
+  decltype(auto) writable_element(TTensor& tensor, const Index& index)
+  {
+    if constexpr (TTensor::IsIndexed)
+      return tensor.writable_at(index);
+    else
+      return tensor(index);
+  }
+
   template <typename TTensor>
   void bind_tensor_view_operations(pybind11::class_<TTensor>& cls)
   {
@@ -150,6 +159,23 @@ namespace sb_py
       .def("__getitem__", [](const TTensor& self, const std::vector<sb::Slice>& slices) {
         return self[slices];
       })
+      .def("_get_element", [](const TTensor& self, const std::vector<size_t>& index) {
+        assert_valid_index(self, index);
+        return self(index);
+      })
+      .def("_get_element", [](const TTensor& self, size_t index) {
+        assert_valid_index(self, index);
+        return self(index);
+      })
+      .def("_get_writeable_element", [](TTensor& self,
+        const std::vector<size_t>& index) -> decltype(auto) {
+        assert_valid_index(self, index);
+        return writable_element(self, index);
+      }, pybind11::return_value_policy::reference_internal)
+      .def("_get_writeable_element", [](TTensor& self, size_t index) -> decltype(auto) {
+        assert_valid_index(self, index);
+        return writable_element(self, index);
+      }, pybind11::return_value_policy::reference_internal)
       .def("copy", &TTensor::copy)
       .def("flatten", &TTensor::flatten)
       .def("reshape", &TTensor::reshape)
@@ -162,6 +188,9 @@ namespace sb_py
         return self.broadcast_to(shape);
       })
       .def("is_contiguous", &TTensor::is_contiguous);
+
+    if constexpr (TTensor::IsIndexed)
+      cls.def("_ensure_materialized", &TTensor::ensure_materialized);
   }
 
   template <typename T, sb::TensorProperties Properties>
@@ -172,22 +201,7 @@ namespace sb_py
     pybind11::class_<TTensor> cls(m, name.c_str());
     bind_tensor_view_operations(cls);
 
-    cls
-      .def("_get_element", [](const TTensor& self, const std::vector<size_t>& index) {
-        assert_valid_index(self, index);
-        if constexpr (sb::is_point_cloud_v<T>)
-          return self(index).materialize().copy();
-        else
-          return self(index);
-      })
-      .def("_get_element", [](const TTensor& self, size_t index) {
-        assert_valid_index(self, index);
-        if constexpr (sb::is_point_cloud_v<T>)
-          return self(index).materialize().copy();
-        else
-          return self(index);
-      })
-      .def("materialize", &TTensor::materialize);
+    cls.def("materialize", &TTensor::materialize);
 
     if constexpr (sb::is_point_cloud_v<T>)
     {
@@ -282,22 +296,6 @@ namespace sb_py
           return self == rhs;
         })
 
-      .def("_get_element", [](TTensor& self, const std::vector<size_t>& index) {
-          assert_valid_index(self, index);
-          if constexpr (sb::is_point_cloud_v<T>)
-            return self(index).materialize_local();
-          else
-            return self(index);
-        })
-
-      .def("_get_element", [](TTensor& self, size_t index) {
-          assert_valid_index(self, index);
-          if constexpr (sb::is_point_cloud_v<T>)
-            return self(index).materialize_local();
-          else
-            return self(index);
-        })
-
       .def("_set_element", [](TTensor& self, const std::vector<size_t>& index, const T& val) {
           assert_valid_index(self, index);
           self(index) = sb::detail::store_copy(val);
@@ -321,8 +319,7 @@ namespace sb_py
     ;
 
     // For a tensor of point clouds, assigning a plain coordinate tensor wraps it
-    // as a materialized PointCloud element. The generic element-read overloads
-    // remain available to code paths that explicitly request coordinates.
+    // as a materialized PointCloud element.
     if constexpr (sb::is_point_cloud_v<T>)
     {
       using ScalarT = typename T::value_type;

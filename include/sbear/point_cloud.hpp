@@ -103,8 +103,9 @@ namespace sb
     /// the cloud-level members for the selected points.
     [[nodiscard]] const Tensor<T>& coords() const { return m_coords; }
 
-    /// Coordinate @p j of point @p i, transparent to indexing. A mutable
-    /// access first detaches an indexed cloud from its shared source.
+    /// Coordinate @p j of point @p i, transparent to indexing. Mutable access
+    /// is only available for dense clouds; an indexed tensor must transition
+    /// its complete shared backing before exposing mutable coordinates.
     const T& operator()(size_t i, size_t j) const
     {
       const size_t row = is_indexed() ? static_cast<size_t>(m_indices(i)) : i;
@@ -113,8 +114,7 @@ namespace sb
 
     T& operator()(size_t i, size_t j)
     {
-      materialize_local();
-      return m_coords({i, j});
+      return mutable_coords()({i, j});
     }
 
     const T& operator()(const std::vector<size_t>& index) const
@@ -125,15 +125,15 @@ namespace sb
       }
       if (index.size() != 2)
       {
-        throw std::invalid_argument("Point-cloud coordinate index must have rank 2");
+        throw std::invalid_argument(
+          "Point-cloud coordinate index must have 2 dimensions");
       }
       return (*this)(index[0], index[1]);
     }
 
     T& operator()(const std::vector<size_t>& index)
     {
-      materialize_local();
-      return m_coords(index);
+      return mutable_coords()(index);
     }
 
     /// View-transparent equality: two clouds are equal when they present the
@@ -191,13 +191,13 @@ namespace sb
     {
       if (m_coords.rank() != 2)
       {
-        throw std::invalid_argument("Point-cloud coordinates must have rank 2");
+        throw std::invalid_argument("Point-cloud coordinates must have 2 dimensions");
       }
 
       const Tensor<uint64_t>& requested = selection;
       if (requested.rank() != 1)
       {
-        throw std::invalid_argument("Point-cloud selections must have rank 1");
+        throw std::invalid_argument("Point-cloud selections must have 1 dimension");
       }
 
       for (size_t i = 0; i < requested.shape(0); ++i)
@@ -251,12 +251,12 @@ namespace sb
       return out;
     }
 
-    [[nodiscard]] Tensor<T> materialize_local()
+    [[nodiscard]] Tensor<T>& mutable_coords()
     {
       if (is_indexed())
       {
-        m_coords = materialize();
-        m_indices = Tensor<uint64_t>();
+        throw std::logic_error(
+          "Cannot mutate an indexed PointCloud directly; materialize its shared tensor backing first");
       }
       return m_coords;
     }

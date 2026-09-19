@@ -21,6 +21,8 @@ namespace
       .def_property_readonly("is_indexed", &PointCloud::is_indexed)
       .def_property_readonly("indices", &PointCloud::indices)
       .def_property_readonly("coords", &PointCloud::coords)
+      .def("_mutable_coords", &PointCloud::mutable_coords,
+        py::return_value_policy::reference_internal)
       .def("materialize", &PointCloud::materialize)
       .def("copy", &PointCloud::copy, py::arg("keep_source") = true);
   }

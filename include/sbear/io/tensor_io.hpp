@@ -468,7 +468,8 @@ namespace sb::io::detail
       {
         if (source.rank() != 0 && source.rank() != 2)
         {
-          throw std::runtime_error("Invalid point-cloud coordinate rank in saved data");
+          throw std::runtime_error(
+            "Invalid number of point-cloud coordinate dimensions in saved data");
         }
       }
       sources.push_back(std::move(source));
@@ -488,7 +489,8 @@ namespace sb::io::detail
         Tensor<uint64_t> indices = read_element<Tensor<uint64_t>>(is);
         if (indices.rank() != 1)
         {
-          throw std::runtime_error("Invalid point-cloud index rank in saved data");
+          throw std::runtime_error(
+            "Invalid number of point-cloud index dimensions in saved data");
         }
         for (size_t i = 0; i < indices.size(); ++i)
         {

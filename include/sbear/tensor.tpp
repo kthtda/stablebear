@@ -44,14 +44,32 @@ namespace sb
   template <typename T, TensorProperties Properties>
   Tensor<T, Properties>::Tensor(source_tensor_type source, index_tensor_type indices)
     requires IsIndexed && IndexableTensorElement<T>
-    : m_source(std::move(source)), m_indices(std::move(indices))
   {
-    if (m_source.shape() != m_indices.shape())
+    if (source.shape() != indices.shape())
     {
       throw std::invalid_argument(
         "Indexed tensor source and index views must have the same shape");
     }
+
+    m_indexedState = std::make_shared<indexed_state_type>(
+      indexed_state_type{std::move(source), std::move(indices)});
+    m_indexedLocator = Tensor<size_t, TensorProperty::None>(
+      m_indexedState->indices->shape());
+    const size_t count = m_indexedLocator.shape().empty()
+      ? size_t{1}
+      : m_indexedLocator.size();
+    for (size_t i = 0; i < count; ++i)
+    {
+      m_indexedLocator.flat(i) = i;
+    }
   }
+
+  template <typename T, TensorProperties Properties>
+  Tensor<T, Properties>::Tensor(std::shared_ptr<indexed_state_type> state,
+      Tensor<size_t, TensorProperty::None> locator)
+    requires IsIndexed && IndexableTensorElement<T>
+    : m_indexedState(std::move(state)), m_indexedLocator(std::move(locator))
+  { }
 
   template <typename T, TensorProperties Properties>
   requires IndexableTensorElement<T> && (!IndexedTensorProperties<Properties>)
@@ -121,7 +139,7 @@ namespace sb
   Tensor<T, Properties> Tensor<T, Properties>::operator[](SliceVector sliceVector) const
   {
     if constexpr (IsIndexed)
-      return Tensor(m_source[sliceVector], m_indices[sliceVector]);
+      return Tensor(m_indexedState, m_indexedLocator[sliceVector]);
     else
       return extract(sliceVector);
   }
@@ -130,7 +148,13 @@ namespace sb
   decltype(auto) Tensor<T, Properties>::operator()(const std::vector<size_t>& index) const
   {
     if constexpr (IsIndexed)
-      return m_source(index).index_into(detail::IndexTensorStorage<index_type>::at(m_indices, index));
+    {
+      const size_t rootIndex = m_indexedLocator(index);
+      if (!m_indexedState->indices)
+        return value_type(m_indexedState->source.flat(rootIndex));
+      return value_type(m_indexedState->source.flat(rootIndex).index_into(
+        detail::IndexTensorStorage<index_type>::flat(*m_indexedState->indices, rootIndex)));
+    }
     else
       return index_to_ref(index);
   }
@@ -146,7 +170,13 @@ namespace sb
   decltype(auto) Tensor<T, Properties>::operator()(size_t index) const
   {
     if constexpr (IsIndexed)
-      return m_source(index).index_into(detail::IndexTensorStorage<index_type>::at(m_indices, {index}));
+    {
+      const size_t rootIndex = m_indexedLocator(index);
+      if (!m_indexedState->indices)
+        return value_type(m_indexedState->source.flat(rootIndex));
+      return value_type(m_indexedState->source.flat(rootIndex).index_into(
+        detail::IndexTensorStorage<index_type>::flat(*m_indexedState->indices, rootIndex)));
+    }
     else
       return index_to_ref({ index });
   }
@@ -162,7 +192,13 @@ namespace sb
   decltype(auto) Tensor<T, Properties>::flat(size_t index) const
   {
     if constexpr (IsIndexed)
-      return m_source.flat(index).index_into(detail::IndexTensorStorage<index_type>::flat(m_indices, index));
+    {
+      const size_t rootIndex = m_indexedLocator.flat(index);
+      if (!m_indexedState->indices)
+        return value_type(m_indexedState->source.flat(rootIndex));
+      return value_type(m_indexedState->source.flat(rootIndex).index_into(
+        detail::IndexTensorStorage<index_type>::flat(*m_indexedState->indices, rootIndex)));
+    }
     else
       return index_to_ref(flat_to_multi_index(index, {m_shape.begin(), m_shape.end()}));
   }
@@ -415,7 +451,7 @@ namespace sb
   {
     if constexpr (IsIndexed)
     {
-      return Tensor(m_source.broadcast_to(target_shape), m_indices.broadcast_to(target_shape));
+      return Tensor(m_indexedState, m_indexedLocator.broadcast_to(target_shape));
     }
     else
     {
@@ -1248,7 +1284,7 @@ namespace sb
   {
     if constexpr (IsIndexed)
     {
-      return m_indices.size();
+      return m_indexedLocator.size();
     }
     else if (m_shape.empty())
     {
@@ -1300,11 +1336,51 @@ namespace sb
   }
 
   template <typename T, TensorProperties Properties>
+  void Tensor<T, Properties>::ensure_materialized()
+    requires IsIndexed
+  {
+    if (!m_indexedState->indices)
+      return;
+
+    source_tensor_type result(m_indexedState->indices->shape());
+    const size_t count = m_indexedState->indices->shape().empty()
+      ? size_t{1}
+      : m_indexedState->indices->size();
+    for (size_t i = 0; i < count; ++i)
+    {
+      value_type value = m_indexedState->source.flat(i).index_into(
+        detail::IndexTensorStorage<index_type>::flat(*m_indexedState->indices, i));
+      if constexpr (requires { value.materialized_copy(); })
+        result.flat(i) = value.materialized_copy();
+      else
+        result.flat(i) = value;
+    }
+    m_indexedState->source = std::move(result);
+    m_indexedState->indices.reset();
+  }
+
+  template <typename T, TensorProperties Properties>
+  T& Tensor<T, Properties>::writable_at(const std::vector<size_t>& index)
+    requires IsIndexed
+  {
+    ensure_materialized();
+    return m_indexedState->source.flat(m_indexedLocator(index));
+  }
+
+  template <typename T, TensorProperties Properties>
+  T& Tensor<T, Properties>::writable_at(size_t index)
+    requires IsIndexed
+  {
+    ensure_materialized();
+    return m_indexedState->source.flat(m_indexedLocator(index));
+  }
+
+  template <typename T, TensorProperties Properties>
   Tensor<T, Properties> Tensor<T, Properties>::flatten() const
   {
     if constexpr (IsIndexed)
     {
-      return Tensor(m_source.flatten(), m_indices.flatten());
+      return Tensor(m_indexedState, m_indexedLocator.flatten());
     }
     else
     {
@@ -1330,7 +1406,7 @@ namespace sb
   {
     if constexpr (IsIndexed)
     {
-      return Tensor(m_source.reshape(new_shape), m_indices.reshape(new_shape));
+      return Tensor(m_indexedState, m_indexedLocator.reshape(new_shape));
     }
     else
     {
@@ -1402,7 +1478,7 @@ namespace sb
   {
     if constexpr (IsIndexed)
     {
-      return Tensor(m_source.squeeze(), m_indices.squeeze());
+      return Tensor(m_indexedState, m_indexedLocator.squeeze());
     }
     else
     {
@@ -1430,7 +1506,7 @@ namespace sb
   {
     if constexpr (IsIndexed)
     {
-      return Tensor(m_source.squeeze(axis), m_indices.squeeze(axis));
+      return Tensor(m_indexedState, m_indexedLocator.squeeze(axis));
     }
     else
     {
@@ -1465,7 +1541,7 @@ namespace sb
   {
     if constexpr (IsIndexed)
     {
-      return Tensor(m_source.expand_dims(axis), m_indices.expand_dims(axis));
+      return Tensor(m_indexedState, m_indexedLocator.expand_dims(axis));
     }
     else
     {
@@ -1498,7 +1574,7 @@ namespace sb
   {
     if constexpr (IsIndexed)
     {
-      return Tensor(m_source.transpose(axes), m_indices.transpose(axes));
+      return Tensor(m_indexedState, m_indexedLocator.transpose(axes));
     }
     else
     {
@@ -1550,7 +1626,7 @@ namespace sb
   {
     if constexpr (IsIndexed)
     {
-      return Tensor(m_source.swapaxes(axis1, axis2), m_indices.swapaxes(axis1, axis2));
+      return Tensor(m_indexedState, m_indexedLocator.swapaxes(axis1, axis2));
     }
     else
     {

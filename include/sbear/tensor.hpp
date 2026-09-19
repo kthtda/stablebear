@@ -43,6 +43,12 @@ namespace sb
   template <typename T, TensorProperties Properties>
   class Tensor;
 
+  namespace detail
+  {
+    template <typename T, TensorProperties SourceProperties, typename IndexStorage>
+    struct IndexedTensorState;
+  }
+
   template <typename LeafT>
   class NestedTensor;
 
@@ -153,8 +159,11 @@ namespace sb
     using index_type = typename detail::TensorIndexType<T>::type;
     using source_tensor_type = Tensor<T, SourceProperties>;
     using index_tensor_type = typename detail::IndexTensorStorage<index_type>::type;
-    using source_storage_type = std::conditional_t<IsIndexed, source_tensor_type, std::monostate>;
-    using index_storage_type = std::conditional_t<IsIndexed, index_tensor_type, std::monostate>;
+    using indexed_state_type = detail::IndexedTensorState<T, SourceProperties, index_tensor_type>;
+    using indexed_state_storage_type =
+      std::conditional_t<IsIndexed, std::shared_ptr<indexed_state_type>, std::monostate>;
+    using indexed_locator_storage_type =
+      std::conditional_t<IsIndexed, Tensor<size_t, TensorProperty::None>, std::monostate>;
 
     enum class ViewType
     {
@@ -268,35 +277,35 @@ namespace sb
     [[nodiscard]] const std::vector<ptrdiff_t>& strides() const noexcept
     {
       if constexpr (IsIndexed)
-        return m_indices.strides();
+        return m_indexedLocator.strides();
       else
         return m_strides;
     }
     [[nodiscard]] ptrdiff_t stride(size_t idx) const noexcept
     {
       if constexpr (IsIndexed)
-        return m_indices.stride(idx);
+        return m_indexedLocator.stride(idx);
       else
         return m_strides[idx];
     }
     [[nodiscard]] const std::vector<size_t>& shape() const noexcept
     {
       if constexpr (IsIndexed)
-        return m_indices.shape();
+        return m_indexedLocator.shape();
       else
         return m_shape;
     }
     [[nodiscard]] size_t shape(size_t dim) const noexcept
     {
       if constexpr (IsIndexed)
-        return m_indices.shape(dim);
+        return m_indexedLocator.shape(dim);
       else
         return m_shape[dim];
     }
     [[nodiscard]] size_t rank() const noexcept
     {
       if constexpr (IsIndexed)
-        return m_indices.rank();
+        return m_indexedLocator.rank();
       else
         return m_shape.size();
     }
@@ -310,7 +319,7 @@ namespace sb
     [[nodiscard]] bool is_contiguous() const noexcept
     {
       if constexpr (IsIndexed)
-        return m_source.is_contiguous() && m_indices.is_contiguous();
+        return m_indexedLocator.is_contiguous();
       else
         return m_isContiguous;
     }
@@ -385,14 +394,21 @@ namespace sb
      */
     auto copy() const;
     [[nodiscard]] source_tensor_type materialize() const requires IsIndexed;
+    void ensure_materialized() requires IsIndexed;
+    [[nodiscard]] T& writable_at(const std::vector<size_t>& index) requires IsIndexed;
+    [[nodiscard]] T& writable_at(size_t index) requires IsIndexed;
 
+    /// Return the single active backing. Before materialization this is the
+    /// aligned source; afterward it is the dense logical result.
     [[nodiscard]] const source_tensor_type& source_view() const noexcept requires IsIndexed
     {
-      return m_source;
+      return m_indexedState->source;
     }
-    [[nodiscard]] const index_tensor_type& indices_view() const noexcept requires IsIndexed
+    [[nodiscard]] const index_tensor_type& indices_view() const requires IsIndexed
     {
-      return m_indices;
+      if (!m_indexedState->indices)
+        throw std::logic_error("Materialized indexed tensor no longer has selections");
+      return *m_indexedState->indices;
     }
 
     template <typename UnaryPred>
@@ -444,6 +460,10 @@ namespace sb
     };
 
   private:
+    Tensor(std::shared_ptr<indexed_state_type> state,
+      Tensor<size_t, TensorProperty::None> locator)
+      requires IsIndexed && IndexableTensorElement<T>;
+
     template <typename SliceVector>
     [[nodiscard]] Tensor extract(SliceVector sliceVector) const;
 
@@ -460,9 +480,23 @@ namespace sb
 
     ViewType m_viewType = ViewType::Base;
     bool m_isContiguous = true;
-    [[no_unique_address]] source_storage_type m_source;
-    [[no_unique_address]] index_storage_type m_indices;
+    [[no_unique_address]] indexed_state_storage_type m_indexedState;
+    [[no_unique_address]] indexed_locator_storage_type m_indexedLocator;
   };
+
+  namespace detail
+  {
+    /// State shared by every outer view of one lazy indexed tensor. `source`
+    /// is the aligned source while `indices` is present. On the first write it
+    /// is replaced by the dense logical result and `indices` is released.
+    /// Individual views use their locator tensor to address this root.
+    template <typename T, TensorProperties SourceProperties, typename IndexStorage>
+    struct IndexedTensorState
+    {
+      Tensor<T, SourceProperties> source;
+      std::optional<IndexStorage> indices;
+    };
+  }
 
   /// Create a lazy indexed tensor by associating each logical element with an
   /// element-specific index. Source axes align with the leading index-tensor

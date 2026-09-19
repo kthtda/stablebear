@@ -83,6 +83,59 @@ def assert_point_cloud_tensor_sizes(actual, expected):
 
 @pytest.mark.parametrize(("pcloud_dtype", "np_dtype"), _PCLOUD_DTYPES)
 class TestSubsample:
+    def test_write_through_outer_view_materializes_shared_backing_once(
+        self, pcloud_dtype, np_dtype
+    ):
+        coordinates = np.asarray([[1, 2]], dtype=np_dtype)
+        points = sb.PointCloudTensor(coordinates, dtype=pcloud_dtype)
+        samples = subsample(
+            points,
+            n_points=2,
+            n_samples=2,
+            replace=True,
+            generator=sb.random.Generator(seed=229),
+        )
+        separate = subsample(
+            points,
+            n_points=2,
+            n_samples=2,
+            replace=True,
+            generator=sb.random.Generator(seed=229),
+        )
+
+        view = samples[:1]
+        sibling = samples[...]
+        cell = samples[0]
+        other_sample_before = np.asarray(samples[1]).copy()
+        source_before = np.asarray(points[()]).copy()
+        separate_before = np.asarray(separate[0]).copy()
+
+        cast_dtype = sb.pcloud64 if pcloud_dtype == sb.pcloud32 else sb.pcloud32
+        cast = view.astype(cast_dtype)
+        cast[0][0, 0] = -7
+        assert cast.dtype == cast_dtype
+        assert view[0][0, 0] == 1
+
+        view[0][0, 0] = 999
+
+        # Parent, sibling, and an already-extracted cell are aliases of the
+        # same logical result cell. Repeated selected rows, other result cells,
+        # the input, and independently sampled results are not aliases.
+        assert samples[0][0, 0] == 999
+        assert sibling[0][0, 0] == 999
+        assert cell[0, 0] == 999
+        assert samples[0][1, 0] == 1
+        npt.assert_array_equal(np.asarray(samples[1]), other_sample_before)
+        npt.assert_array_equal(np.asarray(points[()]), source_before)
+        npt.assert_array_equal(np.asarray(separate[0]), separate_before)
+
+        # A later write must use the existing materialized backing. If it
+        # materialized the original indexed source again, the first write
+        # would be lost.
+        samples[0][1, 1] = 888
+        assert view[0][0, 0] == 999
+        assert cell[1, 1] == 888
+
     @pytest.mark.parametrize(
         ("shape", "n_points", "replace", "allow_partial", "expected_n_pts"),
         [
