@@ -1,4 +1,5 @@
 import numpy as np
+import numpy.testing as npt
 import pytest
 
 import stablebear as sb
@@ -121,3 +122,38 @@ def test_stored_is_same_as_numpy():
 
     pclouds[0, 1, 2] = X
     assert pclouds[0, 1, 2].array_equal(X)
+
+
+@pytest.mark.parametrize(
+    ("dtype", "np_dtype"),
+    [(sb.pcloud32, np.float32), (sb.pcloud64, np.float64)],
+)
+def test_point_selection_owns_indices_but_retains_source_view(dtype, np_dtype):
+    coordinates = np.asarray([[10], [20], [30]], dtype=np_dtype)
+    points = sb.PointCloudTensor([coordinates], dtype=dtype)
+    selections = sb.NestedTensor(
+        [sb.tensor([2, 0], dtype=sb.uint64)]
+    )
+
+    selected = points[selections]
+    sibling = selected[...]
+    expected = coordinates[[2, 0]].copy()
+
+    selections[0][0] = 1
+    assert selections[0][0] == 1
+    npt.assert_array_equal(np.asarray(selected[0]), expected)
+
+    selections[0] = sb.tensor([1], dtype=sb.uint64)
+    npt.assert_array_equal(np.asarray(selections[0]), [1])
+    npt.assert_array_equal(np.asarray(selected[0]), expected)
+    npt.assert_array_equal(np.asarray(sibling[0]), expected)
+
+    del selections
+
+    npt.assert_array_equal(np.asarray(selected[0]), expected)
+    npt.assert_array_equal(np.asarray(sibling[0]), expected)
+
+    points[0][2, 0] = 99
+    expected[0, 0] = 99
+    npt.assert_array_equal(np.asarray(selected[0]), expected)
+    npt.assert_array_equal(np.asarray(sibling[0]), expected)

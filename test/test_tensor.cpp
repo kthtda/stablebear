@@ -233,6 +233,28 @@ namespace
     EXPECT_THROW(mutableSelected(0, 0) = 99, std::logic_error);
   }
 
+  TEST(TensorProperties, IndexedViewsShareOwnedSelectionState)
+  {
+    using Nested = sb::NestedTensor<uint64_t>;
+    using PointCloud = sb::PointCloud<float>;
+
+    sb::Tensor<float> coordinates({ 1, 1 });
+    sb::Tensor<PointCloud> source({ 1 });
+    source(0) = PointCloud(std::move(coordinates));
+
+    sb::Tensor<uint64_t> rows({ 1 });
+    rows(0) = 0;
+    sb::Tensor<Nested> selectionNodes({ 1 });
+    selectionNodes(0) = Nested(rows);
+    Nested selections(std::move(selectionNodes), 1);
+
+    const auto indexed = sb::make_indexed_tensor(source, selections);
+    const auto sibling = indexed.flatten();
+
+    EXPECT_NE(&indexed.indices_view(), &selections);
+    EXPECT_EQ(&indexed.indices_view(), &sibling.indices_view());
+  }
+
   TEST(TensorProperties, MakeIndexedTensorRejectsNonBroadcastableSourceShape)
   {
     const sb::Tensor<IndexableValue> source({ 2, 2 });

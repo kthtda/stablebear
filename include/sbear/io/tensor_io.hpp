@@ -486,6 +486,14 @@ namespace sb::io::detail
       const bool indexed = read_bytes<bool>(is);
       if (indexed)
       {
+        if constexpr (is_point_cloud_v<ElemT>)
+        {
+          if (sources[id].rank() != 2)
+          {
+            throw std::runtime_error(
+              "Indexed point-cloud source must have 2 dimensions");
+          }
+        }
         Tensor<uint64_t> indices = read_element<Tensor<uint64_t>>(is);
         if (indices.rank() != 1)
         {
@@ -504,7 +512,14 @@ namespace sb::io::detail
       else
       {
         // Sharing, not copying: PointCloud wraps the coordinate tensor.
-        *elem = ElemT(sources[id]);
+        if constexpr (is_point_cloud_v<ElemT>)
+        {
+          *elem = sources[id].rank() == 0 ? ElemT() : ElemT(sources[id]);
+        }
+        else
+        {
+          *elem = ElemT(sources[id]);
+        }
       }
     }
 

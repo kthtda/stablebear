@@ -75,11 +75,11 @@ namespace sb
   requires IndexableTensorElement<T> && (!IndexedTensorProperties<Properties>)
   Tensor<T, Properties | TensorProperty::Indexed> make_indexed_tensor(
     const Tensor<T, Properties>& source,
-    const typename detail::IndexTensorStorage<typename T::index_type>::type& indices)
+    typename detail::IndexTensorStorage<typename T::index_type>::type&& indices)
   {
     detail::IndexTensorStorage<typename T::index_type>::validate(indices);
     const std::vector<size_t>& sourceShape = source.shape();
-    const std::vector<size_t>& indexShape = indices.shape();
+    const std::vector<size_t> indexShape = indices.shape();
     if (sourceShape.size() > indexShape.size())
     {
       throw std::invalid_argument(
@@ -93,7 +93,16 @@ namespace sb
     }
 
     return Tensor<T, Properties | TensorProperty::Indexed>(
-      sourceView.broadcast_to(indexShape), indices);
+      sourceView.broadcast_to(indexShape), std::move(indices));
+  }
+
+  template <typename T, TensorProperties Properties>
+  requires IndexableTensorElement<T> && (!IndexedTensorProperties<Properties>)
+  Tensor<T, Properties | TensorProperty::Indexed> make_indexed_tensor(
+    const Tensor<T, Properties>& source,
+    const typename detail::IndexTensorStorage<typename T::index_type>::type& indices)
+  {
+    return make_indexed_tensor(source, indices.copy());
   }
 
   template <typename T, TensorProperties Properties>

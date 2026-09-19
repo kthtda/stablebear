@@ -10,6 +10,7 @@
 
 #include <map>
 #include <stdexcept>
+#include <string>
 #include <type_traits>
 #include <vector>
 
@@ -37,9 +38,18 @@ namespace sb
     using index_type = Tensor<uint64_t>;
 
     PointCloud() = default;
-    explicit PointCloud(const std::vector<size_t>& shape) : m_coords(shape) { }
-    PointCloud(const Tensor<T>& coords) : m_coords(coords) { }
-    PointCloud(Tensor<T>&& coords) : m_coords(std::move(coords)) { }
+    explicit PointCloud(const std::vector<size_t>& shape) : m_coords(shape)
+    {
+      validate_coordinates();
+    }
+    PointCloud(const Tensor<T>& coords) : m_coords(coords)
+    {
+      validate_coordinates();
+    }
+    PointCloud(Tensor<T>&& coords) : m_coords(std::move(coords))
+    {
+      validate_coordinates();
+    }
 
     // Compatibility with the former PointCloud = Tensor<T> alias. For an
     // indexed cloud, shape() describes the selected logical coordinates.
@@ -70,12 +80,18 @@ namespace sb
 
     /// Indexed view: shares @p source's coordinates and selects rows via @p indices.
     PointCloud(const Tensor<T>& source, Tensor<uint64_t> indices)
-      : m_coords(source), m_indices(std::move(indices)) { }
+      : m_coords(source), m_indices(std::move(indices))
+    {
+      validate_coordinates();
+    }
 
     /// Indexed view over another cloud's coordinates. @p indices refer to rows
     /// of @p source's coordinate storage (not to the rows @p source selects).
     PointCloud(const PointCloud& source, Tensor<uint64_t> indices)
-      : m_coords(source.m_coords), m_indices(std::move(indices)) { }
+      : m_coords(source.m_coords), m_indices(std::move(indices))
+    {
+      validate_coordinates();
+    }
 
     /// Whether this is an indexed view (rather than owning its coordinates).
     [[nodiscard]] bool is_indexed() const { return m_indices.rank() == 1; }
@@ -262,6 +278,16 @@ namespace sb
     }
 
   private:
+    void validate_coordinates() const
+    {
+      if (m_coords.rank() != 2)
+      {
+        throw std::invalid_argument(
+          "Point-cloud coordinates must have 2 dimensions, got "
+          + std::to_string(m_coords.rank()));
+      }
+    }
+
     Tensor<T> m_coords;         // (n_source_points, dim), possibly shared
     Tensor<uint64_t> m_indices; // rank-1 when an indexed view, empty otherwise
   };
@@ -298,6 +324,10 @@ namespace sb
     std::map<std::shared_ptr<const void>, Tensor<T>, std::owner_less<std::shared_ptr<const void>>> castSources;
     walk(src, [&](const std::vector<size_t>& idx) {
       const Tensor<U>& coords = src(idx).coords();
+      if (coords.rank() == 0)
+      {
+        return;
+      }
       if (!castSources.contains(coords.storage_owner()))
       {
         castSources.emplace(coords.storage_owner(), tensor_cast<T>(coords));
@@ -307,6 +337,11 @@ namespace sb
     // ...then rebuild every cell on its shared cast source.
     walk(src, [&](const std::vector<size_t>& idx) {
       const PointCloud<U>& cloud = src(idx);
+      if (cloud.coords().rank() == 0)
+      {
+        result(idx) = PointCloud<T>();
+        return;
+      }
       const Tensor<T>& source = castSources.at(cloud.coords().storage_owner());
       if (cloud.is_indexed())
       {

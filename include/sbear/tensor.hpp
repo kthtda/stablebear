@@ -508,6 +508,13 @@ namespace sb
     const Tensor<T, Properties>& source,
     const typename detail::IndexTensorStorage<typename T::index_type>::type& indices);
 
+  /// Create an indexed tensor by taking ownership of freshly produced indices.
+  template <typename T, TensorProperties Properties>
+  requires IndexableTensorElement<T> && (!IndexedTensorProperties<Properties>)
+  [[nodiscard]] Tensor<T, Properties | TensorProperty::Indexed> make_indexed_tensor(
+    const Tensor<T, Properties>& source,
+    typename detail::IndexTensorStorage<typename T::index_type>::type&& indices);
+
   template <typename U, typename T>
   requires CanMultiplyTo<T, U, T>
   [[nodiscard]] Tensor<T> operator*(const U& u, const Tensor<T>& t);
