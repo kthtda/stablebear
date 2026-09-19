@@ -101,7 +101,7 @@ identify review work, not test-plan items. The broader test plan still applies.
 
 ## B. Indexed tensor API and downstream algorithms
 
-- [ ] **B1. [P1] Accept whole indexed tensors in persistence algorithms.**
+- [x] **B1. [P1] Accept whole indexed tensors in persistence algorithms.**
 
   **Finding:** Persistent homology and homological kernels reject the output of
   `subsample` with an incompatible-arguments `TypeError`. The bindings accept
@@ -119,6 +119,15 @@ identify review work, not test-plan items. The broader test plan still applies.
   Sources: [py_ripser.cpp](../src/python/persistence/py_ripser.cpp),
   [py_homological_kernel.cpp](../src/python/persistence/py_homological_kernel.cpp),
   and their C++ task implementations. Verification: test plan F1–F2.
+
+  **Completed:** Fixed by `2edada84e`. Verified with the full Python suite
+  (2,232 passed), the full C++ suite (474 passed), and focused public-API tests
+  on both the default and forced-CPU backends. Coverage includes both
+  precisions, whole indexed tensors, multidimensional outer views, reordered
+  and repeated rows, reduced and unreduced persistence, mixed indexed/dense
+  kernel inputs, dense-equivalent results, and retained indexed storage. A
+  public-API smoke check also covered whole `subsample` outputs at both
+  precisions.
 
 - [ ] **B2. [P1] Complete the ordinary tensor interface for indexed results.**
 
