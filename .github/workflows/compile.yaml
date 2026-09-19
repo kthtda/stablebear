@@ -28,7 +28,11 @@ jobs:
         env:
           CIBW_BUILD: "cp313-*"
           CIBW_BUILD_FRONTEND: "build[uv]"
-          CIBW_ENVIRONMENT: BUILD_WITH_CUDA=0
+          CIBW_ENVIRONMENT_LINUX: BUILD_WITH_CUDA=0
+          CIBW_ENVIRONMENT_MACOS: >-
+            BUILD_WITH_CUDA=0
+            MACOSX_DEPLOYMENT_TARGET=11.0
+          CIBW_ENVIRONMENT_WINDOWS: BUILD_WITH_CUDA=0
           CIBW_TEST_SKIP: "*"
           CIBW_MANYLINUX_X86_64_IMAGE: manylinux_2_28
           CIBW_MANYLINUX_AARCH64_IMAGE: manylinux_2_28
