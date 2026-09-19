@@ -103,50 +103,62 @@ namespace
     EXPECT_EQ(tensor, retTensor);
   }
 
-  TEST(IoReadWriteTest, IndexTensorRoundtrip)
+  TEST(IoReadWriteTest, NestedTensorRoundtrip)
   {
-    using Selection = sb::Tensor<uint64_t>;
-    using TensorT = sb::Tensor<Selection>;
+    using Leaf = sb::Tensor<uint64_t>;
+    using Nested = sb::NestedTensor<uint64_t>;
 
-    TensorT tensor({ 2, 2 });
-    tensor({ 0, 0 }) = Selection({ 2 });
-    tensor({ 0, 0 })(0) = 3;
-    tensor({ 0, 0 })(1) = 3;
-    tensor({ 0, 1 }) = Selection({ 0 });
-    tensor({ 1, 0 }) = Selection({ 1 });
-    tensor({ 1, 0 })(0) = 4;
-    tensor({ 1, 1 }) = Selection({ 3 });
-    tensor({ 1, 1 })(0) = 9;
-    tensor({ 1, 1 })(1) = 6;
-    tensor({ 1, 1 })(2) = 7;
+    auto leaf = [](std::initializer_list<uint64_t> values)
+    {
+      Leaf result({ values.size() });
+      size_t i = 0;
+      for (uint64_t value : values)
+      {
+        result(i++) = value;
+      }
+      return result;
+    };
+    auto roundtrip = [](const Nested& tensor)
+    {
+      std::stringstream output;
+      sb::write(tensor, output);
+      std::istringstream input(output.str());
+      return sb::read<Nested>(input);
+    };
 
-    std::stringstream ss;
-    sb::write(tensor, ss);
+    sb::Tensor<Leaf> tensorSource({ 2, 2 });
+    tensorSource({ 0, 0 }) = leaf({ 3, 3 });
+    tensorSource({ 0, 1 }) = leaf({});
+    tensorSource({ 1, 0 }) = leaf({ 4 });
+    tensorSource({ 1, 1 }) = leaf({ 9, 6, 7 });
+    const Nested tensor = sb::to_nested_tensor(tensorSource);
 
-    std::istringstream iss(ss.str());
-    auto retTensor = sb::read<TensorT>(iss);
+    EXPECT_EQ(roundtrip(tensor), tensor);
 
-    EXPECT_EQ(tensor, retTensor);
-
-    TensorT scalar(std::vector<size_t>{});
+    sb::Tensor<Leaf> scalarSource(std::vector<size_t>{});
     const std::vector<size_t> scalarIndex;
-    scalar(scalarIndex) = Selection({ 3 });
-    scalar(scalarIndex)(0) = 3;
-    scalar(scalarIndex)(1) = 3;
-    scalar(scalarIndex)(2) = 7;
+    scalarSource(scalarIndex) = leaf({ 3, 3, 7 });
+    const Nested scalar = sb::to_nested_tensor(scalarSource);
 
-    std::stringstream scalarStream;
-    sb::write(scalar, scalarStream);
+    EXPECT_EQ(roundtrip(scalar), scalar);
 
-    std::istringstream scalarInput(scalarStream.str());
-    auto scalarRoundtrip = sb::read<TensorT>(scalarInput);
+    sb::Tensor<Leaf> branch({ 2 });
+    branch(0) = leaf({ 1, 2 });
+    branch(1) = leaf({ 3 });
 
-    EXPECT_EQ(scalar, scalarRoundtrip);
+    sb::Tensor<Leaf> emptyBranch({ 0 });
 
-    TensorT invalid({ 1 });
-    invalid(0) = Selection({ 1, 2 });
-    std::stringstream invalidStream;
-    EXPECT_THROW(sb::write(invalid, invalidStream), std::runtime_error);
+    sb::Tensor<sb::Tensor<Leaf>> recursiveChildren({ 2 });
+    recursiveChildren(0) = std::move(branch);
+    recursiveChildren(1) = std::move(emptyBranch);
+    const Nested recursive = sb::to_nested_tensor(recursiveChildren);
+    const Nested recursiveRoundtrip = roundtrip(recursive);
+
+    EXPECT_EQ(recursiveRoundtrip, recursive);
+    EXPECT_EQ(recursiveRoundtrip.depth(), 3);
+    EXPECT_EQ(recursiveRoundtrip.nested()(0).depth(), 2);
+    EXPECT_EQ(recursiveRoundtrip.nested()(0).nested()(0).depth(), 1);
+    EXPECT_EQ(recursiveRoundtrip.nested()(1).nested().shape(), std::vector<size_t>({ 0 }));
   }
 
 // ============================================================================

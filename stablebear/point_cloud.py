@@ -230,7 +230,7 @@ class PointCloudTensor(Tensor):
                 raise TypeError("Point-cloud indices must have uint64 leaves")
             if index.depth != 2:
                 raise ValueError("Point-cloud indexing requires Tensor<Tensor<uint64>>")
-            return PointCloudTensor(self._data._index_points(index._data))
+            return PointCloudTensor(self._data._index_points(index._root))
 
         if self.ndim == 0:
             cloud = self._point_cloud([])

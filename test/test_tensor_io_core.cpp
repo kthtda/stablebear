@@ -35,11 +35,6 @@ namespace
       EXPECT_EQ(64, fmt.subFormat);
     }
     {
-      auto fmt = tensorFormat<sb::Tensor<uint64_t>>();
-      EXPECT_EQ(5, fmt.baseFormat);
-      EXPECT_EQ(64, fmt.subFormat);
-    }
-    {
       auto fmt = tensorFormat<sb::Pcf<float32_t, float32_t>>();
       EXPECT_EQ(100, fmt.baseFormat);
       EXPECT_EQ(32, fmt.subFormat);
@@ -68,6 +63,40 @@ namespace
       auto fmt = tensorFormat<sb::ph::Barcode<float64_t>>();
       EXPECT_EQ(10000, fmt.baseFormat);
       EXPECT_EQ(64, fmt.subFormat);
+    }
+  }
+
+  TEST(TensorIoCore, NestedTensorFormatsPreserveLeafFormat)
+  {
+    {
+      auto fmt = tensorFormat<sb::NestedTensor<sb::float32_t>>();
+      EXPECT_EQ(fmt.baseFormat, 1);
+      EXPECT_EQ(fmt.subFormat, 100'000'032);
+    }
+    {
+      auto fmt = tensorFormat<sb::NestedTensor<sb::float64_t>>();
+      EXPECT_EQ(fmt.baseFormat, 1);
+      EXPECT_EQ(fmt.subFormat, 100'000'064);
+    }
+    {
+      auto fmt = tensorFormat<sb::NestedTensor<sb::int32_t>>();
+      EXPECT_EQ(fmt.baseFormat, 2);
+      EXPECT_EQ(fmt.subFormat, 100'000'032);
+    }
+    {
+      auto fmt = tensorFormat<sb::NestedTensor<sb::int64_t>>();
+      EXPECT_EQ(fmt.baseFormat, 2);
+      EXPECT_EQ(fmt.subFormat, 100'000'064);
+    }
+    {
+      auto fmt = tensorFormat<sb::NestedTensor<sb::uint32_t>>();
+      EXPECT_EQ(fmt.baseFormat, 3);
+      EXPECT_EQ(fmt.subFormat, 100'000'032);
+    }
+    {
+      auto fmt = tensorFormat<sb::NestedTensor<sb::uint64_t>>();
+      EXPECT_EQ(fmt.baseFormat, 3);
+      EXPECT_EQ(fmt.subFormat, 100'000'064);
     }
   }
 

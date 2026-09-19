@@ -57,14 +57,15 @@ namespace sb
   requires IndexableTensorElement<T> && (!IndexedTensorProperties<Properties>)
   Tensor<T, Properties | TensorProperty::Indexed> make_indexed_tensor(
     const Tensor<T, Properties>& source,
-    const Tensor<typename T::index_type>& indices)
+    const typename detail::IndexTensorStorage<typename T::index_type>::type& indices)
   {
+    detail::IndexTensorStorage<typename T::index_type>::validate(indices);
     const std::vector<size_t>& sourceShape = source.shape();
     const std::vector<size_t>& indexShape = indices.shape();
-    if (sourceShape.size() > indexShape.size()
-        || !std::equal(sourceShape.begin(), sourceShape.end(), indexShape.begin()))
+    if (sourceShape.size() > indexShape.size())
     {
-      throw std::invalid_argument("Source tensor shape must be a prefix of index tensor shape");
+      throw std::invalid_argument(
+        "Source tensor rank cannot exceed index tensor rank");
     }
 
     Tensor<T, Properties> sourceView = source;
@@ -129,7 +130,7 @@ namespace sb
   decltype(auto) Tensor<T, Properties>::operator()(const std::vector<size_t>& index) const
   {
     if constexpr (IsIndexed)
-      return m_source(index).index_into(m_indices(index));
+      return m_source(index).index_into(detail::IndexTensorStorage<index_type>::at(m_indices, index));
     else
       return index_to_ref(index);
   }
@@ -145,7 +146,7 @@ namespace sb
   decltype(auto) Tensor<T, Properties>::operator()(size_t index) const
   {
     if constexpr (IsIndexed)
-      return m_source(index).index_into(m_indices(index));
+      return m_source(index).index_into(detail::IndexTensorStorage<index_type>::at(m_indices, {index}));
     else
       return index_to_ref({ index });
   }
@@ -161,7 +162,7 @@ namespace sb
   decltype(auto) Tensor<T, Properties>::flat(size_t index) const
   {
     if constexpr (IsIndexed)
-      return m_source.flat(index).index_into(m_indices.flat(index));
+      return m_source.flat(index).index_into(detail::IndexTensorStorage<index_type>::flat(m_indices, index));
     else
       return index_to_ref(flat_to_multi_index(index, {m_shape.begin(), m_shape.end()}));
   }

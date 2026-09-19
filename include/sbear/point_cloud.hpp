@@ -34,7 +34,7 @@ namespace sb
   {
   public:
     using value_type = T;
-    using index_type = NestedTensor<uint64_t>;
+    using index_type = Tensor<uint64_t>;
 
     PointCloud() = default;
     explicit PointCloud(const std::vector<size_t>& shape) : m_coords(shape) { }
@@ -189,16 +189,12 @@ namespace sb
     /// tensor; indexed state is not stored in the tensor's source elements.
     [[nodiscard]] PointCloud index_into(const index_type& selection) const
     {
-      if (!selection.is_leaf())
-      {
-        throw std::invalid_argument("Point-cloud selections must contain uint64 tensors directly");
-      }
       if (m_coords.rank() != 2)
       {
         throw std::invalid_argument("Point-cloud coordinates must have rank 2");
       }
 
-      const Tensor<uint64_t>& requested = selection.leaf();
+      const Tensor<uint64_t>& requested = selection;
       if (requested.rank() != 1)
       {
         throw std::invalid_argument("Point-cloud selections must have rank 1");

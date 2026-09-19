@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
 
 #include <sbear/tensor.hpp>
+#include <sbear/nested_tensor.hpp>
+#include <sbear/point_cloud.hpp>
 #include <sbear/walk.hpp>
 #include <sbear/distance_matrix.hpp>
 #include <sbear/symmetric_matrix.hpp>
@@ -14,6 +16,69 @@
 namespace
 {
 
+  static_assert(sb::IsTensor<sb::NestedTensor<uint64_t>>);
+
+  TEST(NestedTensor, SatisfiesTensorInterfaceAtEveryDepth)
+  {
+    using Nested = sb::NestedTensor<uint64_t>;
+
+    sb::Tensor<uint64_t> leaf({ 2 });
+    leaf(0) = 3;
+    leaf(1) = 7;
+    Nested leafTensor(std::move(leaf));
+
+    EXPECT_EQ(leafTensor.shape(), (std::vector<size_t>{ 2 }));
+    EXPECT_EQ(leafTensor.rank(), 1);
+    EXPECT_EQ(leafTensor.size(), 2);
+    EXPECT_EQ(std::get<uint64_t>(leafTensor({ 1 })), 7);
+
+    sb::Tensor<Nested> children({ 1 });
+    children(0) = leafTensor;
+    Nested nestedTensor(std::move(children));
+
+    EXPECT_EQ(nestedTensor.shape(), (std::vector<size_t>{ 1 }));
+    EXPECT_EQ(nestedTensor.rank(), 1);
+    EXPECT_EQ(nestedTensor.size(), 1);
+    const auto child = std::get<Nested>(nestedTensor({ 0 }));
+    EXPECT_EQ(child.depth(), 1);
+    EXPECT_EQ(std::get<uint64_t>(child({ 0 })), 3);
+  }
+
+  TEST(NestedTensor, ConvertsStaticallyNestedTensorTypes)
+  {
+    sb::Tensor<uint64_t> leaf({ 2 });
+    leaf(0) = 3;
+    leaf(1) = 7;
+    sb::Tensor<sb::Tensor<uint64_t>> levelTwo({ 1 }, leaf);
+    sb::Tensor<sb::Tensor<sb::Tensor<uint64_t>>> levelThree(
+      { 1 }, levelTwo);
+
+    const auto nested = sb::to_nested_tensor(levelThree);
+    const auto empty = sb::to_nested_tensor(
+      sb::Tensor<sb::Tensor<sb::Tensor<uint64_t>>>({ 0 }));
+
+    static_assert(std::same_as<
+      std::remove_cvref_t<decltype(nested)>,
+      sb::NestedTensor<uint64_t>>);
+    EXPECT_EQ(nested.depth(), 3);
+    EXPECT_EQ(std::get<uint64_t>(
+      nested.nested()(0).nested()(0)({ 1 })), 7);
+    EXPECT_EQ(empty.depth(), 3);
+    EXPECT_EQ(empty.shape(), (std::vector<size_t>{ 0 }));
+  }
+
+  struct IndexableValue
+  {
+    using index_type = size_t;
+
+    int value = 0;
+
+    [[nodiscard]] IndexableValue index_into(const size_t& index) const
+    {
+      return { value + static_cast<int>(index) };
+    }
+  };
+
   template<typename T>
   sb::Tensor<T> make_sequential(const std::vector<size_t>& shape)
   {
@@ -24,6 +89,102 @@ namespace
       t(idx) = static_cast<T>(n++);
     });
     return t;
+  }
+
+  TEST(TensorProperties, NonIndexedPropertiesComposeWithOrdinaryStorage)
+  {
+    constexpr sb::TensorProperties TestProperty = 1 << 8;
+    using PropertyTensor = sb::Tensor<int, TestProperty>;
+
+    PropertyTensor tensor({ 2, 3 }, 4);
+    static_assert(std::same_as<decltype(tensor.flatten()), PropertyTensor>);
+
+    EXPECT_EQ(tensor.shape(), (std::vector<size_t>{ 2, 3 }));
+    EXPECT_EQ(tensor(std::vector<size_t>{ 1, 2 }), 4);
+    tensor(std::vector<size_t>{ 1, 2 }) = 9;
+    EXPECT_EQ(tensor.flatten()(5), 9);
+  }
+
+  TEST(TensorProperties, MakeIndexedTensorBroadcastsSourceAcrossAdditionalIndexAxes)
+  {
+    // The source [10, 20] has shape (2), while the indices
+    // [[1, 2, 3], [4, 5, 6]] have shape (2, 3). Broadcasting each source
+    // element across the additional axis and adding its index produces
+    // [[11, 12, 13], [24, 25, 26]]. Point-cloud subsampling uses this extra
+    // axis for multiple independently indexed samples of each source cloud.
+    sb::Tensor<IndexableValue> source({ 2 });
+    source(0) = { 10 };
+    source(1) = { 20 };
+    sb::Tensor<size_t> indices({ 2, 3 });
+    indices({ 0, 0 }) = 1;
+    indices({ 0, 1 }) = 2;
+    indices({ 0, 2 }) = 3;
+    indices({ 1, 0 }) = 4;
+    indices({ 1, 1 }) = 5;
+    indices({ 1, 2 }) = 6;
+
+    const auto indexed = sb::make_indexed_tensor(source, indices);
+
+    static_assert(decltype(indexed)::IsIndexed);
+    EXPECT_EQ(indexed.shape(), (std::vector<size_t>{ 2, 3 }));
+    EXPECT_EQ(indexed({ 0, 2 }).value, 13);
+    EXPECT_EQ(indexed({ 1, 1 }).value, 25);
+  }
+
+  TEST(TensorProperties, MakeIndexedTensorBroadcastsSingletonSourceAxes)
+  {
+    sb::Tensor<IndexableValue> source({ 2, 1 });
+    source({ 0, 0 }) = { 10 };
+    source({ 1, 0 }) = { 20 };
+    sb::Tensor<size_t> indices({ 2, 3 });
+    indices({ 0, 0 }) = 1;
+    indices({ 0, 1 }) = 2;
+    indices({ 0, 2 }) = 3;
+    indices({ 1, 0 }) = 4;
+    indices({ 1, 1 }) = 5;
+    indices({ 1, 2 }) = 6;
+
+    const auto indexed = sb::make_indexed_tensor(source, indices);
+
+    EXPECT_EQ(indexed({ 0, 2 }).value, 13);
+    EXPECT_EQ(indexed({ 1, 1 }).value, 25);
+  }
+
+  TEST(TensorProperties, TensorValuedIndicesUseNestedTensorStorage)
+  {
+    using PointCloud = sb::PointCloud<float>;
+
+    sb::Tensor<float> coordinates({ 3, 1 });
+    coordinates({ 0, 0 }) = 10;
+    coordinates({ 1, 0 }) = 20;
+    coordinates({ 2, 0 }) = 30;
+
+    sb::Tensor<PointCloud> source({ 1 });
+    source(0) = PointCloud(std::move(coordinates));
+
+    sb::Tensor<uint64_t> rows({ 2 });
+    rows(0) = 2;
+    rows(1) = 0;
+    const sb::Tensor<sb::Tensor<uint64_t>> selectionsByCloud({ 1 }, rows);
+    const auto selections = sb::to_nested_tensor(selectionsByCloud);
+
+    const auto indexed = sb::make_indexed_tensor(source, selections);
+
+    static_assert(std::same_as<
+      typename decltype(indexed)::index_tensor_type,
+      sb::NestedTensor<uint64_t>>);
+    EXPECT_EQ(indexed.indices_view().depth(), 2);
+    const PointCloud selected = indexed(0);
+    EXPECT_EQ(selected(0, 0), 30);
+    EXPECT_EQ(selected(1, 0), 10);
+  }
+
+  TEST(TensorProperties, MakeIndexedTensorRejectsNonBroadcastableSourceShape)
+  {
+    const sb::Tensor<IndexableValue> source({ 2, 2 });
+    const sb::Tensor<size_t> indices({ 2, 3 });
+
+    EXPECT_THROW(sb::make_indexed_tensor(source, indices), std::invalid_argument);
   }
 
 

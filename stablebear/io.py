@@ -19,7 +19,7 @@ from .point_cloud import PointCloudTensor
 
 def _save(item: Tensor, file):
     cpp_p = cpp.persistence
-    data = item._data
+    data = item._root if isinstance(item, NestedTensor) else item._data
     if isinstance(
         data,
         (cpp._IndexedPointCloud32Tensor, cpp._IndexedPointCloud64Tensor),
@@ -33,12 +33,12 @@ def _save(item: Tensor, file):
         cpp.Uint32Tensor: cpp.IoOps.save_uint32_tensor,
         cpp.Uint64Tensor: cpp.IoOps.save_uint64_tensor,
         cpp.BoolTensor: cpp.IoOps.save_bool_tensor,
-        cpp.NestedFloat32Tensor: cpp.IoOps.save_nested_float32_tensor,
-        cpp.NestedFloat64Tensor: cpp.IoOps.save_nested_float64_tensor,
-        cpp.NestedInt32Tensor: cpp.IoOps.save_nested_int32_tensor,
-        cpp.NestedInt64Tensor: cpp.IoOps.save_nested_int64_tensor,
-        cpp.NestedUint32Tensor: cpp.IoOps.save_nested_uint32_tensor,
-        cpp.NestedUint64Tensor: cpp.IoOps.save_nested_uint64_tensor,
+        cpp.NestedFloat32: cpp.IoOps.save_nested_float32_tensor,
+        cpp.NestedFloat64: cpp.IoOps.save_nested_float64_tensor,
+        cpp.NestedInt32: cpp.IoOps.save_nested_int32_tensor,
+        cpp.NestedInt64: cpp.IoOps.save_nested_int64_tensor,
+        cpp.NestedUint32: cpp.IoOps.save_nested_uint32_tensor,
+        cpp.NestedUint64: cpp.IoOps.save_nested_uint64_tensor,
         cpp.Pcf32Tensor: cpp.IoOps.save_pcf32_tensor,
         cpp.Pcf64Tensor: cpp.IoOps.save_pcf64_tensor,
         cpp.Pcf32iTensor: cpp.IoOps.save_pcf32i_tensor,

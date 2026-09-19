@@ -201,7 +201,11 @@ namespace sb_py
           return self(index);
         })
         .def("_index_points", [](const TTensor& self,
-            const sb::Tensor<sb::NestedTensor<uint64_t>>& selections) {
+            const sb::NestedTensor<uint64_t>& selections) {
+          if (selections.is_leaf())
+          {
+            throw std::invalid_argument("Point-cloud selections must have a nested root");
+          }
           return sb::make_indexed_tensor(self.materialize(), selections);
         });
     }
@@ -332,7 +336,11 @@ namespace sb_py
         assert_valid_index(self, index);
         return self(index);
       }, pybind11::return_value_policy::reference_internal);
-      cls.def("_index_points", [](const TTensor& self, const sb::Tensor<sb::NestedTensor<uint64_t>>& selections) {
+      cls.def("_index_points", [](const TTensor& self, const sb::NestedTensor<uint64_t>& selections) {
+        if (selections.is_leaf())
+        {
+          throw std::invalid_argument("Point-cloud selections must have a nested root");
+        }
         return sb::make_indexed_tensor(self, selections);
       });
       cls.def("_set_element", [](TTensor& self, const std::vector<size_t>& index, const sb::Tensor<ScalarT>& val) {

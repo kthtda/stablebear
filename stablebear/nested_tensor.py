@@ -23,9 +23,11 @@ _NESTED_CPP_TYPES = {
     uint32: (cpp.NestedUint32, cpp.NestedUint32Tensor),
     uint64: (cpp.NestedUint64, cpp.NestedUint64Tensor),
 }
-_NESTED_CPP_TO_DTYPE = {
-    tensor_type: dtype
-    for dtype, (_, tensor_type) in _NESTED_CPP_TYPES.items()
+_NESTED_NODE_TO_DTYPE = {
+    node_type: dtype for dtype, (node_type, _) in _NESTED_CPP_TYPES.items()
+}
+_NESTED_TENSOR_TO_DTYPE = {
+    tensor_type: dtype for dtype, (_, tensor_type) in _NESTED_CPP_TYPES.items()
 }
 
 
@@ -70,20 +72,11 @@ def _nested_node(value, dtype=None):
             raise TypeError(
                 f"NestedTensor leaf dtype must be {dtype}, got {value.dtype}"
             )
-        node_type, _ = _NESTED_CPP_TYPES[value.dtype]
-        return node_type(value._data, value.depth - 1), value.dtype
+        return value._root, value.dtype
 
     leaf = _leaf_tensor(value, dtype=dtype)
     node_type, _ = _NESTED_CPP_TYPES[leaf.dtype]
     return node_type(leaf._data), leaf.dtype
-
-
-def _reconstruct_nested_tensor(shape, values, depth, dtype):
-    _, tensor_type = _NESTED_CPP_TYPES[dtype]
-    tensor = tensor_type(cpp.Shape(list(shape)))
-    for index, value in zip(np.ndindex(*shape), values):
-        tensor._set_element(list(index), value)
-    return NestedTensor(tensor, depth=depth)
 
 
 class NestedTensor(Tensor):
@@ -101,18 +94,19 @@ class NestedTensor(Tensor):
                 raise TypeError(
                     f"NestedTensor leaf dtype must be {dtype}, got {data.dtype}"
                 )
-            source_depth = data.depth
             dtype = data.dtype
-            data = data._data
-            depth = source_depth if depth is None else depth
+            root = data._root
+            if depth is not None and depth != root.depth:
+                raise ValueError(
+                    f"NestedTensor depth is {root.depth}, not requested depth {depth}"
+                )
         elif isinstance(data, (FloatTensor, IntTensor, np.ndarray)):
             leaf = _leaf_tensor(data, dtype=dtype)
             dtype = leaf.dtype
             node_type, tensor_type = _NESTED_CPP_TYPES[dtype]
             tensor = tensor_type(cpp.Shape([]))
             tensor._set_element([], node_type(leaf._data))
-            data = tensor
-            depth = 2
+            root = node_type(tensor, 1)
         elif isinstance(data, (list, tuple)):
             shape, values = _infer_shape_and_flatten(data)
             if not values:
@@ -124,8 +118,9 @@ class NestedTensor(Tensor):
                     raise ValueError(
                         "Empty NestedTensor requires an explicit depth"
                     )
-                _, tensor_type = _NESTED_CPP_TYPES[dtype]
-                data = tensor_type(cpp.Shape(list(shape or (0,))))
+                node_type, tensor_type = _NESTED_CPP_TYPES[dtype]
+                children = tensor_type(cpp.Shape(list(shape or (0,))))
+                root = node_type(children, depth - 1)
             else:
                 first, dtype = _nested_node(values[0], dtype=dtype)
                 nodes = [first]
@@ -143,51 +138,60 @@ class NestedTensor(Tensor):
                     raise ValueError(
                         f"NestedTensor depth is {inferred_depth}, not requested depth {depth}"
                     )
-                depth = inferred_depth
-                _, tensor_type = _NESTED_CPP_TYPES[dtype]
+                node_type, tensor_type = _NESTED_CPP_TYPES[dtype]
                 tensor = tensor_type(cpp.Shape([len(nodes)]))
                 for i, node in enumerate(nodes):
                     tensor._set_element([i], node)
                 if shape != (len(nodes),):
                     tensor = tensor.reshape(list(shape))
-                data = tensor
-        elif type(data) in _NESTED_CPP_TO_DTYPE:
-            actual_dtype = _NESTED_CPP_TO_DTYPE[type(data)]
+                root = node_type(tensor, child_depth)
+        elif type(data) in _NESTED_NODE_TO_DTYPE:
+            actual_dtype = _NESTED_NODE_TO_DTYPE[type(data)]
             if dtype is not None and actual_dtype is not dtype:
                 raise TypeError(
                     f"NestedTensor leaf dtype must be {dtype}, got {actual_dtype}"
                 )
             dtype = actual_dtype
+            if data.is_leaf:
+                raise TypeError("A Python NestedTensor must have a nested root")
+            if depth is not None and depth != data.depth:
+                raise ValueError(
+                    f"NestedTensor depth is {data.depth}, not requested depth {depth}"
+                )
+            root = data
+        elif type(data) in _NESTED_TENSOR_TO_DTYPE:
+            actual_dtype = _NESTED_TENSOR_TO_DTYPE[type(data)]
+            if dtype is not None and actual_dtype is not dtype:
+                raise TypeError(
+                    f"NestedTensor leaf dtype must be {dtype}, got {actual_dtype}"
+                )
+            dtype = actual_dtype
+            node_type, _ = _NESTED_CPP_TYPES[dtype]
+            child_depth = 0 if depth is None else depth - 1
+            root = node_type(data, child_depth)
         else:
             raise TypeError(f"Cannot create NestedTensor from {type(data)}")
 
-        if depth is None:
-            shape = tuple(data.shape)
-            if any(size == 0 for size in shape):
-                raise ValueError("Empty NestedTensor requires an explicit depth")
-            depth = data._get_element([0] * len(shape)).depth + 1
-
-        self._data = data
+        self._root = root
+        self._data = root.nested
         self.dtype = dtype
-        self._depth = depth
 
     @classmethod
     def _from_cpp(cls, data):
-        shape = tuple(data.shape)
-        depth = 2 if any(size == 0 for size in shape) else None
-        return cls(data, depth=depth)
+        return cls(data)
 
     @classmethod
     def _is_cpp_nested_tensor(cls, data):
-        return type(data) in _NESTED_CPP_TO_DTYPE
+        return type(data) in _NESTED_NODE_TO_DTYPE
 
     @property
     def depth(self):
         """Number of ``Tensor`` levels, including the leaf tensor."""
-        return self._depth
+        return self._root.depth
 
     def _to_py_tensor(self, data):
-        return NestedTensor(data, depth=self.depth)
+        node_type, _ = _NESTED_CPP_TYPES[self.dtype]
+        return NestedTensor(node_type(data, self.depth - 1))
 
     def _represent_element(self, element):
         from .base_tensor import FloatTensor, IntTensor
@@ -199,7 +203,7 @@ class NestedTensor(Tensor):
                 else IntTensor
             )
             return wrapper(element.leaf)
-        return NestedTensor(element.nested, depth=element.depth)
+        return NestedTensor(element)
 
     def _decay_value(self, val):
         node, _ = _nested_node(val, dtype=self.dtype)
@@ -215,14 +219,7 @@ class NestedTensor(Tensor):
         return [NestedTensor, FloatTensor, IntTensor, np.ndarray]
 
     def copy(self):
-        shape = tuple(self.shape)
-        values = [
-            self._data._get_element(list(index)).copy()
-            for index in np.ndindex(*shape)
-        ]
-        return _reconstruct_nested_tensor(
-            shape, values, self.depth, self.dtype
-        )
+        return NestedTensor(self._root.copy())
 
     def __deepcopy__(self, memodict=None):
         return self.copy()

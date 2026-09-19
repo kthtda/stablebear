@@ -15,6 +15,8 @@
 
 namespace sb::io::detail
 {
+  constexpr std::int32_t NestedTensorSubFormatBase = 100'000'000;
+
   template <typename T>
   struct is_barcode : std::false_type {};
 
@@ -38,7 +40,6 @@ namespace sb::io::detail
 
   // Point clouds are identified via sb::is_point_cloud (point_cloud.hpp).
 
-
   using StreamableTensor = std::variant<
       Tensor<float32_t>,
       Tensor<float64_t>,
@@ -49,12 +50,12 @@ namespace sb::io::detail
       Tensor<uint64_t>,
       Tensor<bool>,
 
-      Tensor<NestedTensor<float32_t>>,
-      Tensor<NestedTensor<float64_t>>,
-      Tensor<NestedTensor<int32_t>>,
-      Tensor<NestedTensor<int64_t>>,
-      Tensor<NestedTensor<uint32_t>>,
-      Tensor<NestedTensor<uint64_t>>,
+      NestedTensor<float32_t>,
+      NestedTensor<float64_t>,
+      NestedTensor<int32_t>,
+      NestedTensor<int64_t>,
+      NestedTensor<uint32_t>,
+      NestedTensor<uint64_t>,
 
       Tensor<Pcf<float32_t, float32_t>>,
       Tensor<Pcf<float64_t, float64_t>>,
@@ -123,15 +124,16 @@ namespace sb::io::detail
 
     else if constexpr (std::is_same_v<T, bool>)     { return TensorFormat{ .baseFormat = 4, .subFormat = 8 }; }
 
-    // (5, 64) is the original uint64 nested-tensor tag and remains unchanged.
-    // New nested leaf types use 500 + the leaf tensor's base format so their
-    // signedness/kind and width are both represented without a format-version
-    // change (for example, nested float32 is (501, 32)).
-    else if constexpr (std::is_same_v<T, NestedTensor<uint64_t>>) { return TensorFormat{ .baseFormat = 5, .subFormat = 64 }; }
+    // Nested tensors retain the leaf tensor's base format and occupy their own
+    // subformat series: nested float32 is (1, 100000032), signed int64 is
+    // (2, 100000064), and unsigned int32 is (3, 100000032).
     else if constexpr (is_nested_tensor_v<T>)
     {
       const auto leafFormat = tensorFormat<typename is_nested_tensor<T>::leaf_type>();
-      return TensorFormat{ .baseFormat = 500 + leafFormat.baseFormat, .subFormat = leafFormat.subFormat };
+      return TensorFormat{
+        .baseFormat = leafFormat.baseFormat,
+        .subFormat = NestedTensorSubFormatBase + leafFormat.subFormat
+      };
     }
 
     else if constexpr (std::is_same_v<T, Pcf<float32_t, float32_t>>) { return TensorFormat{ .baseFormat = 100, .subFormat = 32 }; }
@@ -158,12 +160,22 @@ namespace sb::io::detail
     throw std::runtime_error("Tensor type "s + sb::detail::unmangled_typename<T>() +  " not supported.");
   }
 
+  template <IsTensor TensorT>
+  TensorFormat getTensorFormat(const TensorT&)
+  {
+    return tensorFormat<typename TensorT::value_type>();
+  }
+
+  template <typename T>
+  TensorFormat getTensorFormat(const NestedTensor<T>&)
+  {
+    return tensorFormat<NestedTensor<T>>();
+  }
+
   inline TensorFormat getTensorFormat(const StreamableTensor& tensor)
   {
     return std::visit([](auto&& arg) -> TensorFormat {
-      using TensorT = std::decay_t<decltype(arg)>;
-      using T = typename TensorT::value_type;
-      return tensorFormat<T>();
+      return getTensorFormat(arg);
     }, tensor);
   }
 
@@ -195,6 +207,18 @@ namespace sb::io::detail
     {
       write_tensor(os, value.nested());
     }
+  }
+
+  inline void write_tensor_format(std::ostream& os, TensorFormat format)
+  {
+    write_bytes<std::int32_t>(os, format.baseFormat);
+    write_bytes<std::int32_t>(os, format.subFormat);
+  }
+
+  template <typename T>
+  void write_tensor_format(std::ostream& os)
+  {
+    write_tensor_format(os, tensorFormat<T>());
   }
 
   inline TensorFormat read_tensor_format(std::istream& is)
@@ -293,9 +317,7 @@ namespace sb::io::detail
   template <IsTensor TensorT>
     void write_contiguous_tensor(std::ostream& os, const TensorT& tensor)
   {
-    auto format = getTensorFormat(tensor);
-    write_bytes<std::int32_t>(os, format.baseFormat);
-    write_bytes<std::int32_t>(os, format.subFormat);
+    write_tensor_format(os, getTensorFormat(tensor));
 
     write_bytes<std::uint64_t>(os, tensor.shape().size());
     for (auto i = 0_uz; i < tensor.shape().size(); ++i)
@@ -335,6 +357,13 @@ namespace sb::io::detail
       return;
     }
     write_contiguous_tensor(os, tensor);
+  }
+
+  template <typename T>
+  void write_tensor(std::ostream& os, const NestedTensor<T>& tensor)
+  {
+    write_tensor_format<NestedTensor<T>>(os);
+    write_element(os, tensor);
   }
 
 
@@ -489,8 +518,10 @@ namespace sb::io::detail
   }
 
 
-  /// The format an earlier version wrote this element type as, for the point-cloud type whose tensor layout changed (1000 -> 1001). Equal to
-  /// tensorFormat<T>() for every other type.
+  /// The format an earlier version used for point-cloud tensors, where each
+  /// point cloud's coordinate tensor was stored inline (1000). The current
+  /// format uses shared coordinate sources (1001). Equal to tensorFormat<T>()
+  /// for every other element type.
   template <typename T>
   TensorFormat legacyTensorFormat()
   {

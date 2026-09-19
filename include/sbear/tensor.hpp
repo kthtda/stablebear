@@ -40,6 +40,12 @@ namespace sb
   template <TensorProperties Properties>
   concept IndexedTensorProperties = has_property(Properties, TensorProperty::Indexed);
 
+  template <typename T, TensorProperties Properties>
+  class Tensor;
+
+  template <typename LeafT>
+  class NestedTensor;
+
   template <typename T>
   concept IndexableTensorElement = requires(const T& value, const typename T::index_type& indices)
   {
@@ -58,6 +64,52 @@ namespace sb
     struct TensorIndexType<T>
     {
       using type = typename T::index_type;
+    };
+
+    template <typename IndexT>
+    struct IndexTensorStorage
+    {
+      using type = Tensor<IndexT, TensorProperty::None>;
+
+      static decltype(auto) at(
+          const type& indices, const std::vector<size_t>& index)
+      {
+        return indices(index);
+      }
+
+      static decltype(auto) flat(const type& indices, size_t index)
+      {
+        return indices.flat(index);
+      }
+
+      static void validate(const type&) { }
+    };
+
+    template <typename IndexT>
+    struct IndexTensorStorage<Tensor<IndexT, TensorProperty::None>>
+    {
+      using index_type = Tensor<IndexT, TensorProperty::None>;
+      using type = NestedTensor<IndexT>;
+
+      static const index_type& at(
+          const type& indices, const std::vector<size_t>& index)
+      {
+        return indices.nested()(index).leaf();
+      }
+
+      static const index_type& flat(const type& indices, size_t index)
+      {
+        return indices.nested().flat(index).leaf();
+      }
+
+      static void validate(const type& indices)
+      {
+        if (indices.depth() != 2)
+        {
+          throw std::invalid_argument(
+            "Tensor-valued indices must have nesting depth 2");
+        }
+      }
     };
   }
 
@@ -100,7 +152,7 @@ namespace sb
     using value_type = T;
     using index_type = typename detail::TensorIndexType<T>::type;
     using source_tensor_type = Tensor<T, SourceProperties>;
-    using index_tensor_type = Tensor<index_type>;
+    using index_tensor_type = typename detail::IndexTensorStorage<index_type>::type;
     using source_storage_type = std::conditional_t<IsIndexed, source_tensor_type, std::monostate>;
     using index_storage_type = std::conditional_t<IsIndexed, index_tensor_type, std::monostate>;
 
@@ -413,13 +465,14 @@ namespace sb
   };
 
   /// Create a lazy indexed tensor by associating each logical element with an
-  /// element-specific index. The source shape must be a prefix of the index
-  /// tensor shape; additional index axes broadcast the source without copying.
+  /// element-specific index. Source axes align with the leading index-tensor
+  /// axes and may broadcast from size one; additional trailing index axes
+  /// broadcast the source without copying.
   template <typename T, TensorProperties Properties>
   requires IndexableTensorElement<T> && (!IndexedTensorProperties<Properties>)
   [[nodiscard]] Tensor<T, Properties | TensorProperty::Indexed> make_indexed_tensor(
     const Tensor<T, Properties>& source,
-    const Tensor<typename T::index_type>& indices);
+    const typename detail::IndexTensorStorage<typename T::index_type>::type& indices);
 
   template <typename U, typename T>
   requires CanMultiplyTo<T, U, T>

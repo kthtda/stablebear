@@ -187,15 +187,27 @@ namespace sb
     }
   }
 
-  template <IsTensor TensorT>
-  void write(const TensorT& tensor, std::ostream& os)
+  namespace io::detail
   {
-    io::detail::write_header(os);
-    io::detail::write_bytes<uint32_t>(os, static_cast<uint32_t>(FormatType::SingleTensor)); // "t" is single tensor
-    io::detail::write_tensor(os, tensor);
+    template <typename TensorT>
+    void write_single_tensor(std::ostream& os, const TensorT& tensor)
+    {
+      write_header(os);
+      write_bytes<uint32_t>(os, static_cast<uint32_t>(FormatType::SingleTensor));
+      write_tensor(os, tensor);
+    }
   }
 
   template <IsTensor TensorT>
+    requires (!is_nested_tensor_v<typename TensorT::value_type>)
+  void write(const TensorT& tensor, std::ostream& os)
+  {
+    io::detail::write_single_tensor(os, tensor);
+  }
+
+  template <IsTensor TensorT>
+    requires (!is_nested_tensor_v<TensorT>
+              && !is_nested_tensor_v<typename TensorT::value_type>)
   TensorT read(std::istream& is)
   {
     io::detail::read_header(is);
@@ -207,16 +219,13 @@ namespace sb
           + " for this operation but got format type " + formatName(formatType));
     }
 
-    io::detail::TensorFormat format;
-
-    format.baseFormat = io::detail::read_bytes<std::int32_t>(is);
-    format.subFormat = io::detail::read_bytes<std::int32_t>(is);
+    const auto format = io::detail::read_tensor_format(is);
 
     using ElemT = typename TensorT::value_type;
 
-    // Point-cloud tensors have both a current and a legacy
-    // layout; accept either, as read_any_tensor does. For every other type the
-    // two formats coincide and this is the plain equality check it replaces.
+    // Point-cloud tensors have both a current and a legacy layout; accept
+    // either, as read_any_tensor does. For every other type the two formats
+    // coincide.
     auto expectedFormat = io::detail::tensorFormat<ElemT>();
     auto legacyFormat = io::detail::legacyTensorFormat<ElemT>();
     if (format != expectedFormat && format != legacyFormat)
@@ -225,6 +234,29 @@ namespace sb
     }
 
     return io::detail::read_tensor_for_format<ElemT>(is, format);
+  }
+
+  template <typename NestedT>
+    requires is_nested_tensor_v<NestedT>
+  NestedT read(std::istream& is)
+  {
+    io::detail::read_header(is);
+
+    auto formatType = io::detail::read_bytes<uint32_t>(is);
+    if (formatType != static_cast<uint32_t>(FormatType::SingleTensor))
+    {
+      throw std::runtime_error("Expected format type " + formatName(static_cast<uint32_t>(FormatType::SingleTensor))
+          + " for this operation but got format type " + formatName(formatType));
+    }
+
+    const auto format = io::detail::read_tensor_format(is);
+    const auto expectedFormat = io::detail::tensorFormat<NestedT>();
+    if (format != expectedFormat)
+    {
+      throw std::runtime_error("Unexpected tensor format " + format.toString() + " where " + expectedFormat.toString() + " was expected.");
+    }
+
+    return io::detail::read_nested_tensor_element<typename is_nested_tensor<NestedT>::leaf_type>(is);
   }
 
   inline io::detail::StreamableTensor read_any_tensor(std::istream& is)
@@ -251,12 +283,12 @@ namespace sb
 
     else if (format == io::detail::tensorFormat<bool>())     { return io::detail::read_tensor<bool>(is); }
 
-    else if (format == io::detail::tensorFormat<NestedTensor<float32_t>>()) { return io::detail::read_tensor<NestedTensor<float32_t>>(is); }
-    else if (format == io::detail::tensorFormat<NestedTensor<float64_t>>()) { return io::detail::read_tensor<NestedTensor<float64_t>>(is); }
-    else if (format == io::detail::tensorFormat<NestedTensor<int32_t>>()) { return io::detail::read_tensor<NestedTensor<int32_t>>(is); }
-    else if (format == io::detail::tensorFormat<NestedTensor<int64_t>>()) { return io::detail::read_tensor<NestedTensor<int64_t>>(is); }
-    else if (format == io::detail::tensorFormat<NestedTensor<uint32_t>>()) { return io::detail::read_tensor<NestedTensor<uint32_t>>(is); }
-    else if (format == io::detail::tensorFormat<NestedTensor<uint64_t>>()) { return io::detail::read_tensor<NestedTensor<uint64_t>>(is); }
+    else if (format == io::detail::tensorFormat<NestedTensor<float32_t>>()) { return io::detail::read_nested_tensor_element<float32_t>(is); }
+    else if (format == io::detail::tensorFormat<NestedTensor<float64_t>>()) { return io::detail::read_nested_tensor_element<float64_t>(is); }
+    else if (format == io::detail::tensorFormat<NestedTensor<int32_t>>()) { return io::detail::read_nested_tensor_element<int32_t>(is); }
+    else if (format == io::detail::tensorFormat<NestedTensor<int64_t>>()) { return io::detail::read_nested_tensor_element<int64_t>(is); }
+    else if (format == io::detail::tensorFormat<NestedTensor<uint32_t>>()) { return io::detail::read_nested_tensor_element<uint32_t>(is); }
+    else if (format == io::detail::tensorFormat<NestedTensor<uint64_t>>()) { return io::detail::read_nested_tensor_element<uint64_t>(is); }
 
     else if (format == io::detail::tensorFormat<Pcf<float32_t, float32_t>>()) { return io::detail::read_tensor<Pcf<float32_t, float32_t>>(is); }
     else if (format == io::detail::tensorFormat<Pcf<float64_t, float64_t>>()) { return io::detail::read_tensor<Pcf<float64_t, float64_t>>(is); }
@@ -292,9 +324,7 @@ namespace sb
   {
     io::detail::write_header(os);
     io::detail::write_bytes<uint32_t>(os, static_cast<uint32_t>(FormatType::SingleObject));
-    auto format = io::detail::tensorFormat<T>();
-    io::detail::write_bytes<int32_t>(os, format.baseFormat);
-    io::detail::write_bytes<int32_t>(os, format.subFormat);
+    io::detail::write_tensor_format<T>(os);
     io::detail::write_element(os, obj);
   }
 

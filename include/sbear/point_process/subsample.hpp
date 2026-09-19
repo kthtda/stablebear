@@ -141,7 +141,7 @@ namespace sb::pp
     std::vector<size_t> outputShape(points.shape().begin(), points.shape().end());
     outputShape.push_back(nSamples);
     Tensor<PointCloud<T>> source(points.shape());
-    Tensor<NestedTensor<uint64_t>> selections(outputShape);
+    Tensor<Tensor<uint64_t>> selections(outputShape);
     const size_t nOutputs = std::accumulate(
       outputShape.begin(), outputShape.end(), size_t{1}, std::multiplies<size_t>());
     const auto seedBlock = gen.reserve(nOutputs);
@@ -173,11 +173,12 @@ namespace sb::pp
           indices = detail::discard_duplicate_coordinates(sourceCoordinates, indices);
         }
         outputIndex.back() = sample;
-        selections(outputIndex) = NestedTensor<uint64_t>(std::move(indices));
+        selections(outputIndex) = std::move(indices);
       }
     }, exec);
 
-    return make_indexed_tensor(source, selections);
+    return make_indexed_tensor(
+      source, to_nested_tensor(selections));
   }
 }
 
