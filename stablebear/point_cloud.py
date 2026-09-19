@@ -60,10 +60,6 @@ class PointCloud:
         return (point_cloud.n_points, point_cloud.n_dims)
 
     @property
-    def ndim(self):
-        return 2
-
-    @property
     def size(self):
         return self.shape[0] * self.shape[1]
 

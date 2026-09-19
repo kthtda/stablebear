@@ -1,6 +1,41 @@
 import numpy as np
+import pytest
 
 import stablebear as sb
+
+
+@pytest.mark.parametrize(
+    ("dtype", "np_dtype"),
+    [(sb.float32, np.float32), (sb.float64, np.float64)],
+)
+def test_point_cloud_is_a_rank_two_facade(dtype, np_dtype):
+    expected = np.arange(12, dtype=np_dtype).reshape(4, 3)
+    cloud = sb.PointCloud(expected, dtype=dtype)
+
+    assert cloud.shape == (4, 3)
+    assert cloud.size == 12
+    assert cloud.dtype == dtype
+    assert not hasattr(cloud, "ndim")
+    assert not hasattr(cloud, "squeeze")
+    assert not hasattr(cloud, "reshape")
+    assert cloud[:, 1].array_equal(expected[:, 1])
+
+    cloud[2, 1] = -1
+    expected[2, 1] = -1
+    np.testing.assert_array_equal(np.asarray(cloud), expected)
+
+
+@pytest.mark.parametrize("shape", [(3,), (2, 3, 4)])
+def test_point_cloud_rejects_non_rank_two_data(shape):
+    with pytest.raises(ValueError, match="rank 2"):
+        sb.PointCloud(np.zeros(shape))
+
+
+@pytest.mark.parametrize("shape", [(3,), (2, 3, 4)])
+def test_point_cloud_tensor_rejects_non_rank_two_assignment(shape):
+    tensor = sb.zeros((1,), dtype=sb.pcloud64)
+    with pytest.raises(ValueError, match="rank 2"):
+        tensor[0] = np.zeros(shape)
 
 
 def test_can_create_point_clouds():
@@ -20,12 +55,11 @@ def test_can_create_point_clouds():
     assert isinstance(Y, sb.PointCloudTensor)
     assert Y.dtype == sb.pcloud32
 
-    Y[0, 0] = np.random.randn(30, 2, 20)
-    Y[1, 1] = np.random.randn(40, 15, 10)
+    Y[0, 0] = np.random.randn(30, 20)
+    Y[1, 1] = np.random.randn(40, 10)
 
-    assert Y[0, 0].shape == (30, 2, 20)
-    assert Y[1, 1].shape == (40, 15, 10)
-
+    assert Y[0, 0].shape == (30, 20)
+    assert Y[1, 1].shape == (40, 10)
 
 def test_single_cloud_is_subscriptable():
     # A 0-d PointCloudTensor wraps a single cloud; it should be indexable as
@@ -51,7 +85,7 @@ def test_tensor_of_clouds_indexing_unchanged():
     T = sb.zeros((3,), dtype=sb.pcloud64)
     T[0] = arr
 
-    assert isinstance(T[0], sb.FloatTensor)
+    assert isinstance(T[0], sb.PointCloud)
     assert T[0].shape == (5, 2)
     assert T[0][:, 1].array_equal(arr[:, 1])
 
@@ -64,6 +98,14 @@ def test_tensor_of_clouds_indexing_unchanged():
     grid[0, 1] = arr
     assert grid[0, 1][:, 0].array_equal(arr[:, 0])
     assert grid[0, 1][3].array_equal(arr[3])
+
+    cloud = grid[0, 1]
+    cloud[3, 0] = -1
+    assert grid[0, 1][3, 0] == -1
+
+    copied = cloud.copy()
+    copied[3, 0] = 12
+    assert grid[0, 1][3, 0] == -1
 
 
 def test_stored_is_same_as_numpy():
