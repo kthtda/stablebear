@@ -26,6 +26,8 @@ jobs:
       contents: write
     uses: ./.github/workflows/analysis.yaml
     needs: check_version
+    secrets:
+      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
   build:
     uses: ./.github/workflows/wheels.yaml
@@ -42,7 +44,7 @@ jobs:
       - name: Download wheels
         uses: actions/download-artifact@v8
         with:
-          name: cpu-wheels
+          name: wheels
           path: dist/
 
       - name: Compare wheels
@@ -66,7 +68,7 @@ jobs:
       - name: Download wheels
         uses: actions/download-artifact@v8
         with:
-          name: cpu-wheels
+          name: wheels
           path: dist/
 
       - name: Publish to TestPyPI
