@@ -161,7 +161,7 @@ identify review work, not test-plan items. The broader test plan still applies.
   indexed/materialized inputs with the full Python suite (2,248 passed) and
   full C++ suite (475 passed).
 
-- [ ] **B3. [P2] Validate the complete public point-cloud indexing contract.**
+- [x] **B3. [P2] Validate the complete public point-cloud indexing contract.**
 
   **Finding:** A source with shape `(2, 1)` accepts selections with shape
   `(2, 3)`, although #231 requires an exact prefix match. Out-of-bounds
@@ -180,6 +180,15 @@ identify review work, not test-plan items. The broader test plan still applies.
   [tensor.tpp](../include/sbear/tensor.tpp), `make_indexed_tensor()`;
   [point_cloud.hpp](../include/sbear/point_cloud.hpp), `index_into()`.
   Verification: test plan C1–C2.
+
+  **Completed:** Fixed by `b0c9791a0`. Indexed tensor construction now
+  validates every aligned element/index pair generically in C++, while the
+  public point-cloud API requires the source shape to exactly match the
+  selection's leading dimensions. Invalid nesting, leaf dtypes/ranks, and
+  point indices fail before a result is returned; access revalidates indices
+  after shared source replacement. Added the `sb.indices()` convenience
+  constructor and documented the selection contract. Verified with the full
+  Python suite (2,262 passed) and full C++ suite (476 passed).
 
 ## C. Serialization and compatibility
 
