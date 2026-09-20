@@ -37,9 +37,19 @@ namespace sb_py
       throw std::runtime_error("content should have 2 dimensions (content has shape " + shape_to_string(content) + ").");
     }
 
+    if (content_buf.shape[1] != 2)
+    {
+      throw std::runtime_error("content should have 2 columns, [time, value] (content has shape " + shape_to_string(content) + ").");
+    }
+
     if (enumeration_buf.ndim < 2)
     {
       throw std::runtime_error("enumeration must have at least 2 dimensions");
+    }
+
+    if (enumeration_buf.shape[enumeration_buf.ndim - 1] != 2)
+    {
+      throw std::runtime_error("enumeration's last dimension should have size 2, [start, stop) (enumeration has shape " + shape_to_string(enumeration) + ").");
     }
 
     std::vector<size_t> targetShape(enumeration_buf.ndim - 1);
@@ -52,7 +62,9 @@ namespace sb_py
 
     sb::walk(target, [&target, &content, &enumeration](const std::vector<size_t>& idx) {
 
-      auto enumerationBaseOffset = std::inner_product(idx.begin(), idx.end(), enumeration.strides(), 0_uz);
+      // Signed accumulation: strides are negative for reversed views, and an
+      // unsigned division of the wrapped sum would produce a garbage offset.
+      auto enumerationBaseOffset = std::inner_product(idx.begin(), idx.end(), enumeration.strides(), py::ssize_t{0});
       enumerationBaseOffset /= enumeration.itemsize();
 
       auto* enumerationBuf = enumeration.unchecked().data();

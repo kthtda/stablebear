@@ -30,7 +30,9 @@ std::string shape_to_string(pybind11::array_t<T> arr)
 template <typename T>
 T& get_element(pybind11::array_t<T>& arr, const std::vector<pybind11::ssize_t>& idx)
 {
-  auto offset = std::inner_product(idx.begin(), idx.end(), arr.strides(), 0_uz);
+  // NumPy strides are signed (negative for reversed views), so the offset
+  // must accumulate and divide as a signed quantity.
+  auto offset = std::inner_product(idx.begin(), idx.end(), arr.strides(), pybind11::ssize_t{0});
   offset /= arr.itemsize();
   return *(static_cast<T*>(arr.request().ptr) + offset);
 }
@@ -55,12 +57,14 @@ public:
     return m_arr.shape(i);
   }
 
-  [[nodiscard]] std::vector<size_t> strides() const
+  [[nodiscard]] std::vector<pybind11::ssize_t> strides() const
   {
-    std::vector<size_t> s;
+    // Signed, like sb::Tensor::strides() -- numpy strides are negative for
+    // reversed views and must not be wrapped through size_t.
+    std::vector<pybind11::ssize_t> s;
     s.resize(m_arr.ndim());
     std::transform(m_arr.strides(), m_arr.strides() + m_arr.ndim(), s.begin(), [this](pybind11::ssize_t n) {
-      return static_cast<size_t>(n / m_arr.itemsize());
+      return n / m_arr.itemsize();
     });
     return s;
   }
