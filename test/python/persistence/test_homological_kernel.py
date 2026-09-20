@@ -49,11 +49,18 @@ def _indexed_kernel_inputs(pcloud_dtype, np_dtype):
         [FLAGSHIP_PROJECTED, np.asarray(FLAGSHIP_PROJECTED) + 10],
         dtype=np_dtype,
     )
-    leaf = lambda rows: sb.tensor(rows, dtype=sb.uint64)
     selections = sb.NestedTensor(
         [
-            [leaf([3, 0, 2, 1]), leaf([1, 1, 0, 3]), leaf([2, 0, 2, 3])],
-            [leaf([0, 3, 1, 2]), leaf([2, 2, 1, 0]), leaf([3, 1, 0, 2])],
+            [
+                sb.indices([3, 0, 2, 1]),
+                sb.indices([1, 1, 0, 3]),
+                sb.indices([2, 0, 2, 3]),
+            ],
+            [
+                sb.indices([0, 3, 1, 2]),
+                sb.indices([2, 2, 1, 0]),
+                sb.indices([3, 1, 0, 2]),
+            ],
         ]
     )
     return (

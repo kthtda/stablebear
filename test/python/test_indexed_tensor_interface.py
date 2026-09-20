@@ -20,7 +20,7 @@ def indexed_points(dtype, np_dtype):
     ]
     source = sb.PointCloudTensor(clouds, dtype=dtype)
     selections = sb.NestedTensor([
-        sb.tensor(rows, dtype=sb.uint64)
+        sb.indices(rows)
         for rows in ([4, 1], [0, 3], [2, 2], [1, 4])
     ])
     return source, source[selections]

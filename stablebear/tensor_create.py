@@ -175,6 +175,14 @@ def tensor(data, dtype: Dtype = None):
     return wrapper(data)
 
 
+def indices(data):
+    """Create a ``uint64`` tensor for use as indices.
+
+    This is shorthand for ``tensor(data, dtype=uint64)``.
+    """
+    return tensor(data, dtype=uint64)
+
+
 def concatenate(tensors, axis=0):
     """Concatenate tensors along an existing axis (outer indexing)."""
     if not tensors:

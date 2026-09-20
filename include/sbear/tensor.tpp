@@ -45,6 +45,7 @@ namespace sb
   Tensor<T, Properties>::Tensor(source_tensor_type source, index_tensor_type indices)
     requires IsIndexed && IndexableTensorElement<T>
   {
+    detail::IndexTensorStorage<index_type>::validate(indices);
     if (source.shape() != indices.shape())
     {
       throw std::invalid_argument(
@@ -53,6 +54,26 @@ namespace sb
 
     m_indexedState = std::make_shared<indexed_state_type>(
       indexed_state_type{std::move(source), std::move(indices)});
+    walk(m_indexedState->source, [&](const std::vector<size_t>& index) {
+      try
+      {
+        m_indexedState->source(index).validate_index(
+          detail::IndexTensorStorage<index_type>::at(
+            *m_indexedState->indices, index));
+      }
+      catch (const std::out_of_range& error)
+      {
+        throw std::out_of_range(
+          "Invalid indexed-tensor selection at outer index "
+          + index_to_string(index) + ": " + error.what());
+      }
+      catch (const std::invalid_argument& error)
+      {
+        throw std::invalid_argument(
+          "Invalid indexed-tensor selection at outer index "
+          + index_to_string(index) + ": " + error.what());
+      }
+    });
     m_indexedLocator = Tensor<size_t, TensorProperty::None>(
       m_indexedState->indices->shape());
     const size_t count = m_indexedLocator.shape().empty()
@@ -72,19 +93,40 @@ namespace sb
   { }
 
   template <typename T, TensorProperties Properties>
-  requires IndexableTensorElement<T> && (!IndexedTensorProperties<Properties>)
-  Tensor<T, Properties | TensorProperty::Indexed> make_indexed_tensor(
+  requires IndexableTensorElement<T>
+  void validate_indexed_tensor_shape(
     const Tensor<T, Properties>& source,
-    typename detail::IndexTensorStorage<typename T::index_type>::type&& indices)
+    const typename detail::IndexTensorStorage<typename T::index_type>::type& indices,
+    IndexedTensorAlignment alignment)
   {
     detail::IndexTensorStorage<typename T::index_type>::validate(indices);
     const std::vector<size_t>& sourceShape = source.shape();
     const std::vector<size_t> indexShape = indices.shape();
+    if (alignment == IndexedTensorAlignment::ExactLeadingDimensions
+        && (sourceShape.size() > indexShape.size()
+          || !std::equal(sourceShape.begin(), sourceShape.end(), indexShape.begin())))
+    {
+      throw std::invalid_argument(
+        "The leading dimensions of index tensor shape "
+        + shape_to_string(indexShape) + " must exactly match source tensor shape "
+        + shape_to_string(sourceShape));
+    }
     if (sourceShape.size() > indexShape.size())
     {
       throw std::invalid_argument(
         "Source tensor rank cannot exceed index tensor rank");
     }
+  }
+
+  template <typename T, TensorProperties Properties>
+  requires IndexableTensorElement<T> && (!IndexedTensorProperties<Properties>)
+  Tensor<T, Properties | TensorProperty::Indexed> make_indexed_tensor(
+    const Tensor<T, Properties>& source,
+    typename detail::IndexTensorStorage<typename T::index_type>::type&& indices,
+    IndexedTensorAlignment alignment)
+  {
+    validate_indexed_tensor_shape(source, indices, alignment);
+    const std::vector<size_t> indexShape = indices.shape();
 
     Tensor<T, Properties> sourceView = source;
     for (size_t axis = source.rank(); axis < indices.rank(); ++axis)
@@ -100,9 +142,10 @@ namespace sb
   requires IndexableTensorElement<T> && (!IndexedTensorProperties<Properties>)
   Tensor<T, Properties | TensorProperty::Indexed> make_indexed_tensor(
     const Tensor<T, Properties>& source,
-    const typename detail::IndexTensorStorage<typename T::index_type>::type& indices)
+    const typename detail::IndexTensorStorage<typename T::index_type>::type& indices,
+    IndexedTensorAlignment alignment)
   {
-    return make_indexed_tensor(source, indices.copy());
+    return make_indexed_tensor(source, indices.copy(), alignment);
   }
 
   template <typename T, TensorProperties Properties>

@@ -31,6 +31,12 @@ namespace sb
     static constexpr TensorProperties Indexed = 1 << 0;
   };
 
+  enum class IndexedTensorAlignment
+  {
+    Broadcast,
+    ExactLeadingDimensions
+  };
+
   [[nodiscard]] constexpr bool has_property(
     TensorProperties properties, TensorProperties property) noexcept
   {
@@ -55,6 +61,7 @@ namespace sb
   template <typename T>
   concept IndexableTensorElement = requires(const T& value, const typename T::index_type& indices)
   {
+    { value.validate_index(indices) } -> std::same_as<void>;
     { value.index_into(indices) } -> std::same_as<T>;
   };
 
@@ -503,19 +510,33 @@ namespace sb
   /// Create a lazy indexed tensor by associating each logical element with an
   /// element-specific index. Source axes align with the leading index-tensor
   /// axes and may broadcast from size one; additional trailing index axes
-  /// broadcast the source without copying.
+  /// broadcast the source without copying. ExactLeadingDimensions alignment
+  /// disables singleton-axis broadcasting while still allowing trailing index
+  /// axes.
+  /// Every aligned element/index pair is validated before construction
+  /// returns; logical access validates again because shared source values may
+  /// subsequently change.
+  template <typename T, TensorProperties Properties>
+  requires IndexableTensorElement<T>
+  void validate_indexed_tensor_shape(
+    const Tensor<T, Properties>& source,
+    const typename detail::IndexTensorStorage<typename T::index_type>::type& indices,
+    IndexedTensorAlignment alignment = IndexedTensorAlignment::Broadcast);
+
   template <typename T, TensorProperties Properties>
   requires IndexableTensorElement<T> && (!IndexedTensorProperties<Properties>)
   [[nodiscard]] Tensor<T, Properties | TensorProperty::Indexed> make_indexed_tensor(
     const Tensor<T, Properties>& source,
-    const typename detail::IndexTensorStorage<typename T::index_type>::type& indices);
+    const typename detail::IndexTensorStorage<typename T::index_type>::type& indices,
+    IndexedTensorAlignment alignment = IndexedTensorAlignment::Broadcast);
 
   /// Create an indexed tensor by taking ownership of freshly produced indices.
   template <typename T, TensorProperties Properties>
   requires IndexableTensorElement<T> && (!IndexedTensorProperties<Properties>)
   [[nodiscard]] Tensor<T, Properties | TensorProperty::Indexed> make_indexed_tensor(
     const Tensor<T, Properties>& source,
-    typename detail::IndexTensorStorage<typename T::index_type>::type&& indices);
+    typename detail::IndexTensorStorage<typename T::index_type>::type&& indices,
+    IndexedTensorAlignment alignment = IndexedTensorAlignment::Broadcast);
 
   template <typename U, typename T>
   requires CanMultiplyTo<T, U, T>

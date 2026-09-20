@@ -231,15 +231,29 @@ class PointCloudTensor(Tensor):
     def __getitem__(self, index):
         """Select clouds, or points when this tensor contains one cloud.
 
-        A ``NestedTensor`` selects rows independently from each source cloud
-        and returns lazy indexed point-cloud views.
+        A depth-2 ``NestedTensor`` with ``uint64`` leaves selects points
+        independently from each source cloud and returns lazy indexed
+        point-cloud views. Every leaf must be rank one. This tensor's outer
+        shape must exactly match the leading dimensions of the selection
+        tensor's outer shape. Any extra trailing selection axes create
+        multiple selections from the corresponding source cloud. Singleton
+        source axes do not broadcast.
+
+        Point order and repetitions are preserved. Empty leaves produce empty
+        point clouds with the source dimension. Invalid outer shapes and leaf
+        ranks raise ``ValueError``; out-of-range points raise ``IndexError``.
+        Every selection is validated before a result is returned.
         """
         if isinstance(index, NestedTensor):
             if index.dtype is not uint64:
                 raise TypeError("Point-cloud indices must have uint64 leaves")
             if index.depth != 2:
                 raise ValueError("Point-cloud indexing requires Tensor<Tensor<uint64>>")
-            return PointCloudTensor(self._data._index_elements(index._root))
+            return PointCloudTensor(
+                self._data._index_elements(
+                    index._root, exact_leading_dimensions=True
+                )
+            )
 
         if self.ndim == 0:
             cloud = self._point_cloud([])
@@ -269,7 +283,7 @@ class PointCloudTensor(Tensor):
     def to_dense(self):
         """Return an independent tensor with ordinary point-cloud storage.
 
-        Indexed tensors resolve their logical row selections without changing
+        Indexed tensors resolve their logical point selections without changing
         the source tensor or any views that share its indexed backing. Calling
         this on an already-dense tensor still returns an independent copy.
         """

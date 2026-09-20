@@ -71,12 +71,10 @@ An empty list produces a shape ``(0,)`` tensor.
 Construct the child tensors explicitly; their shapes may differ, but every
 child must have the same leaf dtype and nesting depth::
 
-   u64 = lambda values: sb.tensor(values, dtype=sb.uint64)
-
    selections = sb.tensor([
-       u64([3, 3, 7]),
-       u64([1]),
-       u64([]),
+       sb.indices([3, 3, 7]),
+       sb.indices([1]),
+       sb.indices([]),
    ])
 
    selections.shape       # (3,)
@@ -87,8 +85,8 @@ child must have the same leaf dtype and nesting depth::
 The outer tensor can have multiple dimensions::
 
    selections = sb.tensor([
-       [u64([3, 2]), u64([2, 6, 7])],
-       [u64([4]), u64([9, 6])],
+       [sb.indices([3, 2]), sb.indices([2, 6, 7])],
+       [sb.indices([4]), sb.indices([9, 6])],
    ])
 
    selections.shape       # (2, 2)

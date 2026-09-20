@@ -342,12 +342,23 @@ namespace sb_py
           sb::index_assign(self, axis, indices, values);
         })
         .def("_index_elements", [](const TTensor& self,
-            const typename TTensor::index_tensor_type& indices) {
+            const typename TTensor::index_tensor_type& indices,
+            bool exactLeadingDimensions) {
+          const auto alignment = exactLeadingDimensions
+            ? sb::IndexedTensorAlignment::ExactLeadingDimensions
+            : sb::IndexedTensorAlignment::Broadcast;
           if constexpr (TTensor::IsIndexed)
-            return sb::make_indexed_tensor(self.materialize(), indices);
+          {
+            sb::validate_indexed_tensor_shape(self, indices, alignment);
+            return sb::make_indexed_tensor(
+              self.materialize(), indices, alignment);
+          }
           else
-            return sb::make_indexed_tensor(self, indices);
-        });
+          {
+            return sb::make_indexed_tensor(self, indices, alignment);
+          }
+        }, pybind11::arg("indices"),
+          pybind11::arg("exact_leading_dimensions") = false);
     }
 
     using ScalarT = scalar_of_t<T>;

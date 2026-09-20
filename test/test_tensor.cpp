@@ -97,12 +97,37 @@ namespace
 
     int value = 0;
 
+    void validate_index(const size_t&) const { }
+
     [[nodiscard]] IndexableValue index_into(const size_t& index) const
     {
+      validate_index(index);
       return { value + static_cast<int>(index) };
     }
 
     bool operator==(const IndexableValue&) const = default;
+  };
+
+  struct BoundsCheckedIndexableValue
+  {
+    using index_type = size_t;
+
+    size_t size = 0;
+
+    void validate_index(const size_t& index) const
+    {
+      if (index >= size)
+      {
+        throw std::out_of_range("index out of bounds");
+      }
+    }
+
+    [[nodiscard]] BoundsCheckedIndexableValue index_into(
+      const size_t& index) const
+    {
+      validate_index(index);
+      return { size - index };
+    }
   };
 
   template<typename T>
@@ -149,7 +174,8 @@ namespace
     indices({ 1, 1 }) = 5;
     indices({ 1, 2 }) = 6;
 
-    const auto indexed = sb::make_indexed_tensor(source, indices);
+    const auto indexed = sb::make_indexed_tensor(
+      source, indices, sb::IndexedTensorAlignment::ExactLeadingDimensions);
 
     static_assert(decltype(indexed)::IsIndexed);
     EXPECT_EQ(indexed.shape(), (std::vector<size_t>{ 2, 3 }));
@@ -174,6 +200,32 @@ namespace
 
     EXPECT_EQ(indexed({ 0, 2 }).value, 13);
     EXPECT_EQ(indexed({ 1, 1 }).value, 25);
+
+    // Default alignment broadcasts the source's singleton second axis from
+    // shape (2, 1) to the index shape (2, 3). Exact-leading-dimensions
+    // alignment forbids that broadcast because the leading index dimensions
+    // (2, 3) do not exactly match the source shape (2, 1).
+    EXPECT_THROW(
+      sb::make_indexed_tensor(
+        source, indices,
+        sb::IndexedTensorAlignment::ExactLeadingDimensions),
+      std::invalid_argument);
+  }
+
+  TEST(TensorProperties, IndexedElementsAreValidatedAtConstruction)
+  {
+    sb::Tensor<BoundsCheckedIndexableValue> source({ 2 });
+    source(0) = { 2 };
+    source(1) = { 1 };
+    sb::Tensor<size_t> elementIndices({ 2 });
+    elementIndices(0) = 1;
+    elementIndices(1) = 1;
+
+    // Indexed tensors align source and index cells. The first pair asks
+    // source(0), of size 2, for index 1 and is valid. The second asks
+    // source(1), of size 1, for index 1 and is out of range.
+    EXPECT_THROW(
+      sb::make_indexed_tensor(source, elementIndices), std::out_of_range);
   }
 
   TEST(TensorProperties, IndexedViewsReplaceSharedSourceWhenMaterialized)

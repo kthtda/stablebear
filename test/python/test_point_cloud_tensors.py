@@ -132,7 +132,7 @@ def test_point_selection_owns_indices_but_retains_source_view(dtype, np_dtype):
     coordinates = np.asarray([[10], [20], [30]], dtype=np_dtype)
     points = sb.PointCloudTensor([coordinates], dtype=dtype)
     selections = sb.NestedTensor(
-        [sb.tensor([2, 0], dtype=sb.uint64)]
+        [sb.indices([2, 0])]
     )
 
     selected = points[selections]
@@ -143,7 +143,7 @@ def test_point_selection_owns_indices_but_retains_source_view(dtype, np_dtype):
     assert selections[0][0] == 1
     npt.assert_array_equal(np.asarray(selected[0]), expected)
 
-    selections[0] = sb.tensor([1], dtype=sb.uint64)
+    selections[0] = sb.indices([1])
     npt.assert_array_equal(np.asarray(selections[0]), [1])
     npt.assert_array_equal(np.asarray(selected[0]), expected)
     npt.assert_array_equal(np.asarray(sibling[0]), expected)
@@ -163,10 +163,183 @@ def test_point_selection_owns_indices_but_retains_source_view(dtype, np_dtype):
     ("dtype", "np_dtype"),
     [(sb.pcloud32, np.float32), (sb.pcloud64, np.float64)],
 )
+def test_point_selection_matches_leading_outer_dimensions(dtype, np_dtype):
+    coordinates = np.arange(10, dtype=np_dtype).reshape(5, 2)
+    scalar_points = sb.PointCloudTensor(coordinates, dtype=dtype)
+    scalar_selections = sb.NestedTensor([
+        sb.indices([3, 3, 1]),
+        sb.indices([]),
+        sb.indices([4]),
+    ])
+
+    scalar_selected = scalar_points[scalar_selections]
+
+    assert scalar_selected.shape == (3,)
+    assert scalar_selected.dtype == dtype
+    npt.assert_array_equal(
+        np.asarray(scalar_selected[0]), coordinates[[3, 3, 1]]
+    )
+    assert scalar_selected[1].shape == (0, 2)
+    npt.assert_array_equal(np.asarray(scalar_selected[2]), coordinates[[4]])
+
+    grid = np.arange(2 * 3 * 5 * 2, dtype=np_dtype).reshape(2, 3, 5, 2)
+    grid_points = sb.PointCloudTensor(grid, dtype=dtype)
+    grid_selections = sb.NestedTensor([
+        sb.indices([1, 0]) for _ in range(2 * 3 * 2 * 2)
+    ]).reshape((2, 3, 2, 2))
+
+    grid_selected = grid_points[grid_selections]
+
+    assert grid_selected.shape == (2, 3, 2, 2)
+    npt.assert_array_equal(
+        np.asarray(grid_selected[1, 2, 1, 0]), grid[1, 2, [1, 0]]
+    )
+
+
+def test_point_selection_preserves_scalar_and_empty_outer_shapes():
+    coordinates = np.arange(5).reshape(5, 1)
+    scalar_points = sb.PointCloudTensor(coordinates)
+    scalar_selection = sb.NestedTensor(
+        sb.indices([3, 0])
+    )
+    expected = sb.PointCloud([[3.0], [0.0]])
+
+    scalar_selected = scalar_points[scalar_selection]
+
+    assert scalar_selected.shape == ()
+    assert scalar_selected[()].array_equal(expected)
+
+    empty_points = sb.zeros((2, 0), dtype=sb.pcloud64)
+    empty_selections = sb.NestedTensor(
+        [], dtype=sb.uint64, depth=2
+    ).reshape((2, 0, 4))
+
+    empty_selected = empty_points[empty_selections]
+
+    assert empty_selected.shape == (2, 0, 4)
+    assert empty_selected.dtype == sb.pcloud64
+
+
+def test_point_selection_rejects_nonmatching_outer_shapes():
+    leaf = sb.indices([0])
+
+    points = sb.PointCloudTensor(
+        np.arange(2 * 2 * 3).reshape(2, 2, 3, 1)
+    )
+    too_few_axes = sb.NestedTensor([leaf, leaf])
+    with pytest.raises(ValueError, match="leading dimensions.*exactly match"):
+        points[too_few_axes]
+
+    points = sb.PointCloudTensor(np.arange(2 * 3).reshape(2, 3, 1))
+    wrong_leading_dimensions = sb.NestedTensor([leaf, leaf, leaf])
+    with pytest.raises(ValueError, match="leading dimensions.*exactly match"):
+        points[wrong_leading_dimensions]
+
+    singleton_axis = sb.PointCloudTensor(
+        np.arange(2 * 1 * 3).reshape(2, 1, 3, 1)
+    )
+    would_broadcast = sb.NestedTensor([leaf for _ in range(2 * 3)]).reshape(
+        (2, 3)
+    )
+    with pytest.raises(ValueError, match="leading dimensions.*exactly match"):
+        singleton_axis[would_broadcast]
+
+
+def test_point_selection_validates_every_child_before_returning():
+    points_array = np.arange(2 * 3).reshape(2, 3, 1)
+    points = sb.PointCloudTensor(points_array)
+    single_cloud = sb.PointCloudTensor(points_array[0])
+
+    wrong_dtype = sb.NestedTensor(sb.tensor([0], dtype=sb.int64))
+    with pytest.raises(TypeError, match="uint64 leaves"):
+        single_cloud[wrong_dtype]
+
+    too_deep = sb.NestedTensor([
+        sb.NestedTensor(sb.indices([0]))
+    ])
+    with pytest.raises(ValueError, match="Tensor<Tensor<uint64>>"):
+        single_cloud[too_deep]
+
+    rank_zero = sb.NestedTensor(sb.indices(np.array(0, dtype=np.uint64)))
+    with pytest.raises(ValueError, match="must have 1 dimension, got 0"):
+        single_cloud[rank_zero]
+
+    rank_two_late = sb.NestedTensor([
+        sb.indices([0]),
+        sb.indices([[0]]),
+    ])
+    with pytest.raises(ValueError, match="must have 1 dimension, got 2"):
+        points[rank_two_late]
+
+    out_of_bounds_late = sb.NestedTensor([
+        sb.indices([0]),
+        sb.indices([3]),
+    ])
+    with pytest.raises(IndexError, match="index 3.*cloud with 3 points"):
+        points[out_of_bounds_late]
+
+    maximum_index = sb.NestedTensor(
+        sb.indices([np.iinfo(np.uint64).max])
+    )
+    with pytest.raises(IndexError, match="out of bounds"):
+        single_cloud[maximum_index]
+
+    empty_cloud = sb.PointCloudTensor(np.empty((0, 1)))
+    first_point = sb.NestedTensor(sb.indices([0]))
+    with pytest.raises(IndexError, match="cloud with 0 points"):
+        empty_cloud[first_point]
+
+    # Failed validation leaves both the source and its selections unchanged.
+    npt.assert_array_equal(np.asarray(points[0]), points_array[0])
+    npt.assert_array_equal(np.asarray(out_of_bounds_late[1]), [3])
+
+
+def test_point_selection_accepts_outer_views_and_reindexes_indexed_results():
+    coordinates = np.arange(4 * 4).reshape(4, 4, 1)
+    points = sb.PointCloudTensor(coordinates)[::2]
+    selections = sb.NestedTensor([
+        sb.indices([3, 1, 3]),
+        sb.indices([0]),
+        sb.indices([2, 0]),
+        sb.indices([1]),
+    ])[::2]
+
+    selected = points[selections]
+    npt.assert_array_equal(np.asarray(selected[0]), coordinates[0, [3, 1, 3]])
+    npt.assert_array_equal(np.asarray(selected[1]), coordinates[2, [2, 0]])
+
+    second_selections = sb.NestedTensor([
+        sb.indices([2, 0]),
+        sb.indices([1]),
+    ])
+    selected_again = selected[second_selections]
+
+    npt.assert_array_equal(np.asarray(selected_again[0]), coordinates[0, [3, 3]])
+    npt.assert_array_equal(np.asarray(selected_again[1]), coordinates[2, [0]])
+
+
+def test_point_selection_revalidates_after_source_replacement():
+    coordinates = np.arange(3).reshape(3, 1)
+    points = sb.PointCloudTensor([coordinates])
+    selections = sb.NestedTensor([
+        sb.indices([2])
+    ])
+    selected = points[selections]
+
+    points[0] = coordinates[:1]
+
+    with pytest.raises(IndexError, match="index 2.*cloud with 1 points"):
+        selected[0]
+
+
+@pytest.mark.parametrize(
+    ("dtype", "np_dtype"),
+    [(sb.pcloud32, np.float32), (sb.pcloud64, np.float64)],
+)
 def test_to_dense_returns_independent_ordinary_storage(dtype, np_dtype):
     coordinates = np.asarray([[10], [20], [30]], dtype=np_dtype)
     points = sb.PointCloudTensor([coordinates], dtype=dtype)
-    selections = sb.NestedTensor([sb.tensor([2, 0], dtype=sb.uint64)])
+    selections = sb.NestedTensor([sb.indices([2, 0])])
     selected = points[selections]
 
     dense = selected.to_dense()

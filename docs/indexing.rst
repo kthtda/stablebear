@@ -39,25 +39,32 @@ idiom for plotting works directly::
    first_point = pc[0]              # shape (2,)
 
 Tensors of clouds (rank ≥ 1) index over the clouds instead: ``X[i]`` returns
-the ``i``-th cloud as a ``PointCloud``, which supports the same row and column
+the ``i``-th cloud as a ``PointCloud``, which supports point and coordinate
 indexing.
 
-Selecting different rows from each point cloud
-------------------------------------------------
+Selecting different points from each point cloud
+--------------------------------------------------
 
-A ``NestedTensor`` whose elements are rank-one ``uint64`` tensors selects rows
-independently from point clouds::
+A ``NestedTensor`` whose elements are rank-one ``uint64`` tensors selects
+points independently from point clouds::
 
-   u64 = lambda values: sb.tensor(values, dtype=sb.uint64)
-   selections = sb.tensor([u64([3, 3, 7]), u64([1]), u64([])])
+   selections = sb.tensor([
+       sb.indices([3, 3, 7]),
+       sb.indices([1]),
+       sb.indices([]),
+   ])
 
    selected = single_cloud[selections]
    selected.shape  # (3,)
 
-The point-cloud tensor shape must be a prefix of ``selections.shape``. The
-result has ``selections.shape``; each child tensor controls the number and
-order of points in that output cloud. Repeated rows are preserved and an empty
-child produces an empty cloud with the original coordinate dimension.
+The point-cloud tensor shape must exactly match the leading dimensions of
+``selections.shape``. The result has ``selections.shape``; each child tensor
+controls the number and order of points in that output cloud. Repeated points are
+preserved and an empty child produces an empty cloud with the original
+coordinate dimension.
+
+``sb.indices(values)`` is shorthand for
+``sb.tensor(values, dtype=sb.uint64)``.
 
 The result is an indexed tensor view. It retains one aligned view of the source
 ``PointCloudTensor`` and one view of ``selections``; it does not construct and

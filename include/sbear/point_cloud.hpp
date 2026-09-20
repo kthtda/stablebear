@@ -20,7 +20,7 @@ namespace sb
   /// A point cloud of shape (n_points, dim).
   ///
   /// A PointCloud either owns its coordinates or is an indexed view: it shares
-  /// another cloud's coordinate buffer and selects rows through an attached
+  /// another cloud's coordinate buffer and selects points through an attached
   /// index set. Access via n_points()/dim()/operator()(i, j) is transparent to
   /// which mode it is in, so consumers need no special case. This
   /// lets a tensor of subsamples store one shared source plus small index arrays
@@ -78,15 +78,15 @@ namespace sb
       return is_indexed() ? n_points() * dim() : m_coords.size();
     }
 
-    /// Indexed view: shares @p source's coordinates and selects rows via @p indices.
+    /// Indexed view: shares @p source's coordinates and selects points via @p indices.
     PointCloud(const Tensor<T>& source, Tensor<uint64_t> indices)
       : m_coords(source), m_indices(std::move(indices))
     {
       validate_coordinates();
     }
 
-    /// Indexed view over another cloud's coordinates. @p indices refer to rows
-    /// of @p source's coordinate storage (not to the rows @p source selects).
+    /// Indexed view over another cloud's coordinates. @p indices refer to points
+    /// in @p source's coordinate storage (not to the points @p source selects).
     PointCloud(const PointCloud& source, Tensor<uint64_t> indices)
       : m_coords(source.m_coords), m_indices(std::move(indices))
     {
@@ -96,7 +96,7 @@ namespace sb
     /// Whether this is an indexed view (rather than owning its coordinates).
     [[nodiscard]] bool is_indexed() const { return m_indices.rank() == 1; }
 
-    /// Number of points: selected rows when indexed, otherwise stored rows.
+    /// Number of points: selected points when indexed, otherwise stored points.
     [[nodiscard]] size_t n_points() const
     {
       if (m_coords.rank() == 0)
@@ -204,10 +204,8 @@ namespace sb
       return PointCloud(m_coords.copy());
     }
 
-    /// Apply a row selection without copying coordinates. The returned value
-    /// is a lightweight logical element produced on demand by an indexed
-    /// tensor; indexed state is not stored in the tensor's source elements.
-    [[nodiscard]] PointCloud index_into(const index_type& selection) const
+    /// Validate a point selection without constructing the selected cloud.
+    void validate_index(const index_type& selection) const
     {
       if (m_coords.rank() != 2)
       {
@@ -217,16 +215,30 @@ namespace sb
       const Tensor<uint64_t>& requested = selection;
       if (requested.rank() != 1)
       {
-        throw std::invalid_argument("Point-cloud selections must have 1 dimension");
+        throw std::invalid_argument(
+          "Point-cloud selections must have 1 dimension, got "
+          + std::to_string(requested.rank()));
       }
 
       for (size_t i = 0; i < requested.shape(0); ++i)
       {
         if (requested(i) >= n_points())
         {
-          throw std::out_of_range("Point-cloud index out of bounds");
+          throw std::out_of_range(
+            "Point-cloud index " + std::to_string(requested(i))
+            + " is out of bounds for a cloud with "
+            + std::to_string(n_points()) + " points");
         }
       }
+    }
+
+    /// Validate and apply a point selection. Indexed tensors also validate at
+    /// construction for immediate errors, but retain this check because their
+    /// shared source elements may subsequently be replaced.
+    [[nodiscard]] PointCloud index_into(const index_type& selection) const
+    {
+      validate_index(selection);
+      const Tensor<uint64_t>& requested = selection;
 
       if (!is_indexed())
       {
