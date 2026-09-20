@@ -581,6 +581,7 @@ SET(SB_HEADER_FILES
     algorithms/functional/apply_functional.hpp
     block_matrix_support.cuh
     persistence/barcode.hpp
+    persistence/barcode_tensor.hpp
     persistence/compute_homological_kernel.hpp
     persistence/compute_persistence.hpp
     persistence/persistence_pair.hpp

@@ -41,13 +41,6 @@ def _diag(points):
     return np.broadcast_to(m, pts.shape).copy()
 
 
-def _assert_barcode_tensors_isomorphic(actual, expected):
-    assert actual.shape == expected.shape
-    assert actual.dtype == expected.dtype
-    for index in np.ndindex(*actual.shape):
-        assert actual[index].is_isomorphic_to(expected[index])
-
-
 def _indexed_kernel_inputs(pcloud_dtype, np_dtype):
     points_array = np.asarray(
         [FLAGSHIP_POINTS, np.asarray(FLAGSHIP_POINTS) + 10], dtype=np_dtype
@@ -143,7 +136,7 @@ def test_kernel_accepts_whole_indexed_tensors_outer_views_and_mixed_storage(
             (dense_points, indexed_projected),
         ):
             actual = pers.compute_homological_kernel(left, right)
-            _assert_barcode_tensors_isomorphic(actual, expected)
+            assert actual.is_isomorphic_to(expected)
 
         assert type(indexed_points._data) is points_storage_type
         assert type(indexed_projected._data) is projected_storage_type

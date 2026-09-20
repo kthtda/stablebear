@@ -73,13 +73,6 @@ def _make_rectangle_point_cloud():
     return X
 
 
-def _assert_barcode_tensors_isomorphic(actual, expected):
-    assert actual.shape == expected.shape
-    assert actual.dtype == expected.dtype
-    for index in np.ndindex(*actual.shape):
-        assert actual[index].is_isomorphic_to(expected[index])
-
-
 def _indexed_rectangle_tensors(pcloud_dtype, np_dtype):
     rectangle = _make_rectangle_point_cloud().astype(np_dtype)
     leaf = lambda rows: sb.tensor(rows, dtype=sb.uint64)
@@ -195,4 +188,4 @@ def test_persistence_accepts_whole_indexed_tensors_and_outer_views(
         )
 
         assert type(indexed._data) is indexed_storage_type
-        _assert_barcode_tensors_isomorphic(actual, expected)
+        assert actual.is_isomorphic_to(expected)
