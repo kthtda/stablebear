@@ -129,7 +129,7 @@ identify review work, not test-plan items. The broader test plan still applies.
   public-API smoke check also covered whole `subsample` outputs at both
   precisions.
 
-- [ ] **B2. [P1] Complete the ordinary tensor interface for indexed results.**
+- [x] **B2. [P1] Complete the ordinary tensor interface for indexed results.**
 
   **Finding:** Equality, `array_equal`, stacking, concatenation, masked
   selection, and splitting fail on indexed results. The indexed binding
@@ -151,6 +151,15 @@ identify review work, not test-plan items. The broader test plan still applies.
   [tensor_create.py](../stablebear/tensor_create.py);
   [_tensor_base.py](../stablebear/_tensor_base.py).
   Verification: test plan E5, I1.
+
+  **Completed:** Fixed by `9c0ea99c1`. Tensor algorithms and bindings now
+  dispatch generically from the complete C++ property bitmask, with one
+  registration path for ordinary and indexed tensors. Selection and join
+  operations materialize self-contained logical values, splits retain indexed
+  view semantics, and assignments update shared indexed state without mutating
+  the original source. Verified for both point-cloud precisions and mixed
+  indexed/materialized inputs with the full Python suite (2,248 passed) and
+  full C++ suite (475 passed).
 
 - [ ] **B3. [P2] Validate the complete public point-cloud indexing contract.**
 
