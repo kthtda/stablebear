@@ -1,0 +1,1464 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>/home/runner/work/stablebear/stablebear/include/sbear/tensor.hpp</title>
+    <link href='valgrind.css' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+    <script src="https://code.jquery.com/jquery-3.4.1.js"></script>
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.0.0/styles/default.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.0.0/highlight.min.js"></script>
+    <script src="valgrind.js"></script>
+</head>
+
+<body>
+    <div class="global">
+        <div class="header">
+            <h1>/home/runner/work/stablebear/stablebear/include/sbear/tensor.hpp</h1>
+            <p><b>3</b> errors</p>
+            <button class="next_error">Goto First Error</button>
+        </div>
+        <div class="listing">
+            <pre class="code">
+<code class="c++"><span class="line_number">1</span>#ifndef STABLEBEAR_TENSOR_H
+<span class="line_number">2</span>#define STABLEBEAR_TENSOR_H
+<span class="line_number">3</span>
+<span class="line_number">4</span>#include &lt;memory&gt;
+<span class="line_number">5</span>#include &lt;vector&gt;
+<span class="line_number">6</span>#include &lt;variant&gt;
+<span class="line_number">7</span>#include &lt;numeric&gt;
+<span class="line_number">8</span>#include &lt;algorithm&gt;
+<span class="line_number">9</span>#include &lt;concepts&gt;
+<span class="line_number">10</span>#include &lt;functional&gt;
+<span class="line_number">11</span>#include &lt;optional&gt;
+<span class="line_number">12</span>#include &lt;stdexcept&gt;
+<span class="line_number">13</span>#include &lt;sstream&gt;
+<span class="line_number">14</span>#include &lt;type_traits&gt;
+<span class="line_number">15</span>
+<span class="line_number">16</span>#include &lt;iostream&gt;
+<span class="line_number">17</span>
+<span class="line_number">18</span>#include &lt;taskflow/core/taskflow.hpp&gt;
+<span class="line_number">19</span>
+<span class="line_number">20</span>#include &#34;config.hpp&#34;
+<span class="line_number">21</span>
+<span class="line_number">22</span>namespace sb
+<span class="line_number">23</span>{
+<span class="line_number">24</span>  class Executor;
+<span class="line_number">25</span>
+<span class="line_number">26</span>  using TensorProperties = int;
+<span class="line_number">27</span>
+<span class="line_number">28</span>  struct TensorProperty
+<span class="line_number">29</span>  {
+<span class="line_number">30</span>    static constexpr TensorProperties None = 0;
+<span class="line_number">31</span>    static constexpr TensorProperties Indexed = 1 &lt;&lt; 0;
+<span class="line_number">32</span>  };
+<span class="line_number">33</span>
+<span class="line_number">34</span>  [[nodiscard]] constexpr bool has_property(
+<span class="line_number">35</span>    TensorProperties properties, TensorProperties property) noexcept
+<span class="line_number">36</span>  {
+<span class="line_number">37</span>    return (properties &amp; property) != 0;
+<span class="line_number">38</span>  }
+<span class="line_number">39</span>
+<span class="line_number">40</span>  template &lt;TensorProperties Properties&gt;
+<span class="line_number">41</span>  concept IndexedTensorProperties = has_property(Properties, TensorProperty::Indexed);
+<span class="line_number">42</span>
+<span class="line_number">43</span>  template &lt;typename T, TensorProperties Properties&gt;
+<span class="line_number">44</span>  class Tensor;
+<span class="line_number">45</span>
+<span class="line_number">46</span>  namespace detail
+<span class="line_number">47</span>  {
+<span class="line_number">48</span>    template &lt;typename T, TensorProperties SourceProperties, typename IndexStorage&gt;
+<span class="line_number">49</span>    struct IndexedTensorState;
+<span class="line_number">50</span>  }
+<span class="line_number">51</span>
+<span class="line_number">52</span>  template &lt;typename LeafT&gt;
+<span class="line_number">53</span>  class NestedTensor;
+<span class="line_number">54</span>
+<span class="line_number">55</span>  template &lt;typename T&gt;
+<span class="line_number">56</span>  concept IndexableTensorElement = requires(const T&amp; value, const typename T::index_type&amp; indices)
+<span class="line_number">57</span>  {
+<span class="line_number">58</span>    { value.index_into(indices) } -&gt; std::same_as&lt;T&gt;;
+<span class="line_number">59</span>  };
+<span class="line_number">60</span>
+<span class="line_number">61</span>  namespace detail
+<span class="line_number">62</span>  {
+<span class="line_number">63</span>    template &lt;typename T&gt;
+<span class="line_number">64</span>    struct TensorIndexType
+<span class="line_number">65</span>    {
+<span class="line_number">66</span>      using type = std::monostate;
+<span class="line_number">67</span>    };
+<span class="line_number">68</span>
+<span class="line_number">69</span>    template &lt;IndexableTensorElement T&gt;
+<span class="line_number">70</span>    struct TensorIndexType&lt;T&gt;
+<span class="line_number">71</span>    {
+<span class="line_number">72</span>      using type = typename T::index_type;
+<span class="line_number">73</span>    };
+<span class="line_number">74</span>
+<span class="line_number">75</span>    template &lt;typename IndexT&gt;
+<span class="line_number">76</span>    struct IndexTensorStorage
+<span class="line_number">77</span>    {
+<span class="line_number">78</span>      using type = Tensor&lt;IndexT, TensorProperty::None&gt;;
+<span class="line_number">79</span>
+<span class="line_number">80</span>      static decltype(auto) at(
+<span class="line_number">81</span>          const type&amp; indices, const std::vector&lt;size_t&gt;&amp; index)
+<span class="line_number">82</span>      {
+<span class="line_number">83</span>        return indices(index);
+<span class="line_number">84</span>      }
+<span class="line_number">85</span>
+<span class="line_number">86</span>      static decltype(auto) flat(const type&amp; indices, size_t index)
+<span class="line_number">87</span>      {
+<span class="line_number">88</span>        return indices.flat(index);
+<span class="line_number">89</span>      }
+<span class="line_number">90</span>
+<span class="line_number">91</span>      static void validate(const type&amp;) { }
+<span class="line_number">92</span>    };
+<span class="line_number">93</span>
+<span class="line_number">94</span>    template &lt;typename IndexT&gt;
+<span class="line_number">95</span>    struct IndexTensorStorage&lt;Tensor&lt;IndexT, TensorProperty::None&gt;&gt;
+<span class="line_number">96</span>    {
+<span class="line_number">97</span>      using index_type = Tensor&lt;IndexT, TensorProperty::None&gt;;
+<span class="line_number">98</span>      using type = NestedTensor&lt;IndexT&gt;;
+<span class="line_number">99</span>
+<span class="line_number">100</span>      static const index_type&amp; at(
+<span class="line_number">101</span>          const type&amp; indices, const std::vector&lt;size_t&gt;&amp; index)
+<span class="line_number">102</span>      {
+<span class="line_number">103</span>        return indices.nested()(index).leaf();
+<span class="line_number">104</span>      }
+<span class="line_number">105</span>
+<span class="line_number">106</span>      static const index_type&amp; flat(const type&amp; indices, size_t index)
+<span class="line_number">107</span>      {
+<span class="line_number">108</span>        return indices.nested().flat(index).leaf();
+<span class="line_number">109</span>      }
+<span class="line_number">110</span>
+<span class="line_number">111</span>      static void validate(const type&amp; indices)
+<span class="line_number">112</span>      {
+<span class="line_number">113</span>        if (indices.depth() != 2)
+<span class="line_number">114</span>        {
+<span class="line_number">115</span>          throw std::invalid_argument(
+<span class="line_number">116</span>            &#34;Tensor-valued indices must have nesting depth 2&#34;);
+<span class="line_number">117</span>        }
+<span class="line_number">118</span>      }
+<span class="line_number">119</span>    };
+<span class="line_number">120</span>  }
+<span class="line_number">121</span>
+<span class="line_number">122</span>  struct SliceAll { };
+<span class="line_number">123</span>
+<span class="line_number">124</span>  struct SliceIndex
+<span class="line_number">125</span>  {
+<span class="line_number">126</span>    ptrdiff_t index;
+<span class="line_number">127</span>  };
+<span class="line_number">128</span>
+<span class="line_number">129</span>  struct SliceRange
+<span class="line_number">130</span>  {
+<span class="line_number">131</span>    std::optional&lt;ptrdiff_t&gt; start;
+<span class="line_number">132</span>    std::optional&lt;ptrdiff_t&gt; stop;
+<span class="line_number">133</span>    std::optional&lt;ptrdiff_t&gt; step;
+<span class="line_number">134</span>  };
+<span class="line_number">135</span>
+<span class="line_number">136</span>  using Slice = std::variant&lt;SliceIndex, SliceRange&gt;;
+<span class="line_number">137</span>
+<span class="line_number">138</span>  [[nodiscard]] inline Slice all() { return Slice{SliceRange{}}; }
+<span class="line_number">139</span>
+<span class="line_number">140</span>  [[nodiscard]] inline Slice index(ptrdiff_t index)
+<span class="line_number">141</span>  {
+<span class="line_number">142</span>    return Slice{SliceIndex{ .index = index }};
+<span class="line_number">143</span>  }
+<span class="line_number">144</span>
+<span class="line_number">145</span>  [[nodiscard]] inline Slice range(std::optional&lt;ptrdiff_t&gt; start, std::optional&lt;ptrdiff_t&gt; stop, std::optional&lt;ptrdiff_t&gt; step)
+<span class="line_number">146</span>  {
+<span class="line_number">147</span>    return Slice{SliceRange{ .start = start, .stop = stop, .step = step }};
+<span class="line_number">148</span>  }
+<span class="line_number">149</span>
+<span class="line_number">150</span>  template &lt;typename T, TensorProperties Properties = TensorProperty::None&gt;
+</code></pre>
+            <div class="issue">
+                <div>
+                    <span class="what">Possible data race during read of size 8 at 0x2AFA8F90 by thread #8</span>
+                    <div class="navigation">
+                        <button class="next_error">Next</button>
+                        <button class="prev_error">Previous</button>
+                    </div>
+                </div>
+                <div>
+                    <table class="call_stack">
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/persistence/../point_cloud.hpp:34<br>
+                                    <code class="cpp">sb::PointCloud&lt;double&gt;::PointCloud(sb::PointCloud&lt;double&gt; const&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">31</span>  /// meaning here. Use the cloud-level members for the selected points, or
+<span class="line_number">32</span>  /// coords() to reach the underlying storage explicitly.
+<span class="line_number">33</span>  template &lt;ArithmeticType T&gt;
+<span class="line_number">34</span><span class="error">  class PointCloud
+</span><span class="line_number">35</span>  {
+<span class="line_number">36</span>  public:
+<span class="line_number">37</span>    using value_type = T;
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/persistence/../distances.hpp:34<br>
+                                    <code class="cpp">sb::SquaredEuclideanDistance&lt;double&gt;::SquaredEuclideanDistance(sb::PointCloud&lt;double&gt; const&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">31</span>  {
+<span class="line_number">32</span>  public:
+<span class="line_number">33</span>    explicit SquaredEuclideanDistance(const PointCloud&lt;T&gt; &amp;points)
+<span class="line_number">34</span><span class="error">        : m_points(points)
+</span><span class="line_number">35</span>    {
+<span class="line_number">36</span>    }
+<span class="line_number">37</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/persistence/compute_homological_kernel.hpp:212<br>
+                                    <code class="cpp">void sb::ph::detail::homological_kernel_pcloud_single_impl&lt;double, 0, 0&gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;sb::ph::Barcode&lt;double&gt;, 0&gt;&amp;, std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">209</span>      // via the n &lt;= 1 early-outs, and a zero-dimensional cloud (n, 0) induces
+<span class="line_number">210</span>      // the all-zero metric, yielding n-1 zero-length bars exactly like the
+<span class="line_number">211</span>      // distance-matrix route does for the equivalent all-zero matrix.
+<span class="line_number">212</span><span class="error">      SquaredEuclideanDistance&lt;T&gt; dDist(pc); // uses logical coordinates, computes d^2 on demand
+</span><span class="line_number">213</span>      SquaredEuclideanDistance&lt;T&gt; dPrimeDist(pcPrime);
+<span class="line_number">214</span>
+<span class="line_number">215</span>      detail::homological_kernel_single_impl(
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/persistence/compute_homological_kernel.hpp:260<br>
+                                    <code class="cpp">sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}::operator()(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">257</span>
+<span class="line_number">258</span>            if constexpr (std::is_same_v&lt;ElemT, PointCloud&lt;T&gt;&gt;)
+<span class="line_number">259</span>            {
+<span class="line_number">260</span><span class="error">              detail::homological_kernel_pcloud_single_impl(m_input, m_inputPrime, m_ret, index);
+</span><span class="line_number">261</span>            }
+<span class="line_number">262</span>            else
+<span class="line_number">263</span>            {
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/persistence/../walk.hpp:155<br>
+                                    <code class="cpp">sb::parallel_walk_async&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}::operator()(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">152</span>  tf::Future&lt;void&gt; parallel_walk_async(const TTensor&amp; tensor, UnaryFunc&amp;&amp; f, Executor&amp; exec)
+<span class="line_number">153</span>  {
+<span class="line_number">154</span>    return detail::parallel_walk_impl(tensor, [f = std::forward&lt;UnaryFunc&gt;(f)](const std::vector&lt;size_t&gt;&amp; idx, size_t) {
+<span class="line_number">155</span><span class="error">      f(idx);
+</span><span class="line_number">156</span>    }, exec);
+<span class="line_number">157</span>  }
+<span class="line_number">158</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/persistence/../walk.hpp:118<br>
+                                    <code class="cpp">sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}::operator()(unsigned long) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">115</span>          rem /= shape[i];
+<span class="line_number">116</span>        }
+<span class="line_number">117</span>
+<span class="line_number">118</span><span class="error">        f(idx, flat);
+</span><span class="line_number">119</span>      });
+<span class="line_number">120</span>
+<span class="line_number">121</span>      return exec.cpu()-&gt;run(std::move(flow));
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/algorithm/for_each.hpp:134<br>
+                                    <code class="cpp">tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}::operator()()::{lambda(unsigned long, unsigned long)#1}::operator()(unsigned long, unsigned long)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">131</span>          part.loop(N, W, *next, [=] (size_t part_b, size_t part_e) mutable {
+<span class="line_number">132</span>            auto idx = static_cast&lt;B_t&gt;(part_b) * inc + beg;
+<span class="line_number">133</span>            for(size_t x=part_b; x&lt;part_e; x++, idx += inc) {
+<span class="line_number">134</span><span class="error">              c(idx);
+</span><span class="line_number">135</span>            }
+<span class="line_number">136</span>          });
+<span class="line_number">137</span>        });
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/../algorithm/partitioner.hpp:316<br>
+                                    <code class="cpp">void tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;::loop&lt;tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}::operator()()::{lambda(unsigned long, unsigned long)#1}, (void*)0&gt;(unsigned long, unsigned long, std::atomic&lt;unsigned long&gt;&amp;, tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}::operator()()::{lambda(unsigned long, unsigned long)#1}&amp;&amp;) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">313</span>          if(curr_b &gt;= N) {
+<span class="line_number">314</span>            return;
+<span class="line_number">315</span>          }
+<span class="line_number">316</span><span class="error">          func(curr_b, (std::min)(curr_b + chunk_size, N));
+</span><span class="line_number">317</span>        }
+<span class="line_number">318</span>        break;
+<span class="line_number">319</span>      }
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/algorithm/for_each.hpp:131<br>
+                                    <code class="cpp">tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}::operator()()</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">128</span>      auto next = std::make_shared&lt;std::atomic&lt;size_t&gt;&gt;(0);
+<span class="line_number">129</span>      for(size_t w=0; w&lt;W;) {
+<span class="line_number">130</span>        auto task = part([=] () mutable {
+<span class="line_number">131</span><span class="error">          part.loop(N, W, *next, [=] (size_t part_b, size_t part_e) mutable {
+</span><span class="line_number">132</span>            auto idx = static_cast&lt;B_t&gt;(part_b) * inc + beg;
+<span class="line_number">133</span>            for(size_t x=part_b; x&lt;part_e; x++, idx += inc) {
+<span class="line_number">134</span>              c(idx);
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/algorithm/for_each.hpp:138<br>
+                                    <code class="cpp">tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">135</span>            }
+<span class="line_number">136</span>          });
+<span class="line_number">137</span>        });
+<span class="line_number">138</span><span class="error">        (++w == W) ? task() : rt.silent_async(task);
+</span><span class="line_number">139</span>      }
+<span class="line_number">140</span>    }
+<span class="line_number">141</span>  };
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:61<br>
+                                    <code class="cpp">void std::__invoke_impl&lt;void, tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}&amp;, tf::Runtime&amp;&gt;(std::__invoke_other, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, tf::Runtime&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">58</span>  template&lt;typename _Res, typename _Fn, typename... _Args&gt;
+<span class="line_number">59</span>    constexpr _Res
+<span class="line_number">60</span>    __invoke_impl(__invoke_other, _Fn&amp;&amp; __f, _Args&amp;&amp;... __args)
+<span class="line_number">61</span><span class="error">    { return std::forward&lt;_Fn&gt;(__f)(std::forward&lt;_Args&gt;(__args)...); }
+</span><span class="line_number">62</span>
+<span class="line_number">63</span>  template&lt;typename _Res, typename _MemFun, typename _Tp, typename... _Args&gt;
+<span class="line_number">64</span>    constexpr _Res
+</code></pre>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            <pre class="code">
+<code class="c++"><span class="line_number">151</span><span class="error">  class Tensor</span>
+<span class="line_number">152</span>  {
+<span class="line_number">153</span>  public:
+<span class="line_number">154</span>    static constexpr bool IsIndexed = IndexedTensorProperties&lt;Properties&gt;;
+<span class="line_number">155</span>    static constexpr TensorProperties SourceProperties =
+<span class="line_number">156</span>      Properties &amp; ~TensorProperty::Indexed;
+<span class="line_number">157</span>
+<span class="line_number">158</span>    using value_type = T;
+<span class="line_number">159</span>    using index_type = typename detail::TensorIndexType&lt;T&gt;::type;
+<span class="line_number">160</span>    using source_tensor_type = Tensor&lt;T, SourceProperties&gt;;
+<span class="line_number">161</span>    using index_tensor_type = typename detail::IndexTensorStorage&lt;index_type&gt;::type;
+<span class="line_number">162</span>    using indexed_state_type = detail::IndexedTensorState&lt;T, SourceProperties, index_tensor_type&gt;;
+<span class="line_number">163</span>    using indexed_state_storage_type =
+<span class="line_number">164</span>      std::conditional_t&lt;IsIndexed, std::shared_ptr&lt;indexed_state_type&gt;, std::monostate&gt;;
+<span class="line_number">165</span>    using indexed_locator_storage_type =
+<span class="line_number">166</span>      std::conditional_t&lt;IsIndexed, Tensor&lt;size_t, TensorProperty::None&gt;, std::monostate&gt;;
+<span class="line_number">167</span>
+<span class="line_number">168</span>    enum class ViewType
+<span class="line_number">169</span>    {
+<span class="line_number">170</span>      Base,           // Normal indexing (no reshaping, etc.)
+<span class="line_number">171</span>      Flattened       // Flattened view (1-d indexing)
+<span class="line_number">172</span>    };
+<span class="line_number">173</span>
+<span class="line_number">174</span>    explicit Tensor(const std::vector&lt;size_t&gt;&amp; shape, const T&amp; init = {}) requires (!IsIndexed);
+<span class="line_number">175</span>    Tensor() requires (!IsIndexed) : Tensor({}, {}) { }
+<span class="line_number">176</span>    Tensor(source_tensor_type source, index_tensor_type indices)
+<span class="line_number">177</span>      requires IsIndexed &amp;&amp; IndexableTensorElement&lt;T&gt;;
+<span class="line_number">178</span>
+<span class="line_number">179</span>    /// Assign val to every element of the Tensor
+<span class="line_number">180</span>    Tensor&amp; operator=(const T&amp; val);
+<span class="line_number">181</span>
+<span class="line_number">182</span>    /**
+<span class="line_number">183</span>     * Elementwise equality comparison
+<span class="line_number">184</span>     * @tparam U value type of the compared with tensor (must be `equality_comparable_with` `value_type`)
+<span class="line_number">185</span>     * @param rhs tensor to compare against
+<span class="line_number">186</span>     * @return `true` if all elements are equal
+<span class="line_number">187</span>     */
+<span class="line_number">188</span>    template &lt;typename U, TensorProperties OtherProperties&gt;
+<span class="line_number">189</span>    requires std::equality_comparable_with&lt;U, T&gt;
+<span class="line_number">190</span>    bool operator==(const Tensor&lt;U, OtherProperties&gt;&amp; rhs) const;
+<span class="line_number">191</span>
+<span class="line_number">192</span>    /**
+<span class="line_number">193</span>     * Elementwise (non)equality comparison
+<span class="line_number">194</span>     * @tparam U value type of the compared with tensor (must be `equality_comparable_with` `value_type`)
+<span class="line_number">195</span>     * @param rhs tensor to compare against
+<span class="line_number">196</span>     * @return `true` if at least one element differs
+<span class="line_number">197</span>     */
+<span class="line_number">198</span>    template &lt;typename U, TensorProperties OtherProperties&gt;
+<span class="line_number">199</span>    requires std::equality_comparable_with&lt;U, T&gt;
+<span class="line_number">200</span>    bool operator!=(const Tensor&lt;U, OtherProperties&gt;&amp; rhs) const;
+<span class="line_number">201</span>
+<span class="line_number">202</span>    bool allclose(const Tensor&amp; rhs, T atol = T(1e-8), T rtol = T(1e-5)) const requires FloatType&lt;T&gt;;
+<span class="line_number">203</span>
+<span class="line_number">204</span>    template &lt;typename U, TensorProperties OtherProperties&gt;
+<span class="line_number">205</span>    requires std::is_constructible_v&lt;T, U&gt;
+<span class="line_number">206</span>    void assign_from(const Tensor&lt;U, OtherProperties&gt;&amp; rhs);
+<span class="line_number">207</span>
+<span class="line_number">208</span>    template &lt;typename U&gt;
+<span class="line_number">209</span>    requires CanDivideTo&lt;T, T, U&gt;
+<span class="line_number">210</span>    Tensor&amp; operator/=(const U&amp; u);
+<span class="line_number">211</span>
+<span class="line_number">212</span>    template &lt;typename U&gt;
+<span class="line_number">213</span>    requires CanDivideTo&lt;T, T, U&gt;
+<span class="line_number">214</span>    [[nodiscard]] Tensor operator/(const U&amp; u) const;
+<span class="line_number">215</span>
+<span class="line_number">216</span>    template &lt;typename U&gt;
+<span class="line_number">217</span>    requires CanMultiplyTo&lt;T, T, U&gt;
+<span class="line_number">218</span>    Tensor&amp; operator*=(const U&amp; u);
+<span class="line_number">219</span>
+<span class="line_number">220</span>    template &lt;typename U&gt;
+<span class="line_number">221</span>    requires CanMultiplyTo&lt;T, T, U&gt;
+<span class="line_number">222</span>    [[nodiscard]] Tensor operator*(const U&amp; u) const;
+<span class="line_number">223</span>
+<span class="line_number">224</span>    template &lt;typename U&gt;
+<span class="line_number">225</span>    requires CanAddTo&lt;T, T, U&gt;
+<span class="line_number">226</span>    Tensor&amp; operator+=(const U&amp; u);
+<span class="line_number">227</span>
+<span class="line_number">228</span>    template &lt;typename U&gt;
+<span class="line_number">229</span>    requires CanAddTo&lt;T, T, U&gt;
+<span class="line_number">230</span>    [[nodiscard]] Tensor operator+(const U&amp; u) const;
+<span class="line_number">231</span>
+<span class="line_number">232</span>    template &lt;typename U&gt;
+<span class="line_number">233</span>    requires CanSubtractTo&lt;T, T, U&gt;
+<span class="line_number">234</span>    Tensor&amp; operator-=(const U&amp; u);
+<span class="line_number">235</span>
+<span class="line_number">236</span>    template &lt;typename U&gt;
+<span class="line_number">237</span>    requires CanSubtractTo&lt;T, T, U&gt;
+<span class="line_number">238</span>    [[nodiscard]] Tensor operator-(const U&amp; u) const;
+<span class="line_number">239</span>
+<span class="line_number">240</span>    [[nodiscard]] Tensor operator-() const requires CanNegate&lt;T&gt;;
+<span class="line_number">241</span>
+<span class="line_number">242</span>    /**
+<span class="line_number">243</span>     * Return a broadcast view of this tensor with the given target shape.
+<span class="line_number">244</span>     * Dimensions of size 1 are expanded (stride set to 0); prepended dimensions also get stride 0.
+<span class="line_number">245</span>     * No data is copied — the result shares the underlying storage.
+<span class="line_number">246</span>     */
+<span class="line_number">247</span>    [[nodiscard]] Tensor broadcast_to(const std::vector&lt;size_t&gt;&amp; target_shape) const;
+<span class="line_number">248</span>
+<span class="line_number">249</span>    /**
+<span class="line_number">250</span>     * Elementwise tensor-tensor arithmetic with NumPy-style broadcasting.
+<span class="line_number">251</span>     *
+<span class="line_number">252</span>     * The two operands are broadcast to a common shape before the operation.
+<span class="line_number">253</span>     * A new tensor with the broadcast output shape is returned; neither operand is modified.
+<span class="line_number">254</span>     *
+<span class="line_number">255</span>     * @param rhs right-hand operand (must be broadcast-compatible with `*this`)
+<span class="line_number">256</span>     * @return new tensor containing the elementwise result
+<span class="line_number">257</span>     * @throws std::invalid_argument if shapes are not broadcast-compatible
+<span class="line_number">258</span>     */
+<span class="line_number">259</span>    [[nodiscard]] Tensor operator+(const Tensor&amp; rhs) const;
+<span class="line_number">260</span>    [[nodiscard]] Tensor operator-(const Tensor&amp; rhs) const;
+<span class="line_number">261</span>    [[nodiscard]] Tensor operator*(const Tensor&amp; rhs) const;
+<span class="line_number">262</span>    [[nodiscard]] Tensor operator/(const Tensor&amp; rhs) const;
+<span class="line_number">263</span>
+<span class="line_number">264</span>    /**
+<span class="line_number">265</span>     * In-place elementwise tensor-tensor arithmetic with broadcasting.
+<span class="line_number">266</span>     *
+<span class="line_number">267</span>     * The right-hand operand is broadcast to the shape of `*this`. The broadcast output shape
+<span class="line_number">268</span>     * must equal the shape of `*this` (i.e. `*this` is never expanded), matching NumPy semantics.
+<span class="line_number">269</span>     *
+<span class="line_number">270</span>     * @param rhs right-hand operand (must be broadcast-compatible without expanding `*this`)
+<span class="line_number">271</span>     * @return reference to the modified `*this` tensor
+<span class="line_number">272</span>     * @throws std::invalid_argument if the broadcast output shape differs from the LHS shape
+<span class="line_number">273</span>     */
+<span class="line_number">274</span>    Tensor&amp; operator+=(const Tensor&amp; rhs);
+<span class="line_number">275</span>    Tensor&amp; operator-=(const Tensor&amp; rhs);
+<span class="line_number">276</span>    Tensor&amp; operator*=(const Tensor&amp; rhs);
+<span class="line_number">277</span>    Tensor&amp; operator/=(const Tensor&amp; rhs);
+<span class="line_number">278</span>
+<span class="line_number">279</span>    [[nodiscard]] const std::vector&lt;ptrdiff_t&gt;&amp; strides() const noexcept
+<span class="line_number">280</span>    {
+<span class="line_number">281</span>      if constexpr (IsIndexed)
+<span class="line_number">282</span>        return m_indexedLocator.strides();
+<span class="line_number">283</span>      else
+<span class="line_number">284</span>        return m_strides;
+<span class="line_number">285</span>    }
+<span class="line_number">286</span>    [[nodiscard]] ptrdiff_t stride(size_t idx) const noexcept
+<span class="line_number">287</span>    {
+<span class="line_number">288</span>      if constexpr (IsIndexed)
+<span class="line_number">289</span>        return m_indexedLocator.stride(idx);
+<span class="line_number">290</span>      else
+<span class="line_number">291</span>        return m_strides[idx];
+<span class="line_number">292</span>    }
+<span class="line_number">293</span>    [[nodiscard]] const std::vector&lt;size_t&gt;&amp; shape() const noexcept
+<span class="line_number">294</span>    {
+<span class="line_number">295</span>      if constexpr (IsIndexed)
+<span class="line_number">296</span>        return m_indexedLocator.shape();
+<span class="line_number">297</span>      else
+<span class="line_number">298</span>        return m_shape;
+<span class="line_number">299</span>    }
+<span class="line_number">300</span>    [[nodiscard]] size_t shape(size_t dim) const noexcept
+<span class="line_number">301</span>    {
+<span class="line_number">302</span>      if constexpr (IsIndexed)
+<span class="line_number">303</span>        return m_indexedLocator.shape(dim);
+<span class="line_number">304</span>      else
+</code></pre>
+            <div class="issue">
+                <div>
+                    <span class="what">Possible data race during read of size 8 at 0x29563C30 by thread #8</span>
+                    <div class="navigation">
+                        <button class="next_error">Next</button>
+                        <button class="prev_error">Previous</button>
+                    </div>
+                </div>
+                <div>
+                    <table class="call_stack">
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/point_process/../point_cloud.hpp:106<br>
+                                    <code class="cpp">sb::PointCloud&lt;double&gt;::n_points() const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">103</span>      {
+<span class="line_number">104</span>        return 0;
+<span class="line_number">105</span>      }
+<span class="line_number">106</span><span class="error">      return is_indexed() ? m_indices.shape(0) : m_coords.shape(0);
+</span><span class="line_number">107</span>    }
+<span class="line_number">108</span>
+<span class="line_number">109</span>    /// Point dimension. A default-constructed empty cloud has dimension zero.
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/persistence/compute_homological_kernel.hpp:200<br>
+                                    <code class="cpp">void sb::ph::detail::homological_kernel_pcloud_single_impl&lt;double, 0, 0&gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;sb::ph::Barcode&lt;double&gt;, 0&gt;&amp;, std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">197</span>            &#34; must have shape (m, n)&#34;);
+<span class="line_number">198</span>      }
+<span class="line_number">199</span>
+<span class="line_number">200</span><span class="error">      if (pc.n_points() != pcPrime.n_points() || pc.dim() != pcPrime.dim())
+</span><span class="line_number">201</span>      {
+<span class="line_number">202</span>        throw std::runtime_error(
+<span class="line_number">203</span>            &#34;homological kernel: point clouds at index &#34; + index_to_string(index) + &#34; have mismatched shapes &#34; +
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/persistence/compute_homological_kernel.hpp:260<br>
+                                    <code class="cpp">sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}::operator()(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">257</span>
+<span class="line_number">258</span>            if constexpr (std::is_same_v&lt;ElemT, PointCloud&lt;T&gt;&gt;)
+<span class="line_number">259</span>            {
+<span class="line_number">260</span><span class="error">              detail::homological_kernel_pcloud_single_impl(m_input, m_inputPrime, m_ret, index);
+</span><span class="line_number">261</span>            }
+<span class="line_number">262</span>            else
+<span class="line_number">263</span>            {
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/persistence/../walk.hpp:155<br>
+                                    <code class="cpp">sb::parallel_walk_async&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}::operator()(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">152</span>  tf::Future&lt;void&gt; parallel_walk_async(const TTensor&amp; tensor, UnaryFunc&amp;&amp; f, Executor&amp; exec)
+<span class="line_number">153</span>  {
+<span class="line_number">154</span>    return detail::parallel_walk_impl(tensor, [f = std::forward&lt;UnaryFunc&gt;(f)](const std::vector&lt;size_t&gt;&amp; idx, size_t) {
+<span class="line_number">155</span><span class="error">      f(idx);
+</span><span class="line_number">156</span>    }, exec);
+<span class="line_number">157</span>  }
+<span class="line_number">158</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/persistence/../walk.hpp:118<br>
+                                    <code class="cpp">sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}::operator()(unsigned long) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">115</span>          rem /= shape[i];
+<span class="line_number">116</span>        }
+<span class="line_number">117</span>
+<span class="line_number">118</span><span class="error">        f(idx, flat);
+</span><span class="line_number">119</span>      });
+<span class="line_number">120</span>
+<span class="line_number">121</span>      return exec.cpu()-&gt;run(std::move(flow));
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/algorithm/for_each.hpp:134<br>
+                                    <code class="cpp">tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}::operator()()::{lambda(unsigned long, unsigned long)#1}::operator()(unsigned long, unsigned long)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">131</span>          part.loop(N, W, *next, [=] (size_t part_b, size_t part_e) mutable {
+<span class="line_number">132</span>            auto idx = static_cast&lt;B_t&gt;(part_b) * inc + beg;
+<span class="line_number">133</span>            for(size_t x=part_b; x&lt;part_e; x++, idx += inc) {
+<span class="line_number">134</span><span class="error">              c(idx);
+</span><span class="line_number">135</span>            }
+<span class="line_number">136</span>          });
+<span class="line_number">137</span>        });
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/../algorithm/partitioner.hpp:316<br>
+                                    <code class="cpp">void tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;::loop&lt;tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}::operator()()::{lambda(unsigned long, unsigned long)#1}, (void*)0&gt;(unsigned long, unsigned long, std::atomic&lt;unsigned long&gt;&amp;, tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}::operator()()::{lambda(unsigned long, unsigned long)#1}&amp;&amp;) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">313</span>          if(curr_b &gt;= N) {
+<span class="line_number">314</span>            return;
+<span class="line_number">315</span>          }
+<span class="line_number">316</span><span class="error">          func(curr_b, (std::min)(curr_b + chunk_size, N));
+</span><span class="line_number">317</span>        }
+<span class="line_number">318</span>        break;
+<span class="line_number">319</span>      }
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/algorithm/for_each.hpp:131<br>
+                                    <code class="cpp">tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}::operator()()</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">128</span>      auto next = std::make_shared&lt;std::atomic&lt;size_t&gt;&gt;(0);
+<span class="line_number">129</span>      for(size_t w=0; w&lt;W;) {
+<span class="line_number">130</span>        auto task = part([=] () mutable {
+<span class="line_number">131</span><span class="error">          part.loop(N, W, *next, [=] (size_t part_b, size_t part_e) mutable {
+</span><span class="line_number">132</span>            auto idx = static_cast&lt;B_t&gt;(part_b) * inc + beg;
+<span class="line_number">133</span>            for(size_t x=part_b; x&lt;part_e; x++, idx += inc) {
+<span class="line_number">134</span>              c(idx);
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/algorithm/for_each.hpp:138<br>
+                                    <code class="cpp">tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">135</span>            }
+<span class="line_number">136</span>          });
+<span class="line_number">137</span>        });
+<span class="line_number">138</span><span class="error">        (++w == W) ? task() : rt.silent_async(task);
+</span><span class="line_number">139</span>      }
+<span class="line_number">140</span>    }
+<span class="line_number">141</span>  };
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:61<br>
+                                    <code class="cpp">void std::__invoke_impl&lt;void, tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}&amp;, tf::Runtime&amp;&gt;(std::__invoke_other, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, tf::Runtime&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">58</span>  template&lt;typename _Res, typename _Fn, typename... _Args&gt;
+<span class="line_number">59</span>    constexpr _Res
+<span class="line_number">60</span>    __invoke_impl(__invoke_other, _Fn&amp;&amp; __f, _Args&amp;&amp;... __args)
+<span class="line_number">61</span><span class="error">    { return std::forward&lt;_Fn&gt;(__f)(std::forward&lt;_Args&gt;(__args)...); }
+</span><span class="line_number">62</span>
+<span class="line_number">63</span>  template&lt;typename _Res, typename _MemFun, typename _Tp, typename... _Args&gt;
+<span class="line_number">64</span>    constexpr _Res
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:111<br>
+                                    <code class="cpp">_ZSt10__invoke_rIvRZN2tf24make_for_each_index_taskImmmZN2sb6detail18parallel_walk_implINS2_6TensorINS2_10PointCloudIdEELi0EEEZNS2_19parallel_walk_asyncIS8_ZNS2_2ph21HomologicalKernelImplIS7_dLi0ELi0EE9run_asyncERNS2_8ExecutorEEUlRKSt6vectorImSaImEEE_EENS0_6FutureIvEERKT_OT0_SE_EUlSJ_mE_EESM_SP_SR_SE_EUlmE0_NS0_17GuidedPartitionerINS0_21DefaultClosureWrapperEEEEEDaSN_SQ_T1_T2_T3_EUlRNS0_7RuntimeEE_JS11_EENSt9enable_ifIX16is_invocable_r_vISN_SQ_DpT1_EESN_E4typeESR_DpOS15_</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">108</span>      using __type = typename __result::type;
+<span class="line_number">109</span>      using __tag = typename __result::__invoke_type;
+<span class="line_number">110</span>      if constexpr (is_void_v&lt;_Res&gt;)
+<span class="line_number">111</span><span class="error">	std::__invoke_impl&lt;__type&gt;(__tag{}, std::forward&lt;_Callable&gt;(__fn),
+</span><span class="line_number">112</span>					std::forward&lt;_Args&gt;(__args)...);
+<span class="line_number">113</span>      else
+<span class="line_number">114</span>	return std::__invoke_impl&lt;__type&gt;(__tag{},
+</code></pre>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            <pre class="code">
+<code class="c++"><span class="line_number">305</span><span class="error">        return m_shape[dim];</span>
+<span class="line_number">306</span>    }
+<span class="line_number">307</span>    [[nodiscard]] size_t rank() const noexcept
+<span class="line_number">308</span>    {
+<span class="line_number">309</span>      if constexpr (IsIndexed)
+<span class="line_number">310</span>        return m_indexedLocator.rank();
+<span class="line_number">311</span>      else
+<span class="line_number">312</span>        return m_shape.size();
+<span class="line_number">313</span>    }
+<span class="line_number">314</span>
+<span class="line_number">315</span>    /**
+<span class="line_number">316</span>     * Compute the total number of elements in the tensor.
+<span class="line_number">317</span>     * @return Total number of elements in the tensor.
+<span class="line_number">318</span>     */
+<span class="line_number">319</span>    [[nodiscard]] size_t size() const noexcept;
+<span class="line_number">320</span>
+<span class="line_number">321</span>    [[nodiscard]] bool is_contiguous() const noexcept
+<span class="line_number">322</span>    {
+<span class="line_number">323</span>      if constexpr (IsIndexed)
+<span class="line_number">324</span>        return m_indexedLocator.is_contiguous();
+<span class="line_number">325</span>      else
+<span class="line_number">326</span>        return m_isContiguous;
+<span class="line_number">327</span>    }
+<span class="line_number">328</span>
+<span class="line_number">329</span>    [[nodiscard]] ptrdiff_t offset() const noexcept requires (!IsIndexed) { return m_offset; }
+<span class="line_number">330</span>    [[nodiscard]] value_type* data() const noexcept requires (!IsIndexed)
+<span class="line_number">331</span>    {
+<span class="line_number">332</span>      return m_data.get() + m_offset;
+<span class="line_number">333</span>    }
+<span class="line_number">334</span>
+<span class="line_number">335</span>    [[nodiscard]] std::shared_ptr&lt;const void&gt; storage_owner() const noexcept requires (!IsIndexed)
+<span class="line_number">336</span>    {
+<span class="line_number">337</span>      return std::shared_ptr&lt;const void&gt;(m_data, static_cast&lt;const void*&gt;(m_data.get()));
+<span class="line_number">338</span>    }
+<span class="line_number">339</span>
+<span class="line_number">340</span>    template &lt;typename SliceVector&gt;
+<span class="line_number">341</span>    [[nodiscard]] Tensor operator[](SliceVector sliceVector) const;
+<span class="line_number">342</span>
+<span class="line_number">343</span>    /// Direct element access
+<span class="line_number">344</span>    [[nodiscard]] decltype(auto) operator()(const std::vector&lt;size_t&gt;&amp; index) const;
+<span class="line_number">345</span>    [[nodiscard]] T&amp; operator()(const std::vector&lt;size_t&gt;&amp; index) requires (!IsIndexed);
+<span class="line_number">346</span>    // Direct element access (1d)
+<span class="line_number">347</span>    [[nodiscard]] decltype(auto) operator()(size_t index) const;
+<span class="line_number">348</span>    [[nodiscard]] T&amp; operator()(size_t index) requires (!IsIndexed);
+<span class="line_number">349</span>
+<span class="line_number">350</span>    /// Flat (linear) element access — treats the tensor as if flattened in
+<span class="line_number">351</span>    /// row-major order.  Works for any tensor, including sliced views.
+<span class="line_number">352</span>    [[nodiscard]] decltype(auto) flat(size_t index) const;
+<span class="line_number">353</span>    [[nodiscard]] T&amp; flat(size_t index) requires (!IsIndexed);
+<span class="line_number">354</span>
+<span class="line_number">355</span>    //T&amp; operator()(const std::vector&lt;size_t&gt;&amp; index);
+<span class="line_number">356</span>    //const T&amp; operator()(const std::vector&lt;size_t&gt;&amp; index) const;
+<span class="line_number">357</span>
+<span class="line_number">358</span>    Tensor flatten() const;
+<span class="line_number">359</span>
+<span class="line_number">360</span>    /**
+<span class="line_number">361</span>     * Return a tensor with the given shape, sharing data when contiguous.
+<span class="line_number">362</span>     * One dimension may be -1 to infer its size from the total element count.
+<span class="line_number">363</span>     * If the tensor is not contiguous, a contiguous copy is made first.
+<span class="line_number">364</span>     */
+<span class="line_number">365</span>    [[nodiscard]] Tensor reshape(const std::vector&lt;ptrdiff_t&gt;&amp; new_shape) const;
+<span class="line_number">366</span>
+<span class="line_number">367</span>    /**
+<span class="line_number">368</span>     * Return a view with axes permuted. If axes is empty, reverses all axes (like NumPy .T).
+<span class="line_number">369</span>     */
+<span class="line_number">370</span>    [[nodiscard]] Tensor transpose(const std::vector&lt;size_t&gt;&amp; axes = {}) const;
+<span class="line_number">371</span>
+<span class="line_number">372</span>    /**
+<span class="line_number">373</span>     * Return a view with two axes swapped.
+<span class="line_number">374</span>     */
+<span class="line_number">375</span>    [[nodiscard]] Tensor swapaxes(size_t axis1, size_t axis2) const;
+<span class="line_number">376</span>
+<span class="line_number">377</span>    /**
+<span class="line_number">378</span>     * Remove all size-1 dimensions. Returns a view.
+<span class="line_number">379</span>     */
+<span class="line_number">380</span>    [[nodiscard]] Tensor squeeze() const;
+<span class="line_number">381</span>
+<span class="line_number">382</span>    /**
+<span class="line_number">383</span>     * Remove a specific size-1 dimension. Raises if its size is not 1. Returns a view.
+<span class="line_number">384</span>     */
+<span class="line_number">385</span>    [[nodiscard]] Tensor squeeze(size_t axis) const;
+<span class="line_number">386</span>
+<span class="line_number">387</span>    /**
+<span class="line_number">388</span>     * Insert a size-1 dimension at the given axis position. Supports negative
+<span class="line_number">389</span>     * indexing. Returns a view.
+<span class="line_number">390</span>     */
+<span class="line_number">391</span>    [[nodiscard]] Tensor expand_dims(ptrdiff_t axis) const;
+<span class="line_number">392</span>
+<span class="line_number">393</span>    /**
+<span class="line_number">394</span>     * Make a deep copy of the tensor. The new tensor will be a contiguous version of the original tensor.
+<span class="line_number">395</span>     * @return Deep copy of the tensor
+<span class="line_number">396</span>     */
+<span class="line_number">397</span>    auto copy() const;
+<span class="line_number">398</span>    [[nodiscard]] source_tensor_type materialize() const requires IsIndexed;
+<span class="line_number">399</span>    void ensure_materialized() requires IsIndexed;
+<span class="line_number">400</span>    [[nodiscard]] T&amp; writable_at(const std::vector&lt;size_t&gt;&amp; index) requires IsIndexed;
+<span class="line_number">401</span>    [[nodiscard]] T&amp; writable_at(size_t index) requires IsIndexed;
+<span class="line_number">402</span>
+<span class="line_number">403</span>    /// Return the single active backing. Before materialization this is the
+<span class="line_number">404</span>    /// aligned source; afterward it is the dense logical result.
+<span class="line_number">405</span>    [[nodiscard]] const source_tensor_type&amp; source_view() const noexcept requires IsIndexed
+<span class="line_number">406</span>    {
+<span class="line_number">407</span>      return m_indexedState-&gt;source;
+<span class="line_number">408</span>    }
+<span class="line_number">409</span>    [[nodiscard]] const index_tensor_type&amp; indices_view() const requires IsIndexed
+<span class="line_number">410</span>    {
+<span class="line_number">411</span>      if (!m_indexedState-&gt;indices)
+<span class="line_number">412</span>        throw std::logic_error(&#34;Materialized indexed tensor no longer has selections&#34;);
+<span class="line_number">413</span>      return *m_indexedState-&gt;indices;
+<span class="line_number">414</span>    }
+<span class="line_number">415</span>
+<span class="line_number">416</span>    template &lt;typename UnaryPred&gt;
+<span class="line_number">417</span>#ifndef __CUDACC__
+<span class="line_number">418</span>    requires std::invocable&lt;UnaryPred, const T&amp;&gt;
+<span class="line_number">419</span>#endif
+<span class="line_number">420</span>    bool any_of(UnaryPred&amp;&amp; f) const;
+<span class="line_number">421</span>
+<span class="line_number">422</span>    template &lt;typename UnaryPred&gt;
+<span class="line_number">423</span>#ifndef __CUDACC__
+<span class="line_number">424</span>    requires std::invocable&lt;UnaryPred, std::vector&lt;size_t&gt;&gt;
+<span class="line_number">425</span>#endif
+<span class="line_number">426</span>    bool any_of_idx(UnaryPred&amp;&amp; f) const;
+<span class="line_number">427</span>
+<span class="line_number">428</span>    /**
+<span class="line_number">429</span>     * Apply a function at each element of the tensor (uses `walk` internally to visit the elements)
+<span class="line_number">430</span>     * @tparam UnaryFunc Function object of type `T&amp;` -&gt; `void` (non-`void` return values get discarded)
+<span class="line_number">431</span>     * @param f The function object to invoke at each index
+<span class="line_number">432</span>     */
+<span class="line_number">433</span>    template &lt;typename UnaryFunc&gt;
+<span class="line_number">434</span>    requires std::invocable&lt;UnaryFunc, T&amp;&gt;
+<span class="line_number">435</span>    void apply(UnaryFunc&amp;&amp; f);
+<span class="line_number">436</span>
+<span class="line_number">437</span>    class AxisIterator
+<span class="line_number">438</span>    {
+<span class="line_number">439</span>    public:
+<span class="line_number">440</span>      AxisIterator(Tensor* tensor, size_t dim, ptrdiff_t pos)
+<span class="line_number">441</span>        : m_tensor(tensor), m_dim(dim)
+<span class="line_number">442</span>      {
+<span class="line_number">443</span>        m_sliceVector.resize(tensor-&gt;shape().size(), SliceAll());
+<span class="line_number">444</span>        m_sliceVector[dim] = SliceIndex{ pos };
+<span class="line_number">445</span>      }
+<span class="line_number">446</span>
+<span class="line_number">447</span>      Tensor operator*() const
+<span class="line_number">448</span>      {
+<span class="line_number">449</span>        return (*m_tensor)[m_sliceVector];
+<span class="line_number">450</span>      }
+<span class="line_number">451</span>
+<span class="line_number">452</span>      AxisIterator&amp; operator++()
+<span class="line_number">453</span>      {
+<span class="line_number">454</span>        ++std::get&lt;SliceIndex&gt;(m_sliceVector[m_dim]).index;
+<span class="line_number">455</span>        return *this;
+<span class="line_number">456</span>      }
+<span class="line_number">457</span>
+<span class="line_number">458</span>    private:
+<span class="line_number">459</span>      std::vector&lt;Slice&gt; m_sliceVector;
+<span class="line_number">460</span>      Tensor* m_tensor;
+<span class="line_number">461</span>      size_t m_dim = 0_uz;
+<span class="line_number">462</span>    };
+<span class="line_number">463</span>
+<span class="line_number">464</span>  private:
+<span class="line_number">465</span>    Tensor(std::shared_ptr&lt;indexed_state_type&gt; state,
+<span class="line_number">466</span>      Tensor&lt;size_t, TensorProperty::None&gt; locator)
+<span class="line_number">467</span>      requires IsIndexed &amp;&amp; IndexableTensorElement&lt;T&gt;;
+<span class="line_number">468</span>
+<span class="line_number">469</span>    template &lt;typename SliceVector&gt;
+<span class="line_number">470</span>    [[nodiscard]] Tensor extract(SliceVector sliceVector) const;
+<span class="line_number">471</span>
+<span class="line_number">472</span>    [[nodiscard]] size_t get_total_size() const;
+<span class="line_number">473</span>
+<span class="line_number">474</span>    [[nodiscard]] ptrdiff_t index_to_data_index(const std::vector&lt;size_t&gt;&amp; index) const;
+<span class="line_number">475</span>    [[nodiscard]] const T&amp; index_to_ref(const std::vector&lt;size_t&gt;&amp; index) const;
+<span class="line_number">476</span>    [[nodiscard]] T&amp; index_to_ref(const std::vector&lt;size_t&gt;&amp; index);
+<span class="line_number">477</span>
+<span class="line_number">478</span>    std::vector&lt;ptrdiff_t&gt; m_strides;
+<span class="line_number">479</span>    std::vector&lt;size_t&gt; m_shape;
+<span class="line_number">480</span>    std::shared_ptr&lt;value_type[]&gt; m_data;
+<span class="line_number">481</span>    ptrdiff_t m_offset = 0;
+<span class="line_number">482</span>
+<span class="line_number">483</span>    ViewType m_viewType = ViewType::Base;
+<span class="line_number">484</span>    bool m_isContiguous = true;
+<span class="line_number">485</span>    [[no_unique_address]] indexed_state_storage_type m_indexedState;
+<span class="line_number">486</span>    [[no_unique_address]] indexed_locator_storage_type m_indexedLocator;
+<span class="line_number">487</span>  };
+<span class="line_number">488</span>
+<span class="line_number">489</span>  namespace detail
+<span class="line_number">490</span>  {
+<span class="line_number">491</span>    /// State shared by every outer view of one lazy indexed tensor. `source`
+<span class="line_number">492</span>    /// is the aligned source while `indices` is present. On the first write it
+<span class="line_number">493</span>    /// is replaced by the dense logical result and `indices` is released.
+<span class="line_number">494</span>    /// Individual views use their locator tensor to address this root.
+<span class="line_number">495</span>    template &lt;typename T, TensorProperties SourceProperties, typename IndexStorage&gt;
+<span class="line_number">496</span>    struct IndexedTensorState
+<span class="line_number">497</span>    {
+<span class="line_number">498</span>      Tensor&lt;T, SourceProperties&gt; source;
+<span class="line_number">499</span>      std::optional&lt;IndexStorage&gt; indices;
+<span class="line_number">500</span>    };
+<span class="line_number">501</span>  }
+<span class="line_number">502</span>
+<span class="line_number">503</span>  /// Create a lazy indexed tensor by associating each logical element with an
+<span class="line_number">504</span>  /// element-specific index. Source axes align with the leading index-tensor
+<span class="line_number">505</span>  /// axes and may broadcast from size one; additional trailing index axes
+<span class="line_number">506</span>  /// broadcast the source without copying.
+<span class="line_number">507</span>  template &lt;typename T, TensorProperties Properties&gt;
+<span class="line_number">508</span>  requires IndexableTensorElement&lt;T&gt; &amp;&amp; (!IndexedTensorProperties&lt;Properties&gt;)
+<span class="line_number">509</span>  [[nodiscard]] Tensor&lt;T, Properties | TensorProperty::Indexed&gt; make_indexed_tensor(
+<span class="line_number">510</span>    const Tensor&lt;T, Properties&gt;&amp; source,
+<span class="line_number">511</span>    const typename detail::IndexTensorStorage&lt;typename T::index_type&gt;::type&amp; indices);
+<span class="line_number">512</span>
+<span class="line_number">513</span>  /// Create an indexed tensor by taking ownership of freshly produced indices.
+<span class="line_number">514</span>  template &lt;typename T, TensorProperties Properties&gt;
+<span class="line_number">515</span>  requires IndexableTensorElement&lt;T&gt; &amp;&amp; (!IndexedTensorProperties&lt;Properties&gt;)
+<span class="line_number">516</span>  [[nodiscard]] Tensor&lt;T, Properties | TensorProperty::Indexed&gt; make_indexed_tensor(
+<span class="line_number">517</span>    const Tensor&lt;T, Properties&gt;&amp; source,
+<span class="line_number">518</span>    typename detail::IndexTensorStorage&lt;typename T::index_type&gt;::type&amp;&amp; indices);
+<span class="line_number">519</span>
+<span class="line_number">520</span>  template &lt;typename U, typename T&gt;
+<span class="line_number">521</span>  requires CanMultiplyTo&lt;T, U, T&gt;
+<span class="line_number">522</span>  [[nodiscard]] Tensor&lt;T&gt; operator*(const U&amp; u, const Tensor&lt;T&gt;&amp; t);
+<span class="line_number">523</span>
+<span class="line_number">524</span>  template &lt;typename U, typename T&gt;
+<span class="line_number">525</span>  requires CanAddTo&lt;T, U, T&gt;
+<span class="line_number">526</span>  [[nodiscard]] Tensor&lt;T&gt; operator+(const U&amp; u, const Tensor&lt;T&gt;&amp; t);
+<span class="line_number">527</span>
+<span class="line_number">528</span>  template &lt;typename U, typename T&gt;
+<span class="line_number">529</span>  requires CanSubtractTo&lt;T, U, T&gt;
+<span class="line_number">530</span>  [[nodiscard]] Tensor&lt;T&gt; operator-(const U&amp; u, const Tensor&lt;T&gt;&amp; t);
+<span class="line_number">531</span>
+<span class="line_number">532</span>  template &lt;typename U, typename T&gt;
+<span class="line_number">533</span>  requires CanDivideTo&lt;T, U, T&gt;
+<span class="line_number">534</span>  [[nodiscard]] Tensor&lt;T&gt; operator/(const U&amp; u, const Tensor&lt;T&gt;&amp; t);
+<span class="line_number">535</span>
+<span class="line_number">536</span>  template &lt;typename IntT&gt;
+<span class="line_number">537</span>  inline std::string shape_to_string(const std::vector&lt;IntT&gt;&amp; shape)
+<span class="line_number">538</span>  {
+<span class="line_number">539</span>    std::stringstream ss;
+<span class="line_number">540</span>    ss &lt;&lt; &#34;(&#34;;
+<span class="line_number">541</span>    for (auto i = 0_uz; i &lt; shape.size(); ++i)
+<span class="line_number">542</span>    {
+<span class="line_number">543</span>      if (i != 0)
+<span class="line_number">544</span>      {
+<span class="line_number">545</span>        ss &lt;&lt; &#34;, &#34;;
+<span class="line_number">546</span>      }
+<span class="line_number">547</span>      ss &lt;&lt; shape[i];
+<span class="line_number">548</span>    }
+<span class="line_number">549</span>    ss &lt;&lt; &#34;)&#34;;
+<span class="line_number">550</span>    return ss.str();
+<span class="line_number">551</span>  }
+<span class="line_number">552</span>
+<span class="line_number">553</span>  template &lt;typename IntT&gt;
+<span class="line_number">554</span>  inline std::string index_to_string(const std::vector&lt;IntT&gt;&amp; idx)
+<span class="line_number">555</span>  {
+<span class="line_number">556</span>    if (idx.size() == 1)
+<span class="line_number">557</span>    {
+<span class="line_number">558</span>      return std::to_string(idx[0]);
+<span class="line_number">559</span>    }
+<span class="line_number">560</span>    else
+<span class="line_number">561</span>    {
+<span class="line_number">562</span>      return shape_to_string(idx);
+<span class="line_number">563</span>    }
+<span class="line_number">564</span>  }
+<span class="line_number">565</span>
+<span class="line_number">566</span>  /**
+<span class="line_number">567</span>   * Compute the broadcast-compatible output shape from two input shapes (NumPy rules).
+<span class="line_number">568</span>   *
+<span class="line_number">569</span>   * Shapes are compared right-to-left. Dimensions match if they are equal or one of them is 1.
+<span class="line_number">570</span>   * Missing leading dimensions are treated as size 1.
+<span class="line_number">571</span>   *
+<span class="line_number">572</span>   * @param a shape of the first operand
+<span class="line_number">573</span>   * @param b shape of the second operand
+<span class="line_number">574</span>   * @return the broadcast output shape
+<span class="line_number">575</span>   * @throws std::invalid_argument if the shapes are not broadcast-compatible
+<span class="line_number">576</span>   */
+<span class="line_number">577</span>  inline std::vector&lt;size_t&gt; broadcast_shapes(
+<span class="line_number">578</span>    const std::vector&lt;size_t&gt;&amp; a,
+<span class="line_number">579</span>    const std::vector&lt;size_t&gt;&amp; b)
+<span class="line_number">580</span>  {
+<span class="line_number">581</span>    size_t ndim = std::max(a.size(), b.size());
+<span class="line_number">582</span>    std::vector&lt;size_t&gt; result(ndim);
+<span class="line_number">583</span>
+<span class="line_number">584</span>    for (size_t i = 0; i &lt; ndim; ++i)
+<span class="line_number">585</span>    {
+<span class="line_number">586</span>      size_t da = (i &lt; ndim - a.size()) ? 1 : a[i - (ndim - a.size())];
+<span class="line_number">587</span>      size_t db = (i &lt; ndim - b.size()) ? 1 : b[i - (ndim - b.size())];
+<span class="line_number">588</span>
+<span class="line_number">589</span>      if (da == db)
+<span class="line_number">590</span>        result[i] = da;
+<span class="line_number">591</span>      else if (da == 1)
+<span class="line_number">592</span>        result[i] = db;
+<span class="line_number">593</span>      else if (db == 1)
+<span class="line_number">594</span>        result[i] = da;
+<span class="line_number">595</span>      else
+<span class="line_number">596</span>        throw std::invalid_argument(&#34;Shapes are not broadcast-compatible: &#34; +
+<span class="line_number">597</span>            shape_to_string(a) + &#34; and &#34; + shape_to_string(b));
+<span class="line_number">598</span>    }
+<span class="line_number">599</span>    return result;
+<span class="line_number">600</span>  }
+<span class="line_number">601</span>
+<span class="line_number">602</span>  namespace detail
+<span class="line_number">603</span>  {
+<span class="line_number">604</span>    // Deep-copy a value about to be stored in a tensor cell, so the cell never
+<span class="line_number">605</span>    // aliases the source. Element types that hold a shared buffer (Tensor /
+<span class="line_number">606</span>    // PointCloud, DistanceMatrix, SymmetricMatrix) expose a deep copy() that is
+<span class="line_number">607</span>    // preferred; all other element types (float, Pcf, ...) already copy deeply
+<span class="line_number">608</span>    // by value, so they are returned unchanged.
+<span class="line_number">609</span>    template &lt;typename T&gt;
+<span class="line_number">610</span>    [[nodiscard]] T store_copy(const T&amp; v)
+<span class="line_number">611</span>    {
+<span class="line_number">612</span>      if constexpr (requires { v.copy(); })
+<span class="line_number">613</span>        return v.copy();
+<span class="line_number">614</span>      else
+</code></pre>
+            <div class="issue">
+                <div>
+                    <span class="what">Possible data race during read of size 4 at 0x30BDB740 by thread #11</span>
+                    <div class="navigation">
+                        <button class="next_error">Next</button>
+                        <button class="prev_error">Previous</button>
+                    </div>
+                </div>
+                <div>
+                    <table class="call_stack">
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/tensor.tpp:1363<br>
+                                    <code class="cpp">sb::Tensor&lt;float, 0&gt;::copy() const::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}::operator()(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1360</span>      Tensor&lt;T, Properties&gt; ret(shape());
+<span class="line_number">1361</span>
+<span class="line_number">1362</span>      sb::walk(*this, [&amp;ret, this](const std::vector&lt;size_t&gt;&amp; idx){
+<span class="line_number">1363</span><span class="error">        ret(idx) = detail::store_copy((*this)(idx));
+</span><span class="line_number">1364</span>      });
+<span class="line_number">1365</span>
+<span class="line_number">1366</span>      return ret;
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/walk.hpp:140<br>
+                                    <code class="cpp">sb::walk&lt;sb::Tensor&lt;float, 0&gt;, sb::Tensor&lt;float, 0&gt;::copy() const::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;float, 0&gt; const&amp;, sb::Tensor&lt;float, 0&gt;::copy() const::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}::operator()(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">137</span>  void walk(const TTensor&amp; tensor, UnaryFunc&amp;&amp; f)
+<span class="line_number">138</span>  {
+<span class="line_number">139</span>    detail::walk_impl(tensor, [&amp;f](const std::vector&lt;size_t&gt;&amp; idx, size_t) -&gt; decltype(auto) {
+<span class="line_number">140</span><span class="error">      return f(idx);
+</span><span class="line_number">141</span>    });
+<span class="line_number">142</span>  }
+<span class="line_number">143</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/point_process/../walk.hpp:50<br>
+                                    <code class="cpp">void sb::detail::walk_impl&lt;sb::Tensor&lt;float, 0&gt;, sb::walk&lt;sb::Tensor&lt;float, 0&gt;, sb::Tensor&lt;float, 0&gt;::copy() const::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;float, 0&gt; const&amp;, sb::Tensor&lt;float, 0&gt;::copy() const::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;float, 0&gt; const&amp;, sb::Tensor&lt;float, 0&gt;::copy() const::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">47</span>        }
+<span class="line_number">48</span>        else
+<span class="line_number">49</span>        {
+<span class="line_number">50</span><span class="error">          f(cur, flat);
+</span><span class="line_number">51</span>        }
+<span class="line_number">52</span>
+<span class="line_number">53</span>        ++flat;
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/point_process/../walk.hpp:139<br>
+                                    <code class="cpp">void sb::walk&lt;sb::Tensor&lt;float, 0&gt;, sb::Tensor&lt;float, 0&gt;::copy() const::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;float, 0&gt; const&amp;, sb::Tensor&lt;float, 0&gt;::copy() const::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">136</span>#endif
+<span class="line_number">137</span>  void walk(const TTensor&amp; tensor, UnaryFunc&amp;&amp; f)
+<span class="line_number">138</span>  {
+<span class="line_number">139</span><span class="error">    detail::walk_impl(tensor, [&amp;f](const std::vector&lt;size_t&gt;&amp; idx, size_t) -&gt; decltype(auto) {
+</span><span class="line_number">140</span>      return f(idx);
+<span class="line_number">141</span>    });
+<span class="line_number">142</span>  }
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/point_process/../tensor.tpp:1362<br>
+                                    <code class="cpp">sb::Tensor&lt;float, 0&gt;::copy() const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1359</span>    {
+<span class="line_number">1360</span>      Tensor&lt;T, Properties&gt; ret(shape());
+<span class="line_number">1361</span>
+<span class="line_number">1362</span><span class="error">      sb::walk(*this, [&amp;ret, this](const std::vector&lt;size_t&gt;&amp; idx){
+</span><span class="line_number">1363</span>        ret(idx) = detail::store_copy((*this)(idx));
+<span class="line_number">1364</span>      });
+<span class="line_number">1365</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/point_process/subsample.hpp:29<br>
+                                    <code class="cpp">sb::Tensor&lt;float, 0&gt; sb::pp::detail::copy_logical_coordinates&lt;float&gt;(sb::PointCloud&lt;float&gt; const&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">26</span>        {
+<span class="line_number">27</span>          return Tensor&lt;T&gt;({0, 0});
+<span class="line_number">28</span>        }
+<span class="line_number">29</span><span class="error">        return cloud.coords().copy();
+</span><span class="line_number">30</span>      }
+<span class="line_number">31</span>
+<span class="line_number">32</span>      Tensor&lt;T&gt; result({cloud.n_points(), cloud.dim()});
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/point_process/subsample.hpp:151<br>
+                                    <code class="cpp">sb::pp::subsample&lt;float&gt;(sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 0&gt; const&amp;, unsigned long, unsigned long, bool, bool, bool, sb::RandomGenerator&lt;sb::Xoroshiro128pp&gt;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}::operator()(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">148</span>
+<span class="line_number">149</span>    parallel_walk(points, [&amp;](const std::vector&lt;size_t&gt;&amp; inputIndex) {
+<span class="line_number">150</span>      const PointCloud&lt;T&gt;&amp; input = points(inputIndex);
+<span class="line_number">151</span><span class="error">      Tensor&lt;T&gt; coordinates = detail::copy_logical_coordinates(input);
+</span><span class="line_number">152</span>      source(inputIndex) = PointCloud&lt;T&gt;(std::move(coordinates));
+<span class="line_number">153</span>      const Tensor&lt;T&gt;&amp; sourceCoordinates = source(inputIndex).coords();
+<span class="line_number">154</span>      const size_t available = input.n_points();
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/point_process/../walk.hpp:155<br>
+                                    <code class="cpp">sb::parallel_walk_async&lt;sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 0&gt;, sb::pp::subsample&lt;float&gt;(sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 0&gt; const&amp;, unsigned long, unsigned long, bool, bool, bool, sb::RandomGenerator&lt;sb::Xoroshiro128pp&gt;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&gt;(sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 0&gt; const&amp;, sb::pp::subsample&lt;float&gt;(sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 0&gt; const&amp;, unsigned long, unsigned long, bool, bool, bool, sb::RandomGenerator&lt;sb::Xoroshiro128pp&gt;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}::operator()(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">152</span>  tf::Future&lt;void&gt; parallel_walk_async(const TTensor&amp; tensor, UnaryFunc&amp;&amp; f, Executor&amp; exec)
+<span class="line_number">153</span>  {
+<span class="line_number">154</span>    return detail::parallel_walk_impl(tensor, [f = std::forward&lt;UnaryFunc&gt;(f)](const std::vector&lt;size_t&gt;&amp; idx, size_t) {
+<span class="line_number">155</span><span class="error">      f(idx);
+</span><span class="line_number">156</span>    }, exec);
+<span class="line_number">157</span>  }
+<span class="line_number">158</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/point_process/../walk.hpp:118<br>
+                                    <code class="cpp">sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 0&gt;, sb::pp::subsample&lt;float&gt;(sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 0&gt; const&amp;, unsigned long, unsigned long, bool, bool, bool, sb::RandomGenerator&lt;sb::Xoroshiro128pp&gt;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&gt;(sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 0&gt; const&amp;, sb::pp::subsample&lt;float&gt;(sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 0&gt; const&amp;, unsigned long, unsigned long, bool, bool, bool, sb::RandomGenerator&lt;sb::Xoroshiro128pp&gt;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 0&gt; const&amp;, sb::pp::subsample&lt;float&gt;(sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 0&gt; const&amp;, unsigned long, unsigned long, bool, bool, bool, sb::RandomGenerator&lt;sb::Xoroshiro128pp&gt;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}::operator()(unsigned long) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">115</span>          rem /= shape[i];
+<span class="line_number">116</span>        }
+<span class="line_number">117</span>
+<span class="line_number">118</span><span class="error">        f(idx, flat);
+</span><span class="line_number">119</span>      });
+<span class="line_number">120</span>
+<span class="line_number">121</span>      return exec.cpu()-&gt;run(std::move(flow));
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/algorithm/for_each.hpp:134<br>
+                                    <code class="cpp">tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 0&gt;, sb::pp::subsample&lt;float&gt;(sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 0&gt; const&amp;, unsigned long, unsigned long, bool, bool, bool, sb::RandomGenerator&lt;sb::Xoroshiro128pp&gt;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&gt;(sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 0&gt; const&amp;, sb::pp::subsample&lt;float&gt;(sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 0&gt; const&amp;, unsigned long, unsigned long, bool, bool, bool, sb::RandomGenerator&lt;sb::Xoroshiro128pp&gt;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 0&gt; const&amp;, sb::pp::subsample&lt;float&gt;(sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 0&gt; const&amp;, unsigned long, unsigned long, bool, bool, bool, sb::RandomGenerator&lt;sb::Xoroshiro128pp&gt;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 0&gt;, sb::pp::subsample&lt;float&gt;(sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 0&gt; const&amp;, unsigned long, unsigned long, bool, bool, bool, sb::RandomGenerator&lt;sb::Xoroshiro128pp&gt;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&gt;(sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 0&gt; const&amp;, sb::pp::subsample&lt;float&gt;(sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 0&gt; const&amp;, unsigned long, unsigned long, bool, bool, bool, sb::RandomGenerator&lt;sb::Xoroshiro128pp&gt;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 0&gt; const&amp;, sb::pp::subsample&lt;float&gt;(sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 0&gt; const&amp;, unsigned long, unsigned long, bool, bool, bool, sb::RandomGenerator&lt;sb::Xoroshiro128pp&gt;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}::operator()()::{lambda(unsigned long, unsigned long)#1}::operator()(unsigned long, unsigned long)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">131</span>          part.loop(N, W, *next, [=] (size_t part_b, size_t part_e) mutable {
+<span class="line_number">132</span>            auto idx = static_cast&lt;B_t&gt;(part_b) * inc + beg;
+<span class="line_number">133</span>            for(size_t x=part_b; x&lt;part_e; x++, idx += inc) {
+<span class="line_number">134</span><span class="error">              c(idx);
+</span><span class="line_number">135</span>            }
+<span class="line_number">136</span>          });
+<span class="line_number">137</span>        });
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/../algorithm/partitioner.hpp:316<br>
+                                    <code class="cpp">void tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;::loop&lt;tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 0&gt;, sb::pp::subsample&lt;float&gt;(sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 0&gt; const&amp;, unsigned long, unsigned long, bool, bool, bool, sb::RandomGenerator&lt;sb::Xoroshiro128pp&gt;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&gt;(sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 0&gt; const&amp;, sb::pp::subsample&lt;float&gt;(sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 0&gt; const&amp;, unsigned long, unsigned long, bool, bool, bool, sb::RandomGenerator&lt;sb::Xoroshiro128pp&gt;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 0&gt; const&amp;, sb::pp::subsample&lt;float&gt;(sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 0&gt; const&amp;, unsigned long, unsigned long, bool, bool, bool, sb::RandomGenerator&lt;sb::Xoroshiro128pp&gt;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 0&gt;, sb::pp::subsample&lt;float&gt;(sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 0&gt; const&amp;, unsigned long, unsigned long, bool, bool, bool, sb::RandomGenerator&lt;sb::Xoroshiro128pp&gt;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&gt;(sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 0&gt; const&amp;, sb::pp::subsample&lt;float&gt;(sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 0&gt; const&amp;, unsigned long, unsigned long, bool, bool, bool, sb::RandomGenerator&lt;sb::Xoroshiro128pp&gt;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 0&gt; const&amp;, sb::pp::subsample&lt;float&gt;(sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 0&gt; const&amp;, unsigned long, unsigned long, bool, bool, bool, sb::RandomGenerator&lt;sb::Xoroshiro128pp&gt;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}::operator()()::{lambda(unsigned long, unsigned long)#1}, (void*)0&gt;(unsigned long, unsigned long, std::atomic&lt;unsigned long&gt;&amp;, tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 0&gt;, sb::pp::subsample&lt;float&gt;(sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 0&gt; const&amp;, unsigned long, unsigned long, bool, bool, bool, sb::RandomGenerator&lt;sb::Xoroshiro128pp&gt;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&gt;(sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 0&gt; const&amp;, sb::pp::subsample&lt;float&gt;(sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 0&gt; const&amp;, unsigned long, unsigned long, bool, bool, bool, sb::RandomGenerator&lt;sb::Xoroshiro128pp&gt;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 0&gt; const&amp;, sb::pp::subsample&lt;float&gt;(sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 0&gt; const&amp;, unsigned long, unsigned long, bool, bool, bool, sb::RandomGenerator&lt;sb::Xoroshiro128pp&gt;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 0&gt;, sb::pp::subsample&lt;float&gt;(sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 0&gt; const&amp;, unsigned long, unsigned long, bool, bool, bool, sb::RandomGenerator&lt;sb::Xoroshiro128pp&gt;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&gt;(sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 0&gt; const&amp;, sb::pp::subsample&lt;float&gt;(sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 0&gt; const&amp;, unsigned long, unsigned long, bool, bool, bool, sb::RandomGenerator&lt;sb::Xoroshiro128pp&gt;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 0&gt; const&amp;, sb::pp::subsample&lt;float&gt;(sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 0&gt; const&amp;, unsigned long, unsigned long, bool, bool, bool, sb::RandomGenerator&lt;sb::Xoroshiro128pp&gt;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}::operator()()::{lambda(unsigned long, unsigned long)#1}&amp;&amp;) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">313</span>          if(curr_b &gt;= N) {
+<span class="line_number">314</span>            return;
+<span class="line_number">315</span>          }
+<span class="line_number">316</span><span class="error">          func(curr_b, (std::min)(curr_b + chunk_size, N));
+</span><span class="line_number">317</span>        }
+<span class="line_number">318</span>        break;
+<span class="line_number">319</span>      }
+</code></pre>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            <pre class="code">
+<code class="c++"><span class="line_number">615</span><span class="error">        return v;</span>
+<span class="line_number">616</span>    }
+<span class="line_number">617</span>
+<span class="line_number">618</span>    // Store a self-contained logical value in an ordinary result tensor.
+<span class="line_number">619</span>    // Indexed element types may themselves carry a source/index adapter, so a
+<span class="line_number">620</span>    // normal deep copy is not sufficient at an indexed-to-ordinary boundary.
+<span class="line_number">621</span>    template &lt;typename T&gt;
+<span class="line_number">622</span>    [[nodiscard]] T materialized_store_copy(const T&amp; v)
+<span class="line_number">623</span>    {
+<span class="line_number">624</span>      if constexpr (requires { v.materialized_copy(); })
+<span class="line_number">625</span>        return v.materialized_copy();
+<span class="line_number">626</span>      else
+<span class="line_number">627</span>        return store_copy(v);
+<span class="line_number">628</span>    }
+<span class="line_number">629</span>  }
+<span class="line_number">630</span>
+<span class="line_number">631</span>  template &lt;typename T, typename UnaryPred&gt;
+<span class="line_number">632</span>#ifndef __CUDACC__
+<span class="line_number">633</span>  requires std::invocable&lt;UnaryPred, const T&amp;&gt;
+<span class="line_number">634</span>#endif
+<span class="line_number">635</span>  bool any_of(const Tensor&lt;T&gt;&amp; tensor, UnaryPred&amp;&amp; pred);
+<span class="line_number">636</span>
+<span class="line_number">637</span>  template &lt;typename T, typename UnaryPred&gt;
+<span class="line_number">638</span>#ifndef __CUDACC__
+<span class="line_number">639</span>  requires std::invocable&lt;UnaryPred, const T&amp;&gt;
+<span class="line_number">640</span>#endif
+<span class="line_number">641</span>  bool all_of(const Tensor&lt;T&gt;&amp; tensor, UnaryPred&amp;&amp; pred);
+<span class="line_number">642</span>
+<span class="line_number">643</span>  template &lt;FloatType T&gt;
+<span class="line_number">644</span>  bool allclose(const Tensor&lt;T&gt;&amp; a, const Tensor&lt;T&gt;&amp; b, T atol = T(1e-8), T rtol = T(1e-5));
+<span class="line_number">645</span>
+<span class="line_number">646</span>  // Follows the numpy convention: |a - b| &lt;= atol + rtol * |b|
+<span class="line_number">647</span>  template &lt;typename MatT&gt;
+<span class="line_number">648</span>  requires is_compressed_matrix_v&lt;MatT&gt;
+<span class="line_number">649</span>  bool allclose(const MatT&amp; a, const MatT&amp; b,
+<span class="line_number">650</span>                typename MatT::value_type atol = typename MatT::value_type(1e-8),
+<span class="line_number">651</span>                typename MatT::value_type rtol = typename MatT::value_type(1e-5));
+<span class="line_number">652</span>
+<span class="line_number">653</span>  /// Convert a flat (linear) index to a multi-dimensional index for the given shape.
+<span class="line_number">654</span>  std::vector&lt;size_t&gt; flat_to_multi_index(size_t flat, const std::vector&lt;size_t&gt;&amp; shape);
+<span class="line_number">655</span>
+<span class="line_number">656</span>  // ============================================================================
+<span class="line_number">657</span>  // Masked operations
+<span class="line_number">658</span>  // ============================================================================
+<span class="line_number">659</span>
+<span class="line_number">660</span>  /**
+<span class="line_number">661</span>   * Select elements from src where mask is true, returning a 1D tensor.
+<span class="line_number">662</span>   * Mask shape must match src.shape(). Elements are collected in row-major order.
+<span class="line_number">663</span>   */
+<span class="line_number">664</span>  template &lt;typename T, TensorProperties Properties&gt;
+<span class="line_number">665</span>  [[nodiscard]] typename Tensor&lt;T, Properties&gt;::source_tensor_type masked_select(
+<span class="line_number">666</span>    const Tensor&lt;T, Properties&gt;&amp; src, const Tensor&lt;bool&gt;&amp; mask);
+<span class="line_number">667</span>
+<span class="line_number">668</span>  /**
+<span class="line_number">669</span>   * Assign values into dst at positions where mask is true.
+<span class="line_number">670</span>   * Mask shape must match dst.shape(). values must be 1D with length == count of true values.
+<span class="line_number">671</span>   */
+<span class="line_number">672</span>  template &lt;typename T, TensorProperties DstProperties, TensorProperties ValueProperties&gt;
+<span class="line_number">673</span>  void masked_assign(Tensor&lt;T, DstProperties&gt;&amp; dst, const Tensor&lt;bool&gt;&amp; mask,
+<span class="line_number">674</span>    const Tensor&lt;T, ValueProperties&gt;&amp; values);
+<span class="line_number">675</span>
+<span class="line_number">676</span>  /**
+<span class="line_number">677</span>   * Fill dst with a scalar value at positions where mask is true.
+<span class="line_number">678</span>   * Mask shape must match dst.shape().
+<span class="line_number">679</span>   */
+<span class="line_number">680</span>  template &lt;typename T, TensorProperties Properties&gt;
+<span class="line_number">681</span>  void masked_fill(Tensor&lt;T, Properties&gt;&amp; dst, const Tensor&lt;bool&gt;&amp; mask, const T&amp; value);
+<span class="line_number">682</span>
+<span class="line_number">683</span>  /**
+<span class="line_number">684</span>   * Select along a single axis where mask is true.
+<span class="line_number">685</span>   * mask must be 1D with length == src.shape()[axis].
+<span class="line_number">686</span>   * Returns a tensor with shape[axis] reduced to count of true values.
+<span class="line_number">687</span>   */
+<span class="line_number">688</span>  template &lt;typename T, TensorProperties Properties&gt;
+<span class="line_number">689</span>  [[nodiscard]] typename Tensor&lt;T, Properties&gt;::source_tensor_type axis_select(
+<span class="line_number">690</span>    const Tensor&lt;T, Properties&gt;&amp; src, size_t axis, const Tensor&lt;bool&gt;&amp; mask);
+<span class="line_number">691</span>
+<span class="line_number">692</span>  /**
+<span class="line_number">693</span>   * Assign values into dst along a single axis where mask is true.
+<span class="line_number">694</span>   * mask must be 1D with length == dst.shape()[axis].
+<span class="line_number">695</span>   * values.shape() must match the shape that axis_select(dst, axis, mask) would produce.
+<span class="line_number">696</span>   */
+<span class="line_number">697</span>  template &lt;typename T, TensorProperties DstProperties, TensorProperties ValueProperties&gt;
+<span class="line_number">698</span>  void axis_assign(Tensor&lt;T, DstProperties&gt;&amp; dst, size_t axis, const Tensor&lt;bool&gt;&amp; mask,
+<span class="line_number">699</span>    const Tensor&lt;T, ValueProperties&gt;&amp; values);
+<span class="line_number">700</span>
+<span class="line_number">701</span>  /**
+<span class="line_number">702</span>   * Fill dst with a scalar value along a single axis where mask is true.
+<span class="line_number">703</span>   * mask must be 1D with length == dst.shape()[axis].
+<span class="line_number">704</span>   */
+<span class="line_number">705</span>  template &lt;typename T, TensorProperties Properties&gt;
+<span class="line_number">706</span>  void axis_fill(Tensor&lt;T, Properties&gt;&amp; dst, size_t axis, const Tensor&lt;bool&gt;&amp; mask,
+<span class="line_number">707</span>    const T&amp; value);
+<span class="line_number">708</span>
+<span class="line_number">709</span>  /**
+<span class="line_number">710</span>   * Select along multiple axes where each mask is true (outer indexing).
+<span class="line_number">711</span>   * Each pair is (axis, mask). Masks are applied independently per axis.
+<span class="line_number">712</span>   */
+<span class="line_number">713</span>  template &lt;typename T, TensorProperties Properties&gt;
+<span class="line_number">714</span>  [[nodiscard]] typename Tensor&lt;T, Properties&gt;::source_tensor_type multi_axis_select(
+<span class="line_number">715</span>    const Tensor&lt;T, Properties&gt;&amp; src,
+<span class="line_number">716</span>    const std::vector&lt;std::pair&lt;size_t, Tensor&lt;bool&gt;&gt;&gt;&amp; axis_masks);
+<span class="line_number">717</span>
+<span class="line_number">718</span>  /**
+<span class="line_number">719</span>   * Fill dst with a scalar value at positions where all masks are true (outer indexing).
+<span class="line_number">720</span>   * Each pair is (axis, mask). A position is filled if mask_i[idx[axis_i]] is true for every i.
+<span class="line_number">721</span>   */
+<span class="line_number">722</span>  template &lt;typename T, TensorProperties Properties&gt;
+<span class="line_number">723</span>  void multi_axis_fill(Tensor&lt;T, Properties&gt;&amp; dst,
+<span class="line_number">724</span>    const std::vector&lt;std::pair&lt;size_t, Tensor&lt;bool&gt;&gt;&gt;&amp; axis_masks,
+<span class="line_number">725</span>    const T&amp; value);
+<span class="line_number">726</span>
+<span class="line_number">727</span>  /**
+<span class="line_number">728</span>   * Assign values into dst at positions where all masks are true (outer indexing).
+<span class="line_number">729</span>   * Each pair is (axis, mask). values.shape() must match the multi_axis_select output shape.
+<span class="line_number">730</span>   */
+<span class="line_number">731</span>  template &lt;typename T, TensorProperties DstProperties, TensorProperties ValueProperties&gt;
+<span class="line_number">732</span>  void multi_axis_assign(Tensor&lt;T, DstProperties&gt;&amp; dst,
+<span class="line_number">733</span>    const std::vector&lt;std::pair&lt;size_t, Tensor&lt;bool&gt;&gt;&gt;&amp; axis_masks,
+<span class="line_number">734</span>    const Tensor&lt;T, ValueProperties&gt;&amp; values);
+<span class="line_number">735</span>
+<span class="line_number">736</span>  // ============================================================================
+<span class="line_number">737</span>  // Generalized multi-axis operations (bool masks and/or int indices)
+<span class="line_number">738</span>  // ============================================================================
+<span class="line_number">739</span>
+<span class="line_number">740</span>  /// An axis selector: either a boolean mask or an integer index array.
+<span class="line_number">741</span>  using AxisSelector = std::variant&lt;Tensor&lt;bool&gt;, Tensor&lt;int64_t&gt;&gt;;
+<span class="line_number">742</span>
+<span class="line_number">743</span>  /**
+<span class="line_number">744</span>   * Select along multiple axes using any mix of bool masks and int index arrays
+<span class="line_number">745</span>   * (outer indexing). Each pair is (axis, selector).
+<span class="line_number">746</span>   */
+<span class="line_number">747</span>  template &lt;typename T, TensorProperties Properties&gt;
+<span class="line_number">748</span>  [[nodiscard]] typename Tensor&lt;T, Properties&gt;::source_tensor_type outer_select(
+<span class="line_number">749</span>    const Tensor&lt;T, Properties&gt;&amp; src,
+<span class="line_number">750</span>    const std::vector&lt;std::pair&lt;size_t, AxisSelector&gt;&gt;&amp; selectors);
+<span class="line_number">751</span>
+<span class="line_number">752</span>  /**
+<span class="line_number">753</span>   * Fill dst with a scalar at positions selected by outer indexing.
+<span class="line_number">754</span>   */
+<span class="line_number">755</span>  template &lt;typename T, TensorProperties Properties&gt;
+<span class="line_number">756</span>  void outer_fill(Tensor&lt;T, Properties&gt;&amp; dst,
+<span class="line_number">757</span>    const std::vector&lt;std::pair&lt;size_t, AxisSelector&gt;&gt;&amp; selectors,
+<span class="line_number">758</span>    const T&amp; value);
+<span class="line_number">759</span>
+<span class="line_number">760</span>  /**
+<span class="line_number">761</span>   * Assign values into dst at positions selected by outer indexing.
+<span class="line_number">762</span>   * values.shape() must match the outer_select output shape.
+<span class="line_number">763</span>   */
+<span class="line_number">764</span>  template &lt;typename T, TensorProperties DstProperties, TensorProperties ValueProperties&gt;
+<span class="line_number">765</span>  void outer_assign(Tensor&lt;T, DstProperties&gt;&amp; dst,
+<span class="line_number">766</span>    const std::vector&lt;std::pair&lt;size_t, AxisSelector&gt;&gt;&amp; selectors,
+<span class="line_number">767</span>    const Tensor&lt;T, ValueProperties&gt;&amp; values);
+<span class="line_number">768</span>
+<span class="line_number">769</span>  // ============================================================================
+<span class="line_number">770</span>  // Type casting
+<span class="line_number">771</span>  // ============================================================================
+<span class="line_number">772</span>
+<span class="line_number">773</span>  /**
+<span class="line_number">774</span>   * Create a new tensor of type Tensor&lt;T&gt; by converting each element from Tensor&lt;U&gt;.
+<span class="line_number">775</span>   * Requires T to be constructible from U.
+<span class="line_number">776</span>   */
+<span class="line_number">777</span>  template &lt;typename T, typename U&gt;
+<span class="line_number">778</span>  requires std::is_constructible_v&lt;T, U&gt;
+<span class="line_number">779</span>  [[nodiscard]] Tensor&lt;T&gt; tensor_cast(const Tensor&lt;U&gt;&amp; src);
+<span class="line_number">780</span>
+<span class="line_number">781</span>  // ============================================================================
+<span class="line_number">782</span>  // Joining operations
+<span class="line_number">783</span>  // ============================================================================
+<span class="line_number">784</span>
+<span class="line_number">785</span>  /**
+<span class="line_number">786</span>   * Concatenate tensors along an existing axis.
+<span class="line_number">787</span>   * All tensors must have the same shape except along the join axis.
+<span class="line_number">788</span>   */
+<span class="line_number">789</span>  template &lt;typename T, TensorProperties Properties&gt;
+<span class="line_number">790</span>  [[nodiscard]] typename Tensor&lt;T, Properties&gt;::source_tensor_type concatenate(
+<span class="line_number">791</span>    const std::vector&lt;Tensor&lt;T, Properties&gt;&gt;&amp; tensors, size_t axis);
+<span class="line_number">792</span>
+<span class="line_number">793</span>  /**
+<span class="line_number">794</span>   * Stack tensors along a new axis.
+<span class="line_number">795</span>   * All tensors must have the same shape. Supports negative axis.
+<span class="line_number">796</span>   */
+<span class="line_number">797</span>  template &lt;typename T, TensorProperties Properties&gt;
+<span class="line_number">798</span>  [[nodiscard]] typename Tensor&lt;T, Properties&gt;::source_tensor_type stack(
+<span class="line_number">799</span>    const std::vector&lt;Tensor&lt;T, Properties&gt;&gt;&amp; tensors, ptrdiff_t axis);
+<span class="line_number">800</span>
+<span class="line_number">801</span>  /**
+<span class="line_number">802</span>   * Split a tensor into sub-tensors along an axis.
+<span class="line_number">803</span>   * A section count produces that many equal contiguous parts. Split points
+<span class="line_number">804</span>   * `{i0, i1, ...}` produce half-open axis intervals `[0, i0)`, `[i0, i1)`,
+<span class="line_number">805</span>   * ..., `[ik, axis_size)`, so the element at each split point begins the next
+<span class="line_number">806</span>   * part. Returns views.
+<span class="line_number">807</span>   */
+<span class="line_number">808</span>  template &lt;typename T, TensorProperties Properties&gt;
+<span class="line_number">809</span>  [[nodiscard]] std::vector&lt;Tensor&lt;T, Properties&gt;&gt; split(const Tensor&lt;T, Properties&gt;&amp; tensor,
+<span class="line_number">810</span>    const std::vector&lt;size_t&gt;&amp; split_points, size_t axis);
+<span class="line_number">811</span>
+<span class="line_number">812</span>  template &lt;typename T, TensorProperties Properties&gt;
+<span class="line_number">813</span>  [[nodiscard]] std::vector&lt;Tensor&lt;T, Properties&gt;&gt; split(const Tensor&lt;T, Properties&gt;&amp; tensor,
+<span class="line_number">814</span>    size_t n_sections, size_t axis);
+<span class="line_number">815</span>
+<span class="line_number">816</span>  /**
+<span class="line_number">817</span>   * Split a tensor into n_sections parts, allowing uneven splits.
+<span class="line_number">818</span>   * Let `axis_size = q * n_sections + r`. The first `r` parts have length
+<span class="line_number">819</span>   * `q + 1`; the remaining trailing parts have length `q` and do not receive
+<span class="line_number">820</span>   * the extra element.
+<span class="line_number">821</span>   */
+<span class="line_number">822</span>  template &lt;typename T, TensorProperties Properties&gt;
+<span class="line_number">823</span>  [[nodiscard]] std::vector&lt;Tensor&lt;T, Properties&gt;&gt; array_split(const Tensor&lt;T, Properties&gt;&amp; tensor,
+<span class="line_number">824</span>    size_t n_sections, size_t axis);
+<span class="line_number">825</span>
+<span class="line_number">826</span>  // ============================================================================
+<span class="line_number">827</span>  // Index-based gather/scatter operations
+<span class="line_number">828</span>  // ============================================================================
+<span class="line_number">829</span>
+<span class="line_number">830</span>  /**
+<span class="line_number">831</span>   * Gather elements from src along a single axis using integer indices.
+<span class="line_number">832</span>   * indices must be 1D. Returns a tensor with shape[axis] == indices.size().
+<span class="line_number">833</span>   */
+<span class="line_number">834</span>  template &lt;typename T, TensorProperties Properties, typename I&gt;
+<span class="line_number">835</span>  [[nodiscard]] typename Tensor&lt;T, Properties&gt;::source_tensor_type index_select(
+<span class="line_number">836</span>    const Tensor&lt;T, Properties&gt;&amp; src, size_t axis, const Tensor&lt;I&gt;&amp; indices);
+<span class="line_number">837</span>
+<span class="line_number">838</span>  /**
+<span class="line_number">839</span>   * Scatter values into dst along a single axis at integer indices.
+<span class="line_number">840</span>   * indices must be 1D. values.shape() must match the shape that
+<span class="line_number">841</span>   * index_select(dst, axis, indices) would produce.
+<span class="line_number">842</span>   */
+<span class="line_number">843</span>  template &lt;typename T, TensorProperties DstProperties, typename I, TensorProperties ValueProperties&gt;
+<span class="line_number">844</span>  void index_assign(Tensor&lt;T, DstProperties&gt;&amp; dst, size_t axis, const Tensor&lt;I&gt;&amp; indices,
+<span class="line_number">845</span>    const Tensor&lt;T, ValueProperties&gt;&amp; values);
+<span class="line_number">846</span>
+<span class="line_number">847</span>  /**
+<span class="line_number">848</span>   * Fill dst with a scalar value along a single axis at integer indices.
+<span class="line_number">849</span>   * indices must be 1D.
+<span class="line_number">850</span>   */
+<span class="line_number">851</span>  template &lt;typename T, TensorProperties Properties, typename I&gt;
+<span class="line_number">852</span>  void index_fill(Tensor&lt;T, Properties&gt;&amp; dst, size_t axis, const Tensor&lt;I&gt;&amp; indices,
+<span class="line_number">853</span>    const T&amp; value);
+<span class="line_number">854</span>
+<span class="line_number">855</span>}
+<span class="line_number">856</span>
+<span class="line_number">857</span>#include &#34;tensor.tpp&#34;
+<span class="line_number">858</span>
+<span class="line_number">859</span>#include &#34;detail/tensor_1d_value_iterator.hpp&#34;
+<span class="line_number">860</span>
+<span class="line_number">861</span>#endif //STABLEBEAR_TENSOR_H
+</code>
+            </pre>
+        </div>
+    </div>
+</body>
+
+</html>

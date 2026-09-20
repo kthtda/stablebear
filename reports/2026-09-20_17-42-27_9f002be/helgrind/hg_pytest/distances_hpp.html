@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>/home/runner/work/stablebear/stablebear/include/sbear/persistence/../distances.hpp</title>
+    <link href='valgrind.css' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+    <script src="https://code.jquery.com/jquery-3.4.1.js"></script>
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.0.0/styles/default.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.0.0/highlight.min.js"></script>
+    <script src="valgrind.js"></script>
+</head>
+
+<body>
+    <div class="global">
+        <div class="header">
+            <h1>/home/runner/work/stablebear/stablebear/include/sbear/persistence/../distances.hpp</h1>
+            <p><b>1</b> errors</p>
+            <button class="next_error">Goto First Error</button>
+        </div>
+        <div class="listing">
+            <pre class="code">
+<code class="c++"><span class="line_number">1</span>#ifndef STABLEBEAR_DISTANCES_H
+<span class="line_number">2</span>#define STABLEBEAR_DISTANCES_H
+<span class="line_number">3</span>
+<span class="line_number">4</span>#include &#34;concepts.hpp&#34;
+<span class="line_number">5</span>#include &#34;point_cloud.hpp&#34;
+<span class="line_number">6</span>#include &#34;tensor.hpp&#34;
+<span class="line_number">7</span>
+<span class="line_number">8</span>#include &lt;cstddef&gt;
+<span class="line_number">9</span>
+<span class="line_number">10</span>namespace sb
+<span class="line_number">11</span>{
+<span class="line_number">12</span>  // Distance oracles: lightweight functors that answer d(i, j) on demand over
+<span class="line_number">13</span>  // some underlying data, satisfying the DistanceOracle concept (see
+<span class="line_number">14</span>  // concepts.hpp). Together with DistanceMatrix&lt;T&gt; they let algorithms be
+<span class="line_number">15</span>  // templated over &#34;anything that measures distance between indexed points&#34; --
+<span class="line_number">16</span>  // wrapping data such as a point cloud in an oracle is the intended way to
+<span class="line_number">17</span>  // add new metrics without materializing matrices.
+<span class="line_number">18</span>
+<span class="line_number">19</span>  /// Squared-Euclidean distance functor over a point cloud: answers d(i, j)^2
+<span class="line_number">20</span>  /// on demand without materializing a distance matrix. Satisfies
+<span class="line_number">21</span>  /// DistanceOracle just like DistanceMatrix&lt;T&gt;, so algorithms such as MST
+<span class="line_number">22</span>  /// construction can be templated over either.
+<span class="line_number">23</span>  /// Precondition: the cloud must be rank 2 with shape (n, dim); callers
+<span class="line_number">24</span>  /// validate that before constructing the oracle. Works
+<span class="line_number">25</span>  /// in squared distances because comparisons are unchanged (x -&gt; x^2 is
+<span class="line_number">26</span>  /// monotone on [0, inf)); the caller applies sqrt to the few distances it
+<span class="line_number">27</span>  /// keeps (e.g. the n-1 merge distances of an MST) instead of one sqrt per
+<span class="line_number">28</span>  /// O(n^2) query.
+<span class="line_number">29</span>  template &lt;typename T&gt;
+<span class="line_number">30</span>  class SquaredEuclideanDistance
+<span class="line_number">31</span>  {
+<span class="line_number">32</span>  public:
+<span class="line_number">33</span>    explicit SquaredEuclideanDistance(const PointCloud&lt;T&gt; &amp;points)
+<span class="line_number">34</span>        : m_points(points)
+<span class="line_number">35</span>    {
+<span class="line_number">36</span>    }
+<span class="line_number">37</span>
+<span class="line_number">38</span>    [[nodiscard]] T operator()(size_t i, size_t j) const
+<span class="line_number">39</span>    {
+<span class="line_number">40</span>      T sumSq{0};
+<span class="line_number">41</span>      for (size_t k = 0; k &lt; m_points.dim(); ++k)
+<span class="line_number">42</span>      {
+</code></pre>
+            <div class="issue">
+                <div>
+                    <span class="what">Possible data race during read of size 8 at 0x2AD641B0 by thread #8</span>
+                    <div class="navigation">
+                        <button class="next_error">Next</button>
+                        <button class="prev_error">Previous</button>
+                    </div>
+                </div>
+                <div>
+                    <table class="call_stack">
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/persistence/../algorithms/minimum_spanning_tree.hpp:66<br>
+                                    <code class="cpp">void sb::mst_merge_order&lt;sb::SquaredEuclideanDistance&lt;double&gt;, double&gt;(sb::SquaredEuclideanDistance&lt;double&gt; const&amp;, std::vector&lt;sb::MergeEdge&lt;double&gt;, std::allocator&lt;sb::MergeEdge&lt;double&gt; &gt; &gt;&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">63</span>      {
+<span class="line_number">64</span>        if (!visited[j])
+<span class="line_number">65</span>        {
+<span class="line_number">66</span><span class="error">          auto candidateDist = dist(nearest, j);
+</span><span class="line_number">67</span>          if (candidateDist &lt; minDist[j])
+<span class="line_number">68</span>          {
+<span class="line_number">69</span>            minDist[j] = candidateDist;
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/persistence/compute_homological_kernel.hpp:151<br>
+                                    <code class="cpp">void sb::ph::detail::homological_kernel_single_impl&lt;sb::SquaredEuclideanDistance&lt;double&gt;, double, sb::ph::detail::homological_kernel_pcloud_single_impl&lt;double, 0, 0&gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;sb::ph::Barcode&lt;double&gt;, 0&gt;&amp;, std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)::{lambda(double)#1}&gt;(sb::SquaredEuclideanDistance&lt;double&gt; const&amp;, sb::SquaredEuclideanDistance&lt;double&gt; const&amp;, sb::ph::Barcode&lt;double&gt;&amp;, sb::ph::detail::homological_kernel_pcloud_single_impl&lt;double, 0, 0&gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;sb::ph::Barcode&lt;double&gt;, 0&gt;&amp;, std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)::{lambda(double)#1})</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">148</span>    {
+<span class="line_number">149</span>      std::vector&lt;MergeEdge&lt;T&gt;&gt; primeMerges; // d&#39; merge order: the births
+<span class="line_number">150</span>      std::vector&lt;MergeEdge&lt;T&gt;&gt; dMerges;     // d-MST edges: the sweep timeline that answers the deaths
+<span class="line_number">151</span><span class="error">      mst_merge_order(dPrimeDist, primeMerges);
+</span><span class="line_number">152</span>      mst_merge_order(dDist, dMerges);
+<span class="line_number">153</span>      for (auto &amp;m : primeMerges)
+<span class="line_number">154</span>      {
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/persistence/compute_homological_kernel.hpp:215<br>
+                                    <code class="cpp">void sb::ph::detail::homological_kernel_pcloud_single_impl&lt;double, 0, 0&gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;sb::ph::Barcode&lt;double&gt;, 0&gt;&amp;, std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">212</span>      SquaredEuclideanDistance&lt;T&gt; dDist(pc); // uses logical coordinates, computes d^2 on demand
+<span class="line_number">213</span>      SquaredEuclideanDistance&lt;T&gt; dPrimeDist(pcPrime);
+<span class="line_number">214</span>
+<span class="line_number">215</span><span class="error">      detail::homological_kernel_single_impl(
+</span><span class="line_number">216</span>          dDist, dPrimeDist, retBarcodes(index), [](T v) { return std::sqrt(v); });
+<span class="line_number">217</span>    }
+<span class="line_number">218</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/persistence/compute_homological_kernel.hpp:260<br>
+                                    <code class="cpp">sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}::operator()(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">257</span>
+<span class="line_number">258</span>            if constexpr (std::is_same_v&lt;ElemT, PointCloud&lt;T&gt;&gt;)
+<span class="line_number">259</span>            {
+<span class="line_number">260</span><span class="error">              detail::homological_kernel_pcloud_single_impl(m_input, m_inputPrime, m_ret, index);
+</span><span class="line_number">261</span>            }
+<span class="line_number">262</span>            else
+<span class="line_number">263</span>            {
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/persistence/../walk.hpp:155<br>
+                                    <code class="cpp">sb::parallel_walk_async&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}::operator()(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">152</span>  tf::Future&lt;void&gt; parallel_walk_async(const TTensor&amp; tensor, UnaryFunc&amp;&amp; f, Executor&amp; exec)
+<span class="line_number">153</span>  {
+<span class="line_number">154</span>    return detail::parallel_walk_impl(tensor, [f = std::forward&lt;UnaryFunc&gt;(f)](const std::vector&lt;size_t&gt;&amp; idx, size_t) {
+<span class="line_number">155</span><span class="error">      f(idx);
+</span><span class="line_number">156</span>    }, exec);
+<span class="line_number">157</span>  }
+<span class="line_number">158</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/persistence/../walk.hpp:118<br>
+                                    <code class="cpp">sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}::operator()(unsigned long) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">115</span>          rem /= shape[i];
+<span class="line_number">116</span>        }
+<span class="line_number">117</span>
+<span class="line_number">118</span><span class="error">        f(idx, flat);
+</span><span class="line_number">119</span>      });
+<span class="line_number">120</span>
+<span class="line_number">121</span>      return exec.cpu()-&gt;run(std::move(flow));
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/algorithm/for_each.hpp:134<br>
+                                    <code class="cpp">tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}::operator()()::{lambda(unsigned long, unsigned long)#1}::operator()(unsigned long, unsigned long)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">131</span>          part.loop(N, W, *next, [=] (size_t part_b, size_t part_e) mutable {
+<span class="line_number">132</span>            auto idx = static_cast&lt;B_t&gt;(part_b) * inc + beg;
+<span class="line_number">133</span>            for(size_t x=part_b; x&lt;part_e; x++, idx += inc) {
+<span class="line_number">134</span><span class="error">              c(idx);
+</span><span class="line_number">135</span>            }
+<span class="line_number">136</span>          });
+<span class="line_number">137</span>        });
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/../algorithm/partitioner.hpp:316<br>
+                                    <code class="cpp">void tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;::loop&lt;tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}::operator()()::{lambda(unsigned long, unsigned long)#1}, (void*)0&gt;(unsigned long, unsigned long, std::atomic&lt;unsigned long&gt;&amp;, tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}::operator()()::{lambda(unsigned long, unsigned long)#1}&amp;&amp;) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">313</span>          if(curr_b &gt;= N) {
+<span class="line_number">314</span>            return;
+<span class="line_number">315</span>          }
+<span class="line_number">316</span><span class="error">          func(curr_b, (std::min)(curr_b + chunk_size, N));
+</span><span class="line_number">317</span>        }
+<span class="line_number">318</span>        break;
+<span class="line_number">319</span>      }
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/algorithm/for_each.hpp:131<br>
+                                    <code class="cpp">tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}::operator()()</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">128</span>      auto next = std::make_shared&lt;std::atomic&lt;size_t&gt;&gt;(0);
+<span class="line_number">129</span>      for(size_t w=0; w&lt;W;) {
+<span class="line_number">130</span>        auto task = part([=] () mutable {
+<span class="line_number">131</span><span class="error">          part.loop(N, W, *next, [=] (size_t part_b, size_t part_e) mutable {
+</span><span class="line_number">132</span>            auto idx = static_cast&lt;B_t&gt;(part_b) * inc + beg;
+<span class="line_number">133</span>            for(size_t x=part_b; x&lt;part_e; x++, idx += inc) {
+<span class="line_number">134</span>              c(idx);
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/algorithm/for_each.hpp:138<br>
+                                    <code class="cpp">tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">135</span>            }
+<span class="line_number">136</span>          });
+<span class="line_number">137</span>        });
+<span class="line_number">138</span><span class="error">        (++w == W) ? task() : rt.silent_async(task);
+</span><span class="line_number">139</span>      }
+<span class="line_number">140</span>    }
+<span class="line_number">141</span>  };
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:61<br>
+                                    <code class="cpp">void std::__invoke_impl&lt;void, tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;double&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}&amp;, tf::Runtime&amp;&gt;(std::__invoke_other, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;double&gt;, double, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, tf::Runtime&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">58</span>  template&lt;typename _Res, typename _Fn, typename... _Args&gt;
+<span class="line_number">59</span>    constexpr _Res
+<span class="line_number">60</span>    __invoke_impl(__invoke_other, _Fn&amp;&amp; __f, _Args&amp;&amp;... __args)
+<span class="line_number">61</span><span class="error">    { return std::forward&lt;_Fn&gt;(__f)(std::forward&lt;_Args&gt;(__args)...); }
+</span><span class="line_number">62</span>
+<span class="line_number">63</span>  template&lt;typename _Res, typename _MemFun, typename _Tp, typename... _Args&gt;
+<span class="line_number">64</span>    constexpr _Res
+</code></pre>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            <pre class="code">
+<code class="c++"><span class="line_number">43</span><span class="error">        auto diff = m_points(i, k) - m_points(j, k);</span>
+<span class="line_number">44</span>        sumSq += diff * diff;
+<span class="line_number">45</span>      }
+<span class="line_number">46</span>      return sumSq;
+<span class="line_number">47</span>    }
+<span class="line_number">48</span>
+<span class="line_number">49</span>    [[nodiscard]] size_t size() const noexcept
+<span class="line_number">50</span>    {
+<span class="line_number">51</span>      return m_points.n_points();
+<span class="line_number">52</span>    }
+<span class="line_number">53</span>
+<span class="line_number">54</span>  private:
+<span class="line_number">55</span>    PointCloud&lt;T&gt; m_points;
+<span class="line_number">56</span>  };
+<span class="line_number">57</span>} // namespace sb
+<span class="line_number">58</span>
+<span class="line_number">59</span>#endif
+</code>
+            </pre>
+        </div>
+    </div>
+</body>
+
+</html>
