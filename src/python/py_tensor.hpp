@@ -10,7 +10,6 @@
 
 #include <sbear/tensor.hpp>
 #include <sbear/nested_tensor.hpp>
-#include <sbear/point_cloud.hpp>
 #include <sbear/concepts.hpp>
 #include <sbear/functional/pcf.hpp>
 #include "functional/py_pcf_tensor_eval.hpp"
@@ -193,46 +192,208 @@ namespace sb_py
       cls.def("_ensure_materialized", &TTensor::ensure_materialized);
   }
 
+  /// Bind operations that depend only on the logical Tensor interface.  The
+  /// property bitmask controls storage behavior in C++; Python sees the same
+  /// API for ordinary and indexed tensors.
   template <typename T, sb::TensorProperties Properties>
-  requires sb::IndexedTensorProperties<Properties> && sb::IndexableTensorElement<T>
-  void register_indexed_tensor_bindings(pybind11::module_& m, const std::string& name)
+  void bind_tensor_operations(pybind11::class_<sb::Tensor<T, Properties>>& cls)
   {
     using TTensor = sb::Tensor<T, Properties>;
-    pybind11::class_<TTensor> cls(m, name.c_str());
-    bind_tensor_view_operations(cls);
+    static constexpr sb::TensorProperties PlainProperties =
+      Properties & ~sb::TensorProperty::Indexed;
+    using TPlain = sb::Tensor<T, PlainProperties>;
+    using TIndexed = sb::Tensor<T, PlainProperties | sb::TensorProperty::Indexed>;
 
-    cls.def("materialize", &TTensor::materialize);
+    cls
+      .def("__setitem__", [](TTensor& self, const std::vector<sb::Slice>& slices,
+          const TPlain& values) { self[slices].assign_from(values); })
+      .def("__eq__", [](const TTensor& self, const TPlain& rhs) {
+        return sb::elementwise_eq(self, rhs);
+      })
+      .def("__ne__", [](const TTensor& self, const TPlain& rhs) {
+        return sb::elementwise_ne(self, rhs);
+      })
+      .def("array_equal", [](const TTensor& self, const TPlain& rhs) {
+        return self == rhs;
+      })
+      .def("_set_element", [](TTensor& self,
+          const std::vector<size_t>& index, const T& value) {
+        assert_valid_index(self, index);
+        writable_element(self, index) = sb::detail::store_copy(value);
+      })
+      .def_static("concatenate", [](const pybind11::iterable& values, size_t axis) {
+        std::vector<TPlain> tensors;
+        for (const auto item : values)
+        {
+          if (pybind11::isinstance<TPlain>(item))
+            tensors.push_back(pybind11::cast<TPlain>(item));
+          else if constexpr (sb::IndexableTensorElement<T>)
+          {
+            if (pybind11::isinstance<TIndexed>(item))
+              tensors.push_back(pybind11::cast<TIndexed>(item).materialize());
+            else
+              throw pybind11::type_error("all tensors must have the same element type and properties");
+          }
+          else
+            throw pybind11::type_error("all tensors must have the same element type and properties");
+        }
+        return sb::concatenate(tensors, axis);
+      }, pybind11::arg("tensors"), pybind11::arg("axis") = 0)
+      .def_static("stack", [](const pybind11::iterable& values, ptrdiff_t axis) {
+        std::vector<TPlain> tensors;
+        for (const auto item : values)
+        {
+          if (pybind11::isinstance<TPlain>(item))
+            tensors.push_back(pybind11::cast<TPlain>(item));
+          else if constexpr (sb::IndexableTensorElement<T>)
+          {
+            if (pybind11::isinstance<TIndexed>(item))
+              tensors.push_back(pybind11::cast<TIndexed>(item).materialize());
+            else
+              throw pybind11::type_error("all tensors must have the same element type and properties");
+          }
+          else
+            throw pybind11::type_error("all tensors must have the same element type and properties");
+        }
+        return sb::stack(tensors, axis);
+      }, pybind11::arg("tensors"), pybind11::arg("axis") = 0)
+      .def_static("split_sections", [](const TTensor& tensor,
+          size_t sections, size_t axis) { return sb::split(tensor, sections, axis); },
+          pybind11::arg("tensor"), pybind11::arg("n_sections"), pybind11::arg("axis") = 0)
+      .def_static("split_indices", [](const TTensor& tensor,
+          const std::vector<size_t>& indices, size_t axis) {
+        return sb::split(tensor, indices, axis);
+      }, pybind11::arg("tensor"), pybind11::arg("indices"), pybind11::arg("axis") = 0)
+      .def_static("array_split", [](const TTensor& tensor,
+          size_t sections, size_t axis) { return sb::array_split(tensor, sections, axis); },
+          pybind11::arg("tensor"), pybind11::arg("n_sections"), pybind11::arg("axis") = 0)
+      .def("masked_select", [](const TTensor& self, const sb::Tensor<bool>& mask) {
+        return sb::masked_select(self, mask);
+      })
+      .def("masked_assign", [](TTensor& self, const sb::Tensor<bool>& mask,
+          const TPlain& values) { sb::masked_assign(self, mask, values); })
+      .def("masked_fill", [](TTensor& self, const sb::Tensor<bool>& mask,
+          const T& value) { sb::masked_fill(self, mask, value); })
+      .def("axis_select", [](const TTensor& self, size_t axis,
+          const sb::Tensor<bool>& mask) { return sb::axis_select(self, axis, mask); })
+      .def("axis_assign", [](TTensor& self, size_t axis, const sb::Tensor<bool>& mask,
+          const TPlain& values) { sb::axis_assign(self, axis, mask, values); })
+      .def("axis_fill", [](TTensor& self, size_t axis, const sb::Tensor<bool>& mask,
+          const T& value) { sb::axis_fill(self, axis, mask, value); })
+      .def("multi_axis_select", [](const TTensor& self,
+          const std::vector<std::pair<size_t, sb::Tensor<bool>>>& masks) {
+        return sb::multi_axis_select(self, masks);
+      })
+      .def("multi_axis_assign", [](TTensor& self,
+          const std::vector<std::pair<size_t, sb::Tensor<bool>>>& masks,
+          const TPlain& values) { sb::multi_axis_assign(self, masks, values); })
+      .def("multi_axis_fill", [](TTensor& self,
+          const std::vector<std::pair<size_t, sb::Tensor<bool>>>& masks,
+          const T& value) { sb::multi_axis_fill(self, masks, value); })
+      .def("outer_select", [](const TTensor& self,
+          const std::vector<std::pair<size_t, sb::AxisSelector>>& selectors) {
+        return sb::outer_select(self, selectors);
+      })
+      .def("outer_assign", [](TTensor& self,
+          const std::vector<std::pair<size_t, sb::AxisSelector>>& selectors,
+          const TPlain& values) { sb::outer_assign(self, selectors, values); })
+      .def("outer_fill", [](TTensor& self,
+          const std::vector<std::pair<size_t, sb::AxisSelector>>& selectors,
+          const T& value) { sb::outer_fill(self, selectors, value); })
+      .def("index_select", [](const TTensor& self, size_t axis,
+          const sb::Tensor<sb::int64_t>& indices) {
+        return sb::index_select(self, axis, indices);
+      })
+      .def("index_assign", [](TTensor& self, size_t axis,
+          const sb::Tensor<sb::int64_t>& indices, const TPlain& values) {
+        sb::index_assign(self, axis, indices, values);
+      })
+      .def("index_fill", [](TTensor& self, size_t axis,
+          const sb::Tensor<sb::int64_t>& indices, const T& value) {
+        sb::index_fill(self, axis, indices, value);
+      });
 
-    if constexpr (sb::is_point_cloud_v<T>)
+    if constexpr (sb::IndexableTensorElement<T>)
     {
       cls
-        .def("_get_point_cloud", [](const TTensor& self, const std::vector<size_t>& index) {
-          assert_valid_index(self, index);
-          return self(index);
+        .def("__setitem__", [](TTensor& self, const std::vector<sb::Slice>& slices,
+            const TIndexed& values) { self[slices].assign_from(values); })
+        .def("__eq__", [](const TTensor& self, const TIndexed& rhs) {
+          return sb::elementwise_eq(self, rhs);
         })
-        .def("_get_point_cloud", [](const TTensor& self, size_t index) {
-          assert_valid_index(self, index);
-          return self(index);
+        .def("__ne__", [](const TTensor& self, const TIndexed& rhs) {
+          return sb::elementwise_ne(self, rhs);
         })
-        .def("_index_points", [](const TTensor& self,
-            const sb::NestedTensor<uint64_t>& selections) {
-          if (selections.is_leaf())
-          {
-            throw std::invalid_argument("Point-cloud selections must have a nested root");
-          }
-          return sb::make_indexed_tensor(self.materialize(), selections);
+        .def("array_equal", [](const TTensor& self, const TIndexed& rhs) {
+          return self == rhs;
+        })
+        .def("masked_assign", [](TTensor& self, const sb::Tensor<bool>& mask,
+            const TIndexed& values) { sb::masked_assign(self, mask, values); })
+        .def("axis_assign", [](TTensor& self, size_t axis, const sb::Tensor<bool>& mask,
+            const TIndexed& values) { sb::axis_assign(self, axis, mask, values); })
+        .def("multi_axis_assign", [](TTensor& self,
+            const std::vector<std::pair<size_t, sb::Tensor<bool>>>& masks,
+            const TIndexed& values) { sb::multi_axis_assign(self, masks, values); })
+        .def("outer_assign", [](TTensor& self,
+            const std::vector<std::pair<size_t, sb::AxisSelector>>& selectors,
+            const TIndexed& values) { sb::outer_assign(self, selectors, values); })
+        .def("index_assign", [](TTensor& self, size_t axis,
+            const sb::Tensor<sb::int64_t>& indices, const TIndexed& values) {
+          sb::index_assign(self, axis, indices, values);
+        })
+        .def("_index_elements", [](const TTensor& self,
+            const typename TTensor::index_tensor_type& indices) {
+          if constexpr (TTensor::IsIndexed)
+            return sb::make_indexed_tensor(self.materialize(), indices);
+          else
+            return sb::make_indexed_tensor(self, indices);
         });
     }
+
+    using ScalarT = scalar_of_t<T>;
+    if constexpr (std::is_constructible_v<T, sb::Tensor<ScalarT>>)
+    {
+      cls.def("_set_element", [](TTensor& self,
+          const std::vector<size_t>& index, const sb::Tensor<ScalarT>& value) {
+        assert_valid_index(self, index);
+        writable_element(self, index) = sb::detail::store_copy(T(value));
+      });
+      cls.def("masked_fill", [](TTensor& self, const sb::Tensor<bool>& mask,
+          const sb::Tensor<ScalarT>& value) {
+        sb::masked_fill(self, mask, T(value));
+      });
+      cls.def("axis_fill", [](TTensor& self, size_t axis,
+          const sb::Tensor<bool>& mask, const sb::Tensor<ScalarT>& value) {
+        sb::axis_fill(self, axis, mask, T(value));
+      });
+      cls.def("multi_axis_fill", [](TTensor& self,
+          const std::vector<std::pair<size_t, sb::Tensor<bool>>>& masks,
+          const sb::Tensor<ScalarT>& value) {
+        sb::multi_axis_fill(self, masks, T(value));
+      });
+      cls.def("outer_fill", [](TTensor& self,
+          const std::vector<std::pair<size_t, sb::AxisSelector>>& selectors,
+          const sb::Tensor<ScalarT>& value) {
+        sb::outer_fill(self, selectors, T(value));
+      });
+      cls.def("index_fill", [](TTensor& self, size_t axis,
+          const sb::Tensor<sb::int64_t>& indices,
+          const sb::Tensor<ScalarT>& value) {
+        sb::index_fill(self, axis, indices, T(value));
+      });
+    }
+
   }
 
-  template <typename T>
+  template <typename T,
+    sb::TensorProperties Properties = sb::TensorProperty::None>
   void register_typed_tensor_bindings(pybind11::module_& m, const std::string& prefix, const std::string& suffix)
   {
-    using TTensor = sb::Tensor<T>;
+    using TTensor = sb::Tensor<T, Properties>;
 
     pybind11::class_<TTensor> cls = [&m, &prefix, &suffix]
     {
-      if constexpr (std::is_trivially_copyable_v<T>)
+      if constexpr (!TTensor::IsIndexed && std::is_trivially_copyable_v<T>)
       {
         pybind11::class_<TTensor> cls(m, (prefix + "Tensor" + suffix).c_str(), pybind11::buffer_protocol());
 
@@ -270,82 +431,23 @@ namespace sb_py
     }();
 
     bind_tensor_view_operations(cls);
+    bind_tensor_operations<T, Properties>(cls);
 
-    cls
-      .def(pybind11::init([](const Shape& shape)
+    if constexpr (TTensor::IsIndexed)
+    {
+      cls.def("materialize", &TTensor::materialize);
+    }
+    else
+    {
+      cls
+        .def(pybind11::init([](const Shape& shape)
         {
           return TTensor(shape.data);
         }))
-
-      .def(pybind11::init([](const Shape& shape, const T& init)
+        .def(pybind11::init([](const Shape& shape, const T& init)
         {
           return TTensor(shape.data, init);
-        }))
-
-      .def("__setitem__", [](TTensor& self, const std::vector<sb::Slice>& slices, const TTensor& vals) {
-          self[slices].assign_from(vals);
-        })
-
-      .def("__eq__", [](const TTensor& self, const TTensor& rhs){
-          return sb::elementwise_eq(self, rhs);
-        })
-      .def("__ne__", [](const TTensor& self, const TTensor& rhs){
-          return sb::elementwise_ne(self, rhs);
-        })
-      .def("array_equal", [](const TTensor& self, const TTensor& rhs){
-          return self == rhs;
-        })
-
-      .def("_set_element", [](TTensor& self, const std::vector<size_t>& index, const T& val) {
-          assert_valid_index(self, index);
-          self(index) = sb::detail::store_copy(val);
-        })
-
-      .def_static("concatenate", [](const std::vector<TTensor>& tensors, size_t axis) {
-        return sb::concatenate(tensors, axis);
-      }, pybind11::arg("tensors"), pybind11::arg("axis") = 0)
-      .def_static("stack", [](const std::vector<TTensor>& tensors, ptrdiff_t axis) {
-        return sb::stack(tensors, axis);
-      }, pybind11::arg("tensors"), pybind11::arg("axis") = 0)
-      .def_static("split_sections", [](const TTensor& tensor, size_t n_sections, size_t axis) {
-        return sb::split(tensor, n_sections, axis);
-      }, pybind11::arg("tensor"), pybind11::arg("n_sections"), pybind11::arg("axis") = 0)
-      .def_static("split_indices", [](const TTensor& tensor, const std::vector<size_t>& indices, size_t axis) {
-        return sb::split(tensor, indices, axis);
-      }, pybind11::arg("tensor"), pybind11::arg("indices"), pybind11::arg("axis") = 0)
-      .def_static("array_split", [](const TTensor& tensor, size_t n_sections, size_t axis) {
-        return sb::array_split(tensor, n_sections, axis);
-      }, pybind11::arg("tensor"), pybind11::arg("n_sections"), pybind11::arg("axis") = 0)
-    ;
-
-    // For a tensor of point clouds, assigning a plain coordinate tensor wraps it
-    // as a materialized PointCloud element.
-    if constexpr (sb::is_point_cloud_v<T>)
-    {
-      using ScalarT = typename T::value_type;
-      // Structural access for the Python PointCloud facade. This preserves an
-      // indexed cloud until the facade actually reads or writes coordinates.
-      cls.def("_get_point_cloud", [](const TTensor& self, const std::vector<size_t>& index) -> const T& {
-        assert_valid_index(self, index);
-        return self(index);
-      }, pybind11::return_value_policy::reference_internal);
-      cls.def("_get_point_cloud", [](const TTensor& self, size_t index) -> const T& {
-        assert_valid_index(self, index);
-        return self(index);
-      }, pybind11::return_value_policy::reference_internal);
-      cls.def("_index_points", [](const TTensor& self, const sb::NestedTensor<uint64_t>& selections) {
-        if (selections.is_leaf())
-        {
-          throw std::invalid_argument("Point-cloud selections must have a nested root");
-        }
-        return sb::make_indexed_tensor(self, selections);
-      });
-      cls.def("_set_element", [](TTensor& self, const std::vector<size_t>& index, const sb::Tensor<ScalarT>& val) {
-        assert_valid_index(self, index);
-        // T(val) shares val's coordinate buffer; store_copy makes the stored cell
-        // independent (matches the generic _set_element above and main's #39 fix).
-        self(index) = sb::detail::store_copy(T(val));
-      });
+        }));
     }
 
     // Unary negation
@@ -404,56 +506,6 @@ namespace sb_py
         .def("__itruediv__", [](TTensor& self, const TTensor& rhs) -> TTensor& { self /= rhs; return self; })
       ;
     }
-
-    // Masked operations
-    cls.def("masked_select", [](const TTensor& self, const sb::Tensor<bool>& mask) {
-      return sb::masked_select(self, mask);
-    });
-    cls.def("masked_assign", [](TTensor& self, const sb::Tensor<bool>& mask, const TTensor& values) {
-      sb::masked_assign(self, mask, values);
-    });
-    cls.def("masked_fill", [](TTensor& self, const sb::Tensor<bool>& mask, const T& value) {
-      sb::masked_fill(self, mask, value);
-    });
-    cls.def("axis_select", [](const TTensor& self, size_t axis, const sb::Tensor<bool>& mask) {
-      return sb::axis_select(self, axis, mask);
-    });
-    cls.def("axis_assign", [](TTensor& self, size_t axis, const sb::Tensor<bool>& mask, const TTensor& values) {
-      sb::axis_assign(self, axis, mask, values);
-    });
-    cls.def("axis_fill", [](TTensor& self, size_t axis, const sb::Tensor<bool>& mask, const T& value) {
-      sb::axis_fill(self, axis, mask, value);
-    });
-    cls.def("multi_axis_select", [](const TTensor& self, const std::vector<std::pair<size_t, sb::Tensor<bool>>>& axis_masks) {
-      return sb::multi_axis_select(self, axis_masks);
-    });
-    cls.def("multi_axis_assign", [](TTensor& self, const std::vector<std::pair<size_t, sb::Tensor<bool>>>& axis_masks, const TTensor& values) {
-      sb::multi_axis_assign(self, axis_masks, values);
-    });
-    cls.def("multi_axis_fill", [](TTensor& self, const std::vector<std::pair<size_t, sb::Tensor<bool>>>& axis_masks, const T& value) {
-      sb::multi_axis_fill(self, axis_masks, value);
-    });
-
-    cls.def("outer_select", [](const TTensor& self, const std::vector<std::pair<size_t, sb::AxisSelector>>& selectors) {
-      return sb::outer_select(self, selectors);
-    });
-    cls.def("outer_assign", [](TTensor& self, const std::vector<std::pair<size_t, sb::AxisSelector>>& selectors, const TTensor& values) {
-      sb::outer_assign(self, selectors, values);
-    });
-    cls.def("outer_fill", [](TTensor& self, const std::vector<std::pair<size_t, sb::AxisSelector>>& selectors, const T& value) {
-      sb::outer_fill(self, selectors, value);
-    });
-
-    // Index-based gather/scatter (always use int64 as index type)
-    cls.def("index_select", [](const TTensor& self, size_t axis, const sb::Tensor<sb::int64_t>& indices) {
-      return sb::index_select(self, axis, indices);
-    });
-    cls.def("index_assign", [](TTensor& self, size_t axis, const sb::Tensor<sb::int64_t>& indices, const TTensor& values) {
-      sb::index_assign(self, axis, indices, values);
-    });
-    cls.def("index_fill", [](TTensor& self, size_t axis, const sb::Tensor<sb::int64_t>& indices, const T& value) {
-      sb::index_fill(self, axis, indices, value);
-    });
 
     using Tv = scalar_of_t<T>;
     using Tt = time_of_t<T>;

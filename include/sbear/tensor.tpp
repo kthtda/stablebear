@@ -113,10 +113,11 @@ namespace sb
   }
 
   template <typename T, TensorProperties Properties>
-  template <typename U> requires std::equality_comparable_with<U, T>
-  bool Tensor<T, Properties>::operator==(const Tensor<U>& rhs) const
+  template <typename U, TensorProperties OtherProperties>
+  requires std::equality_comparable_with<U, T>
+  bool Tensor<T, Properties>::operator==(const Tensor<U, OtherProperties>& rhs) const
   {
-    if (m_shape != rhs.shape())
+    if (shape() != rhs.shape())
     {
       return false;
     }
@@ -130,10 +131,11 @@ namespace sb
   }
 
   template <typename T, TensorProperties Properties>
-  template <typename U> requires std::equality_comparable_with<U, T>
-  bool Tensor<T, Properties>::operator!=(const Tensor<U>& rhs) const
+  template <typename U, TensorProperties OtherProperties>
+  requires std::equality_comparable_with<U, T>
+  bool Tensor<T, Properties>::operator!=(const Tensor<U, OtherProperties>& rhs) const
   {
-    if (m_shape != rhs.shape())
+    if (shape() != rhs.shape())
     {
       return true;
     }
@@ -220,9 +222,9 @@ namespace sb
   }
 
   template <typename T, TensorProperties Properties>
-  template <typename U>
+  template <typename U, TensorProperties OtherProperties>
   requires std::is_constructible_v<T, U>
-  void Tensor<T, Properties>::assign_from(const Tensor<U>& rhs)
+  void Tensor<T, Properties>::assign_from(const Tensor<U, OtherProperties>& rhs)
   {
     auto target = shape();
     auto out_shape = broadcast_shapes(target, rhs.shape());
@@ -242,7 +244,8 @@ namespace sb
     // handling of overlapping assignment. Aliasing is only possible when the
     // element types match and the two views share the same base buffer; data()
     // includes the view offset, so compare the buffer base (data() - offset()).
-    if constexpr (std::is_same_v<T, U>)
+    if constexpr (std::is_same_v<T, U> && !IsIndexed
+      && !Tensor<U, OtherProperties>::IsIndexed)
     {
       if (this->data() - this->offset() == rhs.data() - rhs.offset())
       {
@@ -251,7 +254,7 @@ namespace sb
           // store_copy as well: rhs_copy.copy() duplicates only the outer
           // buffer, so element types that share a buffer (point clouds, the
           // matrix types) would still alias the source until copied per cell.
-          (*this)(idx) = detail::store_copy(rhs_copy(idx));
+          (*this)(idx) = detail::materialized_store_copy(rhs_copy(idx));
         });
         return;
       }
@@ -260,7 +263,10 @@ namespace sb
     sb::walk(*this, [this, &rhs_view](const std::vector<size_t>& idx){
       // store_copy deep-copies element types that share a buffer (point clouds
       // and the matrix types), so a slice assignment never aliases the source.
-      (*this)(idx) = detail::store_copy(T(rhs_view(idx)));
+      if constexpr (IsIndexed)
+        writable_at(idx) = detail::materialized_store_copy(T(rhs_view(idx)));
+      else
+        (*this)(idx) = detail::materialized_store_copy(T(rhs_view(idx)));
     });
   }
 
@@ -517,9 +523,11 @@ namespace sb
   {
     /// Apply a binary operation elementwise to two broadcast-compatible tensors.
     /// The result element type R is deduced from the return type of op.
-    template <typename T, typename BinaryOp,
+    template <typename T, TensorProperties LhsProperties,
+              TensorProperties RhsProperties, typename BinaryOp,
               typename R = std::invoke_result_t<BinaryOp, const T&, const T&>>
-    Tensor<R> broadcast_binop(const Tensor<T>& lhs, const Tensor<T>& rhs, BinaryOp op)
+    Tensor<R> broadcast_binop(const Tensor<T, LhsProperties>& lhs,
+        const Tensor<T, RhsProperties>& rhs, BinaryOp op)
     {
       auto out_shape = broadcast_shapes(lhs.shape(), rhs.shape());
       auto lhs_view = lhs.broadcast_to(out_shape);
@@ -585,14 +593,16 @@ namespace sb
 
   // Elementwise comparison with broadcasting (returns Tensor<bool>)
 
-  template <typename T>
+  template <typename T, TensorProperties LhsProperties, TensorProperties RhsProperties>
   requires std::equality_comparable<T>
-  Tensor<bool> elementwise_eq(const Tensor<T>& lhs, const Tensor<T>& rhs)
+  Tensor<bool> elementwise_eq(const Tensor<T, LhsProperties>& lhs,
+      const Tensor<T, RhsProperties>& rhs)
   { return detail::broadcast_binop(lhs, rhs, [](const T& a, const T& b){ return a == b; }); }
 
-  template <typename T>
+  template <typename T, TensorProperties LhsProperties, TensorProperties RhsProperties>
   requires std::equality_comparable<T>
-  Tensor<bool> elementwise_ne(const Tensor<T>& lhs, const Tensor<T>& rhs)
+  Tensor<bool> elementwise_ne(const Tensor<T, LhsProperties>& lhs,
+      const Tensor<T, RhsProperties>& rhs)
   { return detail::broadcast_binop(lhs, rhs, [](const T& a, const T& b){ return a != b; }); }
 
   template <typename T>
@@ -619,9 +629,24 @@ namespace sb
   // Masked operations
   // ============================================================================
 
-  template <typename T>
-  Tensor<T> masked_select(const Tensor<T>& src, const Tensor<bool>& mask)
+  namespace detail
   {
+    template <typename T, TensorProperties Properties>
+    T& writable_tensor_element(Tensor<T, Properties>& tensor,
+        const std::vector<size_t>& index)
+    {
+      if constexpr (Tensor<T, Properties>::IsIndexed)
+        return tensor.writable_at(index);
+      else
+        return tensor(index);
+    }
+  }
+
+  template <typename T, TensorProperties Properties>
+  typename Tensor<T, Properties>::source_tensor_type masked_select(
+      const Tensor<T, Properties>& src, const Tensor<bool>& mask)
+  {
+    using TResult = typename Tensor<T, Properties>::source_tensor_type;
     if (mask.shape() != src.shape())
     {
       throw std::invalid_argument(
@@ -632,22 +657,23 @@ namespace sb
     std::vector<T> buf;
     walk(src, [&](const std::vector<size_t>& idx) {
       if (mask(idx))
-        buf.push_back(src(idx));
+        buf.push_back(detail::materialized_store_copy(src(idx)));
     });
 
     if (buf.empty())
     {
-      return Tensor<T>({0});
+      return TResult({0});
     }
 
-    Tensor<T> result({buf.size()});
+    TResult result({buf.size()});
     std::move(buf.begin(), buf.end(), result.data());
 
     return result;
   }
 
-  template <typename T>
-  void masked_assign(Tensor<T>& dst, const Tensor<bool>& mask, const Tensor<T>& values)
+  template <typename T, TensorProperties DstProperties, TensorProperties ValueProperties>
+  void masked_assign(Tensor<T, DstProperties>& dst, const Tensor<bool>& mask,
+      const Tensor<T, ValueProperties>& values)
   {
     if (mask.shape() != dst.shape())
     {
@@ -664,7 +690,8 @@ namespace sb
           throw std::invalid_argument(
             "masked_assign: more true values in mask than elements in values");
         }
-        dst(idx) = values({pos++});
+        detail::writable_tensor_element(dst, idx) =
+          detail::materialized_store_copy(values({pos++}));
       }
     });
 
@@ -676,8 +703,8 @@ namespace sb
     }
   }
 
-  template <typename T>
-  void masked_fill(Tensor<T>& dst, const Tensor<bool>& mask, const T& value)
+  template <typename T, TensorProperties Properties>
+  void masked_fill(Tensor<T, Properties>& dst, const Tensor<bool>& mask, const T& value)
   {
     if (mask.shape() != dst.shape())
     {
@@ -687,7 +714,7 @@ namespace sb
 
     walk(dst, [&](const std::vector<size_t>& idx) {
       if (mask(idx))
-        dst(idx) = value;
+        detail::writable_tensor_element(dst, idx) = detail::materialized_store_copy(value);
     });
   }
 
@@ -720,9 +747,11 @@ namespace sb
     }
   }
 
-  template <typename T>
-  Tensor<T> axis_select(const Tensor<T>& src, size_t axis, const Tensor<bool>& mask)
+  template <typename T, TensorProperties Properties>
+  typename Tensor<T, Properties>::source_tensor_type axis_select(
+      const Tensor<T, Properties>& src, size_t axis, const Tensor<bool>& mask)
   {
+    using TResult = typename Tensor<T, Properties>::source_tensor_type;
     detail::validate_axis_mask(axis, src.shape().size(), mask, src.shape()[axis]);
     auto true_indices = detail::collect_true_indices(mask);
 
@@ -732,21 +761,22 @@ namespace sb
 
     if (true_indices.empty())
     {
-      return Tensor<T>(out_shape);
+      return TResult(out_shape);
     }
 
-    Tensor<T> result(out_shape);
+    TResult result(out_shape);
     walk(result, [&](const std::vector<size_t>& out_idx) {
       auto src_idx = out_idx;
       src_idx[axis] = true_indices[out_idx[axis]];
-      result(out_idx) = src(src_idx);
+      result(out_idx) = detail::materialized_store_copy(src(src_idx));
     });
 
     return result;
   }
 
-  template <typename T>
-  void axis_assign(Tensor<T>& dst, size_t axis, const Tensor<bool>& mask, const Tensor<T>& values)
+  template <typename T, TensorProperties DstProperties, TensorProperties ValueProperties>
+  void axis_assign(Tensor<T, DstProperties>& dst, size_t axis, const Tensor<bool>& mask,
+      const Tensor<T, ValueProperties>& values)
   {
     detail::validate_axis_mask(axis, dst.shape().size(), mask, dst.shape()[axis]);
     auto true_indices = detail::collect_true_indices(mask);
@@ -764,18 +794,20 @@ namespace sb
     walk(values, [&](const std::vector<size_t>& val_idx) {
       auto dst_idx = val_idx;
       dst_idx[axis] = true_indices[val_idx[axis]];
-      dst(dst_idx) = values(val_idx);
+      detail::writable_tensor_element(dst, dst_idx) =
+        detail::materialized_store_copy(values(val_idx));
     });
   }
 
-  template <typename T>
-  void axis_fill(Tensor<T>& dst, size_t axis, const Tensor<bool>& mask, const T& value)
+  template <typename T, TensorProperties Properties>
+  void axis_fill(Tensor<T, Properties>& dst, size_t axis, const Tensor<bool>& mask,
+      const T& value)
   {
     detail::validate_axis_mask(axis, dst.shape().size(), mask, dst.shape()[axis]);
 
     walk(dst, [&](const std::vector<size_t>& idx) {
       if (mask(idx[axis]))
-        dst(idx) = value;
+        detail::writable_tensor_element(dst, idx) = detail::materialized_store_copy(value);
     });
   }
 
@@ -802,8 +834,9 @@ namespace sb
     }
   }
 
-  template <typename T>
-  Tensor<T> multi_axis_select(const Tensor<T>& src,
+  template <typename T, TensorProperties Properties>
+  typename Tensor<T, Properties>::source_tensor_type multi_axis_select(
+    const Tensor<T, Properties>& src,
     const std::vector<std::pair<size_t, Tensor<bool>>>& axis_masks)
   {
     auto infos = detail::prepare_axis_masks(axis_masks, src.shape());
@@ -812,19 +845,19 @@ namespace sb
     for (const auto& info : infos)
       out_shape[info.axis] = info.true_indices.size();
 
-    Tensor<T> result(out_shape);
+    typename Tensor<T, Properties>::source_tensor_type result(out_shape);
     walk(result, [&](const std::vector<size_t>& out_idx) {
       auto src_idx = out_idx;
       for (const auto& info : infos)
         src_idx[info.axis] = info.true_indices[out_idx[info.axis]];
-      result(out_idx) = src(src_idx);
+      result(out_idx) = detail::materialized_store_copy(src(src_idx));
     });
 
     return result;
   }
 
-  template <typename T>
-  void multi_axis_fill(Tensor<T>& dst,
+  template <typename T, TensorProperties Properties>
+  void multi_axis_fill(Tensor<T, Properties>& dst,
     const std::vector<std::pair<size_t, Tensor<bool>>>& axis_masks,
     const T& value)
   {
@@ -837,14 +870,14 @@ namespace sb
         if (!mask(idx[axis]))
           return;
       }
-      dst(idx) = value;
+      detail::writable_tensor_element(dst, idx) = detail::materialized_store_copy(value);
     });
   }
 
-  template <typename T>
-  void multi_axis_assign(Tensor<T>& dst,
+  template <typename T, TensorProperties DstProperties, TensorProperties ValueProperties>
+  void multi_axis_assign(Tensor<T, DstProperties>& dst,
     const std::vector<std::pair<size_t, Tensor<bool>>>& axis_masks,
-    const Tensor<T>& values)
+    const Tensor<T, ValueProperties>& values)
   {
     auto infos = detail::prepare_axis_masks(axis_masks, dst.shape());
 
@@ -864,7 +897,8 @@ namespace sb
       auto dst_idx = val_idx;
       for (const auto& info : infos)
         dst_idx[info.axis] = info.true_indices[val_idx[info.axis]];
-      dst(dst_idx) = values(val_idx);
+      detail::writable_tensor_element(dst, dst_idx) =
+        detail::materialized_store_copy(values(val_idx));
     });
   }
 
@@ -929,8 +963,9 @@ namespace sb
     }
   }
 
-  template <typename T>
-  Tensor<T> outer_select(const Tensor<T>& src,
+  template <typename T, TensorProperties Properties>
+  typename Tensor<T, Properties>::source_tensor_type outer_select(
+    const Tensor<T, Properties>& src,
     const std::vector<std::pair<size_t, AxisSelector>>& selectors)
   {
     auto resolved = detail::resolve_selectors(selectors, src.shape());
@@ -939,19 +974,19 @@ namespace sb
     for (const auto& rs : resolved)
       out_shape[rs.axis] = rs.indices.size();
 
-    Tensor<T> result(out_shape);
+    typename Tensor<T, Properties>::source_tensor_type result(out_shape);
     walk(result, [&](const std::vector<size_t>& out_idx) {
       auto src_idx = out_idx;
       for (const auto& rs : resolved)
         src_idx[rs.axis] = rs.indices[out_idx[rs.axis]];
-      result(out_idx) = src(src_idx);
+      result(out_idx) = detail::materialized_store_copy(src(src_idx));
     });
 
     return result;
   }
 
-  template <typename T>
-  void outer_fill(Tensor<T>& dst,
+  template <typename T, TensorProperties Properties>
+  void outer_fill(Tensor<T, Properties>& dst,
     const std::vector<std::pair<size_t, AxisSelector>>& selectors,
     const T& value)
   {
@@ -972,14 +1007,14 @@ namespace sb
         if (!axis_selected[rs.axis][idx[rs.axis]])
           return;
       }
-      dst(idx) = value;
+      detail::writable_tensor_element(dst, idx) = detail::materialized_store_copy(value);
     });
   }
 
-  template <typename T>
-  void outer_assign(Tensor<T>& dst,
+  template <typename T, TensorProperties DstProperties, TensorProperties ValueProperties>
+  void outer_assign(Tensor<T, DstProperties>& dst,
     const std::vector<std::pair<size_t, AxisSelector>>& selectors,
-    const Tensor<T>& values)
+    const Tensor<T, ValueProperties>& values)
   {
     auto resolved = detail::resolve_selectors(selectors, dst.shape());
 
@@ -999,7 +1034,8 @@ namespace sb
       auto dst_idx = val_idx;
       for (const auto& rs : resolved)
         dst_idx[rs.axis] = rs.indices[val_idx[rs.axis]];
-      dst(dst_idx) = values(val_idx);
+      detail::writable_tensor_element(dst, dst_idx) =
+        detail::materialized_store_copy(values(val_idx));
     });
   }
 
@@ -1033,9 +1069,11 @@ namespace sb
   // Joining operations
   // ============================================================================
 
-  template <typename T>
-  Tensor<T> concatenate(const std::vector<Tensor<T>>& tensors, size_t axis)
+  template <typename T, TensorProperties Properties>
+  typename Tensor<T, Properties>::source_tensor_type concatenate(
+      const std::vector<Tensor<T, Properties>>& tensors, size_t axis)
   {
+    using TResult = typename Tensor<T, Properties>::source_tensor_type;
     if (tensors.empty())
       throw std::invalid_argument("concatenate: need at least one tensor");
 
@@ -1062,7 +1100,7 @@ namespace sb
     for (const auto& t : tensors)
       out_shape[axis] += t.shape()[axis];
 
-    Tensor<T> result(out_shape);
+    TResult result(out_shape);
 
     // Copy each tensor's data into the result
     size_t offset = 0;
@@ -1072,7 +1110,7 @@ namespace sb
       walk(src, [&](const std::vector<size_t>& src_idx) {
         auto dst_idx = src_idx;
         dst_idx[axis] += offset;
-        result(dst_idx) = src(src_idx);
+        result(dst_idx) = detail::materialized_store_copy(src(src_idx));
       });
       offset += src_axis_size;
     }
@@ -1080,8 +1118,9 @@ namespace sb
     return result;
   }
 
-  template <typename T>
-  Tensor<T> stack(const std::vector<Tensor<T>>& tensors, ptrdiff_t axis)
+  template <typename T, TensorProperties Properties>
+  typename Tensor<T, Properties>::source_tensor_type stack(
+      const std::vector<Tensor<T, Properties>>& tensors, ptrdiff_t axis)
   {
     if (tensors.empty())
       throw std::invalid_argument("stack: need at least one tensor");
@@ -1102,7 +1141,7 @@ namespace sb
     }
 
     // expand_dims each tensor, then concatenate along the new axis
-    std::vector<Tensor<T>> expanded;
+    std::vector<Tensor<T, Properties>> expanded;
     expanded.reserve(tensors.size());
     for (const auto& t : tensors)
       expanded.push_back(t.expand_dims(axis));
@@ -1110,8 +1149,8 @@ namespace sb
     return concatenate(expanded, static_cast<size_t>(axis));
   }
 
-  template <typename T>
-  std::vector<Tensor<T>> split(const Tensor<T>& tensor,
+  template <typename T, TensorProperties Properties>
+  std::vector<Tensor<T, Properties>> split(const Tensor<T, Properties>& tensor,
     const std::vector<size_t>& split_points, size_t axis)
   {
     auto ndim = tensor.shape().size();
@@ -1133,7 +1172,7 @@ namespace sb
     }
     boundaries.push_back(axis_size);
 
-    std::vector<Tensor<T>> result;
+    std::vector<Tensor<T, Properties>> result;
     result.reserve(boundaries.size() - 1);
     for (size_t i = 0; i + 1 < boundaries.size(); ++i)
     {
@@ -1147,8 +1186,8 @@ namespace sb
     return result;
   }
 
-  template <typename T>
-  std::vector<Tensor<T>> split(const Tensor<T>& tensor,
+  template <typename T, TensorProperties Properties>
+  std::vector<Tensor<T, Properties>> split(const Tensor<T, Properties>& tensor,
     size_t n_sections, size_t axis)
   {
     auto ndim = tensor.shape().size();
@@ -1174,8 +1213,8 @@ namespace sb
     return split(tensor, split_points, axis);
   }
 
-  template <typename T>
-  std::vector<Tensor<T>> array_split(const Tensor<T>& tensor,
+  template <typename T, TensorProperties Properties>
+  std::vector<Tensor<T, Properties>> array_split(const Tensor<T, Properties>& tensor,
     size_t n_sections, size_t axis)
   {
     auto ndim = tensor.shape().size();
@@ -1229,9 +1268,12 @@ namespace sb
     }
   }
 
-  template <typename T, typename I>
-  Tensor<T> index_select(const Tensor<T>& src, size_t axis, const Tensor<I>& indices)
+  template <typename T, TensorProperties Properties, typename I>
+  typename Tensor<T, Properties>::source_tensor_type index_select(
+      const Tensor<T, Properties>& src, size_t axis,
+      const Tensor<I>& indices)
   {
+    using TResult = typename Tensor<T, Properties>::source_tensor_type;
     detail::validate_axis_indices(axis, src.shape().size(), indices, src.shape()[axis]);
 
     auto out_shape = src.shape();
@@ -1242,18 +1284,20 @@ namespace sb
       return Tensor<T>(out_shape);
     }
 
-    Tensor<T> result(out_shape);
+    TResult result(out_shape);
     walk(result, [&](const std::vector<size_t>& out_idx) {
       auto src_idx = out_idx;
       src_idx[axis] = static_cast<size_t>(indices({out_idx[axis]}));
-      result(out_idx) = src(src_idx);
+      result(out_idx) = detail::materialized_store_copy(src(src_idx));
     });
 
     return result;
   }
 
-  template <typename T, typename I>
-  void index_assign(Tensor<T>& dst, size_t axis, const Tensor<I>& indices, const Tensor<T>& values)
+  template <typename T, TensorProperties DstProperties, typename I,
+      TensorProperties ValueProperties>
+  void index_assign(Tensor<T, DstProperties>& dst, size_t axis,
+      const Tensor<I>& indices, const Tensor<T, ValueProperties>& values)
   {
     detail::validate_axis_indices(axis, dst.shape().size(), indices, dst.shape()[axis]);
 
@@ -1268,12 +1312,14 @@ namespace sb
     walk(values, [&](const std::vector<size_t>& val_idx) {
       auto dst_idx = val_idx;
       dst_idx[axis] = static_cast<size_t>(indices({val_idx[axis]}));
-      dst(dst_idx) = values(val_idx);
+      detail::writable_tensor_element(dst, dst_idx) =
+        detail::materialized_store_copy(values(val_idx));
     });
   }
 
-  template <typename T, typename I>
-  void index_fill(Tensor<T>& dst, size_t axis, const Tensor<I>& indices, const T& value)
+  template <typename T, TensorProperties Properties, typename I>
+  void index_fill(Tensor<T, Properties>& dst, size_t axis, const Tensor<I>& indices,
+      const T& value)
   {
     detail::validate_axis_indices(axis, dst.shape().size(), indices, dst.shape()[axis]);
 
@@ -1283,7 +1329,7 @@ namespace sb
       // Walk over all positions along the other axes
       walk(dst, [&](const std::vector<size_t>& idx) {
         if (idx[axis] == target)
-          dst(idx) = value;
+          detail::writable_tensor_element(dst, idx) = detail::materialized_store_copy(value);
       });
     }
   }

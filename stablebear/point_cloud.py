@@ -82,7 +82,7 @@ class PointCloud:
     def _current_point_cloud(self):
         if self._owner is None:
             return self._value
-        return self._owner._data._get_point_cloud(self._outer_index)
+        return self._owner._data._get_element(self._outer_index)
 
     def _cpp_point_cloud(self):
         return self._current_point_cloud()
@@ -222,7 +222,7 @@ class PointCloudTensor(Tensor):
         return PointCloud(element)
 
     def _point_cloud(self, index):
-        element = self._data._get_point_cloud(index)
+        element = self._data._get_element(index)
         return PointCloud(element, _owner=self, _outer_index=index)
 
     def _single_cloud(self):
@@ -239,7 +239,7 @@ class PointCloudTensor(Tensor):
                 raise TypeError("Point-cloud indices must have uint64 leaves")
             if index.depth != 2:
                 raise ValueError("Point-cloud indexing requires Tensor<Tensor<uint64>>")
-            return PointCloudTensor(self._data._index_points(index._root))
+            return PointCloudTensor(self._data._index_elements(index._root))
 
         if self.ndim == 0:
             cloud = self._point_cloud([])

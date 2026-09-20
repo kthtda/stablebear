@@ -153,7 +153,7 @@ namespace sb
   public:
     static constexpr bool IsIndexed = IndexedTensorProperties<Properties>;
     static constexpr TensorProperties SourceProperties =
-      IsIndexed ? Properties & ~TensorProperty::Indexed : TensorProperty::None;
+      Properties & ~TensorProperty::Indexed;
 
     using value_type = T;
     using index_type = typename detail::TensorIndexType<T>::type;
@@ -185,8 +185,9 @@ namespace sb
      * @param rhs tensor to compare against
      * @return `true` if all elements are equal
      */
-    template <typename U> requires std::equality_comparable_with<U, T>
-    bool operator==(const Tensor<U>& rhs) const;
+    template <typename U, TensorProperties OtherProperties>
+    requires std::equality_comparable_with<U, T>
+    bool operator==(const Tensor<U, OtherProperties>& rhs) const;
 
     /**
      * Elementwise (non)equality comparison
@@ -194,14 +195,15 @@ namespace sb
      * @param rhs tensor to compare against
      * @return `true` if at least one element differs
      */
-    template <typename U> requires std::equality_comparable_with<U, T>
-    bool operator!=(const Tensor<U>& rhs) const;
+    template <typename U, TensorProperties OtherProperties>
+    requires std::equality_comparable_with<U, T>
+    bool operator!=(const Tensor<U, OtherProperties>& rhs) const;
 
     bool allclose(const Tensor& rhs, T atol = T(1e-8), T rtol = T(1e-5)) const requires FloatType<T>;
 
-    template <typename U>
+    template <typename U, TensorProperties OtherProperties>
     requires std::is_constructible_v<T, U>
-    void assign_from(const Tensor<U>& rhs);
+    void assign_from(const Tensor<U, OtherProperties>& rhs);
 
     template <typename U>
     requires CanDivideTo<T, T, U>
@@ -612,6 +614,18 @@ namespace sb
       else
         return v;
     }
+
+    // Store a self-contained logical value in an ordinary result tensor.
+    // Indexed element types may themselves carry a source/index adapter, so a
+    // normal deep copy is not sufficient at an indexed-to-ordinary boundary.
+    template <typename T>
+    [[nodiscard]] T materialized_store_copy(const T& v)
+    {
+      if constexpr (requires { v.materialized_copy(); })
+        return v.materialized_copy();
+      else
+        return store_copy(v);
+    }
   }
 
   template <typename T, typename UnaryPred>
@@ -647,60 +661,66 @@ namespace sb
    * Select elements from src where mask is true, returning a 1D tensor.
    * Mask shape must match src.shape(). Elements are collected in row-major order.
    */
-  template <typename T>
-  [[nodiscard]] Tensor<T> masked_select(const Tensor<T>& src, const Tensor<bool>& mask);
+  template <typename T, TensorProperties Properties>
+  [[nodiscard]] typename Tensor<T, Properties>::source_tensor_type masked_select(
+    const Tensor<T, Properties>& src, const Tensor<bool>& mask);
 
   /**
    * Assign values into dst at positions where mask is true.
    * Mask shape must match dst.shape(). values must be 1D with length == count of true values.
    */
-  template <typename T>
-  void masked_assign(Tensor<T>& dst, const Tensor<bool>& mask, const Tensor<T>& values);
+  template <typename T, TensorProperties DstProperties, TensorProperties ValueProperties>
+  void masked_assign(Tensor<T, DstProperties>& dst, const Tensor<bool>& mask,
+    const Tensor<T, ValueProperties>& values);
 
   /**
    * Fill dst with a scalar value at positions where mask is true.
    * Mask shape must match dst.shape().
    */
-  template <typename T>
-  void masked_fill(Tensor<T>& dst, const Tensor<bool>& mask, const T& value);
+  template <typename T, TensorProperties Properties>
+  void masked_fill(Tensor<T, Properties>& dst, const Tensor<bool>& mask, const T& value);
 
   /**
    * Select along a single axis where mask is true.
    * mask must be 1D with length == src.shape()[axis].
    * Returns a tensor with shape[axis] reduced to count of true values.
    */
-  template <typename T>
-  [[nodiscard]] Tensor<T> axis_select(const Tensor<T>& src, size_t axis, const Tensor<bool>& mask);
+  template <typename T, TensorProperties Properties>
+  [[nodiscard]] typename Tensor<T, Properties>::source_tensor_type axis_select(
+    const Tensor<T, Properties>& src, size_t axis, const Tensor<bool>& mask);
 
   /**
    * Assign values into dst along a single axis where mask is true.
    * mask must be 1D with length == dst.shape()[axis].
    * values.shape() must match the shape that axis_select(dst, axis, mask) would produce.
    */
-  template <typename T>
-  void axis_assign(Tensor<T>& dst, size_t axis, const Tensor<bool>& mask, const Tensor<T>& values);
+  template <typename T, TensorProperties DstProperties, TensorProperties ValueProperties>
+  void axis_assign(Tensor<T, DstProperties>& dst, size_t axis, const Tensor<bool>& mask,
+    const Tensor<T, ValueProperties>& values);
 
   /**
    * Fill dst with a scalar value along a single axis where mask is true.
    * mask must be 1D with length == dst.shape()[axis].
    */
-  template <typename T>
-  void axis_fill(Tensor<T>& dst, size_t axis, const Tensor<bool>& mask, const T& value);
+  template <typename T, TensorProperties Properties>
+  void axis_fill(Tensor<T, Properties>& dst, size_t axis, const Tensor<bool>& mask,
+    const T& value);
 
   /**
    * Select along multiple axes where each mask is true (outer indexing).
    * Each pair is (axis, mask). Masks are applied independently per axis.
    */
-  template <typename T>
-  [[nodiscard]] Tensor<T> multi_axis_select(const Tensor<T>& src,
+  template <typename T, TensorProperties Properties>
+  [[nodiscard]] typename Tensor<T, Properties>::source_tensor_type multi_axis_select(
+    const Tensor<T, Properties>& src,
     const std::vector<std::pair<size_t, Tensor<bool>>>& axis_masks);
 
   /**
    * Fill dst with a scalar value at positions where all masks are true (outer indexing).
    * Each pair is (axis, mask). A position is filled if mask_i[idx[axis_i]] is true for every i.
    */
-  template <typename T>
-  void multi_axis_fill(Tensor<T>& dst,
+  template <typename T, TensorProperties Properties>
+  void multi_axis_fill(Tensor<T, Properties>& dst,
     const std::vector<std::pair<size_t, Tensor<bool>>>& axis_masks,
     const T& value);
 
@@ -708,10 +728,10 @@ namespace sb
    * Assign values into dst at positions where all masks are true (outer indexing).
    * Each pair is (axis, mask). values.shape() must match the multi_axis_select output shape.
    */
-  template <typename T>
-  void multi_axis_assign(Tensor<T>& dst,
+  template <typename T, TensorProperties DstProperties, TensorProperties ValueProperties>
+  void multi_axis_assign(Tensor<T, DstProperties>& dst,
     const std::vector<std::pair<size_t, Tensor<bool>>>& axis_masks,
-    const Tensor<T>& values);
+    const Tensor<T, ValueProperties>& values);
 
   // ============================================================================
   // Generalized multi-axis operations (bool masks and/or int indices)
@@ -724,15 +744,16 @@ namespace sb
    * Select along multiple axes using any mix of bool masks and int index arrays
    * (outer indexing). Each pair is (axis, selector).
    */
-  template <typename T>
-  [[nodiscard]] Tensor<T> outer_select(const Tensor<T>& src,
+  template <typename T, TensorProperties Properties>
+  [[nodiscard]] typename Tensor<T, Properties>::source_tensor_type outer_select(
+    const Tensor<T, Properties>& src,
     const std::vector<std::pair<size_t, AxisSelector>>& selectors);
 
   /**
    * Fill dst with a scalar at positions selected by outer indexing.
    */
-  template <typename T>
-  void outer_fill(Tensor<T>& dst,
+  template <typename T, TensorProperties Properties>
+  void outer_fill(Tensor<T, Properties>& dst,
     const std::vector<std::pair<size_t, AxisSelector>>& selectors,
     const T& value);
 
@@ -740,10 +761,10 @@ namespace sb
    * Assign values into dst at positions selected by outer indexing.
    * values.shape() must match the outer_select output shape.
    */
-  template <typename T>
-  void outer_assign(Tensor<T>& dst,
+  template <typename T, TensorProperties DstProperties, TensorProperties ValueProperties>
+  void outer_assign(Tensor<T, DstProperties>& dst,
     const std::vector<std::pair<size_t, AxisSelector>>& selectors,
-    const Tensor<T>& values);
+    const Tensor<T, ValueProperties>& values);
 
   // ============================================================================
   // Type casting
@@ -765,35 +786,41 @@ namespace sb
    * Concatenate tensors along an existing axis.
    * All tensors must have the same shape except along the join axis.
    */
-  template <typename T>
-  [[nodiscard]] Tensor<T> concatenate(const std::vector<Tensor<T>>& tensors, size_t axis);
+  template <typename T, TensorProperties Properties>
+  [[nodiscard]] typename Tensor<T, Properties>::source_tensor_type concatenate(
+    const std::vector<Tensor<T, Properties>>& tensors, size_t axis);
 
   /**
    * Stack tensors along a new axis.
    * All tensors must have the same shape. Supports negative axis.
    */
-  template <typename T>
-  [[nodiscard]] Tensor<T> stack(const std::vector<Tensor<T>>& tensors, ptrdiff_t axis);
+  template <typename T, TensorProperties Properties>
+  [[nodiscard]] typename Tensor<T, Properties>::source_tensor_type stack(
+    const std::vector<Tensor<T, Properties>>& tensors, ptrdiff_t axis);
 
   /**
    * Split a tensor into sub-tensors along an axis.
-   * indices_or_sections is either a single count (equal splits) or
-   * a list of split points (like NumPy). Returns views.
+   * A section count produces that many equal contiguous parts. Split points
+   * `{i0, i1, ...}` produce half-open axis intervals `[0, i0)`, `[i0, i1)`,
+   * ..., `[ik, axis_size)`, so the element at each split point begins the next
+   * part. Returns views.
    */
-  template <typename T>
-  [[nodiscard]] std::vector<Tensor<T>> split(const Tensor<T>& tensor,
+  template <typename T, TensorProperties Properties>
+  [[nodiscard]] std::vector<Tensor<T, Properties>> split(const Tensor<T, Properties>& tensor,
     const std::vector<size_t>& split_points, size_t axis);
 
-  template <typename T>
-  [[nodiscard]] std::vector<Tensor<T>> split(const Tensor<T>& tensor,
+  template <typename T, TensorProperties Properties>
+  [[nodiscard]] std::vector<Tensor<T, Properties>> split(const Tensor<T, Properties>& tensor,
     size_t n_sections, size_t axis);
 
   /**
    * Split a tensor into n_sections parts, allowing uneven splits.
-   * The first (axis_size % n_sections) parts get one extra element.
+   * Let `axis_size = q * n_sections + r`. The first `r` parts have length
+   * `q + 1`; the remaining trailing parts have length `q` and do not receive
+   * the extra element.
    */
-  template <typename T>
-  [[nodiscard]] std::vector<Tensor<T>> array_split(const Tensor<T>& tensor,
+  template <typename T, TensorProperties Properties>
+  [[nodiscard]] std::vector<Tensor<T, Properties>> array_split(const Tensor<T, Properties>& tensor,
     size_t n_sections, size_t axis);
 
   // ============================================================================
@@ -804,23 +831,26 @@ namespace sb
    * Gather elements from src along a single axis using integer indices.
    * indices must be 1D. Returns a tensor with shape[axis] == indices.size().
    */
-  template <typename T, typename I>
-  [[nodiscard]] Tensor<T> index_select(const Tensor<T>& src, size_t axis, const Tensor<I>& indices);
+  template <typename T, TensorProperties Properties, typename I>
+  [[nodiscard]] typename Tensor<T, Properties>::source_tensor_type index_select(
+    const Tensor<T, Properties>& src, size_t axis, const Tensor<I>& indices);
 
   /**
    * Scatter values into dst along a single axis at integer indices.
    * indices must be 1D. values.shape() must match the shape that
    * index_select(dst, axis, indices) would produce.
    */
-  template <typename T, typename I>
-  void index_assign(Tensor<T>& dst, size_t axis, const Tensor<I>& indices, const Tensor<T>& values);
+  template <typename T, TensorProperties DstProperties, typename I, TensorProperties ValueProperties>
+  void index_assign(Tensor<T, DstProperties>& dst, size_t axis, const Tensor<I>& indices,
+    const Tensor<T, ValueProperties>& values);
 
   /**
    * Fill dst with a scalar value along a single axis at integer indices.
    * indices must be 1D.
    */
-  template <typename T, typename I>
-  void index_fill(Tensor<T>& dst, size_t axis, const Tensor<I>& indices, const T& value);
+  template <typename T, TensorProperties Properties, typename I>
+  void index_fill(Tensor<T, Properties>& dst, size_t axis, const Tensor<I>& indices,
+    const T& value);
 
 }
 

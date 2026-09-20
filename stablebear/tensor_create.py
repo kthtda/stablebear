@@ -201,8 +201,15 @@ def split(tensor, indices_or_sections, axis=0):
     tensor : Tensor
         The tensor to split.
     indices_or_sections : int or list of int
-        If an int, the tensor is split into that many equal parts.
-        If a list, it gives the indices where splits occur.
+        If an int, the axis length must be evenly divisible by that number.
+        The result contains that many contiguous parts, each of length
+        ``axis_size // sections``. Use ``array_split`` when equal division is
+        not possible.
+        If a list ``[i0, i1, ...]``, its entries are boundaries and the
+        resulting parts cover the half-open intervals ``[0, i0)``,
+        ``[i0, i1)``, ..., ``[ik, axis_size)`` along *axis*. For example,
+        splitting an axis of length 8 at ``[3, 5]`` produces parts of lengths
+        3, 2, and 3. The element at each boundary starts the following part.
     axis : int
         The axis along which to split (default 0).
 
@@ -226,16 +233,20 @@ def split(tensor, indices_or_sections, axis=0):
 def array_split(tensor, indices_or_sections, axis=0):
     """Split a tensor into sub-tensors, allowing uneven splits.
 
-    Like ``split``, but when *indices_or_sections* is an integer and the axis
-    size is not evenly divisible, the first sections are one element larger.
-
     Parameters
     ----------
     tensor : Tensor
         The tensor to split.
     indices_or_sections : int or list of int
-        If an int, the tensor is split into that many parts (uneven allowed).
-        If a list, it gives the indices where splits occur (same as ``split``).
+        If an int, the tensor is split into that many parts. Let
+        ``axis_size = q * sections + r``. The first ``r`` parts have length
+        ``q + 1``; the remaining trailing parts have length ``q`` and do not
+        receive the extra element. For example, an axis of length 8 split into
+        3 parts produces lengths 3, 3, and 2.
+        If a list ``[i0, i1, ...]``, the parts use the same half-open intervals
+        as ``split``: ``[0, i0)``, ``[i0, i1)``, ...,
+        ``[ik, axis_size)``. The element at each boundary starts the following
+        part.
     axis : int
         The axis along which to split (default 0).
 

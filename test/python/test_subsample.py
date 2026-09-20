@@ -212,7 +212,7 @@ class TestSubsample:
         )
 
         for index in np.ndindex(*actual.shape):
-            sampled = actual._data._get_point_cloud(list(index))
+            sampled = actual._data._get_element(list(index))
             indices = np.asarray(sampled.indices).copy()
             coordinates = np.asarray(sampled.coords).copy()
             npt.assert_array_equal(coordinates, clouds[index[0]])

@@ -101,6 +101,8 @@ namespace
     {
       return { value + static_cast<int>(index) };
     }
+
+    bool operator==(const IndexableValue&) const = default;
   };
 
   template<typename T>
@@ -199,6 +201,55 @@ namespace
     // A second transition is a no-op and must not restore the lazy source.
     indexed.ensure_materialized();
     EXPECT_EQ(view(0).value, 99);
+  }
+
+  TEST(TensorProperties, OrdinaryAlgorithmsAcceptComposedIndexedProperties)
+  {
+    constexpr sb::TensorProperties TestProperty = 1 << 8;
+    using SourceTensor = sb::Tensor<IndexableValue, TestProperty>;
+
+    SourceTensor source({ 3 });
+    source(0) = { 10 };
+    source(1) = { 20 };
+    source(2) = { 30 };
+    sb::Tensor<size_t> indices({ 3 });
+    indices(0) = 2;
+    indices(1) = 1;
+    indices(2) = 0;
+
+    auto indexed = sb::make_indexed_tensor(source, indices);
+    auto sibling = indexed.flatten();
+    static_assert(decltype(indexed)::IsIndexed);
+    static_assert(decltype(indexed)::SourceProperties == TestProperty);
+
+    const auto dense = indexed.materialize();
+    EXPECT_TRUE(indexed == dense);
+    EXPECT_TRUE(dense == indexed);
+
+    sb::Tensor<bool> mask({ 3 });
+    mask(0) = true;
+    mask(1) = false;
+    mask(2) = true;
+    const auto selected = sb::masked_select(indexed, mask);
+    static_assert(std::same_as<decltype(selected), const SourceTensor>);
+    EXPECT_EQ(selected.shape(), (std::vector<size_t>{ 2 }));
+    EXPECT_EQ(selected(0).value, 12);
+    EXPECT_EQ(selected(1).value, 30);
+
+    sb::masked_fill(indexed, mask, IndexableValue{ 99 });
+    EXPECT_EQ(sibling(0).value, 99);
+    EXPECT_EQ(sibling(1).value, 21);
+    EXPECT_EQ(sibling(2).value, 99);
+    EXPECT_EQ(source(0).value, 10);
+
+    const auto parts = sb::split(indexed, std::vector<size_t>{ 1 }, 0);
+    static_assert(std::same_as<typename decltype(parts)::value_type,
+      decltype(indexed)>);
+    EXPECT_EQ(parts[0].shape(), (std::vector<size_t>{ 1 }));
+    EXPECT_EQ(parts[1].shape(), (std::vector<size_t>{ 2 }));
+    EXPECT_EQ(parts[0](0).value, 99);
+    EXPECT_EQ(parts[1](0).value, 21);
+    EXPECT_EQ(parts[1](1).value, 99);
   }
 
   TEST(TensorProperties, TensorValuedIndicesUseNestedTensorStorage)
