@@ -14,7 +14,10 @@ from .base_tensor import (
     Tensor,
 )
 from .nested_tensor import NestedTensor
-from .point_cloud import PointCloudTensor
+from .point_cloud import PointCloud, PointCloudTensor
+
+
+_BINARY_MAGIC = b"\x01MPCF"
 
 
 def _save(item: Tensor, file):
@@ -107,6 +110,8 @@ def _init_object_save_dispatch():
         cpp.Pcf_f64_f64: cpp.IoOps.save_pcf64_object,
         cpp.Pcf_i32_i32: cpp.IoOps.save_pcf32i_object,
         cpp.Pcf_i64_i64: cpp.IoOps.save_pcf64i_object,
+        cpp.PointCloud32: cpp.IoOps.save_point_cloud32_object,
+        cpp.PointCloud64: cpp.IoOps.save_point_cloud64_object,
         cpp_p.Barcode32: cpp.IoOps.save_barcode32_object,
         cpp_p.Barcode64: cpp.IoOps.save_barcode64_object,
         cpp.SymmetricMatrix_f32: cpp.IoOps.save_symmetric_matrix32_object,
@@ -129,6 +134,8 @@ def _init_object_load_dispatch():
         cpp.Pcf_f64_f64: Pcf,
         cpp.Pcf_i32_i32: Pcf,
         cpp.Pcf_i64_i64: Pcf,
+        cpp.PointCloud32: PointCloud,
+        cpp.PointCloud64: PointCloud,
         cpp_p.Barcode32: Barcode,
         cpp_p.Barcode64: Barcode,
         cpp.SymmetricMatrix_f32: SymmetricMatrix,
@@ -140,10 +147,11 @@ def _init_object_load_dispatch():
 
 def _save_object(item, file):
     _init_object_save_dispatch()
-    fn = _OBJECT_SAVE_DISPATCH.get(type(item._data))
+    data = item._binary_io_data()
+    fn = _OBJECT_SAVE_DISPATCH.get(type(data))
     if fn is None:
-        raise TypeError(f"Unsupported object type {type(item._data)}")
-    fn(item._data, file)
+        raise TypeError(f"Unsupported object type {type(data)}")
+    fn(data, file)
 
 
 def _load_object(file):
@@ -158,17 +166,19 @@ def _load_object(file):
 def save(item, file):
     """Save a tensor or object to a file in stablebear's binary format.
 
-    All tensor types and standalone objects (Pcf, Barcode, DistanceMatrix,
-    SymmetricMatrix) are supported.
+    All tensor types and standalone objects (Pcf, PointCloud, Barcode,
+    DistanceMatrix, SymmetricMatrix) are supported.
 
     Parameters
     ----------
-    item : Tensor or Pcf or Barcode or DistanceMatrix or SymmetricMatrix
+    item : Tensor or Pcf or PointCloud or Barcode or DistanceMatrix or SymmetricMatrix
         The item to save.
     file : str or file-like
         A file path or an open file object in binary write mode.
     """
-    is_object = isinstance(item, (Pcf, Barcode, DistanceMatrix, SymmetricMatrix))
+    is_object = isinstance(
+        item, (Pcf, PointCloud, Barcode, DistanceMatrix, SymmetricMatrix)
+    )
     save_fn = _save_object if is_object else _save
     if isinstance(file, str):
         with open(file, "wb") as f:
@@ -189,7 +199,7 @@ def load(file):
 
     Returns
     -------
-    Tensor or Pcf or Barcode or DistanceMatrix or SymmetricMatrix
+    Tensor or Pcf or PointCloud or Barcode or DistanceMatrix or SymmetricMatrix
         The loaded item.
     """
     if isinstance(file, str):
@@ -199,9 +209,40 @@ def load(file):
         return _load_any(file)
 
 
-def _unpickle_object(data: bytes):
+def _pickle_reduce(item):
+    """Return the shared binary-IO reduction used by public data objects."""
     import io as _io
-    return _load_object(_io.BytesIO(data))
+
+    buf = _io.BytesIO()
+    save(item, buf)
+    return _unpickle, (buf.getvalue(),)
+
+
+def _unpickle(data: bytes, legacy_loader=None):
+    """Restore a binary pickle, or delegate a recognized legacy payload.
+
+    The magic check is intentionally performed before loading. A corrupt
+    Stablebear binary payload must report its binary-format error rather than
+    being reinterpreted by a legacy decoder.
+    """
+    import io as _io
+    import pickle as _pickle
+
+    if data.startswith(_BINARY_MAGIC):
+        return load(_io.BytesIO(data))
+    if legacy_loader is not None:
+        return legacy_loader(data)
+    raise _pickle.UnpicklingError("Unrecognized Stablebear pickle payload")
+
+
+# Retain the callable paths embedded in pickles written since binary pickling
+# was introduced. New reducers use _unpickle directly.
+def _unpickle_object(data: bytes):
+    return _unpickle(data)
+
+
+def _unpickle_tensor(data: bytes):
+    return _unpickle(data)
 
 
 def _load_any(file):

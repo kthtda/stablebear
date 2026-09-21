@@ -1,0 +1,2419 @@
+{
+  "schema_version": 1,
+  "producer": {
+    "package": "stablebear",
+    "version": "0.4.7",
+    "label": "0.4.7",
+    "python": "3.13.0",
+    "numpy": "2.4.6",
+    "platform": "Linux-7.0.0-31-generic-x86_64-with-glibc2.43",
+    "backend": "stablebear._sb_cuda13",
+    "pickle_protocol": 4
+  },
+  "artifacts": [
+    {
+      "name": "tensor_float32",
+      "description": "Contiguous float32 tensor with shape (3,)",
+      "serialization": "pickle",
+      "file": "tensor_float32.pkl",
+      "bytes": 175,
+      "sha256": "c49f4d9fda37a59324340f19b674a2aa90e657e8e82c3bcacece42f53889ae2e",
+      "expected": {
+        "accepted_types": [
+          "FloatTensor"
+        ],
+        "comparison": "array",
+        "array": {
+          "dtype": "float32",
+          "shape": [
+            3
+          ],
+          "values": [
+            1.25,
+            -2.5,
+            4.0
+          ]
+        },
+        "dtype": "float32",
+        "shape": [
+          3
+        ]
+      }
+    },
+    {
+      "name": "tensor_float32",
+      "description": "Contiguous float32 tensor with shape (3,)",
+      "serialization": "binary",
+      "file": "tensor_float32.sb",
+      "bytes": 109,
+      "sha256": "172d408555acf3e1385e1a95fabac6ff026e123b1db05f86881820dc341be5fb",
+      "expected": {
+        "accepted_types": [
+          "FloatTensor"
+        ],
+        "comparison": "array",
+        "array": {
+          "dtype": "float32",
+          "shape": [
+            3
+          ],
+          "values": [
+            1.25,
+            -2.5,
+            4.0
+          ]
+        },
+        "dtype": "float32",
+        "shape": [
+          3
+        ]
+      }
+    },
+    {
+      "name": "tensor_float64",
+      "description": "Contiguous float64 tensor with shape (3,)",
+      "serialization": "pickle",
+      "file": "tensor_float64.pkl",
+      "bytes": 187,
+      "sha256": "9ab39f76eb165157f56835ecc86ae3dd24432cf085e3f8b16692daabad420dc4",
+      "expected": {
+        "accepted_types": [
+          "FloatTensor"
+        ],
+        "comparison": "array",
+        "array": {
+          "dtype": "float64",
+          "shape": [
+            3
+          ],
+          "values": [
+            1.25,
+            -2.5,
+            4.0
+          ]
+        },
+        "dtype": "float64",
+        "shape": [
+          3
+        ]
+      }
+    },
+    {
+      "name": "tensor_float64",
+      "description": "Contiguous float64 tensor with shape (3,)",
+      "serialization": "binary",
+      "file": "tensor_float64.sb",
+      "bytes": 121,
+      "sha256": "ac2c4291c4f7130ae56fd487cdb800d6216d7e69f45111cff6a3d9ae41fe5d5b",
+      "expected": {
+        "accepted_types": [
+          "FloatTensor"
+        ],
+        "comparison": "array",
+        "array": {
+          "dtype": "float64",
+          "shape": [
+            3
+          ],
+          "values": [
+            1.25,
+            -2.5,
+            4.0
+          ]
+        },
+        "dtype": "float64",
+        "shape": [
+          3
+        ]
+      }
+    },
+    {
+      "name": "tensor_int32",
+      "description": "Contiguous int32 tensor with shape (3,)",
+      "serialization": "pickle",
+      "file": "tensor_int32.pkl",
+      "bytes": 175,
+      "sha256": "6d928c68ad9e0205bf9d3de73faa7f9b48625f4c8c8d2edd77554cae886394d6",
+      "expected": {
+        "accepted_types": [
+          "IntTensor"
+        ],
+        "comparison": "array",
+        "array": {
+          "dtype": "int32",
+          "shape": [
+            3
+          ],
+          "values": [
+            1,
+            -2,
+            4
+          ]
+        },
+        "dtype": "int32",
+        "shape": [
+          3
+        ]
+      }
+    },
+    {
+      "name": "tensor_int32",
+      "description": "Contiguous int32 tensor with shape (3,)",
+      "serialization": "binary",
+      "file": "tensor_int32.sb",
+      "bytes": 109,
+      "sha256": "a02b969972bd1d662cf3258a29cf2df0fb2627626fcbdb430133a1d095598161",
+      "expected": {
+        "accepted_types": [
+          "IntTensor"
+        ],
+        "comparison": "array",
+        "array": {
+          "dtype": "int32",
+          "shape": [
+            3
+          ],
+          "values": [
+            1,
+            -2,
+            4
+          ]
+        },
+        "dtype": "int32",
+        "shape": [
+          3
+        ]
+      }
+    },
+    {
+      "name": "tensor_int64",
+      "description": "Contiguous int64 tensor with shape (3,)",
+      "serialization": "pickle",
+      "file": "tensor_int64.pkl",
+      "bytes": 187,
+      "sha256": "f3ab641ac72d25015136798c8884c0c162eeb641091d20bf6438947e10bf7542",
+      "expected": {
+        "accepted_types": [
+          "IntTensor"
+        ],
+        "comparison": "array",
+        "array": {
+          "dtype": "int64",
+          "shape": [
+            3
+          ],
+          "values": [
+            1,
+            -2,
+            4
+          ]
+        },
+        "dtype": "int64",
+        "shape": [
+          3
+        ]
+      }
+    },
+    {
+      "name": "tensor_int64",
+      "description": "Contiguous int64 tensor with shape (3,)",
+      "serialization": "binary",
+      "file": "tensor_int64.sb",
+      "bytes": 121,
+      "sha256": "7e3050f2f9f6990cbb1410d3d9afe20e4b36ecd4a6ad9d7e46d6c33a6f1da8e6",
+      "expected": {
+        "accepted_types": [
+          "IntTensor"
+        ],
+        "comparison": "array",
+        "array": {
+          "dtype": "int64",
+          "shape": [
+            3
+          ],
+          "values": [
+            1,
+            -2,
+            4
+          ]
+        },
+        "dtype": "int64",
+        "shape": [
+          3
+        ]
+      }
+    },
+    {
+      "name": "tensor_uint32",
+      "description": "Contiguous uint32 tensor with shape (3,)",
+      "serialization": "pickle",
+      "file": "tensor_uint32.pkl",
+      "bytes": 175,
+      "sha256": "8759a4b1548476501b64bd866997fec29225f4692e0c3503120529392453db9f",
+      "expected": {
+        "accepted_types": [
+          "IntTensor"
+        ],
+        "comparison": "array",
+        "array": {
+          "dtype": "uint32",
+          "shape": [
+            3
+          ],
+          "values": [
+            1,
+            2,
+            4
+          ]
+        },
+        "dtype": "uint32",
+        "shape": [
+          3
+        ]
+      }
+    },
+    {
+      "name": "tensor_uint32",
+      "description": "Contiguous uint32 tensor with shape (3,)",
+      "serialization": "binary",
+      "file": "tensor_uint32.sb",
+      "bytes": 109,
+      "sha256": "3af369fcc9298ba0e174251fd97aa1c3028786bb0d818bfc52eeb07f4da611b6",
+      "expected": {
+        "accepted_types": [
+          "IntTensor"
+        ],
+        "comparison": "array",
+        "array": {
+          "dtype": "uint32",
+          "shape": [
+            3
+          ],
+          "values": [
+            1,
+            2,
+            4
+          ]
+        },
+        "dtype": "uint32",
+        "shape": [
+          3
+        ]
+      }
+    },
+    {
+      "name": "tensor_uint64",
+      "description": "Contiguous uint64 tensor with shape (3,)",
+      "serialization": "pickle",
+      "file": "tensor_uint64.pkl",
+      "bytes": 187,
+      "sha256": "aa5c0e90b5e44e82ed502cd069a1780587f4233b6bbf6533fdfb4a770f7bed48",
+      "expected": {
+        "accepted_types": [
+          "IntTensor"
+        ],
+        "comparison": "array",
+        "array": {
+          "dtype": "uint64",
+          "shape": [
+            3
+          ],
+          "values": [
+            1,
+            2,
+            4
+          ]
+        },
+        "dtype": "uint64",
+        "shape": [
+          3
+        ]
+      }
+    },
+    {
+      "name": "tensor_uint64",
+      "description": "Contiguous uint64 tensor with shape (3,)",
+      "serialization": "binary",
+      "file": "tensor_uint64.sb",
+      "bytes": 121,
+      "sha256": "00813f02bb483ef4d8dbf583857cc2c90838cc6dc50d039df4ef44db8dd9a4c3",
+      "expected": {
+        "accepted_types": [
+          "IntTensor"
+        ],
+        "comparison": "array",
+        "array": {
+          "dtype": "uint64",
+          "shape": [
+            3
+          ],
+          "values": [
+            1,
+            2,
+            4
+          ]
+        },
+        "dtype": "uint64",
+        "shape": [
+          3
+        ]
+      }
+    },
+    {
+      "name": "tensor_bool",
+      "description": "Contiguous bool tensor with shape (3,)",
+      "serialization": "pickle",
+      "file": "tensor_bool.pkl",
+      "bytes": 166,
+      "sha256": "204e58b7398bdf458898863d89baffeb48d1435eba98e6cf55b98b560c253f97",
+      "expected": {
+        "accepted_types": [
+          "BoolTensor"
+        ],
+        "comparison": "array",
+        "array": {
+          "dtype": "bool",
+          "shape": [
+            3
+          ],
+          "values": [
+            true,
+            false,
+            true
+          ]
+        },
+        "dtype": "boolean",
+        "shape": [
+          3
+        ]
+      }
+    },
+    {
+      "name": "tensor_bool",
+      "description": "Contiguous bool tensor with shape (3,)",
+      "serialization": "binary",
+      "file": "tensor_bool.sb",
+      "bytes": 100,
+      "sha256": "f68b611f0f9b87e277525f7645c20481cc01ca1caa37a0ce1c1b92219666fea4",
+      "expected": {
+        "accepted_types": [
+          "BoolTensor"
+        ],
+        "comparison": "array",
+        "array": {
+          "dtype": "bool",
+          "shape": [
+            3
+          ],
+          "values": [
+            true,
+            false,
+            true
+          ]
+        },
+        "dtype": "boolean",
+        "shape": [
+          3
+        ]
+      }
+    },
+    {
+      "name": "tensor_float32_noncontiguous_view",
+      "description": "Non-contiguous float32 tensor view with shape (3, 2)",
+      "serialization": "pickle",
+      "file": "tensor_float32_noncontiguous_view.pkl",
+      "bytes": 203,
+      "sha256": "45d950c501dea8d370bcd20ca9a06c85dbc77dd6c9299ed219851f65c29f8418",
+      "expected": {
+        "accepted_types": [
+          "FloatTensor"
+        ],
+        "comparison": "array",
+        "array": {
+          "dtype": "float32",
+          "shape": [
+            3,
+            2
+          ],
+          "values": [
+            [
+              0.0,
+              2.0
+            ],
+            [
+              4.0,
+              6.0
+            ],
+            [
+              8.0,
+              10.0
+            ]
+          ]
+        },
+        "dtype": "float32",
+        "shape": [
+          3,
+          2
+        ]
+      }
+    },
+    {
+      "name": "tensor_float32_noncontiguous_view",
+      "description": "Non-contiguous float32 tensor view with shape (3, 2)",
+      "serialization": "binary",
+      "file": "tensor_float32_noncontiguous_view.sb",
+      "bytes": 137,
+      "sha256": "9c26ccaebf93fa8010f46f59b2ba479710ad3bfdbbbadd8740adbfae5178f14e",
+      "expected": {
+        "accepted_types": [
+          "FloatTensor"
+        ],
+        "comparison": "array",
+        "array": {
+          "dtype": "float32",
+          "shape": [
+            3,
+            2
+          ],
+          "values": [
+            [
+              0.0,
+              2.0
+            ],
+            [
+              4.0,
+              6.0
+            ],
+            [
+              8.0,
+              10.0
+            ]
+          ]
+        },
+        "dtype": "float32",
+        "shape": [
+          3,
+          2
+        ]
+      }
+    },
+    {
+      "name": "tensor_float64_empty",
+      "description": "Empty float64 tensor with shape (0, 2)",
+      "serialization": "pickle",
+      "file": "tensor_float64_empty.pkl",
+      "bytes": 179,
+      "sha256": "9adfac4da9cea6b8166d4510671a92d9e444eca45e95990d75377e385cfca9e8",
+      "expected": {
+        "accepted_types": [
+          "FloatTensor"
+        ],
+        "comparison": "array",
+        "array": {
+          "dtype": "float64",
+          "shape": [
+            0,
+            2
+          ],
+          "values": []
+        },
+        "dtype": "float64",
+        "shape": [
+          0,
+          2
+        ]
+      }
+    },
+    {
+      "name": "tensor_float64_empty",
+      "description": "Empty float64 tensor with shape (0, 2)",
+      "serialization": "binary",
+      "file": "tensor_float64_empty.sb",
+      "bytes": 113,
+      "sha256": "13b75684d83cc1f1a99438e42a78f8db7dbbb4c4bfbb6e04402d897ea5b2517d",
+      "expected": {
+        "accepted_types": [
+          "FloatTensor"
+        ],
+        "comparison": "array",
+        "array": {
+          "dtype": "float64",
+          "shape": [
+            0,
+            2
+          ],
+          "values": []
+        },
+        "dtype": "float64",
+        "shape": [
+          0,
+          2
+        ]
+      }
+    },
+    {
+      "name": "pcf_f32",
+      "description": "Standalone f32 piecewise constant function",
+      "serialization": "pickle",
+      "file": "pcf_f32.pkl",
+      "bytes": 161,
+      "sha256": "a390690a69740725ab1aa5429fb91d11be5fb06674abb361ceb0ec4502f8fc17",
+      "expected": {
+        "accepted_types": [
+          "Pcf"
+        ],
+        "comparison": "array",
+        "array": {
+          "dtype": "float32",
+          "shape": [
+            3,
+            2
+          ],
+          "values": [
+            [
+              0.0,
+              1.0
+            ],
+            [
+              2.0,
+              3.0
+            ],
+            [
+              5.0,
+              -1.0
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "name": "pcf_f32",
+      "description": "Standalone f32 piecewise constant function",
+      "serialization": "binary",
+      "file": "pcf_f32.sb",
+      "bytes": 105,
+      "sha256": "5ac4d3b073252398786936c4882c021181c8c890635acb74ff0518e5f693db27",
+      "expected": {
+        "accepted_types": [
+          "Pcf"
+        ],
+        "comparison": "array",
+        "array": {
+          "dtype": "float32",
+          "shape": [
+            3,
+            2
+          ],
+          "values": [
+            [
+              0.0,
+              1.0
+            ],
+            [
+              2.0,
+              3.0
+            ],
+            [
+              5.0,
+              -1.0
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "name": "pcf_f64",
+      "description": "Standalone f64 piecewise constant function",
+      "serialization": "pickle",
+      "file": "pcf_f64.pkl",
+      "bytes": 185,
+      "sha256": "a49a7975b65b46aaa1fa58bf9a3b6b68c3feccbf2dff6da038a41c3012468ae9",
+      "expected": {
+        "accepted_types": [
+          "Pcf"
+        ],
+        "comparison": "array",
+        "array": {
+          "dtype": "float64",
+          "shape": [
+            3,
+            2
+          ],
+          "values": [
+            [
+              0.0,
+              1.0
+            ],
+            [
+              2.0,
+              3.0
+            ],
+            [
+              5.0,
+              -1.0
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "name": "pcf_f64",
+      "description": "Standalone f64 piecewise constant function",
+      "serialization": "binary",
+      "file": "pcf_f64.sb",
+      "bytes": 129,
+      "sha256": "4c3bee096f30c5019f04427c761d75775f53a8f5ecf86429838065083e4a023d",
+      "expected": {
+        "accepted_types": [
+          "Pcf"
+        ],
+        "comparison": "array",
+        "array": {
+          "dtype": "float64",
+          "shape": [
+            3,
+            2
+          ],
+          "values": [
+            [
+              0.0,
+              1.0
+            ],
+            [
+              2.0,
+              3.0
+            ],
+            [
+              5.0,
+              -1.0
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "name": "pcf_i32",
+      "description": "Standalone i32 piecewise constant function",
+      "serialization": "pickle",
+      "file": "pcf_i32.pkl",
+      "bytes": 161,
+      "sha256": "b15d4439f75f934454f1c5cf2fcbf8dd3cb53e747b068fcc204919af66226f7c",
+      "expected": {
+        "accepted_types": [
+          "Pcf"
+        ],
+        "comparison": "array",
+        "array": {
+          "dtype": "int32",
+          "shape": [
+            3,
+            2
+          ],
+          "values": [
+            [
+              0,
+              1
+            ],
+            [
+              2,
+              3
+            ],
+            [
+              5,
+              -1
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "name": "pcf_i32",
+      "description": "Standalone i32 piecewise constant function",
+      "serialization": "binary",
+      "file": "pcf_i32.sb",
+      "bytes": 105,
+      "sha256": "e3b2122f6f56a78fce72c9acb0409e41547686e9fc05b9e2f928cc8032fbf868",
+      "expected": {
+        "accepted_types": [
+          "Pcf"
+        ],
+        "comparison": "array",
+        "array": {
+          "dtype": "int32",
+          "shape": [
+            3,
+            2
+          ],
+          "values": [
+            [
+              0,
+              1
+            ],
+            [
+              2,
+              3
+            ],
+            [
+              5,
+              -1
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "name": "pcf_i64",
+      "description": "Standalone i64 piecewise constant function",
+      "serialization": "pickle",
+      "file": "pcf_i64.pkl",
+      "bytes": 185,
+      "sha256": "b6104ebf262d78cdd311a00e1910cca6bbc8ac9fc45cebab49bf2ec727e6a609",
+      "expected": {
+        "accepted_types": [
+          "Pcf"
+        ],
+        "comparison": "array",
+        "array": {
+          "dtype": "int64",
+          "shape": [
+            3,
+            2
+          ],
+          "values": [
+            [
+              0,
+              1
+            ],
+            [
+              2,
+              3
+            ],
+            [
+              5,
+              -1
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "name": "pcf_i64",
+      "description": "Standalone i64 piecewise constant function",
+      "serialization": "binary",
+      "file": "pcf_i64.sb",
+      "bytes": 129,
+      "sha256": "117a297ebc04f8f21371ac2e86c4039856a637b2bacdede7f12553b70fa3f1ee",
+      "expected": {
+        "accepted_types": [
+          "Pcf"
+        ],
+        "comparison": "array",
+        "array": {
+          "dtype": "int64",
+          "shape": [
+            3,
+            2
+          ],
+          "values": [
+            [
+              0,
+              1
+            ],
+            [
+              2,
+              3
+            ],
+            [
+              5,
+              -1
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "name": "pcf_tensor_f32",
+      "description": "Tensor containing two f32 PCFs",
+      "serialization": "pickle",
+      "file": "pcf_tensor_f32.pkl",
+      "bytes": 211,
+      "sha256": "1f58b6641e26bb67328473809dcb98fc8fc979772e0029b14d0903b0cff4505c",
+      "expected": {
+        "accepted_types": [
+          "PcfTensor"
+        ],
+        "comparison": "elements",
+        "dtype": "pcf32",
+        "shape": [
+          2
+        ],
+        "elements": [
+          {
+            "index": [
+              0
+            ],
+            "array": {
+              "dtype": "float32",
+              "shape": [
+                2,
+                2
+              ],
+              "values": [
+                [
+                  0.0,
+                  1.0
+                ],
+                [
+                  2.0,
+                  3.0
+                ]
+              ]
+            }
+          },
+          {
+            "index": [
+              1
+            ],
+            "array": {
+              "dtype": "float32",
+              "shape": [
+                2,
+                2
+              ],
+              "values": [
+                [
+                  0.0,
+                  -1.0
+                ],
+                [
+                  4.0,
+                  2.0
+                ]
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "pcf_tensor_f32",
+      "description": "Tensor containing two f32 PCFs",
+      "serialization": "binary",
+      "file": "pcf_tensor_f32.sb",
+      "bytes": 145,
+      "sha256": "5c2b41a6ffef950827f319a026705f2dbbefca3dbe99f19fc8e4a2a9017d4496",
+      "expected": {
+        "accepted_types": [
+          "PcfTensor"
+        ],
+        "comparison": "elements",
+        "dtype": "pcf32",
+        "shape": [
+          2
+        ],
+        "elements": [
+          {
+            "index": [
+              0
+            ],
+            "array": {
+              "dtype": "float32",
+              "shape": [
+                2,
+                2
+              ],
+              "values": [
+                [
+                  0.0,
+                  1.0
+                ],
+                [
+                  2.0,
+                  3.0
+                ]
+              ]
+            }
+          },
+          {
+            "index": [
+              1
+            ],
+            "array": {
+              "dtype": "float32",
+              "shape": [
+                2,
+                2
+              ],
+              "values": [
+                [
+                  0.0,
+                  -1.0
+                ],
+                [
+                  4.0,
+                  2.0
+                ]
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "pcf_tensor_f64",
+      "description": "Tensor containing two f64 PCFs",
+      "serialization": "pickle",
+      "file": "pcf_tensor_f64.pkl",
+      "bytes": 243,
+      "sha256": "cbfea20c30fbff25abc94f1f544fed8c67ff45dae070bb650c39976bc3099636",
+      "expected": {
+        "accepted_types": [
+          "PcfTensor"
+        ],
+        "comparison": "elements",
+        "dtype": "pcf64",
+        "shape": [
+          2
+        ],
+        "elements": [
+          {
+            "index": [
+              0
+            ],
+            "array": {
+              "dtype": "float64",
+              "shape": [
+                2,
+                2
+              ],
+              "values": [
+                [
+                  0.0,
+                  1.0
+                ],
+                [
+                  2.0,
+                  3.0
+                ]
+              ]
+            }
+          },
+          {
+            "index": [
+              1
+            ],
+            "array": {
+              "dtype": "float64",
+              "shape": [
+                2,
+                2
+              ],
+              "values": [
+                [
+                  0.0,
+                  -1.0
+                ],
+                [
+                  4.0,
+                  2.0
+                ]
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "pcf_tensor_f64",
+      "description": "Tensor containing two f64 PCFs",
+      "serialization": "binary",
+      "file": "pcf_tensor_f64.sb",
+      "bytes": 177,
+      "sha256": "13915844f8cfd2bb33475336852b8f2f25a5ccd1378159c043947420de33f526",
+      "expected": {
+        "accepted_types": [
+          "PcfTensor"
+        ],
+        "comparison": "elements",
+        "dtype": "pcf64",
+        "shape": [
+          2
+        ],
+        "elements": [
+          {
+            "index": [
+              0
+            ],
+            "array": {
+              "dtype": "float64",
+              "shape": [
+                2,
+                2
+              ],
+              "values": [
+                [
+                  0.0,
+                  1.0
+                ],
+                [
+                  2.0,
+                  3.0
+                ]
+              ]
+            }
+          },
+          {
+            "index": [
+              1
+            ],
+            "array": {
+              "dtype": "float64",
+              "shape": [
+                2,
+                2
+              ],
+              "values": [
+                [
+                  0.0,
+                  -1.0
+                ],
+                [
+                  4.0,
+                  2.0
+                ]
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "pcf_tensor_i32",
+      "description": "Tensor containing an i32 PCF",
+      "serialization": "pickle",
+      "file": "pcf_tensor_i32.pkl",
+      "bytes": 187,
+      "sha256": "5cada020315c9167309233c15a67112fbe1425f75bd488a4adac88b97da9068e",
+      "expected": {
+        "accepted_types": [
+          "IntPcfTensor"
+        ],
+        "comparison": "elements",
+        "dtype": "pcf32i",
+        "shape": [
+          1
+        ],
+        "elements": [
+          {
+            "index": [
+              0
+            ],
+            "array": {
+              "dtype": "int32",
+              "shape": [
+                2,
+                2
+              ],
+              "values": [
+                [
+                  0,
+                  1
+                ],
+                [
+                  2,
+                  3
+                ]
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "pcf_tensor_i32",
+      "description": "Tensor containing an i32 PCF",
+      "serialization": "binary",
+      "file": "pcf_tensor_i32.sb",
+      "bytes": 121,
+      "sha256": "4ed301c6a30a2748a0dd4a9183422c9f7d6b2462c64a108a02351426bc5a1b4f",
+      "expected": {
+        "accepted_types": [
+          "IntPcfTensor"
+        ],
+        "comparison": "elements",
+        "dtype": "pcf32i",
+        "shape": [
+          1
+        ],
+        "elements": [
+          {
+            "index": [
+              0
+            ],
+            "array": {
+              "dtype": "int32",
+              "shape": [
+                2,
+                2
+              ],
+              "values": [
+                [
+                  0,
+                  1
+                ],
+                [
+                  2,
+                  3
+                ]
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "pcf_tensor_i64",
+      "description": "Tensor containing an i64 PCF",
+      "serialization": "pickle",
+      "file": "pcf_tensor_i64.pkl",
+      "bytes": 203,
+      "sha256": "056d742144df974623269edececab13fd44ad83290f944f21dc5d90d7c3fda33",
+      "expected": {
+        "accepted_types": [
+          "IntPcfTensor"
+        ],
+        "comparison": "elements",
+        "dtype": "pcf64i",
+        "shape": [
+          1
+        ],
+        "elements": [
+          {
+            "index": [
+              0
+            ],
+            "array": {
+              "dtype": "int64",
+              "shape": [
+                2,
+                2
+              ],
+              "values": [
+                [
+                  0,
+                  1
+                ],
+                [
+                  2,
+                  3
+                ]
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "pcf_tensor_i64",
+      "description": "Tensor containing an i64 PCF",
+      "serialization": "binary",
+      "file": "pcf_tensor_i64.sb",
+      "bytes": 137,
+      "sha256": "2a6d45082fba9a7a813ce21751a469f064cd00b176e844f4ed3aa4dcc0433b3c",
+      "expected": {
+        "accepted_types": [
+          "IntPcfTensor"
+        ],
+        "comparison": "elements",
+        "dtype": "pcf64i",
+        "shape": [
+          1
+        ],
+        "elements": [
+          {
+            "index": [
+              0
+            ],
+            "array": {
+              "dtype": "int64",
+              "shape": [
+                2,
+                2
+              ],
+              "values": [
+                [
+                  0,
+                  1
+                ],
+                [
+                  2,
+                  3
+                ]
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "point_cloud_tensor_f32",
+      "description": "Two dense f32 point clouds",
+      "serialization": "pickle",
+      "file": "point_cloud_tensor_f32.pkl",
+      "bytes": 291,
+      "sha256": "1c9a7e549b76fd81b3562c25d5b24d9bceba009191da92d28544cf006a510fec",
+      "expected": {
+        "accepted_types": [
+          "PointCloudTensor"
+        ],
+        "comparison": "elements",
+        "dtype": "pcloud32",
+        "shape": [
+          2
+        ],
+        "elements": [
+          {
+            "index": [
+              0
+            ],
+            "array": {
+              "dtype": "float32",
+              "shape": [
+                2,
+                2
+              ],
+              "values": [
+                [
+                  1.0,
+                  2.0
+                ],
+                [
+                  3.0,
+                  4.0
+                ]
+              ]
+            }
+          },
+          {
+            "index": [
+              1
+            ],
+            "array": {
+              "dtype": "float32",
+              "shape": [
+                2,
+                2
+              ],
+              "values": [
+                [
+                  5.0,
+                  6.0
+                ],
+                [
+                  7.0,
+                  8.0
+                ]
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "point_cloud_tensor_f32",
+      "description": "Two dense f32 point clouds",
+      "serialization": "binary",
+      "file": "point_cloud_tensor_f32.sb",
+      "bytes": 225,
+      "sha256": "c6ef7e738da82749e95060b0b78654c3bb1ca889e3619b779a93271753a453f1",
+      "expected": {
+        "accepted_types": [
+          "PointCloudTensor"
+        ],
+        "comparison": "elements",
+        "dtype": "pcloud32",
+        "shape": [
+          2
+        ],
+        "elements": [
+          {
+            "index": [
+              0
+            ],
+            "array": {
+              "dtype": "float32",
+              "shape": [
+                2,
+                2
+              ],
+              "values": [
+                [
+                  1.0,
+                  2.0
+                ],
+                [
+                  3.0,
+                  4.0
+                ]
+              ]
+            }
+          },
+          {
+            "index": [
+              1
+            ],
+            "array": {
+              "dtype": "float32",
+              "shape": [
+                2,
+                2
+              ],
+              "values": [
+                [
+                  5.0,
+                  6.0
+                ],
+                [
+                  7.0,
+                  8.0
+                ]
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "point_cloud_tensor_f64",
+      "description": "Two dense f64 point clouds",
+      "serialization": "pickle",
+      "file": "point_cloud_tensor_f64.pkl",
+      "bytes": 326,
+      "sha256": "b93e1f6e6354543de867f2a42e8d4e39b477c47a0f06ba801a2eba0e13103b6f",
+      "expected": {
+        "accepted_types": [
+          "PointCloudTensor"
+        ],
+        "comparison": "elements",
+        "dtype": "pcloud64",
+        "shape": [
+          2
+        ],
+        "elements": [
+          {
+            "index": [
+              0
+            ],
+            "array": {
+              "dtype": "float64",
+              "shape": [
+                2,
+                2
+              ],
+              "values": [
+                [
+                  1.0,
+                  2.0
+                ],
+                [
+                  3.0,
+                  4.0
+                ]
+              ]
+            }
+          },
+          {
+            "index": [
+              1
+            ],
+            "array": {
+              "dtype": "float64",
+              "shape": [
+                2,
+                2
+              ],
+              "values": [
+                [
+                  5.0,
+                  6.0
+                ],
+                [
+                  7.0,
+                  8.0
+                ]
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "point_cloud_tensor_f64",
+      "description": "Two dense f64 point clouds",
+      "serialization": "binary",
+      "file": "point_cloud_tensor_f64.sb",
+      "bytes": 257,
+      "sha256": "db7a41db68253441e8735a78bb68289e1f2fbc13f3ae1ed91c6d8ea69b495fc4",
+      "expected": {
+        "accepted_types": [
+          "PointCloudTensor"
+        ],
+        "comparison": "elements",
+        "dtype": "pcloud64",
+        "shape": [
+          2
+        ],
+        "elements": [
+          {
+            "index": [
+              0
+            ],
+            "array": {
+              "dtype": "float64",
+              "shape": [
+                2,
+                2
+              ],
+              "values": [
+                [
+                  1.0,
+                  2.0
+                ],
+                [
+                  3.0,
+                  4.0
+                ]
+              ]
+            }
+          },
+          {
+            "index": [
+              1
+            ],
+            "array": {
+              "dtype": "float64",
+              "shape": [
+                2,
+                2
+              ],
+              "values": [
+                [
+                  5.0,
+                  6.0
+                ],
+                [
+                  7.0,
+                  8.0
+                ]
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "barcode_f32",
+      "description": "Standalone f32 persistence barcode",
+      "serialization": "pickle",
+      "file": "barcode_f32.pkl",
+      "bytes": 153,
+      "sha256": "f4dec21254ddce214afcc98d4952f99d313c428abd37ed08f6381d3bba0b0461",
+      "expected": {
+        "accepted_types": [
+          "Barcode"
+        ],
+        "comparison": "array",
+        "array": {
+          "dtype": "float32",
+          "shape": [
+            2,
+            2
+          ],
+          "values": [
+            [
+              0.0,
+              1.0
+            ],
+            [
+              0.5,
+              2.0
+            ]
+          ]
+        },
+        "dtype": "barcode32"
+      }
+    },
+    {
+      "name": "barcode_f32",
+      "description": "Standalone f32 persistence barcode",
+      "serialization": "binary",
+      "file": "barcode_f32.sb",
+      "bytes": 97,
+      "sha256": "842e9906df68fe3dead19c605b2e26256d86d2f88c6138815a5251d63fa512cd",
+      "expected": {
+        "accepted_types": [
+          "Barcode"
+        ],
+        "comparison": "array",
+        "array": {
+          "dtype": "float32",
+          "shape": [
+            2,
+            2
+          ],
+          "values": [
+            [
+              0.0,
+              1.0
+            ],
+            [
+              0.5,
+              2.0
+            ]
+          ]
+        },
+        "dtype": "barcode32"
+      }
+    },
+    {
+      "name": "barcode_tensor_f32",
+      "description": "Tensor containing one f32 barcode",
+      "serialization": "pickle",
+      "file": "barcode_tensor_f32.pkl",
+      "bytes": 187,
+      "sha256": "bfe10ce098f149fa7237fa9243e3366a729baa23fade035899ed1d4587c2f8c5",
+      "expected": {
+        "accepted_types": [
+          "BarcodeTensor"
+        ],
+        "comparison": "elements",
+        "dtype": "barcode32",
+        "shape": [
+          1
+        ],
+        "elements": [
+          {
+            "index": [
+              0
+            ],
+            "array": {
+              "dtype": "float32",
+              "shape": [
+                2,
+                2
+              ],
+              "values": [
+                [
+                  0.0,
+                  1.0
+                ],
+                [
+                  0.5,
+                  2.0
+                ]
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "barcode_tensor_f32",
+      "description": "Tensor containing one f32 barcode",
+      "serialization": "binary",
+      "file": "barcode_tensor_f32.sb",
+      "bytes": 121,
+      "sha256": "58f09b8d680e4642a108257d526585be27d8d7116d0b2a4a9caa8fdd4aa14405",
+      "expected": {
+        "accepted_types": [
+          "BarcodeTensor"
+        ],
+        "comparison": "elements",
+        "dtype": "barcode32",
+        "shape": [
+          1
+        ],
+        "elements": [
+          {
+            "index": [
+              0
+            ],
+            "array": {
+              "dtype": "float32",
+              "shape": [
+                2,
+                2
+              ],
+              "values": [
+                [
+                  0.0,
+                  1.0
+                ],
+                [
+                  0.5,
+                  2.0
+                ]
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "barcode_f64",
+      "description": "Standalone f64 persistence barcode",
+      "serialization": "pickle",
+      "file": "barcode_f64.pkl",
+      "bytes": 169,
+      "sha256": "fda188cfa3efdb4612e8396f75ac97f8a49ab3904b927ec5af91e63b11c0ddd8",
+      "expected": {
+        "accepted_types": [
+          "Barcode"
+        ],
+        "comparison": "array",
+        "array": {
+          "dtype": "float64",
+          "shape": [
+            2,
+            2
+          ],
+          "values": [
+            [
+              0.0,
+              1.0
+            ],
+            [
+              0.5,
+              2.0
+            ]
+          ]
+        },
+        "dtype": "barcode64"
+      }
+    },
+    {
+      "name": "barcode_f64",
+      "description": "Standalone f64 persistence barcode",
+      "serialization": "binary",
+      "file": "barcode_f64.sb",
+      "bytes": 113,
+      "sha256": "3d386fee3bf657d549a393735525ddf85edfa2a3cdc169e59b35b67f7acb8357",
+      "expected": {
+        "accepted_types": [
+          "Barcode"
+        ],
+        "comparison": "array",
+        "array": {
+          "dtype": "float64",
+          "shape": [
+            2,
+            2
+          ],
+          "values": [
+            [
+              0.0,
+              1.0
+            ],
+            [
+              0.5,
+              2.0
+            ]
+          ]
+        },
+        "dtype": "barcode64"
+      }
+    },
+    {
+      "name": "barcode_tensor_f64",
+      "description": "Tensor containing one f64 barcode",
+      "serialization": "pickle",
+      "file": "barcode_tensor_f64.pkl",
+      "bytes": 203,
+      "sha256": "ae2a84818a2d1d9fc5d55e08b13ad46bdcec5db669b8cffe05adb2511ea4d3a9",
+      "expected": {
+        "accepted_types": [
+          "BarcodeTensor"
+        ],
+        "comparison": "elements",
+        "dtype": "barcode64",
+        "shape": [
+          1
+        ],
+        "elements": [
+          {
+            "index": [
+              0
+            ],
+            "array": {
+              "dtype": "float64",
+              "shape": [
+                2,
+                2
+              ],
+              "values": [
+                [
+                  0.0,
+                  1.0
+                ],
+                [
+                  0.5,
+                  2.0
+                ]
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "barcode_tensor_f64",
+      "description": "Tensor containing one f64 barcode",
+      "serialization": "binary",
+      "file": "barcode_tensor_f64.sb",
+      "bytes": 137,
+      "sha256": "17f7706bc9d8c56a9019a502912ca17df6ecfd055a985c4dd7b8825976d1c1a1",
+      "expected": {
+        "accepted_types": [
+          "BarcodeTensor"
+        ],
+        "comparison": "elements",
+        "dtype": "barcode64",
+        "shape": [
+          1
+        ],
+        "elements": [
+          {
+            "index": [
+              0
+            ],
+            "array": {
+              "dtype": "float64",
+              "shape": [
+                2,
+                2
+              ],
+              "values": [
+                [
+                  0.0,
+                  1.0
+                ],
+                [
+                  0.5,
+                  2.0
+                ]
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "symmetric_matrix_f32",
+      "description": "Standalone 2x2 f32 symmetric matrix",
+      "serialization": "pickle",
+      "file": "symmetric_matrix_f32.pkl",
+      "bytes": 149,
+      "sha256": "033a8ea9309b1390c3ad262fcc4dfa28979c4f54aae53af7cfcd0792f10d8653",
+      "expected": {
+        "accepted_types": [
+          "SymmetricMatrix"
+        ],
+        "comparison": "array",
+        "array": {
+          "dtype": "float32",
+          "shape": [
+            2,
+            2
+          ],
+          "values": [
+            [
+              1.0,
+              2.0
+            ],
+            [
+              2.0,
+              3.0
+            ]
+          ]
+        },
+        "dtype": "float32"
+      }
+    },
+    {
+      "name": "symmetric_matrix_f32",
+      "description": "Standalone 2x2 f32 symmetric matrix",
+      "serialization": "binary",
+      "file": "symmetric_matrix_f32.sb",
+      "bytes": 93,
+      "sha256": "654e6381d6dfd77750914748eabeb9e56c9071aa5a82e69b7d23bea61be56374",
+      "expected": {
+        "accepted_types": [
+          "SymmetricMatrix"
+        ],
+        "comparison": "array",
+        "array": {
+          "dtype": "float32",
+          "shape": [
+            2,
+            2
+          ],
+          "values": [
+            [
+              1.0,
+              2.0
+            ],
+            [
+              2.0,
+              3.0
+            ]
+          ]
+        },
+        "dtype": "float32"
+      }
+    },
+    {
+      "name": "symmetric_matrix_tensor_f32",
+      "description": "Tensor containing one 2x2 f32 symmetric matrix",
+      "serialization": "pickle",
+      "file": "symmetric_matrix_tensor_f32.pkl",
+      "bytes": 183,
+      "sha256": "91f6670b301af5eb3412ae061ff71f9db4b69f4772a41a5c3d9494a5456f92f0",
+      "expected": {
+        "accepted_types": [
+          "SymmetricMatrixTensor"
+        ],
+        "comparison": "elements",
+        "dtype": "symmat32",
+        "shape": [
+          1
+        ],
+        "elements": [
+          {
+            "index": [
+              0
+            ],
+            "array": {
+              "dtype": "float32",
+              "shape": [
+                2,
+                2
+              ],
+              "values": [
+                [
+                  1.0,
+                  2.0
+                ],
+                [
+                  2.0,
+                  3.0
+                ]
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "symmetric_matrix_tensor_f32",
+      "description": "Tensor containing one 2x2 f32 symmetric matrix",
+      "serialization": "binary",
+      "file": "symmetric_matrix_tensor_f32.sb",
+      "bytes": 117,
+      "sha256": "d9dd0dbc9a5b021843337c1607858e1daf4dc4acff131c6e6ece443f2876b536",
+      "expected": {
+        "accepted_types": [
+          "SymmetricMatrixTensor"
+        ],
+        "comparison": "elements",
+        "dtype": "symmat32",
+        "shape": [
+          1
+        ],
+        "elements": [
+          {
+            "index": [
+              0
+            ],
+            "array": {
+              "dtype": "float32",
+              "shape": [
+                2,
+                2
+              ],
+              "values": [
+                [
+                  1.0,
+                  2.0
+                ],
+                [
+                  2.0,
+                  3.0
+                ]
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "symmetric_matrix_f64",
+      "description": "Standalone 2x2 f64 symmetric matrix",
+      "serialization": "pickle",
+      "file": "symmetric_matrix_f64.pkl",
+      "bytes": 161,
+      "sha256": "31267e68a07a14822694ad5b4906303d21422d4c30c20b7908da7b865cb08fd3",
+      "expected": {
+        "accepted_types": [
+          "SymmetricMatrix"
+        ],
+        "comparison": "array",
+        "array": {
+          "dtype": "float64",
+          "shape": [
+            2,
+            2
+          ],
+          "values": [
+            [
+              1.0,
+              2.0
+            ],
+            [
+              2.0,
+              3.0
+            ]
+          ]
+        },
+        "dtype": "float64"
+      }
+    },
+    {
+      "name": "symmetric_matrix_f64",
+      "description": "Standalone 2x2 f64 symmetric matrix",
+      "serialization": "binary",
+      "file": "symmetric_matrix_f64.sb",
+      "bytes": 105,
+      "sha256": "fbdca34c2feee61d7e6d939d8bee779a4e949c7ddd9f961acf210d8eac8afd9c",
+      "expected": {
+        "accepted_types": [
+          "SymmetricMatrix"
+        ],
+        "comparison": "array",
+        "array": {
+          "dtype": "float64",
+          "shape": [
+            2,
+            2
+          ],
+          "values": [
+            [
+              1.0,
+              2.0
+            ],
+            [
+              2.0,
+              3.0
+            ]
+          ]
+        },
+        "dtype": "float64"
+      }
+    },
+    {
+      "name": "symmetric_matrix_tensor_f64",
+      "description": "Tensor containing one 2x2 f64 symmetric matrix",
+      "serialization": "pickle",
+      "file": "symmetric_matrix_tensor_f64.pkl",
+      "bytes": 195,
+      "sha256": "2a1082f70ca446970a577448fd83e7d270538dc1b6ef13ce8d910c0d78c49ea8",
+      "expected": {
+        "accepted_types": [
+          "SymmetricMatrixTensor"
+        ],
+        "comparison": "elements",
+        "dtype": "symmat64",
+        "shape": [
+          1
+        ],
+        "elements": [
+          {
+            "index": [
+              0
+            ],
+            "array": {
+              "dtype": "float64",
+              "shape": [
+                2,
+                2
+              ],
+              "values": [
+                [
+                  1.0,
+                  2.0
+                ],
+                [
+                  2.0,
+                  3.0
+                ]
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "symmetric_matrix_tensor_f64",
+      "description": "Tensor containing one 2x2 f64 symmetric matrix",
+      "serialization": "binary",
+      "file": "symmetric_matrix_tensor_f64.sb",
+      "bytes": 129,
+      "sha256": "c1d4530b5ffbfd37b3e1df9d02664b7f93094936fe29466b8be12d9834ce8b57",
+      "expected": {
+        "accepted_types": [
+          "SymmetricMatrixTensor"
+        ],
+        "comparison": "elements",
+        "dtype": "symmat64",
+        "shape": [
+          1
+        ],
+        "elements": [
+          {
+            "index": [
+              0
+            ],
+            "array": {
+              "dtype": "float64",
+              "shape": [
+                2,
+                2
+              ],
+              "values": [
+                [
+                  1.0,
+                  2.0
+                ],
+                [
+                  2.0,
+                  3.0
+                ]
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "distance_matrix_f32",
+      "description": "Standalone 2x2 f32 distance matrix",
+      "serialization": "pickle",
+      "file": "distance_matrix_f32.pkl",
+      "bytes": 141,
+      "sha256": "583b2770b8a8731c7548b5f9021dee24f759810460b566df61d7448df2d7a7f3",
+      "expected": {
+        "accepted_types": [
+          "DistanceMatrix"
+        ],
+        "comparison": "array",
+        "array": {
+          "dtype": "float32",
+          "shape": [
+            2,
+            2
+          ],
+          "values": [
+            [
+              0.0,
+              2.0
+            ],
+            [
+              2.0,
+              0.0
+            ]
+          ]
+        },
+        "dtype": "float32"
+      }
+    },
+    {
+      "name": "distance_matrix_f32",
+      "description": "Standalone 2x2 f32 distance matrix",
+      "serialization": "binary",
+      "file": "distance_matrix_f32.sb",
+      "bytes": 85,
+      "sha256": "b901abc8c8e998893bba1947c6fbc865a15792335b1227be280ef405d03ad4fb",
+      "expected": {
+        "accepted_types": [
+          "DistanceMatrix"
+        ],
+        "comparison": "array",
+        "array": {
+          "dtype": "float32",
+          "shape": [
+            2,
+            2
+          ],
+          "values": [
+            [
+              0.0,
+              2.0
+            ],
+            [
+              2.0,
+              0.0
+            ]
+          ]
+        },
+        "dtype": "float32"
+      }
+    },
+    {
+      "name": "distance_matrix_tensor_f32",
+      "description": "Tensor containing one 2x2 f32 distance matrix",
+      "serialization": "pickle",
+      "file": "distance_matrix_tensor_f32.pkl",
+      "bytes": 175,
+      "sha256": "00bebced17b251ce5d4dc9c14d9c2e41f2d03c73ec011689f2dca0c230e8eb7c",
+      "expected": {
+        "accepted_types": [
+          "DistanceMatrixTensor"
+        ],
+        "comparison": "elements",
+        "dtype": "distmat32",
+        "shape": [
+          1
+        ],
+        "elements": [
+          {
+            "index": [
+              0
+            ],
+            "array": {
+              "dtype": "float32",
+              "shape": [
+                2,
+                2
+              ],
+              "values": [
+                [
+                  0.0,
+                  2.0
+                ],
+                [
+                  2.0,
+                  0.0
+                ]
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "distance_matrix_tensor_f32",
+      "description": "Tensor containing one 2x2 f32 distance matrix",
+      "serialization": "binary",
+      "file": "distance_matrix_tensor_f32.sb",
+      "bytes": 109,
+      "sha256": "9834220525844498796164ffcb7a84e5911cf3afb7dc32548eebee85904494e2",
+      "expected": {
+        "accepted_types": [
+          "DistanceMatrixTensor"
+        ],
+        "comparison": "elements",
+        "dtype": "distmat32",
+        "shape": [
+          1
+        ],
+        "elements": [
+          {
+            "index": [
+              0
+            ],
+            "array": {
+              "dtype": "float32",
+              "shape": [
+                2,
+                2
+              ],
+              "values": [
+                [
+                  0.0,
+                  2.0
+                ],
+                [
+                  2.0,
+                  0.0
+                ]
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "distance_matrix_f64",
+      "description": "Standalone 2x2 f64 distance matrix",
+      "serialization": "pickle",
+      "file": "distance_matrix_f64.pkl",
+      "bytes": 145,
+      "sha256": "6a6599776ec99532dc4d151a02ad5d57119f74a23a55e36c615509a61e1a4166",
+      "expected": {
+        "accepted_types": [
+          "DistanceMatrix"
+        ],
+        "comparison": "array",
+        "array": {
+          "dtype": "float64",
+          "shape": [
+            2,
+            2
+          ],
+          "values": [
+            [
+              0.0,
+              2.0
+            ],
+            [
+              2.0,
+              0.0
+            ]
+          ]
+        },
+        "dtype": "float64"
+      }
+    },
+    {
+      "name": "distance_matrix_f64",
+      "description": "Standalone 2x2 f64 distance matrix",
+      "serialization": "binary",
+      "file": "distance_matrix_f64.sb",
+      "bytes": 89,
+      "sha256": "43c984f25426f65ad3234e037e5559a74dc51c49304aa8886bd263fff095ef86",
+      "expected": {
+        "accepted_types": [
+          "DistanceMatrix"
+        ],
+        "comparison": "array",
+        "array": {
+          "dtype": "float64",
+          "shape": [
+            2,
+            2
+          ],
+          "values": [
+            [
+              0.0,
+              2.0
+            ],
+            [
+              2.0,
+              0.0
+            ]
+          ]
+        },
+        "dtype": "float64"
+      }
+    },
+    {
+      "name": "distance_matrix_tensor_f64",
+      "description": "Tensor containing one 2x2 f64 distance matrix",
+      "serialization": "pickle",
+      "file": "distance_matrix_tensor_f64.pkl",
+      "bytes": 179,
+      "sha256": "25b554e8716b8ad0639c3ce7acd871cdc2222101157e2424294fbb72f9465266",
+      "expected": {
+        "accepted_types": [
+          "DistanceMatrixTensor"
+        ],
+        "comparison": "elements",
+        "dtype": "distmat64",
+        "shape": [
+          1
+        ],
+        "elements": [
+          {
+            "index": [
+              0
+            ],
+            "array": {
+              "dtype": "float64",
+              "shape": [
+                2,
+                2
+              ],
+              "values": [
+                [
+                  0.0,
+                  2.0
+                ],
+                [
+                  2.0,
+                  0.0
+                ]
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "distance_matrix_tensor_f64",
+      "description": "Tensor containing one 2x2 f64 distance matrix",
+      "serialization": "binary",
+      "file": "distance_matrix_tensor_f64.sb",
+      "bytes": 113,
+      "sha256": "40557d2c68a4887794325660c43032d293ec680354ab5a0f7148697aebddc150",
+      "expected": {
+        "accepted_types": [
+          "DistanceMatrixTensor"
+        ],
+        "comparison": "elements",
+        "dtype": "distmat64",
+        "shape": [
+          1
+        ],
+        "elements": [
+          {
+            "index": [
+              0
+            ],
+            "array": {
+              "dtype": "float64",
+              "shape": [
+                2,
+                2
+              ],
+              "values": [
+                [
+                  0.0,
+                  2.0
+                ],
+                [
+                  2.0,
+                  0.0
+                ]
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "dtype_float32",
+      "description": "float32 dtype singleton metadata",
+      "serialization": "pickle",
+      "file": "dtype_float32.pkl",
+      "bytes": 44,
+      "sha256": "f0289e19c0e9271103216af6290592a6c329401015a0b1ed72c4b8ece2f17253",
+      "expected": {
+        "accepted_types": [
+          "dtype"
+        ],
+        "comparison": "singleton",
+        "name": "float32"
+      }
+    }
+  ],
+  "unsupported": []
+}

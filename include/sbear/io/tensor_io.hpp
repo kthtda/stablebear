@@ -83,6 +83,9 @@ namespace sb::io::detail
       Pcf<int32_t, int32_t>,
       Pcf<int64_t, int64_t>,
 
+      PointCloud<float32_t>,
+      PointCloud<float64_t>,
+
       ph::Barcode<float32_t>,
       ph::Barcode<float64_t>,
 
@@ -182,6 +185,15 @@ namespace sb::io::detail
   template <IsTensor TensorT>
   void write_tensor(std::ostream& os, const TensorT& tensor);
 
+  // A standalone cloud is a logical value, not a view into its owner. Store
+  // only its selected coordinates so owner-backed clouds cannot pull their
+  // parent tensor (or unrelated cells) into a pickle.
+  template <typename T>
+  void write_element(std::ostream& os, const PointCloud<T>& cloud)
+  {
+    write_tensor(os, cloud.materialize());
+  }
+
   template <typename T>
   void write_element(std::ostream& os, const sb::Tensor<T>& t)
   {
@@ -239,6 +251,18 @@ namespace sb::io::detail
       throw std::runtime_error("Unexpected tensor of type " + format.toString() + " where " + expectedFormat.toString() + " was expected.");
     }
     return io::detail::read_tensor<typename TensorT::value_type>(is);
+  }
+
+  template <typename T>
+  PointCloud<T> read_point_cloud(std::istream& is)
+  {
+    auto coords = read_element<Tensor<T>>(is);
+    if (coords.rank() != 2)
+    {
+      throw std::runtime_error(
+          "Invalid number of standalone point-cloud coordinate dimensions in saved data");
+    }
+    return PointCloud<T>(std::move(coords));
   }
 
   // Shared writer for tensors whose elements may be indexed views over a

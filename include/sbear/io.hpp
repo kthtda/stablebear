@@ -347,6 +347,9 @@ namespace sb
     else if (format == io::detail::tensorFormat<Pcf<int32_t, int32_t>>()) { return io::detail::read_element<Pcf<int32_t, int32_t>>(is); }
     else if (format == io::detail::tensorFormat<Pcf<int64_t, int64_t>>()) { return io::detail::read_element<Pcf<int64_t, int64_t>>(is); }
 
+    else if (format == io::detail::tensorFormat<PointCloud<float32_t>>()) { return io::detail::read_point_cloud<float32_t>(is); }
+    else if (format == io::detail::tensorFormat<PointCloud<float64_t>>()) { return io::detail::read_point_cloud<float64_t>(is); }
+
     else if (format == io::detail::tensorFormat<ph::Barcode<float32_t>>()) { return io::detail::read_barcode<float32_t>(is); }
     else if (format == io::detail::tensorFormat<ph::Barcode<float64_t>>()) { return io::detail::read_barcode<float64_t>(is); }
 

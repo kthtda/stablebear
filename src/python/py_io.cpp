@@ -102,6 +102,9 @@ namespace sb_py
         .def_static("save_pcf32i_object",        &IoOps::save_object_to_file<sb::Pcf<sb::int32_t, sb::int32_t>>)
         .def_static("save_pcf64i_object",        &IoOps::save_object_to_file<sb::Pcf<sb::int64_t, sb::int64_t>>)
 
+        .def_static("save_point_cloud32_object", &IoOps::save_object_to_file<sb::PointCloud<sb::float32_t>>)
+        .def_static("save_point_cloud64_object", &IoOps::save_object_to_file<sb::PointCloud<sb::float64_t>>)
+
         .def_static("save_barcode32_object",     &IoOps::save_object_to_file<sb::ph::Barcode<sb::float32_t>>)
         .def_static("save_barcode64_object",     &IoOps::save_object_to_file<sb::ph::Barcode<sb::float64_t>>)
 

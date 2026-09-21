@@ -5,6 +5,7 @@ from abc import ABC, abstractmethod
 from typing import Union
 
 from . import _sb_cpp as cpp
+from ._binary_io import _BinaryIoMixin
 
 Shape = cpp.Shape
 
@@ -12,9 +13,10 @@ ShapeLike = Shape | tuple[int, ...]
 
 
 def _unpickle_tensor(data: bytes):
-    import io as _io
-    from .io import _load
-    return _load(_io.BytesIO(data))
+    # Historical import path retained for pickles written before the unified
+    # reducer. Keep the implementation centralized in stablebear.io.
+    from .io import _unpickle_tensor as unpickle
+    return unpickle(data)
 
 CppTensor = Union[
     cpp.Float32Tensor,
@@ -155,10 +157,13 @@ def _resolve_axis(axis: int, ndim: int) -> int:
     return resolved
 
 
-class Tensor(ABC):
+class Tensor(_BinaryIoMixin, ABC):
     _data: CppTensor
 
     __array_ufunc__ = None
+
+    def _binary_io_data(self):
+        return self._data
 
     def __array__(self, dtype=None, copy=None):
         raise TypeError(
@@ -675,13 +680,6 @@ class Tensor(ABC):
             True if the tensors are elementwise equal, False otherwise.
         """
         return self._data.array_equal(rhs._data)
-
-    def __reduce__(self):
-        import io as _io
-        from .io import _save, _load
-        buf = _io.BytesIO()
-        _save(self, buf)
-        return _unpickle_tensor, (buf.getvalue(),)
 
     def __deepcopy__(self, memodict=None):
         return self._to_py_tensor(self._data.copy())

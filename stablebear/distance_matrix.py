@@ -5,6 +5,7 @@ import warnings
 import numpy as np
 
 from . import _sb_cpp as cpp
+from ._binary_io import _BinaryIoMixin
 from ._tensor_base import Tensor
 from .typing import float32, float64, distmat32, distmat64
 
@@ -26,7 +27,7 @@ _DISTMAT_CPP_TO_DTYPE = {
 }
 
 
-class DistanceMatrix:
+class DistanceMatrix(_BinaryIoMixin):
     """Compressed distance matrix (symmetric, zero diagonal, nonnegative).
 
     Stores only n*(n-1)/2 elements for an n×n distance matrix.
@@ -48,6 +49,9 @@ class DistanceMatrix:
         explicit dtype converts the array before construction. Ignored for
         existing matrix objects.
     """
+
+    def _binary_io_data(self):
+        return self._data
 
     def __init__(
         self,
@@ -164,13 +168,6 @@ class DistanceMatrix:
         if dtype is not None:
             arr = arr.astype(dtype, copy=False)
         return arr
-
-    def __reduce__(self):
-        import io as _io
-        from .io import _save_object, _unpickle_object
-        buf = _io.BytesIO()
-        _save_object(self, buf)
-        return _unpickle_object, (buf.getvalue(),)
 
     @classmethod
     def from_dense(cls, array):

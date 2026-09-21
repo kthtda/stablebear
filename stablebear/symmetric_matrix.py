@@ -5,6 +5,7 @@ import warnings
 import numpy as np
 
 from . import _sb_cpp as cpp
+from ._binary_io import _BinaryIoMixin
 from ._tensor_base import Tensor
 from .typing import float32, float64, symmat32, symmat64
 
@@ -26,7 +27,7 @@ _SYMMAT_CPP_TO_DTYPE = {
 }
 
 
-class SymmetricMatrix:
+class SymmetricMatrix(_BinaryIoMixin):
     """Compressed symmetric matrix using lower-triangular storage.
 
     Stores only n*(n+1)/2 elements for an n×n symmetric matrix.
@@ -48,6 +49,9 @@ class SymmetricMatrix:
         explicit dtype converts the array before construction. Ignored for
         existing matrix objects.
     """
+
+    def _binary_io_data(self):
+        return self._data
 
     def __init__(
         self,
@@ -163,13 +167,6 @@ class SymmetricMatrix:
         if dtype is not None:
             arr = arr.astype(dtype, copy=False)
         return arr
-
-    def __reduce__(self):
-        import io as _io
-        from .io import _save_object, _unpickle_object
-        buf = _io.BytesIO()
-        _save_object(self, buf)
-        return _unpickle_object, (buf.getvalue(),)
 
     @classmethod
     def from_dense(cls, array):

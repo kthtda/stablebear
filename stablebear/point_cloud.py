@@ -3,6 +3,7 @@ from __future__ import annotations
 import numpy as np
 
 from . import _sb_cpp as cpp
+from ._binary_io import _BinaryIoMixin
 from ._tensor_base import Tensor
 from .nested_tensor import NestedTensor
 from .typing import float32, float64, pcloud32, pcloud64, uint64
@@ -25,7 +26,7 @@ _POINT_CLOUD_CPP_TYPES = (cpp.PointCloud32, cpp.PointCloud64)
 _PCLOUD_TO_FLOAT_DTYPE = {pcloud32: float32, pcloud64: float64}
 
 
-class PointCloud:
+class PointCloud(_BinaryIoMixin):
     """A rank-2 point-cloud view.
 
     Point clouds returned from a :class:`PointCloudTensor` retain their owner.
@@ -85,6 +86,9 @@ class PointCloud:
         return self._owner._data._get_element(self._outer_index)
 
     def _cpp_point_cloud(self):
+        return self._current_point_cloud()
+
+    def _binary_io_data(self):
         return self._current_point_cloud()
 
     def _readable_coords(self):

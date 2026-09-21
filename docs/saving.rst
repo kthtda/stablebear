@@ -23,9 +23,10 @@ You can also pass an open file object in binary write mode::
 Pickle support
 ==============
 
-All tensor types and standalone objects (``Pcf``, ``Barcode``, ``DistanceMatrix``,
-``SymmetricMatrix``) support Python's ``pickle`` protocol. This means they work
-with ``pickle.dumps``/``pickle.loads``, ``copy.deepcopy``, and multiprocessing::
+All tensor types and standalone data objects (``Pcf``, ``PointCloud``,
+``Barcode``, ``DistanceMatrix``, and ``SymmetricMatrix``) support Python's
+``pickle`` protocol. This means they work with ``pickle.dumps``/``pickle.loads``,
+``copy.deepcopy``, and multiprocessing::
 
    import pickle
 
