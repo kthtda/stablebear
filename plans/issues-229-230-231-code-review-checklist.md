@@ -192,7 +192,7 @@ identify review work, not test-plan items. The broader test plan still applies.
 
 ## C. Serialization and compatibility
 
-- [ ] **C1. [P1] Preserve indexed representation through binary IO and pickle.**
+- [x] **C1. [P1] Preserve indexed representation through binary IO and pickle.**
 
   **Finding:** Python `_save()` materializes indexed tensors before dispatch.
   Save/load returns an ordinary point-cloud tensor, losing the adapter and
@@ -211,6 +211,12 @@ identify review work, not test-plan items. The broader test plan still applies.
   Sources: [io.py](../stablebear/io.py), `_save()`;
   [tensor_io.hpp](../include/sbear/io/tensor_io.hpp);
   [io.hpp](../include/sbear/io.hpp). Verification: test plan G1–G3, H2, J1.
+
+  **Completed:** Fixed by `0e437023b`. Binary and pickle round trips retain
+  indexed point-cloud storage, shared coordinate sources, owned selections,
+  and safe materialization on mutation. Coverage includes ordered, repeated,
+  empty, scalar, and sliced selections at both precisions, plus a payload-size
+  check confirming that saving does not materialize every selected cloud.
 
 - [ ] **C2. [P1] Restore the legacy nested `(5, 64)` decoder.**
 
