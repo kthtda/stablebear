@@ -297,5 +297,5 @@ def test_binary_io_mixin_requires_explicit_backend_data_hook():
     class IncompleteBinaryObject(_BinaryIoMixin):
         pass
 
-    with pytest.raises(TypeError, match="abstract method _binary_io_data"):
+    with pytest.raises(TypeError, match=r"abstract method.*_binary_io_data"):
         IncompleteBinaryObject()
