@@ -20,29 +20,18 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
+import stablebear as sb
 
 
 PICKLE_PROTOCOL = 4
-
-
-def _import_package():
-    for name in ("stablebear", "masspcf"):
-        try:
-            return name, importlib.import_module(name)
-        except ImportError:
-            pass
-    raise RuntimeError("Neither stablebear nor masspcf is importable")
-
-
-PACKAGE_NAME, sb = _import_package()
+PACKAGE_NAME = "stablebear"
 
 
 def _distribution_version():
-    for name in (PACKAGE_NAME, "stablebear", "masspcf"):
-        try:
-            return importlib.metadata.version(name)
-        except importlib.metadata.PackageNotFoundError:
-            pass
+    try:
+        return importlib.metadata.version(PACKAGE_NAME)
+    except importlib.metadata.PackageNotFoundError:
+        pass
     pyproject = Path(__file__).resolve().parents[3] / "pyproject.toml"
     if pyproject.exists():
         match = re.search(

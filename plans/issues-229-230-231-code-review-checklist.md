@@ -230,7 +230,7 @@ identify review work, not test-plan items. The broader test plan still applies.
   Sources: [io.hpp](../include/sbear/io.hpp), `read_any_tensor()`;
   historical writer at commit `0c2cb6efc`. Verification: test plan G2.
 
-- [ ] **C3. [P2] Route standalone `PointCloud` IO and pickle through binary IO.**
+- [x] **C3. [P2] Route standalone `PointCloud` IO and pickle through binary IO.**
 
   **Finding:** `sb.save(cloud, ...)` raises `AttributeError` because `PointCloud`
   has no `_data`. Pickle instead uses default Python object state, including
@@ -250,6 +250,44 @@ identify review work, not test-plan items. The broader test plan still applies.
   Sources: [point_cloud.py](../stablebear/point_cloud.py), `PointCloud`;
   [io.py](../stablebear/io.py), object dispatch and `save()`.
   Verification: test plan H1–H4.
+
+  **Completed:** Fixed by `654ba0b9c`. Standalone and owner-backed point
+  clouds now serialize their logical value through binary object IO at both
+  precisions; pickle uses the same path without retaining the parent tensor.
+
+- [x] **C4. [P1] Use binary-first pickle loading with explicit legacy fallback.**
+
+  **Finding:** Issue #230 requires all newly written pickles to use Stablebear
+  binary IO while retaining compatibility with previously written pickle
+  representations. The current review items require both halves independently
+  but do not define one coherent decoding order or failure contract.
+
+  **Change:** Route every new pickle reducer through the same binary bytes
+  written by public `save()`, and use shared reconstruction entry points that
+  first attempt public binary `load()`. If the payload is not a supported
+  Stablebear binary representation, dispatch to the retained legacy decoder
+  for that specific type and historical representation. Keep historical
+  callable/module paths that existing pickle opcodes reference. Do not resume
+  writing legacy representations.
+
+  **Complete when:** Every supported public pickleable type writes binary IO,
+  binary payloads are always attempted first, and fixed historical pickles for
+  every replaced representation load through an explicit type-specific
+  fallback. Corrupt current binary data is not silently accepted as legacy
+  state. If both paths fail, the raised error identifies the binary failure and
+  the attempted legacy path instead of hiding the original cause. Unsupported
+  types and unrecognized legacy state fail clearly.
+
+  Sources: [_tensor_base.py](../stablebear/_tensor_base.py), tensor reducers;
+  [io.py](../stablebear/io.py), load and pickle reconstruction dispatch;
+  standalone-object reducers in `stablebear/`; historical implementations and
+  their retained reconstruction symbols. Verification: test plan H1–H4.
+
+  **Completed:** Fixed by `654ba0b9c`. Supported objects share one binary IO
+  reducer and loader. Recognized current binary payloads never fall back after
+  corruption; non-binary payloads use the retained type-specific legacy
+  decoders. Stablebear 0.4.7 binary and pickle goldens cover the historical
+  formats that existed on `main`.
 
 ## D. Simplification and completion review
 

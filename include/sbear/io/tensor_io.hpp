@@ -15,7 +15,11 @@
 
 namespace sb::io::detail
 {
-  constexpr std::int32_t NestedTensorSubFormatBase = 100'000'000;
+  struct TensorFormatFlag
+  {
+    static constexpr std::uint32_t None = 0;
+    static constexpr std::uint32_t Nested = 1 << 0;
+  };
 
   template <typename T>
   struct is_barcode : std::false_type {};
@@ -65,6 +69,8 @@ namespace sb::io::detail
 
       Tensor<PointCloud<float32_t>>,
       Tensor<PointCloud<float64_t>>,
+      Tensor<PointCloud<float32_t>, TensorProperty::Indexed>,
+      Tensor<PointCloud<float64_t>, TensorProperty::Indexed>,
 
       Tensor<ph::Barcode<float32_t>>,
       Tensor<ph::Barcode<float64_t>>,
@@ -100,23 +106,63 @@ namespace sb::io::detail
   {
     std::int32_t baseFormat;
     std::int32_t subFormat;
+    std::uint32_t tensorProperties = TensorProperty::None;
+    std::uint32_t formatFlags = TensorFormatFlag::None;
 
     std::string toString() const
     {
-      return "(" + std::to_string(baseFormat) + ", " + std::to_string(subFormat) + ")";
+      return "(" + std::to_string(baseFormat) + ", "
+        + std::to_string(subFormat) + ", "
+        + std::to_string(tensorProperties) + ", "
+        + std::to_string(formatFlags) + ")";
     }
 
     bool operator==(const TensorFormat&) const = default;
     bool operator!=(const TensorFormat&) const = default;
+
+    [[nodiscard]] bool same_base_and_subformat(
+        const TensorFormat& other) const
+    {
+      return baseFormat == other.baseFormat
+        && subFormat == other.subFormat;
+    }
+
+    [[nodiscard]] bool matches(
+        const TensorFormat& expected, int fileFormatVersion) const
+    {
+      return fileFormatVersion >= 3
+        ? *this == expected
+        : same_base_and_subformat(expected);
+    }
+
+    template <typename T>
+    [[nodiscard]] bool matches_type(int fileFormatVersion) const;
   };
 
   template <typename U>
-  TensorFormat tensorFormat()
+  TensorFormat tensorFormatV3()
   {
     using namespace std::string_literals;
     using T = std::decay_t<U>;
 
-    if      constexpr (std::is_same_v<T, float32_t>) { return TensorFormat{ .baseFormat = 1, .subFormat = 32 }; }
+    if constexpr (is_nested_tensor_v<T>)
+    {
+      const auto leafFormat = tensorFormatV3<typename is_nested_tensor<T>::leaf_type>();
+      return TensorFormat{
+        .baseFormat = leafFormat.baseFormat,
+        .subFormat = leafFormat.subFormat,
+        .tensorProperties = leafFormat.tensorProperties,
+        .formatFlags = leafFormat.formatFlags | TensorFormatFlag::Nested
+      };
+    }
+    else if constexpr (IsTensor<T>)
+    {
+      using value_type = typename T::value_type;
+      auto format = tensorFormatV3<value_type>();
+      format.tensorProperties = static_cast<std::uint32_t>(T::PropertyFlags);
+      return format;
+    }
+    else if constexpr (std::is_same_v<T, float32_t>) { return TensorFormat{ .baseFormat = 1, .subFormat = 32 }; }
     else if constexpr (std::is_same_v<T, float64_t>) { return TensorFormat{ .baseFormat = 1, .subFormat = 64 }; }
 
     else if constexpr (std::is_same_v<T, int32_t>)  { return TensorFormat{ .baseFormat = 2, .subFormat = 32 }; }
@@ -127,27 +173,15 @@ namespace sb::io::detail
 
     else if constexpr (std::is_same_v<T, bool>)     { return TensorFormat{ .baseFormat = 4, .subFormat = 8 }; }
 
-    // Nested tensors retain the leaf tensor's base format and occupy their own
-    // subformat series: nested float32 is (1, 100000032), signed int64 is
-    // (2, 100000064), and unsigned int32 is (3, 100000032).
-    else if constexpr (is_nested_tensor_v<T>)
-    {
-      const auto leafFormat = tensorFormat<typename is_nested_tensor<T>::leaf_type>();
-      return TensorFormat{
-        .baseFormat = leafFormat.baseFormat,
-        .subFormat = NestedTensorSubFormatBase + leafFormat.subFormat
-      };
-    }
-
     else if constexpr (std::is_same_v<T, Pcf<float32_t, float32_t>>) { return TensorFormat{ .baseFormat = 100, .subFormat = 32 }; }
     else if constexpr (std::is_same_v<T, Pcf<float64_t, float64_t>>) { return TensorFormat{ .baseFormat = 100, .subFormat = 64 }; }
 
     else if constexpr (std::is_same_v<T, Pcf<int32_t, int32_t>>) { return TensorFormat{ .baseFormat = 101, .subFormat = 32 }; }
     else if constexpr (std::is_same_v<T, Pcf<int64_t, int64_t>>) { return TensorFormat{ .baseFormat = 101, .subFormat = 64 }; }
 
-    // baseFormat 1000 is the legacy point cloud format (every element stored as a
-    // full nested tensor); 1001 is the current format that stores each distinct
-    // source coordinate buffer once plus per-element (source id, indices).
+    // Earlier point-cloud tensors use base format 1000 and store every cloud
+    // as a full coordinate tensor. V3 uses base format 1001 and stores each
+    // distinct coordinate source once plus per-element source metadata.
     else if constexpr (std::is_same_v<T, PointCloud<float32_t>>) { return TensorFormat{ .baseFormat = 1001, .subFormat = 32 }; }
     else if constexpr (std::is_same_v<T, PointCloud<float64_t>>) { return TensorFormat{ .baseFormat = 1001, .subFormat = 64 }; }
 
@@ -163,23 +197,69 @@ namespace sb::io::detail
     throw std::runtime_error("Tensor type "s + sb::detail::unmangled_typename<T>() +  " not supported.");
   }
 
-  template <IsTensor TensorT>
-  TensorFormat getTensorFormat(const TensorT&)
+  template <typename U>
+  TensorFormat tensorValueFormatV1_V2()
   {
-    return tensorFormat<typename TensorT::value_type>();
+    using T = std::decay_t<U>;
+    using namespace std::string_literals;
+
+    if constexpr (std::is_same_v<T, float32_t>) { return { 1, 32, 0, 0 }; }
+    else if constexpr (std::is_same_v<T, float64_t>) { return { 1, 64, 0, 0 }; }
+    else if constexpr (std::is_same_v<T, int32_t>) { return { 2, 32, 0, 0 }; }
+    else if constexpr (std::is_same_v<T, int64_t>) { return { 2, 64, 0, 0 }; }
+    else if constexpr (std::is_same_v<T, uint32_t>) { return { 3, 32, 0, 0 }; }
+    else if constexpr (std::is_same_v<T, uint64_t>) { return { 3, 64, 0, 0 }; }
+    else if constexpr (std::is_same_v<T, bool>) { return { 4, 8, 0, 0 }; }
+    else if constexpr (std::is_same_v<T, Pcf<float32_t, float32_t>>) { return { 100, 32, 0, 0 }; }
+    else if constexpr (std::is_same_v<T, Pcf<float64_t, float64_t>>) { return { 100, 64, 0, 0 }; }
+    else if constexpr (std::is_same_v<T, Pcf<int32_t, int32_t>>) { return { 101, 32, 0, 0 }; }
+    else if constexpr (std::is_same_v<T, Pcf<int64_t, int64_t>>) { return { 101, 64, 0, 0 }; }
+    else if constexpr (std::is_same_v<T, PointCloud<float32_t>>) { return { 1000, 32, 0, 0 }; }
+    else if constexpr (std::is_same_v<T, PointCloud<float64_t>>) { return { 1000, 64, 0, 0 }; }
+    else if constexpr (std::is_same_v<T, SymmetricMatrix<float32_t>>) { return { 1100, 32, 0, 0 }; }
+    else if constexpr (std::is_same_v<T, SymmetricMatrix<float64_t>>) { return { 1100, 64, 0, 0 }; }
+    else if constexpr (std::is_same_v<T, DistanceMatrix<float32_t>>) { return { 1120, 32, 0, 0 }; }
+    else if constexpr (std::is_same_v<T, DistanceMatrix<float64_t>>) { return { 1120, 64, 0, 0 }; }
+    else if constexpr (std::is_same_v<T, ph::Barcode<float32_t>>) { return { 10000, 32, 0, 0 }; }
+    else if constexpr (std::is_same_v<T, ph::Barcode<float64_t>>) { return { 10000, 64, 0, 0 }; }
+
+    throw std::runtime_error(
+      "Tensor type "s + sb::detail::unmangled_typename<T>()
+      + " not supported by format versions 1 and 2.");
+  }
+
+  template <typename U>
+    requires (IsTensor<std::decay_t<U>>
+              && !is_nested_tensor_v<std::decay_t<U>>)
+  TensorFormat tensorFormatV1_V2()
+  {
+    using TensorT = std::decay_t<U>;
+    using value_type = typename TensorT::value_type;
+    return tensorValueFormatV1_V2<value_type>();
   }
 
   template <typename T>
-  TensorFormat getTensorFormat(const NestedTensor<T>&)
+  bool TensorFormat::matches_type(int fileFormatVersion) const
   {
-    return tensorFormat<NestedTensor<T>>();
-  }
-
-  inline TensorFormat getTensorFormat(const StreamableTensor& tensor)
-  {
-    return std::visit([](auto&& arg) -> TensorFormat {
-      return getTensorFormat(arg);
-    }, tensor);
+    if constexpr (IsTensor<std::decay_t<T>>)
+    {
+      if constexpr (is_nested_tensor_v<std::decay_t<T>>)
+      {
+        return fileFormatVersion >= 3
+          && matches(tensorFormatV3<std::decay_t<T>>(), fileFormatVersion);
+      }
+      else
+      {
+        const auto expected = (fileFormatVersion >= 3)
+          ? tensorFormatV3<std::decay_t<T>>()
+          : tensorFormatV1_V2<std::decay_t<T>>();
+        return matches(expected, fileFormatVersion);
+      }
+    }
+    else
+    {
+      return matches(tensorFormatV3<std::decay_t<T>>(), fileFormatVersion);
+    }
   }
 
   template <IsTensor TensorT>
@@ -189,25 +269,25 @@ namespace sb::io::detail
   // only its selected coordinates so owner-backed clouds cannot pull their
   // parent tensor (or unrelated cells) into a pickle.
   template <typename T>
-  void write_element(std::ostream& os, const PointCloud<T>& cloud)
+  void write_value(std::ostream& os, const PointCloud<T>& cloud)
   {
     write_tensor(os, cloud.materialize());
   }
 
   template <typename T>
-  void write_element(std::ostream& os, const sb::Tensor<T>& t)
+  void write_value(std::ostream& os, const sb::Tensor<T>& t)
   {
     io::detail::write_tensor(os, t);
   }
 
   template <typename T>
-  Tensor<T> read_tensor(std::istream& is);
+  Tensor<T> read_tensor(BinaryReader& reader);
 
   template <typename T>
-  NestedTensor<T> read_nested_tensor_element(std::istream& is);
+  NestedTensor<T> read_nested_tensor_element(BinaryReader& reader);
 
   template <typename T>
-  void write_element(std::ostream& os, const NestedTensor<T>& value)
+  void write_value(std::ostream& os, const NestedTensor<T>& value)
   {
     write_bytes<uint64_t>(os, static_cast<uint64_t>(value.depth()));
     write_bytes<bool>(os, value.is_leaf());
@@ -221,42 +301,69 @@ namespace sb::io::detail
     }
   }
 
-  inline void write_tensor_format(std::ostream& os, TensorFormat format)
+  template <typename T>
+  void write_value(std::ostream& os, const T& value)
+  {
+    write_element(os, value);
+  }
+
+  inline void write_type_format(std::ostream& os, TensorFormat format)
   {
     write_bytes<std::int32_t>(os, format.baseFormat);
     write_bytes<std::int32_t>(os, format.subFormat);
+    write_bytes<std::uint32_t>(os, format.tensorProperties);
+    write_bytes<std::uint32_t>(os, format.formatFlags);
   }
 
   template <typename T>
-  void write_tensor_format(std::ostream& os)
+  void write_type_format(std::ostream& os)
   {
-    write_tensor_format(os, tensorFormat<T>());
+    write_type_format(os, tensorFormatV3<T>());
   }
 
-  inline TensorFormat read_tensor_format(std::istream& is)
+  inline TensorFormat read_type_format(BinaryReader& reader)
   {
-    TensorFormat format;
-    format.baseFormat = read_bytes<std::int32_t>(is);
-    format.subFormat  = read_bytes<std::int32_t>(is);
+    auto& is = reader.stream();
+    TensorFormat format{
+      .baseFormat = read_bytes<std::int32_t>(is),
+      .subFormat = read_bytes<std::int32_t>(is),
+      .tensorProperties = TensorProperty::None,
+      .formatFlags = TensorFormatFlag::None
+    };
+    if (reader.format_version() >= 3)
+    {
+      format.tensorProperties = read_bytes<std::uint32_t>(is);
+      format.formatFlags = read_bytes<std::uint32_t>(is);
+    }
     return format;
   }
 
-  template <IsTensor TensorT>
-  TensorT read_element(std::istream& is)
+  template <typename NestedT>
+    requires is_nested_tensor_v<std::decay_t<NestedT>>
+  bool matches_nested_tensor_format(
+      const BinaryReader& reader, TensorFormat actual)
   {
-    auto format = read_tensor_format(is);
-    auto expectedFormat = tensorFormat<typename TensorT::value_type>();
-    if (format != expectedFormat)
+    return actual.template matches_type<std::decay_t<NestedT>>(
+      reader.format_version());
+  }
+
+  template <IsTensor TensorT>
+  TensorT read_element(BinaryReader& reader)
+  {
+    auto format = read_type_format(reader);
+    if (!format.template matches_type<TensorT>(reader.format_version()))
     {
-      throw std::runtime_error("Unexpected tensor of type " + format.toString() + " where " + expectedFormat.toString() + " was expected.");
+      throw std::runtime_error(
+        "Unexpected tensor of type " + format.toString() + " where "
+        + tensorFormatV3<TensorT>().toString() + " was expected.");
     }
-    return io::detail::read_tensor<typename TensorT::value_type>(is);
+    return io::detail::read_tensor<typename TensorT::value_type>(reader);
   }
 
   template <typename T>
-  PointCloud<T> read_point_cloud(std::istream& is)
+  PointCloud<T> read_point_cloud(BinaryReader& reader)
   {
-    auto coords = read_element<Tensor<T>>(is);
+    auto coords = read_element<Tensor<T>>(reader);
     if (coords.rank() != 2)
     {
       throw std::runtime_error(
@@ -274,7 +381,8 @@ namespace sb::io::detail
   // @p writeSource writes one element's source.
   template <typename ElemT, typename SourceKeyF, typename WriteSourceF>
   void write_shared_source_elements(
-      std::ostream& os, const Tensor<ElemT>& tensor, SourceKeyF sourceKey, WriteSourceF writeSource)
+      std::ostream& os, const Tensor<ElemT>& tensor,
+      SourceKeyF sourceKey, WriteSourceF writeSource)
   {
     using KeyT = decltype(sourceKey(std::declval<const ElemT&>()));
 
@@ -314,12 +422,79 @@ namespace sb::io::detail
 
   // Point cloud sources are their coordinate tensors.
   template <typename ScalarT>
-  void write_point_cloud_elements(std::ostream& os, const Tensor<PointCloud<ScalarT>>& tensor)
+  void write_point_cloud_elements(
+      std::ostream& os, const Tensor<PointCloud<ScalarT>>& tensor)
   {
     write_shared_source_elements(
         os, tensor,
         [](const PointCloud<ScalarT>& elem) { return elem.coords().storage_owner(); },
-        [](std::ostream& o, const PointCloud<ScalarT>& src) { write_tensor(o, src.coords()); });
+        [](std::ostream& output, const PointCloud<ScalarT>& src) {
+          write_tensor(output, src.coords());
+        });
+  }
+
+  // Write a tensor-level indexed point-cloud tensor without materializing its
+  // logical coordinates.  Iterating through the logical view composes any
+  // source-cloud indexing with the tensor-level selections, so sliced,
+  // transposed, and repeated views become self-contained while coordinate
+  // buffers remain deduplicated.
+  template <typename ScalarT>
+  void write_indexed_point_cloud_tensor(
+      std::ostream& os,
+      const Tensor<PointCloud<ScalarT>, TensorProperty::Indexed>& tensor)
+  {
+    write_type_format(os, tensorFormatV3<decltype(tensor)>());
+
+    write_bytes<std::uint64_t>(os, tensor.shape().size());
+    std::vector<uint64_t> contiguousStrides(tensor.shape().size());
+    if (!contiguousStrides.empty())
+    {
+      contiguousStrides.back() = 1;
+      for (ptrdiff_t i = static_cast<ptrdiff_t>(contiguousStrides.size()) - 2;
+           i >= 0; --i)
+      {
+        contiguousStrides[i] = contiguousStrides[i + 1]
+          * static_cast<uint64_t>(tensor.shape()[i + 1]);
+      }
+    }
+    for (auto i = 0_uz; i < tensor.shape().size(); ++i)
+    {
+      write_bytes<std::uint64_t>(os, tensor.shape()[i]);
+      write_bytes<std::uint64_t>(os, contiguousStrides[i]);
+    }
+
+    const size_t count = tensor.shape().empty() ? size_t{1} : tensor.size();
+    using KeyT = std::shared_ptr<const void>;
+    std::map<KeyT, uint64_t, std::owner_less<KeyT>> idOf;
+    std::vector<Tensor<ScalarT>> sources;
+    for (size_t i = 0; i < count; ++i)
+    {
+      const PointCloud<ScalarT> cloud = tensor.flat(i);
+      const KeyT key = cloud.coords().storage_owner();
+      if (!idOf.contains(key))
+      {
+        idOf.emplace(key, static_cast<uint64_t>(sources.size()));
+        sources.push_back(cloud.coords());
+      }
+    }
+
+    write_bytes<uint64_t>(os, static_cast<uint64_t>(sources.size()));
+    for (const auto& source : sources)
+    {
+      write_tensor(os, source);
+    }
+
+    const bool hasSelections = tensor.has_indices();
+    write_bytes<bool>(os, hasSelections);
+    for (size_t i = 0; i < count; ++i)
+    {
+      const PointCloud<ScalarT> cloud = tensor.flat(i);
+      write_bytes<uint64_t>(os, idOf.at(cloud.coords().storage_owner()));
+      if (hasSelections)
+      {
+        write_tensor(os, cloud.indices());
+      }
+    }
   }
 
   template <typename T>
@@ -341,7 +516,7 @@ namespace sb::io::detail
   template <IsTensor TensorT>
     void write_contiguous_tensor(std::ostream& os, const TensorT& tensor)
   {
-    write_tensor_format(os, getTensorFormat(tensor));
+    write_type_format(os, tensorFormatV3<TensorT>());
 
     write_bytes<std::uint64_t>(os, tensor.shape().size());
     for (auto i = 0_uz; i < tensor.shape().size(); ++i)
@@ -359,9 +534,26 @@ namespace sb::io::detail
     else
     {
       auto sz = serialized_tensor_size(tensor);
-      for (auto const * elem = tensor.data(); elem != tensor.data() + sz; ++elem)
+      if constexpr (std::is_same_v<value_type, bool>)
       {
-        write_element(os, *elem);
+        for (size_t offset = 0; offset < sz; offset += 8)
+        {
+          std::uint8_t packed = 0;
+          const size_t end = std::min(offset + 8, sz);
+          for (size_t i = offset; i < end; ++i)
+          {
+            packed |= static_cast<std::uint8_t>(tensor.data()[i] ? 1 : 0)
+              << (i - offset);
+          }
+          write_bytes<std::uint8_t>(os, packed);
+        }
+      }
+      else
+      {
+        for (auto const * elem = tensor.data(); elem != tensor.data() + sz; ++elem)
+        {
+          write_value(os, *elem);
+        }
       }
     }
   }
@@ -369,7 +561,13 @@ namespace sb::io::detail
   template <IsTensor TensorT>
   void write_tensor(std::ostream& os, const TensorT& tensor)
   {
-    if (!tensor.is_contiguous())
+    using value_type = typename TensorT::value_type;
+    if constexpr (TensorT::IsIndexed && is_point_cloud_v<value_type>)
+    {
+      write_indexed_point_cloud_tensor<
+        typename is_point_cloud<value_type>::scalar_type>(os, tensor);
+    }
+    else if (!tensor.is_contiguous())
     {
       auto copy = tensor.copy();
       if (!copy.is_contiguous())
@@ -380,21 +578,25 @@ namespace sb::io::detail
       write_tensor(os, copy);
       return;
     }
-    write_contiguous_tensor(os, tensor);
+    else
+    {
+      write_contiguous_tensor(os, tensor);
+    }
   }
 
   template <typename T>
   void write_tensor(std::ostream& os, const NestedTensor<T>& tensor)
   {
-    write_tensor_format<NestedTensor<T>>(os);
-    write_element(os, tensor);
+    write_type_format<NestedTensor<T>>(os);
+    write_value(os, tensor);
   }
 
 
 
   template <typename T>
-  Tensor<T> read_tensor(std::istream& is)
+  Tensor<T> read_tensor(BinaryReader& reader)
   {
+    auto& is = reader.stream();
     auto shapeSz = read_bytes<std::uint64_t>(is);
     std::vector<size_t> shape(shapeSz);
     std::vector<ptrdiff_t> strides(shapeSz);
@@ -411,6 +613,23 @@ namespace sb::io::detail
     }
 
     auto sz = serialized_tensor_size(ret);
+    if constexpr (std::is_same_v<T, bool>)
+    {
+      if (reader.format_version() >= 3)
+      {
+        for (size_t offset = 0; offset < sz; offset += 8)
+        {
+          const std::uint8_t packed = read_bytes<std::uint8_t>(is);
+          const size_t end = std::min(offset + 8, sz);
+          for (size_t i = offset; i < end; ++i)
+          {
+            ret.data()[i] = (packed & (std::uint8_t{1} << (i - offset))) != 0;
+          }
+        }
+        return ret;
+      }
+    }
+
     for (auto * elem = ret.data(); elem != ret.data() + sz; ++elem)
     {
       if constexpr (is_barcode_v<T>)
@@ -418,11 +637,11 @@ namespace sb::io::detail
       else if constexpr (is_compressed_matrix_v<T>)
         *elem = read_compressed_matrix<T>(is);
       else if constexpr (is_point_cloud_v<T>)
-        // Legacy (baseFormat 1000) point cloud tensors: every element is a full
-        // nested coordinate tensor.
-        *elem = T(read_element<Tensor<typename is_point_cloud<T>::scalar_type>>(is));
+        // Earlier point-cloud tensors (baseFormat 1000) store a complete
+        // coordinate tensor for every element.
+        *elem = T(read_element<Tensor<typename is_point_cloud<T>::scalar_type>>(reader));
       else if constexpr (is_nested_tensor_v<T>)
-        *elem = read_nested_tensor_element<typename is_nested_tensor<T>::leaf_type>(is);
+        *elem = read_nested_tensor_element<typename is_nested_tensor<T>::leaf_type>(reader);
       else
       {
         *elem = read_element<T>(is);
@@ -433,8 +652,9 @@ namespace sb::io::detail
   }
 
   template <typename T>
-  NestedTensor<T> read_nested_tensor_element(std::istream& is)
+  NestedTensor<T> read_nested_tensor_element(BinaryReader& reader)
   {
+    auto& is = reader.stream();
     const size_t depth = static_cast<size_t>(read_bytes<uint64_t>(is));
     const bool isLeaf = read_bytes<bool>(is);
     if (isLeaf)
@@ -443,13 +663,13 @@ namespace sb::io::detail
       {
         throw std::runtime_error("Invalid leaf depth in nested tensor");
       }
-      return NestedTensor<T>(read_element<Tensor<T>>(is));
+      return NestedTensor<T>(read_element<Tensor<T>>(reader));
     }
     if (depth < 2)
     {
       throw std::runtime_error("Invalid nested tensor depth");
     }
-    auto children = read_element<Tensor<NestedTensor<T>>>(is);
+    auto children = read_element<Tensor<NestedTensor<T>>>(reader);
     NestedTensor<T> result(std::move(children), depth - 1);
     if (result.depth() != depth)
     {
@@ -465,8 +685,10 @@ namespace sb::io::detail
   // @p readSource reads one source of type SourceT; elements are built as
   // ElemT(source) or ElemT(source, indices).
   template <typename ElemT, typename SourceT, typename ReadSourceF>
-  Tensor<ElemT> read_shared_source_tensor(std::istream& is, ReadSourceF readSource)
+  Tensor<ElemT> read_shared_source_tensor(
+      BinaryReader& reader, ReadSourceF readSource)
   {
+    auto& is = reader.stream();
     auto shapeSz = read_bytes<std::uint64_t>(is);
     std::vector<size_t> shape(shapeSz);
     std::vector<ptrdiff_t> strides(shapeSz);
@@ -487,7 +709,7 @@ namespace sb::io::detail
     sources.reserve(numSources);
     for (auto i = 0_uz; i < numSources; ++i)
     {
-      SourceT source = readSource(is);
+      SourceT source = readSource(reader);
       if constexpr (is_point_cloud_v<ElemT>)
       {
         if (source.rank() != 0 && source.rank() != 2)
@@ -518,7 +740,7 @@ namespace sb::io::detail
               "Indexed point-cloud source must have 2 dimensions");
           }
         }
-        Tensor<uint64_t> indices = read_element<Tensor<uint64_t>>(is);
+        Tensor<uint64_t> indices = read_element<Tensor<uint64_t>>(reader);
         if (indices.rank() != 1)
         {
           throw std::runtime_error(
@@ -550,46 +772,192 @@ namespace sb::io::detail
     return ret;
   }
 
-  // Read the current (baseFormat 1001) point cloud tensor format.
+  // Read the V3 shared-source point-cloud layout (baseFormat 1001).
   template <typename ScalarT>
-  Tensor<PointCloud<ScalarT>> read_indexed_point_cloud_tensor(std::istream& is)
+  Tensor<PointCloud<ScalarT>> read_indexed_point_cloud_tensor(
+      BinaryReader& reader)
   {
     return read_shared_source_tensor<PointCloud<ScalarT>, Tensor<ScalarT>>(
-        is, [](std::istream& s) { return read_element<Tensor<ScalarT>>(s); });
+        reader, [](BinaryReader& input) {
+          return read_element<Tensor<ScalarT>>(input);
+        });
+  }
+
+  template <typename ScalarT>
+  void validate_indexed_point_cloud_source(const Tensor<ScalarT>& coordinates)
+  {
+    if (coordinates.rank() != 2)
+    {
+      throw std::runtime_error(
+        "Indexed point-cloud coordinate source must have 2 dimensions");
+    }
+  }
+
+  inline void validate_indexed_point_cloud_source_reference(
+      std::uint64_t sourceId, size_t sourceCount)
+  {
+    if (sourceId >= sourceCount)
+    {
+      throw std::runtime_error(
+        "Invalid indexed point-cloud source reference in saved data");
+    }
+  }
+
+  inline void validate_indexed_point_cloud_selection(
+      const Tensor<uint64_t>& selection, size_t sourcePointCount)
+  {
+    if (selection.rank() != 1)
+    {
+      throw std::runtime_error(
+        "Invalid number of indexed point-cloud selection dimensions in saved data");
+    }
+    for (size_t i = 0; i < selection.size(); ++i)
+    {
+      if (selection(i) >= sourcePointCount)
+      {
+        throw std::runtime_error(
+          "Indexed point-cloud selection out of bounds in saved data");
+      }
+    }
+  }
+
+  // Read the V3 tensor-level indexed point-cloud layout (baseFormat 1001 with
+  // the Indexed tensor-property bit).
+  // The payload contains a deduplicated coordinate-source table followed by
+  // an aligned source reference and owned selection for each logical cell.
+  template <typename ScalarT>
+  Tensor<PointCloud<ScalarT>, TensorProperty::Indexed>
+  read_tensor_level_indexed_point_cloud_tensor(BinaryReader& reader)
+  {
+    auto& is = reader.stream();
+    auto shapeSz = read_bytes<std::uint64_t>(is);
+    std::vector<size_t> shape(shapeSz);
+    std::vector<ptrdiff_t> strides(shapeSz);
+    for (auto i = 0_uz; i < shapeSz; ++i)
+    {
+      shape[i] = read_bytes<std::uint64_t>(is);
+      strides[i] = static_cast<ptrdiff_t>(read_bytes<std::uint64_t>(is));
+    }
+
+    Tensor<PointCloud<ScalarT>> source(shape);
+    if (source.strides() != strides)
+    {
+      throw std::runtime_error(
+        "Incorrect strides in saved indexed tensor (expected "
+        + index_to_string(source.strides()) + " but got "
+        + index_to_string(strides) + ")");
+    }
+
+    const auto numSources = read_bytes<std::uint64_t>(is);
+    std::vector<Tensor<ScalarT>> sources;
+    sources.reserve(numSources);
+    for (auto i = 0_uz; i < numSources; ++i)
+    {
+      Tensor<ScalarT> coords = read_element<Tensor<ScalarT>>(reader);
+      validate_indexed_point_cloud_source(coords);
+      sources.push_back(std::move(coords));
+    }
+
+    const bool hasSelections = read_bytes<bool>(is);
+    Tensor<NestedTensor<uint64_t>> selections(shape);
+    const size_t count = shape.empty() ? size_t{1} : source.size();
+    for (size_t i = 0; i < count; ++i)
+    {
+      const auto sourceId = read_bytes<std::uint64_t>(is);
+      validate_indexed_point_cloud_source_reference(sourceId, sources.size());
+
+      source.flat(i) = PointCloud<ScalarT>(sources[sourceId]);
+      if (hasSelections)
+      {
+        Tensor<uint64_t> indices = read_element<Tensor<uint64_t>>(reader);
+        validate_indexed_point_cloud_selection(
+          indices, sources[sourceId].shape(0));
+        selections.flat(i) = NestedTensor<uint64_t>(std::move(indices));
+      }
+    }
+
+    using IndexedTensor =
+      Tensor<PointCloud<ScalarT>, TensorProperty::Indexed>;
+    if (!hasSelections)
+    {
+      return IndexedTensor(std::move(source), std::nullopt);
+    }
+    NestedTensor<uint64_t> ownedSelections(std::move(selections), 1);
+    return IndexedTensor(
+      std::move(source), std::move(ownedSelections));
   }
 
 
-  /// The format an earlier version used for point-cloud tensors, where each
-  /// point cloud's coordinate tensor was stored inline (1000). The current
-  /// format uses shared coordinate sources (1001). Equal to tensorFormat<T>()
-  /// for every other element type.
-  template <typename T>
-  TensorFormat legacyTensorFormat()
+  template <IsTensor TensorT>
+  bool is_tensor_format(const BinaryReader& reader, TensorFormat format)
   {
-    if constexpr (is_point_cloud_v<T>)
+    if constexpr (TensorT::IsIndexed)
     {
-      return TensorFormat{ .baseFormat = 1000, .subFormat = tensorFormat<T>().subFormat };
+      if (reader.format_version() < 3)
+      {
+        return false;
+      }
+    }
+    return format.template matches_type<TensorT>(reader.format_version());
+  }
+
+  /// Read a tensor body for TensorT, routing on its full type and the format
+  /// already read from the stream: lazy indexed point-cloud storage, the
+  /// ordinary V3 shared-source layout, or the element-wise V1/V2 layout.
+  /// Both read entry points go through here so they cannot drift apart.
+  template <IsTensor TensorT>
+  TensorT read_tensor_for_format(BinaryReader& reader, TensorFormat format)
+  {
+    const auto expectedFormat = reader.format_version() >= 3
+      ? tensorFormatV3<TensorT>()
+      : tensorFormatV1_V2<TensorT>();
+    if (!is_tensor_format<TensorT>(reader, format))
+    {
+      throw std::runtime_error(
+        "Unexpected tensor format " + format.toString() + " where "
+        + expectedFormat.toString() + " was expected.");
+    }
+
+    using value_type = typename TensorT::value_type;
+    if constexpr (TensorT::IsIndexed && is_point_cloud_v<value_type>)
+    {
+      return read_tensor_level_indexed_point_cloud_tensor<
+        typename is_point_cloud<value_type>::scalar_type>(reader);
+    }
+    else if constexpr (is_point_cloud_v<value_type>)
+    {
+      if (reader.format_version() >= 3)
+      {
+        return read_indexed_point_cloud_tensor<
+          typename is_point_cloud<value_type>::scalar_type>(reader);
+      }
+      return read_tensor<value_type>(reader);
     }
     else
     {
-      return tensorFormat<T>();
+      return read_tensor<value_type>(reader);
     }
   }
 
-  /// Read a tensor body for element type T, routing on the format already read
-  /// from the stream: the shared-source layout for the current point-cloud format, element-wise for legacy and unchanged formats.
-  /// Both read entry points go through here so they cannot drift apart.
-  template <typename T>
-  Tensor<T> read_tensor_for_format(std::istream& is, TensorFormat format)
+  inline TensorFormat read_type_format(std::istream& is)
   {
-    if constexpr (is_point_cloud_v<T>)
-    {
-      if (format == tensorFormat<T>())
-      {
-        return read_indexed_point_cloud_tensor<typename is_point_cloud<T>::scalar_type>(is);
-      }
-    }
-    return read_tensor<T>(is);
+    BinaryReader reader(is);
+    return read_type_format(reader);
+  }
+
+  template <typename T>
+  Tensor<T> read_tensor(std::istream& is)
+  {
+    BinaryReader reader(is);
+    return read_tensor<T>(reader);
+  }
+
+  template <typename ScalarT>
+  Tensor<PointCloud<ScalarT>, TensorProperty::Indexed>
+  read_tensor_level_indexed_point_cloud_tensor(std::istream& is)
+  {
+    BinaryReader reader(is);
+    return read_tensor_level_indexed_point_cloud_tensor<ScalarT>(reader);
   }
 }
 

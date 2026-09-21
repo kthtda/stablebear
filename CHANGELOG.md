@@ -1,5 +1,9 @@
 ## Unreleased
 
+### Breaking changes
+
+* **Updated binary save format** — Stablebear 0.5.0 continues to read files from earlier supported releases. Use Stablebear 0.5.0 or later to read newly saved files.
+
 ### New features
 
 * **Uniform point-cloud subsampling** — `point_process.subsample` draws one or more uniform samples, with or without replacement, from every cloud in a `PointCloudTensor`. Samples share one fresh coordinate copy per input cloud through indexed point-cloud storage, support partial draws and coordinate-level duplicate removal, remain isolated from later source mutations, and round-trip through the new shared-storage point-cloud serialization subtype. ([#229](https://github.com/kthtda/stablebear/issues/229))

@@ -15,8 +15,9 @@ namespace
   class IoOps
   {
   public:
-    template <typename T>
-    static void save_tensor_to_file(const sb::Tensor<T>& tensor, py::object file)
+    template <typename T, sb::TensorProperties Properties = sb::TensorProperty::None>
+    static void save_tensor_to_file(
+        const sb::Tensor<T, Properties>& tensor, py::object file)
     {
       sb_py::PythonOStreamBuf buf(file);
       std::ostream os(&buf);
@@ -85,6 +86,8 @@ namespace sb_py
 
         .def_static("save_point_cloud32_tensor", &IoOps::save_tensor_to_file<sb::PointCloud<sb::float32_t>>)
         .def_static("save_point_cloud64_tensor", &IoOps::save_tensor_to_file<sb::PointCloud<sb::float64_t>>)
+        .def_static("save_indexed_point_cloud32_tensor", &IoOps::save_tensor_to_file<sb::PointCloud<sb::float32_t>, sb::TensorProperty::Indexed>)
+        .def_static("save_indexed_point_cloud64_tensor", &IoOps::save_tensor_to_file<sb::PointCloud<sb::float64_t>, sb::TensorProperty::Indexed>)
 
         .def_static("save_barcode32_tensor",     &IoOps::save_tensor_to_file<sb::ph::Barcode<sb::float32_t>>)
         .def_static("save_barcode64_tensor",     &IoOps::save_tensor_to_file<sb::ph::Barcode<sb::float64_t>>)

@@ -137,7 +137,7 @@ namespace
     sb::io::detail::write_tensor(ss, tensor);
 
     std::istringstream iss(ss.str());
-    ASSERT_EQ(sb::io::detail::read_tensor_format(iss), sb::io::detail::tensorFormat<TypeParam>());
+    ASSERT_EQ(sb::io::detail::read_type_format(iss), sb::io::detail::tensorFormatV3<TypeParam>());
     TensorT retTensor = sb::io::detail::read_tensor<TypeParam>(iss);
 
     EXPECT_EQ(tensor, retTensor);
@@ -214,7 +214,7 @@ namespace
     sb::io::detail::write_tensor(ss, tensor);
 
     std::istringstream iss(ss.str());
-    ASSERT_EQ(sb::io::detail::read_tensor_format(iss), sb::io::detail::tensorFormat<typename decltype(tensor)::value_type>());
+    ASSERT_EQ(sb::io::detail::read_type_format(iss), sb::io::detail::tensorFormatV3<typename decltype(tensor)::value_type>());
     auto retTensor = sb::io::detail::read_tensor<PcfT>(iss);
 
     EXPECT_EQ(tensor, retTensor);
@@ -237,7 +237,7 @@ namespace
     sb::io::detail::write_tensor(ss, tensor);
 
     std::istringstream iss(ss.str());
-    ASSERT_EQ(sb::io::detail::read_tensor_format(iss), sb::io::detail::tensorFormat<typename decltype(tensor)::value_type>());
+    ASSERT_EQ(sb::io::detail::read_type_format(iss), sb::io::detail::tensorFormatV3<typename decltype(tensor)::value_type>());
     auto retTensor = sb::io::detail::read_tensor<PcfT>(iss);
 
     EXPECT_EQ(tensor, retTensor);
@@ -328,7 +328,7 @@ namespace
     sb::io::detail::write_tensor(ss, sliced);
 
     std::istringstream iss(ss.str());
-    ASSERT_EQ(sb::io::detail::read_tensor_format(iss), sb::io::detail::tensorFormat<typename decltype(tensor)::value_type>());
+    ASSERT_EQ(sb::io::detail::read_type_format(iss), sb::io::detail::tensorFormatV3<typename decltype(tensor)::value_type>());
     auto retTensor = sb::io::detail::read_tensor<TypeParam>(iss);
 
     // The returned tensor should be contiguous and contain the sliced values
@@ -430,7 +430,7 @@ namespace
     sb::io::detail::write_tensor(ss, tensor);
   
     std::istringstream iss(ss.str());
-    ASSERT_EQ(sb::io::detail::read_tensor_format(iss), sb::io::detail::tensorFormat<typename decltype(tensor)::value_type>());
+    ASSERT_EQ(sb::io::detail::read_type_format(iss), sb::io::detail::tensorFormatV3<typename decltype(tensor)::value_type>());
     auto retTensor = sb::io::detail::read_tensor<PcfT>(iss);
   
     EXPECT_EQ(tensor, retTensor);

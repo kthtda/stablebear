@@ -74,8 +74,24 @@ namespace sb
           + index_to_string(index) + ": " + error.what());
       }
     });
-    m_indexedLocator = Tensor<size_t, TensorProperty::None>(
-      m_indexedState->indices->shape());
+    initialize_indexed_locator(m_indexedState->indices->shape());
+  }
+
+  template <typename T, TensorProperties Properties>
+  Tensor<T, Properties>::Tensor(source_tensor_type source, std::nullopt_t)
+    requires IsIndexed && IndexableTensorElement<T>
+    : m_indexedState(std::make_shared<indexed_state_type>(
+        indexed_state_type{std::move(source), std::nullopt}))
+  {
+    initialize_indexed_locator(m_indexedState->source.shape());
+  }
+
+  template <typename T, TensorProperties Properties>
+  void Tensor<T, Properties>::initialize_indexed_locator(
+      const std::vector<size_t>& shape)
+    requires IsIndexed
+  {
+    m_indexedLocator = Tensor<size_t, TensorProperty::None>(shape);
     const size_t count = m_indexedLocator.shape().empty()
       ? size_t{1}
       : m_indexedLocator.size();

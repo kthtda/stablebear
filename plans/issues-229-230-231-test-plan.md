@@ -70,7 +70,7 @@ turn current behavior into the expected result solely to make a test pass.
 | Indexed Python save currently materializes; IO describes subtype `1001` as per-element source IDs and indices. | Require a distinct tensor-level indexed encoding, indexed round trips, and readers for old `1000`/`1001` files. | G1–G3 |
 | General nested format dispatch has no visible reader for legacy `(5, 64)`. | Use fixed legacy bytes to test the required reader. | G2 |
 | Standalone `PointCloud` is absent from object IO dispatch; dtype pickling still uses a name lookup. | Audit all public pickleable types, including default pickling. Do not silently exempt either from #230. | H1–H4 |
-| C++ IO format version changes from 2 to 3, attributed to shared-source point clouds. #231 forbids a version bump merely for nested tensors. | Distinguish the reasons, verify supported old headers, and require new nested depths/types to work within the chosen current version. | G1–G3 |
+| Tensor metadata now records tensor-property bits and independent layout flags, such as nested storage. This expands each `TensorFormat` record and makes new files unreadable by older readers. | Bump the binary format to version 3, retain version-aware V1/V2 decoding, and verify that 0.5.0 reads supported old files while older releases reject V3. | G1–G3 |
 | `CHANGELOG.md` still advertises `IndexTensor`; saving/indexing docs describe older or inconsistent ownership. | Verify documentation against the accepted API/storage contracts. | I3 |
 
 ## Ordered checklist
@@ -426,8 +426,8 @@ A–K in order; each item remains independently executable.
     from historical writers for materialized point clouds (`1000`, both
     precisions), shared-source indexed point clouds (`1001`, both precisions),
     and one-level nested `uint64` format `(5, 64)`. Include supported historical
-    header versions 1 and 2 and branch version 3 where applicable, plus ordinary
-    tensor/object controls. Record producer commit/version, backend, generation
+    header versions 1 and 2, current version 3, and ordinary tensor/object
+    controls. Record producer commit/version, backend, generation
     command, checksum, and expected contents alongside each fixture. Use
     isolated historical checkouts/environments; do not fabricate compatibility
     bytes using today's writer. Load with current Python and appropriate C++
@@ -495,8 +495,15 @@ A–K in order; each item remains independently executable.
     Cover changed reducers, historical reconstruction function/module paths,
     moved classes where relevant, both precisions, and representative views/
     empties. Run only loading through the current implementation in compatibility
-    tests. Pass: every replaced representation has fixed-byte coverage with
-    exact type/shape/dtype/content checks and retained reconstruction symbols;
+    tests. Verify that shared pickle reconstruction tries public Stablebear
+    binary IO first, then invokes only the registered type-specific legacy
+    decoder when the payload is not supported binary IO. Include corrupt
+    current-binary, valid legacy, invalid legacy, and unsupported-type cases;
+    a corrupt recognized binary payload must not be silently reinterpreted as
+    legacy state. If both decoding paths fail, assert that the final exception
+    retains the binary failure and identifies the attempted legacy path. Pass:
+    every replaced representation has fixed-byte coverage with exact
+    type/shape/dtype/content checks and retained reconstruction symbols;
     missing historical bytes remain an explicit coverage gap.
 
 - [ ] **H4. CPU/CUDA serialization interoperability.**

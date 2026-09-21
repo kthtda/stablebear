@@ -158,6 +158,7 @@ namespace sb
   class Tensor
   {
   public:
+    static constexpr TensorProperties PropertyFlags = Properties;
     static constexpr bool IsIndexed = IndexedTensorProperties<Properties>;
     static constexpr TensorProperties SourceProperties =
       Properties & ~TensorProperty::Indexed;
@@ -181,6 +182,10 @@ namespace sb
     explicit Tensor(const std::vector<size_t>& shape, const T& init = {}) requires (!IsIndexed);
     Tensor() requires (!IsIndexed) : Tensor({}, {}) { }
     Tensor(source_tensor_type source, index_tensor_type indices)
+      requires IsIndexed && IndexableTensorElement<T>;
+    /// Construct an indexed tensor whose backing already contains its logical
+    /// values, with no element-selection storage.
+    Tensor(source_tensor_type source, std::nullopt_t)
       requires IsIndexed && IndexableTensorElement<T>;
 
     /// Assign val to every element of the Tensor
@@ -413,6 +418,10 @@ namespace sb
     {
       return m_indexedState->source;
     }
+    [[nodiscard]] bool has_indices() const noexcept requires IsIndexed
+    {
+      return m_indexedState->indices.has_value();
+    }
     [[nodiscard]] const index_tensor_type& indices_view() const requires IsIndexed
     {
       if (!m_indexedState->indices)
@@ -472,6 +481,9 @@ namespace sb
     Tensor(std::shared_ptr<indexed_state_type> state,
       Tensor<size_t, TensorProperty::None> locator)
       requires IsIndexed && IndexableTensorElement<T>;
+
+    void initialize_indexed_locator(const std::vector<size_t>& shape)
+      requires IsIndexed;
 
     template <typename SliceVector>
     [[nodiscard]] Tensor extract(SliceVector sliceVector) const;

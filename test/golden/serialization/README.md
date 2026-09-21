@@ -21,3 +21,14 @@ SHA-256 checksum. It also records formats the producer did not support so gaps
 remain visible.
 
 Do not regenerate historical directories with a newer Stablebear build.
+
+For the V1 binary format from the final `masspcf` release before format V2,
+install `masspcf==0.4.0b8` and run:
+
+```bash
+python test/golden/serialization/generate_masspcf_v1.py
+```
+
+This dedicated generator imports `masspcf` directly and writes only V1 binary
+files. It does not create pickles whose embedded module name predates the
+package rename.

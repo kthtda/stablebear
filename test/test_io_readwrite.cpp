@@ -161,6 +161,82 @@ namespace
     EXPECT_EQ(recursiveRoundtrip.nested()(1).nested().shape(), std::vector<size_t>({ 0 }));
   }
 
+  TYPED_TEST(IoReadWriteTest, TensorLevelIndexedPointCloudRoundtrip)
+  {
+    using Cloud = sb::PointCloud<TypeParam>;
+    using DenseTensor = sb::Tensor<Cloud>;
+    using IndexedTensor =
+      sb::Tensor<Cloud, sb::TensorProperty::Indexed>;
+
+    sb::Tensor<TypeParam> coordinates({ 5, 2 });
+    for (size_t i = 0; i < coordinates.shape(0); ++i)
+    {
+      coordinates({ i, 0 }) = static_cast<TypeParam>(10 * i);
+      coordinates({ i, 1 }) = static_cast<TypeParam>(10 * i + 1);
+    }
+    DenseTensor source({ 1 });
+    source(0) = Cloud(coordinates);
+
+    sb::Tensor<sb::NestedTensor<uint64_t>> selectionChildren({ 1, 3 });
+    auto selection = [](std::initializer_list<uint64_t> values)
+    {
+      sb::Tensor<uint64_t> result({ values.size() });
+      size_t i = 0;
+      for (uint64_t value : values)
+      {
+        result(i++) = value;
+      }
+      return sb::NestedTensor<uint64_t>(std::move(result));
+    };
+    selectionChildren({ 0, 0 }) = selection({ 3, 1, 3 });
+    selectionChildren({ 0, 1 }) = selection({});
+    selectionChildren({ 0, 2 }) = selection({ 4, 0 });
+    sb::NestedTensor<uint64_t> selections(
+      std::move(selectionChildren), 1);
+
+    const IndexedTensor indexed = sb::make_indexed_tensor(
+      source, std::move(selections));
+    const IndexedTensor view = indexed.transpose();
+
+    std::stringstream output;
+    sb::write(view, output);
+
+    std::istringstream typedInput(output.str());
+    IndexedTensor restored = sb::read<IndexedTensor>(typedInput);
+    EXPECT_EQ(restored.shape(), (std::vector<size_t>{ 3, 1 }));
+    EXPECT_EQ(restored, view);
+    EXPECT_TRUE(restored.has_indices());
+    EXPECT_TRUE(restored.flat(0).is_indexed());
+    EXPECT_EQ(restored.flat(0).indices()(0), 3);
+    EXPECT_EQ(restored.flat(0).indices()(1), 1);
+    EXPECT_EQ(restored.flat(0).indices()(2), 3);
+    EXPECT_EQ(restored.flat(1).n_points(), 0);
+    EXPECT_EQ(
+      restored.flat(0).coords().storage_owner(),
+      restored.flat(2).coords().storage_owner());
+
+    // Loading retains the shared indexed state and its one-time
+    // materialization behavior on mutation.
+    restored.writable_at({ 0, 0 }).mutable_coords()({ 0, 0 }) =
+      static_cast<TypeParam>(-1);
+    EXPECT_FALSE(restored.has_indices());
+    EXPECT_EQ(restored({ 0, 0 })(0, 0), static_cast<TypeParam>(-1));
+    EXPECT_EQ(restored({ 2, 0 })(0, 0), static_cast<TypeParam>(40));
+
+    std::stringstream materializedOutput;
+    sb::write(restored, materializedOutput);
+    std::istringstream materializedInput(materializedOutput.str());
+    IndexedTensor materializedRoundtrip =
+      sb::read<IndexedTensor>(materializedInput);
+    EXPECT_EQ(materializedRoundtrip, restored);
+    EXPECT_FALSE(materializedRoundtrip.has_indices());
+
+    std::istringstream untypedInput(output.str());
+    auto any = sb::read_any_tensor(untypedInput);
+    EXPECT_TRUE(std::holds_alternative<IndexedTensor>(any));
+    EXPECT_EQ(std::get<IndexedTensor>(any), view);
+  }
+
 // ============================================================================
 // Empty (scalar/0-d) tensor roundtrip
 // ============================================================================
@@ -315,49 +391,6 @@ namespace
     auto tensor3 = sb::read<TensorT>(iss2);
 
     EXPECT_EQ(tensor, tensor3);
-  }
-
-// ============================================================================
-// Format version backward compatibility
-// ============================================================================
-
-  TYPED_TEST(IoReadWriteTest, ReadsFormatVersion1WithoutPlatformField)
-  {
-    using TensorT = sb::Tensor<TypeParam>;
-
-    // Write a v2 tensor, then patch it back to v1 by removing the platform field
-    TensorT tensor({ 3 });
-    tensor(0) = TypeParam(1);
-    tensor(1) = TypeParam(2);
-    tensor(2) = TypeParam(3);
-
-    std::stringstream ss;
-    sb::write(tensor, ss);
-
-    // The v2 header is: "\1MPCF" (legacy magic, 5) + endianness (1) + version (4) + version_string + date_string + platform_string + ...
-    // We need to patch version to 1 and remove the platform string.
-    std::string data = ss.str();
-    constexpr size_t versionOffset = 6; // after "\1MPCF" (legacy magic) + "e"/"E"
-
-    // Read the v2 header to find where the platform string starts and ends
-    std::istringstream probe(data);
-    sb::io::detail::read_binary_string(probe, 5); // header id
-    sb::io::detail::read_binary_string(probe, 1); // endianness
-    sb::io::detail::read_bytes<int>(probe);        // format version
-    sb::io::detail::read_string(probe);            // version string
-    sb::io::detail::read_string(probe);            // date string
-    auto beforePlatform = probe.tellg();
-    sb::io::detail::read_string(probe);            // platform string
-    auto afterPlatform = probe.tellg();
-
-    // Build a v1 stream: everything before platform + everything after platform, with version patched to 1
-    std::string v1data = data.substr(0, beforePlatform) + data.substr(afterPlatform);
-    sb::int32_t v1 = 1;
-    std::memcpy(v1data.data() + versionOffset, &v1, sizeof(sb::int32_t));
-
-    std::istringstream iss(v1data);
-    auto retTensor = sb::read<TensorT>(iss);
-    EXPECT_EQ(tensor, retTensor);
   }
 
   TYPED_TEST(IoReadWriteTest, ThrowsOnFutureFormatVersion)

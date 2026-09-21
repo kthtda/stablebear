@@ -23,11 +23,6 @@ _BINARY_MAGIC = b"\x01MPCF"
 def _save(item: Tensor, file):
     cpp_p = cpp.persistence
     data = item._root if isinstance(item, NestedTensor) else item._data
-    if isinstance(
-        data,
-        (cpp._IndexedPointCloud32Tensor, cpp._IndexedPointCloud64Tensor),
-    ):
-        data = data.materialize()
     _SAVE_DISPATCH = {
         cpp.Float32Tensor: cpp.IoOps.save_float32_tensor,
         cpp.Float64Tensor: cpp.IoOps.save_float64_tensor,
@@ -48,6 +43,8 @@ def _save(item: Tensor, file):
         cpp.Pcf64iTensor: cpp.IoOps.save_pcf64i_tensor,
         cpp.PointCloud32Tensor: cpp.IoOps.save_point_cloud32_tensor,
         cpp.PointCloud64Tensor: cpp.IoOps.save_point_cloud64_tensor,
+        cpp._IndexedPointCloud32Tensor: cpp.IoOps.save_indexed_point_cloud32_tensor,
+        cpp._IndexedPointCloud64Tensor: cpp.IoOps.save_indexed_point_cloud64_tensor,
         cpp_p.Barcode32Tensor: cpp.IoOps.save_barcode32_tensor,
         cpp_p.Barcode64Tensor: cpp.IoOps.save_barcode64_tensor,
         cpp.SymmetricMatrix32Tensor: cpp.IoOps.save_symmetric_matrix32_tensor,
@@ -79,6 +76,8 @@ def _load(file):
         cpp.Pcf64iTensor: IntPcfTensor,
         cpp.PointCloud32Tensor: PointCloudTensor,
         cpp.PointCloud64Tensor: PointCloudTensor,
+        cpp._IndexedPointCloud32Tensor: PointCloudTensor,
+        cpp._IndexedPointCloud64Tensor: PointCloudTensor,
         cpp_p.Barcode32Tensor: BarcodeTensor,
         cpp_p.Barcode64Tensor: BarcodeTensor,
         cpp.SymmetricMatrix32Tensor: SymmetricMatrixTensor,

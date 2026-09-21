@@ -14,6 +14,27 @@
 
 namespace sb::io::detail
 {
+  // Only bump this when an older format reader would otherwise accept a newly
+  // written file and interpret its contents incorrectly or as corrupt. New
+  // formats with distinct type or subtype identifiers do not require a bump.
+  // Version 3 expands every TensorFormat record with tensor properties and
+  // general format flags, so older readers cannot parse files written by it.
+  constexpr int FormatVersion = 3;
+
+  class BinaryReader
+  {
+  public:
+    explicit BinaryReader(std::istream& stream, int formatVersion = FormatVersion)
+      : m_stream(stream), m_formatVersion(formatVersion) { }
+
+    [[nodiscard]] std::istream& stream() const { return m_stream; }
+    [[nodiscard]] int format_version() const { return m_formatVersion; }
+
+  private:
+    std::istream& m_stream;
+    int m_formatVersion;
+  };
+
   template <typename CharT, typename Traits>
   void assert_not_bad(std::basic_ios<CharT, Traits>& stream)
   {
