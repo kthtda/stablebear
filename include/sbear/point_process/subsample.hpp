@@ -177,7 +177,7 @@ namespace sb::pp
       }
     }, exec);
 
-    return make_indexed_tensor(
+    return make_indexed_tensor_from_owned_indices(
       source, to_nested_tensor(selections));
   }
 }

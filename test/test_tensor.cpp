@@ -74,7 +74,7 @@ namespace
     sb::Tensor<uint64_t> firstLeaf({ 1 });
     firstLeaf(0) = 1;
     sb::Tensor<Nested> children({ 1 });
-    children(0) = Nested(firstLeaf);
+    children(0) = Nested::from_leaf_view(firstLeaf);
 
     const Nested value(children, 1);
     const Nested view = Nested::from_outer_view(children.flatten(), 1);
@@ -89,6 +89,37 @@ namespace
 
     EXPECT_EQ(std::get<uint64_t>(value.nested()(0)({ 0 })), 1);
     EXPECT_EQ(std::get<uint64_t>(view.nested()(0)({ 0 })), 7);
+  }
+
+  TEST(NestedTensor, ExplicitFactoriesPreserveStorageOnlyForViews)
+  {
+    using Nested = sb::NestedTensor<uint64_t>;
+    sb::Tensor<uint64_t> leaf({ 2 });
+    leaf(0) = 1;
+    leaf(1) = 2;
+    const auto leafView = Nested::from_leaf_view(leaf);
+    const auto leafValue = Nested::from_values(leaf);
+    EXPECT_EQ(leafView.leaf().data(), leaf.data());
+    EXPECT_NE(leafValue.leaf().data(), leaf.data());
+
+    sb::Tensor<Nested> children({ 1 });
+    children(0) = leafView;
+    const auto view = Nested::from_outer_view(children, 1);
+    const auto value = Nested::from_values(children, 1);
+    EXPECT_EQ(view.nested().data(), children.data());
+    EXPECT_EQ(view.nested()(0).leaf().data(), leaf.data());
+    EXPECT_NE(value.nested()(0).leaf().data(), leaf.data());
+    const auto reshaped = view.reshape({ 1, 1 });
+    EXPECT_EQ(reshaped.nested().data(), children.data());
+    EXPECT_EQ(reshaped.nested()({ 0, 0 }).leaf().data(), leaf.data());
+
+    // Temporaries are not an implicit request to share caller-owned storage.
+    const Nested temporaryLeaf(leaf.reshape({ 2 }));
+    const Nested temporaryOuter(children.reshape({ 1 }), 1);
+    EXPECT_NE(temporaryLeaf.leaf().data(), leaf.data());
+    EXPECT_NE(temporaryOuter.nested()(0).leaf().data(), leaf.data());
+    const auto empty = Nested::from_outer_view(sb::Tensor<Nested>({ 0 }), 3);
+    EXPECT_EQ(empty.copy().depth(), 4);
   }
 
   struct IndexableValue
@@ -181,6 +212,29 @@ namespace
     EXPECT_EQ(indexed.shape(), (std::vector<size_t>{ 2, 3 }));
     EXPECT_EQ(indexed({ 0, 2 }).value, 13);
     EXPECT_EQ(indexed({ 1, 1 }).value, 25);
+  }
+
+  TEST(TensorProperties, IndexedConstructionCopiesValuesAndExplicitlyAdoptsOwnedIndices)
+  {
+    sb::Tensor<IndexableValue> source({ 1 });
+    source(0) = { 10 };
+    sb::Tensor<size_t> indices({ 1 });
+    indices(0) = 2;
+    // A temporary view still aliases its caller and must be copied.
+    const auto copied = sb::make_indexed_tensor(source, indices.reshape({ 1 }));
+    EXPECT_NE(copied.indices_view().data(), indices.data());
+    indices(0) = 3;
+    EXPECT_EQ(copied(0).value, 12);
+
+    auto owned = indices.copy();
+    const auto* ownedData = owned.data();
+    const auto adopted = sb::make_indexed_tensor_from_owned_indices(source, std::move(owned));
+    EXPECT_EQ(adopted.indices_view().data(), ownedData);
+    const auto view = adopted.reshape({ 1, 1 });
+    EXPECT_EQ(view.indices_view().data(), ownedData);
+    EXPECT_EQ(view.source_view().data(), source.data());
+    source(0) = { 20 };
+    EXPECT_EQ(view({ 0, 0 }).value, 23);
   }
 
   TEST(TensorProperties, MakeIndexedTensorBroadcastsSingletonSourceAxes)

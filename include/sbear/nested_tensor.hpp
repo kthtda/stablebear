@@ -26,16 +26,20 @@ namespace sb
 
     NestedTensor() : m_storage(std::make_shared<storage_type>(Tensor<LeafT>({0}))), m_depth(1) { }
 
+    /// Value construction always copies, including when passed a temporary.
     explicit NestedTensor(const Tensor<LeafT>& leaf)
-      : m_storage(std::make_shared<storage_type>(leaf)), m_depth(1) { }
-
-    explicit NestedTensor(Tensor<LeafT>&& leaf)
-      : m_storage(std::make_shared<storage_type>(std::move(leaf))), m_depth(1) { }
+      : NestedTensor(from_values(leaf)) { }
 
     explicit NestedTensor(const nested_tensor_type& nested, size_t childDepth = 0)
-      : NestedTensor(copy_nested(nested), childDepth) { }
+      : NestedTensor(from_values(nested, childDepth)) { }
 
-    explicit NestedTensor(nested_tensor_type&& nested, size_t childDepth = 0)
+  private:
+    struct SharedStorage { };
+
+    NestedTensor(SharedStorage, Tensor<LeafT> leaf)
+      : m_storage(std::make_shared<storage_type>(std::move(leaf))), m_depth(1) { }
+
+    NestedTensor(SharedStorage, nested_tensor_type nested, size_t childDepth)
       : m_storage(std::make_shared<storage_type>(std::move(nested)))
     {
       const auto& values = std::get<nested_tensor_type>(*m_storage);
@@ -60,13 +64,31 @@ namespace sb
       m_depth = inferredDepth + 1;
     }
 
-    /// Wrap outer tensor view metadata without recursively copying its children.
-    /// The caller must already own the child values; public value construction
-    /// through the const-reference constructor intentionally copies them.
-    [[nodiscard]] static NestedTensor from_outer_view(
-      nested_tensor_type view, size_t childDepth)
+  public:
+    /// Recursively copy caller-owned values, regardless of value category.
+    [[nodiscard]] static NestedTensor from_values(const Tensor<LeafT>& leaf)
     {
-      return NestedTensor(std::move(view), childDepth);
+      return from_leaf_view(leaf.copy());
+    }
+
+    [[nodiscard]] static NestedTensor from_values(
+      const nested_tensor_type& values, size_t childDepth = 0)
+    {
+      return from_outer_view(copy_nested(values), childDepth);
+    }
+
+    /// Wrap shared leaf storage without copying numeric values.
+    [[nodiscard]] static NestedTensor from_leaf_view(Tensor<LeafT> view)
+    {
+      return NestedTensor(SharedStorage{}, std::move(view));
+    }
+
+    /// Wrap shared outer storage without copying children. Also used to adopt
+    /// freshly built storage whose children have already been copied once.
+    [[nodiscard]] static NestedTensor from_outer_view(
+      nested_tensor_type view, size_t childDepth = 0)
+    {
+      return NestedTensor(SharedStorage{}, std::move(view), childDepth);
     }
 
     [[nodiscard]] bool is_leaf() const noexcept
@@ -120,81 +142,81 @@ namespace sb
     {
       if (is_leaf())
       {
-        return NestedTensor(leaf()[sliceVector]);
+        return from_leaf_view(leaf()[sliceVector]);
       }
-      return NestedTensor(nested()[sliceVector], m_depth - 1);
+      return from_outer_view(nested()[sliceVector], m_depth - 1);
     }
 
     [[nodiscard]] NestedTensor broadcast_to(const std::vector<size_t>& shape) const
     {
       if (is_leaf())
       {
-        return NestedTensor(leaf().broadcast_to(shape));
+        return from_leaf_view(leaf().broadcast_to(shape));
       }
-      return NestedTensor(nested().broadcast_to(shape), m_depth - 1);
+      return from_outer_view(nested().broadcast_to(shape), m_depth - 1);
     }
 
     [[nodiscard]] NestedTensor flatten() const
     {
       if (is_leaf())
       {
-        return NestedTensor(leaf().flatten());
+        return from_leaf_view(leaf().flatten());
       }
-      return NestedTensor(nested().flatten(), m_depth - 1);
+      return from_outer_view(nested().flatten(), m_depth - 1);
     }
 
     [[nodiscard]] NestedTensor reshape(const std::vector<ptrdiff_t>& shape) const
     {
       if (is_leaf())
       {
-        return NestedTensor(leaf().reshape(shape));
+        return from_leaf_view(leaf().reshape(shape));
       }
-      return NestedTensor(nested().reshape(shape), m_depth - 1);
+      return from_outer_view(nested().reshape(shape), m_depth - 1);
     }
 
     [[nodiscard]] NestedTensor transpose(const std::vector<size_t>& axes = {}) const
     {
       if (is_leaf())
       {
-        return NestedTensor(leaf().transpose(axes));
+        return from_leaf_view(leaf().transpose(axes));
       }
-      return NestedTensor(nested().transpose(axes), m_depth - 1);
+      return from_outer_view(nested().transpose(axes), m_depth - 1);
     }
 
     [[nodiscard]] NestedTensor swapaxes(size_t axis1, size_t axis2) const
     {
       if (is_leaf())
       {
-        return NestedTensor(leaf().swapaxes(axis1, axis2));
+        return from_leaf_view(leaf().swapaxes(axis1, axis2));
       }
-      return NestedTensor(nested().swapaxes(axis1, axis2), m_depth - 1);
+      return from_outer_view(nested().swapaxes(axis1, axis2), m_depth - 1);
     }
 
     [[nodiscard]] NestedTensor squeeze() const
     {
       if (is_leaf())
       {
-        return NestedTensor(leaf().squeeze());
+        return from_leaf_view(leaf().squeeze());
       }
-      return NestedTensor(nested().squeeze(), m_depth - 1);
+      return from_outer_view(nested().squeeze(), m_depth - 1);
     }
 
     [[nodiscard]] NestedTensor squeeze(size_t axis) const
     {
       if (is_leaf())
       {
-        return NestedTensor(leaf().squeeze(axis));
+        return from_leaf_view(leaf().squeeze(axis));
       }
-      return NestedTensor(nested().squeeze(axis), m_depth - 1);
+      return from_outer_view(nested().squeeze(axis), m_depth - 1);
     }
 
     [[nodiscard]] NestedTensor expand_dims(ptrdiff_t axis) const
     {
       if (is_leaf())
       {
-        return NestedTensor(leaf().expand_dims(axis));
+        return from_leaf_view(leaf().expand_dims(axis));
       }
-      return NestedTensor(nested().expand_dims(axis), m_depth - 1);
+      return from_outer_view(nested().expand_dims(axis), m_depth - 1);
     }
 
     [[nodiscard]] const Tensor<LeafT>& leaf() const
@@ -219,14 +241,14 @@ namespace sb
     {
       if (is_leaf())
       {
-        return NestedTensor(leaf().copy());
+        return from_leaf_view(leaf().copy());
       }
 
       nested_tensor_type result(nested().shape());
       walk(nested(), [&](const std::vector<size_t>& index) {
         result(index) = nested()(index).copy();
       });
-      return NestedTensor(std::move(result), m_depth - 1);
+      return from_outer_view(std::move(result), m_depth - 1);
     }
 
     [[nodiscard]] bool operator==(const NestedTensor& rhs) const
@@ -313,7 +335,7 @@ namespace sb
 
     if constexpr (Source::depth == 0)
     {
-      return NestedTensor<LeafT>(tensor);
+      return NestedTensor<LeafT>::from_leaf_view(tensor);
     }
     else
     {
@@ -321,7 +343,7 @@ namespace sb
       walk(tensor, [&](const std::vector<size_t>& index) {
         children(index) = to_nested_tensor(tensor(index));
       });
-      return NestedTensor<LeafT>(std::move(children), Source::depth);
+      return NestedTensor<LeafT>::from_outer_view(std::move(children), Source::depth);
     }
   }
 

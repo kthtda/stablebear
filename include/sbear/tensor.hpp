@@ -543,9 +543,12 @@ namespace sb
     IndexedTensorAlignment alignment = IndexedTensorAlignment::Broadcast);
 
   /// Create an indexed tensor by taking ownership of freshly produced indices.
+  /// The caller must supply independent storage: moving a shared handle alone
+  /// does not isolate its aliases. Public selection uses make_indexed_tensor,
+  /// which always copies selections, even when given a temporary view.
   template <typename T, TensorProperties Properties>
   requires IndexableTensorElement<T> && (!IndexedTensorProperties<Properties>)
-  [[nodiscard]] Tensor<T, Properties | TensorProperty::Indexed> make_indexed_tensor(
+  [[nodiscard]] Tensor<T, Properties | TensorProperty::Indexed> make_indexed_tensor_from_owned_indices(
     const Tensor<T, Properties>& source,
     typename detail::IndexTensorStorage<typename T::index_type>::type&& indices,
     IndexedTensorAlignment alignment = IndexedTensorAlignment::Broadcast);

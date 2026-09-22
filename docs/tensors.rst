@@ -82,6 +82,15 @@ child must have the same leaf dtype and nesting depth::
    selections[1].shape    # (1,)
    repr(selections)        # 'Tensor<Tensor<uint64>>'
 
+Construction (including ``sb.NestedTensor(existing_nested)``) and assignment
+recursively copy supplied children. Reusing a child twice creates independent
+stored values. Ordinary outer views, such as slices and transposes, share
+storage: leaf mutations and child replacements are visible through the
+parent and its other views. ``copy()`` and ``copy.deepcopy()`` recursively copy
+logical values, including noncontiguous views; empty copies retain their dtype
+and depth. Reshaping shares storage when the layout permits it and copies
+noncontiguous storage when necessary.
+
 The outer tensor can have multiple dimensions::
 
    selections = sb.tensor([
@@ -96,6 +105,21 @@ Nesting can continue to any depth at runtime::
 
    deeper = sb.tensor([selections, selections.copy()])
    repr(deeper)  # 'Tensor<Tensor<Tensor<uint64>>>'
+
+Depth counts tensor levels, independently of the number of axes at each level.
+For nonempty input, depth and dtype are inferred from the children; neither
+argument is required. An explicitly supplied depth checks the inferred depth
+and does not add nesting levels.
+The following tested depth-3 example combines depth-2 children with vector,
+matrix, scalar, and empty outer shapes. Their numeric leaves also have different
+shapes. An empty child retains its depth and dtype but contains no leaves and
+therefore has no inner shapes. Here ``np`` is NumPy and ``sb`` is stablebear.
+
+.. literalinclude:: ../test/python/test_nested_tensor.py
+   :language: python
+   :start-after: # depth-three-example-start
+   :end-before: # depth-three-example-end
+   :dedent: 4
 
 Numeric leaf tensors may use ``float32``, ``float64``, ``int32``, ``int64``,
 ``uint32``, or ``uint64``. All leaves in one nested tensor must have the same

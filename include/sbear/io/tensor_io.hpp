@@ -617,14 +617,14 @@ namespace sb::io::detail
       {
         throw std::runtime_error("Invalid leaf depth in nested tensor");
       }
-      return NestedTensor<T>(read_element<Tensor<T>>(reader));
+      return NestedTensor<T>::from_leaf_view(read_element<Tensor<T>>(reader));
     }
     if (depth < 2)
     {
       throw std::runtime_error("Invalid nested tensor depth");
     }
     auto children = read_element<Tensor<NestedTensor<T>>>(reader);
-    NestedTensor<T> result(std::move(children), depth - 1);
+    auto result = NestedTensor<T>::from_outer_view(std::move(children), depth - 1);
     if (result.depth() != depth)
     {
       throw std::runtime_error("Nested tensor depth does not match its children");
@@ -721,7 +721,7 @@ namespace sb::io::detail
         Tensor<uint64_t> indices = read_element<Tensor<uint64_t>>(reader);
         validate_indexed_point_cloud_selection(
           indices, sources[sourceId].shape(0));
-        selections.flat(i) = NestedTensor<uint64_t>(std::move(indices));
+        selections.flat(i) = NestedTensor<uint64_t>::from_leaf_view(std::move(indices));
       }
     }
 
@@ -731,7 +731,7 @@ namespace sb::io::detail
     {
       return IndexedTensor(std::move(source), std::nullopt);
     }
-    NestedTensor<uint64_t> ownedSelections(std::move(selections), 1);
+    auto ownedSelections = NestedTensor<uint64_t>::from_outer_view(std::move(selections), 1);
     return IndexedTensor(
       std::move(source), std::move(ownedSelections));
   }

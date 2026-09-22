@@ -113,9 +113,14 @@ namespace
   {
     using Nested = sb::NestedTensor<T>;
     py::class_<Nested>(m, ("Nested" + suffix).c_str())
-        .def(py::init<const sb::Tensor<T>&>())
-        .def(py::init<const typename Nested::nested_tensor_type&, size_t>(),
+        .def(py::init([](const sb::Tensor<T>& values) {
+          return Nested::from_values(values);
+        }))
+        .def(py::init([](const typename Nested::nested_tensor_type& values, size_t childDepth) {
+          return Nested::from_values(values, childDepth);
+        }),
              py::arg("tensor"), py::arg("child_depth") = 0)
+        .def_static("_from_leaf_view", &Nested::from_leaf_view)
         .def_static("_from_outer_view", &Nested::from_outer_view,
              py::arg("tensor"), py::arg("child_depth"))
         .def_property_readonly("is_leaf", &Nested::is_leaf)

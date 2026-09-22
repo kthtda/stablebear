@@ -136,7 +136,7 @@ namespace sb
 
   template <typename T, TensorProperties Properties>
   requires IndexableTensorElement<T> && (!IndexedTensorProperties<Properties>)
-  Tensor<T, Properties | TensorProperty::Indexed> make_indexed_tensor(
+  Tensor<T, Properties | TensorProperty::Indexed> make_indexed_tensor_from_owned_indices(
     const Tensor<T, Properties>& source,
     typename detail::IndexTensorStorage<typename T::index_type>::type&& indices,
     IndexedTensorAlignment alignment)
@@ -161,7 +161,7 @@ namespace sb
     const typename detail::IndexTensorStorage<typename T::index_type>::type& indices,
     IndexedTensorAlignment alignment)
   {
-    return make_indexed_tensor(source, indices.copy(), alignment);
+    return make_indexed_tensor_from_owned_indices(source, indices.copy(), alignment);
   }
 
   template <typename T, TensorProperties Properties>

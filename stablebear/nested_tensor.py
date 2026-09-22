@@ -76,11 +76,15 @@ def _nested_node(value, dtype=None):
 
     leaf = _leaf_tensor(value, dtype=dtype)
     node_type, _ = _NESTED_CPP_TYPES[leaf.dtype]
-    return node_type(leaf._data), leaf.dtype
+    return node_type._from_leaf_view(leaf._data), leaf.dtype
 
 
 class NestedTensor(Tensor):
-    """A recursively nested tensor whose leaf tensors share one numeric dtype."""
+    """A recursively nested tensor whose leaf tensors share one numeric dtype.
+
+    Construction and assignment recursively copy supplied values. Outer views
+    share storage; ``copy()`` and ``deepcopy()`` recursively isolate it.
+    """
 
     def __init__(self, data, *, dtype=None, depth=None):
         from .base_tensor import FloatTensor, IntTensor
@@ -95,7 +99,7 @@ class NestedTensor(Tensor):
                     f"NestedTensor leaf dtype must be {dtype}, got {data.dtype}"
                 )
             dtype = data.dtype
-            root = data._root
+            root = data._root.copy()
             if depth is not None and depth != root.depth:
                 raise ValueError(
                     f"NestedTensor depth is {root.depth}, not requested depth {depth}"
@@ -105,8 +109,8 @@ class NestedTensor(Tensor):
             dtype = leaf.dtype
             node_type, tensor_type = _NESTED_CPP_TYPES[dtype]
             tensor = tensor_type(cpp.Shape([]))
-            tensor._set_element([], node_type(leaf._data))
-            root = node_type(tensor, 1)
+            tensor._set_element([], node_type._from_leaf_view(leaf._data))
+            root = node_type._from_outer_view(tensor, 1)
         elif isinstance(data, (list, tuple)):
             shape, values = _infer_shape_and_flatten(data)
             if not values:
@@ -120,7 +124,7 @@ class NestedTensor(Tensor):
                     )
                 node_type, tensor_type = _NESTED_CPP_TYPES[dtype]
                 children = tensor_type(cpp.Shape(list(shape or (0,))))
-                root = node_type(children, depth - 1)
+                root = node_type._from_outer_view(children, depth - 1)
             else:
                 first, dtype = _nested_node(values[0], dtype=dtype)
                 nodes = [first]
@@ -144,7 +148,7 @@ class NestedTensor(Tensor):
                     tensor._set_element([i], node)
                 if shape != (len(nodes),):
                     tensor = tensor.reshape(list(shape))
-                root = node_type(tensor, child_depth)
+                root = node_type._from_outer_view(tensor, child_depth)
         elif type(data) in _NESTED_NODE_TO_DTYPE:
             actual_dtype = _NESTED_NODE_TO_DTYPE[type(data)]
             if dtype is not None and actual_dtype is not dtype:
@@ -158,7 +162,7 @@ class NestedTensor(Tensor):
                 raise ValueError(
                     f"NestedTensor depth is {data.depth}, not requested depth {depth}"
                 )
-            root = data
+            root = data.copy()
         elif type(data) in _NESTED_TENSOR_TO_DTYPE:
             actual_dtype = _NESTED_TENSOR_TO_DTYPE[type(data)]
             if dtype is not None and actual_dtype is not dtype:
@@ -178,7 +182,13 @@ class NestedTensor(Tensor):
 
     @classmethod
     def _from_cpp(cls, data):
-        return cls(data)
+        """Wrap an internal node without copying its already-owned storage."""
+        result = cls.__new__(cls)
+        Tensor.__init__(result)
+        result._root = data
+        result._data = data.nested
+        result.dtype = _NESTED_NODE_TO_DTYPE[type(data)]
+        return result
 
     @classmethod
     def _is_cpp_nested_tensor(cls, data):
@@ -192,7 +202,7 @@ class NestedTensor(Tensor):
     def _to_py_tensor(self, data):
         node_type, _ = _NESTED_CPP_TYPES[self.dtype]
         root = node_type._from_outer_view(data, self.depth - 1)
-        return NestedTensor(root)
+        return NestedTensor._from_cpp(root)
 
     def _represent_element(self, element):
         from .base_tensor import FloatTensor, IntTensor
@@ -204,7 +214,7 @@ class NestedTensor(Tensor):
                 else IntTensor
             )
             return wrapper(element.leaf)
-        return NestedTensor(element)
+        return NestedTensor._from_cpp(element)
 
     def _decay_value(self, val):
         node, _ = _nested_node(val, dtype=self.dtype)
@@ -220,7 +230,7 @@ class NestedTensor(Tensor):
         return [NestedTensor, FloatTensor, IntTensor, np.ndarray]
 
     def copy(self):
-        return NestedTensor(self._root.copy())
+        return NestedTensor._from_cpp(self._root.copy())
 
     def __deepcopy__(self, memodict=None):
         return self.copy()
