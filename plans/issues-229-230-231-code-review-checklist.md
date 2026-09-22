@@ -326,7 +326,7 @@ identify review work, not test-plan items. The broader test plan still applies.
   Indexed serialization is property-driven through an extensible codec, and
   the Python façade delegates writes through the shared tensor transition.
 
-- [ ] **D2. Make copy and view construction explicit.**
+- [x] **D2. Make copy and view construction explicit.**
 
   **Recommendation:** Distinguish “copy supplied values” from “wrap shared
   storage” at nested and indexed construction boundaries. Apply the same
@@ -342,6 +342,26 @@ identify review work, not test-plan items. The broader test plan still applies.
   [nested_tensor.py](../stablebear/nested_tensor.py),
   [py_tensor.cpp](../src/python/py_tensor.cpp), and indexed construction.
   Verification: test plan B3–B4, C2, E1–E2.
+
+  **Completed:** Fixed by `44924b7e0`. Nested value
+  construction now recursively copies regardless of C++ value category;
+  explicit leaf/outer-view factories and Python internal wrapping preserve
+  shared storage. Python list construction no longer recursively copies its
+  already-copied children again, and construction from an existing Python
+  nested tensor isolates caller data. Indexed construction always copies
+  caller selections; a separately named owned-indices factory adopts fresh
+  sampler selections. Binary readers explicitly wrap their fresh storage.
+  Public ownership behavior is documented in `docs/tensors.rst`.
+
+  Verified with 2,358 Python tests using `_sb_cuda12`, 2,328 passed and 30 CUDA
+  tests skipped using the separate `_sb_cpu` extension (`SB_FORCE_CPU=1`),
+  all 486 C++ tests, and a successful Sphinx HTML build. New regressions cover
+  all six numeric leaf dtypes, deep/scalar/empty and noncontiguous values,
+  repeated children, assignment independence, temporary C++ views, and buffer
+  identity for shared views and adopted selections. The CUDA suite includes
+  device-parametrized tests; the ownership checks themselves do not require GPU
+  execution. The documented depth-3 example also checks differently shaped
+  tensors and demonstrates indexing at each level.
 
 - [ ] **D3. Copy logical coordinates only once when resampling indexed input.**
 
