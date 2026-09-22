@@ -304,13 +304,14 @@ identify review work, not test-plan items. The broader test plan still applies.
   **Recommendation:** The branch combines tensor-level adapters, per-element
   selection/local-materialization state, and Python wrapper-level detachment.
   Consolidate around materialized `PointCloud` values, a read-only logical
-  accessor, and one shared tensor-level materialization transition. Keep legacy
-  decoding at the serialization boundary rather than preserving a second
-  runtime ownership model solely to read old files.
+  accessor, and one shared tensor-level materialization transition. The
+  `PointCloud` index member may implement that transient read-only accessor,
+  but copies and ordinary tensor serialization must materialize it; no released
+  format requires a second persistent indexed-cloud ownership model.
 
   **Complete when:** Ownership and mutation paths are explicit, obsolete local
-  indexing/materialization paths are removed or confined to compatibility
-  conversion, and the fixes in section A do not require duplicated mechanisms.
+  indexing/materialization paths are removed or confined to transient logical
+  access, and the fixes in section A do not require duplicated mechanisms.
   Verify the property-bitmask design and const algorithm access remain intact.
 
   Sources: [point_cloud.hpp](../include/sbear/point_cloud.hpp),

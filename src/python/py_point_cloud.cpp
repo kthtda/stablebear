@@ -15,7 +15,6 @@ namespace
     using PointCloud = sb::PointCloud<T>;
     py::class_<PointCloud>(m, ("PointCloud" + suffix).c_str())
       .def(py::init<const sb::Tensor<T>&>())
-      .def(py::init<const sb::Tensor<T>&, sb::Tensor<sb::uint64_t>>())
       .def_property_readonly("n_points", &PointCloud::n_points)
       .def_property_readonly("n_dims", &PointCloud::dim)
       .def_property_readonly("is_indexed", &PointCloud::is_indexed)
@@ -24,7 +23,7 @@ namespace
       .def("_mutable_coords", &PointCloud::mutable_coords,
         py::return_value_policy::reference_internal)
       .def("materialize", &PointCloud::materialize)
-      .def("copy", &PointCloud::copy, py::arg("keep_source") = true);
+      .def("copy", &PointCloud::copy);
   }
 }
 

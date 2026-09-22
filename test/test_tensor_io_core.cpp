@@ -45,22 +45,22 @@ namespace
     }
     {
       auto fmt = tensorFormatV3<sb::PointCloud<float32_t>>();
-      EXPECT_EQ(1001, fmt.baseFormat);
+      EXPECT_EQ(1000, fmt.baseFormat);
       EXPECT_EQ(32, fmt.subFormat);
     }
     {
       auto fmt = tensorFormatV3<sb::PointCloud<float64_t>>();
-      EXPECT_EQ(1001, fmt.baseFormat);
+      EXPECT_EQ(1000, fmt.baseFormat);
       EXPECT_EQ(64, fmt.subFormat);
     }
     {
       auto fmt = tensorFormatV3<sb::Tensor<sb::PointCloud<float32_t>>>();
-      EXPECT_EQ(1001, fmt.baseFormat);
+      EXPECT_EQ(1000, fmt.baseFormat);
       EXPECT_EQ(32, fmt.subFormat);
     }
     {
       auto fmt = tensorFormatV3<sb::Tensor<sb::PointCloud<float64_t>>>();
-      EXPECT_EQ(1001, fmt.baseFormat);
+      EXPECT_EQ(1000, fmt.baseFormat);
       EXPECT_EQ(64, fmt.subFormat);
     }
     {
@@ -72,13 +72,13 @@ namespace
     {
       auto fmt = sb::io::detail::tensorFormatV3<
         sb::Tensor<sb::PointCloud<float32_t>>>();
-      EXPECT_EQ(1001, fmt.baseFormat);
+      EXPECT_EQ(1000, fmt.baseFormat);
       EXPECT_EQ(32, fmt.subFormat);
     }
     {
       auto fmt = sb::io::detail::tensorFormatV3<
         sb::Tensor<sb::PointCloud<float32_t>, sb::TensorProperty::Indexed>>();
-      EXPECT_EQ(1001, fmt.baseFormat);
+      EXPECT_EQ(1000, fmt.baseFormat);
       EXPECT_EQ(32, fmt.subFormat);
       EXPECT_EQ(sb::TensorProperty::Indexed, fmt.tensorProperties);
       EXPECT_EQ(sb::io::detail::TensorFormatFlag::None, fmt.formatFlags);
@@ -86,7 +86,7 @@ namespace
     {
       auto fmt = sb::io::detail::tensorFormatV3<
         sb::Tensor<sb::PointCloud<float64_t>, sb::TensorProperty::Indexed>>();
-      EXPECT_EQ(1001, fmt.baseFormat);
+      EXPECT_EQ(1000, fmt.baseFormat);
       EXPECT_EQ(64, fmt.subFormat);
       EXPECT_EQ(sb::TensorProperty::Indexed, fmt.tensorProperties);
       EXPECT_EQ(sb::io::detail::TensorFormatFlag::None, fmt.formatFlags);
@@ -146,7 +146,7 @@ namespace
   TEST(TensorIoCore, TensorFormatReaderUsesFileVersion)
   {
     const TensorFormat v3Format{
-      .baseFormat = 1001,
+      .baseFormat = 1000,
       .subFormat = 64,
       .tensorProperties = sb::TensorProperty::Indexed,
       .formatFlags = sb::io::detail::TensorFormatFlag::Nested

@@ -180,28 +180,16 @@ namespace sb
       return true;
     }
 
-    /// Deep copy. Tensor cells route stores through detail::store_copy, which
-    /// prefers copy(). An owning cloud copies its coordinates. An indexed view
-    /// copies its index array (so cells don't alias) and, by default
-    /// (@p keepSource), keeps sharing the source coordinates — immutable by
-    /// convention, the point of indexed views; with @p keepSource false it also
-    /// deep-copies the source, yielding a view that aliases nothing.
-    /// @p keepSource is moot for an owning cloud, which never shares.
-    [[nodiscard]] PointCloud copy(bool keepSource = true) const
+    /// Return a self-contained copy of the logical coordinates. Indexed point
+    /// clouds are transient read-only views produced by indexed tensors; a
+    /// copy crosses into ordinary value storage and is therefore materialized.
+    [[nodiscard]] PointCloud copy() const
     {
       if (m_coords.rank() == 0)
       {
         return PointCloud();
       }
-      if (is_indexed())
-      {
-        if (keepSource)
-        {
-          return PointCloud(m_coords, m_indices.copy());
-        }
-        return PointCloud(m_coords.copy(), m_indices.copy());
-      }
-      return PointCloud(m_coords.copy());
+      return materialized_copy();
     }
 
     /// Validate a point selection without constructing the selected cloud.
@@ -327,12 +315,9 @@ namespace sb
    * Cast a tensor of point clouds (Tensor<PointCloud<U>>) to a different precision
    * (Tensor<PointCloud<T>>), converting each point cloud's coordinates.
    *
-   * Sharing carries over: each distinct coordinate buffer is cast once
-   * (deduplicated by storage identity, as in the io layer) and indexed views are
-   * rebuilt on top of the cast source with their own index arrays. Casting cell
-   * by cell through materialize() would instead expand every view into a full
-   * private copy of its source -- exactly the storage blow-up that indexed
-   * subsample tensors exist to avoid.
+   * Dense coordinate sharing carries over: each distinct coordinate buffer is
+   * cast once. A transient indexed view is materialized because an ordinary
+   * tensor must contain self-contained point-cloud values.
    */
   template <typename T, typename U>
   requires std::is_constructible_v<T, U>
@@ -343,8 +328,13 @@ namespace sb
     // Cast each distinct source buffer once...
     std::map<std::shared_ptr<const void>, Tensor<T>, std::owner_less<std::shared_ptr<const void>>> castSources;
     walk(src, [&](const std::vector<size_t>& idx) {
-      const Tensor<U>& coords = src(idx).coords();
+      const PointCloud<U>& cloud = src(idx);
+      const Tensor<U>& coords = cloud.coords();
       if (coords.rank() == 0)
+      {
+        return;
+      }
+      if (cloud.is_indexed())
       {
         return;
       }
@@ -362,14 +352,14 @@ namespace sb
         result(idx) = PointCloud<T>();
         return;
       }
-      const Tensor<T>& source = castSources.at(cloud.coords().storage_owner());
       if (cloud.is_indexed())
       {
-        result(idx) = PointCloud<T>(source, cloud.indices().copy());
+        result(idx) = PointCloud<T>(tensor_cast<T>(cloud.materialize()));
       }
       else
       {
-        result(idx) = PointCloud<T>(source);
+        result(idx) = PointCloud<T>(
+          castSources.at(cloud.coords().storage_owner()));
       }
     });
     return result;

@@ -65,9 +65,9 @@ turn current behavior into the expected result solely to make a test pass.
 | Observation at reviewed HEAD | Required treatment | Entries |
 | --- | --- | --- |
 | #229 describes full-element access returning a writable `FloatTensor`; this branch intentionally returns a write-aware `PointCloud` façade. | Cover the new façade and retain the underlying requirement that no mutable escape bypasses shared-state materialization. Record the public return-type change explicitly. | A2–A4, E3 |
-| `PointCloud` in C++ still contains `m_indices` and local materialization; Python `_ensure_writeable()` replaces the calling wrapper's `_data`. | Verify tensor-level storage and whole shared-state transition, including pre-existing sibling views. Do not accept per-wrapper detachment as equivalent. | D4, E1–E3 |
+| `PointCloud` in C++ uses `m_indices` to represent the transient read-only value returned by indexed tensor access. | Verify that persistent selections live only in tensor-level storage, copies and ordinary serialization materialize the logical value, and writes perform one whole shared-state transition visible to pre-existing sibling views. | D4, E1–E3 |
 | Generic `make_indexed_tensor` allows singleton source-axis broadcasting. #231 requires an exact public prefix match. | Test both contracts at their respective boundaries; public `(2, 1)` versus `(2, 3)` selection shapes must fail. | C1–C2 |
-| Indexed Python save currently materializes; IO describes subtype `1001` as per-element source IDs and indices. | Require a distinct tensor-level indexed encoding, indexed round trips, and readers for old `1000`/`1001` files. | G1–G3 |
+| Indexed Python save currently materializes. No released Stablebear format stored indexed point clouds. | Require a distinct tensor-level indexed encoding and indexed round trips. Legacy coverage applies only to released materialized point-cloud files. | G1–G3 |
 | The reviewed `(5, 64)` nested format existed only on this feature branch and was never on `main` or in a release. | Do not retain or test compatibility with the unreleased intermediate format. | G2 |
 | Standalone `PointCloud` is absent from object IO dispatch; dtype pickling still uses a name lookup. | Audit all public pickleable types, including default pickling. Do not silently exempt either from #230. | H1–H4 |
 | Tensor metadata now records tensor-property bits and independent layout flags, such as nested storage. This expands each `TensorFormat` record and makes new files unreadable by older readers. | Bump the binary format to version 3, retain version-aware V1/V2 decoding, and verify that 0.5.0 reads supported old files while older releases reject V3. | G1–G3 |
@@ -361,11 +361,10 @@ A–K in order; each item remains independently executable.
     masked select/assignment, equality, and NumPy conversion to dense references.
     Check mutation independence and shape errors, not just resulting values.
     Operations must preserve a valid adapter or materialize the whole affected
-    shared state according to their semantics. For retained low-level
-    `copy(keep_source=True/False)` bindings, verify their distinct documented
-    ownership and index-copy behavior without making them substitutes for
-    public deep copies. Exercise source sharing in low-level casts and sources
-    with the same owner but different offsets/strides. Pass: no accidental
+    shared state according to their semantics. Verify that copying a transient
+    indexed point-cloud view produces a self-contained materialized value.
+    Exercise source sharing in low-level casts and sources with the same owner
+    but different offsets/strides. Pass: no accidental
     aliasing, dropped selections, unsupported-overload failures for promised
     operations, or incorrect cast deduplication.
 
@@ -424,16 +423,16 @@ A–K in order; each item remains independently executable.
 
     Scope: #229/#231. Within this entry, obtain and commit immutable fixtures
     from historical writers for materialized point clouds (`1000`, both
-    precisions) and shared-source indexed point clouds (`1001`, both
     precisions). Include supported historical header versions 1 and 2, current
-    version 3, and ordinary tensor/object controls. Record producer
+    version 3, and ordinary tensor/object controls. Indexed point-cloud files
+    begin with the current V3 tensor-property representation and therefore use
+    current generated fixtures rather than historical ones. Record producer
     commit/version, backend, generation command, checksum, and expected
     contents alongside each fixture. Use isolated historical
     checkouts/environments; do not fabricate compatibility bytes using today's
     writer. Load with current Python and appropriate C++
-    readers, verifying types/shapes/dtypes/values. Legacy indexed data may
-    normalize or materialize, but must retain logical values and safe ownership.
-    Pass: all promised old formats load and new writes use current formats.
+    readers, verifying types/shapes/dtypes/values. Pass: all promised old
+    formats load and new writes use current formats.
 
 - [ ] **G3. Malformed binary input and boolean encoding.**
 

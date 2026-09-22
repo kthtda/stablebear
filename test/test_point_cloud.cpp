@@ -25,4 +25,27 @@ namespace
     EXPECT_NO_THROW((void)sb::PointCloud<T>{});
     EXPECT_NO_THROW(((void)sb::PointCloud<T>{std::vector<size_t>{0, 2}}));
   }
+
+  TYPED_TEST(PointCloudTest, CopyMaterializesAnIndexedView)
+  {
+    using T = TypeParam;
+
+    sb::Tensor<T> coordinates({3, 1});
+    coordinates({0, 0}) = T{10};
+    coordinates({1, 0}) = T{20};
+    coordinates({2, 0}) = T{30};
+    sb::Tensor<uint64_t> rows({2});
+    rows(0) = 2;
+    rows(1) = 0;
+
+    const sb::PointCloud<T> view(coordinates, std::move(rows));
+    const sb::PointCloud<T> copied = view.copy();
+
+    EXPECT_TRUE(view.is_indexed());
+    EXPECT_FALSE(copied.is_indexed());
+    EXPECT_EQ(copied.n_points(), 2);
+    EXPECT_EQ(copied(0, 0), T{30});
+    EXPECT_EQ(copied(1, 0), T{10});
+    EXPECT_NE(copied.coords().storage_owner(), coordinates.storage_owner());
+  }
 }

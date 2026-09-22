@@ -179,11 +179,8 @@ namespace sb::io::detail
     else if constexpr (std::is_same_v<T, Pcf<int32_t, int32_t>>) { return TensorFormat{ .baseFormat = 101, .subFormat = 32 }; }
     else if constexpr (std::is_same_v<T, Pcf<int64_t, int64_t>>) { return TensorFormat{ .baseFormat = 101, .subFormat = 64 }; }
 
-    // Earlier point-cloud tensors use base format 1000 and store every cloud
-    // as a full coordinate tensor. V3 uses base format 1001 and stores each
-    // distinct coordinate source once plus per-element source metadata.
-    else if constexpr (std::is_same_v<T, PointCloud<float32_t>>) { return TensorFormat{ .baseFormat = 1001, .subFormat = 32 }; }
-    else if constexpr (std::is_same_v<T, PointCloud<float64_t>>) { return TensorFormat{ .baseFormat = 1001, .subFormat = 64 }; }
+    else if constexpr (std::is_same_v<T, PointCloud<float32_t>>) { return TensorFormat{ .baseFormat = 1000, .subFormat = 32 }; }
+    else if constexpr (std::is_same_v<T, PointCloud<float64_t>>) { return TensorFormat{ .baseFormat = 1000, .subFormat = 64 }; }
 
     else if constexpr (std::is_same_v<T, SymmetricMatrix<float32_t>>) { return TensorFormat{ .baseFormat = 1100, .subFormat = 32 }; }
     else if constexpr (std::is_same_v<T, SymmetricMatrix<float64_t>>) { return TensorFormat{ .baseFormat = 1100, .subFormat = 64 }; }
@@ -286,6 +283,24 @@ namespace sb::io::detail
   template <typename T>
   NestedTensor<T> read_nested_tensor_element(BinaryReader& reader);
 
+  /// Element-specific encoding for tensors carrying the Indexed property.
+  /// Add a specialization when another element type gains persistent indexed
+  /// storage; the top-level tensor reader and writer remain property-driven.
+  template <typename ElementT>
+  struct IndexedTensorCodec;
+
+  template <typename ScalarT>
+  struct IndexedTensorCodec<PointCloud<ScalarT>>
+  {
+    template <TensorProperties Properties>
+      requires IndexedTensorProperties<Properties>
+    static void write(
+      std::ostream& os, const Tensor<PointCloud<ScalarT>, Properties>& tensor);
+
+    static Tensor<PointCloud<ScalarT>, TensorProperty::Indexed> read(
+      BinaryReader& reader);
+  };
+
   template <typename T>
   void write_value(std::ostream& os, const NestedTensor<T>& value)
   {
@@ -372,76 +387,17 @@ namespace sb::io::detail
     return PointCloud<T>(std::move(coords));
   }
 
-  // Shared writer for tensors whose elements may be indexed views over a
-  // source coordinate buffer (PointCloud): each distinct source is
-  // stored once (deduplicated by buffer address — elements sharing a source,
-  // e.g. indexed subsamples, are written once),
-  // then every element as its source id plus, for indexed views, its index
-  // array. @p sourceKey maps an element to its source buffer address;
-  // @p writeSource writes one element's source.
-  template <typename ElemT, typename SourceKeyF, typename WriteSourceF>
-  void write_shared_source_elements(
-      std::ostream& os, const Tensor<ElemT>& tensor,
-      SourceKeyF sourceKey, WriteSourceF writeSource)
-  {
-    using KeyT = decltype(sourceKey(std::declval<const ElemT&>()));
-
-    auto sz = tensor.size();
-    const auto* data = tensor.data();
-
-    // Assign each distinct source an id in first-appearance order...
-    std::map<KeyT, uint64_t, std::owner_less<KeyT>> idOf;
-    std::vector<const ElemT*> sources;
-    for (auto k = 0_uz; k < sz; ++k)
-    {
-      if (!idOf.contains(sourceKey(data[k])))
-      {
-        idOf.emplace(sourceKey(data[k]), static_cast<uint64_t>(sources.size()));
-        sources.push_back(&data[k]);
-      }
-    }
-
-    // ...write the source block...
-    write_bytes<uint64_t>(os, static_cast<uint64_t>(sources.size()));
-    for (const ElemT* src : sources)
-    {
-      writeSource(os, *src);
-    }
-
-    // ...then every element as a reference to its source.
-    for (auto k = 0_uz; k < sz; ++k)
-    {
-      write_bytes<uint64_t>(os, idOf.at(sourceKey(data[k])));
-      write_bytes<bool>(os, data[k].is_indexed());
-      if (data[k].is_indexed())
-      {
-        write_tensor(os, data[k].indices());
-      }
-    }
-  }
-
-  // Point cloud sources are their coordinate tensors.
-  template <typename ScalarT>
-  void write_point_cloud_elements(
-      std::ostream& os, const Tensor<PointCloud<ScalarT>>& tensor)
-  {
-    write_shared_source_elements(
-        os, tensor,
-        [](const PointCloud<ScalarT>& elem) { return elem.coords().storage_owner(); },
-        [](std::ostream& output, const PointCloud<ScalarT>& src) {
-          write_tensor(output, src.coords());
-        });
-  }
-
   // Write a tensor-level indexed point-cloud tensor without materializing its
   // logical coordinates.  Iterating through the logical view composes any
   // source-cloud indexing with the tensor-level selections, so sliced,
   // transposed, and repeated views become self-contained while coordinate
   // buffers remain deduplicated.
   template <typename ScalarT>
-  void write_indexed_point_cloud_tensor(
+  template <TensorProperties Properties>
+    requires IndexedTensorProperties<Properties>
+  void IndexedTensorCodec<PointCloud<ScalarT>>::write(
       std::ostream& os,
-      const Tensor<PointCloud<ScalarT>, TensorProperty::Indexed>& tensor)
+      const Tensor<PointCloud<ScalarT>, Properties>& tensor)
   {
     write_type_format(os, tensorFormatV3<decltype(tensor)>());
 
@@ -527,33 +483,26 @@ namespace sb::io::detail
     }
 
     using value_type = typename TensorT::value_type;
-    if constexpr (is_point_cloud_v<value_type>)
+    auto sz = serialized_tensor_size(tensor);
+    if constexpr (std::is_same_v<value_type, bool>)
     {
-      write_point_cloud_elements<typename is_point_cloud<value_type>::scalar_type>(os, tensor);
+      for (size_t offset = 0; offset < sz; offset += 8)
+      {
+        std::uint8_t packed = 0;
+        const size_t end = std::min(offset + 8, sz);
+        for (size_t i = offset; i < end; ++i)
+        {
+          packed |= static_cast<std::uint8_t>(tensor.data()[i] ? 1 : 0)
+            << (i - offset);
+        }
+        write_bytes<std::uint8_t>(os, packed);
+      }
     }
     else
     {
-      auto sz = serialized_tensor_size(tensor);
-      if constexpr (std::is_same_v<value_type, bool>)
+      for (auto const * elem = tensor.data(); elem != tensor.data() + sz; ++elem)
       {
-        for (size_t offset = 0; offset < sz; offset += 8)
-        {
-          std::uint8_t packed = 0;
-          const size_t end = std::min(offset + 8, sz);
-          for (size_t i = offset; i < end; ++i)
-          {
-            packed |= static_cast<std::uint8_t>(tensor.data()[i] ? 1 : 0)
-              << (i - offset);
-          }
-          write_bytes<std::uint8_t>(os, packed);
-        }
-      }
-      else
-      {
-        for (auto const * elem = tensor.data(); elem != tensor.data() + sz; ++elem)
-        {
-          write_value(os, *elem);
-        }
+        write_value(os, *elem);
       }
     }
   }
@@ -562,10 +511,9 @@ namespace sb::io::detail
   void write_tensor(std::ostream& os, const TensorT& tensor)
   {
     using value_type = typename TensorT::value_type;
-    if constexpr (TensorT::IsIndexed && is_point_cloud_v<value_type>)
+    if constexpr (TensorT::IsIndexed)
     {
-      write_indexed_point_cloud_tensor<
-        typename is_point_cloud<value_type>::scalar_type>(os, tensor);
+      IndexedTensorCodec<value_type>::write(os, tensor);
     }
     else if (!tensor.is_contiguous())
     {
@@ -637,9 +585,15 @@ namespace sb::io::detail
       else if constexpr (is_compressed_matrix_v<T>)
         *elem = read_compressed_matrix<T>(is);
       else if constexpr (is_point_cloud_v<T>)
-        // Earlier point-cloud tensors (baseFormat 1000) store a complete
-        // coordinate tensor for every element.
-        *elem = T(read_element<Tensor<typename is_point_cloud<T>::scalar_type>>(reader));
+      {
+        // Point-cloud tensors store a complete logical coordinate tensor for
+        // every element. A rank-zero tensor represents a default empty cell.
+        auto coordinates = read_element<
+          Tensor<typename is_point_cloud<T>::scalar_type>>(reader);
+        *elem = coordinates.rank() == 0
+          ? T()
+          : T(std::move(coordinates));
+      }
       else if constexpr (is_nested_tensor_v<T>)
         *elem = read_nested_tensor_element<typename is_nested_tensor<T>::leaf_type>(reader);
       else
@@ -676,111 +630,6 @@ namespace sb::io::detail
       throw std::runtime_error("Nested tensor depth does not match its children");
     }
     return result;
-  }
-
-  // Shared reader for the shared-source tensor formats (see
-  // write_shared_source_elements): distinct sources stored once, then
-  // per-element (source id, indexed flag, optional indices). Elements that
-  // reference the same source share its buffer, as before saving.
-  // @p readSource reads one source of type SourceT; elements are built as
-  // ElemT(source) or ElemT(source, indices).
-  template <typename ElemT, typename SourceT, typename ReadSourceF>
-  Tensor<ElemT> read_shared_source_tensor(
-      BinaryReader& reader, ReadSourceF readSource)
-  {
-    auto& is = reader.stream();
-    auto shapeSz = read_bytes<std::uint64_t>(is);
-    std::vector<size_t> shape(shapeSz);
-    std::vector<ptrdiff_t> strides(shapeSz);
-    for (auto i = 0_uz; i < shapeSz; ++i)
-    {
-      shape[i] = read_bytes<std::uint64_t>(is);
-      strides[i] = static_cast<ptrdiff_t>(read_bytes<std::uint64_t>(is));
-    }
-
-    Tensor<ElemT> ret(shape);
-    if (ret.strides() != strides)
-    {
-      throw std::runtime_error("Incorrect strides in saved data (expected " + index_to_string(ret.strides()) + " but got " + index_to_string(strides) + ")");
-    }
-
-    auto numSources = read_bytes<std::uint64_t>(is);
-    std::vector<SourceT> sources;
-    sources.reserve(numSources);
-    for (auto i = 0_uz; i < numSources; ++i)
-    {
-      SourceT source = readSource(reader);
-      if constexpr (is_point_cloud_v<ElemT>)
-      {
-        if (source.rank() != 0 && source.rank() != 2)
-        {
-          throw std::runtime_error(
-            "Invalid number of point-cloud coordinate dimensions in saved data");
-        }
-      }
-      sources.push_back(std::move(source));
-    }
-
-    auto sz = ret.size();
-    for (auto* elem = ret.data(); elem != ret.data() + sz; ++elem)
-    {
-      auto id = read_bytes<std::uint64_t>(is);
-      if (id >= sources.size())
-      {
-        throw std::runtime_error("Invalid shared-source reference in saved data");
-      }
-      const bool indexed = read_bytes<bool>(is);
-      if (indexed)
-      {
-        if constexpr (is_point_cloud_v<ElemT>)
-        {
-          if (sources[id].rank() != 2)
-          {
-            throw std::runtime_error(
-              "Indexed point-cloud source must have 2 dimensions");
-          }
-        }
-        Tensor<uint64_t> indices = read_element<Tensor<uint64_t>>(reader);
-        if (indices.rank() != 1)
-        {
-          throw std::runtime_error(
-            "Invalid number of point-cloud index dimensions in saved data");
-        }
-        for (size_t i = 0; i < indices.size(); ++i)
-        {
-          if (indices(i) >= sources[id].shape(0))
-          {
-            throw std::runtime_error("Point-cloud index out of bounds in saved data");
-          }
-        }
-        *elem = ElemT(sources[id], std::move(indices));
-      }
-      else
-      {
-        // Sharing, not copying: PointCloud wraps the coordinate tensor.
-        if constexpr (is_point_cloud_v<ElemT>)
-        {
-          *elem = sources[id].rank() == 0 ? ElemT() : ElemT(sources[id]);
-        }
-        else
-        {
-          *elem = ElemT(sources[id]);
-        }
-      }
-    }
-
-    return ret;
-  }
-
-  // Read the V3 shared-source point-cloud layout (baseFormat 1001).
-  template <typename ScalarT>
-  Tensor<PointCloud<ScalarT>> read_indexed_point_cloud_tensor(
-      BinaryReader& reader)
-  {
-    return read_shared_source_tensor<PointCloud<ScalarT>, Tensor<ScalarT>>(
-        reader, [](BinaryReader& input) {
-          return read_element<Tensor<ScalarT>>(input);
-        });
   }
 
   template <typename ScalarT>
@@ -821,13 +670,13 @@ namespace sb::io::detail
     }
   }
 
-  // Read the V3 tensor-level indexed point-cloud layout (baseFormat 1001 with
+  // Read the V3 tensor-level indexed point-cloud layout (baseFormat 1000 with
   // the Indexed tensor-property bit).
   // The payload contains a deduplicated coordinate-source table followed by
   // an aligned source reference and owned selection for each logical cell.
   template <typename ScalarT>
   Tensor<PointCloud<ScalarT>, TensorProperty::Indexed>
-  read_tensor_level_indexed_point_cloud_tensor(BinaryReader& reader)
+  IndexedTensorCodec<PointCloud<ScalarT>>::read(BinaryReader& reader)
   {
     auto& is = reader.stream();
     auto shapeSz = read_bytes<std::uint64_t>(is);
@@ -902,8 +751,8 @@ namespace sb::io::detail
   }
 
   /// Read a tensor body for TensorT, routing on its full type and the format
-  /// already read from the stream: lazy indexed point-cloud storage, the
-  /// ordinary V3 shared-source layout, or the element-wise V1/V2 layout.
+  /// already read from the stream: an element-specific indexed layout or the
+  /// ordinary element-wise layout.
   /// Both read entry points go through here so they cannot drift apart.
   template <IsTensor TensorT>
   TensorT read_tensor_for_format(BinaryReader& reader, TensorFormat format)
@@ -919,19 +768,9 @@ namespace sb::io::detail
     }
 
     using value_type = typename TensorT::value_type;
-    if constexpr (TensorT::IsIndexed && is_point_cloud_v<value_type>)
+    if constexpr (TensorT::IsIndexed)
     {
-      return read_tensor_level_indexed_point_cloud_tensor<
-        typename is_point_cloud<value_type>::scalar_type>(reader);
-    }
-    else if constexpr (is_point_cloud_v<value_type>)
-    {
-      if (reader.format_version() >= 3)
-      {
-        return read_indexed_point_cloud_tensor<
-          typename is_point_cloud<value_type>::scalar_type>(reader);
-      }
-      return read_tensor<value_type>(reader);
+      return IndexedTensorCodec<value_type>::read(reader);
     }
     else
     {
@@ -957,7 +796,7 @@ namespace sb::io::detail
   read_tensor_level_indexed_point_cloud_tensor(std::istream& is)
   {
     BinaryReader reader(is);
-    return read_tensor_level_indexed_point_cloud_tensor<ScalarT>(reader);
+    return IndexedTensorCodec<PointCloud<ScalarT>>::read(reader);
   }
 }
 
