@@ -1,17 +1,29 @@
-# Test plan: subsampling, nested tensors, and unified persistence
+# Test plan: PR #233 subsampling, nesting, and persistence
 
-Planning only: this document does not implement tests or report test results.
-All checklist entries are initially unchecked.
+Updated 2026-09-22 after reviewing the committed branch. This document records
+existing evidence and remaining acceptance work; this review did not implement
+or modify tests. Unchecked entries may have substantial partial coverage: they
+remain open until their full stated contract is verified.
 
 ## Scope and execution rules
 
-Reviewed on 2026-09-19 against:
+Reviewed against:
 
-- [#229: uniform point-cloud subsampling with tensor-level indexed storage](https://github.com/kthtda/stablebear/issues/229), including every acceptance criterion.
-- [#230: all pickling through Stablebear IO with legacy compatibility](https://github.com/kthtda/stablebear/issues/230), including every acceptance criterion.
-- [#231: runtime-nested tensors and ragged point-cloud indexing](https://github.com/kthtda/stablebear/issues/231), including every acceptance criterion.
-- Branch `issue-229-uniform-subsampling`, HEAD `44acc9f97667025beb0c63fe5499ba759b435c14`.
-- Freshly fetched `origin/main`, `4a9c284f4f48d6711083d99ee529819d4c546384`, which is also the merge base. The net diff contains 53 changed files, including one deleted test file. Issue comments were empty at review time.
+- [PR #233: uniform subsampling and indexed tensor support](https://github.com/kthtda/stablebear/pull/233).
+- [#229: uniform point-cloud subsampling](https://github.com/kthtda/stablebear/issues/229).
+- [#230: binary-backed pickling and legacy compatibility](https://github.com/kthtda/stablebear/issues/230).
+- [#231: runtime nesting and ragged indexing](https://github.com/kthtda/stablebear/issues/231).
+- [#232: barcode tensor isomorphism](https://github.com/kthtda/stablebear/issues/232), now included as F3 below.
+- Local branch `issue-229-uniform-subsampling`, HEAD `cced5d9b78c56f97cee4495505df5c0560438fcb`.
+- PR base/main and merge base `4a9c284f4f48d6711083d99ee529819d4c546384`.
+  The local diff contains 148 changed files. Remote PR head is
+  `b0b39ee1530230d0ac021276b5f5c3e770fe948f`; local D2 work is two commits ahead.
+- D3 changes in `stash@{0}` are excluded. Rebuild after stashing before claiming
+  evidence for this commit; an installed extension can otherwise still contain
+  the stashed code.
+- [#236: distance-matrix subsampling](https://github.com/kthtda/stablebear/issues/236)
+  remains an explicitly deferred follow-up dependent on #229. It is not
+  implemented or accepted by this review.
 
 Execute numbered entries in order. Each entry is a self-contained work unit:
 create its own inputs, generators, temporary files, and any required historical
@@ -25,7 +37,7 @@ For each entry, record test locations, cases covered, backend/build identity,
 commands and results, and any remaining failures or blocked cases. Mark an entry
 complete only when its acceptance checks pass; an expected failure or skipped
 CUDA run is not acceptance evidence. These are instructions for future test
-work, not authorization to implement tests as part of creating this plan.
+work, not authorization to implement tests as part of this review.
 
 Common environment prerequisite, independently applicable to every executable
 entry: follow [CLAUDE.md](../CLAUDE.md), build and install before testing, and run
@@ -55,23 +67,73 @@ or recursive IO has a GPU kernel merely because the CUDA module is loaded.
 Use exact comparisons for selections, shapes, integer data, and lossless IO;
 use explicit precision-appropriate tolerances for computed floating results.
 
+## Current evidence and remaining coverage
+
+The committed source was rebuilt/installed with `cmake --build
+cmake-build-debug -j$(nproc)` and `cmake --install cmake-build-debug`.
+Commands below ran from `test/` unless otherwise noted:
+
+| Verification at `cced5d9b7` | Result |
+| --- | --- |
+| `python -m pytest python -q`, loaded `_sb_cuda12` | 2,358 passed |
+| `SB_FORCE_CPU=1 python -m pytest python -q`, loaded `_sb_cpu` | 2,328 passed, 30 CUDA cases skipped |
+| `../cmake-build-debug/sb_test` | 486 passed |
+| `make html` from `docs/` | Succeeded |
+| Temporary Python review probes | Scalar serialization and wrong-depth nested assignment failures reproduced on both modules; see review E1/E2 |
+| Temporary standalone C++ probes | Indexed overlap and shared-coordinate-view corruption reproduced; see review E3/E4 |
+
+These are local regression results, not proof that every acceptance item below
+is implemented. No fresh wheel/platform matrix, coverage instrumentation, or
+current-version bidirectional CPU/CUDA file exchange was run. A CUDA-backed
+module does not make subsampling or IO execute on GPU. Fixed 0.4.7 artifacts
+produced with `_sb_cuda13` load on both current modules; this does not constitute
+running the current CUDA 13 extension.
+
+| Plan entries | Existing committed evidence | Remaining work / status |
+| --- | --- | --- |
+| A1–A4 | Point-cloud construction/rank tests, façade mutation tests, two actual extension builds | Partial: packaging/import matrix, every mutable escape, and failed-write atomicity still need a focused audit |
+| B1–B4 | `test_nested_tensor.py`: 19 positive construction/view/ownership cases, including all six leaf dtypes and the documented depth-3 example | Blocked by review E2: wrong-depth bulk assignment, scalar explicit descriptors, and incompatible empty joins lack rejection tests |
+| B5 | `test/test_tensor.cpp`: nested factories, static conversion, generic properties, indexed validation/ownership | Partial: add overlapping indexed assignment regression (review E3) and invalid descriptor routes |
+| C1–C2 | `test_point_cloud_tensors.py`: exact-prefix checks, row bounds, dtype/rank validation, selection ownership | Substantial coverage; complete scalar/empty/deep/view case matrix before checking off |
+| D1 | `test_subsample.py`: 24 cases across three methods (20 scalar-size, 2 ragged-size, 2 shared-mutation cases) | Partial: broader outer-shape and complete argument boundary matrix still needed |
+| D2–D4 | Generic RNG tests exist; temporary sampler probes passed validation/no-advance, stream allocation, empty-slot, stable filtering, and 1/2/4-worker checks | No committed sampler-specific rejection/RNG/deduplication/resampling tests or C++ sampler tests; statistical uniformity remains unverified |
+| E1–E4 | Shared materialization, independence, selection ownership, splits/views; D2 copy-boundary tests | Review D3 remains in committed code; allocation evidence from stashed work is excluded. Review E3 exposes overlap corruption |
+| E5 | `test_indexed_tensor_interface.py`: comparisons, mixed joins, mask/index selection, constant-cloud assignment | Partial: tensor-RHS/overlap paths and precision casts of shared coordinate views (review E4) remain gaps |
+| F1–F2 | Indexed whole-tensor persistence/kernel tests at both precisions, dense comparisons, generic async tests | Strengthen retained-storage assertions; wrapper type alone survives materialization. Temporary probes confirmed actual indexed state, but task lifetime/cancellation matrix remains incomplete |
+| F3 (#232) | `persistence/test_barcode_isomorphism.py`: aligned tensor comparison, type/dtype/shape errors, tolerances at both precisions | Core implementation covered; scalar/empty/transposed cases passed temporary probes and should become permanent regression cases |
+| G1 / H2 | Indexed round trips, public pickle paths for tensor/standalone families, all nested leaf dtypes, protocols, owner-backed standalone clouds | Blocked by review E1/E4: nonzero scalar payloads and distinct coordinate views sharing one allocation are missing |
+| G2 / H3 | 63 immutable 0.4.7 artifacts (31 binary, 32 pickle) and 2 V1 masspcf artifacts; checksums and independent manifest expectations | Preserve these bytes. Historical scope audit and remaining format matrix must stay explicit; unreleased `(5, 64)` is deliberately excluded |
+| G3 | Existing serialization robustness tests and current-binary magic/fallback tests | Partial: malformed new nested/indexed metadata and checked size/stride/rank cases need broader targeted coverage |
+| H1 | Shared reducer assertions in exercised classes; dtype singleton behavior and unsupported state objects explicitly tested | Guard is a hardcoded inventory, not a discovery guard that detects a newly exported bespoke/default-pickle type |
+| H4 | Same historical files load under separate CPU and CUDA 12 modules | Partial: current CPU↔CUDA writes/reads and current CUDA 13 execution not tested |
+| I1–I3 | Full suites pass; Sphinx builds; depth-3 example is included directly from a test | Full deleted-test intent audit remains; changelog still advertises `IndexTensor`; examples need scalar IO coverage |
+| J1 | Released corpora under `test/golden/serialization/`, generation scripts, manifests and loader tests | Partial: no pinned current-version nested/indexed corpus; add completeness/unlisted-file checks after correctness fixes |
+| K1 | Fresh committed-build local regression results above | Not accepted: review findings and missing acceptance evidence remain open |
+
+An existing public limitation remains: tensor-valued `PointCloudTensor` RHS
+assignment is rejected, and some accepted `FloatTensor` RHS mask/index paths
+also fail. The materialized restriction predates this branch; do not report it
+as a new regression. E5 should resolve/document the promised ordinary/indexed
+assignment boundary and test whichever contract is accepted.
+
 ## Contract discrepancies to keep visible
 
-These are source-review observations, not executed-test results. Test the issue
-requirements even where the current implementation appears incomplete. Record
-an explicit approved contract change if the intended behavior changes; do not
-turn current behavior into the expected result solely to make a test pass.
+Do not turn an implementation failure into an expected result merely to pass a
+test. The [review checklist](issues-229-230-231-code-review-checklist.md) records
+confirmed defects separately from incomplete coverage.
 
 | Observation at reviewed HEAD | Required treatment | Entries |
 | --- | --- | --- |
-| #229 describes full-element access returning a writable `FloatTensor`; this branch intentionally returns a write-aware `PointCloud` façade. | Cover the new façade and retain the underlying requirement that no mutable escape bypasses shared-state materialization. Record the public return-type change explicitly. | A2–A4, E3 |
-| `PointCloud` in C++ uses `m_indices` to represent the transient read-only value returned by indexed tensor access. | Verify that persistent selections live only in tensor-level storage, copies and ordinary serialization materialize the logical value, and writes perform one whole shared-state transition visible to pre-existing sibling views. | D4, E1–E3 |
-| Generic `make_indexed_tensor` allows singleton source-axis broadcasting. #231 requires an exact public prefix match. | Test both contracts at their respective boundaries; public `(2, 1)` versus `(2, 3)` selection shapes must fail. | C1–C2 |
-| Indexed Python save currently materializes. No released Stablebear format stored indexed point clouds. | Require a distinct tensor-level indexed encoding and indexed round trips. Legacy coverage applies only to released materialized point-cloud files. | G1–G3 |
-| The reviewed `(5, 64)` nested format existed only on this feature branch and was never on `main` or in a release. | Do not retain or test compatibility with the unreleased intermediate format. | G2 |
-| Standalone `PointCloud` is absent from object IO dispatch; dtype pickling still uses a name lookup. | Audit all public pickleable types, including default pickling. Do not silently exempt either from #230. | H1–H4 |
-| Tensor metadata now records tensor-property bits and independent layout flags, such as nested storage. This expands each `TensorFormat` record and makes new files unreadable by older readers. | Bump the binary format to version 3, retain version-aware V1/V2 decoding, and verify that 0.5.0 reads supported old files while older releases reject V3. | G1–G3 |
-| `CHANGELOG.md` still advertises `IndexTensor`; saving/indexing docs describe older or inconsistent ownership. | Verify documentation against the accepted API/storage contracts. | I3 |
+| #229 describes full-element access returning `FloatTensor`; the branch uses a write-aware `PointCloud` façade. | Cover the actual façade and preserve the requirement that writes transition shared state safely. Record the public return type clearly. | A2–A4, E3 |
+| C++ `PointCloud::m_indices` is confined to transient logical access; persistent state belongs to the tensor. | Test actual selection state, owned values, and one shared transition. Backend wrapper class identity is insufficient evidence. | B5, E1–E3, F1 |
+| Generic indexing allows singleton broadcasting; the public point-cloud API now enforces exact leading dimensions. | Both contracts need independent checks at their boundaries. | C1–C2 |
+| Indexed IO and standalone PointCloud IO are implemented; scalar payloads and aliased coordinate views still corrupt data. | Add regressions for review E1/E4 without regenerating historical bytes. | G1, H2, J1 |
+| Bulk nested writes bypass the stored depth descriptor; scalar descriptors and empty joins are inconsistent. | Validate before any mutation, including empty operands and every tensor-RHS path. | B2–B4 |
+| Overlapping indexed C++ assignment lacks the ordinary alias safeguard. | Compare reverse/shift writes against a pre-write snapshot and verify siblings/source independence. | B5, E3, E5 |
+| The `(5, 64)` nested format existed only on this feature branch, never main or a release. | No legacy decoder/fixture is required; preserve the recorded history decision. | G2 |
+| Dtype pickling deliberately retains immutable singleton lookup; Generator and Rectangle are not pickleable. | Keep the explicit supported-type policy visible; expand the guard beyond its current hand-maintained cases. | H1 |
+| V3 tensor-property/layout metadata is implemented, with V1/V2 readers. | Preserve version-aware decoding and fixed released files; add new-format corruption and pinned-current fixtures. | G1–G3, J1 |
+| `CHANGELOG.md` still names the removed public `IndexTensor`. | Reconcile release notes and ownership descriptions during review D4. | I3 |
 
 ## Ordered checklist
 
@@ -165,7 +227,9 @@ A–K in order; each item remains independently executable.
    with incompatible stored depth. Exercise checked leaf/nested accessors and
    visitation in C++; a wrong alternative must report an error, not cast
    unchecked. Pass: concise Python type/value errors and safe C++ failures,
-   without partly initialized values escaping.
+   without partly initialized values escaping. Explicitly cover the scalar-outer
+   numeric-tensor/NumPy constructor with incompatible and noninteger `depth`,
+   which currently ignores that argument (review E2).
 
 - [ ] **B3. Nested ownership, assignment, copy, and deepcopy.**
 
@@ -180,6 +244,11 @@ A–K in order; each item remains independently executable.
    outer views share storage, while value construction/assignment and explicit
    deep copies do not alias caller-owned children.
 
+   **Required regression (review E2):** Assign a depth-3 RHS into a depth-2
+   destination through slices, boolean masks, and integer/multi-axis selectors.
+   Every route must reject before changing values, depth metadata, or aliases;
+   also verify successful same-depth writes actually take effect.
+
 - [ ] **B4. Nested outer operations and generic tensor compatibility.**
 
    Scope: #231 and branch integration with the base tensor interface. Check
@@ -187,7 +256,9 @@ A–K in order; each item remains independently executable.
    advanced indices where ordinary tensors support them, iteration, flatten,
    reshape, transpose, swapaxes, squeeze, expand-dims, broadcast, stack,
    concatenate, split, and array-split. Use scalar/empty/deep values and
-   transposed, reversed, and stepped outer views. Validate illegal axes,
+   transposed, reversed, and stepped outer views. Include incompatible empty
+   join operands with different stored depths in both operand orders (review
+   E2); zero elements must not bypass type validation. Validate illegal axes,
    incompatible shapes, reshape inference, and mixed type/depth joins. Compare
    children with independently built expected values, not just `repr`. Pass:
    depth, dtype, shape, contents, and ordinary view/copy semantics survive every
@@ -310,8 +381,9 @@ A–K in order; each item remains independently executable.
     obtained writable input views after return, then delete inputs: samples
     must remain unchanged and valid. Empty outer inputs need no coordinate
     copy. Pass: structural and copy-count requirements hold, not merely equal
-    numerical results. Flag the issue's prohibition on local `PointCloud`
-    selection state if the implementation still relies on it.
+    numerical results. Transient read-only `PointCloud` selections are allowed
+    by the settled D1 design; reject persistent per-cell selections or mutable
+    escapes that bypass the shared tensor transition.
 
 - [ ] **E2. Indexed outer views preserve alignment and sharing.**
 
@@ -338,6 +410,11 @@ A–K in order; each item remains independently executable.
     aliases of the same logical cell see the write; other sampled cells, the
     original input, and a separate sampling result do not. No mixture of local
     indexed/materialized cells is accepted.
+
+    **Required regression (review E3):** In C++, assign a reversed/shifted view
+    into the same indexed tensor before and after materialization. Compare all
+    values to a pre-write snapshot, not a live alias. The current overlap guard
+    excludes indexed properties and corrupts a four-element reversal.
 
 - [ ] **E4. Repeated indexing and resampling indexed inputs.**
 
@@ -368,6 +445,11 @@ A–K in order; each item remains independently executable.
     aliasing, dropped selections, unsupported-overload failures for promised
     operations, or incorrect cast deduplication.
 
+    **Required regression (review E4):** Construct two C++ point clouds from
+    different views of one coordinate allocation and cast precision. Verify
+    both coordinate mappings survive; storage-owner equality alone is not
+    sufficient to identify the same logical cloud.
+
 ### F. Downstream algorithms and task lifetimes
 
 - [ ] **F1. Distances, persistent homology, and homological kernels.**
@@ -388,6 +470,13 @@ A–K in order; each item remains independently executable.
     no const-read storage transition. Existing single-cloud tests alone do not
     establish whole indexed-tensor support.
 
+    **Storage assertion correction:** Existing Python persistence tests compare
+    `type(indexed._data)` before/after computation. That type remains unchanged
+    after materialization, so it cannot prove const access. Assert C++
+    `has_indices()`, backend cloud `is_indexed`, and/or source/selection storage
+    identity; include a mutation control proving the assertion detects the
+    transition. Temporary review probes passed these stronger checks.
+
 - [ ] **F2. Persistence task lifetime and error propagation.**
 
     Scope: branch changes from referenced to owned C++ task inputs and new
@@ -401,6 +490,16 @@ A–K in order; each item remains independently executable.
     Do not assume a documented snapshot against concurrent user mutation unless
     that contract exists.
 
+- [ ] **F3. Barcode tensor isomorphism (#232).**
+
+    Compare aligned `BarcodeTensor` values at both precisions using reordered
+    bars, unequal diagrams, tolerance forwarding, and explicit incompatible
+    shape/dtype/type cases. Assert one Python bool result. Existing tests cover
+    the core nonempty cases; add scalar, empty, transposed, and sliced outer
+    tensors, comparing to independently evaluated per-cell barcode results.
+    Pass: aligned tensor semantics match `Barcode.is_isomorphic_to` without
+    hidden broadcasting or accidental equality-by-storage-order.
+
 ### G. Binary IO and format compatibility
 
 - [ ] **G1. Current binary IO round trips and indexed representation.**
@@ -412,16 +511,23 @@ A–K in order; each item remains independently executable.
     transposed views, both precisions, and nested tensors at several depths
     with scalar/ragged/empty children and all leaf dtypes. Preserve shape,
     values, depth, ambient dimensions, and normalized logical row-major order.
-    Inspect indexed payload and loaded state: a new subtype must retain one
-    materialized source, source-view mapping, and ordered/repeated/empty
-    selections, not silently flatten to ordinary coordinates. Delete original
+    Inspect indexed payload and loaded state: the V3 tensor-property encoding
+    must retain materialized coordinate sources, deduplicated sharing and
+    per-cell mappings, and ordered/repeated/empty
+    selections, not silently flatten to ordinary coordinates. Review E1 requires
+    nonzero numeric scalar leaves and ordinary scalar cloud tensors: distinguish
+    `()` (one value) from `(0,)` (no values), including inside depth-3 structures.
+    Review E4 requires C++ coordinate views sharing an allocation but with
+    different offsets/shapes/strides; normal Python construction may copy away
+    that condition. Delete original
     owners before loading and exercise loaded mutation semantics. Pass:
     self-contained files, correct type dispatch and structure, and no
     reinterpretation of existing subtype IDs or new format version per depth.
 
 - [ ] **G2. Fixed legacy binary compatibility.**
 
-    Scope: #229/#231. Within this entry, obtain and commit immutable fixtures
+    Scope: #229/#231. Reuse the committed 0.4.7 and masspcf V1 corpora under
+    `test/golden/serialization/`; obtain any missing immutable fixtures
     from historical writers for materialized point clouds (`1000`, both
     precisions). Include supported historical header versions 1 and 2, current
     version 3, and ordinary tensor/object controls. Indexed point-cloud files
@@ -443,9 +549,12 @@ A–K in order; each item remains independently executable.
     version, and truncation points. Include empty payloads and checked size
     overflow cases, using subprocess resource limits for dangerous lengths.
     Invalid data must be rejected before exposing a usable value, without
-    hangs, out-of-bounds access, or uncontrolled allocation. Boolean writers
-    emit canonical 0/1 bytes; test the branch reader's nonzero-is-true behavior
-    on noncanonical flag bytes separately from structural validation. Exercise
+    hangs, out-of-bounds access, or uncontrolled allocation. Boolean metadata
+    flags such as `isLeaf` and `hasSelections` emit canonical 0/1 bytes; test
+    nonzero-is-true flag reading separately from structural validation. V3
+    `BoolTensor` payloads are bit-packed: test bit order, boundary lengths, and
+    trailing padding separately instead of requiring each packed byte to be
+    0 or 1. Exercise
     Python's tensor/object load fallback to ensure corruption is not accepted
     as a different type. Pass: safe, informative failures and unchanged valid
     legacy bool reading.
@@ -484,11 +593,18 @@ A–K in order; each item remains independently executable.
     type/depth metadata, special values, and appropriate singleton identity or
     object independence survive; restored objects work in normal operations.
 
+    **Required regressions (review E1/E4):** Round-trip nonzero scalar numeric
+    tensors, scalar clouds, and scalar leaves at multiple nesting depths through
+    both binary IO and pickle. Add C++ shared-coordinate-view fixtures as in G1;
+    ordinary Python constructors can conceal the source-aliasing defect.
+
 - [ ] **H3. Fixed historical pickle fixtures and reconstruction paths.**
 
     Scope: #230. Independently audit Git history for every replaced pickle
     representation, including changes already present on `main`; current
-    round-trip tests are not a replacement for historical fixtures. Produce
+    round-trip tests are not a replacement for historical fixtures. Reuse and
+    preserve the 32 committed 0.4.7 pickle artifacts; extend proven gaps rather
+    than recreating existing bytes. Produce
     fixtures with each actual previous implementation and commit the fixed
     bytes with producer/protocol/backend/checksum/expected-value metadata.
     Cover changed reducers, historical reconstruction function/module paths,
@@ -533,7 +649,7 @@ A–K in order; each item remains independently executable.
     expectations as adjacent regressions. Earlier branch commit subjects about
     `subsample_relative` and compressed-matrix rewrites are not net changes at
     this reviewed HEAD; do not invent APIs from those subjects. Pass: no
-    regressions from the 53-file net diff.
+    regressions from the 148-file net diff.
 
 - [ ] **I2. Recover the intent of deleted or rewritten tests.**
 
@@ -569,13 +685,20 @@ A–K in order; each item remains independently executable.
 - [ ] **J1. Small golden tensor files from the current version and 0.4.7.**
 
     Scope: commit two permanent golden corpora under
-    `test/fixtures/tensors/`: one produced by the current branch version, pinned
+    `test/golden/serialization/`: one produced by the current branch version, pinned
     to its exact generation commit, and one produced by the actual released
     Stablebear `0.4.7`. Give their directories immutable producer identities
-    such as `current-<commit>/` and `0.4.7/`; do not use a rolling directory
+    such as `current-<commit>/` and the existing `0.4.7/`. A version directory
+    with an exact immutable producer commit in its manifest is also valid.
+    Do not use a rolling directory
     whose bytes are overwritten on every release. This entry includes its own
     inventory, data descriptions, generation procedure, binary/pickle files,
     and load tests, so it has no dependency on other checklist entries.
+
+    **Current status:** 0.4.7 is already generated and committed; two older
+    masspcf V1 binaries are also retained. No pinned current-version corpus
+    exists. Fix review E1/E4 before generating scalar/nested/indexed goldens;
+    use the existing generation/manifest framework and retain released bytes.
 
     **Type and format coverage.** Independently inventory every supported tensor
     type and dtype in each producer. For the current version, include
@@ -717,6 +840,7 @@ A–K in order; each item remains independently executable.
 | New Python `PointCloud`, strict rank-two validation, moved exports | A1–A4, H1–H3, I2–I3 |
 | C++ tensor properties, generic views/bindings, numeric wrapper dispatch | A1, B4–B5, E2, E5, I1 |
 | Distance oracle, persistence dispatch, task input ownership | F1–F2 |
+| #232 aligned barcode tensor isomorphism, views and edge shapes | F3 |
 | Poisson coordinate wrapping and general tensor regressions | I1 |
 | IO bool encoding, version change, recursive dispatch, legacy source tables | G1–G3 |
 | Existing added/changed tests and deleted persistence tests | D1, F1, G1, I1–I2 |

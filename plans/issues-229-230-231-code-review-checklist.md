@@ -1,22 +1,60 @@
-# Code review checklist: issues #229, #230, and #231
+# Code review checklist: PR #233
 
-This document records the review findings and proposed implementation work.
-Creating this checklist does not implement fixes or tests. All items remain open.
+This document records review findings and implementation evidence for
+[PR #233](https://github.com/kthtda/stablebear/pull/233), covering issues
+#229–#232. The 2026-09-22 update is review only: no fixes or tests were added.
+Previous completed items remain as historical evidence; new findings below
+identify gaps beyond the cases those fixes covered.
 
-Reviewed branch: `issue-229-uniform-subsampling`, commit
-`6d3e00e36f7114dcffe54a675262e49b7f44e9e7`, against `origin/main` at
-`4a9c284f4f48d6711083d99ee529819d4c546384`.
+## Current review: 2026-09-22
 
-The review checked the existing CMake build/install and used small in-memory
-reproductions with the installed CUDA extension and CPU execution forced.
-It did not run the full regression suite, exercise GPU execution, or create
-test files. Findings A1–A3, B1–B3, and C1/C3 were reproduced; C2 and the
-simplification recommendations also rely on source/history inspection.
+Reviewed local branch `issue-229-uniform-subsampling` at
+`cced5d9b78c56f97cee4495505df5c0560438fcb`, against PR base/main
+`4a9c284f4f48d6711083d99ee529819d4c546384`. GitHub PR #233 currently points
+to `b0b39ee1530230d0ac021276b5f5c3e770fe948f`: the local D2 implementation
+and its checklist commit are two commits ahead of that remote head. The D3
+work in `stash@{0}` was not applied and is not counted as branch coverage.
+The local net diff contains 148 changed files.
+
+**Assessment:** The major features exist, but the branch is not ready for
+acceptance. Four additional correctness findings are recorded in section E;
+D3's extra resampling copy and D4's completion audit remain open. Passing
+regression tests do not cover the failing cases below.
+
+| PR scope | Current coverage and remaining work |
+| --- | --- |
+| #229 uniform point-cloud subsampling | API, indexed backing, owned selections, shared materialization, and indexed persistence integration are implemented. D3 still copies indexed input twice; E3/E4 expose C++ indexed-storage correctness gaps. Committed sampling tests do not yet establish the full RNG/deduplication/copy-count contract. |
+| #230 binary-backed pickle and compatibility | Shared reducers, standalone object IO, and released 0.4.7 fixtures are present. E1 demonstrates scalar data loss, including inside the new nested type; E4 corrupts legitimate C++ coordinate views. The PR's checked issue-tracking box is not sufficient acceptance evidence. |
+| #231 runtime nesting and ragged indexing | Recursive types, exact-prefix selection validation, ordinary views, and D2 copy boundaries are implemented. E2 allows bulk writes to violate homogeneous nesting depth; scalar IO also fails. |
+| #232 barcode tensor isomorphism | Implemented with aligned, same-dtype tensor semantics; existing tests and additional scalar/empty/transposed probes passed. No substantive issue found in the reviewed scope. |
+| #236 distance-matrix subsampling | Not implemented: the sampler accepts only `PointCloudTensor`. The issue and PR explicitly identify this as a follow-up blocked by #229; do not count it as delivered or as an unexpected defect in this PR. |
+
+**Verification:** Rebuilt and installed the committed source after stashing D3.
+From `test/`, the full Python suite passed **2,358 tests with `_sb_cuda12`**;
+`SB_FORCE_CPU=1` passed **2,328 tests with `_sb_cpu`, with 30 CUDA tests
+skipped**. The full C++ executable passed **486 tests**. `make html` in `docs/`
+succeeded. These are local builds, not clean-wheel/platform-matrix validation.
+Sampling and serialization run on CPU even when the CUDA module is loaded.
+CUDA 13 and bidirectional cross-module file writing/reading were not exercised.
+
+Focused, temporary reproductions confirmed E1/E2 on both extension modules,
+and E3/E4 with standalone C++ programs compiled against the reviewed headers.
+Additional sampler probes passed validation, no RNG advancement on failure,
+row-major stream allocation, empty cases, stable duplicate filtering, and
+resampling value/ownership checks. These probes are review evidence, not
+committed regression coverage. See the updated [test plan](issues-229-230-231-test-plan.md)
+for the coverage inventory and missing cases.
+
+The original review covered commit `6d3e00e36f7114dcffe54a675262e49b7f44e9e7`
+against the same base. Sections A–D retain its findings and subsequent fixing
+commits; its original focused reproduction results should not be confused with
+the current full-suite run.
 
 P1 denotes a correctness or compatibility blocker for the stated issue scope.
 P2 denotes an API/validation gap that should also be addressed before acceptance.
-Work through sections A–D in order. Each item describes its own completion
-criteria; related fixes may be implemented together. Record the fixing commit
+Prioritize the correctness findings in section E and the remaining D3 work
+before D4 acceptance. Each item describes its own completion criteria; related
+fixes may be implemented together. Record the fixing commit
 and verification evidence before checking an item off.
 
 References such as “test plan E3” refer to the separate
@@ -365,6 +403,10 @@ identify review work, not test-plan items. The broader test plan still applies.
 
 - [ ] **D3. Copy logical coordinates only once when resampling indexed input.**
 
+  **2026-09-22 status:** Still present at the reviewed commit. The proposed
+  implementation and additional tests are stashed, not part of this branch.
+  No stashed verification is credited to this review.
+
   **Finding from source inspection:** `subsample.py` first materializes indexed
   input, then the C++ sampler copies those coordinates again into its fresh
   source. This adds an unnecessary full coordinate allocation/copy and violates
@@ -399,3 +441,133 @@ identify review work, not test-plan items. The broader test plan still applies.
   remains unchecked rather than being hidden by a changed expected result.
 
   Verification: test plan H4, I3, J1, K1.
+
+
+## E. Additional correctness findings from the 2026-09-22 review
+
+- [ ] **E1. [P1] Serialize the value in every scalar tensor, including nested numeric leaves.**
+
+  **Finding:** `serialized_tensor_size()` treats shape `()` as one element
+  only for tensors of nested nodes. Numeric scalar leaves are serialized with
+  zero elements and reload as zero. A scalar ordinary `PointCloudTensor` loses
+  its entire cloud. Both public binary IO and pickle exhibit this data loss.
+
+  ```python
+  import pickle
+  import numpy as np
+  import stablebear as sb
+
+  x = sb.NestedTensor([np.array(42, dtype=np.int64)])
+  y = pickle.loads(pickle.dumps(x))
+  print(x[0][()], y[0][()])  # 42, 0
+  ```
+
+  A `PointCloudTensor(np.array([[1., 2.], [3., 4.]]))` has outer shape `()`;
+  its restored cloud has shape `(0, 0)` instead of `(2, 2)`. Reproduced on both
+  modules, for all six nested numeric dtypes and both point-cloud precisions.
+  Ordinary scalar IO has an inherited size-convention problem; the new nested
+  scalar-leaf feature makes this directly relevant to #231 as well as #230.
+
+  **Complete when:** Scalar tensors serialize exactly one logical value at
+  every nesting level, while true zero-extent tensors serialize none. Public
+  binary and pickle tests compare nonzero scalar values and cloud contents to
+  independent expectations, including scalar leaves inside the documented
+  depth-3 example. Preserve supported historical decoding deliberately.
+
+  Source: [tensor_io.hpp](../include/sbear/io/tensor_io.hpp),
+  `serialized_tensor_size()` at lines 456–468 and ordinary tensor payload IO.
+  Verification: test plan G1, H2, J1. Existing round-trip/golden tests use
+  non-scalar numeric leaves and do not catch this case.
+
+- [ ] **E2. [P1] Preserve the nested depth invariant across bulk assignment and descriptor boundaries.**
+
+  **Finding:** Scalar element assignment checks depth through `_decay_value`,
+  but slice, boolean-mask, and integer-index assignment of a tensor RHS bypass
+  that check. An incompatible assignment succeeds and leaves an invalid
+  tensor: stored root depth disagrees with its children, and later slicing or
+  serialization fails.
+
+  ```python
+  leaf = lambda values: sb.tensor(values, dtype=sb.int64)
+  target = sb.NestedTensor([leaf([1]), leaf([2])])
+  rhs = sb.NestedTensor([sb.NestedTensor([leaf([3])])])
+  target[:1] = rhs  # Incorrectly succeeds; target.depth stays 2
+  target[:]        # Now raises: children have different nesting depths
+  ```
+
+  Mask `[True, False]` and integer selector `[0]` reproduce the same problem.
+  Full-slice assignment can leave `target.depth == 2` but
+  `target[:].depth == 3`. Related descriptor-validation gaps: the scalar-outer
+  constructor silently ignores `depth=3` or even `depth="bad"`; stacking or
+  concatenating empty nested tensors of depths 2 and 3 silently adopts the
+  first operand's depth. Empty data must not erase incompatible type metadata.
+
+  **Complete when:** Every construction/join/assignment route validates the
+  declared recursive type, including empty operands, before copying or writing
+  values. Wrong-depth bulk writes reject without changing the destination or
+  any aliases. Compatible writes still propagate through views, and valid
+  independently shaped children remain supported.
+
+  Sources: [nested_tensor.py](../stablebear/nested_tensor.py), scalar
+  construction at lines 107–113 and `_decay_value()` at 219–225;
+  [_tensor_base.py](../stablebear/_tensor_base.py), tensor-RHS assignment paths
+  at 529–531, 559–572, and 607–608;
+  [tensor_create.py](../stablebear/tensor_create.py), join dispatch.
+  Verification: test plan B2–B4. D2's positive ownership tests pass but do not
+  cover incompatible descriptors or bulk assignment failure atomicity.
+
+- [ ] **E3. [P1] Snapshot overlapping indexed assignment before mutating shared backing.**
+
+  **Finding:** The C++ overlap guard in `Tensor::assign_from()` explicitly
+  excludes indexed tensors. Assigning a reversed view back into the same
+  indexed state overwrites values that later RHS reads still need. With four
+  logical values `1, 2, 3, 4`:
+
+  ```cpp
+  auto reversed = indexed[std::vector<sb::Slice>{
+    sb::range(std::nullopt, std::nullopt, -1)}];
+  indexed.assign_from(reversed);
+  // Observed: 4, 3, 3, 4. Required: 4, 3, 2, 1.
+  ```
+
+  Reproduced using a simple indexable C++ value and the generic indexed tensor
+  interface. This is a C++ storage bug, not a demonstrated public Python
+  `PointCloudTensor` assignment regression: Python currently rejects a
+  point-cloud tensor RHS before reaching this route.
+
+  **Complete when:** Overlapping RHS values are preserved across the shared
+  materialization transition and subsequent writes, including reversed and
+  shifted views, already-materialized indexed backing, and combinations with
+  ordinary backing where aliasing is possible. Nonoverlapping assignment
+  retains value independence and ordinary view behavior.
+
+  Source: [tensor.tpp](../include/sbear/tensor.tpp), `assign_from()` overlap
+  guard at lines 304–305 and indexed writes immediately below it.
+  Verification: test plan B5, E3, E5. Existing ordinary-overlap tests and
+  constant-value indexed assignment tests do not exercise this case.
+
+- [ ] **E4. [P1] Preserve coordinate-view identity when sharing serialized or cast sources.**
+
+  **Finding:** Indexed serialization and `pcloud_cast()` deduplicate coordinate
+  tensors by allocation owner alone. Different slices of one allocation have
+  the same owner but can have different offsets, shapes, strides, and values.
+  The second cloud is incorrectly replaced with the first cloud's coordinates.
+
+  Reproduced through valid C++ construction: create one `(2, 2, 1)` numeric
+  tensor containing clouds `[[1], [2]]` and `[[10], [20]]`, then construct two
+  `PointCloud<double>` cells from its axis-0 views. Select row 0 from both.
+  The indexed input returns `1, 10`; its binary round trip returns `1, 1`.
+  Casting the ordinary source with `pcloud_cast<float>()` likewise returns
+  `1, 1` instead of `1, 10`. Python's usual value constructors copy coordinates,
+  so this reproduction targets the supported C++ view-construction boundary.
+
+  **Complete when:** Shared-source reuse distinguishes the complete logical
+  coordinate view or explicitly records/reconstructs its mapping. Distinct
+  slices, transposes, and strided views survive IO and precision casts with
+  correct shapes and values, while identical views still share when intended.
+
+  Sources: [tensor_io.hpp](../include/sbear/io/tensor_io.hpp), indexed source
+  table at lines 422–448; [point_cloud.hpp](../include/sbear/point_cloud.hpp),
+  `pcloud_cast()` source map at lines 327–361.
+  Verification: test plan E5, G1, J1; require C++ storage/view fixtures rather
+  than Python constructors that remove the alias before the operation.
