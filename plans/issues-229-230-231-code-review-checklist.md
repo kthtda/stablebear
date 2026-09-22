@@ -218,23 +218,25 @@ identify review work, not test-plan items. The broader test plan still applies.
   empty, scalar, and sliced selections at both precisions, plus a payload-size
   check confirming that saving does not materialize every selected cloud.
 
-- [ ] **C2. [P1] Restore the legacy nested `(5, 64)` decoder.**
+- [x] **C2. [P1] Restore the legacy nested `(5, 64)` decoder.**
 
-  **Finding:** Source/history inspection confirms that earlier branch code
-  wrote the one-level nested `uint64` format `(5, 64)`. Current dispatch only
-  recognizes the new nested formats. The required compatibility reader is
-  missing. This was not validated with a historical fixture during the review.
+  **Finding:** The review initially treated `(5, 64)` as a supported historical
+  format because commit `0c2cb6efc` wrote one-level `uint64` index tensors with
+  that identifier.
 
-  **Change:** Retain a decoder for the old payload and normalize it into the
-  general `NestedTensor` representation. New writes should continue using the
-  current representation.
+  **Decision:** No decoder or fixture is required. An ancestry audit showed
+  that `0c2cb6efc` exists only on this feature branch: it is not an ancestor of
+  `main` or `origin/main`, and no release tag contains it. Main therefore never
+  produced `(5, 64)` files.
 
-  **Complete when:** Fixed bytes produced by the actual historical writer load
-  with correct dtype, shape, selections, and depth. Include empty and scalar
-  cases. Do not manufacture historical fixtures with the current writer.
+  **Complete when:** Repository history confirms that the format was never on
+  main or in a release, and compatibility plans no longer require it.
 
-  Sources: [io.hpp](../include/sbear/io.hpp), `read_any_tensor()`;
-  historical writer at commit `0c2cb6efc`. Verification: test plan G2.
+  Sources: historical writer at commit `0c2cb6efc`; ancestry of `main`,
+  `origin/main`, and release tags. Verification: test plan G2.
+
+  **Resolved without a fix:** Compatibility with an unreleased intermediate
+  branch format is intentionally not retained.
 
 - [x] **C3. [P2] Route standalone `PointCloud` IO and pickle through binary IO.**
 

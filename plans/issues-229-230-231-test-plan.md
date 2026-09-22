@@ -68,7 +68,7 @@ turn current behavior into the expected result solely to make a test pass.
 | `PointCloud` in C++ still contains `m_indices` and local materialization; Python `_ensure_writeable()` replaces the calling wrapper's `_data`. | Verify tensor-level storage and whole shared-state transition, including pre-existing sibling views. Do not accept per-wrapper detachment as equivalent. | D4, E1–E3 |
 | Generic `make_indexed_tensor` allows singleton source-axis broadcasting. #231 requires an exact public prefix match. | Test both contracts at their respective boundaries; public `(2, 1)` versus `(2, 3)` selection shapes must fail. | C1–C2 |
 | Indexed Python save currently materializes; IO describes subtype `1001` as per-element source IDs and indices. | Require a distinct tensor-level indexed encoding, indexed round trips, and readers for old `1000`/`1001` files. | G1–G3 |
-| General nested format dispatch has no visible reader for legacy `(5, 64)`. | Use fixed legacy bytes to test the required reader. | G2 |
+| The reviewed `(5, 64)` nested format existed only on this feature branch and was never on `main` or in a release. | Do not retain or test compatibility with the unreleased intermediate format. | G2 |
 | Standalone `PointCloud` is absent from object IO dispatch; dtype pickling still uses a name lookup. | Audit all public pickleable types, including default pickling. Do not silently exempt either from #230. | H1–H4 |
 | Tensor metadata now records tensor-property bits and independent layout flags, such as nested storage. This expands each `TensorFormat` record and makes new files unreadable by older readers. | Bump the binary format to version 3, retain version-aware V1/V2 decoding, and verify that 0.5.0 reads supported old files while older releases reject V3. | G1–G3 |
 | `CHANGELOG.md` still advertises `IndexTensor`; saving/indexing docs describe older or inconsistent ownership. | Verify documentation against the accepted API/storage contracts. | I3 |
@@ -424,13 +424,13 @@ A–K in order; each item remains independently executable.
 
     Scope: #229/#231. Within this entry, obtain and commit immutable fixtures
     from historical writers for materialized point clouds (`1000`, both
-    precisions), shared-source indexed point clouds (`1001`, both precisions),
-    and one-level nested `uint64` format `(5, 64)`. Include supported historical
-    header versions 1 and 2, current version 3, and ordinary tensor/object
-    controls. Record producer commit/version, backend, generation
-    command, checksum, and expected contents alongside each fixture. Use
-    isolated historical checkouts/environments; do not fabricate compatibility
-    bytes using today's writer. Load with current Python and appropriate C++
+    precisions) and shared-source indexed point clouds (`1001`, both
+    precisions). Include supported historical header versions 1 and 2, current
+    version 3, and ordinary tensor/object controls. Record producer
+    commit/version, backend, generation command, checksum, and expected
+    contents alongside each fixture. Use isolated historical
+    checkouts/environments; do not fabricate compatibility bytes using today's
+    writer. Load with current Python and appropriate C++
     readers, verifying types/shapes/dtypes/values. Legacy indexed data may
     normalize or materialize, but must retain logical values and safe ownership.
     Pass: all promised old formats load and new writes use current formats.
@@ -714,7 +714,7 @@ A–K in order; each item remains independently executable.
 | #231 runtime recursion, homogeneous descriptor, empty/scalar construction | B1–B2, B5 |
 | #231 ownership and outer operations | B3–B4 |
 | #231 prefix indexing, lazy alignment, repeated indexing | C1–C2, E1–E4 |
-| #231 recursive IO, `(5, 64)` compatibility, backend/docs | G1–G3, H4, I3 |
+| #231 recursive IO, backend/docs | G1–G3, H4, I3 |
 | New Python `PointCloud`, strict rank-two validation, moved exports | A1–A4, H1–H3, I2–I3 |
 | C++ tensor properties, generic views/bindings, numeric wrapper dispatch | A1, B4–B5, E2, E5, I1 |
 | Distance oracle, persistence dispatch, task input ownership | F1–F2 |
