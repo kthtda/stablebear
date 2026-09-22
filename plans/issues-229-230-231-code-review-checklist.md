@@ -299,7 +299,7 @@ identify review work, not test-plan items. The broader test plan still applies.
 
 ## D. Simplification and completion review
 
-- [ ] **D1. Consolidate the indexed storage model.**
+- [x] **D1. Consolidate the indexed storage model.**
 
   **Recommendation:** The branch combines tensor-level adapters, per-element
   selection/local-materialization state, and Python wrapper-level detachment.
@@ -318,6 +318,13 @@ identify review work, not test-plan items. The broader test plan still applies.
   [tensor.hpp](../include/sbear/tensor.hpp),
   [point_cloud.py](../stablebear/point_cloud.py).
   Verification: test plan B5, E1–E3, F1.
+
+  **Completed:** Fixed by `5cf5411b0`. Persistent selections and the one-time
+  materialization transition live in shared tensor-level state. Locally
+  indexed `PointCloud` values are confined to transient read-only access;
+  copies, casts, and ordinary serialization materialize their logical values.
+  Indexed serialization is property-driven through an extensible codec, and
+  the Python façade delegates writes through the shared tensor transition.
 
 - [ ] **D2. Make copy and view construction explicit.**
 
