@@ -455,7 +455,7 @@ identify review work, not test-plan items. The broader test plan still applies.
 
 ## E. Additional correctness findings from the 2026-09-22 review
 
-- [ ] **E1. [P1] Serialize the value in every scalar tensor, including nested numeric leaves.**
+- [x] **E1. [P1] Serialize the value in every scalar tensor, including nested numeric leaves.**
 
   **Finding:** `serialized_tensor_size()` treats shape `()` as one element
   only for tensors of nested nodes. Numeric scalar leaves are serialized with
@@ -488,6 +488,19 @@ identify review work, not test-plan items. The broader test plan still applies.
   `serialized_tensor_size()` at lines 456–468 and ordinary tensor payload IO.
   Verification: test plan G1, H2, J1. Existing round-trip/golden tests use
   non-scalar numeric leaves and do not catch this case.
+
+  **Completed:** Fixed by `b70dbec19`. V3 now treats an empty shape as one
+  logical value for every tensor element type while shapes containing a zero
+  extent still serialize no values. The binary and pickle regressions cover
+  all six numeric dtypes as ordinary scalar tensors and as scalar leaves in a
+  depth-3 nested tensor, scalar booleans, and scalar point-cloud tensors at
+  both precisions. Independent value assertions catch default-value data loss.
+
+  Verified after rebuild and install with 99 focused serialization and 0.4.7
+  golden tests on each of `_sb_cuda12` and the separate `_sb_cpu` extension,
+  27 focused C++ IO tests, the full 2,378-test Python suite, and the full C++
+  suite. Released golden bytes remain unchanged. V3 is not yet released, so
+  correcting its scalar payload does not require a format-version bump.
 
 - [ ] **E2. [P1] Preserve the nested depth invariant across bulk assignment and descriptor boundaries.**
 
