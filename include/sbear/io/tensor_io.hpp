@@ -456,18 +456,10 @@ namespace sb::io::detail
   template <typename T>
   size_t serialized_tensor_size(const Tensor<T>& tensor)
   {
-    if constexpr (is_nested_tensor_v<T>)
-    {
-      // A scalar nested tensor has one element even though Tensor::size()
-      // reports zero for a rank-0 tensor.
-      if (tensor.shape().empty())
-      {
-        return 1;
-      }
-    }
-    return tensor.size();
+    // A rank-zero tensor has one logical value even though Tensor::size()
+    // reports zero. A shape containing a zero extent still has no values.
+    return tensor.shape().empty() ? size_t{1} : tensor.size();
   }
-
 
   template <IsTensor TensorT>
     void write_contiguous_tensor(std::ostream& os, const TensorT& tensor)
