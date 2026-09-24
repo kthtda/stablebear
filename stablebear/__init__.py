@@ -44,6 +44,12 @@ from .typing import (
     uint64,
 )
 
+try:
+    from importlib.metadata import version as _pkg_version
+    __version__ = _pkg_version("stablebear")
+except Exception:  # source tree without installed metadata
+    __version__ = "unknown"
+
 import types as _types
 __all__ = sorted(
     name for name in set(dir()) - __before - {"__before"}

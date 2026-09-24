@@ -41,6 +41,15 @@ std::vector<GpuInfo> detect_gpus()
   const struct dirent* entry;
   while ((entry = readdir(drm)) != nullptr)
   {
+    // Each GPU exposes several drm nodes (cardN, renderDN, connectors);
+    // count only primary card nodes to avoid double-counting devices.
+    const std::string node_name = entry->d_name;
+    if (node_name.rfind("card", 0) != 0 || node_name.size() == 4 ||
+        node_name.find_first_not_of("0123456789", 4) != std::string::npos)
+    {
+      continue;
+    }
+
     std::string base = "/sys/class/drm/";
     base += entry->d_name;
     std::string device_path = base + "/device/";
