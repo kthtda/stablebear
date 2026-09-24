@@ -1,0 +1,1954 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>/usr/include/c++/13/optional</title>
+    <link href='valgrind.css' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+    <script src="https://code.jquery.com/jquery-3.4.1.js"></script>
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.0.0/styles/default.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.0.0/highlight.min.js"></script>
+    <script src="valgrind.js"></script>
+</head>
+
+<body>
+    <div class="global">
+        <div class="header">
+            <h1>/usr/include/c++/13/optional</h1>
+            <p><b>2</b> errors</p>
+            <button class="next_error">Goto First Error</button>
+        </div>
+        <div class="listing">
+            <pre class="code">
+<code class="c++"><span class="line_number">1</span>// &lt;optional&gt; -*- C++ -*-
+<span class="line_number">2</span>
+<span class="line_number">3</span>// Copyright (C) 2013-2023 Free Software Foundation, Inc.
+<span class="line_number">4</span>// Copyright The GNU Toolchain Authors.
+<span class="line_number">5</span>//
+<span class="line_number">6</span>// This file is part of the GNU ISO C++ Library.  This library is free
+<span class="line_number">7</span>// software; you can redistribute it and/or modify it under the
+<span class="line_number">8</span>// terms of the GNU General Public License as published by the
+<span class="line_number">9</span>// Free Software Foundation; either version 3, or (at your option)
+<span class="line_number">10</span>// any later version.
+<span class="line_number">11</span>
+<span class="line_number">12</span>// This library is distributed in the hope that it will be useful,
+<span class="line_number">13</span>// but WITHOUT ANY WARRANTY; without even the implied warranty of
+<span class="line_number">14</span>// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+<span class="line_number">15</span>// GNU General Public License for more details.
+<span class="line_number">16</span>
+<span class="line_number">17</span>// Under Section 7 of GPL version 3, you are granted additional
+<span class="line_number">18</span>// permissions described in the GCC Runtime Library Exception, version
+<span class="line_number">19</span>// 3.1, as published by the Free Software Foundation.
+<span class="line_number">20</span>
+<span class="line_number">21</span>// You should have received a copy of the GNU General Public License and
+<span class="line_number">22</span>// a copy of the GCC Runtime Library Exception along with this program;
+<span class="line_number">23</span>// see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
+<span class="line_number">24</span>// &lt;http://www.gnu.org/licenses/&gt;.
+<span class="line_number">25</span>
+<span class="line_number">26</span>/** @file include/optional
+<span class="line_number">27</span> *  This is a Standard C++ Library header.
+<span class="line_number">28</span> */
+<span class="line_number">29</span>
+<span class="line_number">30</span>#ifndef _GLIBCXX_OPTIONAL
+<span class="line_number">31</span>#define _GLIBCXX_OPTIONAL 1
+<span class="line_number">32</span>
+<span class="line_number">33</span>#pragma GCC system_header
+<span class="line_number">34</span>
+<span class="line_number">35</span>#if __cplusplus &gt;= 201703L
+<span class="line_number">36</span>
+<span class="line_number">37</span>#include &lt;type_traits&gt;
+<span class="line_number">38</span>#include &lt;exception&gt;
+<span class="line_number">39</span>#include &lt;new&gt;
+<span class="line_number">40</span>#include &lt;initializer_list&gt;
+<span class="line_number">41</span>#include &lt;bits/enable_special_members.h&gt;
+<span class="line_number">42</span>#include &lt;bits/exception_defines.h&gt;
+<span class="line_number">43</span>#include &lt;bits/functional_hash.h&gt;
+<span class="line_number">44</span>#include &lt;bits/stl_construct.h&gt; // _Construct
+<span class="line_number">45</span>#include &lt;bits/utility.h&gt; // in_place_t
+<span class="line_number">46</span>#if __cplusplus &gt; 201703L
+<span class="line_number">47</span># include &lt;compare&gt;
+<span class="line_number">48</span># include &lt;bits/invoke.h&gt; // std::__invoke
+<span class="line_number">49</span>#endif
+<span class="line_number">50</span>#if __cplusplus &gt; 202002L
+<span class="line_number">51</span># include &lt;concepts&gt;
+<span class="line_number">52</span>#endif
+<span class="line_number">53</span>
+<span class="line_number">54</span>namespace std _GLIBCXX_VISIBILITY(default)
+<span class="line_number">55</span>{
+<span class="line_number">56</span>_GLIBCXX_BEGIN_NAMESPACE_VERSION
+<span class="line_number">57</span>
+<span class="line_number">58</span>  /**
+<span class="line_number">59</span>   *  @addtogroup utilities
+<span class="line_number">60</span>   *  @{
+<span class="line_number">61</span>   */
+<span class="line_number">62</span>
+<span class="line_number">63</span>#if __cplusplus &gt; 202002L &amp;&amp; __cpp_lib_concepts
+<span class="line_number">64</span># define __cpp_lib_optional 202110L
+<span class="line_number">65</span>#elif __cplusplus &gt;= 202002L
+<span class="line_number">66</span># define __cpp_lib_optional 202106L
+<span class="line_number">67</span>#else
+<span class="line_number">68</span># define __cpp_lib_optional 201606L
+<span class="line_number">69</span>#endif
+<span class="line_number">70</span>
+<span class="line_number">71</span>  template&lt;typename _Tp&gt;
+<span class="line_number">72</span>    class optional;
+<span class="line_number">73</span>
+<span class="line_number">74</span>  /// Tag type to disengage optional objects.
+<span class="line_number">75</span>  struct nullopt_t
+<span class="line_number">76</span>  {
+<span class="line_number">77</span>    // Do not user-declare default constructor at all for
+<span class="line_number">78</span>    // optional_value = {} syntax to work.
+<span class="line_number">79</span>    // nullopt_t() = delete;
+<span class="line_number">80</span>
+<span class="line_number">81</span>    // Used for constructing nullopt.
+<span class="line_number">82</span>    enum class _Construct { _Token };
+<span class="line_number">83</span>
+<span class="line_number">84</span>    // Must be constexpr for nullopt_t to be literal.
+<span class="line_number">85</span>    explicit constexpr nullopt_t(_Construct) noexcept { }
+<span class="line_number">86</span>  };
+<span class="line_number">87</span>
+<span class="line_number">88</span>  /// Tag to disengage optional objects.
+<span class="line_number">89</span>  inline constexpr nullopt_t nullopt { nullopt_t::_Construct::_Token };
+<span class="line_number">90</span>
+<span class="line_number">91</span>  template&lt;typename _Fn&gt; struct _Optional_func { _Fn&amp; _M_f; };
+<span class="line_number">92</span>
+<span class="line_number">93</span>  /**
+<span class="line_number">94</span>   *  @brief Exception class thrown when a disengaged optional object is
+<span class="line_number">95</span>   *  dereferenced.
+<span class="line_number">96</span>   *  @ingroup exceptions
+<span class="line_number">97</span>   */
+<span class="line_number">98</span>  class bad_optional_access : public exception
+<span class="line_number">99</span>  {
+<span class="line_number">100</span>  public:
+<span class="line_number">101</span>    bad_optional_access() = default;
+<span class="line_number">102</span>    virtual ~bad_optional_access() = default;
+<span class="line_number">103</span>
+<span class="line_number">104</span>    const char* what() const noexcept override
+<span class="line_number">105</span>    { return &#34;bad optional access&#34;; }
+<span class="line_number">106</span>  };
+<span class="line_number">107</span>
+<span class="line_number">108</span>  // XXX Does not belong here.
+<span class="line_number">109</span>  [[__noreturn__]] inline void
+<span class="line_number">110</span>  __throw_bad_optional_access()
+<span class="line_number">111</span>  { _GLIBCXX_THROW_OR_ABORT(bad_optional_access()); }
+<span class="line_number">112</span>
+<span class="line_number">113</span>  // This class template manages construction/destruction of
+<span class="line_number">114</span>  // the contained value for a std::optional.
+<span class="line_number">115</span>  template &lt;typename _Tp&gt;
+<span class="line_number">116</span>    struct _Optional_payload_base
+<span class="line_number">117</span>    {
+<span class="line_number">118</span>      using _Stored_type = remove_const_t&lt;_Tp&gt;;
+<span class="line_number">119</span>
+<span class="line_number">120</span>      _Optional_payload_base() = default;
+<span class="line_number">121</span>      ~_Optional_payload_base() = default;
+<span class="line_number">122</span>
+<span class="line_number">123</span>      template&lt;typename... _Args&gt;
+<span class="line_number">124</span>	constexpr
+<span class="line_number">125</span>	_Optional_payload_base(in_place_t __tag, _Args&amp;&amp;... __args)
+<span class="line_number">126</span>	: _M_payload(__tag, std::forward&lt;_Args&gt;(__args)...),
+<span class="line_number">127</span>	  _M_engaged(true)
+<span class="line_number">128</span>	{ }
+<span class="line_number">129</span>
+<span class="line_number">130</span>      template&lt;typename _Up, typename... _Args&gt;
+<span class="line_number">131</span>	constexpr
+<span class="line_number">132</span>	_Optional_payload_base(std::initializer_list&lt;_Up&gt; __il,
+<span class="line_number">133</span>			       _Args&amp;&amp;... __args)
+<span class="line_number">134</span>	: _M_payload(__il, std::forward&lt;_Args&gt;(__args)...),
+<span class="line_number">135</span>	  _M_engaged(true)
+<span class="line_number">136</span>	{ }
+<span class="line_number">137</span>
+<span class="line_number">138</span>      // Constructor used by _Optional_base copy constructor when the
+<span class="line_number">139</span>      // contained value is not trivially copy constructible.
+<span class="line_number">140</span>      constexpr
+<span class="line_number">141</span>      _Optional_payload_base(bool /* __engaged */,
+<span class="line_number">142</span>			     const _Optional_payload_base&amp; __other)
+<span class="line_number">143</span>      {
+<span class="line_number">144</span>	if (__other._M_engaged)
+<span class="line_number">145</span>	  this-&gt;_M_construct(__other._M_get());
+<span class="line_number">146</span>      }
+<span class="line_number">147</span>
+<span class="line_number">148</span>      // Constructor used by _Optional_base move constructor when the
+<span class="line_number">149</span>      // contained value is not trivially move constructible.
+<span class="line_number">150</span>      constexpr
+<span class="line_number">151</span>      _Optional_payload_base(bool /* __engaged */,
+<span class="line_number">152</span>			     _Optional_payload_base&amp;&amp; __other)
+<span class="line_number">153</span>      {
+<span class="line_number">154</span>	if (__other._M_engaged)
+<span class="line_number">155</span>	  this-&gt;_M_construct(std::move(__other._M_get()));
+<span class="line_number">156</span>      }
+<span class="line_number">157</span>
+<span class="line_number">158</span>      // Copy constructor is only used to when the contained value is
+<span class="line_number">159</span>      // trivially copy constructible.
+<span class="line_number">160</span>      _Optional_payload_base(const _Optional_payload_base&amp;) = default;
+<span class="line_number">161</span>
+<span class="line_number">162</span>      // Move constructor is only used to when the contained value is
+<span class="line_number">163</span>      // trivially copy constructible.
+<span class="line_number">164</span>      _Optional_payload_base(_Optional_payload_base&amp;&amp;) = default;
+<span class="line_number">165</span>
+<span class="line_number">166</span>      _Optional_payload_base&amp;
+<span class="line_number">167</span>      operator=(const _Optional_payload_base&amp;) = default;
+<span class="line_number">168</span>
+<span class="line_number">169</span>      _Optional_payload_base&amp;
+<span class="line_number">170</span>      operator=(_Optional_payload_base&amp;&amp;) = default;
+<span class="line_number">171</span>
+<span class="line_number">172</span>      // used to perform non-trivial copy assignment.
+<span class="line_number">173</span>      constexpr void
+<span class="line_number">174</span>      _M_copy_assign(const _Optional_payload_base&amp; __other)
+<span class="line_number">175</span>      {
+<span class="line_number">176</span>	if (this-&gt;_M_engaged &amp;&amp; __other._M_engaged)
+<span class="line_number">177</span>	  this-&gt;_M_get() = __other._M_get();
+<span class="line_number">178</span>	else
+<span class="line_number">179</span>	  {
+<span class="line_number">180</span>	    if (__other._M_engaged)
+<span class="line_number">181</span>	      this-&gt;_M_construct(__other._M_get());
+<span class="line_number">182</span>	    else
+<span class="line_number">183</span>	      this-&gt;_M_reset();
+<span class="line_number">184</span>	  }
+<span class="line_number">185</span>      }
+<span class="line_number">186</span>
+<span class="line_number">187</span>      // used to perform non-trivial move assignment.
+<span class="line_number">188</span>      constexpr void
+<span class="line_number">189</span>      _M_move_assign(_Optional_payload_base&amp;&amp; __other)
+<span class="line_number">190</span>      noexcept(__and_v&lt;is_nothrow_move_constructible&lt;_Tp&gt;,
+<span class="line_number">191</span>		       is_nothrow_move_assignable&lt;_Tp&gt;&gt;)
+<span class="line_number">192</span>      {
+<span class="line_number">193</span>	if (this-&gt;_M_engaged &amp;&amp; __other._M_engaged)
+<span class="line_number">194</span>	  this-&gt;_M_get() = std::move(__other._M_get());
+<span class="line_number">195</span>	else
+<span class="line_number">196</span>	  {
+<span class="line_number">197</span>	    if (__other._M_engaged)
+<span class="line_number">198</span>	      this-&gt;_M_construct(std::move(__other._M_get()));
+<span class="line_number">199</span>	    else
+<span class="line_number">200</span>	      this-&gt;_M_reset();
+<span class="line_number">201</span>	  }
+<span class="line_number">202</span>      }
+<span class="line_number">203</span>
+<span class="line_number">204</span>      struct _Empty_byte { };
+<span class="line_number">205</span>
+<span class="line_number">206</span>      template&lt;typename _Up, bool = is_trivially_destructible_v&lt;_Up&gt;&gt;
+<span class="line_number">207</span>	union _Storage
+<span class="line_number">208</span>	{
+<span class="line_number">209</span>	  constexpr _Storage() noexcept : _M_empty() { }
+<span class="line_number">210</span>
+<span class="line_number">211</span>	  template&lt;typename... _Args&gt;
+<span class="line_number">212</span>	    constexpr
+<span class="line_number">213</span>	    _Storage(in_place_t, _Args&amp;&amp;... __args)
+<span class="line_number">214</span>	    : _M_value(std::forward&lt;_Args&gt;(__args)...)
+<span class="line_number">215</span>	    { }
+<span class="line_number">216</span>
+<span class="line_number">217</span>	  template&lt;typename _Vp, typename... _Args&gt;
+<span class="line_number">218</span>	    constexpr
+<span class="line_number">219</span>	    _Storage(std::initializer_list&lt;_Vp&gt; __il, _Args&amp;&amp;... __args)
+<span class="line_number">220</span>	    : _M_value(__il, std::forward&lt;_Args&gt;(__args)...)
+<span class="line_number">221</span>	    { }
+<span class="line_number">222</span>
+<span class="line_number">223</span>#if __cplusplus &gt;= 202002L
+<span class="line_number">224</span>	  template&lt;typename _Fn, typename _Arg&gt;
+<span class="line_number">225</span>	    constexpr
+<span class="line_number">226</span>	    _Storage(_Optional_func&lt;_Fn&gt; __f, _Arg&amp;&amp; __arg)
+<span class="line_number">227</span>	    : _M_value(std::__invoke(std::forward&lt;_Fn&gt;(__f._M_f),
+<span class="line_number">228</span>				     std::forward&lt;_Arg&gt;(__arg)))
+<span class="line_number">229</span>	    { }
+<span class="line_number">230</span>#endif
+<span class="line_number">231</span>
+<span class="line_number">232</span>	  _Empty_byte _M_empty;
+<span class="line_number">233</span>	  _Up _M_value;
+<span class="line_number">234</span>	};
+<span class="line_number">235</span>
+<span class="line_number">236</span>      template&lt;typename _Up&gt;
+<span class="line_number">237</span>	union _Storage&lt;_Up, false&gt;
+<span class="line_number">238</span>	{
+<span class="line_number">239</span>	  constexpr _Storage() noexcept : _M_empty() { }
+<span class="line_number">240</span>
+<span class="line_number">241</span>	  template&lt;typename... _Args&gt;
+<span class="line_number">242</span>	    constexpr
+<span class="line_number">243</span>	    _Storage(in_place_t, _Args&amp;&amp;... __args)
+<span class="line_number">244</span>	    : _M_value(std::forward&lt;_Args&gt;(__args)...)
+<span class="line_number">245</span>	    { }
+<span class="line_number">246</span>
+<span class="line_number">247</span>	  template&lt;typename _Vp, typename... _Args&gt;
+<span class="line_number">248</span>	    constexpr
+<span class="line_number">249</span>	    _Storage(std::initializer_list&lt;_Vp&gt; __il, _Args&amp;&amp;... __args)
+<span class="line_number">250</span>	    : _M_value(__il, std::forward&lt;_Args&gt;(__args)...)
+<span class="line_number">251</span>	    { }
+<span class="line_number">252</span>
+<span class="line_number">253</span>#if __cplusplus &gt;= 202002L
+<span class="line_number">254</span>	  template&lt;typename _Fn, typename _Arg&gt;
+<span class="line_number">255</span>	    constexpr
+<span class="line_number">256</span>	    _Storage(_Optional_func&lt;_Fn&gt; __f, _Arg&amp;&amp; __arg)
+<span class="line_number">257</span>	    : _M_value(std::__invoke(std::forward&lt;_Fn&gt;(__f._M_f),
+<span class="line_number">258</span>				     std::forward&lt;_Arg&gt;(__arg)))
+<span class="line_number">259</span>	    { }
+<span class="line_number">260</span>#endif
+<span class="line_number">261</span>
+<span class="line_number">262</span>	  // User-provided destructor is needed when _Up has non-trivial dtor.
+<span class="line_number">263</span>	  _GLIBCXX20_CONSTEXPR ~_Storage() { }
+<span class="line_number">264</span>
+<span class="line_number">265</span>	  _Empty_byte _M_empty;
+<span class="line_number">266</span>	  _Up _M_value;
+<span class="line_number">267</span>	};
+<span class="line_number">268</span>
+<span class="line_number">269</span>      _Storage&lt;_Stored_type&gt; _M_payload;
+<span class="line_number">270</span>
+<span class="line_number">271</span>      bool _M_engaged = false;
+<span class="line_number">272</span>
+<span class="line_number">273</span>      template&lt;typename... _Args&gt;
+<span class="line_number">274</span>	constexpr void
+<span class="line_number">275</span>	_M_construct(_Args&amp;&amp;... __args)
+<span class="line_number">276</span>	noexcept(is_nothrow_constructible_v&lt;_Stored_type, _Args...&gt;)
+<span class="line_number">277</span>	{
+<span class="line_number">278</span>	  std::_Construct(std::__addressof(this-&gt;_M_payload._M_value),
+<span class="line_number">279</span>			  std::forward&lt;_Args&gt;(__args)...);
+<span class="line_number">280</span>	  this-&gt;_M_engaged = true;
+<span class="line_number">281</span>	}
+<span class="line_number">282</span>
+<span class="line_number">283</span>      constexpr void
+<span class="line_number">284</span>      _M_destroy() noexcept
+<span class="line_number">285</span>      {
+</code></pre>
+            <div class="issue">
+                <div>
+                    <span class="what">Possible data race during write of size 1 at 0x2B162A38 by thread #1</span>
+                    <div class="navigation">
+                        <button class="next_error">Next</button>
+                        <button class="prev_error">Previous</button>
+                    </div>
+                </div>
+                <div>
+                    <table class="call_stack">
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/optional:318<br>
+                                    <code class="cpp">std::_Optional_payload_base&lt;sb::NestedTensor&lt;unsigned long&gt; &gt;::_M_reset()</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">315</span>      _M_reset() noexcept
+<span class="line_number">316</span>      {
+<span class="line_number">317</span>	if (this-&gt;_M_engaged)
+<span class="line_number">318</span><span class="error">	  _M_destroy();
+</span><span class="line_number">319</span>	else // This seems redundant but improves codegen, see PR 112480.
+<span class="line_number">320</span>	  this-&gt;_M_engaged = false;
+<span class="line_number">321</span>      }
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/optional:441<br>
+                                    <code class="cpp">std::_Optional_payload&lt;sb::NestedTensor&lt;unsigned long&gt;, false, false, false&gt;::~_Optional_payload()</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">438</span>      _Optional_payload&amp; operator=(_Optional_payload&amp;&amp;) = default;
+<span class="line_number">439</span>
+<span class="line_number">440</span>      // Destructor needs to destroy the contained value:
+<span class="line_number">441</span><span class="error">      _GLIBCXX20_CONSTEXPR ~_Optional_payload() { this-&gt;_M_reset(); }
+</span><span class="line_number">442</span>    };
+<span class="line_number">443</span>
+<span class="line_number">444</span>  // Common base class for _Optional_base&lt;T&gt; to avoid repeating these
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/optional:512<br>
+                                    <code class="cpp">std::_Optional_base&lt;sb::NestedTensor&lt;unsigned long&gt;, false, false&gt;::~_Optional_base()</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">509</span>  template&lt;typename _Tp,
+<span class="line_number">510</span>	   bool = is_trivially_copy_constructible_v&lt;_Tp&gt;,
+<span class="line_number">511</span>	   bool = is_trivially_move_constructible_v&lt;_Tp&gt;&gt;
+<span class="line_number">512</span><span class="error">    struct _Optional_base
+</span><span class="line_number">513</span>    : _Optional_base_impl&lt;_Tp, _Optional_base&lt;_Tp&gt;&gt;
+<span class="line_number">514</span>    {
+<span class="line_number">515</span>      // Constructors for disengaged optionals.
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/optional:707<br>
+                                    <code class="cpp">std::optional&lt;sb::NestedTensor&lt;unsigned long&gt; &gt;::~optional()</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">704</span>    * @brief Class template for optional values.
+<span class="line_number">705</span>    */
+<span class="line_number">706</span>  template&lt;typename _Tp&gt;
+<span class="line_number">707</span><span class="error">    class optional
+</span><span class="line_number">708</span>    : private _Optional_base&lt;_Tp&gt;,
+<span class="line_number">709</span>      private _Enable_copy_move&lt;
+<span class="line_number">710</span>	// Copy constructor.
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/tensor.hpp:515<br>
+                                    <code class="cpp">sb::detail::IndexedTensorState&lt;sb::PointCloud&lt;float&gt;, 0, sb::NestedTensor&lt;unsigned long&gt; &gt;::~IndexedTensorState()</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">512</span>    /// is replaced by the dense logical result and `indices` is released.
+<span class="line_number">513</span>    /// Individual views use their locator tensor to address this root.
+<span class="line_number">514</span>    template &lt;typename T, TensorProperties SourceProperties, typename IndexStorage&gt;
+<span class="line_number">515</span><span class="error">    struct IndexedTensorState
+</span><span class="line_number">516</span>    {
+<span class="line_number">517</span>      Tensor&lt;T, SourceProperties&gt; source;
+<span class="line_number">518</span>      std::optional&lt;IndexStorage&gt; indices;
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/stl_construct.h:88<br>
+                                    <code class="cpp">void std::destroy_at&lt;sb::detail::IndexedTensorState&lt;sb::PointCloud&lt;float&gt;, 0, sb::NestedTensor&lt;unsigned long&gt; &gt; &gt;(sb::detail::IndexedTensorState&lt;sb::PointCloud&lt;float&gt;, 0, sb::NestedTensor&lt;unsigned long&gt; &gt;*)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">85</span>	    std::destroy_at(std::__addressof(__x));
+<span class="line_number">86</span>	}
+<span class="line_number">87</span>      else
+<span class="line_number">88</span><span class="error">	__location-&gt;~_Tp();
+</span><span class="line_number">89</span>    }
+<span class="line_number">90</span>
+<span class="line_number">91</span>#if __cplusplus &gt;= 202002L
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/stl_construct.h:149<br>
+                                    <code class="cpp">void std::_Destroy&lt;sb::detail::IndexedTensorState&lt;sb::PointCloud&lt;float&gt;, 0, sb::NestedTensor&lt;unsigned long&gt; &gt; &gt;(sb::detail::IndexedTensorState&lt;sb::PointCloud&lt;float&gt;, 0, sb::NestedTensor&lt;unsigned long&gt; &gt;*)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">146</span>    _Destroy(_Tp* __pointer)
+<span class="line_number">147</span>    {
+<span class="line_number">148</span>#if __cplusplus &gt; 201703L
+<span class="line_number">149</span><span class="error">      std::destroy_at(__pointer);
+</span><span class="line_number">150</span>#else
+<span class="line_number">151</span>      __pointer-&gt;~_Tp();
+<span class="line_number">152</span>#endif
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/alloc_traits.h:675<br>
+                                    <code class="cpp">destroy&lt;sb::detail::IndexedTensorState&lt;sb::PointCloud&lt;float&gt;, 0, sb::NestedTensor&lt;long unsigned int&gt; &gt; &gt;</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">672</span>	static _GLIBCXX20_CONSTEXPR void
+<span class="line_number">673</span>	destroy(allocator_type&amp;, _Up* __p)
+<span class="line_number">674</span>	noexcept(is_nothrow_destructible&lt;_Up&gt;::value)
+<span class="line_number">675</span><span class="error">	{ std::_Destroy(__p); }
+</span><span class="line_number">676</span>
+<span class="line_number">677</span>      /// max_size is ill-formed for allocator&lt;void&gt;
+<span class="line_number">678</span>      static size_type
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/shared_ptr_base.h:613<br>
+                                    <code class="cpp">std::_Sp_counted_ptr_inplace&lt;sb::detail::IndexedTensorState&lt;sb::PointCloud&lt;float&gt;, 0, sb::NestedTensor&lt;unsigned long&gt; &gt;, std::allocator&lt;void&gt;, (__gnu_cxx::_Lock_policy)2&gt;::_M_dispose()</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">610</span>      virtual void
+<span class="line_number">611</span>      _M_dispose() noexcept
+<span class="line_number">612</span>      {
+<span class="line_number">613</span><span class="error">	allocator_traits&lt;_Alloc&gt;::destroy(_M_impl._M_alloc(), _M_ptr());
+</span><span class="line_number">614</span>      }
+<span class="line_number">615</span>
+<span class="line_number">616</span>      // Override because the allocator needs to know the dynamic type
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/shared_ptr_base.h:346<br>
+                                    <code class="cpp">std::_Sp_counted_base&lt;(__gnu_cxx::_Lock_policy)2&gt;::_M_release()</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">343</span>	      _M_weak_count = _M_use_count = 0;
+<span class="line_number">344</span>	      _GLIBCXX_SYNCHRONIZATION_HAPPENS_AFTER(&amp;_M_use_count);
+<span class="line_number">345</span>	      _GLIBCXX_SYNCHRONIZATION_HAPPENS_AFTER(&amp;_M_weak_count);
+<span class="line_number">346</span><span class="error">	      _M_dispose();
+</span><span class="line_number">347</span>	      _M_destroy();
+<span class="line_number">348</span>	      return;
+<span class="line_number">349</span>	    }
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/shared_ptr_base.h:1071<br>
+                                    <code class="cpp">std::__shared_count&lt;(__gnu_cxx::_Lock_policy)2&gt;::~__shared_count()</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1068</span>      ~__shared_count() noexcept
+<span class="line_number">1069</span>      {
+<span class="line_number">1070</span>	if (_M_pi != nullptr)
+<span class="line_number">1071</span><span class="error">	  _M_pi-&gt;_M_release();
+</span><span class="line_number">1072</span>      }
+<span class="line_number">1073</span>
+<span class="line_number">1074</span>      __shared_count(const __shared_count&amp; __r) noexcept
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/shared_ptr_base.h:1524<br>
+                                    <code class="cpp">std::__shared_ptr&lt;sb::detail::IndexedTensorState&lt;sb::PointCloud&lt;float&gt;, 0, sb::NestedTensor&lt;unsigned long&gt; &gt;, (__gnu_cxx::_Lock_policy)2&gt;::~__shared_ptr()</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1521</span>
+<span class="line_number">1522</span>      __shared_ptr(const __shared_ptr&amp;) noexcept = default;
+<span class="line_number">1523</span>      __shared_ptr&amp; operator=(const __shared_ptr&amp;) noexcept = default;
+<span class="line_number">1524</span><span class="error">      ~__shared_ptr() = default;
+</span><span class="line_number">1525</span>
+<span class="line_number">1526</span>      template&lt;typename _Yp, typename = _Compatible&lt;_Yp&gt;&gt;
+<span class="line_number">1527</span>	__shared_ptr(const __shared_ptr&lt;_Yp, _Lp&gt;&amp; __r) noexcept
+</code></pre>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            <pre class="code">
+<code class="c++"><span class="line_number">286</span><span class="error">	_M_engaged = false;</span>
+<span class="line_number">287</span>	_M_payload._M_value.~_Stored_type();
+<span class="line_number">288</span>      }
+<span class="line_number">289</span>
+<span class="line_number">290</span>#if __cplusplus &gt;= 202002L
+<span class="line_number">291</span>      template&lt;typename _Fn, typename _Up&gt;
+<span class="line_number">292</span>	constexpr void
+<span class="line_number">293</span>	_M_apply(_Optional_func&lt;_Fn&gt; __f, _Up&amp;&amp; __x)
+<span class="line_number">294</span>	{
+<span class="line_number">295</span>	  std::construct_at(std::__addressof(this-&gt;_M_payload),
+<span class="line_number">296</span>			    __f, std::forward&lt;_Up&gt;(__x));
+<span class="line_number">297</span>	  _M_engaged = true;
+<span class="line_number">298</span>	}
+<span class="line_number">299</span>#endif
+<span class="line_number">300</span>
+<span class="line_number">301</span>      // The _M_get() operations have _M_engaged as a precondition.
+<span class="line_number">302</span>      // They exist to access the contained value with the appropriate
+<span class="line_number">303</span>      // const-qualification, because _M_payload has had the const removed.
+<span class="line_number">304</span>
+<span class="line_number">305</span>      constexpr _Tp&amp;
+<span class="line_number">306</span>      _M_get() noexcept
+<span class="line_number">307</span>      { return this-&gt;_M_payload._M_value; }
+<span class="line_number">308</span>
+<span class="line_number">309</span>      constexpr const _Tp&amp;
+<span class="line_number">310</span>      _M_get() const noexcept
+<span class="line_number">311</span>      { return this-&gt;_M_payload._M_value; }
+<span class="line_number">312</span>
+<span class="line_number">313</span>      // _M_reset is a &#39;safe&#39; operation with no precondition.
+<span class="line_number">314</span>      constexpr void
+<span class="line_number">315</span>      _M_reset() noexcept
+<span class="line_number">316</span>      {
+<span class="line_number">317</span>	if (this-&gt;_M_engaged)
+<span class="line_number">318</span>	  _M_destroy();
+<span class="line_number">319</span>	else // This seems redundant but improves codegen, see PR 112480.
+<span class="line_number">320</span>	  this-&gt;_M_engaged = false;
+<span class="line_number">321</span>      }
+<span class="line_number">322</span>    };
+<span class="line_number">323</span>
+<span class="line_number">324</span>  // Class template that manages the payload for optionals.
+<span class="line_number">325</span>  template &lt;typename _Tp,
+<span class="line_number">326</span>	    bool /*_HasTrivialDestructor*/ =
+<span class="line_number">327</span>	      is_trivially_destructible_v&lt;_Tp&gt;,
+<span class="line_number">328</span>	    bool /*_HasTrivialCopy */ =
+<span class="line_number">329</span>	      is_trivially_copy_assignable_v&lt;_Tp&gt;
+<span class="line_number">330</span>	      &amp;&amp; is_trivially_copy_constructible_v&lt;_Tp&gt;,
+<span class="line_number">331</span>	    bool /*_HasTrivialMove */ =
+<span class="line_number">332</span>	      is_trivially_move_assignable_v&lt;_Tp&gt;
+<span class="line_number">333</span>	      &amp;&amp; is_trivially_move_constructible_v&lt;_Tp&gt;&gt;
+<span class="line_number">334</span>    struct _Optional_payload;
+<span class="line_number">335</span>
+<span class="line_number">336</span>  // Payload for potentially-constexpr optionals (trivial copy/move/destroy).
+<span class="line_number">337</span>  template &lt;typename _Tp&gt;
+<span class="line_number">338</span>    struct _Optional_payload&lt;_Tp, true, true, true&gt;
+<span class="line_number">339</span>    : _Optional_payload_base&lt;_Tp&gt;
+<span class="line_number">340</span>    {
+<span class="line_number">341</span>      using _Optional_payload_base&lt;_Tp&gt;::_Optional_payload_base;
+<span class="line_number">342</span>
+<span class="line_number">343</span>      _Optional_payload() = default;
+<span class="line_number">344</span>    };
+<span class="line_number">345</span>
+<span class="line_number">346</span>  // Payload for optionals with non-trivial copy construction/assignment.
+<span class="line_number">347</span>  template &lt;typename _Tp&gt;
+<span class="line_number">348</span>    struct _Optional_payload&lt;_Tp, true, false, true&gt;
+<span class="line_number">349</span>    : _Optional_payload_base&lt;_Tp&gt;
+<span class="line_number">350</span>    {
+<span class="line_number">351</span>      using _Optional_payload_base&lt;_Tp&gt;::_Optional_payload_base;
+<span class="line_number">352</span>
+<span class="line_number">353</span>      _Optional_payload() = default;
+<span class="line_number">354</span>      ~_Optional_payload() = default;
+<span class="line_number">355</span>      _Optional_payload(const _Optional_payload&amp;) = default;
+<span class="line_number">356</span>      _Optional_payload(_Optional_payload&amp;&amp;) = default;
+<span class="line_number">357</span>      _Optional_payload&amp; operator=(_Optional_payload&amp;&amp;) = default;
+<span class="line_number">358</span>
+<span class="line_number">359</span>      // Non-trivial copy assignment.
+<span class="line_number">360</span>      constexpr
+<span class="line_number">361</span>      _Optional_payload&amp;
+<span class="line_number">362</span>      operator=(const _Optional_payload&amp; __other)
+<span class="line_number">363</span>      {
+<span class="line_number">364</span>	this-&gt;_M_copy_assign(__other);
+<span class="line_number">365</span>	return *this;
+<span class="line_number">366</span>      }
+<span class="line_number">367</span>    };
+<span class="line_number">368</span>
+<span class="line_number">369</span>  // Payload for optionals with non-trivial move construction/assignment.
+<span class="line_number">370</span>  template &lt;typename _Tp&gt;
+<span class="line_number">371</span>    struct _Optional_payload&lt;_Tp, true, true, false&gt;
+<span class="line_number">372</span>    : _Optional_payload_base&lt;_Tp&gt;
+<span class="line_number">373</span>    {
+<span class="line_number">374</span>      using _Optional_payload_base&lt;_Tp&gt;::_Optional_payload_base;
+<span class="line_number">375</span>
+<span class="line_number">376</span>      _Optional_payload() = default;
+<span class="line_number">377</span>      ~_Optional_payload() = default;
+<span class="line_number">378</span>      _Optional_payload(const _Optional_payload&amp;) = default;
+<span class="line_number">379</span>      _Optional_payload(_Optional_payload&amp;&amp;) = default;
+<span class="line_number">380</span>      _Optional_payload&amp; operator=(const _Optional_payload&amp;) = default;
+<span class="line_number">381</span>
+<span class="line_number">382</span>      // Non-trivial move assignment.
+<span class="line_number">383</span>      constexpr
+<span class="line_number">384</span>      _Optional_payload&amp;
+<span class="line_number">385</span>      operator=(_Optional_payload&amp;&amp; __other)
+<span class="line_number">386</span>      noexcept(__and_v&lt;is_nothrow_move_constructible&lt;_Tp&gt;,
+<span class="line_number">387</span>		       is_nothrow_move_assignable&lt;_Tp&gt;&gt;)
+<span class="line_number">388</span>      {
+<span class="line_number">389</span>	this-&gt;_M_move_assign(std::move(__other));
+<span class="line_number">390</span>	return *this;
+<span class="line_number">391</span>      }
+<span class="line_number">392</span>    };
+<span class="line_number">393</span>
+<span class="line_number">394</span>  // Payload for optionals with non-trivial copy and move assignment.
+<span class="line_number">395</span>  template &lt;typename _Tp&gt;
+<span class="line_number">396</span>    struct _Optional_payload&lt;_Tp, true, false, false&gt;
+<span class="line_number">397</span>    : _Optional_payload_base&lt;_Tp&gt;
+<span class="line_number">398</span>    {
+<span class="line_number">399</span>      using _Optional_payload_base&lt;_Tp&gt;::_Optional_payload_base;
+<span class="line_number">400</span>
+<span class="line_number">401</span>      _Optional_payload() = default;
+<span class="line_number">402</span>      ~_Optional_payload() = default;
+<span class="line_number">403</span>      _Optional_payload(const _Optional_payload&amp;) = default;
+<span class="line_number">404</span>      _Optional_payload(_Optional_payload&amp;&amp;) = default;
+<span class="line_number">405</span>
+<span class="line_number">406</span>      // Non-trivial copy assignment.
+<span class="line_number">407</span>      constexpr
+<span class="line_number">408</span>      _Optional_payload&amp;
+<span class="line_number">409</span>      operator=(const _Optional_payload&amp; __other)
+<span class="line_number">410</span>      {
+<span class="line_number">411</span>	this-&gt;_M_copy_assign(__other);
+<span class="line_number">412</span>	return *this;
+<span class="line_number">413</span>      }
+<span class="line_number">414</span>
+<span class="line_number">415</span>      // Non-trivial move assignment.
+<span class="line_number">416</span>      constexpr
+<span class="line_number">417</span>      _Optional_payload&amp;
+<span class="line_number">418</span>      operator=(_Optional_payload&amp;&amp; __other)
+<span class="line_number">419</span>      noexcept(__and_v&lt;is_nothrow_move_constructible&lt;_Tp&gt;,
+<span class="line_number">420</span>		       is_nothrow_move_assignable&lt;_Tp&gt;&gt;)
+<span class="line_number">421</span>      {
+<span class="line_number">422</span>	this-&gt;_M_move_assign(std::move(__other));
+<span class="line_number">423</span>	return *this;
+<span class="line_number">424</span>      }
+<span class="line_number">425</span>    };
+<span class="line_number">426</span>
+<span class="line_number">427</span>  // Payload for optionals with non-trivial destructors.
+<span class="line_number">428</span>  template &lt;typename _Tp, bool _Copy, bool _Move&gt;
+<span class="line_number">429</span>    struct _Optional_payload&lt;_Tp, false, _Copy, _Move&gt;
+<span class="line_number">430</span>    : _Optional_payload&lt;_Tp, true, false, false&gt;
+<span class="line_number">431</span>    {
+<span class="line_number">432</span>      // Base class implements all the constructors and assignment operators:
+<span class="line_number">433</span>      using _Optional_payload&lt;_Tp, true, false, false&gt;::_Optional_payload;
+<span class="line_number">434</span>      _Optional_payload() = default;
+<span class="line_number">435</span>      _Optional_payload(const _Optional_payload&amp;) = default;
+<span class="line_number">436</span>      _Optional_payload(_Optional_payload&amp;&amp;) = default;
+<span class="line_number">437</span>      _Optional_payload&amp; operator=(const _Optional_payload&amp;) = default;
+<span class="line_number">438</span>      _Optional_payload&amp; operator=(_Optional_payload&amp;&amp;) = default;
+<span class="line_number">439</span>
+<span class="line_number">440</span>      // Destructor needs to destroy the contained value:
+<span class="line_number">441</span>      _GLIBCXX20_CONSTEXPR ~_Optional_payload() { this-&gt;_M_reset(); }
+<span class="line_number">442</span>    };
+<span class="line_number">443</span>
+<span class="line_number">444</span>  // Common base class for _Optional_base&lt;T&gt; to avoid repeating these
+<span class="line_number">445</span>  // member functions in each specialization.
+<span class="line_number">446</span>  template&lt;typename _Tp, typename _Dp&gt;
+<span class="line_number">447</span>    class _Optional_base_impl
+<span class="line_number">448</span>    {
+<span class="line_number">449</span>    protected:
+<span class="line_number">450</span>      using _Stored_type = remove_const_t&lt;_Tp&gt;;
+<span class="line_number">451</span>
+<span class="line_number">452</span>      // The _M_construct operation has !_M_engaged as a precondition
+<span class="line_number">453</span>      // while _M_destruct has _M_engaged as a precondition.
+<span class="line_number">454</span>      template&lt;typename... _Args&gt;
+<span class="line_number">455</span>	constexpr void
+<span class="line_number">456</span>	_M_construct(_Args&amp;&amp;... __args)
+<span class="line_number">457</span>	noexcept(is_nothrow_constructible_v&lt;_Stored_type, _Args...&gt;)
+<span class="line_number">458</span>	{
+<span class="line_number">459</span>	  static_cast&lt;_Dp*&gt;(this)-&gt;_M_payload._M_construct(
+<span class="line_number">460</span>	    std::forward&lt;_Args&gt;(__args)...);
+<span class="line_number">461</span>	}
+<span class="line_number">462</span>
+<span class="line_number">463</span>      constexpr void
+<span class="line_number">464</span>      _M_destruct() noexcept
+<span class="line_number">465</span>      { static_cast&lt;_Dp*&gt;(this)-&gt;_M_payload._M_destroy(); }
+<span class="line_number">466</span>
+<span class="line_number">467</span>      // _M_reset is a &#39;safe&#39; operation with no precondition.
+<span class="line_number">468</span>      constexpr void
+<span class="line_number">469</span>      _M_reset() noexcept
+<span class="line_number">470</span>      { static_cast&lt;_Dp*&gt;(this)-&gt;_M_payload._M_reset(); }
+<span class="line_number">471</span>
+<span class="line_number">472</span>      constexpr bool _M_is_engaged() const noexcept
+</code></pre>
+            <div class="issue">
+                <div>
+                    <span class="what">Possible data race during read of size 1 at 0x2B162A38 by thread #10</span>
+                    <div class="navigation">
+                        <button class="next_error">Next</button>
+                        <button class="prev_error">Previous</button>
+                    </div>
+                </div>
+                <div>
+                    <table class="call_stack">
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/optional:987<br>
+                                    <code class="cpp">std::optional&lt;sb::NestedTensor&lt;unsigned long&gt; &gt;::operator bool() const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">984</span>      { return std::move(this-&gt;_M_get()); }
+<span class="line_number">985</span>
+<span class="line_number">986</span>      constexpr explicit operator bool() const noexcept
+<span class="line_number">987</span><span class="error">      { return this-&gt;_M_is_engaged(); }
+</span><span class="line_number">988</span>
+<span class="line_number">989</span>      constexpr bool has_value() const noexcept
+<span class="line_number">990</span>      { return this-&gt;_M_is_engaged(); }
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/persistence/../tensor.tpp:223<br>
+                                    <code class="cpp">sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 1&gt;::operator()(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">220</span>    if constexpr (IsIndexed)
+<span class="line_number">221</span>    {
+<span class="line_number">222</span>      const size_t rootIndex = m_indexedLocator(index);
+<span class="line_number">223</span><span class="error">      if (!m_indexedState-&gt;indices)
+</span><span class="line_number">224</span>        return value_type(m_indexedState-&gt;source.flat(rootIndex));
+<span class="line_number">225</span>      return value_type(m_indexedState-&gt;source.flat(rootIndex).index_into(
+<span class="line_number">226</span>        detail::IndexTensorStorage&lt;index_type&gt;::flat(*m_indexedState-&gt;indices, rootIndex)));
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/persistence/compute_homological_kernel.hpp:190<br>
+                                    <code class="cpp">void sb::ph::detail::homological_kernel_pcloud_single_impl&lt;float, 1, 1&gt;(sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 1&gt; const&amp;, sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 1&gt; const&amp;, sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt;&amp;, std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">187</span>        const Tensor&lt;PointCloud&lt;T&gt;, PrimeProperties&gt; &amp;pcloudsPrime,
+<span class="line_number">188</span>        Tensor&lt;Barcode&lt;T&gt;&gt; &amp;retBarcodes, const std::vector&lt;size_t&gt; &amp;index)
+<span class="line_number">189</span>    {
+<span class="line_number">190</span><span class="error">      auto const &amp;pc = pclouds(index);
+</span><span class="line_number">191</span>      auto const &amp;pcPrime = pcloudsPrime(index);
+<span class="line_number">192</span>
+<span class="line_number">193</span>      if (pc.coords().rank() != 2 || pcPrime.coords().rank() != 2)
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/persistence/compute_homological_kernel.hpp:260<br>
+                                    <code class="cpp">sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;float&gt;, float, 1, 1&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}::operator()(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">257</span>
+<span class="line_number">258</span>            if constexpr (std::is_same_v&lt;ElemT, PointCloud&lt;T&gt;&gt;)
+<span class="line_number">259</span>            {
+<span class="line_number">260</span><span class="error">              detail::homological_kernel_pcloud_single_impl(m_input, m_inputPrime, m_ret, index);
+</span><span class="line_number">261</span>            }
+<span class="line_number">262</span>            else
+<span class="line_number">263</span>            {
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/persistence/../walk.hpp:155<br>
+                                    <code class="cpp">sb::parallel_walk_async&lt;sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 1&gt;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;float&gt;, float, 1, 1&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 1&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;float&gt;, float, 1, 1&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}::operator()(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">152</span>  tf::Future&lt;void&gt; parallel_walk_async(const TTensor&amp; tensor, UnaryFunc&amp;&amp; f, Executor&amp; exec)
+<span class="line_number">153</span>  {
+<span class="line_number">154</span>    return detail::parallel_walk_impl(tensor, [f = std::forward&lt;UnaryFunc&gt;(f)](const std::vector&lt;size_t&gt;&amp; idx, size_t) {
+<span class="line_number">155</span><span class="error">      f(idx);
+</span><span class="line_number">156</span>    }, exec);
+<span class="line_number">157</span>  }
+<span class="line_number">158</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/persistence/../walk.hpp:118<br>
+                                    <code class="cpp">sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 1&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 1&gt;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;float&gt;, float, 1, 1&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 1&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;float&gt;, float, 1, 1&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 1&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;float&gt;, float, 1, 1&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}::operator()(unsigned long) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">115</span>          rem /= shape[i];
+<span class="line_number">116</span>        }
+<span class="line_number">117</span>
+<span class="line_number">118</span><span class="error">        f(idx, flat);
+</span><span class="line_number">119</span>      });
+<span class="line_number">120</span>
+<span class="line_number">121</span>      return exec.cpu()-&gt;run(std::move(flow));
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/algorithm/for_each.hpp:134<br>
+                                    <code class="cpp">tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 1&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 1&gt;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;float&gt;, float, 1, 1&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 1&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;float&gt;, float, 1, 1&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 1&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;float&gt;, float, 1, 1&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 1&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 1&gt;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;float&gt;, float, 1, 1&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 1&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;float&gt;, float, 1, 1&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 1&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;float&gt;, float, 1, 1&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}::operator()()::{lambda(unsigned long, unsigned long)#1}::operator()(unsigned long, unsigned long)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">131</span>          part.loop(N, W, *next, [=] (size_t part_b, size_t part_e) mutable {
+<span class="line_number">132</span>            auto idx = static_cast&lt;B_t&gt;(part_b) * inc + beg;
+<span class="line_number">133</span>            for(size_t x=part_b; x&lt;part_e; x++, idx += inc) {
+<span class="line_number">134</span><span class="error">              c(idx);
+</span><span class="line_number">135</span>            }
+<span class="line_number">136</span>          });
+<span class="line_number">137</span>        });
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/../algorithm/partitioner.hpp:316<br>
+                                    <code class="cpp">void tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;::loop&lt;tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 1&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 1&gt;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;float&gt;, float, 1, 1&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 1&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;float&gt;, float, 1, 1&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 1&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;float&gt;, float, 1, 1&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 1&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 1&gt;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;float&gt;, float, 1, 1&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 1&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;float&gt;, float, 1, 1&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 1&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;float&gt;, float, 1, 1&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}::operator()()::{lambda(unsigned long, unsigned long)#1}, (void*)0&gt;(unsigned long, unsigned long, std::atomic&lt;unsigned long&gt;&amp;, tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 1&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 1&gt;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;float&gt;, float, 1, 1&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 1&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;float&gt;, float, 1, 1&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 1&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;float&gt;, float, 1, 1&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 1&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 1&gt;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;float&gt;, float, 1, 1&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 1&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;float&gt;, float, 1, 1&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 1&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;float&gt;, float, 1, 1&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}::operator()()::{lambda(unsigned long, unsigned long)#1}&amp;&amp;) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">313</span>          if(curr_b &gt;= N) {
+<span class="line_number">314</span>            return;
+<span class="line_number">315</span>          }
+<span class="line_number">316</span><span class="error">          func(curr_b, (std::min)(curr_b + chunk_size, N));
+</span><span class="line_number">317</span>        }
+<span class="line_number">318</span>        break;
+<span class="line_number">319</span>      }
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/algorithm/for_each.hpp:131<br>
+                                    <code class="cpp">tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 1&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 1&gt;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;float&gt;, float, 1, 1&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 1&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;float&gt;, float, 1, 1&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 1&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;float&gt;, float, 1, 1&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 1&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 1&gt;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;float&gt;, float, 1, 1&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 1&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;float&gt;, float, 1, 1&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 1&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;float&gt;, float, 1, 1&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}::operator()()</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">128</span>      auto next = std::make_shared&lt;std::atomic&lt;size_t&gt;&gt;(0);
+<span class="line_number">129</span>      for(size_t w=0; w&lt;W;) {
+<span class="line_number">130</span>        auto task = part([=] () mutable {
+<span class="line_number">131</span><span class="error">          part.loop(N, W, *next, [=] (size_t part_b, size_t part_e) mutable {
+</span><span class="line_number">132</span>            auto idx = static_cast&lt;B_t&gt;(part_b) * inc + beg;
+<span class="line_number">133</span>            for(size_t x=part_b; x&lt;part_e; x++, idx += inc) {
+<span class="line_number">134</span>              c(idx);
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/algorithm/for_each.hpp:138<br>
+                                    <code class="cpp">tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 1&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 1&gt;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;float&gt;, float, 1, 1&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 1&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;float&gt;, float, 1, 1&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 1&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;float&gt;, float, 1, 1&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 1&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 1&gt;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;float&gt;, float, 1, 1&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 1&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;float&gt;, float, 1, 1&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 1&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;float&gt;, float, 1, 1&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">135</span>            }
+<span class="line_number">136</span>          });
+<span class="line_number">137</span>        });
+<span class="line_number">138</span><span class="error">        (++w == W) ? task() : rt.silent_async(task);
+</span><span class="line_number">139</span>      }
+<span class="line_number">140</span>    }
+<span class="line_number">141</span>  };
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:61<br>
+                                    <code class="cpp">void std::__invoke_impl&lt;void, tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 1&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 1&gt;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;float&gt;, float, 1, 1&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 1&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;float&gt;, float, 1, 1&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 1&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;float&gt;, float, 1, 1&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 1&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 1&gt;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;float&gt;, float, 1, 1&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 1&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;float&gt;, float, 1, 1&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::PointCloud&lt;float&gt;, 1&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;float&gt;, float, 1, 1&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}&amp;, tf::Runtime&amp;&gt;(std::__invoke_other, sb::ph::HomologicalKernelImpl&lt;sb::PointCloud&lt;float&gt;, float, 1, 1&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, tf::Runtime&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">58</span>  template&lt;typename _Res, typename _Fn, typename... _Args&gt;
+<span class="line_number">59</span>    constexpr _Res
+<span class="line_number">60</span>    __invoke_impl(__invoke_other, _Fn&amp;&amp; __f, _Args&amp;&amp;... __args)
+<span class="line_number">61</span><span class="error">    { return std::forward&lt;_Fn&gt;(__f)(std::forward&lt;_Args&gt;(__args)...); }
+</span><span class="line_number">62</span>
+<span class="line_number">63</span>  template&lt;typename _Res, typename _MemFun, typename _Tp, typename... _Args&gt;
+<span class="line_number">64</span>    constexpr _Res
+</code></pre>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            <pre class="code">
+<code class="c++"><span class="line_number">473</span><span class="error">      { return static_cast&lt;const _Dp*&gt;(this)-&gt;_M_payload._M_engaged; }</span>
+<span class="line_number">474</span>
+<span class="line_number">475</span>      // The _M_get operations have _M_engaged as a precondition.
+<span class="line_number">476</span>      constexpr _Tp&amp;
+<span class="line_number">477</span>      _M_get() noexcept
+<span class="line_number">478</span>      {
+<span class="line_number">479</span>	__glibcxx_assert(this-&gt;_M_is_engaged());
+<span class="line_number">480</span>	return static_cast&lt;_Dp*&gt;(this)-&gt;_M_payload._M_get();
+<span class="line_number">481</span>      }
+<span class="line_number">482</span>
+<span class="line_number">483</span>      constexpr const _Tp&amp;
+<span class="line_number">484</span>      _M_get() const noexcept
+<span class="line_number">485</span>      {
+<span class="line_number">486</span>	__glibcxx_assert(this-&gt;_M_is_engaged());
+<span class="line_number">487</span>	return static_cast&lt;const _Dp*&gt;(this)-&gt;_M_payload._M_get();
+<span class="line_number">488</span>      }
+<span class="line_number">489</span>    };
+<span class="line_number">490</span>
+<span class="line_number">491</span>  /**
+<span class="line_number">492</span>    * @brief Class template that provides copy/move constructors of optional.
+<span class="line_number">493</span>    *
+<span class="line_number">494</span>    * Such a separate base class template is necessary in order to
+<span class="line_number">495</span>    * conditionally make copy/move constructors trivial.
+<span class="line_number">496</span>    *
+<span class="line_number">497</span>    * When the contained value is trivially copy/move constructible,
+<span class="line_number">498</span>    * the copy/move constructors of _Optional_base will invoke the
+<span class="line_number">499</span>    * trivial copy/move constructor of _Optional_payload. Otherwise,
+<span class="line_number">500</span>    * they will invoke _Optional_payload(bool, const _Optional_payload&amp;)
+<span class="line_number">501</span>    * or _Optional_payload(bool, _Optional_payload&amp;&amp;) to initialize
+<span class="line_number">502</span>    * the contained value, if copying/moving an engaged optional.
+<span class="line_number">503</span>    *
+<span class="line_number">504</span>    * Whether the other special members are trivial is determined by the
+<span class="line_number">505</span>    * _Optional_payload&lt;_Tp&gt; specialization used for the _M_payload member.
+<span class="line_number">506</span>    *
+<span class="line_number">507</span>    * @see optional, _Enable_special_members
+<span class="line_number">508</span>    */
+<span class="line_number">509</span>  template&lt;typename _Tp,
+<span class="line_number">510</span>	   bool = is_trivially_copy_constructible_v&lt;_Tp&gt;,
+<span class="line_number">511</span>	   bool = is_trivially_move_constructible_v&lt;_Tp&gt;&gt;
+<span class="line_number">512</span>    struct _Optional_base
+<span class="line_number">513</span>    : _Optional_base_impl&lt;_Tp, _Optional_base&lt;_Tp&gt;&gt;
+<span class="line_number">514</span>    {
+<span class="line_number">515</span>      // Constructors for disengaged optionals.
+<span class="line_number">516</span>      constexpr _Optional_base() = default;
+<span class="line_number">517</span>
+<span class="line_number">518</span>      // Constructors for engaged optionals.
+<span class="line_number">519</span>      template&lt;typename... _Args,
+<span class="line_number">520</span>	       enable_if_t&lt;is_constructible_v&lt;_Tp, _Args...&gt;, bool&gt; = false&gt;
+<span class="line_number">521</span>	constexpr explicit
+<span class="line_number">522</span>	_Optional_base(in_place_t, _Args&amp;&amp;... __args)
+<span class="line_number">523</span>	: _M_payload(in_place, std::forward&lt;_Args&gt;(__args)...)
+<span class="line_number">524</span>	{ }
+<span class="line_number">525</span>
+<span class="line_number">526</span>      template&lt;typename _Up, typename... _Args,
+<span class="line_number">527</span>	       enable_if_t&lt;is_constructible_v&lt;_Tp,
+<span class="line_number">528</span>					      initializer_list&lt;_Up&gt;&amp;,
+<span class="line_number">529</span>					      _Args...&gt;, bool&gt; = false&gt;
+<span class="line_number">530</span>	constexpr explicit
+<span class="line_number">531</span>	_Optional_base(in_place_t,
+<span class="line_number">532</span>		       initializer_list&lt;_Up&gt; __il,
+<span class="line_number">533</span>		       _Args&amp;&amp;... __args)
+<span class="line_number">534</span>	: _M_payload(in_place, __il, std::forward&lt;_Args&gt;(__args)...)
+<span class="line_number">535</span>	{ }
+<span class="line_number">536</span>
+<span class="line_number">537</span>      // Copy and move constructors.
+<span class="line_number">538</span>      constexpr
+<span class="line_number">539</span>      _Optional_base(const _Optional_base&amp; __other)
+<span class="line_number">540</span>      : _M_payload(__other._M_payload._M_engaged, __other._M_payload)
+<span class="line_number">541</span>      { }
+<span class="line_number">542</span>
+<span class="line_number">543</span>      constexpr
+<span class="line_number">544</span>      _Optional_base(_Optional_base&amp;&amp; __other)
+<span class="line_number">545</span>      noexcept(is_nothrow_move_constructible_v&lt;_Tp&gt;)
+<span class="line_number">546</span>      : _M_payload(__other._M_payload._M_engaged,
+<span class="line_number">547</span>		   std::move(__other._M_payload))
+<span class="line_number">548</span>      { }
+<span class="line_number">549</span>
+<span class="line_number">550</span>      // Assignment operators.
+<span class="line_number">551</span>      _Optional_base&amp; operator=(const _Optional_base&amp;) = default;
+<span class="line_number">552</span>      _Optional_base&amp; operator=(_Optional_base&amp;&amp;) = default;
+<span class="line_number">553</span>
+<span class="line_number">554</span>      _Optional_payload&lt;_Tp&gt; _M_payload;
+<span class="line_number">555</span>    };
+<span class="line_number">556</span>
+<span class="line_number">557</span>  template&lt;typename _Tp&gt;
+<span class="line_number">558</span>    struct _Optional_base&lt;_Tp, false, true&gt;
+<span class="line_number">559</span>    : _Optional_base_impl&lt;_Tp, _Optional_base&lt;_Tp&gt;&gt;
+<span class="line_number">560</span>    {
+<span class="line_number">561</span>      // Constructors for disengaged optionals.
+<span class="line_number">562</span>      constexpr _Optional_base() = default;
+<span class="line_number">563</span>
+<span class="line_number">564</span>      // Constructors for engaged optionals.
+<span class="line_number">565</span>      template&lt;typename... _Args,
+<span class="line_number">566</span>	       enable_if_t&lt;is_constructible_v&lt;_Tp, _Args...&gt;, bool&gt; = false&gt;
+<span class="line_number">567</span>	constexpr explicit
+<span class="line_number">568</span>	_Optional_base(in_place_t, _Args&amp;&amp;... __args)
+<span class="line_number">569</span>	: _M_payload(in_place, std::forward&lt;_Args&gt;(__args)...)
+<span class="line_number">570</span>	{ }
+<span class="line_number">571</span>
+<span class="line_number">572</span>      template&lt;typename _Up, typename... _Args,
+<span class="line_number">573</span>	       enable_if_t&lt;is_constructible_v&lt;_Tp,
+<span class="line_number">574</span>					      initializer_list&lt;_Up&gt;&amp;,
+<span class="line_number">575</span>					      _Args...&gt;, bool&gt; = false&gt;
+<span class="line_number">576</span>	constexpr explicit
+<span class="line_number">577</span>	_Optional_base(in_place_t,
+<span class="line_number">578</span>		       initializer_list&lt;_Up&gt; __il,
+<span class="line_number">579</span>		       _Args... __args)
+<span class="line_number">580</span>	: _M_payload(in_place, __il, std::forward&lt;_Args&gt;(__args)...)
+<span class="line_number">581</span>	{ }
+<span class="line_number">582</span>
+<span class="line_number">583</span>      // Copy and move constructors.
+<span class="line_number">584</span>      constexpr _Optional_base(const _Optional_base&amp; __other)
+<span class="line_number">585</span>      : _M_payload(__other._M_payload._M_engaged, __other._M_payload)
+<span class="line_number">586</span>      { }
+<span class="line_number">587</span>
+<span class="line_number">588</span>      constexpr _Optional_base(_Optional_base&amp;&amp; __other) = default;
+<span class="line_number">589</span>
+<span class="line_number">590</span>      // Assignment operators.
+<span class="line_number">591</span>      _Optional_base&amp; operator=(const _Optional_base&amp;) = default;
+<span class="line_number">592</span>      _Optional_base&amp; operator=(_Optional_base&amp;&amp;) = default;
+<span class="line_number">593</span>
+<span class="line_number">594</span>      _Optional_payload&lt;_Tp&gt; _M_payload;
+<span class="line_number">595</span>    };
+<span class="line_number">596</span>
+<span class="line_number">597</span>  template&lt;typename _Tp&gt;
+<span class="line_number">598</span>    struct _Optional_base&lt;_Tp, true, false&gt;
+<span class="line_number">599</span>    : _Optional_base_impl&lt;_Tp, _Optional_base&lt;_Tp&gt;&gt;
+<span class="line_number">600</span>    {
+<span class="line_number">601</span>      // Constructors for disengaged optionals.
+<span class="line_number">602</span>      constexpr _Optional_base() = default;
+<span class="line_number">603</span>
+<span class="line_number">604</span>      // Constructors for engaged optionals.
+<span class="line_number">605</span>      template&lt;typename... _Args,
+<span class="line_number">606</span>	       enable_if_t&lt;is_constructible_v&lt;_Tp, _Args...&gt;, bool&gt; = false&gt;
+<span class="line_number">607</span>	constexpr explicit
+<span class="line_number">608</span>	_Optional_base(in_place_t, _Args&amp;&amp;... __args)
+<span class="line_number">609</span>	: _M_payload(in_place, std::forward&lt;_Args&gt;(__args)...)
+<span class="line_number">610</span>	{ }
+<span class="line_number">611</span>
+<span class="line_number">612</span>      template&lt;typename _Up, typename... _Args,
+<span class="line_number">613</span>	       enable_if_t&lt;is_constructible_v&lt;_Tp,
+<span class="line_number">614</span>					      initializer_list&lt;_Up&gt;&amp;,
+<span class="line_number">615</span>					      _Args...&gt;, bool&gt; = false&gt;
+<span class="line_number">616</span>	constexpr explicit
+<span class="line_number">617</span>	_Optional_base(in_place_t,
+<span class="line_number">618</span>		       initializer_list&lt;_Up&gt; __il,
+<span class="line_number">619</span>		       _Args&amp;&amp;... __args)
+<span class="line_number">620</span>	: _M_payload(in_place, __il, std::forward&lt;_Args&gt;(__args)...)
+<span class="line_number">621</span>	{ }
+<span class="line_number">622</span>
+<span class="line_number">623</span>      // Copy and move constructors.
+<span class="line_number">624</span>      constexpr _Optional_base(const _Optional_base&amp; __other) = default;
+<span class="line_number">625</span>
+<span class="line_number">626</span>      constexpr
+<span class="line_number">627</span>      _Optional_base(_Optional_base&amp;&amp; __other)
+<span class="line_number">628</span>      noexcept(is_nothrow_move_constructible_v&lt;_Tp&gt;)
+<span class="line_number">629</span>      : _M_payload(__other._M_payload._M_engaged,
+<span class="line_number">630</span>		   std::move(__other._M_payload))
+<span class="line_number">631</span>      { }
+<span class="line_number">632</span>
+<span class="line_number">633</span>      // Assignment operators.
+<span class="line_number">634</span>      _Optional_base&amp; operator=(const _Optional_base&amp;) = default;
+<span class="line_number">635</span>      _Optional_base&amp; operator=(_Optional_base&amp;&amp;) = default;
+<span class="line_number">636</span>
+<span class="line_number">637</span>      _Optional_payload&lt;_Tp&gt; _M_payload;
+<span class="line_number">638</span>    };
+<span class="line_number">639</span>
+<span class="line_number">640</span>  template&lt;typename _Tp&gt;
+<span class="line_number">641</span>    struct _Optional_base&lt;_Tp, true, true&gt;
+<span class="line_number">642</span>    : _Optional_base_impl&lt;_Tp, _Optional_base&lt;_Tp&gt;&gt;
+<span class="line_number">643</span>    {
+<span class="line_number">644</span>      // Constructors for disengaged optionals.
+<span class="line_number">645</span>      constexpr _Optional_base() = default;
+<span class="line_number">646</span>
+<span class="line_number">647</span>      // Constructors for engaged optionals.
+<span class="line_number">648</span>      template&lt;typename... _Args,
+<span class="line_number">649</span>	       enable_if_t&lt;is_constructible_v&lt;_Tp, _Args...&gt;, bool&gt; = false&gt;
+<span class="line_number">650</span>	constexpr explicit
+<span class="line_number">651</span>	_Optional_base(in_place_t, _Args&amp;&amp;... __args)
+<span class="line_number">652</span>	: _M_payload(in_place, std::forward&lt;_Args&gt;(__args)...)
+<span class="line_number">653</span>	{ }
+<span class="line_number">654</span>
+<span class="line_number">655</span>      template&lt;typename _Up, typename... _Args,
+<span class="line_number">656</span>	       enable_if_t&lt;is_constructible_v&lt;_Tp,
+<span class="line_number">657</span>					      initializer_list&lt;_Up&gt;&amp;,
+<span class="line_number">658</span>					      _Args...&gt;, bool&gt; = false&gt;
+<span class="line_number">659</span>	constexpr explicit
+<span class="line_number">660</span>	_Optional_base(in_place_t,
+<span class="line_number">661</span>		       initializer_list&lt;_Up&gt; __il,
+<span class="line_number">662</span>		       _Args&amp;&amp;... __args)
+<span class="line_number">663</span>	: _M_payload(in_place, __il, std::forward&lt;_Args&gt;(__args)...)
+<span class="line_number">664</span>	{ }
+<span class="line_number">665</span>
+<span class="line_number">666</span>      // Copy and move constructors.
+<span class="line_number">667</span>      constexpr _Optional_base(const _Optional_base&amp; __other) = default;
+<span class="line_number">668</span>      constexpr _Optional_base(_Optional_base&amp;&amp; __other) = default;
+<span class="line_number">669</span>
+<span class="line_number">670</span>      // Assignment operators.
+<span class="line_number">671</span>      _Optional_base&amp; operator=(const _Optional_base&amp;) = default;
+<span class="line_number">672</span>      _Optional_base&amp; operator=(_Optional_base&amp;&amp;) = default;
+<span class="line_number">673</span>
+<span class="line_number">674</span>      _Optional_payload&lt;_Tp&gt; _M_payload;
+<span class="line_number">675</span>    };
+<span class="line_number">676</span>
+<span class="line_number">677</span>  template&lt;typename _Tp&gt;
+<span class="line_number">678</span>  class optional;
+<span class="line_number">679</span>
+<span class="line_number">680</span>  template&lt;typename _Tp&gt;
+<span class="line_number">681</span>    inline constexpr bool __is_optional_v = false;
+<span class="line_number">682</span>  template&lt;typename _Tp&gt;
+<span class="line_number">683</span>    inline constexpr bool __is_optional_v&lt;optional&lt;_Tp&gt;&gt; = true;
+<span class="line_number">684</span>
+<span class="line_number">685</span>  template&lt;typename _Tp, typename _Up&gt;
+<span class="line_number">686</span>    using __converts_from_optional =
+<span class="line_number">687</span>      __or_&lt;is_constructible&lt;_Tp, const optional&lt;_Up&gt;&amp;&gt;,
+<span class="line_number">688</span>	    is_constructible&lt;_Tp, optional&lt;_Up&gt;&amp;&gt;,
+<span class="line_number">689</span>	    is_constructible&lt;_Tp, const optional&lt;_Up&gt;&amp;&amp;&gt;,
+<span class="line_number">690</span>	    is_constructible&lt;_Tp, optional&lt;_Up&gt;&amp;&amp;&gt;,
+<span class="line_number">691</span>	    is_convertible&lt;const optional&lt;_Up&gt;&amp;, _Tp&gt;,
+<span class="line_number">692</span>	    is_convertible&lt;optional&lt;_Up&gt;&amp;, _Tp&gt;,
+<span class="line_number">693</span>	    is_convertible&lt;const optional&lt;_Up&gt;&amp;&amp;, _Tp&gt;,
+<span class="line_number">694</span>	    is_convertible&lt;optional&lt;_Up&gt;&amp;&amp;, _Tp&gt;&gt;;
+<span class="line_number">695</span>
+<span class="line_number">696</span>  template&lt;typename _Tp, typename _Up&gt;
+<span class="line_number">697</span>    using __assigns_from_optional =
+<span class="line_number">698</span>      __or_&lt;is_assignable&lt;_Tp&amp;, const optional&lt;_Up&gt;&amp;&gt;,
+<span class="line_number">699</span>	    is_assignable&lt;_Tp&amp;, optional&lt;_Up&gt;&amp;&gt;,
+<span class="line_number">700</span>	    is_assignable&lt;_Tp&amp;, const optional&lt;_Up&gt;&amp;&amp;&gt;,
+<span class="line_number">701</span>	    is_assignable&lt;_Tp&amp;, optional&lt;_Up&gt;&amp;&amp;&gt;&gt;;
+<span class="line_number">702</span>
+<span class="line_number">703</span>  /**
+<span class="line_number">704</span>    * @brief Class template for optional values.
+<span class="line_number">705</span>    */
+<span class="line_number">706</span>  template&lt;typename _Tp&gt;
+<span class="line_number">707</span>    class optional
+<span class="line_number">708</span>    : private _Optional_base&lt;_Tp&gt;,
+<span class="line_number">709</span>      private _Enable_copy_move&lt;
+<span class="line_number">710</span>	// Copy constructor.
+<span class="line_number">711</span>	is_copy_constructible_v&lt;_Tp&gt;,
+<span class="line_number">712</span>	// Copy assignment.
+<span class="line_number">713</span>	__and_v&lt;is_copy_constructible&lt;_Tp&gt;, is_copy_assignable&lt;_Tp&gt;&gt;,
+<span class="line_number">714</span>	// Move constructor.
+<span class="line_number">715</span>	is_move_constructible_v&lt;_Tp&gt;,
+<span class="line_number">716</span>	// Move assignment.
+<span class="line_number">717</span>	__and_v&lt;is_move_constructible&lt;_Tp&gt;, is_move_assignable&lt;_Tp&gt;&gt;,
+<span class="line_number">718</span>	// Unique tag type.
+<span class="line_number">719</span>	optional&lt;_Tp&gt;&gt;
+<span class="line_number">720</span>    {
+<span class="line_number">721</span>      static_assert(!is_same_v&lt;remove_cv_t&lt;_Tp&gt;, nullopt_t&gt;);
+<span class="line_number">722</span>      static_assert(!is_same_v&lt;remove_cv_t&lt;_Tp&gt;, in_place_t&gt;);
+<span class="line_number">723</span>      static_assert(is_object_v&lt;_Tp&gt; &amp;&amp; !is_array_v&lt;_Tp&gt;);
+<span class="line_number">724</span>
+<span class="line_number">725</span>    private:
+<span class="line_number">726</span>      using _Base = _Optional_base&lt;_Tp&gt;;
+<span class="line_number">727</span>
+<span class="line_number">728</span>      // SFINAE helpers
+<span class="line_number">729</span>      template&lt;typename _Up&gt;
+<span class="line_number">730</span>	using __not_self = __not_&lt;is_same&lt;optional, __remove_cvref_t&lt;_Up&gt;&gt;&gt;;
+<span class="line_number">731</span>      template&lt;typename _Up&gt;
+<span class="line_number">732</span>	using __not_tag = __not_&lt;is_same&lt;in_place_t, __remove_cvref_t&lt;_Up&gt;&gt;&gt;;
+<span class="line_number">733</span>      template&lt;typename... _Cond&gt;
+<span class="line_number">734</span>	using _Requires = enable_if_t&lt;__and_v&lt;_Cond...&gt;, bool&gt;;
+<span class="line_number">735</span>
+<span class="line_number">736</span>    public:
+<span class="line_number">737</span>      using value_type = _Tp;
+<span class="line_number">738</span>
+<span class="line_number">739</span>      constexpr optional() noexcept { }
+<span class="line_number">740</span>
+<span class="line_number">741</span>      constexpr optional(nullopt_t) noexcept { }
+<span class="line_number">742</span>
+<span class="line_number">743</span>      // Converting constructors for engaged optionals.
+<span class="line_number">744</span>      template&lt;typename _Up = _Tp,
+<span class="line_number">745</span>	       _Requires&lt;__not_self&lt;_Up&gt;, __not_tag&lt;_Up&gt;,
+<span class="line_number">746</span>			 is_constructible&lt;_Tp, _Up&gt;,
+<span class="line_number">747</span>			 is_convertible&lt;_Up, _Tp&gt;&gt; = true&gt;
+<span class="line_number">748</span>	constexpr
+<span class="line_number">749</span>	optional(_Up&amp;&amp; __t)
+<span class="line_number">750</span>	noexcept(is_nothrow_constructible_v&lt;_Tp, _Up&gt;)
+<span class="line_number">751</span>	: _Base(std::in_place, std::forward&lt;_Up&gt;(__t)) { }
+<span class="line_number">752</span>
+<span class="line_number">753</span>      template&lt;typename _Up = _Tp,
+<span class="line_number">754</span>	       _Requires&lt;__not_self&lt;_Up&gt;, __not_tag&lt;_Up&gt;,
+<span class="line_number">755</span>			 is_constructible&lt;_Tp, _Up&gt;,
+<span class="line_number">756</span>			 __not_&lt;is_convertible&lt;_Up, _Tp&gt;&gt;&gt; = false&gt;
+<span class="line_number">757</span>	explicit constexpr
+<span class="line_number">758</span>	optional(_Up&amp;&amp; __t)
+<span class="line_number">759</span>	noexcept(is_nothrow_constructible_v&lt;_Tp, _Up&gt;)
+<span class="line_number">760</span>	: _Base(std::in_place, std::forward&lt;_Up&gt;(__t)) { }
+<span class="line_number">761</span>
+<span class="line_number">762</span>      template&lt;typename _Up,
+<span class="line_number">763</span>	       _Requires&lt;__not_&lt;is_same&lt;_Tp, _Up&gt;&gt;,
+<span class="line_number">764</span>			 is_constructible&lt;_Tp, const _Up&amp;&gt;,
+<span class="line_number">765</span>			 is_convertible&lt;const _Up&amp;, _Tp&gt;,
+<span class="line_number">766</span>			 __not_&lt;__converts_from_optional&lt;_Tp, _Up&gt;&gt;&gt; = true&gt;
+<span class="line_number">767</span>	constexpr
+<span class="line_number">768</span>	optional(const optional&lt;_Up&gt;&amp; __t)
+<span class="line_number">769</span>	noexcept(is_nothrow_constructible_v&lt;_Tp, const _Up&amp;&gt;)
+<span class="line_number">770</span>	{
+<span class="line_number">771</span>	  if (__t)
+<span class="line_number">772</span>	    emplace(*__t);
+<span class="line_number">773</span>	}
+<span class="line_number">774</span>
+<span class="line_number">775</span>      template&lt;typename _Up,
+<span class="line_number">776</span>	       _Requires&lt;__not_&lt;is_same&lt;_Tp, _Up&gt;&gt;,
+<span class="line_number">777</span>			 is_constructible&lt;_Tp, const _Up&amp;&gt;,
+<span class="line_number">778</span>			 __not_&lt;is_convertible&lt;const _Up&amp;, _Tp&gt;&gt;,
+<span class="line_number">779</span>			 __not_&lt;__converts_from_optional&lt;_Tp, _Up&gt;&gt;&gt; = false&gt;
+<span class="line_number">780</span>	explicit constexpr
+<span class="line_number">781</span>	optional(const optional&lt;_Up&gt;&amp; __t)
+<span class="line_number">782</span>	noexcept(is_nothrow_constructible_v&lt;_Tp, const _Up&amp;&gt;)
+<span class="line_number">783</span>	{
+<span class="line_number">784</span>	  if (__t)
+<span class="line_number">785</span>	    emplace(*__t);
+<span class="line_number">786</span>	}
+<span class="line_number">787</span>
+<span class="line_number">788</span>      template&lt;typename _Up,
+<span class="line_number">789</span>	       _Requires&lt;__not_&lt;is_same&lt;_Tp, _Up&gt;&gt;,
+<span class="line_number">790</span>			 is_constructible&lt;_Tp, _Up&gt;,
+<span class="line_number">791</span>			 is_convertible&lt;_Up, _Tp&gt;,
+<span class="line_number">792</span>			 __not_&lt;__converts_from_optional&lt;_Tp, _Up&gt;&gt;&gt; = true&gt;
+<span class="line_number">793</span>	constexpr
+<span class="line_number">794</span>	optional(optional&lt;_Up&gt;&amp;&amp; __t)
+<span class="line_number">795</span>	noexcept(is_nothrow_constructible_v&lt;_Tp, _Up&gt;)
+<span class="line_number">796</span>	{
+<span class="line_number">797</span>	  if (__t)
+<span class="line_number">798</span>	    emplace(std::move(*__t));
+<span class="line_number">799</span>	}
+<span class="line_number">800</span>
+<span class="line_number">801</span>      template&lt;typename _Up,
+<span class="line_number">802</span>	       _Requires&lt;__not_&lt;is_same&lt;_Tp, _Up&gt;&gt;,
+<span class="line_number">803</span>			 is_constructible&lt;_Tp, _Up&gt;,
+<span class="line_number">804</span>			 __not_&lt;is_convertible&lt;_Up, _Tp&gt;&gt;,
+<span class="line_number">805</span>			 __not_&lt;__converts_from_optional&lt;_Tp, _Up&gt;&gt;&gt; = false&gt;
+<span class="line_number">806</span>	explicit constexpr
+<span class="line_number">807</span>	optional(optional&lt;_Up&gt;&amp;&amp; __t)
+<span class="line_number">808</span>	noexcept(is_nothrow_constructible_v&lt;_Tp, _Up&gt;)
+<span class="line_number">809</span>	{
+<span class="line_number">810</span>	  if (__t)
+<span class="line_number">811</span>	    emplace(std::move(*__t));
+<span class="line_number">812</span>	}
+<span class="line_number">813</span>
+<span class="line_number">814</span>      template&lt;typename... _Args,
+<span class="line_number">815</span>	       _Requires&lt;is_constructible&lt;_Tp, _Args...&gt;&gt; = false&gt;
+<span class="line_number">816</span>	explicit constexpr
+<span class="line_number">817</span>	optional(in_place_t, _Args&amp;&amp;... __args)
+<span class="line_number">818</span>	noexcept(is_nothrow_constructible_v&lt;_Tp, _Args...&gt;)
+<span class="line_number">819</span>	: _Base(std::in_place, std::forward&lt;_Args&gt;(__args)...) { }
+<span class="line_number">820</span>
+<span class="line_number">821</span>      template&lt;typename _Up, typename... _Args,
+<span class="line_number">822</span>	       _Requires&lt;is_constructible&lt;_Tp,
+<span class="line_number">823</span>					  initializer_list&lt;_Up&gt;&amp;,
+<span class="line_number">824</span>					  _Args...&gt;&gt; = false&gt;
+<span class="line_number">825</span>	explicit constexpr
+<span class="line_number">826</span>	optional(in_place_t, initializer_list&lt;_Up&gt; __il, _Args&amp;&amp;... __args)
+<span class="line_number">827</span>	noexcept(is_nothrow_constructible_v&lt;_Tp, initializer_list&lt;_Up&gt;&amp;,
+<span class="line_number">828</span>					    _Args...&gt;)
+<span class="line_number">829</span>	: _Base(std::in_place, __il, std::forward&lt;_Args&gt;(__args)...) { }
+<span class="line_number">830</span>
+<span class="line_number">831</span>
+<span class="line_number">832</span>      // Assignment operators.
+<span class="line_number">833</span>      _GLIBCXX20_CONSTEXPR optional&amp;
+<span class="line_number">834</span>      operator=(nullopt_t) noexcept
+<span class="line_number">835</span>      {
+<span class="line_number">836</span>	this-&gt;_M_reset();
+<span class="line_number">837</span>	return *this;
+<span class="line_number">838</span>      }
+<span class="line_number">839</span>
+<span class="line_number">840</span>      template&lt;typename _Up = _Tp&gt;
+<span class="line_number">841</span>	_GLIBCXX20_CONSTEXPR
+<span class="line_number">842</span>	enable_if_t&lt;__and_v&lt;__not_self&lt;_Up&gt;,
+<span class="line_number">843</span>			    __not_&lt;__and_&lt;is_scalar&lt;_Tp&gt;,
+<span class="line_number">844</span>					  is_same&lt;_Tp, decay_t&lt;_Up&gt;&gt;&gt;&gt;,
+<span class="line_number">845</span>			    is_constructible&lt;_Tp, _Up&gt;,
+<span class="line_number">846</span>			    is_assignable&lt;_Tp&amp;, _Up&gt;&gt;,
+<span class="line_number">847</span>		    optional&amp;&gt;
+<span class="line_number">848</span>	operator=(_Up&amp;&amp; __u)
+<span class="line_number">849</span>	noexcept(__and_v&lt;is_nothrow_constructible&lt;_Tp, _Up&gt;,
+<span class="line_number">850</span>			 is_nothrow_assignable&lt;_Tp&amp;, _Up&gt;&gt;)
+<span class="line_number">851</span>	{
+<span class="line_number">852</span>	  if (this-&gt;_M_is_engaged())
+<span class="line_number">853</span>	    this-&gt;_M_get() = std::forward&lt;_Up&gt;(__u);
+<span class="line_number">854</span>	  else
+<span class="line_number">855</span>	    this-&gt;_M_construct(std::forward&lt;_Up&gt;(__u));
+<span class="line_number">856</span>
+<span class="line_number">857</span>	  return *this;
+<span class="line_number">858</span>	}
+<span class="line_number">859</span>
+<span class="line_number">860</span>      template&lt;typename _Up&gt;
+<span class="line_number">861</span>	_GLIBCXX20_CONSTEXPR
+<span class="line_number">862</span>	enable_if_t&lt;__and_v&lt;__not_&lt;is_same&lt;_Tp, _Up&gt;&gt;,
+<span class="line_number">863</span>			    is_constructible&lt;_Tp, const _Up&amp;&gt;,
+<span class="line_number">864</span>			    is_assignable&lt;_Tp&amp;, const _Up&amp;&gt;,
+<span class="line_number">865</span>			    __not_&lt;__converts_from_optional&lt;_Tp, _Up&gt;&gt;,
+<span class="line_number">866</span>			    __not_&lt;__assigns_from_optional&lt;_Tp, _Up&gt;&gt;&gt;,
+<span class="line_number">867</span>		    optional&amp;&gt;
+<span class="line_number">868</span>	operator=(const optional&lt;_Up&gt;&amp; __u)
+<span class="line_number">869</span>	noexcept(__and_v&lt;is_nothrow_constructible&lt;_Tp, const _Up&amp;&gt;,
+<span class="line_number">870</span>			 is_nothrow_assignable&lt;_Tp&amp;, const _Up&amp;&gt;&gt;)
+<span class="line_number">871</span>	{
+<span class="line_number">872</span>	  if (__u)
+<span class="line_number">873</span>	    {
+<span class="line_number">874</span>	      if (this-&gt;_M_is_engaged())
+<span class="line_number">875</span>		this-&gt;_M_get() = *__u;
+<span class="line_number">876</span>	      else
+<span class="line_number">877</span>		this-&gt;_M_construct(*__u);
+<span class="line_number">878</span>	    }
+<span class="line_number">879</span>	  else
+<span class="line_number">880</span>	    {
+<span class="line_number">881</span>	      this-&gt;_M_reset();
+<span class="line_number">882</span>	    }
+<span class="line_number">883</span>	  return *this;
+<span class="line_number">884</span>	}
+<span class="line_number">885</span>
+<span class="line_number">886</span>      template&lt;typename _Up&gt;
+<span class="line_number">887</span>	_GLIBCXX20_CONSTEXPR
+<span class="line_number">888</span>	enable_if_t&lt;__and_v&lt;__not_&lt;is_same&lt;_Tp, _Up&gt;&gt;,
+<span class="line_number">889</span>			    is_constructible&lt;_Tp, _Up&gt;,
+<span class="line_number">890</span>			    is_assignable&lt;_Tp&amp;, _Up&gt;,
+<span class="line_number">891</span>			    __not_&lt;__converts_from_optional&lt;_Tp, _Up&gt;&gt;,
+<span class="line_number">892</span>			    __not_&lt;__assigns_from_optional&lt;_Tp, _Up&gt;&gt;&gt;,
+<span class="line_number">893</span>		    optional&amp;&gt;
+<span class="line_number">894</span>	operator=(optional&lt;_Up&gt;&amp;&amp; __u)
+<span class="line_number">895</span>	noexcept(__and_v&lt;is_nothrow_constructible&lt;_Tp, _Up&gt;,
+<span class="line_number">896</span>			 is_nothrow_assignable&lt;_Tp&amp;, _Up&gt;&gt;)
+<span class="line_number">897</span>	{
+<span class="line_number">898</span>	  if (__u)
+<span class="line_number">899</span>	    {
+<span class="line_number">900</span>	      if (this-&gt;_M_is_engaged())
+<span class="line_number">901</span>		this-&gt;_M_get() = std::move(*__u);
+<span class="line_number">902</span>	      else
+<span class="line_number">903</span>		this-&gt;_M_construct(std::move(*__u));
+<span class="line_number">904</span>	    }
+<span class="line_number">905</span>	  else
+<span class="line_number">906</span>	    {
+<span class="line_number">907</span>	      this-&gt;_M_reset();
+<span class="line_number">908</span>	    }
+<span class="line_number">909</span>
+<span class="line_number">910</span>	  return *this;
+<span class="line_number">911</span>	}
+<span class="line_number">912</span>
+<span class="line_number">913</span>      template&lt;typename... _Args&gt;
+<span class="line_number">914</span>	_GLIBCXX20_CONSTEXPR
+<span class="line_number">915</span>	enable_if_t&lt;is_constructible_v&lt;_Tp, _Args...&gt;, _Tp&amp;&gt;
+<span class="line_number">916</span>	emplace(_Args&amp;&amp;... __args)
+<span class="line_number">917</span>	noexcept(is_nothrow_constructible_v&lt;_Tp, _Args...&gt;)
+<span class="line_number">918</span>	{
+<span class="line_number">919</span>	  this-&gt;_M_reset();
+<span class="line_number">920</span>	  this-&gt;_M_construct(std::forward&lt;_Args&gt;(__args)...);
+<span class="line_number">921</span>	  return this-&gt;_M_get();
+<span class="line_number">922</span>	}
+<span class="line_number">923</span>
+<span class="line_number">924</span>      template&lt;typename _Up, typename... _Args&gt;
+<span class="line_number">925</span>	_GLIBCXX20_CONSTEXPR
+<span class="line_number">926</span>	enable_if_t&lt;is_constructible_v&lt;_Tp, initializer_list&lt;_Up&gt;&amp;, _Args...&gt;,
+<span class="line_number">927</span>		    _Tp&amp;&gt;
+<span class="line_number">928</span>	emplace(initializer_list&lt;_Up&gt; __il, _Args&amp;&amp;... __args)
+<span class="line_number">929</span>	noexcept(is_nothrow_constructible_v&lt;_Tp, initializer_list&lt;_Up&gt;&amp;,
+<span class="line_number">930</span>					    _Args...&gt;)
+<span class="line_number">931</span>	{
+<span class="line_number">932</span>	  this-&gt;_M_reset();
+<span class="line_number">933</span>	  this-&gt;_M_construct(__il, std::forward&lt;_Args&gt;(__args)...);
+<span class="line_number">934</span>	  return this-&gt;_M_get();
+<span class="line_number">935</span>	}
+<span class="line_number">936</span>
+<span class="line_number">937</span>      // Destructor is implicit, implemented in _Optional_base.
+<span class="line_number">938</span>
+<span class="line_number">939</span>      // Swap.
+<span class="line_number">940</span>      _GLIBCXX20_CONSTEXPR void
+<span class="line_number">941</span>      swap(optional&amp; __other)
+<span class="line_number">942</span>      noexcept(is_nothrow_move_constructible_v&lt;_Tp&gt;
+<span class="line_number">943</span>	       &amp;&amp; is_nothrow_swappable_v&lt;_Tp&gt;)
+<span class="line_number">944</span>      {
+<span class="line_number">945</span>	using std::swap;
+<span class="line_number">946</span>
+<span class="line_number">947</span>	if (this-&gt;_M_is_engaged() &amp;&amp; __other._M_is_engaged())
+<span class="line_number">948</span>	  swap(this-&gt;_M_get(), __other._M_get());
+<span class="line_number">949</span>	else if (this-&gt;_M_is_engaged())
+<span class="line_number">950</span>	  {
+<span class="line_number">951</span>	    __other._M_construct(std::move(this-&gt;_M_get()));
+<span class="line_number">952</span>	    this-&gt;_M_destruct();
+<span class="line_number">953</span>	  }
+<span class="line_number">954</span>	else if (__other._M_is_engaged())
+<span class="line_number">955</span>	  {
+<span class="line_number">956</span>	    this-&gt;_M_construct(std::move(__other._M_get()));
+<span class="line_number">957</span>	    __other._M_destruct();
+<span class="line_number">958</span>	  }
+<span class="line_number">959</span>      }
+<span class="line_number">960</span>
+<span class="line_number">961</span>      // Observers.
+<span class="line_number">962</span>      constexpr const _Tp*
+<span class="line_number">963</span>      operator-&gt;() const noexcept
+<span class="line_number">964</span>      { return std::__addressof(this-&gt;_M_get()); }
+<span class="line_number">965</span>
+<span class="line_number">966</span>      constexpr _Tp*
+<span class="line_number">967</span>      operator-&gt;() noexcept
+<span class="line_number">968</span>      { return std::__addressof(this-&gt;_M_get()); }
+<span class="line_number">969</span>
+<span class="line_number">970</span>      constexpr const _Tp&amp;
+<span class="line_number">971</span>      operator*() const&amp; noexcept
+<span class="line_number">972</span>      { return this-&gt;_M_get(); }
+<span class="line_number">973</span>
+<span class="line_number">974</span>      constexpr _Tp&amp;
+<span class="line_number">975</span>      operator*()&amp; noexcept
+<span class="line_number">976</span>      { return this-&gt;_M_get(); }
+<span class="line_number">977</span>
+<span class="line_number">978</span>      constexpr _Tp&amp;&amp;
+<span class="line_number">979</span>      operator*()&amp;&amp; noexcept
+<span class="line_number">980</span>      { return std::move(this-&gt;_M_get()); }
+<span class="line_number">981</span>
+<span class="line_number">982</span>      constexpr const _Tp&amp;&amp;
+<span class="line_number">983</span>      operator*() const&amp;&amp; noexcept
+<span class="line_number">984</span>      { return std::move(this-&gt;_M_get()); }
+<span class="line_number">985</span>
+<span class="line_number">986</span>      constexpr explicit operator bool() const noexcept
+<span class="line_number">987</span>      { return this-&gt;_M_is_engaged(); }
+<span class="line_number">988</span>
+<span class="line_number">989</span>      constexpr bool has_value() const noexcept
+<span class="line_number">990</span>      { return this-&gt;_M_is_engaged(); }
+<span class="line_number">991</span>
+<span class="line_number">992</span>      constexpr const _Tp&amp;
+<span class="line_number">993</span>      value() const&amp;
+<span class="line_number">994</span>      {
+<span class="line_number">995</span>	if (this-&gt;_M_is_engaged())
+<span class="line_number">996</span>	  return this-&gt;_M_get();
+<span class="line_number">997</span>	__throw_bad_optional_access();
+<span class="line_number">998</span>      }
+<span class="line_number">999</span>
+<span class="line_number">1000</span>      constexpr _Tp&amp;
+<span class="line_number">1001</span>      value()&amp;
+<span class="line_number">1002</span>      {
+<span class="line_number">1003</span>	if (this-&gt;_M_is_engaged())
+<span class="line_number">1004</span>	  return this-&gt;_M_get();
+<span class="line_number">1005</span>	__throw_bad_optional_access();
+<span class="line_number">1006</span>      }
+<span class="line_number">1007</span>
+<span class="line_number">1008</span>      constexpr _Tp&amp;&amp;
+<span class="line_number">1009</span>      value()&amp;&amp;
+<span class="line_number">1010</span>      {
+<span class="line_number">1011</span>	if (this-&gt;_M_is_engaged())
+<span class="line_number">1012</span>	  return std::move(this-&gt;_M_get());
+<span class="line_number">1013</span>	__throw_bad_optional_access();
+<span class="line_number">1014</span>      }
+<span class="line_number">1015</span>
+<span class="line_number">1016</span>      constexpr const _Tp&amp;&amp;
+<span class="line_number">1017</span>      value() const&amp;&amp;
+<span class="line_number">1018</span>      {
+<span class="line_number">1019</span>	if (this-&gt;_M_is_engaged())
+<span class="line_number">1020</span>	  return std::move(this-&gt;_M_get());
+<span class="line_number">1021</span>	__throw_bad_optional_access();
+<span class="line_number">1022</span>      }
+<span class="line_number">1023</span>
+<span class="line_number">1024</span>      template&lt;typename _Up&gt;
+<span class="line_number">1025</span>	constexpr _Tp
+<span class="line_number">1026</span>	value_or(_Up&amp;&amp; __u) const&amp;
+<span class="line_number">1027</span>	{
+<span class="line_number">1028</span>	  static_assert(is_copy_constructible_v&lt;_Tp&gt;);
+<span class="line_number">1029</span>	  static_assert(is_convertible_v&lt;_Up&amp;&amp;, _Tp&gt;);
+<span class="line_number">1030</span>
+<span class="line_number">1031</span>	  if (this-&gt;_M_is_engaged())
+<span class="line_number">1032</span>	    return this-&gt;_M_get();
+<span class="line_number">1033</span>	  else
+<span class="line_number">1034</span>	    return static_cast&lt;_Tp&gt;(std::forward&lt;_Up&gt;(__u));
+<span class="line_number">1035</span>	}
+<span class="line_number">1036</span>
+<span class="line_number">1037</span>      template&lt;typename _Up&gt;
+<span class="line_number">1038</span>	constexpr _Tp
+<span class="line_number">1039</span>	value_or(_Up&amp;&amp; __u) &amp;&amp;
+<span class="line_number">1040</span>	{
+<span class="line_number">1041</span>	  static_assert(is_move_constructible_v&lt;_Tp&gt;);
+<span class="line_number">1042</span>	  static_assert(is_convertible_v&lt;_Up&amp;&amp;, _Tp&gt;);
+<span class="line_number">1043</span>
+<span class="line_number">1044</span>	  if (this-&gt;_M_is_engaged())
+<span class="line_number">1045</span>	    return std::move(this-&gt;_M_get());
+<span class="line_number">1046</span>	  else
+<span class="line_number">1047</span>	    return static_cast&lt;_Tp&gt;(std::forward&lt;_Up&gt;(__u));
+<span class="line_number">1048</span>	}
+<span class="line_number">1049</span>
+<span class="line_number">1050</span>#if __cpp_lib_optional &gt;= 202110L
+<span class="line_number">1051</span>      // [optional.monadic]
+<span class="line_number">1052</span>
+<span class="line_number">1053</span>      template&lt;typename _Fn&gt;
+<span class="line_number">1054</span>	constexpr auto
+<span class="line_number">1055</span>	and_then(_Fn&amp;&amp; __f) &amp;
+<span class="line_number">1056</span>	{
+<span class="line_number">1057</span>	  using _Up = remove_cvref_t&lt;invoke_result_t&lt;_Fn, _Tp&amp;&gt;&gt;;
+<span class="line_number">1058</span>	  static_assert(__is_optional_v&lt;remove_cvref_t&lt;_Up&gt;&gt;,
+<span class="line_number">1059</span>			&#34;the function passed to std::optional&lt;T&gt;::and_then &#34;
+<span class="line_number">1060</span>			&#34;must return a std::optional&#34;);
+<span class="line_number">1061</span>	  if (has_value())
+<span class="line_number">1062</span>	    return std::__invoke(std::forward&lt;_Fn&gt;(__f), **this);
+<span class="line_number">1063</span>	  else
+<span class="line_number">1064</span>	    return _Up();
+<span class="line_number">1065</span>	}
+<span class="line_number">1066</span>
+<span class="line_number">1067</span>      template&lt;typename _Fn&gt;
+<span class="line_number">1068</span>	constexpr auto
+<span class="line_number">1069</span>	and_then(_Fn&amp;&amp; __f) const &amp;
+<span class="line_number">1070</span>	{
+<span class="line_number">1071</span>	  using _Up = remove_cvref_t&lt;invoke_result_t&lt;_Fn, const _Tp&amp;&gt;&gt;;
+<span class="line_number">1072</span>	  static_assert(__is_optional_v&lt;_Up&gt;,
+<span class="line_number">1073</span>			&#34;the function passed to std::optional&lt;T&gt;::and_then &#34;
+<span class="line_number">1074</span>			&#34;must return a std::optional&#34;);
+<span class="line_number">1075</span>	  if (has_value())
+<span class="line_number">1076</span>	    return std::__invoke(std::forward&lt;_Fn&gt;(__f), **this);
+<span class="line_number">1077</span>	  else
+<span class="line_number">1078</span>	    return _Up();
+<span class="line_number">1079</span>	}
+<span class="line_number">1080</span>
+<span class="line_number">1081</span>      template&lt;typename _Fn&gt;
+<span class="line_number">1082</span>	constexpr auto
+<span class="line_number">1083</span>	and_then(_Fn&amp;&amp; __f) &amp;&amp;
+<span class="line_number">1084</span>	{
+<span class="line_number">1085</span>	  using _Up = remove_cvref_t&lt;invoke_result_t&lt;_Fn, _Tp&gt;&gt;;
+<span class="line_number">1086</span>	  static_assert(__is_optional_v&lt;remove_cvref_t&lt;_Up&gt;&gt;,
+<span class="line_number">1087</span>			&#34;the function passed to std::optional&lt;T&gt;::and_then &#34;
+<span class="line_number">1088</span>			&#34;must return a std::optional&#34;);
+<span class="line_number">1089</span>	  if (has_value())
+<span class="line_number">1090</span>	    return std::__invoke(std::forward&lt;_Fn&gt;(__f), std::move(**this));
+<span class="line_number">1091</span>	  else
+<span class="line_number">1092</span>	    return _Up();
+<span class="line_number">1093</span>	}
+<span class="line_number">1094</span>
+<span class="line_number">1095</span>      template&lt;typename _Fn&gt;
+<span class="line_number">1096</span>	constexpr auto
+<span class="line_number">1097</span>	and_then(_Fn&amp;&amp; __f) const &amp;&amp;
+<span class="line_number">1098</span>	{
+<span class="line_number">1099</span>	  using _Up = remove_cvref_t&lt;invoke_result_t&lt;_Fn, const _Tp&gt;&gt;;
+<span class="line_number">1100</span>	  static_assert(__is_optional_v&lt;remove_cvref_t&lt;_Up&gt;&gt;,
+<span class="line_number">1101</span>			&#34;the function passed to std::optional&lt;T&gt;::and_then &#34;
+<span class="line_number">1102</span>			&#34;must return a std::optional&#34;);
+<span class="line_number">1103</span>	  if (has_value())
+<span class="line_number">1104</span>	    return std::__invoke(std::forward&lt;_Fn&gt;(__f), std::move(**this));
+<span class="line_number">1105</span>	  else
+<span class="line_number">1106</span>	    return _Up();
+<span class="line_number">1107</span>	}
+<span class="line_number">1108</span>
+<span class="line_number">1109</span>      template&lt;typename _Fn&gt;
+<span class="line_number">1110</span>	constexpr auto
+<span class="line_number">1111</span>	transform(_Fn&amp;&amp; __f) &amp;
+<span class="line_number">1112</span>	{
+<span class="line_number">1113</span>	  using _Up = remove_cv_t&lt;invoke_result_t&lt;_Fn, _Tp&amp;&gt;&gt;;
+<span class="line_number">1114</span>	  if (has_value())
+<span class="line_number">1115</span>	    return optional&lt;_Up&gt;(_Optional_func&lt;_Fn&gt;{__f}, **this);
+<span class="line_number">1116</span>	  else
+<span class="line_number">1117</span>	    return optional&lt;_Up&gt;();
+<span class="line_number">1118</span>	}
+<span class="line_number">1119</span>
+<span class="line_number">1120</span>      template&lt;typename _Fn&gt;
+<span class="line_number">1121</span>	constexpr auto
+<span class="line_number">1122</span>	transform(_Fn&amp;&amp; __f) const &amp;
+<span class="line_number">1123</span>	{
+<span class="line_number">1124</span>	  using _Up = remove_cv_t&lt;invoke_result_t&lt;_Fn, const _Tp&amp;&gt;&gt;;
+<span class="line_number">1125</span>	  if (has_value())
+<span class="line_number">1126</span>	    return optional&lt;_Up&gt;(_Optional_func&lt;_Fn&gt;{__f}, **this);
+<span class="line_number">1127</span>	  else
+<span class="line_number">1128</span>	    return optional&lt;_Up&gt;();
+<span class="line_number">1129</span>	}
+<span class="line_number">1130</span>
+<span class="line_number">1131</span>      template&lt;typename _Fn&gt;
+<span class="line_number">1132</span>	constexpr auto
+<span class="line_number">1133</span>	transform(_Fn&amp;&amp; __f) &amp;&amp;
+<span class="line_number">1134</span>	{
+<span class="line_number">1135</span>	  using _Up = remove_cv_t&lt;invoke_result_t&lt;_Fn, _Tp&gt;&gt;;
+<span class="line_number">1136</span>	  if (has_value())
+<span class="line_number">1137</span>	    return optional&lt;_Up&gt;(_Optional_func&lt;_Fn&gt;{__f}, std::move(**this));
+<span class="line_number">1138</span>	  else
+<span class="line_number">1139</span>	    return optional&lt;_Up&gt;();
+<span class="line_number">1140</span>	}
+<span class="line_number">1141</span>
+<span class="line_number">1142</span>      template&lt;typename _Fn&gt;
+<span class="line_number">1143</span>	constexpr auto
+<span class="line_number">1144</span>	transform(_Fn&amp;&amp; __f) const &amp;&amp;
+<span class="line_number">1145</span>	{
+<span class="line_number">1146</span>	  using _Up = remove_cv_t&lt;invoke_result_t&lt;_Fn, const _Tp&gt;&gt;;
+<span class="line_number">1147</span>	  if (has_value())
+<span class="line_number">1148</span>	    return optional&lt;_Up&gt;(_Optional_func&lt;_Fn&gt;{__f}, std::move(**this));
+<span class="line_number">1149</span>	  else
+<span class="line_number">1150</span>	    return optional&lt;_Up&gt;();
+<span class="line_number">1151</span>	}
+<span class="line_number">1152</span>
+<span class="line_number">1153</span>      template&lt;typename _Fn&gt; requires invocable&lt;_Fn&gt; &amp;&amp; copy_constructible&lt;_Tp&gt;
+<span class="line_number">1154</span>	constexpr optional
+<span class="line_number">1155</span>	or_else(_Fn&amp;&amp; __f) const&amp;
+<span class="line_number">1156</span>	{
+<span class="line_number">1157</span>	  using _Up = invoke_result_t&lt;_Fn&gt;;
+<span class="line_number">1158</span>	  static_assert(is_same_v&lt;remove_cvref_t&lt;_Up&gt;, optional&gt;,
+<span class="line_number">1159</span>			&#34;the function passed to std::optional&lt;T&gt;::or_else &#34;
+<span class="line_number">1160</span>			&#34;must return a std::optional&lt;T&gt;&#34;);
+<span class="line_number">1161</span>
+<span class="line_number">1162</span>	  if (has_value())
+<span class="line_number">1163</span>	    return *this;
+<span class="line_number">1164</span>	  else
+<span class="line_number">1165</span>	    return std::forward&lt;_Fn&gt;(__f)();
+<span class="line_number">1166</span>	}
+<span class="line_number">1167</span>
+<span class="line_number">1168</span>      template&lt;typename _Fn&gt; requires invocable&lt;_Fn&gt; &amp;&amp; move_constructible&lt;_Tp&gt;
+<span class="line_number">1169</span>	constexpr optional
+<span class="line_number">1170</span>	or_else(_Fn&amp;&amp; __f) &amp;&amp;
+<span class="line_number">1171</span>	{
+<span class="line_number">1172</span>	  using _Up = invoke_result_t&lt;_Fn&gt;;
+<span class="line_number">1173</span>	  static_assert(is_same_v&lt;remove_cvref_t&lt;_Up&gt;, optional&gt;,
+<span class="line_number">1174</span>			&#34;the function passed to std::optional&lt;T&gt;::or_else &#34;
+<span class="line_number">1175</span>			&#34;must return a std::optional&lt;T&gt;&#34;);
+<span class="line_number">1176</span>
+<span class="line_number">1177</span>	  if (has_value())
+<span class="line_number">1178</span>	    return std::move(*this);
+<span class="line_number">1179</span>	  else
+<span class="line_number">1180</span>	    return std::forward&lt;_Fn&gt;(__f)();
+<span class="line_number">1181</span>	}
+<span class="line_number">1182</span>#endif
+<span class="line_number">1183</span>
+<span class="line_number">1184</span>      _GLIBCXX20_CONSTEXPR void reset() noexcept { this-&gt;_M_reset(); }
+<span class="line_number">1185</span>
+<span class="line_number">1186</span>    private:
+<span class="line_number">1187</span>#if __cplusplus &gt;= 202002L
+<span class="line_number">1188</span>      template&lt;typename _Up&gt; friend class optional;
+<span class="line_number">1189</span>
+<span class="line_number">1190</span>      template&lt;typename _Fn, typename _Value&gt;
+<span class="line_number">1191</span>	explicit constexpr
+<span class="line_number">1192</span>	optional(_Optional_func&lt;_Fn&gt; __f, _Value&amp;&amp; __v)
+<span class="line_number">1193</span>	{
+<span class="line_number">1194</span>	  this-&gt;_M_payload._M_apply(__f, std::forward&lt;_Value&gt;(__v));
+<span class="line_number">1195</span>	}
+<span class="line_number">1196</span>#endif
+<span class="line_number">1197</span>    };
+<span class="line_number">1198</span>
+<span class="line_number">1199</span>  template&lt;typename _Tp&gt;
+<span class="line_number">1200</span>    using __optional_relop_t =
+<span class="line_number">1201</span>      enable_if_t&lt;is_convertible&lt;_Tp, bool&gt;::value, bool&gt;;
+<span class="line_number">1202</span>
+<span class="line_number">1203</span>  template&lt;typename _Tp, typename _Up&gt;
+<span class="line_number">1204</span>    using __optional_eq_t = __optional_relop_t&lt;
+<span class="line_number">1205</span>      decltype(std::declval&lt;const _Tp&amp;&gt;() == std::declval&lt;const _Up&amp;&gt;())
+<span class="line_number">1206</span>      &gt;;
+<span class="line_number">1207</span>
+<span class="line_number">1208</span>  template&lt;typename _Tp, typename _Up&gt;
+<span class="line_number">1209</span>    using __optional_ne_t = __optional_relop_t&lt;
+<span class="line_number">1210</span>      decltype(std::declval&lt;const _Tp&amp;&gt;() != std::declval&lt;const _Up&amp;&gt;())
+<span class="line_number">1211</span>      &gt;;
+<span class="line_number">1212</span>
+<span class="line_number">1213</span>  template&lt;typename _Tp, typename _Up&gt;
+<span class="line_number">1214</span>    using __optional_lt_t = __optional_relop_t&lt;
+<span class="line_number">1215</span>      decltype(std::declval&lt;const _Tp&amp;&gt;() &lt; std::declval&lt;const _Up&amp;&gt;())
+<span class="line_number">1216</span>      &gt;;
+<span class="line_number">1217</span>
+<span class="line_number">1218</span>  template&lt;typename _Tp, typename _Up&gt;
+<span class="line_number">1219</span>    using __optional_gt_t = __optional_relop_t&lt;
+<span class="line_number">1220</span>      decltype(std::declval&lt;const _Tp&amp;&gt;() &gt; std::declval&lt;const _Up&amp;&gt;())
+<span class="line_number">1221</span>      &gt;;
+<span class="line_number">1222</span>
+<span class="line_number">1223</span>  template&lt;typename _Tp, typename _Up&gt;
+<span class="line_number">1224</span>    using __optional_le_t = __optional_relop_t&lt;
+<span class="line_number">1225</span>      decltype(std::declval&lt;const _Tp&amp;&gt;() &lt;= std::declval&lt;const _Up&amp;&gt;())
+<span class="line_number">1226</span>      &gt;;
+<span class="line_number">1227</span>
+<span class="line_number">1228</span>  template&lt;typename _Tp, typename _Up&gt;
+<span class="line_number">1229</span>    using __optional_ge_t = __optional_relop_t&lt;
+<span class="line_number">1230</span>      decltype(std::declval&lt;const _Tp&amp;&gt;() &gt;= std::declval&lt;const _Up&amp;&gt;())
+<span class="line_number">1231</span>      &gt;;
+<span class="line_number">1232</span>
+<span class="line_number">1233</span>  // Comparisons between optional values.
+<span class="line_number">1234</span>  template&lt;typename _Tp, typename _Up&gt;
+<span class="line_number">1235</span>    constexpr auto
+<span class="line_number">1236</span>    operator==(const optional&lt;_Tp&gt;&amp; __lhs, const optional&lt;_Up&gt;&amp; __rhs)
+<span class="line_number">1237</span>    -&gt; __optional_eq_t&lt;_Tp, _Up&gt;
+<span class="line_number">1238</span>    {
+<span class="line_number">1239</span>      return static_cast&lt;bool&gt;(__lhs) == static_cast&lt;bool&gt;(__rhs)
+<span class="line_number">1240</span>	     &amp;&amp; (!__lhs || *__lhs == *__rhs);
+<span class="line_number">1241</span>    }
+<span class="line_number">1242</span>
+<span class="line_number">1243</span>  template&lt;typename _Tp, typename _Up&gt;
+<span class="line_number">1244</span>    constexpr auto
+<span class="line_number">1245</span>    operator!=(const optional&lt;_Tp&gt;&amp; __lhs, const optional&lt;_Up&gt;&amp; __rhs)
+<span class="line_number">1246</span>    -&gt; __optional_ne_t&lt;_Tp, _Up&gt;
+<span class="line_number">1247</span>    {
+<span class="line_number">1248</span>      return static_cast&lt;bool&gt;(__lhs) != static_cast&lt;bool&gt;(__rhs)
+<span class="line_number">1249</span>	|| (static_cast&lt;bool&gt;(__lhs) &amp;&amp; *__lhs != *__rhs);
+<span class="line_number">1250</span>    }
+<span class="line_number">1251</span>
+<span class="line_number">1252</span>  template&lt;typename _Tp, typename _Up&gt;
+<span class="line_number">1253</span>    constexpr auto
+<span class="line_number">1254</span>    operator&lt;(const optional&lt;_Tp&gt;&amp; __lhs, const optional&lt;_Up&gt;&amp; __rhs)
+<span class="line_number">1255</span>    -&gt; __optional_lt_t&lt;_Tp, _Up&gt;
+<span class="line_number">1256</span>    {
+<span class="line_number">1257</span>      return static_cast&lt;bool&gt;(__rhs) &amp;&amp; (!__lhs || *__lhs &lt; *__rhs);
+<span class="line_number">1258</span>    }
+<span class="line_number">1259</span>
+<span class="line_number">1260</span>  template&lt;typename _Tp, typename _Up&gt;
+<span class="line_number">1261</span>    constexpr auto
+<span class="line_number">1262</span>    operator&gt;(const optional&lt;_Tp&gt;&amp; __lhs, const optional&lt;_Up&gt;&amp; __rhs)
+<span class="line_number">1263</span>    -&gt; __optional_gt_t&lt;_Tp, _Up&gt;
+<span class="line_number">1264</span>    {
+<span class="line_number">1265</span>      return static_cast&lt;bool&gt;(__lhs) &amp;&amp; (!__rhs || *__lhs &gt; *__rhs);
+<span class="line_number">1266</span>    }
+<span class="line_number">1267</span>
+<span class="line_number">1268</span>  template&lt;typename _Tp, typename _Up&gt;
+<span class="line_number">1269</span>    constexpr auto
+<span class="line_number">1270</span>    operator&lt;=(const optional&lt;_Tp&gt;&amp; __lhs, const optional&lt;_Up&gt;&amp; __rhs)
+<span class="line_number">1271</span>    -&gt; __optional_le_t&lt;_Tp, _Up&gt;
+<span class="line_number">1272</span>    {
+<span class="line_number">1273</span>      return !__lhs || (static_cast&lt;bool&gt;(__rhs) &amp;&amp; *__lhs &lt;= *__rhs);
+<span class="line_number">1274</span>    }
+<span class="line_number">1275</span>
+<span class="line_number">1276</span>  template&lt;typename _Tp, typename _Up&gt;
+<span class="line_number">1277</span>    constexpr auto
+<span class="line_number">1278</span>    operator&gt;=(const optional&lt;_Tp&gt;&amp; __lhs, const optional&lt;_Up&gt;&amp; __rhs)
+<span class="line_number">1279</span>    -&gt; __optional_ge_t&lt;_Tp, _Up&gt;
+<span class="line_number">1280</span>    {
+<span class="line_number">1281</span>      return !__rhs || (static_cast&lt;bool&gt;(__lhs) &amp;&amp; *__lhs &gt;= *__rhs);
+<span class="line_number">1282</span>    }
+<span class="line_number">1283</span>
+<span class="line_number">1284</span>#ifdef __cpp_lib_three_way_comparison
+<span class="line_number">1285</span>  template&lt;typename _Tp, three_way_comparable_with&lt;_Tp&gt; _Up&gt;
+<span class="line_number">1286</span>    constexpr compare_three_way_result_t&lt;_Tp, _Up&gt;
+<span class="line_number">1287</span>    operator&lt;=&gt;(const optional&lt;_Tp&gt;&amp; __x, const optional&lt;_Up&gt;&amp; __y)
+<span class="line_number">1288</span>    {
+<span class="line_number">1289</span>      return __x &amp;&amp; __y ? *__x &lt;=&gt; *__y : bool(__x) &lt;=&gt; bool(__y);
+<span class="line_number">1290</span>    }
+<span class="line_number">1291</span>#endif
+<span class="line_number">1292</span>
+<span class="line_number">1293</span>  // Comparisons with nullopt.
+<span class="line_number">1294</span>  template&lt;typename _Tp&gt;
+<span class="line_number">1295</span>    constexpr bool
+<span class="line_number">1296</span>    operator==(const optional&lt;_Tp&gt;&amp; __lhs, nullopt_t) noexcept
+<span class="line_number">1297</span>    { return !__lhs; }
+<span class="line_number">1298</span>
+<span class="line_number">1299</span>#ifdef __cpp_lib_three_way_comparison
+<span class="line_number">1300</span>  template&lt;typename _Tp&gt;
+<span class="line_number">1301</span>    constexpr strong_ordering
+<span class="line_number">1302</span>    operator&lt;=&gt;(const optional&lt;_Tp&gt;&amp; __x, nullopt_t) noexcept
+<span class="line_number">1303</span>    { return bool(__x) &lt;=&gt; false; }
+<span class="line_number">1304</span>#else
+<span class="line_number">1305</span>  template&lt;typename _Tp&gt;
+<span class="line_number">1306</span>    constexpr bool
+<span class="line_number">1307</span>    operator==(nullopt_t, const optional&lt;_Tp&gt;&amp; __rhs) noexcept
+<span class="line_number">1308</span>    { return !__rhs; }
+<span class="line_number">1309</span>
+<span class="line_number">1310</span>  template&lt;typename _Tp&gt;
+<span class="line_number">1311</span>    constexpr bool
+<span class="line_number">1312</span>    operator!=(const optional&lt;_Tp&gt;&amp; __lhs, nullopt_t) noexcept
+<span class="line_number">1313</span>    { return static_cast&lt;bool&gt;(__lhs); }
+<span class="line_number">1314</span>
+<span class="line_number">1315</span>  template&lt;typename _Tp&gt;
+<span class="line_number">1316</span>    constexpr bool
+<span class="line_number">1317</span>    operator!=(nullopt_t, const optional&lt;_Tp&gt;&amp; __rhs) noexcept
+<span class="line_number">1318</span>    { return static_cast&lt;bool&gt;(__rhs); }
+<span class="line_number">1319</span>
+<span class="line_number">1320</span>  template&lt;typename _Tp&gt;
+<span class="line_number">1321</span>    constexpr bool
+<span class="line_number">1322</span>    operator&lt;(const optional&lt;_Tp&gt;&amp; /* __lhs */, nullopt_t) noexcept
+<span class="line_number">1323</span>    { return false; }
+<span class="line_number">1324</span>
+<span class="line_number">1325</span>  template&lt;typename _Tp&gt;
+<span class="line_number">1326</span>    constexpr bool
+<span class="line_number">1327</span>    operator&lt;(nullopt_t, const optional&lt;_Tp&gt;&amp; __rhs) noexcept
+<span class="line_number">1328</span>    { return static_cast&lt;bool&gt;(__rhs); }
+<span class="line_number">1329</span>
+<span class="line_number">1330</span>  template&lt;typename _Tp&gt;
+<span class="line_number">1331</span>    constexpr bool
+<span class="line_number">1332</span>    operator&gt;(const optional&lt;_Tp&gt;&amp; __lhs, nullopt_t) noexcept
+<span class="line_number">1333</span>    { return static_cast&lt;bool&gt;(__lhs); }
+<span class="line_number">1334</span>
+<span class="line_number">1335</span>  template&lt;typename _Tp&gt;
+<span class="line_number">1336</span>    constexpr bool
+<span class="line_number">1337</span>    operator&gt;(nullopt_t, const optional&lt;_Tp&gt;&amp; /* __rhs */) noexcept
+<span class="line_number">1338</span>    { return false; }
+<span class="line_number">1339</span>
+<span class="line_number">1340</span>  template&lt;typename _Tp&gt;
+<span class="line_number">1341</span>    constexpr bool
+<span class="line_number">1342</span>    operator&lt;=(const optional&lt;_Tp&gt;&amp; __lhs, nullopt_t) noexcept
+<span class="line_number">1343</span>    { return !__lhs; }
+<span class="line_number">1344</span>
+<span class="line_number">1345</span>  template&lt;typename _Tp&gt;
+<span class="line_number">1346</span>    constexpr bool
+<span class="line_number">1347</span>    operator&lt;=(nullopt_t, const optional&lt;_Tp&gt;&amp; /* __rhs */) noexcept
+<span class="line_number">1348</span>    { return true; }
+<span class="line_number">1349</span>
+<span class="line_number">1350</span>  template&lt;typename _Tp&gt;
+<span class="line_number">1351</span>    constexpr bool
+<span class="line_number">1352</span>    operator&gt;=(const optional&lt;_Tp&gt;&amp; /* __lhs */, nullopt_t) noexcept
+<span class="line_number">1353</span>    { return true; }
+<span class="line_number">1354</span>
+<span class="line_number">1355</span>  template&lt;typename _Tp&gt;
+<span class="line_number">1356</span>    constexpr bool
+<span class="line_number">1357</span>    operator&gt;=(nullopt_t, const optional&lt;_Tp&gt;&amp; __rhs) noexcept
+<span class="line_number">1358</span>    { return !__rhs; }
+<span class="line_number">1359</span>#endif // three-way-comparison
+<span class="line_number">1360</span>
+<span class="line_number">1361</span>  // Comparisons with value type.
+<span class="line_number">1362</span>  template&lt;typename _Tp, typename _Up&gt;
+<span class="line_number">1363</span>    constexpr auto
+<span class="line_number">1364</span>    operator==(const optional&lt;_Tp&gt;&amp; __lhs, const _Up&amp; __rhs)
+<span class="line_number">1365</span>    -&gt; __optional_eq_t&lt;_Tp, _Up&gt;
+<span class="line_number">1366</span>    { return __lhs &amp;&amp; *__lhs == __rhs; }
+<span class="line_number">1367</span>
+<span class="line_number">1368</span>  template&lt;typename _Tp, typename _Up&gt;
+<span class="line_number">1369</span>    constexpr auto
+<span class="line_number">1370</span>    operator==(const _Up&amp; __lhs, const optional&lt;_Tp&gt;&amp; __rhs)
+<span class="line_number">1371</span>    -&gt; __optional_eq_t&lt;_Up, _Tp&gt;
+<span class="line_number">1372</span>    { return __rhs &amp;&amp; __lhs == *__rhs; }
+<span class="line_number">1373</span>
+<span class="line_number">1374</span>  template&lt;typename _Tp, typename _Up&gt;
+<span class="line_number">1375</span>    constexpr auto
+<span class="line_number">1376</span>    operator!=(const optional&lt;_Tp&gt;&amp; __lhs, const _Up&amp; __rhs)
+<span class="line_number">1377</span>    -&gt; __optional_ne_t&lt;_Tp, _Up&gt;
+<span class="line_number">1378</span>    { return !__lhs || *__lhs != __rhs; }
+<span class="line_number">1379</span>
+<span class="line_number">1380</span>  template&lt;typename _Tp, typename _Up&gt;
+<span class="line_number">1381</span>    constexpr auto
+<span class="line_number">1382</span>    operator!=(const _Up&amp; __lhs, const optional&lt;_Tp&gt;&amp; __rhs)
+<span class="line_number">1383</span>    -&gt; __optional_ne_t&lt;_Up, _Tp&gt;
+<span class="line_number">1384</span>    { return !__rhs || __lhs != *__rhs; }
+<span class="line_number">1385</span>
+<span class="line_number">1386</span>  template&lt;typename _Tp, typename _Up&gt;
+<span class="line_number">1387</span>    constexpr auto
+<span class="line_number">1388</span>    operator&lt;(const optional&lt;_Tp&gt;&amp; __lhs, const _Up&amp; __rhs)
+<span class="line_number">1389</span>    -&gt; __optional_lt_t&lt;_Tp, _Up&gt;
+<span class="line_number">1390</span>    { return !__lhs || *__lhs &lt; __rhs; }
+<span class="line_number">1391</span>
+<span class="line_number">1392</span>  template&lt;typename _Tp, typename _Up&gt;
+<span class="line_number">1393</span>    constexpr auto
+<span class="line_number">1394</span>    operator&lt;(const _Up&amp; __lhs, const optional&lt;_Tp&gt;&amp; __rhs)
+<span class="line_number">1395</span>    -&gt; __optional_lt_t&lt;_Up, _Tp&gt;
+<span class="line_number">1396</span>    { return __rhs &amp;&amp; __lhs &lt; *__rhs; }
+<span class="line_number">1397</span>
+<span class="line_number">1398</span>  template&lt;typename _Tp, typename _Up&gt;
+<span class="line_number">1399</span>    constexpr auto
+<span class="line_number">1400</span>    operator&gt;(const optional&lt;_Tp&gt;&amp; __lhs, const _Up&amp; __rhs)
+<span class="line_number">1401</span>    -&gt; __optional_gt_t&lt;_Tp, _Up&gt;
+<span class="line_number">1402</span>    { return __lhs &amp;&amp; *__lhs &gt; __rhs; }
+<span class="line_number">1403</span>
+<span class="line_number">1404</span>  template&lt;typename _Tp, typename _Up&gt;
+<span class="line_number">1405</span>    constexpr auto
+<span class="line_number">1406</span>    operator&gt;(const _Up&amp; __lhs, const optional&lt;_Tp&gt;&amp; __rhs)
+<span class="line_number">1407</span>    -&gt; __optional_gt_t&lt;_Up, _Tp&gt;
+<span class="line_number">1408</span>    { return !__rhs || __lhs &gt; *__rhs; }
+<span class="line_number">1409</span>
+<span class="line_number">1410</span>  template&lt;typename _Tp, typename _Up&gt;
+<span class="line_number">1411</span>    constexpr auto
+<span class="line_number">1412</span>    operator&lt;=(const optional&lt;_Tp&gt;&amp; __lhs, const _Up&amp; __rhs)
+<span class="line_number">1413</span>    -&gt; __optional_le_t&lt;_Tp, _Up&gt;
+<span class="line_number">1414</span>    { return !__lhs || *__lhs &lt;= __rhs; }
+<span class="line_number">1415</span>
+<span class="line_number">1416</span>  template&lt;typename _Tp, typename _Up&gt;
+<span class="line_number">1417</span>    constexpr auto
+<span class="line_number">1418</span>    operator&lt;=(const _Up&amp; __lhs, const optional&lt;_Tp&gt;&amp; __rhs)
+<span class="line_number">1419</span>    -&gt; __optional_le_t&lt;_Up, _Tp&gt;
+<span class="line_number">1420</span>    { return __rhs &amp;&amp; __lhs &lt;= *__rhs; }
+<span class="line_number">1421</span>
+<span class="line_number">1422</span>  template&lt;typename _Tp, typename _Up&gt;
+<span class="line_number">1423</span>    constexpr auto
+<span class="line_number">1424</span>    operator&gt;=(const optional&lt;_Tp&gt;&amp; __lhs, const _Up&amp; __rhs)
+<span class="line_number">1425</span>    -&gt; __optional_ge_t&lt;_Tp, _Up&gt;
+<span class="line_number">1426</span>    { return __lhs &amp;&amp; *__lhs &gt;= __rhs; }
+<span class="line_number">1427</span>
+<span class="line_number">1428</span>  template&lt;typename _Tp, typename _Up&gt;
+<span class="line_number">1429</span>    constexpr auto
+<span class="line_number">1430</span>    operator&gt;=(const _Up&amp; __lhs, const optional&lt;_Tp&gt;&amp; __rhs)
+<span class="line_number">1431</span>    -&gt; __optional_ge_t&lt;_Up, _Tp&gt;
+<span class="line_number">1432</span>    { return !__rhs || __lhs &gt;= *__rhs; }
+<span class="line_number">1433</span>
+<span class="line_number">1434</span>#ifdef __cpp_lib_three_way_comparison
+<span class="line_number">1435</span>  template&lt;typename _Tp, typename _Up&gt;
+<span class="line_number">1436</span>    requires (!__is_optional_v&lt;_Up&gt;)
+<span class="line_number">1437</span>      &amp;&amp; three_way_comparable_with&lt;_Up, _Tp&gt;
+<span class="line_number">1438</span>    constexpr compare_three_way_result_t&lt;_Tp, _Up&gt;
+<span class="line_number">1439</span>    operator&lt;=&gt;(const optional&lt;_Tp&gt;&amp; __x, const _Up&amp; __v)
+<span class="line_number">1440</span>    { return bool(__x) ? *__x &lt;=&gt; __v : strong_ordering::less; }
+<span class="line_number">1441</span>#endif
+<span class="line_number">1442</span>
+<span class="line_number">1443</span>  // Swap and creation functions.
+<span class="line_number">1444</span>
+<span class="line_number">1445</span>  // _GLIBCXX_RESOLVE_LIB_DEFECTS
+<span class="line_number">1446</span>  // 2748. swappable traits for optionals
+<span class="line_number">1447</span>  template&lt;typename _Tp&gt;
+<span class="line_number">1448</span>    _GLIBCXX20_CONSTEXPR
+<span class="line_number">1449</span>    inline enable_if_t&lt;is_move_constructible_v&lt;_Tp&gt; &amp;&amp; is_swappable_v&lt;_Tp&gt;&gt;
+<span class="line_number">1450</span>    swap(optional&lt;_Tp&gt;&amp; __lhs, optional&lt;_Tp&gt;&amp; __rhs)
+<span class="line_number">1451</span>    noexcept(noexcept(__lhs.swap(__rhs)))
+<span class="line_number">1452</span>    { __lhs.swap(__rhs); }
+<span class="line_number">1453</span>
+<span class="line_number">1454</span>  template&lt;typename _Tp&gt;
+<span class="line_number">1455</span>    enable_if_t&lt;!(is_move_constructible_v&lt;_Tp&gt; &amp;&amp; is_swappable_v&lt;_Tp&gt;)&gt;
+<span class="line_number">1456</span>    swap(optional&lt;_Tp&gt;&amp;, optional&lt;_Tp&gt;&amp;) = delete;
+<span class="line_number">1457</span>
+<span class="line_number">1458</span>  template&lt;typename _Tp&gt;
+<span class="line_number">1459</span>    constexpr
+<span class="line_number">1460</span>    enable_if_t&lt;is_constructible_v&lt;decay_t&lt;_Tp&gt;, _Tp&gt;,
+<span class="line_number">1461</span>		optional&lt;decay_t&lt;_Tp&gt;&gt;&gt;
+<span class="line_number">1462</span>    make_optional(_Tp&amp;&amp; __t)
+<span class="line_number">1463</span>    noexcept(is_nothrow_constructible_v&lt;optional&lt;decay_t&lt;_Tp&gt;&gt;, _Tp&gt;)
+<span class="line_number">1464</span>    { return optional&lt;decay_t&lt;_Tp&gt;&gt;{ std::forward&lt;_Tp&gt;(__t) }; }
+<span class="line_number">1465</span>
+<span class="line_number">1466</span>  template&lt;typename _Tp, typename... _Args&gt;
+<span class="line_number">1467</span>    constexpr
+<span class="line_number">1468</span>    enable_if_t&lt;is_constructible_v&lt;_Tp, _Args...&gt;,
+<span class="line_number">1469</span>		optional&lt;_Tp&gt;&gt;
+<span class="line_number">1470</span>    make_optional(_Args&amp;&amp;... __args)
+<span class="line_number">1471</span>    noexcept(is_nothrow_constructible_v&lt;_Tp, _Args...&gt;)
+<span class="line_number">1472</span>    { return optional&lt;_Tp&gt;{ in_place, std::forward&lt;_Args&gt;(__args)... }; }
+<span class="line_number">1473</span>
+<span class="line_number">1474</span>  template&lt;typename _Tp, typename _Up, typename... _Args&gt;
+<span class="line_number">1475</span>    constexpr
+<span class="line_number">1476</span>    enable_if_t&lt;is_constructible_v&lt;_Tp, initializer_list&lt;_Up&gt;&amp;, _Args...&gt;,
+<span class="line_number">1477</span>		optional&lt;_Tp&gt;&gt;
+<span class="line_number">1478</span>    make_optional(initializer_list&lt;_Up&gt; __il, _Args&amp;&amp;... __args)
+<span class="line_number">1479</span>    noexcept(is_nothrow_constructible_v&lt;_Tp, initializer_list&lt;_Up&gt;&amp;, _Args...&gt;)
+<span class="line_number">1480</span>    { return optional&lt;_Tp&gt;{ in_place, __il, std::forward&lt;_Args&gt;(__args)... }; }
+<span class="line_number">1481</span>
+<span class="line_number">1482</span>  // Hash.
+<span class="line_number">1483</span>
+<span class="line_number">1484</span>  template&lt;typename _Tp, typename _Up = remove_const_t&lt;_Tp&gt;,
+<span class="line_number">1485</span>	   bool = __poison_hash&lt;_Up&gt;::__enable_hash_call&gt;
+<span class="line_number">1486</span>    struct __optional_hash_call_base
+<span class="line_number">1487</span>    {
+<span class="line_number">1488</span>      size_t
+<span class="line_number">1489</span>      operator()(const optional&lt;_Tp&gt;&amp; __t) const
+<span class="line_number">1490</span>      noexcept(noexcept(hash&lt;_Up&gt;{}(*__t)))
+<span class="line_number">1491</span>      {
+<span class="line_number">1492</span>	// We pick an arbitrary hash for disengaged optionals which hopefully
+<span class="line_number">1493</span>	// usual values of _Tp won&#39;t typically hash to.
+<span class="line_number">1494</span>	constexpr size_t __magic_disengaged_hash = static_cast&lt;size_t&gt;(-3333);
+<span class="line_number">1495</span>	return __t ? hash&lt;_Up&gt;{}(*__t) : __magic_disengaged_hash;
+<span class="line_number">1496</span>      }
+<span class="line_number">1497</span>    };
+<span class="line_number">1498</span>
+<span class="line_number">1499</span>  template&lt;typename _Tp, typename _Up&gt;
+<span class="line_number">1500</span>    struct __optional_hash_call_base&lt;_Tp, _Up, false&gt; {};
+<span class="line_number">1501</span>
+<span class="line_number">1502</span>  template&lt;typename _Tp&gt;
+<span class="line_number">1503</span>    struct hash&lt;optional&lt;_Tp&gt;&gt;
+<span class="line_number">1504</span>    : private __poison_hash&lt;remove_const_t&lt;_Tp&gt;&gt;,
+<span class="line_number">1505</span>      public __optional_hash_call_base&lt;_Tp&gt;
+<span class="line_number">1506</span>    {
+<span class="line_number">1507</span>      using result_type [[__deprecated__]] = size_t;
+<span class="line_number">1508</span>      using argument_type [[__deprecated__]] = optional&lt;_Tp&gt;;
+<span class="line_number">1509</span>    };
+<span class="line_number">1510</span>
+<span class="line_number">1511</span>  template&lt;typename _Tp&gt;
+<span class="line_number">1512</span>    struct __is_fast_hash&lt;hash&lt;optional&lt;_Tp&gt;&gt;&gt; : __is_fast_hash&lt;hash&lt;_Tp&gt;&gt;
+<span class="line_number">1513</span>    { };
+<span class="line_number">1514</span>
+<span class="line_number">1515</span>  /// @}
+<span class="line_number">1516</span>
+<span class="line_number">1517</span>#if __cpp_deduction_guides &gt;= 201606
+<span class="line_number">1518</span>  template &lt;typename _Tp&gt; optional(_Tp) -&gt; optional&lt;_Tp&gt;;
+<span class="line_number">1519</span>#endif
+<span class="line_number">1520</span>
+<span class="line_number">1521</span>_GLIBCXX_END_NAMESPACE_VERSION
+<span class="line_number">1522</span>} // namespace std
+<span class="line_number">1523</span>
+<span class="line_number">1524</span>#endif // C++17
+<span class="line_number">1525</span>
+<span class="line_number">1526</span>#endif // _GLIBCXX_OPTIONAL
+</code>
+            </pre>
+        </div>
+    </div>
+</body>
+
+</html>
