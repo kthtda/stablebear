@@ -30,6 +30,8 @@
     // Persist Claude Code auth/config across rebuilds.
     "source=${localEnv:HOME}/.claude,target=/home/ubuntu/.claude,type=bind,consistency=cached",
     "source=${localEnv:HOME}/.claude.json,target=/home/ubuntu/.claude.json,type=bind,consistency=cached",
+    // Reuse the host's file-based Codex login while keeping container config/rules.
+    "source=${localEnv:HOME}/.codex/auth.json,target=/home/ubuntu/.codex/auth.json,type=bind,consistency=cached",
     // Container-private build dir (shadows the host's host-path CMakeCache.txt).
     "source=stablebear-cpu-build,target=${containerWorkspaceFolder}/cmake-build-debug,type=volume"
   ],

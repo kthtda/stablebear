@@ -401,11 +401,7 @@ identify review work, not test-plan items. The broader test plan still applies.
   execution. The documented depth-3 example also checks differently shaped
   tensors and demonstrates indexing at each level.
 
-- [ ] **D3. Copy logical coordinates only once when resampling indexed input.**
-
-  **2026-09-22 status:** Still present at the reviewed commit. The proposed
-  implementation and additional tests are stashed, not part of this branch.
-  No stashed verification is credited to this review.
+- [x] **D3. Copy logical coordinates only once when resampling indexed input.**
 
   **Finding from source inspection:** `subsample.py` first materializes indexed
   input, then the C++ sampler copies those coordinates again into its fresh
@@ -425,21 +421,19 @@ identify review work, not test-plan items. The broader test plan still applies.
   [subsample.hpp](../include/sbear/point_process/subsample.hpp).
   Verification: test plan D2–D4, E1, E4.
 
-  **Implemented and verified in the working tree (2026-09-22):** The C++
-  sampler accepts const tensors with arbitrary property bitmasks; Python binds
-  ordinary and indexed inputs at both precisions and no longer materializes
-  indexed input before sampling. The existing logical coordinate copier now
-  writes directly into each fresh source cloud. Validation still completes
-  before reserving random streams, and the parallel walk completes before
-  returning. Resampling retains input storage and produces dense source cells
-  shared only among that input cell's new samples, without an adapter chain.
+  **Completed:** Fixed by `8134f40c4`. The C++ sampler accepts const tensors
+  with arbitrary property bitmasks; Python binds ordinary and indexed inputs at
+  both precisions and no longer materializes indexed input before sampling. The
+  existing logical coordinate copier writes directly into each fresh source
+  cloud. Validation still completes before reserving random streams, and the
+  parallel walk completes before returning. Resampling retains input storage
+  and produces dense source cells shared only among that input cell's new
+  samples, without an adapter chain.
 
   The focused Python regression rejects intermediate `materialize()` calls,
   compares indexed resampling with a dense equivalent, and checks subsequent
   generator state. Subsampling itself executes on CPU in both extension
   modules.
-
-  Remains unchecked until the fixing commit is recorded.
 
 - [ ] **D4. Reconcile documentation and verify the settled implementation.**
 
