@@ -42,11 +42,11 @@ namespace sb
     {
       validate_coordinates();
     }
-    PointCloud(const Tensor<T>& coords) : m_coords(coords)
+    PointCloud(const Tensor<T>& coords) : m_coords(coords.copy())
     {
       validate_coordinates();
     }
-    PointCloud(Tensor<T>&& coords) : m_coords(std::move(coords))
+    PointCloud(Tensor<T>&& coords) : m_coords(coords.copy())
     {
       validate_coordinates();
     }
@@ -326,7 +326,7 @@ namespace sb
     Tensor<PointCloud<T>> result(src.shape());
 
     // Cast each distinct source buffer once...
-    std::map<std::shared_ptr<const void>, Tensor<T>, std::owner_less<std::shared_ptr<const void>>> castSources;
+    std::map<std::shared_ptr<const void>, PointCloud<T>, std::owner_less<std::shared_ptr<const void>>> castSources;
     walk(src, [&](const std::vector<size_t>& idx) {
       const PointCloud<U>& cloud = src(idx);
       const Tensor<U>& coords = cloud.coords();
@@ -340,7 +340,8 @@ namespace sb
       }
       if (!castSources.contains(coords.storage_owner()))
       {
-        castSources.emplace(coords.storage_owner(), tensor_cast<T>(coords));
+        castSources.emplace(
+          coords.storage_owner(), PointCloud<T>(tensor_cast<T>(coords)));
       }
     });
 
@@ -358,8 +359,7 @@ namespace sb
       }
       else
       {
-        result(idx) = PointCloud<T>(
-          castSources.at(cloud.coords().storage_owner()));
+        result(idx) = castSources.at(cloud.coords().storage_owner());
       }
     });
     return result;

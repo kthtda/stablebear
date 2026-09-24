@@ -690,13 +690,13 @@ namespace sb::io::detail
     }
 
     const auto numSources = read_bytes<std::uint64_t>(is);
-    std::vector<Tensor<ScalarT>> sources;
+    std::vector<PointCloud<ScalarT>> sources;
     sources.reserve(numSources);
     for (auto i = 0_uz; i < numSources; ++i)
     {
       Tensor<ScalarT> coords = read_element<Tensor<ScalarT>>(reader);
       validate_indexed_point_cloud_source(coords);
-      sources.push_back(std::move(coords));
+      sources.emplace_back(coords);
     }
 
     const bool hasSelections = read_bytes<bool>(is);
@@ -707,7 +707,7 @@ namespace sb::io::detail
       const auto sourceId = read_bytes<std::uint64_t>(is);
       validate_indexed_point_cloud_source_reference(sourceId, sources.size());
 
-      source.flat(i) = PointCloud<ScalarT>(sources[sourceId]);
+      source.flat(i) = sources[sourceId];
       if (hasSelections)
       {
         Tensor<uint64_t> indices = read_element<Tensor<uint64_t>>(reader);

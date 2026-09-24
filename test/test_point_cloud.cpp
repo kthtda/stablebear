@@ -48,4 +48,39 @@ namespace
     EXPECT_EQ(copied(1, 0), T{10});
     EXPECT_NE(copied.coords().storage_owner(), coordinates.storage_owner());
   }
+
+  TYPED_TEST(PointCloudTest, CoordinateConstructionCopiesViews)
+  {
+    using T = TypeParam;
+
+    sb::Tensor<T> coordinates({4, 2});
+    for (size_t row = 0; row < 4; ++row)
+    {
+      for (size_t column = 0; column < 2; ++column)
+      {
+        coordinates({row, column}) = static_cast<T>(10 * row + column);
+      }
+    }
+
+    const auto view = coordinates[std::vector<sb::Slice>{
+      sb::range(0, 2, 1), sb::all()}];
+    const sb::PointCloud<T> fromTensor(coordinates);
+    const sb::PointCloud<T> fromLvalue(view);
+    const sb::PointCloud<T> fromRvalue(
+      coordinates[std::vector<sb::Slice>{
+        sb::range(2, 4, 1), sb::all()}]);
+
+    coordinates = T{-1};
+
+    EXPECT_EQ(fromTensor(3, 1), T{31});
+    EXPECT_EQ(fromLvalue(0, 0), T{0});
+    EXPECT_EQ(fromLvalue(1, 1), T{11});
+    EXPECT_EQ(fromRvalue(0, 0), T{20});
+    EXPECT_EQ(fromRvalue(1, 1), T{31});
+    EXPECT_NE(fromTensor.coords().storage_owner(), coordinates.storage_owner());
+    EXPECT_NE(fromLvalue.coords().storage_owner(), coordinates.storage_owner());
+    EXPECT_NE(fromRvalue.coords().storage_owner(), coordinates.storage_owner());
+    EXPECT_NE(
+      fromLvalue.coords().storage_owner(), fromRvalue.coords().storage_owner());
+  }
 }
