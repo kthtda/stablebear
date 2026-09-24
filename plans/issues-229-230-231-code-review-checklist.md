@@ -502,7 +502,7 @@ identify review work, not test-plan items. The broader test plan still applies.
   suite. Released golden bytes remain unchanged. V3 is not yet released, so
   correcting its scalar payload does not require a format-version bump.
 
-- [ ] **E2. [P1] Preserve the nested depth invariant across bulk assignment and descriptor boundaries.**
+- [x] **E2. [P1] Preserve the nested depth invariant across bulk assignment and descriptor boundaries.**
 
   **Finding:** Scalar element assignment checks depth through `_decay_value`,
   but slice, boolean-mask, and integer-index assignment of a tensor RHS bypass
@@ -538,6 +538,18 @@ identify review work, not test-plan items. The broader test plan still applies.
   [tensor_create.py](../stablebear/tensor_create.py), join dispatch.
   Verification: test plan B2–B4. D2's positive ownership tests pass but do not
   cover incompatible descriptors or bulk assignment failure atomicity.
+
+  **Completed:** Fixed by `339252aae`. Nested construction now validates the
+  requested depth, joins reject incompatible nested metadata even for empty
+  operands, and assignment validates depth and leaf dtype before making the
+  destination writeable. Wrong-depth slice, mask, index, and empty-selection
+  writes leave the destination and its aliases unchanged. Compatible bulk
+  writes still propagate through views and isolate later RHS mutations, while
+  lower-depth child values remain valid broadcast assignments.
+
+  Verified after rebuild and install with 73 focused nested-tensor and tensor
+  join tests. The implementation was also exercised by the full 2,386-test
+  Python suite during development.
 
 - [ ] **E3. [P1] Snapshot overlapping indexed assignment before mutating shared backing.**
 
