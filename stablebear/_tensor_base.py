@@ -465,6 +465,13 @@ class Tensor(_BinaryIoMixin, ABC):
             return val.astype(self.dtype)
         return val
 
+    def _is_tensor_rhs(self, val):
+        """Whether ``val`` represents elementwise tensor assignment."""
+        return isinstance(val, Tensor)
+
+    def _validate_setitem_value(self, entries, val):
+        """Hook for subclasses to validate a value against normalized indices."""
+
     def _ensure_writeable(self):
         """Reject writes into a broadcast view.
 
@@ -513,12 +520,13 @@ class Tensor(_BinaryIoMixin, ABC):
         TypeError
             If ``val`` has a type that cannot be assigned to this tensor.
         """
-        self._ensure_writeable()
         entries, inserts = self._normalize_index(slices)
+        self._validate_setitem_dtype(val)
+        self._validate_setitem_value(entries, val)
         # A scalar-boolean ``False`` (or any zero-length newaxis) selects nothing.
         if any(length == 0 for _, length in inserts):
             return
-        self._validate_setitem_dtype(val)
+        self._ensure_writeable()
         self._setitem_entries(entries, val)
 
     def _setitem_entries(self, entries, val):
@@ -527,7 +535,7 @@ class Tensor(_BinaryIoMixin, ABC):
 
         # Single full-shape boolean mask: flat masked assign/fill.
         if len(entries) == 1 and isinstance(entries[0], BoolTensor):
-            if isinstance(val, Tensor):
+            if self._is_tensor_rhs(val):
                 self._data.masked_assign(entries[0]._data, self._coerce_rhs(val)._data)  # type: ignore[arg-type]
             else:
                 self._data.masked_fill(entries[0]._data, self._decay_value(val))  # type: ignore[arg-type]
@@ -557,18 +565,18 @@ class Tensor(_BinaryIoMixin, ABC):
         if len(selectors) == 1:
             axis, sel_data, is_bool = selectors[0]
             if is_bool:
-                if isinstance(val, Tensor):
+                if self._is_tensor_rhs(val):
                     view._data.axis_assign(axis, sel_data, self._coerce_rhs(val)._data)  # type: ignore[arg-type]
                 else:
                     view._data.axis_fill(axis, sel_data, self._decay_value(val))  # type: ignore[arg-type]
             else:
-                if isinstance(val, Tensor):
+                if self._is_tensor_rhs(val):
                     view._data.index_assign(axis, sel_data, self._coerce_rhs(val)._data)  # type: ignore[arg-type]
                 else:
                     view._data.index_fill(axis, sel_data, self._decay_value(val))  # type: ignore[arg-type]
         else:
             sel_pairs = [(axis, data) for axis, data, _ in selectors]
-            if isinstance(val, Tensor):
+            if self._is_tensor_rhs(val):
                 view._data.outer_assign(sel_pairs, self._coerce_rhs(val)._data)  # type: ignore[arg-type]
             else:
                 view._data.outer_fill(sel_pairs, self._decay_value(val))  # type: ignore[arg-type]
@@ -604,7 +612,7 @@ class Tensor(_BinaryIoMixin, ABC):
             # PointCloud*.
             arr = val if isinstance(val, np.ndarray) else np.asarray(val)
             self._data[cpp_slices] = type(self)(arr, dtype=self.dtype)._data
-        elif isinstance(val, Tensor):
+        elif self._is_tensor_rhs(val):
             self._data[cpp_slices] = self._coerce_rhs(val)._data
         elif isinstance(val, np.ndarray) and isinstance(self, NumericTensor):
             # Element-wise array RHS: wrap as a same-dtype tensor and broadcast.

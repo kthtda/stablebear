@@ -240,6 +240,76 @@ def test_scalar_and_empty_value_construction_preserves_metadata():
     assert scalar[()][0] == 1
 
 
+def test_scalar_construction_validates_requested_depth():
+    leaf = _leaf([1, 2])
+    scalar = sb.NestedTensor(leaf, depth=2)
+    assert scalar.depth == 2
+    with pytest.raises(ValueError, match="not requested depth 3"):
+        sb.NestedTensor(leaf, depth=3)
+    with pytest.raises(ValueError, match="not requested depth 3"):
+        sb.NestedTensor(scalar._data, depth=3)
+    with pytest.raises(TypeError, match="depth must be an integer"):
+        sb.NestedTensor(leaf, depth="bad")
+
+
+@pytest.mark.parametrize("selector", ["slice", "mask", "indices", "empty"])
+def test_wrong_depth_bulk_assignment_is_atomic(selector):
+    target = sb.NestedTensor([_leaf([1]), _leaf([2])])
+    alias = target[...]
+    rhs = sb.NestedTensor([sb.NestedTensor([_leaf([3])])])
+
+    with pytest.raises(ValueError, match="assignment depth"):
+        if selector == "slice":
+            target[:1] = rhs
+        elif selector == "mask":
+            target[sb.tensor([True, False])] = rhs
+        elif selector == "indices":
+            target[sb.indices([0])] = rhs
+        else:
+            target[False] = rhs
+
+    assert target.depth == 2
+    assert target[:].depth == 2
+    npt.assert_array_equal(np.asarray(target[0]), [1])
+    npt.assert_array_equal(np.asarray(target[1]), [2])
+    npt.assert_array_equal(np.asarray(alias[0]), [1])
+
+
+def test_wrong_leaf_dtype_bulk_assignment_is_atomic():
+    target = sb.NestedTensor([_leaf([1]), _leaf([2])])
+    rhs = sb.NestedTensor([
+        sb.tensor(np.array([3], dtype=np.float64), dtype=sb.float64)
+    ])
+
+    with pytest.raises(TypeError, match="leaf dtype"):
+        target[:1] = rhs
+
+    npt.assert_array_equal(np.asarray(target[0]), [1])
+    npt.assert_array_equal(np.asarray(target[1]), [2])
+
+
+def test_compatible_bulk_assignment_propagates_through_view():
+    target = sb.NestedTensor([_leaf([1]), _leaf([2])])
+    view = target[:1]
+    rhs = sb.NestedTensor([_leaf([7, 8])])
+
+    view[:] = rhs
+    rhs[0][0] = 70
+
+    assert rhs[0][0] == 70
+    npt.assert_array_equal(np.asarray(target[0]), [7, 8])
+    npt.assert_array_equal(np.asarray(view[0]), [7, 8])
+    npt.assert_array_equal(np.asarray(target[1]), [2])
+
+
+def test_leaf_element_broadcast_assignment():
+    target = sb.NestedTensor([_leaf([1]), _leaf([2])])
+    target[:] = _leaf([5, 6])
+
+    npt.assert_array_equal(np.asarray(target[0]), [5, 6])
+    npt.assert_array_equal(np.asarray(target[1]), [5, 6])
+
+
 def test_internal_node_wrapping_preserves_leaf_buffer():
     nested = sb.NestedTensor([sb.NestedTensor([_leaf([1, 2])])])
     original_buffer = np.asarray(nested[0][0]._data)

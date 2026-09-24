@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import operator
+
 import numpy as np
 
 from . import _sb_cpp as cpp
@@ -79,6 +81,20 @@ def _nested_node(value, dtype=None):
     return node_type._from_leaf_view(leaf._data), leaf.dtype
 
 
+def _normalize_depth(depth):
+    if depth is None:
+        return None
+    if isinstance(depth, (bool, np.bool_)):
+        raise TypeError("NestedTensor depth must be an integer")
+    try:
+        depth = operator.index(depth)
+    except TypeError as error:
+        raise TypeError("NestedTensor depth must be an integer") from error
+    if depth < 2:
+        raise ValueError("Python NestedTensor depth must be at least 2")
+    return depth
+
+
 class NestedTensor(Tensor):
     """A recursively nested tensor whose leaf tensors share one numeric dtype.
 
@@ -90,6 +106,7 @@ class NestedTensor(Tensor):
         from .base_tensor import FloatTensor, IntTensor
 
         super().__init__()
+        depth = _normalize_depth(depth)
         if dtype is not None and dtype not in _NESTED_CPP_TYPES:
             raise TypeError(f"Unsupported NestedTensor leaf dtype {dtype}")
 
@@ -111,6 +128,10 @@ class NestedTensor(Tensor):
             tensor = tensor_type(cpp.Shape([]))
             tensor._set_element([], node_type._from_leaf_view(leaf._data))
             root = node_type._from_outer_view(tensor, 1)
+            if depth is not None and depth != root.depth:
+                raise ValueError(
+                    f"NestedTensor depth is {root.depth}, not requested depth {depth}"
+                )
         elif isinstance(data, (list, tuple)):
             shape, values = _infer_shape_and_flatten(data)
             if not values:
@@ -173,6 +194,10 @@ class NestedTensor(Tensor):
             node_type, _ = _NESTED_CPP_TYPES[dtype]
             child_depth = 0 if depth is None else depth - 1
             root = node_type(data, child_depth)
+            if depth is not None and depth != root.depth:
+                raise ValueError(
+                    f"NestedTensor depth is {root.depth}, not requested depth {depth}"
+                )
         else:
             raise TypeError(f"Cannot create NestedTensor from {type(data)}")
 
@@ -223,6 +248,30 @@ class NestedTensor(Tensor):
                 f"NestedTensor element depth must be {self.depth - 1}, got {node.depth}"
             )
         return node
+
+    def _is_tensor_rhs(self, val):
+        return isinstance(val, NestedTensor) and val.depth == self.depth
+
+    def _validate_setitem_value(self, entries, val):
+        scalar_target = (
+            len(entries) == self.ndim
+            and all(isinstance(entry, int) for entry in entries)
+        )
+        if isinstance(val, NestedTensor):
+            if val.dtype is not self.dtype:
+                raise TypeError(
+                    f"NestedTensor leaf dtype must be {self.dtype}, got {val.dtype}"
+                )
+            allowed_depths = {self.depth - 1} if scalar_target else {
+                self.depth - 1, self.depth
+            }
+            if val.depth not in allowed_depths:
+                expected = " or ".join(str(depth) for depth in sorted(allowed_depths))
+                raise ValueError(
+                    f"NestedTensor assignment depth must be {expected}, got {val.depth}"
+                )
+            return
+        self._decay_value(val)
 
     def _get_valid_setitem_dtypes(self):
         from .base_tensor import FloatTensor, IntTensor

@@ -187,6 +187,7 @@ def concatenate(tensors, axis=0):
     """Concatenate tensors along an existing axis (outer indexing)."""
     if not tensors:
         raise ValueError("need at least one tensor to concatenate")
+    _validate_nested_join(tensors)
     cpp_tensors = [t._data for t in tensors]
     result = type(cpp_tensors[0]).concatenate(cpp_tensors, axis)
     return tensors[0]._to_py_tensor(result)
@@ -196,9 +197,28 @@ def stack(tensors, axis=0):
     """Stack tensors along a new axis. All tensors must have the same shape."""
     if not tensors:
         raise ValueError("need at least one tensor to stack")
+    _validate_nested_join(tensors)
     cpp_tensors = [t._data for t in tensors]
     result = type(cpp_tensors[0]).stack(cpp_tensors, axis)
     return tensors[0]._to_py_tensor(result)
+
+
+def _validate_nested_join(tensors):
+    first = tensors[0]
+    if not isinstance(first, NestedTensor):
+        return
+    for tensor in tensors[1:]:
+        if not isinstance(tensor, NestedTensor):
+            raise TypeError("all tensors in a nested join must be NestedTensor objects")
+        if tensor.dtype is not first.dtype:
+            raise TypeError(
+                f"NestedTensor leaf dtype must be {first.dtype}, got {tensor.dtype}"
+            )
+        if tensor.depth != first.depth:
+            raise ValueError(
+                "all NestedTensor operands must have the same depth; "
+                f"got {first.depth} and {tensor.depth}"
+            )
 
 
 def split(tensor, indices_or_sections, axis=0):
