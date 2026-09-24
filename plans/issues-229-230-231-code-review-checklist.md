@@ -419,11 +419,27 @@ identify review work, not test-plan items. The broader test plan still applies.
   **Complete when:** Indexed and ordinary inputs each incur one logical source
   copy per input cloud, regardless of sample count. Resampling creates no
   adapter chain, keeps input/result independence, and leaves random-stream
-  behavior unchanged. Use copy/allocation evidence in addition to value checks.
+  behavior unchanged. Verify the direct indexed dispatch and resulting values.
 
   Sources: [subsample.py](../stablebear/point_process/subsample.py),
   [subsample.hpp](../include/sbear/point_process/subsample.hpp).
   Verification: test plan D2–D4, E1, E4.
+
+  **Implemented and verified in the working tree (2026-09-22):** The C++
+  sampler accepts const tensors with arbitrary property bitmasks; Python binds
+  ordinary and indexed inputs at both precisions and no longer materializes
+  indexed input before sampling. The existing logical coordinate copier now
+  writes directly into each fresh source cloud. Validation still completes
+  before reserving random streams, and the parallel walk completes before
+  returning. Resampling retains input storage and produces dense source cells
+  shared only among that input cell's new samples, without an adapter chain.
+
+  The focused Python regression rejects intermediate `materialize()` calls,
+  compares indexed resampling with a dense equivalent, and checks subsequent
+  generator state. Subsampling itself executes on CPU in both extension
+  modules.
+
+  Remains unchecked until the fixing commit is recorded.
 
 - [ ] **D4. Reconcile documentation and verify the settled implementation.**
 

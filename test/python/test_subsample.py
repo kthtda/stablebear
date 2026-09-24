@@ -232,3 +232,34 @@ class TestSubsample:
                 pcloud_dtype,
             ),
         )
+
+    def test_resampling_indexed_input_matches_dense_without_materializing(
+        self, pcloud_dtype, np_dtype, monkeypatch
+    ):
+        points = sb.PointCloudTensor(
+            np.arange(24, dtype=np_dtype).reshape(2, 6, 2), dtype=pcloud_dtype
+        )
+        selected = points[
+            sb.NestedTensor([sb.indices([4, 1, 4, 0]), sb.indices([5, 0, 5, 2])])
+        ]
+        dense = selected.copy()
+        actual_gen = sb.random.Generator(seed=301)
+        expected_gen = sb.random.Generator(seed=301)
+        options = dict(n_points=3, n_samples=2)
+
+        def reject_intermediate_materialization(*args):
+            pytest.fail("resampling must pass indexed input directly to C++")
+
+        with monkeypatch.context() as patch:
+            patch.setattr(
+                type(selected._data), "materialize", reject_intermediate_materialization
+            )
+            actual = subsample(selected, generator=actual_gen, **options)
+        expected = subsample(dense, generator=expected_gen, **options)
+        assert actual.array_equal(expected)
+        assert selected._data._get_element([0]).is_indexed
+
+        # Direct indexed dispatch must not alter random-stream allocation.
+        actual_next = subsample(points, generator=actual_gen, **options)
+        expected_next = subsample(points, generator=expected_gen, **options)
+        assert actual_next.array_equal(expected_next)

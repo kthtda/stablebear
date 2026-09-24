@@ -107,9 +107,9 @@ namespace sb::pp
     }
   }
 
-  template <ArithmeticType T>
+  template <ArithmeticType T, TensorProperties Properties>
   Tensor<PointCloud<T>, TensorProperty::Indexed> subsample(
-      const Tensor<PointCloud<T>>& points, size_t nPoints, size_t nSamples, bool replace, bool allowPartial,
+      const Tensor<PointCloud<T>, Properties>& points, size_t nPoints, size_t nSamples, bool replace, bool allowPartial,
       bool discardDuplicates, DefaultRandomGenerator& gen, Executor& exec)
   {
     if (nPoints == 0)

@@ -44,6 +44,12 @@ samples from that cloud share the fresh copy and store only row indices, so
 later changes to the input do not affect the samples. Mutating an indexed
 sample uses copy-on-write and does not affect sibling samples.
 
+This also applies when resampling an indexed result or a view of one. The
+sampler reads its selected rows directly and copies those logical coordinates
+once into a fresh source, preserving their order and repetitions. The input
+retains its indexed storage; the new result does not depend on the previous
+result's coordinates or selections.
+
 
 Poisson point process
 =====================

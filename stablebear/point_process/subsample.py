@@ -38,7 +38,7 @@ def subsample(
 
     One sample axis is appended to the input tensor shape. Coordinates are
     copied once per input cloud and shared by that cloud's samples; samples
-    store only their selected row indices.
+    store only their selected point indices.
 
     Parameters
     ----------
@@ -75,15 +75,9 @@ def subsample(
         raise TypeError("generator must be a stablebear.random.Generator or None")
 
     backend = cpp.point_process.subsample32 if points.dtype == pcloud32 else cpp.point_process.subsample64
-    data = points._data
-    if isinstance(
-        data,
-        (cpp._IndexedPointCloud32Tensor, cpp._IndexedPointCloud64Tensor),
-    ):
-        data = data.materialize()
     return PointCloudTensor(
         backend(
-            data,
+            points._data,
             n_points,
             n_samples,
             replace,
