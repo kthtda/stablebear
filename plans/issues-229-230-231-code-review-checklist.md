@@ -2,7 +2,8 @@
 
 This document records review findings and implementation evidence for
 [PR #233](https://github.com/kthtda/stablebear/pull/233), covering issues
-#229–#232. The 2026-09-22 update is review only: no fixes or tests were added.
+#229–#232, plus the dependent #236 follow-up. The 2026-09-22 update is review
+only: no fixes or tests were added.
 Previous completed items remain as historical evidence; new findings below
 identify gaps beyond the cases those fixes covered.
 
@@ -581,7 +582,7 @@ identify review work, not test-plan items. The broader test plan still applies.
   Verification: test plan B5, E3, E5. Existing ordinary-overlap tests and
   constant-value indexed assignment tests do not exercise this case.
 
-- [ ] **E4. [P1] Preserve coordinate-view identity when sharing serialized or cast sources.**
+- [x] **E4. [P1] Preserve coordinate-view identity when sharing serialized or cast sources.**
 
   **Finding:** Indexed serialization and `pcloud_cast()` deduplicate coordinate
   tensors by allocation owner alone. Different slices of one allocation have
@@ -606,3 +607,41 @@ identify review work, not test-plan items. The broader test plan still applies.
   `pcloud_cast()` source map at lines 327–361.
   Verification: test plan E5, G1, J1; require C++ storage/view fixtures rather
   than Python constructors that remove the alias before the operation.
+
+  **Completed:** Fixed by `1570fdafd`. Constructing a `PointCloud` from either
+  an lvalue or rvalue coordinate tensor now copies its logical coordinates, so
+  coordinate views cannot introduce distinct mappings of one external backing
+  allocation into point-cloud storage. `pcloud_cast()` and indexed IO cache
+  complete `PointCloud` values, preserving intentional sharing without a
+  coordinate-view construction bypass. The file format did not need additional
+  offset, shape, or stride metadata.
+
+  A typed C++ regression covers full tensors, lvalue views, and rvalue views,
+  including independence from later source mutation and distinct storage
+  ownership. Verified after rebuild and install with the full **2,388-test**
+  Python suite and **488-test** C++ suite.
+
+## F. Dependent follow-up
+
+- [ ] **F1. Extend uniform subsampling to distance-matrix tensors (#236).**
+
+  Generalize the #229 sampling and indexed-storage infrastructure so
+  `subsample()` accepts `DistanceMatrixTensor` as well as `PointCloudTensor`.
+  For sampled indices `S`, each result is the compressed symmetric principal
+  submatrix `M[S, S]`, preserving sampled order and repeated positions.
+
+  Apply the same output-shape, validation, replacement, partial-sample,
+  duplicate-filtering, RNG-stream, determinism, and failure contracts as the
+  point-cloud route. Duplicate filtering removes repeated sampled indices only;
+  zero distance between distinct indices does not make them duplicates.
+
+  **Complete when:** Both `distmat32` and `distmat64` produce correctly typed
+  tensors with the appended sample axis. Indexed results retain one owned
+  source plus aligned row/column selections; const persistence and kernel
+  consumers operate without eager materialization, while mutation materializes
+  shared state once. Outer views, copying, resampling, serialization, and
+  dtype preservation follow the settled indexed-tensor guarantees, and the
+  existing point-cloud and distance-matrix suites still pass.
+
+  Source and acceptance criteria:
+  [issue #236](https://github.com/kthtda/stablebear/issues/236).
