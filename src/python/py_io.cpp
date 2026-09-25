@@ -97,6 +97,8 @@ namespace sb_py
 
         .def_static("save_distance_matrix32_tensor", &IoOps::save_tensor_to_file<sb::DistanceMatrix<sb::float32_t>>)
         .def_static("save_distance_matrix64_tensor", &IoOps::save_tensor_to_file<sb::DistanceMatrix<sb::float64_t>>)
+        .def_static("save_indexed_distance_matrix32_tensor", &IoOps::save_tensor_to_file<sb::DistanceMatrix<sb::float32_t>, sb::TensorProperty::Indexed>)
+        .def_static("save_indexed_distance_matrix64_tensor", &IoOps::save_tensor_to_file<sb::DistanceMatrix<sb::float64_t>, sb::TensorProperty::Indexed>)
 
         .def_static("load_tensor_from_file", &IoOps::load_tensor_from_file)
 

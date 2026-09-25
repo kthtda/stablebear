@@ -10,7 +10,7 @@
 #include "../functional/pcf.hpp"
 #include "../persistence/barcode.hpp"
 
-#include <map>
+#include <unordered_map>
 #include <vector>
 
 namespace sb::io::detail
@@ -79,7 +79,9 @@ namespace sb::io::detail
       Tensor<SymmetricMatrix<float64_t>>,
 
       Tensor<DistanceMatrix<float32_t>>,
-      Tensor<DistanceMatrix<float64_t>>
+      Tensor<DistanceMatrix<float64_t>>,
+      Tensor<DistanceMatrix<float32_t>, TensorProperty::Indexed>,
+      Tensor<DistanceMatrix<float64_t>, TensorProperty::Indexed>
       >;
 
   using StreamableObject = std::variant<
@@ -268,7 +270,7 @@ namespace sb::io::detail
   template <typename T>
   void write_value(std::ostream& os, const PointCloud<T>& cloud)
   {
-    write_tensor(os, cloud.materialize());
+    write_tensor(os, cloud.coordinates_copy());
   }
 
   template <typename T>
@@ -283,21 +285,27 @@ namespace sb::io::detail
   template <typename T>
   NestedTensor<T> read_nested_tensor_element(BinaryReader& reader);
 
-  /// Element-specific encoding for tensors carrying the Indexed property.
-  /// Add a specialization when another element type gains persistent indexed
-  /// storage; the top-level tensor reader and writer remain property-driven.
   template <typename ElementT>
-  struct IndexedTensorCodec;
+  concept PersistableIndexedTensorElement = IndexableTensorElement<ElementT>
+    && requires(const ElementT& value)
+    {
+      { value.storage_data() } -> std::convertible_to<const void*>;
+      { value.source_view() } -> std::same_as<ElementT>;
+      { value.indices() } -> std::same_as<const typename ElementT::index_type&>;
+    };
 
-  template <typename ScalarT>
-  struct IndexedTensorCodec<PointCloud<ScalarT>>
+  /// Common encoding for tensors carrying the Indexed property. Element types
+  /// expose their backing identity/source and logical selection; the tensor
+  /// codec owns the outer shape, source table, and aligned selections.
+  template <PersistableIndexedTensorElement ElementT>
+  struct IndexedTensorCodec
   {
     template <TensorProperties Properties>
       requires IndexedTensorProperties<Properties>
     static void write(
-      std::ostream& os, const Tensor<PointCloud<ScalarT>, Properties>& tensor);
+      std::ostream& os, const Tensor<ElementT, Properties>& tensor);
 
-    static Tensor<PointCloud<ScalarT>, TensorProperty::Indexed> read(
+    static Tensor<ElementT, TensorProperty::Indexed> read(
       BinaryReader& reader);
   };
 
@@ -387,17 +395,15 @@ namespace sb::io::detail
     return PointCloud<T>(std::move(coords));
   }
 
-  // Write a tensor-level indexed point-cloud tensor without materializing its
-  // logical coordinates.  Iterating through the logical view composes any
-  // source-cloud indexing with the tensor-level selections, so sliced,
-  // transposed, and repeated views become self-contained while coordinate
-  // buffers remain deduplicated.
-  template <typename ScalarT>
+  // Write any tensor-level indexed element without materializing its logical
+  // selection. Logical iteration composes nested selections while backing
+  // owners provide a deduplicated source table.
+  template <PersistableIndexedTensorElement ElementT>
   template <TensorProperties Properties>
     requires IndexedTensorProperties<Properties>
-  void IndexedTensorCodec<PointCloud<ScalarT>>::write(
+  void IndexedTensorCodec<ElementT>::write(
       std::ostream& os,
-      const Tensor<PointCloud<ScalarT>, Properties>& tensor)
+      const Tensor<ElementT, Properties>& tensor)
   {
     write_type_format(os, tensorFormatV3<decltype(tensor)>());
 
@@ -420,36 +426,31 @@ namespace sb::io::detail
     }
 
     const size_t count = tensor.shape().empty() ? size_t{1} : tensor.size();
-    using KeyT = std::shared_ptr<const void>;
-    std::map<KeyT, uint64_t, std::owner_less<KeyT>> idOf;
-    std::vector<Tensor<ScalarT>> sources;
+    std::unordered_map<const typename ElementT::value_type*, uint64_t> idOf;
+    std::vector<ElementT> sources;
     for (size_t i = 0; i < count; ++i)
     {
-      const PointCloud<ScalarT> cloud = tensor.flat(i);
-      const KeyT key = cloud.coords().storage_owner();
+      const ElementT value = tensor.flat(i);
+      const auto* key = value.storage_data();
       if (!idOf.contains(key))
       {
         idOf.emplace(key, static_cast<uint64_t>(sources.size()));
-        sources.push_back(cloud.coords());
+        sources.push_back(value.source_view());
       }
     }
 
     write_bytes<uint64_t>(os, static_cast<uint64_t>(sources.size()));
     for (const auto& source : sources)
-    {
-      write_tensor(os, source);
-    }
+      write_value(os, source);
 
     const bool hasSelections = tensor.has_indices();
     write_bytes<bool>(os, hasSelections);
     for (size_t i = 0; i < count; ++i)
     {
-      const PointCloud<ScalarT> cloud = tensor.flat(i);
-      write_bytes<uint64_t>(os, idOf.at(cloud.coords().storage_owner()));
+      const ElementT value = tensor.flat(i);
+      write_bytes<uint64_t>(os, idOf.at(value.storage_data()));
       if (hasSelections)
-      {
-        write_tensor(os, cloud.indices());
-      }
+        write_tensor(os, value.indices());
     }
   }
 
@@ -625,62 +626,62 @@ namespace sb::io::detail
   }
 
   template <typename ScalarT>
-  void validate_indexed_point_cloud_source(const Tensor<ScalarT>& coordinates)
+  PointCloud<ScalarT> read_indexed_source(
+      BinaryReader& reader, std::type_identity<PointCloud<ScalarT>>)
   {
-    if (coordinates.rank() != 2)
-    {
-      throw std::runtime_error(
-        "Indexed point-cloud coordinate source must have 2 dimensions");
-    }
+    return read_point_cloud<ScalarT>(reader);
   }
 
-  inline void validate_indexed_point_cloud_source_reference(
+  template <typename ScalarT>
+  DistanceMatrix<ScalarT> read_indexed_source(
+      BinaryReader& reader, std::type_identity<DistanceMatrix<ScalarT>>)
+  {
+    return read_compressed_matrix<DistanceMatrix<ScalarT>>(reader.stream());
+  }
+
+  inline void validate_indexed_source_reference(
       std::uint64_t sourceId, size_t sourceCount)
   {
     if (sourceId >= sourceCount)
     {
       throw std::runtime_error(
-        "Invalid indexed point-cloud source reference in saved data");
+        "Invalid indexed-element source reference in saved data");
     }
   }
 
-  inline void validate_indexed_point_cloud_selection(
-      const Tensor<uint64_t>& selection, size_t sourcePointCount)
+  template <IndexableTensorElement ElementT>
+  void validate_indexed_selection(
+      const ElementT& source, const typename ElementT::index_type& selection)
   {
-    if (selection.rank() != 1)
+    try
+    {
+      source.validate_index(selection);
+    }
+    catch (const std::exception& error)
     {
       throw std::runtime_error(
-        "Invalid number of indexed point-cloud selection dimensions in saved data");
-    }
-    for (size_t i = 0; i < selection.size(); ++i)
-    {
-      if (selection(i) >= sourcePointCount)
-      {
-        throw std::runtime_error(
-          "Indexed point-cloud selection out of bounds in saved data");
-      }
+        "Invalid indexed-element selection in saved data: "
+        + std::string(error.what()));
     }
   }
 
-  // Read the V3 tensor-level indexed point-cloud layout (baseFormat 1000 with
-  // the Indexed tensor-property bit).
-  // The payload contains a deduplicated coordinate-source table followed by
-  // an aligned source reference and owned selection for each logical cell.
-  template <typename ScalarT>
-  Tensor<PointCloud<ScalarT>, TensorProperty::Indexed>
-  IndexedTensorCodec<PointCloud<ScalarT>>::read(BinaryReader& reader)
+  // Read the common V3 indexed layout: a deduplicated source table followed
+  // by one source reference and optional owned selection per logical cell.
+  template <PersistableIndexedTensorElement ElementT>
+  Tensor<ElementT, TensorProperty::Indexed>
+  IndexedTensorCodec<ElementT>::read(BinaryReader& reader)
   {
     auto& is = reader.stream();
-    auto shapeSz = read_bytes<std::uint64_t>(is);
-    std::vector<size_t> shape(shapeSz);
-    std::vector<ptrdiff_t> strides(shapeSz);
-    for (auto i = 0_uz; i < shapeSz; ++i)
+    const auto shapeSize = read_bytes<std::uint64_t>(is);
+    std::vector<size_t> shape(shapeSize);
+    std::vector<ptrdiff_t> strides(shapeSize);
+    for (size_t i = 0; i < shapeSize; ++i)
     {
       shape[i] = read_bytes<std::uint64_t>(is);
       strides[i] = static_cast<ptrdiff_t>(read_bytes<std::uint64_t>(is));
     }
 
-    Tensor<PointCloud<ScalarT>> source(shape);
+    Tensor<ElementT> source(shape);
     if (source.strides() != strides)
     {
       throw std::runtime_error(
@@ -689,15 +690,12 @@ namespace sb::io::detail
         + index_to_string(strides) + ")");
     }
 
-    const auto numSources = read_bytes<std::uint64_t>(is);
-    std::vector<PointCloud<ScalarT>> sources;
-    sources.reserve(numSources);
-    for (auto i = 0_uz; i < numSources; ++i)
-    {
-      Tensor<ScalarT> coords = read_element<Tensor<ScalarT>>(reader);
-      validate_indexed_point_cloud_source(coords);
-      sources.emplace_back(coords);
-    }
+    const auto sourceCount = read_bytes<std::uint64_t>(is);
+    std::vector<ElementT> sources;
+    sources.reserve(sourceCount);
+    for (size_t i = 0; i < sourceCount; ++i)
+      sources.push_back(read_indexed_source(
+        reader, std::type_identity<ElementT>{}));
 
     const bool hasSelections = read_bytes<bool>(is);
     Tensor<NestedTensor<uint64_t>> selections(shape);
@@ -705,27 +703,23 @@ namespace sb::io::detail
     for (size_t i = 0; i < count; ++i)
     {
       const auto sourceId = read_bytes<std::uint64_t>(is);
-      validate_indexed_point_cloud_source_reference(sourceId, sources.size());
+      validate_indexed_source_reference(sourceId, sources.size());
 
       source.flat(i) = sources[sourceId];
       if (hasSelections)
       {
         Tensor<uint64_t> indices = read_element<Tensor<uint64_t>>(reader);
-        validate_indexed_point_cloud_selection(
-          indices, sources[sourceId].shape(0));
+        validate_indexed_selection(sources[sourceId], indices);
         selections.flat(i) = NestedTensor<uint64_t>::from_leaf_view(std::move(indices));
       }
     }
 
-    using IndexedTensor =
-      Tensor<PointCloud<ScalarT>, TensorProperty::Indexed>;
+    using IndexedTensor = Tensor<ElementT, TensorProperty::Indexed>;
     if (!hasSelections)
-    {
       return IndexedTensor(std::move(source), std::nullopt);
-    }
-    auto ownedSelections = NestedTensor<uint64_t>::from_outer_view(std::move(selections), 1);
-    return IndexedTensor(
-      std::move(source), std::move(ownedSelections));
+    auto ownedSelections = NestedTensor<uint64_t>::from_outer_view(
+      std::move(selections), 1);
+    return IndexedTensor(std::move(source), std::move(ownedSelections));
   }
 
 

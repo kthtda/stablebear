@@ -129,20 +129,10 @@ namespace sb::ph
       auto pcIdx = std::vector<size_t>(index.begin(), std::prev(index.end()));
       auto const & points = pclouds(pcIdx);
 
-      auto const & coords = points.coords();
-
-      // Skip empty cells: default-constructed (rank-0 coords), no points
-      // selected/stored, or zero-dimensional points. Rank order matters:
-      // n_points()/dim() read coords.shape(0)/shape(1), which throw on lower ranks.
-      if (coords.rank() == 0 || points.n_points() == 0)
+      // Empty clouds do not contribute persistence intervals.
+      if (points.n_points() == 0)
       {
         return;
-      }
-
-      if (coords.rank() != 2)
-      {
-        throw std::runtime_error("Point cloud at index " + index_to_string(pcIdx) + " has unexpected shape " +
-                                 shape_to_string(coords.shape()) + " (should be (m, n))");
       }
 
       if (points.dim() == 0)
@@ -153,8 +143,8 @@ namespace sb::ph
       run_euclidean_ripser(points, ret, maxDim, index, reducedHomology);
     }
 
-    template <typename T>
-    void compute_persistence_distmat_single_impl(const Tensor<DistanceMatrix<T>>& dmats, Tensor<Barcode<T>>& ret, size_t maxDim, const std::vector<size_t>& index, bool reducedHomology = false)
+    template <typename T, TensorProperties Properties>
+    void compute_persistence_distmat_single_impl(const Tensor<DistanceMatrix<T>, Properties>& dmats, Tensor<Barcode<T>>& ret, size_t maxDim, const std::vector<size_t>& index, bool reducedHomology = false)
     {
       if (index.back() != 0)
       {
@@ -218,8 +208,8 @@ namespace sb::ph
   template <typename T, TensorProperties Properties = TensorProperty::None>
   using RipserTask = RipserTaskImpl<PointCloud<T>, T, Properties>;
 
-  template <typename T>
-  using RipserDistMatTask = RipserTaskImpl<DistanceMatrix<T>, T>;
+  template <typename T, TensorProperties Properties = TensorProperty::None>
+  using RipserDistMatTask = RipserTaskImpl<DistanceMatrix<T>, T, Properties>;
 
 }
 

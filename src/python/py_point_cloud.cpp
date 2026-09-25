@@ -19,10 +19,19 @@ namespace
       .def_property_readonly("n_dims", &PointCloud::dim)
       .def_property_readonly("is_indexed", &PointCloud::is_indexed)
       .def_property_readonly("indices", &PointCloud::indices)
-      .def_property_readonly("coords", &PointCloud::coords)
-      .def("_mutable_coords", &PointCloud::mutable_coords,
-        py::return_value_policy::reference_internal)
-      .def("materialize", &PointCloud::materialize)
+      .def_property_readonly("coords", &PointCloud::source_coordinates_copy)
+      .def("_coordinate", [](const PointCloud& self, size_t row, size_t column) {
+        return self(row, column);
+      })
+      .def("_storage_array", [](const PointCloud& self) {
+        const auto source = self.source_view();
+        return py::array_t<T>(
+          {static_cast<py::ssize_t>(source.n_points()),
+           static_cast<py::ssize_t>(source.dim())},
+          {static_cast<py::ssize_t>(source.dim() * sizeof(T)),
+           static_cast<py::ssize_t>(sizeof(T))},
+          source.storage_data(), py::cast(source));
+      })
       .def("copy", &PointCloud::copy);
   }
 }
@@ -34,15 +43,10 @@ namespace sb_py
     register_point_cloud<sb::float32_t>(m, "32");
     register_point_cloud<sb::float64_t>(m, "64");
 
-    register_typed_tensor_bindings<sb::PointCloud<sb::float32_t>>(m, "PointCloud32", "");
-    register_typed_tensor_bindings<sb::PointCloud<sb::float64_t>>(m, "PointCloud64", "");
-
-    register_typed_tensor_bindings<
-      sb::PointCloud<sb::float32_t>, sb::TensorProperty::Indexed>(
-      m, "_IndexedPointCloud32", "");
-    register_typed_tensor_bindings<
-      sb::PointCloud<sb::float64_t>, sb::TensorProperty::Indexed>(
-      m, "_IndexedPointCloud64", "");
+    register_indexable_tensor_bindings<sb::PointCloud<sb::float32_t>>(
+      m, "PointCloud32");
+    register_indexable_tensor_bindings<sb::PointCloud<sb::float64_t>>(
+      m, "PointCloud64");
 
     m.def("cast_pcloud32_pcloud64", [](const sb::Tensor<sb::PointCloud<sb::float32_t>>& src) {
       return sb::pcloud_cast<sb::float64_t>(src);

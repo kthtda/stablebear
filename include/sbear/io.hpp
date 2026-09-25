@@ -288,8 +288,10 @@ namespace sb
     else if (format.matches_type<SymmetricMatrix<float32_t>>(reader.format_version())) { return io::detail::read_tensor<SymmetricMatrix<float32_t>>(reader); }
     else if (format.matches_type<SymmetricMatrix<float64_t>>(reader.format_version())) { return io::detail::read_tensor<SymmetricMatrix<float64_t>>(reader); }
 
-    else if (format.matches_type<DistanceMatrix<float32_t>>(reader.format_version())) { return io::detail::read_tensor<DistanceMatrix<float32_t>>(reader); }
-    else if (format.matches_type<DistanceMatrix<float64_t>>(reader.format_version())) { return io::detail::read_tensor<DistanceMatrix<float64_t>>(reader); }
+    else if (io::detail::is_tensor_format<Tensor<DistanceMatrix<float32_t>>>(reader, format)) { return io::detail::read_tensor_for_format<Tensor<DistanceMatrix<float32_t>>>(reader, format); }
+    else if (io::detail::is_tensor_format<Tensor<DistanceMatrix<float64_t>>>(reader, format)) { return io::detail::read_tensor_for_format<Tensor<DistanceMatrix<float64_t>>>(reader, format); }
+    else if (io::detail::is_tensor_format<Tensor<DistanceMatrix<float32_t>, TensorProperty::Indexed>>(reader, format)) { return io::detail::read_tensor_for_format<Tensor<DistanceMatrix<float32_t>, TensorProperty::Indexed>>(reader, format); }
+    else if (io::detail::is_tensor_format<Tensor<DistanceMatrix<float64_t>, TensorProperty::Indexed>>(reader, format)) { return io::detail::read_tensor_for_format<Tensor<DistanceMatrix<float64_t>, TensorProperty::Indexed>>(reader, format); }
 
     else if (format.matches_type<ph::Barcode<float32_t>>(reader.format_version())) { return io::detail::read_tensor<ph::Barcode<float32_t>>(reader); }
     else if (format.matches_type<ph::Barcode<float64_t>>(reader.format_version())) { return io::detail::read_tensor<ph::Barcode<float64_t>>(reader); }

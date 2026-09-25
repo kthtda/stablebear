@@ -874,6 +874,7 @@ if (BUILD_TESTER)
       test/test_iterate_rectangles.cpp
       test/test_iterate_segments.cpp
       test/test_parallel_reduce.cpp
+      test/test_fixed_rank_tensor.cpp
       test/test_point_cloud.cpp
       test/test_tensor.cpp
       test/test_tensor_broadcast.cpp

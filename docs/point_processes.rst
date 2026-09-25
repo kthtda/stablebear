@@ -2,18 +2,20 @@
 Point Processes
 ===============
 
-The :py:mod:`stablebear.point_process` module provides samplers for spatial point
-processes, returning :py:class:`~stablebear.base_tensor.PointCloudTensor` objects. All
-samplers support deterministic seeding via :py:class:`~stablebear.random.Generator`
-(see :doc:`random`).
+The :py:mod:`stablebear.point_process` module provides samplers for spatial
+point processes and their distance matrices. All samplers support
+deterministic seeding via :py:class:`~stablebear.random.Generator` (see
+:doc:`random`).
 
 Uniform subsampling
 ===================
 
 :py:func:`~stablebear.point_process.subsample` draws one or more uniform
-subsamples from every cloud in a
-:py:class:`~stablebear.base_tensor.PointCloudTensor`. The result appends a
-sample axis to the input shape::
+subsamples from every value in a
+:py:class:`~stablebear.base_tensor.PointCloudTensor` or
+:py:class:`~stablebear.distance_matrix.DistanceMatrixTensor`. The result has
+the same element family and precision and appends a sample axis to the input
+shape::
 
    import numpy as np
    import stablebear as sb
@@ -37,7 +39,9 @@ draws are allowed; an empty input is accepted only when
 ``allow_partial=True``.
 
 Set ``discard_duplicates=True`` to keep only the first drawn occurrence of
-each coordinate-identical point. Discarded points are not redrawn.
+each coordinate-identical point. For distance matrices, it removes repeated
+drawn source indices; distinct indices are retained even when their distance
+is zero. Discarded points are not redrawn.
 
 Each call copies each input cloud's current logical coordinates once. All
 samples from that cloud share the fresh copy and store only row indices, so
@@ -49,6 +53,14 @@ sampler reads its selected rows directly and copies those logical coordinates
 once into a fresh source, preserving their order and repetitions. The input
 retains its indexed storage; the new result does not depend on the previous
 result's coordinates or selections.
+
+For a distance matrix ``M`` and sampled index sequence ``S``, the corresponding
+result is the compressed symmetric principal submatrix ``M[S, S]``. Sampled
+order and repetitions are preserved, including zero distance between two
+occurrences of the same source index. Indexed results share one fresh copy of
+the source matrix across its samples. Persistent homology and homological
+kernel computations consume these logical matrices directly; mutation first
+materializes the shared indexed state.
 
 
 Poisson point process

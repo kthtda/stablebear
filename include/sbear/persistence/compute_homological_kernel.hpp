@@ -164,9 +164,10 @@ namespace sb::ph
       ret = std::move(bars);
     }
 
-    template <typename T>
+    template <typename T, TensorProperties Properties, TensorProperties PrimeProperties>
     void homological_kernel_distmat_single_impl(
-        const Tensor<DistanceMatrix<T>> &distmat, const Tensor<DistanceMatrix<T>> &distmatPrime,
+        const Tensor<DistanceMatrix<T>, Properties> &distmat,
+        const Tensor<DistanceMatrix<T>, PrimeProperties> &distmatPrime,
         Tensor<Barcode<T>> &retBarcodes, const std::vector<size_t> &index)
     {
       auto const &dm = distmat(index);           // the Distmat<T> for this instance
@@ -189,13 +190,6 @@ namespace sb::ph
     {
       auto const &pc = pclouds(index);
       auto const &pcPrime = pcloudsPrime(index);
-
-      if (pc.coords().rank() != 2 || pcPrime.coords().rank() != 2)
-      {
-        throw std::runtime_error(
-            "homological kernel: point cloud at index " + index_to_string(index) +
-            " must have shape (m, n)");
-      }
 
       if (pc.n_points() != pcPrime.n_points() || pc.dim() != pcPrime.dim())
       {

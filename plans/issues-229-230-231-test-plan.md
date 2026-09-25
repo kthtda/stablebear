@@ -125,7 +125,7 @@ confirmed defects separately from incomplete coverage.
 | Observation at reviewed HEAD | Required treatment | Entries |
 | --- | --- | --- |
 | #229 describes full-element access returning `FloatTensor`; the branch uses a write-aware `PointCloud` façade. | Cover the actual façade and preserve the requirement that writes transition shared state safely. Record the public return type clearly. | A2–A4, E3 |
-| C++ `PointCloud::m_indices` is confined to transient logical access; persistent state belongs to the tensor. | Test actual selection state, owned values, and one shared transition. Backend wrapper class identity is insufficient evidence. | B5, E1–E3, F1 |
+| C++ point-cloud selection state lives in the `PointCloudLayout` owned by its `FixedRankTensor`; shallow views copy the layout and share only the coordinate allocation. | Test actual selection state, shared storage with independent layout metadata, owned values, and one shared transition. Backend wrapper class identity is insufficient evidence. | B5, E1–E3, F1 |
 | Generic indexing allows singleton broadcasting; the public point-cloud API now enforces exact leading dimensions. | Both contracts need independent checks at their boundaries. | C1–C2 |
 | Indexed IO and standalone PointCloud IO are implemented; scalar payloads and aliased coordinate views still corrupt data. | Add regressions for review E1/E4 without regenerating historical bytes. | G1, H2, J1 |
 | Bulk nested writes bypass the stored depth descriptor; scalar descriptors and empty joins are inconsistent. | Validate before any mutation, including empty operands and every tensor-RHS path. | B2–B4 |
@@ -180,8 +180,8 @@ A–K in order; each item remains independently executable.
    For a scalar `PointCloudTensor`, distinguish `points[()]`/`points[...]` from
    coordinate indexing; for outer tensors, complete indices select clouds.
    Coordinate assignment through a retained façade updates the correct parent
-   cell. `copy()` and `materialize()` produce independent values; materialize
-   returns a `FloatTensor`. Check NumPy dtype/copy behavior and ownership of
+   cell. `copy()` produces an independent `PointCloud`. Check NumPy dtype/copy
+   behavior and ownership of
    arrays and row views. Rank-changing methods such as reshape/squeeze must not
    be exposed as point-cloud operations. Delete the original Python owner and
    force garbage collection while retaining a façade; it must stay valid.

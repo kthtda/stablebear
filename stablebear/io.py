@@ -51,6 +51,8 @@ def _save(item: Tensor, file):
         cpp.SymmetricMatrix64Tensor: cpp.IoOps.save_symmetric_matrix64_tensor,
         cpp.DistanceMatrix32Tensor: cpp.IoOps.save_distance_matrix32_tensor,
         cpp.DistanceMatrix64Tensor: cpp.IoOps.save_distance_matrix64_tensor,
+        cpp._IndexedDistanceMatrix32Tensor: cpp.IoOps.save_indexed_distance_matrix32_tensor,
+        cpp._IndexedDistanceMatrix64Tensor: cpp.IoOps.save_indexed_distance_matrix64_tensor,
     }
 
     fn = _SAVE_DISPATCH.get(type(data))
@@ -84,6 +86,8 @@ def _load(file):
         cpp.SymmetricMatrix64Tensor: SymmetricMatrixTensor,
         cpp.DistanceMatrix32Tensor: DistanceMatrixTensor,
         cpp.DistanceMatrix64Tensor: DistanceMatrixTensor,
+        cpp._IndexedDistanceMatrix32Tensor: DistanceMatrixTensor,
+        cpp._IndexedDistanceMatrix64Tensor: DistanceMatrixTensor,
     }
 
     cpp_tensor = cpp.IoOps.load_tensor_from_file(file)

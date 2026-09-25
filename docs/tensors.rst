@@ -164,10 +164,23 @@ assignment::
    cloud[:, 0]             # first coordinate of each point
    cloud[0, 1] = 4.0       # updates ragged[0]
 
+Coordinate indexing follows NumPy: scalar indexing reads a single value,
+basic slices remain views, and integer-array or boolean indexing returns
+independent values. Multiple integer arrays use NumPy's paired indexing.
+Writes through retained coordinate views update the owning cloud; for indexed
+clouds, the first successful write materializes the shared tensor state.
+Invalid assignments leave that state unchanged.
+
+``np.asarray(cloud)`` shares coordinates when the cloud has ordinary storage.
+For an indexed cloud it returns an independent array, because arbitrary point
+indices cannot be represented by NumPy strides. Coordinate slices retain their
+write-through behavior until explicitly converted to an array.
+
 ``PointCloud`` intentionally omits rank-changing tensor operations such as
-``squeeze`` and ``reshape``. Use ``cloud.materialize()`` to obtain a standalone
-``FloatTensor`` when general tensor operations are needed. A standalone cloud
-can also be constructed directly with ``sb.PointCloud(coordinates)``.
+``squeeze`` and ``reshape``. Convert it with ``np.asarray(cloud)`` when general
+array operations are needed. Use ``cloud.copy()`` to obtain an independent
+``PointCloud``. A standalone cloud can also be constructed directly with
+``sb.PointCloud(coordinates)``.
 
 Point selection and subsampling may return a ``PointCloudTensor`` backed by
 shared coordinates and per-cloud row indices. Use ``clouds.to_dense()`` when

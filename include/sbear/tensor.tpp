@@ -2037,15 +2037,18 @@ namespace sb
   bool allclose(const MatT& a, const MatT& b,
                 typename MatT::value_type atol, typename MatT::value_type rtol)
   {
-    if (a.storage_count() != b.storage_count())
+    if (a.size() != b.size())
       return false;
 
-    for (size_t i = 0; i < a.storage_count(); ++i)
+    for (size_t i = 0; i < a.size(); ++i)
     {
-      auto aval = a.data()[i];
-      auto bval = b.data()[i];
-      if (std::abs(aval - bval) > atol + rtol * std::abs(bval))
-        return false;
+      for (size_t j = 0; j <= i; ++j)
+      {
+        const auto aval = a(i, j);
+        const auto bval = b(i, j);
+        if (std::abs(aval - bval) > atol + rtol * std::abs(bval))
+          return false;
+      }
     }
     return true;
   }

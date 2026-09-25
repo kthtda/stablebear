@@ -39,6 +39,10 @@ CppTensor = Union[
     cpp.PointCloud64Tensor,
     cpp._IndexedPointCloud32Tensor,
     cpp._IndexedPointCloud64Tensor,
+    cpp.DistanceMatrix32Tensor,
+    cpp.DistanceMatrix64Tensor,
+    cpp._IndexedDistanceMatrix32Tensor,
+    cpp._IndexedDistanceMatrix64Tensor,
     cpp.BoolTensor,
 ]
 
@@ -848,6 +852,70 @@ class Tensor(_BinaryIoMixin, ABC):
             raise TypeError(
                 f"Tried to construct tensor of type {type(tensor)} from argument of type {type(arg)}. Only the following type(s) are allowed: {valid_types}."
             )
+
+
+class IndexedElementTensor(Tensor):
+    """Shared behavior for tensors whose elements support lazy indexing."""
+
+    _indexed_cpp_types = ()
+    _indexed_element_name = "Element"
+
+    def _element_view(self, element, index):
+        raise NotImplementedError()
+
+    def __getitem__(self, index):
+        from .nested_tensor import NestedTensor
+        from .typing import uint64
+
+        if isinstance(index, NestedTensor):
+            if index.dtype is not uint64:
+                raise TypeError(
+                    f"{self._indexed_element_name} indices must have uint64 leaves"
+                )
+            if index.depth != 2:
+                raise ValueError(
+                    f"{self._indexed_element_name} indexing requires "
+                    "Tensor<Tensor<uint64>>"
+                )
+            return self._to_py_tensor(
+                self._data._index_elements(
+                    index._root, exact_leading_dimensions=True
+                )
+            )
+
+        if self.ndim == 0:
+            element = self._element_view(self._data._get_element([]), [])
+            if index == () or index is Ellipsis:
+                return element
+            return element[index]
+
+        entries, inserts = self._normalize_index(index)
+        if (
+            not inserts
+            and len(entries) == self.ndim
+            and all(isinstance(entry, int) for entry in entries)
+        ):
+            resolved = [
+                self._resolve_axis_int(entry, axis)
+                for axis, entry in enumerate(entries)
+            ]
+            return self._element_view(
+                self._data._get_element(resolved), resolved
+            )
+
+        return super().__getitem__(index)
+
+    def _ensure_writeable(self):
+        super()._ensure_writeable()
+        if isinstance(self._data, self._indexed_cpp_types):
+            self._data._ensure_materialized()
+
+    def to_dense(self):
+        """Return an independent tensor with ordinary element storage."""
+        return self._to_py_tensor(self._data.copy())
+
+    def _has_indexed_storage(self):
+        return isinstance(self._data, self._indexed_cpp_types)
 
 
 class FunctionTensorMixin:

@@ -1,4 +1,5 @@
 #include "py_subsample.hpp"
+#include "../py_tensor_property_variants.hpp"
 
 #include <sbear/point_process/subsample.hpp>
 
@@ -9,28 +10,34 @@ namespace py = pybind11;
 
 namespace
 {
-  template <typename T, sb::TensorProperties Properties>
-  sb::Tensor<sb::PointCloud<T>, sb::TensorProperty::Indexed> subsample(
-      const sb::Tensor<sb::PointCloud<T>, Properties>& points, size_t nPoints, size_t nSamples, bool replace,
+  template <typename ElementT, sb::TensorProperties Properties>
+  sb::Tensor<ElementT, sb::TensorProperty::Indexed> subsample(
+      const sb::Tensor<ElementT, Properties>& data, size_t nPoints, size_t nSamples, bool replace,
       bool allowPartial, bool discardDuplicates, sb::DefaultRandomGenerator* gen)
   {
     auto& generator = gen == nullptr ? sb::default_generator() : *gen;
     py::gil_scoped_release release;
     return sb::pp::subsample(
-        points, nPoints, nSamples, replace, allowPartial, discardDuplicates, generator, sb::default_executor());
+        data, nPoints, nSamples, replace, allowPartial, discardDuplicates, generator, sb::default_executor());
   }
 }
 
 void sb_py::register_point_process_subsample(py::module_& m)
 {
-  auto bind = [&]<typename T, sb::TensorProperties Properties>(const char* name) {
-    m.def(name, &subsample<T, Properties>,
-        py::arg("points"), py::arg("n_points"), py::arg("n_samples"),
+  auto bind = [&]<typename ElementT, sb::TensorProperties Properties>(const char* name) {
+    m.def(name, &subsample<ElementT, Properties>,
+        py::arg("data"), py::arg("n_points"), py::arg("n_samples"),
         py::arg("replace"), py::arg("allow_partial"), py::arg("discard_duplicates"),
         py::arg("generator").none(true) = py::none());
   };
-  bind.operator()<sb::float32_t, sb::TensorProperty::None>("subsample32");
-  bind.operator()<sb::float32_t, sb::TensorProperty::Indexed>("subsample32");
-  bind.operator()<sb::float64_t, sb::TensorProperty::None>("subsample64");
-  bind.operator()<sb::float64_t, sb::TensorProperty::Indexed>("subsample64");
+  auto bindElement = [&]<typename ElementT>(const char* name) {
+    sb_py::bind_tensor_property_variants(
+      [&]<sb::TensorProperties Properties>() {
+        bind.operator()<ElementT, Properties>(name);
+      });
+  };
+  bindElement.operator()<sb::PointCloud<sb::float32_t>>("subsample32");
+  bindElement.operator()<sb::PointCloud<sb::float64_t>>("subsample64");
+  bindElement.operator()<sb::DistanceMatrix<sb::float32_t>>("subsample32");
+  bindElement.operator()<sb::DistanceMatrix<sb::float64_t>>("subsample64");
 }

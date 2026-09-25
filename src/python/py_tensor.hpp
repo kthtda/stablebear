@@ -641,6 +641,17 @@ namespace sb_py
     }
 
   }
+
+  template <sb::IndexableTensorElement T>
+  void register_indexable_tensor_bindings(
+      pybind11::module_& m, const std::string& name,
+      const std::string& suffix = "")
+  {
+    register_typed_tensor_bindings<T>(m, name, suffix);
+    register_typed_tensor_bindings<T, sb::TensorProperty::Indexed>(
+      m, "_Indexed" + name, suffix);
+  }
+
 }
 
 #endif //STABLEBEAR_PY_TENSOR_H

@@ -1,5 +1,6 @@
 #include "py_homological_kernel.hpp"
 #include "../py_async_support.hpp"
+#include "../py_tensor_property_variants.hpp"
 
 #include <sbear/distance_matrix.hpp>
 #include <sbear/persistence/barcode.hpp>
@@ -41,44 +42,36 @@ namespace
           std::move(pointClouds), std::move(pointCloudsPrime), out);
     }
 
+    template <sb::TensorProperties Properties, sb::TensorProperties PrimeProperties>
     static std::unique_ptr<sb::StoppableTask<void>> spawn_homological_kernel_distmat_task(
-        const sb::Tensor<sb::DistanceMatrix<T>> &dmats, const sb::Tensor<sb::DistanceMatrix<T>> &dmatsPrime,
+        const sb::Tensor<sb::DistanceMatrix<T>, Properties> &dmats,
+        const sb::Tensor<sb::DistanceMatrix<T>, PrimeProperties> &dmatsPrime,
         sb::Tensor<sb::ph::Barcode<T>> &out)
     {
-      return sb_py::execute_stoppable_task<sb::ph::HomologicalKernelImpl<sb::DistanceMatrix<T>, T>>(
+      return sb_py::execute_stoppable_task<sb::ph::HomologicalKernelImpl<
+          sb::DistanceMatrix<T>, T, Properties, PrimeProperties>>(
           dmats, dmatsPrime, out);
     }
 
     static void register_bindings(py::module_ &m, const std::string &suffix)
     {
-      py::class_<PyHomologicalKernelBindings>(m, ("HomologicalKernel" + suffix).c_str())
-          .def_static(
-              "spawn_homological_kernel_pcloud_task",
-              &PyHomologicalKernelBindings::template spawn_homological_kernel_pcloud_task<
-                  sb::TensorProperty::None, sb::TensorProperty::None>
-          )
-          .def_static(
-              "spawn_homological_kernel_pcloud_task",
-              &PyHomologicalKernelBindings::template spawn_homological_kernel_pcloud_task<
-                  sb::TensorProperty::Indexed, sb::TensorProperty::Indexed>
-          )
-          .def_static(
-              "spawn_homological_kernel_pcloud_task",
-              &PyHomologicalKernelBindings::template spawn_homological_kernel_pcloud_task<
-                  sb::TensorProperty::Indexed, sb::TensorProperty::None>
-          )
-          .def_static(
-              "spawn_homological_kernel_pcloud_task",
-              &PyHomologicalKernelBindings::template spawn_homological_kernel_pcloud_task<
-                  sb::TensorProperty::None, sb::TensorProperty::Indexed>
-          )
-          .def_static(
-              "spawn_homological_kernel_pcloud_task",
-              &PyHomologicalKernelBindings::spawn_homological_kernel_single_pcloud_task
-          )
-          .def_static(
-              "spawn_homological_kernel_distmat_task",
-              &PyHomologicalKernelBindings::spawn_homological_kernel_distmat_task);
+      py::class_<PyHomologicalKernelBindings> cls(
+        m, ("HomologicalKernel" + suffix).c_str());
+      sb_py::bind_tensor_property_pairs(
+        [&]<sb::TensorProperties Properties,
+            sb::TensorProperties PrimeProperties>() {
+          cls.def_static(
+            "spawn_homological_kernel_pcloud_task",
+            &PyHomologicalKernelBindings::template spawn_homological_kernel_pcloud_task<
+              Properties, PrimeProperties>);
+          cls.def_static(
+            "spawn_homological_kernel_distmat_task",
+            &PyHomologicalKernelBindings::template spawn_homological_kernel_distmat_task<
+              Properties, PrimeProperties>);
+        });
+      cls.def_static(
+        "spawn_homological_kernel_pcloud_task",
+        &PyHomologicalKernelBindings::spawn_homological_kernel_single_pcloud_task);
     }
   };
 

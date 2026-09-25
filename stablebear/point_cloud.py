@@ -4,9 +4,8 @@ import numpy as np
 
 from . import _sb_cpp as cpp
 from ._binary_io import _BinaryIoMixin
-from ._tensor_base import Tensor
-from .nested_tensor import NestedTensor
-from .typing import float32, float64, pcloud32, pcloud64, uint64
+from ._tensor_base import IndexedElementTensor
+from .typing import float32, float64, pcloud32, pcloud64
 
 
 _PCLOUD_CPP_TO_DTYPE = {
@@ -30,8 +29,8 @@ class PointCloud(_BinaryIoMixin):
     """A rank-2 point-cloud view.
 
     Point clouds returned from a :class:`PointCloudTensor` retain their owner.
-    Reads resolve only this cloud. A write asks the owner to materialize if
-    necessary, then delegates the actual indexing operation to ``FloatTensor``.
+    Basic coordinate slices are views; advanced indexing copies coordinates.
+    A write asks the owner to materialize if necessary.
     """
 
     def __init__(self, data, dtype=None, *, _owner=None, _outer_index=None):
@@ -43,7 +42,6 @@ class PointCloud(_BinaryIoMixin):
         if _owner is None:
             if isinstance(data, _POINT_CLOUD_CPP_TYPES):
                 self._value = data
-                tensor = data.coords
             else:
                 if dtype in _PCLOUD_TO_FLOAT_DTYPE:
                     dtype = _PCLOUD_TO_FLOAT_DTYPE[dtype]
@@ -52,18 +50,8 @@ class PointCloud(_BinaryIoMixin):
                     cpp.PointCloud32 if tensor.dtype == float32 else cpp.PointCloud64
                 )
                 self._value = cpp_type(tensor._data)
-            if len(tensor.shape) != 2:
-                raise ValueError(
-                    "PointCloud must have 2 dimensions, "
-                    f"got {len(tensor.shape)}"
-                )
         else:
             self._value = None
-            if tuple(data.coords.shape) != () and len(data.coords.shape) != 2:
-                raise ValueError(
-                    "PointCloud must have 2 dimensions, "
-                    f"got {len(data.coords.shape)}"
-                )
 
     @property
     def shape(self):
@@ -91,44 +79,45 @@ class PointCloud(_BinaryIoMixin):
     def _binary_io_data(self):
         return self._current_point_cloud()
 
-    def _readable_coords(self):
-        from .base_tensor import FloatTensor
-
-        return FloatTensor(self._current_point_cloud().materialize())
-
-    def _writable_coords(self):
-        from .base_tensor import FloatTensor
-
-        if self._owner is not None:
-            self._owner._ensure_writeable()
-            point_cloud = self._owner._data._get_writeable_element(
-                self._outer_index
-            )
-        else:
-            point_cloud = self._value
-        return FloatTensor(point_cloud._mutable_coords())
+    def _coordinates(self):
+        from ._point_cloud_coordinates import CoordinateView
+        return CoordinateView(self)
 
     def __getitem__(self, index):
-        return self._readable_coords()[index]
+        if (isinstance(index, tuple) and len(index) == 2
+                and all(isinstance(i, (int, np.integer))
+                        and not isinstance(i, (bool, np.bool_)) for i in index)):
+            resolved = []
+            for i, size in zip(index, self.shape):
+                i = int(i)
+                i = i + size if i < 0 else i
+                if not 0 <= i < size:
+                    raise IndexError("point-cloud coordinate index out of bounds")
+                resolved.append(i)
+            return self._current_point_cloud()._coordinate(*resolved)
+        return self._coordinates()[index]
 
     def __setitem__(self, index, value):
-        self._writable_coords()[index] = value
+        self._coordinates()[index] = value
+
+    def _writeable_point_cloud(self):
+        if self._owner is not None:
+            self._owner._ensure_writeable()
+            return self._owner._data._get_writeable_element(
+                self._outer_index
+            )
+        if self._value.is_indexed:
+            self._value = self._value.copy()
+        return self._value
 
     def __array__(self, dtype=None, copy=None):
-        array = np.asarray(self._readable_coords(), dtype=dtype)
-        if copy:
-            return array.copy()
-        return array
+        return self._coordinates().__array__(dtype=dtype, copy=copy)
 
     def array_equal(self, other):
         return np.array_equal(np.asarray(self), np.asarray(other))
 
-    def materialize(self):
-        """Return this point cloud as a standalone ``FloatTensor``."""
-        return self._readable_coords().copy()
-
     def copy(self):
-        return PointCloud(self.materialize())
+        return PointCloud(self._current_point_cloud().copy())
 
     def __repr__(self):
         return f"PointCloud(shape={self.shape}, dtype={self.dtype})"
@@ -191,7 +180,7 @@ def _pointcloud_cpp_from_list(seq, dtype):
     return t._data
 
 
-class PointCloudTensor(Tensor):
+class PointCloudTensor(IndexedElementTensor):
     """Tensor whose elements are point clouds (each a ``(n_points, dim)`` array).
 
     Parameters
@@ -205,6 +194,9 @@ class PointCloudTensor(Tensor):
     dtype : pcloud32 | pcloud64 | None, optional
         Element precision. Inferred from the array dtype when ``None``.
     """
+
+    _indexed_cpp_types = _INDEXED_PCLOUD_CPP_TYPES
+    _indexed_element_name = "Point-cloud"
 
     def __init__(self, data, cloud_ndim=2, dtype=None):
         super().__init__()
@@ -225,76 +217,11 @@ class PointCloudTensor(Tensor):
     def _represent_element(self, element):
         return PointCloud(element)
 
-    def _point_cloud(self, index):
-        element = self._data._get_element(index)
+    def _element_view(self, element, index):
         return PointCloud(element, _owner=self, _outer_index=index)
 
-    def _single_cloud(self):
-        return self._point_cloud([])
-
-    def __getitem__(self, index):
-        """Select clouds, or points when this tensor contains one cloud.
-
-        A depth-2 ``NestedTensor`` with ``uint64`` leaves selects points
-        independently from each source cloud and returns lazy indexed
-        point-cloud views. Every leaf must be rank one. This tensor's outer
-        shape must exactly match the leading dimensions of the selection
-        tensor's outer shape. Any extra trailing selection axes create
-        multiple selections from the corresponding source cloud. Singleton
-        source axes do not broadcast.
-
-        Point order and repetitions are preserved. Empty leaves produce empty
-        point clouds with the source dimension. Invalid outer shapes and leaf
-        ranks raise ``ValueError``; out-of-range points raise ``IndexError``.
-        Every selection is validated before a result is returned.
-        """
-        if isinstance(index, NestedTensor):
-            if index.dtype is not uint64:
-                raise TypeError("Point-cloud indices must have uint64 leaves")
-            if index.depth != 2:
-                raise ValueError("Point-cloud indexing requires Tensor<Tensor<uint64>>")
-            return PointCloudTensor(
-                self._data._index_elements(
-                    index._root, exact_leading_dimensions=True
-                )
-            )
-
-        if self.ndim == 0:
-            cloud = self._point_cloud([])
-            if index == () or index is Ellipsis:
-                return cloud
-            return cloud[index]
-
-        entries, inserts = self._normalize_index(index)
-        if (
-            not inserts
-            and len(entries) == self.ndim
-            and all(isinstance(entry, int) for entry in entries)
-        ):
-            resolved = [
-                self._resolve_axis_int(entry, axis)
-                for axis, entry in enumerate(entries)
-            ]
-            return self._point_cloud(resolved)
-
-        return super().__getitem__(index)
-
-    def _ensure_writeable(self):
-        if isinstance(self._data, _INDEXED_PCLOUD_CPP_TYPES):
-            self._data._ensure_materialized()
-        super()._ensure_writeable()
-
-    def to_dense(self):
-        """Return an independent tensor with ordinary point-cloud storage.
-
-        Indexed tensors resolve their logical point selections without changing
-        the source tensor or any views that share its indexed backing. Calling
-        this on an already-dense tensor still returns an independent copy.
-        """
-        return PointCloudTensor(self._data.copy())
-
     def astype(self, dtype):
-        if isinstance(self._data, _INDEXED_PCLOUD_CPP_TYPES):
+        if self._has_indexed_storage():
             # Casting is an out-of-place operation. Materialize a temporary
             # value rather than detaching only this wrapper from the indexed
             # backing shared by its parent and sibling views.

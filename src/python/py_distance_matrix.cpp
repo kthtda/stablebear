@@ -9,8 +9,10 @@ namespace sb_py
     register_distance_matrix_bindings<sb::float32_t>(m, "_f32");
     register_distance_matrix_bindings<sb::float64_t>(m, "_f64");
 
-    register_typed_tensor_bindings<sb::DistanceMatrix<sb::float32_t>>(m, "DistanceMatrix32", "");
-    register_typed_tensor_bindings<sb::DistanceMatrix<sb::float64_t>>(m, "DistanceMatrix64", "");
+    register_indexable_tensor_bindings<sb::DistanceMatrix<sb::float32_t>>(
+      m, "DistanceMatrix32");
+    register_indexable_tensor_bindings<sb::DistanceMatrix<sb::float64_t>>(
+      m, "DistanceMatrix64");
   }
 
 }
