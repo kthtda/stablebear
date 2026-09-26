@@ -39,7 +39,11 @@ draws are allowed; an empty input is accepted only when
 ``allow_partial=True``.
 
 Set ``discard_duplicates=True`` to keep only the first drawn occurrence of
-each coordinate-identical point. For distance matrices, it removes repeated
+each coordinate-identical point. Coordinates are compared with ordinary numeric
+equality: signed zeros compare equal, infinities with the same sign compare
+equal, and positive and negative infinity are distinct. NaN does not equal itself. Points
+containing any NaN coordinate are therefore never discarded, even when the
+same source point is drawn repeatedly. For distance matrices, it removes repeated
 drawn source indices; distinct indices are retained even when their distance
 is zero. Discarded points are not redrawn.
 

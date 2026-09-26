@@ -59,6 +59,10 @@ def subsample(
         an empty output cloud when sampling an empty input with replacement.
     discard_duplicates : bool, optional
         For point clouds, keep only the first coordinate-identical drawn point.
+        Equality is numeric: signed zeros and same-sign infinities compare
+        equal; opposite-sign infinities are distinct, and NaNs do not compare equal.
+        Points containing NaN are always retained, including repeated draws
+        of the same source point.
         For distance matrices, keep only the first occurrence of each drawn
         source index. Distinct zero-distance indices remain distinct.
     generator : stablebear.random.Generator, optional
