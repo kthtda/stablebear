@@ -24,12 +24,8 @@ def _assert_same_clouds(actual, expected):
         npt.assert_array_equal(np.asarray(actual[index]), np.asarray(expected[index]))
 
 
-@pytest.mark.parametrize(("dtype", "np_dtype", "cpp_type"), _DTYPES)
-def test_indexed_binary_and_pickle_roundtrip_retains_storage(
-    dtype, np_dtype, cpp_type
-):
-    coordinates = np.arange(40, dtype=np_dtype).reshape(2, 5, 4)
-    points = sb.PointCloudTensor(coordinates, dtype=dtype)
+def test_indexed_binary_and_pickle_roundtrip_retains_storage(make_pcloud_or_distmat_tensor):
+    points = make_pcloud_or_distmat_tensor(np.arange(40).reshape(2, 5, 4))
     selections = sb.NestedTensor(
         [
             [sb.indices([3, 1, 3]), sb.indices([]), sb.indices([4, 0])],
@@ -37,6 +33,7 @@ def test_indexed_binary_and_pickle_roundtrip_retains_storage(
         ]
     )
     indexed = points[selections][:, ::-1]
+    cpp_type = type(indexed._data)
 
     stream = io.BytesIO()
     sb.save(indexed, stream)
@@ -45,10 +42,12 @@ def test_indexed_binary_and_pickle_roundtrip_retains_storage(
 
     restored = sb.load(io.BytesIO(payload))
     assert type(restored._data) is cpp_type
+    assert restored._data.has_indices()
     _assert_same_clouds(restored, indexed)
 
     unpickled = pickle.loads(pickle.dumps(indexed))
     assert type(unpickled._data) is cpp_type
+    assert unpickled._data.has_indices()
     _assert_same_clouds(unpickled, indexed)
 
     # A loaded result still performs one shared-state transition on its first
@@ -57,11 +56,11 @@ def test_indexed_binary_and_pickle_roundtrip_retains_storage(
     sibling = restored[...]
     cell = restored[0, 2]
     other_cell = np.asarray(restored[0, 0]).copy()
-    repeated_row = restored[0, 2][2, 0]
-    restored[0, 2][0, 0] = -99
-    assert sibling[0, 2][0, 0] == -99
-    assert cell[0, 0] == -99
-    assert restored[0, 2][2, 0] == repeated_row
+    repeated_row = restored[0, 2][2, 1]
+    restored[0, 2][0, 1] = 99
+    assert sibling[0, 2][0, 1] == 99
+    assert cell[0, 1] == 99
+    assert restored[0, 2][2, 1] == repeated_row
     npt.assert_array_equal(np.asarray(restored[0, 0]), other_cell)
 
     rematerialized_roundtrip = sb.load(io.BytesIO(_saved_bytes(restored)))
@@ -69,14 +68,13 @@ def test_indexed_binary_and_pickle_roundtrip_retains_storage(
     _assert_same_clouds(rematerialized_roundtrip, restored)
 
 
-@pytest.mark.parametrize(("dtype", "np_dtype", "cpp_type"), _DTYPES)
-def test_indexed_scalar_and_empty_outer_roundtrip(dtype, np_dtype, cpp_type):
-    scalar = sb.PointCloudTensor(
-        np.arange(12, dtype=np_dtype).reshape(6, 2), dtype=dtype
-    )
+def test_indexed_scalar_and_empty_outer_roundtrip(make_pcloud_or_distmat_tensor):
+    scalar = make_pcloud_or_distmat_tensor(np.arange(12).reshape(6, 2))
+    dtype = scalar.dtype
 
     scalar_selection = sb.NestedTensor(sb.indices([5, 2, 5]))
     scalar_indexed = scalar[scalar_selection]
+    cpp_type = type(scalar_indexed._data)
     scalar_restored = sb.load(io.BytesIO(_saved_bytes(scalar_indexed)))
     assert type(scalar_restored._data) is cpp_type
     assert scalar_restored.shape == ()
@@ -88,7 +86,6 @@ def test_indexed_scalar_and_empty_outer_roundtrip(dtype, np_dtype, cpp_type):
     restored = sb.load(io.BytesIO(_saved_bytes(selected)))
     assert type(restored._data) is cpp_type
     _assert_same_clouds(restored, selected)
-    assert restored[1].shape == (0, 2)
 
     empty_points = sb.zeros((0,), dtype=dtype)
     empty_selections = sb.NestedTensor([], dtype=sb.uint64, depth=2)

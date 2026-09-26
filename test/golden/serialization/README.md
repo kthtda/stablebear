@@ -22,6 +22,13 @@ remain visible.
 
 Do not regenerate historical directories with a newer Stablebear build.
 
+The `0.4.7-matrices-3x3` directory supplements the original 0.4.7 fixtures
+with 16 binary/pickle artifacts exported using the actual 0.4.7 release.
+It covers standalone and tensor distance/symmetric matrices at both precisions.
+Distinct stored entries detect payload-order errors, including negative
+symmetric-matrix diagonals. The manifest retains the export's producer metadata,
+expected values, sizes, and checksums. The original 2x2 fixtures remain unchanged.
+
 For the V1 binary format from the final `masspcf` release before format V2,
 install `masspcf==0.4.0b8` and run:
 
