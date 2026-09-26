@@ -19,7 +19,8 @@ namespace
       .def_property_readonly("n_dims", &PointCloud::dim)
       .def_property_readonly("is_indexed", &PointCloud::is_indexed)
       .def_property_readonly("indices", &PointCloud::indices)
-      .def_property_readonly("coords", &PointCloud::source_coordinates_copy)
+      .def("to_float_tensor", &PointCloud::source_coordinates_copy,
+           "Return an independent float tensor of the full source coordinates, without applying indices.")
       .def("_coordinate", [](const PointCloud& self, size_t row, size_t column) {
         return self(row, column);
       })

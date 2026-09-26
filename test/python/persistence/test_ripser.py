@@ -187,5 +187,5 @@ def test_persistence_accepts_whole_indexed_tensors_and_outer_views(
             dense, max_dim=2, reduced=reduced
         )
 
-        assert indexed._data._get_element([0, 0]).is_indexed
+        assert indexed._data.has_indices()
         assert actual.is_isomorphic_to(expected)
