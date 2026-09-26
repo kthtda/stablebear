@@ -123,14 +123,14 @@ namespace sb
       : m_coords(copy_coordinates(source))
     {
       validate_index(indices);
-      m_coords = m_coords.with_layout(
+      m_coords = m_coords.view_with_layout(
         PointCloudLayout(m_coords.layout().source_shape(), std::move(indices)));
     }
 
     /// Indexed view over another cloud's coordinates. @p indices refer to points
     /// in @p source's coordinate storage (not to the points @p source selects).
     PointCloud(const PointCloud& source, Tensor<uint64_t> indices)
-      : m_coords(source.m_coords.with_layout(
+      : m_coords(source.m_coords.view_with_layout(
           PointCloudLayout(source.m_coords.layout().source_shape(),
             std::move(indices))))
     { }
@@ -286,10 +286,10 @@ namespace sb
 
     /// Return a shallow view of the complete backing cloud before any logical
     /// point selection is applied.
-    [[nodiscard]] PointCloud source_view() const
+    [[nodiscard]] PointCloud view_source() const
     {
       PointCloud result;
-      result.m_coords = m_coords.with_layout(
+      result.m_coords = m_coords.view_with_layout(
         PointCloudLayout(m_coords.layout().source_shape()));
       return result;
     }
@@ -315,7 +315,7 @@ namespace sb
     [[nodiscard]] Tensor<T> source_coordinates_copy() const
     {
       const auto& sourceShape = m_coords.layout().source_shape();
-      const auto source = m_coords.with_layout(PointCloudLayout(sourceShape));
+      const auto source = m_coords.view_with_layout(PointCloudLayout(sourceShape));
       Tensor<T> out({sourceShape[0], sourceShape[1]});
       for (size_t i = 0; i < sourceShape[0]; ++i)
       {

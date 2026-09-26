@@ -189,7 +189,8 @@ namespace sb_py
       .def("is_contiguous", &TTensor::is_contiguous);
 
     if constexpr (TTensor::IsIndexed)
-      cls.def("_ensure_materialized", &TTensor::ensure_materialized);
+      cls.def("_ensure_materialized", &TTensor::ensure_materialized)
+        .def("_copy_indices", &TTensor::copy_indices);
     
     cls.def("has_indices", [](const TTensor& t) { 
       if constexpr (TTensor::IsIndexed)

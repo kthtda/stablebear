@@ -246,10 +246,10 @@ namespace sb
 
     /// Return a shallow view of the complete backing matrix, before any
     /// logical row/column selection is applied.
-    [[nodiscard]] DistanceMatrix source_view() const
+    [[nodiscard]] DistanceMatrix view_source() const
     {
       DistanceMatrix result;
-      result.m_storage = m_storage.with_layout(
+      result.m_storage = m_storage.view_with_layout(
         DistanceMatrixLayout(m_storage.layout().source_size()));
       return result;
     }
@@ -261,7 +261,7 @@ namespace sb
 
   private:
     DistanceMatrix(const DistanceMatrix& source, index_type indices)
-      : m_storage(source.m_storage.with_layout(
+      : m_storage(source.m_storage.view_with_layout(
           DistanceMatrixLayout(source.m_storage.layout().source_size(),
             std::move(indices))))
     { }

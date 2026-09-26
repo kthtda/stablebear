@@ -414,7 +414,7 @@ namespace sb
 
     /// Return the single active backing. Before materialization this is the
     /// aligned source; afterward it is the dense logical result.
-    [[nodiscard]] const source_tensor_type& source_view() const noexcept requires IsIndexed
+    [[nodiscard]] const source_tensor_type& view_source() const noexcept requires IsIndexed
     {
       return m_indexedState->source;
     }
@@ -422,7 +422,8 @@ namespace sb
     {
       return m_indexedState->indices.has_value();
     }
-    [[nodiscard]] const index_tensor_type& indices_view() const requires IsIndexed
+    [[nodiscard]] index_tensor_type copy_indices() const requires IsIndexed;
+    [[nodiscard]] const index_tensor_type& view_indices() const requires IsIndexed
     {
       if (!m_indexedState->indices)
         throw std::logic_error("Materialized indexed tensor no longer has selections");

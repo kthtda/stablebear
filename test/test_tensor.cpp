@@ -222,17 +222,17 @@ namespace
     indices(0) = 2;
     // A temporary view still aliases its caller and must be copied.
     const auto copied = sb::make_indexed_tensor(source, indices.reshape({ 1 }));
-    EXPECT_NE(copied.indices_view().data(), indices.data());
+    EXPECT_NE(copied.view_indices().data(), indices.data());
     indices(0) = 3;
     EXPECT_EQ(copied(0).value, 12);
 
     auto owned = indices.copy();
     const auto* ownedData = owned.data();
     const auto adopted = sb::make_indexed_tensor_from_owned_indices(source, std::move(owned));
-    EXPECT_EQ(adopted.indices_view().data(), ownedData);
+    EXPECT_EQ(adopted.view_indices().data(), ownedData);
     const auto view = adopted.reshape({ 1, 1 });
-    EXPECT_EQ(view.indices_view().data(), ownedData);
-    EXPECT_EQ(view.source_view().data(), source.data());
+    EXPECT_EQ(view.view_indices().data(), ownedData);
+    EXPECT_EQ(view.view_source().data(), source.data());
     source(0) = { 20 };
     EXPECT_EQ(view({ 0, 0 }).value, 23);
   }
@@ -296,9 +296,9 @@ namespace
 
     view.ensure_materialized();
 
-    EXPECT_THROW((void)indexed.indices_view(), std::logic_error);
-    EXPECT_EQ(indexed.source_view()(0).value, 11);
-    EXPECT_EQ(indexed.source_view()(1).value, 22);
+    EXPECT_THROW((void)indexed.view_indices(), std::logic_error);
+    EXPECT_EQ(indexed.view_source()(0).value, 11);
+    EXPECT_EQ(indexed.view_source()(1).value, 22);
 
     view.writable_at(0).value = 99;
     EXPECT_EQ(indexed(0).value, 99);
@@ -381,7 +381,7 @@ namespace
     static_assert(std::same_as<
       typename decltype(indexed)::index_tensor_type,
       sb::NestedTensor<uint64_t>>);
-    EXPECT_EQ(indexed.indices_view().depth(), 2);
+    EXPECT_EQ(indexed.view_indices().depth(), 2);
     const PointCloud selected = indexed(0);
     EXPECT_EQ(selected(0, 0), 30);
     EXPECT_EQ(selected(1, 0), 10);
@@ -408,8 +408,8 @@ namespace
     const auto indexed = sb::make_indexed_tensor(source, selections);
     const auto sibling = indexed.flatten();
 
-    EXPECT_NE(&indexed.indices_view(), &selections);
-    EXPECT_EQ(&indexed.indices_view(), &sibling.indices_view());
+    EXPECT_NE(&indexed.view_indices(), &selections);
+    EXPECT_EQ(&indexed.view_indices(), &sibling.view_indices());
   }
 
   TEST(TensorProperties, MakeIndexedTensorRejectsNonBroadcastableSourceShape)

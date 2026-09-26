@@ -860,6 +860,20 @@ class IndexedElementTensor(Tensor):
     _indexed_cpp_types = ()
     _indexed_element_name = "Element"
 
+    @property
+    def indices(self):
+        """Independent uint64 NestedTensor of selections, or None if not indexed.
+
+        The outer shape and order follow this tensor's views. Mutating the
+        returned selections does not change this tensor. After a write
+        materializes the shared backing, selections are no longer available.
+        """
+        from .nested_tensor import NestedTensor
+
+        if not self._data.has_indices():
+            return None
+        return NestedTensor._from_cpp(self._data._copy_indices())
+
     def _element_view(self, element, index):
         raise NotImplementedError()
 

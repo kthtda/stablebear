@@ -231,7 +231,7 @@ namespace sb
     }
 
     /// Return a shallow view with independent adapter metadata.
-    [[nodiscard]] FixedRankTensor with_layout(Layout layout) const
+    [[nodiscard]] FixedRankTensor view_with_layout(Layout layout) const
     {
       if (layout.storage_size() != storage_size())
         throw std::invalid_argument(

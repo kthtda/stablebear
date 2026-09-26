@@ -43,6 +43,13 @@ each coordinate-identical point. For distance matrices, it removes repeated
 drawn source indices; distinct indices are retained even when their distance
 is zero. Discarded points are not redrawn.
 
+For indexed point-cloud and distance-matrix tensors, ``samples.indices``
+returns an independent ``NestedTensor`` of uint64 selections. For example,
+``samples.indices[0]`` gives the first sample's drawn source indices.
+The selections follow the tensor's outer shape and view order; changing them
+does not change the samples. Ordinary tensors, and indexed tensors whose
+shared backing has been materialized by a write, return ``None``.
+
 Each call copies each input cloud's current logical coordinates once. All
 samples from that cloud share the fresh copy and store only row indices, so
 later changes to the input do not affect the samples. Mutating an indexed

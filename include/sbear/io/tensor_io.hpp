@@ -291,7 +291,7 @@ namespace sb::io::detail
     && requires(const ElementT& value)
     {
       { value.storage_data() } -> std::convertible_to<const void*>;
-      { value.source_view() } -> std::same_as<ElementT>;
+      { value.view_source() } -> std::same_as<ElementT>;
       { value.indices() } -> std::same_as<const typename ElementT::index_type&>;
     };
 
@@ -443,7 +443,7 @@ namespace sb::io::detail
       if (!idOf.contains(key))
       {
         idOf.emplace(key, static_cast<uint64_t>(sources.size()));
-        sources.push_back(value.source_view());
+        sources.push_back(value.view_source());
       }
     }
 

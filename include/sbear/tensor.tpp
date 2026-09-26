@@ -9,6 +9,33 @@
 
 namespace sb
 {
+  template <typename T, TensorProperties Properties>
+  auto Tensor<T, Properties>::copy_indices() const -> index_tensor_type
+    requires IsIndexed
+  {
+    const auto& indices = view_indices();
+    if constexpr (IsTensor<index_type>)
+    {
+      using Node = NestedTensor<typename index_type::value_type>;
+      Tensor<Node> result(shape());
+      walk(result, [&](const std::vector<size_t>& index) {
+        result(index) = Node::from_leaf_view(
+          detail::IndexTensorStorage<index_type>::flat(
+            indices, m_indexedLocator(index)).copy());
+      });
+      return Node::from_outer_view(std::move(result), 1);
+    }
+    else
+    {
+      index_tensor_type result(shape());
+      walk(result, [&](const std::vector<size_t>& index) {
+        result(index) = detail::IndexTensorStorage<index_type>::flat(
+          indices, m_indexedLocator(index));
+      });
+      return result;
+    }
+  }
+
   // Forward declarations -- definitions below walk()
   template <IsTensor TTensor, typename UnaryFunc>
 #ifndef __CUDACC__

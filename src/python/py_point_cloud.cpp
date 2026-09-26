@@ -25,7 +25,7 @@ namespace
         return self(row, column);
       })
       .def("_storage_array", [](const PointCloud& self) {
-        const auto source = self.source_view();
+        const auto source = self.view_source();
         return py::array_t<T>(
           {static_cast<py::ssize_t>(source.n_points()),
            static_cast<py::ssize_t>(source.dim())},
