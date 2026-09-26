@@ -93,7 +93,7 @@ Input flexibility
 
 ``compute_persistent_homology`` also accepts:
 
-- A single ``FloatTensor`` (interpreted as a single point cloud)
+- A single ``PointCloud`` or ``FloatTensor`` (interpreted as a single point cloud)
 - A plain NumPy array (interpreted as a single point cloud)
 - A ``DistanceMatrix`` (precomputed pairwise distances for a single data set)
 - A ``DistanceMatrixTensor`` (a tensor of precomputed distance matrices)
@@ -359,5 +359,4 @@ References
 
 
 .. footbibliography::
-
 

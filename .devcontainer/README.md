@@ -106,6 +106,13 @@ persist across rebuilds. To share **credentials only** (not full host config/hoo
 edit `devcontainer.json` and narrow the first mount to
 `~/.claude/.credentials.json`.
 
+## Codex auth
+
+Both devcontainer configs bind-mount the host's `~/.codex/auth.json` to
+`/home/ubuntu/.codex/auth.json`, so a file-based Codex login is available in
+the container and survives rebuilds. The host file must exist before opening
+the devcontainer. Codex configuration and rules remain container-specific.
+
 ## Codex sandbox
 
 The image copies `.devcontainer/codex-config.toml` to

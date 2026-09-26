@@ -581,6 +581,7 @@ SET(SB_HEADER_FILES
     algorithms/functional/apply_functional.hpp
     block_matrix_support.cuh
     persistence/barcode.hpp
+    persistence/barcode_tensor.hpp
     persistence/compute_homological_kernel.hpp
     persistence/compute_persistence.hpp
     persistence/persistence_pair.hpp
@@ -614,6 +615,7 @@ list(TRANSFORM SB_PY_PERSISTENCE_SOURCES PREPEND "persistence/")
 
 SET(SB_PY_POINT_PROCESS_SOURCES
     py_poisson.hpp py_poisson.cpp
+    py_subsample.hpp py_subsample.cpp
     pymodule_point_process.hpp pymodule_point_process.cpp
 )
 
@@ -634,6 +636,7 @@ SET(SB_PY_SOURCES
     functional/py_norms.hpp functional/py_norms.cpp
     functional/py_reductions.hpp functional/py_reductions.cpp
     py_tensor.hpp py_tensor.cpp
+    py_point_cloud.hpp py_point_cloud.cpp
     py_io.hpp py_io.cpp
     py_symmetric_matrix.hpp py_symmetric_matrix.cpp
     py_distance_matrix.hpp py_distance_matrix.cpp
@@ -871,6 +874,8 @@ if (BUILD_TESTER)
       test/test_iterate_rectangles.cpp
       test/test_iterate_segments.cpp
       test/test_parallel_reduce.cpp
+      test/test_fixed_rank_tensor.cpp
+      test/test_point_cloud.cpp
       test/test_tensor.cpp
       test/test_tensor_broadcast.cpp
       test/test_tensor_iteration.cpp

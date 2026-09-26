@@ -1,0 +1,445 @@
+{
+  "schema_version": 1,
+  "producer": {
+    "package": "stablebear",
+    "version": "0.4.7",
+    "commit": "b81b8f31011932b525e770a89cab755e7dcba44d",
+    "format_version": 3,
+    "python": "3.10.12",
+    "numpy": "2.2.6",
+    "platform": "Linux-7.0.0-31-generic-x86_64-with-glibc2.35",
+    "pickle_protocol": 4,
+    "backend": "stablebear._sb_cuda12"
+  },
+  "artifacts": [
+    {
+      "name": "point_cloud_dense_float32",
+      "description": "V3 dense standalone point cloud",
+      "serialization": "binary",
+      "file": "point_cloud_dense_float32.sb",
+      "bytes": 121,
+      "sha256": "13087ef4e28073447e0eeb35844904dd67a857bd4ca6d47e1ae5fe2de65c806c",
+      "expected": {
+        "accepted_types": [
+          "PointCloud"
+        ],
+        "comparison": "array",
+        "dtype": "float32",
+        "shape": [
+          3,
+          2
+        ],
+        "array": {
+          "dtype": "float32",
+          "shape": [
+            3,
+            2
+          ],
+          "values": [
+            [
+              0,
+              1
+            ],
+            [
+              2,
+              3
+            ],
+            [
+              4,
+              5
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "name": "point_cloud_dense_float32",
+      "description": "V3 dense standalone point cloud",
+      "serialization": "pickle",
+      "file": "point_cloud_dense_float32.pkl",
+      "bytes": 170,
+      "sha256": "cd41adf2300a82233bef56fec417eb43d6f84ba43dec4443c7604fbf130c1180",
+      "expected": {
+        "accepted_types": [
+          "PointCloud"
+        ],
+        "comparison": "array",
+        "dtype": "float32",
+        "shape": [
+          3,
+          2
+        ],
+        "array": {
+          "dtype": "float32",
+          "shape": [
+            3,
+            2
+          ],
+          "values": [
+            [
+              0,
+              1
+            ],
+            [
+              2,
+              3
+            ],
+            [
+              4,
+              5
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "name": "point_cloud_selected_float32",
+      "description": "V3 selected standalone point cloud",
+      "serialization": "binary",
+      "file": "point_cloud_selected_float32.sb",
+      "bytes": 121,
+      "sha256": "6719afd2f8451b49b0c260a7b75cc6d7a349f97512987bad7ce76995ee5d9b31",
+      "expected": {
+        "accepted_types": [
+          "PointCloud"
+        ],
+        "comparison": "array",
+        "dtype": "float32",
+        "shape": [
+          3,
+          2
+        ],
+        "array": {
+          "dtype": "float32",
+          "shape": [
+            3,
+            2
+          ],
+          "values": [
+            [
+              4,
+              5
+            ],
+            [
+              0,
+              1
+            ],
+            [
+              4,
+              5
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "name": "point_cloud_selected_float32",
+      "description": "V3 selected standalone point cloud",
+      "serialization": "pickle",
+      "file": "point_cloud_selected_float32.pkl",
+      "bytes": 170,
+      "sha256": "4f85287691fdb14d030356bbda0a2e074ac8a3fae8a7abebb3e4d9ff3bddf315",
+      "expected": {
+        "accepted_types": [
+          "PointCloud"
+        ],
+        "comparison": "array",
+        "dtype": "float32",
+        "shape": [
+          3,
+          2
+        ],
+        "array": {
+          "dtype": "float32",
+          "shape": [
+            3,
+            2
+          ],
+          "values": [
+            [
+              4,
+              5
+            ],
+            [
+              0,
+              1
+            ],
+            [
+              4,
+              5
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "name": "point_cloud_empty_float32",
+      "description": "V3 empty standalone point cloud",
+      "serialization": "binary",
+      "file": "point_cloud_empty_float32.sb",
+      "bytes": 97,
+      "sha256": "9407f00a2774511f583b93a81b4ceb27a58ad27d7a9430d0c208b2fb163d7a74",
+      "expected": {
+        "accepted_types": [
+          "PointCloud"
+        ],
+        "comparison": "array",
+        "dtype": "float32",
+        "shape": [
+          0,
+          2
+        ],
+        "array": {
+          "dtype": "float32",
+          "shape": [
+            0,
+            2
+          ],
+          "values": []
+        }
+      }
+    },
+    {
+      "name": "point_cloud_empty_float32",
+      "description": "V3 empty standalone point cloud",
+      "serialization": "pickle",
+      "file": "point_cloud_empty_float32.pkl",
+      "bytes": 146,
+      "sha256": "836c862ea103bd26046c80c3dd8b2854fee15f7f23a204dba31f271a277e0081",
+      "expected": {
+        "accepted_types": [
+          "PointCloud"
+        ],
+        "comparison": "array",
+        "dtype": "float32",
+        "shape": [
+          0,
+          2
+        ],
+        "array": {
+          "dtype": "float32",
+          "shape": [
+            0,
+            2
+          ],
+          "values": []
+        }
+      }
+    },
+    {
+      "name": "point_cloud_dense_float64",
+      "description": "V3 dense standalone point cloud",
+      "serialization": "binary",
+      "file": "point_cloud_dense_float64.sb",
+      "bytes": 145,
+      "sha256": "720d036e38f0166fa57833b5c8ec34418278e9e1553d2865745b138d9efe98ce",
+      "expected": {
+        "accepted_types": [
+          "PointCloud"
+        ],
+        "comparison": "array",
+        "dtype": "float64",
+        "shape": [
+          3,
+          2
+        ],
+        "array": {
+          "dtype": "float64",
+          "shape": [
+            3,
+            2
+          ],
+          "values": [
+            [
+              0,
+              1
+            ],
+            [
+              2,
+              3
+            ],
+            [
+              4,
+              5
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "name": "point_cloud_dense_float64",
+      "description": "V3 dense standalone point cloud",
+      "serialization": "pickle",
+      "file": "point_cloud_dense_float64.pkl",
+      "bytes": 194,
+      "sha256": "679a1e16f243abbe563c08967a0615d0397bfbe864aa5f5d5de8dc1a5739e8a4",
+      "expected": {
+        "accepted_types": [
+          "PointCloud"
+        ],
+        "comparison": "array",
+        "dtype": "float64",
+        "shape": [
+          3,
+          2
+        ],
+        "array": {
+          "dtype": "float64",
+          "shape": [
+            3,
+            2
+          ],
+          "values": [
+            [
+              0,
+              1
+            ],
+            [
+              2,
+              3
+            ],
+            [
+              4,
+              5
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "name": "point_cloud_selected_float64",
+      "description": "V3 selected standalone point cloud",
+      "serialization": "binary",
+      "file": "point_cloud_selected_float64.sb",
+      "bytes": 145,
+      "sha256": "abba20aa959a90238836f549a7b7d5e0f707695b111fbcdf97dd666c35322208",
+      "expected": {
+        "accepted_types": [
+          "PointCloud"
+        ],
+        "comparison": "array",
+        "dtype": "float64",
+        "shape": [
+          3,
+          2
+        ],
+        "array": {
+          "dtype": "float64",
+          "shape": [
+            3,
+            2
+          ],
+          "values": [
+            [
+              4,
+              5
+            ],
+            [
+              0,
+              1
+            ],
+            [
+              4,
+              5
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "name": "point_cloud_selected_float64",
+      "description": "V3 selected standalone point cloud",
+      "serialization": "pickle",
+      "file": "point_cloud_selected_float64.pkl",
+      "bytes": 194,
+      "sha256": "932cda09342b20e7853dc30ae7c367ec6165157760f78cebb9b1f74ca8d6abcd",
+      "expected": {
+        "accepted_types": [
+          "PointCloud"
+        ],
+        "comparison": "array",
+        "dtype": "float64",
+        "shape": [
+          3,
+          2
+        ],
+        "array": {
+          "dtype": "float64",
+          "shape": [
+            3,
+            2
+          ],
+          "values": [
+            [
+              4,
+              5
+            ],
+            [
+              0,
+              1
+            ],
+            [
+              4,
+              5
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "name": "point_cloud_empty_float64",
+      "description": "V3 empty standalone point cloud",
+      "serialization": "binary",
+      "file": "point_cloud_empty_float64.sb",
+      "bytes": 97,
+      "sha256": "2b0076f6bb6a1dff8549a448335b163251c416ba4ffa21056db0cecf1d201e4a",
+      "expected": {
+        "accepted_types": [
+          "PointCloud"
+        ],
+        "comparison": "array",
+        "dtype": "float64",
+        "shape": [
+          0,
+          2
+        ],
+        "array": {
+          "dtype": "float64",
+          "shape": [
+            0,
+            2
+          ],
+          "values": []
+        }
+      }
+    },
+    {
+      "name": "point_cloud_empty_float64",
+      "description": "V3 empty standalone point cloud",
+      "serialization": "pickle",
+      "file": "point_cloud_empty_float64.pkl",
+      "bytes": 146,
+      "sha256": "afa16c129d42eb8771952581ca5caa5766d5f0a81fd11e46518be8a73c92c02e",
+      "expected": {
+        "accepted_types": [
+          "PointCloud"
+        ],
+        "comparison": "array",
+        "dtype": "float64",
+        "shape": [
+          0,
+          2
+        ],
+        "array": {
+          "dtype": "float64",
+          "shape": [
+            0,
+            2
+          ],
+          "values": []
+        }
+      }
+    }
+  ],
+  "unsupported": []
+}

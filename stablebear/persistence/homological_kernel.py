@@ -6,14 +6,12 @@ from ..distance_matrix import (
     DistanceMatrix,
     DistanceMatrixTensor,
 )
-from ..base_tensor import (
-    FloatTensor,
-    PointCloudTensor,
-    _get_backend,
-)
+from ..base_tensor import FloatTensor, _get_backend
+from ..point_cloud import PointCloud, PointCloudTensor
 from ..typing import distmat32, distmat64, float32, float64, pcloud32, pcloud64
 from .homology import (
     _DISTMAT_TO_BARCODE_DTYPE,
+    _FLOAT_TO_BARCODE_DTYPE,
     _FLOAT_TO_PCLOUD_DTYPE,
     _PCLOUD_TO_BARCODE_DTYPE,
 )
@@ -25,15 +23,25 @@ _FLOAT_TO_DISTMAT_DTYPE = {float32: distmat32, float64: distmat64}
 
 
 def _spawn_homological_kernel_pcloud_task(
-    X: PointCloudTensor,
-    Y: PointCloudTensor,
+    X: PointCloud | PointCloudTensor,
+    Y: PointCloud | PointCloudTensor,
     out: BarcodeTensor,
 ):
     backend, X = _get_backend(
-        X, {pcloud32: cpp_p.HomologicalKernel32, pcloud64: cpp_p.HomologicalKernel64}
+        X,
+        {
+            float32: cpp_p.HomologicalKernel32,
+            float64: cpp_p.HomologicalKernel64,
+            pcloud32: cpp_p.HomologicalKernel32,
+            pcloud64: cpp_p.HomologicalKernel64,
+        },
     )
+    x_data = X._cpp_point_cloud() if isinstance(X, PointCloud) else X._data
+    y_data = Y._cpp_point_cloud() if isinstance(Y, PointCloud) else Y._data
 
-    return backend.spawn_homological_kernel_pcloud_task(X._data, Y._data, out._data)
+    return backend.spawn_homological_kernel_pcloud_task(
+        x_data, y_data, out._data
+    )
 
 
 def _spawn_homological_kernel_distmat_task(
@@ -66,7 +74,7 @@ def _normalize_kernel_input(X, name: str):
         dmX[0] = X
         return dmX
 
-    if isinstance(X, (PointCloudTensor, DistanceMatrixTensor)):
+    if isinstance(X, (PointCloud, PointCloudTensor, DistanceMatrixTensor)):
         return X
 
     raise TypeError(f"compute_homological_kernel does not support {name} of type {type(X)}")
@@ -81,12 +89,14 @@ def _validate_kernel_pair(X, Y):
 
 
 def compute_homological_kernel(
-    X: PointCloudTensor
+    X: PointCloud
+    | PointCloudTensor
     | DistanceMatrix
     | DistanceMatrixTensor
     | FloatTensor
     | np.ndarray,
-    Y: PointCloudTensor
+    Y: PointCloud
+    | PointCloudTensor
     | DistanceMatrix
     | DistanceMatrixTensor
     | FloatTensor
@@ -111,7 +121,7 @@ def compute_homological_kernel(
 
     Parameters
     ----------
-    X : PointCloudTensor, DistanceMatrix, DistanceMatrixTensor, FloatTensor, or numpy.ndarray
+    X : PointCloud, PointCloudTensor, DistanceMatrix, DistanceMatrixTensor, FloatTensor, or numpy.ndarray
         Input data for :math:`d`. A ``FloatTensor`` or NumPy array is
         interpreted as a single point cloud (one row per point).
     Y : same kind as ``X``
@@ -159,7 +169,12 @@ def compute_homological_kernel(
     Y = _normalize_kernel_input(Y, "Y")
 
     # --- Point cloud input path ---
-    if isinstance(X, PointCloudTensor) and isinstance(Y, PointCloudTensor):
+    if isinstance(X, PointCloud) and isinstance(Y, PointCloud):
+        _validate_kernel_pair(X, Y)
+        out = zeros((1,), dtype=_FLOAT_TO_BARCODE_DTYPE[X.dtype])
+        task = _spawn_homological_kernel_pcloud_task(X, Y, out)
+
+    elif isinstance(X, PointCloudTensor) and isinstance(Y, PointCloudTensor):
         _validate_kernel_pair(X, Y)
         out = zeros((1,), dtype=_PCLOUD_TO_BARCODE_DTYPE[X.dtype])
         task = _spawn_homological_kernel_pcloud_task(X, Y, out)

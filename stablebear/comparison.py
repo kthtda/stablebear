@@ -38,7 +38,7 @@ def allclose(a, b, atol=1e-8, rtol=1e-5) -> bool:
     if isinstance(a, FloatTensor) and isinstance(b, FloatTensor):
         return a._data.allclose(b._data, atol=atol, rtol=rtol)
     elif isinstance(a, DistanceMatrix) and isinstance(b, DistanceMatrix):
-        return a._data.allclose(b._data, atol=atol, rtol=rtol)
+        return a._current_matrix().allclose(b._current_matrix(), atol=atol, rtol=rtol)
     elif isinstance(a, SymmetricMatrix) and isinstance(b, SymmetricMatrix):
         return a._data.allclose(b._data, atol=atol, rtol=rtol)
     else:

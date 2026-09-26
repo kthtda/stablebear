@@ -86,3 +86,12 @@ class TestStack:
         b = TensorType(np.zeros((2, 4), dtype=np_dtype))
         with pytest.raises((ValueError, RuntimeError)):
             sb.stack((a, b), axis=0)
+
+
+@pytest.mark.parametrize("join", [sb.concatenate, sb.stack])
+def test_nested_join_rejects_different_depths_even_when_empty(join):
+    depth_two = sb.NestedTensor([], dtype=sb.int64, depth=2)
+    depth_three = sb.NestedTensor([], dtype=sb.int64, depth=3)
+
+    with pytest.raises(ValueError, match="same depth"):
+        join((depth_two, depth_three))

@@ -124,7 +124,8 @@ _DTYPE_TO_WRAPPER = {}
 def _init_dtype_wrappers():
     if _DTYPE_TO_WRAPPER:
         return
-    from .base_tensor import FloatTensor, IntTensor, PcfTensor, IntPcfTensor, PointCloudTensor
+    from .base_tensor import FloatTensor, IntTensor, PcfTensor, IntPcfTensor
+    from .point_cloud import PointCloudTensor
     _DTYPE_TO_WRAPPER.update({
         float32: FloatTensor, float64: FloatTensor,
         int32: IntTensor, int64: IntTensor,

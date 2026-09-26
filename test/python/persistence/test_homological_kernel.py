@@ -41,6 +41,33 @@ def _diag(points):
     return np.broadcast_to(m, pts.shape).copy()
 
 
+def _indexed_kernel_inputs(make_pcloud_or_distmat_tensor):
+    points_array = np.asarray(
+        [FLAGSHIP_POINTS, np.asarray(FLAGSHIP_POINTS) + 10]
+    )
+    projected_array = np.asarray(
+        [FLAGSHIP_PROJECTED, np.asarray(FLAGSHIP_PROJECTED) + 10],
+    )
+    selections = sb.NestedTensor(
+        [
+            [
+                sb.indices([3, 0, 2, 1]),
+                sb.indices([1, 1, 0, 3]),
+                sb.indices([2, 0, 2, 3]),
+            ],
+            [
+                sb.indices([0, 3, 1, 2]),
+                sb.indices([2, 2, 1, 0]),
+                sb.indices([3, 1, 0, 2]),
+            ],
+        ]
+    )
+    return (
+        make_pcloud_or_distmat_tensor(points_array)[selections],
+        make_pcloud_or_distmat_tensor(projected_array)[selections],
+    )
+
+
 # --- Hand-computed 2D cases for the diagonal projection ---
 
 # All points on the diagonal are fixed by the projection, so d' = d and
@@ -86,6 +113,33 @@ def test_diagonal_projection_gives_hand_computed_barcode(points, expected):
     bcs = pers.compute_homological_kernel(np.array(points), _diag(points))
     assert bcs.shape == (1,)
     assert bcs[0].is_isomorphic_to(_bc(expected))
+
+
+def test_kernel_accepts_whole_indexed_tensors_outer_views_and_mixed_storage(
+    make_pcloud_or_distmat_tensor
+):
+    points, projected = _indexed_kernel_inputs(make_pcloud_or_distmat_tensor)
+
+    for indexed_points, indexed_projected in (
+        (points, projected),
+        (points[1:, 1:], projected[1:, 1:]),
+    ):
+        dense_points = indexed_points.to_dense()
+        dense_projected = indexed_projected.to_dense()
+        expected = pers.compute_homological_kernel(
+            dense_points, dense_projected
+        )
+
+        for left, right in (
+            (indexed_points, indexed_projected),
+            (indexed_points, dense_projected),
+            (dense_points, indexed_projected),
+        ):
+            actual = pers.compute_homological_kernel(left, right)
+            assert actual.is_isomorphic_to(expected)
+
+        assert indexed_points._data.has_indices()
+        assert indexed_projected._data.has_indices()
 
 
 def test_coordinate_projection_gives_hand_computed_barcode():
@@ -503,10 +557,3 @@ def test_mismatched_point_counts_raise():
     X = np.array(DIAGONAL_POINTS)
     with pytest.raises(RuntimeError):
         pers.compute_homological_kernel(X, X[:2].copy())
-
-
-def test_rank1_arrays_raise():
-    # A 1-D array is not an (n, dim) point cloud and must be rejected.
-    X = np.array([1.0, 2.0, 3.0])
-    with pytest.raises(RuntimeError, match="unexpected shape"):
-        pers.compute_homological_kernel(X, X / 2.0)

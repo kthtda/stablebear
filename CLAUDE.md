@@ -21,6 +21,11 @@ cmake --install cmake-build-debug
 ```
 This works when `SKBUILD` is off (plain CMake). Builds `_sb_cpu` (always) and `_sb_cudaXX` (when CUDA available). Extensions are symlinked into `stablebear/` for immediate use.
 
+Always match build parallelism to the CPUs available in the current
+environment (`-j$(nproc)` on Linux, or the platform equivalent), including
+targeted and incremental builds. Do not hard-code a smaller job count such as
+`-j2`.
+
 ### CUDA control
 - `BUILD_WITH_CUDA=0` env var disables CUDA (auto-detected otherwise, always off on macOS)
 - Supports pip-installed CUDA toolkits (`nvidia.cu12`, `nvidia.cu13`)
@@ -44,7 +49,7 @@ cd test && python -m pytest python/test_pdist.py  # single test file
 
 ### C++ tests (GoogleTest)
 ```bash
-cmake --build cmake-build-debug --target sb_test
+cmake --build cmake-build-debug --target sb_test -j$(nproc)
 cd test && ../cmake-build-debug/sb_test  # run from test/ directory
 ```
 

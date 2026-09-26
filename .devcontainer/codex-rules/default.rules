@@ -5,7 +5,6 @@ prefix_rule(
     pattern = [
         ["git", "/usr/bin/git"],
         [
-            "add",
             "am",
             "apply",
             "bisect",

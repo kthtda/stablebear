@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
 
 #include <sbear/tensor.hpp>
+#include <sbear/nested_tensor.hpp>
+#include <sbear/point_cloud.hpp>
 #include <sbear/walk.hpp>
 #include <sbear/distance_matrix.hpp>
 #include <sbear/symmetric_matrix.hpp>
@@ -14,6 +16,151 @@
 namespace
 {
 
+  static_assert(sb::IsTensor<sb::NestedTensor<uint64_t>>);
+
+  TEST(NestedTensor, SatisfiesTensorInterfaceAtEveryDepth)
+  {
+    using Nested = sb::NestedTensor<uint64_t>;
+
+    sb::Tensor<uint64_t> leaf({ 2 });
+    leaf(0) = 3;
+    leaf(1) = 7;
+    Nested leafTensor(std::move(leaf));
+
+    EXPECT_EQ(leafTensor.shape(), (std::vector<size_t>{ 2 }));
+    EXPECT_EQ(leafTensor.rank(), 1);
+    EXPECT_EQ(leafTensor.size(), 2);
+    EXPECT_EQ(std::get<uint64_t>(leafTensor({ 1 })), 7);
+
+    sb::Tensor<Nested> children({ 1 });
+    children(0) = leafTensor;
+    Nested nestedTensor(std::move(children));
+
+    EXPECT_EQ(nestedTensor.shape(), (std::vector<size_t>{ 1 }));
+    EXPECT_EQ(nestedTensor.rank(), 1);
+    EXPECT_EQ(nestedTensor.size(), 1);
+    const auto child = std::get<Nested>(nestedTensor({ 0 }));
+    EXPECT_EQ(child.depth(), 1);
+    EXPECT_EQ(std::get<uint64_t>(child({ 0 })), 3);
+  }
+
+  TEST(NestedTensor, ConvertsStaticallyNestedTensorTypes)
+  {
+    sb::Tensor<uint64_t> leaf({ 2 });
+    leaf(0) = 3;
+    leaf(1) = 7;
+    sb::Tensor<sb::Tensor<uint64_t>> levelTwo({ 1 }, leaf);
+    sb::Tensor<sb::Tensor<sb::Tensor<uint64_t>>> levelThree(
+      { 1 }, levelTwo);
+
+    const auto nested = sb::to_nested_tensor(levelThree);
+    const auto empty = sb::to_nested_tensor(
+      sb::Tensor<sb::Tensor<sb::Tensor<uint64_t>>>({ 0 }));
+
+    static_assert(std::same_as<
+      std::remove_cvref_t<decltype(nested)>,
+      sb::NestedTensor<uint64_t>>);
+    EXPECT_EQ(nested.depth(), 3);
+    EXPECT_EQ(std::get<uint64_t>(
+      nested.nested()(0).nested()(0)({ 1 })), 7);
+    EXPECT_EQ(empty.depth(), 3);
+    EXPECT_EQ(empty.shape(), (std::vector<size_t>{ 0 }));
+  }
+
+  TEST(NestedTensor, DistinguishesValueConstructionFromOuterViewWrapping)
+  {
+    using Nested = sb::NestedTensor<uint64_t>;
+
+    sb::Tensor<uint64_t> firstLeaf({ 1 });
+    firstLeaf(0) = 1;
+    sb::Tensor<Nested> children({ 1 });
+    children(0) = Nested::from_leaf_view(firstLeaf);
+
+    const Nested value(children, 1);
+    const Nested view = Nested::from_outer_view(children.flatten(), 1);
+
+    firstLeaf(0) = 9;
+    EXPECT_EQ(std::get<uint64_t>(value.nested()(0)({ 0 })), 1);
+    EXPECT_EQ(std::get<uint64_t>(view.nested()(0)({ 0 })), 9);
+
+    sb::Tensor<uint64_t> replacement({ 1 });
+    replacement(0) = 7;
+    children(0) = Nested(replacement);
+
+    EXPECT_EQ(std::get<uint64_t>(value.nested()(0)({ 0 })), 1);
+    EXPECT_EQ(std::get<uint64_t>(view.nested()(0)({ 0 })), 7);
+  }
+
+  TEST(NestedTensor, ExplicitFactoriesPreserveStorageOnlyForViews)
+  {
+    using Nested = sb::NestedTensor<uint64_t>;
+    sb::Tensor<uint64_t> leaf({ 2 });
+    leaf(0) = 1;
+    leaf(1) = 2;
+    const auto leafView = Nested::from_leaf_view(leaf);
+    const auto leafValue = Nested::from_values(leaf);
+    EXPECT_EQ(leafView.leaf().data(), leaf.data());
+    EXPECT_NE(leafValue.leaf().data(), leaf.data());
+
+    sb::Tensor<Nested> children({ 1 });
+    children(0) = leafView;
+    const auto view = Nested::from_outer_view(children, 1);
+    const auto value = Nested::from_values(children, 1);
+    EXPECT_EQ(view.nested().data(), children.data());
+    EXPECT_EQ(view.nested()(0).leaf().data(), leaf.data());
+    EXPECT_NE(value.nested()(0).leaf().data(), leaf.data());
+    const auto reshaped = view.reshape({ 1, 1 });
+    EXPECT_EQ(reshaped.nested().data(), children.data());
+    EXPECT_EQ(reshaped.nested()({ 0, 0 }).leaf().data(), leaf.data());
+
+    // Temporaries are not an implicit request to share caller-owned storage.
+    const Nested temporaryLeaf(leaf.reshape({ 2 }));
+    const Nested temporaryOuter(children.reshape({ 1 }), 1);
+    EXPECT_NE(temporaryLeaf.leaf().data(), leaf.data());
+    EXPECT_NE(temporaryOuter.nested()(0).leaf().data(), leaf.data());
+    const auto empty = Nested::from_outer_view(sb::Tensor<Nested>({ 0 }), 3);
+    EXPECT_EQ(empty.copy().depth(), 4);
+  }
+
+  struct IndexableValue
+  {
+    using index_type = size_t;
+
+    int value = 0;
+
+    void validate_index(const size_t&) const { }
+
+    [[nodiscard]] IndexableValue index_into(const size_t& index) const
+    {
+      validate_index(index);
+      return { value + static_cast<int>(index) };
+    }
+
+    bool operator==(const IndexableValue&) const = default;
+  };
+
+  struct BoundsCheckedIndexableValue
+  {
+    using index_type = size_t;
+
+    size_t size = 0;
+
+    void validate_index(const size_t& index) const
+    {
+      if (index >= size)
+      {
+        throw std::out_of_range("index out of bounds");
+      }
+    }
+
+    [[nodiscard]] BoundsCheckedIndexableValue index_into(
+      const size_t& index) const
+    {
+      validate_index(index);
+      return { size - index };
+    }
+  };
+
   template<typename T>
   sb::Tensor<T> make_sequential(const std::vector<size_t>& shape)
   {
@@ -24,6 +171,253 @@ namespace
       t(idx) = static_cast<T>(n++);
     });
     return t;
+  }
+
+  TEST(TensorProperties, NonIndexedPropertiesComposeWithOrdinaryStorage)
+  {
+    constexpr sb::TensorProperties TestProperty = 1 << 8;
+    using PropertyTensor = sb::Tensor<int, TestProperty>;
+
+    PropertyTensor tensor({ 2, 3 }, 4);
+    static_assert(std::same_as<decltype(tensor.flatten()), PropertyTensor>);
+
+    EXPECT_EQ(tensor.shape(), (std::vector<size_t>{ 2, 3 }));
+    EXPECT_EQ(tensor(std::vector<size_t>{ 1, 2 }), 4);
+    tensor(std::vector<size_t>{ 1, 2 }) = 9;
+    EXPECT_EQ(tensor.flatten()(5), 9);
+  }
+
+  TEST(TensorProperties, MakeIndexedTensorBroadcastsSourceAcrossAdditionalIndexAxes)
+  {
+    // The source [10, 20] has shape (2), while the indices
+    // [[1, 2, 3], [4, 5, 6]] have shape (2, 3). Broadcasting each source
+    // element across the additional axis and adding its index produces
+    // [[11, 12, 13], [24, 25, 26]]. Point-cloud subsampling uses this extra
+    // axis for multiple independently indexed samples of each source cloud.
+    sb::Tensor<IndexableValue> source({ 2 });
+    source(0) = { 10 };
+    source(1) = { 20 };
+    sb::Tensor<size_t> indices({ 2, 3 });
+    indices({ 0, 0 }) = 1;
+    indices({ 0, 1 }) = 2;
+    indices({ 0, 2 }) = 3;
+    indices({ 1, 0 }) = 4;
+    indices({ 1, 1 }) = 5;
+    indices({ 1, 2 }) = 6;
+
+    const auto indexed = sb::make_indexed_tensor(
+      source, indices, sb::IndexedTensorAlignment::ExactLeadingDimensions);
+
+    static_assert(decltype(indexed)::IsIndexed);
+    EXPECT_EQ(indexed.shape(), (std::vector<size_t>{ 2, 3 }));
+    EXPECT_EQ(indexed({ 0, 2 }).value, 13);
+    EXPECT_EQ(indexed({ 1, 1 }).value, 25);
+  }
+
+  TEST(TensorProperties, IndexedConstructionCopiesValuesAndExplicitlyAdoptsOwnedIndices)
+  {
+    sb::Tensor<IndexableValue> source({ 1 });
+    source(0) = { 10 };
+    sb::Tensor<size_t> indices({ 1 });
+    indices(0) = 2;
+    // A temporary view still aliases its caller and must be copied.
+    const auto copied = sb::make_indexed_tensor(source, indices.reshape({ 1 }));
+    EXPECT_NE(copied.indices_view().data(), indices.data());
+    indices(0) = 3;
+    EXPECT_EQ(copied(0).value, 12);
+
+    auto owned = indices.copy();
+    const auto* ownedData = owned.data();
+    const auto adopted = sb::make_indexed_tensor_from_owned_indices(source, std::move(owned));
+    EXPECT_EQ(adopted.indices_view().data(), ownedData);
+    const auto view = adopted.reshape({ 1, 1 });
+    EXPECT_EQ(view.indices_view().data(), ownedData);
+    EXPECT_EQ(view.source_view().data(), source.data());
+    source(0) = { 20 };
+    EXPECT_EQ(view({ 0, 0 }).value, 23);
+  }
+
+  TEST(TensorProperties, MakeIndexedTensorBroadcastsSingletonSourceAxes)
+  {
+    sb::Tensor<IndexableValue> source({ 2, 1 });
+    source({ 0, 0 }) = { 10 };
+    source({ 1, 0 }) = { 20 };
+    sb::Tensor<size_t> indices({ 2, 3 });
+    indices({ 0, 0 }) = 1;
+    indices({ 0, 1 }) = 2;
+    indices({ 0, 2 }) = 3;
+    indices({ 1, 0 }) = 4;
+    indices({ 1, 1 }) = 5;
+    indices({ 1, 2 }) = 6;
+
+    const auto indexed = sb::make_indexed_tensor(source, indices);
+
+    EXPECT_EQ(indexed({ 0, 2 }).value, 13);
+    EXPECT_EQ(indexed({ 1, 1 }).value, 25);
+
+    // Default alignment broadcasts the source's singleton second axis from
+    // shape (2, 1) to the index shape (2, 3). Exact-leading-dimensions
+    // alignment forbids that broadcast because the leading index dimensions
+    // (2, 3) do not exactly match the source shape (2, 1).
+    EXPECT_THROW(
+      sb::make_indexed_tensor(
+        source, indices,
+        sb::IndexedTensorAlignment::ExactLeadingDimensions),
+      std::invalid_argument);
+  }
+
+  TEST(TensorProperties, IndexedElementsAreValidatedAtConstruction)
+  {
+    sb::Tensor<BoundsCheckedIndexableValue> source({ 2 });
+    source(0) = { 2 };
+    source(1) = { 1 };
+    sb::Tensor<size_t> elementIndices({ 2 });
+    elementIndices(0) = 1;
+    elementIndices(1) = 1;
+
+    // Indexed tensors align source and index cells. The first pair asks
+    // source(0), of size 2, for index 1 and is valid. The second asks
+    // source(1), of size 1, for index 1 and is out of range.
+    EXPECT_THROW(
+      sb::make_indexed_tensor(source, elementIndices), std::out_of_range);
+  }
+
+  TEST(TensorProperties, IndexedViewsReplaceSharedSourceWhenMaterialized)
+  {
+    sb::Tensor<IndexableValue> source({ 2 });
+    source(0) = { 10 };
+    source(1) = { 20 };
+    sb::Tensor<size_t> indices({ 2 });
+    indices(0) = 1;
+    indices(1) = 2;
+
+    auto indexed = sb::make_indexed_tensor(source, indices);
+    auto view = indexed.flatten();
+
+    view.ensure_materialized();
+
+    EXPECT_THROW((void)indexed.indices_view(), std::logic_error);
+    EXPECT_EQ(indexed.source_view()(0).value, 11);
+    EXPECT_EQ(indexed.source_view()(1).value, 22);
+
+    view.writable_at(0).value = 99;
+    EXPECT_EQ(indexed(0).value, 99);
+    EXPECT_EQ(source(0).value, 10);
+
+    // A second transition is a no-op and must not restore the lazy source.
+    indexed.ensure_materialized();
+    EXPECT_EQ(view(0).value, 99);
+  }
+
+  TEST(TensorProperties, OrdinaryAlgorithmsAcceptComposedIndexedProperties)
+  {
+    constexpr sb::TensorProperties TestProperty = 1 << 8;
+    using SourceTensor = sb::Tensor<IndexableValue, TestProperty>;
+
+    SourceTensor source({ 3 });
+    source(0) = { 10 };
+    source(1) = { 20 };
+    source(2) = { 30 };
+    sb::Tensor<size_t> indices({ 3 });
+    indices(0) = 2;
+    indices(1) = 1;
+    indices(2) = 0;
+
+    auto indexed = sb::make_indexed_tensor(source, indices);
+    auto sibling = indexed.flatten();
+    static_assert(decltype(indexed)::IsIndexed);
+    static_assert(decltype(indexed)::SourceProperties == TestProperty);
+
+    const auto dense = indexed.materialize();
+    EXPECT_TRUE(indexed == dense);
+    EXPECT_TRUE(dense == indexed);
+
+    sb::Tensor<bool> mask({ 3 });
+    mask(0) = true;
+    mask(1) = false;
+    mask(2) = true;
+    const auto selected = sb::masked_select(indexed, mask);
+    static_assert(std::same_as<decltype(selected), const SourceTensor>);
+    EXPECT_EQ(selected.shape(), (std::vector<size_t>{ 2 }));
+    EXPECT_EQ(selected(0).value, 12);
+    EXPECT_EQ(selected(1).value, 30);
+
+    sb::masked_fill(indexed, mask, IndexableValue{ 99 });
+    EXPECT_EQ(sibling(0).value, 99);
+    EXPECT_EQ(sibling(1).value, 21);
+    EXPECT_EQ(sibling(2).value, 99);
+    EXPECT_EQ(source(0).value, 10);
+
+    const auto parts = sb::split(indexed, std::vector<size_t>{ 1 }, 0);
+    static_assert(std::same_as<typename decltype(parts)::value_type,
+      decltype(indexed)>);
+    EXPECT_EQ(parts[0].shape(), (std::vector<size_t>{ 1 }));
+    EXPECT_EQ(parts[1].shape(), (std::vector<size_t>{ 2 }));
+    EXPECT_EQ(parts[0](0).value, 99);
+    EXPECT_EQ(parts[1](0).value, 21);
+    EXPECT_EQ(parts[1](1).value, 99);
+  }
+
+  TEST(TensorProperties, TensorValuedIndicesUseNestedTensorStorage)
+  {
+    using PointCloud = sb::PointCloud<float>;
+
+    sb::Tensor<float> coordinates({ 3, 1 });
+    coordinates({ 0, 0 }) = 10;
+    coordinates({ 1, 0 }) = 20;
+    coordinates({ 2, 0 }) = 30;
+
+    sb::Tensor<PointCloud> source({ 1 });
+    source(0) = PointCloud(std::move(coordinates));
+
+    sb::Tensor<uint64_t> rows({ 2 });
+    rows(0) = 2;
+    rows(1) = 0;
+    const sb::Tensor<sb::Tensor<uint64_t>> selectionsByCloud({ 1 }, rows);
+    const auto selections = sb::to_nested_tensor(selectionsByCloud);
+
+    const auto indexed = sb::make_indexed_tensor(source, selections);
+
+    static_assert(std::same_as<
+      typename decltype(indexed)::index_tensor_type,
+      sb::NestedTensor<uint64_t>>);
+    EXPECT_EQ(indexed.indices_view().depth(), 2);
+    const PointCloud selected = indexed(0);
+    EXPECT_EQ(selected(0, 0), 30);
+    EXPECT_EQ(selected(1, 0), 10);
+
+    PointCloud mutableSelected = indexed(0);
+    EXPECT_THROW(mutableSelected(0, 0) = 99, std::logic_error);
+  }
+
+  TEST(TensorProperties, IndexedViewsShareOwnedSelectionState)
+  {
+    using Nested = sb::NestedTensor<uint64_t>;
+    using PointCloud = sb::PointCloud<float>;
+
+    sb::Tensor<float> coordinates({ 1, 1 });
+    sb::Tensor<PointCloud> source({ 1 });
+    source(0) = PointCloud(std::move(coordinates));
+
+    sb::Tensor<uint64_t> rows({ 1 });
+    rows(0) = 0;
+    sb::Tensor<Nested> selectionNodes({ 1 });
+    selectionNodes(0) = Nested(rows);
+    Nested selections(std::move(selectionNodes), 1);
+
+    const auto indexed = sb::make_indexed_tensor(source, selections);
+    const auto sibling = indexed.flatten();
+
+    EXPECT_NE(&indexed.indices_view(), &selections);
+    EXPECT_EQ(&indexed.indices_view(), &sibling.indices_view());
+  }
+
+  TEST(TensorProperties, MakeIndexedTensorRejectsNonBroadcastableSourceShape)
+  {
+    const sb::Tensor<IndexableValue> source({ 2, 2 });
+    const sb::Tensor<size_t> indices({ 2, 3 });
+
+    EXPECT_THROW(sb::make_indexed_tensor(source, indices), std::invalid_argument);
   }
 
 

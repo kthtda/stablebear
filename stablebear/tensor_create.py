@@ -1,15 +1,16 @@
 from . import _sb_cpp as cpp
-from ._tensor_base import Shape, ShapeLike
+from ._tensor_base import Shape, ShapeLike, Tensor
 from .base_tensor import (
     BoolTensor,
     FloatTensor,
     IntPcfTensor,
     IntTensor,
     PcfTensor,
-    PointCloudTensor,
     _first_pcf,
     _to_tensor_pcf,
 )
+from .nested_tensor import NestedTensor
+from .point_cloud import PointCloudTensor
 from .typing import (
     Dtype,
     _assert_valid_dtype,
@@ -138,6 +139,16 @@ def tensor(data, dtype: Dtype = None):
     -------
     Tensor
     """
+    def contains_tensor(value):
+        if isinstance(value, Tensor):
+            return True
+        return isinstance(value, (list, tuple)) and any(
+            contains_tensor(child) for child in value
+        )
+
+    if isinstance(data, (list, tuple)) and contains_tensor(data):
+        return NestedTensor(data, dtype=dtype)
+
     if dtype is None:
         if _first_pcf(data) is not None:
             return _to_tensor_pcf(data)
@@ -164,10 +175,19 @@ def tensor(data, dtype: Dtype = None):
     return wrapper(data)
 
 
+def indices(data):
+    """Create a ``uint64`` tensor for use as indices.
+
+    This is shorthand for ``tensor(data, dtype=uint64)``.
+    """
+    return tensor(data, dtype=uint64)
+
+
 def concatenate(tensors, axis=0):
     """Concatenate tensors along an existing axis (outer indexing)."""
     if not tensors:
         raise ValueError("need at least one tensor to concatenate")
+    _validate_nested_join(tensors)
     cpp_tensors = [t._data for t in tensors]
     result = type(cpp_tensors[0]).concatenate(cpp_tensors, axis)
     return tensors[0]._to_py_tensor(result)
@@ -177,9 +197,28 @@ def stack(tensors, axis=0):
     """Stack tensors along a new axis. All tensors must have the same shape."""
     if not tensors:
         raise ValueError("need at least one tensor to stack")
+    _validate_nested_join(tensors)
     cpp_tensors = [t._data for t in tensors]
     result = type(cpp_tensors[0]).stack(cpp_tensors, axis)
     return tensors[0]._to_py_tensor(result)
+
+
+def _validate_nested_join(tensors):
+    first = tensors[0]
+    if not isinstance(first, NestedTensor):
+        return
+    for tensor in tensors[1:]:
+        if not isinstance(tensor, NestedTensor):
+            raise TypeError("all tensors in a nested join must be NestedTensor objects")
+        if tensor.dtype is not first.dtype:
+            raise TypeError(
+                f"NestedTensor leaf dtype must be {first.dtype}, got {tensor.dtype}"
+            )
+        if tensor.depth != first.depth:
+            raise ValueError(
+                "all NestedTensor operands must have the same depth; "
+                f"got {first.depth} and {tensor.depth}"
+            )
 
 
 def split(tensor, indices_or_sections, axis=0):
@@ -190,8 +229,15 @@ def split(tensor, indices_or_sections, axis=0):
     tensor : Tensor
         The tensor to split.
     indices_or_sections : int or list of int
-        If an int, the tensor is split into that many equal parts.
-        If a list, it gives the indices where splits occur.
+        If an int, the axis length must be evenly divisible by that number.
+        The result contains that many contiguous parts, each of length
+        ``axis_size // sections``. Use ``array_split`` when equal division is
+        not possible.
+        If a list ``[i0, i1, ...]``, its entries are boundaries and the
+        resulting parts cover the half-open intervals ``[0, i0)``,
+        ``[i0, i1)``, ..., ``[ik, axis_size)`` along *axis*. For example,
+        splitting an axis of length 8 at ``[3, 5]`` produces parts of lengths
+        3, 2, and 3. The element at each boundary starts the following part.
     axis : int
         The axis along which to split (default 0).
 
@@ -215,16 +261,20 @@ def split(tensor, indices_or_sections, axis=0):
 def array_split(tensor, indices_or_sections, axis=0):
     """Split a tensor into sub-tensors, allowing uneven splits.
 
-    Like ``split``, but when *indices_or_sections* is an integer and the axis
-    size is not evenly divisible, the first sections are one element larger.
-
     Parameters
     ----------
     tensor : Tensor
         The tensor to split.
     indices_or_sections : int or list of int
-        If an int, the tensor is split into that many parts (uneven allowed).
-        If a list, it gives the indices where splits occur (same as ``split``).
+        If an int, the tensor is split into that many parts. Let
+        ``axis_size = q * sections + r``. The first ``r`` parts have length
+        ``q + 1``; the remaining trailing parts have length ``q`` and do not
+        receive the extra element. For example, an axis of length 8 split into
+        3 parts produces lengths 3, 3, and 2.
+        If a list ``[i0, i1, ...]``, the parts use the same half-open intervals
+        as ``split``: ``[0, i0)``, ``[i0, i1)``, ...,
+        ``[ik, axis_size)``. The element at each boundary starts the following
+        part.
     axis : int
         The axis along which to split (default 0).
 

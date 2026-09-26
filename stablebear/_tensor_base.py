@@ -5,6 +5,7 @@ from abc import ABC, abstractmethod
 from typing import Union
 
 from . import _sb_cpp as cpp
+from ._binary_io import _BinaryIoMixin
 
 Shape = cpp.Shape
 
@@ -12,9 +13,10 @@ ShapeLike = Shape | tuple[int, ...]
 
 
 def _unpickle_tensor(data: bytes):
-    import io as _io
-    from .io import _load
-    return _load(_io.BytesIO(data))
+    # Historical import path retained for pickles written before the unified
+    # reducer. Keep the implementation centralized in stablebear.io.
+    from .io import _unpickle_tensor as unpickle
+    return unpickle(data)
 
 CppTensor = Union[
     cpp.Float32Tensor,
@@ -23,12 +25,24 @@ CppTensor = Union[
     cpp.Int64Tensor,
     cpp.Uint32Tensor,
     cpp.Uint64Tensor,
+    cpp.NestedFloat32Tensor,
+    cpp.NestedFloat64Tensor,
+    cpp.NestedInt32Tensor,
+    cpp.NestedInt64Tensor,
+    cpp.NestedUint32Tensor,
+    cpp.NestedUint64Tensor,
     cpp.Pcf32Tensor,
     cpp.Pcf64Tensor,
     cpp.Pcf32iTensor,
     cpp.Pcf64iTensor,
     cpp.PointCloud32Tensor,
     cpp.PointCloud64Tensor,
+    cpp._IndexedPointCloud32Tensor,
+    cpp._IndexedPointCloud64Tensor,
+    cpp.DistanceMatrix32Tensor,
+    cpp.DistanceMatrix64Tensor,
+    cpp._IndexedDistanceMatrix32Tensor,
+    cpp._IndexedDistanceMatrix64Tensor,
     cpp.BoolTensor,
 ]
 
@@ -147,10 +161,13 @@ def _resolve_axis(axis: int, ndim: int) -> int:
     return resolved
 
 
-class Tensor(ABC):
+class Tensor(_BinaryIoMixin, ABC):
     _data: CppTensor
 
     __array_ufunc__ = None
+
+    def _binary_io_data(self):
+        return self._data
 
     def __array__(self, dtype=None, copy=None):
         raise TypeError(
@@ -452,6 +469,13 @@ class Tensor(ABC):
             return val.astype(self.dtype)
         return val
 
+    def _is_tensor_rhs(self, val):
+        """Whether ``val`` represents elementwise tensor assignment."""
+        return isinstance(val, Tensor)
+
+    def _validate_setitem_value(self, entries, val):
+        """Hook for subclasses to validate a value against normalized indices."""
+
     def _ensure_writeable(self):
         """Reject writes into a broadcast view.
 
@@ -500,12 +524,13 @@ class Tensor(ABC):
         TypeError
             If ``val`` has a type that cannot be assigned to this tensor.
         """
-        self._ensure_writeable()
         entries, inserts = self._normalize_index(slices)
+        self._validate_setitem_dtype(val)
+        self._validate_setitem_value(entries, val)
         # A scalar-boolean ``False`` (or any zero-length newaxis) selects nothing.
         if any(length == 0 for _, length in inserts):
             return
-        self._validate_setitem_dtype(val)
+        self._ensure_writeable()
         self._setitem_entries(entries, val)
 
     def _setitem_entries(self, entries, val):
@@ -514,7 +539,7 @@ class Tensor(ABC):
 
         # Single full-shape boolean mask: flat masked assign/fill.
         if len(entries) == 1 and isinstance(entries[0], BoolTensor):
-            if isinstance(val, Tensor):
+            if self._is_tensor_rhs(val):
                 self._data.masked_assign(entries[0]._data, self._coerce_rhs(val)._data)  # type: ignore[arg-type]
             else:
                 self._data.masked_fill(entries[0]._data, self._decay_value(val))  # type: ignore[arg-type]
@@ -544,18 +569,18 @@ class Tensor(ABC):
         if len(selectors) == 1:
             axis, sel_data, is_bool = selectors[0]
             if is_bool:
-                if isinstance(val, Tensor):
+                if self._is_tensor_rhs(val):
                     view._data.axis_assign(axis, sel_data, self._coerce_rhs(val)._data)  # type: ignore[arg-type]
                 else:
                     view._data.axis_fill(axis, sel_data, self._decay_value(val))  # type: ignore[arg-type]
             else:
-                if isinstance(val, Tensor):
+                if self._is_tensor_rhs(val):
                     view._data.index_assign(axis, sel_data, self._coerce_rhs(val)._data)  # type: ignore[arg-type]
                 else:
                     view._data.index_fill(axis, sel_data, self._decay_value(val))  # type: ignore[arg-type]
         else:
             sel_pairs = [(axis, data) for axis, data, _ in selectors]
-            if isinstance(val, Tensor):
+            if self._is_tensor_rhs(val):
                 view._data.outer_assign(sel_pairs, self._coerce_rhs(val)._data)  # type: ignore[arg-type]
             else:
                 view._data.outer_fill(sel_pairs, self._decay_value(val))  # type: ignore[arg-type]
@@ -563,7 +588,8 @@ class Tensor(ABC):
     def _basic_setitem(self, entries, val):
         """Assign using only ints and slices (negatives resolved, bounds checked)."""
         import numpy as np
-        from .base_tensor import FloatTensor, NumericTensor, PointCloudTensor
+        from .base_tensor import FloatTensor, NumericTensor
+        from .point_cloud import PointCloudTensor
 
         if (len(entries) == self.ndim
                 and all(isinstance(s, int) for s in entries)):
@@ -590,7 +616,7 @@ class Tensor(ABC):
             # PointCloud*.
             arr = val if isinstance(val, np.ndarray) else np.asarray(val)
             self._data[cpp_slices] = type(self)(arr, dtype=self.dtype)._data
-        elif isinstance(val, Tensor):
+        elif self._is_tensor_rhs(val):
             self._data[cpp_slices] = self._coerce_rhs(val)._data
         elif isinstance(val, np.ndarray) and isinstance(self, NumericTensor):
             # Element-wise array RHS: wrap as a same-dtype tensor and broadcast.
@@ -666,13 +692,6 @@ class Tensor(ABC):
             True if the tensors are elementwise equal, False otherwise.
         """
         return self._data.array_equal(rhs._data)
-
-    def __reduce__(self):
-        import io as _io
-        from .io import _save, _load
-        buf = _io.BytesIO()
-        _save(self, buf)
-        return _unpickle_tensor, (buf.getvalue(),)
 
     def __deepcopy__(self, memodict=None):
         return self._to_py_tensor(self._data.copy())
@@ -833,6 +852,70 @@ class Tensor(ABC):
             raise TypeError(
                 f"Tried to construct tensor of type {type(tensor)} from argument of type {type(arg)}. Only the following type(s) are allowed: {valid_types}."
             )
+
+
+class IndexedElementTensor(Tensor):
+    """Shared behavior for tensors whose elements support lazy indexing."""
+
+    _indexed_cpp_types = ()
+    _indexed_element_name = "Element"
+
+    def _element_view(self, element, index):
+        raise NotImplementedError()
+
+    def __getitem__(self, index):
+        from .nested_tensor import NestedTensor
+        from .typing import uint64
+
+        if isinstance(index, NestedTensor):
+            if index.dtype is not uint64:
+                raise TypeError(
+                    f"{self._indexed_element_name} indices must have uint64 leaves"
+                )
+            if index.depth != 2:
+                raise ValueError(
+                    f"{self._indexed_element_name} indexing requires "
+                    "Tensor<Tensor<uint64>>"
+                )
+            return self._to_py_tensor(
+                self._data._index_elements(
+                    index._root, exact_leading_dimensions=True
+                )
+            )
+
+        if self.ndim == 0:
+            element = self._element_view(self._data._get_element([]), [])
+            if index == () or index is Ellipsis:
+                return element
+            return element[index]
+
+        entries, inserts = self._normalize_index(index)
+        if (
+            not inserts
+            and len(entries) == self.ndim
+            and all(isinstance(entry, int) for entry in entries)
+        ):
+            resolved = [
+                self._resolve_axis_int(entry, axis)
+                for axis, entry in enumerate(entries)
+            ]
+            return self._element_view(
+                self._data._get_element(resolved), resolved
+            )
+
+        return super().__getitem__(index)
+
+    def _ensure_writeable(self):
+        super()._ensure_writeable()
+        if isinstance(self._data, self._indexed_cpp_types):
+            self._data._ensure_materialized()
+
+    def to_dense(self):
+        """Return an independent tensor with ordinary element storage."""
+        return self._to_py_tensor(self._data.copy())
+
+    def _has_indexed_storage(self):
+        return isinstance(self._data, self._indexed_cpp_types)
 
 
 class FunctionTensorMixin:
