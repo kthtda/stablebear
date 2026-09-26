@@ -41,13 +41,12 @@ def _diag(points):
     return np.broadcast_to(m, pts.shape).copy()
 
 
-def _indexed_kernel_inputs(pcloud_dtype, np_dtype):
+def _indexed_kernel_inputs(make_pcloud_or_distmat_tensor):
     points_array = np.asarray(
-        [FLAGSHIP_POINTS, np.asarray(FLAGSHIP_POINTS) + 10], dtype=np_dtype
+        [FLAGSHIP_POINTS, np.asarray(FLAGSHIP_POINTS) + 10]
     )
     projected_array = np.asarray(
         [FLAGSHIP_PROJECTED, np.asarray(FLAGSHIP_PROJECTED) + 10],
-        dtype=np_dtype,
     )
     selections = sb.NestedTensor(
         [
@@ -64,8 +63,8 @@ def _indexed_kernel_inputs(pcloud_dtype, np_dtype):
         ]
     )
     return (
-        sb.PointCloudTensor(points_array, dtype=pcloud_dtype)[selections],
-        sb.PointCloudTensor(projected_array, dtype=pcloud_dtype)[selections],
+        make_pcloud_or_distmat_tensor(points_array)[selections],
+        make_pcloud_or_distmat_tensor(projected_array)[selections],
     )
 
 
@@ -116,21 +115,15 @@ def test_diagonal_projection_gives_hand_computed_barcode(points, expected):
     assert bcs[0].is_isomorphic_to(_bc(expected))
 
 
-@pytest.mark.parametrize(
-    "pcloud_dtype,np_dtype",
-    [(sb.pcloud32, np.float32), (sb.pcloud64, np.float64)],
-)
 def test_kernel_accepts_whole_indexed_tensors_outer_views_and_mixed_storage(
-    pcloud_dtype, np_dtype
+    make_pcloud_or_distmat_tensor
 ):
-    points, projected = _indexed_kernel_inputs(pcloud_dtype, np_dtype)
+    points, projected = _indexed_kernel_inputs(make_pcloud_or_distmat_tensor)
 
     for indexed_points, indexed_projected in (
         (points, projected),
         (points[1:, 1:], projected[1:, 1:]),
     ):
-        points_storage_type = type(indexed_points._data)
-        projected_storage_type = type(indexed_projected._data)
         dense_points = indexed_points.to_dense()
         dense_projected = indexed_projected.to_dense()
         expected = pers.compute_homological_kernel(
@@ -145,8 +138,8 @@ def test_kernel_accepts_whole_indexed_tensors_outer_views_and_mixed_storage(
             actual = pers.compute_homological_kernel(left, right)
             assert actual.is_isomorphic_to(expected)
 
-        assert type(indexed_points._data) is points_storage_type
-        assert type(indexed_projected._data) is projected_storage_type
+        assert indexed_points._data.has_indices()
+        assert indexed_projected._data.has_indices()
 
 
 def test_coordinate_projection_gives_hand_computed_barcode():

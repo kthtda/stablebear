@@ -12,6 +12,10 @@ TEST(FixedRankTensor, StoresShapeAndUsesRowMajorIndexing)
   EXPECT_EQ(values.size(), 6);
   EXPECT_EQ(values.flat(5), 7);
   EXPECT_THROW((void)values(2, 0), std::out_of_range);
+  size_t index = 0;
+  for (const auto& value : values.flat_view())
+    EXPECT_EQ(&value, values.storage_data() + index++);
+  EXPECT_EQ(index, values.size());
 }
 
 TEST(FixedRankTensor, CopiesShareStorageAndExplicitCopyIsIndependent)
@@ -35,4 +39,16 @@ TEST(FixedRankTensor, DefaultShapeHasZeroExtentOnEveryAxis)
   const Tensor values;
   EXPECT_EQ(values.shape(), (Tensor::shape_type{0, 0}));
   EXPECT_EQ(values.size(), 0);
+  const auto flat = values.flat_view();
+  EXPECT_EQ(flat.begin(), flat.end());
+}
+
+TEST(FixedRankTensor, ScalarFlatViewContainsOneValue)
+{
+  const sb::FixedRankTensor<int, 0> scalar;
+  const auto flat = scalar.flat_view();
+  auto it = flat.begin();
+  EXPECT_EQ(&*it, scalar.storage_data());
+  ++it;
+  EXPECT_EQ(it, flat.end());
 }

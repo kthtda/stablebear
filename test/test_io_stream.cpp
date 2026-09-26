@@ -167,6 +167,23 @@ namespace
     EXPECT_EQ(value, result);
   }
 
+  TYPED_TEST(IoStreamTest, FixedSizeArrayIo)
+  {
+    const std::array<TypeParam, 3> values{TypeParam(-2.5), TypeParam(0), TypeParam(3.25)};
+    std::stringstream stream;
+    sb::io::detail::write_array<TypeParam>(stream, values);
+    EXPECT_EQ(stream.str().size(), values.size() * sizeof(TypeParam));
+    EXPECT_EQ((sb::io::detail::read_array<TypeParam, 3>(stream)), values);
+
+    std::istringstream truncated(stream.str().substr(0, stream.str().size() - 1));
+    EXPECT_THROW((sb::io::detail::read_array<TypeParam, 3>(truncated)), std::runtime_error);
+
+    std::stringstream empty;
+    sb::io::detail::write_array<TypeParam>(empty, std::array<TypeParam, 0>{});
+    EXPECT_TRUE(empty.str().empty());
+    EXPECT_TRUE((sb::io::detail::read_array<TypeParam, 0>(empty)).empty());
+  }
+
   TYPED_TEST(IoStreamTest, WriteBytesRoundtripNegative)
   {
     TypeParam value = static_cast<TypeParam>(-42.5);

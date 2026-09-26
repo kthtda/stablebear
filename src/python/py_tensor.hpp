@@ -189,7 +189,8 @@ namespace sb_py
       .def("is_contiguous", &TTensor::is_contiguous);
 
     if constexpr (TTensor::IsIndexed)
-      cls.def("_ensure_materialized", &TTensor::ensure_materialized);
+      cls.def("_ensure_materialized", &TTensor::ensure_materialized)
+        .def("has_indices", &TTensor::has_indices);
   }
 
   /// Bind operations that depend only on the logical Tensor interface.  The

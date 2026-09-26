@@ -73,8 +73,8 @@ def _make_rectangle_point_cloud():
     return X
 
 
-def _indexed_rectangle_tensors(pcloud_dtype, np_dtype):
-    rectangle = _make_rectangle_point_cloud().astype(np_dtype)
+def _indexed_rectangle_tensors(make_pcloud_or_distmat_tensor):
+    rectangle = _make_rectangle_point_cloud()
     selections = sb.NestedTensor(
         [
             [
@@ -89,9 +89,7 @@ def _indexed_rectangle_tensors(pcloud_dtype, np_dtype):
             ],
         ]
     )
-    source = sb.PointCloudTensor(
-        [rectangle, rectangle * np_dtype(2)], dtype=pcloud_dtype
-    )
+    source = make_pcloud_or_distmat_tensor([rectangle, rectangle * 2])
     return source[selections]
 
 
@@ -173,18 +171,13 @@ def test_persistence_ripser_compute_euclidean_barcode_on_tensor():
                 assert Y[i, j, k, 1].is_isomorphic_to(xbc[1])
 
 
-@pytest.mark.parametrize(
-    "pcloud_dtype,np_dtype",
-    [(sb.pcloud32, np.float32), (sb.pcloud64, np.float64)],
-)
 @pytest.mark.parametrize("reduced", [False, True])
 def test_persistence_accepts_whole_indexed_tensors_and_outer_views(
-    pcloud_dtype, np_dtype, reduced
+    make_pcloud_or_distmat_tensor, reduced
 ):
-    indexed_tensor = _indexed_rectangle_tensors(pcloud_dtype, np_dtype)
+    indexed_tensor = _indexed_rectangle_tensors(make_pcloud_or_distmat_tensor)
 
     for indexed in (indexed_tensor, indexed_tensor[1:, 1:]):
-        indexed_storage_type = type(indexed._data)
         dense = indexed.to_dense()
 
         actual = pers.compute_persistent_homology(
@@ -194,5 +187,5 @@ def test_persistence_accepts_whole_indexed_tensors_and_outer_views(
             dense, max_dim=2, reduced=reduced
         )
 
-        assert type(indexed._data) is indexed_storage_type
+        assert indexed._data._get_element([0, 0]).is_indexed
         assert actual.is_isomorphic_to(expected)
