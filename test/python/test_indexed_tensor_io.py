@@ -24,6 +24,35 @@ def _assert_same_clouds(actual, expected):
         npt.assert_array_equal(np.asarray(actual[index]), np.asarray(expected[index]))
 
 
+def test_public_indices_are_independent_and_follow_views(make_pcloud_or_distmat_tensor):
+    source = make_pcloud_or_distmat_tensor(np.arange(24).reshape(2, 6, 2))
+    assert source.indices is None
+    selected = source[sb.NestedTensor([
+        [sb.indices([4, 1, 4]), sb.indices([])],
+        [sb.indices([2]), sb.indices([5, 0])],
+    ])]
+    view = selected.T[::-1]
+    indices = view.indices
+    assert isinstance(indices, sb.NestedTensor)
+    assert indices.dtype is sb.uint64
+    assert indices.shape == view.shape
+    assert indices.depth == 2
+    npt.assert_array_equal(np.asarray(indices[0, 0]), [])
+    npt.assert_array_equal(np.asarray(indices[0, 1]), [5, 0])
+    npt.assert_array_equal(np.asarray(indices[1, 0]), [4, 1, 4])
+    npt.assert_array_equal(np.asarray(indices[1, 1]), [2])
+    indices[1, 0][0] = 0
+    npt.assert_array_equal(np.asarray(view.indices[1, 0]), [4, 1, 4])
+    assert selected[:0].indices.shape == (0, 2)
+    scalar = selected[1, 1:2].squeeze()
+    assert scalar.indices.shape == ()
+    npt.assert_array_equal(np.asarray(scalar.indices[()]), [5, 0])
+    view[1, 0][0, 1] = 99
+    assert selected.indices is None
+    assert view.indices is None
+    npt.assert_array_equal(np.asarray(indices[1, 0]), [0, 1, 4])
+
+
 def test_indexed_binary_and_pickle_roundtrip_retains_storage(make_pcloud_or_distmat_tensor):
     points = make_pcloud_or_distmat_tensor(np.arange(40).reshape(2, 5, 4))
     selections = sb.NestedTensor(
