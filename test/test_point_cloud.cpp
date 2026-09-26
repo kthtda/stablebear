@@ -21,9 +21,12 @@ namespace
       (void)sb::PointCloud<T>{sb::Tensor<T>({3})}, std::invalid_argument);
     EXPECT_THROW(
       (void)sb::PointCloud<T>{std::vector<size_t>{0}}, std::invalid_argument);
+    EXPECT_THROW(
+      (void)sb::PointCloud<T>{sb::Tensor<T>({2, 3, 4})}, std::invalid_argument);
 
     EXPECT_NO_THROW((void)sb::PointCloud<T>{});
     EXPECT_NO_THROW(((void)sb::PointCloud<T>{std::vector<size_t>{0, 2}}));
+    EXPECT_EQ(sb::PointCloud<T>{}.rank(), 2);
   }
 
   TYPED_TEST(PointCloudTest, CopyMaterializesAnIndexedView)
@@ -38,15 +41,22 @@ namespace
     rows(0) = 2;
     rows(1) = 0;
 
-    const sb::PointCloud<T> view(coordinates, std::move(rows));
+    sb::PointCloud<T> source(coordinates);
+    const sb::PointCloud<T> view = source.index_into(rows);
     const sb::PointCloud<T> copied = view.copy();
+
+    EXPECT_EQ(source.storage_data(), view.storage_data());
+    EXPECT_EQ(source.n_points(), 3);
+    EXPECT_EQ(view.n_points(), 2);
+    source(2, 0) = T{40};
+    EXPECT_EQ(view(0, 0), T{40});
 
     EXPECT_TRUE(view.is_indexed());
     EXPECT_FALSE(copied.is_indexed());
     EXPECT_EQ(copied.n_points(), 2);
     EXPECT_EQ(copied(0, 0), T{30});
     EXPECT_EQ(copied(1, 0), T{10});
-    EXPECT_NE(copied.coords().storage_owner(), coordinates.storage_owner());
+    EXPECT_NE(copied.storage_data(), source.storage_data());
   }
 
   TYPED_TEST(PointCloudTest, CoordinateConstructionCopiesViews)
@@ -77,10 +87,10 @@ namespace
     EXPECT_EQ(fromLvalue(1, 1), T{11});
     EXPECT_EQ(fromRvalue(0, 0), T{20});
     EXPECT_EQ(fromRvalue(1, 1), T{31});
-    EXPECT_NE(fromTensor.coords().storage_owner(), coordinates.storage_owner());
-    EXPECT_NE(fromLvalue.coords().storage_owner(), coordinates.storage_owner());
-    EXPECT_NE(fromRvalue.coords().storage_owner(), coordinates.storage_owner());
+    EXPECT_NE(fromTensor.storage_data(), coordinates.data());
+    EXPECT_NE(fromLvalue.storage_data(), coordinates.data());
+    EXPECT_NE(fromRvalue.storage_data(), coordinates.data());
     EXPECT_NE(
-      fromLvalue.coords().storage_owner(), fromRvalue.coords().storage_owner());
+      fromLvalue.coords().storage_data(), fromRvalue.coords().storage_data());
   }
 }

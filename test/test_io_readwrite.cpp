@@ -212,8 +212,8 @@ namespace
     EXPECT_EQ(restored.flat(0).indices()(2), 3);
     EXPECT_EQ(restored.flat(1).n_points(), 0);
     EXPECT_EQ(
-      restored.flat(0).coords().storage_owner(),
-      restored.flat(2).coords().storage_owner());
+      restored.flat(0).coords().storage_data(),
+      restored.flat(2).coords().storage_data());
 
     // Loading retains the shared indexed state and its one-time
     // materialization behavior on mutation.
