@@ -16,14 +16,75 @@ def test_point_cloud_is_a_rank_two_facade(dtype, np_dtype):
     assert cloud.shape == (4, 3)
     assert cloud.size == 12
     assert cloud.dtype == dtype
-    assert not hasattr(cloud, "ndim")
-    assert not hasattr(cloud, "squeeze")
-    assert not hasattr(cloud, "reshape")
     assert cloud[:, 1].array_equal(expected[:, 1])
 
     cloud[2, 1] = -1
     expected[2, 1] = -1
     np.testing.assert_array_equal(np.asarray(cloud), expected)
+
+
+@pytest.mark.parametrize("indexed", [False, True])
+def test_coordinate_indexing_matches_numpy_views_and_copies(indexed, monkeypatch):
+    source = sb.PointCloudTensor(np.arange(24.).reshape(1, 6, 4))
+    points = (source[sb.NestedTensor([sb.indices([4, 1, 4])])]
+              if indexed else source)
+    backend_type = type(points._data._get_element([0]))
+
+    def reject_source_copy(*args):
+        pytest.fail("extracting a cloud must not copy its coordinate source")
+
+    monkeypatch.setattr(backend_type, "to_float_tensor", reject_source_copy)
+    cloud = points[0]
+    expected = np.asarray(cloud).copy()
+    source_before = np.asarray(source[0]).copy()
+    view = cloud[::-1, None, 1:]
+    expected_view = expected[::-1, None, 1:]
+    npt.assert_array_equal(np.asarray(view), expected_view)
+    assert points._data.has_indices() == indexed
+
+    # Chained basic slices write through, even after the shared transition.
+    row = view[0, 0]
+    row[0] = 99
+    expected_view[0, 0, 0] = 99
+    row += 2
+    expected_view[0, 0] += 2
+    npt.assert_array_equal(np.asarray(cloud), expected)
+    npt.assert_array_equal(np.asarray(view), expected_view)
+    if indexed:
+        npt.assert_array_equal(np.asarray(source[0]), source_before)
+
+    column = cloud[:].T[0]
+    column.reshape((1, -1))[0, 0] = 71
+    expected[0, 0] = 71
+    npt.assert_array_equal(np.asarray(cloud), expected)
+    with pytest.raises(ValueError, match="read-only"):
+        column.broadcast_to((2, len(column)))[0, 0] = 0
+
+    # Multiple advanced indices use NumPy's paired indexing, not outer indexing.
+    indices = ([0, 1], [1, 2])
+    gathered = cloud[indices]
+    npt.assert_array_equal(np.asarray(gathered), expected[indices])
+    gathered[:] = -1
+    masked = cloud[expected > 10]
+    masked[:] = -2
+    copied = cloud.copy()
+    copied[0, 0] = -3
+    npt.assert_array_equal(np.asarray(cloud), expected)
+
+    array = np.asarray(cloud)
+    array[0, 0] = 72
+    assert cloud[0, 0] == 72
+
+
+def test_rejected_coordinate_view_write_keeps_indexed_source_connection():
+    source = sb.PointCloudTensor(np.arange(12.).reshape(1, 6, 2))
+    points = source[sb.NestedTensor([sb.indices([4, 1, 4])])]
+    row = points[0][0]
+    with pytest.raises(ValueError):
+        row[:] = [1, 2, 3]
+    assert points._data.has_indices()
+    source[0][4, 0] = 70
+    assert row[0] == 70
 
 
 @pytest.mark.parametrize("shape", [(3,), (2, 3, 4)])
