@@ -42,11 +42,17 @@ def test_public_indices_are_independent_and_follow_views(make_pcloud_or_distmat_
     npt.assert_array_equal(np.asarray(indices[1, 0]), [4, 1, 4])
     npt.assert_array_equal(np.asarray(indices[1, 1]), [2])
     indices[1, 0][0] = 0
-    npt.assert_array_equal(np.asarray(view.indices[1, 0]), [4, 1, 4])
-    assert selected[:0].indices.shape == (0, 2)
+    unchanged_indices = view.indices
+    assert unchanged_indices is not None
+    npt.assert_array_equal(np.asarray(unchanged_indices[1, 0]), [4, 1, 4])
+    empty_indices = selected[:0].indices
+    assert empty_indices is not None
+    assert empty_indices.shape == (0, 2)
     scalar = selected[1, 1:2].squeeze()
-    assert scalar.indices.shape == ()
-    npt.assert_array_equal(np.asarray(scalar.indices[()]), [5, 0])
+    scalar_indices = scalar.indices
+    assert scalar_indices is not None
+    assert scalar_indices.shape == ()
+    npt.assert_array_equal(np.asarray(scalar_indices[()]), [5, 0])
     view[1, 0][0, 1] = 99
     assert selected.indices is None
     assert view.indices is None
