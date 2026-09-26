@@ -226,6 +226,39 @@ A–K in order; each item remains independently executable.
    Pass: no mutable coordinate route bypasses the ownership contract; do not
    assume that NumPy conversion is zero-copy.
 
+- [ ] **A5. Individual point-cloud, distance-matrix, and symmetric-matrix selectors.**
+
+   Scope: index a single `PointCloud`, `DistanceMatrix`, or `SymmetricMatrix` directly, not an
+   outer tensor and not through `NestedTensor` selections. Cover ordinary
+   signed/unsigned integer tensors (including `sb.indices`), boolean tensors,
+   slices, and scalar indices at both precisions. Include standalone objects
+   and cells extracted from dense/indexed tensors, ordered/repeated indices,
+   empty selections, all-true/all-false masks, negative indices where supported,
+   and invalid selector dtype, rank, mask length, or bounds.
+
+   Point-cloud coordinate indexing should follow numeric NumPy indexing,
+   including row/column selectors and basic-view versus advanced-copy behavior.
+   Define and document matrix vertex selection separately: a single
+   selector chooses the principal submatrix on both axes, preserving order and
+   repetitions; retain scalar `(i, j)` access and explicitly specify any
+   supported two-axis array indexing and its result type. Do not silently
+   substitute NumPy's row-only or paired advanced indexing for vertex selection.
+
+   Check reads and supported assignment routes, result types/shapes/values,
+   retained-view lifetimes, copy independence, and shared-state materialization
+   on successful writes. Rejected writes must not detach or mutate the source;
+   matrix symmetry must survive. Distance matrices must retain nonnegativity
+   and implicit zero diagonals; symmetric matrices must preserve their stored
+   diagonal and permit negative entries.
+   Compare with independent NumPy coordinate/principal-submatrix references.
+
+   **Known implementation gap:** `DistanceMatrix.__getitem__` currently handles
+   only scalar `(i, j)` access; audit `SymmetricMatrix` independently as well.
+   Direct selector-tensor support must be implemented where missing
+   and documented, not marked covered by tensor-level nested-indexing tests.
+   Pass: the agreed individual-object selector contract has committed
+   implementation and regression coverage for all three families at both precisions.
+
 ### B. Nested tensors and C++ tensor properties
 
 - [ ] **B1. Runtime-nested construction, depth, and representation.**
@@ -943,6 +976,7 @@ A–K in order; each item remains independently executable.
 | #231 prefix indexing, lazy alignment, repeated indexing | C1–C2, E1–E4 |
 | #231 recursive IO, backend/docs | G1–G3, H4, I3 |
 | New Python `PointCloud`, strict rank-two validation, moved exports | A1–A4, H1–H3, I2–I3 |
+| Individual point-cloud/distance-matrix/symmetric-matrix integer-tensor, boolean-mask, slice and scalar indexing | A5 |
 | C++ tensor properties, generic views/bindings, numeric wrapper dispatch | A1, B4–B5, E2, E5, I1 |
 | FixedRankTensor and point-cloud/compressed-matrix layouts | A2–A4, B6, D5, E5, G1, I1 |
 | Distance oracle, persistence dispatch, task input ownership | F1–F2 |
