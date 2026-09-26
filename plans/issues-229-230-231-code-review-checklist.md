@@ -2,35 +2,42 @@
 
 This document records review findings and implementation evidence for
 [PR #233](https://github.com/kthtda/stablebear/pull/233), covering issues
-#229–#232, plus the dependent #236 follow-up. The 2026-09-22 update is review
-only: no fixes or tests were added.
+#229–#232, plus the dependent #236 follow-up. The 2026-09-26 update changes
+planning documents only and separates committed work from pending tests.
 Previous completed items remain as historical evidence; new findings below
 identify gaps beyond the cases those fixes covered.
 
-## Current review: 2026-09-22
+## Current review: 2026-09-26
 
 Reviewed local branch `issue-229-uniform-subsampling` at
-`cced5d9b78c56f97cee4495505df5c0560438fcb`, against PR base/main
-`4a9c284f4f48d6711083d99ee529819d4c546384`. GitHub PR #233 currently points
-to `b0b39ee1530230d0ac021276b5f5c3e770fe948f`: the local D2 implementation
-and its checklist commit are two commits ahead of that remote head. The D3
-work in `stash@{0}` was not applied and is not counted as branch coverage.
-The local net diff contains 148 changed files.
+`991d8e5ce75e2a4cb855454e05a892d85f1ff3c2`, against local main/merge base
+`4a9c284f4f48d6711083d99ee529819d4c546384`. The committed net diff contains
+162 changed files. Remote PR/issue state was not refreshed. Uncommitted tests
+are listed separately in the [test plan](issues-229-230-231-test-plan.md).
 
 **Assessment:** The major features exist, but the branch is not ready for
-acceptance. Four additional correctness findings are recorded in section E;
-D3's extra resampling copy and D4's completion audit remain open. Passing
-regression tests do not cover the failing cases below.
+acceptance. D3 and E1/E2/E4 have fixing commits and retain their checked status.
+E3's indexed-overlap guard remains unresolved. F1 is implemented, but its
+regression tests are pending; D4 remains open. A clean HEAD checkout cannot
+build the current C++ test target: CMake names the untracked FixedRankTensor
+test, and existing tests need the pending updates for removed storage/IO APIs.
 
 | PR scope | Current coverage and remaining work |
 | --- | --- |
-| #229 uniform point-cloud subsampling | API, indexed backing, owned selections, shared materialization, and indexed persistence integration are implemented. D3 still copies indexed input twice; E3/E4 expose C++ indexed-storage correctness gaps. Committed sampling tests do not yet establish the full RNG/deduplication/copy-count contract. |
-| #230 binary-backed pickle and compatibility | Shared reducers, standalone object IO, and released 0.4.7 fixtures are present. E1 demonstrates scalar data loss, including inside the new nested type; E4 corrupts legitimate C++ coordinate views. The PR's checked issue-tracking box is not sufficient acceptance evidence. |
-| #231 runtime nesting and ragged indexing | Recursive types, exact-prefix selection validation, ordinary views, and D2 copy boundaries are implemented. E2 allows bulk writes to violate homogeneous nesting depth; scalar IO also fails. |
+| #229 uniform point-cloud subsampling | D3's direct indexed resampling and regression are committed (`8134f40c4`). `991d8e5ce` adds generic sampling and hash-based filtering with task-local scratch. Broader RNG/uniformity acceptance and review E3 remain open; new hash-filter tests are pending. |
+| #230 binary-backed pickle and compatibility | Scalar payload loss is fixed (`b70dbec19`); coordinate construction copies to prevent ambiguous source mappings (`1570fdafd`). V3 remains unreleased and unchanged in version. Legacy goldens remain; broader inventory/cross-backend/current-golden acceptance is open. |
+| #231 runtime nesting and ragged indexing | D2 ownership and E2 depth/assignment validation (`339252aae`) are committed with regressions. Remaining deep/outer-operation acceptance is tracked separately; these are no longer known E2 failures. |
 | #232 barcode tensor isomorphism | Implemented with aligned, same-dtype tensor semantics; existing tests and additional scalar/empty/transposed probes passed. No substantive issue found in the reviewed scope. |
-| #236 distance-matrix subsampling | Not implemented: the sampler accepts only `PointCloudTensor`. The issue and PR explicitly identify this as a follow-up blocked by #229; do not count it as delivered or as an unexpected defect in this PR. |
+| #236 distance-matrix subsampling | Implemented in `991d8e5ce`, including indexed principal submatrices, generic bindings/consumers, IO, and shared-state mutation. Acceptance stays open until the pending tests are committed and the complete F1 contract is audited. |
 
-**Verification:** Rebuilt and installed the committed source after stashing D3.
+**Current verification:** Rebuilt and installed HEAD plus pending tests. Full
+Python runs passed **2,427 tests with `_sb_cuda12`** and **2,397 tests with
+`_sb_cpu` (30 CUDA tests skipped)**. The full C++ suite passed **491 tests**;
+`make html` succeeded. These are working-tree results, not clean-commit
+acceptance. No tests, production files, or commits were added by this review.
+
+**Historical verification (2026-09-22, `cced5d9b7`):** Rebuilt and installed
+the then-committed source after stashing the then-uncommitted D3 work.
 From `test/`, the full Python suite passed **2,358 tests with `_sb_cuda12`**;
 `SB_FORCE_CPU=1` passed **2,328 tests with `_sb_cpu`, with 30 CUDA tests
 skipped**. The full C++ executable passed **486 tests**. `make html` in `docs/`
@@ -38,7 +45,7 @@ succeeded. These are local builds, not clean-wheel/platform-matrix validation.
 Sampling and serialization run on CPU even when the CUDA module is loaded.
 CUDA 13 and bidirectional cross-module file writing/reading were not exercised.
 
-Focused, temporary reproductions confirmed E1/E2 on both extension modules,
+At that historical review, temporary reproductions confirmed E1/E2 on both extension modules,
 and E3/E4 with standalone C++ programs compiled against the reviewed headers.
 Additional sampler probes passed validation, no RNG advancement on failure,
 row-major stream allocation, empty cases, stable duplicate filtering, and
@@ -49,12 +56,12 @@ for the coverage inventory and missing cases.
 The original review covered commit `6d3e00e36f7114dcffe54a675262e49b7f44e9e7`
 against the same base. Sections A–D retain its findings and subsequent fixing
 commits; its original focused reproduction results should not be confused with
-the current full-suite run.
+the later full-suite runs.
 
 P1 denotes a correctness or compatibility blocker for the stated issue scope.
 P2 denotes an API/validation gap that should also be addressed before acceptance.
-Prioritize the correctness findings in section E and the remaining D3 work
-before D4 acceptance. Each item describes its own completion criteria; related
+Prioritize unresolved E3 and the pending F1 test/build dependencies before D4
+acceptance. Each item describes its own completion criteria; related
 fixes may be implemented together. Record the fixing commit
 and verification evidence before checking an item off.
 
@@ -645,3 +652,14 @@ identify review work, not test-plan items. The broader test plan still applies.
 
   Source and acceptance criteria:
   [issue #236](https://github.com/kthtda/stablebear/issues/236).
+
+  **Implemented, not checked off (2026-09-26):** `991d8e5ce` contains the
+  distance-matrix sampler, FixedRankTensor-backed layouts, shared Python
+  indexed-element handling, generic persistence bindings, indexed binary IO,
+  logical matrix allclose/IO traversal, and public documentation. Its test
+  additions were deliberately left out of that commit. Pending tests cover
+  both precisions, principal submatrices, zero-distance/index duplicate
+  semantics, resampling and generator parity, mutation/ownership, binary and
+  pickle round trips, and const persistence/kernel consumers. They pass in
+  the working tree but cannot yet serve as committed acceptance evidence.
+  The test plan now includes B6 (fixed-rank storage) and D5 (#236 integration).
