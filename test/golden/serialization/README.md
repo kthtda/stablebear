@@ -22,6 +22,15 @@ remain visible.
 
 Do not regenerate historical directories with a newer Stablebear build.
 
+`0.5-pre` pins 12 V3 point-cloud artifacts to the
+producer implementation commit recorded in its manifest. Binary and protocol-4
+pickle cases cover dense, repeated/reordered selected, and empty `(0, 2)`
+standalone clouds at both precisions. Expected coordinates are explicit in
+`generate_point_cloud_v3.py`, independent of the writer and reader.
+After building/installing, generate a new corpus from `test/` with
+`python golden/serialization/generate_point_cloud_v3.py`. It refuses to
+overwrite a corpus or run with uncommitted implementation changes.
+
 The `0.4.7-matrices-3x3` directory supplements the original 0.4.7 fixtures
 with 16 binary/pickle artifacts exported using the actual 0.4.7 release.
 It covers standalone and tensor distance/symmetric matrices at both precisions.

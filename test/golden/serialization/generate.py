@@ -245,8 +245,10 @@ def _cases():
                 )
 
     matrix_types = (
-        ("symmetric", "SymmetricMatrix", "SymmetricMatrixTensor", [[1, 2], [2, 3]]),
-        ("distance", "DistanceMatrix", "DistanceMatrixTensor", [[0, 2], [2, 0]]),
+        ("symmetric", "SymmetricMatrix", "SymmetricMatrixTensor",
+         [[-1, 1, 2], [1, -2, 3], [2, 3, -3]]),
+        ("distance", "DistanceMatrix", "DistanceMatrixTensor",
+         [[0, 1, 2], [1, 0, 3], [2, 3, 0]]),
     )
     for prefix, object_name, tensor_name, values in matrix_types:
         if not _available(object_name):
@@ -258,7 +260,7 @@ def _cases():
             _case(
                 cases,
                 f"{prefix}_matrix_{suffix}",
-                f"Standalone 2x2 {suffix} {prefix} matrix",
+                f"Standalone 3x3 {suffix} {prefix} matrix",
                 object_factory,
                 _array_expectation,
             )
@@ -266,7 +268,7 @@ def _cases():
                 _case(
                     cases,
                     f"{prefix}_matrix_tensor_{suffix}",
-                    f"Tensor containing one 2x2 {suffix} {prefix} matrix",
+                    f"Tensor containing one 3x3 {suffix} {prefix} matrix",
                     lambda tensor_name=tensor_name, dtype=dtype, values=values: getattr(
                         sb, tensor_name
                     )(np.asarray([values], dtype=dtype)),
