@@ -4,6 +4,7 @@
 #include "io_stream_base.hpp"
 #include "barcode_io.hpp"
 #include "compressed_matrix_io.hpp"
+#include "fixed_rank_tensor_io.hpp"
 #include "../tensor.hpp"
 #include "../nested_tensor.hpp"
 #include "../point_cloud.hpp"
@@ -270,7 +271,7 @@ namespace sb::io::detail
   template <typename T>
   void write_value(std::ostream& os, const PointCloud<T>& cloud)
   {
-    write_tensor(os, cloud.coordinates_copy());
+    write_fixed_rank_tensor(os, cloud.coords());
   }
 
   template <typename T>
@@ -386,6 +387,13 @@ namespace sb::io::detail
   template <typename T>
   PointCloud<T> read_point_cloud(BinaryReader& reader)
   {
+    if (reader.format_version() >= 3)
+    {
+      PointCloud<T> cloud;
+      cloud.mutable_coords() = read_fixed_rank_tensor<T, 2, PointCloudLayout>(reader.stream());
+      return cloud;
+    }
+
     auto coords = read_element<Tensor<T>>(reader);
     if (coords.rank() != 2)
     {
@@ -579,13 +587,15 @@ namespace sb::io::detail
         *elem = read_compressed_matrix<T>(is);
       else if constexpr (is_point_cloud_v<T>)
       {
-        // Point-cloud tensors store a complete logical coordinate tensor for
-        // every element. A rank-zero tensor represents a default empty cell.
-        auto coordinates = read_element<
-          Tensor<typename is_point_cloud<T>::scalar_type>>(reader);
-        *elem = coordinates.rank() == 0
-          ? T()
-          : T(std::move(coordinates));
+        if (reader.format_version() >= 3)
+          *elem = read_point_cloud<typename is_point_cloud<T>::scalar_type>(reader);
+        else
+        {
+          // V1/V2 stored dynamic tensors; rank zero denoted a default empty cell.
+          auto coordinates = read_element<
+            Tensor<typename is_point_cloud<T>::scalar_type>>(reader);
+          *elem = coordinates.rank() == 0 ? T() : T(std::move(coordinates));
+        }
       }
       else if constexpr (is_nested_tensor_v<T>)
         *elem = read_nested_tensor_element<typename is_nested_tensor<T>::leaf_type>(reader);

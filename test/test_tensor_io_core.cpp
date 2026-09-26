@@ -317,46 +317,37 @@ namespace
     EXPECT_THROW((void)sb::io::detail::read_tensor<T>(iss), std::runtime_error);
   }
 
-  TEST(TensorIoCore, IndexedPointCloudSourcesMustBeCoordinateMatrices)
-  {
-    EXPECT_NO_THROW(
-      sb::io::detail::validate_indexed_point_cloud_source(
-        sb::Tensor<float>({ 2, 3 })));
-    EXPECT_THROW(
-      sb::io::detail::validate_indexed_point_cloud_source(
-        sb::Tensor<float>({ 2 })),
-      std::runtime_error);
-  }
-
   TEST(TensorIoCore, IndexedPointCloudSourceReferencesMustExist)
   {
     EXPECT_NO_THROW(
-      sb::io::detail::validate_indexed_point_cloud_source_reference(0, 1));
+      sb::io::detail::validate_indexed_source_reference(0, 1));
     EXPECT_THROW(
-      sb::io::detail::validate_indexed_point_cloud_source_reference(1, 1),
+      sb::io::detail::validate_indexed_source_reference(1, 1),
       std::runtime_error);
     EXPECT_THROW(
-      sb::io::detail::validate_indexed_point_cloud_source_reference(0, 0),
+      sb::io::detail::validate_indexed_source_reference(0, 0),
       std::runtime_error);
   }
 
   TEST(TensorIoCore, IndexedPointCloudSelectionsMustNameCoordinateRows)
   {
+    sb::PointCloud<float> source(std::vector<size_t>{ 2, 3 });
+
     sb::Tensor<uint64_t> valid({ 2 });
     valid(0) = 1;
     valid(1) = 0;
     EXPECT_NO_THROW(
-      sb::io::detail::validate_indexed_point_cloud_selection(valid, 2));
+      sb::io::detail::validate_indexed_selection(source, valid));
 
     sb::Tensor<uint64_t> notAVector({ 1, 1 });
     EXPECT_THROW(
-      sb::io::detail::validate_indexed_point_cloud_selection(notAVector, 2),
+      sb::io::detail::validate_indexed_selection(source, notAVector),
       std::runtime_error);
 
     sb::Tensor<uint64_t> outOfBounds({ 1 });
     outOfBounds(0) = 2;
     EXPECT_THROW(
-      sb::io::detail::validate_indexed_point_cloud_selection(outOfBounds, 2),
+      sb::io::detail::validate_indexed_selection(source, outOfBounds),
       std::runtime_error);
   }
 

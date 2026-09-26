@@ -5,6 +5,7 @@
 #include "../config.hpp"
 
 #include <cstddef>
+#include <array>
 #include <cstdint>
 #include <vector>
 #include <iostream>
@@ -111,6 +112,24 @@ namespace sb::io::detail
   inline bool read_bytes<bool>(std::istream& is)
   {
     return read_bytes<uint8_t>(is) != 0;
+  }
+
+  // Fixed-size arrays contain only their elements, with no length or padding.
+  // The explicit wire type allows size_t extents to be stored as uint64_t.
+  template <typename WireT, typename T, size_t Size>
+  void write_array(std::ostream& os, const std::array<T, Size>& values)
+  {
+    for (const auto& value : values)
+      write_bytes<WireT>(os, value);
+  }
+
+  template <typename T, size_t Size>
+  std::array<T, Size> read_array(std::istream& is)
+  {
+    std::array<T, Size> values{};
+    for (auto& value : values)
+      value = read_bytes<T>(is);
+    return values;
   }
 
   template <std::forward_iterator FwdIt>

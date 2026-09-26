@@ -4,8 +4,10 @@
 #include <algorithm>
 #include <array>
 #include <concepts>
+#include <compare>
 #include <cstddef>
 #include <functional>
+#include <iterator>
 #include <memory>
 #include <numeric>
 #include <stdexcept>
@@ -118,6 +120,89 @@ namespace sb
     {
       return (*this)(indices_from_flat(index));
     }
+
+    /// Borrow a read-only row-major range, advancing coordinates without
+    /// converting a flat index on every access. The tensor must outlive it.
+    struct FlatView
+    {
+      const FixedRankTensor* tensor;
+      struct Iterator
+      {
+        using value_type = T;
+        using difference_type = ptrdiff_t;
+        using reference = const T&;
+        using pointer = const T*;
+        using iterator_concept = std::random_access_iterator_tag;
+        using iterator_category = std::random_access_iterator_tag;
+
+        const FixedRankTensor* tensor = nullptr;
+        shape_type shape{};
+        shape_type indices{};
+        difference_type position = 0;
+
+        reference operator*() const { return (*tensor)(indices); }
+        pointer operator->() const { return std::addressof(**this); }
+        reference operator[](difference_type offset) const { return *(*this + offset); }
+        Iterator& operator++()
+        {
+          ++position;
+          for (size_t axis = Rank; axis-- > 0;)
+          {
+            if (++indices[axis] < shape[axis])
+              break;
+            indices[axis] = 0;
+          }
+          return *this;
+        }
+        Iterator operator++(int) { auto previous = *this; ++*this; return previous; }
+        Iterator& operator--()
+        {
+          --position;
+          for (size_t axis = Rank; axis-- > 0;)
+          {
+            if (indices[axis] != 0)
+            {
+              --indices[axis];
+              break;
+            }
+            indices[axis] = shape[axis] - 1;
+          }
+          return *this;
+        }
+        Iterator operator--(int) { auto previous = *this; --*this; return previous; }
+        Iterator& operator+=(difference_type offset)
+        {
+          if (offset == 0)
+            return *this;
+          position += offset;
+          size_t flat = static_cast<size_t>(position);
+          for (size_t axis = Rank; axis-- > 0;)
+          {
+            indices[axis] = flat % shape[axis];
+            flat /= shape[axis];
+          }
+          return *this;
+        }
+        Iterator& operator-=(difference_type offset) { return *this += -offset; }
+        friend Iterator operator+(Iterator it, difference_type offset) { return it += offset; }
+        friend Iterator operator+(difference_type offset, Iterator it) { return it += offset; }
+        friend Iterator operator-(Iterator it, difference_type offset) { return it -= offset; }
+        difference_type operator-(const Iterator& other) const { return position - other.position; }
+        bool operator==(const Iterator& other) const
+        {
+          return tensor == other.tensor && position == other.position;
+        }
+        auto operator<=>(const Iterator& other) const { return position <=> other.position; }
+      };
+      Iterator begin() const { return {tensor, tensor->shape(), {}, 0}; }
+      Iterator end() const
+      {
+        return {tensor, tensor->shape(), {}, static_cast<ptrdiff_t>(tensor->size())};
+      }
+    };
+
+    [[nodiscard]] FlatView flat_view() const & { return {this}; }
+    auto flat_view() const && = delete;
 
     template <typename... Indices>
       requires (sizeof...(Indices) == Rank)
