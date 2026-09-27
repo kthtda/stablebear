@@ -326,21 +326,25 @@ namespace sb
     // If the RHS aliases this tensor's storage (e.g. a[:] = a[::-1] or
     // a[1:] = a[:-1], where both sides are views of the same buffer), an
     // element-wise walk would read positions it has already overwritten.
-    // Materialize an independent copy of the RHS first, matching NumPy's
-    // handling of overlapping assignment. Aliasing is only possible when the
-    // element types match and the two views share the same base buffer; data()
-    // includes the view offset, so compare the buffer base (data() - offset()).
-    if constexpr (std::is_same_v<T, U> && !IsIndexed
-      && !Tensor<U, OtherProperties>::IsIndexed)
+    // Snapshot the logical RHS before any write or shared materialization.
+    // Indexed views share their active source buffer, even after their
+    // selections have been removed. Compare backing storage, not view offsets.
+    if constexpr (std::is_same_v<T, U>)
     {
-      if (this->data() - this->offset() == rhs.data() - rhs.offset())
+      const auto backing_owner = [](const auto& tensor) {
+        if constexpr (std::remove_cvref_t<decltype(tensor)>::IsIndexed)
+          return tensor.view_source().storage_owner();
+        else
+          return tensor.storage_owner();
+      };
+      if (backing_owner(*this) == backing_owner(rhs))
       {
-        Tensor<T> rhs_copy = rhs_view.copy();
+        const auto rhs_copy = rhs_view.copy();
         sb::walk(*this, [this, &rhs_copy](const std::vector<size_t>& idx){
-          // store_copy as well: rhs_copy.copy() duplicates only the outer
-          // buffer, so element types that share a buffer (point clouds, the
-          // matrix types) would still alias the source until copied per cell.
-          (*this)(idx) = detail::materialized_store_copy(rhs_copy(idx));
+          if constexpr (IsIndexed)
+            writable_at(idx) = detail::materialized_store_copy(rhs_copy(idx));
+          else
+            (*this)(idx) = detail::materialized_store_copy(rhs_copy(idx));
         });
         return;
       }

@@ -309,6 +309,47 @@ namespace
     EXPECT_EQ(view(0).value, 99);
   }
 
+  TEST(TensorProperties, OverlappingAssignmentSnapshotsBeforeMaterialization)
+  {
+    using Matrix = sb::DistanceMatrix<double>;
+    // Matrix(2, d) represents two points at distance d: [[0, d],
+    //                                                    [d, 0]].
+    sb::Tensor<Matrix> source({ 4 });
+    source(0) = Matrix(2, 1);
+    source(1) = Matrix(2, 2);
+    source(2) = Matrix(2, 3);
+    source(3) = Matrix(2, 4);
+
+    // Keep both vertices (rows and columns) from each matrix.
+    sb::Tensor<uint64_t> vertices({ 2 });
+    vertices(0) = 0;
+    vertices(1) = 1;
+    sb::Tensor<sb::Tensor<uint64_t>> selections({ 4 });
+    selections(0) = vertices;
+    selections(1) = vertices;
+    selections(2) = vertices;
+    selections(3) = vertices;
+    auto indexed = sb::make_indexed_tensor(source, sb::to_nested_tensor(selections));
+    const auto reversed = indexed[std::vector<sb::Slice>{
+      sb::range(std::nullopt, std::nullopt, -1) }];
+
+    // Assignment itself must materialize the backing, unlike the Python route.
+    ASSERT_TRUE(indexed.has_indices());
+    indexed.assign_from(reversed);
+
+    EXPECT_FALSE(indexed.has_indices());
+    EXPECT_EQ(indexed(0), Matrix(2, 4));
+    EXPECT_EQ(indexed(1), Matrix(2, 3));
+    EXPECT_EQ(indexed(2), Matrix(2, 2));
+    EXPECT_EQ(indexed(3), Matrix(2, 1));
+
+    // Reversing the indexed result must leave its source unchanged.
+    EXPECT_EQ(source(0), Matrix(2, 1));
+    EXPECT_EQ(source(1), Matrix(2, 2));
+    EXPECT_EQ(source(2), Matrix(2, 3));
+    EXPECT_EQ(source(3), Matrix(2, 4));
+  }
+
   TEST(TensorProperties, OrdinaryAlgorithmsAcceptComposedIndexedProperties)
   {
     constexpr sb::TensorProperties TestProperty = 1 << 8;

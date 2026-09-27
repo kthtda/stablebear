@@ -57,6 +57,48 @@ def test_indexed_write_leaves_source_and_other_selections_unchanged(make_pcloud_
     npt.assert_array_equal(np.asarray(source[()]), source_before)
 
 
+def test_overlapping_indexed_matrix_assignment_preserves_rhs_values():
+    original_matrices = np.array([
+        [[0., 1.],
+         [1., 0.]],
+
+        [[0., 2.],
+         [2., 0.]],
+
+        [[0., 3.],
+         [3., 0.]],
+
+        [[0., 4.],
+         [4., 0.]],
+    ])
+    source = sb.DistanceMatrixTensor(original_matrices)
+    # Keep vertices 0 and 1 (both rows and columns) from each source matrix.
+    indexed = source[sb.NestedTensor([
+        sb.indices([0, 1]),
+        sb.indices([0, 1]),
+        sb.indices([0, 1]),
+        sb.indices([0, 1]),
+    ])]
+
+    indexed[:] = indexed[::-1]
+
+    expected_matrices = np.array([
+        [[0., 4.],
+         [4., 0.]],
+
+        [[0., 3.],
+         [3., 0.]],
+
+        [[0., 2.],
+         [2., 0.]],
+
+        [[0., 1.],
+         [1., 0.]],
+    ])
+    npt.assert_array_equal([np.asarray(matrix) for matrix in indexed], expected_matrices)
+    npt.assert_array_equal([np.asarray(matrix) for matrix in source], original_matrices)
+
+
 def test_second_indexed_write_preserves_first_write(make_pcloud_or_distmat_tensor):
     source = make_pcloud_or_distmat_tensor([[1, 2]])
     indexed = source[sb.NestedTensor([sb.indices([0, 0, 0])])]
