@@ -80,6 +80,30 @@ class TestSubsample:
         with pytest.raises(ValueError, match=f"{parameter} must be greater than zero"):
             subsample(source, **counts)
 
+    def test_undersized_last_input_does_not_advance_generator(self):
+        source = sb.PointCloudTensor([
+            np.array([
+                [0., 0.],
+                [1., 0.],
+                [0., 2.],
+                [3., 1.],
+            ]),
+            np.array([[10., 1.]]),
+        ])
+        generator = sb.random.Generator(seed=229)
+        control_generator = sb.random.Generator(seed=229)
+
+        # The first cloud is large enough; the second must reject the whole call.
+        with pytest.raises(ValueError, match="n_points exceeds the number of input points"):
+            subsample(source, n_points=3, generator=generator)
+
+        valid_source = source[:1]
+        after_failure = subsample(valid_source, n_points=3, n_samples=2,
+                                  generator=generator)
+        control = subsample(valid_source, n_points=3, n_samples=2,
+                            generator=control_generator)
+        assert after_failure.array_equal(control)
+
     def test_sampling_does_not_change_input(self, sample_data):
         before = sample_data.copy()
         subsample(sample_data, n_points=3, n_samples=2, replace=True)
