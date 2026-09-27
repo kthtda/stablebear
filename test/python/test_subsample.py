@@ -104,6 +104,34 @@ class TestSubsample:
                             generator=control_generator)
         assert after_failure.array_equal(control)
 
+    def test_batched_sampling_matches_individual_calls_in_row_major_order(self):
+        source = sb.PointCloudTensor([
+            np.array([
+                [10.],
+                [20.],
+                [30.],
+                [40.],
+            ]),
+            np.array([
+                [50.],
+                [60.],
+                [70.],
+                [80.],
+            ]),
+        ])
+        batched_generator = sb.random.Generator(seed=229)
+        individual_generator = sb.random.Generator(seed=229)
+
+        batched = subsample(source, n_points=3, n_samples=2,
+                            generator=batched_generator)
+
+        # Both samples of cloud 0 precede both samples of cloud 1.
+        for cloud, sample in [(0, 0), (0, 1), (1, 0), (1, 1)]:
+            individual = subsample(source[cloud:cloud + 1], n_points=3,
+                                   generator=individual_generator)
+            npt.assert_array_equal(np.asarray(batched[cloud, sample]),
+                                   np.asarray(individual[0, 0]))
+
     def test_sampling_does_not_change_input(self, sample_data):
         before = sample_data.copy()
         subsample(sample_data, n_points=3, n_samples=2, replace=True)
