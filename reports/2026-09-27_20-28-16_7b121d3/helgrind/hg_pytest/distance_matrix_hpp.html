@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>/home/runner/work/stablebear/stablebear/include/sbear/point_process/../distance_matrix.hpp</title>
+    <link href='valgrind.css' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+    <script src="https://code.jquery.com/jquery-3.4.1.js"></script>
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.0.0/styles/default.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.0.0/highlight.min.js"></script>
+    <script src="valgrind.js"></script>
+</head>
+
+<body>
+    <div class="global">
+        <div class="header">
+            <h1>/home/runner/work/stablebear/stablebear/include/sbear/point_process/../distance_matrix.hpp</h1>
+            <p><b>2</b> errors</p>
+            <button class="next_error">Goto First Error</button>
+        </div>
+        <div class="listing">
+            <pre class="code">
+<code class="c++"><span class="line_number">1</span>#ifndef STABLEBEAR_DISTANCE_MATRIX_H
+<span class="line_number">2</span>#define STABLEBEAR_DISTANCE_MATRIX_H
+<span class="line_number">3</span>
+<span class="line_number">4</span>#include &#34;config.hpp&#34;
+<span class="line_number">5</span>#include &#34;fixed_rank_tensor.hpp&#34;
+<span class="line_number">6</span>#include &#34;tensor.hpp&#34;
+<span class="line_number">7</span>
+<span class="line_number">8</span>#include &lt;algorithm&gt;
+<span class="line_number">9</span>#include &lt;cstddef&gt;
+<span class="line_number">10</span>#include &lt;memory&gt;
+<span class="line_number">11</span>#include &lt;stdexcept&gt;
+<span class="line_number">12</span>#include &lt;sstream&gt;
+<span class="line_number">13</span>
+<span class="line_number">14</span>namespace sb
+<span class="line_number">15</span>{
+<span class="line_number">16</span>  class DistanceMatrixLayout
+<span class="line_number">17</span>  {
+<span class="line_number">18</span>  public:
+<span class="line_number">19</span>    using shape_type = std::array&lt;size_t, 2&gt;;
+<span class="line_number">20</span>    using index_type = Tensor&lt;uint64_t&gt;;
+<span class="line_number">21</span>
+<span class="line_number">22</span>    DistanceMatrixLayout() = default;
+<span class="line_number">23</span>    explicit DistanceMatrixLayout(size_t sourceSize) : m_sourceSize(sourceSize) { }
+<span class="line_number">24</span>    DistanceMatrixLayout(size_t sourceSize, index_type indices)
+<span class="line_number">25</span>      : m_sourceSize(sourceSize), m_indices(std::move(indices))
+<span class="line_number">26</span>    { }
+<span class="line_number">27</span>
+<span class="line_number">28</span>    [[nodiscard]] shape_type shape() const noexcept
+<span class="line_number">29</span>    {
+<span class="line_number">30</span>      const size_t logicalSize = size();
+<span class="line_number">31</span>      return {logicalSize, logicalSize};
+<span class="line_number">32</span>    }
+<span class="line_number">33</span>    [[nodiscard]] size_t storage_size() const noexcept
+<span class="line_number">34</span>    {
+<span class="line_number">35</span>      return m_sourceSize * (m_sourceSize - 1) / 2;
+<span class="line_number">36</span>    }
+<span class="line_number">37</span>    [[nodiscard]] size_t offset(const shape_type&amp; indices) const
+<span class="line_number">38</span>    {
+<span class="line_number">39</span>      if (indices[0] &gt;= size() || indices[1] &gt;= size())
+<span class="line_number">40</span>        throw std::out_of_range(&#34;DistanceMatrix index out of range&#34;);
+<span class="line_number">41</span>      const size_t i = source_index(indices[0]);
+<span class="line_number">42</span>      const size_t j = source_index(indices[1]);
+<span class="line_number">43</span>      if (i == j)
+<span class="line_number">44</span>        throw std::logic_error(&#34;DistanceMatrix diagonal has no physical storage&#34;);
+<span class="line_number">45</span>      const auto row = std::max(i, j);
+<span class="line_number">46</span>      const auto col = std::min(i, j);
+<span class="line_number">47</span>      return row * (row - 1) / 2 + col;
+<span class="line_number">48</span>    }
+<span class="line_number">49</span>    [[nodiscard]] size_t size() const noexcept
+<span class="line_number">50</span>    {
+</code></pre>
+            <div class="issue">
+                <div>
+                    <span class="what">Possible data race during read of size 8 at 0x2B4A7340 by thread #8</span>
+                    <div class="navigation">
+                        <button class="next_error">Next</button>
+                        <button class="prev_error">Previous</button>
+                    </div>
+                </div>
+                <div>
+                    <table class="call_stack">
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/distance_matrix.hpp:139<br>
+                                    <code class="cpp">sb::DistanceMatrix&lt;float&gt;::size() const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">136</span>
+<span class="line_number">137</span>    [[nodiscard]] size_t size() const
+<span class="line_number">138</span>    {
+<span class="line_number">139</span><span class="error">      return m_storage.layout().size();
+</span><span class="line_number">140</span>    }
+<span class="line_number">141</span>    [[nodiscard]] size_t storage_count() const { return storage_size(size()); }
+<span class="line_number">142</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/persistence/compute_homological_kernel.hpp:175<br>
+                                    <code class="cpp">void sb::ph::detail::homological_kernel_distmat_single_impl&lt;float, 0, 0&gt;(sb::Tensor&lt;sb::DistanceMatrix&lt;float&gt;, 0&gt; const&amp;, sb::Tensor&lt;sb::DistanceMatrix&lt;float&gt;, 0&gt; const&amp;, sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt;&amp;, std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">172</span>    {
+<span class="line_number">173</span>      auto const &amp;dm = distmat(index);           // the Distmat&lt;T&gt; for this instance
+<span class="line_number">174</span>      auto const &amp;dmPrime = distmatPrime(index); // its aligned d′ counterpart
+<span class="line_number">175</span><span class="error">      if (dm.size() != dmPrime.size())
+</span><span class="line_number">176</span>      {
+<span class="line_number">177</span>        throw std::runtime_error(
+<span class="line_number">178</span>            &#34;homological kernel: distance matrices at index &#34; + index_to_string(index) + &#34; have mismatched sizes (&#34; +
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/persistence/compute_homological_kernel.hpp:258<br>
+                                    <code class="cpp">sb::ph::HomologicalKernelImpl&lt;sb::DistanceMatrix&lt;float&gt;, float, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}::operator()(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">255</span>            }
+<span class="line_number">256</span>            else
+<span class="line_number">257</span>            {
+<span class="line_number">258</span><span class="error">              detail::homological_kernel_distmat_single_impl(m_input, m_inputPrime, m_ret, index);
+</span><span class="line_number">259</span>            }
+<span class="line_number">260</span>
+<span class="line_number">261</span>            add_progress(1);
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/walk.hpp:155<br>
+                                    <code class="cpp">sb::parallel_walk_async&lt;sb::Tensor&lt;sb::DistanceMatrix&lt;float&gt;, 0&gt;, sb::ph::HomologicalKernelImpl&lt;sb::DistanceMatrix&lt;float&gt;, float, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::DistanceMatrix&lt;float&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::DistanceMatrix&lt;float&gt;, float, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}::operator()(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">152</span>  tf::Future&lt;void&gt; parallel_walk_async(const TTensor&amp; tensor, UnaryFunc&amp;&amp; f, Executor&amp; exec)
+<span class="line_number">153</span>  {
+<span class="line_number">154</span>    return detail::parallel_walk_impl(tensor, [f = std::forward&lt;UnaryFunc&gt;(f)](const std::vector&lt;size_t&gt;&amp; idx, size_t) {
+<span class="line_number">155</span><span class="error">      f(idx);
+</span><span class="line_number">156</span>    }, exec);
+<span class="line_number">157</span>  }
+<span class="line_number">158</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/walk.hpp:118<br>
+                                    <code class="cpp">sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::DistanceMatrix&lt;float&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::DistanceMatrix&lt;float&gt;, 0&gt;, sb::ph::HomologicalKernelImpl&lt;sb::DistanceMatrix&lt;float&gt;, float, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::DistanceMatrix&lt;float&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::DistanceMatrix&lt;float&gt;, float, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::DistanceMatrix&lt;float&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::DistanceMatrix&lt;float&gt;, float, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}::operator()(unsigned long) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">115</span>          rem /= shape[i];
+<span class="line_number">116</span>        }
+<span class="line_number">117</span>
+<span class="line_number">118</span><span class="error">        f(idx, flat);
+</span><span class="line_number">119</span>      });
+<span class="line_number">120</span>
+<span class="line_number">121</span>      return exec.cpu()-&gt;run(std::move(flow));
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/algorithm/for_each.hpp:134<br>
+                                    <code class="cpp">tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::DistanceMatrix&lt;float&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::DistanceMatrix&lt;float&gt;, 0&gt;, sb::ph::HomologicalKernelImpl&lt;sb::DistanceMatrix&lt;float&gt;, float, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::DistanceMatrix&lt;float&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::DistanceMatrix&lt;float&gt;, float, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::DistanceMatrix&lt;float&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::DistanceMatrix&lt;float&gt;, float, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::DistanceMatrix&lt;float&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::DistanceMatrix&lt;float&gt;, 0&gt;, sb::ph::HomologicalKernelImpl&lt;sb::DistanceMatrix&lt;float&gt;, float, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::DistanceMatrix&lt;float&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::DistanceMatrix&lt;float&gt;, float, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::DistanceMatrix&lt;float&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::DistanceMatrix&lt;float&gt;, float, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}::operator()()::{lambda(unsigned long, unsigned long)#1}::operator()(unsigned long, unsigned long)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">131</span>          part.loop(N, W, *next, [=] (size_t part_b, size_t part_e) mutable {
+<span class="line_number">132</span>            auto idx = static_cast&lt;B_t&gt;(part_b) * inc + beg;
+<span class="line_number">133</span>            for(size_t x=part_b; x&lt;part_e; x++, idx += inc) {
+<span class="line_number">134</span><span class="error">              c(idx);
+</span><span class="line_number">135</span>            }
+<span class="line_number">136</span>          });
+<span class="line_number">137</span>        });
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/../algorithm/partitioner.hpp:316<br>
+                                    <code class="cpp">void tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;::loop&lt;tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::DistanceMatrix&lt;float&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::DistanceMatrix&lt;float&gt;, 0&gt;, sb::ph::HomologicalKernelImpl&lt;sb::DistanceMatrix&lt;float&gt;, float, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::DistanceMatrix&lt;float&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::DistanceMatrix&lt;float&gt;, float, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::DistanceMatrix&lt;float&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::DistanceMatrix&lt;float&gt;, float, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::DistanceMatrix&lt;float&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::DistanceMatrix&lt;float&gt;, 0&gt;, sb::ph::HomologicalKernelImpl&lt;sb::DistanceMatrix&lt;float&gt;, float, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::DistanceMatrix&lt;float&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::DistanceMatrix&lt;float&gt;, float, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::DistanceMatrix&lt;float&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::DistanceMatrix&lt;float&gt;, float, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}::operator()()::{lambda(unsigned long, unsigned long)#1}, (void*)0&gt;(unsigned long, unsigned long, std::atomic&lt;unsigned long&gt;&amp;, tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::DistanceMatrix&lt;float&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::DistanceMatrix&lt;float&gt;, 0&gt;, sb::ph::HomologicalKernelImpl&lt;sb::DistanceMatrix&lt;float&gt;, float, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::DistanceMatrix&lt;float&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::DistanceMatrix&lt;float&gt;, float, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::DistanceMatrix&lt;float&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::DistanceMatrix&lt;float&gt;, float, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::DistanceMatrix&lt;float&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::DistanceMatrix&lt;float&gt;, 0&gt;, sb::ph::HomologicalKernelImpl&lt;sb::DistanceMatrix&lt;float&gt;, float, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::DistanceMatrix&lt;float&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::DistanceMatrix&lt;float&gt;, float, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::DistanceMatrix&lt;float&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::DistanceMatrix&lt;float&gt;, float, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}::operator()()::{lambda(unsigned long, unsigned long)#1}&amp;&amp;) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">313</span>          if(curr_b &gt;= N) {
+<span class="line_number">314</span>            return;
+<span class="line_number">315</span>          }
+<span class="line_number">316</span><span class="error">          func(curr_b, (std::min)(curr_b + chunk_size, N));
+</span><span class="line_number">317</span>        }
+<span class="line_number">318</span>        break;
+<span class="line_number">319</span>      }
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/algorithm/for_each.hpp:131<br>
+                                    <code class="cpp">tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::DistanceMatrix&lt;float&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::DistanceMatrix&lt;float&gt;, 0&gt;, sb::ph::HomologicalKernelImpl&lt;sb::DistanceMatrix&lt;float&gt;, float, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::DistanceMatrix&lt;float&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::DistanceMatrix&lt;float&gt;, float, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::DistanceMatrix&lt;float&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::DistanceMatrix&lt;float&gt;, float, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::DistanceMatrix&lt;float&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::DistanceMatrix&lt;float&gt;, 0&gt;, sb::ph::HomologicalKernelImpl&lt;sb::DistanceMatrix&lt;float&gt;, float, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::DistanceMatrix&lt;float&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::DistanceMatrix&lt;float&gt;, float, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::DistanceMatrix&lt;float&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::DistanceMatrix&lt;float&gt;, float, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}::operator()()</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">128</span>      auto next = std::make_shared&lt;std::atomic&lt;size_t&gt;&gt;(0);
+<span class="line_number">129</span>      for(size_t w=0; w&lt;W;) {
+<span class="line_number">130</span>        auto task = part([=] () mutable {
+<span class="line_number">131</span><span class="error">          part.loop(N, W, *next, [=] (size_t part_b, size_t part_e) mutable {
+</span><span class="line_number">132</span>            auto idx = static_cast&lt;B_t&gt;(part_b) * inc + beg;
+<span class="line_number">133</span>            for(size_t x=part_b; x&lt;part_e; x++, idx += inc) {
+<span class="line_number">134</span>              c(idx);
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/algorithm/for_each.hpp:138<br>
+                                    <code class="cpp">tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::DistanceMatrix&lt;float&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::DistanceMatrix&lt;float&gt;, 0&gt;, sb::ph::HomologicalKernelImpl&lt;sb::DistanceMatrix&lt;float&gt;, float, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::DistanceMatrix&lt;float&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::DistanceMatrix&lt;float&gt;, float, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::DistanceMatrix&lt;float&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::DistanceMatrix&lt;float&gt;, float, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::DistanceMatrix&lt;float&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::DistanceMatrix&lt;float&gt;, 0&gt;, sb::ph::HomologicalKernelImpl&lt;sb::DistanceMatrix&lt;float&gt;, float, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::DistanceMatrix&lt;float&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::DistanceMatrix&lt;float&gt;, float, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::DistanceMatrix&lt;float&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::DistanceMatrix&lt;float&gt;, float, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">135</span>            }
+<span class="line_number">136</span>          });
+<span class="line_number">137</span>        });
+<span class="line_number">138</span><span class="error">        (++w == W) ? task() : rt.silent_async(task);
+</span><span class="line_number">139</span>      }
+<span class="line_number">140</span>    }
+<span class="line_number">141</span>  };
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:61<br>
+                                    <code class="cpp">void std::__invoke_impl&lt;void, tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::DistanceMatrix&lt;float&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::DistanceMatrix&lt;float&gt;, 0&gt;, sb::ph::HomologicalKernelImpl&lt;sb::DistanceMatrix&lt;float&gt;, float, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::DistanceMatrix&lt;float&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::DistanceMatrix&lt;float&gt;, float, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::DistanceMatrix&lt;float&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::DistanceMatrix&lt;float&gt;, float, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::DistanceMatrix&lt;float&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::DistanceMatrix&lt;float&gt;, 0&gt;, sb::ph::HomologicalKernelImpl&lt;sb::DistanceMatrix&lt;float&gt;, float, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::DistanceMatrix&lt;float&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::DistanceMatrix&lt;float&gt;, float, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::DistanceMatrix&lt;float&gt;, 0&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::DistanceMatrix&lt;float&gt;, float, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}&amp;, tf::Runtime&amp;&gt;(std::__invoke_other, sb::ph::HomologicalKernelImpl&lt;sb::DistanceMatrix&lt;float&gt;, float, 0, 0&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, tf::Runtime&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">58</span>  template&lt;typename _Res, typename _Fn, typename... _Args&gt;
+<span class="line_number">59</span>    constexpr _Res
+<span class="line_number">60</span>    __invoke_impl(__invoke_other, _Fn&amp;&amp; __f, _Args&amp;&amp;... __args)
+<span class="line_number">61</span><span class="error">    { return std::forward&lt;_Fn&gt;(__f)(std::forward&lt;_Args&gt;(__args)...); }
+</span><span class="line_number">62</span>
+<span class="line_number">63</span>  template&lt;typename _Res, typename _MemFun, typename _Tp, typename... _Args&gt;
+<span class="line_number">64</span>    constexpr _Res
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:111<br>
+                                    <code class="cpp">_ZSt10__invoke_rIvRZN2tf24make_for_each_index_taskImmmZN2sb6detail18parallel_walk_implINS2_6TensorINS2_14DistanceMatrixIfEELi0EEEZNS2_19parallel_walk_asyncIS8_ZNS2_2ph21HomologicalKernelImplIS7_fLi0ELi0EE9run_asyncERNS2_8ExecutorEEUlRKSt6vectorImSaImEEE_EENS0_6FutureIvEERKT_OT0_SE_EUlSJ_mE_EESM_SP_SR_SE_EUlmE0_NS0_17GuidedPartitionerINS0_21DefaultClosureWrapperEEEEEDaSN_SQ_T1_T2_T3_EUlRNS0_7RuntimeEE_JS11_EENSt9enable_ifIX16is_invocable_r_vISN_SQ_DpT1_EESN_E4typeESR_DpOS15_</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">108</span>      using __type = typename __result::type;
+<span class="line_number">109</span>      using __tag = typename __result::__invoke_type;
+<span class="line_number">110</span>      if constexpr (is_void_v&lt;_Res&gt;)
+<span class="line_number">111</span><span class="error">	std::__invoke_impl&lt;__type&gt;(__tag{}, std::forward&lt;_Callable&gt;(__fn),
+</span><span class="line_number">112</span>					std::forward&lt;_Args&gt;(__args)...);
+<span class="line_number">113</span>      else
+<span class="line_number">114</span>	return std::__invoke_impl&lt;__type&gt;(__tag{},
+</code></pre>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            <pre class="code">
+<code class="c++"><span class="line_number">51</span><span class="error">      return is_indexed() ? m_indices.shape(0) : m_sourceSize;</span>
+<span class="line_number">52</span>    }
+<span class="line_number">53</span>    [[nodiscard]] size_t source_size() const noexcept { return m_sourceSize; }
+<span class="line_number">54</span>    [[nodiscard]] size_t source_index(size_t logicalIndex) const
+<span class="line_number">55</span>    {
+<span class="line_number">56</span>      return is_indexed()
+<span class="line_number">57</span>        ? static_cast&lt;size_t&gt;(m_indices(logicalIndex))
+<span class="line_number">58</span>        : logicalIndex;
+<span class="line_number">59</span>    }
+<span class="line_number">60</span>    [[nodiscard]] bool is_indexed() const noexcept
+<span class="line_number">61</span>    {
+<span class="line_number">62</span>      return m_indices.rank() == 1;
+<span class="line_number">63</span>    }
+<span class="line_number">64</span>    [[nodiscard]] const index_type&amp; indices() const noexcept { return m_indices; }
+<span class="line_number">65</span>
+<span class="line_number">66</span>  private:
+<span class="line_number">67</span>    size_t m_sourceSize = 0;
+<span class="line_number">68</span>    index_type m_indices;
+<span class="line_number">69</span>  };
+<span class="line_number">70</span>
+<span class="line_number">71</span>  /// Lower-triangular compressed distance matrix (zero diagonal, nonnegative entries).
+<span class="line_number">72</span>  ///
+<span class="line_number">73</span>  /// Stores n*(n-1)/2 elements for an n×n symmetric matrix with
+<span class="line_number">74</span>  /// implicit zeros on the diagonal.
+<span class="line_number">75</span>  /// For i != j, element (i, j) maps to storage index
+<span class="line_number">76</span>  /// max(i,j)*(max(i,j)-1)/2 + min(i,j).
+<span class="line_number">77</span>  template &lt;ArithmeticType T&gt;
+<span class="line_number">78</span>  class DistanceMatrix
+<span class="line_number">79</span>  {
+<span class="line_number">80</span>  public:
+<span class="line_number">81</span>    using value_type = T;
+<span class="line_number">82</span>    using index_type = Tensor&lt;uint64_t&gt;;
+<span class="line_number">83</span>
+<span class="line_number">84</span>    class EntryProxy
+<span class="line_number">85</span>    {
+<span class="line_number">86</span>    public:
+<span class="line_number">87</span>      explicit EntryProxy(T* ptr) : m_ptr(ptr) { }
+<span class="line_number">88</span>
+<span class="line_number">89</span>      operator T() const
+<span class="line_number">90</span>      {
+<span class="line_number">91</span>        if (!m_ptr)
+<span class="line_number">92</span>          return T{};
+<span class="line_number">93</span>        return *m_ptr;
+<span class="line_number">94</span>      }
+<span class="line_number">95</span>
+<span class="line_number">96</span>      EntryProxy&amp; operator=(const T&amp; value)
+<span class="line_number">97</span>      {
+<span class="line_number">98</span>        if (value &lt; T{})
+<span class="line_number">99</span>          throw std::invalid_argument(&#34;Distance matrix entries must be nonnegative&#34;);
+<span class="line_number">100</span>        if (!m_ptr)
+<span class="line_number">101</span>        {
+<span class="line_number">102</span>          if (value != T{})
+<span class="line_number">103</span>            throw std::invalid_argument(&#34;Diagonal entries of a distance matrix must be zero&#34;);
+<span class="line_number">104</span>          return *this;
+<span class="line_number">105</span>        }
+<span class="line_number">106</span>        *m_ptr = value;
+<span class="line_number">107</span>        return *this;
+<span class="line_number">108</span>      }
+<span class="line_number">109</span>
+<span class="line_number">110</span>    private:
+<span class="line_number">111</span>      T* m_ptr;
+<span class="line_number">112</span>    };
+<span class="line_number">113</span>
+<span class="line_number">114</span>    explicit DistanceMatrix(size_t n, const T&amp; init = {})
+<span class="line_number">115</span>      : m_storage(DistanceMatrixLayout(n), init)
+<span class="line_number">116</span>    {
+<span class="line_number">117</span>      if (init &lt; T{})
+<span class="line_number">118</span>        throw std::invalid_argument(&#34;Distance matrix entries must be nonnegative&#34;);
+<span class="line_number">119</span>    }
+<span class="line_number">120</span>
+<span class="line_number">121</span>    DistanceMatrix() : DistanceMatrix(0) { }
+<span class="line_number">122</span>
+<span class="line_number">123</span>    /// Return an independent deep copy. The implicit copy shares the
+<span class="line_number">124</span>    /// std::shared_ptr buffer (view-like), which is relied on internally; this
+<span class="line_number">125</span>    /// is used when a matrix must not alias its source (e.g. a tensor cell).
+<span class="line_number">126</span>    [[nodiscard]] DistanceMatrix copy() const
+<span class="line_number">127</span>    {
+<span class="line_number">128</span>      DistanceMatrix result(size());
+<span class="line_number">129</span>      for (size_t i = 1; i &lt; size(); ++i)
+<span class="line_number">130</span>      {
+<span class="line_number">131</span>        for (size_t j = 0; j &lt; i; ++j)
+<span class="line_number">132</span>          result(i, j) = (*this)(i, j);
+<span class="line_number">133</span>      }
+<span class="line_number">134</span>      return result;
+<span class="line_number">135</span>    }
+<span class="line_number">136</span>
+<span class="line_number">137</span>    [[nodiscard]] size_t size() const
+<span class="line_number">138</span>    {
+<span class="line_number">139</span>      return m_storage.layout().size();
+<span class="line_number">140</span>    }
+<span class="line_number">141</span>    [[nodiscard]] size_t storage_count() const { return storage_size(size()); }
+<span class="line_number">142</span>
+<span class="line_number">143</span>    [[nodiscard]] bool is_indexed() const
+<span class="line_number">144</span>    {
+<span class="line_number">145</span>      return m_storage.layout().is_indexed();
+<span class="line_number">146</span>    }
+<span class="line_number">147</span>    [[nodiscard]] const index_type&amp; indices() const
+<span class="line_number">148</span>    {
+<span class="line_number">149</span>      return m_storage.layout().indices();
+<span class="line_number">150</span>    }
+<span class="line_number">151</span>    /// Physical compressed storage, before any logical vertex selection.
+<span class="line_number">152</span>    [[nodiscard]] const T* storage_data() const noexcept
+<span class="line_number">153</span>    {
+<span class="line_number">154</span>      return m_storage.storage_data();
+<span class="line_number">155</span>    }
+<span class="line_number">156</span>
+<span class="line_number">157</span>    [[nodiscard]] EntryProxy operator()(size_t i, size_t j)
+<span class="line_number">158</span>    {
+<span class="line_number">159</span>      bounds_check(i, j);
+<span class="line_number">160</span>      if (is_indexed())
+<span class="line_number">161</span>      {
+<span class="line_number">162</span>        throw std::logic_error(
+<span class="line_number">163</span>          &#34;Cannot mutate an indexed DistanceMatrix directly; materialize its shared tensor backing first&#34;);
+<span class="line_number">164</span>      }
+<span class="line_number">165</span>      if (i == j)
+<span class="line_number">166</span>        return EntryProxy(nullptr);
+<span class="line_number">167</span>      return EntryProxy(&amp;m_storage(i, j));
+<span class="line_number">168</span>    }
+<span class="line_number">169</span>
+<span class="line_number">170</span>    [[nodiscard]] T operator()(size_t i, size_t j) const
+<span class="line_number">171</span>    {
+<span class="line_number">172</span>      bounds_check(i, j);
+<span class="line_number">173</span>      if (i == j)
+<span class="line_number">174</span>        return T{};
+<span class="line_number">175</span>      if (is_indexed())
+<span class="line_number">176</span>      {
+<span class="line_number">177</span>        if (m_storage.layout().source_index(i)
+<span class="line_number">178</span>            == m_storage.layout().source_index(j))
+<span class="line_number">179</span>          return T{};
+<span class="line_number">180</span>      }
+<span class="line_number">181</span>      return m_storage(i, j);
+<span class="line_number">182</span>    }
+<span class="line_number">183</span>
+<span class="line_number">184</span>    [[nodiscard]] bool operator==(const DistanceMatrix&amp; rhs) const
+<span class="line_number">185</span>    {
+<span class="line_number">186</span>      if (size() != rhs.size())
+<span class="line_number">187</span>        return false;
+<span class="line_number">188</span>      for (size_t i = 1; i &lt; size(); ++i)
+<span class="line_number">189</span>      {
+<span class="line_number">190</span>        for (size_t j = 0; j &lt; i; ++j)
+<span class="line_number">191</span>        {
+<span class="line_number">192</span>          if ((*this)(i, j) != rhs(i, j))
+<span class="line_number">193</span>            return false;
+<span class="line_number">194</span>        }
+<span class="line_number">195</span>      }
+<span class="line_number">196</span>      return true;
+<span class="line_number">197</span>    }
+<span class="line_number">198</span>
+<span class="line_number">199</span>    [[nodiscard]] bool operator!=(const DistanceMatrix&amp; rhs) const
+<span class="line_number">200</span>    {
+<span class="line_number">201</span>      return !(*this == rhs);
+<span class="line_number">202</span>    }
+<span class="line_number">203</span>
+<span class="line_number">204</span>    [[nodiscard]] const T* data() const
+<span class="line_number">205</span>    {
+<span class="line_number">206</span>      if (is_indexed())
+<span class="line_number">207</span>      {
+<span class="line_number">208</span>        throw std::logic_error(
+<span class="line_number">209</span>          &#34;Indexed DistanceMatrix storage is not logically contiguous; copy it before accessing data()&#34;);
+<span class="line_number">210</span>      }
+<span class="line_number">211</span>      return m_storage.storage_data();
+<span class="line_number">212</span>    }
+<span class="line_number">213</span>
+<span class="line_number">214</span>    void validate_index(const index_type&amp; selection) const
+<span class="line_number">215</span>    {
+<span class="line_number">216</span>      if (selection.rank() != 1)
+<span class="line_number">217</span>      {
+<span class="line_number">218</span>        throw std::invalid_argument(
+<span class="line_number">219</span>          &#34;Distance-matrix selections must have 1 dimension, got &#34;
+<span class="line_number">220</span>          + std::to_string(selection.rank()));
+<span class="line_number">221</span>      }
+<span class="line_number">222</span>      for (size_t i = 0; i &lt; selection.shape(0); ++i)
+<span class="line_number">223</span>      {
+</code></pre>
+            <div class="issue">
+                <div>
+                    <span class="what">Possible data race during read of size 8 at 0x2B4B24F0 by thread #10</span>
+                    <div class="navigation">
+                        <button class="next_error">Next</button>
+                        <button class="prev_error">Previous</button>
+                    </div>
+                </div>
+                <div>
+                    <table class="call_stack">
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/distance_matrix.hpp:235<br>
+                                    <code class="cpp">sb::DistanceMatrix&lt;double&gt;::index_into(sb::Tensor&lt;unsigned long, 0&gt; const&amp;) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">232</span>
+<span class="line_number">233</span>    [[nodiscard]] DistanceMatrix index_into(const index_type&amp; selection) const
+<span class="line_number">234</span>    {
+<span class="line_number">235</span><span class="error">      validate_index(selection);
+</span><span class="line_number">236</span>      Tensor&lt;uint64_t&gt; resolved({selection.shape(0)});
+<span class="line_number">237</span>      for (size_t i = 0; i &lt; selection.shape(0); ++i)
+<span class="line_number">238</span>      {
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/tensor.tpp:253<br>
+                                    <code class="cpp">sb::Tensor&lt;sb::DistanceMatrix&lt;double&gt;, 1&gt;::operator()(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">250</span>      if (!m_indexedState-&gt;indices)
+<span class="line_number">251</span>        return value_type(m_indexedState-&gt;source.flat(rootIndex));
+<span class="line_number">252</span>      return value_type(m_indexedState-&gt;source.flat(rootIndex).index_into(
+<span class="line_number">253</span><span class="error">        detail::IndexTensorStorage&lt;index_type&gt;::flat(*m_indexedState-&gt;indices, rootIndex)));
+</span><span class="line_number">254</span>    }
+<span class="line_number">255</span>    else
+<span class="line_number">256</span>      return index_to_ref(index);
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/persistence/compute_homological_kernel.hpp:173<br>
+                                    <code class="cpp">void sb::ph::detail::homological_kernel_distmat_single_impl&lt;double, 1, 1&gt;(sb::Tensor&lt;sb::DistanceMatrix&lt;double&gt;, 1&gt; const&amp;, sb::Tensor&lt;sb::DistanceMatrix&lt;double&gt;, 1&gt; const&amp;, sb::Tensor&lt;sb::ph::Barcode&lt;double&gt;, 0&gt;&amp;, std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">170</span>        const Tensor&lt;DistanceMatrix&lt;T&gt;, PrimeProperties&gt; &amp;distmatPrime,
+<span class="line_number">171</span>        Tensor&lt;Barcode&lt;T&gt;&gt; &amp;retBarcodes, const std::vector&lt;size_t&gt; &amp;index)
+<span class="line_number">172</span>    {
+<span class="line_number">173</span><span class="error">      auto const &amp;dm = distmat(index);           // the Distmat&lt;T&gt; for this instance
+</span><span class="line_number">174</span>      auto const &amp;dmPrime = distmatPrime(index); // its aligned d′ counterpart
+<span class="line_number">175</span>      if (dm.size() != dmPrime.size())
+<span class="line_number">176</span>      {
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/persistence/compute_homological_kernel.hpp:258<br>
+                                    <code class="cpp">sb::ph::HomologicalKernelImpl&lt;sb::DistanceMatrix&lt;double&gt;, double, 1, 1&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}::operator()(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">255</span>            }
+<span class="line_number">256</span>            else
+<span class="line_number">257</span>            {
+<span class="line_number">258</span><span class="error">              detail::homological_kernel_distmat_single_impl(m_input, m_inputPrime, m_ret, index);
+</span><span class="line_number">259</span>            }
+<span class="line_number">260</span>
+<span class="line_number">261</span>            add_progress(1);
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/walk.hpp:155<br>
+                                    <code class="cpp">sb::parallel_walk_async&lt;sb::Tensor&lt;sb::DistanceMatrix&lt;double&gt;, 1&gt;, sb::ph::HomologicalKernelImpl&lt;sb::DistanceMatrix&lt;double&gt;, double, 1, 1&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::DistanceMatrix&lt;double&gt;, 1&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::DistanceMatrix&lt;double&gt;, double, 1, 1&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}::operator()(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">152</span>  tf::Future&lt;void&gt; parallel_walk_async(const TTensor&amp; tensor, UnaryFunc&amp;&amp; f, Executor&amp; exec)
+<span class="line_number">153</span>  {
+<span class="line_number">154</span>    return detail::parallel_walk_impl(tensor, [f = std::forward&lt;UnaryFunc&gt;(f)](const std::vector&lt;size_t&gt;&amp; idx, size_t) {
+<span class="line_number">155</span><span class="error">      f(idx);
+</span><span class="line_number">156</span>    }, exec);
+<span class="line_number">157</span>  }
+<span class="line_number">158</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/walk.hpp:118<br>
+                                    <code class="cpp">sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::DistanceMatrix&lt;double&gt;, 1&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::DistanceMatrix&lt;double&gt;, 1&gt;, sb::ph::HomologicalKernelImpl&lt;sb::DistanceMatrix&lt;double&gt;, double, 1, 1&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::DistanceMatrix&lt;double&gt;, 1&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::DistanceMatrix&lt;double&gt;, double, 1, 1&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::DistanceMatrix&lt;double&gt;, 1&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::DistanceMatrix&lt;double&gt;, double, 1, 1&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}::operator()(unsigned long) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">115</span>          rem /= shape[i];
+<span class="line_number">116</span>        }
+<span class="line_number">117</span>
+<span class="line_number">118</span><span class="error">        f(idx, flat);
+</span><span class="line_number">119</span>      });
+<span class="line_number">120</span>
+<span class="line_number">121</span>      return exec.cpu()-&gt;run(std::move(flow));
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/algorithm/for_each.hpp:134<br>
+                                    <code class="cpp">tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::DistanceMatrix&lt;double&gt;, 1&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::DistanceMatrix&lt;double&gt;, 1&gt;, sb::ph::HomologicalKernelImpl&lt;sb::DistanceMatrix&lt;double&gt;, double, 1, 1&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::DistanceMatrix&lt;double&gt;, 1&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::DistanceMatrix&lt;double&gt;, double, 1, 1&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::DistanceMatrix&lt;double&gt;, 1&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::DistanceMatrix&lt;double&gt;, double, 1, 1&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::DistanceMatrix&lt;double&gt;, 1&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::DistanceMatrix&lt;double&gt;, 1&gt;, sb::ph::HomologicalKernelImpl&lt;sb::DistanceMatrix&lt;double&gt;, double, 1, 1&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::DistanceMatrix&lt;double&gt;, 1&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::DistanceMatrix&lt;double&gt;, double, 1, 1&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::DistanceMatrix&lt;double&gt;, 1&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::DistanceMatrix&lt;double&gt;, double, 1, 1&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}::operator()()::{lambda(unsigned long, unsigned long)#1}::operator()(unsigned long, unsigned long)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">131</span>          part.loop(N, W, *next, [=] (size_t part_b, size_t part_e) mutable {
+<span class="line_number">132</span>            auto idx = static_cast&lt;B_t&gt;(part_b) * inc + beg;
+<span class="line_number">133</span>            for(size_t x=part_b; x&lt;part_e; x++, idx += inc) {
+<span class="line_number">134</span><span class="error">              c(idx);
+</span><span class="line_number">135</span>            }
+<span class="line_number">136</span>          });
+<span class="line_number">137</span>        });
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/../algorithm/partitioner.hpp:316<br>
+                                    <code class="cpp">void tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;::loop&lt;tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::DistanceMatrix&lt;double&gt;, 1&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::DistanceMatrix&lt;double&gt;, 1&gt;, sb::ph::HomologicalKernelImpl&lt;sb::DistanceMatrix&lt;double&gt;, double, 1, 1&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::DistanceMatrix&lt;double&gt;, 1&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::DistanceMatrix&lt;double&gt;, double, 1, 1&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::DistanceMatrix&lt;double&gt;, 1&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::DistanceMatrix&lt;double&gt;, double, 1, 1&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::DistanceMatrix&lt;double&gt;, 1&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::DistanceMatrix&lt;double&gt;, 1&gt;, sb::ph::HomologicalKernelImpl&lt;sb::DistanceMatrix&lt;double&gt;, double, 1, 1&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::DistanceMatrix&lt;double&gt;, 1&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::DistanceMatrix&lt;double&gt;, double, 1, 1&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::DistanceMatrix&lt;double&gt;, 1&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::DistanceMatrix&lt;double&gt;, double, 1, 1&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}::operator()()::{lambda(unsigned long, unsigned long)#1}, (void*)0&gt;(unsigned long, unsigned long, std::atomic&lt;unsigned long&gt;&amp;, tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::DistanceMatrix&lt;double&gt;, 1&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::DistanceMatrix&lt;double&gt;, 1&gt;, sb::ph::HomologicalKernelImpl&lt;sb::DistanceMatrix&lt;double&gt;, double, 1, 1&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::DistanceMatrix&lt;double&gt;, 1&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::DistanceMatrix&lt;double&gt;, double, 1, 1&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::DistanceMatrix&lt;double&gt;, 1&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::DistanceMatrix&lt;double&gt;, double, 1, 1&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::DistanceMatrix&lt;double&gt;, 1&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::DistanceMatrix&lt;double&gt;, 1&gt;, sb::ph::HomologicalKernelImpl&lt;sb::DistanceMatrix&lt;double&gt;, double, 1, 1&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::DistanceMatrix&lt;double&gt;, 1&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::DistanceMatrix&lt;double&gt;, double, 1, 1&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::DistanceMatrix&lt;double&gt;, 1&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::DistanceMatrix&lt;double&gt;, double, 1, 1&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}::operator()()::{lambda(unsigned long, unsigned long)#1}&amp;&amp;) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">313</span>          if(curr_b &gt;= N) {
+<span class="line_number">314</span>            return;
+<span class="line_number">315</span>          }
+<span class="line_number">316</span><span class="error">          func(curr_b, (std::min)(curr_b + chunk_size, N));
+</span><span class="line_number">317</span>        }
+<span class="line_number">318</span>        break;
+<span class="line_number">319</span>      }
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/algorithm/for_each.hpp:131<br>
+                                    <code class="cpp">tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::DistanceMatrix&lt;double&gt;, 1&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::DistanceMatrix&lt;double&gt;, 1&gt;, sb::ph::HomologicalKernelImpl&lt;sb::DistanceMatrix&lt;double&gt;, double, 1, 1&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::DistanceMatrix&lt;double&gt;, 1&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::DistanceMatrix&lt;double&gt;, double, 1, 1&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::DistanceMatrix&lt;double&gt;, 1&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::DistanceMatrix&lt;double&gt;, double, 1, 1&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::DistanceMatrix&lt;double&gt;, 1&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::DistanceMatrix&lt;double&gt;, 1&gt;, sb::ph::HomologicalKernelImpl&lt;sb::DistanceMatrix&lt;double&gt;, double, 1, 1&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::DistanceMatrix&lt;double&gt;, 1&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::DistanceMatrix&lt;double&gt;, double, 1, 1&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::DistanceMatrix&lt;double&gt;, 1&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::DistanceMatrix&lt;double&gt;, double, 1, 1&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}::operator()()</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">128</span>      auto next = std::make_shared&lt;std::atomic&lt;size_t&gt;&gt;(0);
+<span class="line_number">129</span>      for(size_t w=0; w&lt;W;) {
+<span class="line_number">130</span>        auto task = part([=] () mutable {
+<span class="line_number">131</span><span class="error">          part.loop(N, W, *next, [=] (size_t part_b, size_t part_e) mutable {
+</span><span class="line_number">132</span>            auto idx = static_cast&lt;B_t&gt;(part_b) * inc + beg;
+<span class="line_number">133</span>            for(size_t x=part_b; x&lt;part_e; x++, idx += inc) {
+<span class="line_number">134</span>              c(idx);
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/algorithm/for_each.hpp:138<br>
+                                    <code class="cpp">tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::DistanceMatrix&lt;double&gt;, 1&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::DistanceMatrix&lt;double&gt;, 1&gt;, sb::ph::HomologicalKernelImpl&lt;sb::DistanceMatrix&lt;double&gt;, double, 1, 1&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::DistanceMatrix&lt;double&gt;, 1&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::DistanceMatrix&lt;double&gt;, double, 1, 1&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::DistanceMatrix&lt;double&gt;, 1&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::DistanceMatrix&lt;double&gt;, double, 1, 1&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::DistanceMatrix&lt;double&gt;, 1&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::DistanceMatrix&lt;double&gt;, 1&gt;, sb::ph::HomologicalKernelImpl&lt;sb::DistanceMatrix&lt;double&gt;, double, 1, 1&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::DistanceMatrix&lt;double&gt;, 1&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::DistanceMatrix&lt;double&gt;, double, 1, 1&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::DistanceMatrix&lt;double&gt;, 1&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::DistanceMatrix&lt;double&gt;, double, 1, 1&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">135</span>            }
+<span class="line_number">136</span>          });
+<span class="line_number">137</span>        });
+<span class="line_number">138</span><span class="error">        (++w == W) ? task() : rt.silent_async(task);
+</span><span class="line_number">139</span>      }
+<span class="line_number">140</span>    }
+<span class="line_number">141</span>  };
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:61<br>
+                                    <code class="cpp">void std::__invoke_impl&lt;void, tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::DistanceMatrix&lt;double&gt;, 1&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::DistanceMatrix&lt;double&gt;, 1&gt;, sb::ph::HomologicalKernelImpl&lt;sb::DistanceMatrix&lt;double&gt;, double, 1, 1&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::DistanceMatrix&lt;double&gt;, 1&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::DistanceMatrix&lt;double&gt;, double, 1, 1&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::DistanceMatrix&lt;double&gt;, 1&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::DistanceMatrix&lt;double&gt;, double, 1, 1&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::DistanceMatrix&lt;double&gt;, 1&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::DistanceMatrix&lt;double&gt;, 1&gt;, sb::ph::HomologicalKernelImpl&lt;sb::DistanceMatrix&lt;double&gt;, double, 1, 1&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::DistanceMatrix&lt;double&gt;, 1&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::DistanceMatrix&lt;double&gt;, double, 1, 1&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::DistanceMatrix&lt;double&gt;, 1&gt; const&amp;, sb::ph::HomologicalKernelImpl&lt;sb::DistanceMatrix&lt;double&gt;, double, 1, 1&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}&amp;, tf::Runtime&amp;&gt;(std::__invoke_other, sb::ph::HomologicalKernelImpl&lt;sb::DistanceMatrix&lt;double&gt;, double, 1, 1&gt;::run_async(sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, tf::Runtime&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">58</span>  template&lt;typename _Res, typename _Fn, typename... _Args&gt;
+<span class="line_number">59</span>    constexpr _Res
+<span class="line_number">60</span>    __invoke_impl(__invoke_other, _Fn&amp;&amp; __f, _Args&amp;&amp;... __args)
+<span class="line_number">61</span><span class="error">    { return std::forward&lt;_Fn&gt;(__f)(std::forward&lt;_Args&gt;(__args)...); }
+</span><span class="line_number">62</span>
+<span class="line_number">63</span>  template&lt;typename _Res, typename _MemFun, typename _Tp, typename... _Args&gt;
+<span class="line_number">64</span>    constexpr _Res
+</code></pre>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            <pre class="code">
+<code class="c++"><span class="line_number">224</span><span class="error">        if (selection(i) &gt;= size())</span>
+<span class="line_number">225</span>        {
+<span class="line_number">226</span>          throw std::out_of_range(
+<span class="line_number">227</span>            &#34;Distance-matrix index &#34; + std::to_string(selection(i))
+<span class="line_number">228</span>            + &#34; is out of bounds for a matrix of size &#34; + std::to_string(size()));
+<span class="line_number">229</span>        }
+<span class="line_number">230</span>      }
+<span class="line_number">231</span>    }
+<span class="line_number">232</span>
+<span class="line_number">233</span>    [[nodiscard]] DistanceMatrix index_into(const index_type&amp; selection) const
+<span class="line_number">234</span>    {
+<span class="line_number">235</span>      validate_index(selection);
+<span class="line_number">236</span>      Tensor&lt;uint64_t&gt; resolved({selection.shape(0)});
+<span class="line_number">237</span>      for (size_t i = 0; i &lt; selection.shape(0); ++i)
+<span class="line_number">238</span>      {
+<span class="line_number">239</span>        const auto logical = static_cast&lt;size_t&gt;(selection(i));
+<span class="line_number">240</span>        resolved(i) = m_storage.layout().source_index(logical);
+<span class="line_number">241</span>      }
+<span class="line_number">242</span>      return DistanceMatrix(*this, std::move(resolved));
+<span class="line_number">243</span>    }
+<span class="line_number">244</span>
+<span class="line_number">245</span>    [[nodiscard]] DistanceMatrix materialized_copy() const { return copy(); }
+<span class="line_number">246</span>
+<span class="line_number">247</span>    /// Return a shallow view of the complete backing matrix, before any
+<span class="line_number">248</span>    /// logical row/column selection is applied.
+<span class="line_number">249</span>    [[nodiscard]] DistanceMatrix view_source() const
+<span class="line_number">250</span>    {
+<span class="line_number">251</span>      DistanceMatrix result;
+<span class="line_number">252</span>      result.m_storage = m_storage.view_with_layout(
+<span class="line_number">253</span>        DistanceMatrixLayout(m_storage.layout().source_size()));
+<span class="line_number">254</span>      return result;
+<span class="line_number">255</span>    }
+<span class="line_number">256</span>
+<span class="line_number">257</span>    [[nodiscard]] static size_t storage_size(size_t n)
+<span class="line_number">258</span>    {
+<span class="line_number">259</span>      return n * (n - 1) / 2;
+<span class="line_number">260</span>    }
+<span class="line_number">261</span>
+<span class="line_number">262</span>  private:
+<span class="line_number">263</span>    DistanceMatrix(const DistanceMatrix&amp; source, index_type indices)
+<span class="line_number">264</span>      : m_storage(source.m_storage.view_with_layout(
+<span class="line_number">265</span>          DistanceMatrixLayout(source.m_storage.layout().source_size(),
+<span class="line_number">266</span>            std::move(indices))))
+<span class="line_number">267</span>    { }
+<span class="line_number">268</span>
+<span class="line_number">269</span>    void bounds_check(size_t i, size_t j) const
+<span class="line_number">270</span>    {
+<span class="line_number">271</span>      if (i &gt;= size() || j &gt;= size())
+<span class="line_number">272</span>      {
+<span class="line_number">273</span>        std::ostringstream oss;
+<span class="line_number">274</span>        oss &lt;&lt; &#34;DistanceMatrix index (&#34; &lt;&lt; i &lt;&lt; &#34;, &#34; &lt;&lt; j &lt;&lt; &#34;) out of range for matrix of size &#34; &lt;&lt; size();
+<span class="line_number">275</span>        throw std::out_of_range(oss.str());
+<span class="line_number">276</span>      }
+<span class="line_number">277</span>    }
+<span class="line_number">278</span>
+<span class="line_number">279</span>    FixedRankTensor&lt;T, 2, DistanceMatrixLayout&gt; m_storage;
+<span class="line_number">280</span>  };
+<span class="line_number">281</span>
+<span class="line_number">282</span>  template &lt;typename T&gt;
+<span class="line_number">283</span>  struct is_compressed_matrix&lt;DistanceMatrix&lt;T&gt;&gt; : std::true_type {};
+<span class="line_number">284</span>
+<span class="line_number">285</span>}
+<span class="line_number">286</span>
+<span class="line_number">287</span>#endif // STABLEBEAR_DISTANCE_MATRIX_H
+</code>
+            </pre>
+        </div>
+    </div>
+</body>
+
+</html>
