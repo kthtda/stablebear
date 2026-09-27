@@ -25,6 +25,33 @@ to its shape::
    assert samples.shape == (8,)
    assert samples[0].shape == (25, 3)
 
+Point-cloud samples
+===================
+
+Each panel below shows the same 40 points, evenly spaced around a circle.
+The point cloud is constructed without randomness; only the selections are random.
+Ten points are selected without replacement in each sample and highlighted in
+orange. Selections are independent
+between samples, so a point can appear in more than one panel's selection.
+
+.. image:: _static/subsampling_cloud_light.png
+   :width: 100%
+   :alt: Three panels of the same point cloud, each highlighting a different ten-point sample.
+   :class: only-light
+
+.. image:: _static/subsampling_cloud_dark.png
+   :width: 100%
+   :alt: Three panels of the same point cloud, each highlighting a different ten-point sample.
+   :class: only-dark
+
+.. dropdown:: Show code
+   :color: secondary
+
+   .. literalinclude:: _static/gen_subsampling_fig.py
+      :language: python
+      :start-after: docs snippet start point_cloud_subsamples --
+      :end-before: docs snippet end point_cloud_subsamples --
+
 Replacement and partial samples
 ===============================
 
@@ -122,6 +149,59 @@ The first and third rows represent the same original vertex, so their distance
 is zero and their distances to every other sampled vertex agree. With
 ``discard_duplicates=True``, that draw becomes ``[2, 0]``, giving the 2×2
 matrix above. Distinct vertices whose distance happens to be zero are retained.
+
+Mapping sampled vertices back to points
+---------------------------------------
+
+If the matrix was computed from known points, ``samples.indices`` lets you
+recover their coordinates from the original point array. Here we start with
+10 explicit points and use SciPy's ``pdist`` to compute their pairwise
+distances. ``DistanceMatrix`` accepts its condensed output directly::
+
+   from scipy.spatial.distance import pdist
+
+   points = np.array([
+       [0., 0.],
+       [2., 0.],
+       [4., 0.],
+       [1., 1.],
+       [3., 1.],
+       [0., 2.],
+       [4., 2.],
+       [1., 3.],
+       [3., 3.],
+       [2., 4.],
+   ])
+   matrix = sb.DistanceMatrix(pdist(points))
+   samples = sb.random.subsample(
+       matrix, n_points=4, n_samples=3,
+       generator=sb.random.Generator(seed=5),
+   )
+
+   selected_points = points[samples.indices[0]]
+
+``selected_points`` contains the original coordinates in the same order as
+the first sampled matrix's rows and columns. Each panel below highlights the
+four points recovered this way for one sample. Only the distance matrix is
+passed to ``subsample``; the coordinates come from indexing ``points``.
+
+.. image:: _static/subsampling_matrix_light.png
+   :width: 100%
+   :alt: Three panels of the same ten points, highlighting four original points recovered from each distance-matrix sample's indices.
+   :class: only-light
+
+.. image:: _static/subsampling_matrix_dark.png
+   :width: 100%
+   :alt: Three panels of the same ten points, highlighting four original points recovered from each distance-matrix sample's indices.
+   :class: only-dark
+
+.. dropdown:: Show code
+   :color: secondary
+
+   .. literalinclude:: _static/gen_subsampling_fig.py
+      :language: python
+      :start-after: docs snippet start distance_matrix_subsamples --
+      :end-before: docs snippet end distance_matrix_subsamples --
 
 Indexed results share one fresh copy of
 the source matrix across its samples. Persistent homology and homological
