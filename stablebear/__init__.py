@@ -8,7 +8,7 @@ from .inner_product import l2_kernel
 from .io import load, save
 from .norms import lp_norm
 from .functional import Pcf, iterate_rectangles
-from .reductions import max_time, mean
+from .reductions import max_time, mean, sum
 from .serialize import from_serial_content
 from .distance_matrix import DistanceMatrix, DistanceMatrixTensor
 from .symmetric_matrix import SymmetricMatrix, SymmetricMatrixTensor

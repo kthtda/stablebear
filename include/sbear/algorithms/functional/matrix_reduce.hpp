@@ -97,11 +97,17 @@ namespace sb
   }
 
   template <typename PcfT>
-  Tensor<PcfT> mean(const Tensor<PcfT>& in, size_t dim, Executor& exec = default_executor())
+  Tensor<PcfT> sum(const Tensor<PcfT>& in, size_t dim, Executor& exec = default_executor())
   {
-    auto ret = parallel_tensor_reduce(in, dim, [](const typename PcfT::rectangle_type& rect) {
+    return parallel_tensor_reduce(in, dim, [](const typename PcfT::rectangle_type& rect) {
       return rect.f_value + rect.g_value;
     }, exec);
+  }
+
+  template <typename PcfT>
+  Tensor<PcfT> mean(const Tensor<PcfT>& in, size_t dim, Executor& exec = default_executor())
+  {
+    auto ret = sum(in, dim, exec);
 
     const auto inDimSize = in.shape()[dim];
     ret /= inDimSize;

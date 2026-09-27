@@ -6,6 +6,7 @@
 
 ### New features
 
+* **Pointwise PCF sums** — `sum` adds the PCFs in a tensor along a chosen `dim`, preserving precision and supporting negative dimensions. ([#234](https://github.com/kthtda/stablebear/issues/234))
 * **Uniform subsampling** — `random.subsample` draws samples from individual point clouds and distance matrices or tensors of them, with or without replacement. Samples own a snapshot of their input and support partial draws and duplicate removal (by coordinates for clouds, by vertex index for matrices). ([#229](https://github.com/kthtda/stablebear/issues/229), [#236](https://github.com/kthtda/stablebear/issues/236))
 * **Nested tensors and ragged indexing** — `NestedTensor` supports recursively nested numeric tensors with differently shaped children. Nested `uint64` selections create indexed point-cloud and distance-matrix tensor views while preserving selection order and repetitions. ([#231](https://github.com/kthtda/stablebear/issues/231))
 * **Unified data serialization** — Tensor and standalone data-object pickles use the same binary format as `save`/`load`, including standalone point clouds, nested tensors, and indexed tensors. Readers for supported legacy files and pickles are retained. ([#230](https://github.com/kthtda/stablebear/issues/230))
