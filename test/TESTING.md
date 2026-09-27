@@ -76,6 +76,12 @@ protect. These principles apply when writing, reviewing, or changing tests.
     smaller tests when that makes each behavior and expected outcome easier
     to understand, while preserving meaningful coverage.
 
+17. **Use names that avoid context switching.** Keep related names consistent
+    so readers do not have to translate between terms. For example, name
+    `unfiltered.indices` and `filtered.indices` as `unfiltered_indices` and
+    `filtered_indices`, rather than introducing `drawn_indices` and
+    `kept_indices` for the same objects.
+
 The review question is: **What bug would make this test fail, and can I see
 that immediately?**
 

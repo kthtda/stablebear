@@ -98,6 +98,25 @@ class TestSubsample:
         result = subsample(sample_data, n_points=3)
         assert result.dtype == sample_data.dtype
 
+    def test_default_sampling_uses_each_vertex_once_per_full_sample(
+        self, make_pcloud_or_distmat_tensor
+    ):
+        source = make_pcloud_or_distmat_tensor([
+            [0, 0],
+            [1, 0],
+            [0, 2],
+            [3, 1],
+        ])
+
+        samples = subsample(source, n_points=4, n_samples=2,
+                            generator=sb.random.Generator(seed=229))
+        indices = samples.indices
+        assert indices is not None
+
+        # Each sample starts from all four vertices, with no repeated draw.
+        npt.assert_array_equal(np.sort(np.asarray(indices[0])), [0, 1, 2, 3])
+        npt.assert_array_equal(np.sort(np.asarray(indices[1])), [0, 1, 2, 3])
+
     @pytest.mark.parametrize(
         ("shape", "n_points", "replace", "allow_partial", "expected_n_pts"),
         [
@@ -117,6 +136,8 @@ class TestSubsample:
                       expected_n_pts=1, id="below-population", ),
             size_case(shape=(4, 3), n_points=4, replace=False, allow_partial=False,
                       expected_n_pts=4, id="full-population", ),
+            size_case(shape=(4, 3), n_points=7, replace=False, allow_partial=True,
+                      expected_n_pts=4, id="above-population-partial", ),
             size_case(shape=(4, 3), n_points=7, replace=True, allow_partial=False,
                       expected_n_pts=7, id="above-population-replacement", ),
             size_case(shape=(7, 32), n_points=4, replace=False, allow_partial=False,
@@ -151,6 +172,69 @@ class TestSubsample:
         for sample in range(2):
             assert len(indices[sample]) == expected_n_pts
             assert np.asarray(actual[sample]).shape == expected_shape
+
+    @pytest.mark.parametrize(("pcloud_dtype", "np_dtype"), _PCLOUD_DTYPES)
+    def test_cloud_duplicate_filter_removes_equal_coordinates(
+        self, pcloud_dtype, np_dtype
+    ):
+        source = sb.PointCloudTensor(np.array([
+            [10, 1],
+            [10, 1],
+            [10, 1],
+        ], dtype=np_dtype), dtype=pcloud_dtype)
+
+        filtered = subsample(source, n_points=3, discard_duplicates=True,
+                             generator=sb.random.Generator(seed=229))
+
+        npt.assert_array_equal(np.asarray(filtered[0]), [[10, 1]])
+
+    @pytest.mark.parametrize(("distmat_dtype", "np_dtype"), _DISTMAT_DTYPES)
+    def test_matrix_duplicate_filter_removes_repeated_vertices(
+        self, distmat_dtype, np_dtype
+    ):
+        source = sb.DistanceMatrixTensor(np.array([[0]], dtype=np_dtype),
+                                         dtype=distmat_dtype)
+
+        # Every draw selects the only vertex; filtering leaves it once.
+        filtered = subsample(source, n_points=3, replace=True, discard_duplicates=True,
+                             generator=sb.random.Generator(seed=229))
+
+        npt.assert_array_equal(np.asarray(filtered[0]), [[0]])
+
+    @pytest.mark.parametrize(("distmat_dtype", "np_dtype"), _DISTMAT_DTYPES)
+    def test_matrix_duplicate_filter_preserves_distinct_zero_distance_vertices(
+        self, distmat_dtype, np_dtype
+    ):
+        distances = np.array([
+            [0, 0, 5],
+            [0, 0, 5],
+            [5, 5, 0],
+        ], dtype=np_dtype)
+        source = sb.DistanceMatrixTensor(distances, dtype=distmat_dtype)
+
+        samples = subsample(source, n_points=3, discard_duplicates=True,
+                            generator=sb.random.Generator(seed=229))
+        indices = samples.indices
+        assert indices is not None
+        vertices = np.asarray(indices[0])
+
+        # Vertices 0 and 1 have zero distance but are still distinct vertices.
+        npt.assert_array_equal(np.sort(vertices), [0, 1, 2])
+        npt.assert_array_equal(np.asarray(samples[0]), distances[np.ix_(vertices, vertices)])
+
+    def test_duplicate_filtering_preserves_generator_advancement(self, sample_data):
+        unfiltered_generator = sb.random.Generator(seed=229)
+        filtered_generator = sb.random.Generator(seed=229)
+
+        # Seven draws from each six-point input guarantee duplicates to remove.
+        subsample(sample_data, n_points=7, replace=True, generator=unfiltered_generator)
+        subsample(sample_data, n_points=7, replace=True, discard_duplicates=True,
+                  generator=filtered_generator)
+
+        next_unfiltered = subsample(sample_data, n_points=3, generator=unfiltered_generator)
+        next_filtered = subsample(sample_data, n_points=3, generator=filtered_generator)
+        # Filtering must not change the random stream used by the next call.
+        assert next_filtered.array_equal(next_unfiltered)
 
     def test_ragged_sizes(self, ragged_data):
         actual = subsample(ragged_data, n_points=3, n_samples=2)
