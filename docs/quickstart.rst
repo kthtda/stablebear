@@ -70,6 +70,7 @@ Higher-dimensional tensors support NumPy-style reductions:
 
     A = sb.zeros((4, 100))
     avg = sb.mean(A, dim=1)       # mean along axis 1 -> shape (4,)
+    total = sb.sum(A, dim=1)      # sum along axis 1 -> shape (4,)
 
 Persistent homology
 --------------------

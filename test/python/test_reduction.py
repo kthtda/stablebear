@@ -4,6 +4,27 @@ import pytest
 import stablebear as sb
 
 
+@pytest.mark.parametrize("dtype", [sb.pcf32, sb.pcf64])
+def test_sum_matches_pcf_addition(dtype):
+    f1 = sb.Pcf([
+        [0.0, 1.0],
+        [1.0, 0.0],
+    ], dtype=dtype)
+    f2 = sb.Pcf([
+        [0.0, 2.0],
+        [2.0, 0.0],
+    ], dtype=dtype)
+    f3 = sb.Pcf([
+        [0.0, 3.0],
+        [3.0, 0.0],
+    ], dtype=dtype)
+    functions = sb.tensor([f1, f2, f3])
+
+    total = sb.sum(functions)
+
+    assert total[0] == f1 + f2 + f3
+
+
 def test_mean_of_1d_returns_tensor():
     A = sb.zeros((10,))
     avg = sb.mean(A)
