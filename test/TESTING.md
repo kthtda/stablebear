@@ -71,6 +71,11 @@ protect. These principles apply when writing, reviewing, or changing tests.
     Add one when it helps the reader
     understand the test; avoid narrating code that is already obvious.
 
+16. **Take a second look after writing a test.** Review whether its setup,
+    actions, and assertions can be simpler and more transparent. Split it into
+    smaller tests when that makes each behavior and expected outcome easier
+    to understand, while preserving meaningful coverage.
+
 The review question is: **What bug would make this test fail, and can I see
 that immediately?**
 
