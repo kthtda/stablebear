@@ -66,15 +66,20 @@ coordinate dimension.
 ``sb.indices(values)`` is shorthand for
 ``sb.tensor(values, dtype=sb.uint64)``.
 
-The result is an indexed tensor view. It retains one aligned view of the source
-``PointCloudTensor`` and one view of ``selections``; it does not construct and
-store a separate indexed point-cloud object at every output position. Slicing,
-reshaping, and transposing the result transform both views together. Accessing
-an output cloud applies the corresponding selection to the corresponding
-source cloud. Reading one complete output cloud returns a ``PointCloud`` view
+The result retains an aligned view of the source ``PointCloudTensor`` and owns
+an independent copy of ``selections``. Later changes to the caller's selections
+do not affect the result. Direct indexing shares source coordinates, so source
+mutations remain visible until the result materializes. By comparison,
+:doc:`subsampling <subsampling>` owns a snapshot of its input.
+
+Slicing, reshaping, and transposing the result keep its source and selections
+aligned. Reading one complete output cloud returns a ``PointCloud`` view
 without materializing the indexed tensor. Writing through that view, or
-assigning through the ``PointCloudTensor``, materializes the indexed tensor
-before applying the change.
+assigning through the ``PointCloudTensor``, materializes the shared indexed
+state before applying the change. Existing views observe that same transition.
+
+``selected.indices`` returns an independent copy of the selections. It returns
+``None`` after the shared state has materialized.
 
 Slicing
 -------

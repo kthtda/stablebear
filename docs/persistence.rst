@@ -335,6 +335,32 @@ You can also convert a single barcode to a stable rank::
    # sr is a Pcf
 
 
+Comparing barcode tensors
+=========================
+
+Use :py:meth:`~stablebear.persistence.BarcodeTensor.is_isomorphic_to` to compare
+every aligned pair of barcodes and return one boolean. Bar order within each
+barcode does not matter::
+
+   import numpy as np
+   from stablebear.persistence import Barcode, BarcodeTensor
+
+   barcodes = BarcodeTensor([Barcode(np.array([
+       [0.0, 1.0],
+       [0.0, 2.0],
+   ]))])
+   reordered = BarcodeTensor([Barcode(np.array([
+       [0.0, 2.0],
+       [0.0, 1.0],
+   ]))])
+
+   barcodes.is_isomorphic_to(reordered)  # True
+
+The tensors must have the same outer shape and dtype; there is no broadcasting.
+Endpoint comparisons use ``atol=1e-8`` and ``rtol=1e-5`` by default. Pass
+``atol=0, rtol=0`` for exact comparison. Infinite endpoints must match exactly.
+
+
 Relative Persistent Homology
 ============================
 
@@ -359,4 +385,3 @@ References
 
 
 .. footbibliography::
-

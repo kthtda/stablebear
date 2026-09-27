@@ -7,7 +7,9 @@
 ### New features
 
 * **Uniform subsampling** — `random.subsample` draws samples from individual point clouds and distance matrices or tensors of them, with or without replacement. Samples own a snapshot of their input and support partial draws and duplicate removal (by coordinates for clouds, by vertex index for matrices). ([#229](https://github.com/kthtda/stablebear/issues/229), [#236](https://github.com/kthtda/stablebear/issues/236))
-* **Ragged index tensors** — `IndexTensor` stores an arbitrary-dimensional outer tensor of variable-length `uint64` index selections without padding them to a common length and supports binary save/load round-trips. ([#229](https://github.com/kthtda/stablebear/issues/229))
+* **Nested tensors and ragged indexing** — `NestedTensor` supports recursively nested numeric tensors with differently shaped children. Nested `uint64` selections create indexed point-cloud and distance-matrix tensor views while preserving selection order and repetitions. ([#231](https://github.com/kthtda/stablebear/issues/231))
+* **Unified data serialization** — Tensor and standalone data-object pickles use the same binary format as `save`/`load`, including standalone point clouds, nested tensors, and indexed tensors. Readers for supported legacy files and pickles are retained. ([#230](https://github.com/kthtda/stablebear/issues/230))
+* **Barcode tensor comparison** — `BarcodeTensor.is_isomorphic_to` compares aligned barcodes independently of bar order, with configurable endpoint tolerances, and returns one boolean for the whole tensor. ([#232](https://github.com/kthtda/stablebear/issues/232))
 
 ### Bug fixes
 
