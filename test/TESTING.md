@@ -47,6 +47,18 @@ protect. These principles apply when writing, reviewing, or changing tests.
     executors, monkeypatching, or allocation instrumentation unless essential
     to the specific guarantee.
 
+13. **Formatting matters.** Lay out test inputs and expected values so their
+    structure is visible. Write matrices with one row per line rather than
+    compressing them into `[[a, b], [c, d]]`:
+
+    ```python
+    [[a, b],
+     [c, d]]
+    ```
+
+    For collections of matrices, use blank lines between matrices to make
+    their boundaries clear.
+
 The review question is: **What bug would make this test fail, and can I see
 that immediately?**
 
