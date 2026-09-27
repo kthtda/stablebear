@@ -1,6 +1,6 @@
-===================
-Uniform subsampling
-===================
+===========
+Subsampling
+===========
 
 :py:func:`~stablebear.random.subsample` draws one or more uniform
 subsamples from a single :py:class:`~stablebear.point_cloud.PointCloud` or

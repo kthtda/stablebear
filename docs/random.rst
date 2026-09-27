@@ -105,7 +105,7 @@ For example, draw two samples of three points from a four-point cloud::
 .. toctree::
    :maxdepth: 1
 
-   Subsampling guide <subsampling>
+   Subsampling <subsampling>
 
 
 How determinism works

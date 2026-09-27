@@ -91,22 +91,6 @@ serialize
    :undoc-members:
    :show-inheritance:
 
-plotting
---------
-
-.. automodule:: stablebear.plotting
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-random
-------
-
-.. automodule:: stablebear.random
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
 system
 ------
 
@@ -133,4 +117,3 @@ typing
 .. automodule:: stablebear.typing
    :members:
    :undoc-members:
-
