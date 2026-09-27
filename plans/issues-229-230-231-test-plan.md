@@ -5,7 +5,7 @@ and refreshed main `4a9c284f4f48d6711083d99ee529819d4c546384` (201 changed files
 The [review checklist](issues-229-230-231-code-review-checklist.md) records the
 live PR/issue audit, implementation status, known bug, and historical results.
 E3/T1 is now committed in `5c9ae885f`, including both focused regressions.
-T2 is committed in `5e612d55f`. T3–T4, documentation D4,
+T2 is committed in `5e612d55f`; T3 is complete using committed tests and existing randomness coverage. T4, documentation D4,
 and final V1 remain open. Remote status has not been refreshed since the initial
 review.
 
@@ -20,7 +20,7 @@ Protect the user-visible contracts of [#229](https://github.com/kthtda/stablebea
 expectations, public APIs, one behavior per test, and meaningful parameterization.
 
 **T1 is committed (`5c9ae885f`) and T2 is committed (`5e612d55f`).
-Finish T3–T4, reconcile documentation in review D4, then perform V1 once on the
+T3 is complete using existing randomness coverage. Finish T4, reconcile documentation in review D4, then perform V1 once on the
 settled revision. That is sufficient acceptance for this PR.** Existing coverage
 counts. Do not reopen completed features just because more combinations can be
 tested. Add work only for a demonstrated failure, a specific uncovered issue
@@ -142,23 +142,53 @@ After replacing the Python order checks with explicit C++ draws, the rebuilt
 for float and double, plus index filtering).
 No production changes were needed. Further floating-point corner cases and
 statistical checks are not
-required to close T2; T3–T4 and final V1 remain separate work.
+required to close T2; T3–T4 and final V1 are separate work.
 
-## T3. Validation and deterministic random streams
+## T3. Validation and deterministic random streams — completed
 
-- [ ] Cover a representative invalid count type and nonpositive count with
+- [x] Cover a representative invalid count type and nonpositive count with
   the documented `TypeError`/`ValueError`. Parameterize `n_points` and
   `n_samples` if clearer than separate tests; no catalogue of exotic coercion
   objects or every invalid flag is required.
-- [ ] Put an undersized input last in a small ragged input. A non-partial call
+- [x] Put an undersized input last in a small ragged input. A non-partial call
   must raise before advancing its generator: the next valid draw must match a
   same-seed control that never made the failing call. This checks validation
   after valid earlier cells. Do not repeat the RNG assertion for every error.
-- [ ] Check row-major stream allocation with a small seeded example: compare
+- [x] Check row-major stream allocation with a small seeded example: compare
   batched samples with the same logical sequence of individual calls.
-- [ ] Separately compare same-seed results with one worker and an available
-  multi-worker run. Restore CPU limits afterward. Use existing RNG helpers;
-  do not introduce scheduling instrumentation.
+- [x] Accept existing tensor/randomness coverage plus the sampling stream-order
+  regression and source review for scheduling independence. No separate
+  worker-count sampling test is required.
+
+**First subitem committed in `c0d3af44a`:** two small
+Python tests cover both count parameters: `1.5` raises `TypeError`, while `0`
+and `-1` raise `ValueError`. They check that the message identifies the invalid
+parameter. One point-cloud input is sufficient because validation happens in
+the shared Python wrapper before backend dispatch. No production change was
+needed. From `test/`, `SB_FORCE_CPU=1 python -m pytest python/test_subsample.py -q`
+passed **112 tests**, including the six new cases.
+
+**Second subitem committed in `efd53e46f`:** a four-point
+cloud followed by a one-point cloud rejects a request for three points. The
+next valid sampling call matches a same-seed control that never made the
+failing call. Source review confirms all inputs are validated before
+`gen.reserve(nOutputs)`. No production change was needed. The same Python
+sampling command passed **113 tests**.
+
+**Third subitem committed in `337f840e2`:** two clouds with
+two samples each match four individual calls in explicit order `(0, 0)`,
+`(0, 1)`, `(1, 0)`, `(1, 1)`, using same-seed generators. Source review confirms
+stream selection uses `inputFlat * nSamples + sample`, with one reserved slot
+per output and zero slots for an empty outer output. No production change was
+needed. The same Python sampling command passed **114 tests**.
+
+**Fourth subitem closed using existing coverage:** `test/test_walk_random.cpp`
+checks parallel versus sequential random walks, repeatability across parallel
+runs, and reserved seed-block derivation. These tests do not explicitly compare
+worker counts. Together with the committed sampling stream-order regression
+and source review showing seeds are selected by output index, they provide
+sufficient coverage for this PR. A separate executor-count sampling test adds
+little value and is omitted.
 
 **Bugs protected:** invalid calls consuming random state, worker scheduling
 choosing seeds, or wrong output-to-stream mapping. Also inspect that the shared

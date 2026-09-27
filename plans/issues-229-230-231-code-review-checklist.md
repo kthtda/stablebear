@@ -19,18 +19,18 @@ Progress updated through local commit `5e612d55f` (T2 sampling tests); remote st
 **The implementation is substantially complete. E3's overlapping indexed
 assignment fix and both regressions are committed in `5c9ae885f`.**
 T2 sampling semantics are verified and committed in `5e612d55f`. The remaining testing
-work is T3–T4, followed by documentation cleanup and final regression validation.
+work is T4 (T3 is complete using existing randomness coverage), followed by documentation cleanup and final regression validation.
 Use the bounded
 [test plan](issues-229-230-231-test-plan.md);
 the previous exhaustive A–K acceptance matrix is superseded.
 
 | Issue | Current branch evidence | Remaining acceptance work |
 | --- | --- | --- |
-| [#229 uniform subsampling](https://github.com/kthtda/stablebear/issues/229) | Sampling, indexed storage, shared materialization, independent resampling, public selection inspection, and const consumers are implemented. Ownership/view regressions are committed. | E3 is complete (`5c9ae885f`); T2 is committed (`5e612d55f`); finish T3–T4 and reconcile documented API choices. |
+| [#229 uniform subsampling](https://github.com/kthtda/stablebear/issues/229) | Sampling, indexed storage, shared materialization, independent resampling, public selection inspection, and const consumers are implemented. Ownership/view regressions are committed. | E3 is complete (`5c9ae885f`); T2 is committed (`5e612d55f`); T3 is complete; finish T4 and reconcile documented API choices. |
 | [#230 binary-backed pickle](https://github.com/kthtda/stablebear/issues/230) | Shared binary reducer, standalone cloud IO, retained legacy reconstruction functions, public-type round trips, and fixed compatibility files are committed. | Documentation and final validation. No new reducer-discovery framework or all-type golden corpus is required. |
 | [#231 nesting and ragged indexing](https://github.com/kthtda/stablebear/issues/231) | Runtime recursion, depth validation, copying/views, exact-prefix selection, scalar/empty metadata, and binary/pickle coverage are committed. | E3 is complete (`5c9ae885f`); documentation reconciliation and final validation remain. No new depth-by-operation test matrix. |
 | [#232 barcode tensor isomorphism](https://github.com/kthtda/stablebear/issues/232) | Aligned same-dtype comparison, tolerance forwarding, and error cases are implemented and tested at both precisions. | Add the missing `.rst` description/example and include existing tests in final validation. |
-| [#236 distance-matrix subsampling](https://github.com/kthtda/stablebear/issues/236) | Implemented in `991d8e5ce`; committed tests cover principal submatrices, repeated vertices, resampling, views/mutation, IO, and persistence/kernel consumers. | E3 is complete (`5c9ae885f`); T2, including matrix-specific duplicate semantics, is committed (`5e612d55f`); T3–T4 remain. Acceptance still depends on completing #229. |
+| [#236 distance-matrix subsampling](https://github.com/kthtda/stablebear/issues/236) | Implemented in `991d8e5ce`; committed tests cover principal submatrices, repeated vertices, resampling, views/mutation, IO, and persistence/kernel consumers. | E3 is complete (`5c9ae885f`); T2, including matrix-specific duplicate semantics, is committed (`5e612d55f`); T3 is complete; T4 remains. Acceptance still depends on completing #229. |
 
 ## Corrections to the previous plan
 
@@ -48,8 +48,8 @@ the previous exhaustive A–K acceptance matrix is superseded.
   The V3 corpus is not a released 0.5 corpus or a complete nested/indexed corpus.
 - At the initial review, `test_subsample.py` lacked duplicate-filtering and
   explicit without-replacement uniqueness assertions. T2 now covers these in
-  `5e612d55f`. Argument rejection and failure/no-advance RNG checks remain
-  T3 work; earlier descriptions of pending tests do not establish coverage.
+  `5e612d55f`. T3 count rejection is committed in `c0d3af44a`;
+  failure/no-advance RNG coverage is committed in `efd53e46f`.
 
 ## Completion status
 
@@ -95,8 +95,11 @@ by the corrected `AGENTS.md`.
 - [x] T2: no-replacement full samples, nonempty partial sampling, stable cloud
   and matrix duplicate filtering, preservation of distinct zero-distance
   vertices, and unchanged generator advancement when filtering is enabled.
-- [ ] T3: representative argument validation, failure without RNG advancement,
-  row-major stream allocation, and thread independence.
+- [x] T3: count validation (`c0d3af44a`) and failure without RNG advancement
+  (`efd53e46f`) and row-major stream allocation (`337f840e2`) are committed
+  (**114 sampling tests passed**). Scheduling independence is accepted using
+  existing tensor/randomness tests and index-based seed allocation review; no
+  separate worker-count sampling test is required.
 - [ ] T4: mutating the original input after sampling leaves its snapshot intact.
 
 **T2 verification:** direct CMake build/install with GCC 13, followed by
