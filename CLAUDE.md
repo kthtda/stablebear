@@ -38,6 +38,9 @@ targeted and incremental builds. Do not hard-code a smaller job count such as
 
 ## Testing
 
+Read and follow the [testing manifesto](test/TESTING.md) when writing,
+reviewing, or changing tests.
+
 **Important**: Always `cd test` before running pytest. Running from the repo root causes the local `stablebear/` directory to shadow the installed package. You must also build and install first.
 
 ### Python tests
