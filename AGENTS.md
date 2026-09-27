@@ -8,12 +8,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Build & Development
 
-### Full install (required before minimal builds)
-```bash
-pip install .
-```
+On Linux, use **GCC 13 or newer** for all builds. The devcontainer already
+selects GCC 13 by default; no `CC` or `CXX` exports are needed there.
 
-### Minimal module build (for iterative C++ development)
+CMake caches the compiler selection. If an existing build directory was
+configured with an older GCC, configure a fresh build directory with GCC 13 or
+newer.
+
+Always build and install this repository directly with CMake. Do not use
+`pip install .` or another pip-based build of the project; no preliminary pip
+installation is required.
+
+### Configure, build, and install
 ```bash
 cmake -B cmake-build-debug
 cmake --build cmake-build-debug -j$(nproc)
