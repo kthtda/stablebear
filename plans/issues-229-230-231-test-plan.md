@@ -5,7 +5,7 @@ and refreshed main `4a9c284f4f48d6711083d99ee529819d4c546384` (201 changed files
 The [review checklist](issues-229-230-231-code-review-checklist.md) records the
 live PR/issue audit, implementation status, known bug, and historical results.
 E3/T1 is now committed in `5c9ae885f`, including both focused regressions.
-T2 is committed in `5e612d55f`; T3 is complete using committed tests and existing randomness coverage. T4, documentation D4,
+T2 is committed in `5e612d55f`; T3 is complete using committed tests and existing randomness coverage. T4 is committed in `d7dbaaf8d`. Documentation D4
 and final V1 remain open. Remote status has not been refreshed since the initial
 review.
 
@@ -20,7 +20,7 @@ Protect the user-visible contracts of [#229](https://github.com/kthtda/stablebea
 expectations, public APIs, one behavior per test, and meaningful parameterization.
 
 **T1 is committed (`5c9ae885f`) and T2 is committed (`5e612d55f`).
-T3 is complete using existing randomness coverage. Finish T4, reconcile documentation in review D4, then perform V1 once on the
+T3 is complete using existing randomness coverage; T4 is committed in `d7dbaaf8d`. Reconcile documentation in review D4, then perform V1 once on the
 settled revision. That is sufficient acceptance for this PR.** Existing coverage
 counts. Do not reopen completed features just because more combinations can be
 tested. Add work only for a demonstrated failure, a specific uncovered issue
@@ -202,11 +202,20 @@ explicit/global generators × all worker counts × all outer layouts × both
 extension modules. Do not add statistical uniformity thresholds or benchmarks
 as merge gates: review the uniform draw algorithm and test its exact contracts.
 
-## T4. Sampling owns its input snapshot
+## T4. Sampling owns its input snapshot — completed (`d7dbaaf8d`)
 
-- [ ] Add one direct input-to-output independence test: retain an input view,
+- [x] Add one direct input-to-output independence test: retain an input view,
   sample from that input, save expected sampled values, successfully mutate
   through the retained input view, and verify sampled values remain unchanged.
+
+**Verification (test committed in `d7dbaaf8d`):**
+`test_writing_input_view_does_not_change_sample` retains an input view before
+sampling both points, copies the sampled values, then changes a coordinate or
+distance through the retained view. It verifies the source changed and the
+samples did not. Drawing both points guarantees the mutation affects a selected
+value. The existing fixture covers clouds and matrices at both precisions.
+From `test/`, `SB_FORCE_CPU=1 python -m pytest python/test_subsample.py -q`
+passed **118 tests**. No production change was needed.
 
 **Bug protected:** retaining the caller's coordinate/matrix storage instead of
 the fresh source copy required by #229/#236. Current mutation tests mostly
@@ -220,7 +229,7 @@ allocation counters to prove the same ownership behavior.
 
 ## V1. Final verification
 
-- [ ] Complete review S1 and documentation D4 before the final full run; E3 is done.
+- [ ] Complete documentation D4 before the final full run; E3 and S1 are done.
 - [ ] Build/install settled code and run existing Python and C++ suites.
 - [ ] Run Sphinx after documentation changes.
 - [ ] Inspect CI for the same revision and record the tested commit, actual

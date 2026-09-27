@@ -3,7 +3,7 @@
 Initial review on 2026-09-27 covered the live
 [PR #233](https://github.com/kthtda/stablebear/pull/233), its five linked issues,
 the plans, and the branch diff against refreshed `origin/main`.
-Progress updated through local commit `5e612d55f` (T2 sampling tests); remote state has not been refreshed since the initial review.
+Progress updated through local commit `d7dbaaf8d` (T4 input snapshot test); remote state has not been refreshed since the initial review.
 
 ## Review baseline and conclusion
 
@@ -18,19 +18,18 @@ Progress updated through local commit `5e612d55f` (T2 sampling tests); remote st
 
 **The implementation is substantially complete. E3's overlapping indexed
 assignment fix and both regressions are committed in `5c9ae885f`.**
-T2 sampling semantics are verified and committed in `5e612d55f`. The remaining testing
-work is T4 (T3 is complete using existing randomness coverage), followed by documentation cleanup and final regression validation.
+T2 sampling semantics are verified and committed in `5e612d55f`. T3 is complete using existing randomness coverage; T4 is committed in `d7dbaaf8d`. Documentation cleanup and final regression validation remain.
 Use the bounded
 [test plan](issues-229-230-231-test-plan.md);
 the previous exhaustive A–K acceptance matrix is superseded.
 
 | Issue | Current branch evidence | Remaining acceptance work |
 | --- | --- | --- |
-| [#229 uniform subsampling](https://github.com/kthtda/stablebear/issues/229) | Sampling, indexed storage, shared materialization, independent resampling, public selection inspection, and const consumers are implemented. Ownership/view regressions are committed. | E3 is complete (`5c9ae885f`); T2 is committed (`5e612d55f`); T3 is complete; finish T4 and reconcile documented API choices. |
+| [#229 uniform subsampling](https://github.com/kthtda/stablebear/issues/229) | Sampling, indexed storage, shared materialization, independent resampling, public selection inspection, and const consumers are implemented. Ownership/view regressions are committed. | E3 is complete (`5c9ae885f`); T2 is committed (`5e612d55f`); T3 is complete; T4 is committed in `d7dbaaf8d`; reconcile documented API choices. |
 | [#230 binary-backed pickle](https://github.com/kthtda/stablebear/issues/230) | Shared binary reducer, standalone cloud IO, retained legacy reconstruction functions, public-type round trips, and fixed compatibility files are committed. | Documentation and final validation. No new reducer-discovery framework or all-type golden corpus is required. |
 | [#231 nesting and ragged indexing](https://github.com/kthtda/stablebear/issues/231) | Runtime recursion, depth validation, copying/views, exact-prefix selection, scalar/empty metadata, and binary/pickle coverage are committed. | E3 is complete (`5c9ae885f`); documentation reconciliation and final validation remain. No new depth-by-operation test matrix. |
 | [#232 barcode tensor isomorphism](https://github.com/kthtda/stablebear/issues/232) | Aligned same-dtype comparison, tolerance forwarding, and error cases are implemented and tested at both precisions. | Add the missing `.rst` description/example and include existing tests in final validation. |
-| [#236 distance-matrix subsampling](https://github.com/kthtda/stablebear/issues/236) | Implemented in `991d8e5ce`; committed tests cover principal submatrices, repeated vertices, resampling, views/mutation, IO, and persistence/kernel consumers. | E3 is complete (`5c9ae885f`); T2, including matrix-specific duplicate semantics, is committed (`5e612d55f`); T3 is complete; T4 remains. Acceptance still depends on completing #229. |
+| [#236 distance-matrix subsampling](https://github.com/kthtda/stablebear/issues/236) | Implemented in `991d8e5ce`; committed tests cover principal submatrices, repeated vertices, resampling, views/mutation, IO, and persistence/kernel consumers. | E3 is complete (`5c9ae885f`); T2, including matrix-specific duplicate semantics, is committed (`5e612d55f`); T3 is complete; T4 is committed in `d7dbaaf8d`. Acceptance still depends on completing #229. |
 
 ## Corrections to the previous plan
 
@@ -90,7 +89,7 @@ paragraph or additional overlap test matrix is needed. Full PR and CUDA
 validation remain V1 work. All subsequent builds use direct CMake as required
 by the corrected `AGENTS.md`.
 
-### S1. Finish meaningful sampling coverage — T2 committed (`5e612d55f`)
+### S1. Finish meaningful sampling coverage — completed
 
 - [x] T2: no-replacement full samples, nonempty partial sampling, stable cloud
   and matrix duplicate filtering, preservation of distinct zero-distance
@@ -100,7 +99,9 @@ by the corrected `AGENTS.md`.
   (**114 sampling tests passed**). Scheduling independence is accepted using
   existing tensor/randomness tests and index-based seed allocation review; no
   separate worker-count sampling test is required.
-- [ ] T4: mutating the original input after sampling leaves its snapshot intact.
+- [x] T4: mutating the original input through a retained view leaves sampled
+  values unchanged, for clouds and matrices at both precisions. Committed in
+  `d7dbaaf8d`; **118 Python sampling tests passed**.
 
 **T2 verification:** direct CMake build/install with GCC 13, followed by
 `SB_FORCE_CPU=1 python -m pytest python/test_subsample.py -q` from `test/`:
@@ -173,7 +174,7 @@ Existing CI covers platform wheels, source distribution, coverage and memory
 checks. Use it; a separate local platform/CUDA-version/serialization-exchange
 matrix is not required. State unavailable CUDA coverage accurately.
 
-**E3 is complete. Stop when S1, D4, and V1 are complete.** F1 then has the same evidence it
+**E3 and S1 are complete. Stop when D4 and V1 are complete.** F1 then has the same evidence it
 needs. Reopen work for a concrete failure, an uncovered issue requirement, or a
 new implementation change, not merely another possible test permutation.
 
