@@ -1,20 +1,29 @@
-## Unreleased
+## 0.5.0
 
 ### Breaking changes
 
-* **Updated binary save format** — Stablebear 0.5.0 continues to read files from earlier supported releases. Use Stablebear 0.5.0 or later to read newly saved files.
+* **Updated binary save format** — Files and pickles written by 0.5.0 require Stablebear 0.5.0 or later to read. Readers for supported earlier formats are retained.
+* **Point-cloud elements return `PointCloud`** — Selecting a complete element from a `PointCloudTensor` now returns a `PointCloud` view instead of a `FloatTensor`. Coordinate indexing and assignment remain supported; use `np.asarray(cloud)` for general array operations such as reshaping. ([#233](https://github.com/kthtda/stablebear/pull/233))
 
 ### New features
 
-* **Pointwise PCF sums** — `sum` adds the PCFs in a tensor along a chosen `dim`, preserving precision and supporting negative dimensions. ([#234](https://github.com/kthtda/stablebear/issues/234))
 * **Uniform subsampling** — `random.subsample` draws samples from individual point clouds and distance matrices or tensors of them, with or without replacement. Samples own a snapshot of their input and support partial draws and duplicate removal (by coordinates for clouds, by vertex index for matrices). ([#229](https://github.com/kthtda/stablebear/issues/229), [#236](https://github.com/kthtda/stablebear/issues/236))
-* **Nested tensors and ragged indexing** — `NestedTensor` supports recursively nested numeric tensors with differently shaped children. Nested `uint64` selections create indexed point-cloud and distance-matrix tensor views while preserving selection order and repetitions. ([#231](https://github.com/kthtda/stablebear/issues/231))
+* **Nested tensors and ragged indexing** — `NestedTensor` supports recursively nested numeric tensors with differently shaped children. Nested `uint64` selections create indexed point-cloud and distance-matrix tensor views while preserving selection order and repetitions. `indices(values)` is shorthand for constructing a `uint64` selection tensor. ([#231](https://github.com/kthtda/stablebear/issues/231))
+* **Standalone point clouds** — Construct a cloud with `PointCloud(coordinates)` and pass it directly to subsampling, persistent homology, and homological-kernel computations. Clouds support coordinate views, NumPy conversion, copying, and binary/pickle serialization. ([#233](https://github.com/kthtda/stablebear/pull/233))
+* **Selection inspection and independent copies** — Point-cloud and distance-matrix tensors expose copied selections through `.indices`, returning `None` after materialization. Their `.to_dense()` method creates an independent tensor with ordinary storage. `DistanceMatrix.copy()` also provides an independent copy of an individual matrix. ([#233](https://github.com/kthtda/stablebear/pull/233))
+* **Pointwise PCF sums** — `sum` adds the PCFs in a tensor along a chosen `dim`, preserving precision and supporting negative dimensions. ([#234](https://github.com/kthtda/stablebear/issues/234))
 * **Unified data serialization** — Tensor and standalone data-object pickles use the same binary format as `save`/`load`, including standalone point clouds, nested tensors, and indexed tensors. Readers for supported legacy files and pickles are retained. ([#230](https://github.com/kthtda/stablebear/issues/230))
 * **Barcode tensor comparison** — `BarcodeTensor.is_isomorphic_to` compares aligned barcodes independently of bar order, with configurable endpoint tolerances, and returns one boolean for the whole tensor. ([#232](https://github.com/kthtda/stablebear/issues/232))
 
 ### Bug fixes
 
-* **`PointCloudTensor` cells now enforce rank-2 point clouds** — assigning an array whose shape is not `(n_points, dimension)` now raises `ValueError`. Higher-rank values such as `(30, 2, 20)` were previously accepted and returned with the same invalid shape. ([#229](https://github.com/kthtda/stablebear/issues/229))
+* **Point clouds must have rank 2** — Each cloud must have shape `(n_points, dimension)`, and `PointCloudTensor(..., cloud_ndim=...)` now accepts only `2`. Assigning higher-rank data raises `ValueError`. ([#229](https://github.com/kthtda/stablebear/issues/229))
+* **Scalar tensor serialization preserves values** — Binary save/load and pickle round trips now preserve the value of a zero-dimensional tensor instead of treating it as empty. ([#233](https://github.com/kthtda/stablebear/pull/233))
+* **Windows free-threaded builds** — Correct Python library discovery and compiler definitions for free-threaded Python builds on Windows. ([#233](https://github.com/kthtda/stablebear/pull/233))
+
+### Build requirements
+
+* Source builds now require CMake 3.30.3 or newer. Use GCC 13 or newer on Linux.
 
 ## 0.4.7
 
