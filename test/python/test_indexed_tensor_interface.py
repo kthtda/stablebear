@@ -1,4 +1,4 @@
-"""Ordinary tensor operations on property-indexed point-cloud tensors."""
+"""Ordinary tensor operations on property-indexed tensors."""
 
 import numpy as np
 import numpy.testing as npt
@@ -24,6 +24,63 @@ def indexed_points(dtype, np_dtype):
         for rows in ([4, 1], [0, 3], [2, 2], [1, 4])
     ])
     return source, source[selections]
+
+
+def test_write_through_view_is_visible_to_existing_aliases(make_pcloud_or_distmat_tensor):
+    source = make_pcloud_or_distmat_tensor([[1, 2]])
+    indexed = source[sb.NestedTensor([
+        sb.indices([0, 0, 0]), sb.indices([0, 0, 0]), sb.indices([0, 0, 0]),
+    ])]
+    view = indexed[1:3]
+    sibling = indexed[...]
+    cell = indexed[1]
+    untouched = np.asarray(indexed[0]).copy()
+
+    view[0][0, 1] = 999
+    assert indexed[1][0, 1] == 999
+    assert sibling[1][0, 1] == 999
+    assert cell[0, 1] == 999
+    npt.assert_array_equal(np.asarray(indexed[0]), untouched)
+    assert indexed.indices is None
+
+
+def test_indexed_write_leaves_source_and_other_selections_unchanged(make_pcloud_or_distmat_tensor):
+    source = make_pcloud_or_distmat_tensor([[1, 2]])
+    indexed = source[sb.NestedTensor([sb.indices([0, 0, 0]), sb.indices([0, 0, 0])])]
+    source_before = np.asarray(source[()]).copy()
+    other_before = np.asarray(indexed[1]).copy()
+    repeated_entry = indexed[0][2, 1]
+
+    indexed[0][0, 1] = 999
+    assert indexed[0][2, 1] == repeated_entry
+    npt.assert_array_equal(np.asarray(indexed[1]), other_before)
+    npt.assert_array_equal(np.asarray(source[()]), source_before)
+
+
+def test_second_indexed_write_preserves_first_write(make_pcloud_or_distmat_tensor):
+    source = make_pcloud_or_distmat_tensor([[1, 2]])
+    indexed = source[sb.NestedTensor([sb.indices([0, 0, 0])])]
+    view = indexed[:]
+    cell = indexed[0]
+
+    view[0][0, 1] = 999
+    indexed[0][2, 1] = 888
+    assert view[0][0, 1] == 999
+    assert cell[2, 1] == 888
+
+
+@pytest.mark.parametrize(("dtype", "np_dtype"), DTYPES)
+def test_cast_indexed_view_is_independent(dtype, np_dtype):
+    _, indexed = indexed_points(dtype, np_dtype)
+    view = indexed[:1]
+    original = np.asarray(view[0]).copy()
+    cast_dtype = sb.pcloud64 if dtype == sb.pcloud32 else sb.pcloud32
+    cast = view.astype(cast_dtype)
+    assert cast.dtype == cast_dtype
+    npt.assert_array_equal(np.asarray(cast[0]), original)
+    cast[0][0, 0] = -7
+    assert cast[0][0, 0] == -7
+    npt.assert_array_equal(np.asarray(view[0]), original)
 
 
 @pytest.mark.parametrize(("dtype", "np_dtype"), DTYPES)
