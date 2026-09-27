@@ -40,7 +40,7 @@
   // `cmake --install` symlinks it into stablebear/. Python deps are already installed
   // at image-build time (see Dockerfile). The chown gives the ubuntu user ownership
   // of the freshly-created (root-owned) build volume.
-  "postCreateCommand": "sudo chown ubuntu:ubuntu cmake-build-debug && git submodule update --init --recursive && cmake --preset debug-nocuda && cmake --build --preset debug-nocuda && cmake --install cmake-build-debug",
+  "postCreateCommand": "sudo chown ubuntu:ubuntu cmake-build-debug && git submodule update --init --recursive && cmake --preset debug-nocuda && cmake --build --preset debug-nocuda -j$(nproc --ignore=4) && cmake --install cmake-build-debug",
 
   "customizations": {
     "vscode": {

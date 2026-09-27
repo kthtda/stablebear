@@ -47,7 +47,7 @@ jobs:
           echo "${{github.workspace}}/.venv/bin" >> $GITHUB_PATH
 
       - name: Install Python dependencies
-        run: bash .github/scripts/ci-retry.sh pip install numpy tqdm pytest pytest-cov scipy matplotlib
+        run: bash .github/scripts/ci-retry.sh pip install 'cmake>=3.30.3' numpy tqdm pytest pytest-cov scipy matplotlib
 
       - name: Install LLVM toolchain (GitHub runner)
         if: inputs.use_github_runners
@@ -208,7 +208,7 @@ jobs:
           echo "${{github.workspace}}/.venv/bin" >> $GITHUB_PATH
 
       - name: Install Python dependencies
-        run: bash .github/scripts/ci-retry.sh pip install numpy tqdm pytest ValgrindCI scipy matplotlib
+        run: bash .github/scripts/ci-retry.sh pip install 'cmake>=3.30.3' numpy tqdm pytest ValgrindCI scipy matplotlib
 
       - name: Install Valgrind (GitHub runner)
         if: inputs.use_github_runners
@@ -344,10 +344,9 @@ jobs:
           cp test/reports/vg-gtest.xml test/reports/vg_gtest/raw.xml || true
           cp test/reports/vg-gtest-supp.log test/reports/vg_gtest/raw.log || true
           cp test/reports/vg-gtest-summary.txt test/reports/vg_gtest/summary.txt || true
-          cp test/reports/hg-pytest.xml test/reports/hg_pytest/raw.xml || true
+          # Keep rendered Helgrind reports; raw XML can exceed GitHub's file limit.
           cp test/reports/hg-pytest-supp.log test/reports/hg_pytest/raw.log || true
           cp test/reports/hg-pytest-summary.txt test/reports/hg_pytest/summary.txt || true
-          cp test/reports/hg-gtest.xml test/reports/hg_gtest/raw.xml || true
           cp test/reports/hg-gtest-supp.log test/reports/hg_gtest/raw.log || true
           cp test/reports/hg-gtest-summary.txt test/reports/hg_gtest/summary.txt || true
           cp test/reports/vg-pytest.supp test/reports/vg_pytest/generated.supp || true
@@ -359,7 +358,9 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: valgrind-output
-          path: test/reports/
+          path: |
+            test/reports/
+            !test/reports/hg-*.xml
           retention-days: 1
 
   cuda_test:
@@ -386,7 +387,7 @@ jobs:
           echo "${{github.workspace}}/.venv/bin" >> $GITHUB_PATH
 
       - name: Install Python dependencies
-        run: bash .github/scripts/ci-retry.sh pip install numpy tqdm pytest scipy
+        run: bash .github/scripts/ci-retry.sh pip install 'cmake>=3.30.3' numpy tqdm pytest scipy
 
       - name: Install gpucov and lcov
         run: |

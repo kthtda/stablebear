@@ -64,14 +64,17 @@ Presets live in repo-root `CMakePresets.json`:
 
 ```bash
 cmake --preset debug          # configure
-cmake --build --preset debug  # build _sb_cpu (+_sb_cuda12)
+cmake --build --preset debug -j$(nproc --ignore=4)  # build _sb_cpu (+_sb_cuda12)
 cmake --install cmake-build-debug   # symlink extensions into stablebear/
 ```
+
+`nproc --ignore=4` leaves four CPUs worth of capacity for the host, with a
+minimum of one build job. Use fewer jobs if memory is tight.
 
 C++ tests:
 
 ```bash
-cmake --build --preset tests
+cmake --build --preset tests -j$(nproc --ignore=4)
 cd test && ../cmake-build-debug/sb_test
 ```
 
@@ -84,7 +87,7 @@ cd test && python -m pytest python
 Benchmarks/perf -> always use the release preset:
 
 ```bash
-cmake --preset release && cmake --build --preset release && cmake --install cmake-build-release
+cmake --preset release && cmake --build --preset release -j$(nproc --ignore=4) && cmake --install cmake-build-release
 ```
 
 CUDA-off build: `cmake --preset debug-nocuda`.

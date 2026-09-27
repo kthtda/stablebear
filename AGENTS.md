@@ -8,6 +8,9 @@ This file provides guidance to coding agents working in this repository.
 
 ## Build & Development
 
+Use **CMake 3.30.3 or newer** so Python discovery supports free-threaded
+interpreters and supplies their required compiler definitions on Windows.
+
 On Linux, use **GCC 13 or newer** for all builds. The devcontainer already
 selects GCC 13 by default; no `CC` or `CXX` exports are needed there.
 
@@ -22,15 +25,16 @@ installation is required.
 ### Configure, build, and install
 ```bash
 cmake -B cmake-build-debug
-cmake --build cmake-build-debug -j$(nproc)
+cmake --build cmake-build-debug -j$(nproc --ignore=4)
 cmake --install cmake-build-debug
 ```
 This works when `SKBUILD` is off (plain CMake). Builds `_sb_cpu` (always) and `_sb_cudaXX` (when CUDA available). Extensions are symlinked into `stablebear/` for immediate use.
 
-Always match build parallelism to the CPUs available in the current
-environment (`-j$(nproc)` on Linux, or the platform equivalent), including
-targeted and incremental builds. Do not hard-code a smaller job count such as
-`-j2`.
+For local builds, leave four CPUs worth of capacity for the editor and host:
+use `-j$(nproc --ignore=4)` on Linux, including targeted and incremental builds.
+This uses `max(1, available CPUs - 4)` jobs. On other platforms, calculate the
+equivalent from the available CPU count. Respect any explicitly requested lower
+job limit; CPU-based sizing alone does not guarantee enough memory for a build.
 
 ### CUDA control
 - `BUILD_WITH_CUDA=0` env var disables CUDA (auto-detected otherwise, always off on macOS)
@@ -51,14 +55,14 @@ reviewing, or changing tests.
 
 ### Python tests
 ```bash
-cmake --build cmake-build-debug -j$(nproc) && cmake --install cmake-build-debug
+cmake --build cmake-build-debug -j$(nproc --ignore=4) && cmake --install cmake-build-debug
 cd test && python -m pytest python               # all Python tests
 cd test && python -m pytest python/test_pdist.py  # single test file
 ```
 
 ### C++ tests (GoogleTest)
 ```bash
-cmake --build cmake-build-debug --target sb_test -j$(nproc)
+cmake --build cmake-build-debug --target sb_test -j$(nproc --ignore=4)
 cd test && ../cmake-build-debug/sb_test  # run from test/ directory
 ```
 

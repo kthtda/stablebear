@@ -52,7 +52,7 @@
   // cmake-build-debug volume holds a cache from a different generator/toolchain
   // (e.g. an old Unix Makefiles cache vs. the Ninja preset). Build manually with
   // the commands documented in AGENTS.md:
-  //   cmake --preset debug && cmake --build --preset debug && cmake --install cmake-build-debug
+  //   cmake --preset debug && cmake --build --preset debug -j$(nproc --ignore=4) && cmake --install cmake-build-debug
   // Claude Code is installed natively into ~/.local/bin by the Dockerfile, which
   // already matches installMethod=native in the bind-mounted ~/.claude.json, so
   // no /doctor-quieting symlink is needed here anymore.
