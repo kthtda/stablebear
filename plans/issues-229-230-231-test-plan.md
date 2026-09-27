@@ -1,10 +1,12 @@
 # Test plan: finish PR #233
 
-Updated 2026-09-27 against branch HEAD `27106ca6a674347c7defa11a4e467ee5b103dd70`
+Initial review on 2026-09-27 used branch HEAD `27106ca6a674347c7defa11a4e467ee5b103dd70`
 and refreshed main `4a9c284f4f48d6711083d99ee529819d4c546384` (201 changed files).
 The [review checklist](issues-229-230-231-code-review-checklist.md) records the
 live PR/issue audit, implementation status, known bug, and historical results.
-This update changes plans only; it adds no tests and claims no fresh suite run.
+E3/T1 is now committed in `5c9ae885f`, including both focused regressions.
+T2–T4, documentation D4, and final V1 remain open. Remote status has not been
+refreshed since the initial review.
 
 ## Scope and stopping rule
 
@@ -16,9 +18,9 @@ Protect the user-visible contracts of [#229](https://github.com/kthtda/stablebea
 [testing manifesto](../test/TESTING.md): small distinguishable inputs, obvious
 expectations, public APIs, one behavior per test, and meaningful parameterization.
 
-**Finish T1–T4, reconcile documentation in review D4, then perform V1 once on the
-settled revision. That is sufficient acceptance for this PR.** Existing coverage
-counts. Do not reopen completed features just because more combinations can be
+**T1 is complete (`5c9ae885f`). Finish T2–T4, reconcile documentation in
+review D4, then perform V1 once on the settled revision. That is sufficient
+acceptance for this PR.** Existing coverage counts. Do not reopen completed features just because more combinations can be
 tested. Add work only for a demonstrated failure, a specific uncovered issue
 requirement, or code changed while completing these items.
 
@@ -59,26 +61,43 @@ families. Do not require reflective discovery/instantiation of every future
 public class. Preserve old reconstruction symbols and immutable golden bytes;
 do not regenerate files to make a failing compatibility test pass.
 
-## T1. Overlapping indexed assignment
+## T1. Overlapping indexed assignment — completed
 
-- [ ] Add a public distance-matrix regression for review E3 and fix the bug.
+- [x] Fix review E3 and add focused public and C++ regressions (`5c9ae885f`).
 
-**Bug protected:** assigning an overlapping reversed RHS corrupts later reads.
-Four 2×2 matrices with distinct off-diagonal distances `[1, 2, 3, 4]`, selected
-through nested indices, become `[4, 3, 3, 4]` after `selected[:] = selected[::-1]`.
-The required result is `[4, 3, 2, 1]`.
+The Python test in `test/python/test_indexed_tensor_interface.py` explicitly
+lists four 2×2 matrices and their vertex selections. It compares the complete
+reversed matrices and unchanged source matrices. This protects the assignment
+path where Python has already materialized the shared backing.
 
-Place the test in `test/python/test_indexed_tensor_interface.py`, alongside
-view/assignment behavior. Use explicit expected distances, not a live alias as
-the oracle. Check assignment succeeded and the original source remains
-unchanged. If the fix distinguishes initially indexed and already-materialized
-backing, exercise those two states with the same small case.
+The C++ test `TensorProperties.OverlappingAssignmentSnapshotsBeforeMaterialization`
+in `test/test_tensor.cpp` uses real distance matrices and starts with active
+selections. It checks that `assign_from()` itself materializes the result and
+preserves RHS values and source independence. These two tests cover distinct
+entry states without adding a matrix of view/dtype combinations.
 
-Existing ordinary reverse/shift assignment tests remain regression controls.
-Python materializes the destination before C++ assignment; add a small C++ case
-if the fix needs separate protection for materialization inside `assign_from()`.
-Add shifted/mixed-storage cases only for distinct affected routes, not to
-repeat the same bug at every layer.
+During implementation, after installing the GCC 13 CPU build, these commands
+passed from `test/`:
+
+```bash
+# 49 passed on the installed stablebear._sb_cpu module.
+SB_FORCE_CPU=1 python -m pytest python/test_indexed_tensor_interface.py python/test_bugscan_setitem.py python/test_bugscan_element_assign.py -q
+# 171 passed in the CMake GCC 13 CPU build.
+../cmake-build-e3/sb_test --gtest_filter='TensorProperties.*:TensorTpp*'
+```
+
+The Python regression was subsequently rerun successfully after switching to
+full-matrix assertions. The final simplified C++ regression was rebuilt with
+`cmake --build cmake-build-e3 --target sb_test -j$(nproc)` and passed with
+`--gtest_filter=TensorProperties.OverlappingAssignmentSnapshotsBeforeMaterialization`.
+`make html` also succeeded during implementation. No extra public documentation
+is needed for restoring expected assignment behavior.
+
+The initial Python build used pip under the old guidance; `AGENTS.md` now
+requires direct CMake builds. The results above are development evidence, not
+a claim that the full suites ran on `5c9ae885f`. Full-suite and CUDA validation
+remain V1 work. T1 needs no further tests unless a new failure or code change
+warrants them.
 
 ## T2. Sampling and duplicate-removal semantics
 
@@ -159,21 +178,20 @@ allocation counters to prove the same ownership behavior.
 
 ## V1. Final verification
 
-- [ ] Complete review E3/S1 and documentation D4 before the final full run.
+- [ ] Complete review S1 and documentation D4 before the final full run; E3 is done.
 - [ ] Build/install settled code and run existing Python and C++ suites.
 - [ ] Run Sphinx after documentation changes.
 - [ ] Inspect CI for the same revision and record the tested commit, actual
   modules, results/skips, and failures still needing resolution.
 
-Follow [AGENTS.md](../AGENTS.md). A full install is required before the minimal
-build; always run pytest and the C++ executable from `test/`. Match build jobs
-to available CPUs.
+Follow [AGENTS.md](../AGENTS.md): configure, build, and install directly with
+CMake, using GCC 13 or newer on Linux. Do not build this project through pip.
+Always run pytest and the C++ executable from `test/`. Match build jobs to
+available CPUs.
 
 ```bash
-# Initial installation, if needed, from the repository root:
-python -m pip install .
-
-# Subsequent build/install in the configured development environment:
+# From the repository root:
+cmake -B cmake-build-debug
 cmake --build cmake-build-debug -j$(nproc)
 cmake --install cmake-build-debug
 cmake --build cmake-build-debug --target sb_test -j$(nproc)
@@ -198,8 +216,9 @@ on top of passing regression/CI checks.
 
 The prior 2026-09-26 result (2,427 Python CUDA-module tests; 2,397 CPU-module tests
 with 30 skips; 491 C++ tests; successful HTML build) was for `991d8e5ce` plus
-then-pending tests. It cannot serve as the final result for current HEAD. CI was
-pending, with the CUDA job skipped, when this plan was refreshed.
+then-pending tests. It cannot serve as the final result for current HEAD. CI for `27106ca6a` was
+pending, with the CUDA job skipped, at the initial review; it has not been
+refreshed for this progress update.
 
 After V1 passes, stop. Repeat focused checks for a subsequent code fix, and
 repeat broader validation only when that change or a failure justifies it.

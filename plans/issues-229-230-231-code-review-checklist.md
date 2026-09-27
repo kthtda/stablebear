@@ -1,34 +1,36 @@
 # Code review checklist: PR #233
 
-Updated 2026-09-27 after reviewing the live
+Initial review on 2026-09-27 covered the live
 [PR #233](https://github.com/kthtda/stablebear/pull/233), its five linked issues,
 the plans, and the branch diff against refreshed `origin/main`.
+Progress updated through local commit `5c9ae885f`; remote state has not been
+refreshed since the initial review.
 
 ## Review baseline and conclusion
 
-- Branch: `issue-229-uniform-subsampling`, HEAD
-  `27106ca6a674347c7defa11a4e467ee5b103dd70`, matching the remote PR head.
+- Initial review: `issue-229-uniform-subsampling` at
+  `27106ca6a674347c7defa11a4e467ee5b103dd70`, matching the remote PR head at that time.
 - `main`, refreshed `origin/main`, and merge base:
   `4a9c284f4f48d6711083d99ee529819d4c546384`.
-- Net change: 201 files. The working tree was clean before this plan update.
+- Net change: 201 files. The working tree was clean before the initial plan update.
 - The PR has no conversation comments, submitted reviews, or inline review
-  comments at this review. Its body marks #230/#232 complete and #229/#231/#236
+  comments at the initial review. Its body marks #230/#232 complete and #229/#231/#236
   incomplete. All five issues remain open.
 
-**The implementation is substantially complete. The remaining correctness
-blocker is E3: overlapping indexed assignment corrupts values, including through
-the public distance-matrix API.** The remaining testing work is a small set of
-sampling contract checks, followed by documentation cleanup and final regression
-validation. Use the bounded [test plan](issues-229-230-231-test-plan.md);
+**The implementation is substantially complete. E3's overlapping indexed
+assignment fix and both regressions are committed in `5c9ae885f`.**
+The remaining testing work is a small set of sampling contract checks, followed
+by documentation cleanup and final regression validation. Use the bounded
+[test plan](issues-229-230-231-test-plan.md);
 the previous exhaustive A–K acceptance matrix is superseded.
 
 | Issue | Current branch evidence | Remaining acceptance work |
 | --- | --- | --- |
-| [#229 uniform subsampling](https://github.com/kthtda/stablebear/issues/229) | Sampling, indexed storage, shared materialization, independent resampling, public selection inspection, and const consumers are implemented. Ownership/view regressions are committed. | Fix E3; finish focused sampling tests T2–T4; reconcile documented API choices. |
+| [#229 uniform subsampling](https://github.com/kthtda/stablebear/issues/229) | Sampling, indexed storage, shared materialization, independent resampling, public selection inspection, and const consumers are implemented. Ownership/view regressions are committed. | E3 is complete (`5c9ae885f`); finish focused sampling tests T2–T4 and reconcile documented API choices. |
 | [#230 binary-backed pickle](https://github.com/kthtda/stablebear/issues/230) | Shared binary reducer, standalone cloud IO, retained legacy reconstruction functions, public-type round trips, and fixed compatibility files are committed. | Documentation and final validation. No new reducer-discovery framework or all-type golden corpus is required. |
-| [#231 nesting and ragged indexing](https://github.com/kthtda/stablebear/issues/231) | Runtime recursion, depth validation, copying/views, exact-prefix selection, scalar/empty metadata, and binary/pickle coverage are committed. | Shared indexed overlap fix and documentation reconciliation; no new depth-by-operation test matrix. |
+| [#231 nesting and ragged indexing](https://github.com/kthtda/stablebear/issues/231) | Runtime recursion, depth validation, copying/views, exact-prefix selection, scalar/empty metadata, and binary/pickle coverage are committed. | E3 is complete (`5c9ae885f`); documentation reconciliation and final validation remain. No new depth-by-operation test matrix. |
 | [#232 barcode tensor isomorphism](https://github.com/kthtda/stablebear/issues/232) | Aligned same-dtype comparison, tolerance forwarding, and error cases are implemented and tested at both precisions. | Add the missing `.rst` description/example and include existing tests in final validation. |
-| [#236 distance-matrix subsampling](https://github.com/kthtda/stablebear/issues/236) | Implemented in `991d8e5ce`; committed tests cover principal submatrices, repeated vertices, resampling, views/mutation, IO, and persistence/kernel consumers. | E3 and shared sampling tests, including matrix-specific duplicate semantics. Implementation is already present; acceptance still depends on completing #229. |
+| [#236 distance-matrix subsampling](https://github.com/kthtda/stablebear/issues/236) | Implemented in `991d8e5ce`; committed tests cover principal submatrices, repeated vertices, resampling, views/mutation, IO, and persistence/kernel consumers. | E3 is complete (`5c9ae885f`); shared sampling tests, including matrix-specific duplicate semantics, remain. Acceptance still depends on completing #229. |
 
 ## Corrections to the previous plan
 
@@ -49,51 +51,44 @@ the previous exhaustive A–K acceptance matrix is superseded.
   without-replacement uniqueness assertion. Earlier descriptions of pending
   tests are not evidence that these guarantees are covered at HEAD.
 
-## Remaining work
+## Completion status
 
-### E3. Fix overlapping indexed assignment — correctness blocker
+### E3. Fix overlapping indexed assignment — completed
 
-- [ ] Preserve RHS logical values before writing into overlapping indexed
-  backing, and add the focused regression in test-plan T1.
+- [x] Preserve RHS logical values before writing into overlapping indexed
+  backing, with Python and C++ regressions. Committed in `5c9ae885f`.
 
-`Tensor::assign_from()` in [tensor.tpp](../include/sbear/tensor.tpp) still
-restricts its alias snapshot to two non-indexed operands. A write can overwrite
-an element needed by a later RHS read. This also affects indexed tensors whose
-backing has already been materialized, since the C++ property remains indexed.
+Before the fix, `Tensor::assign_from()` excluded indexed operands from its
+alias snapshot. Reversing four indexed distance matrices corrupted the result:
+their off-diagonal distances became `[4, 3, 3, 4]` instead of `[4, 3, 2, 1]`.
 
-The earlier review described only a C++ reproduction because point-cloud tensor
-RHS assignment was rejected. The distance-matrix route now exposes this publicly:
+**Resolution:** compare active backing storage for ordinary and indexed
+operands and snapshot the logical RHS before writing when they alias. Indexed
+destinations use `writable_at()` to preserve shared materialization. The
+snapshot retains the tensor's other property bits.
 
-```python
-import numpy as np
-import stablebear as sb
+**Committed regressions:**
 
-source = sb.DistanceMatrixTensor(np.array([
-    [[0., 1.], [1., 0.]],
-    [[0., 2.], [2., 0.]],
-    [[0., 3.], [3., 0.]],
-    [[0., 4.], [4., 0.]],
-]))
-selected = source[sb.NestedTensor([
-    sb.indices([0, 1]) for _ in range(4)
-])]
-selected[:] = selected[::-1]
-# Required off-diagonal values: [4, 3, 2, 1]
-# Observed with the installed backend: [4, 3, 3, 4]
-```
+- `test_overlapping_indexed_matrix_assignment_preserves_rhs_values` in
+  `test/python/test_indexed_tensor_interface.py` uses four explicit 2×2
+  matrices and selections, compares complete expected matrices, and checks
+  source independence. Python materializes the destination before C++ assignment.
+- `TensorProperties.OverlappingAssignmentSnapshotsBeforeMaterialization` in
+  `test/test_tensor.cpp` uses real two-point distance matrices and calls
+  `assign_from()` with selections still active. It checks reversal,
+  materialization, and unchanged source matrices.
 
-Current source inspection confirms the excluded overlap path. The Python probe
-used the pre-existing installed `_sb_cuda12` module, both before and after an
-initial materializing write; it is corroborating evidence, not a fresh HEAD
-build. Python makes the destination writable before `assign_from()`; a C++
-caller can also trigger materialization within assignment itself.
+**Verification:** 49 focused Python tests on `_sb_cpu` and 171 C++ tensor/property
+tests passed during implementation with GCC 13. The revised Python regression
+and final simplified C++ regression also passed individually; the latter was
+rebuilt directly with CMake. `make html` succeeded during implementation.
+These are focused development results, not a full-suite run of the committed
+revision. See test-plan T1 for commands and scope.
 
-**Done when:** a pre-write value snapshot protects aliased reads, the public
-reversal regression passes, and existing ordinary assignment tests still pass.
-Cover materialization within C++ assignment separately only if that transition
-needs a different path in the fix. Add shifted or mixed-storage cases only for a
-distinct alias path affected by the fix. Do not require every combination of
-view, dtype, element family, and property bits.
+This restores expected assignment behavior; no extra user-documentation
+paragraph or additional overlap test matrix is needed. Full PR and CUDA
+validation remain V1 work. All subsequent builds use direct CMake as required
+by the corrected `AGENTS.md`.
 
 ### S1. Finish meaningful sampling coverage
 
@@ -114,7 +109,7 @@ complements these tests; statistical certification is not a merge requirement.
 - [x] Implement generic sampling/indexed matrix support (`991d8e5ce`) and
   commit its main integration tests (`d5165c928`, `b81b8f310`, and subsequent
   indexed-view/resampling test commits).
-- [ ] Close acceptance after E3, shared sampling tests, and final validation.
+- [ ] E3 is complete; close acceptance after shared sampling tests and final validation.
 
 For selections `S`, results preserve the compressed logical principal submatrix
 `M[S, S]`, including repeated vertices. Const persistence/kernel consumers and
@@ -137,8 +132,8 @@ family-specific difference without duplicating the whole point-cloud test plan.
 - [ ] Add a short `.rst` example of `BarcodeTensor.is_isomorphic_to`; its
   docstring and tests already cover the behavior.
 - [ ] Reconcile PR/issue descriptions with the settled choices below and
-  replace old test counts with final evidence. This review edits local plans
-  only; it does not change GitHub descriptions or issue state.
+  replace old test counts with final evidence. GitHub descriptions and issue
+  state have not been changed by this work.
 
 Settled choices that should remain explicit:
 
@@ -170,7 +165,7 @@ Existing CI covers platform wheels, source distribution, coverage and memory
 checks. Use it; a separate local platform/CUDA-version/serialization-exchange
 matrix is not required. State unavailable CUDA coverage accurately.
 
-**Stop when E3, S1, D4, and V1 are complete.** F1 then has the same evidence it
+**E3 is complete. Stop when S1, D4, and V1 are complete.** F1 then has the same evidence it
 needs. Reopen work for a concrete failure, an uncovered issue requirement, or a
 new implementation change, not merely another possible test permutation.
 
@@ -197,14 +192,15 @@ remain in Git history before this update.
 | D3 | Indexed resampling copies logical input directly once. | `8134f40c4` |
 | E1 | Scalar tensors and nested scalar leaves retain serialized values. | `b70dbec19` |
 | E2 | Depth/dtype checks guard nested bulk assignment and empty joins. | `339252aae` |
+| E3 | Overlapping indexed assignment snapshots logical RHS values before writes/materialization. | `5c9ae885f` |
 | E4 | Coordinate construction copies external views, removing ambiguous source identity. | `1570fdafd` |
 
 ## Verification evidence and its limits
 
-This update reviewed source, committed tests, live issue/PR text, and CI status.
-It did not rebuild or run full suites. The E3 probe is described separately
-above. At inspection, platform build/test and analysis jobs for HEAD were still
-pending; CUDA build/test/coverage was skipped. No final CI pass is claimed.
+The initial plan review inspected source, committed tests, live issue/PR text,
+and CI status without rebuilding. E3's subsequent build and focused verification
+are recorded above; full suites have not been rerun. At the initial inspection,
+platform build/test and analysis jobs for `27106ca6a` were still pending; CUDA build/test/coverage was skipped. No final CI pass is claimed.
 
 The previous plan recorded these **historical** local results:
 
