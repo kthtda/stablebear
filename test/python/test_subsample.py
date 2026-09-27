@@ -61,6 +61,25 @@ def ragged_data(request):
 
 
 class TestSubsample:
+    @pytest.mark.parametrize("parameter", ["n_points", "n_samples"])
+    def test_rejects_noninteger_count(self, parameter):
+        source = sb.PointCloudTensor(np.array([[10., 1.]]))
+        counts = dict(n_points=1, n_samples=1)
+        counts[parameter] = 1.5
+
+        with pytest.raises(TypeError, match=f"{parameter} must be an integer"):
+            subsample(source, **counts)
+
+    @pytest.mark.parametrize("parameter", ["n_points", "n_samples"])
+    @pytest.mark.parametrize("count", [0, -1])
+    def test_rejects_nonpositive_count(self, parameter, count):
+        source = sb.PointCloudTensor(np.array([[10., 1.]]))
+        counts = dict(n_points=1, n_samples=1)
+        counts[parameter] = count
+
+        with pytest.raises(ValueError, match=f"{parameter} must be greater than zero"):
+            subsample(source, **counts)
+
     def test_sampling_does_not_change_input(self, sample_data):
         before = sample_data.copy()
         subsample(sample_data, n_points=3, n_samples=2, replace=True)
