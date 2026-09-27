@@ -137,6 +137,22 @@ class TestSubsample:
         subsample(sample_data, n_points=3, n_samples=2, replace=True)
         assert sample_data.array_equal(before)
 
+    def test_writing_input_view_does_not_change_sample(self, make_pcloud_or_distmat_tensor):
+        source = make_pcloud_or_distmat_tensor([[
+            [0, 0],
+            [3, 4],
+        ]])
+        input_view = source[0]
+
+        # Sample both points so the changed coordinate or distance is included.
+        samples = subsample(source, n_points=2,
+                            generator=sb.random.Generator(seed=229))
+        samples_before = samples.copy()
+
+        input_view[0, 1] = 999
+        assert source[0][0, 1] == 999
+        assert samples.array_equal(samples_before)
+
     def test_writing_sample_does_not_change_input(self, sample_data):
         source_before = sample_data.copy()
         result = subsample(sample_data, n_points=3, n_samples=2, replace=True)
