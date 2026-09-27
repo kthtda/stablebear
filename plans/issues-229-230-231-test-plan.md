@@ -5,8 +5,9 @@ and refreshed main `4a9c284f4f48d6711083d99ee529819d4c546384` (201 changed files
 The [review checklist](issues-229-230-231-code-review-checklist.md) records the
 live PR/issue audit, implementation status, known bug, and historical results.
 E3/T1 is now committed in `5c9ae885f`, including both focused regressions.
-T2–T4, documentation D4, and final V1 remain open. Remote status has not been
-refreshed since the initial review.
+T2 is committed in `5e612d55f`. T3–T4, documentation D4,
+and final V1 remain open. Remote status has not been refreshed since the initial
+review.
 
 ## Scope and stopping rule
 
@@ -18,9 +19,10 @@ Protect the user-visible contracts of [#229](https://github.com/kthtda/stablebea
 [testing manifesto](../test/TESTING.md): small distinguishable inputs, obvious
 expectations, public APIs, one behavior per test, and meaningful parameterization.
 
-**T1 is complete (`5c9ae885f`). Finish T2–T4, reconcile documentation in
-review D4, then perform V1 once on the settled revision. That is sufficient
-acceptance for this PR.** Existing coverage counts. Do not reopen completed features just because more combinations can be
+**T1 is committed (`5c9ae885f`) and T2 is committed (`5e612d55f`).
+Finish T3–T4, reconcile documentation in review D4, then perform V1 once on the
+settled revision. That is sufficient acceptance for this PR.** Existing coverage
+counts. Do not reopen completed features just because more combinations can be
 tested. Add work only for a demonstrated failure, a specific uncovered issue
 requirement, or code changed while completing these items.
 
@@ -28,7 +30,8 @@ Prefer extending an existing test over adding a parallel suite. Preserve both
 precisions where bindings or numeric behavior differ; exercise shared sampling
 rules across point-cloud and distance-matrix inputs without multiplying each
 case by every view, dtype, backend, and generator mode. Use a small C++ test only
-for guarantees that the public API cannot observe.
+when explicit inputs are needed to check a guarantee reliably without random
+draws; retain simple public-API coverage for the behavior.
 
 ## Existing coverage to retain
 
@@ -99,38 +102,47 @@ a claim that the full suites ran on `5c9ae885f`. Full-suite and CUDA validation
 remain V1 work. T1 needs no further tests unless a new failure or code change
 warrants them.
 
-## T2. Sampling and duplicate-removal semantics
+## T2. Sampling and duplicate-removal semantics — completed (`5e612d55f`)
 
-- [ ] Extend an existing size/value test to assert default sampling without
-  replacement selects each logical row at most once. Drawing all four distinct
-  row IDs in each of two samples checks uniqueness and a fresh population per
-  sample; the expected unordered IDs are `[0, 1, 2, 3]`.
-- [ ] Add one nonempty insufficient-population case with `allow_partial=True`:
-  requesting more than `N` returns `N` rows/vertices without replacement.
-  Existing empty and with-replacement size tests cover those branches.
-- [ ] Add a point-cloud duplicate case with distinct source indices holding
-  equal coordinates. From equal generator seeds, compare unfiltered draws
-  with `discard_duplicates=True`: keep first occurrences in draw order and
-  do not redraw. Check the subsequent sampling call agrees between generators.
-- [ ] Add matrix-specific duplicate cases: repeated sampled indices are
-  removed, while distinct zero-distance vertices survive. Compare logical
-  results with the small principal submatrix for the retained indices.
+- [x] Default sampling without replacement uses each of four vertices once in
+  each of two full-population samples.
+- [x] The existing size table includes a nonempty partial draw: requesting seven
+  points from a population of four returns four without replacement.
+- [x] Point-cloud filtering keeps the first occurrence of equal coordinates,
+  preserves draw order and source indices, and does not redraw discarded rows.
+- [x] Matrix filtering removes repeated sampled indices while preserving
+  distinct zero-distance vertices and the corresponding principal submatrix.
+- [x] A separate test checks that enabling filtering leaves the next generator
+  draw unchanged for both input families.
 
-**Bugs protected:** replacement accidentally enabled by default; populations
-exhausted across samples; wrong partial counts; filtering before drawing or
-redrawing; unstable filtering order; coordinate-based deduplication applied to
-matrices.
+These additions live in `test/python/test_subsample.py` and
+`test/test_subsample.cpp`. Inputs are small and
+explicit, matrix rows are formatted separately, and comments explain the
+selection and assertion intent. A C++ filter test uses explicit draw indices `[2, 1, 0]` and expects
+`[2, 1]`, checking first-occurrence order without relying on random draws.
+The index filter similarly maps `[2, 1, 2, 0, 1]` to `[2, 1, 0]`. Python
+keeps simple public-API checks that equal coordinates and repeated vertices
+are removed, without recomputing first-occurrence order.
+Common behavior uses the existing cloud/matrix fixture; coordinate and vertex
+filtering have separate tests. Both supported precisions are exercised.
 
-Keep these in `test/python/test_subsample.py`. Use public `indices` for draw
-identity and coordinates/matrix entries for logical results. Do not pin the
-exact random sequence across standard-library implementations. The two duplicate
-rules warrant separate readable tests rather than a type-dependent reference
-algorithm.
+**Verification (tests committed in `5e612d55f`):** direct GCC 13 CMake CPU build and
+installation succeeded:
 
-The coordinate filter has explicit signed-zero/NaN handling. A small table for
-these two cases is useful if needed to exercise those branches while adding the
-duplicate test; an exhaustive floating-value/dimension/precision matrix is not
-required. Keep normal finite-coordinate behavior the main example.
+```bash
+BUILD_WITH_CUDA=0 cmake -S . -B cmake-build-e3
+cmake --build cmake-build-e3 -j$(nproc)
+cmake --install cmake-build-e3
+```
+
+From `test/`, `SB_FORCE_CPU=1 python -m pytest python/test_subsample.py -q`
+passed **106 tests**, loading the installed `stablebear._sb_cpu` module.
+After replacing the Python order checks with explicit C++ draws, the rebuilt
+`sb_test --gtest_filter='SubsampleTest*.*'` passed **3 tests** (coordinate filtering
+for float and double, plus index filtering).
+No production changes were needed. Further floating-point corner cases and
+statistical checks are not
+required to close T2; T3–T4 and final V1 remain separate work.
 
 ## T3. Validation and deterministic random streams
 

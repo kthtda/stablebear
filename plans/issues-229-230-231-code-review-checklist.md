@@ -3,8 +3,7 @@
 Initial review on 2026-09-27 covered the live
 [PR #233](https://github.com/kthtda/stablebear/pull/233), its five linked issues,
 the plans, and the branch diff against refreshed `origin/main`.
-Progress updated through local commit `5c9ae885f`; remote state has not been
-refreshed since the initial review.
+Progress updated through local commit `5e612d55f` (T2 sampling tests); remote state has not been refreshed since the initial review.
 
 ## Review baseline and conclusion
 
@@ -19,18 +18,19 @@ refreshed since the initial review.
 
 **The implementation is substantially complete. E3's overlapping indexed
 assignment fix and both regressions are committed in `5c9ae885f`.**
-The remaining testing work is a small set of sampling contract checks, followed
-by documentation cleanup and final regression validation. Use the bounded
+T2 sampling semantics are verified and committed in `5e612d55f`. The remaining testing
+work is T3–T4, followed by documentation cleanup and final regression validation.
+Use the bounded
 [test plan](issues-229-230-231-test-plan.md);
 the previous exhaustive A–K acceptance matrix is superseded.
 
 | Issue | Current branch evidence | Remaining acceptance work |
 | --- | --- | --- |
-| [#229 uniform subsampling](https://github.com/kthtda/stablebear/issues/229) | Sampling, indexed storage, shared materialization, independent resampling, public selection inspection, and const consumers are implemented. Ownership/view regressions are committed. | E3 is complete (`5c9ae885f`); finish focused sampling tests T2–T4 and reconcile documented API choices. |
+| [#229 uniform subsampling](https://github.com/kthtda/stablebear/issues/229) | Sampling, indexed storage, shared materialization, independent resampling, public selection inspection, and const consumers are implemented. Ownership/view regressions are committed. | E3 is complete (`5c9ae885f`); T2 is committed (`5e612d55f`); finish T3–T4 and reconcile documented API choices. |
 | [#230 binary-backed pickle](https://github.com/kthtda/stablebear/issues/230) | Shared binary reducer, standalone cloud IO, retained legacy reconstruction functions, public-type round trips, and fixed compatibility files are committed. | Documentation and final validation. No new reducer-discovery framework or all-type golden corpus is required. |
 | [#231 nesting and ragged indexing](https://github.com/kthtda/stablebear/issues/231) | Runtime recursion, depth validation, copying/views, exact-prefix selection, scalar/empty metadata, and binary/pickle coverage are committed. | E3 is complete (`5c9ae885f`); documentation reconciliation and final validation remain. No new depth-by-operation test matrix. |
 | [#232 barcode tensor isomorphism](https://github.com/kthtda/stablebear/issues/232) | Aligned same-dtype comparison, tolerance forwarding, and error cases are implemented and tested at both precisions. | Add the missing `.rst` description/example and include existing tests in final validation. |
-| [#236 distance-matrix subsampling](https://github.com/kthtda/stablebear/issues/236) | Implemented in `991d8e5ce`; committed tests cover principal submatrices, repeated vertices, resampling, views/mutation, IO, and persistence/kernel consumers. | E3 is complete (`5c9ae885f`); shared sampling tests, including matrix-specific duplicate semantics, remain. Acceptance still depends on completing #229. |
+| [#236 distance-matrix subsampling](https://github.com/kthtda/stablebear/issues/236) | Implemented in `991d8e5ce`; committed tests cover principal submatrices, repeated vertices, resampling, views/mutation, IO, and persistence/kernel consumers. | E3 is complete (`5c9ae885f`); T2, including matrix-specific duplicate semantics, is committed (`5e612d55f`); T3–T4 remain. Acceptance still depends on completing #229. |
 
 ## Corrections to the previous plan
 
@@ -46,10 +46,10 @@ the previous exhaustive A–K acceptance matrix is superseded.
   16 additional 0.4.7 matrix files (`b81b8f310`), two V1 binaries, and 12 pinned
   pre-release V3 standalone-cloud files (`946df8486`, directory `0.5-pre`).
   The V3 corpus is not a released 0.5 corpus or a complete nested/indexed corpus.
-- Conversely, current `test_subsample.py` has no `discard_duplicates` checks,
-  argument-rejection tests, failure/no-advance RNG test, or explicit
-  without-replacement uniqueness assertion. Earlier descriptions of pending
-  tests are not evidence that these guarantees are covered at HEAD.
+- At the initial review, `test_subsample.py` lacked duplicate-filtering and
+  explicit without-replacement uniqueness assertions. T2 now covers these in
+  `5e612d55f`. Argument rejection and failure/no-advance RNG checks remain
+  T3 work; earlier descriptions of pending tests do not establish coverage.
 
 ## Completion status
 
@@ -90,19 +90,24 @@ paragraph or additional overlap test matrix is needed. Full PR and CUDA
 validation remain V1 work. All subsequent builds use direct CMake as required
 by the corrected `AGENTS.md`.
 
-### S1. Finish meaningful sampling coverage
+### S1. Finish meaningful sampling coverage — T2 committed (`5e612d55f`)
 
-- [ ] Complete test-plan T2–T4 using small, explicit public-API examples.
+- [x] T2: no-replacement full samples, nonempty partial sampling, stable cloud
+  and matrix duplicate filtering, preservation of distinct zero-distance
+  vertices, and unchanged generator advancement when filtering is enabled.
+- [ ] T3: representative argument validation, failure without RNG advancement,
+  row-major stream allocation, and thread independence.
+- [ ] T4: mutating the original input after sampling leaves its snapshot intact.
 
-The additions protect documented behavior: sampling without replacement,
-nonempty partial samples, stable duplicate filtering, validation before RNG
-reservation, deterministic streams, and input-to-result snapshot independence.
-Reuse existing coverage for shapes, sizes, dtype, resampling, result-to-input
-isolation, shared views, and consumers.
-
-This is missing regression coverage, not a finding that the sampler currently
-produces incorrect draws. Source review of the uniform draw algorithm
-complements these tests; statistical certification is not a merge requirement.
+**T2 verification:** direct CMake build/install with GCC 13, followed by
+`SB_FORCE_CPU=1 python -m pytest python/test_subsample.py -q` from `test/`:
+**106 passed** on the installed `_sb_cpu` module. The explicit C++ filter-order
+tests also passed (**3 tests**: float/double coordinates and indices). These
+results cover the tests committed in `5e612d55f`; no sampler implementation
+change was needed. The
+[test plan](issues-229-230-231-test-plan.md) records the bounded scope and build
+commands. Existing ownership, view, and consumer coverage remains sufficient;
+no additional sampling matrix or statistical certification is required.
 
 ### F1. Accept implemented distance-matrix integration
 
