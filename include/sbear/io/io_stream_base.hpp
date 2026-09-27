@@ -5,6 +5,8 @@
 #include "../config.hpp"
 
 #include <cstddef>
+#include <array>
+#include <cstdint>
 #include <vector>
 #include <iostream>
 #include <string_view>
@@ -13,6 +15,27 @@
 
 namespace sb::io::detail
 {
+  // Only bump this when an older format reader would otherwise accept a newly
+  // written file and interpret its contents incorrectly or as corrupt. New
+  // formats with distinct type or subtype identifiers do not require a bump.
+  // Version 3 expands every TensorFormat record with tensor properties and
+  // general format flags, so older readers cannot parse files written by it.
+  constexpr int FormatVersion = 3;
+
+  class BinaryReader
+  {
+  public:
+    explicit BinaryReader(std::istream& stream, int formatVersion = FormatVersion)
+      : m_stream(stream), m_formatVersion(formatVersion) { }
+
+    [[nodiscard]] std::istream& stream() const { return m_stream; }
+    [[nodiscard]] int format_version() const { return m_formatVersion; }
+
+  private:
+    std::istream& m_stream;
+    int m_formatVersion;
+  };
+
   template <typename CharT, typename Traits>
   void assert_not_bad(std::basic_ios<CharT, Traits>& stream)
   {
@@ -74,6 +97,39 @@ namespace sb::io::detail
     std::cout << v << '\n';
 #endif
     return v;
+  }
+
+  /// bool is serialized as one canonical byte (0 or 1): the raw memory of a
+  /// bool can technically hold any value 0-255, so it must not be written or
+  /// reinterpreted bitwise.
+  template <>
+  inline void write_bytes<bool>(std::ostream& os, const bool& v)
+  {
+    write_bytes<uint8_t>(os, v ? uint8_t{1} : uint8_t{0});
+  }
+
+  template <>
+  inline bool read_bytes<bool>(std::istream& is)
+  {
+    return read_bytes<uint8_t>(is) != 0;
+  }
+
+  // Fixed-size arrays contain only their elements, with no length or padding.
+  // The explicit wire type allows size_t extents to be stored as uint64_t.
+  template <typename WireT, typename T, size_t Size>
+  void write_array(std::ostream& os, const std::array<T, Size>& values)
+  {
+    for (const auto& value : values)
+      write_bytes<WireT>(os, value);
+  }
+
+  template <typename T, size_t Size>
+  std::array<T, Size> read_array(std::istream& is)
+  {
+    std::array<T, Size> values{};
+    for (auto& value : values)
+      value = read_bytes<T>(is);
+    return values;
   }
 
   template <std::forward_iterator FwdIt>

@@ -137,7 +137,7 @@ namespace
     sb::io::detail::write_tensor(ss, tensor);
 
     std::istringstream iss(ss.str());
-    ASSERT_EQ(sb::io::detail::read_tensor_format(iss), sb::io::detail::tensorFormat<TypeParam>());
+    ASSERT_EQ(sb::io::detail::read_type_format(iss), sb::io::detail::tensorFormatV3<TypeParam>());
     TensorT retTensor = sb::io::detail::read_tensor<TypeParam>(iss);
 
     EXPECT_EQ(tensor, retTensor);
@@ -165,6 +165,23 @@ namespace
     auto result = sb::io::detail::read_bytes<TypeParam>(iss);
 
     EXPECT_EQ(value, result);
+  }
+
+  TYPED_TEST(IoStreamTest, FixedSizeArrayIo)
+  {
+    const std::array<TypeParam, 3> values{TypeParam(-2.5), TypeParam(0), TypeParam(3.25)};
+    std::stringstream stream;
+    sb::io::detail::write_array<TypeParam>(stream, values);
+    EXPECT_EQ(stream.str().size(), values.size() * sizeof(TypeParam));
+    EXPECT_EQ((sb::io::detail::read_array<TypeParam, 3>(stream)), values);
+
+    std::istringstream truncated(stream.str().substr(0, stream.str().size() - 1));
+    EXPECT_THROW((sb::io::detail::read_array<TypeParam, 3>(truncated)), std::runtime_error);
+
+    std::stringstream empty;
+    sb::io::detail::write_array<TypeParam>(empty, std::array<TypeParam, 0>{});
+    EXPECT_TRUE(empty.str().empty());
+    EXPECT_TRUE((sb::io::detail::read_array<TypeParam, 0>(empty)).empty());
   }
 
   TYPED_TEST(IoStreamTest, WriteBytesRoundtripNegative)
@@ -214,7 +231,7 @@ namespace
     sb::io::detail::write_tensor(ss, tensor);
 
     std::istringstream iss(ss.str());
-    ASSERT_EQ(sb::io::detail::read_tensor_format(iss), sb::io::detail::tensorFormat<typename decltype(tensor)::value_type>());
+    ASSERT_EQ(sb::io::detail::read_type_format(iss), sb::io::detail::tensorFormatV3<typename decltype(tensor)::value_type>());
     auto retTensor = sb::io::detail::read_tensor<PcfT>(iss);
 
     EXPECT_EQ(tensor, retTensor);
@@ -237,7 +254,7 @@ namespace
     sb::io::detail::write_tensor(ss, tensor);
 
     std::istringstream iss(ss.str());
-    ASSERT_EQ(sb::io::detail::read_tensor_format(iss), sb::io::detail::tensorFormat<typename decltype(tensor)::value_type>());
+    ASSERT_EQ(sb::io::detail::read_type_format(iss), sb::io::detail::tensorFormatV3<typename decltype(tensor)::value_type>());
     auto retTensor = sb::io::detail::read_tensor<PcfT>(iss);
 
     EXPECT_EQ(tensor, retTensor);
@@ -328,7 +345,7 @@ namespace
     sb::io::detail::write_tensor(ss, sliced);
 
     std::istringstream iss(ss.str());
-    ASSERT_EQ(sb::io::detail::read_tensor_format(iss), sb::io::detail::tensorFormat<typename decltype(tensor)::value_type>());
+    ASSERT_EQ(sb::io::detail::read_type_format(iss), sb::io::detail::tensorFormatV3<typename decltype(tensor)::value_type>());
     auto retTensor = sb::io::detail::read_tensor<TypeParam>(iss);
 
     // The returned tensor should be contiguous and contain the sliced values
@@ -430,7 +447,7 @@ namespace
     sb::io::detail::write_tensor(ss, tensor);
   
     std::istringstream iss(ss.str());
-    ASSERT_EQ(sb::io::detail::read_tensor_format(iss), sb::io::detail::tensorFormat<typename decltype(tensor)::value_type>());
+    ASSERT_EQ(sb::io::detail::read_type_format(iss), sb::io::detail::tensorFormatV3<typename decltype(tensor)::value_type>());
     auto retTensor = sb::io::detail::read_tensor<PcfT>(iss);
   
     EXPECT_EQ(tensor, retTensor);

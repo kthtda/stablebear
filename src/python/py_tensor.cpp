@@ -106,14 +106,28 @@ namespace
     tc.template operator()<sb::Pcf_i64, sb::Pcf_i32>("cast_pcf32i_pcf64i");
     tc.template operator()<sb::Pcf_i32, sb::Pcf_i64>("cast_pcf64i_pcf32i");
 
-    // PointCloud precision: Tensor<Tensor<float>> <-> Tensor<Tensor<double>>
-    m.def("cast_pcloud32_pcloud64", [](const sb::Tensor<sb::PointCloud<sb::float32_t>>& src) {
-      return sb::pcloud_cast<sb::float64_t>(src);
-    });
-    m.def("cast_pcloud64_pcloud32", [](const sb::Tensor<sb::PointCloud<sb::float64_t>>& src) {
-      return sb::pcloud_cast<sb::float32_t>(src);
-    });
+  }
 
+  template <typename T>
+  void register_nested_tensor_element(py::module_& m, const std::string& suffix)
+  {
+    using Nested = sb::NestedTensor<T>;
+    py::class_<Nested>(m, ("Nested" + suffix).c_str())
+        .def(py::init([](const sb::Tensor<T>& values) {
+          return Nested::from_values(values);
+        }))
+        .def(py::init([](const typename Nested::nested_tensor_type& values, size_t childDepth) {
+          return Nested::from_values(values, childDepth);
+        }),
+             py::arg("tensor"), py::arg("child_depth") = 0)
+        .def_static("_from_leaf_view", &Nested::from_leaf_view)
+        .def_static("_from_outer_view", &Nested::from_outer_view,
+             py::arg("tensor"), py::arg("child_depth"))
+        .def_property_readonly("is_leaf", &Nested::is_leaf)
+        .def_property_readonly("depth", &Nested::depth)
+        .def_property_readonly("leaf", &Nested::leaf)
+        .def_property_readonly("nested", &Nested::nested)
+        .def("copy", &Nested::copy);
   }
 
 }
@@ -134,12 +148,23 @@ namespace sb_py
     register_typed_tensor_bindings<uint32_t>(m, "Uint32", "");
     register_typed_tensor_bindings<uint64_t>(m, "Uint64", "");
 
+    register_nested_tensor_element<sb::float32_t>(m, "Float32");
+    register_typed_tensor_bindings<sb::NestedTensor<sb::float32_t>>(m, "NestedFloat32", "");
+    register_nested_tensor_element<sb::float64_t>(m, "Float64");
+    register_typed_tensor_bindings<sb::NestedTensor<sb::float64_t>>(m, "NestedFloat64", "");
+    register_nested_tensor_element<sb::int32_t>(m, "Int32");
+    register_typed_tensor_bindings<sb::NestedTensor<sb::int32_t>>(m, "NestedInt32", "");
+    register_nested_tensor_element<sb::int64_t>(m, "Int64");
+    register_typed_tensor_bindings<sb::NestedTensor<sb::int64_t>>(m, "NestedInt64", "");
+    register_nested_tensor_element<uint32_t>(m, "Uint32");
+    register_typed_tensor_bindings<sb::NestedTensor<uint32_t>>(m, "NestedUint32", "");
+    register_nested_tensor_element<uint64_t>(m, "Uint64");
+    register_typed_tensor_bindings<sb::NestedTensor<uint64_t>>(m, "NestedUint64", "");
+
     register_typed_tensor_bindings<sb::Pcf_f32>(m, "Pcf32", "");
     register_typed_tensor_bindings<sb::Pcf_f64>(m, "Pcf64", "");
     register_typed_tensor_bindings<sb::Pcf_i32>(m, "Pcf32i", "");
     register_typed_tensor_bindings<sb::Pcf_i64>(m, "Pcf64i", "");
 
-    register_typed_tensor_bindings<sb::PointCloud<sb::float32_t>>(m, "PointCloud32", "");
-    register_typed_tensor_bindings<sb::PointCloud<sb::float64_t>>(m, "PointCloud64", "");
   }
 }

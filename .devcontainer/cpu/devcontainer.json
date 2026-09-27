@@ -30,6 +30,8 @@
     // Persist Claude Code auth/config across rebuilds.
     "source=${localEnv:HOME}/.claude,target=/home/ubuntu/.claude,type=bind,consistency=cached",
     "source=${localEnv:HOME}/.claude.json,target=/home/ubuntu/.claude.json,type=bind,consistency=cached",
+    // Reuse the host's file-based Codex login while keeping container config/rules.
+    "source=${localEnv:HOME}/.codex/auth.json,target=/home/ubuntu/.codex/auth.json,type=bind,consistency=cached",
     // Container-private build dir (shadows the host's host-path CMakeCache.txt).
     "source=stablebear-cpu-build,target=${containerWorkspaceFolder}/cmake-build-debug,type=volume"
   ],
@@ -38,7 +40,7 @@
   // `cmake --install` symlinks it into stablebear/. Python deps are already installed
   // at image-build time (see Dockerfile). The chown gives the ubuntu user ownership
   // of the freshly-created (root-owned) build volume.
-  "postCreateCommand": "sudo chown ubuntu:ubuntu cmake-build-debug && git submodule update --init --recursive && cmake --preset debug-nocuda && cmake --build --preset debug-nocuda && cmake --install cmake-build-debug",
+  "postCreateCommand": "sudo chown ubuntu:ubuntu cmake-build-debug && git submodule update --init --recursive && cmake --preset debug-nocuda && cmake --build --preset debug-nocuda -j$(nproc --ignore=4) && cmake --install cmake-build-debug",
 
   "customizations": {
     "vscode": {

@@ -1,5 +1,6 @@
 import numpy as np
 import pytest
+import stablebear as sb
 
 from stablebear.distance_matrix import DistanceMatrix
 from stablebear.typing import float32, float64
@@ -41,6 +42,32 @@ class TestConstruction:
         dm1[0, 1] = 1.0
         dm2 = DistanceMatrix(dm1)
         assert dm2[0, 1] == 1.0
+
+    def test_wrapping_indexed_cell_preserves_owner_and_rejected_writes(self, dtype):
+        np_dtype = np.float32 if dtype is float32 else np.float64
+        source = sb.DistanceMatrixTensor(
+            np.array([
+                [0, 1, 2, 3],
+                [1, 0, 1, 2],
+                [2, 1, 0, 1],
+                [3, 2, 1, 0],
+            ], dtype=np_dtype))
+        indexed = source[sb.NestedTensor([sb.indices([3, 0])])]
+        cell = indexed[0]
+        wrapped = DistanceMatrix(cell)
+
+        for index, value in (((0, 1), -1), ((0, 0), 1), ((0, 1), "invalid")):
+            with pytest.raises((ValueError, TypeError)):
+                wrapped[index] = value
+            assert indexed._data._get_element([0]).is_indexed
+
+        source[()][3, 0] = 7
+        assert wrapped[0, 1] == 7
+        wrapped[0, 1] = 9
+        assert cell[0, 1] == 9
+        assert indexed[0][0, 1] == 9
+        assert source[()][3, 0] == 7
+        assert sb.allclose(wrapped, DistanceMatrix(np.asarray(cell)))
 
 
 class TestArrayConstruction:

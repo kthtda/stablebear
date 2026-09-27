@@ -8,10 +8,8 @@ from ..distance_matrix import (
     DistanceMatrix,
     DistanceMatrixTensor,
 )
-from ..base_tensor import (
-    FloatTensor,
-    PointCloudTensor,
-)
+from ..base_tensor import FloatTensor
+from ..point_cloud import PointCloud, PointCloudTensor
 from ..typing import barcode32, barcode64, distmat32, distmat64, float32, float64, pcloud32, pcloud64
 from .ph_tensor import BarcodeTensor
 
@@ -20,6 +18,7 @@ cpp_p = cpp.persistence
 _DISTMAT_TO_BARCODE_DTYPE = {distmat32: barcode32, distmat64: barcode64}
 _PCLOUD_TO_BARCODE_DTYPE = {pcloud32: barcode32, pcloud64: barcode64}
 _FLOAT_TO_PCLOUD_DTYPE = {float32: pcloud32, float64: pcloud64}
+_FLOAT_TO_BARCODE_DTYPE = {float32: barcode32, float64: barcode64}
 
 
 class DistanceType(Enum):
@@ -31,7 +30,8 @@ class ComplexType(Enum):
 
 
 def compute_persistent_homology(
-    X: PointCloudTensor
+    X: PointCloud
+    | PointCloudTensor
     | DistanceMatrix
     | DistanceMatrixTensor
     | FloatTensor
@@ -55,7 +55,7 @@ def compute_persistent_homology(
 
     Parameters
     ----------
-    X : PointCloudTensor, DistanceMatrix, DistanceMatrixTensor, FloatTensor, or numpy.ndarray
+    X : PointCloud, PointCloudTensor, DistanceMatrix, DistanceMatrixTensor, FloatTensor, or numpy.ndarray
         Input data. A ``FloatTensor`` or NumPy array is
         interpreted as a single point cloud (one row per point).
         A ``DistanceMatrix`` or ``DistanceMatrixTensor`` provides
@@ -84,7 +84,10 @@ def compute_persistent_homology(
     """
 
     from ..tensor_create import zeros
-    from .ripser import _compute_barcodes_distmat_ripser, _compute_barcodes_euclidean_pcloud_ripser
+    from .ripser import (
+        _compute_barcodes_distmat_ripser,
+        _compute_barcodes_euclidean_pcloud_ripser,
+    )
 
     # --- Distance matrix input path ---
     if isinstance(X, (DistanceMatrix, DistanceMatrixTensor)):
@@ -122,7 +125,10 @@ def compute_persistent_homology(
         pcX[0] = X
         X = pcX
 
-    if isinstance(X, PointCloudTensor):
+    if isinstance(X, PointCloud):
+        barcode_dtype = _FLOAT_TO_BARCODE_DTYPE[X.dtype]
+        out = zeros((1,), dtype=barcode_dtype)
+    elif isinstance(X, PointCloudTensor):
         barcode_dtype = _PCLOUD_TO_BARCODE_DTYPE[X.dtype]
         out = zeros((1,), dtype=barcode_dtype)
 
@@ -130,7 +136,9 @@ def compute_persistent_homology(
         # Use Ripser
         match distance_type:
             case DistanceType.Euclidean:
-                task = _compute_barcodes_euclidean_pcloud_ripser(X, out, max_dim, reduced)
+                task = _compute_barcodes_euclidean_pcloud_ripser(
+                    X, out, max_dim, reduced
+                )
             case _:
                 raise ValueError(
                     f"Distance type {distance_type} not supported for complex type {complex_type}."

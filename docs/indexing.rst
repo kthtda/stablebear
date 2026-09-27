@@ -12,7 +12,9 @@ Indexing with all integers returns the element at that position::
    X = sb.zeros((10, 5))
    f = X[3, 2]   # returns a Pcf object
 
-For a ``PcfTensor``, the returned element is a :py:class:`~stablebear.Pcf`. For a ``FloatTensor``, it is a Python float. For a ``PointCloudTensor``, it is a ``FloatTensor`` (representing the point cloud as a numeric array).
+For a ``PcfTensor``, the returned element is a :py:class:`~stablebear.Pcf`.
+For a ``FloatTensor``, it is a Python float. For a ``PointCloudTensor``, it is
+a rank-2 :py:class:`~stablebear.PointCloud` view.
 
 Negative integers count from the end, as in NumPy, and an out-of-range
 integer raises ``IndexError``::
@@ -37,8 +39,47 @@ idiom for plotting works directly::
    first_point = pc[0]              # shape (2,)
 
 Tensors of clouds (rank ≥ 1) index over the clouds instead: ``X[i]`` returns
-the ``i``-th cloud as a ``FloatTensor`` (see above), which then supports the
-same column indexing.
+the ``i``-th cloud as a ``PointCloud``, which supports point and coordinate
+indexing.
+
+Selecting different points from each point cloud
+--------------------------------------------------
+
+A ``NestedTensor`` whose elements are rank-one ``uint64`` tensors selects
+points independently from point clouds::
+
+   selections = sb.tensor([
+       sb.indices([3, 3, 7]),
+       sb.indices([1]),
+       sb.indices([]),
+   ])
+
+   selected = single_cloud[selections]
+   selected.shape  # (3,)
+
+The point-cloud tensor shape must exactly match the leading dimensions of
+``selections.shape``. The result has ``selections.shape``; each child tensor
+controls the number and order of points in that output cloud. Repeated points are
+preserved and an empty child produces an empty cloud with the original
+coordinate dimension.
+
+``sb.indices(values)`` is shorthand for
+``sb.tensor(values, dtype=sb.uint64)``.
+
+The result retains an aligned view of the source ``PointCloudTensor`` and owns
+an independent copy of ``selections``. Later changes to the caller's selections
+do not affect the result. Direct indexing shares source coordinates, so source
+mutations remain visible until the result materializes. By comparison,
+:doc:`subsampling <subsampling>` owns a snapshot of its input.
+
+Slicing, reshaping, and transposing the result keep its source and selections
+aligned. Reading one complete output cloud returns a ``PointCloud`` view
+without materializing the indexed tensor. Writing through that view, or
+assigning through the ``PointCloudTensor``, materializes the shared indexed
+state before applying the change. Existing views observe that same transition.
+
+``selected.indices`` returns an independent copy of the selections. It returns
+``None`` after the shared state has materialized.
 
 Slicing
 -------

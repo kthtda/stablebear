@@ -164,9 +164,10 @@ namespace sb::ph
       ret = std::move(bars);
     }
 
-    template <typename T>
+    template <typename T, TensorProperties Properties, TensorProperties PrimeProperties>
     void homological_kernel_distmat_single_impl(
-        const Tensor<DistanceMatrix<T>> &distmat, const Tensor<DistanceMatrix<T>> &distmatPrime,
+        const Tensor<DistanceMatrix<T>, Properties> &distmat,
+        const Tensor<DistanceMatrix<T>, PrimeProperties> &distmatPrime,
         Tensor<Barcode<T>> &retBarcodes, const std::vector<size_t> &index)
     {
       auto const &dm = distmat(index);           // the Distmat<T> for this instance
@@ -181,46 +182,45 @@ namespace sb::ph
       detail::homological_kernel_single_impl(dm, dmPrime, retBarcodes(index));
     }
 
-    template <typename T>
+    template <typename T, TensorProperties Properties, TensorProperties PrimeProperties>
     void homological_kernel_pcloud_single_impl(
-        const Tensor<PointCloud<T>> &pclouds, const Tensor<PointCloud<T>> &pcloudsPrime,
+        const Tensor<PointCloud<T>, Properties> &pclouds,
+        const Tensor<PointCloud<T>, PrimeProperties> &pcloudsPrime,
         Tensor<Barcode<T>> &retBarcodes, const std::vector<size_t> &index)
     {
-      auto const &pc = pclouds(index);           // the PointCloud<T> for this instance
-      auto const &pcPrime = pcloudsPrime(index); // its aligned d′ counterpart
+      auto const &pc = pclouds(index);
+      auto const &pcPrime = pcloudsPrime(index);
 
-      if (pc.shape() != pcPrime.shape())
+      if (pc.n_points() != pcPrime.n_points() || pc.dim() != pcPrime.dim())
       {
         throw std::runtime_error(
             "homological kernel: point clouds at index " + index_to_string(index) + " have mismatched shapes " +
-            shape_to_string(pc.shape()) + " and " + shape_to_string(pcPrime.shape()));
-      }
-
-      if (pc.rank() != 2)
-      {
-        throw std::runtime_error(
-            "homological kernel: point cloud at index " + index_to_string(index) + " has unexpected shape " +
-            shape_to_string(pc.shape()) + " (should be (m, n))");
+            shape_to_string(std::vector<size_t>{pc.n_points(), pc.dim()}) + " and " +
+            shape_to_string(std::vector<size_t>{pcPrime.n_points(), pcPrime.dim()}));
       }
 
       // Every rank-2 cloud flows through: 0 or 1 points give an empty barcode
       // via the n <= 1 early-outs, and a zero-dimensional cloud (n, 0) induces
       // the all-zero metric, yielding n-1 zero-length bars exactly like the
       // distance-matrix route does for the equivalent all-zero matrix.
-      SquaredEuclideanDistance<T> dDist(pc); // captures pointer+strides, computes d^2 on demand
+      SquaredEuclideanDistance<T> dDist(pc); // uses logical coordinates, computes d^2 on demand
       SquaredEuclideanDistance<T> dPrimeDist(pcPrime);
 
-      detail::homological_kernel_single_impl(dDist, dPrimeDist, retBarcodes(index), [](T v) { return std::sqrt(v); });
+      detail::homological_kernel_single_impl(
+          dDist, dPrimeDist, retBarcodes(index), [](T v) { return std::sqrt(v); });
     }
 
   } // namespace detail
 
-  template <typename ElemT, typename T>
+  template <
+      typename ElemT, typename T, TensorProperties Properties = TensorProperty::None,
+      TensorProperties PrimeProperties = Properties>
   class HomologicalKernelImpl : public StoppableTask<void>
   {
   public:
-    HomologicalKernelImpl(const Tensor<ElemT> &input, const Tensor<ElemT> &inputPrime, Tensor<Barcode<T>> &ret)
-        : m_input(input), m_inputPrime(inputPrime), m_ret(ret)
+    HomologicalKernelImpl(
+        Tensor<ElemT, Properties> input, Tensor<ElemT, PrimeProperties> inputPrime, Tensor<Barcode<T>> &ret)
+        : m_input(std::move(input)), m_inputPrime(std::move(inputPrime)), m_ret(ret)
     {
     }
 
@@ -262,8 +262,8 @@ namespace sb::ph
           },
           exec);
     }
-    const Tensor<ElemT> &m_input;
-    const Tensor<ElemT> &m_inputPrime;
+    Tensor<ElemT, Properties> m_input;
+    Tensor<ElemT, PrimeProperties> m_inputPrime;
     Tensor<Barcode<T>> &m_ret;
   };
 

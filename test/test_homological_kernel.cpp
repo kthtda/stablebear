@@ -233,35 +233,6 @@ namespace
         sb::ph::detail::homological_kernel_pcloud_single_impl(input, inputPrime, ret, {0}), std::runtime_error);
   }
 
-  TYPED_TEST(HomologicalKernelTest, PcloudWrapperRejectsRankOneElements)
-  {
-    using T = TypeParam;
-
-    sb::Tensor<sb::PointCloud<T>> input({1});
-    sb::Tensor<sb::PointCloud<T>> inputPrime({1});
-    sb::Tensor<sb::ph::Barcode<T>> ret({1});
-
-    // A rank-1 "cloud" (a bare vector, no coordinate axis) is not a valid
-    // (n, dim) point cloud and must be rejected.
-    sb::PointCloud<T> vec(std::vector<size_t>{3});
-    vec({0}) = T(1);
-    vec({1}) = T(2);
-    vec({2}) = T(3);
-    input({0}) = vec;
-    inputPrime({0}) = vec;
-
-    EXPECT_THROW(
-        sb::ph::detail::homological_kernel_pcloud_single_impl(input, inputPrime, ret, {0}), std::runtime_error);
-
-    // Empty rank-1 shapes are rejected the same way: the rank check runs
-    // before any degeneracy handling, so validation does not depend on
-    // whether the malformed cloud happens to be empty.
-    input({0}) = sb::PointCloud<T>(std::vector<size_t>{0});
-    inputPrime({0}) = sb::PointCloud<T>(std::vector<size_t>{0});
-    EXPECT_THROW(
-        sb::ph::detail::homological_kernel_pcloud_single_impl(input, inputPrime, ret, {0}), std::runtime_error);
-  }
-
   TYPED_TEST(HomologicalKernelTest, PcloudWrapperTreatsZeroDimCloudsAsCoincidentPoints)
   {
     using T = TypeParam;

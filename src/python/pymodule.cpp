@@ -9,6 +9,7 @@
 #include "functional/py_make_from_serial_content.hpp"
 #include "functional/py_norms.hpp"
 #include "py_tensor.hpp"
+#include "py_point_cloud.hpp"
 #include "functional/py_reductions.hpp"
 #include "functional/py_distance.hpp"
 #include "functional/py_inner_product.hpp"
@@ -163,6 +164,7 @@ PYBIND11_MODULE(SB_MODULE_NAME, m) {
   sb_py::register_io(m);
 
   sb_py::register_tensor_bindings(m);
+  sb_py::register_point_cloud_bindings(m);
   sb_py::register_np_conversions(m);
 
   sb_py::register_make_from_serial_content(m);

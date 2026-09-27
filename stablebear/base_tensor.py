@@ -5,7 +5,12 @@ import operator
 import numpy as np
 
 from . import _sb_cpp as cpp
-from ._tensor_base import ArithmeticTensorMixin, FunctionTensorMixin, Tensor, _tensor_from_nested
+from ._tensor_base import (
+    ArithmeticTensorMixin,
+    FunctionTensorMixin,
+    Tensor,
+    _tensor_from_nested,
+)
 from .functional.pcf import Pcf
 from .typing import (
     _NP_TO_SB,
@@ -19,8 +24,6 @@ from .typing import (
     pcf32i,
     pcf64,
     pcf64i,
-    pcloud32,
-    pcloud64,
     uint32,
     uint64,
 )
@@ -39,14 +42,6 @@ _INTPCF_CPP_TO_DTYPE = {
     cpp.Pcf32iTensor: pcf32i,
     cpp.Pcf64iTensor: pcf64i,
 }
-
-_PCLOUD_CPP_TO_DTYPE = {
-    cpp.PointCloud32Tensor: pcloud32,
-    cpp.PointCloud64Tensor: pcloud64,
-}
-
-_PCLOUD_TO_FLOAT_DTYPE = {pcloud32: float32, pcloud64: float64}
-
 
 class NumericTensor(Tensor, ArithmeticTensorMixin):
     def __init__(self):
@@ -260,131 +255,6 @@ class IntPcfTensor(_PcfTensorBase):
         return IntPcfTensor(data)
 
 
-def _pcloud_dtype_for(arr_dtype, dtype):
-    if dtype is not None:
-        if dtype not in (pcloud32, pcloud64):
-            raise TypeError(
-                f"dtype must be pcloud32 or pcloud64, got {getattr(dtype, '__name__', dtype)}")
-        return dtype
-    return pcloud32 if np.dtype(arr_dtype) == np.float32 else pcloud64
-
-
-def _pointcloud_cpp_from_array(arr, cloud_ndim, dtype):
-    """Build a C++ point-cloud tensor from a dense ndarray.
-
-    The trailing ``cloud_ndim`` axes of *arr* form each cloud; the leading
-    axes form the tensor shape. E.g. a ``(3, 5, 4, 2)`` array with
-    ``cloud_ndim=2`` yields a ``(3, 5)`` tensor of ``(4, 2)`` clouds.
-    """
-    from .tensor_create import zeros
-    arr = np.asarray(arr)
-    if cloud_ndim < 1:
-        raise ValueError("cloud_ndim must be >= 1")
-    if arr.ndim < cloud_ndim:
-        raise ValueError(
-            f"array with {arr.ndim} dimension(s) is too small for cloud_ndim={cloud_ndim}")
-    dt = _pcloud_dtype_for(arr.dtype, dtype)
-    np_float = np.float32 if dt == pcloud32 else np.float64
-    arr = np.ascontiguousarray(arr, dtype=np_float)
-    tensor_shape = arr.shape[: arr.ndim - cloud_ndim]
-    t = zeros(tensor_shape, dtype=dt)
-    for idx in np.ndindex(*tensor_shape):
-        t[idx] = arr[idx]
-    return t._data
-
-
-def _pointcloud_cpp_from_list(seq, dtype):
-    """Build a 1-D C++ point-cloud tensor from a list of cloud ndarrays.
-
-    Clouds may have differing numbers of points (ragged), which a single
-    dense ndarray cannot represent.
-    """
-    from .tensor_create import zeros
-    clouds = [np.asarray(c) for c in seq]
-    if not clouds:
-        raise ValueError(
-            "Cannot build a PointCloudTensor from an empty list; "
-            "use zeros((0,), dtype=pcloud64) for an empty tensor")
-    dt = _pcloud_dtype_for(clouds[0].dtype, dtype)
-    np_float = np.float32 if dt == pcloud32 else np.float64
-    t = zeros((len(clouds),), dtype=dt)
-    for i, c in enumerate(clouds):
-        # When inferring (dtype is None), each cloud is a separate array; rather
-        # than silently downcast clouds whose precision differs from the first,
-        # require them to agree (or pass an explicit dtype=).
-        if dtype is None and _pcloud_dtype_for(c.dtype, None) != dt:
-            raise TypeError(
-                f"point clouds have differing dtypes "
-                f"({np.dtype(clouds[0].dtype).name} and {np.dtype(c.dtype).name}); "
-                "pass an explicit dtype= (pcloud32 or pcloud64)")
-        t[i] = np.ascontiguousarray(c, dtype=np_float)
-    return t._data
-
-
-class PointCloudTensor(Tensor):
-    """Tensor whose elements are point clouds (each a ``(n_points, dim)`` array).
-
-    Parameters
-    ----------
-    data : ndarray, list of ndarray, PointCloudTensor, or C++ tensor
-        An ndarray whose trailing ``cloud_ndim`` axes form each cloud and
-        whose leading axes form the tensor shape; or a list of cloud arrays
-        (possibly ragged) forming a 1-D tensor; or an existing tensor.
-    cloud_ndim : int, optional
-        Number of trailing axes of an ndarray *data* that make up each cloud,
-        by default 2 (``(n_points, dim)``).
-    dtype : pcloud32 | pcloud64 | None, optional
-        Element precision. Inferred from the array dtype when ``None``.
-    """
-
-    def __init__(self, data, cloud_ndim=2, dtype=None):
-        super().__init__()
-        if isinstance(data, PointCloudTensor):
-            data = data._data
-        elif isinstance(data, np.ndarray):
-            data = _pointcloud_cpp_from_array(data, cloud_ndim, dtype)
-        elif isinstance(data, (list, tuple)):
-            data = _pointcloud_cpp_from_list(data, dtype)
-        elif not isinstance(data, (cpp.PointCloud32Tensor, cpp.PointCloud64Tensor)):
-            raise TypeError(f"Cannot create PointCloudTensor from {type(data)}")
-        self._data = data
-        self.dtype = _PCLOUD_CPP_TO_DTYPE[type(self._data)]
-
-    def _to_py_tensor(self, data):
-        return PointCloudTensor(data)
-
-    def _represent_element(self, element):
-        return FloatTensor(element)
-
-    def _single_cloud(self):
-        """Return the lone cloud of a 0-d tensor as a ``(n_points, dim)`` FloatTensor."""
-        return self._represent_element(self._data._get_element([]))
-
-    def __getitem__(self, index):
-        """Index the tensor of clouds, or — when this is a single cloud — the cloud itself.
-
-        A 0-d ``PointCloudTensor`` wraps exactly one point cloud. Indexing it
-        delegates to that cloud's ``(n_points, dim)`` array, so the natural
-        NumPy idiom for plotting a cloud works directly::
-
-            plt.scatter(pc[:, 0], pc[:, 1])
-
-        For tensors of rank >= 1, indexing selects clouds as usual (a full
-        integer index returns one cloud as a ``FloatTensor``).
-        """
-        if self.ndim == 0:
-            return self._single_cloud()[index]
-        return super().__getitem__(index)
-
-    def _decay_value(self, val):
-        float_dtype = _PCLOUD_TO_FLOAT_DTYPE[self.dtype]
-        t = FloatTensor(val, dtype=float_dtype)
-        return t._data
-
-    def _get_valid_setitem_dtypes(self):
-        return [FloatTensor, np.ndarray, float, int]
-
-
 class BoolTensor(Tensor):
     """Tensor of boolean values, typically produced by elementwise comparisons."""
 
@@ -515,3 +385,8 @@ def _resolve_pcf_inputs(backend_map: dict, *inputs: PcfContainerLike):
         raise TypeError(f"All inputs must have the same dtype (got {names}).")
 
     return (backend, *tensors)
+
+
+# Backward-compatible re-exports. Implementations live in domain modules.
+from .nested_tensor import NestedTensor  # noqa: E402
+from .point_cloud import PointCloud, PointCloudTensor  # noqa: E402

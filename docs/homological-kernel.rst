@@ -212,7 +212,7 @@ Input flexibility
 Both ``X`` and ``Y`` accept the same forms as
 :py:func:`~stablebear.persistence.compute_persistent_homology`:
 
-- a plain NumPy array or ``FloatTensor`` (a single point cloud);
+- a ``PointCloud``, plain NumPy array, or ``FloatTensor`` (a single point cloud);
 - a ``DistanceMatrix`` (a single precomputed metric);
 - a ``PointCloudTensor`` or ``DistanceMatrixTensor`` (a whole tensor of them,
   computed in parallel).

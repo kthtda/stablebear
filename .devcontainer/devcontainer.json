@@ -34,6 +34,8 @@
     // Persist Claude Code auth/config across rebuilds.
     "source=${localEnv:HOME}/.claude,target=/home/ubuntu/.claude,type=bind,consistency=cached",
     "source=${localEnv:HOME}/.claude.json,target=/home/ubuntu/.claude.json,type=bind,consistency=cached",
+    // Reuse the host's file-based Codex login while keeping container config/rules.
+    "source=${localEnv:HOME}/.codex/auth.json,target=/home/ubuntu/.codex/auth.json,type=bind,consistency=cached",
     // Container-private build dir. The workspace is bind-mounted from the host,
     // whose cmake-build-debug holds a CMakeCache.txt baked with host paths; this
     // volume shadows it so the container keeps its own cache (CMake refuses a
@@ -49,8 +51,8 @@
   // postCreate also avoids wedging container creation when the persistent
   // cmake-build-debug volume holds a cache from a different generator/toolchain
   // (e.g. an old Unix Makefiles cache vs. the Ninja preset). Build manually with
-  // the commands documented in CLAUDE.md:
-  //   cmake --preset debug && cmake --build --preset debug && cmake --install cmake-build-debug
+  // the commands documented in AGENTS.md:
+  //   cmake --preset debug && cmake --build --preset debug -j$(nproc --ignore=4) && cmake --install cmake-build-debug
   // Claude Code is installed natively into ~/.local/bin by the Dockerfile, which
   // already matches installMethod=native in the bind-mounted ~/.claude.json, so
   // no /doctor-quieting symlink is needed here anymore.
@@ -80,7 +82,7 @@
         // lands in Claude's input prompt instead of the shell. Disable it.
         "python.terminal.activateEnvironment": false,
         // Tests must run from test/ so the source-tree stablebear/ dir doesn't
-        // shadow the installed/built extension (see CLAUDE.md > Testing).
+        // shadow the installed/built extension (see AGENTS.md > Testing).
         "python.testing.pytestEnabled": true,
         "python.testing.cwd": "${workspaceFolder}/test",
         "python.testing.pytestArgs": ["python"]

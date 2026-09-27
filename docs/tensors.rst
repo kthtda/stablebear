@@ -67,6 +67,68 @@ This works the same way for ``IntPcfTensor`` and ``BarcodeTensor``.
 The precision (32- or 64-bit) is inferred from the elements.
 An empty list produces a shape ``(0,)`` tensor.
 
+``NestedTensor`` stores a rectangular outer tensor whose elements are tensors.
+Construct the child tensors explicitly; their shapes may differ, but every
+child must have the same leaf dtype and nesting depth::
+
+   selections = sb.tensor([
+       sb.indices([3, 3, 7]),
+       sb.indices([1]),
+       sb.indices([]),
+   ])
+
+   selections.shape       # (3,)
+   selections[0].shape    # (3,)
+   selections[1].shape    # (1,)
+   repr(selections)        # 'Tensor<Tensor<uint64>>'
+
+Construction (including ``sb.NestedTensor(existing_nested)``) and assignment
+recursively copy supplied children. Reusing a child twice creates independent
+stored values. Ordinary outer views, such as slices and transposes, share
+storage: leaf mutations and child replacements are visible through the
+parent and its other views. ``copy()`` and ``copy.deepcopy()`` recursively copy
+logical values, including noncontiguous views; empty copies retain their dtype
+and depth. Reshaping shares storage when the layout permits it and copies
+noncontiguous storage when necessary.
+
+The outer tensor can have multiple dimensions::
+
+   selections = sb.tensor([
+       [sb.indices([3, 2]), sb.indices([2, 6, 7])],
+       [sb.indices([4]), sb.indices([9, 6])],
+   ])
+
+   selections.shape       # (2, 2)
+   selections[0, 1]       # array([2, 6, 7], dtype=uint64)
+
+Nesting can continue to any depth at runtime::
+
+   deeper = sb.tensor([selections, selections.copy()])
+   repr(deeper)  # 'Tensor<Tensor<Tensor<uint64>>>'
+
+Depth counts tensor levels, independently of the number of axes at each level.
+For nonempty input, depth and dtype are inferred from the children; neither
+argument is required. An explicitly supplied depth checks the inferred depth
+and does not add nesting levels.
+The following tested depth-3 example combines depth-2 children with vector,
+matrix, scalar, and empty outer shapes. Their numeric leaves also have different
+shapes. An empty child retains its depth and dtype but contains no leaves and
+therefore has no inner shapes. Here ``np`` is NumPy and ``sb`` is stablebear.
+
+.. literalinclude:: ../test/python/test_nested_tensor.py
+   :language: python
+   :start-after: # depth-three-example-start
+   :end-before: # depth-three-example-end
+   :dedent: 4
+
+Numeric leaf tensors may use ``float32``, ``float64``, ``int32``, ``int64``,
+``uint32``, or ``uint64``. All leaves in one nested tensor must have the same
+dtype. Use an explicit empty child tensor for an empty element. Since neither
+the leaf dtype nor nesting depth can be inferred from an empty outer tensor,
+provide both explicitly::
+
+   empty = sb.NestedTensor([], dtype=sb.float32, depth=2)
+
 
 From NumPy arrays
 -----------------
@@ -75,9 +137,9 @@ Point-cloud, distance-matrix, and symmetric-matrix tensors can be built
 directly from a single NumPy array, avoiding an explicit element-assignment
 loop.
 
-For a :py:class:`~stablebear.PointCloudTensor`, the trailing ``cloud_ndim``
-axes (2 by default) form each ``(n_points, dim)`` cloud and the leading axes
-form the tensor shape::
+For a :py:class:`~stablebear.PointCloudTensor`, the trailing two axes form each
+``(n_points, dim)`` cloud and the leading axes form the tensor shape. Point
+clouds always have rank 2::
 
    import numpy as np
    import stablebear as sb
@@ -92,6 +154,39 @@ A list of cloud arrays (which may have differing numbers of points) builds a
 1-D tensor::
 
    ragged = sb.PointCloudTensor([np.random.rand(3, 2), np.random.rand(5, 2)])
+
+Selecting one element returns a ``PointCloud`` façade. It is always rank 2 and
+supports normal row and column indexing, NumPy conversion, copying, and
+assignment::
+
+   cloud = ragged[0]
+   cloud.shape             # (3, 2)
+   cloud[:, 0]             # first coordinate of each point
+   cloud[0, 1] = 4.0       # updates ragged[0]
+
+Coordinate indexing follows NumPy: scalar indexing reads a single value,
+basic slices remain views, and integer-array or boolean indexing returns
+independent values. Multiple integer arrays use NumPy's paired indexing.
+Writes through retained coordinate views update the owning cloud; for indexed
+clouds, the first successful write materializes the shared tensor state.
+Invalid assignments leave that state unchanged.
+
+``np.asarray(cloud)`` shares coordinates when the cloud has ordinary storage.
+For an indexed cloud it returns an independent array, because arbitrary point
+indices cannot be represented by NumPy strides. Coordinate slices retain their
+write-through behavior until explicitly converted to an array.
+
+``PointCloud`` intentionally omits rank-changing tensor operations such as
+``squeeze`` and ``reshape``. Convert it with ``np.asarray(cloud)`` when general
+array operations are needed. Use ``cloud.copy()`` to obtain an independent
+``PointCloud``. A standalone cloud can also be constructed directly with
+``sb.PointCloud(coordinates)``.
+
+Point selection and subsampling may return a ``PointCloudTensor`` backed by
+shared coordinates and per-cloud row indices. Use ``clouds.to_dense()`` when
+an independent tensor with ordinary point-cloud storage is required. The
+original indexed tensor and its views remain indexed and unchanged. Calling
+``to_dense()`` on an already-dense tensor returns an independent copy.
 
 For matrix tensors, the trailing two axes of the array form each ``n x n``
 matrix and the leading axes form the tensor shape::

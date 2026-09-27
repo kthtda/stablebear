@@ -166,3 +166,12 @@ def test_tensor_factory_distmat():
 def test_tensor_factory_unknown_dtype_raises():
     with pytest.raises(TypeError):
         sb.tensor(np.array(["a", "b"]))
+
+
+@pytest.mark.parametrize("values", [[3, 1, 3], np.array([3, 1, 3])])
+def test_indices_is_uint64_tensor_factory(values):
+    actual = sb.indices(values)
+
+    assert isinstance(actual, sb.IntTensor)
+    assert actual.dtype == sb.uint64
+    npt.assert_array_equal(np.asarray(actual), [3, 1, 3])

@@ -4,6 +4,7 @@
 #include "../py_np_support.hpp"
 
 #include <sbear/persistence/barcode.hpp>
+#include <sbear/persistence/barcode_tensor.hpp>
 
 #include <pybind11/numpy.h>
 
@@ -13,6 +14,18 @@ namespace py = pybind11;
 
 namespace
 {
+
+  template <typename T>
+  void register_barcode_tensor_isomorphism(py::module_& m)
+  {
+    using BarcodeTensor = sb::Tensor<sb::ph::Barcode<T>>;
+    m.def("barcode_tensors_are_isomorphic",
+      [](const BarcodeTensor& lhs, const BarcodeTensor& rhs,
+          double atol, double rtol) {
+        return sb::ph::are_isomorphic(lhs, rhs, atol, rtol);
+      }, py::arg("lhs"), py::arg("rhs"),
+      py::arg("atol") = 1e-8, py::arg("rtol") = 1e-5);
+  }
 
   template <typename T>
   class PyPersistenceBarcodeBindings
@@ -97,5 +110,7 @@ namespace sb_py
 
     register_typed_tensor_bindings<sb::ph::Barcode<sb::float32_t>>(m, "Barcode32", "");
     register_typed_tensor_bindings<sb::ph::Barcode<sb::float64_t>>(m, "Barcode64", "");
+    register_barcode_tensor_isomorphism<sb::float32_t>(m);
+    register_barcode_tensor_isomorphism<sb::float64_t>(m);
   }
 }

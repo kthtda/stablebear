@@ -1,6 +1,7 @@
 """Robustness tests for serialization: corrupted data, truncation, edge cases."""
 
 import io
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -10,6 +11,24 @@ import stablebear.persistence as pers
 
 
 # --- Corrupted data ---
+
+
+@pytest.mark.parametrize("dtype", ["float32", "float64"])
+@pytest.mark.parametrize("case", ["dense", "selected"])
+def test_point_cloud_v3_truncation_and_shape_overflow(dtype, case):
+    directory = (Path(__file__).resolve().parents[1] / "golden" / "serialization"
+                 / "0.5-pre")
+    data = (directory / f"point_cloud_{case}_{dtype}.sb").read_bytes()
+    with pytest.raises((ValueError, RuntimeError)):
+        sb.load(io.BytesIO(data[:-1]))
+
+    # This pinned V3 fixture ends with two uint64 extents and six coordinates.
+    # Corrupt the first extent without consulting the current writer.
+    corrupted = bytearray(data)
+    shape_offset = len(data) - 16 - 6 * np.dtype(dtype).itemsize
+    corrupted[shape_offset:shape_offset + 8] = b"\xff" * 8
+    with pytest.raises((ValueError, RuntimeError)):
+        sb.load(io.BytesIO(corrupted))
 
 
 def test_load_from_empty_bytes_raises():
@@ -125,4 +144,3 @@ def test_save_load_empty_barcode_tensor():
     assert bcs2.shape == (3,)
     for i in range(3):
         assert len(bcs2[i]) == 0
-

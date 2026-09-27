@@ -80,6 +80,14 @@ namespace sb_py
       .def(py::init<size_t>(), py::arg("n"))
       .def_property_readonly("size", &MatT::size)
       .def_property_readonly("storage_count", &MatT::storage_count)
+      .def_property_readonly("is_indexed", &MatT::is_indexed)
+      .def_property_readonly("indices", &MatT::indices)
+      .def("copy", &MatT::copy)
+      .def("_validate_assignment", [](const MatT&, size_t i, size_t j, T value) {
+        T temporary{};
+        typename MatT::EntryProxy entry(i == j ? nullptr : &temporary);
+        entry = value;
+      })
       .def("__getitem__", [](const MatT& self, std::pair<size_t, size_t> ij) {
         return self(ij.first, ij.second);
       })

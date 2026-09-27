@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "producer": {
+    "package": "masspcf",
+    "version": "0.4.0b8",
+    "label": "0.4.0b8",
+    "python": "3.13.0",
+    "numpy": "2.4.6",
+    "platform": "Linux-7.0.0-31-generic-x86_64-with-glibc2.43",
+    "backend": "masspcf._mpcf_cuda13"
+  },
+  "artifacts": [
+    {
+      "name": "tensor_float32",
+      "description": "V1 contiguous float32 tensor",
+      "serialization": "binary",
+      "file": "tensor_float32.sb",
+      "bytes": 91,
+      "sha256": "66855e2cf70e809c22e94680ffb7a24e7ec6bbc261e819434b37c8adcbc33a6e",
+      "expected": {
+        "accepted_types": [
+          "FloatTensor",
+          "Float32Tensor"
+        ],
+        "comparison": "array",
+        "array": {
+          "dtype": "float32",
+          "shape": [
+            3
+          ],
+          "values": [
+            1.25,
+            -2.5,
+            4.0
+          ]
+        },
+        "dtype": "float32",
+        "shape": [
+          3
+        ]
+      }
+    },
+    {
+      "name": "tensor_float64",
+      "description": "V1 contiguous float64 tensor",
+      "serialization": "binary",
+      "file": "tensor_float64.sb",
+      "bytes": 103,
+      "sha256": "f0d181aa32004aca4b00c76626edafce18a161600d8bf4b9be847da85219781b",
+      "expected": {
+        "accepted_types": [
+          "FloatTensor",
+          "Float64Tensor"
+        ],
+        "comparison": "array",
+        "array": {
+          "dtype": "float64",
+          "shape": [
+            3
+          ],
+          "values": [
+            1.25,
+            -2.5,
+            4.0
+          ]
+        },
+        "dtype": "float64",
+        "shape": [
+          3
+        ]
+      }
+    }
+  ],
+  "unsupported": []
+}

@@ -2,11 +2,13 @@
 Point Processes
 ===============
 
-The :py:mod:`stablebear.point_process` module provides samplers for spatial point
-processes, returning :py:class:`~stablebear.base_tensor.PointCloudTensor` objects. All
-samplers support deterministic seeding via :py:class:`~stablebear.random.Generator`
-(see :doc:`random`).
+The :py:mod:`stablebear.point_process` module provides samplers for spatial
+point processes. All samplers support
+deterministic seeding via :py:class:`~stablebear.random.Generator` (see
+:doc:`random`).
 
+For uniform subsampling of existing point clouds or distance matrices, use
+:py:func:`stablebear.random.subsample` (see :doc:`subsampling`).
 
 Poisson point process
 =====================

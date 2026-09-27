@@ -1,0 +1,720 @@
+{
+  "schema_version": 1,
+  "producer": {
+    "package": "stablebear",
+    "version": "0.4.7",
+    "label": "0.4.7",
+    "python": "3.13.0",
+    "numpy": "2.5.3",
+    "platform": "Linux-7.0.0-31-generic-x86_64-with-glibc2.43",
+    "backend": "stablebear._sb_cpu",
+    "pickle_protocol": 4
+  },
+  "artifacts": [
+    {
+      "name": "symmetric_matrix_f32",
+      "description": "Standalone 3x3 f32 symmetric matrix",
+      "serialization": "pickle",
+      "file": "symmetric_matrix_f32.pkl",
+      "bytes": 161,
+      "sha256": "97fbe96ad6cd88d0b605800d6b13e0cb12b457a5d4aac082a826bd692e6de933",
+      "expected": {
+        "accepted_types": [
+          "SymmetricMatrix"
+        ],
+        "comparison": "array",
+        "array": {
+          "dtype": "float32",
+          "shape": [
+            3,
+            3
+          ],
+          "values": [
+            [
+              -1.0,
+              1.0,
+              2.0
+            ],
+            [
+              1.0,
+              -2.0,
+              3.0
+            ],
+            [
+              2.0,
+              3.0,
+              -3.0
+            ]
+          ]
+        },
+        "dtype": "float32"
+      }
+    },
+    {
+      "name": "symmetric_matrix_f32",
+      "description": "Standalone 3x3 f32 symmetric matrix",
+      "serialization": "binary",
+      "file": "symmetric_matrix_f32.sb",
+      "bytes": 105,
+      "sha256": "f2edb9d58435318fb376cab5bccb70e8ca71ffe16de0e91a5cf366172bf8688f",
+      "expected": {
+        "accepted_types": [
+          "SymmetricMatrix"
+        ],
+        "comparison": "array",
+        "array": {
+          "dtype": "float32",
+          "shape": [
+            3,
+            3
+          ],
+          "values": [
+            [
+              -1.0,
+              1.0,
+              2.0
+            ],
+            [
+              1.0,
+              -2.0,
+              3.0
+            ],
+            [
+              2.0,
+              3.0,
+              -3.0
+            ]
+          ]
+        },
+        "dtype": "float32"
+      }
+    },
+    {
+      "name": "symmetric_matrix_tensor_f32",
+      "description": "Tensor containing one 3x3 f32 symmetric matrix",
+      "serialization": "pickle",
+      "file": "symmetric_matrix_tensor_f32.pkl",
+      "bytes": 195,
+      "sha256": "7d27e46edc048ab2824ed45e8adafda7358343f2b089acdc8579a9f041f83d5c",
+      "expected": {
+        "accepted_types": [
+          "SymmetricMatrixTensor"
+        ],
+        "comparison": "elements",
+        "dtype": "symmat32",
+        "shape": [
+          1
+        ],
+        "elements": [
+          {
+            "index": [
+              0
+            ],
+            "array": {
+              "dtype": "float32",
+              "shape": [
+                3,
+                3
+              ],
+              "values": [
+                [
+                  -1.0,
+                  1.0,
+                  2.0
+                ],
+                [
+                  1.0,
+                  -2.0,
+                  3.0
+                ],
+                [
+                  2.0,
+                  3.0,
+                  -3.0
+                ]
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "symmetric_matrix_tensor_f32",
+      "description": "Tensor containing one 3x3 f32 symmetric matrix",
+      "serialization": "binary",
+      "file": "symmetric_matrix_tensor_f32.sb",
+      "bytes": 129,
+      "sha256": "b5b47f653f1641470753c070bb45d7611b33cc9347b59efc88f87da385ee189e",
+      "expected": {
+        "accepted_types": [
+          "SymmetricMatrixTensor"
+        ],
+        "comparison": "elements",
+        "dtype": "symmat32",
+        "shape": [
+          1
+        ],
+        "elements": [
+          {
+            "index": [
+              0
+            ],
+            "array": {
+              "dtype": "float32",
+              "shape": [
+                3,
+                3
+              ],
+              "values": [
+                [
+                  -1.0,
+                  1.0,
+                  2.0
+                ],
+                [
+                  1.0,
+                  -2.0,
+                  3.0
+                ],
+                [
+                  2.0,
+                  3.0,
+                  -3.0
+                ]
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "symmetric_matrix_f64",
+      "description": "Standalone 3x3 f64 symmetric matrix",
+      "serialization": "pickle",
+      "file": "symmetric_matrix_f64.pkl",
+      "bytes": 185,
+      "sha256": "1cab5395f902ab303c8bae25ea3c7dd78ce0927a7d9239126fb2e54881880863",
+      "expected": {
+        "accepted_types": [
+          "SymmetricMatrix"
+        ],
+        "comparison": "array",
+        "array": {
+          "dtype": "float64",
+          "shape": [
+            3,
+            3
+          ],
+          "values": [
+            [
+              -1.0,
+              1.0,
+              2.0
+            ],
+            [
+              1.0,
+              -2.0,
+              3.0
+            ],
+            [
+              2.0,
+              3.0,
+              -3.0
+            ]
+          ]
+        },
+        "dtype": "float64"
+      }
+    },
+    {
+      "name": "symmetric_matrix_f64",
+      "description": "Standalone 3x3 f64 symmetric matrix",
+      "serialization": "binary",
+      "file": "symmetric_matrix_f64.sb",
+      "bytes": 129,
+      "sha256": "23a336dc9a6cb873e8127b520123108ff3a818313d0b83e0b932accc5fc10d87",
+      "expected": {
+        "accepted_types": [
+          "SymmetricMatrix"
+        ],
+        "comparison": "array",
+        "array": {
+          "dtype": "float64",
+          "shape": [
+            3,
+            3
+          ],
+          "values": [
+            [
+              -1.0,
+              1.0,
+              2.0
+            ],
+            [
+              1.0,
+              -2.0,
+              3.0
+            ],
+            [
+              2.0,
+              3.0,
+              -3.0
+            ]
+          ]
+        },
+        "dtype": "float64"
+      }
+    },
+    {
+      "name": "symmetric_matrix_tensor_f64",
+      "description": "Tensor containing one 3x3 f64 symmetric matrix",
+      "serialization": "pickle",
+      "file": "symmetric_matrix_tensor_f64.pkl",
+      "bytes": 219,
+      "sha256": "78e220a8d66c43fcba252b2d35fdb0fef2c04386c6577f1910dad23a8bfd7240",
+      "expected": {
+        "accepted_types": [
+          "SymmetricMatrixTensor"
+        ],
+        "comparison": "elements",
+        "dtype": "symmat64",
+        "shape": [
+          1
+        ],
+        "elements": [
+          {
+            "index": [
+              0
+            ],
+            "array": {
+              "dtype": "float64",
+              "shape": [
+                3,
+                3
+              ],
+              "values": [
+                [
+                  -1.0,
+                  1.0,
+                  2.0
+                ],
+                [
+                  1.0,
+                  -2.0,
+                  3.0
+                ],
+                [
+                  2.0,
+                  3.0,
+                  -3.0
+                ]
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "symmetric_matrix_tensor_f64",
+      "description": "Tensor containing one 3x3 f64 symmetric matrix",
+      "serialization": "binary",
+      "file": "symmetric_matrix_tensor_f64.sb",
+      "bytes": 153,
+      "sha256": "81ceae95a770c468fbe0fb3419db2b8cff6ac07a22ba8c22e79cf30e483a17e8",
+      "expected": {
+        "accepted_types": [
+          "SymmetricMatrixTensor"
+        ],
+        "comparison": "elements",
+        "dtype": "symmat64",
+        "shape": [
+          1
+        ],
+        "elements": [
+          {
+            "index": [
+              0
+            ],
+            "array": {
+              "dtype": "float64",
+              "shape": [
+                3,
+                3
+              ],
+              "values": [
+                [
+                  -1.0,
+                  1.0,
+                  2.0
+                ],
+                [
+                  1.0,
+                  -2.0,
+                  3.0
+                ],
+                [
+                  2.0,
+                  3.0,
+                  -3.0
+                ]
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "distance_matrix_f32",
+      "description": "Standalone 3x3 f32 distance matrix",
+      "serialization": "pickle",
+      "file": "distance_matrix_f32.pkl",
+      "bytes": 149,
+      "sha256": "b7efe40de03297071f992150c367f79522c368943cf8fad2dc14738fa6b911f3",
+      "expected": {
+        "accepted_types": [
+          "DistanceMatrix"
+        ],
+        "comparison": "array",
+        "array": {
+          "dtype": "float32",
+          "shape": [
+            3,
+            3
+          ],
+          "values": [
+            [
+              0.0,
+              1.0,
+              2.0
+            ],
+            [
+              1.0,
+              0.0,
+              3.0
+            ],
+            [
+              2.0,
+              3.0,
+              0.0
+            ]
+          ]
+        },
+        "dtype": "float32"
+      }
+    },
+    {
+      "name": "distance_matrix_f32",
+      "description": "Standalone 3x3 f32 distance matrix",
+      "serialization": "binary",
+      "file": "distance_matrix_f32.sb",
+      "bytes": 93,
+      "sha256": "4465f2187739722c13a065edbc85677d5109d0b27204cae4b84ea855c2f0cd34",
+      "expected": {
+        "accepted_types": [
+          "DistanceMatrix"
+        ],
+        "comparison": "array",
+        "array": {
+          "dtype": "float32",
+          "shape": [
+            3,
+            3
+          ],
+          "values": [
+            [
+              0.0,
+              1.0,
+              2.0
+            ],
+            [
+              1.0,
+              0.0,
+              3.0
+            ],
+            [
+              2.0,
+              3.0,
+              0.0
+            ]
+          ]
+        },
+        "dtype": "float32"
+      }
+    },
+    {
+      "name": "distance_matrix_tensor_f32",
+      "description": "Tensor containing one 3x3 f32 distance matrix",
+      "serialization": "pickle",
+      "file": "distance_matrix_tensor_f32.pkl",
+      "bytes": 183,
+      "sha256": "c6a914c85f6aaf3444acb4bb25b402f5b4ae2489c971c46c9611c2fc5f3b3219",
+      "expected": {
+        "accepted_types": [
+          "DistanceMatrixTensor"
+        ],
+        "comparison": "elements",
+        "dtype": "distmat32",
+        "shape": [
+          1
+        ],
+        "elements": [
+          {
+            "index": [
+              0
+            ],
+            "array": {
+              "dtype": "float32",
+              "shape": [
+                3,
+                3
+              ],
+              "values": [
+                [
+                  0.0,
+                  1.0,
+                  2.0
+                ],
+                [
+                  1.0,
+                  0.0,
+                  3.0
+                ],
+                [
+                  2.0,
+                  3.0,
+                  0.0
+                ]
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "distance_matrix_tensor_f32",
+      "description": "Tensor containing one 3x3 f32 distance matrix",
+      "serialization": "binary",
+      "file": "distance_matrix_tensor_f32.sb",
+      "bytes": 117,
+      "sha256": "32493ad2fd4e297f3c5dd159fbd1ac58ae683f31ec0a0b0ee2bf95d967551c2f",
+      "expected": {
+        "accepted_types": [
+          "DistanceMatrixTensor"
+        ],
+        "comparison": "elements",
+        "dtype": "distmat32",
+        "shape": [
+          1
+        ],
+        "elements": [
+          {
+            "index": [
+              0
+            ],
+            "array": {
+              "dtype": "float32",
+              "shape": [
+                3,
+                3
+              ],
+              "values": [
+                [
+                  0.0,
+                  1.0,
+                  2.0
+                ],
+                [
+                  1.0,
+                  0.0,
+                  3.0
+                ],
+                [
+                  2.0,
+                  3.0,
+                  0.0
+                ]
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "distance_matrix_f64",
+      "description": "Standalone 3x3 f64 distance matrix",
+      "serialization": "pickle",
+      "file": "distance_matrix_f64.pkl",
+      "bytes": 161,
+      "sha256": "291f4898de594e63eab4b8c10e08136482f7b2d9f465a9a59db047782e176680",
+      "expected": {
+        "accepted_types": [
+          "DistanceMatrix"
+        ],
+        "comparison": "array",
+        "array": {
+          "dtype": "float64",
+          "shape": [
+            3,
+            3
+          ],
+          "values": [
+            [
+              0.0,
+              1.0,
+              2.0
+            ],
+            [
+              1.0,
+              0.0,
+              3.0
+            ],
+            [
+              2.0,
+              3.0,
+              0.0
+            ]
+          ]
+        },
+        "dtype": "float64"
+      }
+    },
+    {
+      "name": "distance_matrix_f64",
+      "description": "Standalone 3x3 f64 distance matrix",
+      "serialization": "binary",
+      "file": "distance_matrix_f64.sb",
+      "bytes": 105,
+      "sha256": "8efce39da8e96c4cf02baf03c84454ae349c6dbebb736c6264f9c934c18054ab",
+      "expected": {
+        "accepted_types": [
+          "DistanceMatrix"
+        ],
+        "comparison": "array",
+        "array": {
+          "dtype": "float64",
+          "shape": [
+            3,
+            3
+          ],
+          "values": [
+            [
+              0.0,
+              1.0,
+              2.0
+            ],
+            [
+              1.0,
+              0.0,
+              3.0
+            ],
+            [
+              2.0,
+              3.0,
+              0.0
+            ]
+          ]
+        },
+        "dtype": "float64"
+      }
+    },
+    {
+      "name": "distance_matrix_tensor_f64",
+      "description": "Tensor containing one 3x3 f64 distance matrix",
+      "serialization": "pickle",
+      "file": "distance_matrix_tensor_f64.pkl",
+      "bytes": 195,
+      "sha256": "64ea58da0b7d7b50b950d43c77bfab10ee0dd4ce84f7c88962180e5a165013c9",
+      "expected": {
+        "accepted_types": [
+          "DistanceMatrixTensor"
+        ],
+        "comparison": "elements",
+        "dtype": "distmat64",
+        "shape": [
+          1
+        ],
+        "elements": [
+          {
+            "index": [
+              0
+            ],
+            "array": {
+              "dtype": "float64",
+              "shape": [
+                3,
+                3
+              ],
+              "values": [
+                [
+                  0.0,
+                  1.0,
+                  2.0
+                ],
+                [
+                  1.0,
+                  0.0,
+                  3.0
+                ],
+                [
+                  2.0,
+                  3.0,
+                  0.0
+                ]
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "distance_matrix_tensor_f64",
+      "description": "Tensor containing one 3x3 f64 distance matrix",
+      "serialization": "binary",
+      "file": "distance_matrix_tensor_f64.sb",
+      "bytes": 129,
+      "sha256": "587ec7d4a9a2c16679529943ca482f319bd6300352a9bf75dfaec0f449e77e63",
+      "expected": {
+        "accepted_types": [
+          "DistanceMatrixTensor"
+        ],
+        "comparison": "elements",
+        "dtype": "distmat64",
+        "shape": [
+          1
+        ],
+        "elements": [
+          {
+            "index": [
+              0
+            ],
+            "array": {
+              "dtype": "float64",
+              "shape": [
+                3,
+                3
+              ],
+              "values": [
+                [
+                  0.0,
+                  1.0,
+                  2.0
+                ],
+                [
+                  1.0,
+                  0.0,
+                  3.0
+                ],
+                [
+                  2.0,
+                  3.0,
+                  0.0
+                ]
+              ]
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "unsupported": []
+}

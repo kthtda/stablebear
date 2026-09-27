@@ -1,6 +1,8 @@
 import io
+import pickle
 
 import numpy as np
+import pytest
 
 import stablebear as sb
 
@@ -18,6 +20,61 @@ def _assert_roundtrip(original):
     assert restored.dtype == original.dtype
     assert restored.shape == original.shape
     assert original.array_equal(restored)
+
+
+def _pickle_roundtrip(value):
+    return pickle.loads(pickle.dumps(value))
+
+
+_NESTED_SCALAR_DTYPES = [
+    pytest.param(sb.float32, np.float32, id="float32"),
+    pytest.param(sb.float64, np.float64, id="float64"),
+    pytest.param(sb.int32, np.int32, id="int32"),
+    pytest.param(sb.int64, np.int64, id="int64"),
+    pytest.param(sb.uint32, np.uint32, id="uint32"),
+    pytest.param(sb.uint64, np.uint64, id="uint64"),
+]
+
+
+@pytest.mark.parametrize("roundtrip", [_roundtrip, _pickle_roundtrip])
+@pytest.mark.parametrize("sb_dtype,np_dtype", _NESTED_SCALAR_DTYPES)
+def test_nonzero_scalar_value_survives_at_every_nesting_level(
+    sb_dtype, np_dtype, roundtrip
+):
+    scalar = np.array(42, dtype=np_dtype)
+
+    ordinary = roundtrip(sb.tensor(scalar, dtype=sb_dtype))
+    assert np.asarray(ordinary)[()] == 42
+
+    depth_three = sb.NestedTensor([
+        sb.NestedTensor([scalar], dtype=sb_dtype)
+    ])
+    restored = roundtrip(depth_three)
+    assert restored.depth == 3
+    assert restored[0][0][()] == 42
+
+
+@pytest.mark.parametrize("roundtrip", [_roundtrip, _pickle_roundtrip])
+def test_true_scalar_bool_survives_roundtrip(roundtrip):
+    restored = roundtrip(sb.tensor(np.array(True), dtype=sb.boolean))
+    assert np.asarray(restored)[()]
+
+
+@pytest.mark.parametrize("roundtrip", [_roundtrip, _pickle_roundtrip])
+@pytest.mark.parametrize(
+    "pcloud_dtype,np_dtype",
+    [
+        pytest.param(sb.pcloud32, np.float32, id="pcloud32"),
+        pytest.param(sb.pcloud64, np.float64, id="pcloud64"),
+    ],
+)
+def test_scalar_point_cloud_tensor_preserves_cloud(
+    pcloud_dtype, np_dtype, roundtrip
+):
+    coordinates = np.array([[1, 2], [3, 4]], dtype=np_dtype)
+    restored = roundtrip(sb.PointCloudTensor(coordinates, dtype=pcloud_dtype))
+    assert restored.shape == ()
+    np.testing.assert_array_equal(np.asarray(restored[()]), coordinates)
 
 
 # --- Float tensors ---

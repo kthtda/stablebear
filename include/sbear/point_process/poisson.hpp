@@ -2,6 +2,7 @@
 #define SB_POINT_PROCESS_POISSON_H
 
 #include "../tensor.hpp"
+#include "../point_cloud.hpp"
 #include "../walk.hpp"
 
 #include <cmath>
@@ -72,18 +73,18 @@ namespace sb::pp
       std::poisson_distribution<size_t> countDist(static_cast<double>(lambda));
       auto nPoints = countDist(engine);
 
-      PointCloud<T> pc({nPoints, dim});
+      Tensor<T> coords({nPoints, dim});
 
       for (size_t i = 0; i < nPoints; ++i)
       {
         for (size_t j = 0; j < dim; ++j)
         {
           std::uniform_real_distribution<T> coordDist(lo[j], hi[j]);
-          pc({i, j}) = coordDist(engine);
+          coords({i, j}) = coordDist(engine);
         }
       }
 
-      out(idx) = std::move(pc);
+      out(idx) = PointCloud<T>(std::move(coords));
     }, exec);
   }
 
