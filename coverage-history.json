@@ -1889,6 +1889,6 @@
     "cpp": 89.4,
     "py": 89.0,
     "cuda": 100.0,
-    "release_tag": null
+    "release_tag": "v0.5.0"
   }
 ]
