@@ -2,10 +2,11 @@ import operator
 
 from .. import _sb_cpp as cpp
 from ..base_tensor import _get_backend
-from ..distance_matrix import DistanceMatrixTensor
-from ..point_cloud import PointCloudTensor
-from ..random import Generator, _unwrap
-from ..typing import distmat32, distmat64, pcloud32, pcloud64
+from ..distance_matrix import DistanceMatrix, DistanceMatrixTensor
+from ..point_cloud import PointCloud, PointCloudTensor
+from ..tensor_create import zeros
+from ..typing import distmat32, distmat64, float32, pcloud32, pcloud64
+from .generator import Generator, _unwrap
 
 
 def _positive_integer(value, name):
@@ -36,7 +37,7 @@ def subsample(
     discard_duplicates=False,
     generator=None,
 ):
-    """Draw uniform subsamples from point-cloud or distance-matrix tensors.
+    """Draw uniform subsamples from point clouds, distance matrices, or their tensors.
 
     One sample axis is appended to the input tensor shape. Each input value is
     copied once and shared by its samples, which store only their selected
@@ -45,9 +46,9 @@ def subsample(
 
     Parameters
     ----------
-    data : PointCloudTensor or DistanceMatrixTensor
-        Input tensor. A zero-dimensional tensor represents one point cloud or
-        distance matrix.
+    data : PointCloud, DistanceMatrix, PointCloudTensor, or DistanceMatrixTensor
+        Input value or tensor. A single point cloud or distance matrix is
+        treated as a zero-dimensional tensor.
     n_points : int
         Number of draws requested for each output cloud.
     n_samples : int, optional
@@ -72,11 +73,20 @@ def subsample(
     -------
     PointCloudTensor or DistanceMatrixTensor
         A tensor of the same element family and precision, with shape equal to
-        data.shape plus (n_samples,).
+        the input tensor shape plus (n_samples,). For a single point cloud or
+        distance matrix, the result has shape (n_samples,).
     """
+    if isinstance(data, PointCloud):
+        wrapped = zeros((), dtype=pcloud32 if data.dtype == float32 else pcloud64)
+        wrapped[()] = data
+        data = wrapped
+    elif isinstance(data, DistanceMatrix):
+        wrapped = zeros((), dtype=distmat32 if data.dtype == float32 else distmat64)
+        wrapped[()] = data
+        data = wrapped
     if not isinstance(data, (PointCloudTensor, DistanceMatrixTensor)):
         raise TypeError(
-            "data must be a PointCloudTensor or DistanceMatrixTensor")
+            "data must be a PointCloud, DistanceMatrix, PointCloudTensor, or DistanceMatrixTensor")
     n_points = _positive_integer(n_points, "n_points")
     n_samples = _positive_integer(n_samples, "n_samples")
     replace = _boolean(replace, "replace")

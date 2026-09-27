@@ -1,7 +1,6 @@
 __before = set(dir())
 
 from .poisson import sample_poisson
-from .subsample import subsample
 
 import types as _types
 __all__ = sorted(

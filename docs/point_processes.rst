@@ -3,76 +3,12 @@ Point Processes
 ===============
 
 The :py:mod:`stablebear.point_process` module provides samplers for spatial
-point processes and their distance matrices. All samplers support
+point processes. All samplers support
 deterministic seeding via :py:class:`~stablebear.random.Generator` (see
 :doc:`random`).
 
-Uniform subsampling
-===================
-
-:py:func:`~stablebear.point_process.subsample` draws one or more uniform
-subsamples from every value in a
-:py:class:`~stablebear.base_tensor.PointCloudTensor` or
-:py:class:`~stablebear.distance_matrix.DistanceMatrixTensor`. The result has
-the same element family and precision and appends a sample axis to the input
-shape::
-
-   import numpy as np
-   import stablebear as sb
-   from stablebear.point_process import subsample
-
-   cloud = sb.PointCloudTensor(np.zeros((100, 3), dtype=np.float64))
-   samples = subsample(
-       cloud,
-       n_points=25,
-       n_samples=8,
-       generator=sb.random.Generator(seed=5),
-   )
-
-   assert samples.shape == (8,)
-   assert samples[0].shape == (25, 3)
-
-By default, sampling is without replacement and a cloud with fewer than
-``n_points`` raises ``ValueError``. Set ``allow_partial=True`` to use all
-available points in random order instead. With ``replace=True``, repeated
-draws are allowed; an empty input is accepted only when
-``allow_partial=True``.
-
-Set ``discard_duplicates=True`` to keep only the first drawn occurrence of
-each coordinate-identical point. Coordinates are compared with ordinary numeric
-equality: signed zeros compare equal, infinities with the same sign compare
-equal, and positive and negative infinity are distinct. NaN does not equal itself. Points
-containing any NaN coordinate are therefore never discarded, even when the
-same source point is drawn repeatedly. For distance matrices, it removes repeated
-drawn source indices; distinct indices are retained even when their distance
-is zero. Discarded points are not redrawn.
-
-For indexed point-cloud and distance-matrix tensors, ``samples.indices``
-returns an independent ``NestedTensor`` of uint64 selections. For example,
-``samples.indices[0]`` gives the first sample's drawn source indices.
-The selections follow the tensor's outer shape and view order; changing them
-does not change the samples. Ordinary tensors, and indexed tensors whose
-shared backing has been materialized by a write, return ``None``.
-
-Each call copies each input cloud's current logical coordinates once. All
-samples from that cloud share the fresh copy and store only row indices, so
-later changes to the input do not affect the samples. Mutating an indexed
-sample uses copy-on-write and does not affect sibling samples.
-
-This also applies when resampling an indexed result or a view of one. The
-sampler reads its selected rows directly and copies those logical coordinates
-once into a fresh source, preserving their order and repetitions. The input
-retains its indexed storage; the new result does not depend on the previous
-result's coordinates or selections.
-
-For a distance matrix ``M`` and sampled index sequence ``S``, the corresponding
-result is the compressed symmetric principal submatrix ``M[S, S]``. Sampled
-order and repetitions are preserved, including zero distance between two
-occurrences of the same source index. Indexed results share one fresh copy of
-the source matrix across its samples. Persistent homology and homological
-kernel computations consume these logical matrices directly; mutation first
-materializes the shared indexed state.
-
+For uniform subsampling of existing point clouds or distance matrices, use
+:py:func:`stablebear.random.subsample` (see :doc:`subsampling`).
 
 Poisson point process
 =====================

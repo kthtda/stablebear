@@ -72,6 +72,42 @@ The last value is always set to zero.
 Pass ``dtype=sb.pcf64`` for 64-bit precision (the default is ``pcf32``).
 
 
+Uniform subsampling
+===================
+
+:py:func:`~stablebear.random.subsample` selects random subsets of points from
+point clouds or vertices from distance matrices, individually or in tensors. Use it to create
+smaller datasets or repeated samples for analysis. For distance matrices, each
+sample contains the distances between the selected vertices.
+
+Request the size with ``n_points`` and the number of samples per input with
+``n_samples``. Sampling is without replacement by default, and the results
+remain independent of later changes to the input.
+
+For example, draw two samples of three points from a four-point cloud::
+
+   import stablebear as sb
+
+   cloud = sb.PointCloud([
+       [0., 0.],
+       [1., 0.],
+       [0., 1.],
+       [1., 1.],
+   ])
+   samples = sb.random.subsample(
+       cloud, n_points=3, n_samples=2,
+       generator=sb.random.Generator(seed=5),
+   )
+
+   assert samples.shape == (2,)
+   assert samples[0].shape == (3, 2)  # Three points, each with two coordinates.
+
+.. toctree::
+   :maxdepth: 1
+
+   Subsampling guide <subsampling>
+
+
 How determinism works
 =====================
 

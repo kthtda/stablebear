@@ -146,6 +146,23 @@ family-specific difference without duplicating the whole point-cloud test plan.
 
 Settled choices that should remain explicit:
 
+- Uniform subsampling is exposed as `stablebear.random.subsample`, for both
+  individual point clouds/distance matrices and tensors of them. Standalone
+  inputs are wrapped in scalar tensors, preserving precision and returning
+  shape `(n_samples,)` through the existing sampler. Four focused cases check
+  parity with explicit scalar-tensor inputs at both precisions.
+  `stablebear.random` is a package:
+  `generator.py` holds the generator/seed helpers, `pcf.py` holds noisy sine/cosine
+  generation, and `subsample.py` holds subsampling. Its package exports preserve
+  the existing `sb.random` functions. The API move and corresponding
+  sampling guide/changelog update are complete; the remaining D4
+  documentation reconciliation is still pending.
+  `docs/random.rst` introduces subsampling and links to the detailed
+  `docs/subsampling.rst` subpage for examples, options, and ownership behavior.
+  After direct CMake build/install, the focused CPU Python run passed **156
+  tests** across subsampling, random generation, generator advancement, and
+  point processes. The HTML documentation build also succeeded.
+
 1. Full point-cloud element access returns the write-aware `PointCloud` façade,
    rather than the `FloatTensor` described in #229. Reads retain indexed state;
    successful writes transition shared backing. This is documented and tested

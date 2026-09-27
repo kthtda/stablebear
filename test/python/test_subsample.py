@@ -5,7 +5,7 @@ import numpy.testing as npt
 import pytest
 
 import stablebear as sb
-from stablebear.point_process import subsample
+from stablebear.random import subsample
 
 
 _PCLOUD_DTYPES = [
@@ -61,6 +61,44 @@ def ragged_data(request):
 
 
 class TestSubsample:
+    @pytest.mark.parametrize(("pcloud_dtype", "np_dtype"), _PCLOUD_DTYPES)
+    def test_single_cloud_matches_scalar_tensor(self, pcloud_dtype, np_dtype):
+        coordinates = np.array([
+            [0, 0],
+            [3, 0],
+            [0, 4],
+        ], dtype=np_dtype)
+        cloud = sb.PointCloud(coordinates)
+        tensor = sb.PointCloudTensor(coordinates)
+
+        samples = subsample(cloud, n_points=2, n_samples=2,
+                            generator=sb.random.Generator(seed=229))
+        expected = subsample(tensor, n_points=2, n_samples=2,
+                             generator=sb.random.Generator(seed=229))
+
+        assert samples.shape == (2,)
+        assert samples.dtype == pcloud_dtype
+        assert samples.array_equal(expected)
+
+    @pytest.mark.parametrize(("distmat_dtype", "np_dtype"), _DISTMAT_DTYPES)
+    def test_single_matrix_matches_scalar_tensor(self, distmat_dtype, np_dtype):
+        distances = np.array([
+            [0, 3, 4],
+            [3, 0, 5],
+            [4, 5, 0],
+        ], dtype=np_dtype)
+        matrix = sb.DistanceMatrix(distances)
+        tensor = sb.DistanceMatrixTensor(distances)
+
+        samples = subsample(matrix, n_points=2, n_samples=2,
+                            generator=sb.random.Generator(seed=229))
+        expected = subsample(tensor, n_points=2, n_samples=2,
+                             generator=sb.random.Generator(seed=229))
+
+        assert samples.shape == (2,)
+        assert samples.dtype == distmat_dtype
+        assert samples.array_equal(expected)
+
     @pytest.mark.parametrize("parameter", ["n_points", "n_samples"])
     def test_rejects_noninteger_count(self, parameter):
         source = sb.PointCloudTensor(np.array([[10., 1.]]))
