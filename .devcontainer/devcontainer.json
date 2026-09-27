@@ -51,7 +51,7 @@
   // postCreate also avoids wedging container creation when the persistent
   // cmake-build-debug volume holds a cache from a different generator/toolchain
   // (e.g. an old Unix Makefiles cache vs. the Ninja preset). Build manually with
-  // the commands documented in CLAUDE.md:
+  // the commands documented in AGENTS.md:
   //   cmake --preset debug && cmake --build --preset debug && cmake --install cmake-build-debug
   // Claude Code is installed natively into ~/.local/bin by the Dockerfile, which
   // already matches installMethod=native in the bind-mounted ~/.claude.json, so
@@ -82,7 +82,7 @@
         // lands in Claude's input prompt instead of the shell. Disable it.
         "python.terminal.activateEnvironment": false,
         // Tests must run from test/ so the source-tree stablebear/ dir doesn't
-        // shadow the installed/built extension (see CLAUDE.md > Testing).
+        // shadow the installed/built extension (see AGENTS.md > Testing).
         "python.testing.pytestEnabled": true,
         "python.testing.cwd": "${workspaceFolder}/test",
         "python.testing.pytestArgs": ["python"]

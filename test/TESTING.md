@@ -59,7 +59,19 @@ protect. These principles apply when writing, reviewing, or changing tests.
     For collections of matrices, use blank lines between matrices to make
     their boundaries clear.
 
+14. **Write small test inputs explicitly.** Prefer listing a few entries over
+    generating them with a loop or comprehension, even when they repeat. For
+    example, four explicit `sb.indices([0, 1])` entries make the selections
+    easier to see than `sb.indices([0, 1]) for _ in range(4)`. Use generated
+    data when the size or pattern is itself relevant to the behavior under test.
+
+15. **Use short comments where intent could be unclear.** A brief comment can
+    explain what a selection picks out, why an input matters, what an
+    operation is meant to demonstrate, or which guarantee an assertion checks.
+    Add one when it helps the reader
+    understand the test; avoid narrating code that is already obvious.
+
 The review question is: **What bug would make this test fail, and can I see
 that immediately?**
 
-Build and test commands are documented in [CLAUDE.md](../CLAUDE.md#testing).
+Build and test commands are documented in [AGENTS.md](../AGENTS.md#testing).

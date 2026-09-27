@@ -84,7 +84,7 @@ sdist.exclude = [
     "update_submodules",
     "BUILDING.md",
     "CHANGELOG.md",
-    "CLAUDE.md",
+    "AGENTS.md",
 ]
 
 [project.urls]
