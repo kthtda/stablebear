@@ -1,7 +1,7 @@
 # Relative subsampling: test plan for #243
 
 Status: proposed for joint review. The initial new tests have been removed.
-G4 has a first pair of replacement tests awaiting review; other items are unstarted.
+G4 is reviewed and complete; other items are unstarted.
 
 Read [TESTING.md](../test/TESTING.md) before writing any tests. Work through the items
 below together, using their identifiers in discussion. Each item is a review
@@ -111,18 +111,14 @@ that immediately?**
   Build/install with CMake using **`-j10`**, and run pytest from `test/`.
   Build the documentation and execute its example. Record the checks actually
   run; the removed suite's earlier results are not replacement coverage.
-- [ ] **G4 — Walk on indexed tensors.** The direct walk tests in
-  `test_tensor_iteration.cpp` and `test_walk_random.cpp` currently use ordinary
-  numeric tensors. Add focused coverage in the tensor-iteration tests: walk a
-  small indexed tensor whose logical outer shape differs from its source shape,
-  visit each logical index exactly once in sequential order, and read explicit
-  expected selected values through those indices. Review one sliced outer view
-  to catch traversal of the backing source instead of the view. Audit the
-  parallel and generator-taking overloads for the same gap; compare results by
-  logical index without assuming parallel callback order. Keep these tests in
-  the tensor/walk test area and agree on the minimal cases before writing them.
+- [x] **G4 — Walk on indexed tensors.** Added focused tensor-iteration coverage
+  for a small indexed tensor whose logical outer shape differs from its source
+  shape, checking each logical index exactly once in sequential order and the
+  explicit selected values. A sliced outer view checks traversal of the view
+  rather than its backing source. Reviewed and committed in `e9b1c8b09`.
 
-  First review batch in `test/test_tensor_iteration.cpp`:
+  Reviewed tests in `test/test_tensor_iteration.cpp`:
+
   - `IndexedTensorVisitsLogicalIndicesAndSelectedValues`: one source cloud,
     a 2×2 indexed outer shape, and explicit row-major indices and selected values.
   - `IndexedOuterSliceVisitsOnlyItsLogicalElements`: an outer `[1::2]` slice,
@@ -132,16 +128,15 @@ that immediately?**
   share `detail::parallel_walk_impl`. Both use the tensor's logical shape, with
   no indexed-specific branch. The generator overloads also use `tensor.size()`
   to reserve streams. Existing parallel/random tests exercise ordinary tensors,
-  so direct indexed coverage there remains a follow-up to review after this pair.
-  G4 remains unchecked pending that review.
+  with direct indexed coverage of those overloads deferred beyond this item.
 
   Validation: built `sb_test` with `-j10` and installed via CMake. From `test/`,
   `../cmake-build-debug/sb_test --gtest_filter='TensorWalk.*:WalkRandom.*'`
-  passed all 16 tests, including the two new cases. Changes remain uncommitted.
+  passed all 16 tests, including the two new cases.
 
 ## How we will use this plan
 
-Start with G4, as requested, then return to A1. Agree on each item's input and
+G4 is complete; return to A1 next. Agree on each item's input and
 expected result before expanding its tests.
 Review each small addition before moving on. Mark an item complete only once
 we have reviewed the coverage, including a decision that existing tests suffice.
