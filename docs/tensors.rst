@@ -138,19 +138,19 @@ directly from a single NumPy array, avoiding an explicit element-assignment
 loop.
 
 For a :py:class:`~stablebear.PointCloudTensor`, the trailing two axes form each
-``(n_points, dim)`` cloud and the leading axes form the tensor shape. Point
+``(n_points, dim)`` point cloud and the leading axes form the tensor shape. Point
 clouds always have rank 2::
 
    import numpy as np
    import stablebear as sb
 
-   arr = np.random.rand(3, 5, 4, 2)        # 3 x 5 grid of (4, 2) clouds
+   arr = np.random.rand(3, 5, 4, 2)        # 3 x 5 grid of (4, 2) point clouds
    pc = sb.PointCloudTensor(arr)           # shape (3, 5)
 
-   batch = np.random.rand(10, 8, 2)        # 10 clouds of 8 points in 2-D
+   batch = np.random.rand(10, 8, 2)        # 10 point clouds of 8 points in 2-D
    clouds = sb.PointCloudTensor(batch)     # shape (10,)
 
-A list of cloud arrays (which may have differing numbers of points) builds a
+A list of point cloud arrays (which may have differing numbers of points) builds a
 1-D tensor::
 
    ragged = sb.PointCloudTensor([np.random.rand(3, 2), np.random.rand(5, 2)])
@@ -167,23 +167,23 @@ assignment::
 Coordinate indexing follows NumPy: scalar indexing reads a single value,
 basic slices remain views, and integer-array or boolean indexing returns
 independent values. Multiple integer arrays use NumPy's paired indexing.
-Writes through retained coordinate views update the owning cloud; for indexed
-clouds, the first successful write materializes the shared tensor state.
+Writes through retained coordinate views update the owning point cloud; for indexed
+point clouds, the first successful write materializes the shared tensor state.
 Invalid assignments leave that state unchanged.
 
-``np.asarray(cloud)`` shares coordinates when the cloud has ordinary storage.
-For an indexed cloud it returns an independent array, because arbitrary point
+``np.asarray(cloud)`` shares coordinates when the point cloud has ordinary storage.
+For an indexed point cloud it returns an independent array, because arbitrary point
 indices cannot be represented by NumPy strides. Coordinate slices retain their
 write-through behavior until explicitly converted to an array.
 
 ``PointCloud`` intentionally omits rank-changing tensor operations such as
 ``squeeze`` and ``reshape``. Convert it with ``np.asarray(cloud)`` when general
 array operations are needed. Use ``cloud.copy()`` to obtain an independent
-``PointCloud``. A standalone cloud can also be constructed directly with
+``PointCloud``. A standalone point cloud can also be constructed directly with
 ``sb.PointCloud(coordinates)``.
 
 Point selection and subsampling may return a ``PointCloudTensor`` backed by
-shared coordinates and per-cloud row indices. Use ``clouds.to_dense()`` when
+shared coordinates and row indices for each point cloud. Use ``clouds.to_dense()`` when
 an independent tensor with ordinary point-cloud storage is required. The
 original indexed tensor and its views remain indexed and unchanged. Calling
 ``to_dense()`` on an already-dense tensor returns an independent copy.
@@ -200,7 +200,7 @@ matrix and the leading axes form the tensor shape::
 The precision is inferred from the array dtype (``float32`` → the 32-bit
 variant, otherwise 64-bit) and can be overridden with ``dtype=``. These
 batch constructors are the natural entry point for computing persistent
-homology across many clouds or distance matrices in one parallel call.
+homology across many point clouds or distance matrices in one parallel call.
 
 Using the tensor factory
 ------------------------
