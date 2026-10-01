@@ -1,30 +1,11 @@
-import operator
-
 from .. import _sb_cpp as cpp
+from .._validation import _boolean, _positive_integer
 from ..base_tensor import _get_backend
 from ..distance_matrix import DistanceMatrix, DistanceMatrixTensor
 from ..point_cloud import PointCloud, PointCloudTensor
 from ..tensor_create import zeros
 from ..typing import distmat32, distmat64, float32, pcloud32, pcloud64
 from .generator import Generator, _unwrap
-
-
-def _positive_integer(value, name):
-    if isinstance(value, bool):
-        raise TypeError(f"{name} must be an integer, not bool")
-    try:
-        value = operator.index(value)
-    except TypeError:
-        raise TypeError(f"{name} must be an integer") from None
-    if value <= 0:
-        raise ValueError(f"{name} must be greater than zero")
-    return value
-
-
-def _boolean(value, name):
-    if type(value) is not bool:
-        raise TypeError(f"{name} must be a bool")
-    return value
 
 
 def subsample(
