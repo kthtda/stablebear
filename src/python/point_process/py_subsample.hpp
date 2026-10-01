@@ -6,6 +6,7 @@
 namespace sb_py
 {
   void register_point_process_subsample(pybind11::module_& m);
+  void register_relative_subsample(pybind11::module_& m);
 }
 
 #endif
