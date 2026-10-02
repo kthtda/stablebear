@@ -1,3 +1,20 @@
+a.reference.internal[href*="#term-"] {
+    color: var(--pst-color-success);
+    text-decoration-style: dashed;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.2em;
+}
+
+a.reference.internal[href*="#term-"]::after {
+    content: "?";
+    display: inline-block;
+    margin-inline-start: 0.15em;
+    font-size: 0.7em;
+    font-weight: 600;
+    line-height: 0;
+    vertical-align: super;
+}
+
 .tippy-box[data-theme~="glossary"] {
     background-color: var(--pst-color-surface);
     color: var(--pst-color-text-base);
