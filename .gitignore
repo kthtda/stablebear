@@ -4,6 +4,8 @@
 callgrind.out.*
 _skbuild
 .vscode
+*.vsix
+.worktree-backup/
 .vs
 CMakeSettings.json
 examples/*.png
