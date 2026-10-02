@@ -95,6 +95,17 @@ read its entry here.
       function. More generally, the preimage of a subset :math:`B\subseteq Y`
       is :math:`f^{-1}(B)=\{x\in X\mid f(x)\in B\}`.
 
+   principal submatrix
+      A matrix obtained from a square matrix by keeping the same selection
+      of rows and columns. For an index set :math:`S`, it is written
+      :math:`M[S,S]`. For example, keeping the first and third rows and
+      columns of a :math:`3\times 3` matrix gives
+
+      :math:`\begin{pmatrix} m_{11} & m_{13} \\ m_{31} & m_{33} \end{pmatrix}`.
+
+      For a distance matrix, this retains all pairwise distances between
+      the selected points.
+
    simplicial complex
       An abstract simplicial complex is a collection of finite nonempty
       sets, called simplices, that contains every nonempty subset of each

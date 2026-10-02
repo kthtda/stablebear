@@ -1,0 +1,17 @@
+stablebear.distributions
+========================
+
+Distributions with weight evaluation for plotting and :func:`stablebear.random.subsample_relative`.
+See :doc:`distributions` for an overview of the available distributions and
+:doc:`relative_subsampling` for sampling examples.
+
+.. automodule:: stablebear.distributions
+
+.. autoclass:: stablebear.distributions.Gaussian
+   :members: weight, plot_range
+
+.. autoclass:: stablebear.distributions.Uniform
+   :members: weight, plot_range
+
+.. autoclass:: stablebear.distributions.Mixture
+   :members: weight, plot_range

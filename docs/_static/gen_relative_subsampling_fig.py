@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap, ListedColormap
 import numpy as np
 import stablebear as sb
+from stablebear.plotting import plot_distance_weight_heatmap
 
 
 def plot_relative_subsamples(*, uniform=False, dark=False):
@@ -27,6 +28,7 @@ def plot_relative_subsamples(*, uniform=False, dark=False):
     else:
         distribution = sb.distributions.Gaussian(sigma=0.4)
         title = r"Gaussian distance weights ($\sigma = 0.4$)"
+    peak = distribution.weight(0.0)
     samples = sb.random.subsample_relative(
         sb.PointCloud(points), queries, n_points=10,
         distribution=distribution,
@@ -34,8 +36,6 @@ def plot_relative_subsamples(*, uniform=False, dark=False):
     )
 
     extent = (-1.15, 1.15, -1.15, 1.15)
-    grid = np.linspace(extent[0], extent[1], 601)
-    x, y = np.meshgrid(grid, grid)
     # Higher weights are lighter in both themes, with a wide luminance range.
     field_colors = (["#172331", "#316c90", "#8bd1ed"] if dark else
                     ["#155477", "#78acc9", "#f5f7f9"])
@@ -44,18 +44,10 @@ def plot_relative_subsamples(*, uniform=False, dark=False):
 
     fig, axes = plt.subplots(1, 3, figsize=(11, 4), sharex=True, sharey=True)
     for i, ax in enumerate(axes):
-        # Apply the weight function to distance across the plane for illustration.
-        # Sampling normalizes its values only at the reference points.
-        distance = np.hypot(x - queries[i, 0], y - queries[i, 1])
-        if uniform:
-            weight = ((distance >= distribution.start)
-                      & (distance < distribution.end)).astype(float)
-        else:
-            weight = np.exp(-0.5 * ((distance - distribution.mean)
-                                   / distribution.sigma)**2)
-        heatmap = ax.imshow(weight, origin="lower", extent=extent,
-                            cmap=cmap, vmin=0, vmax=1, zorder=0,
-                            interpolation="nearest")
+        heatmap = plot_distance_weight_heatmap(
+            distribution, query=queries[i], extent=extent, ax=ax,
+            cmap=cmap, vmin=0, vmax=peak, zorder=0,
+        )
         selected = np.asarray(samples[i, 0])
         ax.scatter(points[:, 0], points[:, 1], s=17, color=point_color,
                    edgecolors=outline_color, linewidths=0.45,
@@ -87,8 +79,8 @@ def plot_relative_subsamples(*, uniform=False, dark=False):
     fig.subplots_adjust(left=0.06, right=0.87, bottom=0.22, top=0.86,
                         wspace=0.12)
     colorbar_ax = fig.add_axes((0.9, 0.22, 0.015, 0.64))
-    colorbar = fig.colorbar(heatmap, cax=colorbar_ax, label="Distance weight (unnormalized)",
-                 ticks=[0, 1] if uniform else [0, 0.25, 0.5, 0.75, 1])
+    colorbar = fig.colorbar(heatmap, cax=colorbar_ax, label="Distance weight",
+                 ticks=[0, peak] if uniform else None)
     colorbar.outline.set_visible(False)
     colorbar.ax.tick_params(length=0, labelsize=9)
     return fig

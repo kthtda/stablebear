@@ -9,6 +9,7 @@ matplotlib.use("Agg")
 # -- docs snippet start filter_function --
 import matplotlib.pyplot as plt
 import numpy as np
+import stablebear as sb
 
 
 def plot_filter_function(*, dark=False):
@@ -21,7 +22,8 @@ def plot_filter_function(*, dark=False):
     ])
     distances = np.linalg.norm(points - query, axis=1)
     sigma = 0.9
-    weights = np.exp(-0.5 * (distances / sigma)**2)
+    distribution = sb.distributions.Gaussian(sigma=sigma)
+    weights = distribution.weight(distances)
 
     ink = "#e7edf5" if dark else "#253746"
     muted = "#8996a8" if dark else "#7b8894"
@@ -69,7 +71,7 @@ def plot_filter_function(*, dark=False):
                          color=color, fontsize=11)
 
     d = np.linspace(0, 1.85, 400)
-    weight_ax.plot(d, np.exp(-0.5 * (d / sigma)**2), color=ink, linewidth=1.8)
+    weight_ax.plot(d, distribution.weight(d), color=ink, linewidth=1.8)
     for distance, weight, label, color in zip(distances, weights, "ABCD", colors):
         weight_ax.scatter(distance, 0, s=30, facecolors="none", edgecolors=color, zorder=3)
         weight_ax.annotate("", xy=(distance, weight), xytext=(distance, 0.02),
@@ -78,8 +80,8 @@ def plot_filter_function(*, dark=False):
         weight_ax.annotate(label, (distance, weight), xytext=(6, 6),
                            textcoords="offset points", ha="left", va="bottom",
                            color=color, fontsize=11)
-    weight_ax.set(xlim=(-0.05, 1.85), ylim=(-0.06, 1.1),
-                  xticks=[0, 0.4, 0.8, 1.2, 1.6], yticks=[0, 0.5, 1],
+    weight_ax.set(xlim=(-0.05, 1.85), ylim=(-0.03, 0.5),
+                  xticks=[0, 0.4, 0.8, 1.2, 1.6], yticks=[0, 0.25, 0.5],
                   xlabel=r"Filter value $d$", ylabel=r"Weight $W(d)$")
     weight_ax.spines[["top", "right"]].set_visible(False)
     weight_ax.spines["bottom"].set_position(("data", 0))

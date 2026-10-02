@@ -7,6 +7,11 @@ regardless of thread count or execution order. All random generation functions
 accept an optional :py:class:`~stablebear.random.Generator` for explicit seed
 control.
 
+.. toctree::
+   :maxdepth: 1
+
+   Distributions <distributions>
+
 
 Generators
 ==========
@@ -106,6 +111,21 @@ For example, draw two samples of three points from a four-point cloud::
    :maxdepth: 1
 
    Subsampling <subsampling>
+
+
+Relative subsampling
+====================
+
+:py:func:`~stablebear.random.subsample_relative` selects points from one
+reference dataset using weights derived from a filter function. The current
+filter is distance from a query point; Gaussian, Uniform, and Mixture
+weight functions control which distances to favor.
+
+.. toctree::
+   :maxdepth: 1
+
+   Relative subsampling <relative_subsampling>
+   Shared subsampling options <subsampling_options>
 
 
 How determinism works
