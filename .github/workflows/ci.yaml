@@ -67,3 +67,5 @@ jobs:
     uses: ./.github/workflows/analysis.yaml
     with:
       use_github_runners: true
+    secrets:
+      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
