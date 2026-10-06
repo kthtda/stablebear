@@ -5,6 +5,7 @@
 #include "../distance_matrix.hpp"
 #include "../point_cloud.hpp"
 #include "../random_generator.hpp"
+#include "../sampling/partial_policy.hpp"
 #include "../walk.hpp"
 
 #include <algorithm>
@@ -159,7 +160,7 @@ namespace sb::pp
 
   template <IndexableTensorElement ElementT, TensorProperties Properties>
   Tensor<ElementT, TensorProperty::Indexed> subsample(
-      const Tensor<ElementT, Properties>& values, size_t nPoints, size_t nSamples, bool replace, bool allowPartial,
+      const Tensor<ElementT, Properties>& values, size_t nPoints, size_t nSamples, bool replace, sampling::PartialPolicy partialPolicy,
       bool discardDuplicates, DefaultRandomGenerator& gen, Executor& exec)
   {
     if (nPoints == 0)
@@ -174,10 +175,9 @@ namespace sb::pp
     walk(values, [&](const std::vector<size_t>& index) {
       const auto value = values(index);
       const size_t available = detail::sample_population(value);
-      if (!replace && !allowPartial && available < nPoints)
-        throw std::invalid_argument("n_points exceeds the number of input points");
-      if (replace && !allowPartial && available == 0)
-        throw std::invalid_argument("cannot sample with replacement from an empty input");
+      if (sampling::is_insufficient(partialPolicy, replace, nPoints, available))
+        throw std::invalid_argument(replace ? "cannot sample with replacement from an empty input"
+                                            : "n_points exceeds the number of input points");
     });
 
     std::vector<size_t> outputShape(values.shape().begin(), values.shape().end());
@@ -192,9 +192,7 @@ namespace sb::pp
       const ElementT input = values(inputIndex);
       source(inputIndex) = input.copy();
       const size_t available = detail::sample_population(input);
-      const size_t count = replace
-          ? (available == 0 ? size_t(0) : nPoints)
-          : std::min(nPoints, available);
+      const size_t count = sampling::sample_count(partialPolicy, replace, nPoints, available);
 
       size_t inputFlat = 0;
       for (size_t axis = 0; axis < inputIndex.size(); ++axis)

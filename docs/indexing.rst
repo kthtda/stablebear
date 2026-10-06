@@ -30,7 +30,7 @@ Indexing a single point cloud
 
 A 0-d ``PointCloudTensor`` wraps exactly one point cloud (for example
 ``sb.PointCloudTensor(arr)`` built from an ``(n_points, dim)`` array). Indexing
-it delegates to that cloud's ``(n_points, dim)`` array, so the natural NumPy
+it delegates to that point cloud's ``(n_points, dim)`` array, so the natural NumPy
 idiom for plotting works directly::
 
    pc = sb.PointCloudTensor(arr)   # arr has shape (n_points, 2)
@@ -38,8 +38,8 @@ idiom for plotting works directly::
    plt.scatter(pc[:, 0], pc[:, 1])  # x and y coordinate columns
    first_point = pc[0]              # shape (2,)
 
-Tensors of clouds (rank ≥ 1) index over the clouds instead: ``X[i]`` returns
-the ``i``-th cloud as a ``PointCloud``, which supports point and coordinate
+Tensors of point clouds (rank ≥ 1) index over the point clouds instead: ``X[i]`` returns
+the ``i``-th point cloud as a ``PointCloud``, which supports point and coordinate
 indexing.
 
 Selecting different points from each point cloud
@@ -59,8 +59,8 @@ points independently from point clouds::
 
 The point-cloud tensor shape must exactly match the leading dimensions of
 ``selections.shape``. The result has ``selections.shape``; each child tensor
-controls the number and order of points in that output cloud. Repeated points are
-preserved and an empty child produces an empty cloud with the original
+controls the number and order of points in that output point cloud. Repeated points are
+preserved and an empty child produces an empty point cloud with the original
 coordinate dimension.
 
 ``sb.indices(values)`` is shorthand for
@@ -73,7 +73,7 @@ mutations remain visible until the result materializes. By comparison,
 :doc:`subsampling <subsampling>` owns a snapshot of its input.
 
 Slicing, reshaping, and transposing the result keep its source and selections
-aligned. Reading one complete output cloud returns a ``PointCloud`` view
+aligned. Reading one complete output point cloud returns a ``PointCloud`` view
 without materializing the indexed tensor. Writing through that view, or
 assigning through the ``PointCloudTensor``, materializes the shared indexed
 state before applying the change. Existing views observe that same transition.

@@ -54,11 +54,19 @@ reviewing, or changing tests.
 **Important**: Always `cd test` before running pytest. Running from the repo root causes the local `stablebear/` directory to shadow the installed package. You must also build and install first.
 
 ### Python tests
+Test dependencies are in the `test` dependency group in `pyproject.toml`.
+Install them with `pip install --group test` (pip 25.1 or newer).
+
 ```bash
 cmake --build cmake-build-debug -j$(nproc --ignore=4) && cmake --install cmake-build-debug
 cd test && python -m pytest python               # all Python tests
 cd test && python -m pytest python/test_pdist.py  # single test file
+cd test && SB_RUN_STATISTICAL=1 python -m pytest python  # include large statistical checks
 ```
+
+Tests marked `statistical` rerun probability checks with large inputs and draw
+counts. They are skipped unless `SB_RUN_STATISTICAL=1` is set. CI runs them in
+`.github/workflows/statistical.yaml` on the self-hosted runner.
 
 ### C++ tests (GoogleTest)
 ```bash
@@ -105,6 +113,9 @@ Each tensor class supports multiple precisions via a `dtype` parameter: `PcfTens
 - **googletest** — C++ unit tests
 
 ## Documentation (`docs/`)
+Read and follow the [writing manifesto](docs/WRITING.md) when writing,
+reviewing, or changing documentation.
+
 - Sphinx docs live in `docs/`, built with `make html` from that directory.
 - HTML builds require TeX Live (`texlive-latex-extra`, `texlive-pictures`) and `pdf2svg` for TikZ diagrams, plus Pandoc for notebook pages. These tools are included in the devcontainer. TikZ diagrams use `sphinxcontrib.tikz` with `tikz-cd` and are rendered to SVG during the build.
 - **Keep docs in sync with code changes.** When renaming parameters, changing defaults, or modifying public API behavior, update the corresponding `.rst` files and docstrings in the same commit.

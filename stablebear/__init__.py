@@ -53,10 +53,12 @@ from .typing import (
     uint64,
 )
 
+from . import distributions
+
 import types as _types
 __all__ = sorted(
     name for name in set(dir()) - __before - {"__before"}
     if not name.startswith("_")
     and not isinstance(globals()[name], _types.ModuleType)
-) + ["point_process", "random", "system"]
+) + ["distributions", "point_process", "random", "system"]
 del __before, _types

@@ -155,7 +155,7 @@ def _pointcloud_cpp_from_array(arr, cloud_ndim, dtype):
 
 
 def _pointcloud_cpp_from_list(seq, dtype):
-    """Build a 1-D C++ point-cloud tensor from a list of cloud arrays."""
+    """Build a 1-D C++ point-cloud tensor from a list of point cloud arrays."""
     from .tensor_create import zeros
 
     clouds = [np.asarray(c) for c in seq]
@@ -186,8 +186,8 @@ class PointCloudTensor(IndexedElementTensor):
     Parameters
     ----------
     data : ndarray, list of ndarray, PointCloudTensor, or C++ tensor
-        An ndarray whose trailing ``cloud_ndim`` axes form each cloud and
-        whose leading axes form the tensor shape; or a list of cloud arrays
+        An ndarray whose trailing ``cloud_ndim`` axes form each point cloud and
+        whose leading axes form the tensor shape; or a list of point cloud arrays
         (possibly ragged) forming a 1-D tensor; or an existing tensor.
     cloud_ndim : int, optional
         Must be 2. Retained as a keyword for compatibility.

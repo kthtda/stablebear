@@ -82,6 +82,11 @@ protect. These principles apply when writing, reviewing, or changing tests.
     `filtered_indices`, rather than introducing `drawn_indices` and
     `kept_indices` for the same objects.
 
+18. **Spell out parameters unless testing defaults.** Write
+    `Uniform(0, 0.5)` rather than `Uniform(end=0.5)`, and `Gaussian(0, 1)`
+    rather than `Gaussian()`, so the reader sees every value the expected
+    outcome depends on. Rely on a default only in a test of that default.
+
 The review question is: **What bug would make this test fail, and can I see
 that immediately?**
 

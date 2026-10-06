@@ -133,7 +133,8 @@ class TestSubsample:
 
         # The first cloud is large enough; the second must reject the whole call.
         with pytest.raises(ValueError, match="n_points exceeds the number of input points"):
-            subsample(source, n_points=3, generator=generator)
+            subsample(source, n_points=3, replace=False, allow_partial="no",
+                      generator=generator)
 
         valid_source = source[:1]
         after_failure = subsample(valid_source, n_points=3, n_samples=2,
@@ -141,6 +142,43 @@ class TestSubsample:
         control = subsample(valid_source, n_points=3, n_samples=2,
                             generator=control_generator)
         assert after_failure.array_equal(control)
+
+    def test_default_partial_policy_keeps_an_undersized_input(self):
+        source = sb.PointCloud([
+            [0.0],
+            [1.0],
+        ])
+
+        # allow_partial is omitted to test its default.
+        samples = subsample(source, n_points=3, n_samples=1, replace=False)
+
+        assert samples.shape == (1,)
+        assert set(np.asarray(samples.indices[0])) == {0, 1}
+
+    def test_false_partial_policy_means_no(self):
+        source = sb.PointCloud([
+            [0.0],
+            [1.0],
+        ])
+
+        with pytest.raises(ValueError, match="n_points exceeds the number of input points"):
+            subsample(source, n_points=3, n_samples=1, replace=False, allow_partial=False)
+
+    @pytest.mark.parametrize("replace", [True, False])
+    def test_drop_partial_applies_to_each_ragged_input(self, replace):
+        source = sb.PointCloudTensor([
+            np.zeros((0, 1)),
+            np.array([[0.0], [1.0]]),
+            np.array([[0.0], [1.0], [2.0]]),
+            np.array([[0.0], [1.0], [2.0], [3.0]]),
+        ])
+
+        samples = subsample(
+            source, n_points=3, n_samples=1, replace=replace, allow_partial="drop",
+        )
+
+        sizes = [len(np.asarray(samples.indices[i, 0])) for i in range(4)]
+        assert sizes == [0, 0, 3, 3]
 
     def test_batched_sampling_matches_individual_calls_in_row_major_order(self):
         source = sb.PointCloudTensor([
@@ -223,7 +261,17 @@ class TestSubsample:
         result = subsample(sample_data, n_points=3)
         assert result.dtype == sample_data.dtype
 
-    def test_default_sampling_uses_each_vertex_once_per_full_sample(
+    def test_default_sampling_draws_with_replacement(self):
+        cloud = sb.PointCloud([
+            [1., 2.],
+        ])
+
+        # Without replacement, the default "keep" policy would stop after one draw.
+        samples = subsample(cloud, n_points=3)
+
+        npt.assert_array_equal(np.asarray(samples.indices[0]), [0, 0, 0])
+
+    def test_sampling_without_replacement_uses_each_vertex_once_per_full_sample(
         self, make_pcloud_or_distmat_tensor
     ):
         source = make_pcloud_or_distmat_tensor([
@@ -233,7 +281,7 @@ class TestSubsample:
             [3, 1],
         ])
 
-        samples = subsample(source, n_points=4, n_samples=2,
+        samples = subsample(source, n_points=4, n_samples=2, replace=False,
                             generator=sb.random.Generator(seed=229))
         indices = samples.indices
         assert indices is not None
@@ -337,7 +385,8 @@ class TestSubsample:
         ], dtype=np_dtype)
         source = sb.DistanceMatrixTensor(distances, dtype=distmat_dtype)
 
-        samples = subsample(source, n_points=3, discard_duplicates=True,
+        samples = subsample(source, n_points=3, replace=False,
+                            discard_duplicates=True,
                             generator=sb.random.Generator(seed=229))
         indices = samples.indices
         assert indices is not None

@@ -17,6 +17,7 @@
 #include "py_np_tensor_convert.hpp"
 #include "py_symmetric_matrix.hpp"
 #include "py_distance_matrix.hpp"
+#include "py_distributions.hpp"
 
 #include "persistence/pymodule_persistence.hpp"
 #include "point_process/pymodule_point_process.hpp"
@@ -177,5 +178,6 @@ PYBIND11_MODULE(SB_MODULE_NAME, m) {
   sb_py::register_distance_matrix(m);
 
   sb_py::register_module_persistence(m);
+  sb_py::register_distributions(m);
   sb_py::register_module_point_process(m);
 }

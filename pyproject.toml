@@ -28,6 +28,9 @@ classifiers = [
 ]
 dependencies = [ "numpy>=2.0", "tqdm", "matplotlib" ]
 
+[dependency-groups]
+test = ["pytest", "scipy"]
+
 [tool.scikit-build]
 minimum-version = "build-system.requires"
 cmake.build-type = "Release"
@@ -105,10 +108,14 @@ stablebear = [
 
 [tool.cibuildwheel]
 test-sources = ["test"]
-test-requires = ["pytest", "scipy", "matplotlib"]
+test-groups = ["test"]
 test-command = """
 python ./test/print_wheel_contents.py && python -m pytest --verbose ./test
 """
+# The wheel-test phase installs the wheel + its runtime deps (incl.
+# matplotlib) via uv; a longer HTTP timeout absorbs slow/transient
+# PyPI fetches that otherwise time out after uv's short default.
+test-environment = { UV_HTTP_TIMEOUT = "120", PIP_RETRIES = "5", PIP_DEFAULT_TIMEOUT = "60" }
 # Skip 32-bit builds
 skip = ["*-win32", "*-manylinux_i686", "*-musllinux*",
     "cp*t-win_arm64", # Seems like t Python is missing on Win Arm atm

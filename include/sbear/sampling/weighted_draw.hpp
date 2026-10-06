@@ -19,10 +19,11 @@ namespace sb::sampling::detail
   // Row-level weighted-draw primitives.
   //
   // Pure functions of a weight/CDF row and a random engine: a row is prepared
-  // once per query point (prepare_weight_row) and then drawn from once per
-  // subsample — inverse-CDF draws with replacement, reservoir sampling by
-  // exponential keys without. Nothing here knows about tasks, threads or
-  // point clouds — the parallel orchestration lives in subsample.hpp.
+  // once per query/distribution pair (log_probabilities_to_cdf) and then drawn
+  // from once per subsample — inverse-CDF draws with replacement, reservoir
+  // sampling by exponential keys without. Nothing here knows about tasks,
+  // threads or point clouds — the parallel orchestration lives in
+  // subsample_relative.hpp.
   // ===========================================================================
 
   /// Map a @p target in [0, cdf.back()] to the index whose CDF interval
@@ -49,39 +50,18 @@ namespace sb::sampling::detail
     return index_for_target(cdf, uniform(engine));
   }
 
-  /// Validate a weight row and return its eligible (strictly positive)
-  /// count; with @p toCdf, also replace it in place by its prefix sums.
-  /// Called once per query point, reused by all of the query's subsamples.
+  /// Replace normalized log probabilities (finite or -inf, maximum 0) with
+  /// the prefix sums of their probabilities. An all -inf row is a valid empty
+  /// region and must not be drawn from.
   template <typename T>
-  size_t prepare_weight_row(std::span<T> row, bool toCdf)
+  void log_probabilities_to_cdf(std::span<T> row)
   {
-    size_t nEligible = 0;
     T total = T(0);
     for (T &w : row)
     {
-      // Reject negatives rather than counting them ineligible: an invalid
-      // row must not become a silent empty draw.
-      if (w < T(0))
-      {
-        throw std::invalid_argument("sampling weights must be non-negative");
-      }
-      if (w > T(0))
-      {
-        ++nEligible;
-      }
-      total += w;
-      if (toCdf)
-      {
-        w = total; // with replacement the CDF never changes: build it once
-      }
+      total += std::exp(w);
+      w = total;
     }
-    // A row with eligible weights but no positive total (NaN weights) can
-    // not be drawn from; an all-zero row is a valid empty region.
-    if (nEligible > 0 && !(total > T(0)))
-    {
-      throw std::invalid_argument("sampling weights must have a positive sum");
-    }
-    return nEligible;
   }
 
   /// Draw @p sampleSize reference indices with replacement from a prepared
@@ -97,7 +77,7 @@ namespace sb::sampling::detail
     return drawn;
   }
 
-  /// Draw @p nDraws *distinct* reference indices from a raw weight row by
+  /// Draw @p nDraws *distinct* reference indices from a log-weight row by
   /// weighted reservoir sampling (Efraimidis-Spirakis) in exponential form:
   /// each eligible point gets an independent key Exp(1) / weight, and the
   /// nDraws smallest keys are the sample. Competing exponential clocks make
@@ -105,46 +85,45 @@ namespace sb::sampling::detail
   /// memorylessness the same holds among the remaining points, so ascending
   /// key order has exactly the distribution of drawing sequentially without
   /// replacement — at one pass and one random number per eligible point
-  /// instead of a CDF rebuild per draw. Requires nDraws <= the row's
-  /// eligible count.
+  /// instead of a CDF rebuild per draw. Keys are compared as logarithms so
+  /// weights that would underflow keep positive support. The row holds only
+  /// eligible (finite) log weights; @p sourceIndices maps each entry back to
+  /// its reference index. Requires nDraws <= logWeights.size().
   template <typename T, typename EngineT>
-  Tensor<uint64_t> draw_without_replacement(std::span<const T> weights, size_t nDraws, EngineT &engine)
+  Tensor<uint64_t> draw_without_replacement(std::span<const T> logWeights,
+                                          std::span<const uint64_t> sourceIndices,
+                                          size_t nDraws, EngineT &engine,
+                                          std::vector<std::pair<T, uint64_t>>& keyed)
   {
     std::exponential_distribution<T> exponential(T(1));
-    std::vector<std::pair<T, uint64_t>> keyed;
-    keyed.reserve(weights.size());
-    for (size_t refIdx = 0; refIdx < weights.size(); ++refIdx)
+    keyed.clear();
+    keyed.reserve(logWeights.size());
+    for (size_t i = 0; i < logWeights.size(); ++i)
     {
-      if (weights[refIdx] > T(0))
+      T clock;
+      do
       {
-        keyed.emplace_back(exponential(engine) / weights[refIdx], static_cast<uint64_t>(refIdx));
-      }
+        clock = exponential(engine);
+      } while (clock == T(0) || !std::isfinite(clock));
+      keyed.emplace_back(std::log(clock), static_cast<uint64_t>(i));
     }
-    std::partial_sort(keyed.begin(), keyed.begin() + static_cast<std::ptrdiff_t>(nDraws), keyed.end());
+    // Compare differences rather than adding noise to an enormous log weight:
+    // even equal far-tail weights must retain their independent random clocks.
+    const auto earlier = [&](const auto& a, const auto& b) {
+      const T weightDifference = logWeights[a.second] - logWeights[b.second];
+      const T clockDifference = a.first - b.first;
+      if (weightDifference == clockDifference)
+        return a.second < b.second;
+      return weightDifference > clockDifference;
+    };
+    std::partial_sort(keyed.begin(), keyed.begin() + static_cast<std::ptrdiff_t>(nDraws), keyed.end(), earlier);
 
     Tensor<uint64_t> drawn({nDraws});
     for (size_t drawIdx = 0; drawIdx < nDraws; ++drawIdx)
     {
-      drawn(drawIdx) = keyed[drawIdx].second;
+      drawn(drawIdx) = sourceIndices[keyed[drawIdx].second];
     }
     return drawn;
-  }
-
-  /// The reference indices of one subsample, drawn from a prepared row.
-  /// @p sampleSize is a maximum — the result has length
-  ///   - 0 when @p nEligible is 0 (the query's region holds no points),
-  ///   - min(sampleSize, nEligible) without replacement,
-  ///   - sampleSize with replacement (repeats fill the sample).
-  template <typename T, typename EngineT>
-  Tensor<uint64_t> draw_indices(
-      std::span<const T> row, size_t nEligible, size_t sampleSize, bool replace, EngineT &engine)
-  {
-    if (nEligible == 0)
-    {
-      return Tensor<uint64_t>({0}); // empty region -> length-0 subsample
-    }
-    return replace ? draw_with_replacement(row, sampleSize, engine)
-                   : draw_without_replacement(row, std::min(sampleSize, nEligible), engine);
   }
 
 } // namespace sb::sampling::detail

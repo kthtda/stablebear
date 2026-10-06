@@ -19,6 +19,22 @@ if _require_cuda and not _has_cuda:
     )
 
 
+def pytest_configure(config):
+    config.addinivalue_line(
+        "markers",
+        "statistical: large statistical check, run only with SB_RUN_STATISTICAL=1",
+    )
+
+
+def pytest_collection_modifyitems(config, items):
+    if os.environ.get("SB_RUN_STATISTICAL", "0") == "1":
+        return
+    skip = pytest.mark.skip(reason="set SB_RUN_STATISTICAL=1 to run")
+    for item in items:
+        if "statistical" in item.keywords:
+            item.add_marker(skip)
+
+
 def _cuda_param():
     return pytest.param("cuda", marks=pytest.mark.skipif(
         not _has_cuda, reason="Requires CUDA build with at least one GPU"))

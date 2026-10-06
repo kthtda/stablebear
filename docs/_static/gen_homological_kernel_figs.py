@@ -15,13 +15,13 @@ HERE = Path(__file__).parent
 
 # -- docs snippet start hkernel_quartet_kernel --
 def diagonal_projection(cloud):
-    """Project every point of a 2D cloud onto the diagonal y = x."""
+    """Project every point of a 2D point cloud onto the diagonal y = x."""
     midpoint = cloud.mean(axis=1, keepdims=True)
     return np.broadcast_to(midpoint, cloud.shape).copy()
 
 
 def kernel_stable_rank(cloud):
-    """Stable rank of the homological kernel of a cloud and its projection."""
+    """Stable rank of the homological kernel of a point cloud and its projection."""
     kernels = persistence.compute_homological_kernel(cloud, diagonal_projection(cloud))
     return persistence.barcode_to_stable_rank(kernels)
 
@@ -32,7 +32,7 @@ def kernel_score(stable_ranks):
 # -- docs snippet end hkernel_quartet_kernel --
 
 
-# The small "correlation cloud" used throughout the Background section: two
+# The small "correlation point cloud" used throughout the Background section: two
 # points on the diagonal and two on opposite sides of it. All four project to
 # distinct spots, so every merge happens at a visibly positive scale.
 BACKGROUND_CLOUD = np.array([[0.0, 0.0], [4.0, 0.0], [1.0, 4.0], [3.0, 3.0]])
@@ -149,7 +149,7 @@ def plot_merging(colors=("#2a78d6", "#eb6834", "#1baf7a", "#eda100"),
         for col, t in enumerate(scales):
             ax = fig.add_subplot(gs[row, col])
             # The diagonal the points are projected onto, in both rows: in the
-            # original cloud it shows where each point will land.
+            # original point cloud it shows where each point will land.
             ax.axline((0, 0), slope=1, color=grid_color, linestyle="--",
                       linewidth=0.8)
             comp = _components(points, t)
@@ -220,7 +220,7 @@ def plot_quartet(colors=("#2a78d6", "#eb6834", "#1baf7a", "#eda100"),
     for column, color, (name, cloud) in zip(range(4), colors, quartet.items()):
         cloud_ax, srank_ax = axes[0, column], axes[1, column]
 
-        # Top row: the cloud, the diagonal, and where each point projects to.
+        # Top row: the point cloud, the diagonal, and where each point projects to.
         projected = diagonal_projection(cloud)
         r = np.corrcoef(cloud[:, 0], cloud[:, 1])[0, 1]
         cloud_ax.axline((0, 0), slope=1, color=grid_color, linestyle="--",
@@ -285,7 +285,7 @@ def plot_invariants(colors=("#2a78d6", "#eb6834", "#1baf7a", "#eda100")):
             srank = persistence.barcode_to_stable_rank(bc)
             plotpcf(srank, ax=ax, color=color, linewidth=2, label=name)
 
-    for ax, title in zip(axes, ["$H_0$ of the cloud", "$H_1$ of the cloud",
+    for ax, title in zip(axes, ["$H_0$ of the point cloud", "$H_1$ of the point cloud",
                                 "homological kernel"]):
         ax.set_title(title, fontsize=10)
         ax.set_xlabel("t")
