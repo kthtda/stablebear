@@ -389,6 +389,10 @@ endfunction()
 
 function(sb_apply_cpu_arch_flags tgt)
   if (MSVC)
+    # The x86-64 levels do not apply to MSVC ARM64 targets.
+    if (NOT CMAKE_CXX_COMPILER_ARCHITECTURE_ID STREQUAL "x64")
+      return()
+    endif ()
     if (SB_X86_64_LEVEL STREQUAL "native")
       sb_detect_msvc_native_arch(_native_flag)
       if (_native_flag)

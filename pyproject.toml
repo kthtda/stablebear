@@ -118,7 +118,7 @@ python ./test/print_wheel_contents.py && python -m pytest --verbose ./test
 test-environment = { UV_HTTP_TIMEOUT = "120", PIP_RETRIES = "5", PIP_DEFAULT_TIMEOUT = "60" }
 # Skip 32-bit builds
 skip = ["*-win32", "*-manylinux_i686", "*-musllinux*",
-    "cp*t-win_arm64", # Seems like t Python is missing on Win Arm atm
+    "cp310-win_arm64", # numpy has no Windows ARM64 wheels for Python 3.10
     #"cp*t-win_amd64"  # Skip Windows free-threaded until we can figure out build issues on GH Actions
 ]
 
@@ -137,7 +137,8 @@ archs = ["x86_64", "arm64"]
 archs = ["auto"]
 
 [tool.cibuildwheel.windows]
-archs = ["AMD64"] # Skip "ARM64" for now
+# Native arch of each runner: AMD64 on windows-2022, ARM64 on windows-11-arm
+archs = ["auto64"]
 
 [tool.ruff]
 target-version = "py310"
