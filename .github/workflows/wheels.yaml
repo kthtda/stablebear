@@ -7,6 +7,10 @@ on:
         description: 'Build CPU-only wheels on every platform (no CUDA)'
         type: boolean
         default: false
+      os:
+        description: 'Build only on this runner (e.g. windows-11-arm); empty builds on all'
+        type: string
+        default: ''
   workflow_call:
     inputs:
       cpu_only:
@@ -32,6 +36,9 @@ jobs:
             MATRIX='{"include":[{"os":"ubuntu-24.04","cuda":0,"artifact_suffix":"-cpu"},{"os":"ubuntu-22.04-arm","cuda":0,"artifact_suffix":"-cpu"},{"os":"macos-26","cuda":0,"artifact_suffix":"-cpu"},{"os":"windows-2022","cuda":0,"artifact_suffix":"-cpu"},{"os":"windows-11-arm","cuda":0,"artifact_suffix":"-cpu"}]}'
           else
             MATRIX='{"include":[{"os":"ubuntu-24.04","cuda":1,"cuda_tag":"12-8","cuda_major":12,"artifact_suffix":"-cuda12"},{"os":"ubuntu-24.04","cuda":1,"cuda_tag":"13-1","cuda_major":13,"artifact_suffix":"-cuda13"},{"os":"ubuntu-22.04-arm","cuda":0,"artifact_suffix":"-cpu"},{"os":"macos-26","cuda":0,"artifact_suffix":"-cpu"},{"os":"windows-11-arm","cuda":0,"artifact_suffix":"-cpu"},{"os":"windows-2022","cuda":1,"cuda_version":"12.6","cuda_major":12,"artifact_suffix":"-cuda12"},{"os":"windows-2022","cuda":1,"cuda_version":"13.1","cuda_major":13,"artifact_suffix":"-cuda13"}]}'
+          fi
+          if [ -n "${{ inputs.os }}" ]; then
+            MATRIX=$(echo "$MATRIX" | jq -c --arg os "${{ inputs.os }}" '.include |= map(select(.os == $os))')
           fi
           echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
 
@@ -186,8 +193,8 @@ jobs:
           retention-days: 1
 
   merge_cuda_wheels:
-    # No CUDA wheels exist to merge in CPU-only mode.
-    if: ${{ !inputs.cpu_only }}
+    # No CUDA wheels exist to merge in CPU-only or single-runner mode.
+    if: ${{ !inputs.cpu_only && !inputs.os }}
     runs-on: ubuntu-latest
     needs: build_wheels
     strategy:
