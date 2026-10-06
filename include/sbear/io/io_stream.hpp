@@ -26,20 +26,6 @@ namespace sb::io::detail
     }
   }
 
-  // For new types, make sure to add io::detail::read/write_element in their corresponding headers
-
-  template <ArithmeticType T>
-  T read_element(std::istream& is)
-  {
-    return read_bytes<T>(is);
-  }
-
-  template <ArithmeticType T>
-    void write_element(std::ostream& os, T elem)
-  {
-    write_bytes<T>(os, elem);
-  }
-
   template <typename T, typename AT>
   std::vector<T, AT> read_vector(std::istream& is)
   {
