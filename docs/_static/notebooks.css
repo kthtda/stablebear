@@ -1,0 +1,6 @@
+/* Keep plain-text notebook outputs readable in both documentation themes. */
+html div.nboutput.container div.output_area div.highlight,
+html div.nboutput.container div.output_area pre {
+  color: var(--pst-color-text-base);
+  background-color: var(--pst-color-background);
+}

@@ -13,17 +13,21 @@ namespace
   template <typename ElementT, sb::TensorProperties Properties>
   sb::Tensor<ElementT, sb::TensorProperty::Indexed> subsample(
       const sb::Tensor<ElementT, Properties>& data, size_t nPoints, size_t nSamples, bool replace,
-      bool allowPartial, bool discardDuplicates, sb::DefaultRandomGenerator* gen)
+      sb::sampling::PartialPolicy partialPolicy, bool discardDuplicates, sb::DefaultRandomGenerator* gen)
   {
     auto& generator = gen == nullptr ? sb::default_generator() : *gen;
     py::gil_scoped_release release;
     return sb::pp::subsample(
-        data, nPoints, nSamples, replace, allowPartial, discardDuplicates, generator, sb::default_executor());
+        data, nPoints, nSamples, replace, partialPolicy, discardDuplicates, generator, sb::default_executor());
   }
 }
 
 void sb_py::register_point_process_subsample(py::module_& m)
 {
+  py::enum_<sb::sampling::PartialPolicy>(m, "_PartialPolicy")
+    .value("no", sb::sampling::PartialPolicy::Disallow)
+    .value("keep", sb::sampling::PartialPolicy::Keep)
+    .value("drop", sb::sampling::PartialPolicy::Drop);
   auto bind = [&]<typename ElementT, sb::TensorProperties Properties>(const char* name) {
     m.def(name, &subsample<ElementT, Properties>,
         py::arg("data"), py::arg("n_points"), py::arg("n_samples"),

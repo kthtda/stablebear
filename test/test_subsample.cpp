@@ -1,6 +1,9 @@
 #include <gtest/gtest.h>
 
 #include <sbear/point_process/subsample.hpp>
+#include <sbear/sampling/weighted_draw.hpp>
+
+#include <vector>
 
 namespace
 {
@@ -50,5 +53,22 @@ namespace
     ASSERT_EQ(filtered_indices.size(), 2);
     EXPECT_EQ(filtered_indices(0), 2);
     EXPECT_EQ(filtered_indices(1), 1);
+  }
+
+  TEST(SubsampleTest, CdfBoundaryTargetsSelectPositiveWeightIndices)
+  {
+    // Probabilities [0, 1/4, 0, 3/4, 0]. Index i owns the targets in
+    // [cdf[i - 1], cdf[i]), with cdf[-1] = 0:
+    //   index 0: [0, 0)       empty
+    //   index 1: [0, 0.25)
+    //   index 2: [0.25, 0.25) empty
+    //   index 3: [0.25, 1)
+    //   index 4: [1, 1)       empty
+    const std::vector<double> cdf{0, 0.25, 0.25, 1, 1};
+
+    // A target of 1 selects the last positive weight, index 3.
+    EXPECT_EQ(sb::sampling::detail::index_for_target<double>(cdf, 1.0), 3);
+    // A target of 0 selects the first positive weight, index 1.
+    EXPECT_EQ(sb::sampling::detail::index_for_target<double>(cdf, 0.0), 1);
   }
 }

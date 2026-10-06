@@ -30,7 +30,9 @@ jobs:
         run: bash .github/scripts/ci-retry.sh pip install .
 
       - name: Install dependencies
-        run: bash .github/scripts/ci-retry.sh pip install pytest pytest-cov scipy
+        run: |
+          bash .github/scripts/ci-retry.sh python -m pip install --upgrade pip
+          bash .github/scripts/ci-retry.sh pip install --group test pytest-cov
       
       - name: Run tests
         working-directory: ./test

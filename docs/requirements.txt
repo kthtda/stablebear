@@ -11,6 +11,7 @@ sphinxcontrib-bibtex
 myst-parser
 nbsphinx
 IPython
+ipykernel
 breathe
 exhale
 pybind11-stubgen

@@ -1,6 +1,8 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
+from . import distributions as _distributions
+from ._validation import _positive_integer
 from .persistence.barcode import Barcode
 from .persistence.ph_tensor import BarcodeTensor
 from .reductions import max_time as max_time_reduction
@@ -67,6 +69,83 @@ def plot(f: PcfContainerLike, fmt="", ax=None, auto_label=False, max_time=None, 
             plot_single_(f[i], mt, **kw)
     else:
         plot_single_(f, max_time)
+
+
+def _finite_vector(value, size, message):
+    """Return ``value`` as a float array of ``size`` finite real entries."""
+    if np.iscomplexobj(value):
+        raise ValueError(message)
+    value = np.asarray(value, dtype=float)
+    if value.shape != (size,) or not np.all(np.isfinite(value)):
+        raise ValueError(message)
+    return value
+
+
+def plot_distance_weight_heatmap(
+    distribution, query=(0.0, 0.0), extent=None,
+    resolution=512, ax=None, **kwargs,
+):
+    """Plot distribution weights applied to distance from a query point.
+
+    Parameters
+    ----------
+    distribution : Distribution
+        A distribution from :mod:`stablebear.distributions`.
+    query : array_like, optional
+        Two finite coordinates ``(x, y)``, by default the origin.
+    extent : array_like, optional
+        Plot bounds ``(xmin, xmax, ymin, ymax)``. If omitted, uses
+        ``distribution.plot_range()`` to choose a square centered on ``query``:
+        its half-width is the largest absolute endpoint plus a 10% margin.
+        Bounds must be finite and strictly increasing on each axis.
+    resolution : int, optional
+        Positive number of pixels on each axis, by default 512. Weights are
+        evaluated at pixel centers within ``extent``.
+    ax : matplotlib.axes.Axes, optional
+        Axes to draw on. If omitted, uses the current axes.
+    **kwargs
+        Styling arguments passed to ``Axes.imshow``, such as ``cmap``,
+        ``alpha``, ``norm``, ``vmin``, and ``vmax``. Defaults are
+        ``cmap="viridis"``, ``aspect="equal"``, and ``interpolation="nearest"``.
+        The image origin is fixed to ``"lower"``.
+
+    Returns
+    -------
+    matplotlib.image.AxesImage
+        The heatmap, suitable for passing to ``fig.colorbar``.
+
+    Notes
+    -----
+    Colors represent ``distribution.weight(distance)``. No normalization over
+    the grid is performed, and the image is not a probability density over the
+    plane. This function adds no colorbar, labels, or query marker.
+    """
+    if not isinstance(distribution, _distributions.Distribution):
+        raise TypeError("distribution must be a Distribution")
+    resolution = _positive_integer(resolution, "resolution")
+    query = _finite_vector(query, 2, "query must contain two finite real coordinates")
+    if extent is None:
+        radius = 1.1 * max(abs(bound) for bound in distribution.plot_range())
+        if not np.isfinite(radius) or radius <= 0:
+            raise ValueError("cannot choose a finite plot region; pass extent explicitly")
+        extent = (query[0] - radius, query[0] + radius,
+                  query[1] - radius, query[1] + radius)
+    extent = _finite_vector(extent, 4, "extent must contain four finite real bounds")
+    xmin, xmax, ymin, ymax = extent
+    if xmin >= xmax or ymin >= ymax:
+        raise ValueError("extent must satisfy xmin < xmax and ymin < ymax")
+
+    fractions = (np.arange(resolution) + 0.5) / resolution
+    x = (1 - fractions) * xmin + fractions * xmax
+    y = (1 - fractions) * ymin + fractions * ymax
+    distances = np.hypot(x[None, :] - query[0], y[:, None] - query[1])
+    weights = distribution.weight(distances)
+
+    ax = plt.gca() if ax is None else ax
+    kwargs.setdefault("cmap", "viridis")
+    kwargs.setdefault("aspect", "equal")
+    kwargs.setdefault("interpolation", "nearest")
+    return ax.imshow(weights, origin="lower", extent=extent, **kwargs)
 
 
 def plot_barcode(bc, ax=None, y_offset=0, **kwargs):

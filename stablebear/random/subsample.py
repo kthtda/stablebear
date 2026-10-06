@@ -1,30 +1,24 @@
-import operator
-
 from .. import _sb_cpp as cpp
+from .._validation import _boolean, _positive_integer
 from ..base_tensor import _get_backend
 from ..distance_matrix import DistanceMatrix, DistanceMatrixTensor
 from ..point_cloud import PointCloud, PointCloudTensor
 from ..tensor_create import zeros
 from ..typing import distmat32, distmat64, float32, pcloud32, pcloud64
-from .generator import Generator, _unwrap
+from .generator import _unwrap
 
 
-def _positive_integer(value, name):
-    if isinstance(value, bool):
-        raise TypeError(f"{name} must be an integer, not bool")
-    try:
-        value = operator.index(value)
-    except TypeError:
-        raise TypeError(f"{name} must be an integer") from None
-    if value <= 0:
-        raise ValueError(f"{name} must be greater than zero")
-    return value
-
-
-def _boolean(value, name):
-    if type(value) is not bool:
-        raise TypeError(f"{name} must be a bool")
-    return value
+def _partial_policy(value):
+    """Return the native policy for ``allow_partial``; bools map to "no"/"keep"."""
+    if type(value) is bool:
+        value = "keep" if value else "no"
+    if not isinstance(value, str):
+        raise TypeError("allow_partial must be a string")
+    choices = ("no", "keep", "drop")
+    if value not in choices:
+        options = ", ".join(repr(choice) for choice in choices)
+        raise ValueError(f"allow_partial must be one of {options}")
+    return getattr(cpp.point_process._PartialPolicy, value)
 
 
 def subsample(
@@ -32,8 +26,8 @@ def subsample(
     n_points,
     n_samples=1,
     *,
-    replace=False,
-    allow_partial=False,
+    replace=True,
+    allow_partial="keep",
     discard_duplicates=False,
     generator=None,
 ):
@@ -50,14 +44,21 @@ def subsample(
         Input value or tensor. A single point cloud or distance matrix is
         treated as a zero-dimensional tensor.
     n_points : int
-        Number of draws requested for each output cloud.
+        Number of draws requested for each output point cloud.
     n_samples : int, optional
-        Number of output clouds per input cloud, by default 1.
+        Number of output point clouds per input point cloud, by default 1.
     replace : bool, optional
-        Whether a logical input row may be drawn repeatedly.
-    allow_partial : bool, optional
-        Permit fewer draws when an input is too small without replacement, or
-        an empty output cloud when sampling an empty input with replacement.
+        Whether a logical input row may be drawn repeatedly, by default True. The
+        ``allow_partial="drop"`` threshold still applies when True.
+    allow_partial : {"no", "keep", "drop"}, optional
+        Policy when fewer than ``n_points`` input points are available.
+        ``"no"`` raises when the requested draw cannot be filled.
+        ``"keep"`` (default) returns all available points without replacement, or an
+        empty sample when no points are eligible. With replacement, both policies
+        fill the requested size whenever at least one point is eligible.
+        ``"drop"`` returns an empty sample when fewer than ``n_points`` points
+        are eligible, even with replacement. The check precedes drawing and duplicate removal.
+        For compatibility, False means ``"no"`` and True means ``"keep"``.
     discard_duplicates : bool, optional
         For point clouds, keep only the first coordinate-identical drawn point.
         Equality is numeric: signed zeros and same-sign infinities compare
@@ -90,10 +91,8 @@ def subsample(
     n_points = _positive_integer(n_points, "n_points")
     n_samples = _positive_integer(n_samples, "n_samples")
     replace = _boolean(replace, "replace")
-    allow_partial = _boolean(allow_partial, "allow_partial")
+    partial_policy = _partial_policy(allow_partial)
     discard_duplicates = _boolean(discard_duplicates, "discard_duplicates")
-    if generator is not None and not isinstance(generator, Generator):
-        raise TypeError("generator must be a stablebear.random.Generator or None")
 
     backend, data = _get_backend(
         data,
@@ -109,7 +108,7 @@ def subsample(
         n_points,
         n_samples,
         replace,
-        allow_partial,
+        partial_policy,
         discard_duplicates,
         _unwrap(generator),
     )

@@ -42,8 +42,13 @@ def _unwrap(generator):
     generator (``sb::default_generator()``, reseeded by :func:`seed`). Either
     way the generator advances itself once per sampling call (reserving a fresh
     block of seed slots), so consecutive draws are independent yet reproducible.
+    Anything else raises ``TypeError``.
     """
-    return None if generator is None else generator._gen
+    if generator is None:
+        return None
+    if not isinstance(generator, Generator):
+        raise TypeError("generator must be a stablebear.random.Generator or None")
+    return generator._gen
 
 
 def seed(s):

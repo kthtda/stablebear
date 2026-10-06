@@ -19,7 +19,7 @@ Background
 The **homological kernel** compares two distances on the same set of points.
 The input is a point set together with two distances :math:`d` and :math:`d'`
 with :math:`d' \le d` everywhere -- for example, a point cloud with its
-Euclidean distance, and a projection of the same cloud, which can only move
+Euclidean distance, and a projection of the same point cloud, which can only move
 points closer together. Now grow a scale parameter :math:`t` from zero and
 consider two points connected whenever their distance is at most :math:`t`
 (the filtration scale of :doc:`persistence`). As :math:`t` grows, each
@@ -30,7 +30,7 @@ kernel records those disagreements.
 The figure below shows the shrinking: both points drop onto the diagonal and
 end up closer together than they started. The diagonal :math:`y = x` is not an arbitrary
 choice -- this projection is what turns the homological kernel into a
-**correlation method**: a standardized cloud of two perfectly positively
+**correlation method**: a standardized point cloud of two perfectly positively
 correlated variables already lies on the diagonal and is not moved at all, so
 how much the projection shrinks the distances measures how far the data is
 from that ideal. How this becomes a correlation score is developed below.
@@ -59,7 +59,7 @@ scale where the same clusters merge under :math:`d`. Where the two distances
 agree, the bars have length zero -- the more they disagree, the longer the
 bars.
 
-Watching a small cloud at a few growing scales makes this concrete. Points
+Watching a small point cloud at a few growing scales makes this concrete. Points
 within distance :math:`t` of each other are joined by an edge, and the
 clusters are the connected components of the resulting graph; the grey edges
 are the ones that cause the merges. At every
@@ -86,11 +86,11 @@ same clusters merge under :math:`d`:
       :end-before: docs snippet end hkernel_merging --
 
 The main application of the homological kernel is as a **correlation
-method**: pair two variables into a 2D point cloud, project that cloud onto
+method**: pair two variables into a 2D point cloud, project that point cloud onto
 the diagonal :math:`y = x`, and measure how much the topology of the original
-cloud differs from that of its projection. The
+point cloud differs from that of its projection. The
 score measures deviation from a perfect positive linear relationship. A
-standardized cloud with Pearson correlation :math:`+1` lies exactly on the
+standardized point cloud with Pearson correlation :math:`+1` lies exactly on the
 diagonal, so every bar has length zero, and for positively correlated linear
 data the score moves closely with Pearson's :math:`r`. The two part ways
 exactly where Pearson stops being informative: non-linear relationships and
@@ -133,7 +133,7 @@ Point clouds
 ------------
 
 Point clouds always use the Euclidean metric. For the correlation use case,
-``X`` is the cloud and ``Y`` is its projection onto the diagonal. An
+``X`` is the point cloud and ``Y`` is its projection onto the diagonal. An
 orthogonal projection can only move points closer together, so
 :math:`d' \le d` is guaranteed for any input. Keep point clouds in their
 ambient dimension -- express a projection in the original coordinates rather
@@ -142,7 +142,7 @@ than dropping columns::
    import numpy as np
    from stablebear import persistence
 
-   # A small 2D "correlation cloud"
+   # A small 2D "correlation point cloud"
    X = np.array([[0.0, 0.0], [4.0, 0.0], [0.0, 4.0], [3.0, 3.0]])
 
    # Its projection onto the diagonal: (x, y) -> ((x+y)/2, (x+y)/2)
@@ -238,8 +238,8 @@ threshold :math:`t`, how many disagreements between the two distances exceed
    sranks = persistence.barcode_to_stable_rank(kernels)
    scores = sb.lp_norm(sranks, p=1)
 
-A score of zero means every bar has length zero: the cloud and its projection
-merge identically, i.e. the cloud already lies on the diagonal. Larger scores
+A score of zero means every bar has length zero: the point cloud and its projection
+merge identically, i.e. the point cloud already lies on the diagonal. Larger scores
 mark stronger deviation from it. Comparing, averaging, or classifying whole
 cohorts of homological kernels works exactly as for any other barcode
 tensor -- see :doc:`persistence`.
@@ -281,8 +281,8 @@ Applied to each dataset of the quartet:
       :start-after: docs snippet start hkernel_quartet --
       :end-before: docs snippet end hkernel_quartet --
 
-The top row shows each cloud, the diagonal it is projected onto, and a grey
-segment joining every point to where it lands. Underneath each cloud is the
+The top row shows each point cloud, the diagonal it is projected onto, and a grey
+segment joining every point to where it lands. Underneath each point cloud is the
 stable rank of its homological kernel, with the score -- the area under the
 curve -- annotated. Pearson's :math:`r` is identical across all four; the
 four curves are not remotely alike.
@@ -295,7 +295,7 @@ Reading the curves
   dataset every one of them disagrees at least slightly. What separates the
   datasets is not the count but *how large* the disagreements are, which is
   the rest of the curve.
-- **A curve that drops to zero immediately means the cloud lies on the
+- **A curve that drops to zero immediately means the point cloud lies on the
   diagonal.** Ten bars of length zero give a stable rank that is 0 everywhere,
   area included.
 
@@ -305,12 +305,12 @@ Three things to keep in mind when comparing scores or curves:
   anti-correlated data is far from it and therefore scores *high*. The
   homological kernel measures alignment with the diagonal, not the strength
   of a relationship in either direction.
-- **Scores grow with the number of points.** A cloud of :math:`n` points
-  always produces :math:`n - 1` bars, so for the same shape a larger cloud
+- **Scores grow with the number of points.** A point cloud of :math:`n` points
+  always produces :math:`n - 1` bars, so for the same shape a larger point cloud
   scores higher -- just as :math:`H_0` and :math:`H_1` stable ranks grow with
-  the size of the cloud.
+  the size of the point cloud.
 - **Centering does not change the result, rescaling does.** The homological
-  kernel depends only on distances, so translating a cloud changes nothing.
+  kernel depends only on distances, so translating a point cloud changes nothing.
   Dividing each
   variable by its standard deviation, on the other hand, is a real modelling
   choice that changes both the scores and their order. Decide once, then apply
@@ -344,7 +344,7 @@ kernel produced, so comparing curves costs nothing extra.
 Comparison with ordinary persistent homology
 ============================================
 
-How does this compare with the plain persistent homology of each cloud?
+How does this compare with the plain persistent homology of each point cloud?
 Computing :math:`H_0` and :math:`H_1` of each dataset, next to the
 homological kernel, gives three quite different pictures:
 
@@ -375,7 +375,7 @@ rarely enclose a hole.
 
 There is also a reason of principle that a plain barcode -- however it is
 summarized -- cannot measure correlation. :math:`H_0` and :math:`H_1` depend
-only on the distances between points, and rotating a cloud changes no
+only on the distances between points, and rotating a point cloud changes no
 distance while changing its correlation completely. Rotating dataset I by
 90° about its center::
 
@@ -407,8 +407,8 @@ flips Pearson's :math:`r` from :math:`+0.82` to :math:`-0.82`:
      - 0.973
      - 14.396
 
-The two homology columns cannot tell the rotated cloud from the original --
-and no quantity computed from the cloud's distances alone can, whatever
+The two homology columns cannot tell the rotated point cloud from the original --
+and no quantity computed from the point cloud's distances alone can, whatever
 summary is applied to it. The homological kernel score does move, because
 the diagonal stays fixed while the data turns relative to it. That fixed
 second structure is what a single barcode lacks, and supplying it is what

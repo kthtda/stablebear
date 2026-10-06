@@ -1,7 +1,7 @@
 stablebear.plotting
 ===================
 
-Plotting piecewise constant functions and barcodes. See :doc:`plotting` for
+Plotting piecewise constant functions, barcodes, and distribution heatmaps. See :doc:`plotting` for
 examples.
 
 .. automodule:: stablebear.plotting

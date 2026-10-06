@@ -13,5 +13,6 @@ namespace sb_py
 
     register_point_process_poisson(sm);
     register_point_process_subsample(sm);
+    register_relative_subsample(sm);
   }
 }

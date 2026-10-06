@@ -19,8 +19,8 @@ pyproj_toml = tomllib.load(open("../pyproject.toml", "rb"))
 year = datetime.now().year
 
 project = "stablebear"
-copyright = f"2024-{year}, Björn H. Wehlin"
-author = "Björn H. Wehlin"
+copyright = f"2024-{year}, Björn H. Wehlin and the stablebear contributors"
+author = "Björn H. Wehlin and the stablebear contributors"
 release = pyproj_toml["project"]["version"]
 
 # -- General configuration ---------------------------------------------------
@@ -28,6 +28,7 @@ release = pyproj_toml["project"]["version"]
 
 extensions = [
     "sphinx.ext.autodoc",
+    "sphinx.ext.githubpages",
     "sphinx.ext.coverage",
     "sphinx.ext.napoleon",
     "sphinx.ext.mathjax",
@@ -39,6 +40,7 @@ extensions = [
     "sphinxcontrib.mermaid",
     "sphinxcontrib.tikz",
     "sphinxcontrib.bibtex",
+    "inherited_members",
 ]
 
 # Build glossary previews into the HTML so they also work outside Read the Docs.
@@ -93,7 +95,7 @@ if gen_cpp_docs:
 
 
 templates_path = ["_templates"]
-exclude_patterns = ["_build", "Thumbs.db", ".DS_Store", "**/.virtual_documents"]
+exclude_patterns = ["_build", "Thumbs.db", ".DS_Store", "**/.virtual_documents", "WRITING.md"]
 
 
 # -- Options for HTML output -------------------------------------------------
@@ -105,7 +107,7 @@ html_theme_options = {
     "header_links_before_dropdown": 4,
 }
 html_static_path = ["_static"]
-html_css_files = ["lightbox.css", "diagrams.css", "glossary.css"]
+html_css_files = ["lightbox.css", "diagrams.css", "glossary.css", "notebooks.css"]
 html_js_files = ["lightbox.js"]
 
 # --- Create a temporary bundle of 'stablebear' with a stub C++ backend from the Python source in ../stablebear. This is only for documentation purposes (so that we don't have to keep reinstalling, including recompiling, stablebear everytime we want to update the docs). The setup has been tested on Linux and should probably work on OSX. It is unclear if it'll work on Windows.
@@ -159,6 +161,7 @@ else:
     os.symlink(cpp_src, cpp_dest)
 
 sys.path.insert(0, temp_mod_dir)
+sys.path.insert(0, os.path.abspath("_ext"))
 
 
 def setup(app):

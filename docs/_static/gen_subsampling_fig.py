@@ -17,7 +17,7 @@ def plot_point_cloud_subsamples(point_color="#94a3b8", selected_color="#d55e00")
     points = np.column_stack((np.cos(angles), np.sin(angles)))
     cloud = sb.PointCloud(points)
     samples = sb.random.subsample(
-        cloud, n_points=10, n_samples=3,
+        cloud, n_points=10, n_samples=3, replace=False,
         generator=sb.random.Generator(seed=5),
     )
 
@@ -25,7 +25,7 @@ def plot_point_cloud_subsamples(point_color="#94a3b8", selected_color="#d55e00")
     for i, ax in enumerate(axes):
         selected = np.asarray(samples[i])
         ax.scatter(points[:, 0], points[:, 1], s=28, color=point_color,
-                   label="Original cloud (40 points)", zorder=2)
+                   label="Original point cloud (40 points)", zorder=2)
         ax.scatter(selected[:, 0], selected[:, 1], s=75, color=selected_color,
                    edgecolors=ax.get_facecolor(), linewidths=1.2,
                    label="Selected points (10)", zorder=3)
@@ -64,7 +64,7 @@ def plot_distance_matrix_subsamples(point_color="#94a3b8", selected_color="#d55e
     # DistanceMatrix accepts SciPy's condensed pairwise distances directly.
     matrix = sb.DistanceMatrix(pdist(points))
     samples = sb.random.subsample(
-        matrix, n_points=4, n_samples=3,
+        matrix, n_points=4, n_samples=3, replace=False,
         generator=sb.random.Generator(seed=5),
     )
     indices = samples.indices

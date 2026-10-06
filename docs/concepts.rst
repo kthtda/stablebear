@@ -2,7 +2,9 @@
 Core Concepts
 ==============
 
-This page introduces the foundational ideas behind stablebear: what piecewise constant functions are, how they are stored in tensors, and how the type system works.
+This page introduces the foundational ideas behind stablebear: piecewise
+constant functions, point clouds and distance matrices, collections stored in
+tensors, and the type system.
 
 Piecewise constant functions
 ============================
@@ -101,6 +103,64 @@ Optional ``a`` and ``b`` parameters restrict the iteration to a sub-interval::
    large collections, use the dedicated functions (:py:func:`~stablebear.pdist`,
    :py:func:`~stablebear.lp_norm`, etc.) which are implemented in optimized
    C++/CUDA.
+
+.. _point-clouds-and-distance-matrices:
+
+Point clouds and distance matrices
+====================================
+
+A **point cloud** is a collection of points described by their coordinates.
+In an array of shape ``(n_points, dimension)``, each row is one point and each
+column is a coordinate. For example, these three points lie in the plane::
+
+   import numpy as np
+   import stablebear as sb
+
+   coordinates = np.array([
+       [0.0, 0.0],  # point 0
+       [3.0, 0.0],  # point 1
+       [0.0, 4.0],  # point 2
+   ])
+   cloud = sb.PointCloud(coordinates)
+   assert cloud.shape == (3, 2)
+
+The **point index** is its row number, starting at zero. Index ``1`` refers
+to the whole point ``(3, 0)``; it is not a coordinate value. The order matters
+when referring to points by index, even though rearranging the rows does not
+change the geometry.
+
+A **distance matrix** describes points through their pairwise distances.
+Entry ``D[i, j]`` is the distance between points ``i`` and ``j``. For the
+Euclidean distances in this example::
+
+   distances = np.array([
+       [0.0, 3.0, 4.0],
+       [3.0, 0.0, 5.0],
+       [4.0, 5.0, 0.0],
+   ])
+   matrix = sb.DistanceMatrix(distances)
+   assert matrix[1, 2] == 5.0
+
+Both axes of this ``(3, 3)`` array refer to points. Its columns are not spatial
+coordinates. The matrix is symmetric, distances are nonnegative, and its
+diagonal is zero because a point has zero distance to itself. Stablebear
+stores only the distinct off-diagonal entries internally.
+
+A distance matrix can also be supplied directly when coordinates are
+unavailable. It retains the distances and point indices, but does not store
+the original coordinates. For example, row ``1`` gives distances ``[3, 0, 5]``
+from point 1 to all three points. It cannot tell us distances from a new
+external coordinate such as ``(1, 1)`` without additional information.
+
+One dataset versus a collection
+-------------------------------
+
+``PointCloud`` and ``DistanceMatrix`` each represent one dataset.
+``PointCloudTensor`` and ``DistanceMatrixTensor`` hold collections of these
+datasets: a tensor of shape ``(10,)`` holds ten point clouds or ten matrices.
+The number of points and coordinate dimensions belong to each element, not
+to the collection's shape. See :doc:`tensors` for constructing collections
+from arrays, and :doc:`subsampling` for selecting points from a dataset.
 
 Tensors
 =======

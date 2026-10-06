@@ -543,7 +543,7 @@ list(TRANSFORM SB_PY_PERSISTENCE_SOURCES PREPEND "persistence/")
 
 SET(SB_PY_POINT_PROCESS_SOURCES
     py_poisson.hpp py_poisson.cpp
-    py_subsample.hpp py_subsample.cpp
+    py_subsample.hpp py_subsample.cpp py_subsample_relative.cpp
     pymodule_point_process.hpp pymodule_point_process.cpp
 )
 
@@ -552,6 +552,7 @@ list(TRANSFORM SB_PY_POINT_PROCESS_SOURCES PREPEND "point_process/")
 SET(SB_PY_SOURCES
     pybind.hpp
     pymodule.cpp
+    py_distributions.hpp py_distributions.cpp
     functional/py_random.hpp functional/py_random.cpp
     pypcf_support.hpp
     py_np_support.hpp

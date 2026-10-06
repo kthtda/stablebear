@@ -2,12 +2,25 @@
 Subsampling
 ===========
 
+For an introduction to coordinates, point indices, and pairwise distances,
+see :ref:`point-clouds-and-distance-matrices`. For sampling with filter-based
+weights, see :doc:`relative_subsampling`. Options shared by both samplers,
+including replacement, small-input handling, duplicate removal, and generators,
+are documented in :doc:`subsampling_options`.
+
 :py:func:`~stablebear.random.subsample` draws one or more uniform
 subsamples from a single :py:class:`~stablebear.point_cloud.PointCloud` or
 :py:class:`~stablebear.distance_matrix.DistanceMatrix`, or from every value in a
 :py:class:`~stablebear.point_cloud.PointCloudTensor` or
-:py:class:`~stablebear.distance_matrix.DistanceMatrixTensor`. The result has
-the same element family and precision. For a single cloud or matrix, it is a
+:py:class:`~stablebear.distance_matrix.DistanceMatrixTensor`.
+
+``n_points`` is the positive number of draws requested per sample.
+``n_samples`` is the positive number of samples generated for each input point
+cloud or distance matrix, defaulting to one. Samples are independent, so a
+point can appear in several samples even when sampling without replacement.
+
+The result has the same element family and precision. Empty and partial samples
+retain the output axes. For a single point cloud or distance matrix, it is a
 tensor of shape ``(n_samples,)``; for a tensor input, a sample axis is appended
 to its shape::
 
@@ -52,56 +65,11 @@ between samples, so a point can appear in more than one panel's selection.
       :start-after: docs snippet start point_cloud_subsamples --
       :end-before: docs snippet end point_cloud_subsamples --
 
-Replacement and partial samples
-===============================
-
-By default, sampling is without replacement and a cloud with fewer than
-``n_points`` raises ``ValueError``. Set ``allow_partial=True`` to use all
-available points in random order instead. With ``replace=True``, repeated
-draws are allowed; an empty input is accepted only when
-``allow_partial=True``.
-
-Duplicate removal
-=================
-
-Set ``discard_duplicates=True`` to keep only the first drawn occurrence of
-each coordinate-identical point. Coordinates are compared with ordinary numeric
-equality: signed zeros compare equal, infinities with the same sign compare
-equal, and positive and negative infinity are distinct. NaN does not equal itself. Points
-containing any NaN coordinate are therefore never discarded, even when the
-same source point is drawn repeatedly. For distance matrices, it removes repeated
-drawn source indices; distinct indices are retained even when their distance
-is zero. Discarded points are not redrawn.
-
-Inspecting selected indices
-===========================
-
-For indexed point-cloud and distance-matrix tensors, ``samples.indices``
-returns an independent ``NestedTensor`` of uint64 selections. For example,
-``samples.indices[0]`` gives the first sample's drawn source indices.
-The selections follow the tensor's outer shape and view order; changing them
-does not change the samples. Ordinary tensors, and indexed tensors whose
-shared backing has been materialized by a write, return ``None``.
-
-Input snapshots and mutation
-============================
-
-Each call copies each input cloud's current logical coordinates once. All
-samples from that cloud share the fresh copy and store only row indices, so
-later changes to the input do not affect the samples. Mutating an indexed
-sample uses copy-on-write and does not affect sibling samples.
-
-This also applies when resampling an indexed result or a view of one. The
-sampler reads its selected rows directly and copies those logical coordinates
-once into a fresh source, preserving their order and repetitions. The input
-retains its indexed storage; the new result does not depend on the previous
-result's coordinates or selections.
-
 Distance-matrix samples
 =======================
 
 For a distance matrix ``M`` and sampled index sequence ``S``, the corresponding
-result is the compressed symmetric principal submatrix ``M[S, S]``. Sampled
+result is the compressed symmetric :term:`principal submatrix` ``M[S, S]``. Sampled
 order and repetitions are preserved, including zero distance between two
 occurrences of the same source index.
 
@@ -138,7 +106,7 @@ input, select the same vertices on both axes::
    expected = distances[np.ix_(vertices, vertices)]
    np.testing.assert_array_equal(sampled_matrix, expected)
 
-With ``replace=True``, a draw can repeat a vertex. For example, ``[2, 0, 2]``
+With replacement (the default), a draw can repeat a vertex. For example, ``[2, 0, 2]``
 produces this matrix::
 
    [[0., 4., 0.],
@@ -203,7 +171,4 @@ passed to ``subsample``; the coordinates come from indexing ``points``.
       :start-after: docs snippet start distance_matrix_subsamples --
       :end-before: docs snippet end distance_matrix_subsamples --
 
-Indexed results share one fresh copy of
-the source matrix across its samples. Persistent homology and homological
-kernel computations consume these logical matrices directly; mutation first
-materializes the shared indexed state.
+See :doc:`subsampling_options` for inspecting selected indices.

@@ -125,16 +125,12 @@ jobs:
         env:
           CIBW_BUILD_VERBOSITY: 1
           CIBW_BUILD_FRONTEND: "build[uv]"
-          # Pin cudart to the CUDA major the wheel was built against (CUDA DLLs are not ABI-compatible across majors).
-          # Non-CUDA builds use test-requires from pyproject.toml.
-          CIBW_TEST_REQUIRES: ${{ matrix.cuda == 1 && format('pytest scipy cuda-toolkit[cudart]=={0}.*', matrix.cuda_major) || 'pytest scipy' }}
-          # The wheel-test phase installs the wheel + its runtime deps (incl.
-          # matplotlib) via uv; a longer HTTP timeout absorbs slow/transient
-          # PyPI fetches that otherwise time out after uv's short default.
-          CIBW_TEST_ENVIRONMENT: >-
-            UV_HTTP_TIMEOUT=120
-            PIP_RETRIES=5
-            PIP_DEFAULT_TIMEOUT=60
+          # Test dependencies come from the `test` dependency group in pyproject.toml.
+          # CUDA builds also pin cudart to the CUDA major the wheel was built against
+          # (CUDA DLLs are not ABI-compatible across majors).
+          CIBW_TEST_REQUIRES: ${{ matrix.cuda == 1 && format('cuda-toolkit[cudart]=={0}.*', matrix.cuda_major) || '' }}
+          # The test environment lives in pyproject.toml. The statistical
+          # tests run separately, in statistical.yaml.
           CIBW_MANYLINUX_X86_64_IMAGE: "manylinux_2_28"
           CIBW_BEFORE_ALL_LINUX: >-
             bash -c '
