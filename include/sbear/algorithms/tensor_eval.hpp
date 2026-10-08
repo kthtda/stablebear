@@ -41,6 +41,13 @@ namespace sb
     std::vector<DomainT> domain_values;
     std::vector<std::vector<size_t>> domain_indices;
     auto n = domain.size();
+    if (n == 0)
+    {
+      // out already has shape elems.shape() + domain.shape(), i.e. zero
+      // entries -- nothing to evaluate. Bail before eval_elem indexes
+      // domain_indices[0] (numpy convention: empty grid -> empty result).
+      return;
+    }
     domain_values.reserve(n);
     domain_indices.reserve(n);
     walk(domain, [&](const std::vector<size_t>& idx) {
