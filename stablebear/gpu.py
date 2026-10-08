@@ -5,7 +5,9 @@ falling back to a pure-Python implementation using subprocess.
 """
 
 try:
-    from _gpu_detect import detect_nvidia_gpus, has_nvidia_gpu, nvidia_gpu_count
+    # The extension is installed inside the package (site-packages/stablebear/),
+    # so it must be imported relatively; a top-level import never resolves.
+    from ._gpu_detect import detect_nvidia_gpus, has_nvidia_gpu, nvidia_gpu_count
 except ImportError:
     import os
     import platform
@@ -38,10 +40,14 @@ except ImportError:
         if gpus:
             return gpus
 
-        # Fallback: check sysfs for NVIDIA vendor ID (0x10de)
+        # Fallback: check sysfs for NVIDIA vendor ID (0x10de). Each physical
+        # GPU exposes several drm nodes (cardN, renderDN, connectors); count
+        # only the cardN nodes to avoid double-counting.
         drm_path = "/sys/class/drm"
         if os.path.isdir(drm_path):
             for entry in os.listdir(drm_path):
+                if not re.fullmatch(r"card\d+", entry):
+                    continue
                 vendor_file = os.path.join(drm_path, entry, "device", "vendor")
                 if os.path.isfile(vendor_file):
                     try:
@@ -51,6 +57,40 @@ except ImportError:
                             gpus.append({"name": "NVIDIA GPU"})
                     except OSError:
                         pass
+
+        if gpus:
+            return gpus
+
+        # Fallback: the driver's procfs (one directory per GPU). Covers slim
+        # containers without lspci or drm entries.
+        nvidia_proc = "/proc/driver/nvidia/gpus"
+        if os.path.isdir(nvidia_proc):
+            for entry in sorted(os.listdir(nvidia_proc)):
+                name = "NVIDIA GPU [" + entry + "]"
+                info_file = os.path.join(nvidia_proc, entry, "information")
+                try:
+                    with open(info_file) as f:
+                        for line in f:
+                            if line.startswith("Model:"):
+                                name = line[len("Model:"):].strip()
+                                break
+                except OSError:
+                    pass
+                gpus.append({"name": name})
+
+        if gpus:
+            return gpus
+
+        # Fallback: WSL2 exposes the GPU through /dev/dxg with no NVIDIA PCI
+        # drm nodes and no useful lspci. /dev/dxg alone could be any vendor,
+        # so require the WSL NVIDIA driver libraries as well.
+        if os.path.exists("/dev/dxg"):
+            wsl_lib = "/usr/lib/wsl/lib"
+            if any(
+                os.path.exists(os.path.join(wsl_lib, lib))
+                for lib in ("libcuda.so.1", "libcuda.so", "nvidia-smi")
+            ):
+                gpus.append({"name": "NVIDIA GPU (WSL2)"})
 
         return gpus
 
