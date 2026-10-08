@@ -93,6 +93,7 @@ The square root targets roughly square blocks, which is a good default for 2D CU
    subdivide(3, 10)  ->  [0,2], [3,5], [6,8], [9,9]
    subdivide(4, 8)   ->  [0,3], [4,7]
    subdivide(5, 3)   ->  [0,2]
+   subdivide(5, 0)   ->  (no bands)
 
 Row bands and column bands are computed independently: ``rowBands = subdivide(blockSide, nRows)``, ``colBands = subdivide(blockSide, nCols)``. This means rectangular matrices are handled naturally -- the row and column band counts can differ.
 

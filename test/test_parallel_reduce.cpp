@@ -17,3 +17,22 @@ TEST(ParallelReduce, AddThreeFunctions)
 
   EXPECT_EQ(res, (pcfs[0] + pcfs[1] + pcfs[2]));
 }
+
+// Regression for issue #186: an empty range used to reach subdivide's
+// SIZE_MAX-wrapped block and read far out of bounds.
+TEST(ParallelReduce, EmptyRangeThrows)
+{
+  std::vector<sb::Pcf_f64> pcfs;
+
+  auto op = [](const typename sb::Pcf_f64::rectangle_type& rect) {
+    return rect.f_value + rect.g_value;
+  };
+
+  EXPECT_THROW(sb::parallel_reduce(pcfs.begin(), pcfs.end(), op), std::invalid_argument);
+}
+
+TEST(ParallelReduce, AverageOfEmptyVectorThrows)
+{
+  std::vector<sb::Pcf_f64> pcfs;
+  EXPECT_THROW(sb::average(pcfs), std::invalid_argument);
+}

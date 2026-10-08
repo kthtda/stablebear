@@ -10,6 +10,7 @@
 #include <numeric>
 #include <algorithm>
 #include <iterator>
+#include <stdexcept>
 
 #include <taskflow/taskflow.hpp>
 #include <taskflow/algorithm/reduce.hpp>
@@ -197,6 +198,14 @@ namespace sb
 
     auto chunksz = 2;
     auto sz = std::distance(begin, end);
+    if (sz == 0)
+    {
+      // A pairwise combine has no identity element, so an empty range cannot
+      // be reduced. Reject up front with a clean, catchable exception
+      // (pybind11 maps std::invalid_argument to a Python ValueError) --
+      // mirrors the empty-dimension error in matrix_reduce.hpp.
+      throw std::invalid_argument("Cannot reduce an empty range of PCFs");
+    }
     auto blocks = subdivide(chunkszFirst , sz);
 
     auto nAll = std::accumulate(begin, end, static_cast<size_t>(0ul), [](size_t n, const pcf_type& f){ return f.points().size() + n; });
