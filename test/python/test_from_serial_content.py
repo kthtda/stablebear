@@ -118,6 +118,64 @@ def test_fsc_negative_start_raises(dtype):
         sb.from_serial_content(content, enumeration)
 
 
+def test_fsc_content_wrong_trailing_dim_raises():
+    """content with anything but 2 columns must raise, not read past each row.
+
+    Regression for #193: content of shape (N, 1) read one element past every
+    row (heap over-read) instead of raising a shape error.
+    """
+    enumeration = np.array([[0, 2]], dtype=np.int64)
+    with pytest.raises(RuntimeError):
+        sb.from_serial_content(np.zeros((5, 1)), enumeration)
+    with pytest.raises(RuntimeError):
+        sb.from_serial_content(np.zeros((5, 3)), enumeration)
+
+
+def test_fsc_enumeration_wrong_trailing_dim_raises():
+    """enumeration whose last dim is not 2 must raise, not read stop OOB.
+
+    Regression for #193.
+    """
+    content = np.array([[0.0, 1.0], [2.0, 3.0]])
+    with pytest.raises(RuntimeError):
+        sb.from_serial_content(content, np.zeros((3, 1), dtype=np.int64))
+    with pytest.raises(RuntimeError):
+        sb.from_serial_content(content, np.zeros((3, 3), dtype=np.int64))
+
+
+def test_fsc_negative_stride_content():
+    """A reversed (negative-stride) content view must read the right rows.
+
+    Regression for #194: unsigned stride arithmetic wrapped the negative
+    stride to ~2^64, producing garbage offsets (OOB reads).
+    """
+    content = np.array([[0.0, 1.0], [0.0, 2.0], [0.0, 3.0], [0.0, 4.0]])
+    rev = content[::-1]
+    assert rev.strides[0] < 0
+    enumeration = np.array([[0, 1], [1, 2], [2, 3], [3, 4]], dtype=np.int64)
+
+    X = sb.from_serial_content(rev, enumeration)
+
+    for i in range(4):
+        assert X[i] == sb.Pcf(np.array([[0.0, 4.0 - i]]))
+
+
+def test_fsc_negative_stride_enumeration():
+    """A reversed (negative-stride) enumeration view must read the right items.
+
+    Regression for #194 (the enumeration base-offset accumulation).
+    """
+    content = np.array([[0.0, 10.0], [10.0, 20.0], [0.0, 50.0], [10.0, 60.0]])
+    enumeration = np.array([[0, 2], [2, 4]], dtype=np.int64)
+    rev = enumeration[::-1]
+    assert rev.strides[0] < 0
+
+    X = sb.from_serial_content(content, rev)
+
+    assert X[0] == sb.Pcf(content[2:4])
+    assert X[1] == sb.Pcf(content[0:2])
+
+
 def test_fsc_stop_equals_length_ok():
     """stop == content.shape(0) is in-bounds and must still succeed."""
     content = np.array([[0.0, 10.0], [10.0, 20.0], [20.0, 30.0]])
