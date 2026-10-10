@@ -90,6 +90,40 @@ TEST(WalkRandom, ParallelWalkIsDeterministicAcrossRuns)
   EXPECT_TRUE(sb::allclose(a, b));
 }
 
+TEST(WalkRandom, ParallelForEachIndexSeedsIndexFromReservedBlock)
+{
+  constexpr size_t count = 80;
+  std::vector<uint64_t> par(count);
+
+  sb::DefaultRandomGenerator gen1(123);
+  sb::DefaultRandomGenerator gen2(123);
+
+  sb::parallel_for_each_index_async(count, gen1, [&par](size_t i, auto& engine) {
+    par[i] = engine();
+  }, sb::default_executor()).wait();
+
+  // Index i draws from sub-generator i of one block of count slots.
+  auto block = gen2.reserve(count);
+  for (size_t i = 0; i < count; ++i)
+  {
+    EXPECT_EQ(par[i], block.sub_generator(i)()) << "index " << i;
+  }
+}
+
+TEST(WalkRandom, ParallelForEachIndexAdvancesGeneratorByCount)
+{
+  constexpr size_t count = 80;
+
+  sb::DefaultRandomGenerator gen1(123);
+  sb::DefaultRandomGenerator gen2(123);
+
+  sb::parallel_for_each_index_async(count, gen1, [](size_t, auto&) {}, sb::default_executor()).wait();
+  (void)gen2.reserve(count);
+
+  // Both generators have advanced by count, so their next blocks match.
+  EXPECT_EQ(gen1.reserve(1).sub_generator(0)(), gen2.reserve(1).sub_generator(0)());
+}
+
 namespace
 {
   sb::Tensor<double> fill_uniform(sb::DefaultRandomGenerator& gen)

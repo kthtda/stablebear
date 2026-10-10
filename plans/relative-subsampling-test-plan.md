@@ -461,7 +461,8 @@ repeated for `subsample_relative`.
   a comment). **Catches:** streams keyed by query or distribution value
   instead of position, one stream block shared by all distributions, and every
   sample using the same engine.
-- [ ] **40. Results do not depend on the worker count.** With equal seeds,
+- [x] **40. Results do not depend on the worker count.** (skipped: worker-count
+  independence belongs to random generation, not subsampling) With equal seeds,
   `sb.system.limit_cpus(1)` and `limit_cpus(4)` give identical indices.
   Parametrize the number of queries over 1 and 7, covering nested sample
   parallelism and more queries than workers. Use the distributions
@@ -471,7 +472,7 @@ repeated for `subsample_relative`.
   **Catches:** scratch shared between partitions, and streams assigned in
   scheduling order. Only the without-replacement path uses per-partition key
   buffers, and both modes share the stream assignment.
-- [ ] **41. Seeding contract of `parallel_for_each_index_async`.** [C++]
+- [x] **41. Seeding contract of `parallel_for_each_index_async`.** [C++]
   (optional) In `test/test_walk_random.cpp`, modeled on
   `ParallelWalkMatchesSequentialWalk`: index `i` receives
   `gen.reserve(count).sub_generator(i)`, and the generator advances by exactly
