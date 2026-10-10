@@ -41,3 +41,29 @@ def test_automatic_extent_is_a_square_around_the_query(ax):
     )
 
     assert im.get_extent() == pytest.approx([6.7, 13.3, -8.3, -1.7])
+
+
+def test_documented_defaults(ax):
+    # extent, resolution, and the styling keywords are omitted to test their defaults.
+    im = plot_distance_weight_heatmap(sb.distributions.Gaussian(0, 1), ax=ax)
+
+    assert np.asarray(im.get_array()).shape == (512, 512)
+    assert ax.get_aspect() == 1.0
+    assert im.get_cmap().name == "viridis"
+    assert im.get_interpolation() == "nearest"
+
+
+def test_overflowing_plot_range_asks_for_an_extent(ax):
+    # plot_range() is mean +/- 3 std, which overflows to (-inf, inf).
+    gaussian = sb.distributions.Gaussian(0, 1e308)
+
+    with pytest.raises(ValueError, match="cannot choose a finite plot region; pass extent explicitly"):
+        plot_distance_weight_heatmap(gaussian, resolution=3, ax=ax)
+
+
+def test_overflowing_plot_range_works_with_an_extent(ax):
+    gaussian = sb.distributions.Gaussian(0, 1e308)
+
+    im = plot_distance_weight_heatmap(gaussian, extent=(-1, 1, -1, 1), resolution=3, ax=ax)
+
+    assert im.get_extent() == pytest.approx([-1, 1, -1, 1])

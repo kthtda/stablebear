@@ -668,12 +668,12 @@ Items 63 and 64 go in `test/python/test_distributions.py`; items 65-71 go in
   is 1.1 times the largest absolute `plot_range()` bound, 3. Unbounded and
   infinite `plot_range()` cases are covered by item 63. **Catches:** an extent
   not centered on the query, and a missing margin.
-- [ ] **67. Documented defaults.** (optional) With `extent` and `resolution`
+- [x] **67. Documented defaults.** (optional) With `extent` and `resolution`
   omitted, the image is 512 by 512, `ax.get_aspect() == 1.0`, the colormap is
   viridis, and interpolation is nearest. **Catches:** changed defaults.
   Optional because these are Matplotlib keyword defaults listed in the
   docstring; item 65 checks the origin.
-- [ ] **68. Nonfinite plot range.** (optional) `Gaussian(0, 1e308)` without
+- [x] **68. Nonfinite plot range.** (optional) `Gaussian(0, 1e308)` without
   an extent raises ValueError "cannot choose a finite plot region; pass extent
   explicitly", and works with `extent=(-1, 1, -1, 1)`. Any range whose largest
   absolute bound times 1.1 overflows, such as `Uniform(0, 1.7e308)`, reaches
