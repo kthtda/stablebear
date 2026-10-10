@@ -1900,5 +1900,15 @@
     "py": 87.0,
     "cuda": 100.0,
     "release_tag": "v0.5.1b1"
+  },
+  {
+    "utc_iso": "2026-10-10T21:35:46Z",
+    "sha": "24a6e1a",
+    "branch": "249/merge",
+    "detail_path": "reports/2026-10-10_21-35-46_24a6e1a/report.html",
+    "cpp": 90.0,
+    "py": 89.0,
+    "cuda": null,
+    "release_tag": null
   }
 ]
