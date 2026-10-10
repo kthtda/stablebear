@@ -162,3 +162,16 @@ def test_mixture_repr_names_every_parameter():
         "Mixture(distributions=(Gaussian(mean=0.0, std=0.5), Uniform(start=0.0, end=2.5)), "
         "coefficients=(0.25, 0.75))"
     )
+
+
+@pytest.mark.parametrize(("attribute", "value"), [
+    pytest.param("mean", 2, id="mean"),
+    pytest.param("std", 0.5, id="std"),
+])
+def test_distributions_are_immutable(attribute, value):
+    gaussian = sb.distributions.Gaussian(2, 0.5)
+
+    with pytest.raises(AttributeError, match="Gaussian is immutable"):
+        setattr(gaussian, attribute, 5)
+
+    assert getattr(gaussian, attribute) == value

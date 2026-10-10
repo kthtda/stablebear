@@ -584,7 +584,7 @@ These go in `test/python/test_distributions.py`.
   nested mixtures without parentheses, and dropped zero terms. The nested zero
   term is also the only check that mixtures keep zero-coefficient components,
   as the docstring promises.
-- [ ] **56. Distributions are immutable.** Assigning to `.mean` of
+- [x] **56. Distributions are immutable.** Assigning to `.mean` of
   `Gaussian(2, 0.5)` raises AttributeError "Gaussian is immutable". Match the
   message: without the guard, Python raises a different AttributeError for the
   read-only property. **Catches:** mutable distributions whose hash could
