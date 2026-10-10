@@ -186,7 +186,10 @@ def _resolve_barcode_colors(n, color=None, cmap=None):
     elif is_color_like(color):
         cycle = [color]
     else:
-        cycle = list(color)
+        try:
+            cycle = list(color)
+        except TypeError:
+            cycle = []
         if len(cycle) == 0 or not all(is_color_like(c) for c in cycle):
             raise ValueError(
                 f"'color' must be a color or a non-empty sequence of colors; got {color!r}"
