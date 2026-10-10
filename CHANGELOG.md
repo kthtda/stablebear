@@ -9,6 +9,7 @@
 
 * **Relative subsampling** — `random.subsample_relative` draws from one point cloud or distance matrix with probabilities weighted by distance to each query point, following Agerberg, Chachólski, and Ramanujam (TAG-ML 2023). Weights come from the new `distributions.Gaussian`, `Uniform`, and `Mixture`, which `plotting.plot_distance_weight_heatmap` visualizes. Both samplers gain `allow_partial="drop"`. ([#243](https://github.com/kthtda/stablebear/issues/243))
 * **Progress for uniform subsampling** — `random.subsample` accepts `verbose=True` to show a progress bar, like `random.subsample_relative`. ([#248](https://github.com/kthtda/stablebear/issues/248))
+* **Windows ARM64 wheels** — CPU-only binary wheels for Windows on ARM64, for Python 3.11 and newer. ([#237](https://github.com/kthtda/stablebear/pull/237))
 
 ### Bug fixes
 
