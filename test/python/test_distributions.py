@@ -304,3 +304,15 @@ def test_mixture_rejects_inputs_of_the_wrong_type(distributions, coefficients, m
     with pytest.raises(TypeError, match=message):
         sb.distributions.Mixture(distributions, coefficients)
 
+
+
+@pytest.mark.parametrize(("distribution", "expected"), [
+    pytest.param(sb.distributions.Gaussian(1, 2), (-5, 7), id="gaussian"),
+    pytest.param(sb.distributions.Uniform(0, 10), (-1, 11), id="uniform"),
+    # Infinite endpoints are replaced by a unit-width interval before the margin.
+    pytest.param(sb.distributions.Uniform(1, np.inf), (0.9, 2.1), id="uniform-infinite-end"),
+    pytest.param(sb.distributions.Uniform(-np.inf, 0), (-1.1, 0.1), id="uniform-infinite-start"),
+    pytest.param(sb.distributions.Uniform(-np.inf, np.inf), (-0.1, 1.1), id="uniform-unbounded"),
+])
+def test_plot_range(distribution, expected):
+    assert distribution.plot_range() == pytest.approx(expected)

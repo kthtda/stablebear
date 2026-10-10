@@ -634,14 +634,14 @@ These go in `test/python/test_distributions.py`.
 Items 63 and 64 go in `test/python/test_distributions.py`; items 65-71 go in
 `test/python/test_plotting.py`.
 
-- [ ] **62. Confirm the double margin.** (decision) Uniform's plot range adds
+- [x] **62. Confirm the double margin.** (decision: keep both margins as-is) Uniform's plot range adds
   10% of its width, and the heatmap's automatic extent adds another 10% of the
   largest absolute bound (both documented). Decide whether both margins are
   intended. If either changes, change the code first and adjust the expected
   values in items 63, 64, and 66 before writing them. No test.
-- [ ] **63. Single-distribution plot ranges.** One parametrized test with
-  `pytest.approx`: `Gaussian(2, 0.5)` gives `(0.5, 3.5)` and `Uniform(0, 2)`
-  gives `(-0.2, 2.2)`. An infinite endpoint is first replaced to give a
+- [x] **63. Single-distribution plot ranges.** One parametrized test with
+  `pytest.approx`: `Gaussian(1, 2)` gives `(-5, 7)` and `Uniform(0, 10)`
+  gives `(-1, 11)`. An infinite endpoint is first replaced to give a
   unit-width interval, then widened by 10%: `Uniform(1, inf)` gives
   `(0.9, 2.1)`, `Uniform(-inf, 0)` gives `(-1.1, 0.1)`, and
   `Uniform(-inf, inf)` gives `(-0.1, 1.1)`. **Catches:** infinities leaking
