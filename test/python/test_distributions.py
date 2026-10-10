@@ -221,3 +221,23 @@ def test_nonfinite_values_raise(values):
 def test_non_real_values_raise(values):
     with pytest.raises(TypeError, match="values must be real numbers"):
         sb.distributions.Gaussian(0, 1).weight(values)
+
+
+@pytest.mark.parametrize(("mean", "std"), [
+    pytest.param(0, 0, id="zero-std"),
+    pytest.param(0, -1, id="negative-std"),
+    pytest.param(0, np.inf, id="infinite-std"),
+    pytest.param(np.nan, 1, id="nan-mean"),
+])
+def test_gaussian_rejects_invalid_parameters(mean, std):
+    with pytest.raises(ValueError, match="Gaussian requires a finite mean and finite positive std"):
+        sb.distributions.Gaussian(mean, std)
+
+
+@pytest.mark.parametrize("mean", [
+    pytest.param(True, id="bool"),
+    pytest.param("0", id="string"),
+])
+def test_gaussian_rejects_non_numeric_mean(mean):
+    with pytest.raises(TypeError, match="mean must be a real scalar"):
+        sb.distributions.Gaussian(mean, 1)

@@ -605,7 +605,7 @@ These go in `test/python/test_distributions.py`.
   negative values. Booleans are
   currently accepted; leave them out until that is decided (see the
   follow-ups).
-- [ ] **59. Gaussian parameters.** Two small tests. `std` 0, -1, or inf, or a
+- [x] **59. Gaussian parameters.** Two small tests. `std` 0, -1, or inf, or a
   NaN `mean`, raises ValueError "Gaussian requires a finite mean and finite
   positive std"; `mean=True` or `"0"` raises TypeError "mean must be a real
   scalar" (the shared `_real`, checked once here). **Catches:** nonpositive or
