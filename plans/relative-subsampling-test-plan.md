@@ -557,12 +557,11 @@ repeated for `subsample_relative`.
   finite"; infinite coordinates are left untested. **Catches:** a less helpful error: without the check, a nonfinite
   coordinate raises OverflowError "Euclidean distance exceeds numerical range"
   instead. Optional because only the error type and message are at stake.
-- [ ] **53. NaN written into a matrix.** (optional) Entry assignment rejects
-  only negative values, so `matrix[0, 1] = nan` succeeds, and sampling then
-  raises ValueError "distances must be nonnegative and not NaN". **Catches:**
-  the reference check removed, leaving only the less specific "values must not
-  be NaN" from the weight evaluation. `test_distance_matrix.py` already covers
-  constructor rejection of NaN and negative values.
+- [x] **53. NaN written into a matrix.** (optional, dropped) Entry
+  assignment now rejects NaN, so a NaN can no longer reach
+  `subsample_relative` through a matrix reference, and its "distances must be
+  nonnegative and not NaN" check is only defensive. `test_distance_matrix.py`
+  covers the assignment rejection.
 - [ ] **54. Generator argument type.** Passing a NumPy generator,
   `np.random.default_rng(0)`, as `generator` raises TypeError "generator must
   be a stablebear.random.Generator or None". **Catches:** the sampler bypassing
