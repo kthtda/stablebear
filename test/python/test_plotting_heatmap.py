@@ -1,3 +1,4 @@
+import matplotlib.pyplot as plt
 import numpy as np
 import pytest
 
@@ -67,3 +68,32 @@ def test_overflowing_plot_range_works_with_an_extent(ax):
     im = plot_distance_weight_heatmap(gaussian, extent=(-1, 1, -1, 1), resolution=3, ax=ax)
 
     assert im.get_extent() == pytest.approx([-1, 1, -1, 1])
+
+
+def test_draws_on_the_given_axes(ax):
+    ax.plot([0, 1], [0, 1])
+    other_fig, other_ax = plt.subplots()
+    assert plt.gca() is other_ax
+
+    im = plot_distance_weight_heatmap(
+        sb.distributions.Gaussian(0, 1), extent=(-1, 1, -1, 1), resolution=3, ax=ax,
+    )
+
+    assert im.axes is ax
+    assert len(ax.lines) == 1
+    assert len(other_ax.images) == 0
+    plt.close(other_fig)
+
+
+def test_draws_on_the_current_axes_when_ax_is_omitted(ax):
+    current_fig, current_ax = plt.subplots()
+    assert plt.gca() is current_ax
+
+    im = plot_distance_weight_heatmap(
+        sb.distributions.Gaussian(0, 1), extent=(-1, 1, -1, 1), resolution=3,
+    )
+
+    assert im.axes is current_ax
+    assert len(ax.images) == 0
+    plt.close(current_fig)
+

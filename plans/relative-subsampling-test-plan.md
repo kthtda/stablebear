@@ -679,7 +679,7 @@ Items 63 and 64 go in `test/python/test_distributions.py`; items 65-71 go in
   absolute bound times 1.1 overflows, such as `Uniform(0, 1.7e308)`, reaches
   the same error. **Catches:** an overflowing radius reported only as the
   generic extent error, without telling the caller to pass an extent.
-- [ ] **69. Supplied and current axes.** Two small tests. With `ax` given while
+- [x] **69. Supplied and current axes.** Two small tests. With `ax` given while
   another axes is current, the image lands on the given axes, its existing line
   remains, and the current axes gets no image. With `ax` omitted, the image
   goes to the current axes. The `ax` fixture from `plot_helpers.ax_fixture` is
