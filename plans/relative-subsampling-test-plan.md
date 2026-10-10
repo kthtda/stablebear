@@ -704,10 +704,10 @@ Items 63 and 64 go in `test/python/test_distributions.py`; items 65-71 go in
 
 ## Composition and final checks
 
-- [ ] **72. Persistence pipeline.** (optional) One test parametrized over a
+- [x] **72. Persistence pipeline.** (optional) One test parametrized over a
   point cloud and its pairwise distance matrix: points (0, 0), (1, 0), (0, 1),
   (10, 0), and (11, 0); queries `[0, 3]`; `Uniform(0, 1.5)`; `n_points=3`;
-  `n_samples=2`. Every eligible point is drawn, so draw order does not matter.
+  `n_samples=2`; `replace=False`. Every eligible point is drawn, so draw order does not matter.
   Persistent homology with `max_dim=0`
   (`persistence.compute_persistent_homology`), then
   `persistence.barcode_to_stable_rank`, then `sb.mean(..., dim=1)` gives shape

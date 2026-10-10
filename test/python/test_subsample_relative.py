@@ -916,3 +916,45 @@ def test_numpy_generator_raises():
             distribution=sb.distributions.Uniform(0, 0.5),
             generator=np.random.default_rng(0),
         )
+
+
+_PIPELINE_POINTS = np.array([
+    [0.0, 0.0],
+    [1.0, 0.0],
+    [0.0, 1.0],
+    [10.0, 0.0],
+    [11.0, 0.0],
+])
+
+
+@pytest.mark.parametrize("reference", [
+    pytest.param(sb.PointCloud(_PIPELINE_POINTS), id="point-cloud"),
+    pytest.param(
+        sb.DistanceMatrix(np.linalg.norm(
+            _PIPELINE_POINTS[:, None] - _PIPELINE_POINTS[None, :], axis=-1)),
+        id="distance-matrix",
+    ),
+])
+def test_samples_feed_the_persistence_pipeline(reference):
+    # Query 0 has three eligible points (0, 1, 2) and query 3 has two (3, 4),
+    # so every sample holds all of its eligible points.
+    samples = sb.random.subsample_relative(
+        reference, [0, 3], n_points=3, n_samples=2, replace=False,
+        distribution=sb.distributions.Uniform(0, 1.5),
+    )
+
+    barcodes = sb.persistence.compute_persistent_homology(samples, max_dim=0)
+    stable_ranks = sb.persistence.barcode_to_stable_rank(barcodes)
+    mean_stable_ranks = sb.mean(stable_ranks, dim=1)
+
+    # mean_stable_ranks[query, homology dimension]
+    assert mean_stable_ranks.shape == (2, 1)
+    # Rows are (start, value): the components merge at distance 1, leaving one.
+    npt.assert_array_equal(np.asarray(mean_stable_ranks[0, 0]), [
+        [0.0, 3.0],
+        [1.0, 1.0],
+    ])
+    npt.assert_array_equal(np.asarray(mean_stable_ranks[1, 0]), [
+        [0.0, 2.0],
+        [1.0, 1.0],
+    ])
