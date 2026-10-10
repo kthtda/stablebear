@@ -1,15 +1,13 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+import warnings
 
 import numpy as np
 
 from . import _sb_cpp as cpp
-from ._tensor_base import Tensor
+from ._binary_io import _BinaryIoMixin
+from ._tensor_base import IndexedElementTensor
 from .typing import float32, float64, distmat32, distmat64
-
-if TYPE_CHECKING:
-    CppDistanceMatrix = cpp.DistanceMatrix_f32 | cpp.DistanceMatrix_f64
 
 _dtype_to_cpp = {
     float32: cpp.DistanceMatrix_f32,
@@ -26,10 +24,17 @@ _CPP_TO_DTYPE = {
 _DISTMAT_CPP_TO_DTYPE = {
     cpp.DistanceMatrix32Tensor: distmat32,
     cpp.DistanceMatrix64Tensor: distmat64,
+    cpp._IndexedDistanceMatrix32Tensor: distmat32,
+    cpp._IndexedDistanceMatrix64Tensor: distmat64,
 }
 
+_INDEXED_DISTMAT_CPP_TYPES = (
+    cpp._IndexedDistanceMatrix32Tensor,
+    cpp._IndexedDistanceMatrix64Tensor,
+)
 
-class DistanceMatrix:
+
+class DistanceMatrix(_BinaryIoMixin):
     """Compressed distance matrix (symmetric, zero diagonal, nonnegative).
 
     Stores only n*(n-1)/2 elements for an n×n distance matrix.
@@ -37,22 +42,41 @@ class DistanceMatrix:
 
     Parameters
     ----------
-    n_or_data : int | DistanceMatrix | CppDistanceMatrix
+    n_or_data : int | numpy.ndarray | DistanceMatrix
         If an int, creates a zero-initialized matrix of that size.
-        If a DistanceMatrix or C++ distance matrix, wraps it directly.
+        A two-dimensional NumPy array supplies the full square matrix. A
+        one-dimensional array supplies the strict upper triangle in SciPy
+        condensed order: ``(0, 1), (0, 2), ..., (n-2, n-1)``.
+        If a DistanceMatrix, wraps it directly.
     dtype : float32 | float64 | None, optional
         Element precision. ``float32`` stores entries as 32-bit floats,
         ``float64`` as 64-bit floats. Defaults to ``float64`` when
-        ``n_or_data`` is an int. Ignored otherwise.
+        ``n_or_data`` is an int. For array input, ``float32`` and ``float64``
+        are inferred; other array dtypes require an explicit dtype. An
+        explicit dtype converts the array before construction. Ignored for
+        existing matrix objects.
     """
+
+    def _binary_io_data(self):
+        return self._current_matrix()
 
     def __init__(
         self,
-        n_or_data: int | DistanceMatrix | CppDistanceMatrix,
+        n_or_data: int | np.ndarray | DistanceMatrix,
         dtype: float32 | float64 | None = None,
+        *,
+        _owner=None,
+        _outer_index=None,
     ):
+        self._owner = _owner
+        self._outer_index = _outer_index
+        if _owner is not None:
+            self._data = n_or_data
+            return
         if isinstance(n_or_data, DistanceMatrix):
-            self._data = n_or_data._data
+            self._data = n_or_data._current_matrix()
+            self._owner = n_or_data._owner
+            self._outer_index = n_or_data._outer_index
         elif isinstance(n_or_data, _cpp_types):
             self._data = n_or_data
         elif isinstance(n_or_data, int):
@@ -61,25 +85,40 @@ class DistanceMatrix:
             if dtype not in _dtype_to_cpp:
                 raise TypeError(f"Unsupported dtype {dtype}; use float32 or float64")
             self._data = _dtype_to_cpp[dtype](n_or_data)
+        elif isinstance(n_or_data, np.ndarray):
+            self._data = _distance_matrix_from_array(n_or_data, dtype)
         else:
-            raise TypeError(f"Expected int, DistanceMatrix, or C++ DistanceMatrix; got {type(n_or_data)}")
+            raise TypeError(
+                "Expected int, numpy.ndarray, or DistanceMatrix; "
+                f"got {type(n_or_data)}")
+
+    def _current_matrix(self):
+        if self._owner is None:
+            return self._data
+        return self._owner._data._get_element(self._outer_index)
+
+    def _writeable_matrix(self):
+        if self._owner is None:
+            return self._data
+        self._owner._ensure_writeable()
+        return self._owner._data._get_writeable_element(self._outer_index)
 
     @property
     def dtype(self):
         """Element precision (``float32`` or ``float64``)."""
-        return _CPP_TO_DTYPE[type(self._data)]
+        return _CPP_TO_DTYPE[type(self._current_matrix())]
 
     @property
     def size(self) -> int:
-        return self._data.size
+        return self._current_matrix().size
 
     @property
     def storage_count(self) -> int:
-        return self._data.storage_count
+        return self._current_matrix().storage_count
 
     def _resolve_ij(self, ij):
         i, j = ij
-        n = self._data.size
+        n = self._current_matrix().size
         if i < 0:
             i += n
         if j < 0:
@@ -111,13 +150,14 @@ class DistanceMatrix:
             If ``i`` or ``j`` is out of range for the matrix size.
         """
         i, j = self._resolve_ij(ij)
-        return self._data[i, j]
+        return self._current_matrix()[i, j]
 
     def __setitem__(self, ij, value):
         """Set the entry at ``(i, j)`` (and, symmetrically, ``(j, i)``).
 
         Negative indices count from the end. Writes to the diagonal are
-        rejected unless the value is zero, and entries must be nonnegative.
+        rejected unless the value is zero, and entries must be nonnegative
+        and not NaN.
 
         Parameters
         ----------
@@ -132,11 +172,13 @@ class DistanceMatrix:
             If ``i`` or ``j`` is out of range for the matrix size.
         """
         i, j = self._resolve_ij(ij)
-        self._data[i, j] = value
+        # Convert and validate with the backend before transitioning shared state.
+        self._current_matrix()._validate_assignment(i, j, value)
+        self._writeable_matrix()[i, j] = value
 
     def to_dense(self) -> np.ndarray:
         """Return the full n×n distance matrix as a numpy array."""
-        return self._data.to_dense()
+        return self._current_matrix().to_dense()
 
     def to_numpy(self) -> np.ndarray:
         """Return the full n×n distance matrix as a numpy array.
@@ -145,6 +187,10 @@ class DistanceMatrix:
         rest of the library.
         """
         return self.to_dense()
+
+    def copy(self):
+        """Return an independent distance matrix with logical values copied."""
+        return DistanceMatrix(self._current_matrix().copy())
 
     def __array__(self, dtype=None, copy=None):
         """Return the dense n×n matrix so ``np.asarray(matrix)`` works.
@@ -158,25 +204,47 @@ class DistanceMatrix:
             arr = arr.astype(dtype, copy=False)
         return arr
 
-    def __reduce__(self):
-        import io as _io
-        from .io import _save_object, _unpickle_object
-        buf = _io.BytesIO()
-        _save_object(self, buf)
-        return _unpickle_object, (buf.getvalue(),)
-
     @classmethod
     def from_dense(cls, array):
-        """Create a DistanceMatrix from a dense n×n numpy array."""
-        if array.dtype == np.float32:
-            return cls(cpp.DistanceMatrix_f32.from_dense(array))
-        elif array.dtype == np.float64:
-            return cls(cpp.DistanceMatrix_f64.from_dense(array))
-        else:
+        """Create a DistanceMatrix from a dense n×n NumPy array.
+
+        .. deprecated:: 0.4.7
+           Pass the array to ``DistanceMatrix(array)`` instead.
+        """
+        warnings.warn(
+            "DistanceMatrix.from_dense() is deprecated since 0.4.7; pass the array to "
+            "DistanceMatrix(array) instead",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        if array.dtype not in (np.float32, np.float64):
             raise TypeError(f"Unsupported dtype {array.dtype}")
+        return cls(array)
 
     def __repr__(self):
-        return repr(self._data)
+        return repr(self._current_matrix())
+
+
+def _array_dtype(array, dtype):
+    if dtype is not None:
+        if dtype not in _dtype_to_cpp:
+            raise TypeError(f"Unsupported dtype {dtype}; use float32 or float64")
+        return dtype
+    _validate_matrix_array_dtype(array)
+    return float32 if array.dtype == np.float32 else float64
+
+
+def _validate_matrix_array_dtype(array):
+    if array.dtype not in (np.float32, np.float64):
+        raise TypeError(
+            f"Unsupported array dtype {array.dtype}; use float32 or float64")
+
+
+def _distance_matrix_from_array(array, dtype):
+    dt = _array_dtype(array, dtype)
+    np_dtype = np.float32 if dt is float32 else np.float64
+    array = np.asarray(array, dtype=np_dtype)
+    return _dtype_to_cpp[dt].from_numpy(array)
 
 
 def _matrix_dtype_for(arr_dtype, dtype, dtype32, dtype64, name):
@@ -209,11 +277,11 @@ def _matrix_tensor_cpp_from_array(arr, dtype, scalar_cls, dtype32, dtype64):
     tensor_shape = arr.shape[:-2]
     t = zeros(tensor_shape, dtype=dt)
     for idx in np.ndindex(*tensor_shape):
-        t[idx] = scalar_cls.from_dense(arr[idx])
+        t[idx] = scalar_cls(arr[idx])
     return t._data
 
 
-class DistanceMatrixTensor(Tensor):
+class DistanceMatrixTensor(IndexedElementTensor):
     """Tensor whose elements are :class:`DistanceMatrix` objects.
 
     Parameters
@@ -225,6 +293,9 @@ class DistanceMatrixTensor(Tensor):
         Element precision. Inferred from the array dtype when ``None``.
     """
 
+    _indexed_cpp_types = _INDEXED_DISTMAT_CPP_TYPES
+    _indexed_element_name = "Distance-matrix"
+
     def __init__(self, data, dtype=None):
         super().__init__()
         if isinstance(data, DistanceMatrixTensor):
@@ -232,7 +303,7 @@ class DistanceMatrixTensor(Tensor):
         elif isinstance(data, np.ndarray):
             data = _matrix_tensor_cpp_from_array(
                 data, dtype, DistanceMatrix, distmat32, distmat64)
-        elif not isinstance(data, (cpp.DistanceMatrix32Tensor, cpp.DistanceMatrix64Tensor)):
+        elif not isinstance(data, tuple(_DISTMAT_CPP_TO_DTYPE)):
             raise TypeError(f"Cannot create DistanceMatrixTensor from {type(data)}")
         self._data = data
         self.dtype = _DISTMAT_CPP_TO_DTYPE[type(self._data)]
@@ -251,10 +322,13 @@ class DistanceMatrixTensor(Tensor):
         return DistanceMatrixTensor(data)
 
     def _decay_value(self, val):
-        return val._data
+        return val._current_matrix()
 
     def _represent_element(self, element):
         return DistanceMatrix(element)
+
+    def _element_view(self, element, index):
+        return DistanceMatrix(element, _owner=self, _outer_index=index)
 
     def _get_valid_setitem_dtypes(self):
         return [DistanceMatrix, DistanceMatrixTensor]

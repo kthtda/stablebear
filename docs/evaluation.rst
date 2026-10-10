@@ -177,14 +177,20 @@ In general, for a tensor of shape ``(d_0, d_1, ..., d_k)``, reducing along
 -- the ``j``-th dimension is removed, and each position in the output
 corresponds to the reduction of all elements along that axis.
 
-When the result would be a single element (a tensor of shape ``(1,)``), stablebear
-returns a scalar (a ``Pcf`` or a ``float``) directly rather than a 1-element
-tensor.
+Reductions return tensors. Reducing a one-dimensional tensor produces shape
+``(1,)``; use ``result[0]`` to access the single PCF or numeric value.
 
 ``dim`` follows NumPy axis conventions: it may be negative to count from the
 last axis (``dim=-1`` is the last axis, ``dim=-2`` the second-to-last). For a
 ``k``-dimensional tensor the valid values are ``-k`` through ``k - 1``; an
 out-of-range ``dim`` raises ``IndexError``.
+
+sum
+---
+
+:py:func:`~stablebear.sum` adds PCFs pointwise along a dimension::
+
+   total = sb.sum(X, dim=0)
 
 mean
 ----
@@ -196,7 +202,7 @@ mean
 
    X = noisy_sin((50,), n_points=100)
 
-   # Average all 50 functions into a single Pcf
+   # Average all 50 functions into a tensor of shape (1,)
    avg = sb.mean(X, dim=0)
 
 For a higher-dimensional tensor, the specified dimension is collapsed::

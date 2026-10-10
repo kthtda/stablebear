@@ -16,7 +16,9 @@ Pre-built x86-64 wheels target the `x86-64-v3 <https://en.wikipedia.org/wiki/X86
 
 On import, `stablebear` verifies that the CPU supports the required instruction set and raises a clear ``ImportError`` if it does not — rebuild from source as described below to run on such hardware.
 
-arm64 / aarch64 wheels (Apple Silicon, Linux aarch64) have no equivalent baseline issue.
+arm64 / aarch64 wheels (Apple Silicon, Linux aarch64, Windows ARM64) have no equivalent baseline issue.
+
+Windows ARM64 wheels are CPU-only and available for Python 3.11 and newer. NumPy publishes no Windows ARM64 wheels for Python 3.10.
 
 Building from source
 =====================

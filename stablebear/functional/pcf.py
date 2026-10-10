@@ -3,10 +3,11 @@ from __future__ import annotations
 import numpy as np
 
 from .. import _sb_cpp as cpp
+from .._binary_io import _BinaryIoMixin
 from ..typing import _assert_valid_dtype, _SB_TO_NP, _NP_TO_SB, float32, float64, int32, int64, pcf32, pcf32i, pcf64, pcf64i
 
 
-class Pcf:
+class Pcf(_BinaryIoMixin):
     r"""A piecewise constant function (PCF).
 
     A PCF is defined by a sequence of (time, value) pairs
@@ -39,6 +40,9 @@ class Pcf:
     >>> f.size
     3
     """
+
+    def _binary_io_data(self):
+        return self._data
 
     _DTYPE_TO_NP = {
         pcf32: np.float32,
@@ -278,14 +282,6 @@ class Pcf:
         if dtype is not None:
             arr = arr.astype(dtype, copy=False)
         return arr
-
-    def __reduce__(self):
-        import io as _io
-        from ..io import _save_object, _load_object
-        buf = _io.BytesIO()
-        _save_object(self, buf)
-        from ..io import _unpickle_object
-        return _unpickle_object, (buf.getvalue(),)
 
     def __eq__(self, other):
         return np.array_equal(self.__array__(), np.asarray(other))

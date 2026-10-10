@@ -33,9 +33,14 @@ RUN useradd -m -s /bin/bash runner \
 
 WORKDIR /home/runner/actions-runner
 
-ARG RUNNER_VERSION=2.334.0
-RUN curl -fsSL -o runner.tar.gz \
-      "https://github.com/actions/runner/releases/download/v${RUNNER_VERSION}/actions-runner-linux-x64-${RUNNER_VERSION}.tar.gz" \
+# Empty RUNNER_VERSION installs the latest release. build.sh passes the
+# resolved version so a new release invalidates the cached layer.
+ARG RUNNER_VERSION=
+RUN v="${RUNNER_VERSION:-$(curl -fsSLI -o /dev/null -w '%{url_effective}' \
+          https://github.com/actions/runner/releases/latest | sed 's#.*/v##')}" \
+    && echo "Installing actions runner ${v}" \
+    && curl -fsSL -o runner.tar.gz \
+      "https://github.com/actions/runner/releases/download/v${v}/actions-runner-linux-x64-${v}.tar.gz" \
     && tar xzf runner.tar.gz \
     && rm runner.tar.gz \
     && ./bin/installdependencies.sh

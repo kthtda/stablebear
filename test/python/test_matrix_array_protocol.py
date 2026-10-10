@@ -34,7 +34,7 @@ def _sample_symmetric_array():
 @pytest.mark.parametrize("convert", [np.asarray, np.array])
 def test_distance_matrix_asarray_is_dense(convert):
     dense = _sample_distance_array()
-    dm = DistanceMatrix.from_dense(dense)
+    dm = DistanceMatrix(dense)
     arr = convert(dm)
     assert arr.dtype != object
     assert arr.shape == (3, 3)
@@ -44,7 +44,7 @@ def test_distance_matrix_asarray_is_dense(convert):
 @pytest.mark.parametrize("convert", [np.asarray, np.array])
 def test_symmetric_matrix_asarray_is_dense(convert):
     dense = _sample_symmetric_array()
-    sm = SymmetricMatrix.from_dense(dense)
+    sm = SymmetricMatrix(dense)
     arr = convert(sm)
     assert arr.dtype != object
     assert arr.shape == (3, 3)
@@ -52,17 +52,17 @@ def test_symmetric_matrix_asarray_is_dense(convert):
 
 
 def test_distance_matrix_to_numpy_alias():
-    dm = DistanceMatrix.from_dense(_sample_distance_array())
+    dm = DistanceMatrix(_sample_distance_array())
     npt.assert_allclose(dm.to_numpy(), dm.to_dense())
 
 
 def test_symmetric_matrix_to_numpy_alias():
-    sm = SymmetricMatrix.from_dense(_sample_symmetric_array())
+    sm = SymmetricMatrix(_sample_symmetric_array())
     npt.assert_allclose(sm.to_numpy(), sm.to_dense())
 
 
 def test_asarray_dtype_argument():
-    dm = DistanceMatrix.from_dense(_sample_distance_array())
+    dm = DistanceMatrix(_sample_distance_array())
     arr = np.asarray(dm, dtype=np.float32)
     assert arr.dtype == np.float32
     npt.assert_allclose(arr, _sample_distance_array())

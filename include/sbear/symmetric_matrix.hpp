@@ -3,6 +3,7 @@
 
 #include "config.hpp"
 #include "concepts.hpp"
+#include "fixed_rank_tensor.hpp"
 
 #include <algorithm>
 #include <cstddef>
@@ -12,11 +13,32 @@
 
 namespace sb
 {
-  namespace io::detail
+  class SymmetricMatrixLayout
   {
-    template <typename MatT>
-    MatT read_compressed_matrix(std::istream&);
-  }
+  public:
+    using shape_type = std::array<size_t, 2>;
+
+    SymmetricMatrixLayout() = default;
+    explicit SymmetricMatrixLayout(size_t size) : m_size(size) { }
+
+    [[nodiscard]] shape_type shape() const noexcept { return {m_size, m_size}; }
+    [[nodiscard]] size_t storage_size() const noexcept
+    {
+      return m_size * (m_size + 1) / 2;
+    }
+    [[nodiscard]] size_t offset(const shape_type& indices) const
+    {
+      if (indices[0] >= m_size || indices[1] >= m_size)
+        throw std::out_of_range("SymmetricMatrix index out of range");
+      const auto row = std::max(indices[0], indices[1]);
+      const auto col = std::min(indices[0], indices[1]);
+      return row * (row + 1) / 2 + col;
+    }
+    [[nodiscard]] size_t size() const noexcept { return m_size; }
+
+  private:
+    size_t m_size = 0;
+  };
 
   /// Lower-triangular compressed symmetric matrix.
   ///
@@ -29,11 +51,8 @@ namespace sb
     using value_type = T;
 
     explicit SymmetricMatrix(size_t n, const T& init = {})
-      : m_data(std::make_shared<T[]>(storage_size(n)))
-      , m_size(n)
-    {
-      std::fill(m_data.get(), m_data.get() + storage_size(n), init);
-    }
+      : m_storage(SymmetricMatrixLayout(n), init)
+    { }
 
     SymmetricMatrix() : SymmetricMatrix(0) { }
 
@@ -42,40 +61,36 @@ namespace sb
     /// is used when a matrix must not alias its source (e.g. a tensor cell).
     [[nodiscard]] SymmetricMatrix copy() const
     {
-      SymmetricMatrix result(m_size);
-      std::copy(m_data.get(), m_data.get() + storage_size(m_size), result.m_data.get());
+      SymmetricMatrix result;
+      result.m_storage = m_storage.copy();
       return result;
     }
 
-    [[nodiscard]] size_t size() const { return m_size; }
-    [[nodiscard]] size_t storage_count() const { return storage_size(m_size); }
+    [[nodiscard]] size_t size() const { return m_storage.layout().size(); }
+    [[nodiscard]] size_t storage_count() const { return storage_size(size()); }
 
     [[nodiscard]] T& operator()(size_t i, size_t j)
     {
-      return m_data[compressed_index(i, j)];
+      return m_storage(i, j);
     }
 
     [[nodiscard]] const T& operator()(size_t i, size_t j) const
     {
-      return m_data[compressed_index(i, j)];
+      return m_storage(i, j);
     }
 
     [[nodiscard]] bool operator==(const SymmetricMatrix& rhs) const
     {
-      if (m_size != rhs.m_size)
-        return false;
-      return std::equal(m_data.get(), m_data.get() + storage_size(m_size), rhs.m_data.get());
+      return size() == rhs.size()
+        && std::equal(data(), data() + storage_count(), rhs.data());
     }
 
     [[nodiscard]] bool operator!=(const SymmetricMatrix& rhs) const
     {
-      if (m_size != rhs.m_size)
-        return true;
-      return std::mismatch(m_data.get(), m_data.get() + storage_size(m_size), rhs.m_data.get()).first
-        != m_data.get() + storage_size(m_size);
+      return !(*this == rhs);
     }
 
-    [[nodiscard]] const T* data() const { return m_data.get(); }
+    [[nodiscard]] const T* data() const { return m_storage.storage_data(); }
 
     [[nodiscard]] static size_t storage_size(size_t n)
     {
@@ -83,27 +98,7 @@ namespace sb
     }
 
   private:
-    [[nodiscard]] T* mutable_data() { return m_data.get(); }
-
-    template <typename MatT>
-    friend MatT io::detail::read_compressed_matrix(std::istream&);
-
-    [[nodiscard]] size_t compressed_index(size_t i, size_t j) const
-    {
-      if (i >= m_size || j >= m_size)
-      {
-        std::ostringstream oss;
-        oss << "SymmetricMatrix index (" << i << ", " << j << ") out of range for matrix of size " << m_size;
-        throw std::out_of_range(oss.str());
-      }
-
-      auto row = std::max(i, j);
-      auto col = std::min(i, j);
-      return row * (row + 1) / 2 + col;
-    }
-
-    std::shared_ptr<T[]> m_data;
-    size_t m_size;
+    FixedRankTensor<T, 2, SymmetricMatrixLayout> m_storage;
   };
 
   template <typename T>

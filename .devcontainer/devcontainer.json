@@ -20,10 +20,13 @@
     "NVIDIA_VISIBLE_DEVICES": "all",
     "NVIDIA_DRIVER_CAPABILITIES": "compute,utility",
     // gh token passthrough for hosts that keep it in the OS keyring rather
-    // than hosts.yml (where the ~/.config/gh mount alone wouldn't carry it).
+    // than hosts.yml (where copying the config alone would not carry it).
     // Empty when unset on the host; gh treats that as absent.
     "GH_TOKEN": "${localEnv:GH_TOKEN}"
   },
+
+  // Stage gh config for the image build as the host user (works with AFS).
+  "initializeCommand": ["bash", "${localWorkspaceFolder}/.devcontainer/prepare-gh.sh", "${localWorkspaceFolder}/.devcontainer/.local"],
 
   "remoteUser": "ubuntu",
 
@@ -31,9 +34,8 @@
     // Persist Claude Code auth/config across rebuilds.
     "source=${localEnv:HOME}/.claude,target=/home/ubuntu/.claude,type=bind,consistency=cached",
     "source=${localEnv:HOME}/.claude.json,target=/home/ubuntu/.claude.json,type=bind,consistency=cached",
-    // Share gh CLI auth/config with the host (requires `gh auth login` on the
-    // host first, or once in the container -- it persists back to the host).
-    "source=${localEnv:HOME}/.config/gh,target=/home/ubuntu/.config/gh,type=bind,consistency=cached",
+    // Reuse the host's file-based Codex login while keeping container config/rules.
+    "source=${localEnv:HOME}/.codex/auth.json,target=/home/ubuntu/.codex/auth.json,type=bind,consistency=cached",
     // Container-private build dir. The workspace is bind-mounted from the host,
     // whose cmake-build-debug holds a CMakeCache.txt baked with host paths; this
     // volume shadows it so the container keeps its own cache (CMake refuses a
@@ -49,8 +51,8 @@
   // postCreate also avoids wedging container creation when the persistent
   // cmake-build-debug volume holds a cache from a different generator/toolchain
   // (e.g. an old Unix Makefiles cache vs. the Ninja preset). Build manually with
-  // the commands documented in CLAUDE.md:
-  //   cmake --preset debug && cmake --build --preset debug && cmake --install cmake-build-debug
+  // the commands documented in AGENTS.md:
+  //   cmake --preset debug && cmake --build --preset debug -j$(nproc --ignore=4) && cmake --install cmake-build-debug
   // Claude Code is installed natively into ~/.local/bin by the Dockerfile, which
   // already matches installMethod=native in the bind-mounted ~/.claude.json, so
   // no /doctor-quieting symlink is needed here anymore.
@@ -63,7 +65,8 @@
         "ms-vscode.cpptools",
         "ms-vscode.cmake-tools",
         "llvm-vs-code-extensions.vscode-clangd",
-        "anthropic.claude-code"
+        "anthropic.claude-code",
+        "openai.chatgpt"
       ],
       "settings": {
         // Python deps live in a venv outside the workspace folder (see
@@ -79,7 +82,7 @@
         // lands in Claude's input prompt instead of the shell. Disable it.
         "python.terminal.activateEnvironment": false,
         // Tests must run from test/ so the source-tree stablebear/ dir doesn't
-        // shadow the installed/built extension (see CLAUDE.md > Testing).
+        // shadow the installed/built extension (see AGENTS.md > Testing).
         "python.testing.pytestEnabled": true,
         "python.testing.cwd": "${workspaceFolder}/test",
         "python.testing.pytestArgs": ["python"]

@@ -3,12 +3,13 @@ from __future__ import annotations
 import numpy as np
 
 from .. import _sb_cpp as cpp
+from .._binary_io import _BinaryIoMixin
 from ..typing import barcode32, barcode64
 
 cpp_p = cpp.persistence
 
 
-class Barcode:
+class Barcode(_BinaryIoMixin):
     """A persistence barcode, i.e. a collection of bars (birth-death intervals).
 
     A barcode is represented as an (n, 2) array where each row is a bar
@@ -20,6 +21,9 @@ class Barcode:
         An existing ``Barcode`` to copy, or an (n, 2) NumPy array of
         ``(birth, death)`` pairs (``float32`` or ``float64``).
     """
+
+    def _binary_io_data(self):
+        return self._data
 
     def __init__(self, bc):
         fail = False
@@ -67,13 +71,6 @@ class Barcode:
         if dtype is not None:
             arr = arr.astype(dtype, copy=False)
         return arr
-
-    def __reduce__(self):
-        import io as _io
-        from ..io import _save_object, _unpickle_object
-        buf = _io.BytesIO()
-        _save_object(self, buf)
-        return _unpickle_object, (buf.getvalue(),)
 
     def is_isomorphic_to(self, bc: Barcode, atol: float = 1e-8, rtol: float = 1e-5):
         """Check whether two barcodes are isomorphic (same multiset of bars).

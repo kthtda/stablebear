@@ -39,6 +39,38 @@ def _resolve_dim(dim: int, ndim: int) -> int:
     return resolved
 
 
+def sum(fs: PcfContainerLike, dim: int = 0):
+    r"""Compute the pointwise sum of PCFs along the given dimension.
+
+    For functions :math:`f_1, \ldots, f_n` along the reduced dimension,
+    the result satisfies :math:`s(t) = \sum_{i=1}^{n} f_i(t)` for all
+    :math:`t`. An empty sum is the identically zero PCF.
+
+    See :ref:`tensors-how-dim-works` for dimension reduction semantics.
+
+    Parameters
+    ----------
+    fs : PcfContainerLike
+        A ``PcfTensor`` with dtype ``pcf32`` or ``pcf64``.
+    dim : int, optional
+        Dimension along which to reduce, by default 0. Negative values count
+        from the last axis (NumPy semantics: ``dim=-1`` is the last axis).
+
+    Returns
+    -------
+    PcfTensor
+        A tensor of the same dtype with the reduced dimension removed.
+        Reducing a one-dimensional tensor returns shape ``(1,)``.
+
+    Raises
+    ------
+    IndexError
+        If ``dim`` is out of range for the input tensor's number of dimensions.
+    """
+    backend, tensor = _resolve_pcf_inputs(_REDUCTIONS_BACKEND_MAP, fs)
+    return _to_tensor(backend.sum(tensor._data, _resolve_dim(dim, tensor.ndim)))
+
+
 def mean(fs: PcfContainerLike, dim: int = 0):
     r"""Compute the pointwise mean of a PCF tensor along the given dimension.
 
@@ -66,6 +98,7 @@ def mean(fs: PcfContainerLike, dim: int = 0):
     -------
     PcfTensor
         A ``PcfTensor`` with the reduced dimension removed.
+        Reducing a one-dimensional tensor returns shape ``(1,)``.
 
     Raises
     ------

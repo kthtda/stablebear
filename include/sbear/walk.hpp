@@ -221,6 +221,33 @@ namespace sb
     parallel_walk_async(tensor, gen, std::forward<BinaryFunc>(f), exec).wait();
   }
 
+  // ============================================================================
+  // Parallel index loop with random: deterministically-seeded engine per index
+  // ============================================================================
+
+  /**
+   * Like parallel_walk_async() with random, but over the indices [0, count)
+   * instead of a tensor, with an optional taskflow partitioner. The lambda
+   * receives (i, engine&) where the engine is seeded from the generator and i.
+   * Returns a tf::Future.
+   */
+  template <typename EngineT, typename BinaryFunc, typename Partitioner = tf::DefaultPartitioner>
+#ifndef __CUDACC__
+  requires std::invocable<BinaryFunc, size_t, EngineT&>
+#endif
+  tf::Future<void> parallel_for_each_index_async(size_t count, RandomGenerator<EngineT>& gen, BinaryFunc&& f,
+                                                 Executor& exec, Partitioner partitioner = Partitioner())
+  {
+    auto block = gen.reserve(count);
+    tf::Taskflow flow;
+    flow.for_each_index(size_t{0}, count, size_t{1},
+      [block, f = std::forward<BinaryFunc>(f)](size_t i) {
+        auto engine = block.sub_generator(i);
+        f(i, engine);
+      }, partitioner);
+    return exec.cpu()->run(std::move(flow));
+  }
+
 }
 
 #endif

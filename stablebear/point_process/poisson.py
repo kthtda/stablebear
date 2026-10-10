@@ -63,7 +63,7 @@ def sample_poisson(shape, dim=2, rate=1.0, lo=None, hi=None, generator=None, dty
     if lo.shape != (dim,) or hi.shape != (dim,):
         raise ValueError(f"lo and hi must have shape ({dim},)")
 
-    from ..random import _unwrap
+    from ..random.generator import _unwrap
 
     A = zeros(shape, dtype=dtype)
     backend.sample_poisson(

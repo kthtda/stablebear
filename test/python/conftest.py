@@ -2,6 +2,7 @@
 
 import os
 
+import numpy as np
 import pytest
 
 import stablebear as sb
@@ -16,6 +17,22 @@ if _require_cuda and not _has_cuda:
         f"(build_type={cpp._build_type()}, ngpus={cpp.get_ngpus()})",
         pytrace=False,
     )
+
+
+def pytest_configure(config):
+    config.addinivalue_line(
+        "markers",
+        "statistical: large statistical check, run only with SB_RUN_STATISTICAL=1",
+    )
+
+
+def pytest_collection_modifyitems(config, items):
+    if os.environ.get("SB_RUN_STATISTICAL", "0") == "1":
+        return
+    skip = pytest.mark.skip(reason="set SB_RUN_STATISTICAL=1 to run")
+    for item in items:
+        if "statistical" in item.keywords:
+            item.add_marker(skip)
 
 
 def _cuda_param():
@@ -47,3 +64,21 @@ def device(request):
 def pcf_dtype(request):
     """Parametrize a test to run with both pcf32 and pcf64."""
     return request.param
+
+
+@pytest.fixture(params=[sb.pcloud32, sb.pcloud64, sb.distmat32, sb.distmat64],
+                ids=["pcloud32", "pcloud64", "distmat32", "distmat64"])
+def make_pcloud_or_distmat_tensor(request):
+    """Build clouds or their distance matrices from the same coordinates."""
+    dtype = request.param
+
+    def make(coordinates):
+        points = np.asarray(coordinates, dtype=(
+            np.float32 if dtype in (sb.pcloud32, sb.distmat32) else np.float64))
+        if dtype in (sb.pcloud32, sb.pcloud64):
+            return sb.PointCloudTensor(points, dtype=dtype)
+        distances = np.linalg.norm(
+            points[..., :, None, :] - points[..., None, :, :], axis=-1)
+        return sb.DistanceMatrixTensor(distances, dtype=dtype)
+
+    return make

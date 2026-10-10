@@ -4,6 +4,8 @@
 callgrind.out.*
 _skbuild
 .vscode
+*.vsix
+.worktree-backup/
 .vs
 CMakeSettings.json
 examples/*.png
@@ -207,3 +209,8 @@ test/vgout.txt
 stablebear/_sb_cpp_cuda
 stablebear/_sb_cpp_cpu
 test/run_vg_pytest.sh
+
+# Host credentials staged for the private devcontainer image build
+/.devcontainer/.local/
+
+scratch/

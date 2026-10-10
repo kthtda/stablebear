@@ -1,5 +1,6 @@
 import numpy as np
 import pytest
+import stablebear as sb
 
 from stablebear.distance_matrix import DistanceMatrix
 from stablebear.typing import float32, float64
@@ -42,6 +43,148 @@ class TestConstruction:
         dm2 = DistanceMatrix(dm1)
         assert dm2[0, 1] == 1.0
 
+    def test_wrapping_indexed_cell_preserves_owner_and_rejected_writes(self, dtype):
+        np_dtype = np.float32 if dtype is float32 else np.float64
+        source = sb.DistanceMatrixTensor(
+            np.array([
+                [0, 1, 2, 3],
+                [1, 0, 1, 2],
+                [2, 1, 0, 1],
+                [3, 2, 1, 0],
+            ], dtype=np_dtype))
+        indexed = source[sb.NestedTensor([sb.indices([3, 0])])]
+        cell = indexed[0]
+        wrapped = DistanceMatrix(cell)
+
+        for index, value in (((0, 1), -1), ((0, 0), 1), ((0, 1), "invalid")):
+            with pytest.raises((ValueError, TypeError)):
+                wrapped[index] = value
+            assert indexed._data._get_element([0]).is_indexed
+
+        source[()][3, 0] = 7
+        assert wrapped[0, 1] == 7
+        wrapped[0, 1] = 9
+        assert cell[0, 1] == 9
+        assert indexed[0][0, 1] == 9
+        assert source[()][3, 0] == 7
+        assert sb.allclose(wrapped, DistanceMatrix(np.asarray(cell)))
+
+
+class TestArrayConstruction:
+    @pytest.mark.parametrize(
+        ("np_dtype", "sb_dtype"),
+        [(np.float32, float32), (np.float64, float64)],
+    )
+    def test_squareform_preserves_dtype_and_values(self, np_dtype, sb_dtype):
+        array = np.array(
+            [[0, 1, 2], [1, 0, 3], [2, 3, 0]], dtype=np_dtype)
+        matrix = DistanceMatrix(array)
+
+        assert matrix.dtype is sb_dtype
+        np.testing.assert_array_equal(matrix.to_dense(), array)
+
+    def test_compact_uses_scipy_condensed_order(self):
+        compact = np.array([1, 2, 3, 4, 5, 6], dtype=np.float64)
+        matrix = DistanceMatrix(compact)
+
+        expected = np.array([
+            [0, 1, 2, 3],
+            [1, 0, 4, 5],
+            [2, 4, 0, 6],
+            [3, 5, 6, 0],
+        ], dtype=np.float64)
+        np.testing.assert_array_equal(matrix.to_dense(), expected)
+
+    def test_rejects_integer_input_without_explicit_dtype(self):
+        with pytest.raises(TypeError, match="use float32 or float64"):
+            DistanceMatrix(np.array([1, 2, 3], dtype=np.int32))
+
+    @pytest.mark.parametrize("np_dtype", [np.int32, np.uint64, np.float16])
+    def test_explicit_dtype_converts_input(self, np_dtype):
+        compact = np.array([1, 2, 3], dtype=np_dtype)
+        matrix = DistanceMatrix(compact, dtype=float32)
+
+        expected = np.array([
+            [0, 1, 2],
+            [1, 0, 3],
+            [2, 3, 0],
+        ], dtype=np.float32)
+        assert matrix.dtype is float32
+        np.testing.assert_array_equal(matrix.to_dense(), expected)
+
+    def test_noncontiguous_inputs(self):
+        square = np.array([
+            [0, 1, 2], [1, 0, 3], [2, 3, 0],
+        ], dtype=np.float64)[::-1, ::-1]
+        np.testing.assert_array_equal(
+            DistanceMatrix(square).to_dense(), square)
+
+        compact = np.arange(1, 13, dtype=np.float32)[::2]
+        assert not compact.flags.c_contiguous
+        matrix = DistanceMatrix(compact)
+        np.testing.assert_array_equal(
+            matrix.to_dense(),
+            np.array([
+                [0, 1, 3, 5],
+                [1, 0, 7, 9],
+                [3, 7, 0, 11],
+                [5, 9, 11, 0],
+            ], dtype=np.float32),
+        )
+
+    def test_input_is_copied(self):
+        compact = np.array([1, 2, 3], dtype=np.float64)
+        matrix = DistanceMatrix(compact)
+        compact[:] = 99
+        assert matrix[0, 1] == 1
+
+    @pytest.mark.parametrize("length", [2, 4, 5])
+    def test_rejects_invalid_compact_length(self, length):
+        with pytest.raises(ValueError, match=r"n\*\(n-1\)/2"):
+            DistanceMatrix(np.ones(length))
+
+    @pytest.mark.parametrize(
+        "array",
+        [np.array(1.0), np.zeros((2, 2, 2)), np.zeros((2, 3))],
+    )
+    def test_rejects_invalid_shape(self, array):
+        with pytest.raises(ValueError):
+            DistanceMatrix(array)
+
+    @pytest.mark.parametrize(
+        "array",
+        [
+            np.array([-1.0]),
+            np.array([np.nan]),
+            np.array([[0.0, -1.0], [-1.0, 0.0]]),
+            np.array([[0.0, 1.0], [2.0, 0.0]]),
+            np.array([[1.0]]),
+        ],
+    )
+    def test_rejects_invalid_distance_values(self, array):
+        with pytest.raises(ValueError):
+            DistanceMatrix(array)
+
+    def test_empty_compact_is_one_by_one(self):
+        matrix = DistanceMatrix(np.array([], dtype=np.float64))
+        assert matrix.size == 1
+        np.testing.assert_array_equal(matrix.to_dense(), np.zeros((1, 1)))
+
+    def test_empty_square_is_zero_by_zero(self):
+        matrix = DistanceMatrix(np.empty((0, 0), dtype=np.float64))
+        assert matrix.size == 0
+
+    @pytest.mark.parametrize("np_dtype", [np.float16, np.complex128, np.bool_])
+    def test_rejects_other_unsupported_array_dtypes(self, np_dtype):
+        with pytest.raises(TypeError, match="use float32 or float64"):
+            DistanceMatrix(np.array([1, 2, 3], dtype=np_dtype))
+
+    def test_from_dense_is_deprecated(self):
+        array = np.array([[0, 1], [1, 0]], dtype=np.float64)
+        with pytest.warns(DeprecationWarning, match=r"DistanceMatrix\(array\)"):
+            matrix = DistanceMatrix.from_dense(array)
+        np.testing.assert_array_equal(matrix.to_dense(), array)
+
 
 class TestAccess:
     def test_diagonal_is_zero(self, dtype):
@@ -63,6 +206,12 @@ class TestAccess:
         dm = DistanceMatrix(3, dtype=dtype)
         with pytest.raises(ValueError):
             dm[0, 1] = -1.0
+
+    def test_reject_nan(self, dtype):
+        dm = DistanceMatrix(3, dtype=dtype)
+        with pytest.raises(ValueError, match="Distance matrix entries must not be NaN"):
+            dm[0, 1] = np.nan
+        assert dm[0, 1] == 0.0
 
     def test_reject_nonzero_diagonal(self, dtype):
         dm = DistanceMatrix(3, dtype=dtype)
@@ -99,6 +248,9 @@ class TestToDense:
         assert dense.shape == (0, 0)
 
 
+
+@pytest.mark.filterwarnings(
+    r"ignore:DistanceMatrix\.from_dense\(\) is deprecated since 0\.4\.7:DeprecationWarning")
 class TestFromDense:
     def test_roundtrip_f32(self):
         arr = np.array([[0, 1, 2], [1, 0, 3], [2, 3, 0]], dtype=np.float32)

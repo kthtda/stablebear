@@ -1,0 +1,15 @@
+/* The theme makes legacy .figure elements inline-block, so text-align on
+   the figure alone does not center it within the article. */
+.tikz-diagram .figure {
+    display: block;
+    text-align: center;
+}
+
+.tikz-diagram img {
+    display: block;
+    margin-inline: auto;
+    /* Scale the SVG with the surrounding text instead of its TeX point size. */
+    width: 32.70em;
+    max-width: 100%;
+    height: auto;
+}

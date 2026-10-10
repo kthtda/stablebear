@@ -34,8 +34,7 @@ def test_distmat_single_matches_point_cloud():
     assert bcs_dm.dtype == sb.barcode64
     assert bcs_dm.shape == bcs_pc.shape
 
-    for k in range(bcs_pc.shape[0]):
-        assert bcs_dm[k].is_isomorphic_to(bcs_pc[k])
+    assert bcs_dm.is_isomorphic_to(bcs_pc)
 
 
 def test_distmat_single_f32():
@@ -73,9 +72,7 @@ def test_distmat_tensor_matches_point_cloud():
     assert bcs_dm.dtype == sb.barcode64
     assert bcs_dm.shape == bcs_pc.shape
 
-    for i in range(3):
-        for k in range(2):
-            assert bcs_dm[i, k].is_isomorphic_to(bcs_pc[i, k])
+    assert bcs_dm.is_isomorphic_to(bcs_pc)
 
 
 def test_distmat_reduced_homology():

@@ -89,6 +89,19 @@ namespace sb
     { t.evaluate(x) } -> std::convertible_to<CodomainT>;
   };
 
+  /// A distance structure answering d(i, j) on demand for i, j < size(): in
+  /// practice a distance matrix, or an oracle such as SquaredEuclideanDistance
+  /// that computes distances from a point cloud without materializing a
+  /// matrix. Purely syntactic — algorithms additionally rely on symmetry and
+  /// non-negativity, and the scale convention (e.g. squared vs plain
+  /// distances) is part of the caller's contract with the algorithm.
+  template <typename D, typename T>
+  concept DistanceOracle = requires(const D &d, size_t i, size_t j)
+  {
+    { d(i, j) } -> std::convertible_to<T>;
+    { d.size() } -> std::convertible_to<size_t>;
+  };
+
   template <typename T>
   concept Iterable = requires(T t)
   {

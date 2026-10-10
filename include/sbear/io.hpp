@@ -22,14 +22,17 @@
 
 namespace sb
 {
+  enum class FormatType : std::uint32_t
+  {
+    SingleTensor = 1,
+    SingleObject = 2
+  };
+
   namespace io::detail
   {
     // This should never change! It spells out the legacy project name (masspcf) and is kept as-is so that
     // files written before the rename to stablebear remain readable.
     constexpr const std::string_view HeaderIdBytes = "\1MPCF";
-
-    // This should change as soon as an older version would not be able to read the data produced by the current version.
-    constexpr const int FormatVersion = 2;
 
     inline void write_endianness(std::ostream& os)
     {
@@ -125,7 +128,7 @@ namespace sb
 
 
 
-    inline void write_header(std::ostream& os)
+    inline void write_header(std::ostream& os, FormatType formatType)
     {
       write_binary_string(os, HeaderIdBytes);
       write_endianness(os); // Will likely be little-endian until the end of time, but just to be sure!
@@ -133,9 +136,11 @@ namespace sb
       write_string(os, PROJECT_VERSION_FULL);
       write_string(os, PROJECT_BUILD_DATE);
       write_platform(os); // Added in format version 2
+      write_bytes<std::uint32_t>(
+        os, static_cast<std::uint32_t>(formatType));
     }
 
-    inline void read_header(std::istream& is)
+    inline BinaryReader read_header(std::istream& is)
     {
       auto idBytes = read_binary_string(is, HeaderIdBytes.length());
       if (idBytes != HeaderIdBytes)
@@ -158,15 +163,10 @@ namespace sb
       {
         read_string(is); // platform (added in format version 2)
       }
+      return BinaryReader(is, formatVersion);
     }
 
   }
-
-  enum class FormatType : uint32_t
-  {
-    SingleTensor = 1,
-    SingleObject = 2
-  };
 
   inline std::string formatName(uint32_t tp)
   {
@@ -185,18 +185,29 @@ namespace sb
     }
   }
 
-  template <IsTensor TensorT>
-  void write(const TensorT& tensor, std::ostream& os)
+  namespace io::detail
   {
-    io::detail::write_header(os);
-    io::detail::write_bytes<uint32_t>(os, static_cast<uint32_t>(FormatType::SingleTensor)); // "t" is single tensor
-    io::detail::write_tensor(os, tensor);
+    template <typename TensorT>
+    void write_single_tensor(std::ostream& os, const TensorT& tensor)
+    {
+      write_header(os, FormatType::SingleTensor);
+      write_tensor(os, tensor);
+    }
   }
 
   template <IsTensor TensorT>
+    requires (!is_nested_tensor_v<typename TensorT::value_type>)
+  void write(const TensorT& tensor, std::ostream& os)
+  {
+    io::detail::write_single_tensor(os, tensor);
+  }
+
+  template <IsTensor TensorT>
+    requires (!is_nested_tensor_v<TensorT>
+              && !is_nested_tensor_v<typename TensorT::value_type>)
   TensorT read(std::istream& is)
   {
-    io::detail::read_header(is);
+    auto reader = io::detail::read_header(is);
 
     auto formatType = io::detail::read_bytes<uint32_t>(is);
     if (formatType != static_cast<uint32_t>(FormatType::SingleTensor))
@@ -205,23 +216,36 @@ namespace sb
           + " for this operation but got format type " + formatName(formatType));
     }
 
-    io::detail::TensorFormat format;
+    const auto format = io::detail::read_type_format(reader);
+    return io::detail::read_tensor_for_format<TensorT>(reader, format);
+  }
 
-    format.baseFormat = io::detail::read_bytes<std::int32_t>(is);
-    format.subFormat = io::detail::read_bytes<std::int32_t>(is);
+  template <typename NestedT>
+    requires is_nested_tensor_v<NestedT>
+  NestedT read(std::istream& is)
+  {
+    auto reader = io::detail::read_header(is);
 
-    auto expectedFormat = io::detail::tensorFormat<typename TensorT::value_type>();
-    if (format != expectedFormat)
+    auto formatType = io::detail::read_bytes<uint32_t>(is);
+    if (formatType != static_cast<uint32_t>(FormatType::SingleTensor))
+    {
+      throw std::runtime_error("Expected format type " + formatName(static_cast<uint32_t>(FormatType::SingleTensor))
+          + " for this operation but got format type " + formatName(formatType));
+    }
+
+    const auto format = io::detail::read_type_format(reader);
+    const auto expectedFormat = io::detail::tensorFormatV3<NestedT>();
+    if (!io::detail::matches_nested_tensor_format<NestedT>(reader, format))
     {
       throw std::runtime_error("Unexpected tensor format " + format.toString() + " where " + expectedFormat.toString() + " was expected.");
     }
 
-    return io::detail::read_tensor<typename TensorT::value_type>(is);
+    return io::detail::read_nested_tensor_element<typename is_nested_tensor<NestedT>::leaf_type>(reader);
   }
 
   inline io::detail::StreamableTensor read_any_tensor(std::istream& is)
   {
-    io::detail::read_header(is);
+    auto reader = io::detail::read_header(is);
 
     auto formatType = io::detail::read_bytes<uint32_t>(is);
     if (formatType != static_cast<uint32_t>(FormatType::SingleTensor))
@@ -230,36 +254,47 @@ namespace sb
                                + " for this operation but got format type " + formatName(formatType));
     }
 
-    auto format = io::detail::read_tensor_format(is);
+    auto format = io::detail::read_type_format(reader);
 
-    if      (format == io::detail::tensorFormat<float32_t>()) { return io::detail::read_tensor<float32_t>(is); }
-    else if (format == io::detail::tensorFormat<float64_t>()) { return io::detail::read_tensor<float64_t>(is); }
+    if      (format.matches_type<float32_t>(reader.format_version())) { return io::detail::read_tensor<float32_t>(reader); }
+    else if (format.matches_type<float64_t>(reader.format_version())) { return io::detail::read_tensor<float64_t>(reader); }
 
-    else if (format == io::detail::tensorFormat<int32_t>())  { return io::detail::read_tensor<int32_t>(is); }
-    else if (format == io::detail::tensorFormat<int64_t>())  { return io::detail::read_tensor<int64_t>(is); }
+    else if (format.matches_type<int32_t>(reader.format_version()))  { return io::detail::read_tensor<int32_t>(reader); }
+    else if (format.matches_type<int64_t>(reader.format_version()))  { return io::detail::read_tensor<int64_t>(reader); }
 
-    else if (format == io::detail::tensorFormat<uint32_t>()) { return io::detail::read_tensor<uint32_t>(is); }
-    else if (format == io::detail::tensorFormat<uint64_t>()) { return io::detail::read_tensor<uint64_t>(is); }
+    else if (format.matches_type<uint32_t>(reader.format_version())) { return io::detail::read_tensor<uint32_t>(reader); }
+    else if (format.matches_type<uint64_t>(reader.format_version())) { return io::detail::read_tensor<uint64_t>(reader); }
 
-    else if (format == io::detail::tensorFormat<bool>())     { return io::detail::read_tensor<bool>(is); }
+    else if (format.matches_type<bool>(reader.format_version()))     { return io::detail::read_tensor<bool>(reader); }
 
-    else if (format == io::detail::tensorFormat<Pcf<float32_t, float32_t>>()) { return io::detail::read_tensor<Pcf<float32_t, float32_t>>(is); }
-    else if (format == io::detail::tensorFormat<Pcf<float64_t, float64_t>>()) { return io::detail::read_tensor<Pcf<float64_t, float64_t>>(is); }
+    else if (io::detail::matches_nested_tensor_format<NestedTensor<float32_t>>(reader, format)) { return io::detail::read_nested_tensor_element<float32_t>(reader); }
+    else if (io::detail::matches_nested_tensor_format<NestedTensor<float64_t>>(reader, format)) { return io::detail::read_nested_tensor_element<float64_t>(reader); }
+    else if (io::detail::matches_nested_tensor_format<NestedTensor<int32_t>>(reader, format)) { return io::detail::read_nested_tensor_element<int32_t>(reader); }
+    else if (io::detail::matches_nested_tensor_format<NestedTensor<int64_t>>(reader, format)) { return io::detail::read_nested_tensor_element<int64_t>(reader); }
+    else if (io::detail::matches_nested_tensor_format<NestedTensor<uint32_t>>(reader, format)) { return io::detail::read_nested_tensor_element<uint32_t>(reader); }
+    else if (io::detail::matches_nested_tensor_format<NestedTensor<uint64_t>>(reader, format)) { return io::detail::read_nested_tensor_element<uint64_t>(reader); }
 
-    else if (format == io::detail::tensorFormat<Pcf<int32_t, int32_t>>()) { return io::detail::read_tensor<Pcf<int32_t, int32_t>>(is); }
-    else if (format == io::detail::tensorFormat<Pcf<int64_t, int64_t>>()) { return io::detail::read_tensor<Pcf<int64_t, int64_t>>(is); }
+    else if (format.matches_type<Pcf<float32_t, float32_t>>(reader.format_version())) { return io::detail::read_tensor<Pcf<float32_t, float32_t>>(reader); }
+    else if (format.matches_type<Pcf<float64_t, float64_t>>(reader.format_version())) { return io::detail::read_tensor<Pcf<float64_t, float64_t>>(reader); }
 
-    else if (format == io::detail::tensorFormat<PointCloud<float32_t>>()) { return io::detail::read_tensor<PointCloud<float32_t>>(is); }
-    else if (format == io::detail::tensorFormat<PointCloud<float64_t>>()) { return io::detail::read_tensor<PointCloud<float64_t>>(is); }
+    else if (format.matches_type<Pcf<int32_t, int32_t>>(reader.format_version())) { return io::detail::read_tensor<Pcf<int32_t, int32_t>>(reader); }
+    else if (format.matches_type<Pcf<int64_t, int64_t>>(reader.format_version())) { return io::detail::read_tensor<Pcf<int64_t, int64_t>>(reader); }
 
-    else if (format == io::detail::tensorFormat<SymmetricMatrix<float32_t>>()) { return io::detail::read_tensor<SymmetricMatrix<float32_t>>(is); }
-    else if (format == io::detail::tensorFormat<SymmetricMatrix<float64_t>>()) { return io::detail::read_tensor<SymmetricMatrix<float64_t>>(is); }
+    else if (io::detail::is_tensor_format<Tensor<PointCloud<float32_t>>>(reader, format)) { return io::detail::read_tensor_for_format<Tensor<PointCloud<float32_t>>>(reader, format); }
+    else if (io::detail::is_tensor_format<Tensor<PointCloud<float64_t>>>(reader, format)) { return io::detail::read_tensor_for_format<Tensor<PointCloud<float64_t>>>(reader, format); }
+    else if (io::detail::is_tensor_format<Tensor<PointCloud<float32_t>, TensorProperty::Indexed>>(reader, format)) { return io::detail::read_tensor_for_format<Tensor<PointCloud<float32_t>, TensorProperty::Indexed>>(reader, format); }
+    else if (io::detail::is_tensor_format<Tensor<PointCloud<float64_t>, TensorProperty::Indexed>>(reader, format)) { return io::detail::read_tensor_for_format<Tensor<PointCloud<float64_t>, TensorProperty::Indexed>>(reader, format); }
 
-    else if (format == io::detail::tensorFormat<DistanceMatrix<float32_t>>()) { return io::detail::read_tensor<DistanceMatrix<float32_t>>(is); }
-    else if (format == io::detail::tensorFormat<DistanceMatrix<float64_t>>()) { return io::detail::read_tensor<DistanceMatrix<float64_t>>(is); }
+    else if (format.matches_type<SymmetricMatrix<float32_t>>(reader.format_version())) { return io::detail::read_tensor<SymmetricMatrix<float32_t>>(reader); }
+    else if (format.matches_type<SymmetricMatrix<float64_t>>(reader.format_version())) { return io::detail::read_tensor<SymmetricMatrix<float64_t>>(reader); }
 
-    else if (format == io::detail::tensorFormat<ph::Barcode<float32_t>>()) { return io::detail::read_tensor<ph::Barcode<float32_t>>(is); }
-    else if (format == io::detail::tensorFormat<ph::Barcode<float64_t>>()) { return io::detail::read_tensor<ph::Barcode<float64_t>>(is); }
+    else if (io::detail::is_tensor_format<Tensor<DistanceMatrix<float32_t>>>(reader, format)) { return io::detail::read_tensor_for_format<Tensor<DistanceMatrix<float32_t>>>(reader, format); }
+    else if (io::detail::is_tensor_format<Tensor<DistanceMatrix<float64_t>>>(reader, format)) { return io::detail::read_tensor_for_format<Tensor<DistanceMatrix<float64_t>>>(reader, format); }
+    else if (io::detail::is_tensor_format<Tensor<DistanceMatrix<float32_t>, TensorProperty::Indexed>>(reader, format)) { return io::detail::read_tensor_for_format<Tensor<DistanceMatrix<float32_t>, TensorProperty::Indexed>>(reader, format); }
+    else if (io::detail::is_tensor_format<Tensor<DistanceMatrix<float64_t>, TensorProperty::Indexed>>(reader, format)) { return io::detail::read_tensor_for_format<Tensor<DistanceMatrix<float64_t>, TensorProperty::Indexed>>(reader, format); }
+
+    else if (format.matches_type<ph::Barcode<float32_t>>(reader.format_version())) { return io::detail::read_tensor<ph::Barcode<float32_t>>(reader); }
+    else if (format.matches_type<ph::Barcode<float64_t>>(reader.format_version())) { return io::detail::read_tensor<ph::Barcode<float64_t>>(reader); }
 
     else
     {
@@ -271,17 +306,14 @@ namespace sb
   template <typename T>
   void write_object(const T& obj, std::ostream& os)
   {
-    io::detail::write_header(os);
-    io::detail::write_bytes<uint32_t>(os, static_cast<uint32_t>(FormatType::SingleObject));
-    auto format = io::detail::tensorFormat<T>();
-    io::detail::write_bytes<int32_t>(os, format.baseFormat);
-    io::detail::write_bytes<int32_t>(os, format.subFormat);
-    io::detail::write_element(os, obj);
+    io::detail::write_header(os, FormatType::SingleObject);
+    io::detail::write_type_format<T>(os);
+    io::detail::write_value(os, obj);
   }
 
   inline io::detail::StreamableObject read_any_object(std::istream& is)
   {
-    io::detail::read_header(is);
+    auto reader = io::detail::read_header(is);
 
     auto formatType = io::detail::read_bytes<uint32_t>(is);
     if (formatType != static_cast<uint32_t>(FormatType::SingleObject))
@@ -290,22 +322,25 @@ namespace sb
                                + " for this operation but got format type " + formatName(formatType));
     }
 
-    auto format = io::detail::read_tensor_format(is);
+    auto format = io::detail::read_type_format(reader);
 
-    if      (format == io::detail::tensorFormat<Pcf<float32_t, float32_t>>()) { return io::detail::read_element<Pcf<float32_t, float32_t>>(is); }
-    else if (format == io::detail::tensorFormat<Pcf<float64_t, float64_t>>()) { return io::detail::read_element<Pcf<float64_t, float64_t>>(is); }
+    if      (format.matches_type<Pcf<float32_t, float32_t>>(reader.format_version())) { return io::detail::read_element<Pcf<float32_t, float32_t>>(is); }
+    else if (format.matches_type<Pcf<float64_t, float64_t>>(reader.format_version())) { return io::detail::read_element<Pcf<float64_t, float64_t>>(is); }
 
-    else if (format == io::detail::tensorFormat<Pcf<int32_t, int32_t>>()) { return io::detail::read_element<Pcf<int32_t, int32_t>>(is); }
-    else if (format == io::detail::tensorFormat<Pcf<int64_t, int64_t>>()) { return io::detail::read_element<Pcf<int64_t, int64_t>>(is); }
+    else if (format.matches_type<Pcf<int32_t, int32_t>>(reader.format_version())) { return io::detail::read_element<Pcf<int32_t, int32_t>>(is); }
+    else if (format.matches_type<Pcf<int64_t, int64_t>>(reader.format_version())) { return io::detail::read_element<Pcf<int64_t, int64_t>>(is); }
 
-    else if (format == io::detail::tensorFormat<ph::Barcode<float32_t>>()) { return io::detail::read_barcode<float32_t>(is); }
-    else if (format == io::detail::tensorFormat<ph::Barcode<float64_t>>()) { return io::detail::read_barcode<float64_t>(is); }
+    else if (format.matches_type<PointCloud<float32_t>>(reader.format_version())) { return io::detail::read_point_cloud<float32_t>(reader); }
+    else if (format.matches_type<PointCloud<float64_t>>(reader.format_version())) { return io::detail::read_point_cloud<float64_t>(reader); }
 
-    else if (format == io::detail::tensorFormat<SymmetricMatrix<float32_t>>()) { return io::detail::read_compressed_matrix<SymmetricMatrix<float32_t>>(is); }
-    else if (format == io::detail::tensorFormat<SymmetricMatrix<float64_t>>()) { return io::detail::read_compressed_matrix<SymmetricMatrix<float64_t>>(is); }
+    else if (format.matches_type<ph::Barcode<float32_t>>(reader.format_version())) { return io::detail::read_barcode<float32_t>(is); }
+    else if (format.matches_type<ph::Barcode<float64_t>>(reader.format_version())) { return io::detail::read_barcode<float64_t>(is); }
 
-    else if (format == io::detail::tensorFormat<DistanceMatrix<float32_t>>()) { return io::detail::read_compressed_matrix<DistanceMatrix<float32_t>>(is); }
-    else if (format == io::detail::tensorFormat<DistanceMatrix<float64_t>>()) { return io::detail::read_compressed_matrix<DistanceMatrix<float64_t>>(is); }
+    else if (format.matches_type<SymmetricMatrix<float32_t>>(reader.format_version())) { return io::detail::read_compressed_matrix<SymmetricMatrix<float32_t>>(is); }
+    else if (format.matches_type<SymmetricMatrix<float64_t>>(reader.format_version())) { return io::detail::read_compressed_matrix<SymmetricMatrix<float64_t>>(is); }
+
+    else if (format.matches_type<DistanceMatrix<float32_t>>(reader.format_version())) { return io::detail::read_compressed_matrix<DistanceMatrix<float32_t>>(is); }
+    else if (format.matches_type<DistanceMatrix<float64_t>>(reader.format_version())) { return io::detail::read_compressed_matrix<DistanceMatrix<float64_t>>(is); }
 
     else
     {

@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
 
 #include <sbear/tensor.hpp>
+#include <sbear/nested_tensor.hpp>
+#include <sbear/point_cloud.hpp>
 #include <sbear/walk.hpp>
 
 static_assert(std::random_access_iterator<sb::Tensor1dValueIterator<sb::Tensor<double>>>);
@@ -167,4 +169,65 @@ TEST(TensorWalk, MemberWalkMatchesFreeWalk)
   });
 
   EXPECT_EQ(from_member, from_free);
+}
+
+TEST(TensorWalk, IndexedTensorVisitsLogicalIndicesAndSelectedValues)
+{
+  sb::Tensor<float> coordinates({3, 1});
+  coordinates({0, 0}) = 10;
+  coordinates({1, 0}) = 20;
+  coordinates({2, 0}) = 30;
+  sb::Tensor<sb::PointCloud<float>> source({1}, sb::PointCloud<float>(coordinates));
+
+  // One source cloud backs four single-point selections, including a repeat.
+  sb::Tensor<sb::Tensor<uint64_t>> selections({2, 2});
+  selections({0, 0}) = sb::Tensor<uint64_t>({1}, 2);
+  selections({0, 1}) = sb::Tensor<uint64_t>({1}, 0);
+  selections({1, 0}) = sb::Tensor<uint64_t>({1}, 1);
+  selections({1, 1}) = sb::Tensor<uint64_t>({1}, 2);
+  const auto indexed = sb::make_indexed_tensor(source, sb::to_nested_tensor(selections));
+
+  std::vector<std::vector<size_t>> visited;
+  std::vector<float> values;
+  sb::walk(indexed, [&](const std::vector<size_t>& idx) {
+    visited.push_back(idx);
+    const auto cloud = indexed(idx);
+    values.push_back(cloud(0, 0));
+  });
+
+  EXPECT_EQ(visited, (std::vector<std::vector<size_t>>{
+    {0, 0}, {0, 1},
+    {1, 0}, {1, 1}
+  }));
+  EXPECT_EQ(values, (std::vector<float>{30, 10, 20, 30}));
+}
+
+TEST(TensorWalk, IndexedOuterSliceVisitsOnlyItsLogicalElements)
+{
+  sb::Tensor<float> coordinates({4, 1});
+  coordinates({0, 0}) = 10;
+  coordinates({1, 0}) = 20;
+  coordinates({2, 0}) = 30;
+  coordinates({3, 0}) = 40;
+  sb::Tensor<sb::PointCloud<float>> source({1}, sb::PointCloud<float>(coordinates));
+
+  sb::Tensor<sb::Tensor<uint64_t>> selections({4});
+  selections(0) = sb::Tensor<uint64_t>({1}, 2);
+  selections(1) = sb::Tensor<uint64_t>({1}, 0);
+  selections(2) = sb::Tensor<uint64_t>({1}, 3);
+  selections(3) = sb::Tensor<uint64_t>({1}, 1);
+  const auto indexed = sb::make_indexed_tensor(source, sb::to_nested_tensor(selections));
+  // Outer values [30, 10, 40, 20] sliced with [1::2] become [10, 20].
+  const auto view = indexed[std::vector<sb::Slice>{sb::range(1, std::nullopt, 2)}];
+
+  std::vector<std::vector<size_t>> visited;
+  std::vector<float> values;
+  sb::walk(view, [&](const std::vector<size_t>& idx) {
+    visited.push_back(idx);
+    const auto cloud = view(idx);
+    values.push_back(cloud(0, 0));
+  });
+
+  EXPECT_EQ(visited, (std::vector<std::vector<size_t>>{{0}, {1}}));
+  EXPECT_EQ(values, (std::vector<float>{10, 20}));
 }

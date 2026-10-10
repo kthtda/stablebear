@@ -4,6 +4,7 @@
 #include <pybind11/numpy.h>
 
 #include <sbear/concepts.hpp>
+#include <sbear/config.hpp>
 
 #include <string>
 #include <sstream>

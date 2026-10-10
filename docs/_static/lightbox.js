@@ -10,6 +10,8 @@ document.addEventListener("DOMContentLoaded", function () {
   });
 
   document.querySelectorAll("article img").forEach(function (el) {
+    if (el.closest(".tikz-diagram")) return;
+
     el.style.cursor = "zoom-in";
     el.addEventListener("click", function (e) {
       e.preventDefault();

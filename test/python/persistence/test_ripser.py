@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 
 import stablebear as sb
 import stablebear.persistence as pers
@@ -70,6 +71,26 @@ def _make_rectangle_point_cloud():
     X[2, :] = [3.0, 0.0]
     X[3, :] = [3.0, 4.0]
     return X
+
+
+def _indexed_rectangle_tensors(make_pcloud_or_distmat_tensor):
+    rectangle = _make_rectangle_point_cloud()
+    selections = sb.NestedTensor(
+        [
+            [
+                sb.indices([3, 0, 2, 1]),
+                sb.indices([1, 1, 0, 3]),
+                sb.indices([2, 0, 2, 3]),
+            ],
+            [
+                sb.indices([0, 3, 1, 2]),
+                sb.indices([2, 2, 1, 0]),
+                sb.indices([3, 1, 0, 2]),
+            ],
+        ]
+    )
+    source = make_pcloud_or_distmat_tensor([rectangle, rectangle * 2])
+    return source[selections]
 
 
 def test_persistence_ripser_unreduced_homology():
@@ -148,3 +169,23 @@ def test_persistence_ripser_compute_euclidean_barcode_on_tensor():
 
                 assert Y[i, j, k, 0].is_isomorphic_to(xbc[0])
                 assert Y[i, j, k, 1].is_isomorphic_to(xbc[1])
+
+
+@pytest.mark.parametrize("reduced", [False, True])
+def test_persistence_accepts_whole_indexed_tensors_and_outer_views(
+    make_pcloud_or_distmat_tensor, reduced
+):
+    indexed_tensor = _indexed_rectangle_tensors(make_pcloud_or_distmat_tensor)
+
+    for indexed in (indexed_tensor, indexed_tensor[1:, 1:]):
+        dense = indexed.to_dense()
+
+        actual = pers.compute_persistent_homology(
+            indexed, max_dim=2, reduced=reduced
+        )
+        expected = pers.compute_persistent_homology(
+            dense, max_dim=2, reduced=reduced
+        )
+
+        assert indexed._data.has_indices()
+        assert actual.is_isomorphic_to(expected)

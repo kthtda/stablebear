@@ -19,6 +19,24 @@ base_tensor
    :undoc-members:
    :show-inheritance:
 
+point_cloud
+-----------
+
+.. autoclass:: stablebear.point_cloud.PointCloud
+   :members:
+
+.. autoclass:: stablebear.point_cloud.PointCloudTensor
+   :members:
+
+distance_matrix
+---------------
+
+.. autoclass:: stablebear.distance_matrix.DistanceMatrix
+   :members:
+
+.. autoclass:: stablebear.distance_matrix.DistanceMatrixTensor
+   :members:
+
 tensor_create
 -------------
 
@@ -91,22 +109,6 @@ serialize
    :undoc-members:
    :show-inheritance:
 
-plotting
---------
-
-.. automodule:: stablebear.plotting
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-random
-------
-
-.. automodule:: stablebear.random
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
 system
 ------
 
@@ -133,4 +135,3 @@ typing
 .. automodule:: stablebear.typing
    :members:
    :undoc-members:
-

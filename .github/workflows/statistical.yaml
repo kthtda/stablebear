@@ -1,0 +1,49 @@
+name: StatisticalTests
+
+# Runs the large statistical tests (pytest marker `statistical`) on the
+# self-hosted runner, so the wheel-test phase stays fast. The marked tests are
+# skipped everywhere else unless SB_RUN_STATISTICAL=1 is set.
+
+on:
+  workflow_dispatch:
+  workflow_call:
+
+jobs:
+  statistical:
+    name: Statistical tests
+    runs-on: self-hosted
+    timeout-minutes: 45
+    env:
+      BUILD_WITH_CUDA: 0
+      SKIP_STUBGEN: 1
+      SKIP_BACK_COPY: 1
+      # Make pip more tolerant of transient PyPI/network hiccups.
+      PIP_RETRIES: 5
+      PIP_DEFAULT_TIMEOUT: 60
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: 'recursive'
+
+      # The runner image provides the Python dependencies, from
+      # .github/self-hosted-runner/requirements.txt.
+      - name: Set up Python venv
+        run: |
+          python3 -m venv --system-site-packages ${{github.workspace}}/.venv
+          echo "${{github.workspace}}/.venv/bin" >> $GITHUB_PATH
+
+      - name: Configure CMake
+        run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build module
+        run: cmake --build build -j $(nproc)
+
+      - name: Install module
+        run: cmake --install build
+
+      - name: Run statistical tests
+        env:
+          SB_RUN_STATISTICAL: 1
+        run: |
+          cd test
+          python3 -m pytest python -m statistical -v --durations=0

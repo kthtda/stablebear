@@ -199,32 +199,3 @@ def test_symmetric_matrix_tensor_non_symmetric_raises():
     batch = np.array([[[1.0, 2.0], [9.0, 1.0]]])  # asymmetric off-diagonal
     with pytest.raises(ValueError, match="symmetric"):
         sb.SymmetricMatrixTensor.from_numpy(batch)
-
-
-# --- tensor() factory (#53) ---
-
-
-def test_tensor_factory_numeric_inference():
-    npt.assert_allclose(np.asarray(sb.tensor([1.0, 2.0, 3.0])), np.array([1.0, 2.0, 3.0]))
-    assert isinstance(sb.tensor([1, 2, 3]), sb.IntTensor)
-    assert isinstance(sb.tensor([True, False]), sb.BoolTensor)
-    assert isinstance(sb.tensor([1.0, 2.0]), sb.FloatTensor)
-
-
-def test_tensor_factory_pointcloud():
-    arr = np.zeros((2, 3, 2))
-    pc = sb.tensor(arr, dtype=sb.pcloud64)
-    assert isinstance(pc, sb.PointCloudTensor)
-    assert pc.shape == (2,)
-
-
-def test_tensor_factory_distmat():
-    batch = _symmetric_zero_diag_batch(3, 4)
-    dt = sb.tensor(batch, dtype=sb.distmat64)
-    assert isinstance(dt, sb.DistanceMatrixTensor)
-    assert dt.shape == (3,)
-
-
-def test_tensor_factory_unknown_dtype_raises():
-    with pytest.raises(TypeError):
-        sb.tensor(np.array(["a", "b"]))

@@ -26,8 +26,8 @@ A single PCF
 Overlaying many PCFs
 ====================
 
-Pass a 1-D tensor to plot all elements at once. Use ``alpha`` to see overlapping
-regions:
+Pass a list, tuple, or 1-D PCF tensor to plot all elements at once. Use
+``alpha`` to see overlapping regions:
 
 .. image:: _static/gallery_overlaid_light.png
    :width: 60%

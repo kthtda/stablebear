@@ -62,7 +62,9 @@ jobs:
 
       - name: Install test dependencies (GitHub runner)
         if: inputs.use_github_runners
-        run: bash .github/scripts/ci-retry.sh pip install pytest scipy
+        run: |
+          bash .github/scripts/ci-retry.sh python -m pip install --upgrade pip
+          bash .github/scripts/ci-retry.sh pip install --group test
 
       - name: Test sdist install
         working-directory: test

@@ -4,9 +4,9 @@
 
 ## Minimal module build
 
-Minimal module builds are now enabled whenever `SKBUILD` is not in use (i.e., plain CMake builds). In your IDE, just run a normal CMake configure/build/install and you can use `make` instead of a full `pip install`.
-
-**Before doing this, you should run a manual `pip install .` first!**
+Use CMake 3.30.3 or newer. Build and install directly with CMake; no preliminary
+pip installation of the project is required. See [AGENTS.md](AGENTS.md#build--development)
+for the configure, build, and install commands.
 
 ## Building the documentation
 

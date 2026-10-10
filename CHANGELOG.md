@@ -1,3 +1,80 @@
+## 0.5.1
+
+### Breaking changes
+
+* **New `subsample` defaults** — `random.subsample` now defaults to `replace=True` and `allow_partial="keep"`, so an undersized input returns a smaller sample instead of raising. Pass `replace=False, allow_partial="no"` for the previous behavior. ([#243](https://github.com/kthtda/stablebear/issues/243))
+* **Seeded results change** — Generators with nearby seeds, such as `Generator(5)` and `Generator(6)`, previously reused each other's random streams shifted by one element. Seeds are now mixed before streams are derived, so results for a given seed differ from earlier versions. ([#247](https://github.com/kthtda/stablebear/issues/247))
+
+### New features
+
+* **Relative subsampling** — `random.subsample_relative` draws from one point cloud or distance matrix with probabilities weighted by distance to each query point, following Agerberg, Chachólski, and Ramanujam (TAG-ML 2023). Weights come from the new `distributions.Gaussian`, `Uniform`, and `Mixture`, which `plotting.plot_distance_weight_heatmap` visualizes. Both samplers gain `allow_partial="drop"`. ([#243](https://github.com/kthtda/stablebear/issues/243))
+* **Progress for uniform subsampling** — `random.subsample` accepts `verbose=True` to show a progress bar, like `random.subsample_relative`. ([#248](https://github.com/kthtda/stablebear/issues/248))
+* **Windows ARM64 wheels** — CPU-only binary wheels for Windows on ARM64, for Python 3.11 and newer. ([#237](https://github.com/kthtda/stablebear/pull/237))
+* **Python 3.15** — Binary wheels for CPython 3.15, including the free-threaded build. ([#238](https://github.com/kthtda/stablebear/issues/238))
+
+### Bug fixes
+
+* **`DistanceMatrix` entry assignment rejects NaN** — Assigning NaN to an entry now raises `ValueError`, matching the constructor. ([#245](https://github.com/kthtda/stablebear/issues/245))
+
+## 0.5.0
+
+### Breaking changes
+
+* **Updated binary save format** — Files and pickles written by 0.5.0 require Stablebear 0.5.0 or later to read. Readers for supported earlier formats are retained.
+* **Point-cloud elements return `PointCloud`** — Selecting a complete element from a `PointCloudTensor` now returns a `PointCloud` view instead of a `FloatTensor`. Coordinate indexing and assignment remain supported; use `np.asarray(cloud)` for general array operations such as reshaping. ([#233](https://github.com/kthtda/stablebear/pull/233))
+
+### New features
+
+* **Uniform subsampling** — `random.subsample` draws samples from individual point clouds and distance matrices or tensors of them, with or without replacement. Samples own a snapshot of their input and support partial draws and duplicate removal (by coordinates for clouds, by vertex index for matrices). ([#229](https://github.com/kthtda/stablebear/issues/229), [#236](https://github.com/kthtda/stablebear/issues/236))
+* **Nested tensors and ragged indexing** — `NestedTensor` supports recursively nested numeric tensors with differently shaped children. Nested `uint64` selections create indexed point-cloud and distance-matrix tensor views while preserving selection order and repetitions. `indices(values)` is shorthand for constructing a `uint64` selection tensor. ([#231](https://github.com/kthtda/stablebear/issues/231))
+* **Standalone point clouds** — Construct a cloud with `PointCloud(coordinates)` and pass it directly to subsampling, persistent homology, and homological-kernel computations. Clouds support coordinate views, NumPy conversion, copying, and binary/pickle serialization. ([#233](https://github.com/kthtda/stablebear/pull/233))
+* **Selection inspection and independent copies** — Point-cloud and distance-matrix tensors expose copied selections through `.indices`, returning `None` after materialization. Their `.to_dense()` method creates an independent tensor with ordinary storage. `DistanceMatrix.copy()` also provides an independent copy of an individual matrix. ([#233](https://github.com/kthtda/stablebear/pull/233))
+* **Pointwise PCF sums** — `sum` adds the PCFs in a tensor along a chosen `dim`, preserving precision and supporting negative dimensions. ([#234](https://github.com/kthtda/stablebear/issues/234))
+* **Unified data serialization** — Tensor and standalone data-object pickles use the same binary format as `save`/`load`, including standalone point clouds, nested tensors, and indexed tensors. Readers for supported legacy files and pickles are retained. ([#230](https://github.com/kthtda/stablebear/issues/230))
+* **Barcode tensor comparison** — `BarcodeTensor.is_isomorphic_to` compares aligned barcodes independently of bar order, with configurable endpoint tolerances, and returns one boolean for the whole tensor. ([#232](https://github.com/kthtda/stablebear/issues/232))
+
+### Bug fixes
+
+* **Point clouds must have rank 2** — Each cloud must have shape `(n_points, dimension)`, and `PointCloudTensor(..., cloud_ndim=...)` now accepts only `2`. Assigning higher-rank data raises `ValueError`. ([#229](https://github.com/kthtda/stablebear/issues/229))
+* **Scalar tensor serialization preserves values** — Binary save/load and pickle round trips now preserve the value of a zero-dimensional tensor instead of treating it as empty. ([#233](https://github.com/kthtda/stablebear/pull/233))
+* **Windows free-threaded builds** — Correct Python library discovery and compiler definitions for free-threaded Python builds on Windows. ([#233](https://github.com/kthtda/stablebear/pull/233))
+
+### Build requirements
+
+* Source builds now require CMake 3.30.3 or newer. Use GCC 13 or newer on Linux.
+
+## 0.4.7
+
+### New features
+
+* **NumPy constructors for compressed matrices** — `DistanceMatrix` and `SymmetricMatrix` can now be constructed directly from either a full square NumPy array or a one-dimensional compact array. `DistanceMatrix` compact input follows SciPy condensed order; `SymmetricMatrix` compact input contains the upper triangle, including the diagonal, in row-major order. Array dtype is inferred for `float32` and `float64`, or can be converted explicitly with `dtype=`. ([#228](https://github.com/kthtda/stablebear/pull/228))
+
+### Deprecations
+
+* **`DistanceMatrix.from_dense` and `SymmetricMatrix.from_dense` are deprecated** — pass a square array directly to the corresponding constructor instead. The methods remain available for compatibility and emit `DeprecationWarning`. ([#228](https://github.com/kthtda/stablebear/pull/228))
+
+## 0.4.6
+
+### New features
+
+* **SciPy linkage conversion** — `persistence.linkage_to_barcode` converts a linkage matrix to a `Barcode`, with optional reduced homology and no SciPy runtime dependency. ([#221](https://github.com/kthtda/stablebear/issues/221))
+
+### Bug fixes
+
+* **PCF collections dispatch correctly in `tensor()` and `plotting.plot()`** — `tensor()` now detects lists, tuples, and nested collections of floating or integer `Pcf` objects before NumPy dtype inference, preserving collection shape and avoiding ragged-array failures for unequal breakpoint counts. A single `Pcf` becomes a one-element tensor, and `plotting.plot()` accepts PCF lists and tuples directly. ([#224](https://github.com/kthtda/stablebear/issues/224))
+
+## 0.4.5
+
+### New features
+
+* **Homological kernels for paired point clouds and distance matrices** — `persistence.compute_homological_kernel(X, Y)` computes the 0-dimensional relative-persistence barcode describing where a smaller distance `Y` merges components before a larger distance `X`. It accepts individual NumPy point clouds, `FloatTensor`s, `DistanceMatrix` instances, or matching `PointCloudTensor`/`DistanceMatrixTensor` batches; batched computations run in parallel. Point clouds use Euclidean distance, while precomputed distance matrices support other metrics. The result is a `BarcodeTensor` with one barcode per pair. Only `dim=0` is currently supported. ([#217](https://github.com/kthtda/stablebear/pull/217))
+* **Guide for homological kernels** — the documentation now explains the method, paired-input requirements, point-cloud and distance-matrix workflows, and how to summarize the resulting barcodes as correlation-style scores.
+* **`plot_barcode` accepts NumPy bar arrays** — pass an `(n, 2)` integer or floating-point NumPy array of `(birth, death)` pairs directly. ([#159](https://github.com/kthtda/stablebear/issues/159))
+
+### Bug fixes
+
+* **`plot_barcode` now rejects invalid inputs clearly** — unsupported inputs and array dtypes raise `TypeError`; arrays not shaped `(n, 2)` and barcode tensors with more than one dimension raise `ValueError`. Validation occurs before a plotting axes is created, so invalid calls no longer leave an empty figure behind. ([#159](https://github.com/kthtda/stablebear/issues/159))
+
 ## 0.4.4
 
 ### Breaking changes

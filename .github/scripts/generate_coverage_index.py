@@ -26,8 +26,8 @@ Each report directory is expected to contain:
     valgrind/vg_pytest/raw.log         — raw valgrind text output
     valgrind/vg_pytest/raw.xml         — raw valgrind XML
     valgrind/vg_gtest/  (same layout)
-    helgrind/hg_pytest/ (same layout)
-    helgrind/hg_gtest/  (same layout)
+    helgrind/hg_pytest/ (same layout, without raw.xml in new reports)
+    helgrind/hg_gtest/  (same layout, without raw.xml in new reports)
 
 Template files are resolved relative to this script's location:
     .github/ci/coverage/index.template.html
@@ -429,6 +429,15 @@ def _memory_nav_section(entry: dict, report_dir: str) -> str:
         err_badge = _err_badge_sidebar(errors)
         supp_path = os.path.join(report_dir, base, "generated.supp")
         has_supp = os.path.isfile(supp_path) and os.path.getsize(supp_path) > 0
+        xml_row = ""
+        if os.path.isfile(os.path.join(report_dir, base, "raw.xml")):
+            xml_row = f"""
+        <div class="sidebar-nav-row">
+          <a class="sidebar-nav-item" data-src="{base}/raw.xml" data-mode="xml" href="#">
+            <span class="nav-icon">&#x1f5c2;</span> raw.xml
+          </a>
+          <a class="sidebar-dl-btn" href="{base}/raw.xml" download title="Download">&#x2913;</a>
+        </div>"""
         supp_row = ""
         if has_supp:
             supp_row = f"""
@@ -456,13 +465,7 @@ def _memory_nav_section(entry: dict, report_dir: str) -> str:
             <span class="nav-icon">&#x1f4dd;</span> raw.log
           </a>
           <a class="sidebar-dl-btn" href="{base}/raw.log" download title="Download">&#x2913;</a>
-        </div>
-        <div class="sidebar-nav-row">
-          <a class="sidebar-nav-item" data-src="{base}/raw.xml" data-mode="xml" href="#">
-            <span class="nav-icon">&#x1f5c2;</span> raw.xml
-          </a>
-          <a class="sidebar-dl-btn" href="{base}/raw.xml" download title="Download">&#x2913;</a>
-        </div>{supp_row}"""
+        </div>{xml_row}{supp_row}"""
 
     vg_counts = [entry["vg_pytest_errors"], entry["vg_gtest_errors"]]
     hg_counts = [entry["hg_pytest_errors"], entry["hg_gtest_errors"]]

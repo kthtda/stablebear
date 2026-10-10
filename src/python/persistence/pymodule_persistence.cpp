@@ -2,6 +2,8 @@
 
 #include "py_barcode.hpp"
 #include "py_barcode_summary.hpp"
+#include "py_homological_kernel.hpp"
+#include "py_linkage.hpp"
 #include "py_persistence_pair.hpp"
 #include "py_ripser.hpp"
 
@@ -17,5 +19,7 @@ namespace sb_py
     register_persistence_barcode_summary(sm);
     register_persistence_persistence_pair(sm);
     register_persistence_ripser(sm);
+    register_persistence_homological_kernel(sm);
+    register_persistence_linkage(sm);
   }
 }

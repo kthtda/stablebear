@@ -9,6 +9,7 @@
 #include "functional/py_make_from_serial_content.hpp"
 #include "functional/py_norms.hpp"
 #include "py_tensor.hpp"
+#include "py_point_cloud.hpp"
 #include "functional/py_reductions.hpp"
 #include "functional/py_distance.hpp"
 #include "functional/py_inner_product.hpp"
@@ -16,6 +17,7 @@
 #include "py_np_tensor_convert.hpp"
 #include "py_symmetric_matrix.hpp"
 #include "py_distance_matrix.hpp"
+#include "py_distributions.hpp"
 
 #include "persistence/pymodule_persistence.hpp"
 #include "point_process/pymodule_point_process.hpp"
@@ -163,6 +165,7 @@ PYBIND11_MODULE(SB_MODULE_NAME, m) {
   sb_py::register_io(m);
 
   sb_py::register_tensor_bindings(m);
+  sb_py::register_point_cloud_bindings(m);
   sb_py::register_np_conversions(m);
 
   sb_py::register_make_from_serial_content(m);
@@ -175,5 +178,6 @@ PYBIND11_MODULE(SB_MODULE_NAME, m) {
   sb_py::register_distance_matrix(m);
 
   sb_py::register_module_persistence(m);
+  sb_py::register_distributions(m);
   sb_py::register_module_point_process(m);
 }

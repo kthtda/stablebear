@@ -3,6 +3,7 @@
 #include <string_view>
 
 #include <sbear/tensor.hpp>
+#include <sbear/nested_tensor.hpp>
 #include <sbear/io.hpp>
 
 #include <pybind11/stl.h>
@@ -14,8 +15,17 @@ namespace
   class IoOps
   {
   public:
+    template <typename T, sb::TensorProperties Properties = sb::TensorProperty::None>
+    static void save_tensor_to_file(
+        const sb::Tensor<T, Properties>& tensor, py::object file)
+    {
+      sb_py::PythonOStreamBuf buf(file);
+      std::ostream os(&buf);
+      sb::write(tensor, os);
+    }
+
     template <typename T>
-    static void save_tensor_to_file(const sb::Tensor<T>& tensor, py::object file)
+    static void save_nested_tensor_to_file(const sb::NestedTensor<T>& tensor, py::object file)
     {
       sb_py::PythonOStreamBuf buf(file);
       std::ostream os(&buf);
@@ -61,6 +71,12 @@ namespace sb_py
         .def_static("save_uint32_tensor",        &IoOps::save_tensor_to_file<sb::uint32_t>)
         .def_static("save_uint64_tensor",        &IoOps::save_tensor_to_file<sb::uint64_t>)
         .def_static("save_bool_tensor",          &IoOps::save_tensor_to_file<bool>)
+        .def_static("save_nested_float32_tensor", &IoOps::save_nested_tensor_to_file<sb::float32_t>)
+        .def_static("save_nested_float64_tensor", &IoOps::save_nested_tensor_to_file<sb::float64_t>)
+        .def_static("save_nested_int32_tensor", &IoOps::save_nested_tensor_to_file<sb::int32_t>)
+        .def_static("save_nested_int64_tensor", &IoOps::save_nested_tensor_to_file<sb::int64_t>)
+        .def_static("save_nested_uint32_tensor", &IoOps::save_nested_tensor_to_file<sb::uint32_t>)
+        .def_static("save_nested_uint64_tensor", &IoOps::save_nested_tensor_to_file<sb::uint64_t>)
 
         .def_static("save_pcf32_tensor",         &IoOps::save_tensor_to_file<sb::Pcf<sb::float32_t, sb::float32_t>>)
         .def_static("save_pcf64_tensor",         &IoOps::save_tensor_to_file<sb::Pcf<sb::float64_t, sb::float64_t>>)
@@ -70,6 +86,8 @@ namespace sb_py
 
         .def_static("save_point_cloud32_tensor", &IoOps::save_tensor_to_file<sb::PointCloud<sb::float32_t>>)
         .def_static("save_point_cloud64_tensor", &IoOps::save_tensor_to_file<sb::PointCloud<sb::float64_t>>)
+        .def_static("save_indexed_point_cloud32_tensor", &IoOps::save_tensor_to_file<sb::PointCloud<sb::float32_t>, sb::TensorProperty::Indexed>)
+        .def_static("save_indexed_point_cloud64_tensor", &IoOps::save_tensor_to_file<sb::PointCloud<sb::float64_t>, sb::TensorProperty::Indexed>)
 
         .def_static("save_barcode32_tensor",     &IoOps::save_tensor_to_file<sb::ph::Barcode<sb::float32_t>>)
         .def_static("save_barcode64_tensor",     &IoOps::save_tensor_to_file<sb::ph::Barcode<sb::float64_t>>)
@@ -79,6 +97,8 @@ namespace sb_py
 
         .def_static("save_distance_matrix32_tensor", &IoOps::save_tensor_to_file<sb::DistanceMatrix<sb::float32_t>>)
         .def_static("save_distance_matrix64_tensor", &IoOps::save_tensor_to_file<sb::DistanceMatrix<sb::float64_t>>)
+        .def_static("save_indexed_distance_matrix32_tensor", &IoOps::save_tensor_to_file<sb::DistanceMatrix<sb::float32_t>, sb::TensorProperty::Indexed>)
+        .def_static("save_indexed_distance_matrix64_tensor", &IoOps::save_tensor_to_file<sb::DistanceMatrix<sb::float64_t>, sb::TensorProperty::Indexed>)
 
         .def_static("load_tensor_from_file", &IoOps::load_tensor_from_file)
 
@@ -86,6 +106,9 @@ namespace sb_py
         .def_static("save_pcf64_object",         &IoOps::save_object_to_file<sb::Pcf<sb::float64_t, sb::float64_t>>)
         .def_static("save_pcf32i_object",        &IoOps::save_object_to_file<sb::Pcf<sb::int32_t, sb::int32_t>>)
         .def_static("save_pcf64i_object",        &IoOps::save_object_to_file<sb::Pcf<sb::int64_t, sb::int64_t>>)
+
+        .def_static("save_point_cloud32_object", &IoOps::save_object_to_file<sb::PointCloud<sb::float32_t>>)
+        .def_static("save_point_cloud64_object", &IoOps::save_object_to_file<sb::PointCloud<sb::float64_t>>)
 
         .def_static("save_barcode32_object",     &IoOps::save_object_to_file<sb::ph::Barcode<sb::float32_t>>)
         .def_static("save_barcode64_object",     &IoOps::save_object_to_file<sb::ph::Barcode<sb::float64_t>>)

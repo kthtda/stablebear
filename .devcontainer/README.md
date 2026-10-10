@@ -22,6 +22,10 @@ an NVIDIA GPU). Everything below is shared unless noted.
     `[tool.cibuildwheel].test-requires`), read via `tomli`;
   - Sphinx docs deps from `docs/requirements.txt`.
 - **Node 20** + `@anthropic-ai/claude-code` (run `claude` in the terminal).
+- **Codex**: the CLI and VS Code extension trust `/workspaces/stablebear` and
+  use `danger-full-access` inside the container, avoiding a redundant nested
+  OS sandbox. State-changing Git commands still require explicit user
+  approval.
 - **GPU** (cuda config only): passed through via `--gpus all`. Builds `_sb_cuda12`, arch auto-detected (`native` -> sm_89 for the RTX 4070 Ti).
 
 ## Host prerequisites
@@ -60,14 +64,17 @@ Presets live in repo-root `CMakePresets.json`:
 
 ```bash
 cmake --preset debug          # configure
-cmake --build --preset debug  # build _sb_cpu (+_sb_cuda12)
+cmake --build --preset debug -j$(nproc --ignore=4)  # build _sb_cpu (+_sb_cuda12)
 cmake --install cmake-build-debug   # symlink extensions into stablebear/
 ```
+
+`nproc --ignore=4` leaves four CPUs worth of capacity for the host, with a
+minimum of one build job. Use fewer jobs if memory is tight.
 
 C++ tests:
 
 ```bash
-cmake --build --preset tests
+cmake --build --preset tests -j$(nproc --ignore=4)
 cd test && ../cmake-build-debug/sb_test
 ```
 
@@ -80,14 +87,16 @@ cd test && python -m pytest python
 Benchmarks/perf -> always use the release preset:
 
 ```bash
-cmake --preset release && cmake --build --preset release && cmake --install cmake-build-release
+cmake --preset release && cmake --build --preset release -j$(nproc --ignore=4) && cmake --install cmake-build-release
 ```
 
 CUDA-off build: `cmake --preset debug-nocuda`.
 
 ## Docs (Sphinx)
 
-Deps are already in the image. Build:
+The image includes the Sphinx dependencies, TeX Live with `tikz-cd`,
+`pdf2svg` for rendering TikZ diagrams as SVG, and Pandoc for notebook pages.
+Rebuild existing devcontainers to pick up these tools. Build:
 
 ```bash
 cd docs && make html   # output in docs/_build/html
@@ -100,18 +109,56 @@ persist across rebuilds. To share **credentials only** (not full host config/hoo
 edit `devcontainer.json` and narrow the first mount to
 `~/.claude/.credentials.json`.
 
+## Codex auth
+
+Both devcontainer configs bind-mount the host's `~/.codex/auth.json` to
+`/home/ubuntu/.codex/auth.json`, so a file-based Codex login is available in
+the container and survives rebuilds. The host file must exist before opening
+the devcontainer. Codex configuration and rules remain container-specific.
+
+## Codex sandbox
+
+The image copies `.devcontainer/codex-config.toml` to
+`/home/ubuntu/.codex/config.toml`. It sets
+`sandbox_mode = "danger-full-access"` because the devcontainer itself is the
+intended isolation boundary and some container kernels cannot start Codex's
+nested OS sandbox. It also marks `/workspaces/stablebear` as trusted so
+project-scoped Codex configuration can load.
+
+Interactive approvals remain enabled and are routed to the user. The rules in
+`.devcontainer/codex-rules/default.rules` require approval for state-changing
+Git commands such as `git add`, `commit`, `push`, `reset`, `clean`,
+`restore`, `rebase`, and `merge`. Read-only commands such as `git status`,
+`diff`, `log`, and `show` continue without a prompt. Codex loads the rules
+from `/home/ubuntu/.codex/rules/` at startup.
+
+This grants Codex full filesystem and network access *inside the container*;
+the container's mounts and runtime configuration remain the boundary to the
+host. Rebuild the devcontainer after changing this file.
+
 ## GitHub CLI auth
 
-`gh` is preinstalled; auth passes through from the host two ways:
+`gh` is preinstalled. Before container creation/start, `initializeCommand` runs
+`.devcontainer/prepare-gh.sh` as your host user. It stages `hosts.yml` and
+`config.yml` from `${GH_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/gh}` in the
+Git-ignored `.devcontainer/.local/gh/` directory, with private permissions.
+The Dockerfile copies these files into `/home/ubuntu/.config/gh` with ownership
+set to `ubuntu`. Docker does not need to bind-mount your host credential directory,
+so this also works when that directory is on AFS.
 
-- `~/.config/gh` is bind-mounted, which carries the token when the host stores
-  it in `hosts.yml` (gh's fallback when no OS keyring is available). Run
-  `gh auth login` on the host first -- or once inside the container, which
-  persists back to the host config.
-- `GH_TOKEN` is forwarded from the host environment (`${localEnv:GH_TOKEN}`),
-  for hosts where gh keeps the token in the OS keyring (macOS Keychain, GNOME
-  Keyring) and `hosts.yml` has no token. Export it on the host before starting
-  the container, e.g. `export GH_TOKEN=$(gh auth token)`.
+Existing file-based host logins carry over automatically. Rebuild the container
+after changing host credentials; restarting alone does not update the image.
+Container-side changes do not sync back to the host. Credentials are included in
+the built image and its build cache, so the resulting image is personal.
+The credential copy is the last build layer to avoid reinstalling dependencies
+when credentials change. Direct `docker build` invocations must first run
+`bash .devcontainer/prepare-gh.sh .devcontainer/.local` from the repository root;
+the Dev Containers workflow runs this automatically. The host needs Bash.
+
+For credentials held in an OS keyring, `GH_TOKEN` is still forwarded from the
+host environment. Export it before launching VS Code, for example
+`export GH_TOKEN=$(gh auth token)`. Copying config files does not copy keyring
+credentials.
 
 Note: git push/pull over SSH already works via the forwarded SSH agent; the
 token is only needed for gh's API operations (issues, PRs, etc.).

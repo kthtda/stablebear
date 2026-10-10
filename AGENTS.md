@@ -1,6 +1,6 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to coding agents working in this repository.
 
 ## Project Overview
 
@@ -8,18 +8,33 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Build & Development
 
-### Full install (required before minimal builds)
-```bash
-pip install .
-```
+Use **CMake 3.30.3 or newer** so Python discovery supports free-threaded
+interpreters and supplies their required compiler definitions on Windows.
 
-### Minimal module build (for iterative C++ development)
+On Linux, use **GCC 13 or newer** for all builds. The devcontainer already
+selects GCC 13 by default; no `CC` or `CXX` exports are needed there.
+
+CMake caches the compiler selection. If an existing build directory was
+configured with an older GCC, configure a fresh build directory with GCC 13 or
+newer.
+
+Always build and install this repository directly with CMake. Do not use
+`pip install .` or another pip-based build of the project; no preliminary pip
+installation is required.
+
+### Configure, build, and install
 ```bash
 cmake -B cmake-build-debug
-cmake --build cmake-build-debug -j$(nproc)
+cmake --build cmake-build-debug -j$(nproc --ignore=4)
 cmake --install cmake-build-debug
 ```
 This works when `SKBUILD` is off (plain CMake). Builds `_sb_cpu` (always) and `_sb_cudaXX` (when CUDA available). Extensions are symlinked into `stablebear/` for immediate use.
+
+For local builds, leave four CPUs worth of capacity for the editor and host:
+use `-j$(nproc --ignore=4)` on Linux, including targeted and incremental builds.
+This uses `max(1, available CPUs - 4)` jobs. On other platforms, calculate the
+equivalent from the available CPU count. Respect any explicitly requested lower
+job limit; CPU-based sizing alone does not guarantee enough memory for a build.
 
 ### CUDA control
 - `BUILD_WITH_CUDA=0` env var disables CUDA (auto-detected otherwise, always off on macOS)
@@ -33,18 +48,29 @@ This works when `SKBUILD` is off (plain CMake). Builds `_sb_cpu` (always) and `_
 
 ## Testing
 
+Read and follow the [testing manifesto](test/TESTING.md) when writing,
+reviewing, or changing tests.
+
 **Important**: Always `cd test` before running pytest. Running from the repo root causes the local `stablebear/` directory to shadow the installed package. You must also build and install first.
 
 ### Python tests
+Test dependencies are in the `test` dependency group in `pyproject.toml`.
+Install them with `pip install --group test` (pip 25.1 or newer).
+
 ```bash
-cmake --build cmake-build-debug -j$(nproc) && cmake --install cmake-build-debug
+cmake --build cmake-build-debug -j$(nproc --ignore=4) && cmake --install cmake-build-debug
 cd test && python -m pytest python               # all Python tests
 cd test && python -m pytest python/test_pdist.py  # single test file
+cd test && SB_RUN_STATISTICAL=1 python -m pytest python  # include large statistical checks
 ```
+
+Tests marked `statistical` rerun probability checks with large inputs and draw
+counts. They are skipped unless `SB_RUN_STATISTICAL=1` is set. CI runs them in
+`.github/workflows/statistical.yaml` on the self-hosted runner.
 
 ### C++ tests (GoogleTest)
 ```bash
-cmake --build cmake-build-debug --target sb_test
+cmake --build cmake-build-debug --target sb_test -j$(nproc --ignore=4)
 cd test && ../cmake-build-debug/sb_test  # run from test/ directory
 ```
 
@@ -87,7 +113,11 @@ Each tensor class supports multiple precisions via a `dtype` parameter: `PcfTens
 - **googletest** — C++ unit tests
 
 ## Documentation (`docs/`)
+Read and follow the [writing manifesto](docs/WRITING.md) when writing,
+reviewing, or changing documentation.
+
 - Sphinx docs live in `docs/`, built with `make html` from that directory.
+- HTML builds require TeX Live (`texlive-latex-extra`, `texlive-pictures`) and `pdf2svg` for TikZ diagrams, plus Pandoc for notebook pages. These tools are included in the devcontainer. TikZ diagrams use `sphinxcontrib.tikz` with `tikz-cd` and are rendered to SVG during the build.
 - **Keep docs in sync with code changes.** When renaming parameters, changing defaults, or modifying public API behavior, update the corresponding `.rst` files and docstrings in the same commit.
 - **Document new public functionality.** New public APIs, features, or user-visible behavior changes should be documented in the appropriate `.rst` file unless purely internal.
 - **Plots with code dropdowns.** When adding plots/figures to docs, always include a `.. dropdown:: Show code` with a `.. literalinclude::` referencing snippet markers in the plot generation script. Plot generation scripts live in `docs/_static/`.

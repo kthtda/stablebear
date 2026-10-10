@@ -1,4 +1,5 @@
 build==1.4.2
+cmake==4.4.4
 matplotlib==3.10.3
 numpy==2.2.6
 pytest==9.0.3

@@ -18,6 +18,11 @@ namespace
     using pcf_type = sb::Pcf<Tt, Tv>;
     using tensor_type = sb::Tensor<pcf_type>;
 
+    static tensor_type sum(const tensor_type& tensor, size_t dim)
+    {
+      return sb::sum(tensor, dim);
+    }
+
     static tensor_type mean(const tensor_type& tensor, size_t dim)
     {
       return sb::mean(tensor, dim);
@@ -37,6 +42,7 @@ namespace
       py::class_<PyReductionsBindings> cls(m, ("Reductions" + suffix).c_str());
 
       cls
+          .def_static("sum", &PyReductionsBindings::sum)
           .def_static("mean", &PyReductionsBindings::mean)
           .def_static("max_time", &PyReductionsBindings::max_time)
           ;
