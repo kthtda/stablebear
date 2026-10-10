@@ -540,7 +540,7 @@ repeated for `subsample_relative`.
   rank-2 case. **Catches:** a rank-2 index tensor accepted without the native
   one-dimensional check, and less helpful errors for float lists and
   higher-rank input, which still fail without their Python checks.
-- [ ] **50. A coordinate query of the wrong dimension.** A 2-D coordinate
+- [x] **50. A coordinate query of the wrong dimension.** A 2-D coordinate
   query for a 1-D reference raises ValueError "reference and query must have
   the same dimension". **Catches:** a dimension mismatch reaching the distance
   computation, where it would read past the reference coordinates (only this

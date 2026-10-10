@@ -826,3 +826,20 @@ def test_query_of_wrong_rank_or_type_raises(query, error, message):
             reference, query, n_points=1, n_samples=1, replace=True,
             distribution=sb.distributions.Uniform(0, 0.5),
         )
+
+
+def test_coordinate_query_of_wrong_dimension_raises():
+    reference = sb.PointCloud([
+        [0.0],
+        [4.0],
+        [9.0],
+    ])
+    query = sb.PointCloud([
+        [0.0, 0.0],
+    ])
+
+    with pytest.raises(ValueError, match="reference and query must have the same dimension"):
+        sb.random.subsample_relative(
+            reference, query, n_points=1, n_samples=1, replace=True,
+            distribution=sb.distributions.Uniform(0, 0.5),
+        )
