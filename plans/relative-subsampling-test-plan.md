@@ -562,7 +562,7 @@ repeated for `subsample_relative`.
   `subsample_relative` through a matrix reference, and its "distances must be
   nonnegative and not NaN" check is only defensive. `test_distance_matrix.py`
   covers the assignment rejection.
-- [ ] **54. Generator argument type.** Passing a NumPy generator,
+- [x] **54. Generator argument type.** Passing a NumPy generator,
   `np.random.default_rng(0)`, as `generator` raises TypeError "generator must
   be a stablebear.random.Generator or None". **Catches:** the sampler bypassing
   the shared `_unwrap`, so the object reaches pybind11 with an opaque error.

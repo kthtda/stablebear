@@ -902,3 +902,17 @@ def test_nan_query_coordinate_raises():
             reference, [[np.nan]], n_points=1, n_samples=1, replace=True,
             distribution=sb.distributions.Uniform(0, 0.5),
         )
+
+
+def test_numpy_generator_raises():
+    reference = sb.PointCloud([
+        [0.0],
+        [4.0],
+    ])
+
+    with pytest.raises(TypeError, match="generator must be a stablebear.random.Generator or None"):
+        sb.random.subsample_relative(
+            reference, [0], n_points=1, n_samples=1, replace=True,
+            distribution=sb.distributions.Uniform(0, 0.5),
+            generator=np.random.default_rng(0),
+        )
