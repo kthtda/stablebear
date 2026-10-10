@@ -1,3 +1,17 @@
+## 0.5.1
+
+### Breaking changes
+
+* **New `subsample` defaults** — `random.subsample` now defaults to `replace=True` and `allow_partial="keep"`, so an undersized input returns a smaller sample instead of raising. Pass `replace=False, allow_partial="no"` for the previous behavior. ([#243](https://github.com/kthtda/stablebear/issues/243))
+
+### New features
+
+* **Relative subsampling** — `random.subsample_relative` draws from one point cloud or distance matrix with probabilities weighted by distance to each query point, following Agerberg, Chachólski, and Ramanujam (TAG-ML 2023). Weights come from the new `distributions.Gaussian`, `Uniform`, and `Mixture`, which `plotting.plot_distance_weight_heatmap` visualizes. Both samplers gain `allow_partial="drop"`. ([#243](https://github.com/kthtda/stablebear/issues/243))
+
+### Bug fixes
+
+* **`DistanceMatrix` entry assignment rejects NaN** — Assigning NaN to an entry now raises `ValueError`, matching the constructor. ([#245](https://github.com/kthtda/stablebear/issues/245))
+
 ## 0.5.0
 
 ### Breaking changes
