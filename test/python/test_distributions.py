@@ -122,3 +122,43 @@ def test_unbounded_uniform_weight_is_one_on_its_support():
 
     # 1/(end - start) would be zero on the whole support.
     npt.assert_array_equal(weights, [0, 1, 1])
+
+
+@pytest.mark.parametrize(("mixture", "expected"), [
+    pytest.param(
+        sb.distributions.Mixture(
+            [sb.distributions.Gaussian(0, 0.5), sb.distributions.Uniform(0, 2.5)],
+            [1, 3],
+        ),
+        "0.25 * Gaussian(0, 0.5) + 0.75 * Uniform(0, 2.5)",
+        id="flat",
+    ),
+    pytest.param(
+        sb.distributions.Mixture(
+            [
+                sb.distributions.Mixture(
+                    [sb.distributions.Uniform(0, 1), sb.distributions.Uniform(1, 2)],
+                    [1, 1],
+                ),
+                sb.distributions.Gaussian(0, 1),
+            ],
+            [1, 0],
+        ),
+        "1 * (0.5 * Uniform(0, 1) + 0.5 * Uniform(1, 2)) + 0 * Gaussian(0, 1)",
+        id="nested-with-zero-term",
+    ),
+])
+def test_mixture_str_shows_normalized_coefficients(mixture, expected):
+    assert str(mixture) == expected
+
+
+def test_mixture_repr_names_every_parameter():
+    mixture = sb.distributions.Mixture(
+        [sb.distributions.Gaussian(0, 0.5), sb.distributions.Uniform(0, 2.5)],
+        [1, 3],
+    )
+
+    assert repr(mixture) == (
+        "Mixture(distributions=(Gaussian(mean=0.0, std=0.5), Uniform(start=0.0, end=2.5)), "
+        "coefficients=(0.25, 0.75))"
+    )

@@ -573,7 +573,7 @@ repeated for `subsample_relative`.
 
 These go in `test/python/test_distributions.py`.
 
-- [ ] **55. Printing.** Two small tests. `str`: the docstring example
+- [x] **55. Printing.** Two small tests. `str`: the docstring example
   `str(Mixture([Gaussian(0, 0.5), Uniform(0, 2.5)], [1, 3]))` is
   "0.25 * Gaussian(0, 0.5) + 0.75 * Uniform(0, 2.5)", and the nested mixture
   `Mixture([Mixture([Uniform(0, 1), Uniform(1, 2)], [1, 1]), Gaussian(0, 1)], [1, 0])`
