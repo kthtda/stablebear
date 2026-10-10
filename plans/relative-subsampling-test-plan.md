@@ -618,14 +618,16 @@ These go in `test/python/test_distributions.py`.
   TypeError naming that endpoint. **Catches:** empty, reversed, or NaN
   intervals producing zero or NaN weights, and non-numbers accepted as
   endpoints.
-- [ ] **61. Mixture inputs.** One table of ValueErrors: one distribution with
-  two coefficients ("Mixture needs one coefficient per distribution"), a
-  negative or NaN coefficient ("Mixture coefficients must be finite and
-  nonnegative"), and all-zero coefficients ("Mixture needs at least one
-  positive coefficient"). **Catches:** silently truncated pairs and
-  coefficients that cannot be normalized. An empty mixture and a
-  non-Distribution component need no rows: they still fail without their
-  checks.
+- [x] **61. Mixture inputs.** Two tables. ValueErrors: an empty mixture
+  ("Mixture needs at least one component"), mismatched distribution and
+  coefficient counts ("Mixture needs one coefficient per distribution"), a
+  negative, NaN, or infinite coefficient ("Mixture coefficients must be finite
+  and nonnegative"), and all-zero coefficients ("Mixture needs at least one
+  positive coefficient"). TypeErrors: a non-Distribution component ("Mixture
+  components must be Distribution instances") and a bool, string, or complex
+  coefficient ("coefficient must be a real scalar"). **Catches:** silently
+  truncated pairs, coefficients that cannot be normalized, and non-numbers
+  accepted.
 
 ## Plot ranges and heatmap
 

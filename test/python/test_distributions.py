@@ -268,3 +268,39 @@ def test_uniform_rejects_invalid_intervals(start, end):
 def test_uniform_rejects_non_numeric_endpoints(start, end, message):
     with pytest.raises(TypeError, match=message):
         sb.distributions.Uniform(start, end)
+
+
+@pytest.mark.parametrize(("distributions", "coefficients", "message"), [
+    pytest.param([], [], "Mixture needs at least one component", id="empty"),
+    pytest.param([sb.distributions.Gaussian(0, 1)], [1, 2],
+                 "Mixture needs one coefficient per distribution", id="extra-coefficient"),
+    pytest.param([sb.distributions.Gaussian(0, 1), sb.distributions.Uniform(0, 1)], [1],
+                 "Mixture needs one coefficient per distribution", id="missing-coefficient"),
+    pytest.param([sb.distributions.Gaussian(0, 1), sb.distributions.Uniform(0, 1)], [1, -1],
+                 "Mixture coefficients must be finite and nonnegative", id="negative"),
+    pytest.param([sb.distributions.Gaussian(0, 1), sb.distributions.Uniform(0, 1)], [1, np.nan],
+                 "Mixture coefficients must be finite and nonnegative", id="nan"),
+    pytest.param([sb.distributions.Gaussian(0, 1), sb.distributions.Uniform(0, 1)], [1, np.inf],
+                 "Mixture coefficients must be finite and nonnegative", id="infinite"),
+    pytest.param([sb.distributions.Gaussian(0, 1), sb.distributions.Uniform(0, 1)], [0, 0],
+                 "Mixture needs at least one positive coefficient", id="all-zero"),
+])
+def test_mixture_rejects_invalid_inputs(distributions, coefficients, message):
+    with pytest.raises(ValueError, match=message):
+        sb.distributions.Mixture(distributions, coefficients)
+
+
+@pytest.mark.parametrize(("distributions", "coefficients", "message"), [
+    pytest.param([sb.distributions.Gaussian(0, 1), "gaussian"], [1, 1],
+                 "Mixture components must be Distribution instances", id="string-component"),
+    pytest.param([sb.distributions.Gaussian(0, 1), sb.distributions.Uniform(0, 1)], [True, 1],
+                 "coefficient must be a real scalar", id="bool-coefficient"),
+    pytest.param([sb.distributions.Gaussian(0, 1), sb.distributions.Uniform(0, 1)], ["1", 1],
+                 "coefficient must be a real scalar", id="string-coefficient"),
+    pytest.param([sb.distributions.Gaussian(0, 1), sb.distributions.Uniform(0, 1)], [1j, 1],
+                 "coefficient must be a real scalar", id="complex-coefficient"),
+])
+def test_mixture_rejects_inputs_of_the_wrong_type(distributions, coefficients, message):
+    with pytest.raises(TypeError, match=message):
+        sb.distributions.Mixture(distributions, coefficients)
+
