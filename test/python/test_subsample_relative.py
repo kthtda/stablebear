@@ -684,3 +684,28 @@ def test_every_output_cell_draws_from_its_own_stream():
     for i in range(8):
         for j in range(i + 1, 8):
             assert not cells[i].array_equal(cells[j]), (i, j)
+
+
+def test_indexed_reference_uses_its_selected_points():
+    source = sb.PointCloudTensor([
+        np.array([
+            [0.0],
+            [4.0],
+            [9.0],
+            [20.0],
+        ]),
+    ])
+    # The view holds source points 3 and 1 ([20.0], [4.0]), in that order.
+    reference = source[sb.NestedTensor([sb.indices([3, 1])])][0]
+
+    # Uniform(0, 0.5) keeps only the query point itself.
+    samples = sb.random.subsample_relative(
+        reference, [0, 1], n_points=1, n_samples=1, replace=True,
+        distribution=sb.distributions.Uniform(0, 0.5),
+    )
+
+    # samples[query].indices[sample]
+    npt.assert_array_equal(samples[0, 0], [[20.0]])
+    npt.assert_array_equal(samples[0].indices[0], [0])
+    npt.assert_array_equal(samples[1, 0], [[4.0]])
+    npt.assert_array_equal(samples[1].indices[0], [1])

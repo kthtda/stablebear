@@ -486,7 +486,7 @@ repeated for `subsample_relative`.
   under `"drop"`, which is why the example uses it; under `"keep"` it returns
   a partial sample silently. **Catches:** wrong or missing pairs, and warnings
   in quiet mode.
-- [ ] **43. Verbosity changes neither results nor generator state.** (optional)
+- [x] **43. Verbosity changes neither results nor generator state.** (optional, skipped)
   Two equally seeded generators, one used with `verbose=True` and one without,
   two calls each with the item 39 call, which has no empty cell and so emits no
   warning: all indices match. **Catches:** the reporting path consuming random
@@ -496,7 +496,7 @@ repeated for `subsample_relative`.
 
 ## Reference representations
 
-- [ ] **44. An indexed reference.** Index a one-element `PointCloudTensor`
+- [x] **44. An indexed reference.** Index a one-element `PointCloudTensor`
   holding coordinates 0, 4, 9, 20 with `sb.NestedTensor([sb.indices([3, 1])])`;
   its element `[0]` is a reference with logical points 20 and 4. Queries
   `[0, 1]` with `Uniform(0, 0.5)` and `n_points=1` select 20 and 4, with
