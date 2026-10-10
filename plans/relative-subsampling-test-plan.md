@@ -453,7 +453,7 @@ repeated for `subsample_relative`.
   generators share one advancing path, so a separate caller-generator test
   adds nothing. **Catches:** an omitted generator not reaching the global
   generator, a generator that does not advance, and nondeterministic seeding.
-- [ ] **39. Every output cell has its own stream.** The item 38 reference with
+- [x] **39. Every output cell has its own stream.** The item 38 reference with
   `query=[0, 0]`, two equal `Uniform(0, 100)` distributions, `n_points=5`,
   `n_samples=2`, and `generator=sb.random.Generator(7)`: all eight cells
   differ. With a fixed seed the outcome is fixed; if the streams change, two

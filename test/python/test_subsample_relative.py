@@ -600,17 +600,17 @@ def test_eligibility_is_counted_before_duplicate_removal():
     npt.assert_array_equal(samples[0, 0], [[0.0]])
 
 
-def draw_from_hundred_points():
-    # Uniform(0, 100) covers every point, so all 100 are equally likely.
-    reference = sb.PointCloud(np.arange(100.0).reshape(100, 1))
-    samples = sb.random.subsample_relative(
-        reference, [0], n_points=5, n_samples=1, replace=True,
-        distribution=sb.distributions.Uniform(0, 100),
-    )
-    return np.asarray(samples.indices[0, 0])
-
-
 def test_global_seed_replays_and_calls_advance():
+    reference = sb.PointCloud(np.arange(100.0).reshape(100, 1))
+
+    def draw_from_hundred_points():
+        # Uniform(0, 100) covers every point, so all 100 are equally likely.
+        samples = sb.random.subsample_relative(
+            reference, [0], n_points=5, n_samples=1, replace=True,
+            distribution=sb.distributions.Uniform(0, 100),
+        )
+        return np.asarray(samples.indices[0, 0])
+
     sb.random.seed(7)
     first = draw_from_hundred_points()
     second = draw_from_hundred_points()
@@ -621,3 +621,32 @@ def test_global_seed_replays_and_calls_advance():
     assert not np.array_equal(first, second)
     npt.assert_array_equal(first_again, first)
     npt.assert_array_equal(second_again, second)
+
+
+def test_every_output_cell_draws_from_its_own_stream():
+    reference = sb.PointCloud(np.arange(100.0).reshape(100, 1))
+
+    # Equal queries and equal distributions, so only the cell position
+    # can tell the streams apart.
+    pointclouds = sb.random.subsample_relative(
+        reference, [0, 0], n_points=5, n_samples=2, replace=True,
+        distribution=[sb.distributions.Uniform(0, 100), sb.distributions.Uniform(0, 100)],
+        generator=sb.random.Generator(7),
+    )
+
+    # pointclouds[query, distribution].indices[sample]
+    cells = [
+        pointclouds[0, 0].indices[0],
+        pointclouds[0, 0].indices[1],
+        pointclouds[0, 1].indices[0],
+        pointclouds[0, 1].indices[1],
+        pointclouds[1, 0].indices[0],
+        pointclouds[1, 0].indices[1],
+        pointclouds[1, 1].indices[0],
+        pointclouds[1, 1].indices[1],
+    ]
+    # With the seed fixed, the outcome is fixed. If the streams change, two of
+    # the 28 cell pairs match by chance with probability about 3e-9.
+    for i in range(8):
+        for j in range(i + 1, 8):
+            assert not cells[i].array_equal(cells[j]), (i, j)
