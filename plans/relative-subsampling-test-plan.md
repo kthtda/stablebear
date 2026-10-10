@@ -647,10 +647,10 @@ Items 63 and 64 go in `test/python/test_distributions.py`; items 65-71 go in
   `Uniform(-inf, inf)` gives `(-0.1, 1.1)`. **Catches:** infinities leaking
   into the range, the margin applied before the replacement, and the unit
   window on the wrong side.
-- [ ] **64. Mixture plot ranges span positive-coefficient components.**
-  `Mixture([Mixture([Uniform(0, 1), Uniform(10, 20)], [1, 0]), Uniform(2, 3)], [1, 1])`
-  gives `(-0.1, 3.1)`; including the zero-coefficient component would give
-  `(-0.1, 21.0)`. **Catches:** zero-weight components extending the range, and
+- [x] **64. Mixture plot ranges span positive-coefficient components.**
+  `Mixture([Mixture([Uniform(0, 10), Uniform(100, 200)], [1, 0]), Uniform(20, 30)], [1, 1])`
+  gives `(-1, 31)`; including the zero-coefficient component would give
+  `(-1, 210)`. **Catches:** zero-weight components extending the range, and
   nested mixtures not recursing.
 - [ ] **65. Heatmap geometry and values.** `Uniform(0, 1.1)`, query `(1, 1)`,
   extent `(-0.5, 2.5, 0.5, 3.5)`, resolution 3. Pixel centers are x = 0, 1, 2

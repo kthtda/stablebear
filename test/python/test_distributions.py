@@ -316,3 +316,20 @@ def test_mixture_rejects_inputs_of_the_wrong_type(distributions, coefficients, m
 ])
 def test_plot_range(distribution, expected):
     assert distribution.plot_range() == pytest.approx(expected)
+
+
+def test_mixture_plot_range_spans_positive_coefficient_components():
+    mixture = sb.distributions.Mixture(
+        [
+            sb.distributions.Mixture(
+                [sb.distributions.Uniform(0, 10), sb.distributions.Uniform(100, 200)],
+                [1, 0],
+            ),
+            sb.distributions.Uniform(20, 30),
+        ],
+        [1, 1],
+    )
+
+    # Uniform(0, 10) spans (-1, 11) and Uniform(20, 30) spans (19, 31);
+    # the zero-coefficient Uniform(100, 200) is left out.
+    assert mixture.plot_range() == pytest.approx((-1, 31))
