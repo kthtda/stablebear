@@ -1,6 +1,3 @@
-import re
-import warnings
-
 import numpy as np
 import numpy.testing as npt
 import pytest
@@ -607,36 +604,6 @@ def test_drop_partial_applies_with_and_without_replacement(replace):
     assert len(np.asarray(samples.indices[1, 0])) == 0
 
 
-
-def test_verbose_warns_about_empty_cells():
-    reference = sb.PointCloud([
-        [0.0],
-        [1.0],
-        [4.0],
-    ])
-
-    # Query 1 (point 2) has one eligible point, so "drop" leaves its cell empty.
-    with pytest.warns(UserWarning, match=re.escape(
-            "Empty samples at (query, distribution) indices: [(1, 0)]")):
-        sb.random.subsample_relative(
-            reference, [0, 2], n_points=2, n_samples=1, replace=False, allow_partial="drop",
-            distribution=sb.distributions.Uniform(0, 1.5), verbose=True,
-        )
-
-
-def test_quiet_mode_does_not_warn_about_empty_cells():
-    reference = sb.PointCloud([
-        [0.0],
-        [1.0],
-        [4.0],
-    ])
-
-    with warnings.catch_warnings():
-        warnings.simplefilter("error")
-        sb.random.subsample_relative(
-            reference, [0, 2], n_points=2, n_samples=1, replace=False, allow_partial="drop",
-            distribution=sb.distributions.Uniform(0, 1.5), verbose=False,
-        )
 
 def test_eligibility_is_counted_before_duplicate_removal():
     reference = sb.PointCloud([

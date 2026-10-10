@@ -133,7 +133,6 @@ namespace sb::pp
         shape.push_back(m_distributions.size());
       shape.push_back(nSamples);
       m_selections = Tensor<Tensor<uint64_t>>(shape);
-      m_empty = Tensor<uint8_t>({m_nQuery, m_distributions.size()});
     }
 
     Output result()
@@ -144,20 +143,6 @@ namespace sb::pp
       if (!m_result)
         m_result = make_indexed_tensor_from_owned_indices(m_source, to_nested_tensor(m_selections));
       return *m_result;
-    }
-
-    std::vector<std::pair<size_t, size_t>> empty_regions() const
-    {
-      std::vector<std::pair<size_t, size_t>> result;
-      for (size_t q = 0; q < m_nQuery; ++q)
-      {
-        for (size_t d = 0; d < m_distributions.size(); ++d)
-        {
-          if (m_empty({q, d}))
-            result.emplace_back(q, d);
-        }
-      }
-      return result;
     }
 
   private:
@@ -270,7 +255,6 @@ namespace sb::pp
                                     + ", distribution " + std::to_string(d));
       }
       const size_t count = sampling::sample_count(m_partialPolicy, m_replace, m_nPoints, eligible);
-      m_empty({q, d}) = count == 0;
       sourceIndices.clear();
       if (m_replace)
       {
@@ -313,7 +297,7 @@ namespace sb::pp
     tf::Future<void> run_async(Executor& exec) override
     {
       const size_t population = detail::sample_population(m_source.flat(0));
-      next_step(m_nQuery * population + m_empty.size() * (population + m_nSamples),
+      next_step(m_nQuery * population + m_nQuery * m_distributions.size() * (population + m_nSamples),
                 "Relative subsampling", "item");
       auto* executor = exec.cpu();
       // Each query owns a generator, seeded from its engine, and reserves one
@@ -338,7 +322,6 @@ namespace sb::pp
     sampling::PartialPolicy m_partialPolicy;
     bool m_discardDuplicates;
     Tensor<Tensor<uint64_t>> m_selections;
-    Tensor<uint8_t> m_empty;
     Generator& m_generator;
     std::optional<Output> m_result;
   };

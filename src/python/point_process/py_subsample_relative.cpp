@@ -13,8 +13,7 @@ namespace
     using T = typename ElementT::value_type;
     using Task = sb::pp::RelativeSubsampleTask<ElementT>;
     py::class_<Task, sb::StoppableTask<void>>(m, (std::string("_") + name + "Task").c_str())
-      .def("result", &Task::result, py::call_guard<py::gil_scoped_release>())
-      .def("empty_regions", &Task::empty_regions);
+      .def("result", &Task::result, py::call_guard<py::gil_scoped_release>());
     m.def(name, [](const ElementT& reference, std::optional<sb::pp::RelativeQuery<T>> query,
                    std::vector<sb::random::Distribution> distributions,
                    size_t nPoints, size_t nSamples, bool distributionAxis, bool replace,

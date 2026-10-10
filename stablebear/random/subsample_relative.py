@@ -1,7 +1,5 @@
 """Relative subsampling of one reference dataset."""
 
-import warnings
-
 import numpy as np
 
 from .. import _sb_cpp as cpp
@@ -107,8 +105,7 @@ def subsample_relative(
         Use the global generator when omitted. Each output cell has its own
         random stream, independent of worker scheduling.
     verbose : bool, optional
-        Show progress and warn about empty samples by query and distribution,
-        by default False. Does not affect sampling results.
+        Show progress, by default False. Does not affect sampling results.
 
     Returns
     -------
@@ -149,12 +146,4 @@ def subsample_relative(
     )
     _run_task(lambda: task, verbose=verbose)
     result_type = PointCloudTensor if cloud else DistanceMatrixTensor
-    result = result_type(task.result())
-    if verbose:
-        empty = task.empty_regions()
-        if empty:
-            warnings.warn(
-                f"Empty samples at (query, distribution) indices: {empty}",
-                UserWarning, stacklevel=2,
-            )
-    return result
+    return result_type(task.result())
