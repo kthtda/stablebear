@@ -6,6 +6,7 @@
 #include "tensor.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <cstddef>
 #include <memory>
 #include <stdexcept>
@@ -95,6 +96,8 @@ namespace sb
 
       EntryProxy& operator=(const T& value)
       {
+        if (std::isnan(value))
+          throw std::invalid_argument("Distance matrix entries must not be NaN");
         if (value < T{})
           throw std::invalid_argument("Distance matrix entries must be nonnegative");
         if (!m_ptr)
@@ -114,6 +117,8 @@ namespace sb
     explicit DistanceMatrix(size_t n, const T& init = {})
       : m_storage(DistanceMatrixLayout(n), init)
     {
+      if (std::isnan(init))
+        throw std::invalid_argument("Distance matrix entries must not be NaN");
       if (init < T{})
         throw std::invalid_argument("Distance matrix entries must be nonnegative");
     }

@@ -207,6 +207,12 @@ class TestAccess:
         with pytest.raises(ValueError):
             dm[0, 1] = -1.0
 
+    def test_reject_nan(self, dtype):
+        dm = DistanceMatrix(3, dtype=dtype)
+        with pytest.raises(ValueError, match="Distance matrix entries must not be NaN"):
+            dm[0, 1] = np.nan
+        assert dm[0, 1] == 0.0
+
     def test_reject_nonzero_diagonal(self, dtype):
         dm = DistanceMatrix(3, dtype=dtype)
         with pytest.raises(ValueError):

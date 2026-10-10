@@ -156,7 +156,8 @@ class DistanceMatrix(_BinaryIoMixin):
         """Set the entry at ``(i, j)`` (and, symmetrically, ``(j, i)``).
 
         Negative indices count from the end. Writes to the diagonal are
-        rejected unless the value is zero, and entries must be nonnegative.
+        rejected unless the value is zero, and entries must be nonnegative
+        and not NaN.
 
         Parameters
         ----------
