@@ -596,7 +596,7 @@ These go in `test/python/test_distributions.py`.
   float32 array `[[0, 2], [3, 1.5]]` gives `Uniform(0, 2)` weights
   `[[0.5, 0], [0, 0.5]]` as float64. **Catches:** returning a 0-d array or a
   NumPy scalar for scalar input, flattened output, and a float32 result.
-- [ ] **58. Evaluation validation.** Two small tests. NaN and `[0, -inf]`
+- [x] **58. Evaluation validation.** Two small tests. NaN and `[0, -inf]`
   raise ValueError "values must be finite"; `1 + 2j` and the numeric string
   `"1"` raise TypeError "values must be real numbers". **Catches:** nonfinite
   values producing silent zeros (`[0, -inf]` checks that every element is

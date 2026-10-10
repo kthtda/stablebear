@@ -202,3 +202,22 @@ def test_array_weight_keeps_its_shape_as_float64():
         [0.5, 0],
         [0, 0.5],
     ])
+
+
+@pytest.mark.parametrize("values", [
+    pytest.param(np.nan, id="nan"),
+    # The infinity is the second element, so every element must be checked.
+    pytest.param([0, -np.inf], id="negative-infinity-second"),
+])
+def test_nonfinite_values_raise(values):
+    with pytest.raises(ValueError, match="values must be finite"):
+        sb.distributions.Gaussian(0, 1).weight(values)
+
+
+@pytest.mark.parametrize("values", [
+    pytest.param(1 + 2j, id="complex"),
+    pytest.param("1", id="numeric-string"),
+])
+def test_non_real_values_raise(values):
+    with pytest.raises(TypeError, match="values must be real numbers"):
+        sb.distributions.Gaussian(0, 1).weight(values)
