@@ -518,7 +518,7 @@ repeated for `subsample_relative`.
 
 ## Sampler input validation
 
-- [ ] **47. The distribution argument.** (optional) `distribution=[]` raises
+- [x] **47. The distribution argument.** (optional) `distribution=[]` raises
   ValueError "distribution list must not be empty"; a string raises TypeError
   "distribution must be a Distribution or a list of them". **Catches:** less
   helpful errors: without the Python checks, `[]` raises the native ValueError

@@ -749,3 +749,27 @@ def test_samples_ignore_later_writes_to_the_reference():
 
     assert reference[0, 0] == 99.0
     npt.assert_array_equal(samples[0, 0], [[0.0]])
+
+
+def test_empty_distribution_list_raises():
+    reference = sb.PointCloud([
+        [0.0],
+        [4.0],
+    ])
+
+    with pytest.raises(ValueError, match="distribution list must not be empty"):
+        sb.random.subsample_relative(
+            reference, [0], n_points=1, n_samples=1, replace=True, distribution=[],
+        )
+
+
+def test_non_distribution_argument_raises():
+    reference = sb.PointCloud([
+        [0.0],
+        [4.0],
+    ])
+
+    with pytest.raises(TypeError, match="distribution must be a Distribution or a list of them"):
+        sb.random.subsample_relative(
+            reference, [0], n_points=1, n_samples=1, replace=True, distribution="gaussian",
+        )
