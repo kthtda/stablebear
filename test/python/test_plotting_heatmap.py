@@ -108,3 +108,35 @@ def test_styling_keywords_override_defaults(ax):
     assert im.get_cmap().name == "magma"
     assert im.get_interpolation() == "bilinear"
     assert im.get_alpha() == 0.5
+
+
+@pytest.mark.parametrize("query", [
+    pytest.param((0,), id="one-coordinate"),
+    pytest.param((0, 0, 0), id="three-coordinates"),
+    pytest.param((0, np.nan), id="nan"),
+    pytest.param((1j, 0), id="complex"),
+])
+def test_invalid_query_raises(ax, query):
+    with pytest.raises(ValueError, match="query must contain two finite real coordinates"):
+        plot_distance_weight_heatmap(
+            sb.distributions.Gaussian(0, 1), query=query, extent=(-1, 1, -1, 1),
+            resolution=3, ax=ax,
+        )
+
+
+def test_non_distribution_raises(ax):
+    with pytest.raises(TypeError, match="distribution must be a Distribution"):
+        plot_distance_weight_heatmap("gaussian", extent=(-1, 1, -1, 1), resolution=3, ax=ax)
+
+
+@pytest.mark.parametrize(("extent", "message"), [
+    pytest.param((0, 1, 0), "extent must contain four finite real bounds", id="three-bounds"),
+    pytest.param((0, 1, 0, np.inf), "extent must contain four finite real bounds", id="infinite"),
+    pytest.param((0, 0, 0, 1), "extent must satisfy xmin < xmax and ymin < ymax", id="empty-x"),
+    pytest.param((0, 1, 1, 0), "extent must satisfy xmin < xmax and ymin < ymax", id="reversed-y"),
+])
+def test_invalid_extent_raises(ax, extent, message):
+    with pytest.raises(ValueError, match=message):
+        plot_distance_weight_heatmap(
+            sb.distributions.Gaussian(0, 1), extent=extent, resolution=3, ax=ax,
+        )

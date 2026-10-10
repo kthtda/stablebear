@@ -690,7 +690,7 @@ Items 63 and 64 go in `test/python/test_distributions.py`; items 65-71 go in
   `interpolation="bilinear"`, and `alpha=0.5` reach the returned image.
   **Catches:** defaults overwriting caller keywords. Do not test colorbars
   (Matplotlib's behavior) or `origin=` (see the follow-ups).
-- [ ] **71. Heatmap argument validation.** Two small tests. Queries `(0,)`,
+- [x] **71. Heatmap argument validation.** Two small tests. Queries `(0,)`,
   `(0, nan)`, and `(1j, 0)` raise ValueError "query must contain two finite
   real coordinates", and a non-Distribution raises TypeError "distribution must
   be a Distribution". The extent `(0, 1, 0, inf)` raises ValueError "extent
