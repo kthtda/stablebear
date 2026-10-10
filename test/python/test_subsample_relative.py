@@ -598,3 +598,26 @@ def test_eligibility_is_counted_before_duplicate_removal():
     )
 
     npt.assert_array_equal(samples[0, 0], [[0.0]])
+
+
+def draw_from_hundred_points():
+    # Uniform(0, 100) covers every point, so all 100 are equally likely.
+    reference = sb.PointCloud(np.arange(100.0).reshape(100, 1))
+    samples = sb.random.subsample_relative(
+        reference, [0], n_points=5, n_samples=1, replace=True,
+        distribution=sb.distributions.Uniform(0, 100),
+    )
+    return np.asarray(samples.indices[0, 0])
+
+
+def test_global_seed_replays_and_calls_advance():
+    sb.random.seed(7)
+    first = draw_from_hundred_points()
+    second = draw_from_hundred_points()
+    sb.random.seed(7)
+    first_again = draw_from_hundred_points()
+    second_again = draw_from_hundred_points()
+
+    assert not np.array_equal(first, second)
+    npt.assert_array_equal(first_again, first)
+    npt.assert_array_equal(second_again, second)

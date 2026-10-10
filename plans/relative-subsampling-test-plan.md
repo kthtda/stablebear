@@ -445,19 +445,19 @@ repeated for `subsample_relative`.
 
 ## Streams and reporting
 
-- [ ] **38. Reseeding replays and calls advance.** Reference coordinates 0
-  through 19, query `[0]`, `Uniform(0, 100)` (every point equally likely),
-  `n_points=5`. Two small tests, as in `test_generator_advance.py`: after
-  `sb.random.seed(7)`, two calls with `generator` omitted differ from each
-  other and give the same indices as the same two calls after a second
-  `sb.random.seed(7)`; two consecutive calls with one `sb.random.Generator(7)`
-  differ. **Catches:** an omitted generator not reaching the global generator,
-  a caller generator that does not advance, and nondeterministic seeding.
+- [x] **38. Reseeding replays and calls advance.** Reference coordinates 0
+  through 99, query `[0]`, `Uniform(0, 100)` (every point equally likely),
+  `n_points=5`. One test: after `sb.random.seed(7)`, two calls with
+  `generator` omitted differ from each other and give the same indices as the
+  same two calls after a second `sb.random.seed(7)`. The global and caller
+  generators share one advancing path, so a separate caller-generator test
+  adds nothing. **Catches:** an omitted generator not reaching the global
+  generator, a generator that does not advance, and nondeterministic seeding.
 - [ ] **39. Every output cell has its own stream.** The item 38 reference with
   `query=[0, 0]`, two equal `Uniform(0, 100)` distributions, `n_points=5`,
   `n_samples=2`, and `generator=sb.random.Generator(7)`: all eight cells
   differ. With a fixed seed the outcome is fixed; if the streams change, two
-  of the 28 cell pairs match by chance with probability about 1.5e-5 (say so in
+  of the 28 cell pairs match by chance with probability about 3e-9 (say so in
   a comment). **Catches:** streams keyed by query or distribution value
   instead of position, one stream block shared by all distributions, and every
   sample using the same engine.
