@@ -42,7 +42,7 @@ jobs:
           echo "Using $env:NUMBER_OF_PROCESSORS core(s) to build..."
 
       - name: Build wheels
-        uses: pypa/cibuildwheel@v3.3.1
+        uses: pypa/cibuildwheel@v4.3.1
         env:
           CIBW_BUILD_VERBOSITY: 1
           CIBW_ENVIRONMENT: >-
