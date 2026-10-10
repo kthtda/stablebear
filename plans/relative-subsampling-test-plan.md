@@ -503,10 +503,10 @@ repeated for `subsample_relative`.
   indices `[0]` and `[1]` relative to the view. **Catches:** reading the
   backing source instead of the view (points 0 and 4, or source indices 3
   and 1).
-- [ ] **45. A `FloatTensor` coordinate query.**
+- [x] **45. A `FloatTensor` coordinate query.**
   `sb.FloatTensor(np.array([[8], [3]], dtype=...))`, parametrized over float32
   and float64, against reference coordinates 0, 4, 9 with `Uniform(0, 1.5)`
-  and `n_points=1` selects 9, then 4 (indices `[2]`, then `[1]`). **Catches:**
+  and `n_points=1` selects 9, then 4. **Catches:**
   a float32 query failing to convert to the float64 reference, and a float64
   `FloatTensor` passed on unconverted.
 - [ ] **46. Samples ignore later writes to the reference.** Reference

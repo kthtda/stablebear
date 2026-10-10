@@ -135,6 +135,28 @@ def test_strided_unsigned_index_tensor_selects_the_viewed_indices(dtype):
     npt.assert_array_equal(samples[1, 0], [[0.0]])
 
 
+@pytest.mark.parametrize("np_dtype", [np.float32, np.float64])
+def test_float_tensor_query_selects_points_near_its_coordinates(np_dtype):
+    reference = sb.PointCloud([
+        [0.0],
+        [4.0],
+        [9.0],
+    ])
+    query = sb.FloatTensor(np.array([
+        [8.0],
+        [3.0],
+    ], dtype=np_dtype))
+
+    # Each query has exactly one reference point within distance 1.5.
+    samples = sb.random.subsample_relative(
+        reference, query, n_points=1, n_samples=1, replace=True,
+        distribution=sb.distributions.Uniform(0, 1.5),
+    )
+
+    npt.assert_array_equal(samples[0, 0], [[9.0]])
+    npt.assert_array_equal(samples[1, 0], [[4.0]])
+
+
 def test_output_axes_are_query_distribution_sample():
     reference = sb.PointCloud([
         [0.0],
