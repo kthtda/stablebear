@@ -3,6 +3,7 @@
 ### Breaking changes
 
 * **New `subsample` defaults** — `random.subsample` now defaults to `replace=True` and `allow_partial="keep"`, so an undersized input returns a smaller sample instead of raising. Pass `replace=False, allow_partial="no"` for the previous behavior. ([#243](https://github.com/kthtda/stablebear/issues/243))
+* **Seeded results change** — Generators with nearby seeds, such as `Generator(5)` and `Generator(6)`, previously reused each other's random streams shifted by one element. Seeds are now mixed before streams are derived, so results for a given seed differ from earlier versions. ([#247](https://github.com/kthtda/stablebear/issues/247))
 
 ### New features
 

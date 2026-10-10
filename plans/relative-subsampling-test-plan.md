@@ -801,10 +801,6 @@ protect the other.
   before the workers find the shortfall, whereas uniform `subsample` validates
   first and has a test that it does not advance. Decide whether to document
   this as unspecified or change it; add no test until then.
-- **Adjacent seeds share streams** (predates the branch). A call's stream
-  block starts at `seed + offset`, so `Generator(5)` and `Generator(6)`
-  produce shifted copies of the same streams. Consider a seed mixer
-  separately.
 - **Tiny scales.** `.weight()` returns inf for valid tiny scales such as
   `Uniform(0, 5e-324).weight(0)`, because a finite `long double` is cast to
   double. Sampling is unaffected.

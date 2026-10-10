@@ -51,7 +51,7 @@ For the default engine, the seeding chain is:
 
 .. code-block:: text
 
-   m_seed + m_offset + flatIndex
+   splitmix64(m_seed) + m_offset + flatIndex
      -> make_engine<Xoroshiro128pp>
        -> s0 = splitmix64(seed)
        -> s1 = splitmix64(s0)
@@ -59,7 +59,7 @@ For the default engine, the seeding chain is:
 
 (``m_offset`` is the per-generator stream counter described in
 :ref:`advancing-between-draws` below; it is ``0`` for the first draw after
-seeding, so the chain reduces to ``m_seed + flatIndex`` there.)
+seeding, so the chain reduces to ``splitmix64(m_seed) + flatIndex`` there.)
 
 This follows the recommended seeding approach from :footcite:`Blackman2021`: chain ``splitmix64`` outputs to fill the state words, feeding each output as the next input. Since ``splitmix64`` is a bijection, this guarantees two distinct, well-distributed state words and avoids the all-zeros state (which xoroshiro cannot be in).
 
@@ -123,13 +123,13 @@ RandomGenerator
      // Reserve the next n slots [m_offset, m_offset + n) and advance past them.
      Block reserve(size_t n)
      {
-       Block block(m_seed + m_offset);
+       Block block(splitmix64(m_seed) + m_offset);
        m_offset += n;
        return block;
      }
    };
 
-Within a single draw, element ``i`` is seeded from ``m_base + i`` where ``m_base = m_seed + m_offset``. Since ``flatIndex`` is the row-major index into the tensor, the engine for each element is a pure function of position -- not of execution order. Across draws, the offset moves forward (see below), so successive draws occupy disjoint ranges of seed slots.
+Within a single draw, element ``i`` is seeded from ``m_base + i`` where ``m_base = splitmix64(m_seed) + m_offset``. Since ``flatIndex`` is the row-major index into the tensor, the engine for each element is a pure function of position -- not of execution order. Across draws, the offset moves forward (see below), so successive draws occupy disjoint ranges of seed slots.
 
 
 .. _advancing-between-draws:
@@ -150,7 +150,7 @@ Advancing is the job of ``reserve(n)``: a draw over an ``N``-element tensor rese
 
 Reserving up front -- rather than advancing *after* the draw -- is what makes this correct under parallelism. ``parallel_walk`` dispatches its per-element callback asynchronously via Taskflow, so the callbacks run *after* the call returns. If the generator were advanced only once the draw "finished", there would be no well-defined moment to do so, and reading the live generator's offset from inside the async callbacks would race. Instead, ``reserve`` computes the block base and advances the counter synchronously, then the immutable ``Block`` (a single ``uint64_t``) is captured **by value** into the callback. Workers read only their copy; the generator is free to advance for the next draw.
 
-**Backward compatibility.** The first draw after seeding uses ``m_offset == 0``, so its element ``i`` is seeded from ``m_seed + i`` -- exactly the pre-advancement behaviour. Existing seeds reproduce their historical first draw unchanged; only the *second and later* draws (previously duplicates) now differ.
+**Adjacent seeds.** The master seed is mixed with ``splitmix64`` before the offset is added. Adding raw seeds would make slot 1 of ``Generator(5)`` the same engine as slot 0 of ``Generator(6)``, so generators with nearby seeds would share streams. Mixing first places each seed's slots at an unrelated point in the 64-bit space, much as NumPy's ``SeedSequence`` hashes a seed before deriving streams.
 
 **Non-overlap by construction.** Because each draw reserves a disjoint, contiguous slot range, independence between draws is structural -- it does not rely on a hash scattering nearby seeds apart. (``splitmix64`` still decorrelates adjacent slots *within* the engine seeding chain, as described above.)
 
@@ -221,11 +221,12 @@ Consider a ``(3, 4)`` tensor populated with seed 42:
 
 .. code-block:: text
 
-   Element (0, 0): flat = 0  -> make_engine(42 + 0)  -> splitmix64 chain -> engine
-   Element (0, 1): flat = 1  -> make_engine(42 + 1)  -> splitmix64 chain -> engine
-   Element (0, 2): flat = 2  -> make_engine(42 + 2)  -> splitmix64 chain -> engine
+   base = splitmix64(42)
+   Element (0, 0): flat = 0  -> make_engine(base + 0)  -> splitmix64 chain -> engine
+   Element (0, 1): flat = 1  -> make_engine(base + 1)  -> splitmix64 chain -> engine
+   Element (0, 2): flat = 2  -> make_engine(base + 2)  -> splitmix64 chain -> engine
    ...
-   Element (2, 3): flat = 11 -> make_engine(42 + 11) -> splitmix64 chain -> engine
+   Element (2, 3): flat = 11 -> make_engine(base + 11) -> splitmix64 chain -> engine
 
 Each element gets its own ``Xoroshiro128pp`` engine with a unique state derived from its position. Whether the walk visits these 12 elements on 1 thread or 12 threads, each element always receives the same engine, producing identical results.
 
@@ -233,8 +234,8 @@ The draw reserves slots ``[0, 12)`` and advances the offset to ``12``, so a **se
 
 .. code-block:: text
 
-   Second draw, element (0, 0): flat = 0  -> make_engine(42 + 12 + 0)  -> engine
-   Second draw, element (2, 3): flat = 11 -> make_engine(42 + 12 + 11) -> engine
+   Second draw, element (0, 0): flat = 0  -> make_engine(base + 12 + 0)  -> engine
+   Second draw, element (2, 3): flat = 11 -> make_engine(base + 12 + 11) -> engine
 
 The two draws never share a seed slot, so they differ -- yet replaying with a fresh ``Generator(42)`` reproduces both draws in the same order.
 

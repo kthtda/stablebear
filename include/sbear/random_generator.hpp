@@ -103,11 +103,11 @@ namespace sb
 
     /// Reserve the next @p n seed slots and advance past them, so a subsequent
     /// draw never overlaps this one. The returned block occupies the slots
-    /// [m_offset, m_offset + n). The first reservation after (re-)seeding starts
-    /// at offset 0, reproducing the historical raw-seed behaviour exactly.
+    /// [m_offset, m_offset + n) after the mixed seed. Mixing the seed before
+    /// adding the offset keeps adjacent seeds from sharing slots.
     [[nodiscard]] Block reserve(size_t n) noexcept
     {
-      Block block(m_seed + m_offset);
+      Block block(detail::splitmix64(m_seed) + m_offset);
       m_offset += n;
       return block;
     }
