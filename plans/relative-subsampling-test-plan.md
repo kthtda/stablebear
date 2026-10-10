@@ -716,10 +716,18 @@ Items 63 and 64 go in `test/python/test_distributions.py`; items 65-71 go in
   between sampling and the reduction. Optional because items 11 and 12 cover
   the sampler's axes, and `persistence/test_ripser.py` already runs persistent
   homology on indexed point-cloud and distance-matrix tensors.
-- [ ] **73. Final test run.** Build and install with CMake using
+- [x] **73. Final test run.** Build and install with CMake using
   `-j$(nproc --ignore=4)`, as in AGENTS.md. From `test/`, run the new tests and
   the uniform-sampling suite on the default backend and with `SB_FORCE_CPU=1`,
   and run `sb_test` for the C++ items. Record the checks actually run.
+  Run on 2026-10-10 at `b644cc976`, x86-64 Linux, after a CMake build and
+  install of `cmake-build-debug`: `test_subsample_relative.py`,
+  `test_subsample.py`, `test_distributions.py`, `test_plotting_heatmap.py`,
+  and `test_distance_matrix.py` gave 330 passed, 14 skipped on the default
+  backend (`_sb_cuda12`) and the same with `SB_FORCE_CPU=1` (`_sb_cpu`); the
+  full Python suite gave 2704 passed, 14 skipped; `SB_RUN_STATISTICAL=1` on
+  the statistical tests of `test_subsample_relative.py` gave 14 passed; and
+  `sb_test` passed all 502 tests.
 - [ ] **74. Documentation check.** Build the documentation, run the
   `docs/subsampling_options.rst` snippets by hand (no test runner executes
   them), regenerate the heatmap figures with
