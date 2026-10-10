@@ -219,6 +219,7 @@ def test_nonfinite_values_raise(values):
 @pytest.mark.parametrize("values", [
     pytest.param(1 + 2j, id="complex"),
     pytest.param("1", id="numeric-string"),
+    pytest.param(True, id="bool"),
 ])
 def test_non_real_values_raise(values):
     with pytest.raises(TypeError, match="values must be real numbers"):

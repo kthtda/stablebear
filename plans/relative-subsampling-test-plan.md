@@ -805,10 +805,6 @@ protect the other.
   block starts at `seed + offset`, so `Generator(5)` and `Generator(6)`
   produce shifted copies of the same streams. Consider a seed mixer
   separately.
-- **Booleans in `.weight()`.** `Gaussian().weight(True)` returns the weight at
-  1, although `_real` rejects bool parameters, and `Gaussian().weight(2**70)`
-  raises the misleading TypeError "values must be real numbers". Decide before
-  extending item 58.
 - **`plot_range()` is not always finite or nondegenerate.**
   `Gaussian(0, 1e308)` gives `(-inf, inf)`, `Uniform(0, 1.7e308)` gives
   `(-1.7e307, inf)`, and `Uniform(1e17, inf)`, `Uniform(-inf, 1e308)`, and

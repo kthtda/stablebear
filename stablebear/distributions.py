@@ -19,7 +19,7 @@ __all__ = ["Distribution", "Gaussian", "Uniform", "Mixture"]
 
 def _evaluate(native, values):
     values = np.asarray(values)
-    if values.dtype.kind not in "biuf":
+    if values.dtype.kind not in "iuf":
         raise TypeError("values must be real numbers")
     result = native.evaluate(values)
     return result.item() if values.ndim == 0 else result
@@ -74,7 +74,7 @@ class Distribution(ABC):
         Parameters
         ----------
         values : float or array_like
-            Finite real values, of any shape.
+            Finite real values, of any shape. Booleans are rejected.
 
         Returns
         -------
