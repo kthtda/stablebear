@@ -525,7 +525,7 @@ repeated for `subsample_relative`.
   "expected one distribution or a nonempty distribution list", and a string
   raises AttributeError. Optional because only the error type and message are
   at stake.
-- [ ] **48. Out-of-range indices.** On a three-point reference, `[3]`, `[-4]`,
+- [x] **48. Out-of-range indices.** On a three-point reference, `[3]`, `[-4]`,
   and `np.array([2**64 - 1], dtype=np.uint64)` raise ValueError "query index
   is out of range". **Catches:** unsigned values wrapping, and negative indices
   counting past the start. Pass the dtype explicitly:

@@ -773,3 +773,22 @@ def test_non_distribution_argument_raises():
         sb.random.subsample_relative(
             reference, [0], n_points=1, n_samples=1, replace=True, distribution="gaussian",
         )
+
+
+@pytest.mark.parametrize("query", [
+    pytest.param([3], id="past-end"),
+    pytest.param([-4], id="before-start"),
+    pytest.param(np.array([2**64 - 1], dtype=np.uint64), id="largest-uint64"),
+])
+def test_out_of_range_query_index_raises(query):
+    reference = sb.PointCloud([
+        [0.0],
+        [4.0],
+        [9.0],
+    ])
+
+    with pytest.raises(ValueError, match="query index is out of range"):
+        sb.random.subsample_relative(
+            reference, query, n_points=1, n_samples=1, replace=True,
+            distribution=sb.distributions.Uniform(0, 0.5),
+        )
