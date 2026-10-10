@@ -67,7 +67,7 @@ follow, **(optional)** safe to skip.
   `if segments:`. This is correct today, since infinite bars always add
   segments, but fragile. Compute it from the resolved color, or initialize it
   before the branch. No behavior change.
-- [ ] **7. Docstring cleanup.** Capitalize "Number of barcodes" in the
+- [x] **7. Docstring cleanup.** Capitalize "Number of barcodes" in the
   `_resolve_barcode_colors` docstring. Update the `plot_barcode` docstring for
   the decisions in items 1-3.
 

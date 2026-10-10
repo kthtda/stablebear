@@ -154,7 +154,7 @@ def _resolve_barcode_colors(n, color=None, cmap=None, ax=None):
     Parameters
     ----------
     n : int
-        number of barcodes to plot.
+        Number of barcodes to plot.
     color : color-like object, list of color-like objects or None, optional
         ``None`` takes the next ``n`` colors from the axes' property cycle, a
         single color is repeated for all barcodes, and a sequence of colors is
@@ -218,22 +218,26 @@ def plot_barcode(bc, ax=None, y_offset=0, **kwargs):
         of ``(birth, death)`` pairs. For a tensor,
         the barcodes are stacked vertically in order.
     ax : matplotlib axes, optional
-        Axes to plot on. If ``None``, uses ``matplotlib.pyplot`` directly.
+        Axes to plot on. If ``None``, uses the current axes.
     y_offset : int, optional
         Starting y position for the first bar. Useful when stacking
         multiple barcodes on the same axes.
     **kwargs
         Additional keyword arguments passed to
         ``matplotlib.collections.LineCollection``
-        (e.g. ``color``, ``linewidth``, ``alpha``, ``label``).
-        ``color`` may be a single color or a sequence of colors — one per
-        barcode, cycled if there are more barcodes than colors;
-        surplus colors are ignored; a single ``Barcode`` or array uses the
-        first color. Alternatively, ``cmap`` (a colormap name or ``Colormap``) samples
-        one color per barcode evenly from the colormap; a single ``Barcode``
-        or array gets the colormap's first color. ``color`` and ``cmap`` are mutually
-        exclusive. If both are omitted, each barcode in a tensor gets the
-        next color from matplotlib's property cycle.
+        (e.g. ``linewidth``, ``alpha``, ``label``), except for the color
+        options below. ``colors`` is not accepted, because the bars are sorted
+        before drawing.
+
+        ``color`` is a single color, or a sequence with one color per
+        barcode that is cycled if shorter than the number of barcodes.
+        A tuple of three or four numbers is one RGB(A) color, as in
+        matplotlib. ``cmap`` (a colormap name or ``Colormap``) instead samples
+        one color per barcode evenly from the colormap. ``color`` and ``cmap``
+        are mutually exclusive. A single ``Barcode`` or array is treated as a
+        one-barcode tensor, so it uses the first color of a sequence or
+        colormap. If both are omitted, each barcode takes the next color from
+        the axes' property cycle, continuing across calls on the same axes.
 
     Returns
     -------
