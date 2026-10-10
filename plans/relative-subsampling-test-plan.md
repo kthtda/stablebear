@@ -38,7 +38,8 @@ code. Build and test commands are in [AGENTS.md](../AGENTS.md#testing).
   `test/python/test_distributions.py`, relative-sampling tests in
   `test/python/test_subsample_relative.py`, uniform `subsample` policy tests in
   `test/python/test_subsample.py`, and heatmap tests in
-  `test/python/test_plotting.py`, using its `ax` fixture. C++ items name their
+  `test/python/test_plotting_heatmap.py`, using an `ax` fixture from
+  `plot_helpers`. C++ items name their
   file.
 - **Deterministic checks** use no seed. Every item without [S] is one, except
   items 38-40 and 43, which seed generators to compare runs or streams with
@@ -632,7 +633,7 @@ These go in `test/python/test_distributions.py`.
 ## Plot ranges and heatmap
 
 Items 63 and 64 go in `test/python/test_distributions.py`; items 65-71 go in
-`test/python/test_plotting.py`.
+`test/python/test_plotting_heatmap.py`.
 
 - [x] **62. Confirm the double margin.** (decision: keep both margins as-is) Uniform's plot range adds
   10% of its width, and the heatmap's automatic extent adds another 10% of the
@@ -652,15 +653,16 @@ Items 63 and 64 go in `test/python/test_distributions.py`; items 65-71 go in
   gives `(-1, 31)`; including the zero-coefficient component would give
   `(-1, 210)`. **Catches:** zero-weight components extending the range, and
   nested mixtures not recursing.
-- [ ] **65. Heatmap geometry and values.** `Uniform(0, 1.1)`, query `(1, 1)`,
-  extent `(-0.5, 2.5, 0.5, 3.5)`, resolution 3. Pixel centers are x = 0, 1, 2
-  and y = 1, 2, 3, so the image rows are `[10/11, 10/11, 10/11]`,
-  `[0, 10/11, 0]`, and `[0, 0, 0]`. Also assert that `im.get_extent()` equals
-  the given extent and that `im.origin` is `"lower"`, which puts the first row
-  at the bottom. Compare values with `pytest.approx`. **Catches:** pixel edges
+- [x] **65. Heatmap geometry and values.** `Gaussian(0, 1)`, query `(1, 0)`,
+  extent `(-0.5, 2.5, -0.5, 2.5)`, resolution 3, so pixel centers are
+  x, y = 0, 1, 2. The image equals `Gaussian(0, 1).weight(distances)` for the
+  explicit distance rows `[1, 0, 1]`, `[sqrt(2), 1, sqrt(2)]`, and
+  `[sqrt(5), 2, sqrt(5)]`, starting at y = 0. Also assert that
+  `im.get_extent()` equals the given extent and that `im.origin` is
+  `"lower"`, which puts the first row at the bottom. **Catches:** pixel edges
   instead of centers, axiswise (Chebyshev) instead of Euclidean distance, an
   ignored query offset, transposed rows, a changed origin, and normalization
-  over the grid (1/4 per nonzero pixel).
+  over the grid.
 - [ ] **66. Automatic extent.** One parametrized test with `pytest.approx`:
   `Uniform(0, 2)` with query `(10, -5)` gives `(7.58, 12.42, -7.42, -2.58)`,
   and `Uniform(0, inf)` with query `(0, 0)` gives
