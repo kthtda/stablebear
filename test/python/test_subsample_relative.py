@@ -132,6 +132,28 @@ def test_strided_unsigned_index_tensor_selects_the_viewed_indices(dtype):
     npt.assert_array_equal(samples[1, 0], [[0.0]])
 
 
+@pytest.mark.parametrize("np_dtype", [np.float32, np.float64])
+def test_float_tensor_query_selects_points_near_its_coordinates(np_dtype):
+    reference = sb.PointCloud([
+        [0.0],
+        [4.0],
+        [9.0],
+    ])
+    query = sb.FloatTensor(np.array([
+        [8.0],
+        [3.0],
+    ], dtype=np_dtype))
+
+    # Each query has exactly one reference point within distance 1.5.
+    samples = sb.random.subsample_relative(
+        reference, query, n_points=1, n_samples=1, replace=True,
+        distribution=sb.distributions.Uniform(0, 1.5),
+    )
+
+    npt.assert_array_equal(samples[0, 0], [[9.0]])
+    npt.assert_array_equal(samples[1, 0], [[4.0]])
+
+
 def test_output_axes_are_query_distribution_sample():
     reference = sb.PointCloud([
         [0.0],
@@ -582,6 +604,7 @@ def test_drop_partial_applies_with_and_without_replacement(replace):
     assert len(np.asarray(samples.indices[1, 0])) == 0
 
 
+
 def test_eligibility_is_counted_before_duplicate_removal():
     reference = sb.PointCloud([
         [0.0],
@@ -598,3 +621,327 @@ def test_eligibility_is_counted_before_duplicate_removal():
     )
 
     npt.assert_array_equal(samples[0, 0], [[0.0]])
+
+
+def test_global_seed_replays_and_calls_advance():
+    reference = sb.PointCloud(np.arange(100.0).reshape(100, 1))
+
+    def draw_from_hundred_points():
+        # Uniform(0, 100) covers every point, so all 100 are equally likely.
+        samples = sb.random.subsample_relative(
+            reference, [0], n_points=5, n_samples=1, replace=True,
+            distribution=sb.distributions.Uniform(0, 100),
+        )
+        return np.asarray(samples.indices[0, 0])
+
+    sb.random.seed(7)
+    first = draw_from_hundred_points()
+    second = draw_from_hundred_points()
+    sb.random.seed(7)
+    first_again = draw_from_hundred_points()
+    second_again = draw_from_hundred_points()
+
+    assert not np.array_equal(first, second)
+    npt.assert_array_equal(first_again, first)
+    npt.assert_array_equal(second_again, second)
+
+
+def test_every_output_cell_draws_from_its_own_stream():
+    reference = sb.PointCloud(np.arange(100.0).reshape(100, 1))
+
+    # Equal queries and equal distributions, so only the cell position
+    # can tell the streams apart.
+    pointclouds = sb.random.subsample_relative(
+        reference, [0, 0], n_points=5, n_samples=2, replace=True,
+        distribution=[sb.distributions.Uniform(0, 100), sb.distributions.Uniform(0, 100)],
+        generator=sb.random.Generator(7),
+    )
+
+    # pointclouds[query, distribution].indices[sample]
+    cells = [
+        pointclouds[0, 0].indices[0],
+        pointclouds[0, 0].indices[1],
+        pointclouds[0, 1].indices[0],
+        pointclouds[0, 1].indices[1],
+        pointclouds[1, 0].indices[0],
+        pointclouds[1, 0].indices[1],
+        pointclouds[1, 1].indices[0],
+        pointclouds[1, 1].indices[1],
+    ]
+    # With the seed fixed, the outcome is fixed. If the streams change, two of
+    # the 28 cell pairs match by chance with probability about 3e-9.
+    for i in range(8):
+        for j in range(i + 1, 8):
+            assert not cells[i].array_equal(cells[j]), (i, j)
+
+
+def test_indexed_reference_uses_its_selected_points():
+    source = sb.PointCloudTensor([
+        np.array([
+            [0.0],
+            [4.0],
+            [9.0],
+            [20.0],
+        ]),
+    ])
+    # The view holds source points 3 and 1 ([20.0], [4.0]), in that order.
+    reference = source[sb.NestedTensor([sb.indices([3, 1])])][0]
+
+    # Uniform(0, 0.5) keeps only the query point itself.
+    samples = sb.random.subsample_relative(
+        reference, [0, 1], n_points=1, n_samples=1, replace=True,
+        distribution=sb.distributions.Uniform(0, 0.5),
+    )
+
+    # samples[query].indices[sample]
+    npt.assert_array_equal(samples[0, 0], [[20.0]])
+    npt.assert_array_equal(samples[0].indices[0], [0])
+    npt.assert_array_equal(samples[1, 0], [[4.0]])
+    npt.assert_array_equal(samples[1].indices[0], [1])
+
+
+def test_samples_ignore_later_writes_to_the_reference():
+    reference = sb.PointCloud([
+        [0.0],
+        [4.0],
+        [9.0],
+    ])
+
+    # Uniform(0, 0.5) keeps only the query point itself.
+    samples = sb.random.subsample_relative(
+        reference, [0], n_points=1, n_samples=1, replace=True,
+        distribution=sb.distributions.Uniform(0, 0.5),
+    )
+    reference[0, 0] = 99.0
+
+    assert reference[0, 0] == 99.0
+    npt.assert_array_equal(samples[0, 0], [[0.0]])
+
+
+def test_empty_distribution_list_raises():
+    reference = sb.PointCloud([
+        [0.0],
+        [4.0],
+    ])
+
+    with pytest.raises(ValueError, match="distribution list must not be empty"):
+        sb.random.subsample_relative(
+            reference, [0], n_points=1, n_samples=1, replace=True, distribution=[],
+        )
+
+
+def test_non_distribution_argument_raises():
+    reference = sb.PointCloud([
+        [0.0],
+        [4.0],
+    ])
+
+    with pytest.raises(TypeError, match="distribution must be a Distribution or a list of them"):
+        sb.random.subsample_relative(
+            reference, [0], n_points=1, n_samples=1, replace=True, distribution="gaussian",
+        )
+
+
+@pytest.mark.parametrize("query", [
+    pytest.param([3], id="past-end"),
+    pytest.param([-4], id="before-start"),
+    pytest.param(np.array([2**64 - 1], dtype=np.uint64), id="largest-uint64"),
+])
+def test_out_of_range_query_index_raises(query):
+    reference = sb.PointCloud([
+        [0.0],
+        [4.0],
+        [9.0],
+    ])
+
+    with pytest.raises(ValueError, match="query index is out of range"):
+        sb.random.subsample_relative(
+            reference, query, n_points=1, n_samples=1, replace=True,
+            distribution=sb.distributions.Uniform(0, 0.5),
+        )
+
+
+@pytest.mark.parametrize(("query", "error", "message"), [
+    pytest.param(
+        sb.IntTensor(np.array([
+            [0, 1],
+            [2, 0],
+        ])),
+        ValueError, "query indices must be one-dimensional",
+        id="rank-2-int-tensor",
+    ),
+    pytest.param(
+        [0.0, 1.0],
+        TypeError, "query indices must be integers",
+        id="float-list",
+    ),
+    pytest.param(
+        np.zeros((1, 1, 1)),
+        ValueError, "query must be a 2-D coordinate array or 1-D index vector",
+        id="rank-3-array",
+    ),
+])
+def test_query_of_wrong_rank_or_type_raises(query, error, message):
+    reference = sb.PointCloud([
+        [0.0],
+        [4.0],
+        [9.0],
+    ])
+
+    with pytest.raises(error, match=message):
+        sb.random.subsample_relative(
+            reference, query, n_points=1, n_samples=1, replace=True,
+            distribution=sb.distributions.Uniform(0, 0.5),
+        )
+
+
+def test_coordinate_query_of_wrong_dimension_raises():
+    reference = sb.PointCloud([
+        [0.0],
+        [4.0],
+        [9.0],
+    ])
+    query = sb.PointCloud([
+        [0.0, 0.0],
+    ])
+
+    with pytest.raises(ValueError, match="reference and query must have the same dimension"):
+        sb.random.subsample_relative(
+            reference, query, n_points=1, n_samples=1, replace=True,
+            distribution=sb.distributions.Uniform(0, 0.5),
+        )
+
+
+def test_point_cloud_tensor_query_raises():
+    reference = sb.PointCloud([
+        [0.0],
+        [4.0],
+    ])
+    query = sb.PointCloudTensor([
+        np.array([
+            [0.0],
+        ]),
+    ])
+
+    with pytest.raises(TypeError, match="query must be one point cloud, a coordinate array, or an index vector"):
+        sb.random.subsample_relative(
+            reference, query, n_points=1, n_samples=1, replace=True,
+            distribution=sb.distributions.Uniform(0, 0.5),
+        )
+
+
+def test_point_cloud_tensor_reference_raises():
+    reference = sb.PointCloudTensor([
+        np.array([
+            [0.0],
+            [4.0],
+        ]),
+    ])
+
+    with pytest.raises(TypeError, match="reference must be one PointCloud or DistanceMatrix"):
+        sb.random.subsample_relative(
+            reference, [0], n_points=1, n_samples=1, replace=True,
+            distribution=sb.distributions.Uniform(0, 0.5),
+        )
+
+
+def test_nan_reference_coordinate_raises():
+    reference = sb.PointCloud([
+        [0.0],
+        [np.nan],
+    ])
+
+    with pytest.raises(ValueError, match="coordinates must be finite"):
+        sb.random.subsample_relative(
+            reference, [0], n_points=1, n_samples=1, replace=True,
+            distribution=sb.distributions.Uniform(0, 0.5),
+        )
+
+
+def test_nan_query_coordinate_raises():
+    reference = sb.PointCloud([
+        [0.0],
+        [4.0],
+    ])
+
+    with pytest.raises(ValueError, match="coordinates must be finite"):
+        sb.random.subsample_relative(
+            reference, [[np.nan]], n_points=1, n_samples=1, replace=True,
+            distribution=sb.distributions.Uniform(0, 0.5),
+        )
+
+
+def test_numpy_generator_raises():
+    reference = sb.PointCloud([
+        [0.0],
+        [4.0],
+    ])
+
+    with pytest.raises(TypeError, match="generator must be a stablebear.random.Generator or None"):
+        sb.random.subsample_relative(
+            reference, [0], n_points=1, n_samples=1, replace=True,
+            distribution=sb.distributions.Uniform(0, 0.5),
+            generator=np.random.default_rng(0),
+        )
+
+
+_PIPELINE_POINTS = np.array([
+    [0.0, 0.0],
+    [1.0, 0.0],
+    [0.0, 1.0],
+    [10.0, 0.0],
+    [11.0, 0.0],
+])
+
+
+@pytest.mark.parametrize("reference", [
+    pytest.param(sb.PointCloud(_PIPELINE_POINTS), id="point-cloud"),
+    pytest.param(
+        sb.DistanceMatrix(np.linalg.norm(
+            _PIPELINE_POINTS[:, None] - _PIPELINE_POINTS[None, :], axis=-1)),
+        id="distance-matrix",
+    ),
+])
+def test_samples_feed_the_persistence_pipeline(reference):
+    # Query 0 has three eligible points (0, 1, 2) and query 3 has two (3, 4),
+    # so every sample holds all of its eligible points.
+    samples = sb.random.subsample_relative(
+        reference, [0, 3], n_points=3, n_samples=2, replace=False,
+        distribution=sb.distributions.Uniform(0, 1.5),
+    )
+
+    barcodes = sb.persistence.compute_persistent_homology(samples, max_dim=0)
+    stable_ranks = sb.persistence.barcode_to_stable_rank(barcodes)
+    mean_stable_ranks = sb.mean(stable_ranks, dim=1)
+
+    # mean_stable_ranks[query, homology dimension]
+    assert mean_stable_ranks.shape == (2, 1)
+    # Rows are (start, value): the components merge at distance 1, leaving one.
+    npt.assert_array_equal(np.asarray(mean_stable_ranks[0, 0]), [
+        [0.0, 3.0],
+        [1.0, 1.0],
+    ])
+    npt.assert_array_equal(np.asarray(mean_stable_ranks[1, 0]), [
+        [0.0, 2.0],
+        [1.0, 1.0],
+    ])
+
+
+def test_mixture_coefficient_that_rounds_to_zero_is_never_sampled():
+    # 1e-16 / 1e308 rounds to zero, so this mixture equals the [1, 0] one.
+    mixture = sb.distributions.Mixture(
+        [sb.distributions.Uniform(0, 1), sb.distributions.Uniform(5, 6)],
+        [1e308, 1e-16],
+    )
+    assert mixture.coefficients == (1.0, 0.0)
+    # Only Uniform(5, 6) covers the reference point at distance 5.5.
+    reference = sb.PointCloud([
+        [5.5],
+    ])
+
+    samples = sb.random.subsample_relative(
+        reference, [[0.0]], n_points=1, n_samples=1, replace=True, allow_partial="keep",
+        distribution=mixture,
+    )
+
+    assert np.asarray(samples[0, 0]).shape == (0, 1)

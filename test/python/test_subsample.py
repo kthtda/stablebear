@@ -180,6 +180,28 @@ class TestSubsample:
         sizes = [len(np.asarray(samples.indices[i, 0])) for i in range(4)]
         assert sizes == [0, 0, 3, 3]
 
+    def test_unknown_partial_policy_string_raises(self):
+        source = sb.PointCloud([
+            [0.0],
+            [1.0],
+        ])
+
+        with pytest.raises(ValueError, match="allow_partial must be one of 'no', 'keep', 'drop'"):
+            subsample(source, n_points=1, n_samples=1, replace=False, allow_partial="maybe")
+
+    @pytest.mark.parametrize("allow_partial", [1, None, np.bool_(True)],
+                             ids=["int", "None", "numpy-bool"])
+    def test_non_string_partial_policy_raises(self, allow_partial):
+        source = sb.PointCloud([
+            [0.0],
+            [1.0],
+        ])
+
+        # Only Python bools are accepted as aliases for "no" and "keep".
+        with pytest.raises(TypeError, match="allow_partial must be a string"):
+            subsample(source, n_points=1, n_samples=1, replace=False,
+                      allow_partial=allow_partial)
+
     def test_batched_sampling_matches_individual_calls_in_row_major_order(self):
         source = sb.PointCloudTensor([
             np.array([

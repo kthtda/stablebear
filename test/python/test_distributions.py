@@ -1,3 +1,5 @@
+import re
+
 import numpy as np
 import numpy.testing as npt
 import pytest
@@ -122,3 +124,213 @@ def test_unbounded_uniform_weight_is_one_on_its_support():
 
     # 1/(end - start) would be zero on the whole support.
     npt.assert_array_equal(weights, [0, 1, 1])
+
+
+@pytest.mark.parametrize(("mixture", "expected"), [
+    pytest.param(
+        sb.distributions.Mixture(
+            [sb.distributions.Gaussian(0, 0.5), sb.distributions.Uniform(0, 2.5)],
+            [1, 3],
+        ),
+        "0.25 * Gaussian(0, 0.5) + 0.75 * Uniform(0, 2.5)",
+        id="flat",
+    ),
+    pytest.param(
+        sb.distributions.Mixture(
+            [
+                sb.distributions.Mixture(
+                    [sb.distributions.Uniform(0, 1), sb.distributions.Uniform(1, 2)],
+                    [1, 1],
+                ),
+                sb.distributions.Gaussian(0, 1),
+            ],
+            [1, 0],
+        ),
+        "1 * (0.5 * Uniform(0, 1) + 0.5 * Uniform(1, 2)) + 0 * Gaussian(0, 1)",
+        id="nested-with-zero-term",
+    ),
+])
+def test_mixture_str_shows_normalized_coefficients(mixture, expected):
+    assert str(mixture) == expected
+
+
+def test_mixture_repr_names_every_parameter():
+    mixture = sb.distributions.Mixture(
+        [sb.distributions.Gaussian(0, 0.5), sb.distributions.Uniform(0, 2.5)],
+        [1, 3],
+    )
+
+    assert repr(mixture) == (
+        "Mixture(distributions=(Gaussian(mean=0.0, std=0.5), Uniform(start=0.0, end=2.5)), "
+        "coefficients=(0.25, 0.75))"
+    )
+
+
+@pytest.mark.parametrize(("attribute", "value"), [
+    pytest.param("mean", 2, id="mean"),
+    pytest.param("std", 0.5, id="std"),
+])
+def test_distributions_are_immutable(attribute, value):
+    gaussian = sb.distributions.Gaussian(2, 0.5)
+
+    with pytest.raises(AttributeError, match="Gaussian is immutable"):
+        setattr(gaussian, attribute, 5)
+
+    assert getattr(gaussian, attribute) == value
+
+
+@pytest.mark.parametrize("value", [
+    pytest.param(0, id="python-int"),
+    pytest.param(np.array(0.0), id="0-d-array"),
+])
+def test_scalar_weight_is_a_python_float(value):
+    weight = sb.distributions.Gaussian(0, 1).weight(value)
+
+    # numpy.float64 subclasses float, so isinstance would also accept it.
+    assert type(weight) is float
+    assert weight == pytest.approx(0.3989422804)
+
+
+def test_array_weight_keeps_its_shape_as_float64():
+    values = np.array([
+        [0, 2],
+        [3, 1.5],
+    ], dtype=np.float32)
+
+    weights = sb.distributions.Uniform(0, 2).weight(values)
+
+    assert weights.dtype == np.float64
+    npt.assert_array_equal(weights, [
+        [0.5, 0],
+        [0, 0.5],
+    ])
+
+
+@pytest.mark.parametrize("values", [
+    pytest.param(np.nan, id="nan"),
+    # The infinity is the second element, so every element must be checked.
+    pytest.param([0, -np.inf], id="negative-infinity-second"),
+])
+def test_nonfinite_values_raise(values):
+    with pytest.raises(ValueError, match="values must be finite"):
+        sb.distributions.Gaussian(0, 1).weight(values)
+
+
+@pytest.mark.parametrize("values", [
+    pytest.param(1 + 2j, id="complex"),
+    pytest.param("1", id="numeric-string"),
+    pytest.param(True, id="bool"),
+])
+def test_non_real_values_raise(values):
+    with pytest.raises(TypeError, match="values must be real numbers"):
+        sb.distributions.Gaussian(0, 1).weight(values)
+
+
+@pytest.mark.parametrize(("mean", "std"), [
+    pytest.param(0, 0, id="zero-std"),
+    pytest.param(0, -1, id="negative-std"),
+    pytest.param(0, np.inf, id="infinite-std"),
+    pytest.param(np.nan, 1, id="nan-mean"),
+])
+def test_gaussian_rejects_invalid_parameters(mean, std):
+    with pytest.raises(ValueError, match="Gaussian requires a finite mean and finite positive std"):
+        sb.distributions.Gaussian(mean, std)
+
+
+@pytest.mark.parametrize("mean", [
+    pytest.param(True, id="bool"),
+    pytest.param("0", id="string"),
+])
+def test_gaussian_rejects_non_numeric_mean(mean):
+    with pytest.raises(TypeError, match="mean must be a real scalar"):
+        sb.distributions.Gaussian(mean, 1)
+
+
+@pytest.mark.parametrize(("start", "end"), [
+    pytest.param(np.nan, 1, id="nan-start"),
+    pytest.param(0, np.nan, id="nan-end"),
+    pytest.param(1, 1, id="empty"),
+    pytest.param(2, 1, id="reversed"),
+    pytest.param(np.inf, np.inf, id="both-positive-infinity"),
+    pytest.param(-np.inf, -np.inf, id="both-negative-infinity"),
+    pytest.param(np.inf, -np.inf, id="reversed-infinities"),
+])
+def test_uniform_rejects_invalid_intervals(start, end):
+    with pytest.raises(ValueError, match=re.escape(
+            "Uniform requires start < end (start may be -inf and end may be +inf)")):
+        sb.distributions.Uniform(start, end)
+
+
+@pytest.mark.parametrize(("start", "end", "message"), [
+    pytest.param(True, 1, "start must be a real scalar", id="bool-start"),
+    pytest.param(0, "1", "end must be a real scalar", id="string-end"),
+    pytest.param(0, None, "end must be a real scalar", id="none-end"),
+])
+def test_uniform_rejects_non_numeric_endpoints(start, end, message):
+    with pytest.raises(TypeError, match=message):
+        sb.distributions.Uniform(start, end)
+
+
+@pytest.mark.parametrize(("distributions", "coefficients", "message"), [
+    pytest.param([], [], "Mixture needs at least one component", id="empty"),
+    pytest.param([sb.distributions.Gaussian(0, 1)], [1, 2],
+                 "Mixture needs one coefficient per distribution", id="extra-coefficient"),
+    pytest.param([sb.distributions.Gaussian(0, 1), sb.distributions.Uniform(0, 1)], [1],
+                 "Mixture needs one coefficient per distribution", id="missing-coefficient"),
+    pytest.param([sb.distributions.Gaussian(0, 1), sb.distributions.Uniform(0, 1)], [1, -1],
+                 "Mixture coefficients must be finite and nonnegative", id="negative"),
+    pytest.param([sb.distributions.Gaussian(0, 1), sb.distributions.Uniform(0, 1)], [1, np.nan],
+                 "Mixture coefficients must be finite and nonnegative", id="nan"),
+    pytest.param([sb.distributions.Gaussian(0, 1), sb.distributions.Uniform(0, 1)], [1, np.inf],
+                 "Mixture coefficients must be finite and nonnegative", id="infinite"),
+    pytest.param([sb.distributions.Gaussian(0, 1), sb.distributions.Uniform(0, 1)], [0, 0],
+                 "Mixture needs at least one positive coefficient", id="all-zero"),
+])
+def test_mixture_rejects_invalid_inputs(distributions, coefficients, message):
+    with pytest.raises(ValueError, match=message):
+        sb.distributions.Mixture(distributions, coefficients)
+
+
+@pytest.mark.parametrize(("distributions", "coefficients", "message"), [
+    pytest.param([sb.distributions.Gaussian(0, 1), "gaussian"], [1, 1],
+                 "Mixture components must be Distribution instances", id="string-component"),
+    pytest.param([sb.distributions.Gaussian(0, 1), sb.distributions.Uniform(0, 1)], [True, 1],
+                 "coefficient must be a real scalar", id="bool-coefficient"),
+    pytest.param([sb.distributions.Gaussian(0, 1), sb.distributions.Uniform(0, 1)], ["1", 1],
+                 "coefficient must be a real scalar", id="string-coefficient"),
+    pytest.param([sb.distributions.Gaussian(0, 1), sb.distributions.Uniform(0, 1)], [1j, 1],
+                 "coefficient must be a real scalar", id="complex-coefficient"),
+])
+def test_mixture_rejects_inputs_of_the_wrong_type(distributions, coefficients, message):
+    with pytest.raises(TypeError, match=message):
+        sb.distributions.Mixture(distributions, coefficients)
+
+
+
+@pytest.mark.parametrize(("distribution", "expected"), [
+    pytest.param(sb.distributions.Gaussian(1, 2), (-5, 7), id="gaussian"),
+    pytest.param(sb.distributions.Uniform(0, 10), (-1, 11), id="uniform"),
+    # Infinite endpoints are replaced by a unit-width interval before the margin.
+    pytest.param(sb.distributions.Uniform(1, np.inf), (0.9, 2.1), id="uniform-infinite-end"),
+    pytest.param(sb.distributions.Uniform(-np.inf, 0), (-1.1, 0.1), id="uniform-infinite-start"),
+    pytest.param(sb.distributions.Uniform(-np.inf, np.inf), (-0.1, 1.1), id="uniform-unbounded"),
+])
+def test_plot_range(distribution, expected):
+    assert distribution.plot_range() == pytest.approx(expected)
+
+
+def test_mixture_plot_range_spans_positive_coefficient_components():
+    mixture = sb.distributions.Mixture(
+        [
+            sb.distributions.Mixture(
+                [sb.distributions.Uniform(0, 10), sb.distributions.Uniform(100, 200)],
+                [1, 0],
+            ),
+            sb.distributions.Uniform(20, 30),
+        ],
+        [1, 1],
+    )
+
+    # Uniform(0, 10) spans (-1, 11) and Uniform(20, 30) spans (19, 31);
+    # the zero-coefficient Uniform(100, 200) is left out.
+    assert mixture.plot_range() == pytest.approx((-1, 31))

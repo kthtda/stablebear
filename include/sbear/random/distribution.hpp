@@ -147,31 +147,31 @@ namespace sb::random
   public:
     explicit Mixture(const std::vector<std::pair<double, Distribution>>& terms);
 
-    [[nodiscard]] const std::vector<std::pair<long double, Distribution>>& terms() const noexcept { return m_terms; }
+    [[nodiscard]] const std::vector<std::pair<double, Distribution>>& terms() const noexcept { return m_terms; }
 
     [[nodiscard]] long double weight(long double value) const;
 
     [[nodiscard]] long double log_weight(long double value) const;
 
   private:
-    std::vector<std::pair<long double, Distribution>> m_terms;
+    std::vector<std::pair<double, Distribution>> m_terms;
   };
 
   inline Mixture::Mixture(const std::vector<std::pair<double, Distribution>>& terms)
   {
     if (terms.empty())
       throw std::invalid_argument("Mixture needs at least one component");
-    long double maximum = 0;
+    double maximum = 0;
     for (const auto& [coefficient, component] : terms)
     {
       if (!std::isfinite(coefficient) || coefficient < 0)
         throw std::invalid_argument("Mixture coefficients must be finite and nonnegative");
-      maximum = std::max<long double>(maximum, coefficient);
+      maximum = std::max(maximum, coefficient);
     }
     if (maximum == 0)
       throw std::invalid_argument("Mixture needs at least one positive coefficient");
     // Scale by the maximum first so the sum cannot overflow.
-    long double total = 0;
+    double total = 0;
     for (const auto& [coefficient, component] : terms)
       total += m_terms.emplace_back(coefficient / maximum, component).first;
     for (auto& term : m_terms)

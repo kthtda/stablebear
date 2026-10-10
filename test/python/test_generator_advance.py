@@ -66,3 +66,10 @@ def test_poisson_generator_advances():
     assert p1.array_equal(p1b)
     # ...but the two consecutive draws are not identical.
     assert not p1.array_equal(p2)
+
+
+def test_adjacent_seeds_do_not_share_streams():
+    a = sb.random.noisy_sin((2,), n_points=4, generator=sb.random.Generator(seed=5))
+    b = sb.random.noisy_sin((2,), n_points=4, generator=sb.random.Generator(seed=6))
+    # Element 1 of seed 5 and element 0 of seed 6 used the same stream before seeds were mixed.
+    assert not a[1:].array_equal(b[:1])
