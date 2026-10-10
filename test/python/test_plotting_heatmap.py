@@ -97,3 +97,14 @@ def test_draws_on_the_current_axes_when_ax_is_omitted(ax):
     assert len(ax.images) == 0
     plt.close(current_fig)
 
+
+
+def test_styling_keywords_override_defaults(ax):
+    im = plot_distance_weight_heatmap(
+        sb.distributions.Gaussian(0, 1), extent=(-1, 1, -1, 1), resolution=3, ax=ax,
+        cmap="magma", interpolation="bilinear", alpha=0.5,
+    )
+
+    assert im.get_cmap().name == "magma"
+    assert im.get_interpolation() == "bilinear"
+    assert im.get_alpha() == 0.5

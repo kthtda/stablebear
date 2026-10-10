@@ -686,7 +686,7 @@ Items 63 and 64 go in `test/python/test_distributions.py`; items 65-71 go in
   itself current, so the second test creates and selects another axes
   explicitly. **Catches:** drawing on `plt.gca()` regardless of `ax`, and
   clearing the given axes.
-- [ ] **70. Styling keywords override defaults.** `cmap="magma"`,
+- [x] **70. Styling keywords override defaults.** `cmap="magma"`,
   `interpolation="bilinear"`, and `alpha=0.5` reach the returned image.
   **Catches:** defaults overwriting caller keywords. Do not test colorbars
   (Matplotlib's behavior) or `origin=` (see the follow-ups).
