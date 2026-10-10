@@ -6,11 +6,13 @@
 #include "../point_cloud.hpp"
 #include "../random_generator.hpp"
 #include "../sampling/partial_policy.hpp"
+#include "../task.hpp"
 #include "../walk.hpp"
 
 #include <algorithm>
 #include <functional>
 #include <numeric>
+#include <optional>
 #include <random>
 #include <stdexcept>
 #include <unordered_map>
@@ -158,64 +160,96 @@ namespace sb::pp
     }
   }
 
+  /// Uniform subsampling of every element of @p values, run as a stoppable
+  /// task with progress. Validation and seed reservation happen at
+  /// construction, so an invalid call leaves the generator unchanged.
+  template <IndexableTensorElement ElementT, TensorProperties Properties>
+  class SubsampleTask : public StoppableTask<void>
+  {
+    using Output = Tensor<ElementT, TensorProperty::Indexed>;
+
+  public:
+    SubsampleTask(const Tensor<ElementT, Properties>& values, size_t nPoints, size_t nSamples, bool replace,
+                  sampling::PartialPolicy partialPolicy, bool discardDuplicates, DefaultRandomGenerator& gen)
+      : m_values(values), m_nPoints(nPoints), m_nSamples(nSamples), m_replace(replace),
+        m_partialPolicy(partialPolicy), m_discardDuplicates(discardDuplicates),
+        m_source(values.shape())
+    {
+      if (nPoints == 0)
+        throw std::invalid_argument("n_points must be positive");
+      if (nSamples == 0)
+        throw std::invalid_argument("n_samples must be positive");
+
+      walk(values, [&](const std::vector<size_t>& index) {
+        const size_t available = detail::sample_population(values(index));
+        if (sampling::is_insufficient(partialPolicy, replace, nPoints, available))
+          throw std::invalid_argument(replace ? "cannot sample with replacement from an empty input"
+                                              : "n_points exceeds the number of input points");
+      });
+
+      std::vector<size_t> outputShape(values.shape().begin(), values.shape().end());
+      outputShape.push_back(nSamples);
+      m_selections = Tensor<Tensor<uint64_t>>(outputShape);
+      m_seedBlock = gen.reserve(m_selections.size());
+    }
+
+    Output result()
+    {
+      wait();
+      if (work_completed() != work_total())
+        throw std::runtime_error("subsampling was cancelled");
+      if (!m_result)
+        m_result = make_indexed_tensor_from_owned_indices(m_source, to_nested_tensor(m_selections));
+      return *m_result;
+    }
+
+  private:
+    tf::Future<void> run_async(Executor& exec) override
+    {
+      next_step(m_selections.size(), "Subsampling", "sample");
+      return sb::detail::parallel_walk_impl(m_values, [this](const std::vector<size_t>& inputIndex, size_t inputFlat) {
+        if (stop_requested())
+          throw std::runtime_error("subsampling was cancelled");
+        const ElementT input = m_values(inputIndex);
+        m_source(inputIndex) = input.copy();
+        const size_t available = detail::sample_population(input);
+        const size_t count = sampling::sample_count(m_partialPolicy, m_replace, m_nPoints, available);
+
+        std::vector<size_t> outputIndex(inputIndex);
+        outputIndex.push_back(0);
+        std::vector<uint64_t> kept;
+        for (size_t sample = 0; sample < m_nSamples; ++sample)
+        {
+          auto engine = m_seedBlock->sub_generator(inputFlat * m_nSamples + sample);
+          Tensor<uint64_t> indices = detail::draw_uniform_indices(available, count, m_replace, engine);
+          if (m_discardDuplicates)
+            indices = detail::discard_sample_duplicates(m_source(inputIndex), indices, kept);
+          outputIndex.back() = sample;
+          m_selections(outputIndex) = std::move(indices);
+          add_progress(1);
+        }
+      }, exec);
+    }
+
+    Tensor<ElementT, Properties> m_values;
+    size_t m_nPoints, m_nSamples;
+    bool m_replace;
+    sampling::PartialPolicy m_partialPolicy;
+    bool m_discardDuplicates;
+    Tensor<ElementT> m_source;
+    Tensor<Tensor<uint64_t>> m_selections;
+    std::optional<DefaultRandomGenerator::Block> m_seedBlock;
+    std::optional<Output> m_result;
+  };
+
   template <IndexableTensorElement ElementT, TensorProperties Properties>
   Tensor<ElementT, TensorProperty::Indexed> subsample(
       const Tensor<ElementT, Properties>& values, size_t nPoints, size_t nSamples, bool replace, sampling::PartialPolicy partialPolicy,
       bool discardDuplicates, DefaultRandomGenerator& gen, Executor& exec)
   {
-    if (nPoints == 0)
-    {
-      throw std::invalid_argument("n_points must be positive");
-    }
-    if (nSamples == 0)
-    {
-      throw std::invalid_argument("n_samples must be positive");
-    }
-
-    walk(values, [&](const std::vector<size_t>& index) {
-      const auto value = values(index);
-      const size_t available = detail::sample_population(value);
-      if (sampling::is_insufficient(partialPolicy, replace, nPoints, available))
-        throw std::invalid_argument(replace ? "cannot sample with replacement from an empty input"
-                                            : "n_points exceeds the number of input points");
-    });
-
-    std::vector<size_t> outputShape(values.shape().begin(), values.shape().end());
-    outputShape.push_back(nSamples);
-    Tensor<ElementT> source(values.shape());
-    Tensor<Tensor<uint64_t>> selections(outputShape);
-    const size_t nOutputs = std::accumulate(
-      outputShape.begin(), outputShape.end(), size_t{1}, std::multiplies<size_t>());
-    const auto seedBlock = gen.reserve(nOutputs);
-
-    parallel_walk(values, [&](const std::vector<size_t>& inputIndex) {
-      const ElementT input = values(inputIndex);
-      source(inputIndex) = input.copy();
-      const size_t available = detail::sample_population(input);
-      const size_t count = sampling::sample_count(partialPolicy, replace, nPoints, available);
-
-      size_t inputFlat = 0;
-      for (size_t axis = 0; axis < inputIndex.size(); ++axis)
-      {
-        inputFlat = inputFlat * values.shape(axis) + inputIndex[axis];
-      }
-
-      std::vector<size_t> outputIndex(inputIndex);
-      outputIndex.push_back(0);
-      std::vector<uint64_t> kept;
-      for (size_t sample = 0; sample < nSamples; ++sample)
-      {
-        auto engine = seedBlock.sub_generator(inputFlat * nSamples + sample);
-        Tensor<uint64_t> indices = detail::draw_uniform_indices(available, count, replace, engine);
-        if (discardDuplicates)
-          indices = detail::discard_sample_duplicates(source(inputIndex), indices, kept);
-        outputIndex.back() = sample;
-        selections(outputIndex) = std::move(indices);
-      }
-    }, exec);
-
-    return make_indexed_tensor_from_owned_indices(
-      source, to_nested_tensor(selections));
+    SubsampleTask<ElementT, Properties> task(values, nPoints, nSamples, replace, partialPolicy, discardDuplicates, gen);
+    task.start_async(exec);
+    return task.result();
   }
 }
 

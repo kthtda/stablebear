@@ -114,6 +114,12 @@ the same source index is drawn repeatedly. This matters for uniform
 subsampling; relative subsampling requires finite coordinates. Infinite matrix
 distances give zero sampling weight.
 
+Progress
+========
+
+Both samplers accept ``verbose=True`` to show a progress bar. Verbosity does
+not change results or generator advancement.
+
 Generators
 ==========
 
