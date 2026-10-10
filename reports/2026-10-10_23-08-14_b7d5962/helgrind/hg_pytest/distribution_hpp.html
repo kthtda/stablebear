@@ -1,0 +1,831 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>/home/runner/work/stablebear/stablebear/include/sbear/point_process/../random/distribution.hpp</title>
+    <link href='valgrind.css' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+    <script src="https://code.jquery.com/jquery-3.4.1.js"></script>
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.0.0/styles/default.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.0.0/highlight.min.js"></script>
+    <script src="valgrind.js"></script>
+</head>
+
+<body>
+    <div class="global">
+        <div class="header">
+            <h1>/home/runner/work/stablebear/stablebear/include/sbear/point_process/../random/distribution.hpp</h1>
+            <p><b>3</b> errors</p>
+            <button class="next_error">Goto First Error</button>
+        </div>
+        <div class="listing">
+            <pre class="code">
+<code class="c++"><span class="line_number">1</span>#ifndef STABLEBEAR_RANDOM_DISTRIBUTION_H
+<span class="line_number">2</span>#define STABLEBEAR_RANDOM_DISTRIBUTION_H
+<span class="line_number">3</span>
+<span class="line_number">4</span>#include &lt;algorithm&gt;
+<span class="line_number">5</span>#include &lt;cmath&gt;
+<span class="line_number">6</span>#include &lt;cstddef&gt;
+<span class="line_number">7</span>#include &lt;limits&gt;
+<span class="line_number">8</span>#include &lt;numbers&gt;
+<span class="line_number">9</span>#include &lt;span&gt;
+<span class="line_number">10</span>#include &lt;stdexcept&gt;
+<span class="line_number">11</span>#include &lt;utility&gt;
+<span class="line_number">12</span>#include &lt;variant&gt;
+<span class="line_number">13</span>#include &lt;vector&gt;
+<span class="line_number">14</span>
+<span class="line_number">15</span>namespace sb::random
+<span class="line_number">16</span>{
+<span class="line_number">17</span>
+<span class="line_number">18</span>  namespace detail
+<span class="line_number">19</span>  {
+<span class="line_number">20</span>    inline constexpr long double negativeInfinity = -std::numeric_limits&lt;long double&gt;::infinity();
+<span class="line_number">21</span>
+<span class="line_number">22</span>    inline long double log_add(long double a, long double b)
+<span class="line_number">23</span>    {
+<span class="line_number">24</span>      if (a == negativeInfinity)
+<span class="line_number">25</span>        return b;
+<span class="line_number">26</span>      if (b == negativeInfinity)
+<span class="line_number">27</span>        return a;
+<span class="line_number">28</span>      const auto maximum = std::max(a, b);
+<span class="line_number">29</span>      return maximum + std::log1p(std::exp(std::min(a, b) - maximum));
+<span class="line_number">30</span>    }
+<span class="line_number">31</span>
+<span class="line_number">32</span>    /// Shift log weights so their probabilities sum to one. A row that is
+<span class="line_number">33</span>    /// all -inf (empty support) is left unchanged.
+<span class="line_number">34</span>    inline void normalize_log_row(std::span&lt;long double&gt; row)
+<span class="line_number">35</span>    {
+<span class="line_number">36</span>      long double maximum = negativeInfinity;
+<span class="line_number">37</span>      for (const auto value : row)
+<span class="line_number">38</span>        maximum = std::max(maximum, value);
+<span class="line_number">39</span>      if (!std::isfinite(maximum))
+<span class="line_number">40</span>        return;
+<span class="line_number">41</span>      long double sum = 0;
+<span class="line_number">42</span>      for (auto&amp; value : row)
+<span class="line_number">43</span>      {
+<span class="line_number">44</span>        // Shift first: adding log(sum) to an enormous negative maximum can
+<span class="line_number">45</span>        // lose it entirely, even when several far-tail points have equal mass.
+<span class="line_number">46</span>        value -= maximum;
+<span class="line_number">47</span>        sum += std::exp(value);
+<span class="line_number">48</span>      }
+<span class="line_number">49</span>      const auto logSum = std::log(sum);
+<span class="line_number">50</span>      for (auto&amp; value : row)
+<span class="line_number">51</span>        value -= logSum;
+<span class="line_number">52</span>    }
+<span class="line_number">53</span>  }
+<span class="line_number">54</span>
+<span class="line_number">55</span>  /// Normalized Gaussian density. log_weight stays finite many standard
+<span class="line_number">56</span>  /// deviations from the mean, where the density itself underflows to zero
+<span class="line_number">57</span>  /// (past ~38 sigma in float64).
+<span class="line_number">58</span>  class Gaussian
+<span class="line_number">59</span>  {
+<span class="line_number">60</span>  public:
+<span class="line_number">61</span>    /// Standard normal; also makes Distribution default-constructible.
+<span class="line_number">62</span>    Gaussian() = default;
+<span class="line_number">63</span>
+<span class="line_number">64</span>    Gaussian(double mean, double standardDeviation) : m_mean(mean), m_sigma(standardDeviation)
+<span class="line_number">65</span>    {
+<span class="line_number">66</span>      if (!std::isfinite(mean) || !std::isfinite(standardDeviation) || standardDeviation &lt;= 0)
+<span class="line_number">67</span>        throw std::invalid_argument(&#34;Gaussian requires a finite mean and finite positive std&#34;);
+<span class="line_number">68</span>    }
+<span class="line_number">69</span>
+<span class="line_number">70</span>    [[nodiscard]] long double mean() const noexcept { return m_mean; }
+<span class="line_number">71</span>    [[nodiscard]] long double standard_deviation() const noexcept { return m_sigma; }
+<span class="line_number">72</span>
+<span class="line_number">73</span>    /// Density at @p value; zero where it underflows or the exponent overflows.
+<span class="line_number">74</span>    [[nodiscard]] long double weight(long double value) const noexcept
+<span class="line_number">75</span>    {
+<span class="line_number">76</span>      return std::exp(log_density(value));
+<span class="line_number">77</span>    }
+<span class="line_number">78</span>
+<span class="line_number">79</span>    /// Log density at a finite @p value. Throws if the exponent overflows.
+<span class="line_number">80</span>    [[nodiscard]] long double log_weight(long double value) const
+<span class="line_number">81</span>    {
+<span class="line_number">82</span>      const auto result = log_density(value);
+<span class="line_number">83</span>      if (!std::isfinite(result))
+<span class="line_number">84</span>        throw std::overflow_error(&#34;Gaussian log weight exceeds numerical range&#34;);
+<span class="line_number">85</span>      return result;
+<span class="line_number">86</span>    }
+<span class="line_number">87</span>
+<span class="line_number">88</span>  private:
+<span class="line_number">89</span>    [[nodiscard]] long double log_density(long double value) const noexcept
+<span class="line_number">90</span>    {
+</code></pre>
+            <div class="issue">
+                <div>
+                    <span class="what">Possible data race during read of size 8 at 0x337F1E20 by thread #9</span>
+                    <div class="navigation">
+                        <button class="next_error">Next</button>
+                        <button class="prev_error">Previous</button>
+                    </div>
+                </div>
+                <div>
+                    <table class="call_stack">
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/point_process/../random/distribution.hpp:82<br>
+                                    <code class="cpp">sb::random::Gaussian::log_weight(long double) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">79</span>    /// Log density at a finite @p value. Throws if the exponent overflows.
+<span class="line_number">80</span>    [[nodiscard]] long double log_weight(long double value) const
+<span class="line_number">81</span>    {
+<span class="line_number">82</span><span class="error">      const auto result = log_density(value);
+</span><span class="line_number">83</span>      if (!std::isfinite(result))
+<span class="line_number">84</span>        throw std::overflow_error(&#34;Gaussian log weight exceeds numerical range&#34;);
+<span class="line_number">85</span>      return result;
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/point_process/../random/distribution.hpp:221<br>
+                                    <code class="cpp">auto sb::random::log_weights(std::variant&lt;sb::random::Gaussian, sb::random::Uniform, sb::random::Mixture&gt; const&amp;, std::span&lt;long double const, 18446744073709551615ul&gt;, std::span&lt;long double, 18446744073709551615ul&gt;)::{lambda(auto:1 const&amp;)#1}::operator()&lt;sb::random::Gaussian&gt;(sb::random::Gaussian const&amp;) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">218</span>      throw std::invalid_argument(&#34;values must not be NaN&#34;);
+<span class="line_number">219</span>    std::visit([&amp;](const auto&amp; d) {
+<span class="line_number">220</span>      for (size_t i = 0; i &lt; values.size(); ++i)
+<span class="line_number">221</span><span class="error">        row[i] = std::isinf(values[i]) ? detail::negativeInfinity : d.log_weight(values[i]);
+</span><span class="line_number">222</span>    }, distribution);
+<span class="line_number">223</span>    detail::normalize_log_row(row);
+<span class="line_number">224</span>  }
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:61<br>
+                                    <code class="cpp">void std::__invoke_impl&lt;void, sb::random::log_weights(std::variant&lt;sb::random::Gaussian, sb::random::Uniform, sb::random::Mixture&gt; const&amp;, std::span&lt;long double const, 18446744073709551615ul&gt;, std::span&lt;long double, 18446744073709551615ul&gt;)::{lambda(auto:1 const&amp;)#1}, sb::random::Gaussian const&amp;&gt;(std::__invoke_other, sb::random::log_weights(std::variant&lt;sb::random::Gaussian, sb::random::Uniform, sb::random::Mixture&gt; const&amp;, std::span&lt;long double const, 18446744073709551615ul&gt;, std::span&lt;long double, 18446744073709551615ul&gt;)::{lambda(auto:1 const&amp;)#1}&amp;&amp;, sb::random::Gaussian const&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">58</span>  template&lt;typename _Res, typename _Fn, typename... _Args&gt;
+<span class="line_number">59</span>    constexpr _Res
+<span class="line_number">60</span>    __invoke_impl(__invoke_other, _Fn&amp;&amp; __f, _Args&amp;&amp;... __args)
+<span class="line_number">61</span><span class="error">    { return std::forward&lt;_Fn&gt;(__f)(std::forward&lt;_Args&gt;(__args)...); }
+</span><span class="line_number">62</span>
+<span class="line_number">63</span>  template&lt;typename _Res, typename _MemFun, typename _Tp, typename... _Args&gt;
+<span class="line_number">64</span>    constexpr _Res
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:96<br>
+                                    <code class="cpp">std::__invoke_result&lt;sb::random::log_weights(std::variant&lt;sb::random::Gaussian, sb::random::Uniform, sb::random::Mixture&gt; const&amp;, std::span&lt;long double const, 18446744073709551615ul&gt;, std::span&lt;long double, 18446744073709551615ul&gt;)::{lambda(auto:1 const&amp;)#1}, sb::random::Gaussian const&amp;&gt;::type std::__invoke&lt;sb::random::log_weights(std::variant&lt;sb::random::Gaussian, sb::random::Uniform, sb::random::Mixture&gt; const&amp;, std::span&lt;long double const, 18446744073709551615ul&gt;, std::span&lt;long double, 18446744073709551615ul&gt;)::{lambda(auto:1 const&amp;)#1}, sb::random::Gaussian const&amp;&gt;(sb::random::log_weights(std::variant&lt;sb::random::Gaussian, sb::random::Uniform, sb::random::Mixture&gt; const&amp;, std::span&lt;long double const, 18446744073709551615ul&gt;, std::span&lt;long double, 18446744073709551615ul&gt;)::{lambda(auto:1 const&amp;)#1}&amp;&amp;, sb::random::Gaussian const&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">93</span>      using __result = __invoke_result&lt;_Callable, _Args...&gt;;
+<span class="line_number">94</span>      using __type = typename __result::type;
+<span class="line_number">95</span>      using __tag = typename __result::__invoke_type;
+<span class="line_number">96</span><span class="error">      return std::__invoke_impl&lt;__type&gt;(__tag{}, std::forward&lt;_Callable&gt;(__fn),
+</span><span class="line_number">97</span>					std::forward&lt;_Args&gt;(__args)...);
+<span class="line_number">98</span>    }
+<span class="line_number">99</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/variant:1060<br>
+                                    <code class="cpp">std::__detail::__variant::__gen_vtable_impl&lt;std::__detail::__variant::_Multi_array&lt;std::__detail::__variant::__deduce_visit_result&lt;void&gt; (*)(sb::random::log_weights(std::variant&lt;sb::random::Gaussian, sb::random::Uniform, sb::random::Mixture&gt; const&amp;, std::span&lt;long double const, 18446744073709551615ul&gt;, std::span&lt;long double, 18446744073709551615ul&gt;)::{lambda(auto:1 const&amp;)#1}&amp;&amp;, std::variant&lt;sb::random::Gaussian, sb::random::Uniform, sb::random::Mixture&gt; const&amp;)&gt;, std::integer_sequence&lt;unsigned long, 0ul&gt; &gt;::__visit_invoke(sb::random::log_weights(std::variant&lt;sb::random::Gaussian, sb::random::Uniform, sb::random::Mixture&gt; const&amp;, std::span&lt;long double const, 18446744073709551615ul&gt;, std::span&lt;long double, 18446744073709551615ul&gt;)::{lambda(auto:1 const&amp;)#1}&amp;&amp;, std::variant&lt;sb::random::Gaussian, sb::random::Uniform, sb::random::Mixture&gt; const&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1057</span>		std::forward&lt;_Variants&gt;(__vars))...);
+<span class="line_number">1058</span>	else if constexpr (_Array_type::__result_is_deduced::value)
+<span class="line_number">1059</span>	  // For the usual std::visit case deduce the return value:
+<span class="line_number">1060</span><span class="error">	  return std::__invoke(std::forward&lt;_Visitor&gt;(__visitor),
+</span><span class="line_number">1061</span>	      __element_by_index_or_cookie&lt;__indices&gt;(
+<span class="line_number">1062</span>		std::forward&lt;_Variants&gt;(__vars))...);
+<span class="line_number">1063</span>	else // for std::visit&lt;R&gt; use INVOKE&lt;R&gt;
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/variant:1815<br>
+                                    <code class="cpp">decltype(auto) std::__do_visit&lt;std::__detail::__variant::__deduce_visit_result&lt;void&gt;, sb::random::log_weights(std::variant&lt;sb::random::Gaussian, sb::random::Uniform, sb::random::Mixture&gt; const&amp;, std::span&lt;long double const, 18446744073709551615ul&gt;, std::span&lt;long double, 18446744073709551615ul&gt;)::{lambda(auto:1 const&amp;)#1}, std::variant&lt;sb::random::Gaussian, sb::random::Uniform, sb::random::Mixture&gt; const&amp;&gt;(sb::random::log_weights(std::variant&lt;sb::random::Gaussian, sb::random::Uniform, sb::random::Mixture&gt; const&amp;, std::span&lt;long double const, 18446744073709551615ul&gt;, std::span&lt;long double, 18446744073709551615ul&gt;)::{lambda(auto:1 const&amp;)#1}&amp;&amp;, std::variant&lt;sb::random::Gaussian, sb::random::Uniform, sb::random::Mixture&gt; const&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1812</span>
+<span class="line_number">1813</span>	      switch (__v0.index())
+<span class="line_number">1814</span>		{
+<span class="line_number">1815</span><span class="error">		  _GLIBCXX_VISIT_CASE(0)
+</span><span class="line_number">1816</span>		  _GLIBCXX_VISIT_CASE(1)
+<span class="line_number">1817</span>		  _GLIBCXX_VISIT_CASE(2)
+<span class="line_number">1818</span>		  _GLIBCXX_VISIT_CASE(3)
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/variant:1878<br>
+                                    <code class="cpp">std::invoke_result&lt;sb::random::log_weights(std::variant&lt;sb::random::Gaussian, sb::random::Uniform, sb::random::Mixture&gt; const&amp;, std::span&lt;long double const, 18446744073709551615ul&gt;, std::span&lt;long double, 18446744073709551615ul&gt;)::{lambda(auto:1 const&amp;)#1}, std::__conditional&lt;is_lvalue_reference_v&lt;std::variant&lt;sb::random::Gaussian, sb::random::Uniform, sb::random::Mixture&gt; const&amp;&gt; &gt;::type&lt;std::variant_alternative&lt;0ul, std::remove_reference&lt;decltype (__as((declval&lt;std::variant&lt;sb::random::Gaussian, sb::random::Uniform, sb::random::Mixture&gt; const&amp;&gt;)()))&gt;::type&gt;::type&amp;, std::variant_alternative&lt;0ul, std::remove_reference&lt;decltype (__as((declval&lt;std::variant&lt;sb::random::Gaussian, sb::random::Uniform, sb::random::Mixture&gt; const&amp;&gt;)()))&gt;::type&gt;::type&amp;&amp;&gt; &gt;::type std::visit&lt;sb::random::log_weights(std::variant&lt;sb::random::Gaussian, sb::random::Uniform, sb::random::Mixture&gt; const&amp;, std::span&lt;long double const, 18446744073709551615ul&gt;, std::span&lt;long double, 18446744073709551615ul&gt;)::{lambda(auto:1 const&amp;)#1}, std::variant&lt;sb::random::Gaussian, sb::random::Uniform, sb::random::Mixture&gt; const&amp;&gt;(sb::random::log_weights(std::variant&lt;sb::random::Gaussian, sb::random::Uniform, sb::random::Mixture&gt; const&amp;, std::span&lt;long double const, 18446744073709551615ul&gt;, std::span&lt;long double, 18446744073709551615ul&gt;)::{lambda(auto:1 const&amp;)#1}&amp;&amp;, std::variant&lt;sb::random::Gaussian, sb::random::Uniform, sb::random::Mixture&gt; const&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1875</span>	      return;
+<span class="line_number">1876</span>	    }
+<span class="line_number">1877</span>	  else
+<span class="line_number">1878</span><span class="error">	    return std::__do_visit&lt;_Tag&gt;(
+</span><span class="line_number">1879</span>	      std::forward&lt;_Visitor&gt;(__visitor),
+<span class="line_number">1880</span>	      static_cast&lt;_Vp&gt;(__variants)...);
+<span class="line_number">1881</span>	}
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/point_process/../random/distribution.hpp:219<br>
+                                    <code class="cpp">sb::random::log_weights(std::variant&lt;sb::random::Gaussian, sb::random::Uniform, sb::random::Mixture&gt; const&amp;, std::span&lt;long double const, 18446744073709551615ul&gt;, std::span&lt;long double, 18446744073709551615ul&gt;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">216</span>      throw std::invalid_argument(&#34;value and weight rows must have equal length&#34;);
+<span class="line_number">217</span>    if (std::ranges::any_of(values, [](long double v) { return std::isnan(v); }))
+<span class="line_number">218</span>      throw std::invalid_argument(&#34;values must not be NaN&#34;);
+<span class="line_number">219</span><span class="error">    std::visit([&amp;](const auto&amp; d) {
+</span><span class="line_number">220</span>      for (size_t i = 0; i &lt; values.size(); ++i)
+<span class="line_number">221</span>        row[i] = std::isinf(values[i]) ? detail::negativeInfinity : d.log_weight(values[i]);
+<span class="line_number">222</span>    }, distribution);
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/point_process/subsample_relative.hpp:249<br>
+                                    <code class="cpp">sb::pp::RelativeSubsampleTask&lt;sb::PointCloud&lt;double&gt;, sb::Xoroshiro128pp&gt;::sample_distribution(unsigned long, unsigned long, std::vector&lt;long double, std::allocator&lt;long double&gt; &gt; const&amp;, std::vector&lt;long double, std::allocator&lt;long double&gt; &gt;&amp;, std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt;&amp;, sb::RandomGenerator&lt;sb::Xoroshiro128pp&gt;&amp;, tf::Executor&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">246</span>    {
+<span class="line_number">247</span>      const size_t population = distances.size();
+<span class="line_number">248</span>      row.resize(population);
+<span class="line_number">249</span><span class="error">      random::log_weights(m_distributions[d], distances, row);
+</span><span class="line_number">250</span>      const auto eligible = static_cast&lt;size_t&gt;(std::ranges::count_if(row, [](long double w) { return std::isfinite(w); }));
+<span class="line_number">251</span>      add_progress(population);
+<span class="line_number">252</span>      if (sampling::is_insufficient(m_partialPolicy, m_replace, m_nPoints, eligible))
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/point_process/subsample_relative.hpp:293<br>
+                                    <code class="cpp">sb::pp::RelativeSubsampleTask&lt;sb::PointCloud&lt;double&gt;, sb::Xoroshiro128pp&gt;::sample_query(unsigned long, unsigned long, sb::RandomGenerator&lt;sb::Xoroshiro128pp&gt;&amp;, tf::Executor&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">290</span>      for (size_t d = 0; d &lt; m_distributions.size(); ++d)
+<span class="line_number">291</span>      {
+<span class="line_number">292</span>        check_cancelled();
+<span class="line_number">293</span><span class="error">        sample_distribution(q, d, distances, row, sourceIndices, queryGenerator, executor);
+</span><span class="line_number">294</span>      }
+<span class="line_number">295</span>    }
+<span class="line_number">296</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/point_process/subsample_relative.hpp:313<br>
+                                    <code class="cpp">sb::pp::RelativeSubsampleTask&lt;sb::PointCloud&lt;double&gt;, sb::Xoroshiro128pp&gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long, sb::Xoroshiro128pp&amp;)#1}::operator()(unsigned long, sb::Xoroshiro128pp&amp;) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">310</span>        [this, executor, population](size_t q, EngineT&amp; engine) {
+<span class="line_number">311</span>          check_cancelled();
+<span class="line_number">312</span>          Generator queryGenerator(engine());
+<span class="line_number">313</span><span class="error">          sample_query(q, population, queryGenerator, *executor);
+</span><span class="line_number">314</span>        }, exec, tf::DynamicPartitioner&lt;&gt;(1));
+<span class="line_number">315</span>    }
+<span class="line_number">316</span>
+</code></pre>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            <pre class="code">
+<code class="c++"><span class="line_number">91</span><span class="error">      const auto d = (value - m_mean) / m_sigma;</span>
+<span class="line_number">92</span>      return -0.5L * d * d - std::log(m_sigma) - 0.5L * std::log(2 * std::numbers::pi_v&lt;long double&gt;);
+<span class="line_number">93</span>    }
+<span class="line_number">94</span>
+<span class="line_number">95</span>    long double m_mean = 0.L;
+<span class="line_number">96</span>    long double m_sigma = 1.L;
+<span class="line_number">97</span>  };
+<span class="line_number">98</span>
+<span class="line_number">99</span>  /// Density 1 / (end - start) on a finite interval, or weight 1 on an
+<span class="line_number">100</span>  /// unbounded interval. Both cases are zero outside [start, end).
+<span class="line_number">101</span>  class Uniform
+<span class="line_number">102</span>  {
+<span class="line_number">103</span>  public:
+<span class="line_number">104</span>    Uniform(double start, double end) : m_start(start), m_end(end)
+<span class="line_number">105</span>    {
+<span class="line_number">106</span>      if (std::isnan(start) || std::isnan(end) || !(start &lt; end))
+<span class="line_number">107</span>        throw std::invalid_argument(&#34;Uniform requires start &lt; end (start may be -inf and end may be +inf)&#34;);
+<span class="line_number">108</span>    }
+<span class="line_number">109</span>
+<span class="line_number">110</span>    [[nodiscard]] long double start() const noexcept { return m_start; }
+<span class="line_number">111</span>    [[nodiscard]] long double end() const noexcept { return m_end; }
+<span class="line_number">112</span>
+<span class="line_number">113</span>    [[nodiscard]] long double weight(long double value) const noexcept
+<span class="line_number">114</span>    {
+</code></pre>
+            <div class="issue">
+                <div>
+                    <span class="what">Possible data race during read of size 8 at 0x312C7380 by thread #10</span>
+                    <div class="navigation">
+                        <button class="next_error">Next</button>
+                        <button class="prev_error">Previous</button>
+                    </div>
+                </div>
+                <div>
+                    <table class="call_stack">
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/point_process/../random/distribution.hpp:128<br>
+                                    <code class="cpp">sb::random::Uniform::log_weight(long double) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">125</span>
+<span class="line_number">126</span>    [[nodiscard]] long double log_weight(long double value) const noexcept
+<span class="line_number">127</span>    {
+<span class="line_number">128</span><span class="error">      return std::log(weight(value));
+</span><span class="line_number">129</span>    }
+<span class="line_number">130</span>
+<span class="line_number">131</span>  private:
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/point_process/../random/distribution.hpp:221<br>
+                                    <code class="cpp">auto sb::random::log_weights(std::variant&lt;sb::random::Gaussian, sb::random::Uniform, sb::random::Mixture&gt; const&amp;, std::span&lt;long double const, 18446744073709551615ul&gt;, std::span&lt;long double, 18446744073709551615ul&gt;)::{lambda(auto:1 const&amp;)#1}::operator()&lt;sb::random::Uniform&gt;(sb::random::Uniform const&amp;) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">218</span>      throw std::invalid_argument(&#34;values must not be NaN&#34;);
+<span class="line_number">219</span>    std::visit([&amp;](const auto&amp; d) {
+<span class="line_number">220</span>      for (size_t i = 0; i &lt; values.size(); ++i)
+<span class="line_number">221</span><span class="error">        row[i] = std::isinf(values[i]) ? detail::negativeInfinity : d.log_weight(values[i]);
+</span><span class="line_number">222</span>    }, distribution);
+<span class="line_number">223</span>    detail::normalize_log_row(row);
+<span class="line_number">224</span>  }
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:61<br>
+                                    <code class="cpp">void std::__invoke_impl&lt;void, sb::random::log_weights(std::variant&lt;sb::random::Gaussian, sb::random::Uniform, sb::random::Mixture&gt; const&amp;, std::span&lt;long double const, 18446744073709551615ul&gt;, std::span&lt;long double, 18446744073709551615ul&gt;)::{lambda(auto:1 const&amp;)#1}, sb::random::Uniform const&amp;&gt;(std::__invoke_other, sb::random::log_weights(std::variant&lt;sb::random::Gaussian, sb::random::Uniform, sb::random::Mixture&gt; const&amp;, std::span&lt;long double const, 18446744073709551615ul&gt;, std::span&lt;long double, 18446744073709551615ul&gt;)::{lambda(auto:1 const&amp;)#1}&amp;&amp;, sb::random::Uniform const&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">58</span>  template&lt;typename _Res, typename _Fn, typename... _Args&gt;
+<span class="line_number">59</span>    constexpr _Res
+<span class="line_number">60</span>    __invoke_impl(__invoke_other, _Fn&amp;&amp; __f, _Args&amp;&amp;... __args)
+<span class="line_number">61</span><span class="error">    { return std::forward&lt;_Fn&gt;(__f)(std::forward&lt;_Args&gt;(__args)...); }
+</span><span class="line_number">62</span>
+<span class="line_number">63</span>  template&lt;typename _Res, typename _MemFun, typename _Tp, typename... _Args&gt;
+<span class="line_number">64</span>    constexpr _Res
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:96<br>
+                                    <code class="cpp">std::__invoke_result&lt;sb::random::log_weights(std::variant&lt;sb::random::Gaussian, sb::random::Uniform, sb::random::Mixture&gt; const&amp;, std::span&lt;long double const, 18446744073709551615ul&gt;, std::span&lt;long double, 18446744073709551615ul&gt;)::{lambda(auto:1 const&amp;)#1}, sb::random::Uniform const&amp;&gt;::type std::__invoke&lt;sb::random::log_weights(std::variant&lt;sb::random::Gaussian, sb::random::Uniform, sb::random::Mixture&gt; const&amp;, std::span&lt;long double const, 18446744073709551615ul&gt;, std::span&lt;long double, 18446744073709551615ul&gt;)::{lambda(auto:1 const&amp;)#1}, sb::random::Uniform const&amp;&gt;(sb::random::log_weights(std::variant&lt;sb::random::Gaussian, sb::random::Uniform, sb::random::Mixture&gt; const&amp;, std::span&lt;long double const, 18446744073709551615ul&gt;, std::span&lt;long double, 18446744073709551615ul&gt;)::{lambda(auto:1 const&amp;)#1}&amp;&amp;, sb::random::Uniform const&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">93</span>      using __result = __invoke_result&lt;_Callable, _Args...&gt;;
+<span class="line_number">94</span>      using __type = typename __result::type;
+<span class="line_number">95</span>      using __tag = typename __result::__invoke_type;
+<span class="line_number">96</span><span class="error">      return std::__invoke_impl&lt;__type&gt;(__tag{}, std::forward&lt;_Callable&gt;(__fn),
+</span><span class="line_number">97</span>					std::forward&lt;_Args&gt;(__args)...);
+<span class="line_number">98</span>    }
+<span class="line_number">99</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/variant:1060<br>
+                                    <code class="cpp">std::__detail::__variant::__gen_vtable_impl&lt;std::__detail::__variant::_Multi_array&lt;std::__detail::__variant::__deduce_visit_result&lt;void&gt; (*)(sb::random::log_weights(std::variant&lt;sb::random::Gaussian, sb::random::Uniform, sb::random::Mixture&gt; const&amp;, std::span&lt;long double const, 18446744073709551615ul&gt;, std::span&lt;long double, 18446744073709551615ul&gt;)::{lambda(auto:1 const&amp;)#1}&amp;&amp;, std::variant&lt;sb::random::Gaussian, sb::random::Uniform, sb::random::Mixture&gt; const&amp;)&gt;, std::integer_sequence&lt;unsigned long, 1ul&gt; &gt;::__visit_invoke(sb::random::log_weights(std::variant&lt;sb::random::Gaussian, sb::random::Uniform, sb::random::Mixture&gt; const&amp;, std::span&lt;long double const, 18446744073709551615ul&gt;, std::span&lt;long double, 18446744073709551615ul&gt;)::{lambda(auto:1 const&amp;)#1}&amp;&amp;, std::variant&lt;sb::random::Gaussian, sb::random::Uniform, sb::random::Mixture&gt; const&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1057</span>		std::forward&lt;_Variants&gt;(__vars))...);
+<span class="line_number">1058</span>	else if constexpr (_Array_type::__result_is_deduced::value)
+<span class="line_number">1059</span>	  // For the usual std::visit case deduce the return value:
+<span class="line_number">1060</span><span class="error">	  return std::__invoke(std::forward&lt;_Visitor&gt;(__visitor),
+</span><span class="line_number">1061</span>	      __element_by_index_or_cookie&lt;__indices&gt;(
+<span class="line_number">1062</span>		std::forward&lt;_Variants&gt;(__vars))...);
+<span class="line_number">1063</span>	else // for std::visit&lt;R&gt; use INVOKE&lt;R&gt;
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/variant:1816<br>
+                                    <code class="cpp">decltype(auto) std::__do_visit&lt;std::__detail::__variant::__deduce_visit_result&lt;void&gt;, sb::random::log_weights(std::variant&lt;sb::random::Gaussian, sb::random::Uniform, sb::random::Mixture&gt; const&amp;, std::span&lt;long double const, 18446744073709551615ul&gt;, std::span&lt;long double, 18446744073709551615ul&gt;)::{lambda(auto:1 const&amp;)#1}, std::variant&lt;sb::random::Gaussian, sb::random::Uniform, sb::random::Mixture&gt; const&amp;&gt;(sb::random::log_weights(std::variant&lt;sb::random::Gaussian, sb::random::Uniform, sb::random::Mixture&gt; const&amp;, std::span&lt;long double const, 18446744073709551615ul&gt;, std::span&lt;long double, 18446744073709551615ul&gt;)::{lambda(auto:1 const&amp;)#1}&amp;&amp;, std::variant&lt;sb::random::Gaussian, sb::random::Uniform, sb::random::Mixture&gt; const&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1813</span>	      switch (__v0.index())
+<span class="line_number">1814</span>		{
+<span class="line_number">1815</span>		  _GLIBCXX_VISIT_CASE(0)
+<span class="line_number">1816</span><span class="error">		  _GLIBCXX_VISIT_CASE(1)
+</span><span class="line_number">1817</span>		  _GLIBCXX_VISIT_CASE(2)
+<span class="line_number">1818</span>		  _GLIBCXX_VISIT_CASE(3)
+<span class="line_number">1819</span>		  _GLIBCXX_VISIT_CASE(4)
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/variant:1878<br>
+                                    <code class="cpp">std::invoke_result&lt;sb::random::log_weights(std::variant&lt;sb::random::Gaussian, sb::random::Uniform, sb::random::Mixture&gt; const&amp;, std::span&lt;long double const, 18446744073709551615ul&gt;, std::span&lt;long double, 18446744073709551615ul&gt;)::{lambda(auto:1 const&amp;)#1}, std::__conditional&lt;is_lvalue_reference_v&lt;std::variant&lt;sb::random::Gaussian, sb::random::Uniform, sb::random::Mixture&gt; const&amp;&gt; &gt;::type&lt;std::variant_alternative&lt;0ul, std::remove_reference&lt;decltype (__as((declval&lt;std::variant&lt;sb::random::Gaussian, sb::random::Uniform, sb::random::Mixture&gt; const&amp;&gt;)()))&gt;::type&gt;::type&amp;, std::variant_alternative&lt;0ul, std::remove_reference&lt;decltype (__as((declval&lt;std::variant&lt;sb::random::Gaussian, sb::random::Uniform, sb::random::Mixture&gt; const&amp;&gt;)()))&gt;::type&gt;::type&amp;&amp;&gt; &gt;::type std::visit&lt;sb::random::log_weights(std::variant&lt;sb::random::Gaussian, sb::random::Uniform, sb::random::Mixture&gt; const&amp;, std::span&lt;long double const, 18446744073709551615ul&gt;, std::span&lt;long double, 18446744073709551615ul&gt;)::{lambda(auto:1 const&amp;)#1}, std::variant&lt;sb::random::Gaussian, sb::random::Uniform, sb::random::Mixture&gt; const&amp;&gt;(sb::random::log_weights(std::variant&lt;sb::random::Gaussian, sb::random::Uniform, sb::random::Mixture&gt; const&amp;, std::span&lt;long double const, 18446744073709551615ul&gt;, std::span&lt;long double, 18446744073709551615ul&gt;)::{lambda(auto:1 const&amp;)#1}&amp;&amp;, std::variant&lt;sb::random::Gaussian, sb::random::Uniform, sb::random::Mixture&gt; const&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1875</span>	      return;
+<span class="line_number">1876</span>	    }
+<span class="line_number">1877</span>	  else
+<span class="line_number">1878</span><span class="error">	    return std::__do_visit&lt;_Tag&gt;(
+</span><span class="line_number">1879</span>	      std::forward&lt;_Visitor&gt;(__visitor),
+<span class="line_number">1880</span>	      static_cast&lt;_Vp&gt;(__variants)...);
+<span class="line_number">1881</span>	}
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/point_process/../random/distribution.hpp:219<br>
+                                    <code class="cpp">sb::random::log_weights(std::variant&lt;sb::random::Gaussian, sb::random::Uniform, sb::random::Mixture&gt; const&amp;, std::span&lt;long double const, 18446744073709551615ul&gt;, std::span&lt;long double, 18446744073709551615ul&gt;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">216</span>      throw std::invalid_argument(&#34;value and weight rows must have equal length&#34;);
+<span class="line_number">217</span>    if (std::ranges::any_of(values, [](long double v) { return std::isnan(v); }))
+<span class="line_number">218</span>      throw std::invalid_argument(&#34;values must not be NaN&#34;);
+<span class="line_number">219</span><span class="error">    std::visit([&amp;](const auto&amp; d) {
+</span><span class="line_number">220</span>      for (size_t i = 0; i &lt; values.size(); ++i)
+<span class="line_number">221</span>        row[i] = std::isinf(values[i]) ? detail::negativeInfinity : d.log_weight(values[i]);
+<span class="line_number">222</span>    }, distribution);
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/point_process/subsample_relative.hpp:249<br>
+                                    <code class="cpp">sb::pp::RelativeSubsampleTask&lt;sb::PointCloud&lt;double&gt;, sb::Xoroshiro128pp&gt;::sample_distribution(unsigned long, unsigned long, std::vector&lt;long double, std::allocator&lt;long double&gt; &gt; const&amp;, std::vector&lt;long double, std::allocator&lt;long double&gt; &gt;&amp;, std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt;&amp;, sb::RandomGenerator&lt;sb::Xoroshiro128pp&gt;&amp;, tf::Executor&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">246</span>    {
+<span class="line_number">247</span>      const size_t population = distances.size();
+<span class="line_number">248</span>      row.resize(population);
+<span class="line_number">249</span><span class="error">      random::log_weights(m_distributions[d], distances, row);
+</span><span class="line_number">250</span>      const auto eligible = static_cast&lt;size_t&gt;(std::ranges::count_if(row, [](long double w) { return std::isfinite(w); }));
+<span class="line_number">251</span>      add_progress(population);
+<span class="line_number">252</span>      if (sampling::is_insufficient(m_partialPolicy, m_replace, m_nPoints, eligible))
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/point_process/subsample_relative.hpp:293<br>
+                                    <code class="cpp">sb::pp::RelativeSubsampleTask&lt;sb::PointCloud&lt;double&gt;, sb::Xoroshiro128pp&gt;::sample_query(unsigned long, unsigned long, sb::RandomGenerator&lt;sb::Xoroshiro128pp&gt;&amp;, tf::Executor&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">290</span>      for (size_t d = 0; d &lt; m_distributions.size(); ++d)
+<span class="line_number">291</span>      {
+<span class="line_number">292</span>        check_cancelled();
+<span class="line_number">293</span><span class="error">        sample_distribution(q, d, distances, row, sourceIndices, queryGenerator, executor);
+</span><span class="line_number">294</span>      }
+<span class="line_number">295</span>    }
+<span class="line_number">296</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/point_process/subsample_relative.hpp:313<br>
+                                    <code class="cpp">sb::pp::RelativeSubsampleTask&lt;sb::PointCloud&lt;double&gt;, sb::Xoroshiro128pp&gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long, sb::Xoroshiro128pp&amp;)#1}::operator()(unsigned long, sb::Xoroshiro128pp&amp;) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">310</span>        [this, executor, population](size_t q, EngineT&amp; engine) {
+<span class="line_number">311</span>          check_cancelled();
+<span class="line_number">312</span>          Generator queryGenerator(engine());
+<span class="line_number">313</span><span class="error">          sample_query(q, population, queryGenerator, *executor);
+</span><span class="line_number">314</span>        }, exec, tf::DynamicPartitioner&lt;&gt;(1));
+<span class="line_number">315</span>    }
+<span class="line_number">316</span>
+</code></pre>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            <pre class="code">
+<code class="c++"><span class="line_number">115</span><span class="error">      if (!(value &gt;= m_start &amp;&amp; value &lt; m_end))</span>
+<span class="line_number">116</span>        return 0;
+<span class="line_number">117</span>      if (!std::isfinite(m_start) || !std::isfinite(m_end))
+<span class="line_number">118</span>        return 1;
+<span class="line_number">119</span>      const auto width = m_end - m_start;
+<span class="line_number">120</span>      if (std::isfinite(width))
+<span class="line_number">121</span>        return 1 / width;
+<span class="line_number">122</span>      // Finite endpoints can have a width exceeding the floating-point range.
+<span class="line_number">123</span>      return 0.5L / (m_end / 2 - m_start / 2);
+<span class="line_number">124</span>    }
+<span class="line_number">125</span>
+<span class="line_number">126</span>    [[nodiscard]] long double log_weight(long double value) const noexcept
+<span class="line_number">127</span>    {
+<span class="line_number">128</span>      return std::log(weight(value));
+<span class="line_number">129</span>    }
+<span class="line_number">130</span>
+<span class="line_number">131</span>  private:
+<span class="line_number">132</span>    long double m_start;
+<span class="line_number">133</span>    long double m_end;
+<span class="line_number">134</span>  };
+<span class="line_number">135</span>
+<span class="line_number">136</span>  class Mixture;
+<span class="line_number">137</span>
+<span class="line_number">138</span>  /// Any built-in distribution. Interfaces take this variant and dispatch
+<span class="line_number">139</span>  /// once per row rather than once per value.
+<span class="line_number">140</span>  using Distribution = std::variant&lt;Gaussian, Uniform, Mixture&gt;;
+<span class="line_number">141</span>
+<span class="line_number">142</span>  /// Weighted sum of component distributions. Coefficients are normalized to
+<span class="line_number">143</span>  /// sum to one at construction, independently of any evaluation points.
+<span class="line_number">144</span>  /// Zero-coefficient components are kept but never evaluated.
+<span class="line_number">145</span>  class Mixture
+<span class="line_number">146</span>  {
+<span class="line_number">147</span>  public:
+<span class="line_number">148</span>    explicit Mixture(const std::vector&lt;std::pair&lt;double, Distribution&gt;&gt;&amp; terms);
+<span class="line_number">149</span>
+<span class="line_number">150</span>    [[nodiscard]] const std::vector&lt;std::pair&lt;double, Distribution&gt;&gt;&amp; terms() const noexcept { return m_terms; }
+<span class="line_number">151</span>
+<span class="line_number">152</span>    [[nodiscard]] long double weight(long double value) const;
+<span class="line_number">153</span>
+<span class="line_number">154</span>    [[nodiscard]] long double log_weight(long double value) const;
+<span class="line_number">155</span>
+<span class="line_number">156</span>  private:
+<span class="line_number">157</span>    std::vector&lt;std::pair&lt;double, Distribution&gt;&gt; m_terms;
+<span class="line_number">158</span>  };
+<span class="line_number">159</span>
+<span class="line_number">160</span>  inline Mixture::Mixture(const std::vector&lt;std::pair&lt;double, Distribution&gt;&gt;&amp; terms)
+<span class="line_number">161</span>  {
+<span class="line_number">162</span>    if (terms.empty())
+<span class="line_number">163</span>      throw std::invalid_argument(&#34;Mixture needs at least one component&#34;);
+<span class="line_number">164</span>    double maximum = 0;
+<span class="line_number">165</span>    for (const auto&amp; [coefficient, component] : terms)
+<span class="line_number">166</span>    {
+<span class="line_number">167</span>      if (!std::isfinite(coefficient) || coefficient &lt; 0)
+<span class="line_number">168</span>        throw std::invalid_argument(&#34;Mixture coefficients must be finite and nonnegative&#34;);
+<span class="line_number">169</span>      maximum = std::max(maximum, coefficient);
+<span class="line_number">170</span>    }
+<span class="line_number">171</span>    if (maximum == 0)
+<span class="line_number">172</span>      throw std::invalid_argument(&#34;Mixture needs at least one positive coefficient&#34;);
+<span class="line_number">173</span>    // Scale by the maximum first so the sum cannot overflow.
+<span class="line_number">174</span>    double total = 0;
+<span class="line_number">175</span>    for (const auto&amp; [coefficient, component] : terms)
+<span class="line_number">176</span>      total += m_terms.emplace_back(coefficient / maximum, component).first;
+<span class="line_number">177</span>    for (auto&amp; term : m_terms)
+<span class="line_number">178</span>      term.first /= total;
+<span class="line_number">179</span>  }
+<span class="line_number">180</span>
+<span class="line_number">181</span>  inline long double Mixture::weight(long double value) const
+<span class="line_number">182</span>  {
+<span class="line_number">183</span>    long double sum = 0;
+<span class="line_number">184</span>    for (const auto&amp; [coefficient, component] : m_terms)
+<span class="line_number">185</span>    {
+<span class="line_number">186</span>      if (coefficient &gt; 0)
+<span class="line_number">187</span>      {
+<span class="line_number">188</span>        sum += coefficient * std::visit([&amp;](const auto&amp; d) { return d.weight(value); }, component);
+<span class="line_number">189</span>      }
+<span class="line_number">190</span>    }
+<span class="line_number">191</span>    return sum;
+<span class="line_number">192</span>  }
+<span class="line_number">193</span>
+<span class="line_number">194</span>  inline long double Mixture::log_weight(long double value) const
+<span class="line_number">195</span>  {
+<span class="line_number">196</span>    long double result = detail::negativeInfinity;
+<span class="line_number">197</span>    for (const auto&amp; [coefficient, component] : m_terms)
+<span class="line_number">198</span>    {
+</code></pre>
+            <div class="issue">
+                <div>
+                    <span class="what">Possible data race during read of size 8 at 0x31185040 by thread #10</span>
+                    <div class="navigation">
+                        <button class="next_error">Next</button>
+                        <button class="prev_error">Previous</button>
+                    </div>
+                </div>
+                <div>
+                    <table class="call_stack">
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/point_process/../random/distribution.hpp:221<br>
+                                    <code class="cpp">auto sb::random::log_weights(std::variant&lt;sb::random::Gaussian, sb::random::Uniform, sb::random::Mixture&gt; const&amp;, std::span&lt;long double const, 18446744073709551615ul&gt;, std::span&lt;long double, 18446744073709551615ul&gt;)::{lambda(auto:1 const&amp;)#1}::operator()&lt;sb::random::Mixture&gt;(sb::random::Mixture const&amp;) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">218</span>      throw std::invalid_argument(&#34;values must not be NaN&#34;);
+<span class="line_number">219</span>    std::visit([&amp;](const auto&amp; d) {
+<span class="line_number">220</span>      for (size_t i = 0; i &lt; values.size(); ++i)
+<span class="line_number">221</span><span class="error">        row[i] = std::isinf(values[i]) ? detail::negativeInfinity : d.log_weight(values[i]);
+</span><span class="line_number">222</span>    }, distribution);
+<span class="line_number">223</span>    detail::normalize_log_row(row);
+<span class="line_number">224</span>  }
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:61<br>
+                                    <code class="cpp">void std::__invoke_impl&lt;void, sb::random::log_weights(std::variant&lt;sb::random::Gaussian, sb::random::Uniform, sb::random::Mixture&gt; const&amp;, std::span&lt;long double const, 18446744073709551615ul&gt;, std::span&lt;long double, 18446744073709551615ul&gt;)::{lambda(auto:1 const&amp;)#1}, sb::random::Mixture const&amp;&gt;(std::__invoke_other, sb::random::log_weights(std::variant&lt;sb::random::Gaussian, sb::random::Uniform, sb::random::Mixture&gt; const&amp;, std::span&lt;long double const, 18446744073709551615ul&gt;, std::span&lt;long double, 18446744073709551615ul&gt;)::{lambda(auto:1 const&amp;)#1}&amp;&amp;, sb::random::Mixture const&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">58</span>  template&lt;typename _Res, typename _Fn, typename... _Args&gt;
+<span class="line_number">59</span>    constexpr _Res
+<span class="line_number">60</span>    __invoke_impl(__invoke_other, _Fn&amp;&amp; __f, _Args&amp;&amp;... __args)
+<span class="line_number">61</span><span class="error">    { return std::forward&lt;_Fn&gt;(__f)(std::forward&lt;_Args&gt;(__args)...); }
+</span><span class="line_number">62</span>
+<span class="line_number">63</span>  template&lt;typename _Res, typename _MemFun, typename _Tp, typename... _Args&gt;
+<span class="line_number">64</span>    constexpr _Res
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:96<br>
+                                    <code class="cpp">std::__invoke_result&lt;sb::random::log_weights(std::variant&lt;sb::random::Gaussian, sb::random::Uniform, sb::random::Mixture&gt; const&amp;, std::span&lt;long double const, 18446744073709551615ul&gt;, std::span&lt;long double, 18446744073709551615ul&gt;)::{lambda(auto:1 const&amp;)#1}, sb::random::Mixture const&amp;&gt;::type std::__invoke&lt;sb::random::log_weights(std::variant&lt;sb::random::Gaussian, sb::random::Uniform, sb::random::Mixture&gt; const&amp;, std::span&lt;long double const, 18446744073709551615ul&gt;, std::span&lt;long double, 18446744073709551615ul&gt;)::{lambda(auto:1 const&amp;)#1}, sb::random::Mixture const&amp;&gt;(sb::random::log_weights(std::variant&lt;sb::random::Gaussian, sb::random::Uniform, sb::random::Mixture&gt; const&amp;, std::span&lt;long double const, 18446744073709551615ul&gt;, std::span&lt;long double, 18446744073709551615ul&gt;)::{lambda(auto:1 const&amp;)#1}&amp;&amp;, sb::random::Mixture const&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">93</span>      using __result = __invoke_result&lt;_Callable, _Args...&gt;;
+<span class="line_number">94</span>      using __type = typename __result::type;
+<span class="line_number">95</span>      using __tag = typename __result::__invoke_type;
+<span class="line_number">96</span><span class="error">      return std::__invoke_impl&lt;__type&gt;(__tag{}, std::forward&lt;_Callable&gt;(__fn),
+</span><span class="line_number">97</span>					std::forward&lt;_Args&gt;(__args)...);
+<span class="line_number">98</span>    }
+<span class="line_number">99</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/variant:1060<br>
+                                    <code class="cpp">std::__detail::__variant::__gen_vtable_impl&lt;std::__detail::__variant::_Multi_array&lt;std::__detail::__variant::__deduce_visit_result&lt;void&gt; (*)(sb::random::log_weights(std::variant&lt;sb::random::Gaussian, sb::random::Uniform, sb::random::Mixture&gt; const&amp;, std::span&lt;long double const, 18446744073709551615ul&gt;, std::span&lt;long double, 18446744073709551615ul&gt;)::{lambda(auto:1 const&amp;)#1}&amp;&amp;, std::variant&lt;sb::random::Gaussian, sb::random::Uniform, sb::random::Mixture&gt; const&amp;)&gt;, std::integer_sequence&lt;unsigned long, 2ul&gt; &gt;::__visit_invoke(sb::random::log_weights(std::variant&lt;sb::random::Gaussian, sb::random::Uniform, sb::random::Mixture&gt; const&amp;, std::span&lt;long double const, 18446744073709551615ul&gt;, std::span&lt;long double, 18446744073709551615ul&gt;)::{lambda(auto:1 const&amp;)#1}&amp;&amp;, std::variant&lt;sb::random::Gaussian, sb::random::Uniform, sb::random::Mixture&gt; const&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1057</span>		std::forward&lt;_Variants&gt;(__vars))...);
+<span class="line_number">1058</span>	else if constexpr (_Array_type::__result_is_deduced::value)
+<span class="line_number">1059</span>	  // For the usual std::visit case deduce the return value:
+<span class="line_number">1060</span><span class="error">	  return std::__invoke(std::forward&lt;_Visitor&gt;(__visitor),
+</span><span class="line_number">1061</span>	      __element_by_index_or_cookie&lt;__indices&gt;(
+<span class="line_number">1062</span>		std::forward&lt;_Variants&gt;(__vars))...);
+<span class="line_number">1063</span>	else // for std::visit&lt;R&gt; use INVOKE&lt;R&gt;
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/variant:1817<br>
+                                    <code class="cpp">decltype(auto) std::__do_visit&lt;std::__detail::__variant::__deduce_visit_result&lt;void&gt;, sb::random::log_weights(std::variant&lt;sb::random::Gaussian, sb::random::Uniform, sb::random::Mixture&gt; const&amp;, std::span&lt;long double const, 18446744073709551615ul&gt;, std::span&lt;long double, 18446744073709551615ul&gt;)::{lambda(auto:1 const&amp;)#1}, std::variant&lt;sb::random::Gaussian, sb::random::Uniform, sb::random::Mixture&gt; const&amp;&gt;(sb::random::log_weights(std::variant&lt;sb::random::Gaussian, sb::random::Uniform, sb::random::Mixture&gt; const&amp;, std::span&lt;long double const, 18446744073709551615ul&gt;, std::span&lt;long double, 18446744073709551615ul&gt;)::{lambda(auto:1 const&amp;)#1}&amp;&amp;, std::variant&lt;sb::random::Gaussian, sb::random::Uniform, sb::random::Mixture&gt; const&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1814</span>		{
+<span class="line_number">1815</span>		  _GLIBCXX_VISIT_CASE(0)
+<span class="line_number">1816</span>		  _GLIBCXX_VISIT_CASE(1)
+<span class="line_number">1817</span><span class="error">		  _GLIBCXX_VISIT_CASE(2)
+</span><span class="line_number">1818</span>		  _GLIBCXX_VISIT_CASE(3)
+<span class="line_number">1819</span>		  _GLIBCXX_VISIT_CASE(4)
+<span class="line_number">1820</span>		  _GLIBCXX_VISIT_CASE(5)
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/variant:1878<br>
+                                    <code class="cpp">std::invoke_result&lt;sb::random::log_weights(std::variant&lt;sb::random::Gaussian, sb::random::Uniform, sb::random::Mixture&gt; const&amp;, std::span&lt;long double const, 18446744073709551615ul&gt;, std::span&lt;long double, 18446744073709551615ul&gt;)::{lambda(auto:1 const&amp;)#1}, std::__conditional&lt;is_lvalue_reference_v&lt;std::variant&lt;sb::random::Gaussian, sb::random::Uniform, sb::random::Mixture&gt; const&amp;&gt; &gt;::type&lt;std::variant_alternative&lt;0ul, std::remove_reference&lt;decltype (__as((declval&lt;std::variant&lt;sb::random::Gaussian, sb::random::Uniform, sb::random::Mixture&gt; const&amp;&gt;)()))&gt;::type&gt;::type&amp;, std::variant_alternative&lt;0ul, std::remove_reference&lt;decltype (__as((declval&lt;std::variant&lt;sb::random::Gaussian, sb::random::Uniform, sb::random::Mixture&gt; const&amp;&gt;)()))&gt;::type&gt;::type&amp;&amp;&gt; &gt;::type std::visit&lt;sb::random::log_weights(std::variant&lt;sb::random::Gaussian, sb::random::Uniform, sb::random::Mixture&gt; const&amp;, std::span&lt;long double const, 18446744073709551615ul&gt;, std::span&lt;long double, 18446744073709551615ul&gt;)::{lambda(auto:1 const&amp;)#1}, std::variant&lt;sb::random::Gaussian, sb::random::Uniform, sb::random::Mixture&gt; const&amp;&gt;(sb::random::log_weights(std::variant&lt;sb::random::Gaussian, sb::random::Uniform, sb::random::Mixture&gt; const&amp;, std::span&lt;long double const, 18446744073709551615ul&gt;, std::span&lt;long double, 18446744073709551615ul&gt;)::{lambda(auto:1 const&amp;)#1}&amp;&amp;, std::variant&lt;sb::random::Gaussian, sb::random::Uniform, sb::random::Mixture&gt; const&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1875</span>	      return;
+<span class="line_number">1876</span>	    }
+<span class="line_number">1877</span>	  else
+<span class="line_number">1878</span><span class="error">	    return std::__do_visit&lt;_Tag&gt;(
+</span><span class="line_number">1879</span>	      std::forward&lt;_Visitor&gt;(__visitor),
+<span class="line_number">1880</span>	      static_cast&lt;_Vp&gt;(__variants)...);
+<span class="line_number">1881</span>	}
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/point_process/../random/distribution.hpp:219<br>
+                                    <code class="cpp">sb::random::log_weights(std::variant&lt;sb::random::Gaussian, sb::random::Uniform, sb::random::Mixture&gt; const&amp;, std::span&lt;long double const, 18446744073709551615ul&gt;, std::span&lt;long double, 18446744073709551615ul&gt;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">216</span>      throw std::invalid_argument(&#34;value and weight rows must have equal length&#34;);
+<span class="line_number">217</span>    if (std::ranges::any_of(values, [](long double v) { return std::isnan(v); }))
+<span class="line_number">218</span>      throw std::invalid_argument(&#34;values must not be NaN&#34;);
+<span class="line_number">219</span><span class="error">    std::visit([&amp;](const auto&amp; d) {
+</span><span class="line_number">220</span>      for (size_t i = 0; i &lt; values.size(); ++i)
+<span class="line_number">221</span>        row[i] = std::isinf(values[i]) ? detail::negativeInfinity : d.log_weight(values[i]);
+<span class="line_number">222</span>    }, distribution);
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/point_process/subsample_relative.hpp:249<br>
+                                    <code class="cpp">sb::pp::RelativeSubsampleTask&lt;sb::PointCloud&lt;double&gt;, sb::Xoroshiro128pp&gt;::sample_distribution(unsigned long, unsigned long, std::vector&lt;long double, std::allocator&lt;long double&gt; &gt; const&amp;, std::vector&lt;long double, std::allocator&lt;long double&gt; &gt;&amp;, std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt;&amp;, sb::RandomGenerator&lt;sb::Xoroshiro128pp&gt;&amp;, tf::Executor&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">246</span>    {
+<span class="line_number">247</span>      const size_t population = distances.size();
+<span class="line_number">248</span>      row.resize(population);
+<span class="line_number">249</span><span class="error">      random::log_weights(m_distributions[d], distances, row);
+</span><span class="line_number">250</span>      const auto eligible = static_cast&lt;size_t&gt;(std::ranges::count_if(row, [](long double w) { return std::isfinite(w); }));
+<span class="line_number">251</span>      add_progress(population);
+<span class="line_number">252</span>      if (sampling::is_insufficient(m_partialPolicy, m_replace, m_nPoints, eligible))
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/point_process/subsample_relative.hpp:293<br>
+                                    <code class="cpp">sb::pp::RelativeSubsampleTask&lt;sb::PointCloud&lt;double&gt;, sb::Xoroshiro128pp&gt;::sample_query(unsigned long, unsigned long, sb::RandomGenerator&lt;sb::Xoroshiro128pp&gt;&amp;, tf::Executor&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">290</span>      for (size_t d = 0; d &lt; m_distributions.size(); ++d)
+<span class="line_number">291</span>      {
+<span class="line_number">292</span>        check_cancelled();
+<span class="line_number">293</span><span class="error">        sample_distribution(q, d, distances, row, sourceIndices, queryGenerator, executor);
+</span><span class="line_number">294</span>      }
+<span class="line_number">295</span>    }
+<span class="line_number">296</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/point_process/subsample_relative.hpp:313<br>
+                                    <code class="cpp">sb::pp::RelativeSubsampleTask&lt;sb::PointCloud&lt;double&gt;, sb::Xoroshiro128pp&gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long, sb::Xoroshiro128pp&amp;)#1}::operator()(unsigned long, sb::Xoroshiro128pp&amp;) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">310</span>        [this, executor, population](size_t q, EngineT&amp; engine) {
+<span class="line_number">311</span>          check_cancelled();
+<span class="line_number">312</span>          Generator queryGenerator(engine());
+<span class="line_number">313</span><span class="error">          sample_query(q, population, queryGenerator, *executor);
+</span><span class="line_number">314</span>        }, exec, tf::DynamicPartitioner&lt;&gt;(1));
+<span class="line_number">315</span>    }
+<span class="line_number">316</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/point_process/../walk.hpp:246<br>
+                                    <code class="cpp">sb::parallel_for_each_index_async&lt;sb::Xoroshiro128pp, sb::pp::RelativeSubsampleTask&lt;sb::PointCloud&lt;double&gt;, sb::Xoroshiro128pp&gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long, sb::Xoroshiro128pp&amp;)#1}, tf::DynamicPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, sb::RandomGenerator&lt;sb::Xoroshiro128pp&gt;&amp;, sb::pp::RelativeSubsampleTask&lt;sb::PointCloud&lt;double&gt;, sb::Xoroshiro128pp&gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long, sb::Xoroshiro128pp&amp;)#1}&amp;&amp;, sb::Executor&amp;, tf::DynamicPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(unsigned long)#1}::operator()(unsigned long) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">243</span>    flow.for_each_index(size_t{0}, count, size_t{1},
+<span class="line_number">244</span>      [block, f = std::forward&lt;BinaryFunc&gt;(f)](size_t i) {
+<span class="line_number">245</span>        auto engine = block.sub_generator(i);
+<span class="line_number">246</span><span class="error">        f(i, engine);
+</span><span class="line_number">247</span>      }, partitioner);
+<span class="line_number">248</span>    return exec.cpu()-&gt;run(std::move(flow));
+<span class="line_number">249</span>  }
+</code></pre>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            <pre class="code">
+<code class="c++"><span class="line_number">199</span><span class="error">      if (coefficient &gt; 0)</span>
+<span class="line_number">200</span>      {
+<span class="line_number">201</span>        result = detail::log_add(result, std::log(coefficient)
+<span class="line_number">202</span>          + std::visit([&amp;](const auto&amp; d) { return d.log_weight(value); }, component));
+<span class="line_number">203</span>      }
+<span class="line_number">204</span>    }
+<span class="line_number">205</span>    return result;
+<span class="line_number">206</span>  }
+<span class="line_number">207</span>
+<span class="line_number">208</span>  /// Fill @p row with the log probabilities of @p values under @p distribution,
+<span class="line_number">209</span>  /// normalized over the values to sum to one. Tiny positive weights stay
+<span class="line_number">210</span>  /// finite. Infinite values and values outside the support get -inf; if no
+<span class="line_number">211</span>  /// value has support, the row remains all -inf.
+<span class="line_number">212</span>  inline void log_weights(const Distribution&amp; distribution, std::span&lt;const long double&gt; values,
+<span class="line_number">213</span>                          std::span&lt;long double&gt; row)
+<span class="line_number">214</span>  {
+<span class="line_number">215</span>    if (row.size() != values.size())
+<span class="line_number">216</span>      throw std::invalid_argument(&#34;value and weight rows must have equal length&#34;);
+<span class="line_number">217</span>    if (std::ranges::any_of(values, [](long double v) { return std::isnan(v); }))
+<span class="line_number">218</span>      throw std::invalid_argument(&#34;values must not be NaN&#34;);
+<span class="line_number">219</span>    std::visit([&amp;](const auto&amp; d) {
+<span class="line_number">220</span>      for (size_t i = 0; i &lt; values.size(); ++i)
+<span class="line_number">221</span>        row[i] = std::isinf(values[i]) ? detail::negativeInfinity : d.log_weight(values[i]);
+<span class="line_number">222</span>    }, distribution);
+<span class="line_number">223</span>    detail::normalize_log_row(row);
+<span class="line_number">224</span>  }
+<span class="line_number">225</span>
+<span class="line_number">226</span>} // namespace sb::random
+<span class="line_number">227</span>
+<span class="line_number">228</span>#endif
+</code>
+            </pre>
+        </div>
+    </div>
+</body>
+
+</html>
