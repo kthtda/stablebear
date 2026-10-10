@@ -29,3 +29,15 @@ def test_geometry_and_values(ax):
     assert np.asarray(im.get_array()) == pytest.approx(gaussian.weight(distances))
     assert im.get_extent() == pytest.approx([-0.5, 2.5, -0.5, 2.5])
     assert im.origin == "lower"
+
+
+
+def test_automatic_extent_is_a_square_around_the_query(ax):
+    # Without extent, the heatmap draws a square centered on the query.
+    # Its half-width is the largest |endpoint| of plot_range(), plus 10%:
+    # Gaussian(0, 1).plot_range() is (-3, 3), so the half-width is 3.3.
+    im = plot_distance_weight_heatmap(
+        sb.distributions.Gaussian(0, 1), query=(10, -5), resolution=3, ax=ax,
+    )
+
+    assert im.get_extent() == pytest.approx([6.7, 13.3, -8.3, -1.7])

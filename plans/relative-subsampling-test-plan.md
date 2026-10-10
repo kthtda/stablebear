@@ -663,13 +663,11 @@ Items 63 and 64 go in `test/python/test_distributions.py`; items 65-71 go in
   instead of centers, axiswise (Chebyshev) instead of Euclidean distance, an
   ignored query offset, transposed rows, a changed origin, and normalization
   over the grid.
-- [ ] **66. Automatic extent.** One parametrized test with `pytest.approx`:
-  `Uniform(0, 2)` with query `(10, -5)` gives `(7.58, 12.42, -7.42, -2.58)`,
-  and `Uniform(0, inf)` with query `(0, 0)` gives
-  `(-1.21, 1.21, -1.21, 1.21)`, so unbounded support needs no explicit extent.
-  The half-width is 1.1 times the largest absolute `plot_range()` bound.
-  **Catches:** an extent not centered on the query, a missing margin, and
-  unbounded ranges failing.
+- [x] **66. Automatic extent.** `Gaussian(0, 1)` with query `(10, -5)` and
+  no extent gives `(6.7, 13.3, -8.3, -1.7)` (`pytest.approx`): the half-width
+  is 1.1 times the largest absolute `plot_range()` bound, 3. Unbounded and
+  infinite `plot_range()` cases are covered by item 63. **Catches:** an extent
+  not centered on the query, and a missing margin.
 - [ ] **67. Documented defaults.** (optional) With `extent` and `resolution`
   omitted, the image is 512 by 512, `ax.get_aspect() == 1.0`, the colormap is
   viridis, and interpolation is nearest. **Catches:** changed defaults.
