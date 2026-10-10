@@ -843,3 +843,36 @@ def test_coordinate_query_of_wrong_dimension_raises():
             reference, query, n_points=1, n_samples=1, replace=True,
             distribution=sb.distributions.Uniform(0, 0.5),
         )
+
+
+def test_point_cloud_tensor_query_raises():
+    reference = sb.PointCloud([
+        [0.0],
+        [4.0],
+    ])
+    query = sb.PointCloudTensor([
+        np.array([
+            [0.0],
+        ]),
+    ])
+
+    with pytest.raises(TypeError, match="query must be one point cloud, a coordinate array, or an index vector"):
+        sb.random.subsample_relative(
+            reference, query, n_points=1, n_samples=1, replace=True,
+            distribution=sb.distributions.Uniform(0, 0.5),
+        )
+
+
+def test_point_cloud_tensor_reference_raises():
+    reference = sb.PointCloudTensor([
+        np.array([
+            [0.0],
+            [4.0],
+        ]),
+    ])
+
+    with pytest.raises(TypeError, match="reference must be one PointCloud or DistanceMatrix"):
+        sb.random.subsample_relative(
+            reference, [0], n_points=1, n_samples=1, replace=True,
+            distribution=sb.distributions.Uniform(0, 0.5),
+        )

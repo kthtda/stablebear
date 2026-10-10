@@ -546,7 +546,7 @@ repeated for `subsample_relative`.
   computation, where it would read past the reference coordinates (only this
   native check guards it). A coordinate query on a distance-matrix reference
   needs no test: without the Python check, the native code still raises.
-- [ ] **51. Unsupported query and reference objects.** (optional) A
+- [x] **51. Unsupported query and reference objects.** (optional) A
   `PointCloudTensor` as the query raises TypeError "query must be one point
   cloud, a coordinate array, or an index vector", and as the reference
   TypeError "reference must be one PointCloud or DistanceMatrix". **Catches:**
