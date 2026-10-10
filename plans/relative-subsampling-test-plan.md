@@ -429,16 +429,16 @@ repeated for `subsample_relative`.
   parametrize `replace`. Expect sample sizes `[0, 0, 3, 3]` in both modes.
   **Catches:** replacement bypassing the threshold (`[0, 3, 3, 3]`), and
   dropping an element with exactly `n_points` points.
-- [ ] **35. Invalid policy values.** `"maybe"` raises ValueError
+- [x] **35. Invalid policy values.** `"maybe"` raises ValueError
   "allow_partial must be one of 'no', 'keep', 'drop'"; `1`, `None`, and
   `np.bool_(True)` raise TypeError "allow_partial must be a string".
   **Catches:** unknown strings silently accepted, and truthy values treated as
   the bool aliases.
-- [ ] **36. Indexed input uses its logical point count.** (optional) Select two
+- [x] **36. Indexed input uses its logical point count.** (optional, skipped) Select two
   of five source points through an indexed `PointCloudTensor`; with
   `n_points=3` and `allow_partial="drop"`, the sample is empty. **Catches:** a
   threshold counted on the backing source.
-- [ ] **37. The uniform threshold precedes duplicate removal.** (optional)
+- [x] **37. The uniform threshold precedes duplicate removal.** (optional, skipped)
   Three identical points `[1.0]`, `n_points=3`, `allow_partial="drop"`, and
   `discard_duplicates=True` return one point, `[[1.0]]`. **Catches:** the check
   moved after duplicate removal. Item 32 covers the relative sampler.
