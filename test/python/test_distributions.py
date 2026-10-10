@@ -1,3 +1,5 @@
+import re
+
 import numpy as np
 import numpy.testing as npt
 import pytest
@@ -241,3 +243,28 @@ def test_gaussian_rejects_invalid_parameters(mean, std):
 def test_gaussian_rejects_non_numeric_mean(mean):
     with pytest.raises(TypeError, match="mean must be a real scalar"):
         sb.distributions.Gaussian(mean, 1)
+
+
+@pytest.mark.parametrize(("start", "end"), [
+    pytest.param(np.nan, 1, id="nan-start"),
+    pytest.param(0, np.nan, id="nan-end"),
+    pytest.param(1, 1, id="empty"),
+    pytest.param(2, 1, id="reversed"),
+    pytest.param(np.inf, np.inf, id="both-positive-infinity"),
+    pytest.param(-np.inf, -np.inf, id="both-negative-infinity"),
+    pytest.param(np.inf, -np.inf, id="reversed-infinities"),
+])
+def test_uniform_rejects_invalid_intervals(start, end):
+    with pytest.raises(ValueError, match=re.escape(
+            "Uniform requires start < end (start may be -inf and end may be +inf)")):
+        sb.distributions.Uniform(start, end)
+
+
+@pytest.mark.parametrize(("start", "end", "message"), [
+    pytest.param(True, 1, "start must be a real scalar", id="bool-start"),
+    pytest.param(0, "1", "end must be a real scalar", id="string-end"),
+    pytest.param(0, None, "end must be a real scalar", id="none-end"),
+])
+def test_uniform_rejects_non_numeric_endpoints(start, end, message):
+    with pytest.raises(TypeError, match=message):
+        sb.distributions.Uniform(start, end)

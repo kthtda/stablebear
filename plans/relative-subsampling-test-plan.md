@@ -611,11 +611,13 @@ These go in `test/python/test_distributions.py`.
   scalar" (the shared `_real`, checked once here). **Catches:** nonpositive or
   infinite scales producing NaN or zero weights, and bools or strings accepted
   as numbers.
-- [ ] **60. Uniform parameters.** One test. A NaN endpoint, `(1, 1)`, and
-  `(2, 1)` raise ValueError "Uniform requires start < end (start may be -inf
+- [x] **60. Uniform parameters.** Two tests. A NaN endpoint, `(1, 1)`,
+  `(2, 1)`, and intervals of equal or reversed infinities raise ValueError "Uniform requires start < end (start may be -inf
   and end may be +inf)". Infinite endpoints with `start < end` are valid;
-  item 6 constructs them. **Catches:** empty, reversed, or NaN intervals
-  producing zero or NaN weights.
+  item 6 constructs them. A bool start, or a string or `None` end, raises
+  TypeError naming that endpoint. **Catches:** empty, reversed, or NaN
+  intervals producing zero or NaN weights, and non-numbers accepted as
+  endpoints.
 - [ ] **61. Mixture inputs.** One table of ValueErrors: one distribution with
   two coefficients ("Mixture needs one coefficient per distribution"), a
   negative or NaN coefficient ("Mixture coefficients must be finite and
