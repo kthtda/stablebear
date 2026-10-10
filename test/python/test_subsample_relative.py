@@ -731,3 +731,21 @@ def test_indexed_reference_uses_its_selected_points():
     npt.assert_array_equal(samples[0].indices[0], [0])
     npt.assert_array_equal(samples[1, 0], [[4.0]])
     npt.assert_array_equal(samples[1].indices[0], [1])
+
+
+def test_samples_ignore_later_writes_to_the_reference():
+    reference = sb.PointCloud([
+        [0.0],
+        [4.0],
+        [9.0],
+    ])
+
+    # Uniform(0, 0.5) keeps only the query point itself.
+    samples = sb.random.subsample_relative(
+        reference, [0], n_points=1, n_samples=1, replace=True,
+        distribution=sb.distributions.Uniform(0, 0.5),
+    )
+    reference[0, 0] = 99.0
+
+    assert reference[0, 0] == 99.0
+    npt.assert_array_equal(samples[0, 0], [[0.0]])

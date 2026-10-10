@@ -509,7 +509,7 @@ repeated for `subsample_relative`.
   and `n_points=1` selects 9, then 4. **Catches:**
   a float32 query failing to convert to the float64 reference, and a float64
   `FloatTensor` passed on unconverted.
-- [ ] **46. Samples ignore later writes to the reference.** Reference
+- [x] **46. Samples ignore later writes to the reference.** Reference
   coordinates 0, 4, 9; query `[0]`; `Uniform(0, 0.5)`; `n_points=1`. After
   sampling, set `reference[0, 0] = 99.0`, confirm that the write took effect,
   and check that the sample still holds 0. **Catches:** samples sharing storage
