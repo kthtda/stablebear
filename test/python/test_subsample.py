@@ -202,6 +202,27 @@ class TestSubsample:
             subsample(source, n_points=1, n_samples=1, replace=False,
                       allow_partial=allow_partial)
 
+    def test_verbosity_changes_neither_results_nor_generator_state(self):
+        source = sb.PointCloudTensor([
+            np.array([[0.0], [1.0], [2.0], [3.0]]),
+            np.array([[0.0], [1.0], [2.0]]),
+        ])
+        verbose_generator = sb.random.Generator(seed=248)
+        quiet_generator = sb.random.Generator(seed=248)
+
+        # Two calls each, so the second call also checks generator advancement.
+        verbose_samples = [
+            subsample(source, n_points=2, n_samples=3, generator=verbose_generator, verbose=True),
+            subsample(source, n_points=2, n_samples=3, generator=verbose_generator, verbose=True),
+        ]
+        quiet_samples = [
+            subsample(source, n_points=2, n_samples=3, generator=quiet_generator, verbose=False),
+            subsample(source, n_points=2, n_samples=3, generator=quiet_generator, verbose=False),
+        ]
+
+        assert verbose_samples[0].array_equal(quiet_samples[0])
+        assert verbose_samples[1].array_equal(quiet_samples[1])
+
     def test_batched_sampling_matches_individual_calls_in_row_major_order(self):
         source = sb.PointCloudTensor([
             np.array([

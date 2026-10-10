@@ -1,5 +1,6 @@
 from .. import _sb_cpp as cpp
 from .._validation import _boolean, _positive_integer
+from ..async_task import _run_task
 from ..base_tensor import _get_backend
 from ..distance_matrix import DistanceMatrix, DistanceMatrixTensor
 from ..point_cloud import PointCloud, PointCloudTensor
@@ -30,6 +31,7 @@ def subsample(
     allow_partial="keep",
     discard_duplicates=False,
     generator=None,
+    verbose=False,
 ):
     """Draw uniform subsamples from point clouds, distance matrices, or their tensors.
 
@@ -69,6 +71,9 @@ def subsample(
         source index. Distinct zero-distance indices remain distinct.
     generator : stablebear.random.Generator, optional
         Generator to use. The process-wide generator is used when omitted.
+    verbose : bool, optional
+        Show progress, by default False. Verbosity does not change results or
+        generator advancement.
 
     Returns
     -------
@@ -93,6 +98,7 @@ def subsample(
     replace = _boolean(replace, "replace")
     partial_policy = _partial_policy(allow_partial)
     discard_duplicates = _boolean(discard_duplicates, "discard_duplicates")
+    verbose = _boolean(verbose, "verbose")
 
     backend, data = _get_backend(
         data,
@@ -103,7 +109,7 @@ def subsample(
             distmat64: cpp.point_process.subsample64,
         },
     )
-    result = backend(
+    task = backend(
         data._data,
         n_points,
         n_samples,
@@ -112,8 +118,9 @@ def subsample(
         discard_duplicates,
         _unwrap(generator),
     )
+    _run_task(lambda: task, verbose=verbose)
     result_type = (
         PointCloudTensor if isinstance(data, PointCloudTensor)
         else DistanceMatrixTensor
     )
-    return result_type(result)
+    return result_type(task.result())
