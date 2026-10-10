@@ -175,3 +175,30 @@ def test_distributions_are_immutable(attribute, value):
         setattr(gaussian, attribute, 5)
 
     assert getattr(gaussian, attribute) == value
+
+
+@pytest.mark.parametrize("value", [
+    pytest.param(0, id="python-int"),
+    pytest.param(np.array(0.0), id="0-d-array"),
+])
+def test_scalar_weight_is_a_python_float(value):
+    weight = sb.distributions.Gaussian(0, 1).weight(value)
+
+    # numpy.float64 subclasses float, so isinstance would also accept it.
+    assert type(weight) is float
+    assert weight == pytest.approx(0.3989422804)
+
+
+def test_array_weight_keeps_its_shape_as_float64():
+    values = np.array([
+        [0, 2],
+        [3, 1.5],
+    ], dtype=np.float32)
+
+    weights = sb.distributions.Uniform(0, 2).weight(values)
+
+    assert weights.dtype == np.float64
+    npt.assert_array_equal(weights, [
+        [0.5, 0],
+        [0, 0.5],
+    ])

@@ -589,7 +589,7 @@ These go in `test/python/test_distributions.py`.
   message: without the guard, Python raises a different AttributeError for the
   read-only property. **Catches:** mutable distributions whose hash could
   change.
-- [ ] **57. Return types of `.weight()`.** Two small tests.
+- [x] **57. Return types of `.weight()`.** Two small tests.
   `Gaussian(0, 1).weight(0)` and a 0-d array each return an object whose type is
   exactly `float` (`type(result) is float`; `isinstance` passes for
   `numpy.float64`, which subclasses `float`), equal to 0.3989422804. The
