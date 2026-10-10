@@ -478,7 +478,7 @@ repeated for `subsample_relative`.
   `gen.reserve(count).sub_generator(i)`, and the generator advances by exactly
   `count`. **Catches:** a block that skips or repeats stream indices, or
   advances the generator by the wrong count. Item 40 covers this indirectly.
-- [ ] **42. Verbose mode names empty cells.** The item 31 example without
+- [x] **42. Verbose mode names empty cells.** The item 31 example without
   replacement and with `verbose=True` emits the UserWarning "Empty samples at
   (query, distribution) indices: [(1, 0)]"; without `verbose`, there is no
   warning. Two small tests; do not assert progress-bar output. Background,
