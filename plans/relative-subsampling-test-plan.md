@@ -552,9 +552,9 @@ repeated for `subsample_relative`.
   TypeError "reference must be one PointCloud or DistanceMatrix". **Catches:**
   tensors reaching the conversion code with a misleading error. Optional
   because both are one-line type guards.
-- [ ] **52. Nonfinite coordinates.** (optional) An infinite reference
-  coordinate and a NaN coordinate query each raise ValueError "coordinates must
-  be finite". **Catches:** a less helpful error: without the check, a nonfinite
+- [x] **52. Nonfinite coordinates.** (optional) A NaN reference coordinate
+  and a NaN coordinate query each raise ValueError "coordinates must be
+  finite"; infinite coordinates are left untested. **Catches:** a less helpful error: without the check, a nonfinite
   coordinate raises OverflowError "Euclidean distance exceeds numerical range"
   instead. Optional because only the error type and message are at stake.
 - [ ] **53. NaN written into a matrix.** (optional) Entry assignment rejects
