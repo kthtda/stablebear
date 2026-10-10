@@ -337,6 +337,7 @@ def plot_barcode(bc, ax=None, y_offset=0, **kwargs):
             segments.append([(birth, y), (xmax, y)])
             inf_y_positions.append(y)
 
+    arrow_color = None
     if segments:
         lc = LineCollection(segments, **defaults)
         ax.add_collection(lc)

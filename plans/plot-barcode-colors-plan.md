@@ -63,7 +63,7 @@ follow, **(optional)** safe to skip.
   the helper needs the axes, so resolve `ax` before resolving colors. That
   must still happen after input validation, so invalid calls do not create an
   empty figure (a guarantee from #159).
-- [ ] **6. Define `arrow_color` unconditionally.** It is assigned only inside
+- [x] **6. Define `arrow_color` unconditionally.** (done: initialized to None before the check) It is assigned only inside
   `if segments:`. This is correct today, since infinite bars always add
   segments, but fragile. Compute it from the resolved color, or initialize it
   before the branch. No behavior change.
