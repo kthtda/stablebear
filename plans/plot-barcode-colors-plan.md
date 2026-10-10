@@ -58,7 +58,7 @@ follow, **(optional)** safe to skip.
   "'color' must be a color or a non-empty sequence of colors", for any value
   that is neither color-like nor an iterable of color-like values.
   **Catches:** raw TypeErrors that contradict the docstring.
-- [ ] **5. Implement the defaults chosen in items 1 and 2.** Update
+- [x] **5. Implement the defaults chosen in items 1 and 2.** Update
   `_resolve_barcode_colors` and the single-barcode path. If item 1 picks (b),
   the helper needs the axes, so resolve `ax` before resolving colors. That
   must still happen after input validation, so invalid calls do not create an

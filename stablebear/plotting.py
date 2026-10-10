@@ -148,7 +148,7 @@ def plot_distance_weight_heatmap(
     return ax.imshow(weights, origin="lower", extent=extent, **kwargs)
 
 
-def _resolve_barcode_colors(n, color=None, cmap=None):
+def _resolve_barcode_colors(n, color=None, cmap=None, ax=None):
     """Resolve a color specification into one color per barcode.
 
     Parameters
@@ -156,10 +156,14 @@ def _resolve_barcode_colors(n, color=None, cmap=None):
     n : int
         number of barcodes to plot.
     color : color-like object, list of color-like objects or None, optional
-        ``None`` yields matplotlib's property cycle, a single color is repeated
-        for all barcodes, and a sequence of colors is cycled across barcodes.
+        ``None`` takes the next ``n`` colors from the axes' property cycle, a
+        single color is repeated for all barcodes, and a sequence of colors is
+        cycled across barcodes.
     cmap : str or Colormap, optional
         If passed, colors are sampled from the specified color map.
+    ax : matplotlib axes, optional
+        Axes whose property cycle supplies default colors. Only used when
+        both ``color`` and ``cmap`` are ``None``; defaults to the current axes.
 
     Returns
     -------
@@ -182,8 +186,11 @@ def _resolve_barcode_colors(n, color=None, cmap=None):
         return list(mpl.colormaps.get_cmap(cmap)(np.linspace(0, 1, n)))
 
     if color is None:
-        cycle = plt.rcParams["axes.prop_cycle"].by_key().get("color", ["C0"])
-    elif is_color_like(color):
+        # Advance the axes' own cycle, as ax.plot does, so set_prop_cycle and
+        # repeated calls on the same axes behave as in matplotlib.
+        ax = plt.gca() if ax is None else ax
+        return [ax._get_lines.get_next_color() for _ in range(n)]
+    if is_color_like(color):
         cycle = [color]
     else:
         try:
@@ -262,7 +269,8 @@ def plot_barcode(bc, ax=None, y_offset=0, **kwargs):
             if len(squeezed.shape) != 1:
                 raise ValueError(f"Expected 1-dimensional tensor (got shape {bc.shape})")
             return plot_barcode(squeezed, ax=ax, y_offset=y_offset, **kwargs)
-        colors = _resolve_barcode_colors(bc.shape[0], kwargs.pop("color", None), kwargs.pop("cmap", None))
+        colors = _resolve_barcode_colors(
+            bc.shape[0], kwargs.pop("color", None), kwargs.pop("cmap", None), ax)
         y = y_offset
         for i in range(bc.shape[0]):
             y = plot_barcode(bc[i], ax=ax, y_offset=y, color=colors[i], **kwargs)
@@ -272,11 +280,13 @@ def plot_barcode(bc, ax=None, y_offset=0, **kwargs):
         raise TypeError(f"Expected Barcode or numpy.ndarray; got {type(bc)}")
 
     # A single barcode behaves like a 1-element tensor for color purposes:
-    # a sequence of colors or a cmap resolves to its first color.
+    # a sequence of colors or a cmap resolves to its first color, and no
+    # color takes the next one from the axes' cycle once the axes exist.
+    # Explicit colors are validated here, before any axes is created.
     color = kwargs.pop("color", None)
     cmap = kwargs.pop("cmap", None)
     if color is not None or cmap is not None:
-        kwargs["color"] = _resolve_barcode_colors(1, color, cmap)[0]
+        color = _resolve_barcode_colors(1, color, cmap)[0]
 
     if isinstance(bc, np.ndarray):
         if bc.ndim != 2 or bc.shape[1] != 2:
@@ -285,6 +295,9 @@ def plot_barcode(bc, ax=None, y_offset=0, **kwargs):
             raise TypeError(f"Unsupported dtype {bc.dtype}; expected float or integer values")
 
     ax = plt.gca() if ax is None else ax
+    if color is None:
+        color = _resolve_barcode_colors(1, ax=ax)[0]
+    kwargs["color"] = color
 
     bars = np.asarray(bc)
 
