@@ -532,7 +532,7 @@ repeated for `subsample_relative`.
   `np.asarray([2**64 - 1])` also wraps although its dtype prints as uint64, and
   so does the Python list `[2**64 - 1]`; both currently select the last point
   (see the follow-ups).
-- [ ] **49. Index rank and type.** One parametrized test. A rank-2 `IntTensor`
+- [x] **49. Index rank and type.** One parametrized test. A rank-2 `IntTensor`
   raises ValueError "query indices must be one-dimensional"; a 1-D float list
   raises TypeError "query indices must be integers"; a 3-D array raises
   ValueError "query must be a 2-D coordinate array or 1-D index vector". A 2-D

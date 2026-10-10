@@ -792,3 +792,37 @@ def test_out_of_range_query_index_raises(query):
             reference, query, n_points=1, n_samples=1, replace=True,
             distribution=sb.distributions.Uniform(0, 0.5),
         )
+
+
+@pytest.mark.parametrize(("query", "error", "message"), [
+    pytest.param(
+        sb.IntTensor(np.array([
+            [0, 1],
+            [2, 0],
+        ])),
+        ValueError, "query indices must be one-dimensional",
+        id="rank-2-int-tensor",
+    ),
+    pytest.param(
+        [0.0, 1.0],
+        TypeError, "query indices must be integers",
+        id="float-list",
+    ),
+    pytest.param(
+        np.zeros((1, 1, 1)),
+        ValueError, "query must be a 2-D coordinate array or 1-D index vector",
+        id="rank-3-array",
+    ),
+])
+def test_query_of_wrong_rank_or_type_raises(query, error, message):
+    reference = sb.PointCloud([
+        [0.0],
+        [4.0],
+        [9.0],
+    ])
+
+    with pytest.raises(error, match=message):
+        sb.random.subsample_relative(
+            reference, query, n_points=1, n_samples=1, replace=True,
+            distribution=sb.distributions.Uniform(0, 0.5),
+        )
