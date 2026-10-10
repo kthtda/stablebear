@@ -805,11 +805,6 @@ protect the other.
   block starts at `seed + offset`, so `Generator(5)` and `Generator(6)`
   produce shifted copies of the same streams. Consider a seed mixer
   separately.
-- **`plot_range()` is not always finite or nondegenerate.**
-  `Gaussian(0, 1e308)` gives `(-inf, inf)`, `Uniform(0, 1.7e308)` gives
-  `(-1.7e307, inf)`, and `Uniform(1e17, inf)`, `Uniform(-inf, 1e308)`, and
-  `Gaussian(1.7e308, 1)` give zero-width ranges, although the docstring
-  promises finite bounds.
 - **Tiny scales.** `.weight()` returns inf for valid tiny scales such as
   `Uniform(0, 5e-324).weight(0)`, because a finite `long double` is cast to
   double. Sampling is unaffected.

@@ -85,7 +85,7 @@ class Distribution(ABC):
 
     @abstractmethod
     def plot_range(self):
-        """Return suggested finite plotting bounds as ``(lower, upper)``."""
+        """Return suggested plotting bounds as ``(lower, upper)``."""
         raise NotImplementedError
 
 
