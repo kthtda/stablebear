@@ -958,3 +958,23 @@ def test_samples_feed_the_persistence_pipeline(reference):
         [0.0, 2.0],
         [1.0, 1.0],
     ])
+
+
+def test_mixture_coefficient_that_rounds_to_zero_is_never_sampled():
+    # 1e-16 / 1e308 rounds to zero, so this mixture equals the [1, 0] one.
+    mixture = sb.distributions.Mixture(
+        [sb.distributions.Uniform(0, 1), sb.distributions.Uniform(5, 6)],
+        [1e308, 1e-16],
+    )
+    assert mixture.coefficients == (1.0, 0.0)
+    # Only Uniform(5, 6) covers the reference point at distance 5.5.
+    reference = sb.PointCloud([
+        [5.5],
+    ])
+
+    samples = sb.random.subsample_relative(
+        reference, [[0.0]], n_points=1, n_samples=1, replace=True, allow_partial="keep",
+        distribution=mixture,
+    )
+
+    assert np.asarray(samples[0, 0]).shape == (0, 1)

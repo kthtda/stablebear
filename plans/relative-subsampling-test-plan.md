@@ -805,11 +805,6 @@ protect the other.
   block starts at `seed + offset`, so `Generator(5)` and `Generator(6)`
   produce shifted copies of the same streams. Consider a seed mixer
   separately.
-- **Equal mixtures that sample differently.** A normalized coefficient can be
-  positive in `long double` yet round to 0.0 in double:
-  `Mixture([Uniform(0, 1), Uniform(5, 6)], [1e308, 1e-16])` equals and hashes
-  like the `[1, 0]` mixture, but sampling still uses its second component.
-  Consider flushing such coefficients to zero at construction.
 - **Booleans in `.weight()`.** `Gaussian().weight(True)` returns the weight at
   1, although `_real` rejects bool parameters, and `Gaussian().weight(2**70)`
   raises the misleading TypeError "values must be real numbers". Decide before
