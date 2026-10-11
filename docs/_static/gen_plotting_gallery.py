@@ -81,11 +81,11 @@ def plot_mean_highlight(sin_color="b", cos_color="r"):
 
 # -- docs snippet start barcode --
 def plot_barcode_example(h0_color="steelblue", h1_color="orangered"):
-    from stablebear.persistence import Barcode
+    from stablebear.persistence import Barcode, BarcodeTensor
     from stablebear.plotting import plot_barcode
 
     bc_h0 = Barcode(np.array([
-        [0.0, np.inf], [0.0, 1.8], [0.0, 0.6], [0.1, 1.2],
+        [0.0, np.inf], [0.0, 1.8], [0.0, 0.6], [0.0, 1.2],
     ], dtype=np.float64))
 
     bc_h1 = Barcode(np.array([
@@ -93,11 +93,11 @@ def plot_barcode_example(h0_color="steelblue", h1_color="orangered"):
     ], dtype=np.float64))
 
     fig, ax = plt.subplots(figsize=(5, 2.5))
-    y = plot_barcode(bc_h0, ax=ax, color=h0_color, linewidth=2, label="H0")
-    plot_barcode(bc_h1, ax=ax, y_offset=y + 1, color=h1_color, linewidth=2, label="H1")
+    plot_barcode(BarcodeTensor([bc_h0, bc_h1]), ax=ax,
+                 color=[h0_color, h1_color], linewidth=2)
     ax.set_xlabel("t")
     ax.set_yticks([])
-    ax.legend()
+    ax.legend(ax.collections, ["H0", "H1"])
     fig.tight_layout()
     return fig
 # -- docs snippet end barcode --
@@ -137,7 +137,6 @@ def plot_barcode_colors():
 # -- docs snippet start tda_pipeline --
 def plot_tda_pipeline(h0_color="steelblue", h1_color="orangered"):
     from stablebear import persistence
-    from stablebear.plotting import plot_barcode
 
     # 1. Noisy circle (clear H1 topology)
     rng = np.random.RandomState(10)

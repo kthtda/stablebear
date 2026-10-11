@@ -97,7 +97,11 @@ as horizontal line segments. Each bar runs from its birth to its death value.
 Bars with infinite death are drawn as arrows extending to the right edge of the
 plot.
 
-Stack multiple homology dimensions by passing ``y_offset``:
+Pass a :py:class:`~stablebear.persistence.BarcodeTensor` to draw several
+barcodes, such as one per homology dimension, in one call. They are stacked
+from bottom to top, and infinite bars in all of them end at the same x. To
+stack barcodes from separate calls instead, pass the value returned by one call
+as ``y_offset`` of the next.
 
 .. image:: _static/gallery_barcode_light.png
    :width: 60%
@@ -118,9 +122,8 @@ Stack multiple homology dimensions by passing ``y_offset``:
 Coloring barcodes
 -----------------
 
-A :py:class:`~stablebear.persistence.BarcodeTensor` is drawn as one stacked
-group of bars per barcode. Pass ``color`` as a single color to draw every
-barcode in it, or as a sequence with one color per barcode. A shorter sequence
+Pass ``color`` as a single color to draw every barcode in a tensor, or as a
+sequence with one color per barcode. A shorter sequence
 is cycled. A tuple of three or four numbers is one RGB(A) color, as elsewhere
 in matplotlib. Without ``color``, each barcode takes the next color from the
 axes' color cycle, and later calls on the same axes continue that cycle, as

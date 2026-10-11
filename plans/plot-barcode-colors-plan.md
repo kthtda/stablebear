@@ -119,7 +119,7 @@ These go in `test/python/test_plotting.py`, class `TestPlotBarcode`.
   suite after a CMake build and install. Regenerate the gallery with
   `python docs/_static/gen_plotting_gallery.py` and check that the barcode
   figures are unchanged, since they pass single colors.
-- [ ] **16. Docs build.** Run `make html` in `docs/` (with
+- [x] **16. Docs build.** Run `make html` in `docs/` (with
   `LC_ALL=C.UTF-8` if the shell locale is missing) and check for warnings.
 - [ ] **17. Push.** Push to `plot_barcode_color_fix` as ordinary commits, then
   remove this plan before merging.
