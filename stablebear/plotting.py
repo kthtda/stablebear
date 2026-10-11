@@ -148,7 +148,7 @@ def plot_distance_weight_heatmap(
     return ax.imshow(weights, origin="lower", extent=extent, **kwargs)
 
 
-def _resolve_barcode_colors(n, color=None, cmap=None, ax=None):
+def _resolve_barcode_colors(n, color=None, ax=None):
     """Resolve a color specification into one color per barcode.
 
     Parameters
@@ -159,11 +159,9 @@ def _resolve_barcode_colors(n, color=None, cmap=None, ax=None):
         ``None`` takes the next ``n`` colors from the axes' property cycle, a
         single color is repeated for all barcodes, and a sequence of colors is
         cycled across barcodes.
-    cmap : str or Colormap, optional
-        If passed, colors are sampled from the specified color map.
     ax : matplotlib axes, optional
         Axes whose property cycle supplies default colors. Only used when
-        both ``color`` and ``cmap`` are ``None``; defaults to the current axes.
+        ``color`` is ``None``; defaults to the current axes.
 
     Returns
     -------
@@ -174,16 +172,8 @@ def _resolve_barcode_colors(n, color=None, cmap=None, ax=None):
     ------
     ValueError
         If color is neither None, a color-like object, nor a list of color-like objects.
-    TypeError
-        If both color and cmap are passed
     """
-    import matplotlib as mpl
     from matplotlib.colors import is_color_like
-
-    if cmap is not None:
-        if color is not None:
-            raise TypeError("Pass either 'color' or 'cmap', not both")
-        return list(mpl.colormaps.get_cmap(cmap)(np.linspace(0, 1, n)))
 
     if color is None:
         # Advance the axes' own cycle, as ax.plot does, so set_prop_cycle and
@@ -225,19 +215,20 @@ def plot_barcode(bc, ax=None, y_offset=0, **kwargs):
     **kwargs
         Additional keyword arguments passed to
         ``matplotlib.collections.LineCollection``
-        (e.g. ``linewidth``, ``alpha``, ``label``), except for the color
-        options below. ``colors`` is not accepted, because the bars are sorted
-        before drawing.
+        (e.g. ``linewidth``, ``alpha``, ``label``), except for ``color``,
+        described below. ``colors`` is not accepted, because the bars are
+        sorted before drawing, and neither is ``cmap``.
 
         ``color`` is a single color, or a sequence with one color per
         barcode that is cycled if shorter than the number of barcodes.
         A tuple of three or four numbers is one RGB(A) color, as in
-        matplotlib. ``cmap`` (a colormap name or ``Colormap``) instead samples
-        one color per barcode evenly from the colormap. ``color`` and ``cmap``
-        are mutually exclusive. A single ``Barcode`` or array is treated as a
-        one-barcode tensor, so it uses the first color of a sequence or
-        colormap. If both are omitted, each barcode takes the next color from
-        the axes' property cycle, continuing across calls on the same axes.
+        matplotlib. To color barcodes from a colormap, pass its colors, such
+        as ``mpl.colormaps["viridis"](np.linspace(0, 1, n))`` or
+        ``mpl.colormaps["tab20"].colors``. A single ``Barcode`` or array is
+        treated as a one-barcode tensor, so it uses the first color of a
+        sequence. If ``color`` is omitted, each barcode takes the next color
+        from the axes' property cycle, continuing across calls on the same
+        axes.
 
     Returns
     -------
@@ -249,8 +240,7 @@ def plot_barcode(bc, ax=None, y_offset=0, **kwargs):
     TypeError
         If ``bc`` is not a ``Barcode``, ``BarcodeTensor``, or ``numpy.ndarray``,
         if ``bc`` is a ``numpy.ndarray`` containing neither floats nor ints,
-        if keyword ``colors`` is passed (instead of ``color``),
-        or if both ``color`` and ``cmap`` are passed.
+        or if keyword ``colors`` or ``cmap`` is passed.
     ValueError
         If ``bc`` is a numpy array that is not of shape ``(n, 2)``, a
         ``BarcodeTensor`` with more than one dimension, or if ``color`` is
@@ -258,14 +248,16 @@ def plot_barcode(bc, ax=None, y_offset=0, **kwargs):
     """
     from matplotlib.collections import LineCollection
 
-    if "colors" in kwargs:
+    for name in ("colors", "cmap"):
         # LineCollection would accept 'colors' (per-segment), but the bars are
         # sorted internally so per-segment colors would land in scrambled
-        # order. Only 'color' has well-defined semantics here.
-        raise TypeError(
-            "plot_barcode() does not accept 'colors'; use 'color' "
-            "(a single color, or a sequence with one color per barcode)"
-        )
+        # order, and 'cmap' has no effect on it. Only 'color' has
+        # well-defined semantics here.
+        if name in kwargs:
+            raise TypeError(
+                f"plot_barcode() does not accept '{name}'; use 'color' "
+                "(a single color, or a sequence with one color per barcode)"
+            )
 
     if isinstance(bc, BarcodeTensor):
         if len(bc.shape) != 1:
@@ -273,8 +265,7 @@ def plot_barcode(bc, ax=None, y_offset=0, **kwargs):
             if len(squeezed.shape) != 1:
                 raise ValueError(f"Expected 1-dimensional tensor (got shape {bc.shape})")
             return plot_barcode(squeezed, ax=ax, y_offset=y_offset, **kwargs)
-        colors = _resolve_barcode_colors(
-            bc.shape[0], kwargs.pop("color", None), kwargs.pop("cmap", None), ax)
+        colors = _resolve_barcode_colors(bc.shape[0], kwargs.pop("color", None), ax=ax)
         y = y_offset
         for i in range(bc.shape[0]):
             y = plot_barcode(bc[i], ax=ax, y_offset=y, color=colors[i], **kwargs)
@@ -284,13 +275,12 @@ def plot_barcode(bc, ax=None, y_offset=0, **kwargs):
         raise TypeError(f"Expected Barcode or numpy.ndarray; got {type(bc)}")
 
     # A single barcode behaves like a 1-element tensor for color purposes:
-    # a sequence of colors or a cmap resolves to its first color, and no
+    # a sequence of colors resolves to its first color, and no
     # color takes the next one from the axes' cycle once the axes exist.
     # Explicit colors are validated here, before any axes is created.
     color = kwargs.pop("color", None)
-    cmap = kwargs.pop("cmap", None)
-    if color is not None or cmap is not None:
-        color = _resolve_barcode_colors(1, color, cmap)[0]
+    if color is not None:
+        color = _resolve_barcode_colors(1, color)[0]
 
     if isinstance(bc, np.ndarray):
         if bc.ndim != 2 or bc.shape[1] != 2:

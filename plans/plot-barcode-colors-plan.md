@@ -99,16 +99,17 @@ These go in `test/python/test_plotting.py`, class `TestPlotBarcode`.
 ## Documentation and release notes
 
 - [ ] **13. Document the color options.** In `docs/plotting.rst`, under the
-  barcode section, describe `color` (single or per-barcode), `cmap`, the
-  default cycling, and that `colors` is rejected. Add a short example with a
-  barcode tensor and a `cmap`. Following AGENTS.md, a new figure needs a
+  barcode section, describe `color` (single or per-barcode), the default
+  cycling, how to pass a colormap's colors through `color`, and that `colors`
+  and `cmap` are rejected. Add a short example with a barcode tensor colored
+  from a colormap, for ordered barcodes such as a noise sweep. Following AGENTS.md, a new figure needs a
   `.. dropdown:: Show code` with a `literalinclude` of a snippet in
   `docs/_static/gen_plotting_gallery.py`.
 - [ ] **14. Changelog.** Add 0.5.1 entries in `CHANGELOG.md`, linking #215:
-  under New features, per-barcode `color` sequences, `cmap`, and default color
+  under New features, per-barcode `color` sequences and default color
   cycling; under Bug fixes, arrowheads matching their bar's color and alpha.
-  Rejecting `colors`, and `cmap` no longer reaching `LineCollection`, change
-  existing calls, so list them under Breaking changes.
+  Rejecting `colors` and `cmap` changes existing calls, so list it under
+  Breaking changes.
 
 ## Final checks
 
