@@ -27,7 +27,7 @@ def plot_single_pcf():
 
 # -- docs snippet start overlaid --
 def plot_overlaid():
-    X = noisy_sin((20,), n_points=80)
+    X = noisy_sin((20,), n_points=80, generator=sb.random.Generator(seed=5))
 
     fig, ax = plt.subplots(figsize=(5, 2.5))
     plotpcf(X, ax=ax, alpha=0.3, linewidth=0.8)
@@ -61,8 +61,9 @@ def plot_arithmetic():
 
 # -- docs snippet start mean_highlight --
 def plot_mean_highlight(sin_color="b", cos_color="r"):
-    sines = noisy_sin((15,), n_points=100)
-    cosines = noisy_cos((15,), n_points=100)
+    gen = sb.random.Generator(seed=5)
+    sines = noisy_sin((15,), n_points=100, generator=gen)
+    cosines = noisy_cos((15,), n_points=100, generator=gen)
 
     fig, ax = plt.subplots(figsize=(5, 2.5))
     plotpcf(sines, ax=ax, color=sin_color, linewidth=0.5, alpha=0.2)

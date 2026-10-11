@@ -17,8 +17,9 @@ def plot_combining_example(sin_color="b", cos_color="r"):
     M = 10
     A = sb.zeros((2, M))
 
-    A[0, :] = noisy_sin((M,), n_points=100)
-    A[1, :] = noisy_cos((M,), n_points=15)
+    gen = sb.random.Generator(seed=5)
+    A[0, :] = noisy_sin((M,), n_points=100, generator=gen)
+    A[1, :] = noisy_cos((M,), n_points=15, generator=gen)
 
     fig, ax = plt.subplots(figsize=(6, 2))
 
