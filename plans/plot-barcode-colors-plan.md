@@ -92,7 +92,7 @@ These go in `test/python/test_plotting.py`, class `TestPlotBarcode`.
 - [x] **11. An RGB tuple is one color.** A three-barcode tensor with
   `color=(0.5, 0.5, 0.5)` draws all three in that gray. **Catches:** an RGB
   tuple split into per-barcode values.
-- [ ] **12. Arrowheads use the default color.** (optional) An infinite bar
+- [x] **12. Arrowheads use the default color.** (optional) An infinite bar
   with no `color` gets an arrowhead matching the bar's resolved default
   color; the existing arrowhead test covers only an explicit color with alpha.
 

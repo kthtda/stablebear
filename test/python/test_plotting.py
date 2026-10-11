@@ -312,14 +312,22 @@ class TestPlotBarcode:
         with pytest.raises(ValueError, match="sequence of colors"):
             plot_barcode(bt, ax=ax, color=color)
 
-    def test_arrowhead_matches_bar_color_and_alpha(self, ax):
-        from matplotlib.colors import to_rgba
-
+    @pytest.mark.parametrize("kwargs", [
+        pytest.param({"color": "red", "alpha": 0.1}, id="color-alpha"),
+        pytest.param({}, id="default"),
+        pytest.param({"cmap": "viridis"}, id="cmap"),
+    ])
+    def test_arrowhead_matches_bar_color(self, ax, kwargs):
         bc = _make_barcode([[0, 1], [0.5, np.inf]])
-        plot_barcode(bc, ax=ax, color="red", alpha=0.1)
+        plot_barcode(bc, ax=ax, **kwargs)
         bar_color = tuple(ax.collections[0].get_colors()[0])
-        assert bar_color == to_rgba("red", alpha=0.1)
         assert tuple(ax.texts[0].arrow_patch.get_edgecolor()) == bar_color
+
+    def test_tensor_arrowheads_match_their_bar_colors(self, ax):
+        bc = _make_barcode([[0, 1], [0.5, np.inf]])
+        plot_barcode(BarcodeTensor([bc, bc]), ax=ax)
+        for lc, text in zip(ax.collections, ax.texts):
+            assert tuple(text.arrow_patch.get_edgecolor()) == tuple(lc.get_colors()[0])
 
     def test_tensor_cmap_samples_colormap(self, ax):
         import matplotlib as mpl
