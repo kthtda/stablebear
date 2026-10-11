@@ -98,7 +98,7 @@ These go in `test/python/test_plotting.py`, class `TestPlotBarcode`.
 
 ## Documentation and release notes
 
-- [ ] **13. Document the color options.** In `docs/plotting.rst`, under the
+- [x] **13. Document the color options.** In `docs/plotting.rst`, under the
   barcode section, describe `color` (single or per-barcode), the default
   cycling, how to pass a colormap's colors through `color`, and that `colors`
   and `cmap` are rejected. Add a short example with a barcode tensor colored

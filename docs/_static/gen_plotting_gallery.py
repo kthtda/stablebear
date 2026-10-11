@@ -103,6 +103,37 @@ def plot_barcode_example(h0_color="steelblue", h1_color="orangered"):
 # -- docs snippet end barcode --
 
 
+# -- docs snippet start barcode_colors --
+def plot_barcode_colors():
+    from stablebear import persistence
+    from stablebear.plotting import plot_barcode
+
+    # 100 points on the unit sphere
+    rng = np.random.RandomState(0)
+    points = rng.normal(size=(100, 3))
+    points /= np.linalg.norm(points, axis=1, keepdims=True)
+
+    # H0, H1, and H2 barcodes in one BarcodeTensor
+    bcs = persistence.compute_persistent_homology(points, max_dim=2,
+                                                  verbose=False)
+
+    fig, ax = plt.subplots(figsize=(5, 4))
+    plot_barcode(bcs, ax=ax, linewidth=1)
+
+    # Label each dimension in its bars' color, right of the axes
+    y = 0
+    for dim, lc in enumerate(ax.collections):
+        n_bars = len(np.asarray(bcs[dim]))
+        ax.text(1.02, y + (n_bars - 1) / 2, f"H{dim}",
+                color=lc.get_colors()[0], va="center",
+                transform=ax.get_yaxis_transform())
+        y += n_bars
+    ax.set_xlabel("t")
+    fig.tight_layout()
+    return fig
+# -- docs snippet end barcode_colors --
+
+
 # -- docs snippet start tda_pipeline --
 def plot_tda_pipeline(h0_color="steelblue", h1_color="orangered"):
     from stablebear import persistence
@@ -345,6 +376,7 @@ if __name__ == "__main__":
         ("gallery_arithmetic", lambda: plot_arithmetic()),
         ("gallery_mean_highlight", lambda: plot_mean_highlight("b", "r")),
         ("gallery_barcode", lambda: plot_barcode_example("steelblue", "orangered")),
+        ("gallery_barcode_colors", lambda: plot_barcode_colors()),
         ("gallery_tda_pipeline", lambda: plot_tda_pipeline("steelblue", "orangered")),
         ("gallery_betti_pipeline", lambda: plot_betti_pipeline("steelblue", "orangered")),
         ("gallery_apf", lambda: plot_apf_example("steelblue", "orangered")),
@@ -357,6 +389,7 @@ if __name__ == "__main__":
         ("gallery_arithmetic", lambda: plot_arithmetic()),
         ("gallery_mean_highlight", lambda: plot_mean_highlight("#5dade2", "#ff6b6b")),
         ("gallery_barcode", lambda: plot_barcode_example("#5dade2", "#ff6b6b")),
+        ("gallery_barcode_colors", lambda: plot_barcode_colors()),
         ("gallery_tda_pipeline", lambda: plot_tda_pipeline("#5dade2", "#ff6b6b")),
         ("gallery_betti_pipeline", lambda: plot_betti_pipeline("#5dade2", "#ff6b6b")),
         ("gallery_apf", lambda: plot_apf_example("#5dade2", "#ff6b6b")),
