@@ -207,7 +207,6 @@ def plot_betti_pipeline(h0_color="steelblue", h1_color="orangered"):
 
     # 2. Compute persistent homology
     bcs = persistence.compute_persistent_homology(points, max_dim=1, verbose=False)
-    bc_h0, bc_h1 = bcs[0], bcs[1]
 
     # 3. Convert to Betti curves
     bettis = persistence.barcode_to_betti_curve(bcs, verbose=False)
@@ -222,13 +221,11 @@ def plot_betti_pipeline(h0_color="steelblue", h1_color="orangered"):
     ax1.set_title("Point cloud")
 
     # Middle: persistence barcode
-    y = plot_barcode(bc_h0, ax=ax2, color=h0_color, linewidth=2, label="H0")
-    plot_barcode(bc_h1, ax=ax2, y_offset=y + 1, color=h1_color, linewidth=2,
-                 label="H1")
+    plot_barcode(bcs, ax=ax2, color=[h0_color, h1_color], linewidth=2)
     ax2.set_yticks([])
     ax2.set_xlabel("t")
     ax2.set_title("Persistence barcode")
-    ax2.legend(fontsize=8)
+    ax2.legend(ax2.collections, ["H0", "H1"], fontsize=8, loc="center right")
 
     # Right: Betti curves
     plotpcf(bettis[0], ax=ax3, max_time=2, color=h0_color, linewidth=2,
@@ -257,19 +254,16 @@ def plot_apf_example(h0_color="steelblue", h1_color="orangered"):
     points = np.column_stack([r * np.cos(theta), r * np.sin(theta)]).astype(np.float64)
 
     bcs = persistence.compute_persistent_homology(points, max_dim=1, verbose=False)
-    bc_h0, bc_h1 = bcs[0], bcs[1]
     apfs = persistence.barcode_to_accumulated_persistence(bcs, verbose=False)
 
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(8, 3))
 
     # Left: barcode
-    y = plot_barcode(bc_h0, ax=ax1, color=h0_color, linewidth=2, label="H0")
-    plot_barcode(bc_h1, ax=ax1, y_offset=y + 1, color=h1_color, linewidth=2,
-                 label="H1")
+    plot_barcode(bcs, ax=ax1, color=[h0_color, h1_color], linewidth=2)
     ax1.set_yticks([])
     ax1.set_xlabel("t")
     ax1.set_title("Persistence barcode")
-    ax1.legend(fontsize=8)
+    ax1.legend(ax1.collections, ["H0", "H1"], fontsize=8, loc="center right")
 
     # Right: APF
     plotpcf(apfs[0], ax=ax2, max_time=2, color=h0_color, linewidth=2, label="H0")
