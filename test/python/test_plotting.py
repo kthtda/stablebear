@@ -212,16 +212,34 @@ class TestPlotBarcode:
         y = plot_barcode(bt2d, ax=ax)
         assert y == 2
 
-    def test_tensor_default_colors_follow_prop_cycle(self, ax):
-        import matplotlib.pyplot as plt
+    def test_tensor_default_colors_follow_axes_cycle(self, ax):
         from matplotlib.colors import to_rgba
 
+        ax.set_prop_cycle(color=["m", "y", "c"])
         bc = _make_barcode([[0, 1]])
-        bt = BarcodeTensor([bc, bc, bc])
-        plot_barcode(bt, ax=ax)
-        cycle = plt.rcParams["axes.prop_cycle"].by_key()["color"]
-        for i, lc in enumerate(ax.collections):
-            assert tuple(lc.get_colors()[0]) == to_rgba(cycle[i % len(cycle)])
+        plot_barcode(BarcodeTensor([bc, bc]), ax=ax)
+        assert tuple(ax.collections[0].get_colors()[0]) == to_rgba("m")
+        assert tuple(ax.collections[1].get_colors()[0]) == to_rgba("y")
+
+    def test_tensor_default_colors_continue_across_calls(self, ax):
+        from matplotlib.colors import to_rgba
+
+        ax.set_prop_cycle(color=["m", "y", "c"])
+        bc = _make_barcode([[0, 1]])
+        y = plot_barcode(BarcodeTensor([bc, bc]), ax=ax)
+        plot_barcode(BarcodeTensor([bc, bc]), ax=ax, y_offset=y)
+        assert tuple(ax.collections[2].get_colors()[0]) == to_rgba("c")
+        assert tuple(ax.collections[3].get_colors()[0]) == to_rgba("m")
+
+    def test_single_barcode_default_colors_continue_across_calls(self, ax):
+        from matplotlib.colors import to_rgba
+
+        ax.set_prop_cycle(color=["m", "y", "c"])
+        bc = _make_barcode([[0, 1]])
+        y = plot_barcode(bc, ax=ax)
+        plot_barcode(bc, ax=ax, y_offset=y)
+        assert tuple(ax.collections[0].get_colors()[0]) == to_rgba("m")
+        assert tuple(ax.collections[1].get_colors()[0]) == to_rgba("y")
 
     def test_tensor_color_list_assigns_per_barcode(self, ax):
         from matplotlib.colors import to_rgba

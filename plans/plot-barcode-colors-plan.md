@@ -83,7 +83,7 @@ These go in `test/python/test_plotting.py`, class `TestPlotBarcode`.
 - [x] **9. Non-iterable colors raise ValueError.** Parametrize over `5` and
   `object()`; expect the item 4 message. **Catches:** the raw TypeError
   coming back.
-- [ ] **10. Default colors follow the decisions.** Replace or extend
+- [x] **10. Default colors follow the decisions.** Replace or extend
   `test_tensor_default_colors_follow_prop_cycle` to match items 1 and 2. If
   (b): after `ax.set_prop_cycle(color=["m", "y"])`, a two-barcode tensor uses
   magenta, then yellow; a second call continues the cycle; and two
