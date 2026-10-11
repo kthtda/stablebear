@@ -4,17 +4,21 @@
 
 * **New `subsample` defaults** — `random.subsample` now defaults to `replace=True` and `allow_partial="keep"`, so an undersized input returns a smaller sample instead of raising. Pass `replace=False, allow_partial="no"` for the previous behavior. ([#243](https://github.com/kthtda/stablebear/issues/243))
 * **Seeded results change** — Generators with nearby seeds, such as `Generator(5)` and `Generator(6)`, previously reused each other's random streams shifted by one element. Seeds are now mixed before streams are derived, so results for a given seed differ from earlier versions. ([#247](https://github.com/kthtda/stablebear/issues/247))
+* **`plot_barcode` rejects `colors` and `cmap`** — Passing either raises `TypeError`. Previously both went to `LineCollection`, where `colors` landed on the sorted bars in the wrong order and `cmap` had no effect. Pass `color` instead. ([#215](https://github.com/kthtda/stablebear/pull/215))
 
 ### New features
 
 * **Relative subsampling** — `random.subsample_relative` draws from one point cloud or distance matrix with probabilities weighted by distance to each query point, following Agerberg, Chachólski, and Ramanujam (TAG-ML 2023). Weights come from the new `distributions.Gaussian`, `Uniform`, and `Mixture`, which `plotting.plot_distance_weight_heatmap` visualizes. Both samplers gain `allow_partial="drop"`. ([#243](https://github.com/kthtda/stablebear/issues/243))
 * **Progress for uniform subsampling** — `random.subsample` accepts `verbose=True` to show a progress bar, like `random.subsample_relative`. ([#248](https://github.com/kthtda/stablebear/issues/248))
+* **Per-barcode colors in `plot_barcode`** — For a `BarcodeTensor`, `color` accepts a sequence with one color per barcode, cycled if shorter. Without `color`, each barcode takes the next color from the axes' color cycle, continuing across calls on the same axes. ([#215](https://github.com/kthtda/stablebear/pull/215))
 * **Windows ARM64 wheels** — CPU-only binary wheels for Windows on ARM64, for Python 3.11 and newer. ([#237](https://github.com/kthtda/stablebear/pull/237))
 * **Python 3.15** — Binary wheels for CPython 3.15, including the free-threaded build. ([#238](https://github.com/kthtda/stablebear/issues/238))
 
 ### Bug fixes
 
 * **`DistanceMatrix` entry assignment rejects NaN** — Assigning NaN to an entry now raises `ValueError`, matching the constructor. ([#245](https://github.com/kthtda/stablebear/issues/245))
+* **`plot_barcode` arrowheads match their bars** — Arrowheads on infinite bars now use their bar's color and alpha. ([#215](https://github.com/kthtda/stablebear/pull/215))
+* **`plot_barcode` aligns infinite bars in a tensor** — Infinite bars in all barcodes of a `BarcodeTensor` now extend to the same x position. ([#215](https://github.com/kthtda/stablebear/pull/215))
 
 ## 0.5.0
 

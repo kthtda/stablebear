@@ -105,7 +105,7 @@ These go in `test/python/test_plotting.py`, class `TestPlotBarcode`.
   from a colormap, for ordered barcodes such as a noise sweep. Following AGENTS.md, a new figure needs a
   `.. dropdown:: Show code` with a `literalinclude` of a snippet in
   `docs/_static/gen_plotting_gallery.py`.
-- [ ] **14. Changelog.** Add 0.5.1 entries in `CHANGELOG.md`, linking #215:
+- [x] **14. Changelog.** Add 0.5.1 entries in `CHANGELOG.md`, linking #215:
   under New features, per-barcode `color` sequences and default color
   cycling; under Bug fixes, arrowheads matching their bar's color and alpha, and
   infinite bars in a barcode tensor ending at the same x.
