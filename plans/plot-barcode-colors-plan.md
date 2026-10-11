@@ -75,7 +75,7 @@ follow, **(optional)** safe to skip.
 
 These go in `test/python/test_plotting.py`, class `TestPlotBarcode`.
 
-- [ ] **8. Split multi-behavior tests.** `test_colors_kwarg_rejected` covers a
+- [x] **8. Split multi-behavior tests.** `test_colors_kwarg_rejected` covers a
   single barcode and a tensor; `test_tensor_invalid_color_raises` covers an
   invalid name and an empty list; `test_color_and_cmap_together_raises`
   covers a tensor and a single barcode. Parametrize each over its cases, so a

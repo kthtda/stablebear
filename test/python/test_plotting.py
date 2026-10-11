@@ -265,21 +265,23 @@ class TestPlotBarcode:
         assert tuple(ax.collections[0].get_colors()[0]) == to_rgba("red")
         assert tuple(ax.collections[1].get_colors()[0]) == to_rgba("green")
 
-    def test_colors_kwarg_rejected(self, ax):
-        bc = _make_barcode([[0, 1]])
+    @pytest.mark.parametrize("bc", [
+        pytest.param(_make_barcode([[0, 1]]), id="barcode"),
+        pytest.param(BarcodeTensor([_make_barcode([[0, 1]]), _make_barcode([[0, 1]])]), id="tensor"),
+    ])
+    def test_colors_kwarg_rejected(self, ax, bc):
         with pytest.raises(TypeError, match="use 'color'"):
-            plot_barcode(bc, ax=ax, colors=["red"])
-        bt = BarcodeTensor([bc, bc])
-        with pytest.raises(TypeError, match="use 'color'"):
-            plot_barcode(bt, ax=ax, colors=["red", "green"])
+            plot_barcode(bc, ax=ax, colors=["red", "green"])
 
-    def test_tensor_invalid_color_raises(self, ax):
+    @pytest.mark.parametrize("color", [
+        pytest.param(["red", "not-a-color"], id="invalid-name"),
+        pytest.param([], id="empty"),
+    ])
+    def test_tensor_invalid_color_raises(self, ax, color):
         bc = _make_barcode([[0, 1]])
         bt = BarcodeTensor([bc, bc])
         with pytest.raises(ValueError, match="sequence of colors"):
-            plot_barcode(bt, ax=ax, color=["red", "not-a-color"])
-        with pytest.raises(ValueError, match="sequence of colors"):
-            plot_barcode(bt, ax=ax, color=[])
+            plot_barcode(bt, ax=ax, color=color)
 
     def test_arrowhead_matches_bar_color_and_alpha(self, ax):
         from matplotlib.colors import to_rgba
@@ -300,11 +302,11 @@ class TestPlotBarcode:
         for lc, exp in zip(ax.collections, expected):
             assert tuple(lc.get_colors()[0]) == tuple(exp)
 
-    def test_color_and_cmap_together_raises(self, ax):
-        bc = _make_barcode([[0, 1]])
-        bt = BarcodeTensor([bc, bc])
-        with pytest.raises(TypeError, match="not both"):
-            plot_barcode(bt, ax=ax, color="red", cmap="viridis")
+    @pytest.mark.parametrize("bc", [
+        pytest.param(_make_barcode([[0, 1]]), id="barcode"),
+        pytest.param(BarcodeTensor([_make_barcode([[0, 1]]), _make_barcode([[0, 1]])]), id="tensor"),
+    ])
+    def test_color_and_cmap_together_raises(self, ax, bc):
         with pytest.raises(TypeError, match="not both"):
             plot_barcode(bc, ax=ax, color="red", cmap="viridis")
 
