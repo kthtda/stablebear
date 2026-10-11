@@ -267,6 +267,15 @@ class TestPlotBarcode:
         for lc in ax.collections:
             assert tuple(lc.get_colors()[0]) == to_rgba("blue")
 
+    def test_tensor_rgb_tuple_is_one_color(self, ax):
+        from matplotlib.colors import to_rgba
+
+        bc = _make_barcode([[0, 1]])
+        bt = BarcodeTensor([bc, bc, bc])
+        plot_barcode(bt, ax=ax, color=(0.5, 0.5, 0.5))
+        for lc in ax.collections:
+            assert tuple(lc.get_colors()[0]) == to_rgba((0.5, 0.5, 0.5))
+
     def test_color_list_on_single_barcode_uses_first(self, ax):
         from matplotlib.colors import to_rgba
 

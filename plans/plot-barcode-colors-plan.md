@@ -89,7 +89,7 @@ These go in `test/python/test_plotting.py`, class `TestPlotBarcode`.
   magenta, then yellow; a second call continues the cycle; and two
   single-barcode calls get different colors. **Catches:** the global cycle
   being used instead of the axes' cycle.
-- [ ] **11. An RGB tuple is one color.** A three-barcode tensor with
+- [x] **11. An RGB tuple is one color.** A three-barcode tensor with
   `color=(0.5, 0.5, 0.5)` draws all three in that gray. **Catches:** an RGB
   tuple split into per-barcode values.
 - [ ] **12. Arrowheads use the default color.** (optional) An infinite bar
