@@ -179,6 +179,15 @@ class TestPlotBarcode:
         for ann in ax.texts:
             assert ann.arrow_patch is not None
 
+    def test_tensor_infinite_bars_share_end(self, ax):
+        bt = BarcodeTensor([
+            _make_barcode([[0, np.inf], [0, 1]]),
+            _make_barcode([[0, 4]]),
+            _make_barcode([[2, np.inf]]),
+        ])
+        plot_barcode(bt, ax=ax)
+        assert [ann.xy[0] for ann in ax.texts] == pytest.approx([4 * 1.15, 4 * 1.15])
+
     def test_mixed_finite_and_infinite(self, ax):
         bc = _make_barcode([[0, 1], [0.5, np.inf]])
         y = plot_barcode(bc, ax=ax)

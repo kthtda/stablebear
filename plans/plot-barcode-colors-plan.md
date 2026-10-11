@@ -107,7 +107,8 @@ These go in `test/python/test_plotting.py`, class `TestPlotBarcode`.
   `docs/_static/gen_plotting_gallery.py`.
 - [ ] **14. Changelog.** Add 0.5.1 entries in `CHANGELOG.md`, linking #215:
   under New features, per-barcode `color` sequences and default color
-  cycling; under Bug fixes, arrowheads matching their bar's color and alpha.
+  cycling; under Bug fixes, arrowheads matching their bar's color and alpha, and
+  infinite bars in a barcode tensor ending at the same x.
   Rejecting `colors` and `cmap` changes existing calls, so list it under
   Breaking changes.
 

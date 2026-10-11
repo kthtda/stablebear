@@ -194,12 +194,22 @@ def _resolve_barcode_colors(n, color=None, ax=None):
     return [cycle[i % len(cycle)] for i in range(n)]
 
 
+def _infinite_bar_end(bars):
+    """Return the x value where infinite bars in ``bars`` are drawn to end."""
+    deaths = bars[:, 1]
+    finite = np.isfinite(deaths)
+    if finite.any():
+        return deaths[finite].max() * 1.15
+    return bars[:, 0].max() + 1.0
+
+
 def plot_barcode(bc, ax=None, y_offset=0, **kwargs):
     """Plot a persistence barcode as horizontal line segments.
 
     Each bar is drawn as a horizontal segment from birth to death.
     Bars with infinite death are drawn as arrows extending to the right
-    edge of the plot.
+    edge of the plot. For a ``BarcodeTensor``, infinite bars in all of its
+    barcodes end at the same x.
 
     Parameters
     ----------
@@ -266,6 +276,11 @@ def plot_barcode(bc, ax=None, y_offset=0, **kwargs):
                 raise ValueError(f"Expected 1-dimensional tensor (got shape {bc.shape})")
             return plot_barcode(squeezed, ax=ax, y_offset=y_offset, **kwargs)
         colors = _resolve_barcode_colors(bc.shape[0], kwargs.pop("color", None), ax=ax)
+        # Infinite bars in every barcode end at the same x, computed from all
+        # bars in the tensor.
+        all_bars = np.concatenate([np.asarray(bc[i]).reshape(-1, 2) for i in range(bc.shape[0])])
+        if len(all_bars) > 0:
+            kwargs["_inf_end"] = _infinite_bar_end(all_bars)
         y = y_offset
         for i in range(bc.shape[0]):
             y = plot_barcode(bc[i], ax=ax, y_offset=y, color=colors[i], **kwargs)
@@ -281,6 +296,7 @@ def plot_barcode(bc, ax=None, y_offset=0, **kwargs):
     color = kwargs.pop("color", None)
     if color is not None:
         color = _resolve_barcode_colors(1, color)[0]
+    inf_end = kwargs.pop("_inf_end", None)
 
     if isinstance(bc, np.ndarray):
         if bc.ndim != 2 or bc.shape[1] != 2:
@@ -303,20 +319,12 @@ def plot_barcode(bc, ax=None, y_offset=0, **kwargs):
     order = np.lexsort((lengths, bars[:, 0]))[::-1]
     bars = bars[order]
 
-    finite_mask = np.isfinite(bars[:, 1])
-    finite_bars = bars[finite_mask]
-    inf_bars = bars[~finite_mask]
-
     defaults = {"linewidth": 1.5}
     defaults.update(kwargs)
     lw = defaults.get("linewidth", 1.5)
 
-    # Compute xmax for infinite bars (line segment extends to this point)
-    if len(inf_bars) > 0:
-        if len(finite_bars) > 0:
-            xmax = finite_bars[:, 1].max() * 1.15
-        else:
-            xmax = inf_bars[:, 0].max() + 1.0
+    # Infinite bars extend to this point
+    xmax = _infinite_bar_end(bars) if inf_end is None else inf_end
 
     # Build all bar segments in one pass, using sequential y-positions
     segments = []
