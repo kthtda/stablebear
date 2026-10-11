@@ -319,7 +319,7 @@ def _save_themed(plot_func, style, bg_color, fg_color, outfile):
 
 
 LIGHT = ("default", "white", "black")
-DARK = ("dark_background", "#1a1a2e", "#e0e0e0")
+DARK = ("dark_background", "#14181e", "#e0e0e0")
 
 if __name__ == "__main__":
     figures = [

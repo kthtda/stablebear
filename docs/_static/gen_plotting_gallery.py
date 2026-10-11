@@ -27,7 +27,7 @@ def plot_single_pcf():
 
 # -- docs snippet start overlaid --
 def plot_overlaid():
-    X = noisy_sin((20,), n_points=80)
+    X = noisy_sin((20,), n_points=80, generator=sb.random.Generator(seed=5))
 
     fig, ax = plt.subplots(figsize=(5, 2.5))
     plotpcf(X, ax=ax, alpha=0.3, linewidth=0.8)
@@ -61,8 +61,9 @@ def plot_arithmetic():
 
 # -- docs snippet start mean_highlight --
 def plot_mean_highlight(sin_color="b", cos_color="r"):
-    sines = noisy_sin((15,), n_points=100)
-    cosines = noisy_cos((15,), n_points=100)
+    gen = sb.random.Generator(seed=5)
+    sines = noisy_sin((15,), n_points=100, generator=gen)
+    cosines = noisy_cos((15,), n_points=100, generator=gen)
 
     fig, ax = plt.subplots(figsize=(5, 2.5))
     plotpcf(sines, ax=ax, color=sin_color, linewidth=0.5, alpha=0.2)
@@ -81,11 +82,11 @@ def plot_mean_highlight(sin_color="b", cos_color="r"):
 
 # -- docs snippet start barcode --
 def plot_barcode_example(h0_color="steelblue", h1_color="orangered"):
-    from stablebear.persistence import Barcode
+    from stablebear.persistence import Barcode, BarcodeTensor
     from stablebear.plotting import plot_barcode
 
     bc_h0 = Barcode(np.array([
-        [0.0, np.inf], [0.0, 1.8], [0.0, 0.6], [0.1, 1.2],
+        [0.0, np.inf], [0.0, 1.8], [0.0, 0.6], [0.0, 1.2],
     ], dtype=np.float64))
 
     bc_h1 = Barcode(np.array([
@@ -93,20 +94,50 @@ def plot_barcode_example(h0_color="steelblue", h1_color="orangered"):
     ], dtype=np.float64))
 
     fig, ax = plt.subplots(figsize=(5, 2.5))
-    y = plot_barcode(bc_h0, ax=ax, color=h0_color, linewidth=2, label="H0")
-    plot_barcode(bc_h1, ax=ax, y_offset=y + 1, color=h1_color, linewidth=2, label="H1")
+    plot_barcode(BarcodeTensor([bc_h0, bc_h1]), ax=ax,
+                 color=[h0_color, h1_color], linewidth=2)
     ax.set_xlabel("t")
     ax.set_yticks([])
-    ax.legend()
+    ax.legend(ax.collections, ["H0", "H1"])
     fig.tight_layout()
     return fig
 # -- docs snippet end barcode --
 
 
+# -- docs snippet start barcode_colors --
+def plot_barcode_colors():
+    from stablebear import persistence
+    from stablebear.plotting import plot_barcode
+
+    # 100 points on the unit sphere
+    rng = np.random.RandomState(0)
+    points = rng.normal(size=(100, 3))
+    points /= np.linalg.norm(points, axis=1, keepdims=True)
+
+    # H0, H1, and H2 barcodes in one BarcodeTensor
+    bcs = persistence.compute_persistent_homology(points, max_dim=2,
+                                                  verbose=False)
+
+    fig, ax = plt.subplots(figsize=(5, 4))
+    plot_barcode(bcs, ax=ax, linewidth=1)
+
+    # Label each dimension in its bars' color, right of the axes
+    y = 0
+    for dim, lc in enumerate(ax.collections):
+        n_bars = len(np.asarray(bcs[dim]))
+        ax.text(1.02, y + (n_bars - 1) / 2, f"H{dim}",
+                color=lc.get_colors()[0], va="center",
+                transform=ax.get_yaxis_transform())
+        y += n_bars
+    ax.set_xlabel("t")
+    fig.tight_layout()
+    return fig
+# -- docs snippet end barcode_colors --
+
+
 # -- docs snippet start tda_pipeline --
 def plot_tda_pipeline(h0_color="steelblue", h1_color="orangered"):
     from stablebear import persistence
-    from stablebear.plotting import plot_barcode
 
     # 1. Noisy circle (clear H1 topology)
     rng = np.random.RandomState(10)
@@ -176,7 +207,6 @@ def plot_betti_pipeline(h0_color="steelblue", h1_color="orangered"):
 
     # 2. Compute persistent homology
     bcs = persistence.compute_persistent_homology(points, max_dim=1, verbose=False)
-    bc_h0, bc_h1 = bcs[0], bcs[1]
 
     # 3. Convert to Betti curves
     bettis = persistence.barcode_to_betti_curve(bcs, verbose=False)
@@ -191,13 +221,11 @@ def plot_betti_pipeline(h0_color="steelblue", h1_color="orangered"):
     ax1.set_title("Point cloud")
 
     # Middle: persistence barcode
-    y = plot_barcode(bc_h0, ax=ax2, color=h0_color, linewidth=2, label="H0")
-    plot_barcode(bc_h1, ax=ax2, y_offset=y + 1, color=h1_color, linewidth=2,
-                 label="H1")
+    plot_barcode(bcs, ax=ax2, color=[h0_color, h1_color], linewidth=2)
     ax2.set_yticks([])
     ax2.set_xlabel("t")
     ax2.set_title("Persistence barcode")
-    ax2.legend(fontsize=8)
+    ax2.legend(ax2.collections, ["H0", "H1"], fontsize=8, loc="center right")
 
     # Right: Betti curves
     plotpcf(bettis[0], ax=ax3, max_time=2, color=h0_color, linewidth=2,
@@ -226,19 +254,16 @@ def plot_apf_example(h0_color="steelblue", h1_color="orangered"):
     points = np.column_stack([r * np.cos(theta), r * np.sin(theta)]).astype(np.float64)
 
     bcs = persistence.compute_persistent_homology(points, max_dim=1, verbose=False)
-    bc_h0, bc_h1 = bcs[0], bcs[1]
     apfs = persistence.barcode_to_accumulated_persistence(bcs, verbose=False)
 
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(8, 3))
 
     # Left: barcode
-    y = plot_barcode(bc_h0, ax=ax1, color=h0_color, linewidth=2, label="H0")
-    plot_barcode(bc_h1, ax=ax1, y_offset=y + 1, color=h1_color, linewidth=2,
-                 label="H1")
+    plot_barcode(bcs, ax=ax1, color=[h0_color, h1_color], linewidth=2)
     ax1.set_yticks([])
     ax1.set_xlabel("t")
     ax1.set_title("Persistence barcode")
-    ax1.legend(fontsize=8)
+    ax1.legend(ax1.collections, ["H0", "H1"], fontsize=8, loc="center right")
 
     # Right: APF
     plotpcf(apfs[0], ax=ax2, max_time=2, color=h0_color, linewidth=2, label="H0")
@@ -336,7 +361,7 @@ def _save_themed(plot_func, style, bg_color, fg_color, line_color, outfile):
 
 
 LIGHT = ("default", "white", "black", "steelblue")
-DARK = ("dark_background", "#1a1a2e", "#e0e0e0", "#5dade2")
+DARK = ("dark_background", "#14181e", "#e0e0e0", "#5dade2")
 
 if __name__ == "__main__":
     gallery = [
@@ -345,6 +370,7 @@ if __name__ == "__main__":
         ("gallery_arithmetic", lambda: plot_arithmetic()),
         ("gallery_mean_highlight", lambda: plot_mean_highlight("b", "r")),
         ("gallery_barcode", lambda: plot_barcode_example("steelblue", "orangered")),
+        ("gallery_barcode_colors", lambda: plot_barcode_colors()),
         ("gallery_tda_pipeline", lambda: plot_tda_pipeline("steelblue", "orangered")),
         ("gallery_betti_pipeline", lambda: plot_betti_pipeline("steelblue", "orangered")),
         ("gallery_apf", lambda: plot_apf_example("steelblue", "orangered")),
@@ -357,6 +383,7 @@ if __name__ == "__main__":
         ("gallery_arithmetic", lambda: plot_arithmetic()),
         ("gallery_mean_highlight", lambda: plot_mean_highlight("#5dade2", "#ff6b6b")),
         ("gallery_barcode", lambda: plot_barcode_example("#5dade2", "#ff6b6b")),
+        ("gallery_barcode_colors", lambda: plot_barcode_colors()),
         ("gallery_tda_pipeline", lambda: plot_tda_pipeline("#5dade2", "#ff6b6b")),
         ("gallery_betti_pipeline", lambda: plot_betti_pipeline("#5dade2", "#ff6b6b")),
         ("gallery_apf", lambda: plot_apf_example("#5dade2", "#ff6b6b")),

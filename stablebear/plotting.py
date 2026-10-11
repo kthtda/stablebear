@@ -148,12 +148,68 @@ def plot_distance_weight_heatmap(
     return ax.imshow(weights, origin="lower", extent=extent, **kwargs)
 
 
+def _resolve_barcode_colors(n, color=None, ax=None):
+    """Resolve a color specification into one color per barcode.
+
+    Parameters
+    ----------
+    n : int
+        Number of barcodes to plot.
+    color : color-like object, list of color-like objects or None, optional
+        ``None`` takes the next ``n`` colors from the axes' property cycle, a
+        single color is repeated for all barcodes, and a sequence of colors is
+        cycled across barcodes.
+    ax : matplotlib axes, optional
+        Axes whose property cycle supplies default colors. Only used when
+        ``color`` is ``None``; defaults to the current axes.
+
+    Returns
+    -------
+    list of color-like objects
+        One color per barcode to be plotted.
+
+    Raises
+    ------
+    ValueError
+        If color is neither None, a color-like object, nor a list of color-like objects.
+    """
+    from matplotlib.colors import is_color_like
+
+    if color is None:
+        # Advance the axes' own cycle, as ax.plot does, so set_prop_cycle and
+        # repeated calls on the same axes behave as in matplotlib.
+        ax = plt.gca() if ax is None else ax
+        return [ax._get_lines.get_next_color() for _ in range(n)]
+    if is_color_like(color):
+        cycle = [color]
+    else:
+        try:
+            cycle = list(color)
+        except TypeError:
+            cycle = []
+        if len(cycle) == 0 or not all(is_color_like(c) for c in cycle):
+            raise ValueError(
+                f"'color' must be a color or a non-empty sequence of colors; got {color!r}"
+            )
+    return [cycle[i % len(cycle)] for i in range(n)]
+
+
+def _infinite_bar_end(bars):
+    """Return the x value where infinite bars in ``bars`` are drawn to end."""
+    deaths = bars[:, 1]
+    finite = np.isfinite(deaths)
+    if finite.any():
+        return deaths[finite].max() * 1.15
+    return bars[:, 0].max() + 1.0
+
+
 def plot_barcode(bc, ax=None, y_offset=0, **kwargs):
     """Plot a persistence barcode as horizontal line segments.
 
     Each bar is drawn as a horizontal segment from birth to death.
     Bars with infinite death are drawn as arrows extending to the right
-    edge of the plot.
+    edge of the plot. For a ``BarcodeTensor``, infinite bars in all of its
+    barcodes end at the same x.
 
     Parameters
     ----------
@@ -162,14 +218,27 @@ def plot_barcode(bc, ax=None, y_offset=0, **kwargs):
         of ``(birth, death)`` pairs. For a tensor,
         the barcodes are stacked vertically in order.
     ax : matplotlib axes, optional
-        Axes to plot on. If ``None``, uses ``matplotlib.pyplot`` directly.
+        Axes to plot on. If ``None``, uses the current axes.
     y_offset : int, optional
         Starting y position for the first bar. Useful when stacking
         multiple barcodes on the same axes.
     **kwargs
         Additional keyword arguments passed to
         ``matplotlib.collections.LineCollection``
-        (e.g. ``color``, ``linewidth``, ``alpha``, ``label``).
+        (e.g. ``linewidth``, ``alpha``, ``label``), except for ``color``,
+        described below. ``colors`` is not accepted, because the bars are
+        sorted before drawing, and neither is ``cmap``.
+
+        ``color`` is a single color, or a sequence with one color per
+        barcode that is cycled if shorter than the number of barcodes.
+        A tuple of three or four numbers is one RGB(A) color, as in
+        matplotlib. To color barcodes from a colormap, pass its colors, such
+        as ``mpl.colormaps["viridis"](np.linspace(0, 1, n))`` or
+        ``mpl.colormaps["tab20"].colors``. A single ``Barcode`` or array is
+        treated as a one-barcode tensor, so it uses the first color of a
+        sequence. If ``color`` is omitted, each barcode takes the next color
+        from the axes' property cycle, continuing across calls on the same
+        axes.
 
     Returns
     -------
@@ -180,12 +249,25 @@ def plot_barcode(bc, ax=None, y_offset=0, **kwargs):
     ------
     TypeError
         If ``bc`` is not a ``Barcode``, ``BarcodeTensor``, or ``numpy.ndarray``,
-        or if ``bc`` is a ``numpy.ndarray`` containing neither floats nor ints.
+        if ``bc`` is a ``numpy.ndarray`` containing neither floats nor ints,
+        or if keyword ``colors`` or ``cmap`` is passed.
     ValueError
-        If ``bc`` is a numpy array that is not of shape ``(n, 2)``, or a
-        ``BarcodeTensor`` with more than one dimension.
+        If ``bc`` is a numpy array that is not of shape ``(n, 2)``, a
+        ``BarcodeTensor`` with more than one dimension, or if ``color`` is
+        neither a color nor a non-empty sequence of colors.
     """
     from matplotlib.collections import LineCollection
+
+    for name in ("colors", "cmap"):
+        # LineCollection would accept 'colors' (per-segment), but the bars are
+        # sorted internally so per-segment colors would land in scrambled
+        # order, and 'cmap' has no effect on it. Only 'color' has
+        # well-defined semantics here.
+        if name in kwargs:
+            raise TypeError(
+                f"plot_barcode() does not accept '{name}'; use 'color' "
+                "(a single color, or a sequence with one color per barcode)"
+            )
 
     if isinstance(bc, BarcodeTensor):
         if len(bc.shape) != 1:
@@ -193,13 +275,28 @@ def plot_barcode(bc, ax=None, y_offset=0, **kwargs):
             if len(squeezed.shape) != 1:
                 raise ValueError(f"Expected 1-dimensional tensor (got shape {bc.shape})")
             return plot_barcode(squeezed, ax=ax, y_offset=y_offset, **kwargs)
+        colors = _resolve_barcode_colors(bc.shape[0], kwargs.pop("color", None), ax=ax)
+        # Infinite bars in every barcode end at the same x, computed from all
+        # bars in the tensor.
+        all_bars = np.concatenate([np.asarray(bc[i]).reshape(-1, 2) for i in range(bc.shape[0])])
+        if len(all_bars) > 0:
+            kwargs["_inf_end"] = _infinite_bar_end(all_bars)
         y = y_offset
         for i in range(bc.shape[0]):
-            y = plot_barcode(bc[i], ax=ax, y_offset=y, **kwargs)
+            y = plot_barcode(bc[i], ax=ax, y_offset=y, color=colors[i], **kwargs)
         return y
 
     if not isinstance(bc, (Barcode, np.ndarray)):
         raise TypeError(f"Expected Barcode or numpy.ndarray; got {type(bc)}")
+
+    # A single barcode behaves like a 1-element tensor for color purposes:
+    # a sequence of colors resolves to its first color, and no
+    # color takes the next one from the axes' cycle once the axes exist.
+    # Explicit colors are validated here, before any axes is created.
+    color = kwargs.pop("color", None)
+    if color is not None:
+        color = _resolve_barcode_colors(1, color)[0]
+    inf_end = kwargs.pop("_inf_end", None)
 
     if isinstance(bc, np.ndarray):
         if bc.ndim != 2 or bc.shape[1] != 2:
@@ -208,6 +305,9 @@ def plot_barcode(bc, ax=None, y_offset=0, **kwargs):
             raise TypeError(f"Unsupported dtype {bc.dtype}; expected float or integer values")
 
     ax = plt.gca() if ax is None else ax
+    if color is None:
+        color = _resolve_barcode_colors(1, ax=ax)[0]
+    kwargs["color"] = color
 
     bars = np.asarray(bc)
 
@@ -219,21 +319,12 @@ def plot_barcode(bc, ax=None, y_offset=0, **kwargs):
     order = np.lexsort((lengths, bars[:, 0]))[::-1]
     bars = bars[order]
 
-    finite_mask = np.isfinite(bars[:, 1])
-    finite_bars = bars[finite_mask]
-    inf_bars = bars[~finite_mask]
-
     defaults = {"linewidth": 1.5}
     defaults.update(kwargs)
-    color = defaults.get("color", None)
     lw = defaults.get("linewidth", 1.5)
 
-    # Compute xmax for infinite bars (line segment extends to this point)
-    if len(inf_bars) > 0:
-        if len(finite_bars) > 0:
-            xmax = finite_bars[:, 1].max() * 1.15
-        else:
-            xmax = inf_bars[:, 0].max() + 1.0
+    # Infinite bars extend to this point
+    xmax = _infinite_bar_end(bars) if inf_end is None else inf_end
 
     # Build all bar segments in one pass, using sequential y-positions
     segments = []
@@ -248,16 +339,18 @@ def plot_barcode(bc, ax=None, y_offset=0, **kwargs):
             segments.append([(birth, y), (xmax, y)])
             inf_y_positions.append(y)
 
+    arrow_color = None
     if segments:
         lc = LineCollection(segments, **defaults)
         ax.add_collection(lc)
+        arrow_color = tuple(lc.get_colors()[0])
 
     # Add arrowheads for infinite bars
     for y in inf_y_positions:
         ax.annotate("",
             xy=(xmax, y),
             xytext=(xmax - (xmax * 0.02), y),
-            arrowprops=dict(arrowstyle="-|>", color=color, lw=lw))
+            arrowprops=dict(arrowstyle="-|>", color=arrow_color, lw=lw))
 
     ax.autoscale_view()
     ax.yaxis.set_ticks([])

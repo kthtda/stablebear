@@ -179,6 +179,15 @@ class TestPlotBarcode:
         for ann in ax.texts:
             assert ann.arrow_patch is not None
 
+    def test_tensor_infinite_bars_share_end(self, ax):
+        bt = BarcodeTensor([
+            _make_barcode([[0, np.inf], [0, 1]]),
+            _make_barcode([[0, 4]]),
+            _make_barcode([[2, np.inf]]),
+        ])
+        plot_barcode(bt, ax=ax)
+        assert [ann.xy[0] for ann in ax.texts] == pytest.approx([4 * 1.15, 4 * 1.15])
+
     def test_mixed_finite_and_infinite(self, ax):
         bc = _make_barcode([[0, 1], [0.5, np.inf]])
         y = plot_barcode(bc, ax=ax)
@@ -211,6 +220,136 @@ class TestPlotBarcode:
         bt2d = bt.reshape((1, 2))
         y = plot_barcode(bt2d, ax=ax)
         assert y == 2
+
+    def test_tensor_default_colors_follow_axes_cycle(self, ax):
+        from matplotlib.colors import to_rgba
+
+        ax.set_prop_cycle(color=["m", "y", "c"])
+        bc = _make_barcode([[0, 1]])
+        plot_barcode(BarcodeTensor([bc, bc]), ax=ax)
+        assert tuple(ax.collections[0].get_colors()[0]) == to_rgba("m")
+        assert tuple(ax.collections[1].get_colors()[0]) == to_rgba("y")
+
+    def test_tensor_default_colors_continue_across_calls(self, ax):
+        from matplotlib.colors import to_rgba
+
+        ax.set_prop_cycle(color=["m", "y", "c"])
+        bc = _make_barcode([[0, 1]])
+        y = plot_barcode(BarcodeTensor([bc, bc]), ax=ax)
+        plot_barcode(BarcodeTensor([bc, bc]), ax=ax, y_offset=y)
+        assert tuple(ax.collections[2].get_colors()[0]) == to_rgba("c")
+        assert tuple(ax.collections[3].get_colors()[0]) == to_rgba("m")
+
+    def test_single_barcode_default_colors_continue_across_calls(self, ax):
+        from matplotlib.colors import to_rgba
+
+        ax.set_prop_cycle(color=["m", "y", "c"])
+        bc = _make_barcode([[0, 1]])
+        y = plot_barcode(bc, ax=ax)
+        plot_barcode(bc, ax=ax, y_offset=y)
+        assert tuple(ax.collections[0].get_colors()[0]) == to_rgba("m")
+        assert tuple(ax.collections[1].get_colors()[0]) == to_rgba("y")
+
+    def test_tensor_color_list_assigns_per_barcode(self, ax):
+        from matplotlib.colors import to_rgba
+
+        bc = _make_barcode([[0, 1], [0.5, 2]])
+        bt = BarcodeTensor([bc, bc])
+        plot_barcode(bt, ax=ax, color=["red", "green"])
+        assert tuple(ax.collections[0].get_colors()[0]) == to_rgba("red")
+        assert tuple(ax.collections[1].get_colors()[0]) == to_rgba("green")
+
+    def test_tensor_color_list_cycles_when_short(self, ax):
+        from matplotlib.colors import to_rgba
+
+        bc = _make_barcode([[0, 1]])
+        bt = BarcodeTensor([bc, bc, bc])
+        plot_barcode(bt, ax=ax, color=["red", "green"])
+        assert tuple(ax.collections[2].get_colors()[0]) == to_rgba("red")
+
+    def test_tensor_single_color_applies_to_all(self, ax):
+        from matplotlib.colors import to_rgba
+
+        bc = _make_barcode([[0, 1]])
+        bt = BarcodeTensor([bc, bc])
+        plot_barcode(bt, ax=ax, color="blue")
+        for lc in ax.collections:
+            assert tuple(lc.get_colors()[0]) == to_rgba("blue")
+
+    def test_tensor_rgb_tuple_is_one_color(self, ax):
+        from matplotlib.colors import to_rgba
+
+        bc = _make_barcode([[0, 1]])
+        bt = BarcodeTensor([bc, bc, bc])
+        plot_barcode(bt, ax=ax, color=(0.5, 0.5, 0.5))
+        for lc in ax.collections:
+            assert tuple(lc.get_colors()[0]) == to_rgba((0.5, 0.5, 0.5))
+
+    def test_color_list_on_single_barcode_uses_first(self, ax):
+        from matplotlib.colors import to_rgba
+
+        bc = _make_barcode([[0, 1], [0.5, 2]])
+        plot_barcode(bc, ax=ax, color=["red", "green"])
+        assert tuple(ax.collections[0].get_colors()[0]) == to_rgba("red")
+
+    def test_tensor_surplus_colors_ignored(self, ax):
+        from matplotlib.colors import to_rgba
+
+        bc = _make_barcode([[0, 1]])
+        bt = BarcodeTensor([bc, bc])
+        plot_barcode(bt, ax=ax, color=["red", "green", "blue"])
+        assert tuple(ax.collections[0].get_colors()[0]) == to_rgba("red")
+        assert tuple(ax.collections[1].get_colors()[0]) == to_rgba("green")
+
+    @pytest.mark.parametrize("bc", [
+        pytest.param(_make_barcode([[0, 1]]), id="barcode"),
+        pytest.param(BarcodeTensor([_make_barcode([[0, 1]]), _make_barcode([[0, 1]])]), id="tensor"),
+    ])
+    @pytest.mark.parametrize("kwargs", [
+        pytest.param({"colors": ["red", "green"]}, id="colors"),
+        pytest.param({"cmap": "viridis"}, id="cmap"),
+    ])
+    def test_color_alternative_kwargs_rejected(self, ax, bc, kwargs):
+        with pytest.raises(TypeError, match="use 'color'"):
+            plot_barcode(bc, ax=ax, **kwargs)
+
+    @pytest.mark.parametrize("color", [
+        pytest.param(["red", "not-a-color"], id="invalid-name"),
+        pytest.param([], id="empty"),
+        pytest.param(5, id="int"),
+        pytest.param(object(), id="object"),
+    ])
+    def test_tensor_invalid_color_raises(self, ax, color):
+        bc = _make_barcode([[0, 1]])
+        bt = BarcodeTensor([bc, bc])
+        with pytest.raises(ValueError, match="sequence of colors"):
+            plot_barcode(bt, ax=ax, color=color)
+
+    @pytest.mark.parametrize("kwargs", [
+        pytest.param({"color": "red", "alpha": 0.1}, id="color-alpha"),
+        pytest.param({}, id="default"),
+    ])
+    def test_arrowhead_matches_bar_color(self, ax, kwargs):
+        bc = _make_barcode([[0, 1], [0.5, np.inf]])
+        plot_barcode(bc, ax=ax, **kwargs)
+        bar_color = tuple(ax.collections[0].get_colors()[0])
+        assert tuple(ax.texts[0].arrow_patch.get_edgecolor()) == bar_color
+
+    def test_tensor_arrowheads_match_their_bar_colors(self, ax):
+        bc = _make_barcode([[0, 1], [0.5, np.inf]])
+        plot_barcode(BarcodeTensor([bc, bc]), ax=ax)
+        for lc, text in zip(ax.collections, ax.texts):
+            assert tuple(text.arrow_patch.get_edgecolor()) == tuple(lc.get_colors()[0])
+
+    def test_tensor_color_array_from_colormap(self, ax):
+        import matplotlib as mpl
+
+        bc = _make_barcode([[0, 1]])
+        bt = BarcodeTensor([bc, bc, bc])
+        expected = mpl.colormaps["viridis"](np.linspace(0, 1, 3))
+        plot_barcode(bt, ax=ax, color=expected)
+        for lc, exp in zip(ax.collections, expected):
+            assert tuple(lc.get_colors()[0]) == tuple(exp)
 
     def test_bars_sorted_by_birth_then_length_descending(self, ax):
         # Bars given out of order

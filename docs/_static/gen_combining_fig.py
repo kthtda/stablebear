@@ -17,8 +17,9 @@ def plot_combining_example(sin_color="b", cos_color="r"):
     M = 10
     A = sb.zeros((2, M))
 
-    A[0, :] = noisy_sin((M,), n_points=100)
-    A[1, :] = noisy_cos((M,), n_points=15)
+    gen = sb.random.Generator(seed=5)
+    A[0, :] = noisy_sin((M,), n_points=100, generator=gen)
+    A[1, :] = noisy_cos((M,), n_points=15, generator=gen)
 
     fig, ax = plt.subplots(figsize=(6, 2))
 
@@ -64,5 +65,5 @@ if __name__ == "__main__":
                  "default", "white", "black",
                  HERE / "combining_example_light.png")
     _save_themed(lambda: plot_combining_example("#5dade2", "#ff6b6b"),
-                 "dark_background", "#1a1a2e", "#e0e0e0",
+                 "dark_background", "#14181e", "#e0e0e0",
                  HERE / "combining_example_dark.png")

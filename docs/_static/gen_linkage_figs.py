@@ -95,7 +95,7 @@ def main():
     here = Path(__file__).resolve().parent
     for theme, background, foreground in [
         ("light", "white", "#222222"),
-        ("dark", "#1a1a2e", "#e0e0e0"),
+        ("dark", "#14181e", "#e0e0e0"),
     ]:
         with plt.rc_context({
             "font.size": 11,
