@@ -90,7 +90,7 @@ def plot_relative_subsamples(*, uniform=False, dark=False):
 if __name__ == "__main__":
     for theme, style, background in [
         ("light", "default", "white"),
-        ("dark", "dark_background", "#1a1a2e"),
+        ("dark", "dark_background", "#14181e"),
     ]:
         with plt.style.context(style), plt.rc_context({
             "figure.facecolor": background,

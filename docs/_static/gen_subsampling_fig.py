@@ -95,7 +95,7 @@ if __name__ == "__main__":
     here = Path(__file__).parent
     for theme, style, background, points, selected in [
         ("light", "default", "white", "#94a3b8", "#d55e00"),
-        ("dark", "dark_background", "#1a1a2e", "#8892a5", "#ffb36b"),
+        ("dark", "dark_background", "#14181e", "#8892a5", "#ffb36b"),
     ]:
         with plt.style.context(style), plt.rc_context({
             "figure.facecolor": background,

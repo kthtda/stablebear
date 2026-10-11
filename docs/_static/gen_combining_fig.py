@@ -64,5 +64,5 @@ if __name__ == "__main__":
                  "default", "white", "black",
                  HERE / "combining_example_light.png")
     _save_themed(lambda: plot_combining_example("#5dade2", "#ff6b6b"),
-                 "dark_background", "#1a1a2e", "#e0e0e0",
+                 "dark_background", "#14181e", "#e0e0e0",
                  HERE / "combining_example_dark.png")

@@ -106,7 +106,7 @@ def _save_themed(plot_func, style, bg_color, fg_color, line_color, outfile):
 
 
 LIGHT = ("default", "white", "black", "steelblue")
-DARK = ("dark_background", "#1a1a2e", "#e0e0e0", "#5dade2")
+DARK = ("dark_background", "#14181e", "#e0e0e0", "#5dade2")
 
 if __name__ == "__main__":
     for name, plot_func in [("pcf_definitions", plot_pcf_definitions),
