@@ -276,6 +276,8 @@ class TestPlotBarcode:
     @pytest.mark.parametrize("color", [
         pytest.param(["red", "not-a-color"], id="invalid-name"),
         pytest.param([], id="empty"),
+        pytest.param(5, id="int"),
+        pytest.param(object(), id="object"),
     ])
     def test_tensor_invalid_color_raises(self, ax, color):
         bc = _make_barcode([[0, 1]])

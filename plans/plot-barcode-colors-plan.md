@@ -80,7 +80,7 @@ These go in `test/python/test_plotting.py`, class `TestPlotBarcode`.
   invalid name and an empty list; `test_color_and_cmap_together_raises`
   covers a tensor and a single barcode. Parametrize each over its cases, so a
   failure names the case.
-- [ ] **9. Non-iterable colors raise ValueError.** Parametrize over `5` and
+- [x] **9. Non-iterable colors raise ValueError.** Parametrize over `5` and
   `object()`; expect the item 4 message. **Catches:** the raw TypeError
   coming back.
 - [ ] **10. Default colors follow the decisions.** Replace or extend
