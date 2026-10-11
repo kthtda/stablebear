@@ -114,7 +114,7 @@ These go in `test/python/test_plotting.py`, class `TestPlotBarcode`.
 
 ## Final checks
 
-- [ ] **15. Test run.** From `test/`, run `test_plotting.py` and
+- [x] **15. Test run.** From `test/`, run `test_plotting.py` and
   `test_plotting_heatmap.py` against the branch source, then the full Python
   suite after a CMake build and install. Regenerate the gallery with
   `python docs/_static/gen_plotting_gallery.py` and check that the barcode
