@@ -13,6 +13,8 @@ Where the plan departs from the issue:
   defers a channel-combination API.
 - Every channel holds one observation per time, a tensor of a fixed `shape`
   (often `()`).
+- `times` is always given explicitly; a table's column 0 is never read as
+  timestamps.
 - A delay embedding adds a leading delay axis to each observation, and the
   sampler flattens observations into points and returns a
   `PointCloudTensor` directly, so `PointCloudTensor` needs no `FloatTensor`
@@ -265,7 +267,7 @@ parallel threshold.
 
 - [x] **7. Public names and accepted values.** (decision: as recommended; `NestedTensor` values deferred)
   - `stablebear.timeseries` exports `Times(values, unit="s")`,
-    `TimeSeries(values, times=None)` for one channel (named `"0"`),
+    `TimeSeries(values, times)` for one channel (named `"0"`),
     `TimeSeries.from_channels(channels, unit=None)` for several,
     `TimeDelayEmbedding(dimension, delay)` (without the issue's `unit="time"`
     until a second delay mode exists), `Window(size, step=None, overlap=None)`,
@@ -416,22 +418,8 @@ parallel threshold.
   `values.indices is None`. **Catches:** an indexed tensor passed to a binding
   that expects ordinary storage.
 
-- [ ] **15. Packed tables.** With `times` omitted, a 2-D table holds
-  timestamps in seconds in column 0 and the coordinates of one point channel
-  in the remaining columns. Tests with the issue's table
-  `data = np.array([[0.0, 10.0, 20.0], [1.3, 11.0, 21.0], [4.0, 12.0, 22.0]])`:
-  - `TimeSeries(data)` has the same times, unit, and values as
-    `TimeSeries(data[:, 1:], times=data[:, 0])`: times `[0.0, 1.3, 4.0]` and
-    `shape == (2,)`. **Catches:** timestamps left among the coordinates, row
-    numbers used as times.
-  - `TimeSeries(data, times=[0.0, 1.0, 2.0])` has `shape == (3,)`.
-    **Catches:**
-    column 0 removed even though times were given.
-  - Parametrized `ValueError`: `[[0.0], [1.0]]` (no value column),
-    `[1.0, 2.0]` (1-D), `np.zeros((2, 2, 2))` (3-D), and
-    `[[1.0, 10.0], [0.0, 11.0]]` (decreasing timestamps in column 0).
-    **Catches:** an empty point, times inferred from other ranks, column-0
-    timestamps that skip validation.
+- [x] **15. Packed tables.** (dropped: `times` is required and never inferred
+  from a column; split a table with `TimeSeries(data[:, 1:], times=data[:, 0])`)
 
 - [ ] **16. Unsupported values.** Test, parametrized `TypeError`: a list of
   two equal-size `sb.PointCloud`s, `np.array(["a", "b"])`, and a
@@ -835,7 +823,7 @@ pages.
 | --- | --- |
 | Time, domain, evaluation, shape, and ownership contracts; empty and singleton behavior | 1-9, 19, 48-50 |
 | `Times`, native storage and access, default seconds, explicit units, one timestamp per observation | 10-13, 17-18, 20-21 |
-| Floating-point arrays with explicit times or a packed table | 11-12, 15-16 |
+| Floating-point arrays with explicit times (packed tables dropped) | 11-12, 16 |
 | Native operation contract, dispatch, and adapter; calls, parameters, CPU limits | 6, 28-29, 32, 36, 38-39 |
 | Persistence and barcode summaries of series | 28-35 |
 | Delay embedding and windows | 40-47 |
