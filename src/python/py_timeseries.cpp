@@ -4,12 +4,44 @@
 #include <sbear/timeseries.hpp>
 
 #include <pybind11/numpy.h>
+#include <pybind11/stl.h>
 
 #include <algorithm>
 #include <string>
 #include <vector>
 
 namespace py = pybind11;
+
+namespace
+{
+  /// Bind the channel and series classes for element type T, as
+  /// register_nested_tensor_element does for nested tensors.
+  template <typename T>
+  void register_timeseries_element(py::module_& m, const std::string& suffix)
+  {
+    using Channel = sb::Channel<T>;
+    using Series = sb::TimeSeries<T>;
+
+    py::class_<Channel>(m, ("TimeSeriesChannel" + suffix).c_str())
+      .def_property_readonly("times", &Channel::times)
+      .def_property_readonly("shape", [](const Channel& self) {
+        return py::tuple(py::cast(self.shape()));
+      })
+      .def_property_readonly("values", &Channel::values)
+      .def("__len__", &Channel::size);
+
+    py::class_<Series>(m, ("TimeSeries" + suffix).c_str())
+      .def(py::init<sb::Times, const sb::Tensor<T>&>(), py::arg("times"), py::arg("values"))
+      .def_property_readonly("channel_names", [](const Series& self) {
+        return py::tuple(py::cast(self.channel_names()));
+      })
+      .def_property_readonly("unit", [](const Series& self) {
+        return std::string(sb::time_unit_name(self.unit()));
+      })
+      .def("channel", &Series::channel, py::arg("index"), py::return_value_policy::reference_internal)
+      .def_property_readonly("n_channels", &Series::n_channels);
+  }
+}
 
 namespace sb_py
 {
@@ -40,5 +72,13 @@ namespace sb_py
       }, py::arg("unit"))
       .def("__len__", &sb::Times::size)
       .def("__eq__", [](const sb::Times& self, const sb::Times& other) { return self == other; });
+
+    register_timeseries_element<bool>(m, "Bool");
+    register_timeseries_element<sb::float32_t>(m, "Float32");
+    register_timeseries_element<sb::float64_t>(m, "Float64");
+    register_timeseries_element<sb::int32_t>(m, "Int32");
+    register_timeseries_element<sb::int64_t>(m, "Int64");
+    register_timeseries_element<uint32_t>(m, "Uint32");
+    register_timeseries_element<uint64_t>(m, "Uint64");
   }
 }

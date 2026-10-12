@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 
 import stablebear as sb
-from stablebear.timeseries import Times
+from stablebear.timeseries import Times, TimeSeries
 
 
 def test_times_keeps_values_and_unit():
@@ -60,3 +60,42 @@ def test_times_converts_units(values, unit, target, expected):
 
     assert np.array_equal(np.asarray(converted.values), expected)
     assert converted.unit == target
+
+
+def test_series_defaults_to_seconds_and_one_channel():
+    # This test checks the default unit and channel name.
+    series = TimeSeries([10.0, 20.0, 30.0], times=[0.0, 1.5, 4.0])
+
+    assert series.unit == "s"
+    assert series.channel_names == ("0",)
+    assert series.shape == ()
+    assert len(series) == 3
+    assert np.array_equal(np.asarray(series.values), [10.0, 20.0, 30.0])
+
+
+def test_series_keeps_explicit_unit():
+    series = TimeSeries([1.0, 2.0], times=Times([0.0, 0.5], unit="ms"))
+
+    assert series.unit == "ms"
+
+
+@pytest.mark.parametrize("times", [
+    [0.0, 1.0],
+    [0.0, 1.0, 2.0, 3.0],
+])
+def test_series_needs_one_timestamp_per_observation(times):
+    with pytest.raises(ValueError):
+        TimeSeries([10.0, 20.0, 30.0], times=times)
+
+
+@pytest.mark.parametrize("values, dtype", [
+    (np.array([1.0, 2.0], dtype=np.float32), sb.float32),
+    (np.array([1.0, 2.0], dtype=np.float64), sb.float64),
+    (np.array([1, 2], dtype=np.int32), sb.int32),
+    (np.array([1, 2], dtype=np.int64), sb.int64),
+    (np.array([True, False]), sb.boolean),
+])
+def test_series_value_precision(values, dtype):
+    series = TimeSeries(values, times=[0.0, 1.0])
+
+    assert series.dtype is dtype
