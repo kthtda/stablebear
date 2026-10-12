@@ -421,7 +421,7 @@ parallel threshold.
 - [x] **15. Packed tables.** (dropped: `times` is required and never inferred
   from a column; split a table with `TimeSeries(data[:, 1:], times=data[:, 0])`)
 
-- [ ] **16. Unsupported values.** Test, parametrized `TypeError`: a list of
+- [x] **16. Unsupported values.** Test, parametrized `TypeError`: a list of
   two equal-size `sb.PointCloud`s, `np.array(["a", "b"])`, and a
   `NestedTensor`. **Catches:** object sequences silently converted to numeric
   arrays, strings or nested tensors passed to the native constructor.

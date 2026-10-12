@@ -209,3 +209,22 @@ def test_series_of_every_element_type(make_values):
     assert series.dtype is values.dtype
     assert len(series) == 2
     assert series.values.array_equal(values)
+
+
+@pytest.mark.parametrize("values", [
+    pytest.param(
+        [sb.PointCloud(np.zeros((2, 2))), sb.PointCloud(np.ones((2, 2)))],
+        id="list of point clouds",
+    ),
+    pytest.param(np.array(["a", "b"]), id="strings"),
+    pytest.param(
+        sb.NestedTensor([
+            sb.FloatTensor(np.array([1.0, 2.0])),
+            sb.FloatTensor(np.array([1.0])),
+        ]),
+        id="nested tensor",
+    ),
+])
+def test_series_rejects_unsupported_values(values):
+    with pytest.raises(TypeError):
+        TimeSeries(values, times=[0.0, 1.0])
