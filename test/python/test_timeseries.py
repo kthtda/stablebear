@@ -242,3 +242,23 @@ def test_observation_by_index():
     assert np.array_equal(np.asarray(series.observation(-1)), [5.0, 6.0])
     with pytest.raises(IndexError):
         series.observation(3)
+
+
+def test_series_evaluates_to_previous_value():
+    series = TimeSeries([10.0, 20.0, 30.0], times=[0.0, 1.5, 4.0])
+
+    assert series(0.0) == 10.0
+    assert series(1.0) == 10.0
+    assert series(1.5) == 20.0
+    assert series(3.75) == 20.0
+    assert series(4.0) == 30.0
+    assert series(1) == 10.0
+
+
+@pytest.mark.parametrize("t", [-0.5, 4.5])
+def test_series_rejects_times_outside_domain(t):
+    series = TimeSeries([10.0, 20.0, 30.0], times=[0.0, 1.5, 4.0])
+
+    assert series.domain == (0.0, 4.0)
+    with pytest.raises(ValueError):
+        series(t)

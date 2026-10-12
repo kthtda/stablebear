@@ -19,6 +19,15 @@ namespace py = pybind11;
 
 namespace
 {
+  py::object domain_tuple(const std::optional<sb::Domain>& domain)
+  {
+    if (!domain)
+    {
+      return py::none();
+    }
+    return py::make_tuple(domain->start, domain->end);
+  }
+
   /// Bind the channel and series classes for element type T, as
   /// register_nested_tensor_element does for nested tensors.
   template <typename T>
@@ -34,6 +43,7 @@ namespace
       })
       .def_property_readonly("values", &Channel::values)
       .def("observation", &Channel::observation, py::arg("index"))
+      .def_property_readonly("domain", [](const Channel& self) { return domain_tuple(self.domain()); })
       .def("__len__", &Channel::size);
 
     py::class_<Series>(m, ("TimeSeries" + suffix).c_str())
@@ -45,7 +55,9 @@ namespace
         return std::string(sb::time_unit_name(self.unit()));
       })
       .def("channel", &Series::channel, py::arg("index"), py::return_value_policy::reference_internal)
-      .def_property_readonly("n_channels", &Series::n_channels);
+      .def_property_readonly("n_channels", &Series::n_channels)
+      .def_property_readonly("domain", [](const Series& self) { return domain_tuple(self.domain()); })
+      .def("evaluate_channel", &Series::evaluate_channel, py::arg("index"), py::arg("t"));
   }
 }
 
