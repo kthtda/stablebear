@@ -391,14 +391,14 @@ parallel threshold.
     `sb.float32`, `sb.float64`, `sb.int32`, `sb.int64`, and `sb.boolean`.
     **Catches:** float32 widened, integers converted to floats.
 
-- [ ] **12. Observation shapes.** Values of shape `(n, *shape)` form one
+- [x] **12. Observation shapes.** Values of shape `(n, *shape)` form one
   channel whose observations have shape `shape`. Tests:
   - Values `[[1, -1], [2, -2], [3, -3]]` with `times=[0.0, 1.0, 2.0]` give
-    `shape == (2,)`, `len() == 3`, and `series[1.5]` equal to `[2, -2]`.
+    `shape == (2,)`, `len() == 3`, and `values` equal to the input.
     **Catches:** points split into channels or counted as observations,
     coordinates transposed.
   - Values `[[[1, 2], [3, 4]], [[5, 6], [7, 8]]]` with `times=[0.0, 1.0]`
-    give `shape == (2, 2)` and `series[1.0]` equal to `[[5, 6], [7, 8]]`.
+    give `shape == (2, 2)` and `values` equal to the input.
     **Catches:** higher-rank observations flattened or transposed.
 
 - [ ] **13. Every element type.** Register the remaining 12 element types
