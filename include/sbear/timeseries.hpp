@@ -10,6 +10,7 @@
 #include <cmath>
 #include <cstdint>
 #include <functional>
+#include <limits>
 #include <memory>
 #include <numeric>
 #include <optional>
@@ -211,6 +212,13 @@ namespace sb
     std::vector<T> values;
   };
 
+  /// Default snap tolerance, as a fraction of the gap between observations.
+  inline constexpr float64_t DefaultSnapTolerance = 1e-6;
+
+  /// Default cap on the snap distance, in multiples of machine epsilon
+  /// times the magnitude of the timestamps.
+  inline constexpr float64_t DefaultSnapEps = 1024;
+
   /// One channel of a time series: a view of storage that other views may
   /// share. A write materializes the view first unless it owns the storage
   /// alone, so other views never see it. Timestamps never change.
@@ -256,8 +264,11 @@ namespace sb
     [[nodiscard]] const std::optional<Domain>& domain() const noexcept { return m_domain; }
 
     /// The observation with the largest timestamp at or before @p t, which is
-    /// in the channel's own unit.
-    [[nodiscard]] Tensor<T> evaluate(float64_t t) const
+    /// in the channel's own unit. A query below an observation by at most
+    /// @p snapTolerance times the gap to the previous observation, and by at
+    /// most @p snapEps times machine epsilon times the larger magnitude
+    /// of the two timestamps, counts as reaching it.
+    [[nodiscard]] Tensor<T> evaluate(float64_t t, float64_t snapTolerance, float64_t snapEps) const
     {
       if (!m_domain || !m_domain->contains(t))
       {
@@ -267,7 +278,24 @@ namespace sb
         throw std::domain_error(ss.str());
       }
       const auto& times = m_storage->times.values();
-      const auto next = std::upper_bound(times.begin(), times.end(), t);
+      auto next = std::upper_bound(times.begin(), times.end(), t);
+      // A query computed in floating point, such as 0.3 - 0.1, can land just
+      // below the observation it means; snap it forward. Measuring against
+      // the gap keeps the rule independent of the unit and of how large the
+      // timestamps are, and a tolerance below 1 never skips an observation.
+      // The epsilon cap keeps widely spaced observations from snapping
+      // queries that are far off in absolute terms but small next to the gap.
+      // t >= times.front(), so next has a predecessor.
+      if (next != times.end())
+      {
+        const auto prev = *std::prev(next);
+        const auto magnitude = std::max(std::abs(prev), std::abs(*next));
+        const auto cap = snapEps * std::numeric_limits<float64_t>::epsilon() * magnitude;
+        if (*next - t <= std::min(snapTolerance * (*next - prev), cap))
+        {
+          ++next;
+        }
+      }
       return observation(std::distance(times.begin(), next) - 1);
     }
 
@@ -336,9 +364,38 @@ namespace sb
     }
 
     /// A series with one channel named "0", queried in the unit of its times.
-    TimeSeries(Times times, const Tensor<T>& values)
+    TimeSeries(Times times, const Tensor<T>& values, float64_t snapTolerance, float64_t snapEps)
       : TimeSeries({"0"}, {Channel<T>(times, values)}, times.unit())
-    { }
+    {
+      set_snap_tolerance(snapTolerance);
+      set_snap_eps(snapEps);
+    }
+
+    /// The snap tolerance used when evaluating, as a fraction of the gap
+    /// between observations; 0 disables snapping.
+    [[nodiscard]] float64_t snap_tolerance() const noexcept { return m_snapTolerance; }
+
+    void set_snap_tolerance(float64_t tolerance)
+    {
+      if (!(tolerance >= 0 && tolerance < 1))
+      {
+        throw std::invalid_argument("The snap tolerance must be in [0, 1)");
+      }
+      m_snapTolerance = tolerance;
+    }
+
+    /// The cap on the snap distance, in multiples of machine epsilon times
+    /// the magnitude of the timestamps.
+    [[nodiscard]] float64_t snap_eps() const noexcept { return m_snapEps; }
+
+    void set_snap_eps(float64_t eps)
+    {
+      if (!(eps >= 0 && std::isfinite(eps)))
+      {
+        throw std::invalid_argument("snap_eps must be finite and nonnegative");
+      }
+      m_snapEps = eps;
+    }
 
     [[nodiscard]] const std::vector<std::string>& channel_names() const noexcept { return m_names; }
     [[nodiscard]] const Channel<T>& channel(size_t i) const { return m_channels.at(i); }
@@ -389,13 +446,15 @@ namespace sb
     [[nodiscard]] Tensor<T> evaluate_channel(size_t i, float64_t t) const
     {
       const auto& c = channel(i);
-      return c.evaluate(convert_time(t, m_unit, c.times().unit()));
+      return c.evaluate(convert_time(t, m_unit, c.times().unit()), m_snapTolerance, m_snapEps);
     }
 
   private:
     std::vector<std::string> m_names;
     std::vector<Channel<T>> m_channels;
     TimeUnit m_unit;
+    float64_t m_snapTolerance = DefaultSnapTolerance;
+    float64_t m_snapEps = DefaultSnapEps;
   };
 }
 

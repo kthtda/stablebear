@@ -47,7 +47,10 @@ namespace
       .def("__len__", &Channel::size);
 
     py::class_<Series>(m, ("TimeSeries" + suffix).c_str())
-      .def(py::init<sb::Times, const sb::Tensor<T>&>(), py::arg("times"), py::arg("values"))
+      .def(py::init<sb::Times, const sb::Tensor<T>&, sb::float64_t, sb::float64_t>(),
+           py::arg("times"), py::arg("values"), py::arg("snap_tolerance"), py::arg("snap_eps"))
+      .def_property_readonly("snap_tolerance", &Series::snap_tolerance)
+      .def_property_readonly("snap_eps", &Series::snap_eps)
       .def_property_readonly("channel_names", [](const Series& self) {
         return py::tuple(py::cast(self.channel_names()));
       })
