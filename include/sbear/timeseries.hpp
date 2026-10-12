@@ -2,11 +2,14 @@
 #define STABLEBEAR_TIMESERIES_H
 
 #include "config.hpp"
+#include "tensor.hpp"
+#include "walk.hpp"
 
 #include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstdint>
+#include <memory>
 #include <numeric>
 #include <stdexcept>
 #include <string>
@@ -171,6 +174,107 @@ namespace sb
 
   private:
     std::vector<float64_t> m_values;
+    TimeUnit m_unit;
+  };
+
+  /// Recorded observations of one channel: one observation per timestamp,
+  /// each a tensor of shape `shape`, stored flat in row-major order.
+  template <typename T>
+  struct ChannelStorage
+  {
+    Times times;
+    std::vector<size_t> shape;
+    std::vector<T> values;
+  };
+
+  /// One channel of a time series: a view of storage that other views may
+  /// share. A write materializes the view first unless it owns the storage
+  /// alone, so other views never see it. Timestamps never change.
+  template <typename T>
+  class Channel
+  {
+  public:
+    /// Copy @p values, whose axis 0 is time, into new storage.
+    Channel(Times times, const Tensor<T>& values)
+    {
+      if (values.rank() == 0)
+      {
+        throw std::invalid_argument("Values must have a time axis");
+      }
+      if (values.shape(0) != times.size())
+      {
+        throw std::invalid_argument(
+            "Expected one timestamp per observation: got " + std::to_string(times.size())
+            + " timestamps for " + std::to_string(values.shape(0)) + " observations");
+      }
+
+      auto storage = std::make_shared<ChannelStorage<T>>(ChannelStorage<T>{
+          std::move(times),
+          std::vector<size_t>(values.shape().begin() + 1, values.shape().end()),
+          {}});
+      // ponytail: copies on construction; adopt the caller's storage if this shows up in profiles
+      auto owned = values.copy();
+      storage->values.reserve(owned.size());
+      walk(owned, [&](const std::vector<size_t>& index) {
+        storage->values.push_back(owned(index));
+      });
+      m_storage = std::move(storage);
+    }
+
+    [[nodiscard]] const Times& times() const noexcept { return m_storage->times; }
+    [[nodiscard]] const std::vector<size_t>& shape() const noexcept { return m_storage->shape; }
+    [[nodiscard]] size_t size() const noexcept { return m_storage->times.size(); }
+
+    /// A copy of the values as a tensor of shape (size(), *shape()).
+    [[nodiscard]] Tensor<T> values() const
+    {
+      std::vector<size_t> fullShape{size()};
+      fullShape.insert(fullShape.end(), shape().begin(), shape().end());
+      Tensor<T> out(fullShape);
+      size_t i = 0;
+      walk(out, [&](const std::vector<size_t>& index) {
+        out(index) = m_storage->values[i++];
+      });
+      return out;
+    }
+
+  private:
+    std::shared_ptr<ChannelStorage<T>> m_storage;
+  };
+
+  /// Named channels of one element type, queried in one time unit.
+  template <typename T>
+  class TimeSeries
+  {
+  public:
+    using value_type = T;
+
+    TimeSeries(std::vector<std::string> names, std::vector<Channel<T>> channels, TimeUnit unit)
+      : m_names(std::move(names)), m_channels(std::move(channels)), m_unit(unit)
+    {
+      if (m_channels.empty())
+      {
+        throw std::invalid_argument("A time series needs at least one channel");
+      }
+      if (m_names.size() != m_channels.size())
+      {
+        throw std::invalid_argument("Expected one name per channel");
+      }
+    }
+
+    /// A series with one channel named "0", queried in the unit of its times.
+    TimeSeries(Times times, const Tensor<T>& values)
+      : TimeSeries({"0"}, {Channel<T>(times, values)}, times.unit())
+    { }
+
+    [[nodiscard]] const std::vector<std::string>& channel_names() const noexcept { return m_names; }
+    [[nodiscard]] const Channel<T>& channel(size_t i) const { return m_channels.at(i); }
+    [[nodiscard]] size_t n_channels() const noexcept { return m_channels.size(); }
+    [[nodiscard]] TimeUnit unit() const noexcept { return m_unit; }
+
+  private:
+    std::vector<std::string> m_names;
+    std::vector<Channel<T>> m_channels;
     TimeUnit m_unit;
   };
 }

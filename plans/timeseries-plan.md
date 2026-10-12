@@ -288,8 +288,9 @@ parallel threshold.
   - `values` may be a tensor of any element type (`FloatTensor`,
     `IntTensor`, `BoolTensor`, `PcfTensor`, `IntPcfTensor`,
     `PointCloudTensor`, `DistanceMatrixTensor`, `SymmetricMatrixTensor`,
-    `BarcodeTensor`) or a numeric array-like (float32 stays float32, booleans
-    become bool, other numbers become float64) of shape `(n, *shape)`; axis 0
+    `BarcodeTensor`) or a numeric array-like of shape `(n, *shape)`, with the
+    dtype `sb.tensor()` infers (float32, int32, uint32, uint64, and bool are
+    kept; other floats become float64 and other integers int64); axis 0
     is time. Anything else raises `TypeError`: strings, `NestedTensor`, and
     sequences containing stablebear objects, which `np.asarray` would silently
     turn into numeric arrays.
@@ -372,7 +373,7 @@ parallel threshold.
     inverted factor, a rounded factor such as `1e-3` (which gives
     `0.0022500000000000003`), the unit label not updated.
 
-- [ ] **11. Scalar series.** The stored channel and `sb::TimeSeries<T>` with
+- [x] **11. Scalar series.** The stored channel and `sb::TimeSeries<T>` with
   their validation, `register_timeseries_element` for float32 and float64,
   and Python `TimeSeries(values, times)` with `channel_names`, `times`,
   `unit`, `values`, `dtype`, `shape`, `len()`, and `repr`. This is the largest
@@ -386,9 +387,9 @@ parallel threshold.
     `"ms"`. **Catches:** `Times` reduced to a plain array.
   - One timestamp per observation: values of shape `(3,)` with 2 or 4
     timestamps raise `ValueError`. **Catches:** a length mismatch accepted.
-  - Value precision: float32 values give `sb.float32`; float64 and int64
-    values give `sb.float64`. **Catches:** float32 widened, integer values
-    stored as integers.
+  - Value dtype: float32, float64, int32, int64, and bool arrays give
+    `sb.float32`, `sb.float64`, `sb.int32`, `sb.int64`, and `sb.boolean`.
+    **Catches:** float32 widened, integers converted to floats.
 
 - [ ] **12. Observation shapes.** Values of shape `(n, *shape)` form one
   channel whose observations have shape `shape`. Tests:
@@ -400,8 +401,9 @@ parallel threshold.
     give `shape == (2, 2)` and `series[1.0]` equal to `[[5, 6], [7, 8]]`.
     **Catches:** higher-rank observations flattened or transposed.
 
-- [ ] **13. Every element type.** Register the remaining 17 element types and
-  dispatch on the tensor type in Python. Test, parametrized over the 19
+- [ ] **13. Every element type.** Register the remaining 12 element types
+  (the 7 numeric ones came with item 11) and dispatch on the tensor type in
+  Python. Test, parametrized over the 19
   dtypes: a two-observation 1-D tensor whose elements differ (for objects,
   also in size: clouds of 1 and 2 points, 2x2 and 3x3 matrices, barcodes with
   1 and 2 bars, PCFs with 2 and 3 breakpoints) with `times=[0.0, 1.0]` gives a

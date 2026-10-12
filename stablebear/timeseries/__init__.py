@@ -1,6 +1,6 @@
 __before = set(dir())
 
-from .series import Times
+from .series import Times, TimeSeries
 
 import types as _types
 __all__ = sorted(
