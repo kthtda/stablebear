@@ -163,6 +163,9 @@ def _values_tensor(values):
 class TimeSeries(Generic[T]):
     """Observations recorded at known times, in one or more channels.
 
+    A series built from ``values`` and ``times`` has one channel, named
+    ``"0"``.
+
     Parameters
     ----------
     values : array_like or FloatTensor
@@ -172,15 +175,43 @@ class TimeSeries(Generic[T]):
         floats become float64, and other integers become int64.
     times : Times or array_like
         One timestamp per observation. A plain array is in seconds.
+    snap_tolerance : float, optional
+        How close below an observation a query may land and still get that
+        observation, as a fraction of the gap to the previous observation.
+        This lets a time computed in floating point, such as ``0.3 - 0.1``,
+        reach the observation it means. Must be in ``[0, 1)``; 0 disables
+        snapping. Defaults to ``1e-6``.
+    snap_eps : float, optional
+        A cap on the same distance, in multiples of machine epsilon
+        (``np.finfo(np.float64).eps``, about ``2.2e-16``) times the
+        magnitude of the timestamps. This keeps widely spaced observations
+        from capturing queries that are clearly earlier. Must be finite
+        and nonnegative; 0 disables snapping. Defaults to ``1024``.
 
-    A series built this way has one channel, named ``"0"``.
+    Notes
+    -----
+    Let tol be ``snap_tolerance``, k be ``snap_eps``, and
+    eps be machine epsilon, and let the timestamps be
+    t[0] < t[1] < ... < t[n-1], with observations x[0], x[1], ..., x[n-1].
+    At a time t >= t[0], the series is x[i] for the largest i such that
+    i = 0 or ::
+
+        t >= t[i] - min(tol * (t[i] - t[i-1]),
+                        k * eps * max(|t[i-1]|, |t[i]|)).
+
+    With either parameter 0, this is the last observation at or before t.
+    Since tol < 1, the shifted thresholds stay strictly increasing, so no
+    observation is skipped.
     """
 
-    def __init__(self, values, times):
+    def __init__(self, values, times, *, snap_tolerance: float = 1e-6,
+                 snap_eps: float = 1024):
         if not isinstance(times, Times):
             times = Times(times)
         tensor = _values_tensor(values)
-        self._data = _SERIES_TYPES[tensor.dtype][0](times._data, tensor._data)
+        self._data = _SERIES_TYPES[tensor.dtype][0](
+            times._data, tensor._data, snap_tolerance, snap_eps
+        )
 
     def _single_channel(self):
         if self._data.n_channels != 1:
@@ -221,6 +252,16 @@ class TimeSeries(Generic[T]):
         return self._single_channel().shape
 
     @property
+    def snap_tolerance(self) -> float:
+        """The snap tolerance used when evaluating; see the constructor."""
+        return self._data.snap_tolerance
+
+    @property
+    def snap_eps(self) -> float:
+        """The cap on snapping used when evaluating; see the constructor."""
+        return self._data.snap_eps
+
+    @property
     def domain(self) -> tuple[float, float] | None:
         """``(start, end)`` of the times where the series can be evaluated.
 
@@ -232,7 +273,9 @@ class TimeSeries(Generic[T]):
     def evaluate(self, t):
         """The observation with the largest timestamp at or before ``t``.
 
-        ``t`` is in the series' unit. Returns a scalar or element for
+        A ``t`` just below a timestamp snaps forward to it; see
+        ``snap_tolerance`` and ``snap_eps`` in the constructor. ``t``
+        is in the series' unit. Returns a scalar or element for
         observations of shape ``()``, otherwise a tensor of that shape.
 
         Raises

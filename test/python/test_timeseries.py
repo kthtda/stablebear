@@ -279,3 +279,71 @@ def test_singleton_series_evaluates_at_its_time():
 
     assert series.domain == (2.0, 2.0)
     assert series(2.0) == 7.0
+
+
+def test_query_just_below_an_observation_snaps_to_it():
+    series = TimeSeries([1.0, 2.0, 3.0], times=[0.0, 0.25, 0.5], snap_tolerance=1e-6,
+                        snap_eps=1024)
+
+    assert series(np.nextafter(0.25, 0.0)) == 2.0
+
+
+def test_query_further_below_an_observation_does_not_snap():
+    series = TimeSeries([1.0, 2.0, 3.0], times=[0.0, 0.25, 0.5], snap_tolerance=1e-6,
+                        snap_eps=1024)
+
+    assert series(0.24) == 1.0
+
+
+@pytest.mark.parametrize("times, t, expected", [
+    # Sampled every 0.1 ns, in seconds.
+    ([0.0, 1e-10, 2e-10], 1.5e-10, 20.0),
+    # Microsecond spacing on epoch-sized timestamps.
+    ([1.7e9, 1.7e9 + 1e-6, 1.7e9 + 2e-6], 1.7e9 + 1.5e-6, 20.0),
+])
+def test_snapping_does_not_cross_a_gap(times, t, expected):
+    series = TimeSeries([10.0, 20.0, 30.0], times=times, snap_tolerance=1e-6,
+                        snap_eps=1024)
+
+    assert series(t) == expected
+
+
+def test_snapping_is_capped_for_wide_gaps():
+    series = TimeSeries([1.0, 2.0], times=[0.0, 86400.0], snap_tolerance=1e-6,
+                        snap_eps=1024)
+
+    assert series(np.nextafter(86400.0, 0.0)) == 2.0
+    assert series(86400.0 - 0.05) == 1.0
+
+
+def test_snap_tolerance_zero_disables_snapping():
+    series = TimeSeries([1.0, 2.0, 3.0], times=[0.0, 0.25, 0.5], snap_tolerance=0.0,
+                        snap_eps=1024)
+
+    assert series.snap_tolerance == 0.0
+    assert series(np.nextafter(0.25, 0.0)) == 1.0
+
+
+@pytest.mark.parametrize("tolerance", [-0.1, 1.0])
+def test_snap_tolerance_outside_unit_interval_raises(tolerance):
+    with pytest.raises(ValueError):
+        TimeSeries([1.0, 2.0], times=[0.0, 1.0], snap_tolerance=tolerance)
+
+
+def test_snap_eps_bounds_the_snap_distance():
+    times = [0.0, 1.0]
+    query = 1.0 - 4 * np.finfo(np.float64).eps
+    loose = TimeSeries([1.0, 2.0], times=times, snap_tolerance=0.5,
+                       snap_eps=8.0)
+    tight = TimeSeries([1.0, 2.0], times=times, snap_tolerance=0.5,
+                       snap_eps=2.0)
+
+    assert loose.snap_eps == 8.0
+    assert loose(query) == 2.0
+    assert tight(query) == 1.0
+
+
+@pytest.mark.parametrize("eps", [-1.0, np.inf, np.nan])
+def test_snap_eps_must_be_finite_and_nonnegative(eps):
+    with pytest.raises(ValueError):
+        TimeSeries([1.0, 2.0], times=[0.0, 1.0], snap_eps=eps)

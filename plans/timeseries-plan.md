@@ -169,15 +169,22 @@ parallel threshold.
   With either option, `domain` is a `(start, end)` tuple, and an empty channel
   has no domain (`domain is None`) and cannot be evaluated.
 
-- [x] **2. Floating-point timestamps.** (decision: (a), snap within `1e-9 * max(1, |t|)`, no user parameter) Delays
-  and window starts are computed in floating point, so a query can land just
-  before the observation it should reach: `0.3 - 0.1` is less than `0.2`.
-  Options:
-  (a) Snap a query to an observation that lies above it by at most
-  `1e-9 * max(1, |t|)`, as `snap_in_place` does on the branch. No user
-  parameter; domain checks stay exact.
-  (b) No snapping; document that times and delays should be exactly
-  representable.
+- [x] **2. Floating-point timestamps.** (decision: snap within a fraction of the gap, capped at a multiple of machine epsilon times the timestamps' magnitude; both user-settable, defaults `1e-6` and `1024`)
+  Delays and window starts are computed in floating point, so a query can
+  land just before the observation it should reach: `0.3 - 0.1` is less than
+  `0.2`. A query below an observation counts as reaching it if it falls short
+  by at most `min(snap_tolerance * gap, snap_eps * eps * max(|prev|,
+  |next|))`, where the gap is the time since the previous observation and
+  `eps` is float64 machine epsilon. Both are keywords of `TimeSeries`
+  (`snap_tolerance` in `[0, 1)`, default `1e-6`; `snap_eps` finite and
+  nonnegative, default `1024`; 0 in either disables snapping) and are used
+  by everything that evaluates the series. The gap limit keeps the rule from
+  skipping an observation; the epsilon limit keeps wide gaps (daily data in
+  seconds) from capturing queries that are clearly earlier. Both are
+  relative, so the rule does not depend on the unit. Domain checks stay
+  exact. The first choice, `1e-9 * max(1, |t|)` as on the branch, depended
+  on the unit near 0 and crossed whole gaps for small spacings or
+  epoch-sized timestamps.
 
 - [x] **3. Time units.** (decision: (a), fixed set `as` through `d` with exact integer conversion factors) `Times(values, unit="s")`; plain timestamp
   arrays mean seconds. Options:
@@ -453,11 +460,22 @@ parallel threshold.
     `series(2.0) == 7.0`. **Catches:** a singleton series rejected or
     impossible to evaluate.
 
-- [ ] **20. Snapping.** Implement decision 2 in the native lookup. Test with
-  times `[0.0, 0.25, 0.5]` and values `[1.0, 2.0, 3.0]`:
-  `series(np.nextafter(0.25, 0.0))` is 2.0 and `series(0.25 - 1e-6)` is 1.0.
-  **Catches:** no snapping, or a tolerance wide enough to change values at
-  ordinary times.
+- [x] **20. Snapping.** Implement decision 2 in the native lookup. Tests:
+  - Times `[0.0, 0.25, 0.5]`, values `[1.0, 2.0, 3.0]`, and
+    `snap_tolerance=1e-6`: `series(np.nextafter(0.25, 0.0))` is 2.0 and
+    `series(0.24)` is 1.0. **Catches:** no snapping, or a tolerance
+    wide enough to change values at ordinary times.
+  - Parametrized: spacing `1e-10` s near 0 and spacing `1e-6` s near
+    `1.7e9`; a query halfway between two observations gets the earlier one.
+    **Catches:** a tolerance that ignores the gap and skips observations.
+  - Times `[0.0, 86400.0]`: `nextafter(86400, 0)` snaps and `86400 - 0.05`
+    does not. **Catches:** no epsilon cap on wide gaps.
+  - Times `[0.0, 1.0]`, query `1 - 4 eps`: snaps with `snap_eps=8`,
+    not with 2; the property reads back. Negative, infinite, and NaN
+    `snap_eps` raise `ValueError`. **Catches:** the cap ignored or
+    unvalidated.
+  - `snap_tolerance=0.0` is stored and disables snapping, and -0.1 and 1.0 raise
+    `ValueError`. **Catches:** the keyword ignored or unvalidated.
 
 - [ ] **21. Query unit.** `series.to(unit)` returns the series with another
   query unit; the stored channels are unchanged. Test: `TimeSeries([10.0,
@@ -790,8 +808,8 @@ Items 48-50 use the source series of items 43-46 and the embedding of item
 Code items update the docstrings they touch (AGENTS.md). These items add the
 pages.
 
-- [ ] **58. API reference.** Add `docs/api_timeseries.rst` to the toctree in
-  `docs/stablebear.rst`. Check that the docstrings state the contracts of
+- [ ] **58. API reference.** `docs/api_timeseries.rst` is in the toctree in
+  `docs/stablebear.rst` (added with item 20). Check that the docstrings state the contracts of
   decisions 1-4 and 6-8: domains and their closedness, previous-value
   evaluation and snapping, units, query units and conversion, channels and
   their names, time indexing, observation shapes and flattening into
@@ -804,8 +822,10 @@ pages.
   examples. The first follows a point-cloud series through persistence to
   stable ranks; the second takes two numeric channels in different units
   through a delay embedding, windows, and sampling to persistence. Link each
-  operation to its API entry on first mention. Figures are not needed; if one
-  is added, follow the dropdown rule in AGENTS.md.
+  operation to its API entry on first mention. The page exists since item 20
+  with sections on evaluation and snapping, with figures from
+  `docs/_static/gen_timeseries_snap_fig.py`; further figures follow the
+  dropdown rule in AGENTS.md.
 
 - [ ] **60. Changelog.** A New features entry in `CHANGELOG.md` linking #242,
   under the heading of the release that ships it (to be decided; 0.5.1 is in

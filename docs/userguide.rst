@@ -10,6 +10,7 @@ User guide
    indexing
    arithmetic
    evaluation
+   timeseries
    plotting
    saving
    distances
