@@ -7,10 +7,12 @@ import numpy as np
 from .. import _sb_cpp as cpp
 from .._tensor_base import IndexedElementTensor, Tensor
 from ..base_tensor import BoolTensor, FloatTensor, IntPcfTensor, IntTensor, PcfTensor
-from ..distance_matrix import DistanceMatrixTensor
+from ..distance_matrix import DistanceMatrix, DistanceMatrixTensor
+from ..functional.pcf import Pcf
+from ..persistence.barcode import Barcode
 from ..persistence.ph_tensor import BarcodeTensor
-from ..point_cloud import PointCloudTensor
-from ..symmetric_matrix import SymmetricMatrixTensor
+from ..point_cloud import PointCloud, PointCloudTensor
+from ..symmetric_matrix import SymmetricMatrix, SymmetricMatrixTensor
 from ..typing import (
     barcode32,
     barcode64,
@@ -121,10 +123,23 @@ _SERIES_TYPES = {
 _SERIES_CPP_TO_DTYPE = {cls: dtype for dtype, (cls, _) in _SERIES_TYPES.items()}
 
 
+_STABLEBEAR_OBJECTS = (
+    Barcode, DistanceMatrix, Pcf, PointCloud, SymmetricMatrix, Tensor,
+)
+
+
 def _values_tensor(values):
     """Convert values to a tensor whose axis 0 is time."""
     from ..tensor_create import tensor
 
+    if isinstance(values, (list, tuple)) and any(
+        isinstance(value, _STABLEBEAR_OBJECTS) for value in values
+    ):
+        # np.asarray would silently turn equal-size objects into numbers.
+        raise TypeError(
+            "Pass a tensor of observations, such as a PointCloudTensor, "
+            "rather than a list of stablebear objects"
+        )
     if not isinstance(values, Tensor):
         # The same dtype inference as sb.tensor(): float32, int32, uint32,
         # uint64, and bool are kept; other numbers become float64 or int64.
