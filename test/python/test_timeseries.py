@@ -99,3 +99,30 @@ def test_series_value_precision(values, dtype):
     series = TimeSeries(values, times=[0.0, 1.0])
 
     assert series.dtype is dtype
+
+
+def test_series_of_points():
+    values = [
+        [1.0, -1.0],
+        [2.0, -2.0],
+        [3.0, -3.0],
+    ]
+    series = TimeSeries(values, times=[0.0, 1.0, 2.0])
+
+    assert series.shape == (2,)
+    assert len(series) == 3
+    assert np.array_equal(np.asarray(series.values), values)
+
+
+def test_series_of_matrices():
+    values = [
+        [[1.0, 2.0],
+         [3.0, 4.0]],
+
+        [[5.0, 6.0],
+         [7.0, 8.0]],
+    ]
+    series = TimeSeries(values, times=[0.0, 1.0])
+
+    assert series.shape == (2, 2)
+    assert np.array_equal(np.asarray(series.values), values)
