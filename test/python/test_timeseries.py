@@ -262,3 +262,20 @@ def test_series_rejects_times_outside_domain(t):
     assert series.domain == (0.0, 4.0)
     with pytest.raises(ValueError):
         series(t)
+
+
+def test_empty_series_has_no_domain():
+    series = TimeSeries(sb.zeros((0,), dtype=sb.pcloud64), times=[])
+
+    assert len(series) == 0
+    assert series.dtype is sb.pcloud64
+    assert series.domain is None
+    with pytest.raises(ValueError):
+        series(0.0)
+
+
+def test_singleton_series_evaluates_at_its_time():
+    series = TimeSeries([7.0], times=[2.0])
+
+    assert series.domain == (2.0, 2.0)
+    assert series(2.0) == 7.0
