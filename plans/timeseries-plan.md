@@ -115,11 +115,12 @@ This assumes the recommended option of each decision.
   `prod(shape)`, and returns a `PointCloudTensor` of shape
   `(n_windows, n_channels)`.
 - Analysis functions are operations in the style of NumPy ufuncs: a native
-  per-element kernel with bound parameters and an output core shape (for
-  persistence, `(max_dim + 1,)`). One native `UfuncTask` applies an
-  operation to any container through a small adapter. For a series, each
-  output channel keeps its input's name, times, and domain, and its shape is
-  the input shape followed by the core shape. Tensors use the same task.
+  per-element kernel with bound parameters and `extra_dims`, the dimensions
+  one input element adds to the result (for persistence, `(max_dim + 1,)`).
+  One native `UfuncTask` applies an operation to any container through a
+  small adapter. For a series, each output channel keeps its input's name,
+  times, and domain, and its shape is the input shape followed by
+  `extra_dims`. Tensors use the same task.
 
 ## Recycling
 
@@ -233,22 +234,23 @@ parallel threshold.
     `TensorFormatFlag::TimeSeries`, so one writer and reader serve all
     element types, as `TensorFormatFlag::Nested` does.
 
-- [x] **6. Analysis adapter.** (decision: operations in the style of ufuncs; the core shape extends the observation shape; tensors move to the same task; no public `apply` yet)
+- [x] **6. Analysis adapter.** (decision: operations in the style of ufuncs; `extra_dims` extends the observation shape; tensors move to the same task; no public `apply` yet)
   - An operation is a native per-element kernel with its parameters bound and
-    an output core shape, like a NumPy gufunc signature. Persistence maps
-    `PointCloud` or `DistanceMatrix` to `Barcode` with core shape
-    `(max_dim + 1,)`; the barcode summaries map `Barcode` to `Pcf` with core
-    shape `()`. The kernels already exist (`run_euclidean_ripser`,
+    `extra_dims`, the dimensions one input element adds to the result, like
+    the core dimensions of a NumPy gufunc signature. Persistence maps
+    `PointCloud` or `DistanceMatrix` to `Barcode` with `extra_dims`
+    `(max_dim + 1,)`; the barcode summaries map `Barcode` to `Pcf` with
+    no extra dimensions. The kernels already exist (`run_euclidean_ripser`,
     `run_ripser`, `barcode_to_stable_rank`, ...).
   - One native `UfuncTask` walks all input elements in parallel on the
     existing executor and writes the output, with progress, cancellation, and
     error capture from `StoppableTask`. It owns its inputs and output until
     completion.
   - A container adapter says where the elements are and how to build the
-    output. Tensor: output shape is the input shape followed by the core
-    shape. Series: every channel is processed in the same task, and each
+    output. Tensor: the result's shape is the input shape followed by
+    `extra_dims`. Series: every channel is processed in the same task, and each
     output channel keeps its name, times, and domain, with shape
-    `shape + core shape`. Persistence of a channel of shape `()` therefore has
+    `shape + extra_dims`. Persistence of a channel of shape `()` therefore has
     shape `(max_dim + 1,)`; no channels are added. A future container needs
     only an adapter.
   - `compute_persistent_homology` and the summaries keep their signatures and
@@ -331,7 +333,7 @@ parallel threshold.
     (`0.2 + 0.1` and `0.3`); snapping makes their values equal, and merging
     them is a later cleanup.
 
-- [ ] **9. Saving series.** (decision) Recommendation: save a series as its
+- [x] **9. Saving series.** (decision: as recommended; distinct storages once, then one descriptor per channel) save a series as its
   distinct storages, each written once even when several channels share it
   (as the indexed-tensor codec deduplicates sources), followed by each
   channel's name, storage index, and descriptor, and the query unit. A loaded
