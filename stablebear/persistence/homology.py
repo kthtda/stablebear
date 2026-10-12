@@ -83,71 +83,34 @@ def compute_persistent_homology(
 
     """
 
-    from ..tensor_create import zeros
     from .ripser import (
         _compute_barcodes_distmat_ripser,
         _compute_barcodes_euclidean_pcloud_ripser,
     )
 
-    # --- Distance matrix input path ---
+    if complex_type != ComplexType.VietorisRips:
+        raise ValueError(f"Unsupported complex type {complex_type}")
+
     if isinstance(X, (DistanceMatrix, DistanceMatrixTensor)):
-        if isinstance(X, DistanceMatrix):
-            # Wrap single DistanceMatrix into a 1-element tensor
-            if isinstance(X._data, cpp.DistanceMatrix_f32):
-                dmX = zeros((1,), dtype=distmat32)
-            else:
-                dmX = zeros((1,), dtype=distmat64)
-            dmX[0] = X
-            X = dmX
-
-        barcode_dtype = _DISTMAT_TO_BARCODE_DTYPE[X.dtype]
-        out = zeros((1,), dtype=barcode_dtype)
-
-        if complex_type != ComplexType.VietorisRips:
-            raise ValueError(f"Unsupported complex type {complex_type}")
-
-        task = _compute_barcodes_distmat_ripser(X, out, max_dim, reduced)
-        _run_task(lambda: task, verbose=verbose)
-
-        if len(out.shape) == 2 and out.shape[0] == 1:
-            out = out[0, :]
-
-        return out
-
-    # --- Point cloud input path ---
-    if isinstance(X, np.ndarray):
-        X = FloatTensor(X)
-
-    out = None
-    if isinstance(X, FloatTensor):
-        pcloud_dtype = _FLOAT_TO_PCLOUD_DTYPE[X.dtype]
-        pcX = zeros((1,), dtype=pcloud_dtype)
-        pcX[0] = X
-        X = pcX
-
-    if isinstance(X, PointCloud):
-        barcode_dtype = _FLOAT_TO_BARCODE_DTYPE[X.dtype]
-        out = zeros((1,), dtype=barcode_dtype)
-    elif isinstance(X, PointCloudTensor):
-        barcode_dtype = _PCLOUD_TO_BARCODE_DTYPE[X.dtype]
-        out = zeros((1,), dtype=barcode_dtype)
-
-    if complex_type == ComplexType.VietorisRips:
-        # Use Ripser
+        task = _compute_barcodes_distmat_ripser(X, max_dim, reduced)
+    else:
+        if isinstance(X, (np.ndarray, FloatTensor)):
+            X = PointCloud(X)
         match distance_type:
             case DistanceType.Euclidean:
                 task = _compute_barcodes_euclidean_pcloud_ripser(
-                    X, out, max_dim, reduced
+                    X, max_dim, reduced
                 )
             case _:
                 raise ValueError(
                     f"Distance type {distance_type} not supported for complex type {complex_type}."
                 )
-    else:
-        raise ValueError(f"Unsupported complex type {complex_type}")
 
     _run_task(lambda: task, verbose=verbose)
+    out = BarcodeTensor(task.result())
 
+    # A single cloud or matrix gives shape (max_dim + 1,) directly. A tensor
+    # with one element still loses its leading axis, as before.
     if len(out.shape) == 2 and out.shape[0] == 1:
         out = out[0, :]
 

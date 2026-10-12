@@ -1,9 +1,7 @@
 from .. import _sb_cpp as cpp
 from ..async_task import _run_task
-from ..functional.pcf import Pcf
-from ..base_tensor import Tensor, _get_backend
-from ..tensor_create import zeros
-from ..typing import barcode32, barcode64, pcf32, pcf64
+from ..base_tensor import PcfTensor, _get_backend
+from ..typing import barcode32, barcode64
 from .barcode import Barcode
 from .ph_tensor import BarcodeTensor
 
@@ -14,29 +12,24 @@ _BACKEND_MAP = {
     barcode64: cpp_p.PersistenceBarcodeSummary64,
 }
 
-_BARCODE_TO_PCF_DTYPE = {barcode32: pcf32, barcode64: pcf64}
 
-
-def _barcode_to_pcf(bc, single_method, task_method, verbose=False, **kwargs):
+def _barcode_to_pcf(bc, task_method, verbose=False, **kwargs):
     """Shared implementation for barcode-to-PCF conversions."""
 
     backend, X = _get_backend(bc, _BACKEND_MAP)
 
+    task = getattr(backend, task_method)(X._data, **kwargs)
+    _run_task(lambda: task, verbose=verbose)
+    out = PcfTensor(task.result())
+
     if isinstance(X, Barcode):
-        return Pcf(getattr(backend, single_method)(X._data, **kwargs))
-    elif isinstance(X, Tensor):
-        pcf_dtype = _BARCODE_TO_PCF_DTYPE[X.dtype]
-        out = zeros((1,), dtype=pcf_dtype)
+        # A single barcode gives a 0-d result holding its PCF.
+        return out[()]
 
-        _run_task(
-            lambda: getattr(backend, task_method)(X._data, out._data, **kwargs),
-            verbose=verbose,
-        )
+    if len(out.shape) == 2 and out.shape[0] == 1:
+        out = out[0, :]
 
-        if len(out.shape) == 2 and out.shape[0] == 1:
-            out = out[0, :]
-
-        return out
+    return out
 
 
 def barcode_to_stable_rank(
@@ -62,7 +55,7 @@ def barcode_to_stable_rank(
         ``PcfTensor`` with the same shape as the input.
     """
     return _barcode_to_pcf(
-        bc, "barcode_to_stable_rank", "spawn_barcode_to_stable_rank_task", verbose
+        bc, "spawn_barcode_to_stable_rank_task", verbose
     )
 
 
@@ -89,7 +82,7 @@ def barcode_to_betti_curve(
         ``PcfTensor`` with the same shape as the input.
     """
     return _barcode_to_pcf(
-        bc, "barcode_to_betti_curve", "spawn_barcode_to_betti_curve_task", verbose
+        bc, "spawn_barcode_to_betti_curve_task", verbose
     )
 
 
@@ -130,7 +123,6 @@ def barcode_to_accumulated_persistence(
         ``PcfTensor`` with the same shape as the input.
     """
     return _barcode_to_pcf(
-        bc, "barcode_to_accumulated_persistence",
-        "spawn_barcode_to_accumulated_persistence_task", verbose,
+        bc, "spawn_barcode_to_accumulated_persistence_task", verbose,
         max_death=max_death
     )
