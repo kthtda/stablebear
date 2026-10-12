@@ -37,7 +37,7 @@ items that follow; **(existing)** confirm existing coverage without adding a
 test; **(optional)** safe to skip without losing important coverage. Check off
 a skipped optional item with the note "skipped".
 
-**Test budget.** The items add about 55 test functions, many of them
+**Test budget.** The items add about 60 test functions, many of them
 parametrized, plus three optional ones. Keep that number from growing. Before
 adding a test that is not listed, check whether a listed test's
 parametrization covers it, and prefer leaving a guarantee to the design and
@@ -105,8 +105,10 @@ This assumes the recommended option of each decision.
 - `series[t]` looks up each channel on its own grid, in its own unit, and
   returns the value for one channel or an ordered dict for several.
   `series[a:b]` is a window, and `series["name"]` selects channels.
-- Windows and delay embeddings are lazy channels: native nodes that hold
-  their source and parameters and compute values when evaluated. A delay
+- Every channel is a view: a `shared_ptr` to its storage plus a descriptor
+  (domain, lags, unit scale). Windows, delay embeddings, channel selection,
+  and unit changes copy no values; a write materializes the whole view into
+  the writer's own storage, as subsampled tensors do. A delay
   embedding of a numeric channel of shape `S` has shape `(m, *S)`.
 - `RegularSampler` samples each window of each numeric channel into a point
   cloud, flattening each observation into a point of dimension
@@ -143,7 +145,7 @@ and copy ideas and small blocks, not whole files.
 - `masspcf/persistence/homology.py` (the `TensorTimeSeries` branch): one
   batched Ripser call over all snapshots. `UfuncTask` (item 28) keeps the
   idea and moves it into native code.
-- `docs/ts_*.rst`: background wording for item 56; the API differs.
+- `docs/ts_*.rst`: background wording for item 59; the API differs.
 
 Not recycled: datetime support, interpolation strategies, `TimeSeriesTensor`,
 the scikit-learn transformers, `l2_kernel` cross kernels, and the `tensor_eval`
@@ -187,14 +189,22 @@ parallel threshold.
   query unit.
   (b) Any nonempty string, with no conversion.
 
-- [x] **4. Ownership.** (decision: (a), copy in and copy out; stored series are immutable) Options:
-  (a) Copy in, copy out for stored channels. The constructor copies its
-  values, materializing indexed point-cloud and distance-matrix tensors;
-  `values`, `observation(i)`, and evaluation return copies; `Times.values` is
-  a read-only array. Stored channels are then immutable, so series and
-  derived channels can hold references to them without copying them and
-  without seeing later changes.
-  (b) Views, with documented write-through.
+- [x] **4. Ownership.** (decision: copy in, views out, materialize on write, as subsampled tensors do)
+  - The constructor copies its input, materializing indexed point-cloud and
+    distance-matrix tensors, so the caller's data stays independent.
+  - Channel storage lives in a `std::shared_ptr` and is shared by every view
+    of it (decision 8): channel selection, unit changes, windows, and delay
+    embeddings copy no values.
+  - Reads return views: `values` is a tensor backed by the series, and
+    `observation(i)` of a shaped or object observation is a view backed by the
+    series, as `PointCloudTensor[i]` returns a `PointCloud` with an owner.
+    Scalar observations are plain numbers.
+  - Writes go through `set_observation(i, value)`, `values[...] = x`, or an
+    observation view. Before writing, a series whose storage is shared, or
+    whose view is a window or an embedding, materializes the whole view into
+    its own storage, as `IndexedElementTensor._ensure_writeable` does for
+    subsamples. Other views never see the write.
+  - Timestamps are always read-only: `Times.values` is a read-only array.
 
 - [x] **5. Native storage and where the code lives.** (decision: as recommended; all evaluation in C++, flat values plus `shape`, `NestedTensor`-style registration)
   Recommendation, from our discussion:
@@ -247,7 +257,7 @@ parallel threshold.
   - A singleton channel keeps its observation and an empty channel gives a
     typed empty result.
 
-- [ ] **7. Public names and accepted values.** (decision) Recommendation:
+- [x] **7. Public names and accepted values.** (decision: as recommended; `NestedTensor` values deferred)
   - `stablebear.timeseries` exports `Times(values, unit="s")`,
     `TimeSeries(values, times=None)` for one channel (named `"0"`),
     `TimeSeries.from_channels(channels, unit=None)` for several,
@@ -286,27 +296,48 @@ parallel threshold.
   - An empty list gives an empty float64 channel, so a typed empty channel of
     point clouds is built from `sb.zeros((0,), dtype=sb.pcloud64)`.
 
-- [ ] **8. Derived channels are lazy.** (decision) Recommendation: windows and
-  delay embeddings are native nodes that store no values. An embedding of a
-  channel of shape `S` has shape `(m, *S)`, newest last. A node holds its
-  source channel and parameters, exposes the same interface as a stored
-  channel except recorded observations, and evaluates its source when asked.
-  A window cuts every channel at the same `[a, b)` in the query unit and works
-  for any element type; its value at `a` comes from the source even when the
-  last observation lies before the window, and its `times` are the source's
-  timestamps inside `[a, b)`. An embedding requires a numeric channel, takes
-  its delay in the query unit, and has no `times`. Internal lookups skip the
-  domain check, because shifted and converted times may round just outside
-  it. Alternative: materialize derived channels at the union of the times
-  where any component changes, which costs memory and loses the original
-  timestamps.
+- [x] **8. Views.** (decision: every channel is a view of shared storage; a write materializes the whole view)
+  - Like a tensor view, a channel is a `shared_ptr` to its storage plus a
+    small descriptor of how a query time maps into it: the domain (start, end,
+    and end closedness), `lags` (time offsets that add leading observation
+    axes), and `scale` (from the query unit to the storage unit). A freshly
+    built channel is the identity view.
+  - A window narrows the domain to `[a, b)`; it cuts every channel at the
+    same bounds in the query unit and works for any element type. A delay
+    embedding of shape `S` adds lags `[-(m - 1) * delay, ..., 0]`, giving shape
+    `(m, *S)`, oldest first; it requires numeric values and takes its delay in
+    the query unit. `.to(unit)` changes only `scale`. Further indexing modes
+    (observation-axis selection, time shifts, strides) extend the descriptor
+    later.
+  - Views compose into one descriptor rather than nesting: a window of an
+    embedding keeps the lags and narrows the domain; an embedding of a window
+    adds lags and moves the domain start to `a + (m - 1) * delay`, so its
+    lookups never reach before `a`; an embedding of an embedding sums the lag
+    arrays pairwise.
+  - Every view behaves like any other series. Its `times` are the times in
+    its domain where its value can change: the source's timestamps inside the
+    domain for windows (original timestamps), and the shifted times
+    `s + lag` inside the domain for embeddings. `observation(i)` evaluates the
+    view at `times[i]`, and `len()` counts these times.
+  - Materializing a view stores its support: the last change time at or
+    before the domain start (for a window, the observation carried in before
+    `a`, at its original timestamp) followed by the change times inside the
+    domain, each with the view's value there, plus the domain. Under
+    previous-value evaluation the result evaluates identically everywhere in
+    the domain. An embedding with `m` lags may have up to `m * n` change times;
+    that memory is spent only on a write.
+  - Internal lookups skip the domain check, because shifted and converted
+    times may round just outside it. Shifted times may also land one ulp apart
+    (`0.2 + 0.1` and `0.3`); snapping makes their values equal, and merging
+    them is a later cleanup.
 
-- [ ] **9. Saving series.** (decision) Recommendation: save a series as a tree
-  with its channel names and query unit. Each channel is a stored channel or
-  a node (window or embedding, with its parameters) over another channel. A
-  loaded tree evaluates as the original without the original objects.
-  Alternative: materialize derived channels on saving, which brings back the
-  union of time grids that decision 8 avoids.
+- [ ] **9. Saving series.** (decision) Recommendation: save a series as its
+  distinct storages, each written once even when several channels share it
+  (as the indexed-tensor codec deduplicates sources), followed by each
+  channel's name, storage index, and descriptor, and the query unit. A loaded
+  series evaluates as the original, shares storage the same way, and needs no
+  original objects. Alternative: materialize every view on saving, which
+  costs the memory that decision 8 avoids and loses the sharing.
 
 ## Stored channels
 
@@ -395,15 +426,12 @@ parallel threshold.
   `NestedTensor`. **Catches:** object sequences silently converted to numeric
   arrays, strings or nested tensors passed to the native constructor.
 
-- [ ] **17. Observations and ownership.** `series.observation(i)` returns a
-  copy of recorded observation `i`. Tests with values
-  `[[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]]` and `times=[0.0, 1.0, 2.0]`:
-  - `observation(1)` is `[3.0, 4.0]`, `observation(-1)` is `[5.0, 6.0]`, and
-    `observation(3)` raises `IndexError`. **Catches:** indexing along the
-    coordinates, negative indices counted from the wrong end, no bounds check.
-  - After `obs = series.observation(0)` and `obs[0] = 99.0`,
-    `obs[0] == 99.0` and `series.observation(0)` is still `[1.0, 2.0]`.
-    **Catches:** observations returned as views into the series (decision 4).
+- [ ] **17. Observations.** `series.observation(i)` returns observation `i`.
+  Test with values `[[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]]` and
+  `times=[0.0, 1.0, 2.0]`: `observation(1)` is `[3.0, 4.0]`,
+  `observation(-1)` is `[5.0, 6.0]`, and `observation(3)` raises
+  `IndexError`. **Catches:** indexing along the coordinates, negative indices
+  counted from the wrong end, no bounds check. Writes come in items 48-50.
 
 - [ ] **18. Evaluation.** `series.evaluate(t)` and `series[t]` return the
   previous value (decision 1). Tests with times `[0.0, 1.5, 4.0]` and values
@@ -490,8 +518,8 @@ parallel threshold.
   mapped to the wrong type or precision; a dropped unit, domain, or shape;
   timestamps narrowed to 32 bits.
 
-- [ ] **27. Saving several channels.** The tree of decision 9 for stored
-  channels. Test, parametrized over `save`/`load` and `pickle`: the series of
+- [ ] **27. Saving several channels.** The format of decision 9 for identity
+  views. Test, parametrized over `save`/`load` and `pickle`: the series of
   channels A and B loads with the same channel names, query unit, domain, and
   values at 0.5 and 1.5. **Catches:** names, order, or the query unit lost; a
   channel's own unit lost.
@@ -590,7 +618,7 @@ parallel threshold.
 
 ## Delay embeddings, windows, and sampling (workflow 2)
 
-Items 43-50 use the source series with times `[0.0, 0.5, 1.5, 2.5, 4.0]` and
+Items 43-53 use the source series with times `[0.0, 0.5, 1.5, 2.5, 4.0]` and
 values `[1.0, 2.0, 3.0, 4.0, 5.0]`.
 
 - [ ] **40. Delay embedding.** `TimeDelayEmbedding(dimension, delay)` returns
@@ -604,10 +632,10 @@ values `[1.0, 2.0, 3.0, 4.0, 5.0]`.
     points at 3.25 and 3.75 differ from the point at the last observation
     time, 2.5. **Catches:** newest-first order, the same delay for every
     component, points held from the last observation time.
-  - The embedding has domain `(2.0, 4.0)`, unit `"ms"`, and
-    `shape == (3,)`, and
-    `[1.5]` raises `ValueError`. **Catches:** components that refer to times
-    before the series starts.
+  - The embedding has domain `(2.0, 4.0)`, unit `"ms"`, `shape == (3,)`,
+    and times `[2.0, 2.5, 3.0, 3.5, 4.0]` (the shifted observation times in
+    the domain), and `[1.5]` raises `ValueError`. **Catches:** components that
+    refer to times before the series starts, change times missing.
 
 - [ ] **41. Embedding shaped observations, and embedding errors.** A channel
   of shape `S` embeds into shape `(m, *S)`, oldest first. Tests:
@@ -665,14 +693,46 @@ values `[1.0, 2.0, 3.0, 4.0, 5.0]`.
   **Catches:** channels cut at different bounds, channel B cut in
   milliseconds.
 
-- [ ] **48. Sampler query times.** `RegularSampler(n_points).times(series)`
+## Writing
+
+Items 48-50 use the source series of items 43-46 and the embedding of item
+40.
+
+- [ ] **48. Writing a series.** `set_observation(i, value)`, `values[...] = x`
+  (a tensor backed by the series), and writes through observation views, with
+  the materialization of decision 4 for shared storage. Tests with values
+  `[[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]]` and `times=[0.0, 1.0, 2.0]`:
+  - After `other = series["0"]` (sharing storage) and
+    `series.set_observation(1, [7.0, 8.0])`, `series[1.0]` is `[7.0, 8.0]` and
+    `other[1.0]` is still `[3.0, 4.0]`. **Catches:** a lost write, a write
+    leaking into a view that shares storage.
+  - `series.values[0, 1] = 9.0` gives `observation(0) == [1.0, 9.0]`, and after
+    `obs = series.observation(2)` and `obs[0] = 0.0`, `observation(2)` is
+    `[0.0, 6.0]`. **Catches:** `values` or observations returned as detached
+    copies.
+
+- [ ] **49. Writing a window.** Test: with `w = series[1.0:3.0]`,
+  `w.set_observation(0, 30.0)` gives `w[1.75] == 30.0`, keeps `w[1.0] == 2.0`
+  (the carried-in observation) and `w.times == [1.5, 2.5]`, and leaves the
+  source (`series[1.75] == 3.0`) and the window `series[1.0:2.0]` unchanged.
+  **Catches:** the carried-in observation dropped on materializing, the write
+  reaching the source or a sibling window.
+
+- [ ] **50. Writing an embedding.** Test: for item 40's embedding `e`,
+  `e.set_observation(1, [0.0, 0.0, 0.0])` (time 2.5) gives `e[2.75]` equal to
+  `[0, 0, 0]`, keeps `e[2.0] == [10, 20, 20]`, `e[3.25] == [20, 20, 30]`, and
+  `len(e) == 5`, and leaves the source unchanged. **Catches:** a write into a
+  lagged view reaching the source, materialization at observation times only
+  (which would change the value at 3.25).
+
+- [ ] **51. Sampler query times.** `RegularSampler(n_points).times(series)`
   returns `Times` with `a + (b - a) * k / n_points` for
   `k = 0, ..., n_points - 1`, in the series' unit. The end is never sampled,
   even for a closed domain. Test: `RegularSampler(n_points=4).times(w)` for
   `w = series[1.0:3.0]` gives `[1.0, 1.5, 2.0, 2.5]` with the window's unit.
   **Catches:** the end point included, spacing `(b - a) / (n - 1)`.
 
-- [ ] **49. Sampling one channel.** `RegularSampler(n_points)(windows)`
+- [ ] **52. Sampling one channel.** `RegularSampler(n_points)(windows)`
   evaluates each window at its query times and returns a `PointCloudTensor`
   of shape `(len(windows), n_channels)` whose clouds have `n_points` points;
   each observation is flattened into a point of dimension `prod(shape)`, and a
@@ -682,18 +742,18 @@ values `[1.0, 2.0, 3.0, 4.0, 5.0]`.
   **Catches:** windows stacked out of order, values at window starts missing,
   the wrong precision.
 
-- [ ] **50. Sampling several channels.** Test: `Window(size=1.0, step=1.0)` of
+- [ ] **53. Sampling several channels.** Test: `Window(size=1.0, step=1.0)` of
   the series of channels A and B with `n_points=2` gives shape `(2, 2)` with
   the clouds `[[10], [20]]` and `[[-1], [-1]]` in the first window and
   `[[20], [20]]` and `[[-2], [-2]]` in the second. **Catches:** channels
   swapped, channels evaluated on one grid.
 
-- [ ] **51. Sampler errors.** Test, parametrized: `n_points=0` and an empty
+- [ ] **54. Sampler errors.** Test, parametrized: `n_points=0` and an empty
   list raise `ValueError`; a point-cloud series raises `TypeError`.
   **Catches:** an empty result without a type, object values sampled into
   point clouds.
 
-- [ ] **52. The delay workflow end to end.** Test in
+- [ ] **55. The delay workflow end to end.** Test in
   `test/python/test_integration.py`: times `[0.0, 0.5, ..., 3.5]` and values
   `[0, 1, 0, -1, 0, 1, 0, -1]` through
   `TimeDelayEmbedding(dimension=2, delay=0.5)`,
@@ -702,17 +762,22 @@ values `[1.0, 2.0, 3.0, 4.0, 5.0]`.
   `(3, 1)` with four 2-D points each and barcodes of shape `(3, 1, 2)`.
   **Catches:** steps that do not compose.
 
-- [ ] **53. Saving derived series.** Window and embedding nodes in the tree of
-  decision 9. Test, parametrized over `save`/`load` and `pickle`: the window
-  `[1.5, 2.5)` of item 42's embedding loads with the same channel names,
-  domain, unit, and values at 1.5 and 2.0, and `[2.5]` still raises
-  `ValueError`. **Catches:** a node kind, parameter, or query unit lost on
-  saving, the half-open end lost.
+- [ ] **56. Saving views.** Window and embedding descriptors in the format of
+  decision 9, with shared storage written once. Tests, parametrized over
+  `save`/`load` and `pickle`:
+  - The window `[1.5, 2.5)` of item 42's embedding loads with the same channel
+    names, domain, unit, and values at 1.5 and 2.0, and `[2.5]` still raises
+    `ValueError`. **Catches:** a lag, bound, or query unit lost on saving, the
+    half-open end lost.
+  - `from_channels({"x": s, "y": s[1.0:3.0]})`, two views of one storage,
+    saves to fewer bytes than the same series built from two independent
+    copies of `s`, and loads with the same values. **Catches:** shared storage
+    written once per channel.
 
-- [ ] **54. Golden files.** Pin the formats (TESTING.md principle 11) with a
+- [ ] **57. Golden files.** Pin the formats (TESTING.md principle 11) with a
   generator modeled on `test/golden/serialization/generate_point_cloud_v3.py`,
   which records explicit expected values. Write item 28's barcode32 result,
-  the series of channels A and B, and item 53's derived series as `.sb` and
+  the series of channels A and B, and item 56's window as `.sb` and
   pickle files, and teach `test_serialization_goldens.py` to compare series
   (channel names, unit, domain, values at listed times). **Catches:** a later
   change to a payload that breaks saved files.
@@ -722,7 +787,7 @@ values `[1.0, 2.0, 3.0, 4.0, 5.0]`.
 Code items update the docstrings they touch (AGENTS.md). These items add the
 pages.
 
-- [ ] **55. API reference.** Add `docs/api_timeseries.rst` to the toctree in
+- [ ] **58. API reference.** Add `docs/api_timeseries.rst` to the toctree in
   `docs/stablebear.rst`. Check that the docstrings state the contracts of
   decisions 1-4 and 6-8: domains and their closedness, previous-value
   evaluation and snapping, units, query units and conversion, channels and
@@ -731,7 +796,7 @@ pages.
   channels. Check that `compute_persistent_homology`, the three summaries,
   `save`, and `load` document series input and output.
 
-- [ ] **56. User guide.** A `docs/timeseries.rst` guide linked from
+- [ ] **59. User guide.** A `docs/timeseries.rst` guide linked from
   `docs/userguide.rst`: times, units, domains, and channels, then two small
   examples. The first follows a point-cloud series through persistence to
   stable ranks; the second takes two numeric channels in different units
@@ -739,33 +804,33 @@ pages.
   operation to its API entry on first mention. Figures are not needed; if one
   is added, follow the dropdown rule in AGENTS.md.
 
-- [ ] **57. Changelog.** A New features entry in `CHANGELOG.md` linking #242,
+- [ ] **60. Changelog.** A New features entry in `CHANGELOG.md` linking #242,
   under the heading of the release that ships it (to be decided; 0.5.1 is in
   progress).
 
 ## Final checks
 
-- [ ] **58. Test run.** After a CMake build and install, run the new test
+- [ ] **61. Test run.** After a CMake build and install, run the new test
   files, then the full Python suite and `sb_test` from `test/`.
-- [ ] **59. Docs build.** Run `make html` in `docs/` (with `LC_ALL=C.UTF-8` if
+- [ ] **62. Docs build.** Run `make html` in `docs/` (with `LC_ALL=C.UTF-8` if
   the locale is missing), check for warnings, and read the new pages.
-- [ ] **60. Push.** Push `issue-242-timeseries`, open a PR against `main`, and
+- [ ] **63. Push.** Push `issue-242-timeseries`, open a PR against `main`, and
   remove this plan before merging.
 
 ## Coverage of the acceptance criteria
 
 | Criterion in #242 | Items |
 | --- | --- |
-| Time, domain, evaluation, shape, and ownership contracts; empty and singleton behavior | 1-9, 19 |
+| Time, domain, evaluation, shape, and ownership contracts; empty and singleton behavior | 1-9, 19, 48-50 |
 | `Times`, native storage and access, default seconds, explicit units, one timestamp per observation | 10-13, 17-18, 20-21 |
 | Floating-point arrays with explicit times or a packed table | 11-12, 15-16 |
 | Native operation contract, dispatch, and adapter; calls, parameters, CPU limits | 6, 28-29, 32, 36, 38-39 |
 | Persistence and barcode summaries of series | 28-35 |
 | Delay embedding and windows | 40-47 |
-| Regular sampling into point clouds and through persistence | 48-52 |
-| Save, load, and pickle for both workflows | 26-27, 53-54 |
-| Tests and documented examples | all test items, 55-56 |
-| Channels with their own grids and units (added) | 3, 21-25, 29, 42, 47, 50 |
+| Regular sampling into point clouds and through persistence | 51-55 |
+| Save, load, and pickle for both workflows | 26-27, 56-57 |
+| Tests and documented examples | all test items, 58-59 |
+| Channels with their own grids and units (added) | 3, 21-25, 29, 42, 47, 53 |
 
 ## Out of scope
 
@@ -774,6 +839,8 @@ samplers, interpolation, partial windows, gap policies, tensors of series,
 reductions over time, provenance, and normalization. Also deferred here:
 joining channels into one point cloud when sampling, series with channels of
 different element types, observations whose shape changes over time
-(a later per-observation tensor storage mode), `NestedTensor` values,
+(a later per-observation tensor storage mode), `NestedTensor` values (6
+more element types, cheap to add once a use such as spike trains needs
+them),
 `Tensor<TimeSeries>`, views instead of copies for stored channels,
 and the branch's notebooks and scikit-learn transformers.
