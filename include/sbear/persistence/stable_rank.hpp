@@ -69,10 +69,10 @@ namespace sb::ph
   }
 
   template <typename T>
-  auto make_stable_rank_task(const Tensor<Barcode<T>>& barcodes, Tensor<Pcf<T, T>>& out)
+  auto make_stable_rank_task(Tensor<Barcode<T>> barcodes)
   {
-    return std::make_unique<BarcodeSummaryTask<T, decltype(&barcode_to_stable_rank<T>)>>(
-        barcodes, out, barcode_to_stable_rank<T>,
+    return make_barcode_summary_task<T>(
+        std::move(barcodes), [](const Barcode<T>& bc) { return barcode_to_stable_rank(bc); },
         "Converting barcodes to stable rank functions");
   }
 }

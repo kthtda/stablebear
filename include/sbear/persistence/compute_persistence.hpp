@@ -4,15 +4,15 @@
 #include "../tensor.hpp"
 #include "../point_cloud.hpp"
 #include "../distance_matrix.hpp"
-#include "../executor.hpp"
-#include "../task.hpp"
+#include "../ufunc.hpp"
 
 #include "barcode.hpp"
 #include "persistence_pair.hpp"
 
 #include "ripser/ripser.hpp"
 
-#include <iostream>
+#include <span>
+#include <string>
 #include <type_traits>
 #include <utility>
 
@@ -22,9 +22,9 @@ namespace sb::ph
   {
     /// Run Ripser on any distance-matrix-like object (must have .size() and operator()(i,j)).
     /// Computes the enclosing radius threshold, builds the compressed lower-triangular
-    /// matrix, runs Ripser, and writes barcodes into ret at the given index.
+    /// matrix, runs Ripser, and writes the barcode of dimension i into out[i].
     template <typename DistMatT, typename T>
-    void run_ripser(const DistMatT& distanceMatrix, size_t n, Tensor<Barcode<T>>& ret, size_t maxDim, const std::vector<size_t>& index, bool reducedHomology)
+    void run_ripser(const DistMatT& distanceMatrix, size_t n, std::span<Barcode<T>> out, size_t maxDim, bool reducedHomology)
     {
       // A single point has no pairwise distances, so ripser's compressed
       // distance matrix would be empty and init_rows() would dereference
@@ -34,15 +34,12 @@ namespace sb::ph
       {
         for (auto i = 0_uz; i < maxDim + 1; ++i)
         {
-          auto retIdx = index;
-          retIdx.back() = i;
-
           std::vector<PersistencePair<T>> bars;
           if (i == 0 && !reducedHomology && n == 1)
           {
             bars.emplace_back(T{0}, std::numeric_limits<T>::infinity());
           }
-          ret(retIdx) = std::move(bars);
+          out[i] = std::move(bars);
         }
         return;
       }
@@ -68,8 +65,6 @@ namespace sb::ph
       for (auto i = 0_uz; i < maxDim + 1; ++i)
       {
         auto const & intervals = ripser.get_intervals(i);
-        auto retIdx = index;
-        retIdx.back() = i;
 
         std::vector<PersistencePair<T>> bars;
         bars.reserve(intervals.size() + 1);
@@ -86,16 +81,16 @@ namespace sb::ph
           bars.emplace_back(static_cast<T>(rpair.birth), static_cast<T>(rpair.death));
         }
 
-        ret(retIdx) = std::move(bars);
+        out[i] = std::move(bars);
       }
     }
 
-    /// Build a Euclidean distance matrix from @p points and run Ripser into @p ret.
+    /// Build a Euclidean distance matrix from @p points and run Ripser into @p out.
     /// n_points()/dim()/operator()(i, j) read through any indexing transparently, so an
     /// indexed subsample (sharing a source cloud) needs no special handling.
     template <typename T>
-    void run_euclidean_ripser(const PointCloud<T>& points, Tensor<Barcode<T>>& ret,
-                              size_t maxDim, const std::vector<size_t>& index, bool reducedHomology)
+    void run_euclidean_ripser(const PointCloud<T>& points, std::span<Barcode<T>> out,
+                              size_t maxDim, bool reducedHomology)
     {
       const size_t nPoints = points.n_points();
       const size_t dim = points.dim();
@@ -115,101 +110,60 @@ namespace sb::ph
       }
 
       rips::euclidean_distance_matrix distanceMatrix(std::move(rpoints));
-      run_ripser(distanceMatrix, nPoints, ret, maxDim, index, reducedHomology);
-    }
-
-    template <typename T, TensorProperties Properties>
-    void compute_persistence_euclidean_single_impl(const Tensor<PointCloud<T>, Properties>& pclouds, Tensor<Barcode<T>>& ret, size_t maxDim, const std::vector<size_t>& index, bool reducedHomology = false)
-    {
-      if (index.back() != 0)
-      {
-        return;
-      }
-
-      auto pcIdx = std::vector<size_t>(index.begin(), std::prev(index.end()));
-      auto const & points = pclouds(pcIdx);
-
-      // Empty clouds do not contribute persistence intervals.
-      if (points.n_points() == 0)
-      {
-        return;
-      }
-
-      if (points.dim() == 0)
-      {
-        return;
-      }
-
-      run_euclidean_ripser(points, ret, maxDim, index, reducedHomology);
-    }
-
-    template <typename T, TensorProperties Properties>
-    void compute_persistence_distmat_single_impl(const Tensor<DistanceMatrix<T>, Properties>& dmats, Tensor<Barcode<T>>& ret, size_t maxDim, const std::vector<size_t>& index, bool reducedHomology = false)
-    {
-      if (index.back() != 0)
-      {
-        return;
-      }
-
-      auto dmIdx = std::vector<size_t>(index.begin(), std::prev(index.end()));
-      auto const & dmat = dmats(dmIdx);
-
-      if (dmat.size() == 0)
-      {
-        return;
-      }
-
-      run_ripser(dmat, dmat.size(), ret, maxDim, index, reducedHomology);
+      run_ripser(distanceMatrix, nPoints, out, maxDim, reducedHomology);
     }
   }
 
-  /// Parallel Ripser task, templated on the input element type (PointCloud<T> or DistanceMatrix<T>).
-  template <typename ElemT, typename T, TensorProperties Properties = TensorProperty::None>
-  class RipserTaskImpl : public StoppableTask<void>
+  /// Vietoris-Rips persistence of one point cloud (Euclidean distances) or one
+  /// distance matrix, as an operation with extra dimensions (maxDim + 1,): out[i] is
+  /// the barcode of dimension i.
+  template <typename ElemT, typename T>
+  struct PersistenceOperation
   {
-  public:
-    RipserTaskImpl(Tensor<ElemT, Properties> input, Tensor<Barcode<T>>& ret, size_t maxDim = 1, bool reducedHomology = false)
-      : m_input(std::move(input)), m_ret(ret), m_maxDim(maxDim), m_reducedHomology(reducedHomology)
-    { }
+    using input_type = ElemT;
+    using output_type = Barcode<T>;
 
-  private:
-    tf::Future<void> run_async(Executor& exec) override
+    size_t maxDim = 1;
+    bool reducedHomology = false;
+
+    [[nodiscard]] std::vector<size_t> extra_dims() const { return {maxDim + 1}; }
+
+    void operator()(const ElemT& input, std::span<Barcode<T>> out) const
     {
-      auto shape = m_input.shape();
-      shape.emplace_back(m_maxDim + 1);
-      m_ret = Tensor<Barcode<T>>(shape);
-
-      next_step(m_input.size(), "Computing persistence", "pointcloud");
-
-      return sb::parallel_walk_async(m_input, [this](const std::vector<size_t>& index) {
-        if (stop_requested())
+      if constexpr (std::is_same_v<ElemT, PointCloud<T>>)
+      {
+        // Empty clouds do not contribute persistence intervals.
+        if (input.n_points() == 0 || input.dim() == 0)
+        {
           return;
-
-        thread_local std::vector<size_t> retIdx;
-        retIdx.resize(index.size() + 1);
-        std::copy(index.begin(), index.end(), retIdx.begin());
-        retIdx.back() = 0;
-
-        if constexpr (std::is_same_v<ElemT, PointCloud<T>>)
-          detail::compute_persistence_euclidean_single_impl(m_input, m_ret, m_maxDim, retIdx, m_reducedHomology);
-        else
-          detail::compute_persistence_distmat_single_impl(m_input, m_ret, m_maxDim, retIdx, m_reducedHomology);
-        add_progress(1);
-      }, exec);
+        }
+        detail::run_euclidean_ripser(input, out, maxDim, reducedHomology);
+      }
+      else
+      {
+        if (input.size() == 0)
+        {
+          return;
+        }
+        detail::run_ripser(input, input.size(), out, maxDim, reducedHomology);
+      }
     }
-
-    Tensor<ElemT, Properties> m_input;
-    Tensor<Barcode<T>>& m_ret;
-    size_t m_maxDim;
-    bool m_reducedHomology;
-
   };
 
-  template <typename T, TensorProperties Properties = TensorProperty::None>
-  using RipserTask = RipserTaskImpl<PointCloud<T>, T, Properties>;
+  template <typename ElemT, typename T, TensorProperties Properties = TensorProperty::None>
+  using PersistenceTask = UfuncTask<PersistenceOperation<ElemT, T>, Properties>;
 
-  template <typename T, TensorProperties Properties = TensorProperty::None>
-  using RipserDistMatTask = RipserTaskImpl<DistanceMatrix<T>, T, Properties>;
+  /// Persistence of every point cloud or distance matrix in @p input. The
+  /// result has the input's shape followed by (maxDim + 1).
+  template <typename ElemT, TensorProperties Properties>
+  auto make_persistence_task(Tensor<ElemT, Properties> input, size_t maxDim = 1, bool reducedHomology = false)
+  {
+    using T = typename ElemT::value_type;
+    return std::make_unique<PersistenceTask<ElemT, T, Properties>>(
+        std::move(input),
+        PersistenceOperation<ElemT, T>{.maxDim = maxDim, .reducedHomology = reducedHomology},
+        "Computing persistence", "pointcloud");
+  }
 
 }
 

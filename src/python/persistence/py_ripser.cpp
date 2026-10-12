@@ -16,33 +16,23 @@ namespace
   class PyRipserBindings
   {
   public:
-    template <sb::TensorProperties Properties>
-    static std::unique_ptr<sb::StoppableTask<void>> spawn_ripser_pcloud_euclidean_task(
-        const sb::Tensor<sb::PointCloud<T>, Properties>& pclouds,
-        sb::Tensor<sb::ph::Barcode<T>>& out, size_t maxDim,
-        bool reducedHomology)
+    template <typename ElemT, sb::TensorProperties Properties>
+    static auto spawn_persistence_task(
+        const sb::Tensor<ElemT, Properties>& input, size_t maxDim, bool reducedHomology)
     {
-      return sb_py::execute_stoppable_task<sb::ph::RipserTask<T, Properties>>(
-          pclouds, out, maxDim, reducedHomology);
+      auto task = sb::ph::make_persistence_task(input, maxDim, reducedHomology);
+      task->start_async(sb::default_executor());
+      return task;
     }
 
-    static std::unique_ptr<sb::StoppableTask<void>> spawn_ripser_single_pcloud_euclidean_task(const sb::PointCloud<T>& pointCloud, sb::Tensor<sb::ph::Barcode<T>>& out, size_t maxDim, bool reducedHomology)
+    /// A single cloud or matrix runs as a 0-d tensor, so the result has shape
+    /// (maxDim + 1,).
+    template <typename ElemT>
+    static auto spawn_single_persistence_task(
+        const ElemT& element, size_t maxDim, bool reducedHomology)
     {
-      sb::Tensor<sb::PointCloud<T>> pointClouds({1});
-      pointClouds(0) = pointCloud.copy();
-      return sb_py::execute_stoppable_task<sb::ph::RipserTask<T>>(
-        std::move(pointClouds), out, maxDim, reducedHomology);
-    }
-
-    template <sb::TensorProperties Properties>
-    static std::unique_ptr<sb::StoppableTask<void>> spawn_ripser_distmat_task(
-        const sb::Tensor<sb::DistanceMatrix<T>, Properties>& dmats,
-        sb::Tensor<sb::ph::Barcode<T>>& out,
-        size_t maxDim, bool reducedHomology)
-    {
-      return sb_py::execute_stoppable_task<
-        sb::ph::RipserDistMatTask<T, Properties>>(
-        dmats, out, maxDim, reducedHomology);
+      return spawn_persistence_task(
+          sb::Tensor<ElemT>(std::vector<size_t>{}, element), maxDim, reducedHomology);
     }
 
     static void register_bindings(py::module_& m, const std::string& suffix)
@@ -51,16 +41,24 @@ namespace
         m, ("PersistenceRipser" + suffix).c_str());
       sb_py::bind_tensor_property_variants(
         [&]<sb::TensorProperties Properties>() {
+          const std::string variant = Properties == sb::TensorProperty::Indexed ? "Indexed" : "";
+          sb_py::register_result_task<sb::ph::PersistenceTask<sb::PointCloud<T>, T, Properties>>(
+            m, "_PersistenceTaskPointCloud" + suffix + variant);
+          sb_py::register_result_task<sb::ph::PersistenceTask<sb::DistanceMatrix<T>, T, Properties>>(
+            m, "_PersistenceTaskDistanceMatrix" + suffix + variant);
           cls.def_static(
             "spawn_ripser_pcloud_euclidean_task",
-            &PyRipserBindings::template spawn_ripser_pcloud_euclidean_task<Properties>);
+            &PyRipserBindings::template spawn_persistence_task<sb::PointCloud<T>, Properties>);
           cls.def_static(
             "spawn_ripser_distmat_task",
-            &PyRipserBindings::template spawn_ripser_distmat_task<Properties>);
+            &PyRipserBindings::template spawn_persistence_task<sb::DistanceMatrix<T>, Properties>);
         });
       cls.def_static(
           "spawn_ripser_pcloud_euclidean_task",
-          &PyRipserBindings::spawn_ripser_single_pcloud_euclidean_task);
+          &PyRipserBindings::template spawn_single_persistence_task<sb::PointCloud<T>>);
+      cls.def_static(
+          "spawn_ripser_distmat_task",
+          &PyRipserBindings::template spawn_single_persistence_task<sb::DistanceMatrix<T>>);
     }
   };
 

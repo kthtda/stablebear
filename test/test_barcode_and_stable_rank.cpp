@@ -144,7 +144,6 @@ namespace
   {
     using T = TypeParam;
     using Barcode = sb::ph::Barcode<T>;
-    using PcfT = sb::Pcf<T, T>;
 
     sb::Tensor<Barcode> barcodes({ 2 });
 
@@ -156,10 +155,9 @@ namespace
     barcodes(0) = Barcode(bars0);
     barcodes(1) = Barcode(bars1);
 
-    sb::Tensor<PcfT> out;
-
-    auto task = sb::ph::make_stable_rank_task(barcodes, out);
+    auto task = sb::ph::make_stable_rank_task(barcodes);
     task->start_async(sb::default_executor()).future().wait();
+    const auto& out = task->result();
 
     ASSERT_EQ(out.shape().size(), 1u);
     ASSERT_EQ(out.shape(0), 2u);
