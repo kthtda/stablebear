@@ -444,7 +444,7 @@ parallel threshold.
     `ValueError`. **Catches:** extrapolation outside the domain, NaN instead
     of an error.
 
-- [ ] **19. Empty and singleton series.** Tests:
+- [x] **19. Empty and singleton series.** Tests:
   - `TimeSeries(sb.zeros((0,), dtype=sb.pcloud64), times=[])` has
     `len() == 0`, dtype pcloud64, and `domain is None`, and `series(0.0)`
     raises `ValueError`. **Catches:** an invented domain, a crash on empty
