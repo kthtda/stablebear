@@ -106,7 +106,7 @@ This assumes the recommended option of each decision.
   arguments and wraps results.
 - `series(t)` looks up each channel on its own grid, in its own unit, and
   returns the value for one channel or an ordered dict for several.
-  `series[a:b]` is a window, and `series["name"]` selects channels.
+  `series.window(a, b)` is a window, and `series["name"]` selects channels.
 - Every channel is a view: a `shared_ptr` to its storage plus a descriptor
   (domain, lags, unit scale). Windows, delay embeddings, channel selection,
   and unit changes copy no values; a write materializes the whole view into
@@ -278,7 +278,7 @@ parallel threshold.
   - A `TimeSeries` exposes `channel_names`, `dtype`, `unit`, `domain`, `times`
     (a `Times` for one channel, a `NestedTensor` with one leaf per channel in
     the query unit for several), `to(unit)`, `evaluate(t)`, `series(t)` (the
-    same as `evaluate(t)`), `series[a:b]` (a window),
+    same as `evaluate(t)`), `series.window(a, b)` (a window),
     and `series["name"]` or `series[["a", "b"]]` (channel selection). A
     one-channel series also exposes `values`, `shape`, `len()`,
     and `observation(i)`; on several channels these raise `ValueError` asking
@@ -667,14 +667,16 @@ values `[1.0, 2.0, 3.0, 4.0, 5.0]`.
   anchored at the end, partial windows kept, the overlap used as the step, an
   overlapping default.
 
-- [ ] **44. Window contents and time slicing.** `series[a:b]` is the window
-  `[a, b)`, the same object `Window` produces. Tests with the source series:
-  - `w = series[1.0:3.0]` has times `[1.5, 2.5]` (original timestamps),
+- [ ] **44. Window contents and `series.window`.** `series.window(a, b)` is
+  the window `[a, b)`, the same object `Window` produces; `[a, b)` must lie in
+  the domain. Tests with the source series:
+  - `w = series.window(1.0, 3.0)` has times `[1.5, 2.5]` (original timestamps),
     `w(1.0) == 2.0` (the observation at 0.5), and `w(2.75) == 4.0`.
     **Catches:** the value before the first observation in the window missing,
     timestamps moved to the window start.
-  - `w(3.0)` raises `ValueError`, and `series[1.0:3.0:0.5]` raises
-    `ValueError`. **Catches:** a closed window end, a step silently ignored.
+  - `w(3.0)` raises `ValueError`, and `series.window(3.0, 1.0)` and
+    `series.window(-1.0, 1.0)` raise `ValueError`. **Catches:** a closed
+    window end, reversed bounds or bounds outside the domain accepted.
 
 - [ ] **45. Window parameter errors.** Test, parametrized `ValueError`:
   `size=0.0`, `size=-1.0`, `step=0.0`, `overlap=2.0` and `overlap=-0.5` with
@@ -682,10 +684,10 @@ values `[1.0, 2.0, 3.0, 4.0, 5.0]`.
   never advance, conflicting parameters accepted.
 
 - [ ] **46. Embedding a window.** Test: `TimeDelayEmbedding(dimension=2,
-  delay=1.0)` of `series[1.0:3.0]` has domain `(2.0, 3.0)`; its value at 2.0
-  is `[2, 3]` (with the value at 1.0 from the source) and at 2.75 is `[3, 4]`;
-  evaluating it at 1.5 or 3.0 raises `ValueError`. **Catches:** history taken
-  from before the window, the half-open end lost.
+  delay=1.0)` of `series.window(1.0, 3.0)` has domain `(2.0, 3.0)`; its value
+  at 2.0 is `[2, 3]` (with the value at 1.0 from the source) and at 2.75 is
+  `[3, 4]`; evaluating it at 1.5 or 3.0 raises `ValueError`. **Catches:**
+  history taken from before the window, the half-open end lost.
 
 - [ ] **47. Windows of several channels.** Test:
   `Window(size=1.0, step=1.0)` of the series of channels A and B gives windows
@@ -712,12 +714,12 @@ Items 48-50 use the source series of items 43-46 and the embedding of item
     `[0.0, 6.0]`. **Catches:** `values` or observations returned as detached
     copies.
 
-- [ ] **49. Writing a window.** Test: with `w = series[1.0:3.0]`,
+- [ ] **49. Writing a window.** Test: with `w = series.window(1.0, 3.0)`,
   `w.set_observation(0, 30.0)` gives `w(1.75) == 30.0`, keeps `w(1.0) == 2.0`
   (the carried-in observation) and `w.times == [1.5, 2.5]`, and leaves the
-  source (`series(1.75) == 3.0`) and the window `series[1.0:2.0]` unchanged.
-  **Catches:** the carried-in observation dropped on materializing, the write
-  reaching the source or a sibling window.
+  source (`series(1.75) == 3.0`) and the window `series.window(1.0, 2.0)`
+  unchanged. **Catches:** the carried-in observation dropped on materializing,
+  the write reaching the source or a sibling window.
 
 - [ ] **50. Writing an embedding.** Test: for item 40's embedding `e`,
   `e.set_observation(1, [0.0, 0.0, 0.0])` (time 2.5) gives `e(2.75)` equal to
@@ -727,11 +729,11 @@ Items 48-50 use the source series of items 43-46 and the embedding of item
   (which would change the value at 3.25).
 
 - [ ] **51. Sampler query times.** `RegularSampler(n_points).times(series)`
-  returns `Times` with `a + (b - a) * k / n_points` for
-  `k = 0, ..., n_points - 1`, in the series' unit. The end is never sampled,
-  even for a closed domain. Test: `RegularSampler(n_points=4).times(w)` for
-  `w = series[1.0:3.0]` gives `[1.0, 1.5, 2.0, 2.5]` with the window's unit.
-  **Catches:** the end point included, spacing `(b - a) / (n - 1)`.
+  returns `Times` with `a + (b - a) * k / n_points` for `k = 0, ..., n_points
+  - 1`, in the series' unit. The end is never sampled, even for a closed
+  domain. Test: `RegularSampler(n_points=4).times(w)` for `w =
+  series.window(1.0, 3.0)` gives `[1.0, 1.5, 2.0, 2.5]` with the window's
+  unit. **Catches:** the end point included, spacing `(b - a) / (n - 1)`.
 
 - [ ] **52. Sampling one channel.** `RegularSampler(n_points)(windows)`
   evaluates each window at its query times and returns a `PointCloudTensor`
