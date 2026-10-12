@@ -12,9 +12,7 @@ Where the plan departs from the issue:
 - Channels with their own time grids and units are in this release; the issue
   defers a channel-combination API.
 - Every channel holds one observation per time, a tensor of a fixed `shape`
-  (often `()`). Persistence of a channel `"cam"`
-  returns one channel per homology degree (`"cam/H0"`, `"cam/H1"`) instead of
-  a value axis of length `max_dim + 1`.
+  (often `()`).
 - A delay embedding adds a leading delay axis to each observation, and the
   sampler flattens observations into points and returns a
   `PointCloudTensor` directly, so `PointCloudTensor` needs no `FloatTensor`
@@ -40,7 +38,7 @@ test; **(optional)** safe to skip without losing important coverage. Check off
 a skipped optional item with the note "skipped".
 
 **Test budget.** The items add about 55 test functions, many of them
-parametrized, plus two optional ones. Keep that number from growing. Before
+parametrized, plus three optional ones. Keep that number from growing. Before
 adding a test that is not listed, check whether a listed test's
 parametrization covers it, and prefer leaving a guarantee to the design and
 its docstring over testing every combination. Do not test what the public API
@@ -51,8 +49,8 @@ observable from Python (TESTING.md principle 4).
 
 - **Files.** Source: `include/sbear/timeseries.hpp` (`Times`, channels,
   `TimeSeries<T>`), `include/sbear/timeseries/derived.hpp` (windows,
-  embeddings, sampling), `include/sbear/timeseries/series_task.hpp` (analysis
-  adapter), `include/sbear/io/timeseries_io.hpp`,
+  embeddings, sampling), `include/sbear/ufunc.hpp` (operations and
+  `UfuncTask`), `include/sbear/io/timeseries_io.hpp`,
   `src/python/py_timeseries.{hpp,cpp}`, and the package
   `stablebear/timeseries/` with thin wrappers. Tests:
   `test/python/test_timeseries.py` (storage, access, evaluation, units,
@@ -114,9 +112,12 @@ This assumes the recommended option of each decision.
   cloud, flattening each observation into a point of dimension
   `prod(shape)`, and returns a `PointCloudTensor` of shape
   `(n_windows, n_channels)`.
-- `sb::SeriesTask` runs an existing batch task (`RipserTask`,
-  `RipserDistMatTask`, `BarcodeSummaryTask`) once over all channels of a
-  series and returns a series with the inputs' times and domains.
+- Analysis functions are operations in the style of NumPy ufuncs: a native
+  per-element kernel with bound parameters and an output core shape (for
+  persistence, `(max_dim + 1,)`). One native `UfuncTask` applies an
+  operation to any container through a small adapter. For a series, each
+  output channel keeps its input's name, times, and domain, and its shape is
+  the input shape followed by the core shape. Tensors use the same task.
 
 ## Recycling
 
@@ -131,18 +132,18 @@ and copy ideas and small blocks, not whole files.
   not fit.
 - `include/mpcf/algorithms/embed_time_delay.hpp`: the evaluation loop of
   `embed_time_delay_range` (oldest-to-newest components, valid start
-  `start + (dimension - 1) * delay`) for the lazy embedding (items 38-40).
+  `start + (dimension - 1) * delay`) for the lazy embedding (items 40-42).
   Not its windows, which are anchored at the end and keep a partial first
   window, and not its tuples, which it stores only at original observation
   times; the issue rules out both.
 - `include/mpcf/io/timeseries_io.hpp`: the outline of the writer and reader
-  for items 26-27 and 51, with new payloads.
+  for items 26-27 and 53, with new payloads.
 - `src/python/py_timeseries.cpp`: the array-copy and length-check patterns for
   items 10-15.
 - `masspcf/persistence/homology.py` (the `TensorTimeSeries` branch): one
-  batched Ripser call over all snapshots. Item 28 keeps the idea and moves it
-  into native code.
-- `docs/ts_*.rst`: background wording for item 54; the API differs.
+  batched Ripser call over all snapshots. `UfuncTask` (item 28) keeps the
+  idea and moves it into native code.
+- `docs/ts_*.rst`: background wording for item 56; the API differs.
 
 Not recycled: datetime support, interpolation strategies, `TimeSeriesTensor`,
 the scikit-learn transformers, `l2_kernel` cross kernels, and the `tensor_eval`
@@ -195,7 +196,7 @@ parallel threshold.
   without seeing later changes.
   (b) Views, with documented write-through.
 
-- [ ] **5. Native storage and where the code lives.** (decision)
+- [x] **5. Native storage and where the code lives.** (decision: as recommended; all evaluation in C++, flat values plus `shape`, `NestedTensor`-style registration)
   Recommendation, from our discussion:
   - All evaluation runs in C++: the previous-value lookup with snapping,
     domain checks, unit conversion, windows, delay embeddings, and sampling.
@@ -222,22 +223,29 @@ parallel threshold.
     `TensorFormatFlag::TimeSeries`, so one writer and reader serve all
     element types, as `TensorFormatFlag::Nested` does.
 
-- [ ] **6. Analysis adapter.** (decision) Recommendation:
-  `sb::SeriesTask<TaskT, InT, OutT>` derives from an existing batch task. A
-  base declared before the task (base-from-member) holds the input series and
-  the output tensor. It concatenates the values of all channels into one
-  tensor, so the task runs once over the whole series, and `result()` splits
-  the output by channel offsets. Persistence of a channel `"cam"` with
-  `max_dim = k` returns channels `"cam/H0"` to `"cam/Hk"` with cam's times and
-  domain; the barcode summaries keep channel names. The task supplies
-  scheduling, progress, cancellation, and error capture, and the base keeps
-  inputs and output alive until completion (`BarcodeSummaryTask` stores only a
-  reference to its input). Each operation declares its contract with a
-  `make_*_series_task` overload, and pybind11 overloads on the native series
-  type select the implementation. A singleton channel keeps its observation
-  and an empty channel gives a typed empty result. Alternative: Python spawns
-  the existing tasks per channel and rebuilds the series; no new C++, but
-  dispatch and result construction stay in Python, against the issue.
+- [x] **6. Analysis adapter.** (decision: operations in the style of ufuncs; the core shape extends the observation shape; tensors move to the same task; no public `apply` yet)
+  - An operation is a native per-element kernel with its parameters bound and
+    an output core shape, like a NumPy gufunc signature. Persistence maps
+    `PointCloud` or `DistanceMatrix` to `Barcode` with core shape
+    `(max_dim + 1,)`; the barcode summaries map `Barcode` to `Pcf` with core
+    shape `()`. The kernels already exist (`run_euclidean_ripser`,
+    `run_ripser`, `barcode_to_stable_rank`, ...).
+  - One native `UfuncTask` walks all input elements in parallel on the
+    existing executor and writes the output, with progress, cancellation, and
+    error capture from `StoppableTask`. It owns its inputs and output until
+    completion.
+  - A container adapter says where the elements are and how to build the
+    output. Tensor: output shape is the input shape followed by the core
+    shape. Series: every channel is processed in the same task, and each
+    output channel keeps its name, times, and domain, with shape
+    `shape + core shape`. Persistence of a channel of shape `()` therefore has
+    shape `(max_dim + 1,)`; no channels are added. A future container needs
+    only an adapter.
+  - `compute_persistent_homology` and the summaries keep their signatures and
+    forward to private native entry points; pybind11 overloads select the
+    container and element type. A public `apply` stays private for now.
+  - A singleton channel keeps its observation and an empty channel gives a
+    typed empty result.
 
 - [ ] **7. Public names and accepted values.** (decision) Recommendation:
   - `stablebear.timeseries` exports `Times(values, unit="s")`,
@@ -490,48 +498,46 @@ parallel threshold.
 
 ## Snapshot persistence (workflow 1)
 
-- [ ] **28. `SeriesTask` and point-cloud persistence.** Add `sb::SeriesTask`
-  (decision 6) in `include/sbear/timeseries/series_task.hpp`, a
-  `make_ripser_series_task` overload for point-cloud series, and bindings in
-  `src/python/persistence/py_ripser.cpp`, with each task class exposing
-  `result()`. The registered task base is not the first base, so the
-  pybind11 classes need `py::multiple_inheritance()`.
-  `compute_persistent_homology` forwards a `TimeSeries`, keeping the existing
-  complex and distance checks; update its signature and docstring. Tests:
+- [ ] **28. `UfuncTask` and point-cloud persistence.** Add the operation
+  interface, `UfuncTask`, and the series adapter (decision 6) in
+  `include/sbear/ufunc.hpp`, the persistence operation for point clouds, and
+  a private entry point in `src/python/persistence/py_ripser.cpp` returning
+  the task with `result()`. `compute_persistent_homology` forwards a
+  `TimeSeries`, keeping the existing complex and distance checks; update its
+  signature and docstring. Tests:
   - Parametrized over pcloud32 and pcloud64, for the series of the three
-    clouds: the result has `channel_names == ("0/H0", "0/H1")`, the matching
-    barcode dtype, and the input's times and unit in each channel, and
-    `result["0/Hk"].observation(i)` is isomorphic to degree `k` of
+    clouds: the result has `channel_names == ("0",)`, the matching barcode
+    dtype, `shape == (2,)`, and the input's times and unit, and
+    `result.observation(i)` is isomorphic to
     `compute_persistent_homology(clouds[i], max_dim=1)`. **Catches:** lost
-    or permuted times, a dropped unit, degrees mixed up, snapshots paired with
-    the wrong barcodes.
-  - A series of one cloud gives two channels with one observation each.
-    **Catches:** the existing singleton squeeze applied to series.
+    or permuted times, a dropped unit, a missing degree axis, snapshots paired
+    with the wrong barcodes.
+  - A series of one cloud has one observation of shape `(2,)`. **Catches:**
+    the existing singleton squeeze applied to series.
 
 - [ ] **29. Several point-cloud channels.** Test: `from_channels` of `"cam"`
   (the three clouds) and `"lidar"` (the first two clouds at
-  `Times([0.5, 2.0], unit="ms")`) gives channels `"cam/H0"`, `"cam/H1"`,
-  `"lidar/H0"`, and `"lidar/H1"`, each with its source's times and barcodes
-  equal to the persistence of that source alone. **Catches:** channels
-  swapped or merged, results split at the wrong offsets, one channel's times
-  given to another.
+  `Times([0.5, 2.0], unit="ms")`) gives channels `"cam"` and `"lidar"`, each
+  with its source's times and barcodes equal to the persistence of that source
+  alone. **Catches:** channels swapped or merged, results written to the wrong
+  channel, one channel's times given to another.
 
 - [ ] **30. Distance-matrix persistence.** The distance-matrix overload and
   binding. Test, parametrized over distmat32 and distmat64: a series of a 2x2
   and a 3x3 matrix, built with `sb.zeros((2,), dtype=...)` and element
   assignment, keeps its times, and each observation is isomorphic to
-  `compute_persistent_homology(matrix, max_dim=1)` in the matching degree.
+  `compute_persistent_homology(matrix, max_dim=1)`.
   **Catches:** distance matrices sent down the point-cloud path or to the
   wrong precision, matrices of different sizes rejected.
 
-- [ ] **31. Typed empty series.** Test: an empty pcloud32 series gives
-  barcode32 channels `"0/H0"` and `"0/H1"` with no observations for
-  `max_dim=1`, and unit `"s"`. **Catches:** an untyped or missing empty
+- [ ] **31. Typed empty series.** Test: an empty pcloud32 series gives a
+  barcode32 series with no observations and `shape == (2,)` for `max_dim=1`,
+  and unit `"s"`. **Catches:** an untyped or missing empty
   result, failure on empty input.
 
 - [ ] **32. Keyword data argument and parameter forwarding.** Test:
   `compute_persistent_homology(X=series, max_dim=0, reduced=True)` has
-  `channel_names == ("0/H0",)` and no infinite bar. **Catches:** `max_dim` or
+  `shape == (1,)` and no infinite bar. **Catches:** `max_dim` or
   `reduced` dropped on the series path, keyword calls failing.
 
 - [ ] **33. Unsupported series.** Test, parametrized `TypeError`:
@@ -540,9 +546,9 @@ parallel threshold.
   series silently read as point clouds, an unsupported series passed to a
   native task.
 
-- [ ] **34. Stable rank of a series.** A `make_stable_rank_series_task`
-  overload, its binding in `src/python/persistence/py_barcode_summary.cpp`,
-  and a series branch in `_barcode_to_pcf`. Test: a series of barcode
+- [ ] **34. Stable rank of a series.** The stable-rank operation, its private
+  entry point in `src/python/persistence/py_barcode_summary.cpp`, and a series
+  branch in `_barcode_to_pcf`. Test: a series of barcode
   channels `"x"` and `"y"` with two distinct barcodes each gives a PCF series
   with the same channel names and times whose channel values array-equal
   `barcode_to_stable_rank` of each channel's `BarcodeTensor`. **Catches:**
@@ -550,30 +556,44 @@ parallel threshold.
   task finishes.
 
 - [ ] **35. Betti curves and accumulated persistence.** The other two
-  overloads and bindings, forwarding `max_death`. Tests:
+  operations and entry points, forwarding `max_death`. Tests:
   - Parametrize item 34's test over the three summary functions.
-    **Catches:** a summary bound to another summary's task.
+    **Catches:** a summary bound to another summary's kernel.
   - `barcode_to_accumulated_persistence(series, max_death=2.5)` array-equals
     the function applied to each channel's `BarcodeTensor` with
     `max_death=2.5`, and differs from the result without `max_death`.
     **Catches:** `max_death` dropped on the series path.
 
-- [ ] **36. Progress, errors, and the GIL.** (existing) The series path runs
-  through `_run_task`, so the existing progress, error-propagation, and
-  GIL-release tests (`test_gil_release.py`, `test_async_task.py`) cover it,
-  and the existing persistence tests cover calls without series. Confirm; add
-  no test.
+- [ ] **36. Tensors through `UfuncTask`.** Route the existing tensor paths of
+  `compute_persistent_homology` (point clouds and distance matrices, including
+  indexed tensors) and the three summaries through `UfuncTask` with a tensor
+  adapter, and remove `RipserTaskImpl` and `BarcodeSummaryTask` if nothing
+  else uses them. Keep the public results, including the existing squeeze of
+  a length-1 input. No new tests: the existing persistence and summary tests
+  must pass unchanged. **Catches:** behavior changes in the tensor paths.
 
-- [ ] **37. (optional) CPU limits.** Persistence of the three-cloud series
+- [ ] **37. (optional) Selecting a value index.** `series.select(k)` (name to
+  be decided) indexes the observation axes and keeps time, for example to
+  take degree 1 of a barcode series. Test: degree 1 of item 28's result is a
+  series of `shape == ()` whose observations equal `result.observation(i)[1]`.
+  **Catches:** the index applied to the time axis.
+
+- [ ] **38. Progress, errors, and the GIL.** (existing) The series path runs
+  through `_run_task` and `StoppableTask`, so the existing progress,
+  error-propagation, and GIL-release tests (`test_gil_release.py`,
+  `test_async_task.py`) cover the waiting side. Confirm that `UfuncTask`
+  captures a worker exception the way the replaced tasks did; add no test.
+
+- [ ] **39. (optional) CPU limits.** Persistence of the three-cloud series
   under `sb.system.limit_cpus(1)` equals the result with all threads; restore
   the limit afterwards. **Catches:** results that depend on scheduling.
 
 ## Delay embeddings, windows, and sampling (workflow 2)
 
-Items 41-48 use the source series with times `[0.0, 0.5, 1.5, 2.5, 4.0]` and
+Items 43-50 use the source series with times `[0.0, 0.5, 1.5, 2.5, 4.0]` and
 values `[1.0, 2.0, 3.0, 4.0, 5.0]`.
 
-- [ ] **38. Delay embedding.** `TimeDelayEmbedding(dimension, delay)` returns
+- [ ] **40. Delay embedding.** `TimeDelayEmbedding(dimension, delay)` returns
   a lazy series (decision 8) of points: for a scalar channel `x`, the point at
   `t` is `(x(t - (m - 1) * delay), ..., x(t))`, so `shape == (m,)`. The domain
   starts at `start + (m - 1) * delay` and keeps the source's end and its
@@ -589,7 +609,7 @@ values `[1.0, 2.0, 3.0, 4.0, 5.0]`.
     `[1.5]` raises `ValueError`. **Catches:** components that refer to times
     before the series starts.
 
-- [ ] **39. Embedding shaped observations, and embedding errors.** A channel
+- [ ] **41. Embedding shaped observations, and embedding errors.** A channel
   of shape `S` embeds into shape `(m, *S)`, oldest first. Tests:
   - Times `[0.0, 1.0, 2.0]`, values `[[1, -1], [2, -2], [3, -3]]`,
     `dimension=2`, and `delay=1.0` give `shape == (2, 2)` and `[2.0]` equal
@@ -601,13 +621,13 @@ values `[1.0, 2.0, 3.0, 4.0, 5.0]`.
     **Catches:** invalid parameters accepted, an empty domain created
     silently, object values embedded.
 
-- [ ] **40. Embedding several channels.** Each channel is embedded with the
+- [ ] **42. Embedding several channels.** Each channel is embedded with the
   delay converted from the query unit into its own unit. Test:
   `TimeDelayEmbedding(dimension=2, delay=0.5)` of the series of channels A and
   B has domain `(1.0, 2.5)` and gives `{"a": [20, 20], "b": [-1, -2]}` at
   1.5. **Catches:** the delay applied in channel B's milliseconds.
 
-- [ ] **41. Window bounds.** `Window(size, step=None, overlap=None)` returns a
+- [ ] **43. Window bounds.** `Window(size, step=None, overlap=None)` returns a
   list of lazy start-aligned windows `[a, a + size)` with
   `a = start + k * step` while `a + size <= end`, where
   `step = size - overlap` and the default step is `size`. Incomplete windows
@@ -618,7 +638,7 @@ values `[1.0, 2.0, 3.0, 4.0, 5.0]`.
   anchored at the end, partial windows kept, the overlap used as the step, an
   overlapping default.
 
-- [ ] **42. Window contents and time slicing.** `series[a:b]` is the window
+- [ ] **44. Window contents and time slicing.** `series[a:b]` is the window
   `[a, b)`, the same object `Window` produces. Tests with the source series:
   - `w = series[1.0:3.0]` has times `[1.5, 2.5]` (original timestamps),
     `w[1.0] == 2.0` (the observation at 0.5), and `w[2.75] == 4.0`.
@@ -627,32 +647,32 @@ values `[1.0, 2.0, 3.0, 4.0, 5.0]`.
   - `w[3.0]` raises `ValueError`, and `series[1.0:3.0:0.5]` raises
     `ValueError`. **Catches:** a closed window end, a step silently ignored.
 
-- [ ] **43. Window parameter errors.** Test, parametrized `ValueError`:
+- [ ] **45. Window parameter errors.** Test, parametrized `ValueError`:
   `size=0.0`, `size=-1.0`, `step=0.0`, `overlap=2.0` and `overlap=-0.5` with
   `size=2.0`, and `step` together with `overlap`. **Catches:** windows that
   never advance, conflicting parameters accepted.
 
-- [ ] **44. Embedding a window.** Test: `TimeDelayEmbedding(dimension=2,
+- [ ] **46. Embedding a window.** Test: `TimeDelayEmbedding(dimension=2,
   delay=1.0)` of `series[1.0:3.0]` has domain `(2.0, 3.0)`; `[2.0]` is
   `[2, 3]` (with the value at 1.0 from the source) and `[2.75]` is `[3, 4]`;
   `[1.5]` and `[3.0]` raise `ValueError`. **Catches:** history taken from
   before the window, the half-open end lost.
 
-- [ ] **45. Windows of several channels.** Test:
+- [ ] **47. Windows of several channels.** Test:
   `Window(size=1.0, step=1.0)` of the series of channels A and B gives windows
   with domains `(0.5, 1.5)` and `(1.5, 2.5)`; the second gives
   `{"a": 20.0, "b": -2.0}` at 1.5 and has `times` leaves `[]` and `[1.5]`.
   **Catches:** channels cut at different bounds, channel B cut in
   milliseconds.
 
-- [ ] **46. Sampler query times.** `RegularSampler(n_points).times(series)`
+- [ ] **48. Sampler query times.** `RegularSampler(n_points).times(series)`
   returns `Times` with `a + (b - a) * k / n_points` for
   `k = 0, ..., n_points - 1`, in the series' unit. The end is never sampled,
   even for a closed domain. Test: `RegularSampler(n_points=4).times(w)` for
   `w = series[1.0:3.0]` gives `[1.0, 1.5, 2.0, 2.5]` with the window's unit.
   **Catches:** the end point included, spacing `(b - a) / (n - 1)`.
 
-- [ ] **47. Sampling one channel.** `RegularSampler(n_points)(windows)`
+- [ ] **49. Sampling one channel.** `RegularSampler(n_points)(windows)`
   evaluates each window at its query times and returns a `PointCloudTensor`
   of shape `(len(windows), n_channels)` whose clouds have `n_points` points;
   each observation is flattened into a point of dimension `prod(shape)`, and a
@@ -662,18 +682,18 @@ values `[1.0, 2.0, 3.0, 4.0, 5.0]`.
   **Catches:** windows stacked out of order, values at window starts missing,
   the wrong precision.
 
-- [ ] **48. Sampling several channels.** Test: `Window(size=1.0, step=1.0)` of
+- [ ] **50. Sampling several channels.** Test: `Window(size=1.0, step=1.0)` of
   the series of channels A and B with `n_points=2` gives shape `(2, 2)` with
   the clouds `[[10], [20]]` and `[[-1], [-1]]` in the first window and
   `[[20], [20]]` and `[[-2], [-2]]` in the second. **Catches:** channels
   swapped, channels evaluated on one grid.
 
-- [ ] **49. Sampler errors.** Test, parametrized: `n_points=0` and an empty
+- [ ] **51. Sampler errors.** Test, parametrized: `n_points=0` and an empty
   list raise `ValueError`; a point-cloud series raises `TypeError`.
   **Catches:** an empty result without a type, object values sampled into
   point clouds.
 
-- [ ] **50. The delay workflow end to end.** Test in
+- [ ] **52. The delay workflow end to end.** Test in
   `test/python/test_integration.py`: times `[0.0, 0.5, ..., 3.5]` and values
   `[0, 1, 0, -1, 0, 1, 0, -1]` through
   `TimeDelayEmbedding(dimension=2, delay=0.5)`,
@@ -682,17 +702,17 @@ values `[1.0, 2.0, 3.0, 4.0, 5.0]`.
   `(3, 1)` with four 2-D points each and barcodes of shape `(3, 1, 2)`.
   **Catches:** steps that do not compose.
 
-- [ ] **51. Saving derived series.** Window and embedding nodes in the tree of
+- [ ] **53. Saving derived series.** Window and embedding nodes in the tree of
   decision 9. Test, parametrized over `save`/`load` and `pickle`: the window
-  `[1.5, 2.5)` of item 40's embedding loads with the same channel names,
+  `[1.5, 2.5)` of item 42's embedding loads with the same channel names,
   domain, unit, and values at 1.5 and 2.0, and `[2.5]` still raises
   `ValueError`. **Catches:** a node kind, parameter, or query unit lost on
   saving, the half-open end lost.
 
-- [ ] **52. Golden files.** Pin the formats (TESTING.md principle 11) with a
+- [ ] **54. Golden files.** Pin the formats (TESTING.md principle 11) with a
   generator modeled on `test/golden/serialization/generate_point_cloud_v3.py`,
   which records explicit expected values. Write item 28's barcode32 result,
-  the series of channels A and B, and item 51's derived series as `.sb` and
+  the series of channels A and B, and item 53's derived series as `.sb` and
   pickle files, and teach `test_serialization_goldens.py` to compare series
   (channel names, unit, domain, values at listed times). **Catches:** a later
   change to a payload that breaks saved files.
@@ -702,7 +722,7 @@ values `[1.0, 2.0, 3.0, 4.0, 5.0]`.
 Code items update the docstrings they touch (AGENTS.md). These items add the
 pages.
 
-- [ ] **53. API reference.** Add `docs/api_timeseries.rst` to the toctree in
+- [ ] **55. API reference.** Add `docs/api_timeseries.rst` to the toctree in
   `docs/stablebear.rst`. Check that the docstrings state the contracts of
   decisions 1-4 and 6-8: domains and their closedness, previous-value
   evaluation and snapping, units, query units and conversion, channels and
@@ -711,7 +731,7 @@ pages.
   channels. Check that `compute_persistent_homology`, the three summaries,
   `save`, and `load` document series input and output.
 
-- [ ] **54. User guide.** A `docs/timeseries.rst` guide linked from
+- [ ] **56. User guide.** A `docs/timeseries.rst` guide linked from
   `docs/userguide.rst`: times, units, domains, and channels, then two small
   examples. The first follows a point-cloud series through persistence to
   stable ranks; the second takes two numeric channels in different units
@@ -719,17 +739,17 @@ pages.
   operation to its API entry on first mention. Figures are not needed; if one
   is added, follow the dropdown rule in AGENTS.md.
 
-- [ ] **55. Changelog.** A New features entry in `CHANGELOG.md` linking #242,
+- [ ] **57. Changelog.** A New features entry in `CHANGELOG.md` linking #242,
   under the heading of the release that ships it (to be decided; 0.5.1 is in
   progress).
 
 ## Final checks
 
-- [ ] **56. Test run.** After a CMake build and install, run the new test
+- [ ] **58. Test run.** After a CMake build and install, run the new test
   files, then the full Python suite and `sb_test` from `test/`.
-- [ ] **57. Docs build.** Run `make html` in `docs/` (with `LC_ALL=C.UTF-8` if
+- [ ] **59. Docs build.** Run `make html` in `docs/` (with `LC_ALL=C.UTF-8` if
   the locale is missing), check for warnings, and read the new pages.
-- [ ] **58. Push.** Push `issue-242-timeseries`, open a PR against `main`, and
+- [ ] **60. Push.** Push `issue-242-timeseries`, open a PR against `main`, and
   remove this plan before merging.
 
 ## Coverage of the acceptance criteria
@@ -739,13 +759,13 @@ pages.
 | Time, domain, evaluation, shape, and ownership contracts; empty and singleton behavior | 1-9, 19 |
 | `Times`, native storage and access, default seconds, explicit units, one timestamp per observation | 10-13, 17-18, 20-21 |
 | Floating-point arrays with explicit times or a packed table | 11-12, 15-16 |
-| Native operation contract, dispatch, and adapter; calls, parameters, CPU limits | 28-29, 32, 36-37 |
+| Native operation contract, dispatch, and adapter; calls, parameters, CPU limits | 6, 28-29, 32, 36, 38-39 |
 | Persistence and barcode summaries of series | 28-35 |
-| Delay embedding and windows | 38-45 |
-| Regular sampling into point clouds and through persistence | 46-50 |
-| Save, load, and pickle for both workflows | 26-27, 51-52 |
-| Tests and documented examples | all test items, 53-54 |
-| Channels with their own grids and units (added) | 3, 21-25, 29, 40, 45, 48 |
+| Delay embedding and windows | 40-47 |
+| Regular sampling into point clouds and through persistence | 48-52 |
+| Save, load, and pickle for both workflows | 26-27, 53-54 |
+| Tests and documented examples | all test items, 55-56 |
+| Channels with their own grids and units (added) | 3, 21-25, 29, 42, 47, 50 |
 
 ## Out of scope
 
