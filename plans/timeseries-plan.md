@@ -186,7 +186,7 @@ parallel threshold.
   on the unit near 0 and crossed whole gaps for small spacings or
   epoch-sized timestamps.
 
-- [x] **3. Time units.** (decision: (a), fixed set `as` through `d` with exact integer conversion factors) `Times(values, unit="s")`; plain timestamp
+- [x] **3. Time units.** (decision: (a), fixed set `as` through `d` with exact integer conversion factors) `Times(times, unit="s")`; plain timestamp
   arrays mean seconds. Options:
   (a) A fixed set covering physics time scales: `"as"`, `"fs"`, `"ps"`,
   `"ns"`, `"us"`, `"ms"`, `"s"`, `"min"`, `"h"`, and `"d"`. Store each unit as
@@ -216,7 +216,9 @@ parallel threshold.
     whose view is a window or an embedding, materializes the whole view into
     its own storage, as `IndexedElementTensor._ensure_writeable` does for
     subsamples. Other views never see the write.
-  - Timestamps cannot change: `Times.values` returns a `FloatTensor` copy.
+  - Timestamps cannot change: `np.asarray(times)` and `sb.tensor(times)`
+    return copies. `Times` has no `values` attribute, which would be
+    confused with a series' values.
   - Public numeric results are stablebear tensors (`FloatTensor`), not NumPy
     arrays.
 
@@ -273,7 +275,7 @@ parallel threshold.
     typed empty result.
 
 - [x] **7. Public names and accepted values.** (decision: as recommended; `NestedTensor` values deferred)
-  - `stablebear.timeseries` exports `Times(values, unit="s")`,
+  - `stablebear.timeseries` exports `Times(times, unit="s")`,
     `TimeSeries(values, times)` for one channel (named `"0"`),
     `TimeSeries.from_channels(channels, unit=None)` for several,
     `TimeDelayEmbedding(dimension, delay)` (without the issue's `unit="time"`
@@ -372,8 +374,7 @@ parallel threshold.
   - Parametrized: the aliases `"sec"`, `"seconds"`, `"hr"`, `"msec"`, and
     both micro signs give the short names `"s"`, `"h"`, `"ms"`, and `"us"`.
     **Catches:** an alias rejected or mapped to the wrong unit.
-  - After `values = times.values` and `values[0] = 5.0`, `values[0] == 5.0`
-    and `times.values` is unchanged. **Catches:** timestamps that can be
+  - `times[0] = 5.0` raises `TypeError` and leaves the timestamps unchanged. **Catches:** timestamps that can be
     reordered after validation.
   - Parametrized: `Times([0.0, 1.5], unit="min").to("s")` gives
     `[0.0, 90.0]`; `Times([0.0, 1.5], unit="fs").to("as")` gives
@@ -477,7 +478,7 @@ parallel threshold.
   - `snap_tolerance=0.0` is stored and disables snapping, and -0.1 and 1.0 raise
     `ValueError`. **Catches:** the keyword ignored or unvalidated.
 
-- [ ] **21. Query unit.** `series.to(unit)` returns the series with another
+- [x] **21. Query unit.** `series.to(unit)` returns the series with another
   query unit; the stored channels are unchanged. Test: `TimeSeries([10.0,
   20.0], times=Times([0.0, 0.5], unit="s")).to("ms")` has unit `"ms"`, times
   `[0.0, 500.0]`, domain `(0.0, 500.0)`, and its value at 250.0 equal to 10.

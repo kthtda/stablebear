@@ -12,7 +12,7 @@ HERE = Path(__file__).parent
 
 
 def _plot_steps(ax, series, color):
-    times = np.asarray(series.times.values)
+    times = np.asarray(series.times)
     values = np.asarray(series.values)
     ax.step(times, values, where="post", color=color, linewidth=2)
     ax.plot(times, values, "o", color=color, markersize=6, zorder=5)

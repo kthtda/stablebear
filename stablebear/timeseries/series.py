@@ -42,9 +42,13 @@ T = TypeVar("T")
 class Times:
     """Finite, strictly increasing timestamps in one physical time unit.
 
+    ``np.asarray(times)`` gives the timestamps as a new float64 array and
+    ``sb.tensor(times)`` as a ``FloatTensor``; changing either leaves the
+    timestamps unchanged.
+
     Parameters
     ----------
-    values : array_like
+    times : array_like
         One-dimensional timestamps, converted to float64.
     unit : str, optional
         One of ``"as"``, ``"fs"``, ``"ps"``, ``"ns"``, ``"us"``, ``"ms"``,
@@ -59,19 +63,14 @@ class Times:
         increasing, or if the unit is unknown.
     """
 
-    def __init__(self, values, unit: str = "s"):
-        self._data = cpp.Times(np.asarray(values, dtype=np.float64), unit)
+    def __init__(self, times, unit: str = "s"):
+        self._data = cpp.Times(np.asarray(times, dtype=np.float64), unit)
 
     @classmethod
     def _from_cpp(cls, data):
         times = cls.__new__(cls)
         times._data = data
         return times
-
-    @property
-    def values(self) -> FloatTensor:
-        """A float64 copy of the timestamps; changing it leaves these unchanged."""
-        return FloatTensor(self._data.values)
 
     @property
     def unit(self) -> str:
@@ -87,6 +86,13 @@ class Times:
         """
         return Times._from_cpp(self._data.to(unit))
 
+    def __array__(self, dtype=None, copy=None):
+        """Return a float64 copy of the timestamps, so ``np.asarray(times)`` works."""
+        arr = np.array(self._data.values)
+        if dtype is not None:
+            arr = arr.astype(dtype, copy=False)
+        return arr
+
     def __len__(self) -> int:
         return len(self._data)
 
@@ -96,7 +102,7 @@ class Times:
         return self._data == other._data
 
     def __repr__(self):
-        return f"Times({np.asarray(self.values).tolist()!r}, unit={self.unit!r})"
+        return f"Times({np.asarray(self).tolist()!r}, unit={self.unit!r})"
 
 
 # Element dtype -> (native series class, tensor wrapper for its values).
@@ -237,8 +243,9 @@ class TimeSeries(Generic[T]):
 
     @property
     def times(self) -> Times:
-        """The timestamps of the recorded observations."""
-        return Times._from_cpp(self._single_channel().times)
+        """The timestamps of the recorded observations, in :attr:`unit`."""
+        self._single_channel()
+        return Times._from_cpp(self._data.times(0))
 
     @property
     def values(self) -> Tensor:
@@ -269,6 +276,17 @@ class TimeSeries(Generic[T]):
         included. ``None`` for a series without observations.
         """
         return self._data.domain
+
+    def to(self, unit: str) -> TimeSeries:
+        """Return the same series with queries and reported times in ``unit``.
+
+        The stored observations and timestamps are shared, not converted;
+        :attr:`times` and :attr:`domain` are reported in the new unit, and
+        queries are read in it. Accepts the units of :class:`Times`.
+        """
+        series = TimeSeries.__new__(TimeSeries)
+        series._data = self._data.to(unit)
+        return series
 
     def evaluate(self, t):
         """The observation with the largest timestamp at or before ``t``.
