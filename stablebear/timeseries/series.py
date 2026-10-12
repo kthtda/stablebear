@@ -160,9 +160,7 @@ class TimeSeries(Generic[T]):
     A series built this way has one channel, named ``"0"``.
     """
 
-    def __init__(self, values, times=None):
-        if times is None:
-            raise ValueError("times are required")
+    def __init__(self, values, times):
         if not isinstance(times, Times):
             times = Times(times)
         tensor = _values_tensor(values)
