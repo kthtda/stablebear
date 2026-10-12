@@ -11,10 +11,12 @@ Where the plan departs from the issue:
 
 - Channels with their own time grids and units are in this release; the issue
   defers a channel-combination API.
-- Every channel holds one value per time. Persistence of a channel `"cam"`
+- Every channel holds one observation per time, a tensor of a fixed `shape`
+  (often `()`). Persistence of a channel `"cam"`
   returns one channel per homology degree (`"cam/H0"`, `"cam/H1"`) instead of
   a value axis of length `max_dim + 1`.
-- A delay embedding is a channel of points, and the sampler returns a
+- A delay embedding adds a leading delay axis to each observation, and the
+  sampler flattens observations into points and returns a
   `PointCloudTensor` directly, so `PointCloudTensor` needs no `FloatTensor`
   constructor.
 
@@ -89,10 +91,11 @@ This assumes the recommended option of each decision.
 
 - `sb::Times` holds finite, strictly increasing float64 timestamps and a unit
   from a fixed set with exact factors in seconds.
-- A stored channel holds a shared `Times`, a flat `std::vector<T>` with one
-  value per time, and a domain. Numeric channels (float32 or float64) hold
-  points of dimension `dim`, stored as `n * dim` values; `dim = 1` is a
-  scalar. Point counts, matrix sizes, and bar counts are internal to each
+- A stored channel holds a shared `Times`, a flat `std::vector<T>`, a
+  `shape`, and a domain. Each observation is a tensor of shape `shape`
+  (`()` for one element per time, `(d,)` for a point, `(h, w)` for an image),
+  stored as `n * prod(shape)` values and presented as a tensor only when
+  accessed. Point counts, matrix sizes, and bar counts are internal to each
   element and may change over time.
 - `sb::TimeSeries<T>` is an ordered set of named channels of one element type
   `T` and a query unit. Its domain is the intersection of the channels'
@@ -106,9 +109,11 @@ This assumes the recommended option of each decision.
   `series[a:b]` is a window, and `series["name"]` selects channels.
 - Windows and delay embeddings are lazy channels: native nodes that hold
   their source and parameters and compute values when evaluated. A delay
-  embedding of a channel of dimension `d` is a channel of dimension `m * d`.
+  embedding of a numeric channel of shape `S` has shape `(m, *S)`.
 - `RegularSampler` samples each window of each numeric channel into a point
-  cloud and returns a `PointCloudTensor` of shape `(n_windows, n_channels)`.
+  cloud, flattening each observation into a point of dimension
+  `prod(shape)`, and returns a `PointCloudTensor` of shape
+  `(n_windows, n_channels)`.
 - `sb::SeriesTask` runs an existing batch task (`RipserTask`,
   `RipserDistMatTask`, `BarcodeSummaryTask`) once over all channels of a
   series and returns a series with the inputs' times and domains.
@@ -121,7 +126,7 @@ and copy ideas and small blocks, not whole files.
 
 - `include/mpcf/timeseries.hpp`: `snap_in_place` and `default_snap_tol` for
   item 20, `find_interval` for the previous-value lookup, and its row-major
-  `m_values` with `n_channels` for the flat point layout (item 12). The
+  `m_values` with `n_channels` for the flat layout (items 11-12). The
   offsets from `start_time` and `time_step` and the interpolation variants do
   not fit.
 - `include/mpcf/algorithms/embed_time_delay.hpp`: the evaluation loop of
@@ -197,9 +202,12 @@ parallel threshold.
     Python wrappers only bind arguments and wrap results.
   - A stored channel holds a shared `Times`, a flat `std::vector<T>` (not a
     `Tensor<T>`, so its layout, gathering, and slicing stay under our
-    control), and a domain. It holds one value per time; numeric channels
-    hold points of dimension `dim` stored as `n * dim` values. Values are
-    kept apart from times rather than as `(time, value)` pairs, because the
+    control), a `shape`, and a domain. Each observation is a tensor of shape
+    `shape`, stored as `prod(shape)` consecutive values and built as a
+    `Tensor<T>` only when accessed. Storing a `Tensor<T>` per observation
+    instead would cost 80 bytes and 2 to 4 heap allocations per time point.
+    Values are kept apart from times rather than as `(time, value)` pairs,
+    because the
     batched analysis needs a contiguous array of values. A `Pcf` cannot hold a
     channel: it is defined on `[0, inf)` and only for arithmetic values.
   - `sb::TimeSeries<T>` holds named channels of one element type. Following
@@ -246,32 +254,33 @@ parallel threshold.
     the query unit for several), `to(unit)`, `evaluate(t)`, `series[t]` (the
     same as `evaluate(t)`; an int `t` is a time), `series[a:b]` (a window),
     and `series["name"]` or `series[["a", "b"]]` (channel selection). A
-    one-channel series also exposes `values`, `dim` (numeric only), `len()`,
+    one-channel series also exposes `values`, `shape`, `len()`,
     and `observation(i)`; on several channels these raise `ValueError` asking
     for a channel to be selected.
-  - For one channel, `evaluate` returns the value: a float for `dim = 1`, a
-    `FloatTensor` of length `dim` otherwise, or the element (`PointCloud`,
-    `Barcode`, ...). For several channels it returns an ordered dict keyed by
+  - For one channel, `evaluate` returns the observation: a scalar or element
+    (`PointCloud`, `Barcode`, ...) for `shape == ()`, otherwise a tensor of
+    that shape. For several channels it returns an ordered dict keyed by
     channel name.
-  - `values` may be a 1-D tensor of any element type (`FloatTensor`,
+  - `values` may be a tensor of any element type (`FloatTensor`,
     `IntTensor`, `BoolTensor`, `PcfTensor`, `IntPcfTensor`,
     `PointCloudTensor`, `DistanceMatrixTensor`, `SymmetricMatrixTensor`,
-    `BarcodeTensor`), indexed by time, or a numeric array-like of shape
-    `(n,)` or `(n, dim)` (float32 stays float32, booleans become bool, other
-    numbers become float64). Anything else raises: `TypeError` for strings,
-    `NestedTensor`, and sequences containing stablebear objects, which
-    `np.asarray` would silently turn into numeric arrays; `ValueError` for
-    tensors of higher rank, which belong in separate channels.
+    `BarcodeTensor`) or a numeric array-like (float32 stays float32, booleans
+    become bool, other numbers become float64) of shape `(n, *shape)`; axis 0
+    is time. Anything else raises `TypeError`: strings, `NestedTensor`, and
+    sequences containing stablebear objects, which `np.asarray` would silently
+    turn into numeric arrays.
   - `RegularSampler(n_points)(windows)` returns a `PointCloudTensor` of shape
-    `(len(windows), n_channels)`; each cloud has `n_points` points of its
-    channel's `dim`. Joining channels into one cloud is a later extension.
+    `(len(windows), n_channels)`; each cloud has `n_points` points of
+    dimension `prod(shape)` of its channel. Joining channels into one cloud is
+    a later extension.
   - `TimeSeries` is generic (`TimeSeries[PointCloud]`) in Python
     3.10-compatible annotations.
   - An empty list gives an empty float64 channel, so a typed empty channel of
     point clouds is built from `sb.zeros((0,), dtype=sb.pcloud64)`.
 
 - [ ] **8. Derived channels are lazy.** (decision) Recommendation: windows and
-  delay embeddings are native nodes that store no values. A node holds its
+  delay embeddings are native nodes that store no values. An embedding of a
+  channel of shape `S` has shape `(m, *S)`, newest last. A node holds its
   source channel and parameters, exposes the same interface as a stored
   channel except recorded observations, and evaluates its source when asked.
   A window cuts every channel at the same `[a, b)` in the query unit and works
@@ -317,11 +326,11 @@ parallel threshold.
 - [ ] **11. Scalar series.** The stored channel and `sb::TimeSeries<T>` with
   their validation, `register_timeseries_element` for float32 and float64,
   and Python `TimeSeries(values, times)` with `channel_names`, `times`,
-  `unit`, `values`, `dtype`, `dim`, `len()`, and `repr`. This is the largest
+  `unit`, `values`, `dtype`, `shape`, `len()`, and `repr`. This is the largest
   item. Tests:
   - Plain timestamps mean seconds: values `[10.0, 20.0, 30.0]` with
     `times=[0.0, 1.5, 4.0]` give `unit == "s"`, `channel_names == ("0",)`,
-    `dim == 1`, `len() == 3`, and the same values. This test checks the
+    `shape == ()`, `len() == 3`, and the same values. This test checks the
     defaults. **Catches:** a missing default unit or channel name.
   - An explicit unit is kept:
     `TimeSeries([1.0, 2.0], times=Times([0.0, 0.5], unit="ms"))` has unit
@@ -332,14 +341,15 @@ parallel threshold.
     values give `sb.float64`. **Catches:** float32 widened, integer values
     stored as integers.
 
-- [ ] **12. Points.** Numeric values of shape `(n, dim)` form one channel of
-  points. Tests:
+- [ ] **12. Observation shapes.** Values of shape `(n, *shape)` form one
+  channel whose observations have shape `shape`. Tests:
   - Values `[[1, -1], [2, -2], [3, -3]]` with `times=[0.0, 1.0, 2.0]` give
-    `dim == 2`, `len() == 3`, and `series[1.5]` equal to `[2, -2]`.
+    `shape == (2,)`, `len() == 3`, and `series[1.5]` equal to `[2, -2]`.
     **Catches:** points split into channels or counted as observations,
     coordinates transposed.
-  - Values of shape `(3, 2, 2)` raise `ValueError`. **Catches:** value axes
-    accepted that no channel can represent.
+  - Values `[[[1, 2], [3, 4]], [[5, 6], [7, 8]]]` with `times=[0.0, 1.0]`
+    give `shape == (2, 2)` and `series[1.0]` equal to `[[5, 6], [7, 8]]`.
+    **Catches:** higher-rank observations flattened or transposed.
 
 - [ ] **13. Every element type.** Register the remaining 17 element types and
   dispatch on the tensor type in Python. Test, parametrized over the 19
@@ -361,9 +371,10 @@ parallel threshold.
   `data = np.array([[0.0, 10.0, 20.0], [1.3, 11.0, 21.0], [4.0, 12.0, 22.0]])`:
   - `TimeSeries(data)` has the same times, unit, and values as
     `TimeSeries(data[:, 1:], times=data[:, 0])`: times `[0.0, 1.3, 4.0]` and
-    `dim == 2`. **Catches:** timestamps left among the coordinates, row
+    `shape == (2,)`. **Catches:** timestamps left among the coordinates, row
     numbers used as times.
-  - `TimeSeries(data, times=[0.0, 1.0, 2.0])` has `dim == 3`. **Catches:**
+  - `TimeSeries(data, times=[0.0, 1.0, 2.0])` has `shape == (3,)`.
+    **Catches:**
     column 0 removed even though times were given.
   - Parametrized `ValueError`: `[[0.0], [1.0]]` (no value column),
     `[1.0, 2.0]` (1-D), `np.zeros((2, 2, 2))` (3-D), and
@@ -371,12 +382,10 @@ parallel threshold.
     **Catches:** an empty point, times inferred from other ranks, column-0
     timestamps that skip validation.
 
-- [ ] **16. Unsupported values.** Test, parametrized: a list of two equal-size
-  `sb.PointCloud`s, `np.array(["a", "b"])`, and a `NestedTensor` raise
-  `TypeError`; a `PointCloudTensor` of shape `(3, 2)` raises `ValueError`.
-  **Catches:** object sequences silently converted to numeric arrays, strings
-  or nested tensors passed to the native constructor, two clouds per time
-  accepted in one channel.
+- [ ] **16. Unsupported values.** Test, parametrized `TypeError`: a list of
+  two equal-size `sb.PointCloud`s, `np.array(["a", "b"])`, and a
+  `NestedTensor`. **Catches:** object sequences silently converted to numeric
+  arrays, strings or nested tensors passed to the native constructor.
 
 - [ ] **17. Observations and ownership.** `series.observation(i)` returns a
   copy of recorded observation `i`. Tests with values
@@ -459,17 +468,18 @@ parallel threshold.
 
 - [ ] **26. Save, load, and pickle one channel.**
   `include/sbear/io/timeseries_io.hpp` writes a stored channel: unit,
-  timestamps, domain (with its closedness, or none), `dim` for numeric
-  channels, then the values with the existing element writers, under the
+  timestamps, domain (with its closedness, or none), `shape`, then the
+  values with the existing element writers, under the
   element type's format with `TensorFormatFlag::TimeSeries` (decision 5).
   Register it in `StreamableObject` and `read_any_object`; loading goes
   through the validating constructor. No `FormatVersion` bump is needed;
   older readers report an unhandled object type. In Python, `TimeSeries` uses
   `_BinaryIoMixin`, and `save` and `load` dispatch it. Test, parametrized over
-  the 19 dtypes and a float64 channel with `dim == 3`, and over
-  `save`/`load` and `pickle`: the series loads with the same `dtype`, `dim`,
+  the 19 dtypes, a float64 channel with `shape == (2, 2)`, and a barcode
+  channel with `shape == (2,)`, and over `save`/`load` and `pickle`: the
+  series loads with the same `dtype`, `shape`,
   channel name, times, unit, domain, and values. **Catches:** a type flag
-  mapped to the wrong type or precision; a dropped unit, domain, or `dim`;
+  mapped to the wrong type or precision; a dropped unit, domain, or shape;
   timestamps narrowed to 32 bits.
 
 - [ ] **27. Saving several channels.** The tree of decision 9 for stored
@@ -565,7 +575,7 @@ values `[1.0, 2.0, 3.0, 4.0, 5.0]`.
 
 - [ ] **38. Delay embedding.** `TimeDelayEmbedding(dimension, delay)` returns
   a lazy series (decision 8) of points: for a scalar channel `x`, the point at
-  `t` is `(x(t - (m - 1) * delay), ..., x(t))`, so `dim == m`. The domain
+  `t` is `(x(t - (m - 1) * delay), ..., x(t))`, so `shape == (m,)`. The domain
   starts at `start + (m - 1) * delay` and keeps the source's end and its
   closedness. Tests with times `Times([0.0, 1.0, 2.5, 4.0], unit="ms")`,
   values `[10.0, 20.0, 30.0, 40.0]`, `dimension=3`, and `delay=1.0`:
@@ -574,17 +584,17 @@ values `[1.0, 2.0, 3.0, 4.0, 5.0]`.
     points at 3.25 and 3.75 differ from the point at the last observation
     time, 2.5. **Catches:** newest-first order, the same delay for every
     component, points held from the last observation time.
-  - The embedding has domain `(2.0, 4.0)`, unit `"ms"`, and `dim == 3`, and
+  - The embedding has domain `(2.0, 4.0)`, unit `"ms"`, and
+    `shape == (3,)`, and
     `[1.5]` raises `ValueError`. **Catches:** components that refer to times
     before the series starts.
 
-- [ ] **39. Embedding points, and embedding errors.** A channel of dimension
-  `d` embeds into dimension `m * d`, one source point per block, oldest first.
-  Tests:
+- [ ] **39. Embedding shaped observations, and embedding errors.** A channel
+  of shape `S` embeds into shape `(m, *S)`, oldest first. Tests:
   - Times `[0.0, 1.0, 2.0]`, values `[[1, -1], [2, -2], [3, -3]]`,
-    `dimension=2`, and `delay=1.0` give `dim == 4` and `[2.0]` equal to
-    `[2, -2, 3, -3]`. **Catches:** coordinates interleaved across delays,
-    blocks in newest-first order.
+    `dimension=2`, and `delay=1.0` give `shape == (2, 2)` and `[2.0]` equal
+    to `[[2, -2], [3, -3]]`. **Catches:** the delay axis placed last,
+    newest-first order.
   - Parametrized: `dimension=0`, `delay=0.0`, and `delay=-1.0` raise
     `ValueError`; `dimension=3` and `delay=1.0` on times `[0.0, 1.0]` raise
     `ValueError` (too short); a barcode series raises `TypeError`.
@@ -644,8 +654,9 @@ values `[1.0, 2.0, 3.0, 4.0, 5.0]`.
 
 - [ ] **47. Sampling one channel.** `RegularSampler(n_points)(windows)`
   evaluates each window at its query times and returns a `PointCloudTensor`
-  of shape `(len(windows), n_channels)` whose clouds have `n_points` points
-  of the channel's `dim`. Test: the three windows of
+  of shape `(len(windows), n_channels)` whose clouds have `n_points` points;
+  each observation is flattened into a point of dimension `prod(shape)`, and a
+  scalar channel gives 1-D points. Test: the three windows of
   `Window(size=2.0, step=1.0)` with `n_points=2` give shape `(3, 1)` and the
   clouds `[[1], [2]]`, `[[2], [3]]`, and `[[3], [4]]`, of dtype pcloud64.
   **Catches:** windows stacked out of order, values at window starts missing,
@@ -695,7 +706,8 @@ pages.
   `docs/stablebear.rst`. Check that the docstrings state the contracts of
   decisions 1-4 and 6-8: domains and their closedness, previous-value
   evaluation and snapping, units, query units and conversion, channels and
-  their names, time indexing, points and `dim`, copies and lazy derived
+  their names, time indexing, observation shapes and flattening into
+  points, copies and lazy derived
   channels. Check that `compute_persistent_homology`, the three summaries,
   `save`, and `load` document series input and output.
 
@@ -741,6 +753,7 @@ As in the issue: datetime timestamps, sample-count delays and windows, other
 samplers, interpolation, partial windows, gap policies, tensors of series,
 reductions over time, provenance, and normalization. Also deferred here:
 joining channels into one point cloud when sampling, series with channels of
-different element types, value axes beyond point coordinates, `NestedTensor`
-values, `Tensor<TimeSeries>`, views instead of copies for stored channels,
+different element types, observations whose shape changes over time
+(a later per-observation tensor storage mode), `NestedTensor` values,
+`Tensor<TimeSeries>`, views instead of copies for stored channels,
 and the branch's notebooks and scikit-learn transformers.
