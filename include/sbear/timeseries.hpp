@@ -9,6 +9,7 @@
 #include <array>
 #include <cmath>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <numeric>
 #include <stdexcept>
@@ -234,6 +235,28 @@ namespace sb
       size_t i = 0;
       walk(out, [&](const std::vector<size_t>& index) {
         out(index) = m_storage->values[i++];
+      });
+      return out;
+    }
+
+    /// A copy of observation @p i as a tensor of shape shape(). Negative
+    /// indices count from the end.
+    [[nodiscard]] Tensor<T> observation(std::ptrdiff_t i) const
+    {
+      const auto n = static_cast<std::ptrdiff_t>(size());
+      if (i < -n || i >= n)
+      {
+        throw std::out_of_range(
+            "Observation index " + std::to_string(i) + " is out of range for "
+            + std::to_string(n) + " observations");
+      }
+      const size_t index = static_cast<size_t>(i < 0 ? i + n : i);
+      const size_t blockSize = std::accumulate(
+          shape().begin(), shape().end(), size_t{1}, std::multiplies<>());
+      Tensor<T> out(shape());
+      size_t k = index * blockSize;
+      walk(out, [&](const std::vector<size_t>& outIndex) {
+        out(outIndex) = m_storage->values[k++];
       });
       return out;
     }

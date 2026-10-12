@@ -33,6 +33,7 @@ namespace
         return py::tuple(py::cast(self.shape()));
       })
       .def_property_readonly("values", &Channel::values)
+      .def("observation", &Channel::observation, py::arg("index"))
       .def("__len__", &Channel::size);
 
     py::class_<Series>(m, ("TimeSeries" + suffix).c_str())

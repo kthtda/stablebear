@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import operator
 from typing import Generic, TypeVar
 
 import numpy as np
@@ -218,6 +219,16 @@ class TimeSeries(Generic[T]):
     def shape(self) -> tuple[int, ...]:
         """The shape of one observation; ``()`` for scalars."""
         return self._single_channel().shape
+
+    def observation(self, i: int):
+        """A copy of recorded observation ``i``; negative indices count from the end.
+
+        Returns a scalar or element (such as a ``PointCloud``) for
+        observations of shape ``()``, otherwise a tensor of that shape.
+        """
+        wrapper = _SERIES_TYPES[self.dtype][1]
+        observation = wrapper(self._single_channel().observation(operator.index(i)))
+        return observation[()] if observation.ndim == 0 else observation
 
     def __len__(self) -> int:
         return len(self._single_channel())
