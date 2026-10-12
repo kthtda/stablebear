@@ -9,13 +9,12 @@ from stablebear.timeseries import Times, TimeSeries
 def test_times_keeps_values_and_unit():
     times = Times([0.0, 1.5, 4.0], unit="ms")
 
-    assert isinstance(times.values, sb.FloatTensor)
-    assert times.values.dtype is sb.float64
-    assert np.array_equal(np.asarray(times.values), [0.0, 1.5, 4.0])
+    assert np.asarray(times).dtype == np.float64
+    assert np.array_equal(np.asarray(times), [0.0, 1.5, 4.0])
     assert times.unit == "ms"
 
 
-@pytest.mark.parametrize("values, unit", [
+@pytest.mark.parametrize("times, unit", [
     ([0.0, 0.0], "s"),  # duplicate timestamps
     ([1.0, 0.0], "s"),  # decreasing timestamps
     ([0.0, np.nan], "s"),
@@ -23,9 +22,9 @@ def test_times_keeps_values_and_unit():
     ([[0.0, 1.0]], "s"),  # two-dimensional
     ([0.0, 1.0], "yr"),  # unknown unit
 ])
-def test_times_rejects_invalid_input(values, unit):
+def test_times_rejects_invalid_input(times, unit):
     with pytest.raises(ValueError):
-        Times(values, unit=unit)
+        Times(times, unit=unit)
 
 
 
@@ -41,25 +40,24 @@ def test_times_accepts_unit_aliases(alias, unit):
     assert Times([0.0, 1.0], unit=alias).unit == unit
 
 
-def test_changing_times_values_leaves_times_unchanged():
+def test_times_cannot_be_assigned_to():
     times = Times([0.0, 1.0], unit="s")
-    values = times.values
 
-    values[0] = 5.0
+    with pytest.raises(TypeError):
+        times[0] = 5.0
 
-    assert values[0] == 5.0
-    assert np.array_equal(np.asarray(times.values), [0.0, 1.0])
+    assert np.array_equal(np.asarray(times), [0.0, 1.0])
 
 
-@pytest.mark.parametrize("values, unit, target, expected", [
+@pytest.mark.parametrize("times, unit, target, expected", [
     ([0.0, 1.5], "min", "s", [0.0, 90.0]),
     ([0.0, 1.5], "fs", "as", [0.0, 1500.0]),
     ([0.0, 2.25], "as", "fs", [0.0, 0.00225]),
 ])
-def test_times_converts_units(values, unit, target, expected):
-    converted = Times(values, unit=unit).to(target)
+def test_times_converts_units(times, unit, target, expected):
+    converted = Times(times, unit=unit).to(target)
 
-    assert np.array_equal(np.asarray(converted.values), expected)
+    assert np.array_equal(np.asarray(converted), expected)
     assert converted.unit == target
 
 
@@ -347,3 +345,12 @@ def test_snap_eps_bounds_the_snap_distance():
 def test_snap_eps_must_be_finite_and_nonnegative(eps):
     with pytest.raises(ValueError):
         TimeSeries([1.0, 2.0], times=[0.0, 1.0], snap_eps=eps)
+
+
+def test_to_changes_the_query_unit():
+    series = TimeSeries([10.0, 20.0], times=Times([0.0, 0.5], unit="s")).to("ms")
+
+    assert series.unit == "ms"
+    assert np.array_equal(np.asarray(series.times), [0.0, 500.0])
+    assert series.domain == (0.0, 500.0)
+    assert series(250.0) == 10.0

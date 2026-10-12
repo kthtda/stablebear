@@ -402,6 +402,18 @@ namespace sb
     [[nodiscard]] size_t n_channels() const noexcept { return m_channels.size(); }
     [[nodiscard]] TimeUnit unit() const noexcept { return m_unit; }
 
+    /// The same series queried in @p unit; the channels are shared, not
+    /// converted.
+    [[nodiscard]] TimeSeries to(TimeUnit unit) const
+    {
+      auto series = *this;
+      series.m_unit = unit;
+      return series;
+    }
+
+    /// The timestamps of channel @p i, converted to the query unit.
+    [[nodiscard]] Times times(size_t i) const { return channel(i).times().to(m_unit); }
+
     /// The intersection of the channels' domains, in the series' unit; empty
     /// when the channels share no time.
     [[nodiscard]] std::optional<Domain> domain() const
