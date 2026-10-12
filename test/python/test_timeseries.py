@@ -228,3 +228,17 @@ def test_series_of_every_element_type(make_values):
 def test_series_rejects_unsupported_values(values):
     with pytest.raises(TypeError):
         TimeSeries(values, times=[0.0, 1.0])
+
+
+def test_observation_by_index():
+    values = [
+        [1.0, 2.0],
+        [3.0, 4.0],
+        [5.0, 6.0],
+    ]
+    series = TimeSeries(values, times=[0.0, 1.0, 2.0])
+
+    assert np.array_equal(np.asarray(series.observation(1)), [3.0, 4.0])
+    assert np.array_equal(np.asarray(series.observation(-1)), [5.0, 6.0])
+    with pytest.raises(IndexError):
+        series.observation(3)

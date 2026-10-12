@@ -426,7 +426,7 @@ parallel threshold.
   `NestedTensor`. **Catches:** object sequences silently converted to numeric
   arrays, strings or nested tensors passed to the native constructor.
 
-- [ ] **17. Observations.** `series.observation(i)` returns observation `i`.
+- [x] **17. Observations.** `series.observation(i)` returns observation `i`.
   Test with values `[[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]]` and
   `times=[0.0, 1.0, 2.0]`: `observation(1)` is `[3.0, 4.0]`,
   `observation(-1)` is `[5.0, 6.0]`, and `observation(3)` raises
