@@ -184,7 +184,9 @@ parallel threshold.
   a power of ten times an integer (1 or 60, 3600, 86400), and convert by
   multiplying or dividing by an exact integer factor rather than by a
   rounded one such as `1e-15`; dividing by an exact factor rounds once.
-  Adding `"zs"` or `"ys"` later is one table entry. `Times.to(unit)`
+  Adding `"zs"` or `"ys"` later is one table entry. Aliases such as
+  `"sec"`, `"seconds"`, `"hr"`, `"msec"`, and the micro sign `"\u00b5s"`
+  are accepted; `unit` reports the short name. `Times.to(unit)`
   converts, and a series converts each query from its query unit into each
   channel's unit. Delays, window sizes, and query times are in the series'
   query unit.
@@ -205,7 +207,9 @@ parallel threshold.
     whose view is a window or an embedding, materializes the whole view into
     its own storage, as `IndexedElementTensor._ensure_writeable` does for
     subsamples. Other views never see the write.
-  - Timestamps are always read-only: `Times.values` is a read-only array.
+  - Timestamps cannot change: `Times.values` returns a `FloatTensor` copy.
+  - Public numeric results are stablebear tensors (`FloatTensor`), not NumPy
+    arrays.
 
 - [x] **5. Native storage and where the code lives.** (decision: as recommended; all evaluation in C++, flat values plus `shape`, `NestedTensor`-style registration)
   Recommendation, from our discussion:
@@ -343,20 +347,24 @@ parallel threshold.
 
 ## Stored channels
 
-- [ ] **10. `Times`.** `sb::Times` in `include/sbear/timeseries.hpp` validates
+- [x] **10. `Times`.** `sb::Times` in `include/sbear/timeseries.hpp` validates
   its timestamps and unit and converts units. The new `stablebear/timeseries/`
-  package wraps it with `values` (a read-only float64 array), `unit`, `len()`,
-  `==`, `repr`, and `to(unit)`. Tests:
+  package wraps it with `values` (a float64 `FloatTensor` copy), `unit`,
+  `len()`, `==`, `repr`, and `to(unit)`. Tests:
   - `Times([0.0, 1.5, 4.0], unit="ms")` has float64 values
-    `[0.0, 1.5, 4.0]` and unit `"ms"`. **Catches:** a dropped or replaced
-    unit.
+    `[0.0, 1.5, 4.0]` (a `FloatTensor`) and unit `"ms"`. **Catches:** a
+    dropped or replaced unit, an ndarray returned.
   - Invalid input raises `ValueError`, parametrized over the timestamps
     `[0.0, 0.0]`, `[1.0, 0.0]`, `[0.0, nan]`, `[0.0, inf]`, and
-    `[[0.0, 1.0]]`, and over `unit="sec"` with valid timestamps.
+    `[[0.0, 1.0]]`, and over `unit="yr"` with valid timestamps.
     **Catches:** duplicate, decreasing, nonfinite, or 2-D timestamps
     accepted; unknown units accepted.
-  - Assigning `times.values[0] = 5.0` raises `ValueError`. **Catches:**
-    timestamps that can be reordered after validation.
+  - Parametrized: the aliases `"sec"`, `"seconds"`, `"hr"`, `"msec"`, and
+    both micro signs give the short names `"s"`, `"h"`, `"ms"`, and `"us"`.
+    **Catches:** an alias rejected or mapped to the wrong unit.
+  - After `values = times.values` and `values[0] = 5.0`, `values[0] == 5.0`
+    and `times.values` is unchanged. **Catches:** timestamps that can be
+    reordered after validation.
   - Parametrized: `Times([0.0, 1.5], unit="min").to("s")` gives
     `[0.0, 90.0]`; `Times([0.0, 1.5], unit="fs").to("as")` gives
     `[0.0, 1500.0]`; `Times([0.0, 2.25], unit="as").to("fs")` gives
@@ -594,7 +602,7 @@ parallel threshold.
     `max_death=2.5`, and differs from the result without `max_death`.
     **Catches:** `max_death` dropped on the series path.
 
-- [ ] **36. Tensors through `UfuncTask`.** Route the existing tensor paths of
+- [x] **36. Tensors through `UfuncTask`.** (done early, in `46069ff0e`; single clouds, matrices, and barcodes also run as 0-d inputs) Route the existing tensor paths of
   `compute_persistent_homology` (point clouds and distance matrices, including
   indexed tensors) and the three summaries through `UfuncTask` with a tensor
   adapter, and remove `RipserTaskImpl` and `BarcodeSummaryTask` if nothing

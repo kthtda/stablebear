@@ -17,6 +17,7 @@
 #include "py_np_tensor_convert.hpp"
 #include "py_symmetric_matrix.hpp"
 #include "py_distance_matrix.hpp"
+#include "py_timeseries.hpp"
 #include "py_distributions.hpp"
 
 #include "persistence/pymodule_persistence.hpp"
@@ -176,6 +177,7 @@ PYBIND11_MODULE(SB_MODULE_NAME, m) {
   sb_py::register_norms(m);
   sb_py::register_symmetric_matrix(m);
   sb_py::register_distance_matrix(m);
+  sb_py::register_timeseries(m);
 
   sb_py::register_module_persistence(m);
   sb_py::register_distributions(m);

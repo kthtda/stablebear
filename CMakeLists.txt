@@ -573,6 +573,7 @@ SET(SB_PY_SOURCES
     py_io.hpp py_io.cpp
     py_symmetric_matrix.hpp py_symmetric_matrix.cpp
     py_distance_matrix.hpp py_distance_matrix.cpp
+    py_timeseries.hpp py_timeseries.cpp
     ${SB_PY_PERSISTENCE_SOURCES}
     ${SB_PY_POINT_PROCESS_SOURCES}
 )
