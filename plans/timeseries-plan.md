@@ -104,7 +104,7 @@ This assumes the recommended option of each decision.
 - Everything runs in C++: lookups, snapping, domain checks, unit conversion,
   windows, delay embeddings, sampling, and analysis. Python only binds
   arguments and wraps results.
-- `series[t]` looks up each channel on its own grid, in its own unit, and
+- `series(t)` looks up each channel on its own grid, in its own unit, and
   returns the value for one channel or an ordered dict for several.
   `series[a:b]` is a window, and `series["name"]` selects channels.
 - Every channel is a view: a `shared_ptr` to its storage plus a descriptor
@@ -277,8 +277,8 @@ parallel threshold.
     channels' shared unit and is required when their units differ.
   - A `TimeSeries` exposes `channel_names`, `dtype`, `unit`, `domain`, `times`
     (a `Times` for one channel, a `NestedTensor` with one leaf per channel in
-    the query unit for several), `to(unit)`, `evaluate(t)`, `series[t]` (the
-    same as `evaluate(t)`; an int `t` is a time), `series[a:b]` (a window),
+    the query unit for several), `to(unit)`, `evaluate(t)`, `series(t)` (the
+    same as `evaluate(t)`), `series[a:b]` (a window),
     and `series["name"]` or `series[["a", "b"]]` (channel selection). A
     one-channel series also exposes `values`, `shape`, `len()`,
     and `observation(i)`; on several channels these raise `ValueError` asking
@@ -433,37 +433,37 @@ parallel threshold.
   `IndexError`. **Catches:** indexing along the coordinates, negative indices
   counted from the wrong end, no bounds check. Writes come in items 48-50.
 
-- [ ] **18. Evaluation.** `series.evaluate(t)` and `series[t]` return the
+- [x] **18. Evaluation.** `series.evaluate(t)` and `series(t)` return the
   previous value (decision 1). Tests with times `[0.0, 1.5, 4.0]` and values
   `[10.0, 20.0, 30.0]`:
-  - `series[t]` at 0.0, 1.0, 1.5, 3.75, and 4.0 gives 10, 10, 20, 20, and 30,
-    and `series[1]` (an int) gives 10, the value at time 1. **Catches:**
+  - `series(t)` at 0.0, 1.0, 1.5, 3.75, and 4.0 gives 10, 10, 20, 20, and 30,
+    and `series(1)` (an int) gives 10, the value at time 1. **Catches:**
     next-value, nearest, or linear interpolation; an open end; an int read as
     a position.
-  - `domain == (0.0, 4.0)`, and `series[-0.5]` and `series[4.5]` raise
+  - `domain == (0.0, 4.0)`, and `series(-0.5)` and `series(4.5)` raise
     `ValueError`. **Catches:** extrapolation outside the domain, NaN instead
     of an error.
 
 - [ ] **19. Empty and singleton series.** Tests:
   - `TimeSeries(sb.zeros((0,), dtype=sb.pcloud64), times=[])` has
-    `len() == 0`, dtype pcloud64, and `domain is None`, and `series[0.0]`
+    `len() == 0`, dtype pcloud64, and `domain is None`, and `series(0.0)`
     raises `ValueError`. **Catches:** an invented domain, a crash on empty
     storage.
   - `TimeSeries([7.0], times=[2.0])` has domain `(2.0, 2.0)` and
-    `series[2.0] == 7.0`. **Catches:** a singleton series rejected or
+    `series(2.0) == 7.0`. **Catches:** a singleton series rejected or
     impossible to evaluate.
 
 - [ ] **20. Snapping.** Implement decision 2 in the native lookup. Test with
   times `[0.0, 0.25, 0.5]` and values `[1.0, 2.0, 3.0]`:
-  `series[np.nextafter(0.25, 0.0)]` is 2.0 and `series[0.25 - 1e-6]` is 1.0.
+  `series(np.nextafter(0.25, 0.0))` is 2.0 and `series(0.25 - 1e-6)` is 1.0.
   **Catches:** no snapping, or a tolerance wide enough to change values at
   ordinary times.
 
 - [ ] **21. Query unit.** `series.to(unit)` returns the series with another
-  query unit; the stored channels are unchanged. Test:
-  `TimeSeries([10.0, 20.0], times=Times([0.0, 0.5], unit="s")).to("ms")` has
-  unit `"ms"`, times `[0.0, 500.0]`, domain `(0.0, 500.0)`, and `[250.0]`
-  equal to 10. **Catches:** queries or the domain left in the old unit.
+  query unit; the stored channels are unchanged. Test: `TimeSeries([10.0,
+  20.0], times=Times([0.0, 0.5], unit="s")).to("ms")` has unit `"ms"`, times
+  `[0.0, 500.0]`, domain `(0.0, 500.0)`, and its value at 250.0 equal to 10.
+  **Catches:** queries or the domain left in the old unit.
 
 ## Several channels
 
@@ -479,21 +479,21 @@ parallel threshold.
     unit, an empty series, nested channel sets, mixed element types.
 
 - [ ] **23. Domain and times of several channels.** Test with the series of
-  channels A and B: domain `(0.5, 2.5)`; `series[0.25]` raises `ValueError`;
+  channels A and B: domain `(0.5, 2.5)`; `series(0.25)` raises `ValueError`;
   `times` is a `NestedTensor` whose leaves are `[0.0, 1.0, 2.5]` and
   `[0.5, 1.5, 3.0]`. The end is closed only if every channel ending there is
   closed. **Catches:** the union of domains, timestamps reported in each
   channel's own unit.
 
 - [ ] **24. Evaluating several channels.** Test with the series of channels A
-  and B: `series[1.25] == {"a": 20.0, "b": -1.0}`,
-  `series[1.5] == {"a": 20.0, "b": -2.0}`, and the keys come in channel order.
+  and B: `series(1.25) == {"a": 20.0, "b": -1.0}`,
+  `series(1.5) == {"a": 20.0, "b": -2.0}`, and the keys come in channel order.
   **Catches:** channel B read in the wrong unit (it would answer at 1.25 ms),
   one grid assumed for all channels, channel order lost.
 
 - [ ] **25. Selecting channels.** Tests with the series of channels A and B:
   - `series["b"]` is a one-channel series with unit `"s"` and
-    `series["b"][1.5] == -2.0`; `series[["b", "a"]]` has
+    `series["b"](1.5) == -2.0`; `series[["b", "a"]]` has
     `channel_names == ("b", "a")`. **Catches:** the query unit lost on
     selection, selection order ignored.
   - `series.values` and `series.observation(0)` raise `ValueError`, and
@@ -632,16 +632,17 @@ values `[1.0, 2.0, 3.0, 4.0, 5.0]`.
     points at 3.25 and 3.75 differ from the point at the last observation
     time, 2.5. **Catches:** newest-first order, the same delay for every
     component, points held from the last observation time.
-  - The embedding has domain `(2.0, 4.0)`, unit `"ms"`, `shape == (3,)`,
-    and times `[2.0, 2.5, 3.0, 3.5, 4.0]` (the shifted observation times in
-    the domain), and `[1.5]` raises `ValueError`. **Catches:** components that
-    refer to times before the series starts, change times missing.
+  - The embedding has domain `(2.0, 4.0)`, unit `"ms"`, `shape == (3,)`, and
+    times `[2.0, 2.5, 3.0, 3.5, 4.0]` (the shifted observation times in the
+    domain), and evaluating it at 1.5 raises `ValueError`. **Catches:**
+    components that refer to times before the series starts, change times
+    missing.
 
 - [ ] **41. Embedding shaped observations, and embedding errors.** A channel
   of shape `S` embeds into shape `(m, *S)`, oldest first. Tests:
   - Times `[0.0, 1.0, 2.0]`, values `[[1, -1], [2, -2], [3, -3]]`,
-    `dimension=2`, and `delay=1.0` give `shape == (2, 2)` and `[2.0]` equal
-    to `[[2, -2], [3, -3]]`. **Catches:** the delay axis placed last,
+    `dimension=2`, and `delay=1.0` give `shape == (2, 2)` and the value at 2.0
+    equal to `[[2, -2], [3, -3]]`. **Catches:** the delay axis placed last,
     newest-first order.
   - Parametrized: `dimension=0`, `delay=0.0`, and `delay=-1.0` raise
     `ValueError`; `dimension=3` and `delay=1.0` on times `[0.0, 1.0]` raise
@@ -669,10 +670,10 @@ values `[1.0, 2.0, 3.0, 4.0, 5.0]`.
 - [ ] **44. Window contents and time slicing.** `series[a:b]` is the window
   `[a, b)`, the same object `Window` produces. Tests with the source series:
   - `w = series[1.0:3.0]` has times `[1.5, 2.5]` (original timestamps),
-    `w[1.0] == 2.0` (the observation at 0.5), and `w[2.75] == 4.0`.
+    `w(1.0) == 2.0` (the observation at 0.5), and `w(2.75) == 4.0`.
     **Catches:** the value before the first observation in the window missing,
     timestamps moved to the window start.
-  - `w[3.0]` raises `ValueError`, and `series[1.0:3.0:0.5]` raises
+  - `w(3.0)` raises `ValueError`, and `series[1.0:3.0:0.5]` raises
     `ValueError`. **Catches:** a closed window end, a step silently ignored.
 
 - [ ] **45. Window parameter errors.** Test, parametrized `ValueError`:
@@ -681,10 +682,10 @@ values `[1.0, 2.0, 3.0, 4.0, 5.0]`.
   never advance, conflicting parameters accepted.
 
 - [ ] **46. Embedding a window.** Test: `TimeDelayEmbedding(dimension=2,
-  delay=1.0)` of `series[1.0:3.0]` has domain `(2.0, 3.0)`; `[2.0]` is
-  `[2, 3]` (with the value at 1.0 from the source) and `[2.75]` is `[3, 4]`;
-  `[1.5]` and `[3.0]` raise `ValueError`. **Catches:** history taken from
-  before the window, the half-open end lost.
+  delay=1.0)` of `series[1.0:3.0]` has domain `(2.0, 3.0)`; its value at 2.0
+  is `[2, 3]` (with the value at 1.0 from the source) and at 2.75 is `[3, 4]`;
+  evaluating it at 1.5 or 3.0 raises `ValueError`. **Catches:** history taken
+  from before the window, the half-open end lost.
 
 - [ ] **47. Windows of several channels.** Test:
   `Window(size=1.0, step=1.0)` of the series of channels A and B gives windows
@@ -703,8 +704,8 @@ Items 48-50 use the source series of items 43-46 and the embedding of item
   the materialization of decision 4 for shared storage. Tests with values
   `[[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]]` and `times=[0.0, 1.0, 2.0]`:
   - After `other = series["0"]` (sharing storage) and
-    `series.set_observation(1, [7.0, 8.0])`, `series[1.0]` is `[7.0, 8.0]` and
-    `other[1.0]` is still `[3.0, 4.0]`. **Catches:** a lost write, a write
+    `series.set_observation(1, [7.0, 8.0])`, `series(1.0)` is `[7.0, 8.0]` and
+    `other(1.0)` is still `[3.0, 4.0]`. **Catches:** a lost write, a write
     leaking into a view that shares storage.
   - `series.values[0, 1] = 9.0` gives `observation(0) == [1.0, 9.0]`, and after
     `obs = series.observation(2)` and `obs[0] = 0.0`, `observation(2)` is
@@ -712,15 +713,15 @@ Items 48-50 use the source series of items 43-46 and the embedding of item
     copies.
 
 - [ ] **49. Writing a window.** Test: with `w = series[1.0:3.0]`,
-  `w.set_observation(0, 30.0)` gives `w[1.75] == 30.0`, keeps `w[1.0] == 2.0`
+  `w.set_observation(0, 30.0)` gives `w(1.75) == 30.0`, keeps `w(1.0) == 2.0`
   (the carried-in observation) and `w.times == [1.5, 2.5]`, and leaves the
-  source (`series[1.75] == 3.0`) and the window `series[1.0:2.0]` unchanged.
+  source (`series(1.75) == 3.0`) and the window `series[1.0:2.0]` unchanged.
   **Catches:** the carried-in observation dropped on materializing, the write
   reaching the source or a sibling window.
 
 - [ ] **50. Writing an embedding.** Test: for item 40's embedding `e`,
-  `e.set_observation(1, [0.0, 0.0, 0.0])` (time 2.5) gives `e[2.75]` equal to
-  `[0, 0, 0]`, keeps `e[2.0] == [10, 20, 20]`, `e[3.25] == [20, 20, 30]`, and
+  `e.set_observation(1, [0.0, 0.0, 0.0])` (time 2.5) gives `e(2.75)` equal to
+  `[0, 0, 0]`, keeps `e(2.0) == [10, 20, 20]`, `e(3.25) == [20, 20, 30]`, and
   `len(e) == 5`, and leaves the source unchanged. **Catches:** a write into a
   lagged view reaching the source, materialization at observation times only
   (which would change the value at 3.25).
@@ -766,9 +767,9 @@ Items 48-50 use the source series of items 43-46 and the embedding of item
   decision 9, with shared storage written once. Tests, parametrized over
   `save`/`load` and `pickle`:
   - The window `[1.5, 2.5)` of item 42's embedding loads with the same channel
-    names, domain, unit, and values at 1.5 and 2.0, and `[2.5]` still raises
-    `ValueError`. **Catches:** a lag, bound, or query unit lost on saving, the
-    half-open end lost.
+    names, domain, unit, and values at 1.5 and 2.0, and evaluating it at 2.5
+    still raises `ValueError`. **Catches:** a lag, bound, or query unit lost
+    on saving, the half-open end lost.
   - `from_channels({"x": s, "y": s[1.0:3.0]})`, two views of one storage,
     saves to fewer bytes than the same series built from two independent
     copies of `s`, and loads with the same values. **Catches:** shared storage

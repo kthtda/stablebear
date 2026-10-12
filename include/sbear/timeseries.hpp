@@ -12,6 +12,8 @@
 #include <functional>
 #include <memory>
 #include <numeric>
+#include <optional>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -178,6 +180,27 @@ namespace sb
     TimeUnit m_unit;
   };
 
+  /// The times at which a channel can be evaluated: [start, end] when the end
+  /// is closed, otherwise [start, end).
+  struct Domain
+  {
+    float64_t start;
+    float64_t end;
+    bool endClosed = true;
+
+    [[nodiscard]] bool contains(float64_t t) const
+    {
+      return start <= t && (endClosed ? t <= end : t < end);
+    }
+
+    [[nodiscard]] std::string to_string() const
+    {
+      std::ostringstream ss;
+      ss << "[" << start << ", " << end << (endClosed ? "]" : ")");
+      return ss.str();
+    }
+  };
+
   /// Recorded observations of one channel: one observation per timestamp,
   /// each a tensor of shape `shape`, stored flat in row-major order.
   template <typename T>
@@ -220,6 +243,32 @@ namespace sb
         storage->values.push_back(owned(index));
       });
       m_storage = std::move(storage);
+      if (size() > 0)
+      {
+        // A channel built from observations covers [t_0, t_{n-1}].
+        const auto& recorded = m_storage->times.values();
+        m_domain = Domain{recorded.front(), recorded.back(), true};
+      }
+    }
+
+    /// Where the channel can be evaluated; empty for a channel without
+    /// observations.
+    [[nodiscard]] const std::optional<Domain>& domain() const noexcept { return m_domain; }
+
+    /// The observation with the largest timestamp at or before @p t, which is
+    /// in the channel's own unit.
+    [[nodiscard]] Tensor<T> evaluate(float64_t t) const
+    {
+      if (!m_domain || !m_domain->contains(t))
+      {
+        std::ostringstream ss;
+        ss << "Time " << t << " is outside the domain "
+           << (m_domain ? m_domain->to_string() : std::string("(empty)"));
+        throw std::domain_error(ss.str());
+      }
+      const auto& times = m_storage->times.values();
+      const auto next = std::upper_bound(times.begin(), times.end(), t);
+      return observation(std::distance(times.begin(), next) - 1);
     }
 
     [[nodiscard]] const Times& times() const noexcept { return m_storage->times; }
@@ -263,6 +312,7 @@ namespace sb
 
   private:
     std::shared_ptr<ChannelStorage<T>> m_storage;
+    std::optional<Domain> m_domain;
   };
 
   /// Named channels of one element type, queried in one time unit.
@@ -294,6 +344,53 @@ namespace sb
     [[nodiscard]] const Channel<T>& channel(size_t i) const { return m_channels.at(i); }
     [[nodiscard]] size_t n_channels() const noexcept { return m_channels.size(); }
     [[nodiscard]] TimeUnit unit() const noexcept { return m_unit; }
+
+    /// The intersection of the channels' domains, in the series' unit; empty
+    /// when the channels share no time.
+    [[nodiscard]] std::optional<Domain> domain() const
+    {
+      std::optional<Domain> result;
+      for (size_t i = 0; i < m_channels.size(); ++i)
+      {
+        const auto& channelDomain = m_channels[i].domain();
+        if (!channelDomain)
+        {
+          return std::nullopt;
+        }
+        const auto channelUnit = m_channels[i].times().unit();
+        const Domain d{convert_time(channelDomain->start, channelUnit, m_unit),
+                       convert_time(channelDomain->end, channelUnit, m_unit),
+                       channelDomain->endClosed};
+        if (!result)
+        {
+          result = d;
+          continue;
+        }
+        result->start = std::max(result->start, d.start);
+        if (d.end < result->end)
+        {
+          result->end = d.end;
+          result->endClosed = d.endClosed;
+        }
+        else if (d.end == result->end)
+        {
+          result->endClosed = result->endClosed && d.endClosed;
+        }
+      }
+      if (result && (result->start > result->end
+                     || (result->start == result->end && !result->endClosed)))
+      {
+        return std::nullopt;
+      }
+      return result;
+    }
+
+    /// Evaluate channel @p i at @p t, given in the series' unit.
+    [[nodiscard]] Tensor<T> evaluate_channel(size_t i, float64_t t) const
+    {
+      const auto& c = channel(i);
+      return c.evaluate(convert_time(t, m_unit, c.times().unit()));
+    }
 
   private:
     std::vector<std::string> m_names;

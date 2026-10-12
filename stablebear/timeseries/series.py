@@ -220,15 +220,44 @@ class TimeSeries(Generic[T]):
         """The shape of one observation; ``()`` for scalars."""
         return self._single_channel().shape
 
+    @property
+    def domain(self) -> tuple[float, float] | None:
+        """``(start, end)`` of the times where the series can be evaluated.
+
+        A series built from observations covers ``[t_0, t_{n-1}]``, end
+        included. ``None`` for a series without observations.
+        """
+        return self._data.domain
+
+    def evaluate(self, t):
+        """The observation with the largest timestamp at or before ``t``.
+
+        ``t`` is in the series' unit. Returns a scalar or element for
+        observations of shape ``()``, otherwise a tensor of that shape.
+
+        Raises
+        ------
+        ValueError
+            If ``t`` is outside the domain.
+        """
+        self._single_channel()
+        return self._wrap_observation(self._data.evaluate_channel(0, float(t)))
+
+    def __call__(self, t):
+        """``series(t)`` is ``series.evaluate(t)``."""
+        return self.evaluate(t)
+
+    def _wrap_observation(self, data):
+        observation = _SERIES_TYPES[self.dtype][1](data)
+        return observation[()] if observation.ndim == 0 else observation
+
     def observation(self, i: int):
         """A copy of recorded observation ``i``; negative indices count from the end.
 
         Returns a scalar or element (such as a ``PointCloud``) for
         observations of shape ``()``, otherwise a tensor of that shape.
         """
-        wrapper = _SERIES_TYPES[self.dtype][1]
-        observation = wrapper(self._single_channel().observation(operator.index(i)))
-        return observation[()] if observation.ndim == 0 else observation
+        return self._wrap_observation(self._single_channel().observation(operator.index(i)))
 
     def __len__(self) -> int:
         return len(self._single_channel())
