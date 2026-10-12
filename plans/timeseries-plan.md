@@ -401,7 +401,7 @@ parallel threshold.
     give `shape == (2, 2)` and `values` equal to the input.
     **Catches:** higher-rank observations flattened or transposed.
 
-- [ ] **13. Every element type.** Register the remaining 12 element types
+- [x] **13. Every element type.** Register the remaining 12 element types
   (the 7 numeric ones came with item 11) and dispatch on the tensor type in
   Python. Test, parametrized over the 19
   dtypes: a two-observation 1-D tensor whose elements differ (for objects,
@@ -411,7 +411,7 @@ parallel threshold.
   input. **Catches:** a type bound to the wrong native class or precision,
   elements of different sizes rejected.
 
-- [ ] **14. (optional) Indexed tensors are copied.** A point-cloud tensor that
+- [x] **14. (optional) Indexed tensors are copied.** (skipped; `to_dense()` is in place) A point-cloud tensor that
   holds a selection (indexed with `sb.indices`) gives a series whose
   `values.indices is None`. **Catches:** an indexed tensor passed to a binding
   that expects ordinary storage.

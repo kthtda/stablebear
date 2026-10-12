@@ -1,5 +1,10 @@
 #include "py_timeseries.hpp"
 
+#include <sbear/distance_matrix.hpp>
+#include <sbear/functional/pcf.hpp>
+#include <sbear/persistence/barcode.hpp>
+#include <sbear/point_cloud.hpp>
+#include <sbear/symmetric_matrix.hpp>
 #include <sbear/tensor.hpp>
 #include <sbear/timeseries.hpp>
 
@@ -80,5 +85,17 @@ namespace sb_py
     register_timeseries_element<sb::int64_t>(m, "Int64");
     register_timeseries_element<uint32_t>(m, "Uint32");
     register_timeseries_element<uint64_t>(m, "Uint64");
+    register_timeseries_element<sb::Pcf_f32>(m, "Pcf32");
+    register_timeseries_element<sb::Pcf_f64>(m, "Pcf64");
+    register_timeseries_element<sb::Pcf_i32>(m, "Pcf32i");
+    register_timeseries_element<sb::Pcf_i64>(m, "Pcf64i");
+    register_timeseries_element<sb::PointCloud<sb::float32_t>>(m, "PointCloud32");
+    register_timeseries_element<sb::PointCloud<sb::float64_t>>(m, "PointCloud64");
+    register_timeseries_element<sb::DistanceMatrix<sb::float32_t>>(m, "DistanceMatrix32");
+    register_timeseries_element<sb::DistanceMatrix<sb::float64_t>>(m, "DistanceMatrix64");
+    register_timeseries_element<sb::SymmetricMatrix<sb::float32_t>>(m, "SymmetricMatrix32");
+    register_timeseries_element<sb::SymmetricMatrix<sb::float64_t>>(m, "SymmetricMatrix64");
+    register_timeseries_element<sb::ph::Barcode<sb::float32_t>>(m, "Barcode32");
+    register_timeseries_element<sb::ph::Barcode<sb::float64_t>>(m, "Barcode64");
   }
 }
