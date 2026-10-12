@@ -5,9 +5,33 @@ from typing import Generic, TypeVar
 import numpy as np
 
 from .. import _sb_cpp as cpp
-from .._tensor_base import Tensor
-from ..base_tensor import BoolTensor, FloatTensor, IntTensor
-from ..typing import boolean, float32, float64, int32, int64, uint32, uint64
+from .._tensor_base import IndexedElementTensor, Tensor
+from ..base_tensor import BoolTensor, FloatTensor, IntPcfTensor, IntTensor, PcfTensor
+from ..distance_matrix import DistanceMatrixTensor
+from ..persistence.ph_tensor import BarcodeTensor
+from ..point_cloud import PointCloudTensor
+from ..symmetric_matrix import SymmetricMatrixTensor
+from ..typing import (
+    barcode32,
+    barcode64,
+    boolean,
+    distmat32,
+    distmat64,
+    float32,
+    float64,
+    int32,
+    int64,
+    pcf32,
+    pcf32i,
+    pcf64,
+    pcf64i,
+    pcloud32,
+    pcloud64,
+    symmat32,
+    symmat64,
+    uint32,
+    uint64,
+)
 
 T = TypeVar("T")
 
@@ -81,6 +105,18 @@ _SERIES_TYPES = {
     int64: (cpp.TimeSeriesInt64, IntTensor),
     uint32: (cpp.TimeSeriesUint32, IntTensor),
     uint64: (cpp.TimeSeriesUint64, IntTensor),
+    pcf32: (cpp.TimeSeriesPcf32, PcfTensor),
+    pcf64: (cpp.TimeSeriesPcf64, PcfTensor),
+    pcf32i: (cpp.TimeSeriesPcf32i, IntPcfTensor),
+    pcf64i: (cpp.TimeSeriesPcf64i, IntPcfTensor),
+    pcloud32: (cpp.TimeSeriesPointCloud32, PointCloudTensor),
+    pcloud64: (cpp.TimeSeriesPointCloud64, PointCloudTensor),
+    distmat32: (cpp.TimeSeriesDistanceMatrix32, DistanceMatrixTensor),
+    distmat64: (cpp.TimeSeriesDistanceMatrix64, DistanceMatrixTensor),
+    symmat32: (cpp.TimeSeriesSymmetricMatrix32, SymmetricMatrixTensor),
+    symmat64: (cpp.TimeSeriesSymmetricMatrix64, SymmetricMatrixTensor),
+    barcode32: (cpp.TimeSeriesBarcode32, BarcodeTensor),
+    barcode64: (cpp.TimeSeriesBarcode64, BarcodeTensor),
 }
 _SERIES_CPP_TO_DTYPE = {cls: dtype for dtype, (cls, _) in _SERIES_TYPES.items()}
 
@@ -99,8 +135,12 @@ def _values_tensor(values):
             raise TypeError(
                 f"Unsupported time series values of dtype {array.dtype}"
             ) from error
-    if values.dtype not in _SERIES_TYPES:
+    if values.dtype not in _SERIES_TYPES or not isinstance(
+        values, _SERIES_TYPES[values.dtype][1]
+    ):
         raise TypeError(f"Unsupported time series values: {type(values).__name__}")
+    if isinstance(values, IndexedElementTensor) and values._has_indexed_storage():
+        values = values.to_dense()
     return values
 
 

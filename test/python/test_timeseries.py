@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 
 import stablebear as sb
+from stablebear.persistence import Barcode, BarcodeTensor
 from stablebear.timeseries import Times, TimeSeries
 
 
@@ -126,3 +127,85 @@ def test_series_of_matrices():
 
     assert series.shape == (2, 2)
     assert np.array_equal(np.asarray(series.values), values)
+
+
+
+def _pcfs(np_dtype):
+    return sb.tensor([
+        sb.Pcf(np.array([[0, 1], [1, 0]], dtype=np_dtype)),
+        sb.Pcf(np.array([[0, 2], [1, 1], [2, 0]], dtype=np_dtype)),
+    ])
+
+
+def _point_clouds(dtype, np_dtype):
+    # Clouds of 1 and 2 points.
+    return sb.PointCloudTensor([
+        np.array([[0.0, 0.0]], dtype=np_dtype),
+        np.array([[1.0, 0.0], [0.0, 1.0]], dtype=np_dtype),
+    ], dtype=dtype)
+
+
+def _distance_matrices(dtype, np_dtype):
+    tensor = sb.zeros((2,), dtype=dtype)
+    tensor[0] = sb.DistanceMatrix(np.array([
+        [0.0, 1.0],
+        [1.0, 0.0],
+    ], dtype=np_dtype))
+    tensor[1] = sb.DistanceMatrix(np.array([
+        [0.0, 1.0, 2.0],
+        [1.0, 0.0, 3.0],
+        [2.0, 3.0, 0.0],
+    ], dtype=np_dtype))
+    return tensor
+
+
+def _symmetric_matrices(dtype, np_dtype):
+    tensor = sb.zeros((2,), dtype=dtype)
+    tensor[0] = sb.SymmetricMatrix(np.array([
+        [1.0, 2.0],
+        [2.0, 3.0],
+    ], dtype=np_dtype))
+    tensor[1] = sb.SymmetricMatrix(np.array([
+        [1.0, 2.0, 3.0],
+        [2.0, 4.0, 5.0],
+        [3.0, 5.0, 6.0],
+    ], dtype=np_dtype))
+    return tensor
+
+
+def _barcodes(np_dtype):
+    # Barcodes with 1 and 2 bars.
+    return BarcodeTensor([
+        Barcode(np.array([[0.0, 1.0]], dtype=np_dtype)),
+        Barcode(np.array([[0.0, 2.0], [0.5, 1.5]], dtype=np_dtype)),
+    ])
+
+
+@pytest.mark.parametrize("make_values", [
+    pytest.param(lambda: sb.tensor(np.array([True, False])), id="boolean"),
+    pytest.param(lambda: sb.tensor(np.array([1.0, 2.0], dtype=np.float32)), id="float32"),
+    pytest.param(lambda: sb.tensor(np.array([1.0, 2.0], dtype=np.float64)), id="float64"),
+    pytest.param(lambda: sb.tensor(np.array([1, 2], dtype=np.int32)), id="int32"),
+    pytest.param(lambda: sb.tensor(np.array([1, 2], dtype=np.int64)), id="int64"),
+    pytest.param(lambda: sb.tensor(np.array([1, 2], dtype=np.uint32)), id="uint32"),
+    pytest.param(lambda: sb.tensor(np.array([1, 2], dtype=np.uint64)), id="uint64"),
+    pytest.param(lambda: _pcfs(np.float32), id="pcf32"),
+    pytest.param(lambda: _pcfs(np.float64), id="pcf64"),
+    pytest.param(lambda: _pcfs(np.int32), id="pcf32i"),
+    pytest.param(lambda: _pcfs(np.int64), id="pcf64i"),
+    pytest.param(lambda: _point_clouds(sb.pcloud32, np.float32), id="pcloud32"),
+    pytest.param(lambda: _point_clouds(sb.pcloud64, np.float64), id="pcloud64"),
+    pytest.param(lambda: _distance_matrices(sb.distmat32, np.float32), id="distmat32"),
+    pytest.param(lambda: _distance_matrices(sb.distmat64, np.float64), id="distmat64"),
+    pytest.param(lambda: _symmetric_matrices(sb.symmat32, np.float32), id="symmat32"),
+    pytest.param(lambda: _symmetric_matrices(sb.symmat64, np.float64), id="symmat64"),
+    pytest.param(lambda: _barcodes(np.float32), id="barcode32"),
+    pytest.param(lambda: _barcodes(np.float64), id="barcode64"),
+])
+def test_series_of_every_element_type(make_values):
+    values = make_values()
+    series = TimeSeries(values, times=[0.0, 1.0])
+
+    assert series.dtype is values.dtype
+    assert len(series) == 2
+    assert series.values.array_equal(values)
