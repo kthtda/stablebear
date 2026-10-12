@@ -1,0 +1,99 @@
+==1606== Memcheck, a memory error detector
+==1606== Copyright (C) 2002-2022, and GNU GPL'd, by Julian Seward et al.
+==1606== Using Valgrind-3.22.0 and LibVEX; rerun with -h for copyright info
+==1606== Command: python -m pytest . -vv -s
+==1606== Parent PID: 1605
+==1606== 
+==1631== 
+==1631== HEAP SUMMARY:
+==1631==     in use at exit: 27,856,719 bytes in 214,214 blocks
+==1631==   total heap usage: 991,906 allocs, 777,692 frees, 165,563,749 bytes allocated
+==1631== 
+==1631== LEAK SUMMARY:
+==1631==    definitely lost: 0 bytes in 0 blocks
+==1631==    indirectly lost: 0 bytes in 0 blocks
+==1631==      possibly lost: 22,808,647 bytes in 176,059 blocks
+==1631==    still reachable: 3,968,556 bytes in 29,478 blocks
+==1631==         suppressed: 1,079,516 bytes in 8,677 blocks
+==1631== Rerun with --leak-check=full to see details of leaked memory
+==1631== 
+==1631== For lists of detected and suppressed errors, rerun with: -s
+==1631== ERROR SUMMARY: 0 errors from 0 contexts (suppressed: 0 from 0)
+==1606== Conditional jump or move depends on uninitialised value(s)
+==1606==    at 0x95D3C73: NpyIter_GetInnerFixedStrideArray (in /usr/local/lib/python3.13/dist-packages/numpy/_core/_multiarray_umath.cpython-313-x86_64-linux-gnu.so)
+==1606==    by 0x967ECD3: PyUFunc_ReduceWrapper (in /usr/local/lib/python3.13/dist-packages/numpy/_core/_multiarray_umath.cpython-313-x86_64-linux-gnu.so)
+==1606==    by 0x9684B4B: PyUFunc_GenericReduction (in /usr/local/lib/python3.13/dist-packages/numpy/_core/_multiarray_umath.cpython-313-x86_64-linux-gnu.so)
+==1606==    by 0x57F99A: ??? (in /usr/bin/python3.13)
+==1606==    by 0x5650C2: PyObject_Vectorcall (in /usr/bin/python3.13)
+==1606==    by 0x4468F4: ??? (in /usr/bin/python3.13)
+==1606==    by 0x5650C2: PyObject_Vectorcall (in /usr/bin/python3.13)
+==1606==    by 0x955FE12: dispatcher_vectorcall (in /usr/local/lib/python3.13/dist-packages/numpy/_core/_multiarray_umath.cpython-313-x86_64-linux-gnu.so)
+==1606==    by 0x5650C2: PyObject_Vectorcall (in /usr/bin/python3.13)
+==1606==    by 0x4468F4: ??? (in /usr/bin/python3.13)
+==1606==    by 0x5BDFD2: ??? (in /usr/bin/python3.13)
+==1606==    by 0x6518F1: ??? (in /usr/bin/python3.13)
+==1606== 
+{
+   <insert_a_suppression_name_here>
+   Memcheck:Cond
+   fun:NpyIter_GetInnerFixedStrideArray
+   fun:PyUFunc_ReduceWrapper
+   fun:PyUFunc_GenericReduction
+   obj:/usr/bin/python3.13
+   fun:PyObject_Vectorcall
+   obj:/usr/bin/python3.13
+   fun:PyObject_Vectorcall
+   fun:dispatcher_vectorcall
+   fun:PyObject_Vectorcall
+   obj:/usr/bin/python3.13
+   obj:/usr/bin/python3.13
+   obj:/usr/bin/python3.13
+}
+==1606== Conditional jump or move depends on uninitialised value(s)
+==1606==    at 0x95D3C6F: NpyIter_GetInnerFixedStrideArray (in /usr/local/lib/python3.13/dist-packages/numpy/_core/_multiarray_umath.cpython-313-x86_64-linux-gnu.so)
+==1606==    by 0x967ECD3: PyUFunc_ReduceWrapper (in /usr/local/lib/python3.13/dist-packages/numpy/_core/_multiarray_umath.cpython-313-x86_64-linux-gnu.so)
+==1606==    by 0x9684B4B: PyUFunc_GenericReduction (in /usr/local/lib/python3.13/dist-packages/numpy/_core/_multiarray_umath.cpython-313-x86_64-linux-gnu.so)
+==1606==    by 0x57F99A: ??? (in /usr/bin/python3.13)
+==1606==    by 0x5650C2: PyObject_Vectorcall (in /usr/bin/python3.13)
+==1606==    by 0x4468F4: ??? (in /usr/bin/python3.13)
+==1606==    by 0x5650C2: PyObject_Vectorcall (in /usr/bin/python3.13)
+==1606==    by 0x955FE12: dispatcher_vectorcall (in /usr/local/lib/python3.13/dist-packages/numpy/_core/_multiarray_umath.cpython-313-x86_64-linux-gnu.so)
+==1606==    by 0x5650C2: PyObject_Vectorcall (in /usr/bin/python3.13)
+==1606==    by 0x4468F4: ??? (in /usr/bin/python3.13)
+==1606==    by 0x5BDFD2: ??? (in /usr/bin/python3.13)
+==1606==    by 0x6518F1: ??? (in /usr/bin/python3.13)
+==1606== 
+{
+   <insert_a_suppression_name_here>
+   Memcheck:Cond
+   fun:NpyIter_GetInnerFixedStrideArray
+   fun:PyUFunc_ReduceWrapper
+   fun:PyUFunc_GenericReduction
+   obj:/usr/bin/python3.13
+   fun:PyObject_Vectorcall
+   obj:/usr/bin/python3.13
+   fun:PyObject_Vectorcall
+   fun:dispatcher_vectorcall
+   fun:PyObject_Vectorcall
+   obj:/usr/bin/python3.13
+   obj:/usr/bin/python3.13
+   obj:/usr/bin/python3.13
+}
+==1606== 
+==1606== HEAP SUMMARY:
+==1606==     in use at exit: 7,863,448 bytes in 91,919 blocks
+==1606==   total heap usage: 15,533,273 allocs, 15,441,354 frees, 1,630,497,864 bytes allocated
+==1606== 
+==1606== LEAK SUMMARY:
+==1606==    definitely lost: 3,420,214 bytes in 58,937 blocks
+==1606==    indirectly lost: 208,714 bytes in 1,031 blocks
+==1606==      possibly lost: 2,238,165 bytes in 17,995 blocks
+==1606==    still reachable: 398,699 bytes in 2,323 blocks
+==1606==                       of which reachable via heuristic:
+==1606==                         stdstring          : 511 bytes in 7 blocks
+==1606==         suppressed: 1,597,656 bytes in 11,633 blocks
+==1606== Rerun with --leak-check=full to see details of leaked memory
+==1606== 
+==1606== Use --track-origins=yes to see where uninitialised values come from
+==1606== For lists of detected and suppressed errors, rerun with: -s
+==1606== ERROR SUMMARY: 2 errors from 2 contexts (suppressed: 0 from 0)
