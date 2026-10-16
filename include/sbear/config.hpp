@@ -27,6 +27,7 @@ namespace sb
   static_assert(std::numeric_limits<float32_t>::is_iec559, "float32_t must be IEEE754");
   static_assert(std::numeric_limits<float64_t>::is_iec559, "float64_t must be IEEE754");
 
+  using uint8_t = std::uint8_t;
   using int32_t = std::int32_t;
   using int64_t = std::int64_t;
   using uint32_t = std::uint32_t;

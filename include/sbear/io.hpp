@@ -342,6 +342,8 @@ namespace sb
     else if (format.matches_type<DistanceMatrix<float32_t>>(reader.format_version())) { return io::detail::read_compressed_matrix<DistanceMatrix<float32_t>>(is); }
     else if (format.matches_type<DistanceMatrix<float64_t>>(reader.format_version())) { return io::detail::read_compressed_matrix<DistanceMatrix<float64_t>>(is); }
 
+    else if (auto series = io::detail::read_any_timeseries(reader, format)) { return std::move(*series); }
+
     else
     {
       throw std::runtime_error("Unhandled object type (" + std::to_string(format.baseFormat) + ", " + std::to_string(format.subFormat) + ")");

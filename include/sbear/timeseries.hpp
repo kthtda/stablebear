@@ -25,7 +25,7 @@
 namespace sb
 {
   /// Physical time units, from attoseconds to days.
-  enum class TimeUnit : std::uint8_t
+  enum class TimeUnit : uint8_t
   {
     Attoseconds,
     Femtoseconds,
@@ -48,8 +48,8 @@ namespace sb
     {
       TimeUnit unit;
       std::string_view name;
-      int exp;
-      std::int64_t mult;
+      int32_t exp;
+      int64_t mult;
     };
 
     inline constexpr auto TimeUnitTable = std::to_array<TimeUnitInfo>({
@@ -82,16 +82,16 @@ namespace sb
       {"msec", TimeUnit::Milliseconds}, {"usec", TimeUnit::Microseconds},
     });
 
-    inline const TimeUnitInfo& time_unit_info(TimeUnit unit)
+    constexpr const TimeUnitInfo& time_unit_info(TimeUnit unit)
     {
       return TimeUnitTable[static_cast<size_t>(unit)];
     }
 
     /// 10^k, exact in double for k <= 22.
-    inline float64_t exact_power_of_ten(int k)
+    constexpr float64_t exact_power_of_ten(int32_t k)
     {
       float64_t result = 1;
-      for (int i = 0; i < k; ++i)
+      for (int32_t i = 0; i < k; ++i)
       {
         result *= 10;
       }
@@ -99,7 +99,7 @@ namespace sb
     }
   }
 
-  [[nodiscard]] inline std::string_view time_unit_name(TimeUnit unit)
+  [[nodiscard]] constexpr std::string_view time_unit_name(TimeUnit unit)
   {
     return detail::time_unit_info(unit).name;
   }
@@ -129,12 +129,12 @@ namespace sb
   /// Convert @p value from unit @p from to unit @p to. The factor is an
   /// integer that multiplies or divides the value, so the result is rounded
   /// once. The factor is exact unless it exceeds 2^53 (days and attoseconds).
-  [[nodiscard]] inline float64_t convert_time(float64_t value, TimeUnit from, TimeUnit to)
+  [[nodiscard]] constexpr float64_t convert_time(float64_t value, TimeUnit from, TimeUnit to)
   {
     const auto& src = detail::time_unit_info(from);
     const auto& dst = detail::time_unit_info(to);
     const auto g = std::gcd(src.mult, dst.mult);
-    const int diff = src.exp - dst.exp;
+    const int32_t diff = src.exp - dst.exp;
     const float64_t num = static_cast<float64_t>(src.mult / g) * detail::exact_power_of_ten(std::max(diff, 0));
     const float64_t den = static_cast<float64_t>(dst.mult / g) * detail::exact_power_of_ten(std::max(-diff, 0));
     return den == 1 ? value * num : value / den;
@@ -526,6 +526,15 @@ namespace sb
     std::vector<Channel<T>> m_channels;
     TimeUnit m_unit;
   };
+
+  template <typename T>
+  struct is_timeseries : std::false_type {};
+
+  template <typename T>
+  struct is_timeseries<TimeSeries<T>> : std::true_type { using value_type = T; };
+
+  template <typename T>
+  inline constexpr bool is_timeseries_v = is_timeseries<T>::value;
 }
 
 #endif // STABLEBEAR_TIMESERIES_H
