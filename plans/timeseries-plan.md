@@ -177,8 +177,9 @@ parallel threshold.
   |next|))`, where the gap is the time since the previous observation and
   `eps` is float64 machine epsilon. Both are keywords of `TimeSeries`
   (`snap_tolerance` in `[0, 1)`, default `1e-6`; `snap_eps` finite and
-  nonnegative, default `1024`; 0 in either disables snapping) and are used
-  by everything that evaluates the series. The gap limit keeps the rule from
+  nonnegative, default `1024`; 0 in either disables snapping). They belong
+  to the channel: `from_channels` keeps each channel's own, and everything
+  that evaluates a channel uses them. The gap limit keeps the rule from
   skipping an observation; the epsilon limit keeps wide gaps (daily data in
   seconds) from capturing queries that are clearly earlier. Both are
   relative, so the rule does not depend on the unit. Domain checks stay
@@ -486,7 +487,7 @@ parallel threshold.
 
 ## Several channels
 
-- [ ] **22. Building multi-channel series.** `TimeSeries.from_channels`
+- [x] **22. Building multi-channel series.** `TimeSeries.from_channels`
   (decision 7). Tests:
   - `from_channels({"a": a, "b": b}, unit="s")` has
     `channel_names == ("a", "b")` and unit `"s"`, and `from_channels([a, b],
@@ -504,20 +505,25 @@ parallel threshold.
   closed. **Catches:** the union of domains, timestamps reported in each
   channel's own unit.
 
-- [ ] **24. Evaluating several channels.** Test with the series of channels A
-  and B: `series(1.25) == {"a": 20.0, "b": -1.0}`,
-  `series(1.5) == {"a": 20.0, "b": -2.0}`, and the keys come in channel order.
-  **Catches:** channel B read in the wrong unit (it would answer at 1.25 ms),
-  one grid assumed for all channels, channel order lost.
+- [ ] **24. Evaluating several channels.** Tests with the series of channels A
+  and B:
+  - `series(1.25) == {"a": 20.0, "b": -1.0}`,
+    `series(1.5) == {"a": 20.0, "b": -2.0}`, and the keys come in channel
+    order. **Catches:** channel B read in the wrong unit (it would answer at
+    1.25 ms), one grid assumed for all channels, channel order lost.
+  - Channel A built with `snap_tolerance=0.0` and channel B with the
+    default: at `np.nextafter(1.5, 0.0)`, `"a"` is 20.0 and `"b"` is -2.0
+    (snapped). **Catches:** one channel's snap settings applied to another.
 
 - [ ] **25. Selecting channels.** Tests with the series of channels A and B:
   - `series["b"]` is a one-channel series with unit `"s"` and
     `series["b"](1.5) == -2.0`; `series[["b", "a"]]` has
     `channel_names == ("b", "a")`. **Catches:** the query unit lost on
     selection, selection order ignored.
-  - `series.values` and `series.observation(0)` raise `ValueError`, and
-    `series["c"]` raises `KeyError`. **Catches:** per-channel accessors that
-    silently pick a channel.
+  - `series.values`, `series.observation(0)`, and `series.snap_tolerance`
+    raise `ValueError`, and `series["c"]` raises `KeyError`, and
+    `series["a"].snap_tolerance` is channel A's. **Catches:** per-channel
+    accessors that silently pick a channel, snap settings lost on selection.
 
 ## Serialization of stored series
 

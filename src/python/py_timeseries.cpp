@@ -44,13 +44,24 @@ namespace
       .def_property_readonly("values", &Channel::values)
       .def("observation", &Channel::observation, py::arg("index"))
       .def_property_readonly("domain", [](const Channel& self) { return domain_tuple(self.domain()); })
+      .def_property_readonly("snap_tolerance", &Channel::snap_tolerance)
+      .def_property_readonly("snap_eps", &Channel::snap_eps)
       .def("__len__", &Channel::size);
 
     py::class_<Series>(m, ("TimeSeries" + suffix).c_str())
       .def(py::init<sb::Times, const sb::Tensor<T>&, sb::float64_t, sb::float64_t>(),
            py::arg("times"), py::arg("values"), py::arg("snap_tolerance"), py::arg("snap_eps"))
-      .def_property_readonly("snap_tolerance", &Series::snap_tolerance)
-      .def_property_readonly("snap_eps", &Series::snap_eps)
+      .def_static("from_channels",
+                  [](std::vector<std::string> names, const std::vector<Series>& parts,
+                     const std::optional<std::string>& unit) {
+                    std::optional<sb::TimeUnit> parsed;
+                    if (unit)
+                    {
+                      parsed = sb::parse_time_unit(*unit);
+                    }
+                    return Series::from_channels(std::move(names), parts, parsed);
+                  },
+                  py::arg("names"), py::arg("parts"), py::arg("unit"))
       .def_property_readonly("channel_names", [](const Series& self) {
         return py::tuple(py::cast(self.channel_names()));
       })

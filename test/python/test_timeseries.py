@@ -354,3 +354,37 @@ def test_to_changes_the_query_unit():
     assert np.array_equal(np.asarray(series.times), [0.0, 500.0])
     assert series.domain == (0.0, 500.0)
     assert series(250.0) == 10.0
+
+
+def _channel_a():
+    return TimeSeries([10.0, 20.0, 30.0], times=Times([0.0, 1.0, 2.5], unit="s"))
+
+
+def _channel_b():
+    return TimeSeries([-1.0, -2.0, -3.0], times=Times([500.0, 1500.0, 3000.0], unit="ms"))
+
+
+def test_from_channels_keeps_names_and_order():
+    named = TimeSeries.from_channels({"a": _channel_a(), "b": _channel_b()}, unit="s")
+    listed = TimeSeries.from_channels([_channel_a(), _channel_b()], unit="s")
+
+    assert named.channel_names == ("a", "b")
+    assert named.unit == "s"
+    assert listed.channel_names == ("0", "1")
+
+
+def _point_cloud_channel():
+    clouds = sb.zeros((2,), dtype=sb.pcloud64)
+    return TimeSeries(clouds, times=[0.0, 1.0])
+
+
+@pytest.mark.parametrize("make_channels, unit, error", [
+    (lambda: {"a": _channel_a(), "b": _channel_b()}, None, ValueError),  # units differ
+    (lambda: {}, "s", ValueError),
+    (lambda: {"ab": TimeSeries.from_channels([_channel_a(), _channel_b()], unit="s")},
+     "s", ValueError),  # a multi-channel series as a channel
+    (lambda: {"a": _channel_a(), "c": _point_cloud_channel()}, "s", TypeError),
+])
+def test_from_channels_rejects_invalid_channels(make_channels, unit, error):
+    with pytest.raises(error):
+        TimeSeries.from_channels(make_channels(), unit=unit)
