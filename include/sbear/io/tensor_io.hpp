@@ -284,6 +284,13 @@ namespace sb::io::detail
         return matches(expected, fileFormatVersion);
       }
     }
+    else if constexpr (is_timeseries_v<std::decay_t<T>>)
+    {
+      // Time series exist only from version 3 on; older files carry no
+      // flags, so their element formats would otherwise match.
+      return fileFormatVersion >= 3
+        && matches(tensorFormatV3<std::decay_t<T>>(), fileFormatVersion);
+    }
     else
     {
       return matches(tensorFormatV3<std::decay_t<T>>(), fileFormatVersion);
