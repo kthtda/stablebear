@@ -241,7 +241,7 @@ parallel threshold.
     channel: it is defined on `[0, inf)` and only for arithmetic values.
   - `sb::TimeSeries<T>` holds an ordered list of channels of one element type. Following
     the `NestedTensor` pattern (`include/sbear/nested_tensor.hpp`,
-    `register_nested_tensor_element` in `src/python/py_tensor.cpp`,
+    `register_tensor_element` in `src/python/py_tensor.hpp`,
     `stablebear/nested_tensor.py`), one `register_timeseries_element<T>` call
     per element type binds it for bool, float32/64, int32/64, uint32/64,
     pcf32/64, pcf32i/64i, pcloud32/64, distmat32/64, symmat32/64, and
@@ -509,15 +509,19 @@ parallel threshold.
   closed. **Catches:** the union of domains, timestamps reported in each
   channel's own unit.
 
-- [ ] **23a. `NestedTensor` of every element type.** Register `NestedTensor`
-  for the 13 element types it lacks (bool, the four PCF types, point clouds,
-  distance and symmetric matrices, and barcodes, each in 32 and 64 bits),
-  and extend the Python leaf wrapping, `dtype` table, and `repr`, so that
-  item 24 can return one for any series. Leaves of object types hold
-  elements of different sizes. Saving `NestedTensor`s of these types stays
-  out of scope unless it comes for free. Test, parametrized over the 13
-  dtypes: a `NestedTensor` built from two 1-D tensors of that dtype (of
-  lengths 1 and 2) has that `dtype`, and its leaves equal the inputs.
+- [x] **23a. `NestedTensor` of every element type.** One
+  `register_tensor_element<T>` in `src/python/py_tensor.hpp` binds `Tensor<T>`,
+  its indexed variant when `T` supports selections, and `NestedTensor<T>`,
+  and every element type's registration site calls it, so `NestedTensor`
+  gains the 13 element types it lacked (bool, the four PCF types, point
+  clouds, distance and symmetric matrices, and barcodes, each in 32 and 64
+  bits). Extend the Python leaf wrapping and `dtype` table, so that item 24
+  can return one for any series. Leaves of object types hold elements of
+  different sizes; indexed leaves are made dense. Saving `NestedTensor`s of
+  these types stays out of scope. Test, parametrized over the 19 dtypes with
+  the builders shared with item 13 (`test/python/_element_values.py`): a
+  `NestedTensor` built from two 1-D tensors of that dtype (of lengths 1 and
+  2) has that `dtype`, and its leaves equal the inputs.
   **Catches:** a leaf type bound to the wrong native class or precision.
 
 - [ ] **24. Evaluating several channels.** Tests with the series of channels A

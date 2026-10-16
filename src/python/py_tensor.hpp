@@ -651,14 +651,43 @@ namespace sb_py
 
   }
 
-  template <sb::IndexableTensorElement T>
-  void register_indexable_tensor_bindings(
-      pybind11::module_& m, const std::string& name,
-      const std::string& suffix = "")
+  /// Bind NestedTensor<T> nodes as Nested<name>.
+  template <typename T>
+  void register_nested_tensor_node(pybind11::module_& m, const std::string& name)
   {
-    register_typed_tensor_bindings<T>(m, name, suffix);
-    register_typed_tensor_bindings<T, sb::TensorProperty::Indexed>(
-      m, "_Indexed" + name, suffix);
+    using Nested = sb::NestedTensor<T>;
+    pybind11::class_<Nested>(m, ("Nested" + name).c_str())
+        .def(pybind11::init([](const sb::Tensor<T>& values) {
+          return Nested::from_values(values);
+        }))
+        .def(pybind11::init([](const typename Nested::nested_tensor_type& values, size_t childDepth) {
+          return Nested::from_values(values, childDepth);
+        }),
+             pybind11::arg("tensor"), pybind11::arg("child_depth") = 0)
+        .def_static("_from_leaf_view", &Nested::from_leaf_view)
+        .def_static("_from_outer_view", &Nested::from_outer_view,
+             pybind11::arg("tensor"), pybind11::arg("child_depth"))
+        .def_property_readonly("is_leaf", &Nested::is_leaf)
+        .def_property_readonly("depth", &Nested::depth)
+        .def_property_readonly("leaf", &Nested::leaf)
+        .def_property_readonly("nested", &Nested::nested)
+        .def("copy", &Nested::copy);
+  }
+
+  /// Bind everything Python needs for tensors of element type T: Tensor<T>
+  /// as <name>Tensor, its indexed variant as _Indexed<name>Tensor when T
+  /// supports selections, NestedTensor<T> nodes as Nested<name>, and
+  /// Tensor<NestedTensor<T>> as Nested<name>Tensor.
+  template <typename T>
+  void register_tensor_element(pybind11::module_& m, const std::string& name)
+  {
+    register_typed_tensor_bindings<T>(m, name, "");
+    if constexpr (sb::IndexableTensorElement<T>)
+    {
+      register_typed_tensor_bindings<T, sb::TensorProperty::Indexed>(m, "_Indexed" + name, "");
+    }
+    register_nested_tensor_node<T>(m, name);
+    register_typed_tensor_bindings<sb::NestedTensor<T>>(m, "Nested" + name, "");
   }
 
 }

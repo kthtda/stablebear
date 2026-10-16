@@ -7,6 +7,8 @@ import numpy.testing as npt
 
 import stablebear as sb
 
+from _element_values import TWO_ELEMENTS_OF_EVERY_DTYPE
+
 
 def _leaf(values):
     return sb.tensor(np.asarray(values, dtype=np.int64))
@@ -317,3 +319,15 @@ def test_internal_node_wrapping_preserves_leaf_buffer():
     copied_buffer = np.asarray(nested.copy()[0][0]._data)
     assert np.shares_memory(original_buffer, child_buffer)
     assert not np.shares_memory(original_buffer, copied_buffer)
+
+
+@pytest.mark.parametrize("make_values", TWO_ELEMENTS_OF_EVERY_DTYPE)
+def test_leaves_of_every_element_type(make_values):
+    values = make_values()
+    short, full = values[:1], values
+
+    nested = sb.NestedTensor([short, full])
+
+    assert nested.dtype is values.dtype
+    assert nested[0].array_equal(short)
+    assert nested[1].array_equal(full)

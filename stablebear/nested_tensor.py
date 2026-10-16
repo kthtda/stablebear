@@ -8,10 +8,23 @@ from . import _sb_cpp as cpp
 from ._tensor_base import Tensor, _infer_shape_and_flatten
 from .typing import (
     _NP_TO_SB,
+    barcode32,
+    barcode64,
+    boolean,
+    distmat32,
+    distmat64,
     float32,
     float64,
     int32,
     int64,
+    pcf32,
+    pcf32i,
+    pcf64,
+    pcf64i,
+    pcloud32,
+    pcloud64,
+    symmat32,
+    symmat64,
     uint32,
     uint64,
 )
@@ -24,6 +37,19 @@ _NESTED_CPP_TYPES = {
     int64: (cpp.NestedInt64, cpp.NestedInt64Tensor),
     uint32: (cpp.NestedUint32, cpp.NestedUint32Tensor),
     uint64: (cpp.NestedUint64, cpp.NestedUint64Tensor),
+    boolean: (cpp.NestedBool, cpp.NestedBoolTensor),
+    pcf32: (cpp.NestedPcf32, cpp.NestedPcf32Tensor),
+    pcf64: (cpp.NestedPcf64, cpp.NestedPcf64Tensor),
+    pcf32i: (cpp.NestedPcf32i, cpp.NestedPcf32iTensor),
+    pcf64i: (cpp.NestedPcf64i, cpp.NestedPcf64iTensor),
+    pcloud32: (cpp.NestedPointCloud32, cpp.NestedPointCloud32Tensor),
+    pcloud64: (cpp.NestedPointCloud64, cpp.NestedPointCloud64Tensor),
+    distmat32: (cpp.NestedDistanceMatrix32, cpp.NestedDistanceMatrix32Tensor),
+    distmat64: (cpp.NestedDistanceMatrix64, cpp.NestedDistanceMatrix64Tensor),
+    symmat32: (cpp.NestedSymmetricMatrix32, cpp.NestedSymmetricMatrix32Tensor),
+    symmat64: (cpp.NestedSymmetricMatrix64, cpp.NestedSymmetricMatrix64Tensor),
+    barcode32: (cpp.persistence.NestedBarcode32, cpp.persistence.NestedBarcode32Tensor),
+    barcode64: (cpp.persistence.NestedBarcode64, cpp.persistence.NestedBarcode64Tensor),
 }
 _NESTED_NODE_TO_DTYPE = {
     node_type: dtype for dtype, (node_type, _) in _NESTED_CPP_TYPES.items()
@@ -33,18 +59,46 @@ _NESTED_TENSOR_TO_DTYPE = {
 }
 
 
-def _leaf_tensor(data, dtype=None):
-    from .base_tensor import FloatTensor, IntTensor
+def _leaf_wrappers():
+    """Leaf dtype -> the tensor class that wraps a leaf of that dtype."""
+    from .base_tensor import BoolTensor, FloatTensor, IntPcfTensor, IntTensor, PcfTensor
+    from .distance_matrix import DistanceMatrixTensor
+    from .persistence.ph_tensor import BarcodeTensor
+    from .point_cloud import PointCloudTensor
+    from .symmetric_matrix import SymmetricMatrixTensor
 
-    if isinstance(data, (FloatTensor, IntTensor)):
+    return {
+        float32: FloatTensor, float64: FloatTensor,
+        int32: IntTensor, int64: IntTensor, uint32: IntTensor, uint64: IntTensor,
+        boolean: BoolTensor,
+        pcf32: PcfTensor, pcf64: PcfTensor,
+        pcf32i: IntPcfTensor, pcf64i: IntPcfTensor,
+        pcloud32: PointCloudTensor, pcloud64: PointCloudTensor,
+        distmat32: DistanceMatrixTensor, distmat64: DistanceMatrixTensor,
+        symmat32: SymmetricMatrixTensor, symmat64: SymmetricMatrixTensor,
+        barcode32: BarcodeTensor, barcode64: BarcodeTensor,
+    }
+
+
+def _leaf_tensor(data, dtype=None):
+    from ._tensor_base import IndexedElementTensor
+    from .base_tensor import BoolTensor, FloatTensor, IntTensor
+
+    wrappers = _leaf_wrappers()
+    if isinstance(data, Tensor) and not isinstance(data, NestedTensor):
+        if data.dtype not in wrappers or not isinstance(data, wrappers[data.dtype]):
+            raise TypeError(f"Unsupported NestedTensor leaf {type(data).__name__}")
         if dtype is not None and data.dtype is not dtype:
             raise TypeError(
                 f"NestedTensor leaf dtype must be {dtype}, got {data.dtype}"
             )
         leaf = data
+        if isinstance(leaf, IndexedElementTensor) and leaf._has_indexed_storage():
+            # A leaf holds ordinary storage, not a selection of another tensor.
+            leaf = leaf.to_dense()
     elif isinstance(data, np.ndarray):
         if dtype is None:
-            dtype = _NP_TO_SB.get(data.dtype.type)
+            dtype = boolean if data.dtype == np.bool_ else _NP_TO_SB.get(data.dtype.type)
             if dtype is None:
                 if np.issubdtype(data.dtype, np.floating):
                     dtype = float64
@@ -56,11 +110,13 @@ def _leaf_tensor(data, dtype=None):
             leaf = FloatTensor(data, dtype=dtype)
         elif dtype in (int32, int64, uint32, uint64):
             leaf = IntTensor(data, dtype=dtype)
+        elif dtype is boolean:
+            leaf = BoolTensor(data)
         else:
             raise TypeError(f"Unsupported NestedTensor leaf dtype {dtype}")
     else:
         raise TypeError(
-            "NestedTensor leaves must be numeric Tensor or NumPy array objects"
+            "NestedTensor leaves must be stablebear Tensor or NumPy array objects"
         )
 
     if leaf.dtype not in _NESTED_CPP_TYPES:
@@ -96,7 +152,10 @@ def _normalize_depth(depth):
 
 
 class NestedTensor(Tensor):
-    """A recursively nested tensor whose leaf tensors share one numeric dtype.
+    """A recursively nested tensor whose leaf tensors share one dtype.
+
+    Leaves may hold any element type, such as numbers, PCFs, point clouds,
+    or barcodes; NumPy arrays become numeric or boolean leaves.
 
     Construction and assignment recursively copy supplied values. Outer views
     share storage; ``copy()`` and ``deepcopy()`` recursively isolate it.
@@ -230,15 +289,8 @@ class NestedTensor(Tensor):
         return NestedTensor._from_cpp(root)
 
     def _represent_element(self, element):
-        from .base_tensor import FloatTensor, IntTensor
-
         if element.is_leaf:
-            wrapper = (
-                FloatTensor
-                if self.dtype in (float32, float64)
-                else IntTensor
-            )
-            return wrapper(element.leaf)
+            return _leaf_wrappers()[self.dtype](element.leaf)
         return NestedTensor._from_cpp(element)
 
     def _decay_value(self, val):
@@ -274,9 +326,7 @@ class NestedTensor(Tensor):
         self._decay_value(val)
 
     def _get_valid_setitem_dtypes(self):
-        from .base_tensor import FloatTensor, IntTensor
-
-        return [NestedTensor, FloatTensor, IntTensor, np.ndarray]
+        return [NestedTensor, *set(_leaf_wrappers().values()), np.ndarray]
 
     def copy(self):
         return NestedTensor._from_cpp(self._root.copy())
