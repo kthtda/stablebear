@@ -46,3 +46,16 @@ def _compute_barcodes_distmat_ripser(
     data = X._current_matrix() if isinstance(X, DistanceMatrix) else X._data
 
     return backend.spawn_ripser_distmat_task(data, max_dim, reduced_homology)
+
+
+def _compute_barcodes_euclidean_coordinates_ripser(
+    X,
+    max_dim: int = 1,
+    reduced_homology: bool = False,
+):
+    """Persistence of a float tensor or series whose trailing (n, d) axes hold
+    point clouds, one point per row."""
+    backend = cpp_p.PersistenceRipser32 if X.dtype is float32 else cpp_p.PersistenceRipser64
+    return backend.spawn_ripser_coordinates_euclidean_task(
+        X._data, max_dim, reduced_homology
+    )
