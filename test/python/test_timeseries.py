@@ -173,28 +173,25 @@ def test_series_evaluates_to_previous_value():
 
 
 @pytest.mark.parametrize("t", [-0.5, 4.5])
-def test_series_rejects_times_outside_domain(t):
+def test_series_rejects_times_outside_observations(t):
     series = TimeSeries([10.0, 20.0, 30.0], times=[0.0, 1.5, 4.0])
 
-    assert series.domain == (0.0, 4.0)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="outside the domain"):
         series(t)
 
 
-def test_empty_series_has_no_domain():
+def test_empty_series_cannot_be_evaluated():
     series = TimeSeries(sb.zeros((0,), dtype=sb.pcloud64), times=[])
 
     assert len(series) == 0
     assert series.dtype is sb.pcloud64
-    assert series.domain is None
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="without observations"):
         series(0.0)
 
 
 def test_singleton_series_evaluates_at_its_time():
     series = TimeSeries([7.0], times=[2.0])
 
-    assert series.domain == (2.0, 2.0)
     assert series(2.0) == 7.0
 
 
@@ -271,8 +268,8 @@ def test_to_changes_the_query_unit():
 
     assert series.unit == "ms"
     assert np.array_equal(np.asarray(series.times), [0.0, 500.0])
-    assert series.domain == (0.0, 500.0)
     assert series(250.0) == 10.0
+    assert series(500.0) == 20.0  # the last observation, in the new unit
 
 
 def _channel_a():
@@ -311,10 +308,12 @@ def test_from_channels_rejects_invalid_channels(make_channels, unit, error):
     0.25,  # only channel A covers it
     2.75,  # only channel B covers it
 ])
-def test_several_channels_cover_the_intersection_of_their_domains(t):
+def test_several_channels_evaluate_only_where_all_are_observed(t):
     series = TimeSeries.from_channels([_channel_a(), _channel_b()], unit="s")
 
-    assert series.domain == (0.5, 2.5)
+    # Both ends of the shared domain, 0.5 (B's first) and 2.5 (A's last), work.
+    assert series(0.5)[1][()] == -1.0
+    assert series(2.5)[0][()] == 30.0
     with pytest.raises(ValueError, match="outside the domain"):
         series(t)
 
@@ -469,6 +468,5 @@ def test_one_channel_survives_saving(make_values, as_shape, round_trip):
     assert loaded.shape == series.shape
     assert loaded.times == series.times
     assert loaded.unit == "ms"
-    assert loaded.domain == series.domain
     assert (loaded.snap_tolerance, loaded.snap_eps) == (0.25, 8.0)
     assert loaded.values.array_equal(values)
