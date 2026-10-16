@@ -413,15 +413,20 @@ def test_values_of_several_channels_have_one_leaf_per_channel():
     assert np.array_equal(np.asarray(values[1]), [-1.0, -2.0, -3.0])
 
 
-@pytest.mark.parametrize("access", [
-    lambda series: series.shape,
-    lambda series: len(series),
-])
-def test_per_channel_accessors_need_one_channel(access):
+def test_shapes_and_counts_of_several_channels():
+    points = TimeSeries([[1.0, -1.0], [2.0, -2.0]], times=[0.0, 1.0])
+    series = TimeSeries.from_channels([_channel_a(), points])
+
+    assert series.shape == ((), (2,))
+    assert np.array_equal(np.asarray(series.n_observations), [3, 2])
+    assert series[1].n_observations == 2
+
+
+def test_len_of_several_channels_raises():
     series = TimeSeries.from_channels([_channel_a(), _channel_b()], unit="s")
 
     with pytest.raises(ValueError, match="several channels"):
-        access(series)
+        len(series)
 
 
 def test_channel_index_out_of_range_raises():

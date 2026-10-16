@@ -291,12 +291,13 @@ parallel threshold.
     same as `evaluate(t)`), `series.window(a, b)` (a window),
     and `series[i]` or `series[[i, j]]` (channel selection by index; negative
     indices count from the end). A
-    series also exposes `values` and `snap_tolerance` and `snap_eps`: for
-    one channel a tensor of shape `(len(), *shape)` and two floats, for
-    several a `NestedTensor` with one leaf per channel and two float64
-    `FloatTensor`s of shape `(n_channels,)`. A one-channel series also
-    exposes `shape` and `len()`; on several channels these raise
-    `ValueError` asking for a channel to be selected. There is no
+    series also exposes `values`, `shape`, `n_observations`,
+    `snap_tolerance`, and `snap_eps`: for one channel a tensor of shape
+    `(len(), *shape)`, a shape tuple, an int, and two floats; for several a
+    `NestedTensor` with one leaf per channel, a tuple of shape tuples, an
+    int64 `IntTensor`, and two float64 `FloatTensor`s, each with one entry
+    per channel. `len()` is `n_observations` for one channel and raises
+    `ValueError` on several, since it must return an int. There is no
     `observation(i)`: for one channel it would be `values[i]`, and across
     channels index `i` refers to unrelated times. (Revised after item 25.)
   - For one channel, `evaluate` returns the observation: a scalar or element
@@ -555,9 +556,11 @@ parallel threshold.
     `[0.25, 1e-6]` and `series[0].snap_tolerance == 0.25`, and
     `series[1].snap_tolerance` differs. **Catches:** channels' values or
     settings mixed up or lost on selection.
-  - `series.shape` and `len(series)` raise `ValueError`, and `series[2]`
-    raises `IndexError`. **Catches:** per-channel accessors that silently
-    pick a channel, no bounds check.
+  - Channel A with a channel of shape `(2,)` and two observations has
+    `shape == ((), (2,))` and `n_observations` equal to `[3, 2]`, and
+    `series[1].n_observations == 2`. `len(series)` raises `ValueError`, and
+    `series[2]` raises `IndexError`. **Catches:** shapes or counts mixed up,
+    `len` silently picking a channel, no bounds check.
 
 ## Serialization of stored series
 
