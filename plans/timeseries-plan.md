@@ -594,7 +594,7 @@ parallel threshold.
 
 ## Snapshot persistence (workflow 1)
 
-- [ ] **28. `UfuncTask` and point-cloud persistence.** Add the operation
+- [x] **28. `UfuncTask` and point-cloud persistence.** Add the operation
   interface, `UfuncTask`, and the series adapter (decision 6) in
   `include/sbear/ufunc.hpp`, the persistence operation for point clouds, and
   a private entry point in `src/python/persistence/py_ripser.cpp` returning

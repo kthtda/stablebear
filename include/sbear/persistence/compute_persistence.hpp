@@ -150,18 +150,21 @@ namespace sb::ph
     }
   };
 
-  template <typename ElemT, typename T, TensorProperties Properties = TensorProperty::None>
-  using PersistenceTask = UfuncTask<PersistenceOperation<ElemT, T>, Properties>;
+  /// Persistence of every point cloud or distance matrix in a container: a
+  /// tensor (the result has the input's shape followed by maxDim + 1) or a
+  /// time series (each channel's shape is followed by maxDim + 1).
+  template <typename Container>
+  using PersistenceTask = UfuncTask<
+      PersistenceOperation<typename Container::value_type, typename Container::value_type::value_type>,
+      Container>;
 
-  /// Persistence of every point cloud or distance matrix in @p input. The
-  /// result has the input's shape followed by (maxDim + 1).
-  template <typename ElemT, TensorProperties Properties>
-  auto make_persistence_task(Tensor<ElemT, Properties> input, size_t maxDim = 1, bool reducedHomology = false)
+  template <typename Container>
+  auto make_persistence_task(Container input, size_t maxDim = 1, bool reducedHomology = false)
   {
-    using T = typename ElemT::value_type;
-    return std::make_unique<PersistenceTask<ElemT, T, Properties>>(
+    using ElemT = typename Container::value_type;
+    return make_ufunc_task(
         std::move(input),
-        PersistenceOperation<ElemT, T>{.maxDim = maxDim, .reducedHomology = reducedHomology},
+        PersistenceOperation<ElemT, typename ElemT::value_type>{.maxDim = maxDim, .reducedHomology = reducedHomology},
         "Computing persistence", "pointcloud");
   }
 

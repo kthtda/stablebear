@@ -236,6 +236,24 @@ namespace sb
       m_storage = std::move(storage);
     }
 
+    /// Adopt @p values, the observations stored flat in row-major order with
+    /// prod(@p shape) values each.
+    Channel(Times times, std::vector<size_t> shape, std::vector<T> values,
+            float64_t snapTolerance = DefaultSnapTolerance, float64_t snapEps = DefaultSnapEps)
+    {
+      set_snap_tolerance(snapTolerance);
+      set_snap_eps(snapEps);
+      const size_t blockSize = std::accumulate(shape.begin(), shape.end(), size_t{1}, std::multiplies<>());
+      if (values.size() != times.size() * blockSize)
+      {
+        throw std::invalid_argument(
+            "Expected " + std::to_string(times.size() * blockSize) + " values for " + std::to_string(times.size())
+            + " observations, got " + std::to_string(values.size()));
+      }
+      m_storage = std::make_shared<ChannelStorage<T>>(
+          ChannelStorage<T>{std::move(times), std::move(shape), std::move(values)});
+    }
+
     /// The snap tolerance used when evaluating, as a fraction of the gap
     /// between observations; 0 disables snapping.
     [[nodiscard]] float64_t snap_tolerance() const noexcept { return m_snapTolerance; }
@@ -302,6 +320,10 @@ namespace sb
     [[nodiscard]] const Times& times() const noexcept { return m_storage->times; }
     [[nodiscard]] const std::vector<size_t>& shape() const noexcept { return m_storage->shape; }
     [[nodiscard]] size_t size() const noexcept { return m_storage->times.size(); }
+
+    /// The observations stored flat in row-major order, prod(shape()) values
+    /// each.
+    [[nodiscard]] const std::vector<T>& flat_values() const noexcept { return m_storage->values; }
 
     /// A copy of the values as a tensor of shape (size(), *shape()).
     [[nodiscard]] Tensor<T> values() const
