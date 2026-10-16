@@ -44,3 +44,20 @@ def test_series_of_one_cloud_keeps_its_time_axis():
 
     assert len(result) == 1
     assert result.shape == (2,)
+
+
+def test_each_channel_gets_its_own_barcodes_and_times():
+    clouds = _clouds(sb.pcloud64, np.float64)
+    cam = TimeSeries(clouds, times=Times([0.0, 1.3, 4.0], unit="ms"))
+    # Not cam's first two clouds, so reading cam's elements for lidar shows.
+    lidar = TimeSeries(clouds[[2, 1]], times=Times([0.5, 2.0], unit="ms"))
+    series = TimeSeries.from_channels([cam, lidar])
+
+    result = compute_persistent_homology(series, max_dim=1)
+
+    assert result.n_channels == 2
+    for i, source in enumerate((cam, lidar)):
+        channel = result[i]
+        assert channel.times == source.times
+        expected = compute_persistent_homology(source, max_dim=1)
+        assert channel.values.is_isomorphic_to(expected.values, atol=0, rtol=0)
