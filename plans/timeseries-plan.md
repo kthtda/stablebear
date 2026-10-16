@@ -611,8 +611,9 @@ parallel threshold.
   - A series of one cloud has one observation of shape `(2,)`. **Catches:**
     the existing singleton squeeze applied to series.
 
-- [ ] **29. Several point-cloud channels.** Test: `from_channels` of `cam`
-  (the three clouds) and `lidar` (the first two clouds at
+- [x] **29. Several point-cloud channels.** Test: `from_channels` of `cam`
+  (the three clouds) and `lidar` (clouds 2 and 1, so that reading cam's
+  elements for lidar shows, at
   `Times([0.5, 2.0], unit="ms")`) gives channels 0 and 1, each
   with its source's times and barcodes equal to the persistence of that source
   alone. **Catches:** channels swapped or merged, results written to the wrong
