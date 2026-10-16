@@ -322,9 +322,26 @@ class TimeSeries(Generic[T]):
         ])
 
     @property
-    def shape(self) -> tuple[int, ...]:
-        """The shape of one observation; ``()`` for scalars."""
-        return self._single_channel().shape
+    def shape(self) -> tuple[int, ...] | tuple[tuple[int, ...], ...]:
+        """The shape of one observation; ``()`` for scalars.
+
+        For several channels, a tuple with one shape per channel, in
+        channel order.
+        """
+        shapes = tuple(self._data.channel(i).shape for i in range(self.n_channels))
+        return shapes[0] if len(shapes) == 1 else shapes
+
+    @property
+    def n_observations(self) -> int | IntTensor:
+        """The number of recorded observations.
+
+        An int for a series with one channel, the same as ``len(series)``;
+        for several, an int64 ``IntTensor`` with one entry per channel.
+        """
+        counts = [len(self._data.channel(i)) for i in range(self.n_channels)]
+        if len(counts) == 1:
+            return counts[0]
+        return IntTensor(np.array(counts, dtype=np.int64))
 
     def _per_channel(self, name):
         values = [getattr(self._data.channel(i), name) for i in range(self.n_channels)]
@@ -399,6 +416,13 @@ class TimeSeries(Generic[T]):
         return self.evaluate(t)
 
     def __len__(self) -> int:
+        """The number of recorded observations of a one-channel series.
+
+        Raises
+        ------
+        ValueError
+            On several channels; use :attr:`n_observations`.
+        """
         return len(self._single_channel())
 
     def __getitem__(self, index) -> TimeSeries:
