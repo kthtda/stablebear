@@ -46,6 +46,9 @@ an NVIDIA GPU). Everything below is shared unless noted.
 - **CLI (GPU)**: `devcontainer up --workspace-folder .`
 - **CLI (CPU)**: `devcontainer up --workspace-folder . --config .devcontainer/cpu/devcontainer.json`
 - Then `devcontainer exec --workspace-folder . bash`.
+- **Script (GPU)**: `./devcontainer-cli.sh` runs both steps through `npx`, so the
+  CLI need not be installed. It needs Node.js 18 or newer, and loads nvm from
+  `${NVM_DIR:-~/.nvm}` if present. Extra arguments go to `devcontainer up`.
 
 First start runs `postCreateCommand`: submodule init, then the cmake build + install
 (`debug` preset for GPU, `debug-nocuda` for CPU). The extensions are built and
