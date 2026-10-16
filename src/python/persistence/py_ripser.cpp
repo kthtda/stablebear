@@ -1,11 +1,12 @@
 #include "py_ripser.hpp"
 #include "../py_async_support.hpp"
-#include "../py_tensor_property_variants.hpp"
+#include "../py_ufunc_containers.hpp"
 
 #include <sbear/tensor.hpp>
 #include <sbear/distance_matrix.hpp>
 #include <sbear/persistence/barcode.hpp>
 #include <sbear/persistence/compute_persistence.hpp>
+#include <sbear/timeseries.hpp>
 
 namespace py = pybind11;
 
@@ -16,9 +17,10 @@ namespace
   class PyRipserBindings
   {
   public:
-    template <typename ElemT, sb::TensorProperties Properties>
-    static auto spawn_persistence_task(
-        const sb::Tensor<ElemT, Properties>& input, size_t maxDim, bool reducedHomology)
+    /// Persistence of every element of @p input, a tensor or a time series;
+    /// see make_persistence_task.
+    template <typename Container>
+    static auto spawn_persistence_task(const Container& input, size_t maxDim, bool reducedHomology)
     {
       auto task = sb::ph::make_persistence_task(input, maxDim, reducedHomology);
       task->start_async(sb::default_executor());
@@ -35,30 +37,27 @@ namespace
           sb::Tensor<ElemT>(std::vector<size_t>{}, element), maxDim, reducedHomology);
     }
 
+    /// Bind one spawn function, overloaded on every container of ElemT and on
+    /// a single element, with its task classes.
+    template <typename ElemT>
+    static void register_spawn(py::module_& m, py::class_<PyRipserBindings>& cls,
+                               const std::string& spawnName, const std::string& taskName)
+    {
+      sb_py::bind_ufunc_containers<ElemT>([&]<typename Container>(const std::string& variant) {
+        sb_py::register_result_task<sb::ph::PersistenceTask<Container>>(m, taskName + variant);
+        cls.def_static(spawnName.c_str(), &PyRipserBindings::template spawn_persistence_task<Container>);
+      });
+      cls.def_static(spawnName.c_str(), &PyRipserBindings::template spawn_single_persistence_task<ElemT>);
+    }
+
     static void register_bindings(py::module_& m, const std::string& suffix)
     {
       py::class_<PyRipserBindings> cls(
         m, ("PersistenceRipser" + suffix).c_str());
-      sb_py::bind_tensor_property_variants(
-        [&]<sb::TensorProperties Properties>() {
-          const std::string variant = Properties == sb::TensorProperty::Indexed ? "Indexed" : "";
-          sb_py::register_result_task<sb::ph::PersistenceTask<sb::PointCloud<T>, T, Properties>>(
-            m, "_PersistenceTaskPointCloud" + suffix + variant);
-          sb_py::register_result_task<sb::ph::PersistenceTask<sb::DistanceMatrix<T>, T, Properties>>(
-            m, "_PersistenceTaskDistanceMatrix" + suffix + variant);
-          cls.def_static(
-            "spawn_ripser_pcloud_euclidean_task",
-            &PyRipserBindings::template spawn_persistence_task<sb::PointCloud<T>, Properties>);
-          cls.def_static(
-            "spawn_ripser_distmat_task",
-            &PyRipserBindings::template spawn_persistence_task<sb::DistanceMatrix<T>, Properties>);
-        });
-      cls.def_static(
-          "spawn_ripser_pcloud_euclidean_task",
-          &PyRipserBindings::template spawn_single_persistence_task<sb::PointCloud<T>>);
-      cls.def_static(
-          "spawn_ripser_distmat_task",
-          &PyRipserBindings::template spawn_single_persistence_task<sb::DistanceMatrix<T>>);
+      register_spawn<sb::PointCloud<T>>(
+          m, cls, "spawn_ripser_pcloud_euclidean_task", "_PersistenceTaskPointCloud" + suffix);
+      register_spawn<sb::DistanceMatrix<T>>(
+          m, cls, "spawn_ripser_distmat_task", "_PersistenceTaskDistanceMatrix" + suffix);
     }
   };
 

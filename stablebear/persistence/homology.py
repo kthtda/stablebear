@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 from enum import Enum
+from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -12,6 +15,9 @@ from ..base_tensor import FloatTensor
 from ..point_cloud import PointCloud, PointCloudTensor
 from ..typing import barcode32, barcode64, distmat32, distmat64, float32, float64, pcloud32, pcloud64
 from .ph_tensor import BarcodeTensor
+
+if TYPE_CHECKING:
+    from ..timeseries import TimeSeries
 
 cpp_p = cpp.persistence
 
@@ -35,7 +41,8 @@ def compute_persistent_homology(
     | DistanceMatrix
     | DistanceMatrixTensor
     | FloatTensor
-    | np.ndarray,
+    | np.ndarray
+    | TimeSeries,
     max_dim: int = 1,
     distance_type: DistanceType = DistanceType.Euclidean,
     complex_type: ComplexType = ComplexType.VietorisRips,
@@ -53,9 +60,15 @@ def compute_persistent_homology(
     For an input tensor of shape :math:`(d_1, \ldots, d_n)`, the output has
     shape :math:`(d_1, \ldots, d_n, \texttt{max_dim} + 1)`.
 
+    For a :class:`~stablebear.timeseries.TimeSeries` of point clouds, the
+    result is a series of barcodes with the same channels, times, and unit.
+    A channel of observation shape ``shape`` gives barcodes of shape
+    ``(*shape, max_dim + 1)``. A series of one observation keeps its time
+    axis.
+
     Parameters
     ----------
-    X : PointCloud, PointCloudTensor, DistanceMatrix, DistanceMatrixTensor, FloatTensor, or numpy.ndarray
+    X : PointCloud, PointCloudTensor, DistanceMatrix, DistanceMatrixTensor, FloatTensor, numpy.ndarray, or TimeSeries
         Input data. A ``FloatTensor`` or NumPy array is
         interpreted as a single point cloud (one row per point).
         A ``DistanceMatrix`` or ``DistanceMatrixTensor`` provides
@@ -78,11 +91,12 @@ def compute_persistent_homology(
 
     Returns
     -------
-    BarcodeTensor
-        A tensor of barcodes.
+    BarcodeTensor or TimeSeries
+        A tensor of barcodes, or a series of barcodes for a series input.
 
     """
 
+    from ..timeseries.series import TimeSeries
     from .ripser import (
         _compute_barcodes_distmat_ripser,
         _compute_barcodes_euclidean_pcloud_ripser,
@@ -90,6 +104,9 @@ def compute_persistent_homology(
 
     if complex_type != ComplexType.VietorisRips:
         raise ValueError(f"Unsupported complex type {complex_type}")
+
+    if isinstance(X, TimeSeries):
+        return _series_persistent_homology(X, max_dim, distance_type, reduced, verbose)
 
     if isinstance(X, (DistanceMatrix, DistanceMatrixTensor)):
         task = _compute_barcodes_distmat_ripser(X, max_dim, reduced)
@@ -115,3 +132,23 @@ def compute_persistent_homology(
         out = out[0, :]
 
     return out
+
+
+def _series_persistent_homology(series, max_dim, distance_type, reduced, verbose):
+    from ..timeseries.series import TimeSeries
+
+    backends = {
+        pcloud32: cpp_p.PersistenceRipser32,
+        pcloud64: cpp_p.PersistenceRipser64,
+    }
+    if series.dtype not in backends:
+        raise TypeError(
+            f"Persistent homology of a time series needs point clouds, got {series.dtype}"
+        )
+    if distance_type != DistanceType.Euclidean:
+        raise ValueError(f"Distance type {distance_type} not supported for time series")
+    task = backends[series.dtype].spawn_ripser_pcloud_euclidean_task(
+        series._data, max_dim, reduced
+    )
+    _run_task(lambda: task, verbose=verbose)
+    return TimeSeries._from_cpp(task.result())
