@@ -174,7 +174,7 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
     A series built from ``values`` and ``times`` has one channel;
     :meth:`from_channels` combines several. Series can be saved with
     ``sb.save``, loaded with ``sb.load``, and pickled; each channel keeps its
-    times, unit, domain, and snap settings.
+    times, unit, and snap settings.
 
     Parameters
     ----------
@@ -373,24 +373,12 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         """
         return self._per_channel("snap_eps")
 
-    @property
-    def domain(self) -> tuple[float, float] | None:
-        """``(start, end)`` of the times where the series can be evaluated.
-
-        A series built from observations covers ``[t_0, t_{n-1}]``, end
-        included. A series with several channels covers the times every
-        channel covers, in :attr:`unit`; its end is included only if every
-        channel ending there includes it. ``None`` for a series without
-        observations or whose channels share no time.
-        """
-        return self._data.domain
-
     def to(self, unit: str) -> TimeSeries:
         """Return the same series with queries and reported times in ``unit``.
 
         The stored observations and timestamps are shared, not converted;
-        :attr:`times` and :attr:`domain` are reported in the new unit, and
-        queries are read in it. Accepts the units of :class:`Times`.
+        :attr:`times` are reported in the new unit, and queries are read in
+        it. Accepts the units of :class:`Times`.
         """
         return TimeSeries._from_cpp(self._data.to(unit))
 
@@ -399,7 +387,8 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
 
         A ``t`` just below a timestamp snaps forward to it, by each
         channel's own ``snap_tolerance`` and ``snap_eps``; see the
-        constructor. ``t`` is in the series' unit.
+        constructor. ``t`` is in the series' unit and must lie between the
+        first and last observations of every channel, both included.
 
         For one channel, returns a scalar or element for observations of
         shape ``()``, otherwise a tensor of that shape. For several, returns
@@ -409,7 +398,8 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         Raises
         ------
         ValueError
-            If ``t`` is outside the domain.
+            If ``t`` is before the first or after the last observation of
+            any channel, or a channel has no observations.
         """
         values = NestedTensor._from_cpp(self._data.evaluate(float(t)))
         if self.n_channels > 1:

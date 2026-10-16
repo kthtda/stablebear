@@ -91,15 +91,16 @@ This assumes the recommended option of each decision.
 
 - `sb::Times` holds finite, strictly increasing float64 timestamps and a unit
   from a fixed set with exact factors in seconds.
-- A stored channel holds a shared `Times`, a flat `std::vector<T>`, a
-  `shape`, and a domain. Each observation is a tensor of shape `shape`
+- A stored channel holds a shared `Times`, a flat `std::vector<T>`, and a
+  `shape`. Each observation is a tensor of shape `shape`
   (`()` for one element per time, `(d,)` for a point, `(h, w)` for an image),
   stored as `n * prod(shape)` values and presented as a tensor only when
   accessed. Point counts, matrix sizes, and bar counts are internal to each
   element and may change over time.
 - `sb::TimeSeries<T>` is an ordered list of channels of one element type
-  `T` and a query unit. Its domain is the intersection of the channels'
-  domains. Like `NestedTensor`, one registration template binds it for every
+  `T` and a query unit. It can be evaluated from the latest first timestamp
+  to the earliest last timestamp of its channels, both included; there is
+  no stored domain. Like `NestedTensor`, one registration template binds it for every
   tensor element type in the library (19 types).
 - Everything runs in C++: lookups, snapping, domain checks, unit conversion,
   windows, delay embeddings, sampling, and analysis. Python only binds
@@ -121,8 +122,8 @@ This assumes the recommended option of each decision.
   per-element kernel with bound parameters and `extra_dims`, the dimensions
   one input element adds to the result (for persistence, `(max_dim + 1,)`).
   One native `UfuncTask` applies an operation to any container through a
-  small adapter. For a series, each output channel keeps its input's position,
-  times, and domain, and its shape is the input shape followed by
+  small adapter. For a series, each output channel keeps its input's position
+  and times, and its shape is the input shape followed by
   `extra_dims`. Tensors use the same task.
 
 ## Recycling
@@ -157,7 +158,7 @@ parallel threshold.
 
 ## Decisions
 
-- [x] **1. Domain and evaluation.** (decision: (a), closed domain for series built from observations, half-open for windows) Evaluation
+- [x] **1. Domain and evaluation.** (decision: (a), closed domain for series built from observations, half-open for windows; revised during item 26: there is no domain. A series can be evaluated from the first to the last observation of every channel, both included, checked against the timestamps on each query; there is no `domain` property, and a series with an empty channel cannot be evaluated. Windows follow the same rule: there is no open or closed end anywhere, see item 43.) Evaluation
   uses the previous value: at time `t`, the observation with the largest
   timestamp `<= t`. Queries outside the domain raise `ValueError`. Options for
   the domain of a channel:
@@ -230,7 +231,7 @@ parallel threshold.
     Python wrappers only bind arguments and wrap results.
   - A stored channel holds a shared `Times`, a flat `std::vector<T>` (not a
     `Tensor<T>`, so its layout, gathering, and slicing stay under our
-    control), a `shape`, and a domain. Each observation is a tensor of shape
+    control), and a `shape`. Each observation is a tensor of shape
     `shape`, stored as `prod(shape)` consecutive values and built as a
     `Tensor<T>` only when accessed. Storing a `Tensor<T>` per observation
     instead would cost 80 bytes and 2 to 4 heap allocations per time point.
@@ -265,7 +266,7 @@ parallel threshold.
   - A container adapter says where the elements are and how to build the
     output. Tensor: the result's shape is the input shape followed by
     `extra_dims`. Series: every channel is processed in the same task, and each
-    output channel keeps its position, times, and domain, with shape
+    output channel keeps its position and times, with shape
     `shape + extra_dims`. Persistence of a channel of shape `()` therefore has
     shape `(max_dim + 1,)`; no channels are added. A future container needs
     only an adapter.
@@ -285,7 +286,7 @@ parallel threshold.
   - `from_channels` takes a list of one-channel series of one element
     type; channel `i` is the `i`th series. `unit` defaults to the
     channels' shared unit and is required when their units differ.
-  - A `TimeSeries` exposes `n_channels`, `dtype`, `unit`, `domain`, `times`
+  - A `TimeSeries` exposes `n_channels`, `dtype`, `unit`, `times`
     (a `Times` for one channel, a `NestedTensor` with one leaf per channel in
     the query unit for several), `to(unit)`, `evaluate(t)`, `series(t)` (the
     same as `evaluate(t)`), `series.window(a, b)` (a window),
@@ -324,7 +325,7 @@ parallel threshold.
   - An empty list gives an empty float64 channel, so a typed empty channel of
     point clouds is built from `sb.zeros((0,), dtype=sb.pcloud64)`.
 
-- [x] **8. Views.** (decision: every channel is a view of shared storage; a write materializes the whole view)
+- [x] **8. Views.** (decision: every channel is a view of shared storage; a write materializes the whole view; the domain in the descriptor below predates its removal during item 26 and is revised with windows, see item 43)
   - Like a tensor view, a channel is a `shared_ptr` to its storage plus a
     small descriptor of how a query time maps into it: the domain (start, end,
     and end closedness), `lags` (time offsets that add leading observation
@@ -359,13 +360,15 @@ parallel threshold.
     (`0.2 + 0.1` and `0.3`); snapping makes their values equal, and merging
     them is a later cleanup.
 
-- [x] **9. Saving series.** (decision: as recommended; distinct storages once, then one descriptor per channel) save a series as its
-  distinct storages, each written once even when several channels share it
-  (as the indexed-tensor codec deduplicates sources), followed by each
-  channel's storage index and descriptor, and the query unit. A loaded
-  series evaluates as the original, shares storage the same way, and needs no
-  original objects. Alternative: materialize every view on saving, which
-  costs the memory that decision 8 avoids and loses the sharing.
+- [x] **9. Saving series.** (decision, revised in item 26: materialize every
+  channel on saving) Decision 8 governs memory during a run; a file only
+  needs to reproduce the series' values. Save the query unit and one record
+  per channel: its unit, timestamps, values, and snap settings, materializing
+  views as decision 8 does on a write. A loaded series
+  evaluates as the original and needs no original objects, but shares no
+  storage. Saving a series together with views of it is rare, so the
+  duplicated values cost little. The rejected first choice wrote distinct
+  storages once with one descriptor per channel referring to them.
 
 ## Stored channels
 
@@ -459,17 +462,16 @@ parallel threshold.
     and `series(1)` (an int) gives 10, the value at time 1. **Catches:**
     next-value, nearest, or linear interpolation; an open end; an int read as
     a position.
-  - `domain == (0.0, 4.0)`, and `series(-0.5)` and `series(4.5)` raise
-    `ValueError`. **Catches:** extrapolation outside the domain, NaN instead
-    of an error.
+  - `series(-0.5)` and `series(4.5)` raise `ValueError` ("outside the
+    domain"). **Catches:** extrapolation before the first or after
+    the last observation, NaN instead of an error.
 
 - [x] **19. Empty and singleton series.** Tests:
   - `TimeSeries(sb.zeros((0,), dtype=sb.pcloud64), times=[])` has
-    `len() == 0`, dtype pcloud64, and `domain is None`, and `series(0.0)`
-    raises `ValueError`. **Catches:** an invented domain, a crash on empty
-    storage.
-  - `TimeSeries([7.0], times=[2.0])` has domain `(2.0, 2.0)` and
-    `series(2.0) == 7.0`. **Catches:** a singleton series rejected or
+    `len() == 0` and dtype pcloud64, and `series(0.0)` raises `ValueError`
+    ("without observations"). **Catches:** an invented range, a crash on
+    empty storage.
+  - `TimeSeries([7.0], times=[2.0])` has `series(2.0) == 7.0`. **Catches:** a singleton series rejected or
     impossible to evaluate.
 
 - [x] **20. Snapping.** Implement decision 2 in the native lookup. Tests:
@@ -492,8 +494,8 @@ parallel threshold.
 - [x] **21. Query unit.** `series.to(unit)` returns the series with another
   query unit; the stored channels are unchanged. Test: `TimeSeries([10.0,
   20.0], times=Times([0.0, 0.5], unit="s")).to("ms")` has unit `"ms"`, times
-  `[0.0, 500.0]`, domain `(0.0, 500.0)`, and its value at 250.0 equal to 10.
-  **Catches:** queries or the domain left in the old unit.
+  `[0.0, 500.0]`, and values 10 at 250.0 and 20 at 500.0. **Catches:**
+  queries or the domain check left in the old unit.
 
 ## Several channels
 
@@ -509,11 +511,11 @@ parallel threshold.
     unit, an empty series, nested channel sets, mixed element types.
 
 - [x] **23. Domain and times of several channels.** Test with the series of
-  channels A and B: domain `(0.5, 2.5)`; `series(0.25)` and `series(2.75)` raise `ValueError`;
+  channels A and B: the series evaluates at 0.5 (B's first observation) and
+  2.5 (A's last), and `series(0.25)` and `series(2.75)` raise `ValueError`;
   `times` is a `NestedTensor` whose leaves are `[0.0, 1.0, 2.5]` and
-  `[0.5, 1.5, 3.0]`. The end is closed only if every channel ending there is
-  closed. **Catches:** the union of domains, timestamps reported in each
-  channel's own unit.
+  `[0.5, 1.5, 3.0]`. **Catches:** a union of the channels' domains, the ends
+  excluded, timestamps reported in each channel's own unit.
 
 - [x] **23a. `NestedTensor` of every element type.** One
   `register_tensor_element<T>` in `src/python/py_tensor.hpp` binds `Tensor<T>`,
@@ -564,26 +566,30 @@ parallel threshold.
 
 ## Serialization of stored series
 
-- [ ] **26. Save, load, and pickle one channel.**
-  `include/sbear/io/timeseries_io.hpp` writes a stored channel: unit,
-  timestamps, domain (with its closedness, or none), `shape`, then the
-  values with the existing element writers, under the
-  element type's format with `TensorFormatFlag::TimeSeries` (decision 5).
+- [x] **26. Save, load, and pickle one channel.**
+  `include/sbear/io/timeseries_io.hpp` writes the layout of decision 9 under
+  the element type's format with `TensorFormatFlag::TimeSeries` (decision
+  5): the query unit, then one record per channel (its unit, timestamps,
+  values as a tensor with time along axis 0 using the existing element
+  writers, `snap_tolerance`, and `snap_eps`). Units are stored as their length in seconds (`mult *
+  10^exp`), not by name.
   Register it in `StreamableObject` and `read_any_object`; loading goes
   through the validating constructor. No `FormatVersion` bump is needed;
   older readers report an unhandled object type. In Python, `TimeSeries` uses
   `_BinaryIoMixin`, and `save` and `load` dispatch it. Test, parametrized over
-  the 19 dtypes, a float64 channel with `shape == (2, 2)`, and a barcode
-  channel with `shape == (2,)`, and over `save`/`load` and `pickle`: the
+  the 19 dtypes of `_element_values.py`, each as two observations `a` and
+  `b` of shape `()` and as two observations `[a, b]` and `[b, a]` of shape
+  `(2,)`, and over
+  `save`/`load` and `pickle`: the
   series loads with the same `dtype`, `shape`,
-  times, unit, domain, and values. **Catches:** a type flag
-  mapped to the wrong type or precision; a dropped unit, domain, or shape;
-  timestamps narrowed to 32 bits.
+  times, unit, snap settings, and values. **Catches:** a type flag
+  mapped to the wrong type or precision; a dropped unit, shape, or
+  snap setting; timestamps narrowed to 32 bits.
 
-- [ ] **27. Saving several channels.** The format of decision 9 for identity
-  views. Test, parametrized over `save`/`load` and `pickle`: the series of
+- [ ] **27. Saving several channels.** The format of decision 9 for several
+  channels. Test, parametrized over `save`/`load` and `pickle`: the series of
   channels A and B loads with the same number of channels, query unit,
-  domain, and values at 0.5 and 1.5. **Catches:** order or the query unit lost; a
+  times, and values at 0.5 and 1.5. **Catches:** order or the query unit lost; a
   channel's own unit lost.
 
 ## Snapshot persistence (workflow 1)
@@ -683,7 +689,9 @@ parallel threshold.
 Items 43-53 use the source series with times `[0.0, 0.5, 1.5, 2.5, 4.0]` and
 values `[1.0, 2.0, 3.0, 4.0, 5.0]`.
 
-- [ ] **40. Delay embedding.** `TimeDelayEmbedding(dimension, delay)` returns
+- [ ] **40. Delay embedding.** (revise before starting: written with a
+  domain, removed during item 26; an embedding's domain starts at
+  `t_0 + (m - 1) * delay`) `TimeDelayEmbedding(dimension, delay)` returns
   a lazy series (decision 8) of points: for a scalar channel `x`, the point at
   `t` is `(x(t - (m - 1) * delay), ..., x(t))`, so `shape == (m,)`. The domain
   starts at `start + (m - 1) * delay` and keeps the source's end and its
@@ -718,7 +726,16 @@ values `[1.0, 2.0, 3.0, 4.0, 5.0]`.
   B has domain `(1.0, 2.5)` and gives leaves `[20, 20]` and `[-1, -2]` at
   1.5. **Catches:** the delay applied in channel B's milliseconds.
 
-- [ ] **43. Window bounds.** `Window(size, step=None, overlap=None)` returns a
+- [ ] **43. Window bounds.** (decided during item 26, to be worked out before
+  starting items 43-47: a windowed series is a `TimeSeries<TimeSeries<T>>`,
+  a series whose observations are series, and each window is an ordinary
+  series, evaluable from its first to its last observation like any other.
+  There are no half-open windows and no window-specific domain rules. Still
+  to decide: the outer series' timestamps (window starts, presumably), and
+  which observations a window holds, for example whether the value carried
+  in from before the window start becomes an observation at the start.
+  Revise items 43-47, 49, and 51-56 accordingly; the text below predates
+  this.) `Window(size, step=None, overlap=None)` returns a
   list of lazy start-aligned windows `[a, a + size)` with
   `a = start + k * step` while `a + size <= end`, where
   `step = size - overlap` and the default step is `size`. Incomplete windows
@@ -827,24 +844,21 @@ Items 48-50 use the source series of items 43-46 and the embedding of item
   `(3, 1)` with four 2-D points each and barcodes of shape `(3, 1, 2)`.
   **Catches:** steps that do not compose.
 
-- [ ] **56. Saving views.** Window and embedding descriptors in the format of
-  decision 9, with shared storage written once. Tests, parametrized over
-  `save`/`load` and `pickle`:
-  - The window `[1.5, 2.5)` of item 42's embedding loads with the same number
-    of channels, domain, unit, and values at 1.5 and 2.0, and evaluating it at 2.5
-    still raises `ValueError`. **Catches:** a lag, bound, or query unit lost
-    on saving, the half-open end lost.
-  - `from_channels([s, s.window(1.0, 3.0)])`, two views of one storage,
-    saves to fewer bytes than the same series built from two independent
-    copies of `s`, and loads with the same values. **Catches:** shared storage
-    written once per channel.
+- [ ] **56. Saving views.** Windows and embeddings are saved materialized
+  (decision 9), with no stored domain. A windowed series is a series of
+  series (see item 43), so saving one saves each window as an ordinary
+  series; revise this item with item 43. Test, parametrized over `save`/`load`
+  and `pickle`: the window `[1.5, 2.5)` of item 42's embedding loads with
+  the same number of channels, domain, unit, and values at 1.5 and 2.0, and
+  evaluating it at 2.5 still raises `ValueError`. **Catches:** a lag, bound,
+  or query unit lost on saving, the half-open end lost.
 
 - [ ] **57. Golden files.** Pin the formats (TESTING.md principle 11) with a
   generator modeled on `test/golden/serialization/generate_point_cloud_v3.py`,
   which records explicit expected values. Write item 28's barcode32 result,
   the series of channels A and B, and item 56's window as `.sb` and
   pickle files, and teach `test_serialization_goldens.py` to compare series
-  (number of channels, unit, domain, values at listed times). **Catches:** a later
+  (number of channels, unit, times, values at listed times). **Catches:** a later
   change to a payload that breaks saved files.
 
 ## Documentation and release
@@ -854,7 +868,7 @@ pages.
 
 - [ ] **58. API reference.** `docs/api_timeseries.rst` is in the toctree in
   `docs/stablebear.rst` (added with item 20). Check that the docstrings state the contracts of
-  decisions 1-4 and 6-8: domains and their closedness, previous-value
+  decisions 1-4 and 6-8: the domain, previous-value
   evaluation and snapping, units, query units and conversion, channels and
   their order, time indexing, observation shapes and flattening into
   points, copies and lazy derived
@@ -862,7 +876,7 @@ pages.
   `save`, and `load` document series input and output.
 
 - [ ] **59. User guide.** A `docs/timeseries.rst` guide linked from
-  `docs/userguide.rst`: times, units, domains, and channels, then two small
+  `docs/userguide.rst`: times, units, the domain, and channels, then two small
   examples. The first follows a point-cloud series through persistence to
   stable ranks; the second takes two numeric channels in different units
   through a delay embedding, windows, and sampling to persistence. Link each

@@ -21,15 +21,6 @@ namespace py = pybind11;
 
 namespace
 {
-  py::object domain_tuple(const std::optional<sb::Domain>& domain)
-  {
-    if (!domain)
-    {
-      return py::none();
-    }
-    return py::make_tuple(domain->start, domain->end);
-  }
-
   /// Bind the channel and series classes for element type T, as
   /// register_tensor_element does for tensors.
   template <typename T>
@@ -44,7 +35,6 @@ namespace
         return py::tuple(py::cast(self.shape()));
       })
       .def_property_readonly("values", &Channel::values)
-      .def_property_readonly("domain", [](const Channel& self) { return domain_tuple(self.domain()); })
       .def_property_readonly("snap_tolerance", &Channel::snap_tolerance)
       .def_property_readonly("snap_eps", &Channel::snap_eps)
       .def("__len__", &Channel::size);
@@ -72,7 +62,6 @@ namespace
       .def("channel", &Series::channel, py::arg("index"), py::return_value_policy::reference_internal)
       .def_property_readonly("n_channels", &Series::n_channels)
       .def("select", &Series::select, py::arg("indices"))
-      .def_property_readonly("domain", [](const Series& self) { return domain_tuple(self.domain()); })
       .def("evaluate", &Series::evaluate, py::arg("t"))
       .def("_save", [](const Series& self, py::object file) {
         sb_py::PythonOStreamBuf buf(file);

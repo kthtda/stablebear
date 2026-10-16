@@ -14,12 +14,16 @@ and one timestamp per observation; plain timestamp arrays are in seconds, and
 Evaluation
 ----------
 
-A series can be evaluated at any time in its
-:py:attr:`~stablebear.timeseries.TimeSeries.domain`, which runs from the
-first timestamp to the last, both included. Between observations, the series
-keeps the most recent observation, so
-:py:meth:`~stablebear.timeseries.TimeSeries.evaluate` returns the observation
-with the largest timestamp at or before the query::
+For observations :math:`x_0, \dots, x_{n-1}` at timestamps
+:math:`t_0 < \dots < t_{n-1}`,
+:py:meth:`~stablebear.timeseries.TimeSeries.evaluate` computes
+
+.. math::
+
+   x(t) = x_i \quad \text{for } t_i \le t < t_{i+1},
+   \qquad x(t_{n-1}) = x_{n-1},
+
+on the domain :math:`[t_0, t_{n-1}]`::
 
    series(0.5)   # 1.0
    series(1.5)   # 2.0

@@ -182,27 +182,6 @@ namespace sb
     TimeUnit m_unit;
   };
 
-  /// The times at which a channel can be evaluated: [start, end] when the end
-  /// is closed, otherwise [start, end).
-  struct Domain
-  {
-    float64_t start;
-    float64_t end;
-    bool endClosed = true;
-
-    [[nodiscard]] bool contains(float64_t t) const
-    {
-      return start <= t && (endClosed ? t <= end : t < end);
-    }
-
-    [[nodiscard]] std::string to_string() const
-    {
-      std::ostringstream ss;
-      ss << "[" << start << ", " << end << (endClosed ? "]" : ")");
-      return ss.str();
-    }
-  };
-
   /// Recorded observations of one channel: one observation per timestamp,
   /// each a tensor of shape `shape`, stored flat in row-major order.
   template <typename T>
@@ -255,17 +234,7 @@ namespace sb
         storage->values.push_back(owned(index));
       });
       m_storage = std::move(storage);
-      if (size() > 0)
-      {
-        // A channel built from observations covers [t_0, t_{n-1}].
-        const auto& recorded = m_storage->times.values();
-        m_domain = Domain{recorded.front(), recorded.back(), true};
-      }
     }
-
-    /// Where the channel can be evaluated; empty for a channel without
-    /// observations.
-    [[nodiscard]] const std::optional<Domain>& domain() const noexcept { return m_domain; }
 
     /// The snap tolerance used when evaluating, as a fraction of the gap
     /// between observations; 0 disables snapping.
@@ -299,9 +268,10 @@ namespace sb
     /// most snap_eps() times machine epsilon times the larger magnitude
     /// of the two timestamps, counts as reaching it.
     ///
-    /// The caller checks the domain, in its own unit: a time converted into
-    /// the channel's unit may round just outside the channel's domain. A time
-    /// below the first observation gets the first. Requires size() > 0.
+    /// The caller checks that @p t lies between the first and last
+    /// observations, in its own unit: a time converted into the channel's
+    /// unit may round just outside them. A time below the first observation
+    /// gets the first. Requires size() > 0.
     [[nodiscard]] Tensor<T> lookup(float64_t t) const
     {
       const auto& times = m_storage->times.values();
@@ -370,7 +340,6 @@ namespace sb
 
   private:
     std::shared_ptr<ChannelStorage<T>> m_storage;
-    std::optional<Domain> m_domain;
     float64_t m_snapTolerance = DefaultSnapTolerance;
     float64_t m_snapEps = DefaultSnapEps;
   };
@@ -461,58 +430,13 @@ namespace sb
     /// The timestamps of channel @p i, converted to the query unit.
     [[nodiscard]] Times times(size_t i) const { return channel(i).times().to(m_unit); }
 
-    /// The intersection of the channels' domains, in the series' unit; empty
-    /// when the channels share no time.
-    [[nodiscard]] std::optional<Domain> domain() const
-    {
-      std::optional<Domain> result;
-      for (size_t i = 0; i < m_channels.size(); ++i)
-      {
-        const auto& channelDomain = m_channels[i].domain();
-        if (!channelDomain)
-        {
-          return std::nullopt;
-        }
-        const auto channelUnit = m_channels[i].times().unit();
-        const Domain d{convert_time(channelDomain->start, channelUnit, m_unit),
-                       convert_time(channelDomain->end, channelUnit, m_unit),
-                       channelDomain->endClosed};
-        if (!result)
-        {
-          result = d;
-          continue;
-        }
-        result->start = std::max(result->start, d.start);
-        if (d.end < result->end)
-        {
-          result->end = d.end;
-          result->endClosed = d.endClosed;
-        }
-        else if (d.end == result->end)
-        {
-          result->endClosed = result->endClosed && d.endClosed;
-        }
-      }
-      if (result && (result->start > result->end
-                     || (result->start == result->end && !result->endClosed)))
-      {
-        return std::nullopt;
-      }
-      return result;
-    }
-
     /// Every channel's value at @p t, given in the series' unit: one leaf per
     /// channel, in channel order, each a tensor of that channel's shape.
-    /// @p t must lie in domain().
+    /// @p t must lie between the first and last observations of every
+    /// channel, both included.
     [[nodiscard]] NestedTensor<T> evaluate(float64_t t) const
     {
-      const auto d = domain();
-      if (!d || !d->contains(t))
-      {
-        std::ostringstream ss;
-        ss << "Time " << t << " is outside the domain " << (d ? d->to_string() : std::string("(empty)"));
-        throw std::domain_error(ss.str());
-      }
+      check_observed(t);
       Tensor<NestedTensor<T>> values({m_channels.size()});
       for (size_t i = 0; i < m_channels.size(); ++i)
       {
@@ -523,6 +447,32 @@ namespace sb
     }
 
   private:
+    /// Throw unless @p t, in the series' unit, lies between the first and
+    /// last observations of every channel. The check is exact: it compares
+    /// against the timestamps converted to the series' unit, not the query
+    /// converted to each channel's unit.
+    void check_observed(float64_t t) const
+    {
+      auto first = -std::numeric_limits<float64_t>::infinity();
+      auto last = std::numeric_limits<float64_t>::infinity();
+      for (const auto& c : m_channels)
+      {
+        if (c.size() == 0)
+        {
+          throw std::domain_error("Cannot evaluate a channel without observations");
+        }
+        const auto& recorded = c.times().values();
+        first = std::max(first, convert_time(recorded.front(), c.times().unit(), m_unit));
+        last = std::min(last, convert_time(recorded.back(), c.times().unit(), m_unit));
+      }
+      if (t < first || t > last)
+      {
+        std::ostringstream ss;
+        ss << "Time " << t << " is outside the domain [" << first << ", " << last << "]";
+        throw std::domain_error(ss.str());
+      }
+    }
+
     std::vector<Channel<T>> m_channels;
     TimeUnit m_unit;
   };
