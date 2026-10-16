@@ -427,6 +427,26 @@ namespace sb
 
     [[nodiscard]] const Channel<T>& channel(size_t i) const { return m_channels.at(i); }
     [[nodiscard]] size_t n_channels() const noexcept { return m_channels.size(); }
+
+    /// The channels at @p indices, in that order, sharing their storage with
+    /// this series and queried in the same unit. Negative indices count from
+    /// the end.
+    [[nodiscard]] TimeSeries select(const std::vector<std::ptrdiff_t>& indices) const
+    {
+      const auto n = static_cast<std::ptrdiff_t>(m_channels.size());
+      std::vector<Channel<T>> channels;
+      channels.reserve(indices.size());
+      for (const auto i : indices)
+      {
+        if (i < -n || i >= n)
+        {
+          throw std::out_of_range(
+              "Channel index " + std::to_string(i) + " is out of range for " + std::to_string(n) + " channels");
+        }
+        channels.push_back(m_channels[static_cast<size_t>(i < 0 ? i + n : i)]);
+      }
+      return TimeSeries(std::move(channels), m_unit);
+    }
     [[nodiscard]] TimeUnit unit() const noexcept { return m_unit; }
 
     /// The same series queried in @p unit; the channels are shared, not

@@ -158,20 +158,6 @@ def test_series_rejects_unsupported_values(values):
         TimeSeries(values, times=[0.0, 1.0])
 
 
-def test_observation_by_index():
-    values = [
-        [1.0, 2.0],
-        [3.0, 4.0],
-        [5.0, 6.0],
-    ]
-    series = TimeSeries(values, times=[0.0, 1.0, 2.0])
-
-    assert np.array_equal(np.asarray(series.observation(1)), [3.0, 4.0])
-    assert np.array_equal(np.asarray(series.observation(-1)), [5.0, 6.0])
-    with pytest.raises(IndexError):
-        series.observation(3)
-
-
 def test_series_evaluates_to_previous_value():
     series = TimeSeries([10.0, 20.0, 30.0], times=[0.0, 1.5, 4.0])
 
@@ -385,3 +371,61 @@ def test_several_point_cloud_channels_evaluate_to_their_clouds():
     assert values.dtype is sb.pcloud64
     assert np.array_equal(np.asarray(values[0][()]), [[0.0, 0.0]])
     assert np.array_equal(np.asarray(values[1][()]), [[5.0, 5.0], [6.0, 6.0], [7.0, 7.0]])
+
+
+@pytest.mark.parametrize("index", [1, -1])
+def test_selecting_one_channel_keeps_the_query_unit(index):
+    series = TimeSeries.from_channels([_channel_a(), _channel_b()], unit="s")
+
+    selected = series[index]
+
+    assert selected.n_channels == 1
+    assert selected.unit == "s"
+    assert selected(1.5) == -2.0
+
+
+def test_selecting_several_channels_keeps_their_order():
+    series = TimeSeries.from_channels([_channel_a(), _channel_b()], unit="s")
+
+    values = series[[1, 0]](1.5)
+
+    assert [values[0][()], values[1][()]] == [-2.0, 20.0]
+
+
+def test_selection_keeps_each_channel_snap_settings():
+    a = TimeSeries([10.0, 20.0, 30.0], times=Times([0.0, 1.0, 2.5], unit="s"),
+                   snap_tolerance=0.25)
+    series = TimeSeries.from_channels([a, _channel_b()], unit="s")
+
+    assert series[0].snap_tolerance == 0.25
+    assert series[1].snap_tolerance != series[0].snap_tolerance
+    assert np.array_equal(np.asarray(series.snap_tolerance),
+                          [series[0].snap_tolerance, series[1].snap_tolerance])
+
+
+def test_values_of_several_channels_have_one_leaf_per_channel():
+    series = TimeSeries.from_channels([_channel_a(), _channel_b()], unit="s")
+
+    values = series.values
+
+    assert isinstance(values, sb.NestedTensor)
+    assert np.array_equal(np.asarray(values[0]), [10.0, 20.0, 30.0])
+    assert np.array_equal(np.asarray(values[1]), [-1.0, -2.0, -3.0])
+
+
+@pytest.mark.parametrize("access", [
+    lambda series: series.shape,
+    lambda series: len(series),
+])
+def test_per_channel_accessors_need_one_channel(access):
+    series = TimeSeries.from_channels([_channel_a(), _channel_b()], unit="s")
+
+    with pytest.raises(ValueError, match="several channels"):
+        access(series)
+
+
+def test_channel_index_out_of_range_raises():
+    series = TimeSeries.from_channels([_channel_a(), _channel_b()], unit="s")
+
+    with pytest.raises(IndexError):
+        series[2]

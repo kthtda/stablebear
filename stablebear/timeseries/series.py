@@ -307,25 +307,48 @@ class TimeSeries(Generic[T]):
         ])
 
     @property
-    def values(self) -> Tensor:
-        """A copy of the observations, with time along axis 0."""
+    def values(self) -> Tensor | NestedTensor:
+        """A copy of the observations, with time along axis 0.
+
+        A tensor of shape ``(len(series), *shape)`` for a series with one
+        channel. For several channels, a ``NestedTensor`` with one such
+        leaf per channel, in channel order.
+        """
         wrapper = _SERIES_TYPES[self.dtype][1]
-        return wrapper(self._single_channel().values)
+        if self.n_channels == 1:
+            return wrapper(self._data.channel(0).values)
+        return NestedTensor([
+            wrapper(self._data.channel(i).values) for i in range(self.n_channels)
+        ])
 
     @property
     def shape(self) -> tuple[int, ...]:
         """The shape of one observation; ``()`` for scalars."""
         return self._single_channel().shape
 
-    @property
-    def snap_tolerance(self) -> float:
-        """The snap tolerance used when evaluating; see the constructor."""
-        return self._single_channel().snap_tolerance
+    def _per_channel(self, name):
+        values = [getattr(self._data.channel(i), name) for i in range(self.n_channels)]
+        if len(values) == 1:
+            return values[0]
+        return FloatTensor(np.array(values, dtype=np.float64))
 
     @property
-    def snap_eps(self) -> float:
-        """The cap on snapping used when evaluating; see the constructor."""
-        return self._single_channel().snap_eps
+    def snap_tolerance(self) -> float | FloatTensor:
+        """The snap tolerance used when evaluating; see the constructor.
+
+        A float for a series with one channel; for several, a float64
+        ``FloatTensor`` with one entry per channel.
+        """
+        return self._per_channel("snap_tolerance")
+
+    @property
+    def snap_eps(self) -> float | FloatTensor:
+        """The cap on snapping used when evaluating; see the constructor.
+
+        A float for a series with one channel; for several, a float64
+        ``FloatTensor`` with one entry per channel.
+        """
+        return self._per_channel("snap_eps")
 
     @property
     def domain(self) -> tuple[float, float] | None:
@@ -375,20 +398,28 @@ class TimeSeries(Generic[T]):
         """``series(t)`` is ``series.evaluate(t)``."""
         return self.evaluate(t)
 
-    def _wrap_observation(self, data):
-        observation = _SERIES_TYPES[self.dtype][1](data)
-        return observation[()] if observation.ndim == 0 else observation
-
-    def observation(self, i: int):
-        """A copy of recorded observation ``i``; negative indices count from the end.
-
-        Returns a scalar or element (such as a ``PointCloud``) for
-        observations of shape ``()``, otherwise a tensor of that shape.
-        """
-        return self._wrap_observation(self._single_channel().observation(operator.index(i)))
-
     def __len__(self) -> int:
         return len(self._single_channel())
+
+    def __getitem__(self, index) -> TimeSeries:
+        """Select channels by index: ``series[i]`` or ``series[[i, j, ...]]``.
+
+        Returns a series of the selected channels, in the order given, with
+        the same unit. The channels share their observations with this
+        series. Negative indices count from the end.
+
+        Raises
+        ------
+        IndexError
+            If an index is out of range.
+        ValueError
+            If the list of indices is empty.
+        """
+        if isinstance(index, (list, tuple)):
+            indices = [operator.index(i) for i in index]
+        else:
+            indices = [operator.index(index)]
+        return TimeSeries._from_cpp(self._data.select(indices))
 
     def __repr__(self):
         return (
