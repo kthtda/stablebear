@@ -524,15 +524,17 @@ parallel threshold.
   2) has that `dtype`, and its leaves equal the inputs.
   **Catches:** a leaf type bound to the wrong native class or precision.
 
-- [ ] **24. Evaluating several channels.** Tests with the series of channels A
+- [x] **24. Evaluating several channels.** Tests with the series of channels A
   and B:
   - `series(1.25)` is a float64 `NestedTensor` of shape `(2,)` with 0-d
     leaves 20.0 and -1.0, and `series(1.5)` has leaves 20.0 and -2.0.
     **Catches:** channel B read in the wrong unit (it would answer at
     1.25 ms), one grid assumed for all channels, channel order lost.
   - Channel A built with `snap_tolerance=0.0` and channel B with the
-    default: at `np.nextafter(1.5, 0.0)`, leaf 0 is 20.0 and leaf 1 is -2.0
-    (snapped). **Catches:** one channel's snap settings applied to another.
+    default: at `np.nextafter(1.0, 0.0)`, just below A's 1.0 s, leaf 0 is
+    10.0 (not snapped), and at `np.nextafter(1.5, 0.0)`, just below B's
+    1500 ms, leaf 1 is -2.0 (snapped). **Catches:** one channel's snap
+    settings applied to another.
   - A point-cloud channel and a second point-cloud channel give a pcloud64
     `NestedTensor` whose leaves are the two clouds. **Catches:** object
     types left out of multi-channel evaluation.
