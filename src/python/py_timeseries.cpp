@@ -29,7 +29,7 @@ namespace
   }
 
   /// Bind the channel and series classes for element type T, as
-  /// register_nested_tensor_element does for nested tensors.
+  /// register_tensor_element does for tensors.
   template <typename T>
   void register_timeseries_element(py::module_& m, const std::string& suffix)
   {
