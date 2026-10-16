@@ -339,3 +339,49 @@ def test_times_of_several_channels_are_in_the_query_unit():
     assert times.shape == (2,)
     assert np.array_equal(np.asarray(times[0]), [0.0, 1.0, 2.5])
     assert np.array_equal(np.asarray(times[1]), [0.5, 1.5, 3.0])
+
+
+@pytest.mark.parametrize("t, expected", [
+    (1.25, [20.0, -1.0]),  # between B's observations at 500 and 1500 ms
+    (1.5, [20.0, -2.0]),  # at B's observation at 1500 ms
+])
+def test_several_channels_evaluate_to_one_leaf_per_channel(t, expected):
+    series = TimeSeries.from_channels([_channel_a(), _channel_b()], unit="s")
+
+    values = series(t)
+
+    assert isinstance(values, sb.NestedTensor)
+    assert values.dtype is sb.float64
+    assert values.shape == (2,)
+    assert [values[0].shape, values[1].shape] == [(), ()]
+    assert [values[0][()], values[1][()]] == expected
+
+
+def test_each_channel_snaps_by_its_own_settings():
+    a = TimeSeries([10.0, 20.0, 30.0], times=Times([0.0, 1.0, 2.5], unit="s"),
+                   snap_tolerance=0.0)
+    series = TimeSeries.from_channels([a, _channel_b()], unit="s")
+
+    # Just below channel A's 1.0 s and channel B's 1500 ms.
+    assert series(np.nextafter(1.0, 0.0))[0][()] == 10.0
+    assert series(np.nextafter(1.5, 0.0))[1][()] == -2.0
+
+
+def test_several_point_cloud_channels_evaluate_to_their_clouds():
+    first = sb.PointCloudTensor([
+        np.array([[0.0, 0.0]]),
+        np.array([[1.0, 0.0], [0.0, 1.0]]),
+    ], dtype=sb.pcloud64)
+    second = sb.PointCloudTensor([
+        np.array([[5.0, 5.0], [6.0, 6.0], [7.0, 7.0]]),
+    ], dtype=sb.pcloud64)
+    series = TimeSeries.from_channels([
+        TimeSeries(first, times=[0.0, 1.0]),
+        TimeSeries(second, times=[0.0]),
+    ])
+
+    values = series(0.0)
+
+    assert values.dtype is sb.pcloud64
+    assert np.array_equal(np.asarray(values[0][()]), [[0.0, 0.0]])
+    assert np.array_equal(np.asarray(values[1][()]), [[5.0, 5.0], [6.0, 6.0], [7.0, 7.0]])

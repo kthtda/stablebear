@@ -349,23 +349,27 @@ class TimeSeries(Generic[T]):
         return TimeSeries._from_cpp(self._data.to(unit))
 
     def evaluate(self, t):
-        """The observation with the largest timestamp at or before ``t``.
+        """Each channel's observation with the largest timestamp at or before ``t``.
 
-        A ``t`` just below a timestamp snaps forward to it; see
-        ``snap_tolerance`` and ``snap_eps`` in the constructor. ``t``
-        is in the series' unit. Returns a scalar or element for
-        observations of shape ``()``, otherwise a tensor of that shape.
+        A ``t`` just below a timestamp snaps forward to it, by each
+        channel's own ``snap_tolerance`` and ``snap_eps``; see the
+        constructor. ``t`` is in the series' unit.
+
+        For one channel, returns a scalar or element for observations of
+        shape ``()``, otherwise a tensor of that shape. For several, returns
+        a ``NestedTensor`` with one leaf per channel, in channel order; each
+        leaf is a tensor of that channel's shape, 0-d for shape ``()``.
 
         Raises
         ------
         ValueError
             If ``t`` is outside the domain.
         """
-        # The native call checks the domain first, so a query outside it
-        # fails the same way for any number of channels.
-        values = self._data.evaluate(float(t))
-        self._single_channel()
-        return self._wrap_observation(values[0])
+        values = NestedTensor._from_cpp(self._data.evaluate(float(t)))
+        if self.n_channels > 1:
+            return values
+        leaf = values[0]
+        return leaf[()] if leaf.ndim == 0 else leaf
 
     def __call__(self, t):
         """``series(t)`` is ``series.evaluate(t)``."""

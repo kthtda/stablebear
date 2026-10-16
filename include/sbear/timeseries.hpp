@@ -2,6 +2,7 @@
 #define STABLEBEAR_TIMESERIES_H
 
 #include "config.hpp"
+#include "nested_tensor.hpp"
 #include "tensor.hpp"
 #include "walk.hpp"
 
@@ -480,9 +481,10 @@ namespace sb
       return result;
     }
 
-    /// Every channel's value at @p t, given in the series' unit, in channel
-    /// order. @p t must lie in domain().
-    [[nodiscard]] std::vector<Tensor<T>> evaluate(float64_t t) const
+    /// Every channel's value at @p t, given in the series' unit: one leaf per
+    /// channel, in channel order, each a tensor of that channel's shape.
+    /// @p t must lie in domain().
+    [[nodiscard]] NestedTensor<T> evaluate(float64_t t) const
     {
       const auto d = domain();
       if (!d || !d->contains(t))
@@ -491,13 +493,13 @@ namespace sb
         ss << "Time " << t << " is outside the domain " << (d ? d->to_string() : std::string("(empty)"));
         throw std::domain_error(ss.str());
       }
-      std::vector<Tensor<T>> values;
-      values.reserve(m_channels.size());
-      for (const auto& c : m_channels)
+      Tensor<NestedTensor<T>> values({m_channels.size()});
+      for (size_t i = 0; i < m_channels.size(); ++i)
       {
-        values.push_back(c.lookup(convert_time(t, m_unit, c.times().unit())));
+        const auto& c = m_channels[i];
+        values(i) = NestedTensor<T>::from_leaf_view(c.lookup(convert_time(t, m_unit, c.times().unit())));
       }
-      return values;
+      return NestedTensor<T>::from_outer_view(std::move(values), 1);
     }
 
   private:
