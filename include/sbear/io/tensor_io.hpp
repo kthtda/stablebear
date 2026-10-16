@@ -7,6 +7,7 @@
 #include "fixed_rank_tensor_io.hpp"
 #include "../tensor.hpp"
 #include "../nested_tensor.hpp"
+#include "../timeseries.hpp"
 #include "../point_cloud.hpp"
 #include "../functional/pcf.hpp"
 #include "../persistence/barcode.hpp"
@@ -20,6 +21,7 @@ namespace sb::io::detail
   {
     static constexpr std::uint32_t None = 0;
     static constexpr std::uint32_t Nested = 1 << 0;
+    static constexpr std::uint32_t TimeSeries = 1 << 1;
   };
 
   template <typename T>
@@ -102,7 +104,27 @@ namespace sb::io::detail
       SymmetricMatrix<float64_t>,
 
       DistanceMatrix<float32_t>,
-      DistanceMatrix<float64_t>
+      DistanceMatrix<float64_t>,
+
+      TimeSeries<bool>,
+      TimeSeries<float32_t>,
+      TimeSeries<float64_t>,
+      TimeSeries<int32_t>,
+      TimeSeries<int64_t>,
+      TimeSeries<uint32_t>,
+      TimeSeries<uint64_t>,
+      TimeSeries<Pcf<float32_t, float32_t>>,
+      TimeSeries<Pcf<float64_t, float64_t>>,
+      TimeSeries<Pcf<int32_t, int32_t>>,
+      TimeSeries<Pcf<int64_t, int64_t>>,
+      TimeSeries<PointCloud<float32_t>>,
+      TimeSeries<PointCloud<float64_t>>,
+      TimeSeries<DistanceMatrix<float32_t>>,
+      TimeSeries<DistanceMatrix<float64_t>>,
+      TimeSeries<SymmetricMatrix<float32_t>>,
+      TimeSeries<SymmetricMatrix<float64_t>>,
+      TimeSeries<ph::Barcode<float32_t>>,
+      TimeSeries<ph::Barcode<float64_t>>
       >;
 
   struct TensorFormat
@@ -157,6 +179,12 @@ namespace sb::io::detail
         .tensorProperties = leafFormat.tensorProperties,
         .formatFlags = leafFormat.formatFlags | TensorFormatFlag::Nested
       };
+    }
+    else if constexpr (is_timeseries_v<T>)
+    {
+      auto format = tensorFormatV3<typename is_timeseries<T>::value_type>();
+      format.formatFlags |= TensorFormatFlag::TimeSeries;
+      return format;
     }
     else if constexpr (IsTensor<T>)
     {
