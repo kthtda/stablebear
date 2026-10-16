@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+# Stage host Claude Code and Codex state for the devcontainer's bind mounts.
+#
+# Docker reads bind-mount sources as root, and root holds no AFS tokens. A home
+# directory on AFS therefore mounts without error, but every file in it reads as
+# "Permission denied" inside the container. For sources on AFS, this script
+# stages a copy that Docker can read. For other sources, it stages a symlink,
+# so the mount still shows the live host files.
+#
+# Set SB_DEVCONTAINER_COPY_HOME=1 to copy regardless of filesystem.
+set -euo pipefail
+umask 077
+
+copy_root=${1:?Expected a local staging directory}
+stage_root=$copy_root/home
+
+# Reject staging paths owned by someone else or symlinks.
+for directory in "$copy_root" "$stage_root"; do
+    if [[ -L "$directory" ]]; then
+        echo "Refusing symlink staging directory: $directory" >&2
+        exit 1
+    fi
+    if [[ ! -e "$directory" ]]; then
+        mkdir -m 700 -- "$directory"
+    fi
+    if [[ ! -d "$directory" || ! -O "$directory" ]]; then
+        echo "Staging directory must be owned by the current user: $directory" >&2
+        exit 1
+    fi
+    chmod 700 -- "$directory"
+done
+
+needs_copy() {
+    if [[ ${SB_DEVCONTAINER_COPY_HOME:-} == 1 ]]; then
+        return 0
+    fi
+    [[ $(uname -s) == Linux && $(stat -f -c %T -- "$1") == afs ]]
+}
+
+stage() {
+    local source=$HOME/$1
+    local destination=$stage_root/$2
+
+    if [[ ! -e "$source" ]]; then
+        echo "Missing $source; create it on the host before starting the devcontainer" >&2
+        exit 1
+    fi
+
+    if needs_copy "$source"; then
+        # Never copy through a symlink staged by an earlier non-copy run.
+        if [[ -L "$destination" ]]; then
+            rm -f -- "$destination"
+        fi
+        # -u keeps files the container changed after the host did.
+        if [[ -d "$source" ]]; then
+            mkdir -p -- "$destination"
+            cp -R -p -u -- "$source/." "$destination/"
+        else
+            cp -p -u -- "$source" "$destination"
+        fi
+        echo "Copied $source for the devcontainer (container changes stay in $destination)"
+    else
+        if [[ -e "$destination" && ! -L "$destination" ]]; then
+            rm -rf -- "$destination"
+        fi
+        ln -sfn -- "$source" "$destination"
+    fi
+}
+
+stage .claude claude
+stage .claude.json claude.json
+stage .codex/auth.json codex-auth.json

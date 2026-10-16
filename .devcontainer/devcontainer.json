@@ -25,17 +25,19 @@
     "GH_TOKEN": "${localEnv:GH_TOKEN}"
   },
 
-  // Stage gh config for the image build as the host user (works with AFS).
-  "initializeCommand": ["bash", "${localWorkspaceFolder}/.devcontainer/prepare-gh.sh", "${localWorkspaceFolder}/.devcontainer/.local"],
+  // Stage gh config for the image build and Claude/Codex state for the mounts
+  // below, as the host user. Sources on AFS are copied, since Docker cannot
+  // read them; other sources are symlinked so the mounts stay live.
+  "initializeCommand": ["bash", "${localWorkspaceFolder}/.devcontainer/initialize.sh", "${localWorkspaceFolder}/.devcontainer/.local"],
 
   "remoteUser": "ubuntu",
 
   "mounts": [
     // Persist Claude Code auth/config across rebuilds.
-    "source=${localEnv:HOME}/.claude,target=/home/ubuntu/.claude,type=bind,consistency=cached",
-    "source=${localEnv:HOME}/.claude.json,target=/home/ubuntu/.claude.json,type=bind,consistency=cached",
+    "source=${localWorkspaceFolder}/.devcontainer/.local/home/claude,target=/home/ubuntu/.claude,type=bind,consistency=cached",
+    "source=${localWorkspaceFolder}/.devcontainer/.local/home/claude.json,target=/home/ubuntu/.claude.json,type=bind,consistency=cached",
     // Reuse the host's file-based Codex login while keeping container config/rules.
-    "source=${localEnv:HOME}/.codex/auth.json,target=/home/ubuntu/.codex/auth.json,type=bind,consistency=cached",
+    "source=${localWorkspaceFolder}/.devcontainer/.local/home/codex-auth.json,target=/home/ubuntu/.codex/auth.json,type=bind,consistency=cached",
     // Container-private build dir. The workspace is bind-mounted from the host,
     // whose cmake-build-debug holds a CMakeCache.txt baked with host paths; this
     // volume shadows it so the container keeps its own cache (CMake refuses a
