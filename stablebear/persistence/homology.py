@@ -60,8 +60,8 @@ def compute_persistent_homology(
     For an input tensor of shape :math:`(d_1, \ldots, d_n)`, the output has
     shape :math:`(d_1, \ldots, d_n, \texttt{max_dim} + 1)`.
 
-    For a :class:`~stablebear.timeseries.TimeSeries` of point clouds, the
-    result is a series of barcodes with the same channels, times, and unit.
+    For a :class:`~stablebear.timeseries.TimeSeries` of point clouds or
+    distance matrices, the result is a series of barcodes with the same channels, times, and unit.
     A channel of observation shape ``shape`` gives barcodes of shape
     ``(*shape, max_dim + 1)``. A series of one observation keeps its time
     axis.
@@ -137,18 +137,19 @@ def compute_persistent_homology(
 def _series_persistent_homology(series, max_dim, distance_type, reduced, verbose):
     from ..timeseries.series import TimeSeries
 
-    backends = {
-        pcloud32: cpp_p.PersistenceRipser32,
-        pcloud64: cpp_p.PersistenceRipser64,
-    }
-    if series.dtype not in backends:
+    if series.dtype in (distmat32, distmat64):
+        # Distances are given, so distance_type is ignored, as for tensors.
+        backend = cpp_p.PersistenceRipser32 if series.dtype is distmat32 else cpp_p.PersistenceRipser64
+        task = backend.spawn_ripser_distmat_task(series._data, max_dim, reduced)
+    elif series.dtype in (pcloud32, pcloud64):
+        if distance_type != DistanceType.Euclidean:
+            raise ValueError(f"Distance type {distance_type} not supported for time series")
+        backend = cpp_p.PersistenceRipser32 if series.dtype is pcloud32 else cpp_p.PersistenceRipser64
+        task = backend.spawn_ripser_pcloud_euclidean_task(series._data, max_dim, reduced)
+    else:
         raise TypeError(
-            f"Persistent homology of a time series needs point clouds, got {series.dtype}"
+            "Persistent homology of a time series needs point clouds or distance "
+            f"matrices, got {series.dtype}"
         )
-    if distance_type != DistanceType.Euclidean:
-        raise ValueError(f"Distance type {distance_type} not supported for time series")
-    task = backends[series.dtype].spawn_ripser_pcloud_euclidean_task(
-        series._data, max_dim, reduced
-    )
     _run_task(lambda: task, verbose=verbose)
     return TimeSeries._from_cpp(task.result())

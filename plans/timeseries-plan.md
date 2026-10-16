@@ -619,7 +619,7 @@ parallel threshold.
   alone. **Catches:** channels swapped or merged, results written to the wrong
   channel, one channel's times given to another.
 
-- [ ] **30. Distance-matrix persistence.** The distance-matrix overload and
+- [x] **30. Distance-matrix persistence.** The distance-matrix overload and
   binding. Test, parametrized over distmat32 and distmat64: a series of a 2x2
   and a 3x3 matrix, built with `sb.zeros((2,), dtype=...)` and element
   assignment, keeps its times, and each observation is isomorphic to

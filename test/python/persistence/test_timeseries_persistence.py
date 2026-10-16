@@ -61,3 +61,30 @@ def test_each_channel_gets_its_own_barcodes_and_times():
         assert channel.times == source.times
         expected = compute_persistent_homology(source, max_dim=1)
         assert channel.values.is_isomorphic_to(expected.values, atol=0, rtol=0)
+
+
+@pytest.mark.parametrize("dtype, np_dtype, barcode_dtype", [
+    (sb.distmat32, np.float32, sb.barcode32),
+    (sb.distmat64, np.float64, sb.barcode64),
+])
+def test_series_of_distance_matrices(dtype, np_dtype, barcode_dtype):
+    matrices = sb.zeros((2,), dtype=dtype)
+    matrices[0] = sb.DistanceMatrix(np.array([
+        [0, 1],
+        [1, 0],
+    ], dtype=np_dtype))
+    matrices[1] = sb.DistanceMatrix(np.array([
+        [0, 1, 2],
+        [1, 0, 3],
+        [2, 3, 0],
+    ], dtype=np_dtype))
+    times = Times([0.0, 2.5], unit="s")
+    series = TimeSeries(matrices, times=times)
+
+    result = compute_persistent_homology(series, max_dim=1)
+
+    assert result.dtype is barcode_dtype
+    assert result.times == times
+    for i in range(2):
+        expected = compute_persistent_homology(matrices[i], max_dim=1)
+        assert result.values[i].is_isomorphic_to(expected, atol=0, rtol=0)
