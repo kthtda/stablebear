@@ -653,7 +653,7 @@ parallel threshold.
   parameters. **Catches:** `max_dim` or
   `reduced` dropped on the series path, keyword calls failing.
 
-- [ ] **33. Unsupported series.** A float series whose observations have
+- [x] **33. Unsupported series.** A float series whose observations have
   shape `(..., n, d)` is read as point clouds, one point per row, as a
   `FloatTensor` is (done with item 28a, through the coordinates operation;
   tested against the matching point-cloud series in both precisions). Test, parametrized `TypeError`:
@@ -662,7 +662,7 @@ parallel threshold.
   (with item 34). **Catches:** a non-matrix numeric series read as point
   clouds, an unsupported series passed to a native task.
 
-- [ ] **34. Stable rank of a series.** The stable-rank operation, its private
+- [x] **34. Stable rank of a series.** The stable-rank operation, its private
   entry point in `src/python/persistence/py_barcode_summary.cpp`, and a series
   branch in `_barcode_to_pcf`. Test: a series of barcode
   channels with two distinct barcodes each gives a PCF series
@@ -671,13 +671,14 @@ parallel threshold.
   times dropped, channels mixed up, the input released before the
   task finishes.
 
-- [ ] **35. Betti curves and accumulated persistence.** The other two
+- [x] **35. Betti curves and accumulated persistence.** The other two
   operations and entry points, forwarding `max_death`. Tests:
   - Parametrize item 34's test over the three summary functions.
     **Catches:** a summary bound to another summary's kernel.
-  - `barcode_to_accumulated_persistence(series, max_death=2.5)` array-equals
+  - `barcode_to_accumulated_persistence(series, max_death=1.25)` array-equals
     the function applied to each channel's `BarcodeTensor` with
-    `max_death=2.5`, and differs from the result without `max_death`.
+    `max_death=1.25`, and differs from the result without `max_death` in
+    every channel.
     **Catches:** `max_death` dropped on the series path.
 
 - [x] **36. Tensors through `UfuncTask`.** (done early, in `46069ff0e`; single clouds, matrices, and barcodes also run as 0-d inputs) Route the existing tensor paths of

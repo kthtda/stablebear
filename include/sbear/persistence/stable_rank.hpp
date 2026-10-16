@@ -68,10 +68,11 @@ namespace sb::ph
     return Pcf<T, T>(std::move(pcfPoints));
   }
 
-  template <typename T>
-  auto make_stable_rank_task(Tensor<Barcode<T>> barcodes)
+  template <typename Container>
+  auto make_stable_rank_task(Container barcodes)
   {
-    return make_barcode_summary_task<T>(
+    using T = barcode_scalar_t<Container>;
+    return make_barcode_summary_task(
         std::move(barcodes), [](const Barcode<T>& bc) { return barcode_to_stable_rank(bc); },
         "Converting barcodes to stable rank functions");
   }

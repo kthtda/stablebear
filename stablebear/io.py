@@ -15,7 +15,7 @@ from .base_tensor import (
 )
 from .nested_tensor import NestedTensor
 from .point_cloud import PointCloud, PointCloudTensor
-from .timeseries.series import _SERIES_TYPES, TimeSeries
+from .timeseries.series import _SERIES_NATIVE, TimeSeries
 
 
 _BINARY_MAGIC = b"\x01MPCF"
@@ -123,7 +123,7 @@ def _init_object_save_dispatch():
         cpp.DistanceMatrix_f32: cpp.IoOps.save_distance_matrix32_object,
         cpp.DistanceMatrix_f64: cpp.IoOps.save_distance_matrix64_object,
     }
-    for native, _ in _SERIES_TYPES.values():
+    for native in _SERIES_NATIVE.values():
         _OBJECT_SAVE_DISPATCH[native] = native._save
 
 
@@ -149,7 +149,7 @@ def _init_object_load_dispatch():
         cpp.DistanceMatrix_f32: DistanceMatrix,
         cpp.DistanceMatrix_f64: DistanceMatrix,
     }
-    for native, _ in _SERIES_TYPES.values():
+    for native in _SERIES_NATIVE.values():
         _OBJECT_LOAD_DISPATCH[native] = TimeSeries._from_cpp
 
 

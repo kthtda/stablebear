@@ -2,7 +2,14 @@ import numpy as np
 import pytest
 
 import stablebear as sb
-from stablebear.persistence import compute_persistent_homology
+from stablebear.persistence import (
+    Barcode,
+    BarcodeTensor,
+    barcode_to_accumulated_persistence,
+    barcode_to_betti_curve,
+    barcode_to_stable_rank,
+    compute_persistent_homology,
+)
 from stablebear.timeseries import Times, TimeSeries
 
 
@@ -147,3 +154,54 @@ def test_float_series_of_matrices_reads_rows_as_points(np_dtype, barcode_dtype):
 def test_series_that_holds_no_point_clouds_raises(make_series):
     with pytest.raises(TypeError):
         compute_persistent_homology(make_series(), max_dim=1)
+
+
+def _barcode_series():
+    # Two channels with different times, each with two distinct barcodes.
+    x = TimeSeries(BarcodeTensor([
+        Barcode(np.array([[0.0, 1.0]])),
+        Barcode(np.array([[0.0, 2.0], [0.5, 1.5]])),
+    ]), times=Times([0.0, 1.0], unit="s"))
+    y = TimeSeries(BarcodeTensor([
+        Barcode(np.array([[0.0, 4.0], [1.0, 2.0], [1.0, 3.0]])),
+        Barcode(np.array([[0.25, 0.75]])),
+    ]), times=Times([500.0, 1500.0], unit="ms"))
+    return TimeSeries.from_channels([x, y], unit="s")
+
+
+@pytest.mark.parametrize("summary", [
+    barcode_to_stable_rank,
+    barcode_to_betti_curve,
+    barcode_to_accumulated_persistence,
+])
+def test_summary_of_a_series_keeps_channels_and_times(summary):
+    series = _barcode_series()
+
+    result = summary(series)
+
+    assert isinstance(result, TimeSeries)
+    assert result.n_channels == 2
+    for i in range(2):
+        assert result[i].times == series[i].times
+        assert result[i].values.array_equal(summary(series[i].values))
+
+
+def test_accumulated_persistence_of_a_series_forwards_max_death():
+    series = _barcode_series()
+
+    # Both channels have bars dying after 1.25, which max_death removes.
+    result = barcode_to_accumulated_persistence(series, max_death=1.25)
+
+    for i in range(2):
+        expected = barcode_to_accumulated_persistence(series[i].values, max_death=1.25)
+        assert result[i].values.array_equal(expected)
+        assert not result[i].values.array_equal(
+            barcode_to_accumulated_persistence(series[i].values)
+        )
+
+
+def test_stable_rank_of_a_point_cloud_series_raises():
+    series = TimeSeries(_clouds(sb.pcloud64, np.float64), times=[0.0, 1.0, 2.0])
+
+    with pytest.raises(TypeError):
+        barcode_to_stable_rank(series)

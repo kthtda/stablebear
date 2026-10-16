@@ -36,14 +36,27 @@ namespace sb::ph
     }
   };
 
-  template <typename T, typename Func>
-  using BarcodeSummaryTask = UfuncTask<BarcodeSummaryOperation<T, Func>>;
+  template <typename B>
+  struct barcode_scalar;
 
-  /// Apply @p func to every barcode in @p barcodes in parallel.
-  template <typename T, typename Func>
-  auto make_barcode_summary_task(Tensor<Barcode<T>> barcodes, Func func, std::string description)
+  template <typename T>
+  struct barcode_scalar<Barcode<T>>
   {
-    return std::make_unique<BarcodeSummaryTask<T, Func>>(
+    using type = T;
+  };
+
+  /// The scalar type of the barcodes in a container, such as a tensor or a
+  /// time series of barcodes.
+  template <typename Container>
+  using barcode_scalar_t = typename barcode_scalar<typename Container::value_type>::type;
+
+  /// Apply @p func to every barcode in @p barcodes, a tensor or a time
+  /// series, in parallel.
+  template <typename Container, typename Func>
+  auto make_barcode_summary_task(Container barcodes, Func func, std::string description)
+  {
+    using T = barcode_scalar_t<Container>;
+    return make_ufunc_task(
         std::move(barcodes), BarcodeSummaryOperation<T, Func>{std::move(func)},
         std::move(description), "barcode");
   }
