@@ -1,7 +1,9 @@
 #include "py_timeseries.hpp"
+#include "py_io.hpp"
 
 #include <sbear/distance_matrix.hpp>
 #include <sbear/functional/pcf.hpp>
+#include <sbear/io.hpp>
 #include <sbear/persistence/barcode.hpp>
 #include <sbear/point_cloud.hpp>
 #include <sbear/symmetric_matrix.hpp>
@@ -71,7 +73,12 @@ namespace
       .def_property_readonly("n_channels", &Series::n_channels)
       .def("select", &Series::select, py::arg("indices"))
       .def_property_readonly("domain", [](const Series& self) { return domain_tuple(self.domain()); })
-      .def("evaluate", &Series::evaluate, py::arg("t"));
+      .def("evaluate", &Series::evaluate, py::arg("t"))
+      .def("_save", [](const Series& self, py::object file) {
+        sb_py::PythonOStreamBuf buf(file);
+        std::ostream os(&buf);
+        sb::write_object(self, os);
+      }, py::arg("file"));
   }
 }
 
