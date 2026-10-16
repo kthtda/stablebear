@@ -176,6 +176,14 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
     ``sb.save``, loaded with ``sb.load``, and pickled; each channel keeps its
     times, unit, and snap settings.
 
+    Element-wise operations, such as
+    :func:`~stablebear.persistence.compute_persistent_homology`, accept a
+    series wherever they accept a tensor of the same elements. They apply to
+    every channel's observations and return a series with the same channels,
+    times, unit, and snap settings. An operation that consumes trailing axes
+    or adds axes to each element changes each channel's observation shape
+    the same way it changes a tensor's shape.
+
     Parameters
     ----------
     values : array_like or FloatTensor

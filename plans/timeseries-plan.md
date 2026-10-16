@@ -611,6 +611,21 @@ parallel threshold.
   - A series of one cloud has one observation of shape `(2,)`. **Catches:**
     the existing singleton squeeze applied to series.
 
+- [x] **28a. Input core dimensions.** (added during item 33) An operation
+  may declare a `core_rank`, the trailing input dimensions it consumes per
+  call, as a NumPy gufunc's core dimensions; it then receives a
+  `CoreBlock` (a contiguous span and its shape). Adapters split each shape
+  into batch and core dimensions: a tensor of shape `(..., n, d)` runs once
+  per batch index (copied first if not contiguous), and a series channel of
+  shape `(..., n, d)` once per observation and batch index. A coordinates
+  persistence operation of core rank 2 runs Ripser on an `(n, d)` block, so
+  float tensors and float series need no point-cloud conversion, and a
+  `FloatTensor` of shape `(b, n, d)` is a batch of `b` clouds. Test,
+  parametrized over float32 and float64: a strided view of a rank-3
+  `FloatTensor` gives shape `(b, max_dim + 1)` and each cloud's barcodes
+  match the point-cloud path. **Catches:** a strided view read as
+  contiguous, batch and core axes swapped.
+
 - [x] **29. Several point-cloud channels.** Test: `from_channels` of `cam`
   (the three clouds) and `lidar` (clouds 2 and 1, so that reading cam's
   elements for lidar shows, at
@@ -638,11 +653,14 @@ parallel threshold.
   parameters. **Catches:** `max_dim` or
   `reduced` dropped on the series path, keyword calls failing.
 
-- [ ] **33. Unsupported series.** Test, parametrized `TypeError`:
-  `compute_persistent_homology` of a numeric series and of a barcode series,
-  and `barcode_to_stable_rank` of a point-cloud series. **Catches:** a numeric
-  series silently read as point clouds, an unsupported series passed to a
-  native task.
+- [ ] **33. Unsupported series.** A float series whose observations have
+  shape `(..., n, d)` is read as point clouds, one point per row, as a
+  `FloatTensor` is (done with item 28a, through the coordinates operation;
+  tested against the matching point-cloud series in both precisions). Test, parametrized `TypeError`:
+  `compute_persistent_homology` of a float series of shape `()` and of a
+  barcode series (done), and `barcode_to_stable_rank` of a point-cloud series
+  (with item 34). **Catches:** a non-matrix numeric series read as point
+  clouds, an unsupported series passed to a native task.
 
 - [ ] **34. Stable rank of a series.** The stable-rank operation, its private
   entry point in `src/python/persistence/py_barcode_summary.cpp`, and a series
@@ -874,8 +892,11 @@ pages.
   evaluation and snapping, units, query units and conversion, channels and
   their order, time indexing, observation shapes and flattening into
   points, copies and lazy derived
-  channels. Check that `compute_persistent_homology`, the three summaries,
-  `save`, and `load` document series input and output.
+  channels. Operations do not describe containers: `compute_persistent_homology`
+  and the three summaries say only that the result is the same kind of
+  container as the input, and the `TimeSeries` docstring states once how
+  element-wise operations treat a series. Check that `save` and `load` list
+  series.
 
 - [ ] **59. User guide.** A `docs/timeseries.rst` guide linked from
   `docs/userguide.rst`: times, units, the domain, and channels, then two small

@@ -8,6 +8,8 @@
 #include <sbear/persistence/compute_persistence.hpp>
 #include <sbear/timeseries.hpp>
 
+#include <type_traits>
+
 namespace py = pybind11;
 
 namespace
@@ -37,8 +39,8 @@ namespace
           sb::Tensor<ElemT>(std::vector<size_t>{}, element), maxDim, reducedHomology);
     }
 
-    /// Bind one spawn function, overloaded on every container of ElemT and on
-    /// a single element, with its task classes.
+    /// Bind one spawn function, overloaded on every container of ElemT and,
+    /// for clouds and matrices, on a single element, with its task classes.
     template <typename ElemT>
     static void register_spawn(py::module_& m, py::class_<PyRipserBindings>& cls,
                                const std::string& spawnName, const std::string& taskName)
@@ -47,7 +49,10 @@ namespace
         sb_py::register_result_task<sb::ph::PersistenceTask<Container>>(m, taskName + variant);
         cls.def_static(spawnName.c_str(), &PyRipserBindings::template spawn_persistence_task<Container>);
       });
-      cls.def_static(spawnName.c_str(), &PyRipserBindings::template spawn_single_persistence_task<ElemT>);
+      if constexpr (!std::is_floating_point_v<ElemT>)
+      {
+        cls.def_static(spawnName.c_str(), &PyRipserBindings::template spawn_single_persistence_task<ElemT>);
+      }
     }
 
     static void register_bindings(py::module_& m, const std::string& suffix)
@@ -58,6 +63,8 @@ namespace
           m, cls, "spawn_ripser_pcloud_euclidean_task", "_PersistenceTaskPointCloud" + suffix);
       register_spawn<sb::DistanceMatrix<T>>(
           m, cls, "spawn_ripser_distmat_task", "_PersistenceTaskDistanceMatrix" + suffix);
+      register_spawn<T>(
+          m, cls, "spawn_ripser_coordinates_euclidean_task", "_PersistenceTaskCoordinates" + suffix);
     }
   };
 
