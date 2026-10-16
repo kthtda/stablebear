@@ -6,6 +6,7 @@ from typing import Generic, TypeVar
 import numpy as np
 
 from .. import _sb_cpp as cpp
+from .._binary_io import _BinaryIoMixin
 from .._tensor_base import IndexedElementTensor, Tensor
 from ..base_tensor import BoolTensor, FloatTensor, IntPcfTensor, IntTensor, PcfTensor
 from ..distance_matrix import DistanceMatrix, DistanceMatrixTensor
@@ -167,11 +168,13 @@ def _values_tensor(values):
     return values
 
 
-class TimeSeries(Generic[T]):
+class TimeSeries(_BinaryIoMixin, Generic[T]):
     """Observations recorded at known times, in one or more channels.
 
-    A series built from ``values`` and ``times`` has one channel, named
-    ``"0"``; :meth:`from_channels` combines several.
+    A series built from ``values`` and ``times`` has one channel;
+    :meth:`from_channels` combines several. Series can be saved with
+    ``sb.save``, loaded with ``sb.load``, and pickled; each channel keeps its
+    times, unit, domain, and snap settings.
 
     Parameters
     ----------
@@ -225,6 +228,9 @@ class TimeSeries(Generic[T]):
         series = cls.__new__(cls)
         series._data = data
         return series
+
+    def _binary_io_data(self):
+        return self._data
 
     @classmethod
     def from_channels(cls, channels, unit: str | None = None) -> TimeSeries:
