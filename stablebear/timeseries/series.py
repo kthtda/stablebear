@@ -170,7 +170,7 @@ class TimeSeries(Generic[T]):
     """Observations recorded at known times, in one or more channels.
 
     A series built from ``values`` and ``times`` has one channel, named
-    ``"0"``.
+    ``"0"``; :meth:`from_channels` combines several.
 
     Parameters
     ----------
@@ -219,6 +219,61 @@ class TimeSeries(Generic[T]):
             times._data, tensor._data, snap_tolerance, snap_eps
         )
 
+    @classmethod
+    def _from_cpp(cls, data):
+        series = cls.__new__(cls)
+        series._data = data
+        return series
+
+    @classmethod
+    def from_channels(cls, channels, unit: str | None = None) -> TimeSeries:
+        """Combine one-channel series into one series with several channels.
+
+        Each channel keeps its own times, unit, ``snap_tolerance``, and
+        ``snap_eps``; queries are converted from the series' unit into each
+        channel's unit.
+
+        Parameters
+        ----------
+        channels : dict of str to TimeSeries, or list of TimeSeries
+            One-channel series of one element type. A dict names the
+            channels by its keys, in order; a list names them ``"0"``,
+            ``"1"``, and so on.
+        unit : str, optional
+            The unit of queries and reported times. Defaults to the unit
+            the channels share; required when their units differ.
+
+        Raises
+        ------
+        ValueError
+            If there are no channels, a channel has several channels, or
+            ``unit`` is omitted while the channels' units differ.
+        TypeError
+            If a channel is not a ``TimeSeries`` or the channels have
+            different element types.
+        """
+        if isinstance(channels, dict):
+            names, parts = list(channels.keys()), list(channels.values())
+        else:
+            parts = list(channels)
+            names = [str(i) for i in range(len(parts))]
+        if not all(isinstance(name, str) for name in names):
+            raise TypeError("Channel names must be strings")
+        if not all(isinstance(part, TimeSeries) for part in parts):
+            raise TypeError("Each channel must be a TimeSeries")
+        dtypes = {part.dtype for part in parts}
+        if len(dtypes) > 1:
+            raise TypeError(
+                "All channels must have the same element type, got "
+                + ", ".join(sorted(str(dtype) for dtype in dtypes))
+            )
+        if not parts:
+            raise ValueError("A time series needs at least one channel")
+        native = _SERIES_TYPES[parts[0].dtype][0]
+        return cls._from_cpp(native.from_channels(
+            names, [part._data for part in parts], unit
+        ))
+
     def _single_channel(self):
         if self._data.n_channels != 1:
             raise ValueError(
@@ -261,12 +316,12 @@ class TimeSeries(Generic[T]):
     @property
     def snap_tolerance(self) -> float:
         """The snap tolerance used when evaluating; see the constructor."""
-        return self._data.snap_tolerance
+        return self._single_channel().snap_tolerance
 
     @property
     def snap_eps(self) -> float:
         """The cap on snapping used when evaluating; see the constructor."""
-        return self._data.snap_eps
+        return self._single_channel().snap_eps
 
     @property
     def domain(self) -> tuple[float, float] | None:
@@ -284,9 +339,7 @@ class TimeSeries(Generic[T]):
         :attr:`times` and :attr:`domain` are reported in the new unit, and
         queries are read in it. Accepts the units of :class:`Times`.
         """
-        series = TimeSeries.__new__(TimeSeries)
-        series._data = self._data.to(unit)
-        return series
+        return TimeSeries._from_cpp(self._data.to(unit))
 
     def evaluate(self, t):
         """The observation with the largest timestamp at or before ``t``.
