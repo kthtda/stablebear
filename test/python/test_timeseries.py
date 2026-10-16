@@ -1,3 +1,6 @@
+import io
+import pickle
+
 import numpy as np
 import pytest
 
@@ -434,3 +437,38 @@ def test_channel_index_out_of_range_raises():
 
     with pytest.raises(IndexError):
         series[2]
+
+
+def _save_and_load(series):
+    buffer = io.BytesIO()
+    sb.save(series, buffer)
+    buffer.seek(0)
+    return sb.load(buffer)
+
+
+def _pickle_and_unpickle(series):
+    return pickle.loads(pickle.dumps(series))
+
+
+@pytest.mark.parametrize("round_trip", [_save_and_load, _pickle_and_unpickle],
+                         ids=["save", "pickle"])
+@pytest.mark.parametrize("as_shape", [False, True], ids=["scalar", "shape-2"])
+@pytest.mark.parametrize("make_values", TWO_ELEMENTS_OF_EVERY_DTYPE)
+def test_one_channel_survives_saving(make_values, as_shape, round_trip):
+    values = make_values()
+    if as_shape:
+        # Two observations of shape (2,): [a, b] and [b, a].
+        values = sb.concatenate([values, values[[1, 0]]]).reshape((2, 2))
+    times = Times(0.25 * np.arange(values.shape[0]), unit="ms")
+    series = TimeSeries(values, times=times, snap_tolerance=0.25, snap_eps=8.0)
+
+    loaded = round_trip(series)
+
+    assert isinstance(loaded, TimeSeries)
+    assert loaded.dtype is series.dtype
+    assert loaded.shape == series.shape
+    assert loaded.times == series.times
+    assert loaded.unit == "ms"
+    assert loaded.domain == series.domain
+    assert (loaded.snap_tolerance, loaded.snap_eps) == (0.25, 8.0)
+    assert loaded.values.array_equal(values)
