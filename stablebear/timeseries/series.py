@@ -8,14 +8,12 @@ import numpy as np
 from .. import _sb_cpp as cpp
 from .._binary_io import _BinaryIoMixin
 from .._tensor_base import IndexedElementTensor, Tensor
-from ..base_tensor import BoolTensor, FloatTensor, IntPcfTensor, IntTensor, PcfTensor
-from ..distance_matrix import DistanceMatrix, DistanceMatrixTensor
+from ..base_tensor import FloatTensor, IntTensor
+from ..distance_matrix import DistanceMatrix
 from ..functional.pcf import Pcf
-from ..nested_tensor import NestedTensor
-from ..persistence.barcode import Barcode
-from ..persistence.ph_tensor import BarcodeTensor
-from ..point_cloud import PointCloud, PointCloudTensor
-from ..symmetric_matrix import SymmetricMatrix, SymmetricMatrixTensor
+from ..nested_tensor import NestedTensor, _leaf_wrappers
+from ..point_cloud import PointCloud
+from ..symmetric_matrix import SymmetricMatrix
 from ..typing import (
     barcode32,
     barcode64,
@@ -107,34 +105,40 @@ class Times:
         return f"Times({np.asarray(self).tolist()!r}, unit={self.unit!r})"
 
 
-# Element dtype -> (native series class, tensor wrapper for its values).
-_SERIES_TYPES = {
-    boolean: (cpp.TimeSeriesBool, BoolTensor),
-    float32: (cpp.TimeSeriesFloat32, FloatTensor),
-    float64: (cpp.TimeSeriesFloat64, FloatTensor),
-    int32: (cpp.TimeSeriesInt32, IntTensor),
-    int64: (cpp.TimeSeriesInt64, IntTensor),
-    uint32: (cpp.TimeSeriesUint32, IntTensor),
-    uint64: (cpp.TimeSeriesUint64, IntTensor),
-    pcf32: (cpp.TimeSeriesPcf32, PcfTensor),
-    pcf64: (cpp.TimeSeriesPcf64, PcfTensor),
-    pcf32i: (cpp.TimeSeriesPcf32i, IntPcfTensor),
-    pcf64i: (cpp.TimeSeriesPcf64i, IntPcfTensor),
-    pcloud32: (cpp.TimeSeriesPointCloud32, PointCloudTensor),
-    pcloud64: (cpp.TimeSeriesPointCloud64, PointCloudTensor),
-    distmat32: (cpp.TimeSeriesDistanceMatrix32, DistanceMatrixTensor),
-    distmat64: (cpp.TimeSeriesDistanceMatrix64, DistanceMatrixTensor),
-    symmat32: (cpp.TimeSeriesSymmetricMatrix32, SymmetricMatrixTensor),
-    symmat64: (cpp.TimeSeriesSymmetricMatrix64, SymmetricMatrixTensor),
-    barcode32: (cpp.TimeSeriesBarcode32, BarcodeTensor),
-    barcode64: (cpp.TimeSeriesBarcode64, BarcodeTensor),
+# Element dtype -> native series class. The tensor class wrapping the values
+# of each dtype comes from _leaf_wrappers, which loads persistence lazily, so
+# this module does not import stablebear.persistence and persistence can
+# import TimeSeries.
+_SERIES_NATIVE = {
+    boolean: cpp.TimeSeriesBool,
+    float32: cpp.TimeSeriesFloat32,
+    float64: cpp.TimeSeriesFloat64,
+    int32: cpp.TimeSeriesInt32,
+    int64: cpp.TimeSeriesInt64,
+    uint32: cpp.TimeSeriesUint32,
+    uint64: cpp.TimeSeriesUint64,
+    pcf32: cpp.TimeSeriesPcf32,
+    pcf64: cpp.TimeSeriesPcf64,
+    pcf32i: cpp.TimeSeriesPcf32i,
+    pcf64i: cpp.TimeSeriesPcf64i,
+    pcloud32: cpp.TimeSeriesPointCloud32,
+    pcloud64: cpp.TimeSeriesPointCloud64,
+    distmat32: cpp.TimeSeriesDistanceMatrix32,
+    distmat64: cpp.TimeSeriesDistanceMatrix64,
+    symmat32: cpp.TimeSeriesSymmetricMatrix32,
+    symmat64: cpp.TimeSeriesSymmetricMatrix64,
+    barcode32: cpp.TimeSeriesBarcode32,
+    barcode64: cpp.TimeSeriesBarcode64,
 }
-_SERIES_CPP_TO_DTYPE = {cls: dtype for dtype, (cls, _) in _SERIES_TYPES.items()}
+_SERIES_CPP_TO_DTYPE = {cls: dtype for dtype, cls in _SERIES_NATIVE.items()}
 
 
-_STABLEBEAR_OBJECTS = (
-    Barcode, DistanceMatrix, Pcf, PointCloud, SymmetricMatrix, Tensor,
-)
+def _is_stablebear_object(value):
+    from ..persistence.barcode import Barcode
+
+    return isinstance(
+        value, (Barcode, DistanceMatrix, Pcf, PointCloud, SymmetricMatrix, Tensor)
+    )
 
 
 def _values_tensor(values):
@@ -142,7 +146,7 @@ def _values_tensor(values):
     from ..tensor_create import tensor
 
     if isinstance(values, (list, tuple)) and any(
-        isinstance(value, _STABLEBEAR_OBJECTS) for value in values
+        _is_stablebear_object(value) for value in values
     ):
         # np.asarray would silently turn equal-size objects into numbers.
         raise TypeError(
@@ -159,8 +163,8 @@ def _values_tensor(values):
             raise TypeError(
                 f"Unsupported time series values of dtype {array.dtype}"
             ) from error
-    if values.dtype not in _SERIES_TYPES or not isinstance(
-        values, _SERIES_TYPES[values.dtype][1]
+    if values.dtype not in _SERIES_NATIVE or not isinstance(
+        values, _leaf_wrappers()[values.dtype]
     ):
         raise TypeError(f"Unsupported time series values: {type(values).__name__}")
     if isinstance(values, IndexedElementTensor) and values._has_indexed_storage():
@@ -227,7 +231,7 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         if not isinstance(times, Times):
             times = Times(times)
         tensor = _values_tensor(values)
-        self._data = _SERIES_TYPES[tensor.dtype][0](
+        self._data = _SERIES_NATIVE[tensor.dtype](
             times._data, tensor._data, snap_tolerance, snap_eps
         )
 
@@ -277,7 +281,7 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
             )
         if not parts:
             raise ValueError("A time series needs at least one channel")
-        native = _SERIES_TYPES[parts[0].dtype][0]
+        native = _SERIES_NATIVE[parts[0].dtype]
         return cls._from_cpp(native.from_channels(
             [part._data for part in parts], unit
         ))
@@ -328,7 +332,7 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         channel. For several channels, a ``NestedTensor`` with one such
         leaf per channel, in channel order.
         """
-        wrapper = _SERIES_TYPES[self.dtype][1]
+        wrapper = _leaf_wrappers()[self.dtype]
         if self.n_channels == 1:
             return wrapper(self._data.channel(0).values)
         return NestedTensor([

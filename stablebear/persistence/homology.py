@@ -1,7 +1,4 @@
-from __future__ import annotations
-
 from enum import Enum
-from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -13,11 +10,9 @@ from ..distance_matrix import (
 )
 from ..base_tensor import FloatTensor
 from ..point_cloud import PointCloud, PointCloudTensor
+from ..timeseries.series import TimeSeries
 from ..typing import barcode32, barcode64, distmat32, distmat64, float32, float64, pcloud32, pcloud64
 from .ph_tensor import BarcodeTensor
-
-if TYPE_CHECKING:
-    from ..timeseries import TimeSeries
 
 cpp_p = cpp.persistence
 
@@ -93,7 +88,6 @@ def compute_persistent_homology(
 
     """
 
-    from ..timeseries.series import TimeSeries
     from .ripser import (
         _compute_barcodes_distmat_ripser,
         _compute_barcodes_euclidean_coordinates_ripser,
@@ -133,7 +127,6 @@ def compute_persistent_homology(
 
 
 def _series_persistent_homology(series, max_dim, distance_type, reduced, verbose):
-    from ..timeseries.series import TimeSeries
     from .ripser import _compute_barcodes_euclidean_coordinates_ripser
 
     if series.dtype in (float32, float64):
