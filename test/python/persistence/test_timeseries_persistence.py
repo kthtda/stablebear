@@ -88,3 +88,14 @@ def test_series_of_distance_matrices(dtype, np_dtype, barcode_dtype):
     for i in range(2):
         expected = compute_persistent_homology(matrices[i], max_dim=1)
         assert result.values[i].is_isomorphic_to(expected, atol=0, rtol=0)
+
+
+def test_empty_series_gives_a_typed_empty_result():
+    series = TimeSeries(sb.zeros((0,), dtype=sb.pcloud32), times=[])
+
+    result = compute_persistent_homology(series, max_dim=1)
+
+    assert result.dtype is sb.barcode32
+    assert len(result) == 0
+    assert result.shape == (2,)
+    assert result.unit == "s"
