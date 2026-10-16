@@ -99,3 +99,14 @@ def test_empty_series_gives_a_typed_empty_result():
     assert len(result) == 0
     assert result.shape == (2,)
     assert result.unit == "s"
+
+
+def test_keyword_input_and_parameters_reach_the_series_path():
+    clouds = _clouds(sb.pcloud64, np.float64)
+    series = TimeSeries(clouds, times=[0.0, 1.0, 2.0])
+
+    result = compute_persistent_homology(X=series, max_dim=0, reduced=True)
+
+    for i in range(3):
+        expected = compute_persistent_homology(clouds[i], max_dim=0, reduced=True)
+        assert result.values[i].is_isomorphic_to(expected, atol=0, rtol=0)

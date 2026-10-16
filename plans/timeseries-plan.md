@@ -632,9 +632,10 @@ parallel threshold.
   and unit `"s"`. **Catches:** an untyped or missing empty
   result, failure on empty input.
 
-- [ ] **32. Keyword data argument and parameter forwarding.** Test:
-  `compute_persistent_homology(X=series, max_dim=0, reduced=True)` has
-  `shape == (1,)` and no infinite bar. **Catches:** `max_dim` or
+- [x] **32. Keyword data argument and parameter forwarding.** Test:
+  `compute_persistent_homology(X=series, max_dim=0, reduced=True)` has each
+  observation isomorphic to the persistence of its cloud alone with the same
+  parameters. **Catches:** `max_dim` or
   `reduced` dropped on the series path, keyword calls failing.
 
 - [ ] **33. Unsupported series.** Test, parametrized `TypeError`:
