@@ -586,7 +586,7 @@ parallel threshold.
   mapped to the wrong type or precision; a dropped unit, shape, or
   snap setting; timestamps narrowed to 32 bits.
 
-- [ ] **27. Saving several channels.** The format of decision 9 for several
+- [x] **27. Saving several channels.** The format of decision 9 for several
   channels. Test, parametrized over `save`/`load` and `pickle`: the series of
   channels A and B loads with the same number of channels, query unit,
   times, and values at 0.5 and 1.5. **Catches:** order or the query unit lost; a

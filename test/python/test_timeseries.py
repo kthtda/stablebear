@@ -470,3 +470,18 @@ def test_one_channel_survives_saving(make_values, as_shape, round_trip):
     assert loaded.unit == "ms"
     assert (loaded.snap_tolerance, loaded.snap_eps) == (0.25, 8.0)
     assert loaded.values.array_equal(values)
+
+
+@pytest.mark.parametrize("round_trip", [_save_and_load, _pickle_and_unpickle],
+                         ids=["save", "pickle"])
+def test_several_channels_survive_saving(round_trip):
+    series = TimeSeries.from_channels([_channel_a(), _channel_b()], unit="s")
+
+    loaded = round_trip(series)
+
+    assert loaded.n_channels == 2
+    assert loaded.unit == "s"
+    for i in range(2):
+        assert np.array_equal(np.asarray(loaded.times[i]), np.asarray(series.times[i]))
+    for t in (0.5, 1.5):
+        assert [loaded(t)[i][()] for i in range(2)] == [series(t)[i][()] for i in range(2)]
