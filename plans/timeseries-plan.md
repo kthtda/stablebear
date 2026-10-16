@@ -210,11 +210,10 @@ parallel threshold.
     of it (decision 8): channel selection, unit changes, windows, and delay
     embeddings copy no values.
   - Reads return views: `values` is a tensor backed by the series, and
-    `observation(i)` of a shaped or object observation is a view backed by the
-    series, as `PointCloudTensor[i]` returns a `PointCloud` with an owner.
-    Scalar observations are plain numbers.
-  - Writes go through `set_observation(i, value)`, `values[...] = x`, or an
-    observation view. Before writing, a series whose storage is shared, or
+    indexing it gives views as for any tensor, as `PointCloudTensor[i]`
+    returns a `PointCloud` with an owner.
+  - Writes go through `values[...] = x` or a view taken from `values`.
+    Before writing, a series whose storage is shared, or
     whose view is a window or an embedding, materializes the whole view into
     its own storage, as `IndexedElementTensor._ensure_writeable` does for
     subsamples. Other views never see the write.
@@ -292,9 +291,14 @@ parallel threshold.
     same as `evaluate(t)`), `series.window(a, b)` (a window),
     and `series[i]` or `series[[i, j]]` (channel selection by index; negative
     indices count from the end). A
-    one-channel series also exposes `values`, `shape`, `len()`,
-    and `observation(i)`; on several channels these raise `ValueError` asking
-    for a channel to be selected.
+    series also exposes `values` and `snap_tolerance` and `snap_eps`: for
+    one channel a tensor of shape `(len(), *shape)` and two floats, for
+    several a `NestedTensor` with one leaf per channel and two float64
+    `FloatTensor`s of shape `(n_channels,)`. A one-channel series also
+    exposes `shape` and `len()`; on several channels these raise
+    `ValueError` asking for a channel to be selected. There is no
+    `observation(i)`: for one channel it would be `values[i]`, and across
+    channels index `i` refers to unrelated times. (Revised after item 25.)
   - For one channel, `evaluate` returns the observation: a scalar or element
     (`PointCloud`, `Barcode`, ...) for `shape == ()`, otherwise a tensor of
     that shape. For several channels it returns a `NestedTensor` with one
@@ -340,8 +344,8 @@ parallel threshold.
   - Every view behaves like any other series. Its `times` are the times in
     its domain where its value can change: the source's timestamps inside the
     domain for windows (original timestamps), and the shifted times
-    `s + lag` inside the domain for embeddings. `observation(i)` evaluates the
-    view at `times[i]`, and `len()` counts these times.
+    `s + lag` inside the domain for embeddings. `values[i]` is the view's
+    value at `times[i]`, and `len()` counts these times.
   - Materializing a view stores its support: the last change time at or
     before the domain start (for a window, the observation carried in before
     `a`, at its original timestamp) followed by the change times inside the
@@ -439,7 +443,8 @@ parallel threshold.
   `NestedTensor`. **Catches:** object sequences silently converted to numeric
   arrays, strings or nested tensors passed to the native constructor.
 
-- [x] **17. Observations.** `series.observation(i)` returns observation `i`.
+- [x] **17. Observations.** (dropped after item 25 with `observation(i)`;
+  use `values[i]`) `series.observation(i)` returns observation `i`.
   Test with values `[[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]]` and
   `times=[0.0, 1.0, 2.0]`: `observation(1)` is `[3.0, 4.0]`,
   `observation(-1)` is `[5.0, 6.0]`, and `observation(3)` raises
@@ -539,16 +544,20 @@ parallel threshold.
     `NestedTensor` whose leaves are the two clouds. **Catches:** object
     types left out of multi-channel evaluation.
 
-- [ ] **25. Selecting channels.** Tests with the series of channels A and B:
+- [x] **25. Selecting channels.** Tests with the series of channels A and B:
   - `series[1]` and `series[-1]` are one-channel series with unit `"s"` and
     value -2.0 at 1.5; `series[[1, 0]](1.5)` has leaves -2.0 and 20.0.
     **Catches:** the query unit lost on selection, negative indices counted
     from the wrong end, selection order ignored.
-  - `series.values`, `series.observation(0)`, and `series.snap_tolerance`
-    raise `ValueError`, `series[2]` raises `IndexError`, and
-    `series[0].snap_tolerance` is channel A's. **Catches:** per-channel
-    accessors that silently pick a channel, no bounds check, snap settings
-    lost on selection.
+  - `series.values` is a `NestedTensor` whose leaves equal the values of
+    channels A and B; with channel A built with `snap_tolerance=0.25`,
+    `series.snap_tolerance` is a float64 `FloatTensor` equal to
+    `[0.25, 1e-6]` and `series[0].snap_tolerance == 0.25`, and
+    `series[1].snap_tolerance` differs. **Catches:** channels' values or
+    settings mixed up or lost on selection.
+  - `series.shape` and `len(series)` raise `ValueError`, and `series[2]`
+    raises `IndexError`. **Catches:** per-channel accessors that silently
+    pick a channel, no bounds check.
 
 ## Serialization of stored series
 
@@ -586,7 +595,7 @@ parallel threshold.
   - Parametrized over pcloud32 and pcloud64, for the series of the three
     clouds: the result has `n_channels == 1`, the matching barcode
     dtype, `shape == (2,)`, and the input's times and unit, and
-    `result.observation(i)` is isomorphic to
+    `result.values[i]` is isomorphic to
     `compute_persistent_homology(clouds[i], max_dim=1)`. **Catches:** lost
     or permuted times, a dropped unit, a missing degree axis, snapshots paired
     with the wrong barcodes.
@@ -653,7 +662,7 @@ parallel threshold.
 - [ ] **37. (optional) Selecting a value index.** `series.select(k)` (name to
   be decided) indexes the observation axes and keeps time, for example to
   take degree 1 of a barcode series. Test: degree 1 of item 28's result is a
-  series of `shape == ()` whose observations equal `result.observation(i)[1]`.
+  series of `shape == ()` whose values equal `result.values[i][1]`.
   **Catches:** the index applied to the time axis.
 
 - [ ] **38. Progress, errors, and the GIL.** (existing) The series path runs
@@ -751,28 +760,28 @@ values `[1.0, 2.0, 3.0, 4.0, 5.0]`.
 Items 48-50 use the source series of items 43-46 and the embedding of item
 40.
 
-- [ ] **48. Writing a series.** `set_observation(i, value)`, `values[...] = x`
-  (a tensor backed by the series), and writes through observation views, with
-  the materialization of decision 4 for shared storage. Tests with values
+- [ ] **48. Writing a series.** `values[...] = x` (a tensor backed by the
+  series) and writes through views taken from `values`, with the
+  materialization of decision 4 for shared storage. Tests with values
   `[[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]]` and `times=[0.0, 1.0, 2.0]`:
   - After `other = series[0]` (sharing storage) and
-    `series.set_observation(1, [7.0, 8.0])`, `series(1.0)` is `[7.0, 8.0]` and
+    `series.values[1] = [7.0, 8.0]`, `series(1.0)` is `[7.0, 8.0]` and
     `other(1.0)` is still `[3.0, 4.0]`. **Catches:** a lost write, a write
     leaking into a view that shares storage.
-  - `series.values[0, 1] = 9.0` gives `observation(0) == [1.0, 9.0]`, and after
-    `obs = series.observation(2)` and `obs[0] = 0.0`, `observation(2)` is
-    `[0.0, 6.0]`. **Catches:** `values` or observations returned as detached
+  - `series.values[0, 1] = 9.0` gives `series.values[0] == [1.0, 9.0]`, and
+    after `row = series.values[2]` and `row[0] = 0.0`, `series.values[2]` is
+    `[0.0, 6.0]`. **Catches:** `values` or its views returned as detached
     copies.
 
 - [ ] **49. Writing a window.** Test: with `w = series.window(1.0, 3.0)`,
-  `w.set_observation(0, 30.0)` gives `w(1.75) == 30.0`, keeps `w(1.0) == 2.0`
+  `w.values[0] = 30.0` gives `w(1.75) == 30.0`, keeps `w(1.0) == 2.0`
   (the carried-in observation) and `w.times == [1.5, 2.5]`, and leaves the
   source (`series(1.75) == 3.0`) and the window `series.window(1.0, 2.0)`
   unchanged. **Catches:** the carried-in observation dropped on materializing,
   the write reaching the source or a sibling window.
 
 - [ ] **50. Writing an embedding.** Test: for item 40's embedding `e`,
-  `e.set_observation(1, [0.0, 0.0, 0.0])` (time 2.5) gives `e(2.75)` equal to
+  `e.values[1] = [0.0, 0.0, 0.0]` (time 2.5) gives `e(2.75)` equal to
   `[0, 0, 0]`, keeps `e(2.0) == [10, 20, 20]`, `e(3.25) == [20, 20, 30]`, and
   `len(e) == 5`, and leaves the source unchanged. **Catches:** a write into a
   lagged view reaching the source, materialization at observation times only

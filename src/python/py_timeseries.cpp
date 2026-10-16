@@ -42,7 +42,6 @@ namespace
         return py::tuple(py::cast(self.shape()));
       })
       .def_property_readonly("values", &Channel::values)
-      .def("observation", &Channel::observation, py::arg("index"))
       .def_property_readonly("domain", [](const Channel& self) { return domain_tuple(self.domain()); })
       .def_property_readonly("snap_tolerance", &Channel::snap_tolerance)
       .def_property_readonly("snap_eps", &Channel::snap_eps)
@@ -70,6 +69,7 @@ namespace
       .def("times", &Series::times, py::arg("index"))
       .def("channel", &Series::channel, py::arg("index"), py::return_value_policy::reference_internal)
       .def_property_readonly("n_channels", &Series::n_channels)
+      .def("select", &Series::select, py::arg("indices"))
       .def_property_readonly("domain", [](const Series& self) { return domain_tuple(self.domain()); })
       .def("evaluate", &Series::evaluate, py::arg("t"));
   }
