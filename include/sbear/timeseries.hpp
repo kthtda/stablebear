@@ -297,24 +297,24 @@ namespace sb
     /// snap_tolerance() times the gap to the previous observation, and by at
     /// most snap_eps() times machine epsilon times the larger magnitude
     /// of the two timestamps, counts as reaching it.
-    [[nodiscard]] Tensor<T> evaluate(float64_t t) const
+    ///
+    /// The caller checks the domain, in its own unit: a time converted into
+    /// the channel's unit may round just outside the channel's domain. A time
+    /// below the first observation gets the first. Requires size() > 0.
+    [[nodiscard]] Tensor<T> lookup(float64_t t) const
     {
-      if (!m_domain || !m_domain->contains(t))
-      {
-        std::ostringstream ss;
-        ss << "Time " << t << " is outside the domain "
-           << (m_domain ? m_domain->to_string() : std::string("(empty)"));
-        throw std::domain_error(ss.str());
-      }
       const auto& times = m_storage->times.values();
       auto next = std::upper_bound(times.begin(), times.end(), t);
+      if (next == times.begin())
+      {
+        return observation(0);
+      }
       // A query computed in floating point, such as 0.3 - 0.1, can land just
       // below the observation it means; snap it forward. Measuring against
       // the gap keeps the rule independent of the unit and of how large the
       // timestamps are, and a tolerance below 1 never skips an observation.
       // The epsilon cap keeps widely spaced observations from snapping
       // queries that are far off in absolute terms but small next to the gap.
-      // t >= times.front(), so next has a predecessor.
       if (next != times.end())
       {
         const auto prev = *std::prev(next);
@@ -381,30 +381,26 @@ namespace sb
   public:
     using value_type = T;
 
-    TimeSeries(std::vector<std::string> names, std::vector<Channel<T>> channels, TimeUnit unit)
-      : m_names(std::move(names)), m_channels(std::move(channels)), m_unit(unit)
+    TimeSeries(std::vector<Channel<T>> channels, TimeUnit unit)
+      : m_channels(std::move(channels)), m_unit(unit)
     {
       if (m_channels.empty())
       {
         throw std::invalid_argument("A time series needs at least one channel");
       }
-      if (m_names.size() != m_channels.size())
-      {
-        throw std::invalid_argument("Expected one name per channel");
-      }
     }
 
-    /// A series with one channel named "0", queried in the unit of its times.
+    /// A series with one channel, queried in the unit of its times.
     TimeSeries(Times times, const Tensor<T>& values, float64_t snapTolerance, float64_t snapEps)
-      : TimeSeries({"0"}, {Channel<T>(times, values, snapTolerance, snapEps)}, times.unit())
+      : TimeSeries({Channel<T>(times, values, snapTolerance, snapEps)}, times.unit())
     {
     }
 
-    /// Combine one-channel series into one series with the channels named
-    /// @p names, in order. Each channel keeps its own times, unit, and snap
+    /// Combine one-channel series into one series; channel i is @p parts[i].
+    /// Each channel keeps its own times, unit, and snap
     /// settings. @p unit defaults to the unit the parts share and is required
     /// when their units differ.
-    [[nodiscard]] static TimeSeries from_channels(std::vector<std::string> names, const std::vector<TimeSeries>& parts,
+    [[nodiscard]] static TimeSeries from_channels(const std::vector<TimeSeries>& parts,
                                                   std::optional<TimeUnit> unit)
     {
       if (parts.empty())
@@ -417,7 +413,7 @@ namespace sb
       {
         if (part.n_channels() != 1)
         {
-          throw std::invalid_argument("Each channel must be a one-channel series; select channels with series[name]");
+          throw std::invalid_argument("Each channel must be a one-channel series; select channels with series[i]");
         }
         channels.push_back(part.m_channels.front());
         if (!unit && part.unit() != parts.front().unit())
@@ -425,10 +421,9 @@ namespace sb
           throw std::invalid_argument("The channels differ in unit; pass unit= to choose one");
         }
       }
-      return TimeSeries(std::move(names), std::move(channels), unit.value_or(parts.front().unit()));
+      return TimeSeries(std::move(channels), unit.value_or(parts.front().unit()));
     }
 
-    [[nodiscard]] const std::vector<std::string>& channel_names() const noexcept { return m_names; }
     [[nodiscard]] const Channel<T>& channel(size_t i) const { return m_channels.at(i); }
     [[nodiscard]] size_t n_channels() const noexcept { return m_channels.size(); }
     [[nodiscard]] TimeUnit unit() const noexcept { return m_unit; }
@@ -485,15 +480,27 @@ namespace sb
       return result;
     }
 
-    /// Evaluate channel @p i at @p t, given in the series' unit.
-    [[nodiscard]] Tensor<T> evaluate_channel(size_t i, float64_t t) const
+    /// Every channel's value at @p t, given in the series' unit, in channel
+    /// order. @p t must lie in domain().
+    [[nodiscard]] std::vector<Tensor<T>> evaluate(float64_t t) const
     {
-      const auto& c = channel(i);
-      return c.evaluate(convert_time(t, m_unit, c.times().unit()));
+      const auto d = domain();
+      if (!d || !d->contains(t))
+      {
+        std::ostringstream ss;
+        ss << "Time " << t << " is outside the domain " << (d ? d->to_string() : std::string("(empty)"));
+        throw std::domain_error(ss.str());
+      }
+      std::vector<Tensor<T>> values;
+      values.reserve(m_channels.size());
+      for (const auto& c : m_channels)
+      {
+        values.push_back(c.lookup(convert_time(t, m_unit, c.times().unit())));
+      }
+      return values;
     }
 
   private:
-    std::vector<std::string> m_names;
     std::vector<Channel<T>> m_channels;
     TimeUnit m_unit;
   };

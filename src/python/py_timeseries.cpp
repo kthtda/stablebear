@@ -52,19 +52,16 @@ namespace
       .def(py::init<sb::Times, const sb::Tensor<T>&, sb::float64_t, sb::float64_t>(),
            py::arg("times"), py::arg("values"), py::arg("snap_tolerance"), py::arg("snap_eps"))
       .def_static("from_channels",
-                  [](std::vector<std::string> names, const std::vector<Series>& parts,
+                  [](const std::vector<Series>& parts,
                      const std::optional<std::string>& unit) {
                     std::optional<sb::TimeUnit> parsed;
                     if (unit)
                     {
                       parsed = sb::parse_time_unit(*unit);
                     }
-                    return Series::from_channels(std::move(names), parts, parsed);
+                    return Series::from_channels(parts, parsed);
                   },
-                  py::arg("names"), py::arg("parts"), py::arg("unit"))
-      .def_property_readonly("channel_names", [](const Series& self) {
-        return py::tuple(py::cast(self.channel_names()));
-      })
+                  py::arg("parts"), py::arg("unit"))
       .def_property_readonly("unit", [](const Series& self) {
         return std::string(sb::time_unit_name(self.unit()));
       })
@@ -74,7 +71,7 @@ namespace
       .def("channel", &Series::channel, py::arg("index"), py::return_value_policy::reference_internal)
       .def_property_readonly("n_channels", &Series::n_channels)
       .def_property_readonly("domain", [](const Series& self) { return domain_tuple(self.domain()); })
-      .def("evaluate_channel", &Series::evaluate_channel, py::arg("index"), py::arg("t"));
+      .def("evaluate", &Series::evaluate, py::arg("t"));
   }
 }
 

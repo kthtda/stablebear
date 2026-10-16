@@ -10,6 +10,7 @@ from .._tensor_base import IndexedElementTensor, Tensor
 from ..base_tensor import BoolTensor, FloatTensor, IntPcfTensor, IntTensor, PcfTensor
 from ..distance_matrix import DistanceMatrix, DistanceMatrixTensor
 from ..functional.pcf import Pcf
+from ..nested_tensor import NestedTensor
 from ..persistence.barcode import Barcode
 from ..persistence.ph_tensor import BarcodeTensor
 from ..point_cloud import PointCloud, PointCloudTensor
@@ -235,10 +236,9 @@ class TimeSeries(Generic[T]):
 
         Parameters
         ----------
-        channels : dict of str to TimeSeries, or list of TimeSeries
-            One-channel series of one element type. A dict names the
-            channels by its keys, in order; a list names them ``"0"``,
-            ``"1"``, and so on.
+        channels : list of TimeSeries
+            One-channel series of one element type; channel ``i`` of the
+            result is ``channels[i]``.
         unit : str, optional
             The unit of queries and reported times. Defaults to the unit
             the channels share; required when their units differ.
@@ -252,13 +252,7 @@ class TimeSeries(Generic[T]):
             If a channel is not a ``TimeSeries`` or the channels have
             different element types.
         """
-        if isinstance(channels, dict):
-            names, parts = list(channels.keys()), list(channels.values())
-        else:
-            parts = list(channels)
-            names = [str(i) for i in range(len(parts))]
-        if not all(isinstance(name, str) for name in names):
-            raise TypeError("Channel names must be strings")
+        parts = list(channels)
         if not all(isinstance(part, TimeSeries) for part in parts):
             raise TypeError("Each channel must be a TimeSeries")
         dtypes = {part.dtype for part in parts}
@@ -271,20 +265,20 @@ class TimeSeries(Generic[T]):
             raise ValueError("A time series needs at least one channel")
         native = _SERIES_TYPES[parts[0].dtype][0]
         return cls._from_cpp(native.from_channels(
-            names, [part._data for part in parts], unit
+            [part._data for part in parts], unit
         ))
 
     def _single_channel(self):
         if self._data.n_channels != 1:
             raise ValueError(
-                "This series has several channels; select one with series[name]"
+                "This series has several channels; select one with series[i]"
             )
         return self._data.channel(0)
 
     @property
-    def channel_names(self) -> tuple[str, ...]:
-        """The channel names, in order."""
-        return self._data.channel_names
+    def n_channels(self) -> int:
+        """The number of channels."""
+        return self._data.n_channels
 
     @property
     def unit(self) -> str:
@@ -297,10 +291,20 @@ class TimeSeries(Generic[T]):
         return _SERIES_CPP_TO_DTYPE[type(self._data)]
 
     @property
-    def times(self) -> Times:
-        """The timestamps of the recorded observations, in :attr:`unit`."""
-        self._single_channel()
-        return Times._from_cpp(self._data.times(0))
+    def times(self) -> Times | NestedTensor:
+        """The timestamps of the recorded observations, in :attr:`unit`.
+
+        A :class:`Times` for a series with one channel. For several
+        channels, a float64 ``NestedTensor`` with one leaf per channel, in
+        channel order, each holding that channel's timestamps converted
+        to :attr:`unit`.
+        """
+        if self._data.n_channels == 1:
+            return Times._from_cpp(self._data.times(0))
+        return NestedTensor([
+            np.asarray(Times._from_cpp(self._data.times(i)))
+            for i in range(self._data.n_channels)
+        ])
 
     @property
     def values(self) -> Tensor:
@@ -328,7 +332,10 @@ class TimeSeries(Generic[T]):
         """``(start, end)`` of the times where the series can be evaluated.
 
         A series built from observations covers ``[t_0, t_{n-1}]``, end
-        included. ``None`` for a series without observations.
+        included. A series with several channels covers the times every
+        channel covers, in :attr:`unit`; its end is included only if every
+        channel ending there includes it. ``None`` for a series without
+        observations or whose channels share no time.
         """
         return self._data.domain
 
@@ -354,8 +361,11 @@ class TimeSeries(Generic[T]):
         ValueError
             If ``t`` is outside the domain.
         """
+        # The native call checks the domain first, so a query outside it
+        # fails the same way for any number of channels.
+        values = self._data.evaluate(float(t))
         self._single_channel()
-        return self._wrap_observation(self._data.evaluate_channel(0, float(t)))
+        return self._wrap_observation(values[0])
 
     def __call__(self, t):
         """``series(t)`` is ``series.evaluate(t)``."""
@@ -378,6 +388,6 @@ class TimeSeries(Generic[T]):
 
     def __repr__(self):
         return (
-            f"TimeSeries(channels={self.channel_names!r}, dtype={self.dtype}, "
+            f"TimeSeries(n_channels={self.n_channels}, dtype={self.dtype}, "
             f"unit={self.unit!r})"
         )

@@ -66,7 +66,7 @@ def test_series_defaults_to_seconds_and_one_channel():
     series = TimeSeries([10.0, 20.0, 30.0], times=[0.0, 1.5, 4.0])
 
     assert series.unit == "s"
-    assert series.channel_names == ("0",)
+    assert series.n_channels == 1
     assert series.shape == ()
     assert len(series) == 3
     assert np.array_equal(np.asarray(series.values), [10.0, 20.0, 30.0])
@@ -364,13 +364,11 @@ def _channel_b():
     return TimeSeries([-1.0, -2.0, -3.0], times=Times([500.0, 1500.0, 3000.0], unit="ms"))
 
 
-def test_from_channels_keeps_names_and_order():
-    named = TimeSeries.from_channels({"a": _channel_a(), "b": _channel_b()}, unit="s")
-    listed = TimeSeries.from_channels([_channel_a(), _channel_b()], unit="s")
+def test_from_channels_keeps_every_channel():
+    series = TimeSeries.from_channels([_channel_a(), _channel_b()], unit="s")
 
-    assert named.channel_names == ("a", "b")
-    assert named.unit == "s"
-    assert listed.channel_names == ("0", "1")
+    assert series.n_channels == 2
+    assert series.unit == "s"
 
 
 def _point_cloud_channel():
@@ -379,12 +377,35 @@ def _point_cloud_channel():
 
 
 @pytest.mark.parametrize("make_channels, unit, error", [
-    (lambda: {"a": _channel_a(), "b": _channel_b()}, None, ValueError),  # units differ
-    (lambda: {}, "s", ValueError),
-    (lambda: {"ab": TimeSeries.from_channels([_channel_a(), _channel_b()], unit="s")},
+    (lambda: [_channel_a(), _channel_b()], None, ValueError),  # units differ
+    (lambda: [], "s", ValueError),
+    (lambda: [TimeSeries.from_channels([_channel_a(), _channel_b()], unit="s")],
      "s", ValueError),  # a multi-channel series as a channel
-    (lambda: {"a": _channel_a(), "c": _point_cloud_channel()}, "s", TypeError),
+    (lambda: [_channel_a(), _point_cloud_channel()], "s", TypeError),
 ])
 def test_from_channels_rejects_invalid_channels(make_channels, unit, error):
     with pytest.raises(error):
         TimeSeries.from_channels(make_channels(), unit=unit)
+
+
+@pytest.mark.parametrize("t", [
+    0.25,  # only channel A covers it
+    2.75,  # only channel B covers it
+])
+def test_several_channels_cover_the_intersection_of_their_domains(t):
+    series = TimeSeries.from_channels([_channel_a(), _channel_b()], unit="s")
+
+    assert series.domain == (0.5, 2.5)
+    with pytest.raises(ValueError, match="outside the domain"):
+        series(t)
+
+
+def test_times_of_several_channels_are_in_the_query_unit():
+    series = TimeSeries.from_channels([_channel_a(), _channel_b()], unit="s")
+
+    times = series.times
+
+    assert isinstance(times, sb.NestedTensor)
+    assert times.shape == (2,)
+    assert np.array_equal(np.asarray(times[0]), [0.0, 1.0, 2.5])
+    assert np.array_equal(np.asarray(times[1]), [0.5, 1.5, 3.0])
