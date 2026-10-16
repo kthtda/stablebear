@@ -627,7 +627,7 @@ parallel threshold.
   **Catches:** distance matrices sent down the point-cloud path or to the
   wrong precision, matrices of different sizes rejected.
 
-- [ ] **31. Typed empty series.** Test: an empty pcloud32 series gives a
+- [x] **31. Typed empty series.** Test: an empty pcloud32 series gives a
   barcode32 series with no observations and `shape == (2,)` for `max_dim=1`,
   and unit `"s"`. **Catches:** an untyped or missing empty
   result, failure on empty input.
