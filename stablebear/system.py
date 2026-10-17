@@ -39,6 +39,15 @@ def limit_cpus(n: int):
     cpp.limit_cpus(n)
 
 
+def get_cpu_limit() -> int:
+    """Return the number of CPU threads that can be used for computations.
+
+    This is the value set by :func:`limit_cpus`, or the number of hardware
+    CPU threads by default.
+    """
+    return cpp.get_cpu_limit()
+
+
 def limit_gpus(n: int):
     """Sets the number of GPUs that can be used by stablebear. By default, all available GPUs are used.
 

@@ -79,6 +79,12 @@ namespace sb
       return m_upCudaExec.get();
     }
     
+    /// The number of CPU worker threads.
+    [[nodiscard]] size_t cpu_worker_count() const noexcept
+    {
+      return m_cpuExec ? m_cpuExec->num_workers() : 0;
+    }
+
     void limit_cpu_workers(size_t nWorkers)
     {
       if (m_upCpuExec)

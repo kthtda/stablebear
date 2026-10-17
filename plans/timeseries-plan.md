@@ -723,7 +723,7 @@ parallel threshold.
   `test_async_task.py`) cover the waiting side. Confirm that `UfuncTask`
   captures a worker exception the way the replaced tasks did; add no test.
 
-- [ ] **39. (optional) CPU limits.** Persistence of the three-cloud series
+- [x] **39. (optional) CPU limits.** Persistence of the three-cloud series
   under `sb.system.limit_cpus(1)` equals the result with all threads; restore
   the limit afterwards. **Catches:** results that depend on scheduling.
 

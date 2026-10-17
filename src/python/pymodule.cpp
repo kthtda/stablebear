@@ -152,6 +152,7 @@ PYBIND11_MODULE(SB_MODULE_NAME, m) {
   m.def("get_ngpus", &getNumGpus);
 
   m.def("limit_cpus", [](size_t n){ sb::default_executor().limit_cpu_workers(n); });
+  m.def("get_cpu_limit", []{ return sb::default_executor().cpu_worker_count(); });
 
   m.def("_build_type", [] {
 #ifdef BUILD_WITH_CUDA
