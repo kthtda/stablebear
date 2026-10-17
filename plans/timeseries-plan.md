@@ -711,13 +711,13 @@ parallel threshold.
   a length-1 input. No new tests: the existing persistence and summary tests
   must pass unchanged. **Catches:** behavior changes in the tensor paths.
 
-- [ ] **37. (optional) Selecting a value index.** `series.select(k)` (name to
+- [x] **37. (optional) Selecting a value index.** (skipped) `series.select(k)` (name to
   be decided) indexes the observation axes and keeps time, for example to
   take degree 1 of a barcode series. Test: degree 1 of item 28's result is a
   series of `shape == ()` whose values equal `result.values[i][1]`.
   **Catches:** the index applied to the time axis.
 
-- [ ] **38. Progress, errors, and the GIL.** (existing) The series path runs
+- [x] **38. Progress, errors, and the GIL.** (confirmed, and tested for every task in `test/test_stoppable_task.cpp`: an exception thrown in a parallel worker is rethrown once by `wait()` and by `wait_for()` when finished; `UfuncTask` runs through the same path, as a scratch program confirmed for a tensor and a series; the C++ test replaces the end-to-end coverage `test_async_task.py` cited from the removed `test_bugscan_persistence.py`) The series path runs
   through `_run_task` and `StoppableTask`, so the existing progress,
   error-propagation, and GIL-release tests (`test_gil_release.py`,
   `test_async_task.py`) cover the waiting side. Confirm that `UfuncTask`
