@@ -769,16 +769,36 @@ values `[1.0, 2.0, 3.0, 4.0, 5.0]`.
   B has domain `(1.0, 2.5)` and gives leaves `[20, 20]` and `[-1, -2]` at
   1.5. **Catches:** the delay applied in channel B's milliseconds.
 
-- [ ] **43. Window bounds.** (decided during item 26, to be worked out before
-  starting items 43-47: a windowed series is a `TimeSeries<TimeSeries<T>>`,
-  a series whose observations are series, and each window is an ordinary
-  series, evaluable from its first to its last observation like any other.
-  There are no half-open windows and no window-specific domain rules. Still
-  to decide: the outer series' timestamps (window starts, presumably), and
-  which observations a window holds, for example whether the value carried
-  in from before the window start becomes an observation at the start.
-  Revise items 43-47, 49, and 51-56 accordingly; the text below predates
-  this.) `Window(size, step=None, overlap=None)` returns a
+- [ ] **43. Window bounds.** (decided during items 26 and 39; revise items
+  43-47, 49, and 51-56 to match before starting them, since the text below
+  predates these decisions)
+  - A windowed series is a `TimeSeries<TimeSeries<T>>`: an outer series with
+    one observation per window, each an ordinary inner series, evaluable
+    from its first to its last observation like any other. There are no
+    half-open windows and no window-specific domain rules.
+  - The outer series' timestamp for a window is where the window occurs in
+    the original series, its start `a`, in the original unit.
+  - A window of size `s` starting at `a` holds exactly the observations with
+    `a <= t <= a + s`, both ends included, so with `step == size` an
+    observation on a boundary is in two windows. Nothing is carried in from
+    before `a`, so a window can be empty; an empty window is an empty inner
+    series.
+  - Inner timestamps: by default each window is shifted so that its start
+    `a` is time 0, in the original unit; an option (name to be decided, for
+    example `relative=False`) keeps the original timestamps.
+  - Sampling (items 51-53): the value at a window's query time is the
+    original series' value at that time, so a query before the window's
+    first observation gets the value carried in from before the window.
+    A query before the window's start (time 0 in the default shifted
+    timestamps) is an error in every window, and so is a query before the
+    series' first observation. The sampler therefore needs
+    the original series as well as the window bounds; whether a window keeps
+    a view of its source (decision 8) or the sampler takes the source and
+    the window parameters is settled when revising items 51-53.
+  - Several channels: one cut, `[a, a + s]` in the query unit, applies to
+    every channel.
+  The original text follows.
+  `Window(size, step=None, overlap=None)` returns a
   list of lazy start-aligned windows `[a, a + size)` with
   `a = start + k * step` while `a + size <= end`, where
   `step = size - overlap` and the default step is `size`. Incomplete windows
