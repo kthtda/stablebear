@@ -43,7 +43,7 @@ def compute_persistent_homology(
     complex_type: ComplexType = ComplexType.VietorisRips,
     reduced: bool = False,
     verbose: bool = False,
-) -> BarcodeTensor:
+) -> BarcodeTensor | TimeSeries:
     r"""Compute persistent homology of a point cloud or distance matrix.
 
     Returns barcodes for homology dimensions 0 through ``max_dim``. When

@@ -785,7 +785,7 @@ values `[1.0, 2.0, 3.0, 4.0, 5.0]`.
   check, and turn item 41's barcode case into a test of a point-cloud
   embedding.
 
-- [ ] **41. Embedding shaped observations, and embedding errors.** A channel
+- [x] **41. Embedding shaped observations, and embedding errors.** A channel
   of shape `S` embeds into shape `(m, *S)`, oldest first. Tests:
   - Times `[0.0, 1.0, 2.0]`, values `[[1, -1], [2, -2], [3, -3]]`,
     `dimension=2`, and `delay=1.0` give `shape == (2, 2)` and the value at 2.0
@@ -798,14 +798,46 @@ values `[1.0, 2.0, 3.0, 4.0, 5.0]`.
     embedding that can never be evaluated created silently, object values
     embedded.
 
-- [ ] **42. Embedding several channels.** Each channel is embedded with the
-  delay converted from the query unit into its own unit, and the domain is
-  the intersection of the channels' domains. Test:
+- [x] **42. Embedding several channels.** Each channel is embedded on its
+  own times, with the delay converted from the query unit into its own unit,
+  and the domain is the intersection of the channels' domains. Test:
   `TimeDelayEmbedding(dimension=2, delay=0.5)` of the series of channels A and
-  B (A's points at 1.0 and 2.5 s, B's at 1500 and 3000 ms) evaluates at 1.5
-  and 2.5, raises `ValueError` at 1.25, and gives leaves `[10, 20]` and
-  `[-1, -2]` at 1.5. **Catches:** the delay applied in channel
-  B's milliseconds, the union of the channels' domains.
+  B has times `[1.0, 2.5]` and `[1.5, 3.0]` (A's points at 1.0 and 2.5 s,
+  B's at 1500 and 3000 ms, reported in seconds), evaluates at 1.5 and 2.5,
+  raises `ValueError` at 1.25, and gives leaves `[10, 20]` and `[-1, -2]` at
+  1.5. **Catches:** the delay applied in channel B's milliseconds, one
+  channel's times used for another, the union of the channels' domains.
+
+- [x] **42b. Embedding views.** (added after item 40) Tests of the paths
+  through the index-table views that items 40-42 do not reach:
+  - Times `[0.1, 0.2, 0.3]`, values `[1, 2, 3]`, `dimension=2`, `delay=0.1`:
+    the point at 0.3 is `[2, 3]`, since `0.3 - 0.1` computes just below 0.2
+    and snaps to it. **Catches:** component lookups that skip snapping.
+  - An embedding (`dimension=2`, `delay=1.5`) of item 40's embedding has
+    `shape == (2, 3)`, times `[4.0]`, and the point
+    `[[0, 10, 25], [10, 25, 40]]`. **Catches:** index tables of views not
+    composed.
+  - Item 40's embedding at `[4.0, 3.25]` gives both points in the caller's
+    order. **Catches:** the batch lookup bypassing the index table.
+  - Persistence of an embedding of 1-D points equals persistence of the same
+    points stored plainly. **Catches:** the ufunc adapter reading a view
+    wrongly.
+
+- [ ] **42c. (later) Per-channel dimensions and delays.** As in Cao, Mees,
+  and Judd (Physica D 121, 1998, eq. 1), whose reconstruction concatenates
+  each channel's delay vector with its own dimension `d_i` and delay
+  `tau_i`: `TimeDelayEmbedding` accepts a list for `dimension` and for
+  `delay`, one entry per channel, and a single value still applies to every
+  channel. Channel `c` embeds with `d_c` and `tau_c` into shape
+  `(d_c, *S_c)` and keeps its own times; the series' domain is the
+  intersection, from `max_c(t_{c,0} + (d_c - 1) * tau_c)` to
+  `min_c(t_{c,last})`, which is the paper's shared start. A CMJ vector is
+  then built downstream by evaluating the series (or sampling it) and
+  concatenating the leaves. `delay_embed` takes vectors of dimensions and
+  delays. Tests: per-channel dimensions give per-channel shapes and the
+  intersected domain; a list of the wrong length raises `ValueError`.
+  (The paper lists each channel newest first; we keep oldest first, as the
+  libraries do.)
 
 - [ ] **42a. Series of series.** Windows (items 43-47) are a
   `TimeSeries<TimeSeries<T>>`, which needs `TimeSeries<T>` as an element type:
