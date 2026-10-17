@@ -815,6 +815,7 @@ if (BUILD_TESTER)
       test/test_subdivide.cpp
       test/test_homological_kernel.cpp
       test/test_union_find.cpp
+      test/test_stoppable_task.cpp
   )
 
   if (BUILD_CUDA_TESTER)

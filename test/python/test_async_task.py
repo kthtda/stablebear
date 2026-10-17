@@ -2,9 +2,8 @@
 
 These use a fake task that drives wait_for() deterministically, so we can
 exercise the interrupt/cleanup path without having to inject a real
-KeyboardInterrupt into a blocking C++ wait. The C++ side (wait_for actually
-rethrowing a worker's exception once the task completes) is covered end-to-end
-by test_bugscan_persistence.py.
+KeyboardInterrupt into a blocking C++ wait. The C++ side (wait() rethrowing a
+worker's exception once the task completes) is covered by test/test_stoppable_task.cpp.
 """
 
 import pytest
