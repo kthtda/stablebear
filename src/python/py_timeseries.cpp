@@ -62,7 +62,9 @@ namespace
       .def("channel", &Series::channel, py::arg("index"), py::return_value_policy::reference_internal)
       .def_property_readonly("n_channels", &Series::n_channels)
       .def("select", &Series::select, py::arg("indices"))
-      .def("evaluate", &Series::evaluate, py::arg("t"))
+      .def("evaluate", py::overload_cast<sb::float64_t>(&Series::evaluate, py::const_), py::arg("t"))
+      .def("evaluate", py::overload_cast<const sb::Tensor<sb::float64_t>&>(&Series::evaluate, py::const_),
+           py::arg("t"))
       .def("_save", [](const Series& self, py::object file) {
         sb_py::PythonOStreamBuf buf(file);
         std::ostream os(&buf);

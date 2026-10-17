@@ -402,22 +402,32 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         constructor. ``t`` is in the series' unit and must lie between the
         first and last observations of every channel, both included.
 
-        For one channel, returns a scalar or element for observations of
-        shape ``()``, otherwise a tensor of that shape. For several, returns
-        a ``NestedTensor`` with one leaf per channel, in channel order; each
-        leaf is a tensor of that channel's shape, 0-d for shape ``()``.
+        ``t`` is a single time or an array-like or ``FloatTensor`` of times
+        of shape ``t_shape``. Many times are evaluated together: they are
+        sorted once and merged with each channel's timestamps.
+
+        For one channel and a single time, returns a scalar or element for
+        observations of shape ``()``, otherwise a tensor of that shape; for
+        times of shape ``t_shape``, returns a tensor of shape
+        ``(*t_shape, *shape)``. For several channels, returns a
+        ``NestedTensor`` with one such result per channel, in channel order,
+        as a tensor (0-d for a single time and shape ``()``).
 
         Raises
         ------
         ValueError
-            If ``t`` is before the first or after the last observation of
+            If a time is before the first or after the last observation of
             any channel, or a channel has no observations.
         """
-        values = NestedTensor._from_cpp(self._data.evaluate(float(t)))
-        if self.n_channels > 1:
-            return values
-        leaf = values[0]
-        return leaf[()] if leaf.ndim == 0 else leaf
+        if isinstance(t, (int, float, np.integer, np.floating)):
+            values = NestedTensor._from_cpp(self._data.evaluate(float(t)))
+            if self.n_channels > 1:
+                return values
+            leaf = values[0]
+            return leaf[()] if leaf.ndim == 0 else leaf
+        times = FloatTensor(np.asarray(t, dtype=np.float64))
+        values = NestedTensor._from_cpp(self._data.evaluate(times._data))
+        return values if self.n_channels > 1 else values[0]
 
     def __call__(self, t):
         """``series(t)`` is ``series.evaluate(t)``."""
