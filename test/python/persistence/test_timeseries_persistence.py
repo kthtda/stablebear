@@ -205,3 +205,19 @@ def test_stable_rank_of_a_point_cloud_series_raises():
 
     with pytest.raises(TypeError):
         barcode_to_stable_rank(series)
+
+
+def test_series_persistence_does_not_depend_on_the_thread_count():
+    series = TimeSeries(_clouds(sb.pcloud64, np.float64), times=[0.0, 1.0, 2.0])
+    expected = compute_persistent_homology(series, max_dim=1)
+
+    previous = sb.system.get_cpu_limit()
+    sb.system.limit_cpus(1)
+    try:
+        assert sb.system.get_cpu_limit() == 1
+        result = compute_persistent_homology(series, max_dim=1)
+    finally:
+        sb.system.limit_cpus(previous)
+
+    assert sb.system.get_cpu_limit() == previous
+    assert result.values.is_isomorphic_to(expected.values, atol=0, rtol=0)
