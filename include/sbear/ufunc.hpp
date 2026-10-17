@@ -181,16 +181,24 @@ namespace sb
     [[nodiscard]] decltype(auto) input(size_t i) const
     {
       const auto c = channel_of(i);
-      const auto& values = m_input.channel(c).flat_values();
+      const auto& channel = m_input.channel(c);
       if constexpr (CoreRank == 0)
       {
-        return values[i - m_offsets[c]];
+        return channel.flat_value(i - m_offsets[c]);
       }
       else
       {
+        // The block is copied into scratch for this worker thread; the
+        // operation uses it before the thread makes its next call.
+        thread_local std::vector<In> scratch;
         const auto coreSize = m_coreSizes[c];
-        return CoreBlock<In>{
-            std::span<const In>(values.data() + (i - m_offsets[c]) * coreSize, coreSize), m_cores[c]};
+        const auto first = (i - m_offsets[c]) * coreSize;
+        scratch.resize(coreSize);
+        for (size_t e = 0; e < coreSize; ++e)
+        {
+          scratch[e] = channel.flat_value(first + e);
+        }
+        return CoreBlock<In>{std::span<const In>(scratch.data(), coreSize), m_cores[c]};
       }
     }
 

@@ -11,6 +11,7 @@
 #include <cmath>
 #include <cstdint>
 #include <functional>
+#include <iterator>
 #include <limits>
 #include <memory>
 #include <numeric>
@@ -203,194 +204,120 @@ namespace sb
   /// One channel of a time series: a view of storage that other views may
   /// share. A write materializes the view first unless it owns the storage
   /// alone, so other views never see it. Timestamps never change.
+  ///
+  /// A channel either reads its stored observations directly or, as a view,
+  /// through an index table: its observation k gathers the stored
+  /// observations the table names for k, a block of shape gather_shape, so
+  /// observations have shape (*gather_shape, *stored shape). view_at and
+  /// stack make such views; they copy no values.
   template <typename T>
   class Channel
   {
   public:
     /// Copy @p values, whose axis 0 is time, into new storage.
     Channel(Times times, const Tensor<T>& values, float64_t snapTolerance = DefaultSnapTolerance,
-            float64_t snapEps = DefaultSnapEps)
-    {
-      set_snap_tolerance(snapTolerance);
-      set_snap_eps(snapEps);
-      if (values.rank() == 0)
-      {
-        throw std::invalid_argument("Values must have a time axis");
-      }
-      if (values.shape(0) != times.size())
-      {
-        throw std::invalid_argument(
-            "Expected one timestamp per observation: got " + std::to_string(times.size())
-            + " timestamps for " + std::to_string(values.shape(0)) + " observations");
-      }
-
-      auto storage = std::make_shared<ChannelStorage<T>>(ChannelStorage<T>{
-          std::move(times),
-          std::vector<size_t>(values.shape().begin() + 1, values.shape().end()),
-          {}});
-      // ponytail: copies on construction; adopt the caller's storage if this shows up in profiles
-      auto owned = values.copy();
-      storage->values.reserve(owned.size());
-      walk(owned, [&](const std::vector<size_t>& index) {
-        storage->values.push_back(owned(index));
-      });
-      m_storage = std::move(storage);
-    }
+            float64_t snapEps = DefaultSnapEps);
 
     /// Adopt @p values, the observations stored flat in row-major order with
     /// prod(@p shape) values each.
     Channel(Times times, std::vector<size_t> shape, std::vector<T> values,
-            float64_t snapTolerance = DefaultSnapTolerance, float64_t snapEps = DefaultSnapEps)
-    {
-      set_snap_tolerance(snapTolerance);
-      set_snap_eps(snapEps);
-      const size_t blockSize = std::accumulate(shape.begin(), shape.end(), size_t{1}, std::multiplies<>());
-      if (values.size() != times.size() * blockSize)
-      {
-        throw std::invalid_argument(
-            "Expected " + std::to_string(times.size() * blockSize) + " values for " + std::to_string(times.size())
-            + " observations, got " + std::to_string(values.size()));
-      }
-      m_storage = std::make_shared<ChannelStorage<T>>(
-          ChannelStorage<T>{std::move(times), std::move(shape), std::move(values)});
-    }
+            float64_t snapTolerance = DefaultSnapTolerance, float64_t snapEps = DefaultSnapEps);
 
     /// The snap tolerance used when evaluating, as a fraction of the gap
     /// between observations; 0 disables snapping.
     [[nodiscard]] float64_t snap_tolerance() const noexcept { return m_snapTolerance; }
 
-    void set_snap_tolerance(float64_t tolerance)
-    {
-      if (std::isnan(tolerance) || tolerance < 0 || tolerance >= 1)
-      {
-        throw std::invalid_argument("The snap tolerance must be in [0, 1)");
-      }
-      m_snapTolerance = tolerance;
-    }
+    void set_snap_tolerance(float64_t tolerance);
 
     /// The cap on the snap distance, in multiples of machine epsilon times
     /// the magnitude of the timestamps.
     [[nodiscard]] float64_t snap_eps() const noexcept { return m_snapEps; }
 
-    void set_snap_eps(float64_t eps)
-    {
-      if (std::isnan(eps) || std::isinf(eps) || eps < 0)
-      {
-        throw std::invalid_argument("snap_eps must be finite and nonnegative");
-      }
-      m_snapEps = eps;
-    }
+    void set_snap_eps(float64_t eps);
 
-    /// The observation with the largest timestamp at or before @p t, which is
-    /// in the channel's own unit. A query below an observation by at most
-    /// snap_tolerance() times the gap to the previous observation, and by at
-    /// most snap_eps() times machine epsilon times the larger magnitude
-    /// of the two timestamps, counts as reaching it.
+    /// A view of this channel at @p times, ascending and in the channel's
+    /// unit: its observation k is this channel's observation in effect at
+    /// times[k], and its times are @p times. It shares the storage. A time
+    /// before the first observation gets the first.
+    [[nodiscard]] Channel view_at(std::vector<float64_t> times) const;
+
+    /// One view whose observation k stacks observation k of each of
+    /// @p views, in order, along a new leading axis, at the times @p times.
+    /// The views must share their storage, gather shape, and length, which
+    /// must equal the number of times; the snap settings are the first
+    /// view's.
+    [[nodiscard]] static Channel stack(Times times, const std::vector<Channel>& views);
+
+    /// The observation with the largest timestamp at or before @p t, in the
+    /// channel's own unit, a tensor of shape shape(). A query below an
+    /// observation by at most snap_tolerance() times the gap to the previous
+    /// observation, and by at most snap_eps() times machine epsilon times the
+    /// larger magnitude of the two timestamps, counts as reaching it.
     ///
     /// The caller checks that @p t lies between the first and last
     /// observations, in its own unit: a time converted into the channel's
     /// unit may round just outside them. A time below the first observation
     /// gets the first. Requires size() > 0.
-    [[nodiscard]] Tensor<T> lookup(float64_t t) const
-    {
-      const auto& times = m_storage->times.values();
-      const auto next = static_cast<size_t>(std::upper_bound(times.begin(), times.end(), t) - times.begin());
-      return observation(static_cast<std::ptrdiff_t>(snapped_index(next, t)));
-    }
+    [[nodiscard]] Tensor<T> lookup(float64_t t) const;
 
-    /// The observation indices lookup would choose for @p sortedTimes, in
-    /// ascending order and the channel's own unit, found in one merged pass
-    /// over the timestamps. Requires size() > 0.
-    [[nodiscard]] std::vector<size_t> lookup_indices(std::span<const float64_t> sortedTimes) const
-    {
-      const auto& times = m_storage->times.values();
-      std::vector<size_t> indices;
-      indices.reserve(sortedTimes.size());
-      size_t next = 0;
-      for (const auto t : sortedTimes)
-      {
-        while (next < times.size() && times[next] <= t)
-        {
-          ++next;
-        }
-        indices.push_back(snapped_index(next, t));
-      }
-      return indices;
-    }
+    /// Write the observations at @p sortedTimes, ascending and in the
+    /// channel's own unit, to @p out: the one at sortedTimes[k] goes to block
+    /// order[k], each block prod(shape()) values long. @p out is a
+    /// random-access iterator, such as a tensor's data() or a vector's
+    /// begin(). One merged pass over the timestamps. Requires size() > 0.
+    template <std::random_access_iterator Out>
+    void lookup_sorted(std::span<const float64_t> sortedTimes, std::span<const size_t> order, Out out) const;
 
-    [[nodiscard]] const Times& times() const noexcept { return m_storage->times; }
-    [[nodiscard]] const std::vector<size_t>& shape() const noexcept { return m_storage->shape; }
-    [[nodiscard]] size_t size() const noexcept { return m_storage->times.size(); }
+    [[nodiscard]] const Times& times() const noexcept { return m_times ? *m_times : m_storage->times; }
+    [[nodiscard]] TimeUnit unit() const noexcept { return m_storage->times.unit(); }
+    [[nodiscard]] const std::vector<size_t>& shape() const noexcept { return m_shape; }
+    [[nodiscard]] size_t size() const noexcept { return times().size(); }
 
-    /// The observations stored flat in row-major order, prod(shape()) values
-    /// each.
-    [[nodiscard]] const std::vector<T>& flat_values() const noexcept { return m_storage->values; }
+    /// Element @p i of the observations at times(), flattened in row-major
+    /// order: observation i / prod(shape()), element i % prod(shape()).
+    [[nodiscard]] typename std::vector<T>::const_reference flat_value(size_t i) const;
 
     /// A copy of the values as a tensor of shape (size(), *shape()).
-    [[nodiscard]] Tensor<T> values() const
-    {
-      std::vector<size_t> fullShape{size()};
-      fullShape.insert(fullShape.end(), shape().begin(), shape().end());
-      Tensor<T> out(fullShape);
-      size_t i = 0;
-      walk(out, [&](const std::vector<size_t>& index) {
-        out(index) = m_storage->values[i++];
-      });
-      return out;
-    }
+    [[nodiscard]] Tensor<T> values() const;
 
     /// A copy of observation @p i as a tensor of shape shape(). Negative
     /// indices count from the end.
-    [[nodiscard]] Tensor<T> observation(std::ptrdiff_t i) const
-    {
-      const auto n = static_cast<std::ptrdiff_t>(size());
-      if (i < -n || i >= n)
-      {
-        throw std::out_of_range(
-            "Observation index " + std::to_string(i) + " is out of range for "
-            + std::to_string(n) + " observations");
-      }
-      const size_t index = static_cast<size_t>(i < 0 ? i + n : i);
-      const size_t blockSize = std::accumulate(
-          shape().begin(), shape().end(), size_t{1}, std::multiplies<>());
-      Tensor<T> out(shape());
-      size_t k = index * blockSize;
-      walk(out, [&](const std::vector<size_t>& outIndex) {
-        out(outIndex) = m_storage->values[k++];
-      });
-      return out;
-    }
+    [[nodiscard]] Tensor<T> observation(std::ptrdiff_t i) const;
 
   private:
-    /// The index of the observation for @p t, given @p next, the index of the
-    /// first timestamp after t.
-    [[nodiscard]] size_t snapped_index(size_t next, float64_t t) const
+    Channel() = default;
+
+    /// The number of stored observations each observation gathers.
+    [[nodiscard]] size_t gather_size() const noexcept
     {
-      const auto& times = m_storage->times.values();
-      if (next == 0)
-      {
-        return 0;
-      }
-      // A query computed in floating point, such as 0.3 - 0.1, can land just
-      // below the observation it means; snap it forward. Measuring against
-      // the gap keeps the rule independent of the unit and of how large the
-      // timestamps are, and a tolerance below 1 never skips an observation.
-      // The epsilon cap keeps widely spaced observations from snapping
-      // queries that are far off in absolute terms but small next to the gap.
-      if (next < times.size())
-      {
-        const auto prev = times[next - 1];
-        const auto magnitude = std::max(std::abs(prev), std::abs(times[next]));
-        const auto cap = m_snapEps * std::numeric_limits<float64_t>::epsilon() * magnitude;
-        if (times[next] - t <= std::min(m_snapTolerance * (times[next] - prev), cap))
-        {
-          ++next;
-        }
-      }
-      return next - 1;
+      return std::accumulate(m_gatherShape.begin(), m_gatherShape.end(), size_t{1}, std::multiplies<>());
     }
 
+    [[nodiscard]] size_t stored_block_size() const noexcept;
+
+    /// The stored observation that entry @p e of observation @p k reads.
+    [[nodiscard]] size_t stored_index(size_t k, size_t e) const noexcept
+    {
+      return m_table ? (*m_table)[k * gather_size() + e] : k;
+    }
+
+    /// Write the stored observations observation @p k gathers to @p out.
+    template <std::random_access_iterator Out>
+    void copy_observation(size_t k, Out out) const;
+
+    /// The observation indices for @p sortedTimes, ascending and in the
+    /// channel's unit, found in one merged pass. Requires size() > 0.
+    [[nodiscard]] std::vector<size_t> indices_sorted(std::span<const float64_t> sortedTimes) const;
+
+    /// The index of the observation for @p t, given @p next, the index of the
+    /// first timestamp after t.
+    [[nodiscard]] size_t snapped_index(size_t next, float64_t t) const;
+
     std::shared_ptr<ChannelStorage<T>> m_storage;
+    std::shared_ptr<const Times> m_times;
+    std::shared_ptr<const std::vector<size_t>> m_table;
+    std::vector<size_t> m_gatherShape;
+    std::vector<size_t> m_shape;
     float64_t m_snapTolerance = DefaultSnapTolerance;
     float64_t m_snapEps = DefaultSnapEps;
   };
@@ -402,14 +329,7 @@ namespace sb
   public:
     using value_type = T;
 
-    TimeSeries(std::vector<Channel<T>> channels, TimeUnit unit)
-      : m_channels(std::move(channels)), m_unit(unit)
-    {
-      if (m_channels.empty())
-      {
-        throw std::invalid_argument("A time series needs at least one channel");
-      }
-    }
+    TimeSeries(std::vector<Channel<T>> channels, TimeUnit unit);
 
     /// A series with one channel, queried in the unit of its times.
     TimeSeries(Times times, const Tensor<T>& values, float64_t snapTolerance, float64_t snapEps)
@@ -422,28 +342,7 @@ namespace sb
     /// settings. @p unit defaults to the unit the parts share and is required
     /// when their units differ.
     [[nodiscard]] static TimeSeries from_channels(const std::vector<TimeSeries>& parts,
-                                                  std::optional<TimeUnit> unit)
-    {
-      if (parts.empty())
-      {
-        throw std::invalid_argument("A time series needs at least one channel");
-      }
-      std::vector<Channel<T>> channels;
-      channels.reserve(parts.size());
-      for (const auto& part : parts)
-      {
-        if (part.n_channels() != 1)
-        {
-          throw std::invalid_argument("Each channel must be a one-channel series; select channels with series[i]");
-        }
-        channels.push_back(part.m_channels.front());
-        if (!unit && part.unit() != parts.front().unit())
-        {
-          throw std::invalid_argument("The channels differ in unit; pass unit= to choose one");
-        }
-      }
-      return TimeSeries(std::move(channels), unit.value_or(parts.front().unit()));
-    }
+                                                  std::optional<TimeUnit> unit);
 
     [[nodiscard]] const Channel<T>& channel(size_t i) const { return m_channels.at(i); }
     [[nodiscard]] size_t n_channels() const noexcept { return m_channels.size(); }
@@ -451,32 +350,12 @@ namespace sb
     /// The channels at @p indices, in that order, sharing their storage with
     /// this series and queried in the same unit. Negative indices count from
     /// the end.
-    [[nodiscard]] TimeSeries select(const std::vector<std::ptrdiff_t>& indices) const
-    {
-      const auto n = static_cast<std::ptrdiff_t>(m_channels.size());
-      std::vector<Channel<T>> channels;
-      channels.reserve(indices.size());
-      for (const auto i : indices)
-      {
-        if (i < -n || i >= n)
-        {
-          throw std::out_of_range(
-              "Channel index " + std::to_string(i) + " is out of range for " + std::to_string(n) + " channels");
-        }
-        channels.push_back(m_channels[static_cast<size_t>(i < 0 ? i + n : i)]);
-      }
-      return TimeSeries(std::move(channels), m_unit);
-    }
+    [[nodiscard]] TimeSeries select(const std::vector<std::ptrdiff_t>& indices) const;
     [[nodiscard]] TimeUnit unit() const noexcept { return m_unit; }
 
     /// The same series queried in @p unit; the channels are shared, not
     /// converted.
-    [[nodiscard]] TimeSeries to(TimeUnit unit) const
-    {
-      auto series = *this;
-      series.m_unit = unit;
-      return series;
-    }
+    [[nodiscard]] TimeSeries to(TimeUnit unit) const;
 
     /// The timestamps of channel @p i, converted to the query unit.
     [[nodiscard]] Times times(size_t i) const { return channel(i).times().to(m_unit); }
@@ -485,92 +364,21 @@ namespace sb
     /// channel, in channel order, each a tensor of that channel's shape.
     /// @p t must lie between the first and last observations of every
     /// channel, both included.
-    [[nodiscard]] NestedTensor<T> evaluate(float64_t t) const
-    {
-      check_observed(t);
-      Tensor<NestedTensor<T>> values({m_channels.size()});
-      for (size_t i = 0; i < m_channels.size(); ++i)
-      {
-        const auto& c = m_channels[i];
-        values(i) = NestedTensor<T>::from_leaf_view(c.lookup(convert_time(t, m_unit, c.times().unit())));
-      }
-      return NestedTensor<T>::from_outer_view(std::move(values), 1);
-    }
+    [[nodiscard]] NestedTensor<T> evaluate(float64_t t) const;
 
     /// Every channel's values at the times @p t, given in the series' unit:
     /// one leaf per channel, in channel order, each a tensor of shape
     /// (*t.shape(), *shape). The queries are sorted once and merged against
     /// each channel's timestamps, so m queries on n observations cost
     /// O(m log m + n) per channel. Every time must lie in the domain.
-    [[nodiscard]] NestedTensor<T> evaluate(const Tensor<float64_t>& t) const
-    {
-      std::vector<float64_t> queries;
-      walk(t, [&](const std::vector<size_t>& index) { queries.push_back(t(index)); });
-      if (!queries.empty())
-      {
-        const auto [lo, hi] = std::minmax_element(queries.begin(), queries.end());
-        check_observed(*lo);
-        check_observed(*hi);
-      }
-      std::vector<size_t> order(queries.size());
-      std::iota(order.begin(), order.end(), size_t{0});
-      std::sort(order.begin(), order.end(), [&](size_t a, size_t b) { return queries[a] < queries[b]; });
-
-      Tensor<NestedTensor<T>> values({m_channels.size()});
-      std::vector<float64_t> sorted(queries.size());
-      for (size_t c = 0; c < m_channels.size(); ++c)
-      {
-        const auto& channel = m_channels[c];
-        for (size_t k = 0; k < order.size(); ++k)
-        {
-          sorted[k] = convert_time(queries[order[k]], m_unit, channel.times().unit());
-        }
-        const auto indices = channel.lookup_indices(sorted);
-
-        std::vector<size_t> shape(t.shape().begin(), t.shape().end());
-        shape.insert(shape.end(), channel.shape().begin(), channel.shape().end());
-        Tensor<T> out(shape);
-        const size_t blockSize = std::accumulate(
-            channel.shape().begin(), channel.shape().end(), size_t{1}, std::multiplies<>());
-        const auto& flat = channel.flat_values();
-        for (size_t k = 0; k < order.size(); ++k)
-        {
-          for (size_t j = 0; j < blockSize; ++j)
-          {
-            out.data()[order[k] * blockSize + j] = flat[indices[k] * blockSize + j];
-          }
-        }
-        values(c) = NestedTensor<T>::from_leaf_view(std::move(out));
-      }
-      return NestedTensor<T>::from_outer_view(std::move(values), 1);
-    }
+    [[nodiscard]] NestedTensor<T> evaluate(const Tensor<float64_t>& t) const;
 
   private:
     /// Throw unless @p t, in the series' unit, lies between the first and
     /// last observations of every channel. The check is exact: it compares
     /// against the timestamps converted to the series' unit, not the query
     /// converted to each channel's unit.
-    void check_observed(float64_t t) const
-    {
-      auto first = -std::numeric_limits<float64_t>::infinity();
-      auto last = std::numeric_limits<float64_t>::infinity();
-      for (const auto& c : m_channels)
-      {
-        if (c.size() == 0)
-        {
-          throw std::domain_error("Cannot evaluate a channel without observations");
-        }
-        const auto& recorded = c.times().values();
-        first = std::max(first, convert_time(recorded.front(), c.times().unit(), m_unit));
-        last = std::min(last, convert_time(recorded.back(), c.times().unit(), m_unit));
-      }
-      if (t < first || t > last)
-      {
-        std::ostringstream ss;
-        ss << "Time " << t << " is outside the domain [" << first << ", " << last << "]";
-        throw std::domain_error(ss.str());
-      }
-    }
+    void check_observed(float64_t t) const;
 
     std::vector<Channel<T>> m_channels;
     TimeUnit m_unit;
@@ -585,5 +393,7 @@ namespace sb
   template <typename T>
   inline constexpr bool is_timeseries_v = is_timeseries<T>::value;
 }
+
+#include "timeseries.tpp"
 
 #endif // STABLEBEAR_TIMESERIES_H
