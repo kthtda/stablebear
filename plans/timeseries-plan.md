@@ -547,6 +547,28 @@ parallel threshold.
     `NestedTensor` whose leaves are the two clouds. **Catches:** object
     types left out of multi-channel evaluation.
 
+- [x] **24b. Evaluating at many times.** (added after item 35) `series(t)`
+  also takes an array-like or `FloatTensor` `t` of shape `t_shape`, as PCF
+  tensors do (`tensor_eval.hpp`): one channel gives a tensor of shape
+  `(*t_shape, *shape)`, several a `NestedTensor` with one such leaf per
+  channel; a scalar `t` behaves as before. Natively, the domain is checked
+  once, the queries are sorted once in the query unit, and each channel
+  merges them, converted to its own unit, against its timestamps in
+  `O(n + m)` with the same snapping as a single query; results come back in
+  the caller's order. Items 51-52 sample through it. Tests with times
+  `[0.0, 1.5, 4.0]` and values `[10.0, 20.0, 30.0]`, and with channels A and
+  B:
+  - `series([4.0, 0.0, 1.0, 1.5])` is `[30, 10, 10, 20]`, and
+    `series([[0.0, 4.0], [1.5, 1.0]])` has shape `(2, 2)` with the values in
+    place. **Catches:** results in sorted rather than caller order, the
+    query shape lost.
+  - For channels A and B, `series([1.25, 1.5])` has leaves `[20, 20]` and
+    `[-1, -2]`. **Catches:** channel B read in the query unit, one sorted
+    grid shared by all channels.
+  - `series([0.0, np.nextafter(1.5, 0.0)])` equals the two single
+    evaluations, and `series([0.0, 4.5])` raises `ValueError`. **Catches:**
+    snapping or the domain check skipped on the batch path.
+
 - [x] **25. Selecting channels.** Tests with the series of channels A and B:
   - `series[1]` and `series[-1]` are one-channel series with unit `"s"` and
     value -2.0 at 1.5; `series[[1, 0]](1.5)` has leaves -2.0 and 20.0.
@@ -828,7 +850,7 @@ Items 48-50 use the source series of items 43-46 and the embedding of item
   lagged view reaching the source, materialization at observation times only
   (which would change the value at 3.25).
 
-- [ ] **51. Sampler query times.** `RegularSampler(n_points).times(series)`
+- [ ] **51. Sampler query times.** (evaluates through item 24b) `RegularSampler(n_points).times(series)`
   returns `Times` with `a + (b - a) * k / n_points` for `k = 0, ..., n_points
   - 1`, in the series' unit. The end is never sampled, even for a closed
   domain. Test: `RegularSampler(n_points=4).times(w)` for `w =

@@ -14,6 +14,7 @@
 #include <limits>
 #include <memory>
 #include <numeric>
+#include <span>
 #include <optional>
 #include <sstream>
 #include <stdexcept>
@@ -293,28 +294,28 @@ namespace sb
     [[nodiscard]] Tensor<T> lookup(float64_t t) const
     {
       const auto& times = m_storage->times.values();
-      auto next = std::upper_bound(times.begin(), times.end(), t);
-      if (next == times.begin())
+      const auto next = static_cast<size_t>(std::upper_bound(times.begin(), times.end(), t) - times.begin());
+      return observation(static_cast<std::ptrdiff_t>(snapped_index(next, t)));
+    }
+
+    /// The observation indices lookup would choose for @p sortedTimes, in
+    /// ascending order and the channel's own unit, found in one merged pass
+    /// over the timestamps. Requires size() > 0.
+    [[nodiscard]] std::vector<size_t> lookup_indices(std::span<const float64_t> sortedTimes) const
+    {
+      const auto& times = m_storage->times.values();
+      std::vector<size_t> indices;
+      indices.reserve(sortedTimes.size());
+      size_t next = 0;
+      for (const auto t : sortedTimes)
       {
-        return observation(0);
-      }
-      // A query computed in floating point, such as 0.3 - 0.1, can land just
-      // below the observation it means; snap it forward. Measuring against
-      // the gap keeps the rule independent of the unit and of how large the
-      // timestamps are, and a tolerance below 1 never skips an observation.
-      // The epsilon cap keeps widely spaced observations from snapping
-      // queries that are far off in absolute terms but small next to the gap.
-      if (next != times.end())
-      {
-        const auto prev = *std::prev(next);
-        const auto magnitude = std::max(std::abs(prev), std::abs(*next));
-        const auto cap = m_snapEps * std::numeric_limits<float64_t>::epsilon() * magnitude;
-        if (*next - t <= std::min(m_snapTolerance * (*next - prev), cap))
+        while (next < times.size() && times[next] <= t)
         {
           ++next;
         }
+        indices.push_back(snapped_index(next, t));
       }
-      return observation(std::distance(times.begin(), next) - 1);
+      return indices;
     }
 
     [[nodiscard]] const Times& times() const noexcept { return m_storage->times; }
@@ -361,6 +362,34 @@ namespace sb
     }
 
   private:
+    /// The index of the observation for @p t, given @p next, the index of the
+    /// first timestamp after t.
+    [[nodiscard]] size_t snapped_index(size_t next, float64_t t) const
+    {
+      const auto& times = m_storage->times.values();
+      if (next == 0)
+      {
+        return 0;
+      }
+      // A query computed in floating point, such as 0.3 - 0.1, can land just
+      // below the observation it means; snap it forward. Measuring against
+      // the gap keeps the rule independent of the unit and of how large the
+      // timestamps are, and a tolerance below 1 never skips an observation.
+      // The epsilon cap keeps widely spaced observations from snapping
+      // queries that are far off in absolute terms but small next to the gap.
+      if (next < times.size())
+      {
+        const auto prev = times[next - 1];
+        const auto magnitude = std::max(std::abs(prev), std::abs(times[next]));
+        const auto cap = m_snapEps * std::numeric_limits<float64_t>::epsilon() * magnitude;
+        if (times[next] - t <= std::min(m_snapTolerance * (times[next] - prev), cap))
+        {
+          ++next;
+        }
+      }
+      return next - 1;
+    }
+
     std::shared_ptr<ChannelStorage<T>> m_storage;
     float64_t m_snapTolerance = DefaultSnapTolerance;
     float64_t m_snapEps = DefaultSnapEps;
@@ -464,6 +493,54 @@ namespace sb
       {
         const auto& c = m_channels[i];
         values(i) = NestedTensor<T>::from_leaf_view(c.lookup(convert_time(t, m_unit, c.times().unit())));
+      }
+      return NestedTensor<T>::from_outer_view(std::move(values), 1);
+    }
+
+    /// Every channel's values at the times @p t, given in the series' unit:
+    /// one leaf per channel, in channel order, each a tensor of shape
+    /// (*t.shape(), *shape). The queries are sorted once and merged against
+    /// each channel's timestamps, so m queries on n observations cost
+    /// O(m log m + n) per channel. Every time must lie in the domain.
+    [[nodiscard]] NestedTensor<T> evaluate(const Tensor<float64_t>& t) const
+    {
+      std::vector<float64_t> queries;
+      walk(t, [&](const std::vector<size_t>& index) { queries.push_back(t(index)); });
+      if (!queries.empty())
+      {
+        const auto [lo, hi] = std::minmax_element(queries.begin(), queries.end());
+        check_observed(*lo);
+        check_observed(*hi);
+      }
+      std::vector<size_t> order(queries.size());
+      std::iota(order.begin(), order.end(), size_t{0});
+      std::sort(order.begin(), order.end(), [&](size_t a, size_t b) { return queries[a] < queries[b]; });
+
+      Tensor<NestedTensor<T>> values({m_channels.size()});
+      std::vector<float64_t> sorted(queries.size());
+      for (size_t c = 0; c < m_channels.size(); ++c)
+      {
+        const auto& channel = m_channels[c];
+        for (size_t k = 0; k < order.size(); ++k)
+        {
+          sorted[k] = convert_time(queries[order[k]], m_unit, channel.times().unit());
+        }
+        const auto indices = channel.lookup_indices(sorted);
+
+        std::vector<size_t> shape(t.shape().begin(), t.shape().end());
+        shape.insert(shape.end(), channel.shape().begin(), channel.shape().end());
+        Tensor<T> out(shape);
+        const size_t blockSize = std::accumulate(
+            channel.shape().begin(), channel.shape().end(), size_t{1}, std::multiplies<>());
+        const auto& flat = channel.flat_values();
+        for (size_t k = 0; k < order.size(); ++k)
+        {
+          for (size_t j = 0; j < blockSize; ++j)
+          {
+            out.data()[order[k] * blockSize + j] = flat[indices[k] * blockSize + j];
+          }
+        }
+        values(c) = NestedTensor<T>::from_leaf_view(std::move(out));
       }
       return NestedTensor<T>::from_outer_view(std::move(values), 1);
     }

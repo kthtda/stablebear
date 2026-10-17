@@ -375,6 +375,33 @@ def test_several_point_cloud_channels_evaluate_to_their_clouds():
     assert np.array_equal(np.asarray(values[1][()]), [[5.0, 5.0], [6.0, 6.0], [7.0, 7.0]])
 
 
+def test_many_times_keep_the_caller_order_and_shape():
+    series = TimeSeries([10.0, 20.0, 30.0], times=[0.0, 1.5, 4.0])
+
+    assert np.array_equal(np.asarray(series([4.0, 0.0, 1.0, 1.5])), [30.0, 10.0, 10.0, 20.0])
+    assert np.array_equal(np.asarray(series([[0.0, 4.0], [1.5, 1.0]])),
+                          [[10.0, 30.0], [20.0, 10.0]])
+
+
+def test_many_times_on_several_channels():
+    series = TimeSeries.from_channels([_channel_a(), _channel_b()], unit="s")
+
+    values = series([1.25, 1.5])
+
+    assert isinstance(values, sb.NestedTensor)
+    assert np.array_equal(np.asarray(values[0]), [20.0, 20.0])
+    assert np.array_equal(np.asarray(values[1]), [-1.0, -2.0])
+
+
+def test_many_times_snap_and_check_the_domain_like_single_times():
+    series = TimeSeries([10.0, 20.0, 30.0], times=[0.0, 1.5, 4.0])
+    queries = [0.0, np.nextafter(1.5, 0.0)]
+
+    assert np.array_equal(np.asarray(series(queries)), [series(t) for t in queries])
+    with pytest.raises(ValueError, match="outside the domain"):
+        series([0.0, 4.5])
+
+
 @pytest.mark.parametrize("index", [1, -1])
 def test_selecting_one_channel_keeps_the_query_unit(index):
     series = TimeSeries.from_channels([_channel_a(), _channel_b()], unit="s")
