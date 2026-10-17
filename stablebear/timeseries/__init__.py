@@ -1,5 +1,6 @@
 __before = set(dir())
 
+from .embedding import TimeDelayEmbedding
 from .series import Times, TimeSeries
 
 import types as _types
