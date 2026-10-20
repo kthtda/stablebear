@@ -512,3 +512,9 @@ def test_several_channels_survive_saving(round_trip):
         assert np.array_equal(np.asarray(loaded.times[i]), np.asarray(series.times[i]))
     for t in (0.5, 1.5):
         assert [loaded(t)[i][()] for i in range(2)] == [series(t)[i][()] for i in range(2)]
+
+
+def test_series_dtype_is_one_object_per_inner_dtype():
+    assert sb.series(sb.float64) is sb.series(sb.float64)
+    assert sb.series(sb.float64) is not sb.series(sb.float32)
+    assert sb.series(sb.float64).inner is sb.float64
