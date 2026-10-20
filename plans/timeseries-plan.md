@@ -46,7 +46,9 @@ adding a test that is not listed, check whether a listed test's
 parametrization covers it, and prefer leaving a guarantee to the design and
 its docstring over testing every combination. Do not test what the public API
 cannot observe. No C++ unit tests are planned: every guarantee here is
-observable from Python (TESTING.md principle 4).
+observable from Python (TESTING.md principle 4). The exception is
+`gallop_upper_bound` (`test/test_gallop.cpp`), a general algorithm whose
+forward direction no time-series path uses yet.
 
 ## Conventions
 
@@ -115,7 +117,8 @@ This assumes the recommended option of each decision.
   (domain, lags, unit scale). Windows, delay embeddings, channel selection,
   and unit changes copy no values; a write materializes the whole view into
   the writer's own storage, as subsampled tensors do. A delay
-  embedding of a numeric channel of shape `S` has shape `(m, *S)`.
+  embedding of a numeric channel of shape `S` has shape `(m, *S)` and equals
+  the delayed values at every time of its domain (item 40).
 - `RegularSampler` samples each window of each numeric channel into a point
   cloud, taking values from the window's source, flattening each observation
   into a point of dimension `prod(shape)`, and returns a series of point
@@ -328,7 +331,7 @@ parallel threshold.
   - An empty list gives an empty float64 channel, so a typed empty channel of
     point clouds is built from `sb.zeros((0,), dtype=sb.pcloud64)`.
 
-- [x] **8. Views.** (decision: every channel is a view of shared storage; a write materializes the whole view. Revised during item 40: a view is the shared storage read through an optional index table, so a channel's observation k gathers the stored observations its table names. `Channel` offers only the generic `view_at(times)` and `stack(times, views)`; derived series such as embeddings are built from them outside `Channel` and `TimeSeries`, in `timeseries/derived.hpp`, and look like any other series to callers, including ufuncs, which read elements through `flat_value(i)`. The lags, domain, and descriptor described below predate this and are kept for history.)
+- [x] **8. Views.** (decision: every channel is a view of shared storage; a write materializes the whole view. Revised during item 40, first with index tables and then, for memory, as follows: a view made by `stack_at(times, lags)` stacks a source channel's observations at lagged times. It keeps its times, its lags, and per observation a base, the source observation for the smallest lag; each component is found when read by a galloping search back from the base (steps of 1, 2, 4, ... observations, then bisection; `gallop_upper_bound` in `include/sbear/algorithms/gallop.hpp`), with the source's snapping. A view costs two numbers per observation, and views of views nest through their source. `Channel` offers only `stack_at` and the cursor lookup `snapped_index(next, t)`; derived series such as embeddings are built from them outside `Channel` and `TimeSeries`, in `timeseries/derived.hpp`, and look like any other series to callers, including ufuncs, which read elements through `flat_value(i)`. The lags, domain, and descriptor described below predate this and are kept for history.)
   - Like a tensor view, a channel is a `shared_ptr` to its storage plus a
     small descriptor of how a query time maps into it: the domain (start, end,
     and end closedness), `lags` (time offsets that add leading observation
@@ -361,8 +364,8 @@ parallel threshold.
     that memory is spent only on a write.
   - Internal lookups skip the domain check, because shifted and converted
     times may round just outside it. Shifted times may also land one ulp apart
-    (`0.2 + 0.1` and `0.3`); snapping makes their values equal, and merging
-    them is a later cleanup.
+    (`0.2 + 0.1` and `0.3`); snapping makes their values equal, and item 40
+    merges them.
 
 - [x] **9. Saving series.** (decision, revised in item 26: materialize every
   channel on saving) Decision 8 governs memory during a run; a file only
@@ -558,7 +561,8 @@ parallel threshold.
   channel; a scalar `t` behaves as before. Natively, the domain is checked
   once, the queries are sorted once in the query unit, and each channel
   merges them, converted to its own unit, against its timestamps in
-  `O(n + m)` with the same snapping as a single query; results come back in
+  `O(n + m)`, and in `O(m log n)` since the cursor gallops (item 40's
+  efficiency pass), with the same snapping as a single query; results come back in
   the caller's order. Items 51-52 sample through it. Tests with times
   `[0.0, 1.5, 4.0]` and values `[10.0, 20.0, 30.0]`, and with channels A and
   B:
@@ -740,43 +744,65 @@ them settled item by item.)
 Items 43-53 use the source series with times `[0.0, 0.5, 1.5, 2.5, 4.0]` and
 values `[1.0, 2.0, 3.0, 4.0, 5.0]`.
 
-- [x] **40. Delay embedding.** (revised during item 40: the embedding's
-  times are the source's own timestamps, not the times where a delayed
-  component changes) `TimeDelayEmbedding(dimension, delay)` returns a
-  series whose observations are the source channel's timestamps `t` from
-  `t_0 + (m - 1) * delay` on, where every component has a value, each the
-  point `(x(t - (m - 1) * delay), ..., x(t - delay), x(t))`, oldest first as
-  in giotto-tda, GUDHI, DelayEmbeddings.jl, and Kantz and Schreiber, labelled
-  with its newest time, so `shape == (m,)`. Like any
-  series it evaluates to the observation in effect. It is a view of the
-  source built in `timeseries/derived.hpp` from `Channel::view_at` and
-  `Channel::stack`; `TimeSeries` and its binding know nothing of it. Tests
-  with times `Times([0.0, 1.0, 2.5, 4.0], unit="ms")`, values `[0.0, 10.0,
-  25.0, 40.0]` (each `10 * t`, so a carried value stands out), `dimension=3`,
-  and `delay=1.0`:
-  - The values are `[[0, 10, 25], [10, 25, 40]]` (at 2.5 and 4.0), and the
-    embedding at 3.25 is `[0, 10, 25]`. **Catches:** newest-first order,
-    the same delay for every component, a component between observations not
-    taking the earlier value.
-  - The embedding has unit `"ms"`, `shape == (3,)`, and times `[2.5, 4.0]`,
-    and evaluating it at 2.0 raises `ValueError` ("outside the domain").
-    **Catches:** points whose components reach before the series starts.
+- [ ] **40. Delay embedding.** (reopened: first done in `1185ecd29` with
+  points only at the source's timestamps, which made the embedding at `t`
+  the point of the last such timestamp rather than the delayed values at
+  `t`) `TimeDelayEmbedding(dimension, delay)` returns a series that
+  evaluates at every `t` from `t_0 + (m - 1) * delay` to `t_{n-1}`, both
+  included, to the point `(x(t - (m - 1) * delay), ..., x(t - delay), x(t))`,
+  oldest first as in giotto-tda, GUDHI, DelayEmbeddings.jl, and Kantz and
+  Schreiber, so `shape == (m,)`. Its times are decision 8's change times:
+  the times in that domain where a component reaches an observation,
+  `t_i + k * delay` for `k = 0, ..., m - 1`, at most `m * n` of them.
+  Shifted times that round to either
+  side of an observation (`0.2 + 0.1` and `0.3`) give the same point; each
+  run of times whose components read the same observations counts once, at
+  the time its members snap to: the source's own timestamp if the run has
+  one (0.3, not `0.2 + 0.1`), else its latest time. The first point stays at
+  the domain's start, and the last is `t_{n-1}`, a timestamp, so the domain
+  keeps both ends (a run reaching from the start to `t_{n-1}` gives both).
+  On a regular grid with the delay a multiple of the spacing, every point
+  after the first is at one of the source's timestamps. It is a view of the source built in
+  `timeseries/derived.hpp`: one merged pass walks the shifted copies of the
+  timestamps without storing them, one cursor per component finds the runs
+  through `Channel::snapped_index` (now public), and `Channel::stack_at`
+  makes the view (decision 8), 16 bytes per point. It evaluates by looking
+  up the source at each lagged time with the source's snapping, not by
+  previous value on its own points, so it equals the series evaluated at the
+  delayed times everywhere, also where a delayed time snaps to an
+  observation; `TimeSeries` and its
+  binding know nothing of it. Tests with times `Times([0.0, 1.0, 2.5, 4.0], unit="ms")`,
+  values `[0.0, 10.0, 25.0, 40.0]` (each `10 * t`, so a carried value stands
+  out), `dimension=3`, and `delay=1.0`:
+  - The times are `[2.0, 2.5, 3.0, 3.5, 4.0]` and the values
+    `[[0, 10, 10], [0, 10, 25], [10, 10, 25], [10, 25, 25], [10, 25, 40]]`,
+    and the embedding at 3.25 is `[10, 10, 25]`, that is
+    `(x(1.25), x(2.25), x(3.25))`. **Catches:** points only at the source's
+    timestamps (3.25 would give `[0, 10, 25]`), newest-first order, the same
+    delay for every component.
+  - The embedding has unit `"ms"` and `shape == (3,)`, is `[0, 10, 10]` at
+    2.0, the domain's start, and evaluating it at 1.75 raises `ValueError`
+    ("outside the domain"). **Catches:** a domain starting at the first
+    source timestamp after `t_0 + (m - 1) * delay` (2.5), points whose
+    components reach before the series starts.
 
 - [ ] **40a. (revisit after item 55) Embedding stride.** An embedding has a
-  point at every observation time, every possible tuple, as giotto-tda,
-  GUDHI, DelayEmbeddings.jl, and nolds do by default. giotto-tda (`stride`)
-  and GUDHI (`skip`) can keep only every k-th point, counted in samples.
-  Decide whether to add `stride=1` to `TimeDelayEmbedding`, keeping every
-  `stride`-th of the embedding's times, which works for irregular
-  timestamps. In workflow 2 the sampler (items 51-52) already sets the
-  spacing, so a stride mainly serves embeddings used on their own, such as
-  thinning points before persistence. If added: one test that `stride=2`
-  keeps every other time and point.
+  point at every change time (item 40), a superset of the points at
+  observation times that giotto-tda, GUDHI, DelayEmbeddings.jl, and nolds
+  give by default. giotto-tda (`stride`) and GUDHI (`skip`) can keep only
+  every k-th point, counted in samples. Decide whether to add `stride=1` to
+  `TimeDelayEmbedding`. Every `stride`-th change time counts samples only
+  when the delay is a multiple of a regular spacing, so a stride needs a
+  definition for other series, for example over the source's timestamps.
+  In workflow 2 the sampler (items 51-52) already sets the spacing, so a
+  stride mainly serves embeddings used on their own, such as thinning
+  points before persistence. If added: one test that `stride=2` keeps every
+  other time and point.
 
 - [ ] **40b. (revisit after item 55) Embeddings of non-numeric series.**
   `TimeDelayEmbedding` accepts only the 7 numeric element types and raises
   `TypeError` otherwise (item 41 tests this for barcodes). The native
-  `delay_embed` is built from `view_at` and `stack`, which work for every
+  `delay_embed` is built from `snapped_index` and `stack_at`, which work for every
   element type, so only the binding in `py_timeseries_derived.cpp` and the
   Python check restrict it. Decide whether to allow all 19 types, for
   example an embedding of a point-cloud series whose observations are `m`
@@ -787,9 +813,9 @@ values `[1.0, 2.0, 3.0, 4.0, 5.0]`.
 
 - [x] **41. Embedding shaped observations, and embedding errors.** A channel
   of shape `S` embeds into shape `(m, *S)`, oldest first. Tests:
-  - Times `[0.0, 1.0, 2.0]`, values `[[1, -1], [2, -2], [3, -3]]`,
+  - Times `[0.0, 1.0, 2.0]`, values `[[0, 0], [10, -10], [20, -20]]`,
     `dimension=2`, and `delay=1.0` give `shape == (2, 2)` and the value at 2.0
-    equal to `[[2, -2], [3, -3]]`. **Catches:** the delay axis placed last,
+    equal to `[[10, -10], [20, -20]]`. **Catches:** the delay axis placed last,
     newest-first order.
   - Parametrized: `dimension=0`, `delay=0.0`, and `delay=-1.0` raise
     `ValueError`; `dimension=3` and `delay=1.0` on times `[0.0, 1.0]` raise
@@ -798,27 +824,49 @@ values `[1.0, 2.0, 3.0, 4.0, 5.0]`.
     embedding that can never be evaluated created silently, object values
     embedded.
 
-- [x] **42. Embedding several channels.** Each channel is embedded on its
-  own times, with the delay converted from the query unit into its own unit,
-  and the domain is the intersection of the channels' domains. Test:
-  `TimeDelayEmbedding(dimension=2, delay=0.5)` of the series of channels A and
-  B has times `[1.0, 2.5]` and `[1.5, 3.0]` (A's points at 1.0 and 2.5 s,
-  B's at 1500 and 3000 ms, reported in seconds), evaluates at 1.5 and 2.5,
-  raises `ValueError` at 1.25, and gives leaves `[10, 20]` and `[-1, -2]` at
-  1.5. **Catches:** the delay applied in channel B's milliseconds, one
-  channel's times used for another, the union of the channels' domains.
+- [ ] **42. Embedding several channels.** (reopened with item 40) Each
+  channel is embedded on its own times, with the delay converted from the
+  query unit into its own unit, and the domain is the intersection of the
+  channels' domains. Test: `TimeDelayEmbedding(dimension=2, delay=0.5)` of
+  the series of channels A and B has times `[0.5, 1.0, 1.5, 2.5]` and
+  `[1.0, 1.5, 2.0, 3.0]` (B's 1000, 1500, 2000, and 3000 ms, reported in
+  seconds), evaluates at 1.0 and 2.5, raises `ValueError` at 0.75, and gives
+  leaves `[20, 20]` and `[-1, -2]` at 1.75. **Catches:** the delay applied
+  in channel B's milliseconds (leaf 1 would be `[-2, -2]`), one channel's
+  times used for another, the union of the channels' domains.
 
-- [x] **42b. Embedding views.** (added after item 40) Tests of the paths
-  through the index-table views that items 40-42 do not reach:
-  - Times `[0.1, 0.2, 0.3]`, values `[1, 2, 3]`, `dimension=2`, `delay=0.1`:
-    the point at 0.3 is `[2, 3]`, since `0.3 - 0.1` computes just below 0.2
-    and snaps to it. **Catches:** component lookups that skip snapping.
+- [ ] **42b. Embedding views.** (added after item 40; reopened with item 40)
+  Tests of the paths through the views that items 40-42 do not reach:
+  - Parametrized, with `dimension=2` and `delay=0.1`: times
+    `[0.1, 0.2, 0.3, 0.4]` with values `[1, 2, 3, 4]` give times
+    `[0.2, 0.3, 0.4]` and points `[[1, 2], [2, 3], [3, 4]]`, since
+    `0.2 + 0.1` computes just above 0.3 and `0.3 - 0.1` just below 0.2;
+    times `[0.0, 0.7, 0.8, 0.9]` with values `[0, 7, 8, 9]` give times
+    `[0.1, 0.7, 0.8, 0.9]` and points `[[0, 0], [0, 7], [7, 8], [8, 9]]`,
+    since `0.7 + 0.1` computes just below 0.8 and snaps to it; times
+    `[0.7, 0.8, 0.9]` with values `[7, 8, 9]` give times `[0.7 + 0.1, 0.9]`
+    and points `[[7, 8], [8, 9]]`, the first point staying at the domain's
+    start just below 0.8. **Catches:** component lookups that skip snapping,
+    one point at two times an ulp apart, a point recorded at a time that
+    snaps to an observation instead of at the observation, the domain's
+    start lost when merging.
+  - Times `[-3.0, -2.5, nextafter(-1.5, 0)]`, values `[-30, -25, -15]`,
+    `snap_tolerance=0.0`, `dimension=2`, `delay=1.0`: times
+    `[-2.0, -1.5, nextafter(-1.5, 0)]` and points
+    `[[-30, -25], [-25, -25], [-25, -15]]`;
+    the last two times minus 1.0 both round to -2.5. **Catches:** delayed
+    lookup times validated as strictly increasing timestamps, which raised
+    `ValueError` for this valid series.
+  - Times `[0, 1, ..., 8]` with values `[0, 10, ..., 80]`, `dimension=2`,
+    `delay=6.0`: times `[6, 7, 8]` and points `[[0, 60], [10, 70], [20, 80]]`.
+    **Catches:** the search back from the base stopping short or overshooting
+    when a component is many observations back.
   - An embedding (`dimension=2`, `delay=1.5`) of item 40's embedding has
-    `shape == (2, 3)`, times `[4.0]`, and the point
-    `[[0, 10, 25], [10, 25, 40]]`. **Catches:** index tables of views not
-    composed.
+    `shape == (2, 3)`, times `[3.5, 4.0]`, and the points
+    `[[0, 10, 10], [10, 25, 25]]` and `[[0, 10, 25], [10, 25, 40]]`.
+    **Catches:** views of views not composed.
   - Item 40's embedding at `[4.0, 3.25]` gives both points in the caller's
-    order. **Catches:** the batch lookup bypassing the index table.
+    order. **Catches:** the batch lookup bypassing the view.
   - Persistence of an embedding of 1-D points equals persistence of the same
     points stored plainly. **Catches:** the ufunc adapter reading a view
     wrongly.
@@ -917,9 +965,10 @@ values `[1.0, 2.0, 3.0, 4.0, 5.0]`.
     `[3, 4]`; evaluating it at 1.0 raises `ValueError`. **Catches:** history
     taken from before the window.
   - `Window(size=2.0, step=1.0)` of `TimeDelayEmbedding(dimension=2,
-    delay=1.0)` of the source (times `[1.5, 2.5, 4.0]`) has one window, at
-    1.5, with times `[0.0, 1.0]` and values `[[2, 3], [3, 4]]`. **Catches:**
-    the embedding's points lost when windowing.
+    delay=1.0)` of the source (times `[1.0, 1.5, 2.5, 3.5, 4.0]`) has
+    windows at 1.0 and 2.0, and the first has times `[0.0, 0.5, 1.5]` and
+    values `[[1, 2], [2, 3], [3, 4]]`. **Catches:** the embedding's points
+    lost when windowing.
 
 - [ ] **47. Windows of several channels.** One cut, `[a, a + size]` in the
   query unit, applies to every channel. Test: `Window(size=1.0, step=1.0)` of
@@ -961,10 +1010,11 @@ Items 48-50 use the source series of items 43-46 and the embedding of item
   carried-in value lost on materializing.
 
 - [ ] **50. Writing an embedding.** Test: for item 40's embedding `e`,
-  `e.values[0] = [0.0, 0.0, 0.0]` (time 2.5) gives `e(3.25)` equal to
-  `[0, 0, 0]`, keeps `e(4.0) == [10, 25, 40]` and `len(e) == 2`, and leaves
-  the source unchanged. **Catches:** a write into a view reaching the
-  source.
+  `e.values[1] = [0.0, 0.0, 0.0]` (time 2.5) gives `e(2.75)` equal to
+  `[0, 0, 0]`, keeps `e(3.0) == [10, 10, 25]`, which reads two of the
+  written point's stored observations, and `len(e) == 5`, and leaves the
+  source unchanged. **Catches:** a write into a view reaching the source or
+  another point that shares its stored observations.
 
 - [ ] **51. Sampler query times.** `RegularSampler(n_points).times(window)`
   returns the `Times` `start + size * k / n_points` for `k = 0, ...,
@@ -1027,6 +1077,10 @@ Items 48-50 use the source series of items 43-46 and the embedding of item
   over `save`/`load` and `pickle`:
   - Item 40's embedding loads with the same times and the same values at 2.5
     and 3.25. **Catches:** the embedded points lost on saving.
+  A loaded embedding is a stored series and evaluates by previous value on
+  its points with their own snapping, so within the snapping distance just
+  below a point it can differ from the view, which snaps as its source does
+  (item 40). Document this with the saving contract.
   - `Window(size=2.0, step=1.0)` of the source loads with the same outer
     times and window contents, and `RegularSampler(n_points=2)` of it gives
     item 52's clouds. **Catches:** the carried-in observation not saved,

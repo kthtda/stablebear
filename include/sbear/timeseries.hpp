@@ -1,6 +1,7 @@
 #ifndef STABLEBEAR_TIMESERIES_H
 #define STABLEBEAR_TIMESERIES_H
 
+#include "algorithms/gallop.hpp"
 #include "config.hpp"
 #include "nested_tensor.hpp"
 #include "tensor.hpp"
@@ -205,11 +206,12 @@ namespace sb
   /// share. A write materializes the view first unless it owns the storage
   /// alone, so other views never see it. Timestamps never change.
   ///
-  /// A channel either reads its stored observations directly or, as a view,
-  /// through an index table: its observation k gathers the stored
-  /// observations the table names for k, a block of shape gather_shape, so
-  /// observations have shape (*gather_shape, *stored shape). view_at and
-  /// stack make such views; they copy no values.
+  /// A channel either holds stored observations or, as a view made by
+  /// stack_at, stacks observations of a source channel at lagged times. A
+  /// view keeps its times, its lags, and for each observation a base: the
+  /// source observation for the smallest lag. The other components are found
+  /// by searching back from the base when read, so a view costs two numbers
+  /// per observation and copies no values.
   template <typename T>
   class Channel
   {
@@ -235,18 +237,12 @@ namespace sb
 
     void set_snap_eps(float64_t eps);
 
-    /// A view of this channel at @p times, ascending and in the channel's
-    /// unit: its observation k is this channel's observation in effect at
-    /// times[k], and its times are @p times. It shares the storage. A time
-    /// before the first observation gets the first.
-    [[nodiscard]] Channel view_at(std::vector<float64_t> times) const;
-
-    /// One view whose observation k stacks observation k of each of
-    /// @p views, in order, along a new leading axis, at the times @p times.
-    /// The views must share their storage, gather shape, and length, which
-    /// must equal the number of times; the snap settings are the first
-    /// view's.
-    [[nodiscard]] static Channel stack(Times times, const std::vector<Channel>& views);
+    /// A view of this channel whose times are @p times, in the channel's
+    /// unit, and whose observation k stacks, along a new leading axis, this
+    /// channel's observations in effect at times[k] - lags[j] for each j, in
+    /// order. A lagged time before the first observation gets the first. It
+    /// shares this channel and its snap settings.
+    [[nodiscard]] Channel stack_at(Times times, std::span<const float64_t> lags) const;
 
     /// The observation with the largest timestamp at or before @p t, in the
     /// channel's own unit, a tensor of shape shape(). A query below an
@@ -258,18 +254,31 @@ namespace sb
     /// observations, in its own unit: a time converted into the channel's
     /// unit may round just outside them. A time below the first observation
     /// gets the first. Requires size() > 0.
+    ///
+    /// A view instead stacks its source's values at each lagged time
+    /// t - lags[j], with the source's snapping, so it evaluates as the
+    /// source does.
     [[nodiscard]] Tensor<T> lookup(float64_t t) const;
+
+    /// The index of the observation in effect at @p t, in the channel's unit,
+    /// with the snapping of lookup(); a time below the first observation gets
+    /// the first. @p next is a cursor for queries in ascending order: the
+    /// index of the first timestamp after the previous query, 0 before the
+    /// first. It is advanced past @p t by galloping, so a query d timestamps
+    /// ahead of it costs O(log d) comparisons. Requires size() > 0.
+    [[nodiscard]] size_t snapped_index(size_t& next, float64_t t) const;
 
     /// Write the observations at @p sortedTimes, ascending and in the
     /// channel's own unit, to @p out: the one at sortedTimes[k] goes to block
     /// order[k], each block prod(shape()) values long. @p out is a
     /// random-access iterator, such as a tensor's data() or a vector's
-    /// begin(). One merged pass over the timestamps. Requires size() > 0.
+    /// begin(). One merged pass over the timestamps, per lag for a view, as
+    /// in lookup(). Requires size() > 0.
     template <std::random_access_iterator Out>
     void lookup_sorted(std::span<const float64_t> sortedTimes, std::span<const size_t> order, Out out) const;
 
     [[nodiscard]] const Times& times() const noexcept { return m_times ? *m_times : m_storage->times; }
-    [[nodiscard]] TimeUnit unit() const noexcept { return m_storage->times.unit(); }
+    [[nodiscard]] TimeUnit unit() const noexcept { return times().unit(); }
     [[nodiscard]] const std::vector<size_t>& shape() const noexcept { return m_shape; }
     [[nodiscard]] size_t size() const noexcept { return times().size(); }
 
@@ -285,23 +294,13 @@ namespace sb
     [[nodiscard]] Tensor<T> observation(std::ptrdiff_t i) const;
 
   private:
-    Channel() = default;
-
-    /// The number of stored observations each observation gathers.
-    [[nodiscard]] size_t gather_size() const noexcept
+    /// The number of values in one observation, prod(shape()).
+    [[nodiscard]] size_t block_size() const noexcept
     {
-      return std::accumulate(m_gatherShape.begin(), m_gatherShape.end(), size_t{1}, std::multiplies<>());
+      return std::accumulate(m_shape.begin(), m_shape.end(), size_t{1}, std::multiplies<>());
     }
 
-    [[nodiscard]] size_t stored_block_size() const noexcept;
-
-    /// The stored observation that entry @p e of observation @p k reads.
-    [[nodiscard]] size_t stored_index(size_t k, size_t e) const noexcept
-    {
-      return m_table ? (*m_table)[k * gather_size() + e] : k;
-    }
-
-    /// Write the stored observations observation @p k gathers to @p out.
+    /// Write observation @p k, prod(shape()) values, to @p out.
     template <std::random_access_iterator Out>
     void copy_observation(size_t k, Out out) const;
 
@@ -311,12 +310,17 @@ namespace sb
 
     /// The index of the observation for @p t, given @p next, the index of the
     /// first timestamp after t.
-    [[nodiscard]] size_t snapped_index(size_t next, float64_t t) const;
+    [[nodiscard]] size_t snap(size_t next, float64_t t) const;
 
-    std::shared_ptr<ChannelStorage<T>> m_storage;
+    /// For a view, the source observation that component @p j of observation
+    /// @p k reads.
+    [[nodiscard]] size_t source_index(size_t k, size_t j) const;
+
+    std::shared_ptr<ChannelStorage<T>> m_storage;  // null for a view
+    std::shared_ptr<const Channel> m_source;       // null for stored observations
     std::shared_ptr<const Times> m_times;
-    std::shared_ptr<const std::vector<size_t>> m_table;
-    std::vector<size_t> m_gatherShape;
+    std::shared_ptr<const std::vector<size_t>> m_base;
+    std::vector<float64_t> m_lags;
     std::vector<size_t> m_shape;
     float64_t m_snapTolerance = DefaultSnapTolerance;
     float64_t m_snapEps = DefaultSnapEps;
@@ -368,9 +372,10 @@ namespace sb
 
     /// Every channel's values at the times @p t, given in the series' unit:
     /// one leaf per channel, in channel order, each a tensor of shape
-    /// (*t.shape(), *shape). The queries are sorted once and merged against
-    /// each channel's timestamps, so m queries on n observations cost
-    /// O(m log m + n) per channel. Every time must lie in the domain.
+    /// (*t.shape(), *shape). The queries are sorted once, in O(m log m) for m
+    /// queries, and merged against each channel's timestamps, galloping
+    /// between queries: at most O(m log n) and O(m + n) for n observations.
+    /// Every time must lie in the domain.
     [[nodiscard]] NestedTensor<T> evaluate(const Tensor<float64_t>& t) const;
 
   private:

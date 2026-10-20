@@ -5,18 +5,21 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <stdexcept>
 #include <vector>
 
 namespace sb
 {
   /// The delay embedding of @p channel with @p dimension components spaced
-  /// @p delay apart, in the channel's unit. Its times are the channel's own
-  /// timestamps from t_0 + (dimension - 1) * delay on, where every component
-  /// has a value, and its observation at t is
+  /// @p delay apart, in the channel's unit. Its value at t is
   /// (x(t - (dimension - 1) * delay), ..., x(t - delay), x(t)), oldest first
-  /// as in Kantz and Schreiber's convention, so each observation gains a
-  /// leading axis of length @p dimension. It is a view of the channel's
+  /// as in Kantz and Schreiber's convention, for every t from
+  /// t_0 + (dimension - 1) * delay to the last observation, so each
+  /// observation gains a leading axis of length @p dimension. Its times are
+  /// the ends of that domain and the times between where a component reaches
+  /// an observation, t_i + k * delay; times that round to the same point are
+  /// recorded once, at the time they snap to. It is a view of the channel's
   /// storage.
   template <typename T>
   Channel<T> delay_embed(const Channel<T>& channel, size_t dimension, float64_t delay)
@@ -30,29 +33,106 @@ namespace sb
       throw std::invalid_argument("The embedding delay must be finite and positive");
     }
 
-    const auto span = static_cast<float64_t>(dimension - 1) * delay;
+    // Component j, oldest first, reads the channel lags[j] before t.
+    std::vector<float64_t> lags(dimension);
+    for (size_t j = 0; j < dimension; ++j)
+    {
+      lags[j] = static_cast<float64_t>(dimension - 1 - j) * delay;
+    }
+
     const auto& times = channel.times().values();
     std::vector<float64_t> at;
     if (!times.empty())
     {
-      const auto first = std::lower_bound(times.begin(), times.end(), times.front() + span);
-      if (first == times.end())
+      const auto start = times.front() + lags.front();
+      const auto end = times.back();
+      if (start > end)
       {
         throw std::invalid_argument("The series is too short for this embedding: no time has its full history");
       }
-      at.assign(first, times.end());
+      // Component j changes where its lagged time reaches an observation: at
+      // the timestamps shifted by lags[j]. Walk the shifted copies in one
+      // merged pass, from start to end, without storing them.
+      std::vector<size_t> shifted(dimension, 0);
+      const auto pending = [&](size_t j) { return times[shifted[j]] + lags[j]; };
+      for (size_t j = 0; j < dimension; ++j)
+      {
+        while (shifted[j] < times.size() && pending(j) < start)
+        {
+          ++shifted[j];
+        }
+      }
+
+      // Shifted times can round to either side of the observation they mean,
+      // so one point can come up at times an ulp apart. Two times give the
+      // same point when every component reads the same observation at both;
+      // snapped_index decides which observation, with the channel's
+      // snap_tolerance and snap_eps, as evaluation does. A component's index
+      // never decreases with time, so a run of the same point ends where some
+      // component's index differs from the one at the time before.
+      //
+      // Record each run at the time its members snap to: the channel's own
+      // timestamp if the run has one, else its latest time, since snapping
+      // moves a time forward onto the observation it falls just short of.
+      // The first point stays at the start, so the domain keeps its start.
+      // The last observation is a timestamp, so the domain keeps its end,
+      // unless the first run reaches it.
+      std::vector<size_t> next(dimension, 0);
+      std::vector<size_t> previous(dimension);
+      bool runHasTimestamp = false;
+      while (true)
+      {
+        auto s = std::numeric_limits<float64_t>::infinity();
+        for (size_t j = 0; j < dimension; ++j)
+        {
+          if (shifted[j] < times.size())
+          {
+            s = std::min(s, pending(j));
+          }
+        }
+        if (s > end)
+        {
+          break;
+        }
+        // The newest component has lag 0, so its pending times are the
+        // channel's own timestamps.
+        const bool isTimestamp = shifted.back() < times.size() && pending(dimension - 1) == s;
+        for (size_t j = 0; j < dimension; ++j)
+        {
+          while (shifted[j] < times.size() && pending(j) == s)
+          {
+            ++shifted[j];
+          }
+        }
+
+        bool changes = at.empty();
+        for (size_t j = 0; j < dimension; ++j)
+        {
+          const auto index = channel.snapped_index(next[j], s - lags[j]);
+          if (index != previous[j])
+          {
+            changes = true;
+          }
+          previous[j] = index;
+        }
+        if (changes)
+        {
+          at.push_back(s);
+          runHasTimestamp = isTimestamp;
+        }
+        else if (at.size() > 1 && (isTimestamp || !runHasTimestamp))
+        {
+          at.back() = s;
+          runHasTimestamp = runHasTimestamp || isTimestamp;
+        }
+      }
+      if (at.back() != end)
+      {
+        at.push_back(end);
+      }
     }
 
-    std::vector<Channel<T>> components;
-    components.reserve(dimension);
-    for (size_t j = 0; j < dimension; ++j)
-    {
-      const auto lag = -static_cast<float64_t>(dimension - 1 - j) * delay;
-      std::vector<float64_t> shifted(at.size());
-      std::transform(at.begin(), at.end(), shifted.begin(), [lag](float64_t t) { return t + lag; });
-      components.push_back(channel.view_at(std::move(shifted)));
-    }
-    return Channel<T>::stack(Times(std::move(at), channel.unit()), components);
+    return channel.stack_at(Times(std::move(at), channel.unit()), lags);
   }
 
   /// The delay embedding of every channel of @p series, with @p delay given

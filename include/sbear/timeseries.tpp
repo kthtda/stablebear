@@ -75,74 +75,36 @@ namespace sb
   }
 
   template <typename T>
-  Channel<T> Channel<T>::view_at(std::vector<float64_t> times) const
+  Channel<T> Channel<T>::stack_at(Times times, std::span<const float64_t> lags) const
   {
-    Channel view = *this;
-    view.m_times = std::make_shared<const Times>(Times(std::move(times), unit()));
-    const auto& at = view.m_times->values();
+    if (lags.empty())
+    {
+      throw std::invalid_argument("Cannot stack zero lags");
+    }
+    const auto& at = times.values();
     if (!at.empty() && size() == 0)
     {
       throw std::invalid_argument("Cannot view a channel without observations at a time");
     }
-    const auto rows = at.empty() ? std::vector<size_t>{} : indices_sorted(at);
-    const auto gather = gather_size();
-    auto table = std::make_shared<std::vector<size_t>>();
-    table->reserve(at.size() * gather);
-    for (const auto row : rows)
+    // Every component of observation k reads this channel at or before its
+    // observation at times[k] minus the smallest lag, the base.
+    const auto smallest = *std::min_element(lags.begin(), lags.end());
+    auto base = std::make_shared<std::vector<size_t>>();
+    base->reserve(at.size());
+    size_t next = 0;
+    for (const auto t : at)
     {
-      for (size_t e = 0; e < gather; ++e)
-      {
-        table->push_back(stored_index(row, e));
-      }
+      base->push_back(snapped_index(next, t - smallest));
     }
-    view.m_table = std::move(table);
+
+    Channel view = *this;
+    view.m_storage = nullptr;
+    view.m_source = std::make_shared<const Channel>(*this);
+    view.m_times = std::make_shared<const Times>(std::move(times));
+    view.m_base = std::move(base);
+    view.m_lags.assign(lags.begin(), lags.end());
+    view.m_shape.insert(view.m_shape.begin(), lags.size());
     return view;
-  }
-
-  template <typename T>
-  Channel<T> Channel<T>::stack(Times times, const std::vector<Channel>& views)
-  {
-    if (views.empty())
-    {
-      throw std::invalid_argument("Cannot stack zero views");
-    }
-    const auto& first = views.front();
-    for (const auto& view : views)
-    {
-      if (view.m_storage != first.m_storage || view.m_gatherShape != first.m_gatherShape)
-      {
-        throw std::invalid_argument("Stacked views must share their storage and gather shape");
-      }
-      if (view.size() != times.size())
-      {
-        throw std::invalid_argument("Stacked views must have one observation per time");
-      }
-    }
-    Channel result;
-    result.m_storage = first.m_storage;
-    result.m_snapTolerance = first.m_snapTolerance;
-    result.m_snapEps = first.m_snapEps;
-    result.m_gatherShape = first.m_gatherShape;
-    result.m_gatherShape.insert(result.m_gatherShape.begin(), views.size());
-    result.m_shape = result.m_gatherShape;
-    result.m_shape.insert(result.m_shape.end(), first.m_storage->shape.begin(), first.m_storage->shape.end());
-
-    const auto gather = first.gather_size();
-    auto table = std::make_shared<std::vector<size_t>>();
-    table->reserve(times.size() * views.size() * gather);
-    for (size_t k = 0; k < times.size(); ++k)
-    {
-      for (const auto& view : views)
-      {
-        for (size_t e = 0; e < gather; ++e)
-        {
-          table->push_back(view.stored_index(k, e));
-        }
-      }
-    }
-    result.m_table = std::move(table);
-    result.m_times = std::make_shared<const Times>(std::move(times));
-    return result;
   }
 
   template <typename T>
@@ -159,7 +121,26 @@ namespace sb
   template <std::random_access_iterator Out>
   void Channel<T>::lookup_sorted(std::span<const float64_t> sortedTimes, std::span<const size_t> order, Out out) const
   {
-    const auto blockSize = gather_size() * stored_block_size();
+    if (m_source)
+    {
+      // Look up the source at each lagged time, so a view snaps as its
+      // source does. Component j of the query for block order[k] fills
+      // source block order[k] * m + j.
+      const auto m = m_lags.size();
+      std::vector<float64_t> lagged(sortedTimes.size());
+      std::vector<size_t> blocks(sortedTimes.size());
+      for (size_t j = 0; j < m; ++j)
+      {
+        for (size_t k = 0; k < sortedTimes.size(); ++k)
+        {
+          lagged[k] = sortedTimes[k] - m_lags[j];
+          blocks[k] = order[k] * m + j;
+        }
+        m_source->lookup_sorted(lagged, blocks, out);
+      }
+      return;
+    }
+    const auto blockSize = block_size();
     const auto indices = indices_sorted(sortedTimes);
     for (size_t k = 0; k < sortedTimes.size(); ++k)
     {
@@ -170,11 +151,14 @@ namespace sb
   template <typename T>
   typename std::vector<T>::const_reference Channel<T>::flat_value(size_t i) const
   {
-    const auto storedBlock = stored_block_size();
-    const auto blockSize = gather_size() * storedBlock;
-    const auto k = i / blockSize;
-    const auto e = (i % blockSize) / storedBlock;
-    return m_storage->values[stored_index(k, e) * storedBlock + i % storedBlock];
+    if (!m_source)
+    {
+      return m_storage->values[i];
+    }
+    const auto blockSize = block_size();
+    const auto sourceBlock = blockSize / m_lags.size();
+    const auto r = i % blockSize;
+    return m_source->flat_value(source_index(i / blockSize, r / sourceBlock) * sourceBlock + r % sourceBlock);
   }
 
   template <typename T>
@@ -185,7 +169,7 @@ namespace sb
     Tensor<T> out(fullShape);
     if (size() > 0)
     {
-      const auto blockSize = gather_size() * stored_block_size();
+      const auto blockSize = block_size();
       for (size_t k = 0; k < size(); ++k)
       {
         copy_observation(k, out.data() + static_cast<std::ptrdiff_t>(k * blockSize));
@@ -210,47 +194,65 @@ namespace sb
   }
 
   template <typename T>
-  size_t Channel<T>::stored_block_size() const noexcept
-  {
-    return std::accumulate(m_storage->shape.begin(), m_storage->shape.end(), size_t{1}, std::multiplies<>());
-  }
-
-  template <typename T>
   template <std::random_access_iterator Out>
   void Channel<T>::copy_observation(size_t k, Out out) const
   {
-    const auto storedBlock = stored_block_size();
-    const auto& stored = m_storage->values;
-    for (size_t e = 0; e < gather_size(); ++e)
+    if (!m_source)
     {
-      const auto source = stored_index(k, e) * storedBlock;
-      for (size_t v = 0; v < storedBlock; ++v)
+      const auto blockSize = block_size();
+      const auto& stored = m_storage->values;
+      for (size_t v = 0; v < blockSize; ++v)
       {
-        out[static_cast<std::ptrdiff_t>(e * storedBlock + v)] = stored[source + v];
+        out[static_cast<std::ptrdiff_t>(v)] = stored[k * blockSize + v];
       }
+      return;
     }
+    const auto sourceBlock = m_source->block_size();
+    for (size_t j = 0; j < m_lags.size(); ++j)
+    {
+      m_source->copy_observation(source_index(k, j), out + static_cast<std::ptrdiff_t>(j * sourceBlock));
+    }
+  }
+
+  template <typename T>
+  size_t Channel<T>::source_index(size_t k, size_t j) const
+  {
+    // The first timestamp after the lagged time is at or before the one
+    // after the base, usually a few observations back.
+    const auto& times = m_source->times().values();
+    const auto t = this->times().values()[k] - m_lags[j];
+    const auto afterBase = times.begin() + static_cast<std::ptrdiff_t>((*m_base)[k] + 1);
+    const auto next = gallop_upper_bound(times.begin(), times.end(), afterBase, t);
+    return m_source->snap(static_cast<size_t>(next - times.begin()), t);
   }
 
   template <typename T>
   std::vector<size_t> Channel<T>::indices_sorted(std::span<const float64_t> sortedTimes) const
   {
-    const auto& times = this->times().values();
     std::vector<size_t> indices;
     indices.reserve(sortedTimes.size());
     size_t next = 0;
     for (const auto t : sortedTimes)
     {
-      while (next < times.size() && times[next] <= t)
-      {
-        ++next;
-      }
       indices.push_back(snapped_index(next, t));
     }
     return indices;
   }
 
   template <typename T>
-  size_t Channel<T>::snapped_index(size_t next, float64_t t) const
+  size_t Channel<T>::snapped_index(size_t& next, float64_t t) const
+  {
+    // The first timestamp after t is at or after the cursor. Gallop to it,
+    // so a query close ahead costs a comparison or two and a distant one
+    // O(log n).
+    const auto& times = this->times().values();
+    const auto from = times.begin() + static_cast<std::ptrdiff_t>(next);
+    next = static_cast<size_t>(gallop_upper_bound(from, times.end(), from, t) - times.begin());
+    return snap(next, t);
+  }
+
+  template <typename T>
+  size_t Channel<T>::snap(size_t next, float64_t t) const
   {
     const auto& times = this->times().values();
     if (next == 0)
@@ -270,7 +272,7 @@ namespace sb
       const auto cap = m_snapEps * std::numeric_limits<float64_t>::epsilon() * magnitude;
       if (times[next] - t <= std::min(m_snapTolerance * (times[next] - prev), cap))
       {
-        ++next;
+        return next;
       }
     }
     return next - 1;

@@ -14,11 +14,20 @@ class TimeDelayEmbedding:
     """Delay embedding of a numeric time series.
 
     The embedding of a channel ``x`` with ``dimension`` ``m`` and ``delay``
-    ``d`` has an observation at each of the channel's own times ``t`` from
-    ``t_0 + (m - 1) * d`` on, where every component has a value: the point
+    ``d`` evaluates at every time ``t`` from ``t_0 + (m - 1) * d`` to the
+    channel's last observation, both included, to the point
     ``(x(t - (m - 1) * d), ..., x(t - d), x(t))``, oldest first, so each
-    observation gains a leading axis of length ``m``. Like any series, it is evaluated
-    to the observation in effect.
+    observation gains a leading axis of length ``m``. Each component is the
+    channel evaluated at its delayed time, with the channel's snapping, so
+    the embedding agrees with evaluating the series even where a delayed
+    time snaps to an observation. Its times are the ends
+    of that domain and the times between where a component reaches an
+    observation, ``t_i + k * d`` for ``k`` from 0 to ``m - 1``, so it has at
+    most ``m`` times per observation of the channel. Shifted times that
+    differ only by rounding and give the same point appear once, at the time
+    they snap to: the channel's own timestamp if one is among them, such as
+    0.3 rather than ``0.2 + 0.1``, else the latest of them. The first time is
+    always ``t_0 + (m - 1) * d``.
 
     The embedding is a view: it shares the series' observations and
     evaluates them on demand.
@@ -33,8 +42,8 @@ class TimeDelayEmbedding:
     Raises
     ------
     ValueError
-        On an invalid ``dimension`` or ``delay``, or when no time of the
-        series has its full history.
+        On an invalid ``dimension`` or ``delay``, or when
+        ``t_0 + (m - 1) * d`` is after the last observation of a channel.
     TypeError
         If the series does not hold numbers.
     """
