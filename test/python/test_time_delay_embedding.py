@@ -55,14 +55,28 @@ def test_embedding_of_shaped_observations_adds_a_leading_axis():
     ])
 
 
+def test_embedding_of_pcfs_stacks_delayed_pcfs():
+    # PCFs of values 0, 10, and 20 at times 0.0, 1.0, and 2.0.
+    pcfs = [sb.Pcf(np.array([[0.0, 10.0 * t], [1.0, 0.0]])) for t in [0.0, 1.0, 2.0]]
+    series = TimeSeries(sb.tensor(pcfs), times=[0.0, 1.0, 2.0])
+
+    embedding = TimeDelayEmbedding(dimension=2, delay=1.0)(series)
+
+    assert embedding.dtype is sb.pcf64
+    assert embedding.shape == (2,)
+    assert np.array_equal(np.asarray(embedding.times), [1.0, 2.0])
+    assert embedding.values.array_equal(sb.tensor([
+        [pcfs[0], pcfs[1]],   # 1.0: x(0.0), x(1.0)
+        [pcfs[1], pcfs[2]],   # 2.0: x(1.0), x(2.0)
+    ]))
+
+
 @pytest.mark.parametrize("make_embedding, error", [
     pytest.param(lambda: TimeDelayEmbedding(dimension=0, delay=1.0), ValueError, id="dimension-0"),
     pytest.param(lambda: TimeDelayEmbedding(dimension=2, delay=0.0), ValueError, id="delay-0"),
     pytest.param(lambda: TimeDelayEmbedding(dimension=2, delay=-1.0), ValueError, id="delay-negative"),
     pytest.param(lambda: TimeDelayEmbedding(dimension=3, delay=1.0)(
         TimeSeries([0.0, 10.0], times=[0.0, 1.0])), ValueError, id="too-short"),
-    pytest.param(lambda: TimeDelayEmbedding(dimension=2, delay=1.0)(
-        TimeSeries(sb.zeros((2,), dtype=sb.barcode64), times=[0.0, 1.0])), TypeError, id="barcodes"),
 ])
 def test_embedding_rejects_invalid_input(make_embedding, error):
     with pytest.raises(error):
