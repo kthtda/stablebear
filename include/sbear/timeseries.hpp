@@ -266,11 +266,13 @@ namespace sb
 
     /// The index of the observation in effect at @p t, in the channel's unit,
     /// with the snapping of lookup(); a time below the first observation gets
-    /// the first. @p next is a cursor for queries in ascending order: the
-    /// index of the first timestamp after the previous query, 0 before the
-    /// first. It is advanced past @p t by galloping, so a query d timestamps
-    /// ahead of it costs O(log d) comparisons. Requires size() > 0.
-    [[nodiscard]] size_t snapped_index(size_t& next, float64_t t) const;
+    /// the first. This is the only way from a time to an observation, so
+    /// every lookup snaps: the timestamps are not handed out to search.
+    /// The search gallops from @p hint, any index, so a hint d timestamps
+    /// from the answer costs O(log d) comparisons; the answer does not depend
+    /// on it. Passing the previous answer makes a run of nearby queries
+    /// cheap. Requires size() > 0.
+    [[nodiscard]] size_t index_at(float64_t t, size_t hint = 0) const;
 
     /// Write the observations at @p sortedTimes, ascending and in the
     /// channel's own unit, to @p out: the one at sortedTimes[k] goes to block
@@ -281,10 +283,16 @@ namespace sb
     template <std::random_access_iterator Out>
     void lookup_sorted(std::span<const float64_t> sortedTimes, std::span<const size_t> order, Out out) const;
 
-    [[nodiscard]] const Times& times() const noexcept { return m_times ? *m_times : m_storage->times; }
-    [[nodiscard]] TimeUnit unit() const noexcept { return times().unit(); }
+    /// A copy of the timestamps, to save or report them; find observations
+    /// with index_at().
+    [[nodiscard]] Times times() const { return held_times(); }
+
+    /// Timestamp @p k, in the channel's unit, to build new times from.
+    [[nodiscard]] float64_t time(size_t k) const { return held_times().values()[k]; }
+
+    [[nodiscard]] TimeUnit unit() const noexcept { return held_times().unit(); }
     [[nodiscard]] const std::vector<size_t>& shape() const noexcept { return m_shape; }
-    [[nodiscard]] size_t size() const noexcept { return times().size(); }
+    [[nodiscard]] size_t size() const noexcept { return held_times().size(); }
 
     /// The same timestamps, shape, values, and snap settings.
     [[nodiscard]] bool operator==(const Channel& other) const;
@@ -301,6 +309,10 @@ namespace sb
     [[nodiscard]] Tensor<T> observation(std::ptrdiff_t i) const;
 
   private:
+    /// The timestamps, kept inside the channel so that searches go through
+    /// index_at().
+    [[nodiscard]] const Times& held_times() const noexcept { return m_times ? *m_times : m_storage->times; }
+
     /// The number of values in one observation, prod(shape()).
     [[nodiscard]] size_t block_size() const noexcept
     {

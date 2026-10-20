@@ -91,10 +91,11 @@ namespace sb
     const auto smallest = *std::min_element(lags.begin(), lags.end());
     auto base = std::make_shared<std::vector<size_t>>();
     base->reserve(at.size());
-    size_t next = 0;
+    size_t hint = 0;
     for (const auto t : at)
     {
-      base->push_back(snapped_index(next, t - smallest));
+      hint = index_at(t - smallest, hint);
+      base->push_back(hint);
     }
 
     Channel view = *this;
@@ -120,7 +121,7 @@ namespace sb
   bool Channel<T>::operator==(const Channel& other) const
   {
     return m_snapTolerance == other.m_snapTolerance && m_snapEps == other.m_snapEps && m_shape == other.m_shape
-           && times() == other.times() && values() == other.values();
+           && held_times() == other.held_times() && values() == other.values();
   }
 
   template <typename T>
@@ -235,8 +236,8 @@ namespace sb
   {
     // The first timestamp after the lagged time is at or before the one
     // after the base, usually a few observations back.
-    const auto& times = m_source->times().values();
-    const auto t = this->times().values()[k] - m_lags[j];
+    const auto& times = m_source->held_times().values();
+    const auto t = time(k) - m_lags[j];
     const auto afterBase = times.begin() + static_cast<std::ptrdiff_t>((*m_base)[k] + 1);
     const auto next = gallop_upper_bound(times.begin(), times.end(), afterBase, t);
     return m_source->snap(static_cast<size_t>(next - times.begin()), t);
@@ -247,30 +248,30 @@ namespace sb
   {
     std::vector<size_t> indices;
     indices.reserve(sortedTimes.size());
-    size_t next = 0;
+    size_t hint = 0;
     for (const auto t : sortedTimes)
     {
-      indices.push_back(snapped_index(next, t));
+      hint = index_at(t, hint);
+      indices.push_back(hint);
     }
     return indices;
   }
 
   template <typename T>
-  size_t Channel<T>::snapped_index(size_t& next, float64_t t) const
+  size_t Channel<T>::index_at(float64_t t, size_t hint) const
   {
-    // The first timestamp after t is at or after the cursor. Gallop to it,
-    // so a query close ahead costs a comparison or two and a distant one
-    // O(log n).
-    const auto& times = this->times().values();
-    const auto from = times.begin() + static_cast<std::ptrdiff_t>(next);
-    next = static_cast<size_t>(gallop_upper_bound(from, times.end(), from, t) - times.begin());
-    return snap(next, t);
+    // Gallop from the hint to the first timestamp after t, so a query near
+    // the hint costs a comparison or two and a distant one O(log n).
+    const auto& times = held_times().values();
+    const auto begin = times.begin();
+    const auto from = begin + static_cast<std::ptrdiff_t>(std::min(hint, times.size()));
+    return snap(static_cast<size_t>(gallop_upper_bound(begin, times.end(), from, t) - begin), t);
   }
 
   template <typename T>
   size_t Channel<T>::snap(size_t next, float64_t t) const
   {
-    const auto& times = this->times().values();
+    const auto& times = held_times().values();
     if (next == 0)
     {
       return 0;
@@ -414,9 +415,8 @@ namespace sb
       {
         throw std::domain_error("Cannot evaluate a channel without observations");
       }
-      const auto& recorded = c.times().values();
-      first = std::max(first, convert_time(recorded.front(), c.unit(), m_unit));
-      last = std::min(last, convert_time(recorded.back(), c.unit(), m_unit));
+      first = std::max(first, convert_time(c.time(0), c.unit(), m_unit));
+      last = std::min(last, convert_time(c.time(c.size() - 1), c.unit(), m_unit));
     }
     return {first, last};
   }

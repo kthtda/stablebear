@@ -40,12 +40,12 @@ namespace sb
       lags[j] = static_cast<float64_t>(dimension - 1 - j) * delay;
     }
 
-    const auto& times = channel.times().values();
+    const auto n = channel.size();
     std::vector<float64_t> at;
-    if (!times.empty())
+    if (n > 0)
     {
-      const auto start = times.front() + lags.front();
-      const auto end = times.back();
+      const auto start = channel.time(0) + lags.front();
+      const auto end = channel.time(n - 1);
       if (start > end)
       {
         throw std::invalid_argument("The series is too short for this embedding: no time has its full history");
@@ -54,10 +54,10 @@ namespace sb
       // the timestamps shifted by lags[j]. Walk the shifted copies in one
       // merged pass, from start to end, without storing them.
       std::vector<size_t> shifted(dimension, 0);
-      const auto pending = [&](size_t j) { return times[shifted[j]] + lags[j]; };
+      const auto pending = [&](size_t j) { return channel.time(shifted[j]) + lags[j]; };
       for (size_t j = 0; j < dimension; ++j)
       {
-        while (shifted[j] < times.size() && pending(j) < start)
+        while (shifted[j] < n && pending(j) < start)
         {
           ++shifted[j];
         }
@@ -66,7 +66,7 @@ namespace sb
       // Shifted times can round to either side of the observation they mean,
       // so one point can come up at times an ulp apart. Two times give the
       // same point when every component reads the same observation at both;
-      // snapped_index decides which observation, with the channel's
+      // index_at decides which observation, with the channel's
       // snap_tolerance and snap_eps, as evaluation does. A component's index
       // never decreases with time, so a run of the same point ends where some
       // component's index differs from the one at the time before.
@@ -77,15 +77,14 @@ namespace sb
       // The first point stays at the start, so the domain keeps its start.
       // The last observation is a timestamp, so the domain keeps its end,
       // unless the first run reaches it.
-      std::vector<size_t> next(dimension, 0);
-      std::vector<size_t> previous(dimension);
+      std::vector<size_t> previous(dimension, 0);
       bool runHasTimestamp = false;
       while (true)
       {
         auto s = std::numeric_limits<float64_t>::infinity();
         for (size_t j = 0; j < dimension; ++j)
         {
-          if (shifted[j] < times.size())
+          if (shifted[j] < n)
           {
             s = std::min(s, pending(j));
           }
@@ -96,10 +95,10 @@ namespace sb
         }
         // The newest component has lag 0, so its pending times are the
         // channel's own timestamps.
-        const bool isTimestamp = shifted.back() < times.size() && pending(dimension - 1) == s;
+        const bool isTimestamp = shifted.back() < n && pending(dimension - 1) == s;
         for (size_t j = 0; j < dimension; ++j)
         {
-          while (shifted[j] < times.size() && pending(j) == s)
+          while (shifted[j] < n && pending(j) == s)
           {
             ++shifted[j];
           }
@@ -108,7 +107,7 @@ namespace sb
         bool changes = at.empty();
         for (size_t j = 0; j < dimension; ++j)
         {
-          const auto index = channel.snapped_index(next[j], s - lags[j]);
+          const auto index = channel.index_at(s - lags[j], previous[j]);
           if (index != previous[j])
           {
             changes = true;
