@@ -15,6 +15,7 @@ from ..nested_tensor import NestedTensor, _leaf_wrappers
 from ..point_cloud import PointCloud
 from ..symmetric_matrix import SymmetricMatrix
 from ..typing import (
+    _NATIVE_SUFFIX,
     barcode32,
     barcode64,
     boolean,
@@ -30,6 +31,7 @@ from ..typing import (
     pcf64i,
     pcloud32,
     pcloud64,
+    series,
     symmat32,
     symmat64,
     uint32,
@@ -129,8 +131,17 @@ _SERIES_NATIVE = {
     symmat64: cpp.TimeSeriesSymmetricMatrix64,
     barcode32: cpp.TimeSeriesBarcode32,
     barcode64: cpp.TimeSeriesBarcode64,
+    # Series of series, such as the windows of a series.
+    **{
+        series(element): getattr(cpp, f"TimeSeriesSeries{suffix}")
+        for element, suffix in _NATIVE_SUFFIX.items()
+    },
 }
 _SERIES_CPP_TO_DTYPE = {cls: dtype for dtype, cls in _SERIES_NATIVE.items()}
+_SERIES_TENSOR_TO_DTYPE = {
+    getattr(cpp, f"TimeSeries{suffix}Tensor"): series(element)
+    for element, suffix in _NATIVE_SUFFIX.items()
+}
 
 
 def _is_stablebear_object(value):
@@ -163,7 +174,7 @@ def _values_tensor(values):
             raise TypeError(
                 f"Unsupported time series values of dtype {array.dtype}"
             ) from error
-    if values.dtype not in _SERIES_NATIVE or not isinstance(
+    if values.dtype not in _NATIVE_SUFFIX or not isinstance(
         values, _leaf_wrappers()[values.dtype]
     ):
         raise TypeError(f"Unsupported time series values: {type(values).__name__}")
@@ -468,3 +479,30 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
             f"TimeSeries(n_channels={self.n_channels}, dtype={self.dtype}, "
             f"unit={self.unit!r})"
         )
+
+
+class TimeSeriesTensor(Tensor):
+    """Tensor whose elements are :class:`TimeSeries`, such as the values of a
+    series of windows. Its dtype is ``sb.series(inner)`` for series of
+    ``inner`` observations."""
+
+    def __init__(self, data):
+        super().__init__()
+        if isinstance(data, TimeSeriesTensor):
+            data = data._data
+        elif type(data) not in _SERIES_TENSOR_TO_DTYPE:
+            raise TypeError(f"Cannot create TimeSeriesTensor from {type(data)}")
+        self._data = data
+        self.dtype = _SERIES_TENSOR_TO_DTYPE[type(data)]
+
+    def _to_py_tensor(self, data):
+        return TimeSeriesTensor(data)
+
+    def _decay_value(self, val):
+        return val._data
+
+    def _represent_element(self, element):
+        return TimeSeries._from_cpp(element)
+
+    def _get_valid_setitem_dtypes(self):
+        return [TimeSeries, TimeSeriesTensor]

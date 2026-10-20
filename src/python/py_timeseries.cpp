@@ -1,5 +1,6 @@
 #include "py_timeseries.hpp"
 #include "py_io.hpp"
+#include "py_tensor.hpp"
 
 #include <sbear/distance_matrix.hpp>
 #include <sbear/functional/pcf.hpp>
@@ -39,7 +40,8 @@ namespace
       .def_property_readonly("snap_eps", &Channel::snap_eps)
       .def("__len__", &Channel::size);
 
-    py::class_<Series>(m, ("TimeSeries" + suffix).c_str())
+    py::class_<Series> cls(m, ("TimeSeries" + suffix).c_str());
+    cls
       .def(py::init<sb::Times, const sb::Tensor<T>&, sb::float64_t, sb::float64_t>(),
            py::arg("times"), py::arg("values"), py::arg("snap_tolerance"), py::arg("snap_eps"))
       .def_static("from_channels",
@@ -64,12 +66,32 @@ namespace
       .def("select", &Series::select, py::arg("indices"))
       .def("evaluate", py::overload_cast<sb::float64_t>(&Series::evaluate, py::const_), py::arg("t"))
       .def("evaluate", py::overload_cast<const sb::Tensor<sb::float64_t>&>(&Series::evaluate, py::const_),
-           py::arg("t"))
-      .def("_save", [](const Series& self, py::object file) {
+           py::arg("t"));
+
+    if constexpr (sb::is_timeseries_v<T>)
+    {
+      cls.def("_save", [](const Series&, py::object) {
+        throw std::runtime_error("Saving a series of series is not supported yet");
+      }, py::arg("file"));
+    }
+    else
+    {
+      cls.def("_save", [](const Series& self, py::object file) {
         sb_py::PythonOStreamBuf buf(file);
         std::ostream os(&buf);
         sb::write_object(self, os);
       }, py::arg("file"));
+    }
+  }
+
+  /// Bind series of element type T, tensors and nested tensors of them, and
+  /// series whose observations are such series, as windows give.
+  template <typename T>
+  void register_typed_timeseries(py::module_& m, const std::string& suffix)
+  {
+    register_timeseries_element<T>(m, suffix);
+    sb_py::register_tensor_element<sb::TimeSeries<T>>(m, "TimeSeries" + suffix);
+    register_timeseries_element<sb::TimeSeries<T>>(m, "Series" + suffix);
   }
 }
 
@@ -103,24 +125,24 @@ namespace sb_py
       .def("__len__", &sb::Times::size)
       .def("__eq__", [](const sb::Times& self, const sb::Times& other) { return self == other; });
 
-    register_timeseries_element<bool>(m, "Bool");
-    register_timeseries_element<sb::float32_t>(m, "Float32");
-    register_timeseries_element<sb::float64_t>(m, "Float64");
-    register_timeseries_element<sb::int32_t>(m, "Int32");
-    register_timeseries_element<sb::int64_t>(m, "Int64");
-    register_timeseries_element<uint32_t>(m, "Uint32");
-    register_timeseries_element<uint64_t>(m, "Uint64");
-    register_timeseries_element<sb::Pcf_f32>(m, "Pcf32");
-    register_timeseries_element<sb::Pcf_f64>(m, "Pcf64");
-    register_timeseries_element<sb::Pcf_i32>(m, "Pcf32i");
-    register_timeseries_element<sb::Pcf_i64>(m, "Pcf64i");
-    register_timeseries_element<sb::PointCloud<sb::float32_t>>(m, "PointCloud32");
-    register_timeseries_element<sb::PointCloud<sb::float64_t>>(m, "PointCloud64");
-    register_timeseries_element<sb::DistanceMatrix<sb::float32_t>>(m, "DistanceMatrix32");
-    register_timeseries_element<sb::DistanceMatrix<sb::float64_t>>(m, "DistanceMatrix64");
-    register_timeseries_element<sb::SymmetricMatrix<sb::float32_t>>(m, "SymmetricMatrix32");
-    register_timeseries_element<sb::SymmetricMatrix<sb::float64_t>>(m, "SymmetricMatrix64");
-    register_timeseries_element<sb::ph::Barcode<sb::float32_t>>(m, "Barcode32");
-    register_timeseries_element<sb::ph::Barcode<sb::float64_t>>(m, "Barcode64");
+    register_typed_timeseries<bool>(m, "Bool");
+    register_typed_timeseries<sb::float32_t>(m, "Float32");
+    register_typed_timeseries<sb::float64_t>(m, "Float64");
+    register_typed_timeseries<sb::int32_t>(m, "Int32");
+    register_typed_timeseries<sb::int64_t>(m, "Int64");
+    register_typed_timeseries<uint32_t>(m, "Uint32");
+    register_typed_timeseries<uint64_t>(m, "Uint64");
+    register_typed_timeseries<sb::Pcf_f32>(m, "Pcf32");
+    register_typed_timeseries<sb::Pcf_f64>(m, "Pcf64");
+    register_typed_timeseries<sb::Pcf_i32>(m, "Pcf32i");
+    register_typed_timeseries<sb::Pcf_i64>(m, "Pcf64i");
+    register_typed_timeseries<sb::PointCloud<sb::float32_t>>(m, "PointCloud32");
+    register_typed_timeseries<sb::PointCloud<sb::float64_t>>(m, "PointCloud64");
+    register_typed_timeseries<sb::DistanceMatrix<sb::float32_t>>(m, "DistanceMatrix32");
+    register_typed_timeseries<sb::DistanceMatrix<sb::float64_t>>(m, "DistanceMatrix64");
+    register_typed_timeseries<sb::SymmetricMatrix<sb::float32_t>>(m, "SymmetricMatrix32");
+    register_typed_timeseries<sb::SymmetricMatrix<sb::float64_t>>(m, "SymmetricMatrix64");
+    register_typed_timeseries<sb::ph::Barcode<sb::float32_t>>(m, "Barcode32");
+    register_typed_timeseries<sb::ph::Barcode<sb::float64_t>>(m, "Barcode64");
   }
 }

@@ -4,14 +4,11 @@ import math
 import operator
 
 from .. import _sb_cpp as cpp
-from ..typing import boolean, float32, float64, int32, int64, uint32, uint64
 from .series import TimeSeries
-
-_NUMERIC = (boolean, float32, float64, int32, int64, uint32, uint64)
 
 
 class TimeDelayEmbedding:
-    """Delay embedding of a numeric time series.
+    """Delay embedding of a time series.
 
     The embedding of a channel ``x`` with ``dimension`` ``m`` and ``delay``
     ``d`` evaluates at every time ``t`` from ``t_0 + (m - 1) * d`` to the
@@ -44,8 +41,6 @@ class TimeDelayEmbedding:
     ValueError
         On an invalid ``dimension`` or ``delay``, or when
         ``t_0 + (m - 1) * d`` is after the last observation of a channel.
-    TypeError
-        If the series does not hold numbers.
     """
 
     def __init__(self, dimension: int, delay: float):
@@ -57,8 +52,6 @@ class TimeDelayEmbedding:
             raise ValueError("The embedding delay must be finite and positive")
 
     def __call__(self, series: TimeSeries) -> TimeSeries:
-        if series.dtype not in _NUMERIC:
-            raise TypeError(f"Delay embedding needs a numeric series, got {series.dtype}")
         return TimeSeries._from_cpp(cpp.delay_embed(series._data, self.dimension, self.delay))
 
     def __repr__(self):

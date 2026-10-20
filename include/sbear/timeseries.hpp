@@ -244,6 +244,10 @@ namespace sb
     /// shares this channel and its snap settings.
     [[nodiscard]] Channel stack_at(Times times, std::span<const float64_t> lags) const;
 
+    /// stack_at with the single lag @p lag and no new axis: observation k is
+    /// this channel's observation in effect at times[k] - lag.
+    [[nodiscard]] Channel view_at(Times times, float64_t lag) const;
+
     /// The observation with the largest timestamp at or before @p t, in the
     /// channel's own unit, a tensor of shape shape(). A query below an
     /// observation by at most snap_tolerance() times the gap to the previous
@@ -281,6 +285,9 @@ namespace sb
     [[nodiscard]] TimeUnit unit() const noexcept { return times().unit(); }
     [[nodiscard]] const std::vector<size_t>& shape() const noexcept { return m_shape; }
     [[nodiscard]] size_t size() const noexcept { return times().size(); }
+
+    /// The same timestamps, shape, values, and snap settings.
+    [[nodiscard]] bool operator==(const Channel& other) const;
 
     /// Element @p i of the observations at times(), flattened in row-major
     /// order: observation i / prod(shape()), element i % prod(shape()).
@@ -333,6 +340,14 @@ namespace sb
   public:
     using value_type = T;
 
+    /// An empty one-channel series in seconds, so that series can be tensor
+    /// elements.
+    TimeSeries()
+      : TimeSeries(Times(std::vector<float64_t>{}), Tensor<T>(std::vector<size_t>{0}), DefaultSnapTolerance,
+                   DefaultSnapEps)
+    {
+    }
+
     TimeSeries(std::vector<Channel<T>> channels, TimeUnit unit);
 
     /// A series with one channel, queried in the unit of its times.
@@ -363,6 +378,15 @@ namespace sb
 
     /// The timestamps of channel @p i, converted to the query unit.
     [[nodiscard]] Times times(size_t i) const { return channel(i).times().to(m_unit); }
+
+    /// The first and last times, in the series' unit, at which every channel
+    /// has an observation: the latest first timestamp and the earliest last
+    /// one, converted exactly as check_observed() compares. Requires every
+    /// channel to have observations.
+    [[nodiscard]] std::pair<float64_t, float64_t> domain() const;
+
+    /// The same unit and channels.
+    [[nodiscard]] bool operator==(const TimeSeries& other) const = default;
 
     /// Every channel's value at @p t, given in the series' unit: one leaf per
     /// channel, in channel order, each a tensor of that channel's shape.

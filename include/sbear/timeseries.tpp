@@ -108,6 +108,22 @@ namespace sb
   }
 
   template <typename T>
+  Channel<T> Channel<T>::view_at(Times times, float64_t lag) const
+  {
+    const float64_t lags[] = {lag};
+    auto view = stack_at(std::move(times), lags);
+    view.m_shape.erase(view.m_shape.begin());
+    return view;
+  }
+
+  template <typename T>
+  bool Channel<T>::operator==(const Channel& other) const
+  {
+    return m_snapTolerance == other.m_snapTolerance && m_snapEps == other.m_snapEps && m_shape == other.m_shape
+           && times() == other.times() && values() == other.values();
+  }
+
+  template <typename T>
   Tensor<T> Channel<T>::lookup(float64_t t) const
   {
     Tensor<T> out(m_shape);
@@ -388,7 +404,7 @@ namespace sb
   }
 
   template <typename T>
-  void TimeSeries<T>::check_observed(float64_t t) const
+  std::pair<float64_t, float64_t> TimeSeries<T>::domain() const
   {
     auto first = -std::numeric_limits<float64_t>::infinity();
     auto last = std::numeric_limits<float64_t>::infinity();
@@ -402,6 +418,13 @@ namespace sb
       first = std::max(first, convert_time(recorded.front(), c.unit(), m_unit));
       last = std::min(last, convert_time(recorded.back(), c.unit(), m_unit));
     }
+    return {first, last};
+  }
+
+  template <typename T>
+  void TimeSeries<T>::check_observed(float64_t t) const
+  {
+    const auto [first, last] = domain();
     if (t < first || t > last)
     {
       std::ostringstream ss;

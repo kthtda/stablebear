@@ -2,6 +2,7 @@ __before = set(dir())
 
 from .embedding import TimeDelayEmbedding
 from .series import Times, TimeSeries
+from .window import Window
 
 import types as _types
 __all__ = sorted(

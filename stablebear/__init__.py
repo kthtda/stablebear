@@ -47,6 +47,7 @@ from .typing import (
     pcf64i,
     pcloud32,
     pcloud64,
+    series,
     symmat32,
     symmat64,
     uint32,

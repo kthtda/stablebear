@@ -7,6 +7,7 @@ import numpy as np
 from . import _sb_cpp as cpp
 from ._tensor_base import Tensor, _infer_shape_and_flatten
 from .typing import (
+    _NATIVE_SUFFIX,
     _NP_TO_SB,
     barcode32,
     barcode64,
@@ -23,6 +24,7 @@ from .typing import (
     pcf64i,
     pcloud32,
     pcloud64,
+    series,
     symmat32,
     symmat64,
     uint32,
@@ -50,6 +52,14 @@ _NESTED_CPP_TYPES = {
     symmat64: (cpp.NestedSymmetricMatrix64, cpp.NestedSymmetricMatrix64Tensor),
     barcode32: (cpp.persistence.NestedBarcode32, cpp.persistence.NestedBarcode32Tensor),
     barcode64: (cpp.persistence.NestedBarcode64, cpp.persistence.NestedBarcode64Tensor),
+    # Leaves of time series, such as the windows of a series.
+    **{
+        series(element): (
+            getattr(cpp, f"NestedTimeSeries{suffix}"),
+            getattr(cpp, f"NestedTimeSeries{suffix}Tensor"),
+        )
+        for element, suffix in _NATIVE_SUFFIX.items()
+    },
 }
 _NESTED_NODE_TO_DTYPE = {
     node_type: dtype for dtype, (node_type, _) in _NESTED_CPP_TYPES.items()
@@ -66,6 +76,7 @@ def _leaf_wrappers():
     from .persistence.ph_tensor import BarcodeTensor
     from .point_cloud import PointCloudTensor
     from .symmetric_matrix import SymmetricMatrixTensor
+    from .timeseries.series import TimeSeriesTensor
 
     return {
         float32: FloatTensor, float64: FloatTensor,
@@ -77,6 +88,7 @@ def _leaf_wrappers():
         distmat32: DistanceMatrixTensor, distmat64: DistanceMatrixTensor,
         symmat32: SymmetricMatrixTensor, symmat64: SymmetricMatrixTensor,
         barcode32: BarcodeTensor, barcode64: BarcodeTensor,
+        **{series(element): TimeSeriesTensor for element in _NATIVE_SUFFIX},
     }
 
 
