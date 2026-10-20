@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <array>
+#include <charconv>
 #include <cmath>
 #include <cstdint>
 #include <functional>
@@ -206,12 +207,15 @@ namespace sb
   /// share. A write materializes the view first unless it owns the storage
   /// alone, so other views never see it. Timestamps never change.
   ///
-  /// A channel either holds stored observations or, as a view made by
-  /// stack_at, stacks observations of a source channel at lagged times. A
-  /// view keeps its times, its lags, and for each observation a base: the
-  /// source observation for the smallest lag. The other components are found
-  /// by searching back from the base when read, so a view costs two numbers
-  /// per observation and copies no values.
+  /// A channel either holds stored observations or is a view whose
+  /// observations are those of a source channel: stacked at lagged times by
+  /// stack_at, or picked by index by take. A view keeps its times, its lags,
+  /// and for each observation a base: the source observation for the
+  /// smallest lag. The other components are found by searching back from the
+  /// base when read, so a view costs two numbers per observation and copies
+  /// no values. A view evaluates as any channel does, by previous value on
+  /// its own times with its own snapping, so it shows exactly the
+  /// observations it holds and nothing else of its source.
   template <typename T>
   class Channel
   {
@@ -244,9 +248,20 @@ namespace sb
     /// shares this channel and its snap settings.
     [[nodiscard]] Channel stack_at(Times times, std::span<const float64_t> lags) const;
 
-    /// stack_at with the single lag @p lag and no new axis: observation k is
-    /// this channel's observation in effect at times[k] - lag.
-    [[nodiscard]] Channel view_at(Times times, float64_t lag) const;
+    /// A view of this channel whose times are @p times and whose observation
+    /// k is this channel's observation @p indices[k], with no new axis. It
+    /// shares this channel and its snap settings, but not its end.
+    [[nodiscard]] Channel take(Times times, std::vector<size_t> indices) const;
+
+    /// This channel with the open end @p end, in its unit: it can be
+    /// evaluated after its last timestamp up to @p end, but not at it.
+    /// @p end must come after the last timestamp. Views made by stack_at
+    /// keep the end.
+    [[nodiscard]] Channel until(float64_t end) const;
+
+    /// The open end set by until(), if any; without one, the channel can be
+    /// evaluated up to and at its last timestamp.
+    [[nodiscard]] std::optional<float64_t> end() const noexcept { return m_end; }
 
     /// The observation with the largest timestamp at or before @p t, in the
     /// channel's own unit, a tensor of shape shape(). A query below an
@@ -258,10 +273,6 @@ namespace sb
     /// observations, in its own unit: a time converted into the channel's
     /// unit may round just outside them. A time below the first observation
     /// gets the first. Requires size() > 0.
-    ///
-    /// A view instead stacks its source's values at each lagged time
-    /// t - lags[j], with the source's snapping, so it evaluates as the
-    /// source does.
     [[nodiscard]] Tensor<T> lookup(float64_t t) const;
 
     /// The index of the observation in effect at @p t, in the channel's unit,
@@ -278,8 +289,8 @@ namespace sb
     /// channel's own unit, to @p out: the one at sortedTimes[k] goes to block
     /// order[k], each block prod(shape()) values long. @p out is a
     /// random-access iterator, such as a tensor's data() or a vector's
-    /// begin(). One merged pass over the timestamps, per lag for a view, as
-    /// in lookup(). Requires size() > 0.
+    /// begin(). One merged pass over the timestamps, as in lookup(). Requires
+    /// size() > 0.
     template <std::random_access_iterator Out>
     void lookup_sorted(std::span<const float64_t> sortedTimes, std::span<const size_t> order, Out out) const;
 
@@ -294,7 +305,7 @@ namespace sb
     [[nodiscard]] const std::vector<size_t>& shape() const noexcept { return m_shape; }
     [[nodiscard]] size_t size() const noexcept { return held_times().size(); }
 
-    /// The same timestamps, shape, values, and snap settings.
+    /// The same timestamps, end, shape, values, and snap settings.
     [[nodiscard]] bool operator==(const Channel& other) const;
 
     /// Element @p i of the observations at times(), flattened in row-major
@@ -341,6 +352,7 @@ namespace sb
     std::shared_ptr<const std::vector<size_t>> m_base;
     std::vector<float64_t> m_lags;
     std::vector<size_t> m_shape;
+    std::optional<float64_t> m_end;
     float64_t m_snapTolerance = DefaultSnapTolerance;
     float64_t m_snapEps = DefaultSnapEps;
   };
@@ -391,11 +403,20 @@ namespace sb
     /// The timestamps of channel @p i, converted to the query unit.
     [[nodiscard]] Times times(size_t i) const { return channel(i).times().to(m_unit); }
 
-    /// The first and last times, in the series' unit, at which every channel
-    /// has an observation: the latest first timestamp and the earliest last
-    /// one, converted exactly as check_observed() compares. Requires every
-    /// channel to have observations.
-    [[nodiscard]] std::pair<float64_t, float64_t> domain() const;
+    /// The times, in the series' unit, at which every channel can be
+    /// evaluated: from the latest first timestamp to the earliest end, a
+    /// channel's last timestamp or its open end, converted exactly as
+    /// check_observed() compares.
+    struct Domain
+    {
+      float64_t first;
+      float64_t last;
+      bool openEnd;  // last itself is outside the domain
+    };
+
+    /// The domain of the series. Requires every channel to have
+    /// observations.
+    [[nodiscard]] Domain domain() const;
 
     /// The same unit and channels.
     [[nodiscard]] bool operator==(const TimeSeries& other) const = default;

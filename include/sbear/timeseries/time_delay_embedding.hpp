@@ -45,8 +45,13 @@ namespace sb
     if (n > 0)
     {
       const auto start = channel.time(0) + lags.front();
-      const auto end = channel.time(n - 1);
-      if (start > end)
+      // A channel with an open end, such as a window, can be evaluated past
+      // its last timestamp up to its end, so the embedding can too, and keeps
+      // that end through stack_at.
+      const auto end = channel.end().value_or(channel.time(n - 1));
+      const auto open = channel.end().has_value();
+      const auto past = [&](float64_t s) { return open ? s >= end : s > end; };
+      if (past(start))
       {
         throw std::invalid_argument("The series is too short for this embedding: no time has its full history");
       }
@@ -89,7 +94,7 @@ namespace sb
             s = std::min(s, pending(j));
           }
         }
-        if (s > end)
+        if (past(s))
         {
           break;
         }
@@ -125,7 +130,7 @@ namespace sb
           runHasTimestamp = runHasTimestamp || isTimestamp;
         }
       }
-      if (at.back() != end)
+      if (!open && at.back() != end)
       {
         at.push_back(end);
       }

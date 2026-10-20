@@ -14,30 +14,31 @@ class Window:
     ``Window(size, step)(series)`` returns a 1-D tensor of dtype
     ``sb.series(series.dtype)`` with one window per start time
     ``a_k = t_0 + k * step``, while ``a_k + size`` is at most the last time
-    at which every channel of ``series`` has an observation; ``t_0`` is the
+    at which every channel of ``series`` can be evaluated; ``t_0`` is the
     first such time. With ``return_bounds=True`` it returns the tensor and a
     float64 tensor of shape ``(n_windows, 2)`` whose row ``k`` is
     ``(a_k, a_k + size)``, in the unit of ``series``.
 
-    Window ``k`` is a series with the channels of ``series``. Each channel
-    holds its observations at times ``t`` with ``a_k < t < a_k + size``, at
-    the times ``t - a_k`` in the channel's own unit, between the values in
-    effect at ``a_k``, at time 0, and at ``a_k + size``, at time ``size``.
-    Every window channel thus starts at 0 and ends at ``size`` with the
-    values of ``series`` there, so a window can be evaluated anywhere from 0
-    to ``size``, and nowhere else.
+    Window ``k`` covers ``[a_k, a_k + size)`` and is a series with the
+    channels of ``series``. Each channel holds the value in effect at
+    ``a_k``, at time 0, then its observations at times ``t`` with
+    ``a_k < t < a_k + size``, at the times ``t - a_k`` in the channel's own
+    unit. A window can be evaluated from 0 up to ``size``, after its last
+    observation too, but not at ``size``, and an observation at
+    ``a_k + size`` belongs only to the next window. A delay embedding of a
+    window keeps this open end.
     A bound computed in floating point that falls just short of an
     observation reaches it, with the channel's snapping, as evaluation does:
-    the observation is in the window, a window whose start reaches one is
-    shifted by its time, and an end that reaches one ends the window at it.
-    Each channel snaps with its own timestamps and settings, so channels of
-    one window can snap differently; the bounds are therefore the times
+    a window whose start reaches one is shifted by its time, and an end that
+    reaches one excludes it. Each channel snaps with its own timestamps and
+    settings, so channels of one window can snap differently; the bounds are therefore the times
     ``a_k`` and ``a_k + size`` as computed, before any snapping. For
     example, ``3 * 0.3`` computes just below 0.9: a window starting there
     starts at an observation at 0.9, but its bound reads
     ``0.8999999999999999``.
-    Each window shares its observations with ``series`` and evaluates as
-    ``series`` does at the corresponding times.
+    Each window shares its observations with ``series`` and copies none; it
+    evaluates by previous value on its own times, so it shows only the
+    observations it holds.
 
     Parameters
     ----------

@@ -12,12 +12,10 @@ class TimeDelayEmbedding:
 
     The embedding of a channel ``x`` with ``dimension`` ``m`` and ``delay``
     ``d`` evaluates at every time ``t`` from ``t_0 + (m - 1) * d`` to the
-    channel's last observation, both included, to the point
+    channel's last observation, both included, or up to but not at the end
+    of a window (:class:`Window`), to the point
     ``(x(t - (m - 1) * d), ..., x(t - d), x(t))``, oldest first, so each
-    observation gains a leading axis of length ``m``. Each component is the
-    channel evaluated at its delayed time, with the channel's snapping, so
-    the embedding agrees with evaluating the series even where a delayed
-    time snaps to an observation. Its times are the ends
+    observation gains a leading axis of length ``m``. Its times are the ends
     of that domain and the times between where a component reaches an
     observation, ``t_i + k * d`` for ``k`` from 0 to ``m - 1``, so it has at
     most ``m`` times per observation of the channel. Shifted times that
@@ -26,8 +24,10 @@ class TimeDelayEmbedding:
     0.3 rather than ``0.2 + 0.1``, else the latest of them. The first time is
     always ``t_0 + (m - 1) * d``.
 
-    The embedding is a view: it shares the series' observations and
-    evaluates them on demand.
+    Each point's components are the channel evaluated at its delayed times,
+    with the channel's snapping. Between its times the embedding evaluates
+    by previous value, as any series does, with its own snapping. It is a
+    view: it shares the series' observations and copies none.
 
     Parameters
     ----------

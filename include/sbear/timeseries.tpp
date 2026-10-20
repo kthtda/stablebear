@@ -109,19 +109,52 @@ namespace sb
   }
 
   template <typename T>
-  Channel<T> Channel<T>::view_at(Times times, float64_t lag) const
+  Channel<T> Channel<T>::take(Times times, std::vector<size_t> indices) const
   {
-    const float64_t lags[] = {lag};
-    auto view = stack_at(std::move(times), lags);
-    view.m_shape.erase(view.m_shape.begin());
+    if (indices.size() != times.size())
+    {
+      throw std::invalid_argument(
+          "Expected one index per time: got " + std::to_string(indices.size()) + " indices for "
+          + std::to_string(times.size()) + " times");
+    }
+    for (const auto i : indices)
+    {
+      if (i >= size())
+      {
+        throw std::out_of_range(
+            "Observation index " + std::to_string(i) + " is out of range for " + std::to_string(size())
+            + " observations");
+      }
+    }
+
+    // One component at lag 0, whose base is the given index.
+    Channel view = *this;
+    view.m_storage = nullptr;
+    view.m_source = std::make_shared<const Channel>(*this);
+    view.m_times = std::make_shared<const Times>(std::move(times));
+    view.m_base = std::make_shared<const std::vector<size_t>>(std::move(indices));
+    view.m_lags = {0.0};
+    view.m_end = std::nullopt;
     return view;
+  }
+
+  template <typename T>
+  Channel<T> Channel<T>::until(float64_t end) const
+  {
+    if (std::isnan(end) || (size() > 0 && end <= time(size() - 1)))
+    {
+      throw std::invalid_argument("The end of a channel must come after its last timestamp");
+    }
+    auto channel = *this;
+    channel.m_end = end;
+    return channel;
   }
 
   template <typename T>
   bool Channel<T>::operator==(const Channel& other) const
   {
     return m_snapTolerance == other.m_snapTolerance && m_snapEps == other.m_snapEps && m_shape == other.m_shape
-           && held_times() == other.held_times() && values() == other.values();
+           && m_end == other.m_end && held_times() == other.held_times() && values() == other.values();
   }
 
   template <typename T>
@@ -138,25 +171,6 @@ namespace sb
   template <std::random_access_iterator Out>
   void Channel<T>::lookup_sorted(std::span<const float64_t> sortedTimes, std::span<const size_t> order, Out out) const
   {
-    if (m_source)
-    {
-      // Look up the source at each lagged time, so a view snaps as its
-      // source does. Component j of the query for block order[k] fills
-      // source block order[k] * m + j.
-      const auto m = m_lags.size();
-      std::vector<float64_t> lagged(sortedTimes.size());
-      std::vector<size_t> blocks(sortedTimes.size());
-      for (size_t j = 0; j < m; ++j)
-      {
-        for (size_t k = 0; k < sortedTimes.size(); ++k)
-        {
-          lagged[k] = sortedTimes[k] - m_lags[j];
-          blocks[k] = order[k] * m + j;
-        }
-        m_source->lookup_sorted(lagged, blocks, out);
-      }
-      return;
-    }
     const auto blockSize = block_size();
     const auto indices = indices_sorted(sortedTimes);
     for (size_t k = 0; k < sortedTimes.size(); ++k)
@@ -234,6 +248,11 @@ namespace sb
   template <typename T>
   size_t Channel<T>::source_index(size_t k, size_t j) const
   {
+    // A single component is the base, given by take or found by stack_at.
+    if (m_lags.size() == 1)
+    {
+      return (*m_base)[k];
+    }
     // The first timestamp after the lagged time is at or before the one
     // after the base, usually a few observations back.
     const auto& times = m_source->held_times().values();
@@ -405,31 +424,43 @@ namespace sb
   }
 
   template <typename T>
-  std::pair<float64_t, float64_t> TimeSeries<T>::domain() const
+  typename TimeSeries<T>::Domain TimeSeries<T>::domain() const
   {
-    auto first = -std::numeric_limits<float64_t>::infinity();
-    auto last = std::numeric_limits<float64_t>::infinity();
+    Domain domain{-std::numeric_limits<float64_t>::infinity(), std::numeric_limits<float64_t>::infinity(), false};
     for (const auto& c : m_channels)
     {
       if (c.size() == 0)
       {
         throw std::domain_error("Cannot evaluate a channel without observations");
       }
-      first = std::max(first, convert_time(c.time(0), c.unit(), m_unit));
-      last = std::min(last, convert_time(c.time(c.size() - 1), c.unit(), m_unit));
+      domain.first = std::max(domain.first, convert_time(c.time(0), c.unit(), m_unit));
+      // An open end at the same time as another channel's last timestamp
+      // still excludes that time.
+      const auto last = convert_time(c.end().value_or(c.time(c.size() - 1)), c.unit(), m_unit);
+      if (last < domain.last || (last == domain.last && c.end()))
+      {
+        domain.last = last;
+        domain.openEnd = c.end().has_value();
+      }
     }
-    return {first, last};
+    return domain;
   }
 
   template <typename T>
   void TimeSeries<T>::check_observed(float64_t t) const
   {
-    const auto [first, last] = domain();
-    if (t < first || t > last)
+    const auto domain = this->domain();
+    if (t < domain.first || t > domain.last || (domain.openEnd && t == domain.last))
     {
-      std::ostringstream ss;
-      ss << "Time " << t << " is outside the domain [" << first << ", " << last << "]";
-      throw std::domain_error(ss.str());
+      // The shortest text that reads back as the same number, so a bound
+      // such as 0.8999999999999999 does not show as 0.9.
+      const auto text = [](float64_t x) {
+        std::array<char, 32> buffer;
+        const auto result = std::to_chars(buffer.data(), buffer.data() + buffer.size(), x);
+        return std::string(buffer.data(), result.ptr);
+      };
+      throw std::domain_error("Time " + text(t) + " is outside the domain [" + text(domain.first) + ", "
+                              + text(domain.last) + (domain.openEnd ? ")" : "]"));
     }
   }
 }

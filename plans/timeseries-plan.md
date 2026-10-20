@@ -168,7 +168,7 @@ parallel threshold.
 
 ## Decisions
 
-- [x] **1. Domain and evaluation.** (decision: (a), closed domain for series built from observations, half-open for windows; revised during item 26: there is no domain. A series can be evaluated from the first to the last observation of every channel, both included, checked against the timestamps on each query; there is no `domain` property, and a series with an empty channel cannot be evaluated. Windows follow the same rule: there is no open or closed end anywhere, see item 43.) Evaluation
+- [x] **1. Domain and evaluation.** (decision: (a), closed domain for series built from observations, half-open for windows; revised during item 26: there is no domain. A series can be evaluated from the first to the last observation of every channel, both included, checked against the timestamps on each query; there is no `domain` property, and a series with an empty channel cannot be evaluated. Windows follow the same rule: there is no open or closed end anywhere, see item 43. Revised again during item 43: windows are `[a, a + size)`, so a channel may carry an open end after its last timestamp, set by `Channel::until`; it is the only stored bound, and series without one keep the rule above.) Evaluation
   uses the previous value: at time `t`, the observation with the largest
   timestamp `<= t`. Queries outside the domain raise `ValueError`. Options for
   the domain of a channel:
@@ -349,7 +349,7 @@ parallel threshold.
   - An empty list gives an empty float64 channel, so a typed empty channel of
     point clouds is built from `sb.zeros((0,), dtype=sb.pcloud64)`.
 
-- [x] **8. Views.** (decision: every channel is a view of shared storage; a write materializes the whole view. Revised during item 40, first with index tables and then, for memory, as follows: a view made by `stack_at(times, lags)` stacks a source channel's observations at lagged times. It keeps its times, its lags, and per observation a base, the source observation for the smallest lag; each component is found when read by a galloping search back from the base (steps of 1, 2, 4, ... observations, then bisection; `gallop_upper_bound` in `include/sbear/algorithms/gallop.hpp`), with the source's snapping. A view costs two numbers per observation, and views of views nest through their source. `Channel` offers only `stack_at`, `view_at` (one lag, no new axis), and the cursor lookup `index_at(next, t)`, which snaps. It does not hand out its timestamp array: `time(k)` reads one timestamp to build new times from and `times()` returns a copy, so the only way from a time to an observation is `index_at`, and every lookup outside `Channel` snaps (revised after item 43, when window bounds first searched the raw timestamps); derived series, embeddings and windows alike, are built from them outside `Channel` and `TimeSeries`, in `timeseries/time_delay_embedding.hpp` and `timeseries/windowing.hpp`, and look like any other series to callers, including ufuncs, which read elements through `flat_value(i)`. The lags, domain, and descriptor described below predate this and are kept for history.)
+- [x] **8. Views.** (decision: every channel is a view of shared storage; a write materializes the whole view. Revised during item 40, first with index tables and then, for memory, as follows: a view made by `stack_at(times, lags)` stacks a source channel's observations at lagged times. It keeps its times, its lags, and per observation a base, the source observation for the smallest lag; each component is found when read by a galloping search back from the base (steps of 1, 2, 4, ... observations, then bisection; `gallop_upper_bound` in `include/sbear/algorithms/gallop.hpp`), with the source's snapping. A view costs two numbers per observation, and views of views nest through their source. Revised again during item 43: every view evaluates as any channel does, by previous value on its own times with its own snapping (its source's settings, applied to its own gaps), and reads values from its source by index; snapping against the source happens only when a view is built, where computed times such as `0.3 - 0.1` must reach the observations they mean. Views that looked up the source at query time showed observations they did not hold, such as the one at a window's open end, and would have shown the dropped ones of a thinning view. `Channel` offers only `stack_at`, `take` (observations by index, no new axis; it replaced `view_at`, one lag), and the cursor lookup `index_at(next, t)`, which snaps. It does not hand out its timestamp array: `time(k)` reads one timestamp to build new times from and `times()` returns a copy, so the only way from a time to an observation is `index_at`, and every lookup outside `Channel` snaps (revised after item 43, when window bounds first searched the raw timestamps); derived series, embeddings and windows alike, are built from them outside `Channel` and `TimeSeries`, in `timeseries/time_delay_embedding.hpp` and `timeseries/windowing.hpp`, and look like any other series to callers, including ufuncs, which read elements through `flat_value(i)`. The lags, domain, and descriptor described below predate this and are kept for history.)
   - Like a tensor view, a channel is a `shared_ptr` to its storage plus a
     small descriptor of how a query time maps into it: the domain (start, end,
     and end closedness), `lags` (time offsets that add leading observation
@@ -785,11 +785,12 @@ observation it came from.
   `timeseries/time_delay_embedding.hpp`: one merged pass walks the shifted copies of the
   timestamps without storing them, one cursor per component finds the runs
   through `Channel::index_at` (now public), and `Channel::stack_at`
-  makes the view (decision 8), 16 bytes per point. It evaluates by looking
-  up the source at each lagged time with the source's snapping, not by
-  previous value on its own points, so it equals the series evaluated at the
-  delayed times everywhere, also where a delayed time snaps to an
-  observation; `TimeSeries` and its
+  makes the view (decision 8), 16 bytes per point. Each point's components
+  are the source evaluated at the point's delayed times, with the source's
+  snapping; between points it evaluates by previous value on its own times
+  with its own snapping, as every view does (revised during item 43: it
+  first looked up the source at the delayed query times, so within the snap
+  distance below a point it could differ from a saved copy); `TimeSeries` and its
   binding know nothing of it. Tests with times `Times([0.0, 1.0, 2.5, 4.0], unit="ms")`,
   values `[0.0, 10.0, 25.0, 40.0]` (each `10 * t`, so a carried value stands
   out), `dimension=3`, and `delay=1.0`:
@@ -941,39 +942,45 @@ observation it came from.
   returns the bounds, a float64 tensor of shape `(n_windows, 2)` with rows
   `(a_k, a_k + size)` in the series' unit, as computed, not snapped:
   each channel snaps with its own timestamps and settings, so one window's
-  channels can snap differently and no single snapped bound exists. Each
-  window is a series with the source's channels. Each channel holds its
-  observations with `a_k < t < a_k + size` between the values in effect at
-  `a_k`, at time 0, and at `a_k + size`, at time `size`, so every window
-  channel can be evaluated on all of `[0, size]` and nowhere else, and a
-  window is never empty. An observation at either bound is that bound's
-  value; otherwise the value comes from the observation before it.
-  (Revised during item 43: windows first held only the observations in
-  `[a_k, a_k + size]`, and the sampler read values outside them from the
-  source. The sampler must not see values the user cannot, so the window
-  holds them itself.) A window's timestamps are always
+  channels can snap differently and no single snapped bound exists. Window
+  `k` covers `[a_k, a_k + size)`, as the issue asks and as Polars
+  `group_by_dynamic`, Spark, and Flink do by default: it is a series with
+  the source's channels, each holding the value in effect at `a_k`, at time
+  0, then the observations with `a_k < t < a_k + size`, with the open end
+  `size` (`Channel::until`). Every window channel can thus be evaluated
+  from 0 up to `size`, past its last observation too, but not at `size`; a
+  window is never empty, and an observation at `a_k + size` belongs only to
+  the next window. An open end is the one place a series keeps an end that
+  is not a timestamp: `TimeSeries::domain` takes the earliest end of its
+  channels, open if any channel's is, and the error names it, as in
+  `[0, 2)`. A delay embedding of a window keeps the open end, and its
+  change times run up to it. (Revised during item 43: windows first held
+  only the observations in `[a_k, a_k + size]`, and the sampler read values
+  outside them from the source. The sampler must not see values the user
+  cannot, so the window holds them itself; the closed end then gave way to
+  `[)`, which needed views that evaluate on their own points, decision 8.
+  A copy of the last observation one float below `size` first stood in for
+  the open end, but it showed in `times` as `1.9999999999999998` and would
+  have needed writes to keep it equal to the observation it copied.) A
+  window's timestamps are always
   shifted so that `a_k` is 0, in each channel's own unit (a `relative=False`
   option keeping the original timestamps was dropped). Window bounds are
   computed in floating point (`0 + k * 0.3` is `0.8999999999999999` for
   `k = 3`), so they are cut with the channel's snapping, as evaluation does:
-  a bound that falls just short of an observation reaches it, and a window
+  a bound that falls just short of an observation reaches it: a window
   whose start reaches an observation is shifted by that observation's time,
-  so its first time is exactly 0. A bound that rounds just past an
-  observation still misses it, since snapping only moves forward. `t_0` and `t_{n-1}` are the first and last times at which every
-  channel has an observation (`TimeSeries::domain`). As embeddings are,
-  windows are built in `timeseries/windowing.hpp` from a generic `Channel`
-  view, so `Channel` knows nothing of windows: each window channel is
-  `Channel::view_at(times, -shift)`, stack_at with a single lag and no new
-  axis, at the window's shifted times. It copies no values and stores 16
-  bytes per observation per window, so overlapping windows multiply that
-  by the overlap. It evaluates as its source does at the corresponding
-  times, with the source's snapping. A window reads its
-  source at `(t - a_k) + a_k`, which can round just below `t`, often for a
-  window starting at a negative time; without snapping, or when `|a_k|` is
-  far larger than `|t|`, the point would read the observation before it.
-  Each window time is therefore taken one float up at a time until adding
-  `a_k` back reaches `t`. Tests with the
-  source series:
+  so its first time is exactly 0, and an end that reaches one excludes it.
+  A bound that rounds just past an observation still misses it, since
+  snapping only moves forward. `t_0` and `t_{n-1}` are the first and last
+  times at which every channel has an observation (`TimeSeries::domain`).
+  As embeddings are, windows are built in `timeseries/windowing.hpp` from a
+  generic `Channel` view, so `Channel` knows nothing of windows: each window
+  channel is `Channel::take(times, indices)`, a view whose observation `k`
+  is the source observation `indices[k]`, at the window's shifted times. It
+  copies no values and stores 16 bytes per observation per window, so
+  overlapping windows multiply that by the overlap. Shifting can round two
+  close times together, so each time is at least one float above the one
+  before. Tests with the source series:
   - Parametrized over the arguments and the starts in the bounds:
     `size=2.0, step=1.0` gives `[0.0, 1.0, 2.0]`; `size=1.0, step=1.5` gives
     `[0.0, 1.5, 3.0]`; `size=2.0` gives `[0.0, 2.0]`; the ends are the
@@ -981,37 +988,43 @@ observation it came from.
     anchored at the end, partial windows kept, a step larger than the size
     rejected or clamped, an overlapping default, bounds out of step with the
     windows.
-  - With `size=2.0, step=1.0`, the window at 1.0 has times
-    `[0.0, 0.5, 1.5, 2.0]` and values `[5.0, 15.0, 25.0, 25.0]`.
-    **Catches:** no value at the window's start or end, the observation
-    before the start kept at its own time, timestamps not shifted or
-    shifted by the wrong amount.
-  - With `size=1.5, step=1.5`, the windows at 0.0 and 1.5 both hold the
-    observation at 1.5 (values `[0, 5, 15]` and `[15, 25, 25]`).
-    **Catches:** an end of the window excluded, a value added at a bound
-    that has an observation.
+  - With `size=2.0, step=1.0`, the window at 1.0 has times `[0.0, 0.5, 1.5]`
+    and values `[5.0, 15.0, 25.0]`; it is 5 at 0 and 25 at 1.75, after its
+    last observation, and evaluating it at 2.0 raises `ValueError` naming
+    the domain `[0, 2)`. **Catches:** no value at the window's start, a
+    closed end or one at the last observation, the observation before the
+    start kept at its own time, timestamps not shifted or shifted by the
+    wrong amount.
+  - With `size=1.5, step=1.5`, only the second window holds the
+    observation at 1.5 (values `[0, 5]` and `[15, 25]`). **Catches:** an
+    observation at the end kept in the earlier window.
   - With `size=0.5, step=0.5`, the window at 3.0, between the observations
-    at 2.5 and 4.0, has times `[0.0, 0.5]` and values `[25.0, 25.0]`.
-    **Catches:** an empty window, a crash when no observation falls in the
-    window.
+    at 2.5 and 4.0, has times `[0.0]`, values `[25.0]`, and the value 25.0
+    at 0.25. **Catches:** an empty window, a crash when no observation falls
+    in the window, a window that cannot be evaluated past its only
+    observation.
   - (added) Times `[0.0, 0.3, 0.6, 0.9, 1.2]`, values `10 * t`, `size=0.3`,
     `step=0.3`: `3 * 0.3` computes just below 0.9, and still window 2 holds
-    `[6, 9]` and window 3 holds `[9, 12]` with its first time exactly 0.
-    **Catches:** bounds that round just short of an observation missing it
-    (window 2 would be `[6, 6]`) or carrying the value before it in (window
-    3 would be `[6, 9, 12]` with 9 at `1.1e-16`).
-  - (added) Times `[-1.0, -0.3, 0.2, 0.5]`, values `10 * t`,
-    `snap_tolerance=0.0`, `size=1.5`: the window from -1.0 holds all four
-    values, though `(-0.3 + 1.0) - 1.0` and `(0.2 + 1.0) - 1.0` round below
-    -0.3 and 0.2. **Catches:** a window reading the observation before one of
-    its own when the shift does not round-trip.
+    `[6]`, without 0.9, and window 3 holds `[9]` at time exactly 0.
+    **Catches:** a start that rounds just short of an observation carrying
+    the value before it in (window 3 would be `[6, 9]` with 9 at
+    `1.1e-16`), an end just short of one keeping it.
+  - (added) An embedding (`dimension=2`, `delay=0.4`) of the window at 1.0
+    has times `[0.4, 0.5, 0.9, 1.5, 1.9]`, is `[25, 25]` at 1.95, and raises
+    at 2.0 naming `[0.4, 2)`. **Catches:** an embedding of a window stopping
+    at the window's last observation (1.9, where the newer component
+    reaches 1.5, would be missing) or losing its open end.
+  - (dropped with `take`: a window from -1.0 over times
+    `[-1.0, -0.3, 0.2, 0.5]` read the observation before one of its own
+    when `(t - a_k) + a_k` rounded below `t`. Windows now read their
+    observations by index, so no time is added back.)
 
 - [ ] **44. `series.window(a, b)`.** One window, with the same rules as item
   43 and `size = b - a`; `t_0 <= a <= b <= t_{n-1}` is required. Tests with
   the source series:
-  - `w = series.window(1.0, 3.0)` has times `[0.0, 0.5, 1.5, 2.0]` and
-    values `[5.0, 15.0, 25.0, 25.0]`; `w(0.25) == 5.0`, `w(1.0) == 15.0`,
-    and `w(-0.25)` and `w(2.25)` raise `ValueError`. **Catches:** the window differing from the one
+  - `w = series.window(1.0, 3.0)` has times `[0.0, 0.5, 1.5]` and values
+    `[5.0, 15.0, 25.0]`; `w(0.25) == 5.0`, `w(1.0) == 15.0`, and `w(-0.25)` and `w(2.0)` raise
+    `ValueError`. **Catches:** the window differing from the one
     `Window` produces, evaluation reaching before the window.
   - `series.window(3.0, 1.0)` and `series.window(-1.0, 1.0)` raise
     `ValueError`. **Catches:** reversed bounds or bounds outside the domain
@@ -1028,21 +1041,23 @@ observation it came from.
 
 - [ ] **46. Embedding a window, and windowing an embedding.** Tests:
   - `TimeDelayEmbedding(dimension=2, delay=1.0)` of `series.window(1.0, 3.0)`
-    (times `[0.0, 0.5, 1.5, 2.0]`) has times `[1.0, 1.5, 2.0]` and points
-    `[[5, 15], [15, 25], [15, 25]]`; evaluating it at 0.75 raises
-    `ValueError`. **Catches:**
-    history taken from before the window.
+    (times `[0.0, 0.5, 1.5]`, open end 2) has times `[1.0, 1.5]` and points
+    `[[5, 15], [15, 25]]`; evaluating it at 0.75 and at 2.0 raises
+    `ValueError`. **Catches:** history taken from before the window, the
+    window's open end lost.
   - `Window(size=2.0, step=1.0)` of `TimeDelayEmbedding(dimension=2,
     delay=1.0)` of the source (times `[1.0, 1.5, 2.5, 3.5, 4.0]`) has
     windows starting at 1.0 and 2.0, and the first has times
-    `[0.0, 0.5, 1.5, 2.0]` and values `[[0, 5], [5, 15], [15, 25], [15, 25]]`. **Catches:** the embedding's points
+    `[0.0, 0.5, 1.5]` and values `[[0, 5], [5, 15], [15, 25]]`. **Catches:** the embedding's points
     lost when windowing.
 
-- [ ] **47. Windows of several channels.** One cut, `[a, a + size]` in the
+- [ ] **47. Windows of several channels.** One cut, `[a, a + size)` in the
   query unit, applies to every channel. Test: `Window(size=1.0, step=1.0)` of
-  the series of channels A and B has starts `[0.5, 1.5]` in seconds; the first
-  window's `times` leaves are `[0.0, 0.5, 1.0]` and `[0.0, 1.0]`, and the
-  second's are `[0.0, 1.0]` and `[0.0, 1.0]`. **Catches:** channels cut at different
+  the series of channels A and B has starts `[0.5, 1.5]` in seconds; the
+  first window's `times` leaves are `[0.0, 0.5]` and `[0.0]`, without B's
+  observation at 1500 ms, and the second's are `[0.0]` and `[0.0]`; the
+  first window evaluates at 0.5 to leaves 20 and -1 and raises at 1.0.
+  **Catches:** channels cut at different
   bounds, channel B cut in milliseconds.
 
 ## Writing
@@ -1065,10 +1080,11 @@ Items 48-50 use the source series of items 43-46 and the embedding of item
 
 - [ ] **49. Writing a window.** A write into a window first materializes
   it into storage of its own (decision 4), its observations at its times,
-  including the one at 0; a write changes nothing but the written values.
-  Neither the source nor other windows change. Test: with
-  `w = series.window(1.0, 3.0)`, `w.values[1] = 30.0` gives `w(0.5) == 30.0`,
-  `w.times == [0.0, 0.5, 1.5, 2.0]`, and `len(w) == 4`;
+  including the one at 0, and keeps its open end; a write changes nothing
+  but the written values. Neither the source nor other windows change.
+  Test: with `w = series.window(1.0, 3.0)`, `w.values[1] = 30.0` gives
+  `w(0.5) == 30.0`, `w.times == [0.0, 0.5, 1.5]`, `len(w) == 3`, and
+  `w(2.0)` still raises;
   `RegularSampler(n_points=2)(w)` is `[[5], [30]]`; and
   `series(1.5) == 15.0` and `series.window(0.0, 2.0)` are unchanged.
   **Catches:** the write reaching the source or a sibling window, the value
@@ -1129,7 +1145,8 @@ Items 48-50 use the source series of items 43-46 and the embedding of item
 - [ ] **56. Saving embeddings and windows.** An embedding is saved
   materialized (decision 9): its support and values, as an ordinary series.
   A tensor of windows is saved as a tensor of series, each window
-  materialized in item 49's form, with its values at both bounds. A loaded
+  materialized in item 49's form, with its value at 0 and its open end, so
+  the format records a channel's end when it has one. A loaded
   one therefore evaluates and
   samples exactly as the original, with no source in the file; with
   overlapping windows an observation is written once per window holding
@@ -1137,10 +1154,8 @@ Items 48-50 use the source series of items 43-46 and the embedding of item
   over `save`/`load` and `pickle`:
   - Item 40's embedding loads with the same times and the same values at 2.5
     and 3.25. **Catches:** the embedded points lost on saving.
-  A loaded embedding is a stored series and evaluates by previous value on
-  its points with their own snapping, so within the snapping distance just
-  below a point it can differ from the view, which snaps as its source does
-  (item 40). Document this with the saving contract.
+  A loaded embedding evaluates exactly as the view, since views evaluate by
+  previous value on their own points with their own snapping (decision 8).
   - `Window(size=2.0, step=1.0)` of the source loads with the same windows
     in order, and `RegularSampler(n_points=2)` of it gives
     item 52's clouds. **Catches:** windows reordered or their values at the

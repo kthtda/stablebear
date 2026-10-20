@@ -3,7 +3,7 @@ import pytest
 
 import stablebear as sb
 from stablebear import FloatTensor
-from stablebear.timeseries import TimeSeries, Window
+from stablebear.timeseries import TimeDelayEmbedding, TimeSeries, Window
 from stablebear.timeseries.series import TimeSeriesTensor
 
 
@@ -15,18 +15,18 @@ def _windows_source():
 def test_windows_are_a_tensor_of_series_of_the_source_dtype():
     windows = Window(size=2.0, step=2.0)(_windows_source())
 
-    # The windows start at 0.0 and 2.0. The first holds 0.0, 0.5, and 1.5,
-    # and ends with the value at 2.0, observed at 1.5; the second starts with
-    # that value and holds 2.5 and 4.0.
+    # The windows cover [0.0, 2.0) and [2.0, 4.0). The first holds 0.0, 0.5,
+    # and 1.5; the second starts with the value at 2.0, observed at 1.5, and
+    # holds 2.5.
     assert isinstance(windows, TimeSeriesTensor)
     assert windows.dtype is sb.series(sb.float64)
     assert windows.shape == (2,)
     assert windows[0].dtype is sb.float64
     assert windows[1].dtype is sb.float64
-    assert np.array_equal(np.asarray(windows[0].times), [0.0, 0.5, 1.5, 2.0])
-    assert np.array_equal(np.asarray(windows[0].values), [0.0, 5.0, 15.0, 15.0])
-    assert np.array_equal(np.asarray(windows[1].times), [0.0, 0.5, 2.0])
-    assert np.array_equal(np.asarray(windows[1].values), [15.0, 25.0, 40.0])
+    assert np.array_equal(np.asarray(windows[0].times), [0.0, 0.5, 1.5])
+    assert np.array_equal(np.asarray(windows[0].values), [0.0, 5.0, 15.0])
+    assert np.array_equal(np.asarray(windows[1].times), [0.0, 0.5])
+    assert np.array_equal(np.asarray(windows[1].values), [15.0, 25.0])
 
 
 @pytest.mark.parametrize("window, starts", [
@@ -54,29 +54,34 @@ def test_windowing_raises_when_no_window_fits(series, match):
         Window(size=5.0, step=1.0)(series)
 
 
-def test_a_window_starts_and_ends_with_the_values_at_its_bounds():
-    # The window from 1.0 to 3.0 holds 1.5 and 2.5 between the values at 1.0,
-    # observed at 0.5, and at 3.0, observed at 2.5.
+def test_a_window_can_be_evaluated_from_its_start_up_to_its_end():
+    # The window [1.0, 3.0) holds the value at 1.0, observed at 0.5, then 1.5
+    # and 2.5.
     window = Window(size=2.0, step=1.0)(_windows_source())[1]
 
-    assert np.array_equal(np.asarray(window.times), [0.0, 0.5, 1.5, 2.0])
-    assert np.array_equal(np.asarray(window.values), [5.0, 15.0, 25.0, 25.0])
+    assert np.array_equal(np.asarray(window.times), [0.0, 0.5, 1.5])
+    assert np.array_equal(np.asarray(window.values), [5.0, 15.0, 25.0])
+    assert window(0.0) == 5.0
+    assert window(1.75) == 25.0
+    with pytest.raises(ValueError, match=r"outside the domain \[0, 2\)"):
+        window(2.0)
 
 
-def test_windows_include_both_ends():
+def test_an_observation_at_a_window_boundary_is_only_in_the_later_window():
     windows = Window(size=1.5, step=1.5)(_windows_source())
 
-    # The observation at 1.5 ends the first window and starts the second.
-    assert np.array_equal(np.asarray(windows[0].values), [0.0, 5.0, 15.0])
-    assert np.array_equal(np.asarray(windows[1].values), [15.0, 25.0, 25.0])
+    # The observation at 1.5 starts the second window, not the first.
+    assert np.array_equal(np.asarray(windows[0].values), [0.0, 5.0])
+    assert np.array_equal(np.asarray(windows[1].values), [15.0, 25.0])
 
 
-def test_a_window_between_observations_holds_the_value_at_its_bounds():
-    # The window from 3.0 to 3.5 falls between the observations at 2.5 and 4.0.
+def test_a_window_between_observations_holds_the_value_at_its_start():
+    # The window [3.0, 3.5) falls between the observations at 2.5 and 4.0.
     window = Window(size=0.5, step=0.5)(_windows_source())[6]
 
-    assert np.array_equal(np.asarray(window.times), [0.0, 0.5])
-    assert np.array_equal(np.asarray(window.values), [25.0, 25.0])
+    assert np.array_equal(np.asarray(window.times), [0.0])
+    assert np.array_equal(np.asarray(window.values), [25.0])
+    assert window(0.25) == 25.0
 
 
 def test_window_bounds_just_below_an_observation_reach_it():
@@ -88,18 +93,22 @@ def test_window_bounds_just_below_an_observation_reach_it():
     # there.
     assert np.asarray(bounds)[2, 1] < 0.9
     assert np.asarray(bounds)[3, 0] < 0.9
-    # Window 2 ends at the observation at 0.9, and window 3 starts at it, at
-    # time 0.
-    assert np.array_equal(np.asarray(windows[2].values), [6.0, 9.0])
-    assert np.asarray(windows[3].times)[0] == 0.0
-    assert np.array_equal(np.asarray(windows[3].values), [9.0, 12.0])
+    # The observation at 0.9 is the end of window 2, so only window 3 holds
+    # it, at time 0.
+    assert np.array_equal(np.asarray(windows[2].values), [6.0])
+    assert np.array_equal(np.asarray(windows[3].times), [0.0])
+    assert np.array_equal(np.asarray(windows[3].values), [9.0])
 
 
-def test_a_window_reads_its_own_observations_without_snapping():
-    # In the window from -1.0, (-0.3 + 1.0) - 1.0 and (0.2 + 1.0) - 1.0 round
-    # below -0.3 and 0.2, and snapping is off.
-    series = TimeSeries([-10.0, -3.0, 2.0, 5.0], times=[-1.0, -0.3, 0.2, 0.5], snap_tolerance=0.0)
+def test_an_embedding_of_a_window_keeps_its_open_end():
+    # The window [1.0, 3.0) holds 5, 15, and 25 at 0.0, 0.5, and 1.5. With a
+    # delay of 0.4, the newer component reaches 1.5 at 1.9, between the
+    # window's last observation and its end.
+    window = Window(size=2.0, step=1.0)(_windows_source())[1]
 
-    window = Window(size=1.5, step=1.5)(series)[0]
+    embedding = TimeDelayEmbedding(dimension=2, delay=0.4)(window)
 
-    assert np.array_equal(np.asarray(window.values), [-10.0, -3.0, 2.0, 5.0])
+    assert np.array_equal(np.asarray(embedding.times), [0.4, 0.5, 0.9, 1.5, 1.9])
+    assert np.array_equal(np.asarray(embedding(1.95)), [25.0, 25.0])
+    with pytest.raises(ValueError, match=r"outside the domain \[0.4, 2\)"):
+        embedding(2.0)
