@@ -18,8 +18,12 @@ Where the plan departs from the issue:
 - A delay embedding adds a leading delay axis to each observation, and the
   sampler flattens observations into points and returns a series of point
   clouds directly, so `PointCloudTensor` needs no `FloatTensor` constructor.
-- Windows are a series of series (`TimeSeries<TimeSeries<T>>`), each window
-  an ordinary series of the observations it contains (item 43).
+- `Window` takes a size and a step, not an overlap: the overlap is
+  `size - step`, and a step larger than the size, which leaves gaps, has no
+  overlap to give (item 43).
+- Windows are a 1-D tensor of series (`Tensor<TimeSeries<T>>`), each window
+  an ordinary series of the observations it contains, with their start and
+  end times as a float tensor on request (item 43).
 
 ## How to work through this plan
 
@@ -112,7 +116,8 @@ This assumes the recommended option of each decision.
   returns the value for one channel or a `NestedTensor` with one leaf per
   channel for several. `Window(size, step)(series)` is a series of windows,
   `series.window(a, b)` is one window, and `series[i]` selects channels by
-  index.
+  index. `Window(size, step)(series)` is a tensor of windows, and
+  `return_bounds=True` adds their start and end times.
 - Every channel is a view: a `shared_ptr` to its storage plus a descriptor
   (domain, lags, unit scale). Windows, delay embeddings, channel selection,
   and unit changes copy no values; a write materializes the whole view into
@@ -121,8 +126,8 @@ This assumes the recommended option of each decision.
   the delayed values at every time of its domain (item 40).
 - `RegularSampler` samples each window of each numeric channel into a point
   cloud, taking values from the window's source, flattening each observation
-  into a point of dimension `prod(shape)`, and returns a series of point
-  clouds over the windows' start times (item 52).
+  into a point of dimension `prod(shape)`, and returns a `PointCloudTensor`
+  with one entry per window and channel (item 52).
 - Analysis functions are operations in the style of NumPy ufuncs: a native
   per-element kernel with bound parameters and `extra_dims`, the dimensions
   one input element adds to the result (for persistence, `(max_dim + 1,)`).
@@ -286,9 +291,9 @@ parallel threshold.
     `TimeSeries(values, times)` for one channel,
     `TimeSeries.from_channels(channels, unit=None)` for several,
     `TimeDelayEmbedding(dimension, delay)` (without the issue's `unit="time"`
-    until a second delay mode exists), `Window(size, step=None, overlap=None)`
-    (windows always start at time 0; the `relative` option was dropped during
-    item 43), and `RegularSampler(n_points)` with `.times(window)`
+    until a second delay mode exists), `Window(size, step=None)`
+    (windows always start at time 0; the `relative` option and `overlap`,
+    which is `size - step`, were dropped during item 43), and `RegularSampler(n_points)` with `.times(window)`
     (revised with items 40-56).
   - `from_channels` takes a list of one-channel series of one element
     type; channel `i` is the `i`th series. `unit` defaults to the
@@ -323,9 +328,21 @@ parallel threshold.
     is time. Anything else raises `TypeError`: strings, `NestedTensor`, and
     sequences containing stablebear objects, which `np.asarray` would silently
     turn into numeric arrays.
-  - `RegularSampler(n_points)(windows)` returns a series of point clouds over
-    the windows' start times, with the source's channels; each cloud has
-    `n_points` points of dimension `prod(shape)` of its channel (item 52).
+  - `Window(size, step)(series, return_bounds=False)` returns a 1-D
+    `TimeSeriesTensor` of dtype `sb.series(series.dtype)`, one window per
+    entry; with `return_bounds=True` also a float64 `FloatTensor` of shape
+    `(n_windows, 2)` whose row `k` is `(a_k, a_k + size)` in the series'
+    unit. (Revised during item 43: windows were first a series of series
+    over their start times. Its evaluation by previous value meant nothing
+    for windows, `series[i]` selected channels rather than windows, and its
+    results could not go to `pdist` or the reductions. Axis or element tags
+    carrying the times through every tensor operation were considered and
+    rejected as too complex.)
+  - `RegularSampler(n_points)(windows)` returns a `PointCloudTensor` of
+    shape `(n_windows,)` for one channel and `(n_windows, n_channels)` for
+    several, as `evaluate` gives a value for one channel and a leaf per
+    channel for several; each cloud has `n_points` points of dimension
+    `prod(shape)` of its channel (item 52).
     Joining channels into one cloud is a later extension.
   - `TimeSeries` is generic (`TimeSeries[PointCloud]`) in Python
     3.10-compatible annotations.
@@ -357,8 +374,7 @@ parallel threshold.
     `s + lag` inside the domain for embeddings. `values[i]` is the view's
     value at `times[i]`, and `len()` counts these times.
   - Materializing a view stores its support: the last change time at or
-    before the domain start (for a window, the observation carried in before
-    `a`, at its original timestamp) followed by the change times inside the
+    before the domain start followed by the change times inside the
     domain, each with the view's value there, plus the domain. Under
     previous-value evaluation the result evaluates identically everywhere in
     the domain. An embedding with `m` lags may have up to `m * n` change times;
@@ -740,7 +756,8 @@ parallel threshold.
 
 (Revised after item 39 for the decisions of items 26 and 43: no stored
 domain, and windows as series of series, with the choices that follow from
-them settled item by item.)
+them settled item by item; revised again during item 43: windows are a
+tensor of series, with their bounds on request.)
 
 Items 43-53 use the source series with times `[0.0, 0.5, 1.5, 2.5, 4.0]` and
 values `[0.0, 5.0, 15.0, 25.0, 40.0]`, each `10 * t`, so a value shows which
@@ -895,37 +912,46 @@ observation it came from.
   (The paper lists each channel newest first; we keep oldest first, as the
   libraries do.)
 
-- [ ] **42a. Series of series.** (implemented together with item 43, whose
-  `Window` gives the only series of series; saving moved to item 56) Windows (items 43-47) are a
-  `TimeSeries<TimeSeries<T>>`, which needs `TimeSeries<T>` as an element type:
-  `Tensor<TimeSeries<T>>` through `register_tensor_element`, and
-  `TimeSeries<TimeSeries<T>>` through `register_timeseries_element`, for each
-  of the 19 inner element types, plus a Python wrapper for a tensor of
-  series (the `values` of an outer series) and a dtype for it. Tensor
+- [ ] **42a. Tensors of series.** (implemented together with item 43, whose
+  `Window` gives the only tensors of series; saving moved to item 56;
+  revised during item 43: first done as series of series, which are gone)
+  Windows (items 43-47) are a `Tensor<TimeSeries<T>>`, bound through
+  `register_tensor_element` for each of the 19 inner element types, with
+  the Python wrapper `TimeSeriesTensor` and a dtype for it. Tensor
   elements are default-constructed, so `TimeSeries<T>` needs a default (an
   empty one-channel series), and tensor bindings need `==`, which compares
   units, times, shapes, values, and snap settings. Saving waits for item
-  56; until then saving a series of series raises. The dtype of a series of series is parametrized by the inner
-  element type, `sb.series(sb.float64)`, so a constructor for series of
-  series can be added later without changing it. `sb.series(dtype)` returns
-  the same object for the same inner dtype, since dtypes are compared with
-  `is`, and its inner dtype reads back. For now users get series of series
-  only from `Window`. The tensor wrapper is `TimeSeriesTensor`, not exported
-  until a use needs it. Windows work for all 19 element types. Test:
-  for a series of two windows of a float64 series,
-  `dtype is sb.series(sb.float64)`, evaluating it returns the inner series,
-  and `values[1]` is the second one with dtype float64.
-  **Catches:** an inner series bound to the wrong native type, values copied
-  out of order, a series of windows mistaken for a series of floats.
+  56. The dtype is parametrized by the inner element type,
+  `sb.series(sb.float64)`. `sb.series(dtype)` returns the same object for
+  the same inner dtype, since dtypes are compared with `is`, and its inner
+  dtype reads back. For now users get tensors of series only from
+  `Window`. `TimeSeriesTensor` is not exported until a use needs it.
+  Windows work for all 19 element types. Test: two windows of a float64
+  series are a `TimeSeriesTensor` of shape `(2,)` and
+  `dtype is sb.series(sb.float64)`, and `windows[1]` is the second window,
+  a float64 series. **Catches:** an inner series bound to the wrong native
+  type, windows out of order, a tensor of windows mistaken for a tensor of
+  floats.
 
-- [ ] **43. Windows.** `Window(size, step=None, overlap=None)(series)`
-  returns a windowed series: an outer series with one channel and one
-  observation per window, at the window's start `a_k = t_0 + k * step` while
-  `a_k + size <= t_{n-1}`, in the original unit, where `step = size -
-  overlap` and the default step is `size`. Each window is a series with the
-  source's channels holding exactly the observations with
-  `a_k <= t <= a_k + size`, both ends included, so nothing is carried in from
-  before `a_k` and a window can be empty. A window's timestamps are always
+- [ ] **43. Windows.** `Window(size, step=None)(series)`
+  returns a 1-D tensor of series with one window per start
+  `a_k = t_0 + k * step` while `a_k + size <= t_{n-1}`, where the default
+  step is `size`; a smaller step makes windows overlap, a larger one leaves
+  gaps. With `return_bounds=True` it also
+  returns the bounds, a float64 tensor of shape `(n_windows, 2)` with rows
+  `(a_k, a_k + size)` in the series' unit, as computed, not snapped:
+  each channel snaps with its own timestamps and settings, so one window's
+  channels can snap differently and no single snapped bound exists. Each
+  window is a series with the source's channels. Each channel holds its
+  observations with `a_k < t < a_k + size` between the values in effect at
+  `a_k`, at time 0, and at `a_k + size`, at time `size`, so every window
+  channel can be evaluated on all of `[0, size]` and nowhere else, and a
+  window is never empty. An observation at either bound is that bound's
+  value; otherwise the value comes from the observation before it.
+  (Revised during item 43: windows first held only the observations in
+  `[a_k, a_k + size]`, and the sampler read values outside them from the
+  source. The sampler must not see values the user cannot, so the window
+  holds them itself.) A window's timestamps are always
   shifted so that `a_k` is 0, in each channel's own unit (a `relative=False`
   option keeping the original timestamps was dropped). Window bounds are
   computed in floating point (`0 + k * 0.3` is `0.8999999999999999` for
@@ -941,33 +967,39 @@ observation it came from.
   axis, at the window's shifted times. It copies no values and stores 16
   bytes per observation per window, so overlapping windows multiply that
   by the overlap. It evaluates as its source does at the corresponding
-  times, with the source's snapping, which also gives sampling (item 52)
-  the value carried in from before the window. A window reads its
+  times, with the source's snapping. A window reads its
   source at `(t - a_k) + a_k`, which can round just below `t`, often for a
   window starting at a negative time; without snapping, or when `|a_k|` is
   far larger than `|t|`, the point would read the observation before it.
   Each window time is therefore taken one float up at a time until adding
   `a_k` back reaches `t`. Tests with the
   source series:
-  - Parametrized over the arguments and the outer times: `size=2.0,
-    step=1.0` and `size=2.0, overlap=1.0` give `[0.0, 1.0, 2.0]`;
-    `size=2.0` gives `[0.0, 2.0]`; `size=5.0` gives an empty outer series of
-    the right dtype. **Catches:** windows anchored at the end, partial
-    windows kept, the overlap used as the step, an overlapping default.
-  - With `size=2.0, step=1.0`, the window at 1.0 has times `[0.5, 1.5]` and
-    values `[15.0, 25.0]`. **Catches:** the observation at 0.5 carried in,
-    timestamps not shifted or shifted by the wrong amount.
+  - Parametrized over the arguments and the starts in the bounds:
+    `size=2.0, step=1.0` gives `[0.0, 1.0, 2.0]`; `size=1.0, step=1.5` gives
+    `[0.0, 1.5, 3.0]`; `size=2.0` gives `[0.0, 2.0]`; the ends are the
+    starts plus `size`. **Catches:** windows
+    anchored at the end, partial windows kept, a step larger than the size
+    rejected or clamped, an overlapping default, bounds out of step with the
+    windows.
+  - With `size=2.0, step=1.0`, the window at 1.0 has times
+    `[0.0, 0.5, 1.5, 2.0]` and values `[5.0, 15.0, 25.0, 25.0]`.
+    **Catches:** no value at the window's start or end, the observation
+    before the start kept at its own time, timestamps not shifted or
+    shifted by the wrong amount.
   - With `size=1.5, step=1.5`, the windows at 0.0 and 1.5 both hold the
-    observation at 1.5 (values `[0, 5, 15]` and `[15, 25]`). **Catches:** an end
-    of the window excluded.
-  - With `size=0.5, step=0.5`, the window at 3.0 is empty (`len == 0`) and
-    evaluating it raises `ValueError`. **Catches:** a crash on an empty
-    window, a value invented for it.
-  - (added) Times `np.arange(40) * 0.1`, values `10 * t`, `size=0.5`,
-    `step=0.3`: 12 windows, window `k` holding observations `3k` to
-    `3k + 5` with its first time exactly 0. **Catches:** bounds that round
-    just short of an observation dropping it (5 observations instead of 6)
-    or leaving the first time at `5.6e-17` instead of 0.
+    observation at 1.5 (values `[0, 5, 15]` and `[15, 25, 25]`).
+    **Catches:** an end of the window excluded, a value added at a bound
+    that has an observation.
+  - With `size=0.5, step=0.5`, the window at 3.0, between the observations
+    at 2.5 and 4.0, has times `[0.0, 0.5]` and values `[25.0, 25.0]`.
+    **Catches:** an empty window, a crash when no observation falls in the
+    window.
+  - (added) Times `[0.0, 0.3, 0.6, 0.9, 1.2]`, values `10 * t`, `size=0.3`,
+    `step=0.3`: `3 * 0.3` computes just below 0.9, and still window 2 holds
+    `[6, 9]` and window 3 holds `[9, 12]` with its first time exactly 0.
+    **Catches:** bounds that round just short of an observation missing it
+    (window 2 would be `[6, 6]`) or carrying the value before it in (window
+    3 would be `[6, 9, 12]` with 9 at `1.1e-16`).
   - (added) Times `[-1.0, -0.3, 0.2, 0.5]`, values `10 * t`,
     `snap_tolerance=0.0`, `size=1.5`: the window from -1.0 holds all four
     values, though `(-0.3 + 1.0) - 1.0` and `(0.2 + 1.0) - 1.0` round below
@@ -977,36 +1009,41 @@ observation it came from.
 - [ ] **44. `series.window(a, b)`.** One window, with the same rules as item
   43 and `size = b - a`; `t_0 <= a <= b <= t_{n-1}` is required. Tests with
   the source series:
-  - `w = series.window(1.0, 3.0)` has times `[0.5, 1.5]` and values
-    `[15.0, 25.0]`; `w(1.0) == 15.0`, and `w(0.25)` raises `ValueError` (before
-    its first observation). **Catches:** the window differing from the one
-    `Window` produces, the value from before the window used in evaluation.
+  - `w = series.window(1.0, 3.0)` has times `[0.0, 0.5, 1.5, 2.0]` and
+    values `[5.0, 15.0, 25.0, 25.0]`; `w(0.25) == 5.0`, `w(1.0) == 15.0`,
+    and `w(-0.25)` and `w(2.25)` raise `ValueError`. **Catches:** the window differing from the one
+    `Window` produces, evaluation reaching before the window.
   - `series.window(3.0, 1.0)` and `series.window(-1.0, 1.0)` raise
     `ValueError`. **Catches:** reversed bounds or bounds outside the domain
     accepted.
 
 - [ ] **45. Window parameter errors.** Test, parametrized `ValueError`:
-  `size=0.0`, `size=-1.0`, `step=0.0`, `overlap=2.0` and `overlap=-0.5` with
-  `size=2.0`, and `step` together with `overlap`. **Catches:** windows that
-  never advance, conflicting parameters accepted.
+  `size=0.0`, `size=-1.0`, `step=0.0`, `step=-1.0`, and `step=inf`.
+  **Catches:** windows that never advance or never repeat.
+  (Done with item 43: windowing raises `ValueError` when no window fits,
+  for `size=5.0` on the source series and for a series without
+  observations, as an embedding that can never be evaluated does in item
+  41, rather than returning an empty tensor. **Catches:** an empty result
+  that fails later, far from its cause.)
 
 - [ ] **46. Embedding a window, and windowing an embedding.** Tests:
   - `TimeDelayEmbedding(dimension=2, delay=1.0)` of `series.window(1.0, 3.0)`
-    (times `[0.5, 1.5]`) can be evaluated only at 1.5, where it is
-    `[15, 25]`; evaluating it at 1.0 raises `ValueError`. **Catches:** history
-    taken from before the window.
+    (times `[0.0, 0.5, 1.5, 2.0]`) has times `[1.0, 1.5, 2.0]` and points
+    `[[5, 15], [15, 25], [15, 25]]`; evaluating it at 0.75 raises
+    `ValueError`. **Catches:**
+    history taken from before the window.
   - `Window(size=2.0, step=1.0)` of `TimeDelayEmbedding(dimension=2,
     delay=1.0)` of the source (times `[1.0, 1.5, 2.5, 3.5, 4.0]`) has
-    windows at 1.0 and 2.0, and the first has times `[0.0, 0.5, 1.5]` and
-    values `[[0, 5], [5, 15], [15, 25]]`. **Catches:** the embedding's points
+    windows starting at 1.0 and 2.0, and the first has times
+    `[0.0, 0.5, 1.5, 2.0]` and values `[[0, 5], [5, 15], [15, 25], [15, 25]]`. **Catches:** the embedding's points
     lost when windowing.
 
 - [ ] **47. Windows of several channels.** One cut, `[a, a + size]` in the
   query unit, applies to every channel. Test: `Window(size=1.0, step=1.0)` of
-  the series of channels A and B has outer times `[0.5, 1.5]`; the first
-  window's `times` leaves are `[0.5]` and `[0.0, 1.0]`, and the second's are
-  `[1.0]` and `[0.0]`. **Catches:** channels cut at different bounds, channel
-  B cut in milliseconds.
+  the series of channels A and B has starts `[0.5, 1.5]` in seconds; the first
+  window's `times` leaves are `[0.0, 0.5, 1.0]` and `[0.0, 1.0]`, and the
+  second's are `[0.0, 1.0]` and `[0.0, 1.0]`. **Catches:** channels cut at different
+  bounds, channel B cut in milliseconds.
 
 ## Writing
 
@@ -1027,18 +1064,15 @@ Items 48-50 use the source series of items 43-46 and the embedding of item
     copies.
 
 - [ ] **49. Writing a window.** A write into a window first materializes
-  it into storage of its own (decision 4): its observations and, before
-  them, the source observation carried in at its start. Its index range in
-  the new storage starts after that observation, so evaluation, `times`, and
-  `len` see only the window's observations, as before, and sampling still
-  gets the carried-in value; a write changes nothing but the written values.
+  it into storage of its own (decision 4), its observations at its times,
+  including the one at 0; a write changes nothing but the written values.
   Neither the source nor other windows change. Test: with
-  `w = series.window(1.0, 3.0)`, `w.values[0] = 30.0` gives `w(0.5) == 30.0`,
-  `w.times == [0.5, 1.5]`, and `len(w) == 2`; `RegularSampler(n_points=2)(w)`
-  is `[[5], [30]]` (the carried-in 5 at the window's start); and
+  `w = series.window(1.0, 3.0)`, `w.values[1] = 30.0` gives `w(0.5) == 30.0`,
+  `w.times == [0.0, 0.5, 1.5, 2.0]`, and `len(w) == 4`;
+  `RegularSampler(n_points=2)(w)` is `[[5], [30]]`; and
   `series(1.5) == 15.0` and `series.window(0.0, 2.0)` are unchanged.
-  **Catches:** the write reaching the source or a sibling window, the
-  carried-in value lost on materializing.
+  **Catches:** the write reaching the source or a sibling window, the value
+  at 0 lost on materializing.
 
 - [ ] **50. Writing an embedding.** Test: for item 40's embedding `e`,
   `e.values[1] = [0.0, 0.0, 0.0]` (time 2.5) gives `e(2.75)` equal to
@@ -1056,35 +1090,31 @@ Items 48-50 use the source series of items 43-46 and the embedding of item
   spacing `size / (n - 1)`.
 
 - [ ] **52. Sampling windows.** `RegularSampler(n_points)(windows)`
-  evaluates the window's source at each window's query times, through item
-  24b, so a query before a window's first observation gets the value carried
-  in from before the window. A query before a window's start is an error in
-  every window; `RegularSampler` never makes one, so the rule is enforced in
-  the native sampling step and is not observable until a sampler with
-  explicit times exists. A single window can be sampled too, giving its
+  evaluates each window at its query times, through item 24b, so it sees
+  exactly what evaluating the window shows the user. A single window can be sampled too, giving its
   clouds as `evaluate` gives one value: a `PointCloud` for one channel, a
-  `NestedTensor` for several. The result is a series of point clouds with one
-  observation per window, at the windows' outer times, and the source's
-  channels, rather than a `PointCloudTensor` of shape `(n_windows,
-  n_channels)`, so persistence of it is a series of barcodes over window
-  times; `values` gives the clouds as a tensor. Each
+  `NestedTensor` for several. A tensor of windows gives a `PointCloudTensor`
+  of shape `(n_windows,)` for one channel and `(n_windows, n_channels)` for
+  several, in window order, so persistence of it is a `BarcodeTensor` through
+  the tensor path and its summaries go to `pdist` directly; the window
+  bounds come from `Window(..., return_bounds=True)`. Each
   observation is flattened into a point of dimension `prod(shape)`; a scalar
   channel gives 1-D points. Test: `Window(size=2.0, step=1.0)` of the source
-  with `n_points=2` gives a pcloud64 series with times `[0.0, 1.0, 2.0]` and
-  clouds `[[0], [5]]`, `[[5], [15]]`, and `[[15], [25]]`. **Catches:** windows out
-  of order, the carried-in value missing (the window at 1.0 is sampled at
-  1.0, before its first observation at 1.5), the wrong precision.
+  with `n_points=2` gives a pcloud64 tensor of shape `(3,)` with clouds
+  `[[0], [5]]`, `[[5], [15]]`, and `[[15], [25]]`. **Catches:** windows out
+  of order, the value at a window's start missing (the window at 1.0 is
+  sampled at 0, before its observation at 0.5), the wrong precision.
 
 - [ ] **53. Sampling several channels.** Test: `Window(size=1.0, step=1.0)` of
-  the series of channels A and B with `n_points=2` gives a series with times
-  `[0.5, 1.5]` and two channels: the clouds `[[10], [20]]` and `[[-1], [-1]]`
-  in the first window and `[[20], [20]]` and `[[-2], [-2]]` in the second.
-  **Catches:** channels swapped, channels evaluated on one grid.
+  the series of channels A and B with `n_points=2` gives a tensor of shape
+  `(2, 2)`: the clouds `[[10], [20]]` and `[[-1], [-1]]` in row 0 and
+  `[[20], [20]]` and `[[-2], [-2]]` in row 1. **Catches:** channels swapped,
+  windows and channels transposed, channels evaluated on one grid.
 
 - [ ] **54. Sampler errors.** Test, parametrized: `n_points=0` raises
-  `ValueError`; a series that is not windowed and windows of point clouds
-  raise `TypeError`. **Catches:** an empty sample, a plain series read as
-  windows, object values sampled into point clouds.
+  `ValueError`; a `FloatTensor` and windows of point clouds raise
+  `TypeError`. **Catches:** an empty sample, a tensor that does not hold
+  windows sampled, object values sampled into point clouds.
 
 - [ ] **55. The delay workflow end to end.** Test in
   `test/python/test_integration.py`: times `[0.0, 0.5, ..., 3.5]` and values
@@ -1092,18 +1122,18 @@ Items 48-50 use the source series of items 43-46 and the embedding of item
   `TimeDelayEmbedding(dimension=2, delay=0.5)` (domain `[0.5, 3.5]`),
   `Window(size=1.0, step=1.0)` (windows at 0.5, 1.5, and 2.5),
   `RegularSampler(n_points=4)`, and `compute_persistent_homology(...,
-  max_dim=1)` give a series of three clouds of four 2-D points and a series
-  of barcodes with times `[0.5, 1.5, 2.5]` and `shape == (2,)`.
-  **Catches:** steps that do not compose.
+  max_dim=1)` give a tensor of three clouds of four 2-D points and a
+  `BarcodeTensor` of shape `(3, 2)`, and the bounds start at
+  `[0.5, 1.5, 2.5]`. **Catches:** steps that do not compose.
 
 - [ ] **56. Saving embeddings and windows.** An embedding is saved
   materialized (decision 9): its support and values, as an ordinary series.
-  A windowed series is a series of series, and each window is saved
-  materialized in item 49's form: its observations, the observation carried
-  in before them, its span, and its shift. A loaded one therefore evaluates
-  and samples exactly as the original, including values carried in from
-  before a window, with no source in the file; with overlapping windows an
-  observation is written once per window holding it. Tests, parametrized
+  A tensor of windows is saved as a tensor of series, each window
+  materialized in item 49's form, with its values at both bounds. A loaded
+  one therefore evaluates and
+  samples exactly as the original, with no source in the file; with
+  overlapping windows an observation is written once per window holding
+  it. Tests, parametrized
   over `save`/`load` and `pickle`:
   - Item 40's embedding loads with the same times and the same values at 2.5
     and 3.25. **Catches:** the embedded points lost on saving.
@@ -1111,15 +1141,15 @@ Items 48-50 use the source series of items 43-46 and the embedding of item
   its points with their own snapping, so within the snapping distance just
   below a point it can differ from the view, which snaps as its source does
   (item 40). Document this with the saving contract.
-  - `Window(size=2.0, step=1.0)` of the source loads with the same outer
-    times and window contents, and `RegularSampler(n_points=2)` of it gives
-    item 52's clouds. **Catches:** the carried-in observation not saved,
-    which would make sampling at a window's start fail.
+  - `Window(size=2.0, step=1.0)` of the source loads with the same windows
+    in order, and `RegularSampler(n_points=2)` of it gives
+    item 52's clouds. **Catches:** windows reordered or their values at the
+    bounds lost on saving.
 
 - [ ] **57. Golden files.** Pin the formats (TESTING.md principle 11) with a
   generator modeled on `test/golden/serialization/generate_point_cloud_v3.py`,
   which records explicit expected values. Write item 28's barcode32 result,
-  the series of channels A and B, and item 56's windowed series as `.sb` and
+  the series of channels A and B, and item 56's tensor of windows as `.sb` and
   pickle files, and teach `test_serialization_goldens.py` to compare series
   (number of channels, unit, times, values at listed times). **Catches:** a later
   change to a payload that breaks saved files.
@@ -1182,12 +1212,13 @@ pages.
 ## Out of scope
 
 As in the issue: datetime timestamps, sample-count delays and windows, other
-samplers, interpolation, partial windows, gap policies, tensors of series,
-reductions over time, provenance, and normalization. Also deferred here:
+samplers, interpolation, partial windows, gap policies, reductions over
+time, provenance, and normalization. Also deferred here:
 joining channels into one point cloud when sampling, series with channels of
 different element types, observations whose shape changes over time
 (a later per-observation tensor storage mode), `NestedTensor` values (6
 more element types, cheap to add once a use such as spike trains needs
 them),
-`Tensor<TimeSeries>`, views instead of copies for stored channels,
+views instead of copies for stored channels, tensors carrying time labels
+through operations,
 and the branch's notebooks and scikit-learn transformers.

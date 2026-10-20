@@ -40,8 +40,7 @@ namespace
       .def_property_readonly("snap_eps", &Channel::snap_eps)
       .def("__len__", &Channel::size);
 
-    py::class_<Series> cls(m, ("TimeSeries" + suffix).c_str());
-    cls
+    py::class_<Series>(m, ("TimeSeries" + suffix).c_str())
       .def(py::init<sb::Times, const sb::Tensor<T>&, sb::float64_t, sb::float64_t>(),
            py::arg("times"), py::arg("values"), py::arg("snap_tolerance"), py::arg("snap_eps"))
       .def_static("from_channels",
@@ -66,32 +65,21 @@ namespace
       .def("select", &Series::select, py::arg("indices"))
       .def("evaluate", py::overload_cast<sb::float64_t>(&Series::evaluate, py::const_), py::arg("t"))
       .def("evaluate", py::overload_cast<const sb::Tensor<sb::float64_t>&>(&Series::evaluate, py::const_),
-           py::arg("t"));
-
-    if constexpr (sb::is_timeseries_v<T>)
-    {
-      cls.def("_save", [](const Series&, py::object) {
-        throw std::runtime_error("Saving a series of series is not supported yet");
-      }, py::arg("file"));
-    }
-    else
-    {
-      cls.def("_save", [](const Series& self, py::object file) {
+           py::arg("t"))
+      .def("_save", [](const Series& self, py::object file) {
         sb_py::PythonOStreamBuf buf(file);
         std::ostream os(&buf);
         sb::write_object(self, os);
       }, py::arg("file"));
-    }
   }
 
-  /// Bind series of element type T, tensors and nested tensors of them, and
-  /// series whose observations are such series, as windows give.
+  /// Bind series of element type T, and tensors and nested tensors of them,
+  /// as windows give.
   template <typename T>
   void register_typed_timeseries(py::module_& m, const std::string& suffix)
   {
     register_timeseries_element<T>(m, suffix);
     sb_py::register_tensor_element<sb::TimeSeries<T>>(m, "TimeSeries" + suffix);
-    register_timeseries_element<sb::TimeSeries<T>>(m, "Series" + suffix);
   }
 }
 

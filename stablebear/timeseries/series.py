@@ -131,11 +131,6 @@ _SERIES_NATIVE = {
     symmat64: cpp.TimeSeriesSymmetricMatrix64,
     barcode32: cpp.TimeSeriesBarcode32,
     barcode64: cpp.TimeSeriesBarcode64,
-    # Series of series, such as the windows of a series.
-    **{
-        series(element): getattr(cpp, f"TimeSeriesSeries{suffix}")
-        for element, suffix in _NATIVE_SUFFIX.items()
-    },
 }
 _SERIES_CPP_TO_DTYPE = {cls: dtype for dtype, cls in _SERIES_NATIVE.items()}
 _SERIES_TENSOR_TO_DTYPE = {
@@ -482,9 +477,9 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
 
 
 class TimeSeriesTensor(Tensor):
-    """Tensor whose elements are :class:`TimeSeries`, such as the values of a
-    series of windows. Its dtype is ``sb.series(inner)`` for series of
-    ``inner`` observations."""
+    """Tensor whose elements are :class:`TimeSeries`, such as the windows of
+    a series. Its dtype is ``sb.series(inner)`` for series of ``inner``
+    observations."""
 
     def __init__(self, data):
         super().__init__()

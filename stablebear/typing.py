@@ -111,7 +111,7 @@ _SERIES_DTYPES = {}
 def series(inner: dtype) -> dtype:
     """The dtype of time series whose observations have dtype ``inner``.
 
-    It is the dtype of a series of series, such as the windows of a series
+    It is the dtype of a tensor of series, such as the windows of a series
     of ``inner`` observations. The same ``inner`` always gives the same
     object, so dtypes compare with ``is``, and :attr:`inner` reads it back.
 
