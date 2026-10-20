@@ -53,14 +53,14 @@ forward direction no time-series path uses yet.
 ## Conventions
 
 - **Files.** Source: `include/sbear/timeseries.hpp` (`Times`, channels,
-  `TimeSeries<T>`), `include/sbear/timeseries/derived.hpp` (windows,
+  `TimeSeries<T>`), `include/sbear/timeseries/time_delay_embedding.hpp` and `windowing.hpp` (windows,
   embeddings, sampling), `include/sbear/ufunc.hpp` (operations and
   `UfuncTask`), `include/sbear/io/timeseries_io.hpp`,
   `src/python/py_timeseries.{hpp,cpp}`, and the package
   `stablebear/timeseries/` with thin wrappers. Tests:
   `test/python/test_timeseries.py` (storage, access, evaluation, units,
-  channels, serialization), `test/python/test_timeseries_derived.py`
-  (embedding, windows, sampling), and
+  channels, serialization), `test/python/test_time_delay_embedding.py`,
+  `test/python/test_windowing.py` (windows and sampling), and
   `test/python/persistence/test_timeseries_persistence.py` (workflow 1). Items
   that touch another file name it.
 - **Data.** Use timestamps, delays, and window sizes that are exact in binary
@@ -286,8 +286,9 @@ parallel threshold.
     `TimeSeries(values, times)` for one channel,
     `TimeSeries.from_channels(channels, unit=None)` for several,
     `TimeDelayEmbedding(dimension, delay)` (without the issue's `unit="time"`
-    until a second delay mode exists), `Window(size, step=None, overlap=None,
-    relative=True)`, and `RegularSampler(n_points)` with `.times(window)`
+    until a second delay mode exists), `Window(size, step=None, overlap=None)`
+    (windows always start at time 0; the `relative` option was dropped during
+    item 43), and `RegularSampler(n_points)` with `.times(window)`
     (revised with items 40-56).
   - `from_channels` takes a list of one-channel series of one element
     type; channel `i` is the `i`th series. `unit` defaults to the
@@ -331,7 +332,7 @@ parallel threshold.
   - An empty list gives an empty float64 channel, so a typed empty channel of
     point clouds is built from `sb.zeros((0,), dtype=sb.pcloud64)`.
 
-- [x] **8. Views.** (decision: every channel is a view of shared storage; a write materializes the whole view. Revised during item 40, first with index tables and then, for memory, as follows: a view made by `stack_at(times, lags)` stacks a source channel's observations at lagged times. It keeps its times, its lags, and per observation a base, the source observation for the smallest lag; each component is found when read by a galloping search back from the base (steps of 1, 2, 4, ... observations, then bisection; `gallop_upper_bound` in `include/sbear/algorithms/gallop.hpp`), with the source's snapping. A view costs two numbers per observation, and views of views nest through their source. `Channel` offers only `stack_at` and the cursor lookup `snapped_index(next, t)`; derived series such as embeddings are built from them outside `Channel` and `TimeSeries`, in `timeseries/derived.hpp`, and look like any other series to callers, including ufuncs, which read elements through `flat_value(i)`. The lags, domain, and descriptor described below predate this and are kept for history.)
+- [x] **8. Views.** (decision: every channel is a view of shared storage; a write materializes the whole view. Revised during item 40, first with index tables and then, for memory, as follows: a view made by `stack_at(times, lags)` stacks a source channel's observations at lagged times. It keeps its times, its lags, and per observation a base, the source observation for the smallest lag; each component is found when read by a galloping search back from the base (steps of 1, 2, 4, ... observations, then bisection; `gallop_upper_bound` in `include/sbear/algorithms/gallop.hpp`), with the source's snapping. A view costs two numbers per observation, and views of views nest through their source. `Channel` offers only `stack_at`, `view_at` (one lag, no new axis), and the cursor lookup `index_at(next, t)`, which snaps. It does not hand out its timestamp array: `time(k)` reads one timestamp to build new times from and `times()` returns a copy, so the only way from a time to an observation is `index_at`, and every lookup outside `Channel` snaps (revised after item 43, when window bounds first searched the raw timestamps); derived series, embeddings and windows alike, are built from them outside `Channel` and `TimeSeries`, in `timeseries/time_delay_embedding.hpp` and `timeseries/windowing.hpp`, and look like any other series to callers, including ufuncs, which read elements through `flat_value(i)`. The lags, domain, and descriptor described below predate this and are kept for history.)
   - Like a tensor view, a channel is a `shared_ptr` to its storage plus a
     small descriptor of how a query time maps into it: the domain (start, end,
     and end closedness), `lags` (time offsets that add leading observation
@@ -742,9 +743,10 @@ domain, and windows as series of series, with the choices that follow from
 them settled item by item.)
 
 Items 43-53 use the source series with times `[0.0, 0.5, 1.5, 2.5, 4.0]` and
-values `[1.0, 2.0, 3.0, 4.0, 5.0]`.
+values `[0.0, 5.0, 15.0, 25.0, 40.0]`, each `10 * t`, so a value shows which
+observation it came from.
 
-- [ ] **40. Delay embedding.** (reopened: first done in `1185ecd29` with
+- [x] **40. Delay embedding.** (reopened: first done in `1185ecd29` with
   points only at the source's timestamps, which made the embedding at `t`
   the point of the last such timestamp rather than the delayed values at
   `t`) `TimeDelayEmbedding(dimension, delay)` returns a series that
@@ -763,9 +765,9 @@ values `[1.0, 2.0, 3.0, 4.0, 5.0]`.
   keeps both ends (a run reaching from the start to `t_{n-1}` gives both).
   On a regular grid with the delay a multiple of the spacing, every point
   after the first is at one of the source's timestamps. It is a view of the source built in
-  `timeseries/derived.hpp`: one merged pass walks the shifted copies of the
+  `timeseries/time_delay_embedding.hpp`: one merged pass walks the shifted copies of the
   timestamps without storing them, one cursor per component finds the runs
-  through `Channel::snapped_index` (now public), and `Channel::stack_at`
+  through `Channel::index_at` (now public), and `Channel::stack_at`
   makes the view (decision 8), 16 bytes per point. It evaluates by looking
   up the source at each lagged time with the source's snapping, not by
   previous value on its own points, so it equals the series evaluated at the
@@ -799,10 +801,13 @@ values `[1.0, 2.0, 3.0, 4.0, 5.0]`.
   points before persistence. If added: one test that `stride=2` keeps every
   other time and point.
 
-- [ ] **40b. (revisit after item 55) Embeddings of non-numeric series.**
-  `TimeDelayEmbedding` accepts only the 7 numeric element types and raises
+- [x] **40b. Embeddings of non-numeric series.** (decided with item 43:
+  allowed. `register_derived_element` binds `delay_embed` and `windows` for
+  all 19 element types, the Python check is gone, and item 41's barcode case
+  became a test of a PCF embedding, whose observations are `m` delayed PCFs.
+  The sampler still takes numeric windows only, item 54.) Before, `TimeDelayEmbedding` accepted only the 7 numeric element types and raised
   `TypeError` otherwise (item 41 tests this for barcodes). The native
-  `delay_embed` is built from `snapped_index` and `stack_at`, which work for every
+  `delay_embed` is built from `index_at` and `stack_at`, which work for every
   element type, so only the binding in `py_timeseries_derived.cpp` and the
   Python check restrict it. Decide whether to allow all 19 types, for
   example an embedding of a point-cloud series whose observations are `m`
@@ -819,12 +824,15 @@ values `[1.0, 2.0, 3.0, 4.0, 5.0]`.
     newest-first order.
   - Parametrized: `dimension=0`, `delay=0.0`, and `delay=-1.0` raise
     `ValueError`; `dimension=3` and `delay=1.0` on times `[0.0, 1.0]` raise
-    `ValueError` (no time is far enough from the start); a barcode series
-    raises `TypeError`. **Catches:** invalid parameters accepted, an
-    embedding that can never be evaluated created silently, object values
-    embedded.
+    `ValueError` (no time is far enough from the start). **Catches:** invalid
+    parameters accepted, an embedding that can never be evaluated created
+    silently.
+  - (with item 40b) PCFs of values 0, 10, and 20 at times `[0.0, 1.0, 2.0]`,
+    `dimension=2`, `delay=1.0`: a pcf64 series of shape `(2,)` at times
+    `[1.0, 2.0]` whose values array-equal `[[p0, p1], [p1, p2]]`.
+    **Catches:** object elements rejected or stacked out of order.
 
-- [ ] **42. Embedding several channels.** (reopened with item 40) Each
+- [x] **42. Embedding several channels.** (reopened with item 40) Each
   channel is embedded on its own times, with the delay converted from the
   query unit into its own unit, and the domain is the intersection of the
   channels' domains. Test: `TimeDelayEmbedding(dimension=2, delay=0.5)` of
@@ -835,7 +843,7 @@ values `[1.0, 2.0, 3.0, 4.0, 5.0]`.
   in channel B's milliseconds (leaf 1 would be `[-2, -2]`), one channel's
   times used for another, the union of the channels' domains.
 
-- [ ] **42b. Embedding views.** (added after item 40; reopened with item 40)
+- [x] **42b. Embedding views.** (added after item 40; reopened with item 40)
   Tests of the paths through the views that items 40-42 do not reach:
   - Parametrized, with `dimension=2` and `delay=0.1`: times
     `[0.1, 0.2, 0.3, 0.4]` with values `[1, 2, 3, 4]` give times
@@ -887,15 +895,17 @@ values `[1.0, 2.0, 3.0, 4.0, 5.0]`.
   (The paper lists each channel newest first; we keep oldest first, as the
   libraries do.)
 
-- [ ] **42a. Series of series.** Windows (items 43-47) are a
+- [ ] **42a. Series of series.** (implemented together with item 43, whose
+  `Window` gives the only series of series; saving moved to item 56) Windows (items 43-47) are a
   `TimeSeries<TimeSeries<T>>`, which needs `TimeSeries<T>` as an element type:
   `Tensor<TimeSeries<T>>` through `register_tensor_element`, and
   `TimeSeries<TimeSeries<T>>` through `register_timeseries_element`, for each
   of the 19 inner element types, plus a Python wrapper for a tensor of
   series (the `values` of an outer series) and a dtype for it. Tensor
   elements are default-constructed, so `TimeSeries<T>` needs a default (an
-  empty one-channel series). Saving writes each inner series with the series
-  codec. The dtype of a series of series is parametrized by the inner
+  empty one-channel series), and tensor bindings need `==`, which compares
+  units, times, shapes, values, and snap settings. Saving waits for item
+  56; until then saving a series of series raises. The dtype of a series of series is parametrized by the inner
   element type, `sb.series(sb.float64)`, so a constructor for series of
   series can be added later without changing it. `sb.series(dtype)` returns
   the same object for the same inner dtype, since dtypes are compared with
@@ -908,24 +918,36 @@ values `[1.0, 2.0, 3.0, 4.0, 5.0]`.
   **Catches:** an inner series bound to the wrong native type, values copied
   out of order, a series of windows mistaken for a series of floats.
 
-- [ ] **43. Windows.** `Window(size, step=None, overlap=None,
-  relative=True)(series)` returns a windowed series: an outer series with one channel and one
+- [ ] **43. Windows.** `Window(size, step=None, overlap=None)(series)`
+  returns a windowed series: an outer series with one channel and one
   observation per window, at the window's start `a_k = t_0 + k * step` while
   `a_k + size <= t_{n-1}`, in the original unit, where `step = size -
   overlap` and the default step is `size`. Each window is a series with the
   source's channels holding exactly the observations with
   `a_k <= t <= a_k + size`, both ends included, so nothing is carried in from
-  before `a_k` and a window can be empty. With `relative=True` (the default;
-  name to be confirmed) a window's timestamps are shifted so that `a_k` is 0,
-  in each channel's own unit; `relative=False` keeps the original
-  timestamps. A window is a view of its source (decision 8): the source's
-  storage, the contiguous index range of its observations, its span
-  `[a_k, a_k + size]`, and its shift. It copies no values; its flat values
-  are a slice of the source's, so the ufunc adapter and analysis run on it
-  directly, and its times are the source's in the range minus the shift,
-  computed when read. The value carried in for sampling (item 52) is the
-  source observation just before the range. This starts decision 8's
-  descriptor, which embeddings and unit-scale views extend. Tests with the
+  before `a_k` and a window can be empty. A window's timestamps are always
+  shifted so that `a_k` is 0, in each channel's own unit (a `relative=False`
+  option keeping the original timestamps was dropped). Window bounds are
+  computed in floating point (`0 + k * 0.3` is `0.8999999999999999` for
+  `k = 3`), so they are cut with the channel's snapping, as evaluation does:
+  a bound that falls just short of an observation reaches it, and a window
+  whose start reaches an observation is shifted by that observation's time,
+  so its first time is exactly 0. A bound that rounds just past an
+  observation still misses it, since snapping only moves forward. `t_0` and `t_{n-1}` are the first and last times at which every
+  channel has an observation (`TimeSeries::domain`). As embeddings are,
+  windows are built in `timeseries/windowing.hpp` from a generic `Channel`
+  view, so `Channel` knows nothing of windows: each window channel is
+  `Channel::view_at(times, -shift)`, stack_at with a single lag and no new
+  axis, at the window's shifted times. It copies no values and stores 16
+  bytes per observation per window, so overlapping windows multiply that
+  by the overlap. It evaluates as its source does at the corresponding
+  times, with the source's snapping, which also gives sampling (item 52)
+  the value carried in from before the window. A window reads its
+  source at `(t - a_k) + a_k`, which can round just below `t`, often for a
+  window starting at a negative time; without snapping, or when `|a_k|` is
+  far larger than `|t|`, the point would read the observation before it.
+  Each window time is therefore taken one float up at a time until adding
+  `a_k` back reaches `t`. Tests with the
   source series:
   - Parametrized over the arguments and the outer times: `size=2.0,
     step=1.0` and `size=2.0, overlap=1.0` give `[0.0, 1.0, 2.0]`;
@@ -933,21 +955,30 @@ values `[1.0, 2.0, 3.0, 4.0, 5.0]`.
     the right dtype. **Catches:** windows anchored at the end, partial
     windows kept, the overlap used as the step, an overlapping default.
   - With `size=2.0, step=1.0`, the window at 1.0 has times `[0.5, 1.5]` and
-    values `[3.0, 4.0]`; with `relative=False` its times are `[1.5, 2.5]`.
-    **Catches:** the observation at 0.5 carried in, timestamps not shifted
-    or shifted by the wrong amount.
+    values `[15.0, 25.0]`. **Catches:** the observation at 0.5 carried in,
+    timestamps not shifted or shifted by the wrong amount.
   - With `size=1.5, step=1.5`, the windows at 0.0 and 1.5 both hold the
-    observation at 1.5 (values `[1, 2, 3]` and `[3, 4]`). **Catches:** an end
+    observation at 1.5 (values `[0, 5, 15]` and `[15, 25]`). **Catches:** an end
     of the window excluded.
   - With `size=0.5, step=0.5`, the window at 3.0 is empty (`len == 0`) and
     evaluating it raises `ValueError`. **Catches:** a crash on an empty
     window, a value invented for it.
+  - (added) Times `np.arange(40) * 0.1`, values `10 * t`, `size=0.5`,
+    `step=0.3`: 12 windows, window `k` holding observations `3k` to
+    `3k + 5` with its first time exactly 0. **Catches:** bounds that round
+    just short of an observation dropping it (5 observations instead of 6)
+    or leaving the first time at `5.6e-17` instead of 0.
+  - (added) Times `[-1.0, -0.3, 0.2, 0.5]`, values `10 * t`,
+    `snap_tolerance=0.0`, `size=1.5`: the window from -1.0 holds all four
+    values, though `(-0.3 + 1.0) - 1.0` and `(0.2 + 1.0) - 1.0` round below
+    -0.3 and 0.2. **Catches:** a window reading the observation before one of
+    its own when the shift does not round-trip.
 
 - [ ] **44. `series.window(a, b)`.** One window, with the same rules as item
   43 and `size = b - a`; `t_0 <= a <= b <= t_{n-1}` is required. Tests with
   the source series:
   - `w = series.window(1.0, 3.0)` has times `[0.5, 1.5]` and values
-    `[3.0, 4.0]`; `w(1.0) == 3.0`, and `w(0.25)` raises `ValueError` (before
+    `[15.0, 25.0]`; `w(1.0) == 15.0`, and `w(0.25)` raises `ValueError` (before
     its first observation). **Catches:** the window differing from the one
     `Window` produces, the value from before the window used in evaluation.
   - `series.window(3.0, 1.0)` and `series.window(-1.0, 1.0)` raise
@@ -962,12 +993,12 @@ values `[1.0, 2.0, 3.0, 4.0, 5.0]`.
 - [ ] **46. Embedding a window, and windowing an embedding.** Tests:
   - `TimeDelayEmbedding(dimension=2, delay=1.0)` of `series.window(1.0, 3.0)`
     (times `[0.5, 1.5]`) can be evaluated only at 1.5, where it is
-    `[3, 4]`; evaluating it at 1.0 raises `ValueError`. **Catches:** history
+    `[15, 25]`; evaluating it at 1.0 raises `ValueError`. **Catches:** history
     taken from before the window.
   - `Window(size=2.0, step=1.0)` of `TimeDelayEmbedding(dimension=2,
     delay=1.0)` of the source (times `[1.0, 1.5, 2.5, 3.5, 4.0]`) has
     windows at 1.0 and 2.0, and the first has times `[0.0, 0.5, 1.5]` and
-    values `[[1, 2], [2, 3], [3, 4]]`. **Catches:** the embedding's points
+    values `[[0, 5], [5, 15], [15, 25]]`. **Catches:** the embedding's points
     lost when windowing.
 
 - [ ] **47. Windows of several channels.** One cut, `[a, a + size]` in the
@@ -1004,8 +1035,8 @@ Items 48-50 use the source series of items 43-46 and the embedding of item
   Neither the source nor other windows change. Test: with
   `w = series.window(1.0, 3.0)`, `w.values[0] = 30.0` gives `w(0.5) == 30.0`,
   `w.times == [0.5, 1.5]`, and `len(w) == 2`; `RegularSampler(n_points=2)(w)`
-  is `[[2], [30]]` (the carried-in 2 at the window's start); and
-  `series(1.5) == 3.0` and `series.window(0.0, 2.0)` are unchanged.
+  is `[[5], [30]]` (the carried-in 5 at the window's start); and
+  `series(1.5) == 15.0` and `series.window(0.0, 2.0)` are unchanged.
   **Catches:** the write reaching the source or a sibling window, the
   carried-in value lost on materializing.
 
@@ -1018,12 +1049,11 @@ Items 48-50 use the source series of items 43-46 and the embedding of item
 
 - [ ] **51. Sampler query times.** `RegularSampler(n_points).times(window)`
   returns the `Times` `start + size * k / n_points` for `k = 0, ...,
-  n_points - 1`, where `start` is the window's start in its own timestamps
-  (0 by default); the end is never sampled. Test:
+  n_points - 1`, where `start` is the window's start in its own timestamps,
+  always 0; the end is never sampled. Test:
   `RegularSampler(n_points=4).times(series.window(1.0, 3.0))` gives
-  `[0.0, 0.5, 1.0, 1.5]` in seconds, and `[1.0, 1.5, 2.0, 2.5]` for the
-  window with `relative=False`. **Catches:** the end point included, spacing
-  `size / (n - 1)`, the shift ignored.
+  `[0.0, 0.5, 1.0, 1.5]` in seconds. **Catches:** the end point included,
+  spacing `size / (n - 1)`.
 
 - [ ] **52. Sampling windows.** `RegularSampler(n_points)(windows)`
   evaluates the window's source at each window's query times, through item
@@ -1041,7 +1071,7 @@ Items 48-50 use the source series of items 43-46 and the embedding of item
   observation is flattened into a point of dimension `prod(shape)`; a scalar
   channel gives 1-D points. Test: `Window(size=2.0, step=1.0)` of the source
   with `n_points=2` gives a pcloud64 series with times `[0.0, 1.0, 2.0]` and
-  clouds `[[1], [2]]`, `[[2], [3]]`, and `[[3], [4]]`. **Catches:** windows out
+  clouds `[[0], [5]]`, `[[5], [15]]`, and `[[15], [25]]`. **Catches:** windows out
   of order, the carried-in value missing (the window at 1.0 is sampled at
   1.0, before its first observation at 1.5), the wrong precision.
 
