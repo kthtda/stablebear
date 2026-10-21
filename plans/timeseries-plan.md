@@ -3,7 +3,7 @@
 This plan implements #242 on `issue-242-timeseries`, branched from `main` at
 `05ce5ba4a`: unit-bearing timestamps, time series made of channels with their
 own time grids and units, persistence of snapshot series (workflow 1), and
-windowed delay embeddings sampled into point clouds (workflow 2), with
+windowed delay embeddings evaluated into point clouds (workflow 2), with
 serialization and documentation. Useful parts of the `origin/timeseries`
 branch are recycled where they fit (see "Recycling").
 
@@ -15,9 +15,11 @@ Where the plan departs from the issue:
   (often `()`).
 - `times` is always given explicitly; a table's column 0 is never read as
   timestamps.
-- A delay embedding adds a leading delay axis to each observation, and the
-  sampler flattens observations into points and returns a series of point
-  clouds directly, so `PointCloudTensor` needs no `FloatTensor` constructor.
+- A delay embedding adds a leading delay axis to each observation. There
+  is no sampler: a tensor of windows evaluates at a `FloatTensor` of times,
+  as a `PcfTensor` does, and persistence reads the result's last two axes
+  as point clouds, so `PointCloudTensor` needs no `FloatTensor`
+  constructor (item 51).
 - `Window` takes a size and a step, not an overlap: the overlap is
   `size - step`, and a step larger than the size, which leaves gaps, has no
   overlap to give (item 43).
@@ -61,13 +63,13 @@ forward direction no time-series path uses yet.
 
 - **Files.** Source: `include/sbear/timeseries.hpp` (`Times`, channels,
   `TimeSeries<T>`), `include/sbear/timeseries/time_delay_embedding.hpp` and `windowing.hpp` (windows,
-  embeddings, sampling), `include/sbear/ufunc.hpp` (operations and
+  embeddings), `include/sbear/ufunc.hpp` (operations and
   `UfuncTask`), `include/sbear/io/timeseries_io.hpp`,
   `src/python/py_timeseries.{hpp,cpp}`, and the package
   `stablebear/timeseries/` with thin wrappers. Tests:
   `test/python/test_timeseries.py` (storage, access, evaluation, units,
   channels, serialization), `test/python/test_time_delay_embedding.py`,
-  `test/python/test_windowing.py` (windows and sampling), and
+  `test/python/test_windowing.py` (windows and evaluating them), and
   `test/python/persistence/test_timeseries_persistence.py` (workflow 1). Items
   that touch another file name it.
 - **Data.** Use timestamps, delays, and window sizes that are exact in binary
@@ -113,7 +115,7 @@ This assumes the recommended option of each decision.
   no stored domain. Like `NestedTensor`, one registration template binds it for every
   tensor element type in the library (19 types).
 - Everything runs in C++: lookups, snapping, domain checks, unit conversion,
-  windows, delay embeddings, sampling, and analysis. Python only binds
+  windows, delay embeddings, evaluation, and analysis. Python only binds
   arguments and wraps results.
 - `series(t)` looks up each channel on its own grid, in its own unit, and
   returns the value for one channel or a `NestedTensor` with one leaf per
@@ -126,10 +128,11 @@ This assumes the recommended option of each decision.
   copy (decision 4). A delay
   embedding of a numeric channel of shape `S` has shape `(m, *S)` and equals
   the delayed values at every time of its domain (item 40).
-- `RegularSampler` samples each window of each numeric channel into a point
-  cloud, taking values from the window's source, flattening each observation
-  into a point of dimension `prod(shape)`, and returns a `PointCloudTensor`
-  with one entry per window and channel (item 52).
+- A tensor of series, such as windows, evaluates at times `t` of shape
+  `t_shape` to a tensor of shape `(*tensor_shape, *t_shape, *shape)`, as a
+  `PcfTensor` does, or a `NestedTensor` with one such leaf per channel.
+  Evaluating windows of an embedding on a grid gives point clouds in the
+  last two axes, which persistence reads directly (items 51-53).
 - Analysis functions are operations in the style of NumPy ufuncs: a native
   per-element kernel with bound parameters and `extra_dims`, the dimensions
   one input element adds to the result (for persistence, `(max_dim + 1,)`).
@@ -239,7 +242,8 @@ parallel threshold.
 - [x] **5. Native storage and where the code lives.** (decision: as recommended; all evaluation in C++, flat values plus `shape`, `NestedTensor`-style registration)
   Recommendation, from our discussion:
   - All evaluation runs in C++: the previous-value lookup with snapping,
-    domain checks, unit conversion, windows, delay embeddings, and sampling.
+    domain checks, unit conversion, windows, delay embeddings, and
+    evaluation.
     Python wrappers only bind arguments and wrap results.
   - A stored channel holds a shared `Times`, a flat `std::vector<T>` (not a
     `Tensor<T>`, so its layout, gathering, and slicing stay under our
@@ -295,8 +299,8 @@ parallel threshold.
     `TimeDelayEmbedding(dimension, delay)` (without the issue's `unit="time"`
     until a second delay mode exists), `Window(size, step=None)`
     (windows always start at time 0; the `relative` option and `overlap`,
-    which is `size - step`, were dropped during item 43), and `RegularSampler(n_points)` with `.times(window)`
-    (revised with items 40-56).
+    which is `size - step`, were dropped during item 43; revised with items
+    40-56; `RegularSampler` was dropped at item 51).
   - `from_channels` takes a list of one-channel series of one element
     type; channel `i` is the `i`th series. `unit` defaults to the
     channels' shared unit and is required when their units differ.
@@ -339,12 +343,10 @@ parallel threshold.
     results could not go to `pdist` or the reductions. Axis or element tags
     carrying the times through every tensor operation were considered and
     rejected as too complex.)
-  - `RegularSampler(n_points)(windows)` returns a `PointCloudTensor` of
-    shape `(n_windows,)` for one channel and `(n_windows, n_channels)` for
-    several, as `evaluate` gives a value for one channel and a leaf per
-    channel for several; each cloud has `n_points` points of dimension
-    `prod(shape)` of its channel (item 52).
-    Joining channels into one cloud is a later extension.
+  - `windows(t)` evaluates every window at the times `t` (item 51). (A
+    `RegularSampler(n_points)(windows)` returning a `PointCloudTensor` was
+    dropped at item 51.) Joining channels into one cloud is a later
+    extension.
   - `TimeSeries` is generic (`TimeSeries[PointCloud]`) in Python
     3.10-compatible annotations.
   - An empty list gives an empty float64 channel, so a typed empty channel of
@@ -581,7 +583,7 @@ parallel threshold.
   merges them, converted to its own unit, against its timestamps in
   `O(n + m)`, and in `O(m log n)` since the cursor gallops (item 40's
   efficiency pass), with the same snapping as a single query; results come back in
-  the caller's order. Items 51-52 sample through it. Tests with times
+  the caller's order. Items 51-53 evaluate windows through it. Tests with times
   `[0.0, 1.5, 4.0]` and values `[10.0, 20.0, 30.0]`, and with channels A and
   B:
   - `series([4.0, 0.0, 1.0, 1.5])` is `[30, 10, 10, 20]`, and
@@ -753,7 +755,7 @@ parallel threshold.
   under `sb.system.limit_cpus(1)` equals the result with all threads; restore
   the limit afterwards. **Catches:** results that depend on scheduling.
 
-## Delay embeddings, windows, and sampling (workflow 2)
+## Delay embeddings, windows, and evaluation (workflow 2)
 
 (Revised after item 39 for the decisions of items 26 and 43: no stored
 domain, and windows as series of series, with the choices that follow from
@@ -815,7 +817,8 @@ observation it came from.
   `TimeDelayEmbedding`. Every `stride`-th change time counts samples only
   when the delay is a multiple of a regular spacing, so a stride needs a
   definition for other series, for example over the source's timestamps.
-  In workflow 2 the sampler (items 51-52) already sets the spacing, so a
+  In workflow 2 the grid windows are evaluated on (item 51) already sets
+  the spacing, so a
   stride mainly serves embeddings used on their own, such as thinning
   points before persistence. If added: one test that `stride=2` keeps every
   other time and point.
@@ -824,7 +827,7 @@ observation it came from.
   allowed. `register_derived_element` binds `delay_embed` and `windows` for
   all 19 element types, the Python check is gone, and item 41's barcode case
   became a test of a PCF embedding, whose observations are `m` delayed PCFs.
-  The sampler still takes numeric windows only, item 54.) Before, `TimeDelayEmbedding` accepted only the 7 numeric element types and raised
+  Windows of every element type evaluate, item 51.) Before, `TimeDelayEmbedding` accepted only the 7 numeric element types and raised
   `TypeError` otherwise (item 41 tests this for barcodes). The native
   `delay_embed` is built from `index_at` and `stack_at`, which work for every
   element type, so only the binding in `py_timeseries_derived.cpp` and the
@@ -907,7 +910,7 @@ observation it came from.
   `(d_c, *S_c)` and keeps its own times; the series' domain is the
   intersection, from `max_c(t_{c,0} + (d_c - 1) * tau_c)` to
   `min_c(t_{c,last})`, which is the paper's shared start. A CMJ vector is
-  then built downstream by evaluating the series (or sampling it) and
+  then built downstream by evaluating the series and
   concatenating the leaves. `delay_embed` takes vectors of dimensions and
   delays. Tests: per-channel dimensions give per-channel shapes and the
   intersected domain; a list of the wrong length raises `ValueError`.
@@ -1092,8 +1095,8 @@ observation it came from.
   Considered: closing only the last window, which keeps the last
   observation only when the windows land on it and needs a closed end
   past a channel's last observation anyway; and partial windows off by
-  default, which keeps every window `size` long for the sampler (see item
-  51).
+  default, which keeps every window `size` long for evaluating all of
+  them on one grid (item 51).
 
 - [x] **47b. `closed`.** A channel's bounds become an open start and an
   end after its last timestamp that is open or closed, replacing
@@ -1180,54 +1183,57 @@ embedding of item 40.
   source unchanged. **Catches:** a write into a view reaching the source or
   another point that shares its stored observations.
 
-- [ ] **51. Sampler query times.** (open, from item 47a: a partial
-  window, from `partial=True`, is shorter than `size`, so it cannot be
-  sampled on `[0, size)`, and nothing in a window records `size`. Decide
-  whether the sampler raises on a partial window, takes `size` itself, or
-  samples each window's own length.) `RegularSampler(n_points).times(window)`
-  returns the `Times` `start + size * k / n_points` for `k = 0, ...,
-  n_points - 1`, where `start` is the window's start in its own timestamps,
-  always 0; the end is never sampled. Test:
-  `RegularSampler(n_points=4).times(w)`, for the window `w` at 1.0 of
-  `Window(size=2.0, step=1.0)`, gives
-  `[0.0, 0.5, 1.0, 1.5]` in seconds. **Catches:** the end point included,
-  spacing `size / (n - 1)`.
+- [ ] **51. Evaluating a tensor of series.** (revised: there is no
+  `RegularSampler`, nor items 51-54 as first planned, a sampler's query
+  times, sampling windows into a `PointCloudTensor`, sampling several
+  channels, and sampler errors. Its open questions, where `size` comes from
+  for a partial or right-closed window and which grid suits each `closed`,
+  go away when the user chooses the times.) A tensor of series evaluates
+  at times `t`, a number, an array, or a `FloatTensor` of shape `t_shape`,
+  in each series' unit: `windows(t)` and `windows.evaluate(t)` give, for
+  one-channel series, a tensor of shape `(*windows.shape, *t_shape,
+  *shape)` of the element dtype, as `PcfTensor(t)` gives
+  `(*shape, *t_shape)`; a number gives `(*windows.shape, *shape)`. Each
+  element evaluates through item 24b in one native call. Evaluating
+  windows of an embedding on a grid, such as
+  `windows(np.arange(n) * size / n)`, gives clouds of `n` points in the
+  last two axes, which `compute_persistent_homology` reads as point clouds
+  (item 55). Tests with times `[0.0, 1.0, 2.0, 3.0, 4.0]` and values
+  `10 * t`, and `Window(size=2.0, step=1.0, closed="left", partial=False)`
+  (windows at 0, 1, and 2):
+  - `windows([0.0, 1.0])` is `[[0, 10], [10, 20], [20, 30]]`, and
+    `windows(1.5)` is `[10, 20, 30]`. **Catches:** windows out of order,
+    windows and times transposed, a number given a time axis.
+  - `windows([[0.0, 1.0], [0.5, 1.5]])` has shape `(3, 2, 2)`, with window
+    1's values `[[10, 20], [10, 20]]`. **Catches:** the query shape lost.
 
-- [ ] **52. Sampling windows.** `RegularSampler(n_points)(windows)`
-  evaluates each window at its query times, through item 24b, so it sees
-  exactly what evaluating the window shows the user. A single window can be sampled too, giving its
-  clouds as `evaluate` gives one value: a `PointCloud` for one channel, a
-  `NestedTensor` for several. A tensor of windows gives a `PointCloudTensor`
-  of shape `(n_windows,)` for one channel and `(n_windows, n_channels)` for
-  several, in window order, so persistence of it is a `BarcodeTensor` through
-  the tensor path and its summaries go to `pdist` directly; the window
-  bounds come from `Window(..., return_bounds=True)`. Each
-  observation is flattened into a point of dimension `prod(shape)`; a scalar
-  channel gives 1-D points. Test: `Window(size=2.0, step=1.0)` of the source
-  with `n_points=2` gives a pcloud64 tensor of shape `(3,)` with clouds
-  `[[0], [5]]`, `[[5], [15]]`, and `[[15], [25]]`. **Catches:** windows out
-  of order, the value at a window's start missing (the window at 1.0 is
-  sampled at 0, before its observation at 0.5), the wrong precision.
+- [ ] **52. Evaluating several channels.** A tensor of series with several
+  channels evaluates to a `NestedTensor` with one leaf per channel, each of
+  shape `(*windows.shape, *t_shape, *shape)` of its channel, as
+  `series(t)` gives one leaf per channel. Test: `Window(size=1.0,
+  step=1.0, closed="left", partial=False)` of item 47's series of channels
+  A (`10 * t`) and B (`-10 * t`, in ms) has windows at 0.5 and 1.5, and
+  `windows([0.0, 0.5])` has leaves `[[0, 10], [10, 10]]` and
+  `[[-5, -5], [-15, -15]]`. **Catches:** channels swapped, windows and
+  channels transposed, channel B read in the query unit.
 
-- [ ] **53. Sampling several channels.** Test: `Window(size=1.0, step=1.0)` of
-  the series of channels A and B with `n_points=2` gives a tensor of shape
-  `(2, 2)`: the clouds `[[10], [20]]` and `[[-1], [-1]]` in row 0 and
-  `[[20], [20]]` and `[[-2], [-2]]` in row 1. **Catches:** channels swapped,
-  windows and channels transposed, channels evaluated on one grid.
+- [ ] **53. Evaluation errors.** A time outside a window's domain raises
+  `ValueError` naming the window's index and its domain. Test: with
+  `Window(size=3.0, step=3.0, closed="left", partial=True)` of item 51's
+  series (window 1 holds `[0, 1]`), `windows([0.0, 2.0])` raises naming
+  window 1 and `[0, 1]`. **Catches:** a partial window evaluated past its
+  end, an error that does not say which window.
 
-- [ ] **54. Sampler errors.** Test, parametrized: `n_points=0` raises
-  `ValueError`; a `FloatTensor` and windows of point clouds raise
-  `TypeError`. **Catches:** an empty sample, a tensor that does not hold
-  windows sampled, object values sampled into point clouds.
+- [x] **54. Sampler errors.** (dropped with the sampler, item 51)
 
 - [ ] **55. The delay workflow end to end.** Test in
   `test/python/test_integration.py`: times `[0.0, 0.5, ..., 3.5]` and values
   `[0, 1, 0, -1, 0, 1, 0, -1]` through
   `TimeDelayEmbedding(dimension=2, delay=0.5)` (domain `[0.5, 3.5]`),
   `Window(size=1.0, step=1.0, closed="left", partial=False)` (windows at
-  0.5, 1.5, and 2.5),
-  `RegularSampler(n_points=4)`, and `compute_persistent_homology(...,
-  max_dim=1)` give a tensor of three clouds of four 2-D points and a
+  0.5, 1.5, and 2.5), evaluation at `[0.0, 0.25, 0.5, 0.75]`, and
+  `compute_persistent_homology(..., max_dim=1)` give a float tensor of
+  shape `(3, 4, 2)`, three clouds of four 2-D points, and a
   `BarcodeTensor` of shape `(3, 2)`, and the bounds start at
   `[0.5, 1.5, 2.5]`. **Catches:** steps that do not compose.
 
@@ -1238,8 +1244,7 @@ embedding of item 40.
   its ends, so
   the format records whether a channel's start is open and its end when it
   has one (items 43 and 47b). A loaded
-  one therefore evaluates and
-  samples exactly as the original, with no source in the file; with
+  one therefore evaluates exactly as the original, with no source in the file; with
   overlapping windows an observation is written once per window holding
   it. Tests, parametrized
   over `save`/`load` and `pickle`:
@@ -1247,9 +1252,8 @@ embedding of item 40.
     and 3.25. **Catches:** the embedded points lost on saving.
   A loaded embedding evaluates exactly as the view, since views evaluate by
   previous value on their own points with their own snapping (decision 8).
-  - `Window(size=2.0, step=1.0)` of the source loads with the same windows
-    in order, and `RegularSampler(n_points=2)` of it gives
-    item 52's clouds. **Catches:** windows reordered or their values at the
+  - Item 51's windows load in order, and evaluating them at
+    `[0.0, 1.0]` gives item 51's values. **Catches:** windows reordered or their values at the
     bounds lost on saving.
 
 - [ ] **57. Golden files.** Pin the formats (TESTING.md principle 11) with a
@@ -1281,7 +1285,8 @@ pages.
   `docs/userguide.rst`: times, units, the domain, and channels, then two small
   examples. The first follows a point-cloud series through persistence to
   stable ranks; the second takes two numeric channels in different units
-  through a delay embedding, windows, and sampling to persistence. Link each
+  through a delay embedding and windows, evaluated on a grid, to
+  persistence. Link each
   operation to its API entry on first mention. The page exists since item 20
   with sections on evaluation and snapping, with figures from
   `docs/_static/gen_timeseries_snap_fig.py`; further figures follow the
@@ -1310,17 +1315,17 @@ pages.
 | Native operation contract, dispatch, and adapter; calls, parameters, CPU limits | 6, 28-29, 32, 36, 38-39 |
 | Persistence and barcode summaries of series | 28-35 |
 | Delay embedding and windows | 40-47 |
-| Regular sampling into point clouds and through persistence | 51-55 |
+| Evaluating windows into point clouds and through persistence (no sampler) | 51-53, 55 |
 | Save, load, and pickle for both workflows | 26-27, 56-57 |
 | Tests and documented examples | all test items, 58-59 |
-| Channels with their own grids and units (added) | 3, 21-25, 23a, 29, 42, 47, 53 |
+| Channels with their own grids and units (added) | 3, 21-25, 23a, 29, 42, 47, 52 |
 
 ## Out of scope
 
 As in the issue: datetime timestamps, sample-count delays and windows, other
-samplers, interpolation, partial windows, gap policies, reductions over
+samplers, interpolation, gap policies, reductions over
 time, provenance, and normalization. Also deferred here:
-joining channels into one point cloud when sampling, series with channels of
+joining channels into one point cloud when evaluating windows, series with channels of
 different element types, observations whose shape changes over time
 (a later per-observation tensor storage mode), `NestedTensor` values (6
 more element types, cheap to add once a use such as spike trains needs
