@@ -19,9 +19,10 @@ namespace
     m.def("delay_embed", [](const sb::TimeSeries<T>& series, size_t dimension, sb::float64_t delay) {
       return sb::delay_embed(series, dimension, delay);
     }, py::arg("series"), py::arg("dimension"), py::arg("delay"));
-    m.def("windows", [](const sb::TimeSeries<T>& series, sb::float64_t size, sb::float64_t step) {
-      return sb::windows(series, size, step);
-    }, py::arg("series"), py::arg("size"), py::arg("step"));
+    m.def("windows", [](const sb::TimeSeries<T>& series, sb::float64_t size, sb::float64_t step, bool closedStart,
+                        bool closedEnd) {
+      return sb::windows(series, size, step, closedStart, closedEnd);
+    }, py::arg("series"), py::arg("size"), py::arg("step"), py::arg("closed_start"), py::arg("closed_end"));
   }
 }
 

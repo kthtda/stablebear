@@ -1091,32 +1091,31 @@ observation it came from.
   default, which keeps every window `size` long for the sampler (see item
   51).
 
-- [ ] **47b. `closed`.** A channel's bounds become an open start and an
+- [x] **47b. `closed`.** A channel's bounds become an open start and an
   end after its last timestamp that is open or closed, replacing
   `Channel::until`; `TimeSeries::Domain` gains `openStart`, and the error
-  names the domain as in `(0, 1.5]`. An embedding keeps both: its start is
+  names the domain as in `(0, 1]`. An embedding keeps both: its start is
   open when its source's is, and it can be evaluated at a closed end. An
   invalid `closed` raises `ValueError`. With `partial=False`, a closed
   window end must also be inside an open end of the series. Tests with the
   source series:
-  - Parametrized over `closed`, `size=1.5, step=1.5, partial=False`
-    (windows at 0 and 1.5, the observation at 1.5 on the boundary):
-    `"left"` gives values `[0, 5]` and `[15, 25]`, domain `[0, 1.5)`;
-    `"right"` gives `[0, 5, 15]` and `[15, 25]`, domain `(0, 1.5]`;
-    `"both"` gives `[0, 5, 15]` and `[15, 25]`, domain `[0, 1.5]`;
-    `"none"` gives `[0, 5]` and `[15, 25]`, domain `(0, 1.5)`. The domain
-    is read from the error of evaluating each window at -0.25.
+  - One test per value of `closed`, on the window at 1.0 of times
+    `[0.0, 0.5, 1.0, 1.5, 2.0]`, values `10 * t`, and `size=1.0, step=1.0,
+    partial=False`, evaluated at its edges: `"left"` is 10 at 0 and raises
+    at 1 naming `[0, 1)`; `"right"` raises at 0 naming `(0, 1]`, is 10 at
+    0.25 and 20 at 1; `"both"` is 10 at 0 and 20 at 1; `"none"` raises at 0
+    and at 1 naming `(0, 1)` and is 10 at 0.25.
     **Catches:** an observation at a closed end left out, one at an open
     end kept, the value carried in dropped for an open start, the domain's
     ends shown with the wrong brackets.
-  - `TimeDelayEmbedding(dimension=2, delay=0.4)` of the window at 1.0 of
-    `Window(size=2.0, step=1.0, closed="right", partial=False)` (values
-    `[5, 15, 25]` at `[0.0, 0.5, 1.5]`, end 2 closed past its last
-    observation) has times `[0.4, 0.5, 0.9, 1.5, 1.9]`, is `[25, 25]` at
-    2.0, and raises at 0.4 naming `(0.4, 2]`. **Catches:** a closed end
+  - `TimeDelayEmbedding(dimension=2, delay=1.0)` of the window at 1.0 of
+    `Window(size=2.0, step=1.0, closed="right", partial=False)` over times
+    `[0.0, 1.0, 2.0, 4.0]` with values `10 * t` (values `[10, 20]` at
+    `[0.0, 1.0]`, end 2 closed past its last observation) has times
+    `[1.0, 2.0]`, is `[20, 20]` at 2.0, and raises at 1.0 naming `(1, 2]`. **Catches:** a closed end
     past the last observation evaluated as open, an embedding losing the
     window's open start or closed end.
-  - `closed="middle"` raises `ValueError`, in item 45's test.
+  - `closed="middle"` raises `ValueError`.
     **Catches:** an unknown `closed` read as one of the four.
 
 - [ ] **47c. Partial windows.** Tests with the source series:

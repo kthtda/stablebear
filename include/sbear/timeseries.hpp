@@ -250,18 +250,29 @@ namespace sb
 
     /// A view of this channel whose times are @p times and whose observation
     /// k is this channel's observation @p indices[k], with no new axis. It
-    /// shares this channel and its snap settings, but not its end.
+    /// shares this channel and its snap settings, but not its start or end.
     [[nodiscard]] Channel take(Times times, std::vector<size_t> indices) const;
 
-    /// This channel with the open end @p end, in its unit: it can be
-    /// evaluated after its last timestamp up to @p end, but not at it.
+    /// This channel with the end @p end, in its unit: it can be evaluated
+    /// after its last timestamp up to @p end, and at @p end unless @p open.
     /// @p end must come after the last timestamp. Views made by stack_at
     /// keep the end.
-    [[nodiscard]] Channel until(float64_t end) const;
+    [[nodiscard]] Channel until(float64_t end, bool open = true) const;
 
-    /// The open end set by until(), if any; without one, the channel can be
+    /// The end set by until(), if any; without one, the channel can be
     /// evaluated up to and at its last timestamp.
     [[nodiscard]] std::optional<float64_t> end() const noexcept { return m_end; }
+
+    /// Whether end() is set and outside the domain.
+    [[nodiscard]] bool end_open() const noexcept { return m_end && m_endOpen; }
+
+    /// This channel with an open start: its first timestamp is outside the
+    /// domain, though its first observation stays in effect after it. Views
+    /// made by stack_at keep the open start.
+    [[nodiscard]] Channel with_open_start() const;
+
+    /// Whether the first timestamp is outside the domain.
+    [[nodiscard]] bool start_open() const noexcept { return m_startOpen; }
 
     /// The observation with the largest timestamp at or before @p t, in the
     /// channel's own unit, a tensor of shape shape(). A query below an
@@ -305,7 +316,7 @@ namespace sb
     [[nodiscard]] const std::vector<size_t>& shape() const noexcept { return m_shape; }
     [[nodiscard]] size_t size() const noexcept { return held_times().size(); }
 
-    /// The same timestamps, end, shape, values, and snap settings.
+    /// The same timestamps, start, end, shape, values, and snap settings.
     [[nodiscard]] bool operator==(const Channel& other) const;
 
     /// Element @p i of the observations at times(), flattened in row-major
@@ -353,6 +364,8 @@ namespace sb
     std::vector<float64_t> m_lags;
     std::vector<size_t> m_shape;
     std::optional<float64_t> m_end;
+    bool m_endOpen = true;
+    bool m_startOpen = false;
     float64_t m_snapTolerance = DefaultSnapTolerance;
     float64_t m_snapEps = DefaultSnapEps;
   };
@@ -405,13 +418,14 @@ namespace sb
 
     /// The times, in the series' unit, at which every channel can be
     /// evaluated: from the latest first timestamp to the earliest end, a
-    /// channel's last timestamp or its open end, converted exactly as
+    /// channel's last timestamp or its end, converted exactly as
     /// check_observed() compares.
     struct Domain
     {
       float64_t first;
       float64_t last;
-      bool openEnd;  // last itself is outside the domain
+      bool openStart;  // first itself is outside the domain
+      bool openEnd;    // last itself is outside the domain
     };
 
     /// The domain of the series. Requires every channel to have

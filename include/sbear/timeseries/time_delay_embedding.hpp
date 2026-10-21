@@ -45,11 +45,11 @@ namespace sb
     if (n > 0)
     {
       const auto start = channel.time(0) + lags.front();
-      // A channel with an open end, such as a window, can be evaluated past
-      // its last timestamp up to its end, so the embedding can too, and keeps
-      // that end through stack_at.
+      // A channel with an end, such as a window, can be evaluated past its
+      // last timestamp up to its end, so the embedding can too, and keeps
+      // that end, and an open start, through stack_at.
       const auto end = channel.end().value_or(channel.time(n - 1));
-      const auto open = channel.end().has_value();
+      const auto open = channel.end_open();
       const auto past = [&](float64_t s) { return open ? s >= end : s > end; };
       if (past(start))
       {
@@ -130,7 +130,7 @@ namespace sb
           runHasTimestamp = runHasTimestamp || isTimestamp;
         }
       }
-      if (!open && at.back() != end)
+      if (!channel.end() && at.back() != end)
       {
         at.push_back(end);
       }

@@ -1,3 +1,5 @@
+import re
+
 import numpy as np
 import pytest
 
@@ -71,6 +73,56 @@ def test_window_raises_on_a_size_or_step_that_is_not_finite_and_positive(size, s
         Window(size=size, step=step)
 
 
+def test_window_raises_on_an_unknown_closed():
+    with pytest.raises(ValueError, match="closed"):
+        Window(size=1.0, step=1.0, closed="middle")
+
+
+def _closed_source():
+    # Each observation is 10 * t.
+    return TimeSeries([0.0, 5.0, 10.0, 15.0, 20.0], times=[0.0, 0.5, 1.0, 1.5, 2.0])
+
+
+def test_a_left_closed_window_includes_its_start_but_not_its_end():
+    # The window [1.0, 2.0).
+    window = Window(size=1.0, step=1.0, closed="left")(_closed_source())[1]
+
+    assert window(0.0) == 10.0
+    with pytest.raises(ValueError, match=re.escape("outside the domain [0, 1)")):
+        window(1.0)
+
+
+def test_a_right_closed_window_includes_its_end_but_not_its_start():
+    # The window (1.0, 2.0]. The observation at 1.0 stays in effect just
+    # after the start.
+    window = Window(size=1.0, step=1.0, closed="right")(_closed_source())[1]
+
+    with pytest.raises(ValueError, match=re.escape("outside the domain (0, 1]")):
+        window(0.0)
+    assert window(0.25) == 10.0
+    assert window(1.0) == 20.0
+
+
+def test_a_window_closed_on_both_sides_includes_its_start_and_its_end():
+    # The window [1.0, 2.0].
+    window = Window(size=1.0, step=1.0, closed="both")(_closed_source())[1]
+
+    assert window(0.0) == 10.0
+    assert window(1.0) == 20.0
+
+
+def test_a_window_closed_on_neither_side_includes_neither_end():
+    # The window (1.0, 2.0). The observation at 1.0 stays in effect just
+    # after the start.
+    window = Window(size=1.0, step=1.0, closed="none")(_closed_source())[1]
+
+    with pytest.raises(ValueError, match=re.escape("outside the domain (0, 1)")):
+        window(0.0)
+    assert window(0.25) == 10.0
+    with pytest.raises(ValueError, match=re.escape("outside the domain (0, 1)")):
+        window(1.0)
+
+
 def test_a_window_can_be_evaluated_from_its_start_up_to_its_end():
     # The window [1.0, 3.0) holds the value at 1.0, observed at 0.5, then 1.5
     # and 2.5.
@@ -129,6 +181,20 @@ def test_an_embedding_of_a_window_keeps_its_open_end():
     assert np.array_equal(np.asarray(embedding(1.95)), [25.0, 25.0])
     with pytest.raises(ValueError, match=r"outside the domain \[0.4, 2\)"):
         embedding(2.0)
+
+
+def test_an_embedding_of_a_window_keeps_its_open_start_and_closed_end():
+    # The window (1.0, 3.0] holds 10 and 20 at 0.0 and 1.0, and ends at 2.0,
+    # after its last observation.
+    series = TimeSeries([0.0, 10.0, 20.0, 40.0], times=[0.0, 1.0, 2.0, 4.0])
+    window = Window(size=2.0, step=1.0, closed="right")(series)[1]
+
+    embedding = TimeDelayEmbedding(dimension=2, delay=1.0)(window)
+
+    assert np.array_equal(np.asarray(embedding.times), [1.0, 2.0])
+    assert np.array_equal(np.asarray(embedding(2.0)), [20.0, 20.0])
+    with pytest.raises(ValueError, match=re.escape("outside the domain (1, 2]")):
+        embedding(1.0)
 
 
 def test_an_embedding_of_a_window_takes_no_history_from_before_the_window():
