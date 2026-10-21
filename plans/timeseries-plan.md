@@ -1037,7 +1037,7 @@ observation it came from.
   41, rather than returning an empty tensor. **Catches:** an empty result
   that fails later, far from its cause.)
 
-- [ ] **46. Embedding a window, and windowing an embedding.** Tests:
+- [x] **46. Embedding a window, and windowing an embedding.** Tests:
   - `TimeDelayEmbedding(dimension=2, delay=1.0)` of the window at 1.0 of
     `Window(size=2.0, step=1.0)`
     (times `[0.0, 0.5, 1.5]`, open end 2) has times `[1.0, 1.5]` and points

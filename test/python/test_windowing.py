@@ -129,3 +129,29 @@ def test_an_embedding_of_a_window_keeps_its_open_end():
     assert np.array_equal(np.asarray(embedding(1.95)), [25.0, 25.0])
     with pytest.raises(ValueError, match=r"outside the domain \[0.4, 2\)"):
         embedding(2.0)
+
+
+def test_an_embedding_of_a_window_takes_no_history_from_before_the_window():
+    # The window [1.0, 3.0) holds 5, 15, and 25 at 0.0, 0.5, and 1.5. With a
+    # delay of 1.0, the first point is at 1.0.
+    window = Window(size=2.0, step=1.0)(_windows_source())[1]
+
+    embedding = TimeDelayEmbedding(dimension=2, delay=1.0)(window)
+
+    assert np.array_equal(np.asarray(embedding.times), [1.0, 1.5])
+    assert np.array_equal(np.asarray(embedding.values), [[5.0, 15.0], [15.0, 25.0]])
+    with pytest.raises(ValueError, match=r"outside the domain \[1, 2\)"):
+        embedding(0.75)
+    with pytest.raises(ValueError, match=r"outside the domain \[1, 2\)"):
+        embedding(2.0)
+
+
+def test_windows_of_an_embedding_hold_its_points():
+    # The embedding has points at 1.0, 1.5, 2.5, 3.5, and 4.0.
+    embedding = TimeDelayEmbedding(dimension=2, delay=1.0)(_windows_source())
+
+    windows, bounds = Window(size=2.0, step=1.0)(embedding, return_bounds=True)
+
+    assert np.array_equal(np.asarray(bounds)[:, 0], [1.0, 2.0])
+    assert np.array_equal(np.asarray(windows[0].times), [0.0, 0.5, 1.5])
+    assert np.array_equal(np.asarray(windows[0].values), [[0.0, 5.0], [5.0, 15.0], [15.0, 25.0]])
