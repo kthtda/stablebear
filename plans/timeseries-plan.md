@@ -1050,12 +1050,14 @@ observation it came from.
     `[0.0, 0.5, 1.5]` and values `[[0, 5], [5, 15], [15, 25]]`. **Catches:** the embedding's points
     lost when windowing.
 
-- [ ] **47. Windows of several channels.** One cut, `[a, a + size)` in the
+- [x] **47. Windows of several channels.** One cut, `[a, a + size)` in the
   query unit, applies to every channel. Test: `Window(size=1.0, step=1.0)` of
   the series of channels A and B has starts `[0.5, 1.5]` in seconds; the
   first window's `times` leaves are `[0.0, 0.5]` and `[0.0]`, without B's
   observation at 1500 ms, and the second's are `[0.0]` and `[0.0]`; the
-  first window evaluates at 0.5 to leaves 20 and -1 and raises at 1.0.
+  first window evaluates at 0.5 to leaves 10 and -5 and raises at 1.0.
+  (Revised: the test gives A the values `10 * t` and B `-10 * t`, with `t`
+  in seconds, so the values show where they were observed.)
   **Catches:** channels cut at different
   bounds, channel B cut in milliseconds.
 

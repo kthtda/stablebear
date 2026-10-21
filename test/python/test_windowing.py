@@ -3,7 +3,7 @@ import pytest
 
 import stablebear as sb
 from stablebear import FloatTensor
-from stablebear.timeseries import TimeDelayEmbedding, TimeSeries, Window
+from stablebear.timeseries import TimeDelayEmbedding, Times, TimeSeries, Window
 from stablebear.timeseries.series import TimeSeriesTensor
 
 
@@ -155,3 +155,25 @@ def test_windows_of_an_embedding_hold_its_points():
     assert np.array_equal(np.asarray(bounds)[:, 0], [1.0, 2.0])
     assert np.array_equal(np.asarray(windows[0].times), [0.0, 0.5, 1.5])
     assert np.array_equal(np.asarray(windows[0].values), [[0.0, 5.0], [5.0, 15.0], [15.0, 25.0]])
+
+
+def test_windows_cut_every_channel_at_the_same_bounds():
+    # A's observations are 10 * t and B's are -10 * t, with t in seconds.
+    a = TimeSeries([0.0, 10.0, 25.0], times=Times([0.0, 1.0, 2.5], unit="s"))
+    b = TimeSeries([-5.0, -15.0, -30.0], times=Times([500.0, 1500.0, 3000.0], unit="ms"))
+    series = TimeSeries.from_channels([a, b], unit="s")
+
+    windows, bounds = Window(size=1.0, step=1.0)(series, return_bounds=True)
+
+    # Both channels are observed from 0.5 to 2.5, so the windows are
+    # [0.5, 1.5) and [1.5, 2.5).
+    assert np.array_equal(np.asarray(bounds)[:, 0], [0.5, 1.5])
+    # B's observation at 1500 ms is the end of the first window.
+    assert np.array_equal(np.asarray(windows[0].times[0]), [0.0, 0.5])
+    assert np.array_equal(np.asarray(windows[0].times[1]), [0.0])
+    assert np.array_equal(np.asarray(windows[1].times[0]), [0.0])
+    assert np.array_equal(np.asarray(windows[1].times[1]), [0.0])
+    assert windows[0](0.5)[0][()] == 10.0
+    assert windows[0](0.5)[1][()] == -5.0
+    with pytest.raises(ValueError, match=r"outside the domain \[0, 1\)"):
+        windows[0](1.0)
