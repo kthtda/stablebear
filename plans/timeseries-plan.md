@@ -24,6 +24,9 @@ Where the plan departs from the issue:
 - Windows are a 1-D tensor of series (`Tensor<TimeSeries<T>>`), each window
   an ordinary series of the observations it contains, with their start and
   end times as a float tensor on request (item 43).
+- As in Polars `group_by_dynamic`, `closed` chooses which ends of a window
+  are included, and windows continue past the last full one as partial
+  windows unless `partial=False` (item 47a).
 
 ## How to work through this plan
 
@@ -86,8 +89,8 @@ forward direction no time-series path uses yet.
 - **Comparisons.** Compare numeric values exactly; the inputs are exact.
   Compare barcodes with `is_isomorphic_to(..., atol=0, rtol=0)` and PCF
   tensors with `array_equal`.
-- **Parameters.** Spell out `dimension`, `delay`, `size`, `step`, `n_points`,
-  `unit`, `max_dim`, and `reduced` (TESTING.md principle 18) unless the test
+- **Parameters.** Spell out `dimension`, `delay`, `size`, `step`, `closed`,
+  `partial`, `n_points`, `unit`, `max_dim`, and `reduced` (TESTING.md principle 18) unless the test
   checks a default.
 - **Comments.** Test comments describe the input or what is checked. The
   **Catches:** analysis stays in this plan.
@@ -115,7 +118,7 @@ This assumes the recommended option of each decision.
 - `series(t)` looks up each channel on its own grid, in its own unit, and
   returns the value for one channel or a `NestedTensor` with one leaf per
   channel for several. `series[i]` selects channels by index.
-  `Window(size, step)(series)` is a tensor of windows, and
+  `Window(size, step, closed, partial)(series)` is a tensor of windows, and
   `return_bounds=True` adds their start and end times.
 - Every channel is a view: a `shared_ptr` to its storage plus a descriptor
   (domain, lags, unit scale). Windows, delay embeddings, channel selection,
@@ -167,7 +170,7 @@ parallel threshold.
 
 ## Decisions
 
-- [x] **1. Domain and evaluation.** (decision: (a), closed domain for series built from observations, half-open for windows; revised during item 26: there is no domain. A series can be evaluated from the first to the last observation of every channel, both included, checked against the timestamps on each query; there is no `domain` property, and a series with an empty channel cannot be evaluated. Windows follow the same rule: there is no open or closed end anywhere, see item 43. Revised again during item 43: windows are `[a, a + size)`, so a channel may carry an open end after its last timestamp, set by `Channel::until`; it is the only stored bound, and series without one keep the rule above.) Evaluation
+- [x] **1. Domain and evaluation.** (decision: (a), closed domain for series built from observations, half-open for windows; revised during item 26: there is no domain. A series can be evaluated from the first to the last observation of every channel, both included, checked against the timestamps on each query; there is no `domain` property, and a series with an empty channel cannot be evaluated. Windows follow the same rule: there is no open or closed end anywhere, see item 43. Revised again during item 43: windows are `[a, a + size)`, so a channel may carry an open end after its last timestamp, set by `Channel::until`; it is the only stored bound, and series without one keep the rule above. Revised again in item 47a: a window's channel may also have an open start, or a closed end after its last timestamp; `Domain` records both ends and whether each is open.) Evaluation
   uses the previous value: at time `t`, the observation with the largest
   timestamp `<= t`. Queries outside the domain raise `ValueError`. Options for
   the domain of a channel:
@@ -1061,6 +1064,79 @@ observation it came from.
   **Catches:** channels cut at different
   bounds, channel B cut in milliseconds.
 
+- [x] **47a. (decision) Closed ends and partial windows.** (decision:
+  as in Polars `group_by_dynamic`, a `closed` argument and partial
+  windows, on by default; an open start keeps the value carried in; bounds
+  are nominal) `Window(size, step=None, closed="left", partial=True)`.
+  `closed` is `"left"` (`[a, a + size)`, the windows of items 43-47),
+  `"right"` (`(a, a + size]`), `"both"`, or `"none"`, as in Polars. A
+  window always holds the value in effect at `a_k` at time 0, since that
+  value is also in effect just after `a_k` and evaluation on `(0, size]`
+  needs it; an open start only makes 0 itself outside the domain. An
+  observation at `a_k` is that value, so with an open start it still shows
+  at time 0. A closed end includes an observation at `a_k + size`, or one
+  the end snaps onto, so with `"both"` it is in two windows and with
+  `"none"` only as the next window's value at 0. With `partial=True`,
+  windows continue while their start is in the domain (`a_k <= t_{n-1}`,
+  or `a_k < t_{n-1}` with an open start or an open end of the series), and
+  a window whose nominal end passes `t_{n-1}` ends where the series does,
+  closed at its last observation or open at its open end: a partial
+  window. Polars likewise ends with windows that hold only the last rows.
+  `partial=False` keeps only windows that end in the domain and raises when
+  none fits, as item 43 does. The bounds stay nominal, `(a_k, a_k + size)`,
+  as Polars' `include_boundaries` reports them, also for partial windows.
+  Considered: closing only the last window, which keeps the last
+  observation only when the windows land on it and needs a closed end
+  past a channel's last observation anyway; and partial windows off by
+  default, which keeps every window `size` long for the sampler (see item
+  51).
+
+- [ ] **47b. `closed`.** A channel's bounds become an open start and an
+  end after its last timestamp that is open or closed, replacing
+  `Channel::until`; `TimeSeries::Domain` gains `openStart`, and the error
+  names the domain as in `(0, 1.5]`. An embedding keeps both: its start is
+  open when its source's is, and it can be evaluated at a closed end. An
+  invalid `closed` raises `ValueError`. With `partial=False`, a closed
+  window end must also be inside an open end of the series. Tests with the
+  source series:
+  - Parametrized over `closed`, `size=1.5, step=1.5, partial=False`
+    (windows at 0 and 1.5, the observation at 1.5 on the boundary):
+    `"left"` gives values `[0, 5]` and `[15, 25]`, domain `[0, 1.5)`;
+    `"right"` gives `[0, 5, 15]` and `[15, 25]`, domain `(0, 1.5]`;
+    `"both"` gives `[0, 5, 15]` and `[15, 25]`, domain `[0, 1.5]`;
+    `"none"` gives `[0, 5]` and `[15, 25]`, domain `(0, 1.5)`. The domain
+    is read from the error of evaluating each window at -0.25.
+    **Catches:** an observation at a closed end left out, one at an open
+    end kept, the value carried in dropped for an open start, the domain's
+    ends shown with the wrong brackets.
+  - `TimeDelayEmbedding(dimension=2, delay=0.4)` of the window at 1.0 of
+    `Window(size=2.0, step=1.0, closed="right", partial=False)` (values
+    `[5, 15, 25]` at `[0.0, 0.5, 1.5]`, end 2 closed past its last
+    observation) has times `[0.4, 0.5, 0.9, 1.5, 1.9]`, is `[25, 25]` at
+    2.0, and raises at 0.4 naming `(0.4, 2]`. **Catches:** a closed end
+    past the last observation evaluated as open, an embedding losing the
+    window's open start or closed end.
+  - `closed="middle"` raises `ValueError`, in item 45's test.
+    **Catches:** an unknown `closed` read as one of the four.
+
+- [ ] **47c. Partial windows.** Tests with the source series:
+  - `Window(size=1.5, step=1.5, closed="left", partial=True)` has bounds
+    starting at `[0.0, 1.5, 3.0]`, the last row `(3.0, 4.5)`; the window at
+    3.0 has times `[0.0, 1.0]` and values `[25, 40]`, is 40 at 1.0, and
+    raises at 1.25 naming `[0, 1]`. With `partial=False` the starts are
+    `[0.0, 1.5]`. **Catches:** the partial window dropped, its end taken
+    from the nominal bound, the bounds truncated, `partial` ignored.
+  - Parametrized, `size=2.0, step=2.0, partial=True`: `closed="left"` gives
+    starts `[0.0, 2.0, 4.0]`, the window at 4.0 holding `[40]` at 0;
+    `closed="right"` gives `[0.0, 2.0]`, the window at 2.0 holding
+    `[15, 25, 40]`. **Catches:** a window of one instant at the last
+    observation missing with a closed start, or kept with an open start,
+    where nothing in it can be evaluated.
+  Existing window tests spell out `closed` and `partial` (Conventions);
+  those of items 43-47 that count windows pass `partial=False`, and item
+  45's "no window fits" case does too, since a partial window always fits
+  a series with observations.
+
 ## Writing
 
 Items 48-50 use the source series of items 43-46 and the embedding of item
@@ -1099,7 +1175,11 @@ Items 48-50 use the source series of items 43-46 and the embedding of item
   source unchanged. **Catches:** a write into a view reaching the source or
   another point that shares its stored observations.
 
-- [ ] **51. Sampler query times.** `RegularSampler(n_points).times(window)`
+- [ ] **51. Sampler query times.** (open, from item 47a: windows are
+  partial by default and a partial window is shorter than `size`, so it
+  cannot be sampled on `[0, size)`, and nothing in a window records
+  `size`. Decide whether the sampler raises on a partial window, takes
+  `size` itself, or samples each window's own length.) `RegularSampler(n_points).times(window)`
   returns the `Times` `start + size * k / n_points` for `k = 0, ...,
   n_points - 1`, where `start` is the window's start in its own timestamps,
   always 0; the end is never sampled. Test:
@@ -1139,7 +1219,8 @@ Items 48-50 use the source series of items 43-46 and the embedding of item
   `test/python/test_integration.py`: times `[0.0, 0.5, ..., 3.5]` and values
   `[0, 1, 0, -1, 0, 1, 0, -1]` through
   `TimeDelayEmbedding(dimension=2, delay=0.5)` (domain `[0.5, 3.5]`),
-  `Window(size=1.0, step=1.0)` (windows at 0.5, 1.5, and 2.5),
+  `Window(size=1.0, step=1.0, closed="left", partial=False)` (windows at
+  0.5, 1.5, and 2.5),
   `RegularSampler(n_points=4)`, and `compute_persistent_homology(...,
   max_dim=1)` give a tensor of three clouds of four 2-D points and a
   `BarcodeTensor` of shape `(3, 2)`, and the bounds start at
@@ -1148,8 +1229,9 @@ Items 48-50 use the source series of items 43-46 and the embedding of item
 - [ ] **56. Saving embeddings and windows.** An embedding is saved
   materialized (decision 9): its support and values, as an ordinary series.
   A tensor of windows is saved as a tensor of series, each window
-  materialized in item 49's form, with its value at 0 and its open end, so
-  the format records a channel's end when it has one. A loaded
+  materialized in item 49's form, with its value at 0 and its ends, so
+  the format records whether a channel's start is open and its end when it
+  has one (items 43 and 47b). A loaded
   one therefore evaluates and
   samples exactly as the original, with no source in the file; with
   overlapping windows an observation is written once per window holding
