@@ -15,9 +15,13 @@ class Window:
     ``sb.series(series.dtype)`` with one window per start time
     ``a_k = t_0 + k * step``, while ``a_k + size`` is at most the last time
     at which every channel of ``series`` can be evaluated; ``t_0`` is the
-    first such time. With ``return_bounds=True`` it returns the tensor and a
-    float64 tensor of shape ``(n_windows, 2)`` whose row ``k`` is
-    ``(a_k, a_k + size)``, in the unit of ``series``.
+    first such time. With ``partial=True``, windows continue while
+    ``a_k`` is in the domain, and a window that would end after it ends where
+    ``series`` does instead, as the last windows of Polars
+    ``group_by_dynamic`` do. With ``return_bounds=True`` it returns the
+    tensor and a float64 tensor of shape ``(n_windows, 2)`` whose row ``k``
+    is ``(a_k, a_k + size)``, in the unit of ``series``; a partial window's
+    row ends where the series does.
 
     Window ``k`` covers ``a_k`` to ``a_k + size``, with the ends that
     ``closed`` includes, and is a series with the channels of ``series``.
@@ -57,6 +61,9 @@ class Window:
         Which ends of each window are included, as in Polars
         ``group_by_dynamic``: ``"left"`` is ``[a_k, a_k + size)``,
         ``"right"`` is ``(a_k, a_k + size]``.
+    partial : bool, default False
+        Whether to keep the windows at the end that are shorter than
+        ``size``.
 
     Raises
     ------
@@ -64,14 +71,14 @@ class Window:
         On a ``size`` or ``step`` that is not finite and positive, or an
         unknown ``closed``. When
         called, if a channel has no observations or ``size`` is longer
-        than the time during which every channel has observations, so that
-        no window fits.
+        than the time during which every channel has observations and
+        ``partial`` is false, so that no window fits.
     """
 
     _CLOSED = {"left": (True, False), "right": (False, True), "both": (True, True), "none": (False, False)}
 
     def __init__(self, size: float, step: float | None = None,
-                 closed: Literal["left", "right", "both", "none"] = "left"):
+                 closed: Literal["left", "right", "both", "none"] = "left", partial: bool = False):
         self.size = float(size)
         if not (math.isfinite(self.size) and self.size > 0):
             raise ValueError("The window size must be finite and positive")
@@ -81,6 +88,7 @@ class Window:
         if closed not in self._CLOSED:
             raise ValueError(f"closed must be 'left', 'right', 'both', or 'none', not {closed!r}")
         self.closed = closed
+        self.partial = bool(partial)
 
     @overload
     def __call__(self, series: TimeSeries, return_bounds: Literal[False] = False) -> TimeSeriesTensor: ...
@@ -89,10 +97,10 @@ class Window:
     def __call__(self, series: TimeSeries, return_bounds: Literal[True]) -> tuple[TimeSeriesTensor, FloatTensor]: ...
 
     def __call__(self, series: TimeSeries, return_bounds: bool = False):
-        windows, bounds = cpp.windows(series._data, self.size, self.step, *self._CLOSED[self.closed])
+        windows, bounds = cpp.windows(series._data, self.size, self.step, *self._CLOSED[self.closed], self.partial)
         if return_bounds:
             return TimeSeriesTensor(windows), FloatTensor(bounds)
         return TimeSeriesTensor(windows)
 
     def __repr__(self):
-        return f"Window(size={self.size}, step={self.step}, closed={self.closed!r})"
+        return f"Window(size={self.size}, step={self.step}, closed={self.closed!r}, partial={self.partial})"

@@ -20,9 +20,10 @@ namespace
       return sb::delay_embed(series, dimension, delay);
     }, py::arg("series"), py::arg("dimension"), py::arg("delay"));
     m.def("windows", [](const sb::TimeSeries<T>& series, sb::float64_t size, sb::float64_t step, bool closedStart,
-                        bool closedEnd) {
-      return sb::windows(series, size, step, closedStart, closedEnd);
-    }, py::arg("series"), py::arg("size"), py::arg("step"), py::arg("closed_start"), py::arg("closed_end"));
+                        bool closedEnd, bool partial) {
+      return sb::windows(series, size, step, closedStart, closedEnd, partial);
+    }, py::arg("series"), py::arg("size"), py::arg("step"), py::arg("closed_start"), py::arg("closed_end"),
+       py::arg("partial"));
   }
 }
 

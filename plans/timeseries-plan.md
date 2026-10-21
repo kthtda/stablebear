@@ -25,8 +25,8 @@ Where the plan departs from the issue:
   an ordinary series of the observations it contains, with their start and
   end times as a float tensor on request (item 43).
 - As in Polars `group_by_dynamic`, `closed` chooses which ends of a window
-  are included, and windows continue past the last full one as partial
-  windows unless `partial=False` (item 47a).
+  are included, and with `partial=True` windows continue past the last
+  full one as partial windows (item 47a).
 
 ## How to work through this plan
 
@@ -1067,7 +1067,10 @@ observation it came from.
 - [x] **47a. (decision) Closed ends and partial windows.** (decision:
   as in Polars `group_by_dynamic`, a `closed` argument and partial
   windows, on by default; an open start keeps the value carried in; bounds
-  are nominal) `Window(size, step=None, closed="left", partial=True)`.
+  are nominal; revised in item 47c: partial windows are opt-in, so every
+  window is `size` long unless asked otherwise, and a partial window's
+  bounds end where it does)
+  `Window(size, step=None, closed="left", partial=False)`.
   `closed` is `"left"` (`[a, a + size)`, the windows of items 43-47),
   `"right"` (`(a, a + size]`), `"both"`, or `"none"`, as in Polars. A
   window always holds the value in effect at `a_k` at time 0, since that
@@ -1083,8 +1086,9 @@ observation it came from.
   closed at its last observation or open at its open end: a partial
   window. Polars likewise ends with windows that hold only the last rows.
   `partial=False` keeps only windows that end in the domain and raises when
-  none fits, as item 43 does. The bounds stay nominal, `(a_k, a_k + size)`,
-  as Polars' `include_boundaries` reports them, also for partial windows.
+  none fits, as item 43 does. The bounds are `(a_k, a_k + size)`, and for a
+  partial window `(a_k, t_{n-1})`, where it ends (first nominal, as Polars'
+  `include_boundaries` reports them; revised in item 47c).
   Considered: closing only the last window, which keeps the last
   observation only when the windows land on it and needs a closed end
   past a channel's last observation anyway; and partial windows off by
@@ -1118,23 +1122,24 @@ observation it came from.
   - `closed="middle"` raises `ValueError`.
     **Catches:** an unknown `closed` read as one of the four.
 
-- [ ] **47c. Partial windows.** Tests with the source series:
-  - `Window(size=1.5, step=1.5, closed="left", partial=True)` has bounds
-    starting at `[0.0, 1.5, 3.0]`, the last row `(3.0, 4.5)`; the window at
-    3.0 has times `[0.0, 1.0]` and values `[25, 40]`, is 40 at 1.0, and
-    raises at 1.25 naming `[0, 1]`. With `partial=False` the starts are
-    `[0.0, 1.5]`. **Catches:** the partial window dropped, its end taken
-    from the nominal bound, the bounds truncated, `partial` ignored.
-  - Parametrized, `size=2.0, step=2.0, partial=True`: `closed="left"` gives
-    starts `[0.0, 2.0, 4.0]`, the window at 4.0 holding `[40]` at 0;
-    `closed="right"` gives `[0.0, 2.0]`, the window at 2.0 holding
-    `[15, 25, 40]`. **Catches:** a window of one instant at the last
-    observation missing with a closed start, or kept with an open start,
-    where nothing in it can be evaluated.
-  Existing window tests spell out `closed` and `partial` (Conventions);
-  those of items 43-47 that count windows pass `partial=False`, and item
-  45's "no window fits" case does too, since a partial window always fits
-  a series with observations.
+- [x] **47c. Partial windows.** (revised: opt-in, `partial=False` by
+  default) Tests with times `[0.0, 1.0, 2.0, 3.0, 4.0]` and values
+  `10 * t`:
+  - Parametrized over `partial`, `size=3.0, step=3.0, closed="left"`: the
+    bounds are `[[0, 3]]` without and `[[0, 3], [3, 4]]` with partial
+    windows. **Catches:** `partial` ignored, a partial window's bound
+    reported past the end of the series.
+  - With `partial=True`, the window at 3.0 has times `[0.0, 1.0]` and
+    values `[30, 40]`, is 40 at 1.0, and raises at 1.5 naming `[0, 1]`.
+    **Catches:** a partial window's end taken from the nominal bound.
+  - `size=2.0, step=2.0, closed="left", partial=True` gives starts
+    `[0.0, 2.0, 4.0]`, the window at 4.0 holding only 40, at 0.
+    **Catches:** a window of one instant at the last observation missing.
+  - `size=2.0, step=2.0, closed="right", partial=True` gives starts
+    `[0.0, 2.0]`, and the window at 2.0 is 40 at 2.0. **Catches:** a
+    window kept at the last observation with an open start, where nothing
+    in it can be evaluated.
+  Existing window tests spell out `closed` and `partial` (Conventions).
 
 ## Writing
 
@@ -1174,11 +1179,11 @@ Items 48-50 use the source series of items 43-46 and the embedding of item
   source unchanged. **Catches:** a write into a view reaching the source or
   another point that shares its stored observations.
 
-- [ ] **51. Sampler query times.** (open, from item 47a: windows are
-  partial by default and a partial window is shorter than `size`, so it
-  cannot be sampled on `[0, size)`, and nothing in a window records
-  `size`. Decide whether the sampler raises on a partial window, takes
-  `size` itself, or samples each window's own length.) `RegularSampler(n_points).times(window)`
+- [ ] **51. Sampler query times.** (open, from item 47a: a partial
+  window, from `partial=True`, is shorter than `size`, so it cannot be
+  sampled on `[0, size)`, and nothing in a window records `size`. Decide
+  whether the sampler raises on a partial window, takes `size` itself, or
+  samples each window's own length.) `RegularSampler(n_points).times(window)`
   returns the `Times` `start + size * k / n_points` for `k = 0, ...,
   n_points - 1`, where `start` is the window's start in its own timestamps,
   always 0; the end is never sampled. Test:

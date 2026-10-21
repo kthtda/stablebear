@@ -15,7 +15,7 @@ def _windows_source():
 
 
 def test_windows_are_a_tensor_of_series_of_the_source_dtype():
-    windows = Window(size=2.0, step=2.0)(_windows_source())
+    windows = Window(size=2.0, step=2.0, closed="left", partial=False)(_windows_source())
 
     # The windows cover [0.0, 2.0) and [2.0, 4.0). The first holds 0.0, 0.5,
     # and 1.5; the second starts with the value at 2.0, observed at 1.5, and
@@ -32,9 +32,9 @@ def test_windows_are_a_tensor_of_series_of_the_source_dtype():
 
 
 @pytest.mark.parametrize("window, starts", [
-    pytest.param(Window(size=2.0, step=1.0), [0.0, 1.0, 2.0], id="step"),
-    pytest.param(Window(size=1.0, step=1.5), [0.0, 1.5, 3.0], id="gaps"),
-    pytest.param(Window(size=2.0), [0.0, 2.0], id="default-step"),
+    pytest.param(Window(size=2.0, step=1.0, closed="left", partial=False), [0.0, 1.0, 2.0], id="step"),
+    pytest.param(Window(size=1.0, step=1.5, closed="left", partial=False), [0.0, 1.5, 3.0], id="gaps"),
+    pytest.param(Window(size=2.0, closed="left", partial=False), [0.0, 2.0], id="default-step"),
 ])
 def test_windows_start_every_step_while_they_fit(window, starts):
     windows, bounds = window(_windows_source(), return_bounds=True)
@@ -53,7 +53,7 @@ def test_windows_start_every_step_while_they_fit(window, starts):
 ])
 def test_windowing_raises_when_no_window_fits(series, match):
     with pytest.raises(ValueError, match=match):
-        Window(size=5.0, step=1.0)(series)
+        Window(size=5.0, step=1.0, closed="left", partial=False)(series)
 
 
 @pytest.mark.parametrize("size, step, match", [
@@ -85,7 +85,7 @@ def _closed_source():
 
 def test_a_left_closed_window_includes_its_start_but_not_its_end():
     # The window [1.0, 2.0).
-    window = Window(size=1.0, step=1.0, closed="left")(_closed_source())[1]
+    window = Window(size=1.0, step=1.0, closed="left", partial=False)(_closed_source())[1]
 
     assert window(0.0) == 10.0
     with pytest.raises(ValueError, match=re.escape("outside the domain [0, 1)")):
@@ -95,7 +95,7 @@ def test_a_left_closed_window_includes_its_start_but_not_its_end():
 def test_a_right_closed_window_includes_its_end_but_not_its_start():
     # The window (1.0, 2.0]. The observation at 1.0 stays in effect just
     # after the start.
-    window = Window(size=1.0, step=1.0, closed="right")(_closed_source())[1]
+    window = Window(size=1.0, step=1.0, closed="right", partial=False)(_closed_source())[1]
 
     with pytest.raises(ValueError, match=re.escape("outside the domain (0, 1]")):
         window(0.0)
@@ -105,7 +105,7 @@ def test_a_right_closed_window_includes_its_end_but_not_its_start():
 
 def test_a_window_closed_on_both_sides_includes_its_start_and_its_end():
     # The window [1.0, 2.0].
-    window = Window(size=1.0, step=1.0, closed="both")(_closed_source())[1]
+    window = Window(size=1.0, step=1.0, closed="both", partial=False)(_closed_source())[1]
 
     assert window(0.0) == 10.0
     assert window(1.0) == 20.0
@@ -114,7 +114,7 @@ def test_a_window_closed_on_both_sides_includes_its_start_and_its_end():
 def test_a_window_closed_on_neither_side_includes_neither_end():
     # The window (1.0, 2.0). The observation at 1.0 stays in effect just
     # after the start.
-    window = Window(size=1.0, step=1.0, closed="none")(_closed_source())[1]
+    window = Window(size=1.0, step=1.0, closed="none", partial=False)(_closed_source())[1]
 
     with pytest.raises(ValueError, match=re.escape("outside the domain (0, 1)")):
         window(0.0)
@@ -123,10 +123,55 @@ def test_a_window_closed_on_neither_side_includes_neither_end():
         window(1.0)
 
 
+def _partial_source():
+    # Each observation is 10 * t.
+    return TimeSeries([0.0, 10.0, 20.0, 30.0, 40.0], times=[0.0, 1.0, 2.0, 3.0, 4.0])
+
+
+@pytest.mark.parametrize("partial, expected_bounds", [
+    pytest.param(False, [[0.0, 3.0]], id="full"),
+    pytest.param(True, [[0.0, 3.0], [3.0, 4.0]], id="partial"),
+])
+def test_partial_windows_continue_to_the_end_of_the_series(partial, expected_bounds):
+    _, bounds = Window(size=3.0, step=3.0, closed="left", partial=partial)(_partial_source(), return_bounds=True)
+
+    # A partial window's bounds end where the series does.
+    assert np.array_equal(np.asarray(bounds), expected_bounds)
+
+
+def test_a_partial_window_ends_where_the_series_does():
+    # The window at 3.0 would end at 6.0, after the series ends at 4.0.
+    window = Window(size=3.0, step=3.0, closed="left", partial=True)(_partial_source())[1]
+
+    assert np.array_equal(np.asarray(window.times), [0.0, 1.0])
+    assert np.array_equal(np.asarray(window.values), [30.0, 40.0])
+    assert window(1.0) == 40.0
+    with pytest.raises(ValueError, match=re.escape("outside the domain [0, 1]")):
+        window(1.5)
+
+
+def test_a_left_closed_partial_window_can_start_at_the_last_observation():
+    windows, bounds = Window(size=2.0, step=2.0, closed="left", partial=True)(_partial_source(), return_bounds=True)
+
+    # The window at 4.0 holds only the last observation.
+    assert np.array_equal(np.asarray(bounds)[:, 0], [0.0, 2.0, 4.0])
+    assert np.array_equal(np.asarray(windows[2].times), [0.0])
+    assert windows[2](0.0) == 40.0
+
+
+def test_a_right_closed_window_holds_the_last_observation_without_a_partial_window():
+    windows, bounds = Window(size=2.0, step=2.0, closed="right", partial=True)(_partial_source(), return_bounds=True)
+
+    # The window (2.0, 4.0] ends at the last observation, and no window can
+    # start there with an open start.
+    assert np.array_equal(np.asarray(bounds)[:, 0], [0.0, 2.0])
+    assert windows[1](2.0) == 40.0
+
+
 def test_a_window_can_be_evaluated_from_its_start_up_to_its_end():
     # The window [1.0, 3.0) holds the value at 1.0, observed at 0.5, then 1.5
     # and 2.5.
-    window = Window(size=2.0, step=1.0)(_windows_source())[1]
+    window = Window(size=2.0, step=1.0, closed="left", partial=False)(_windows_source())[1]
 
     assert np.array_equal(np.asarray(window.times), [0.0, 0.5, 1.5])
     assert np.array_equal(np.asarray(window.values), [5.0, 15.0, 25.0])
@@ -137,7 +182,7 @@ def test_a_window_can_be_evaluated_from_its_start_up_to_its_end():
 
 
 def test_an_observation_at_a_window_boundary_is_only_in_the_later_window():
-    windows = Window(size=1.5, step=1.5)(_windows_source())
+    windows = Window(size=1.5, step=1.5, closed="left", partial=False)(_windows_source())
 
     # The observation at 1.5 starts the second window, not the first.
     assert np.array_equal(np.asarray(windows[0].values), [0.0, 5.0])
@@ -146,7 +191,7 @@ def test_an_observation_at_a_window_boundary_is_only_in_the_later_window():
 
 def test_a_window_between_observations_holds_the_value_at_its_start():
     # The window [3.0, 3.5) falls between the observations at 2.5 and 4.0.
-    window = Window(size=0.5, step=0.5)(_windows_source())[6]
+    window = Window(size=0.5, step=0.5, closed="left", partial=False)(_windows_source())[6]
 
     assert np.array_equal(np.asarray(window.times), [0.0])
     assert np.array_equal(np.asarray(window.values), [25.0])
@@ -156,7 +201,7 @@ def test_a_window_between_observations_holds_the_value_at_its_start():
 def test_window_bounds_just_below_an_observation_reach_it():
     series = TimeSeries([0.0, 3.0, 6.0, 9.0, 12.0], times=[0.0, 0.3, 0.6, 0.9, 1.2])
 
-    windows, bounds = Window(size=0.3, step=0.3)(series, return_bounds=True)
+    windows, bounds = Window(size=0.3, step=0.3, closed="left", partial=False)(series, return_bounds=True)
 
     # 3 * 0.3 computes just below 0.9, so window 2 ends and window 3 starts
     # there.
@@ -173,7 +218,7 @@ def test_an_embedding_of_a_window_keeps_its_open_end():
     # The window [1.0, 3.0) holds 5, 15, and 25 at 0.0, 0.5, and 1.5. With a
     # delay of 0.4, the newer component reaches 1.5 at 1.9, between the
     # window's last observation and its end.
-    window = Window(size=2.0, step=1.0)(_windows_source())[1]
+    window = Window(size=2.0, step=1.0, closed="left", partial=False)(_windows_source())[1]
 
     embedding = TimeDelayEmbedding(dimension=2, delay=0.4)(window)
 
@@ -187,7 +232,7 @@ def test_an_embedding_of_a_window_keeps_its_open_start_and_closed_end():
     # The window (1.0, 3.0] holds 10 and 20 at 0.0 and 1.0, and ends at 2.0,
     # after its last observation.
     series = TimeSeries([0.0, 10.0, 20.0, 40.0], times=[0.0, 1.0, 2.0, 4.0])
-    window = Window(size=2.0, step=1.0, closed="right")(series)[1]
+    window = Window(size=2.0, step=1.0, closed="right", partial=False)(series)[1]
 
     embedding = TimeDelayEmbedding(dimension=2, delay=1.0)(window)
 
@@ -200,7 +245,7 @@ def test_an_embedding_of_a_window_keeps_its_open_start_and_closed_end():
 def test_an_embedding_of_a_window_takes_no_history_from_before_the_window():
     # The window [1.0, 3.0) holds 5, 15, and 25 at 0.0, 0.5, and 1.5. With a
     # delay of 1.0, the first point is at 1.0.
-    window = Window(size=2.0, step=1.0)(_windows_source())[1]
+    window = Window(size=2.0, step=1.0, closed="left", partial=False)(_windows_source())[1]
 
     embedding = TimeDelayEmbedding(dimension=2, delay=1.0)(window)
 
@@ -216,7 +261,7 @@ def test_windows_of_an_embedding_hold_its_points():
     # The embedding has points at 1.0, 1.5, 2.5, 3.5, and 4.0.
     embedding = TimeDelayEmbedding(dimension=2, delay=1.0)(_windows_source())
 
-    windows, bounds = Window(size=2.0, step=1.0)(embedding, return_bounds=True)
+    windows, bounds = Window(size=2.0, step=1.0, closed="left", partial=False)(embedding, return_bounds=True)
 
     assert np.array_equal(np.asarray(bounds)[:, 0], [1.0, 2.0])
     assert np.array_equal(np.asarray(windows[0].times), [0.0, 0.5, 1.5])
@@ -229,7 +274,7 @@ def test_windows_cut_every_channel_at_the_same_bounds():
     b = TimeSeries([-5.0, -15.0, -30.0], times=Times([500.0, 1500.0, 3000.0], unit="ms"))
     series = TimeSeries.from_channels([a, b], unit="s")
 
-    windows, bounds = Window(size=1.0, step=1.0)(series, return_bounds=True)
+    windows, bounds = Window(size=1.0, step=1.0, closed="left", partial=False)(series, return_bounds=True)
 
     # Both channels are observed from 0.5 to 2.5, so the windows are
     # [0.5, 1.5) and [1.5, 2.5).

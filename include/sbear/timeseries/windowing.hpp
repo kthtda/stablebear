@@ -23,7 +23,10 @@ namespace sb
   /// @p series, each holding the observation in effect at a_k, at time 0,
   /// then its observations at times t with a_k < t < a_k + size, and one at
   /// a_k + size if the end is closed, at the times t - a_k in the channel's
-  /// unit, with the end size (Channel::until). An open start leaves 0
+  /// unit, with the end size (Channel::until). With @p partial, windows
+  /// continue while their start is in the domain, and a window that would
+  /// end past the domain ends where the series does instead, with its
+  /// closedness, and its bounds row ends there too. An open start leaves 0
   /// outside the domain, though the observation there stays in effect after
   /// it. With an open end, an observation at a_k + size belongs only to the
   /// next window. A bound
@@ -36,7 +39,8 @@ namespace sb
   /// observations or no window fits.
   template <typename T>
   std::pair<Tensor<TimeSeries<T>>, Tensor<float64_t>> windows(const TimeSeries<T>& series, float64_t size, float64_t step,
-                                                              bool closedStart = true, bool closedEnd = false)
+                                                              bool closedStart = true, bool closedEnd = false,
+                                                              bool partial = false)
   {
     if (std::isnan(size) || std::isinf(size) || size <= 0)
     {
@@ -61,7 +65,14 @@ namespace sb
     const auto fits = [&](float64_t start) {
       return start + size < last || (start + size == last && (seriesClosedEnd || !closedEnd));
     };
-    if (!fits(first))
+    // The first window starts where the series does, so it cannot be
+    // evaluated at 0 if the series cannot at its start.
+    const auto startClosed = [&](size_t k) { return closedStart && (k > 0 || seriesClosedStart); };
+    // A partial window needs its start in the domain.
+    const auto startsIn = [&](float64_t start, size_t k) {
+      return start < last || (start == last && startClosed(k) && seriesClosedEnd);
+    };
+    if (!fits(first) && !(partial && startsIn(first, 0)))
     {
       std::ostringstream ss;
       ss << "The window size " << size << " is longer than the series, from " << first << " to " << last;
@@ -69,6 +80,7 @@ namespace sb
     }
 
     std::vector<float64_t> starts;
+    std::vector<float64_t> stops;
     std::vector<TimeSeries<T>> contents;
     // Each channel's observations at the last window's start and end,
     // hints for the next window's, which are close by.
@@ -77,17 +89,21 @@ namespace sb
     for (size_t k = 0;; ++k)
     {
       const auto start = first + static_cast<float64_t>(k) * step;
-      if (!fits(start))
+      const bool full = fits(start);
+      if (!full && !(partial && startsIn(start, k)))
       {
         break;
       }
+      // A partial window ends where the series does.
+      const auto stop = full ? start + size : last;
+      const bool stopClosed = full ? closedEnd : seriesClosedEnd;
       std::vector<Channel<T>> channels;
       channels.reserve(series.n_channels());
       for (size_t c = 0; c < series.n_channels(); ++c)
       {
         const auto& channel = series.channel(c);
         const auto from = convert_time(start, series.unit(), channel.unit());
-        const auto to = convert_time(start + size, series.unit(), channel.unit());
+        const auto to = convert_time(stop, series.unit(), channel.unit());
         // The observations in effect at from and at to, with snapping. The
         // one at from is the window's first, at time 0; if from is at it or
         // snaps forward onto it, the window is shifted by its time. An open
@@ -96,8 +112,8 @@ namespace sb
         atFrom[c] = channel.index_at(from, atFrom[c]);
         atTo[c] = channel.index_at(to, atTo[c]);
         const auto lo = atFrom[c];
-        const bool atEnd = channel.time(atTo[c]) >= to && atTo[c] > lo;
-        const auto lastIn = (atEnd && !closedEnd) ? atTo[c] - 1 : atTo[c];
+        const bool atEnd = channel.time(atTo[c]) >= to;
+        const auto lastIn = (atEnd && !stopClosed && atTo[c] > lo) ? atTo[c] - 1 : atTo[c];
         const auto shift = std::max(channel.time(lo), from);
 
         // Subtracting the shift can round two close times together; keep
@@ -110,20 +126,21 @@ namespace sb
           indices.push_back(i);
         }
         // The window can be evaluated up to its end, and at it if closed. A
-        // closed end at an observation is that observation's timestamp.
+        // closed end at or before the last time held needs no end: the
+        // window ends at that timestamp.
         auto window = channel.take(Times(std::move(at), channel.unit()), std::move(indices));
-        if (!(atEnd && closedEnd))
+        const auto end = to - shift;
+        const auto lastAt = window.time(window.size() - 1);
+        if (!(stopClosed && end <= lastAt))
         {
-          const auto end = std::max(to - shift, std::nextafter(window.time(window.size() - 1),
-                                                               std::numeric_limits<float64_t>::infinity()));
-          window = window.until(end, closedEnd);
+          window = window.until(std::max(end, std::nextafter(lastAt, std::numeric_limits<float64_t>::infinity())),
+                                stopClosed);
         }
-        // The first window starts where the series does, so it cannot be
-        // evaluated at 0 if the series cannot at its start.
-        window = window.with_start_closed(closedStart && (k > 0 || seriesClosedStart));
+        window = window.with_start_closed(startClosed(k));
         channels.push_back(std::move(window));
       }
       starts.push_back(start);
+      stops.push_back(stop);
       contents.emplace_back(std::move(channels), series.unit());
     }
 
@@ -133,7 +150,7 @@ namespace sb
     {
       windowTensor(k) = std::move(contents[k]);
       bounds({k, 0}) = starts[k];
-      bounds({k, 1}) = starts[k] + size;
+      bounds({k, 1}) = stops[k];
     }
     return {std::move(windowTensor), std::move(bounds)};
   }
