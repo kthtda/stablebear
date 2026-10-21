@@ -432,6 +432,16 @@ def test_selection_keeps_each_channel_snap_settings():
                           [series[0].snap_tolerance, series[1].snap_tolerance])
 
 
+def test_values_are_a_copy():
+    series = TimeSeries([10.0, 20.0, 30.0], times=[0.0, 1.0, 2.0])
+
+    values = series.values
+    values[1] = 0.0
+
+    assert values[1] == 0.0
+    assert series(1.0) == 20.0
+
+
 def test_values_of_several_channels_have_one_leaf_per_channel():
     series = TimeSeries.from_channels([_channel_a(), _channel_b()], unit="s")
 

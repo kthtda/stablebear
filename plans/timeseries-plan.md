@@ -122,8 +122,8 @@ This assumes the recommended option of each decision.
   `return_bounds=True` adds their start and end times.
 - Every channel is a view: a `shared_ptr` to its storage plus a descriptor
   (domain, lags, unit scale). Windows, delay embeddings, channel selection,
-  and unit changes copy no values; a write materializes the whole view into
-  the writer's own storage, as subsampled tensors do. A delay
+  and unit changes copy no values. Series are immutable: `values` is a
+  copy (decision 4). A delay
   embedding of a numeric channel of shape `S` has shape `(m, *S)` and equals
   the delayed values at every time of its domain (item 40).
 - `RegularSampler` samples each window of each numeric channel into a point
@@ -216,7 +216,7 @@ parallel threshold.
   query unit.
   (b) Any nonempty string, with no conversion.
 
-- [x] **4. Ownership.** (decision: copy in, views out, materialize on write, as subsampled tensors do)
+- [x] **4. Ownership.** (decision: copy in, views out, materialize on write, as subsampled tensors do; revised at item 48: series are immutable, and `values` returns a copy, since nothing else can change a series either, such as adding observations. Writing through `values` with copy-on-write was tried: copying when `values` is read left a tensor kept from before writing into views made later, and copying at write time needs every slice of `values` to reach its tensor through the series, as a proxy. Revisit when series gain operations that change them.)
   - The constructor copies its input, materializing indexed point-cloud and
     distance-matrix tensors, so the caller's data stays independent.
   - Channel storage lives in a `std::shared_ptr` and is shared by every view
@@ -478,7 +478,7 @@ parallel threshold.
   `times=[0.0, 1.0, 2.0]`: `observation(1)` is `[3.0, 4.0]`,
   `observation(-1)` is `[5.0, 6.0]`, and `observation(3)` raises
   `IndexError`. **Catches:** indexing along the coordinates, negative indices
-  counted from the wrong end, no bounds check. Writes come in items 48-50.
+  counted from the wrong end, no bounds check.
 
 - [x] **18. Evaluation.** `series.evaluate(t)` and `series(t)` return the
   previous value (decision 1). Tests with times `[0.0, 1.5, 4.0]` and values
@@ -1143,10 +1143,11 @@ observation it came from.
 
 ## Writing
 
-Items 48-50 use the source series of items 43-46 and the embedding of item
-40.
+(Skipped: series are immutable, decision 4. Items 48-50 are kept for when
+writes return.) Items 48-50 use the source series of items 43-46 and the
+embedding of item 40.
 
-- [ ] **48. Writing a series.** `values[...] = x` (a tensor backed by the
+- [x] **48. Writing a series.** (skipped: series are immutable, decision 4) `values[...] = x` (a tensor backed by the
   series) and writes through views taken from `values`, with the
   materialization of decision 4 for shared storage. Tests with values
   `[[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]]` and `times=[0.0, 1.0, 2.0]`:
@@ -1159,7 +1160,7 @@ Items 48-50 use the source series of items 43-46 and the embedding of item
     `[0.0, 6.0]`. **Catches:** `values` or its views returned as detached
     copies.
 
-- [ ] **49. Writing a window.** A write into a window first materializes
+- [x] **49. Writing a window.** (skipped: series are immutable, decision 4) A write into a window first materializes
   it into storage of its own (decision 4), its observations at its times,
   including the one at 0, and keeps its open end; a write changes nothing
   but the written values. Neither the source nor other windows change.
@@ -1172,7 +1173,7 @@ Items 48-50 use the source series of items 43-46 and the embedding of item
   **Catches:** the write reaching the source or a sibling window, the value
   at 0 lost on materializing.
 
-- [ ] **50. Writing an embedding.** Test: for item 40's embedding `e`,
+- [x] **50. Writing an embedding.** (skipped: series are immutable, decision 4) Test: for item 40's embedding `e`,
   `e.values[1] = [0.0, 0.0, 0.0]` (time 2.5) gives `e(2.75)` equal to
   `[0, 0, 0]`, keeps `e(3.0) == [10, 10, 25]`, which reads two of the
   written point's stored observations, and `len(e) == 5`, and leaves the
@@ -1233,7 +1234,8 @@ Items 48-50 use the source series of items 43-46 and the embedding of item
 - [ ] **56. Saving embeddings and windows.** An embedding is saved
   materialized (decision 9): its support and values, as an ordinary series.
   A tensor of windows is saved as a tensor of series, each window
-  materialized in item 49's form, with its value at 0 and its ends, so
+  materialized: its observations at its times, with its value at 0 and
+  its ends, so
   the format records whether a channel's start is open and its end when it
   has one (items 43 and 47b). A loaded
   one therefore evaluates and
