@@ -148,6 +148,7 @@ namespace sb_py
   {
     cls
       .def_property_readonly("shape", [](const TTensor& self){ return Shape{self.shape()}; })
+      .def_property_readonly("size", [](const TTensor& self){ return self.size(); })
       .def_property_readonly("strides", [](const TTensor& self){ return self.strides(); })
       .def_property_readonly("offset", [](const TTensor& self) {
         if constexpr (TTensor::IsIndexed)

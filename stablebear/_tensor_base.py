@@ -827,11 +827,7 @@ class Tensor(_BinaryIoMixin, ABC):
 
     @property
     def size(self) -> int:
-        s = self._data.shape
-        result = 1
-        for i in range(len(s)):
-            result *= s[i]
-        return result
+        return self._data.size
 
     def __len__(self) -> int:
         if self.ndim == 0:
