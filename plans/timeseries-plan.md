@@ -913,7 +913,7 @@ observation it came from.
   (The paper lists each channel newest first; we keep oldest first, as the
   libraries do.)
 
-- [ ] **42a. Tensors of series.** (implemented together with item 43, whose
+- [x] **42a. Tensors of series.** (implemented together with item 43, whose
   `Window` gives the only tensors of series; saving moved to item 56;
   revised during item 43: first done as series of series, which are gone)
   Windows (items 43-47) are a `Tensor<TimeSeries<T>>`, bound through
@@ -934,7 +934,7 @@ observation it came from.
   type, windows out of order, a tensor of windows mistaken for a tensor of
   floats.
 
-- [ ] **43. Windows.** `Window(size, step=None)(series)`
+- [x] **43. Windows.** `Window(size, step=None)(series)`
   returns a 1-D tensor of series with one window per start
   `a_k = t_0 + k * step` while `a_k + size <= t_{n-1}`, where the default
   step is `size`; a smaller step makes windows overlap, a larger one leaves
