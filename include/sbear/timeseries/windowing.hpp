@@ -57,9 +57,9 @@ namespace sb
     // A window fits when a + size is at most the last time, whether that is
     // a last timestamp or an end; a closed window end must come before an
     // open one of the series.
-    const auto [first, last, openStart, openEnd] = series.domain();
+    const auto [first, last, seriesClosedStart, seriesClosedEnd] = series.domain();
     const auto fits = [&](float64_t start) {
-      return start + size < last || (start + size == last && !(openEnd && closedEnd));
+      return start + size < last || (start + size == last && (seriesClosedEnd || !closedEnd));
     };
     if (!fits(first))
     {
@@ -116,14 +116,11 @@ namespace sb
         {
           const auto end = std::max(to - shift, std::nextafter(window.time(window.size() - 1),
                                                                std::numeric_limits<float64_t>::infinity()));
-          window = window.until(end, !closedEnd);
+          window = window.until(end, closedEnd);
         }
         // The first window starts where the series does, so it cannot be
         // evaluated at 0 if the series cannot at its start.
-        if (!closedStart || (k == 0 && openStart))
-        {
-          window = window.with_open_start();
-        }
+        window = window.with_start_closed(closedStart && (k > 0 || seriesClosedStart));
         channels.push_back(std::move(window));
       }
       starts.push_back(start);

@@ -170,7 +170,7 @@ parallel threshold.
 
 ## Decisions
 
-- [x] **1. Domain and evaluation.** (decision: (a), closed domain for series built from observations, half-open for windows; revised during item 26: there is no domain. A series can be evaluated from the first to the last observation of every channel, both included, checked against the timestamps on each query; there is no `domain` property, and a series with an empty channel cannot be evaluated. Windows follow the same rule: there is no open or closed end anywhere, see item 43. Revised again during item 43: windows are `[a, a + size)`, so a channel may carry an open end after its last timestamp, set by `Channel::until`; it is the only stored bound, and series without one keep the rule above. Revised again in item 47a: a window's channel may also have an open start, or a closed end after its last timestamp; `Domain` records both ends and whether each is open.) Evaluation
+- [x] **1. Domain and evaluation.** (decision: (a), closed domain for series built from observations, half-open for windows; revised during item 26: there is no domain. A series can be evaluated from the first to the last observation of every channel, both included, checked against the timestamps on each query; there is no `domain` property, and a series with an empty channel cannot be evaluated. Windows follow the same rule: there is no open or closed end anywhere, see item 43. Revised again during item 43: windows are `[a, a + size)`, so a channel may carry an open end after its last timestamp, set by `Channel::until`; it is the only stored bound, and series without one keep the rule above. Revised again in item 47a: a window's channel may also have an open start, or a closed end after its last timestamp; `Domain` records both ends and whether each is closed (`closedStart`, `closedEnd`), as `Channel` does (`start_closed`, `end_closed`), matching `closed` in Python.) Evaluation
   uses the previous value: at time `t`, the observation with the largest
   timestamp `<= t`. Queries outside the domain raise `ValueError`. Options for
   the domain of a channel:
@@ -1093,7 +1093,7 @@ observation it came from.
 
 - [x] **47b. `closed`.** A channel's bounds become an open start and an
   end after its last timestamp that is open or closed, replacing
-  `Channel::until`; `TimeSeries::Domain` gains `openStart`, and the error
+  `Channel::until`; `TimeSeries::Domain` gains `closedStart` (and `openEnd` becomes `closedEnd`), and the error
   names the domain as in `(0, 1]`. An embedding keeps both: its start is
   open when its source's is, and it can be evaluated at a closed end. An
   invalid `closed` raises `ValueError`. With `partial=False`, a closed

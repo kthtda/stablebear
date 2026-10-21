@@ -135,13 +135,13 @@ namespace sb
     view.m_base = std::make_shared<const std::vector<size_t>>(std::move(indices));
     view.m_lags = {0.0};
     view.m_end = std::nullopt;
-    view.m_endOpen = true;
-    view.m_startOpen = false;
+    view.m_endClosed = false;
+    view.m_startClosed = true;
     return view;
   }
 
   template <typename T>
-  Channel<T> Channel<T>::until(float64_t end, bool open) const
+  Channel<T> Channel<T>::until(float64_t end, bool closed) const
   {
     if (std::isnan(end) || (size() > 0 && end <= time(size() - 1)))
     {
@@ -149,15 +149,15 @@ namespace sb
     }
     auto channel = *this;
     channel.m_end = end;
-    channel.m_endOpen = open;
+    channel.m_endClosed = closed;
     return channel;
   }
 
   template <typename T>
-  Channel<T> Channel<T>::with_open_start() const
+  Channel<T> Channel<T>::with_start_closed(bool closed) const
   {
     auto channel = *this;
-    channel.m_startOpen = true;
+    channel.m_startClosed = closed;
     return channel;
   }
 
@@ -165,7 +165,7 @@ namespace sb
   bool Channel<T>::operator==(const Channel& other) const
   {
     return m_snapTolerance == other.m_snapTolerance && m_snapEps == other.m_snapEps && m_shape == other.m_shape
-           && m_end == other.m_end && end_open() == other.end_open() && m_startOpen == other.m_startOpen
+           && m_end == other.m_end && end_closed() == other.end_closed() && m_startClosed == other.m_startClosed
            && held_times() == other.held_times() && values() == other.values();
   }
 
@@ -438,8 +438,8 @@ namespace sb
   template <typename T>
   typename TimeSeries<T>::Domain TimeSeries<T>::domain() const
   {
-    Domain domain{-std::numeric_limits<float64_t>::infinity(), std::numeric_limits<float64_t>::infinity(), false,
-                  false};
+    Domain domain{-std::numeric_limits<float64_t>::infinity(), std::numeric_limits<float64_t>::infinity(), true,
+                  true};
     for (const auto& c : m_channels)
     {
       if (c.size() == 0)
@@ -449,16 +449,16 @@ namespace sb
       // An open end at the same time as another channel's closed one still
       // excludes that time, and likewise for starts.
       const auto first = convert_time(c.time(0), c.unit(), m_unit);
-      if (first > domain.first || (first == domain.first && c.start_open()))
+      if (first > domain.first || (first == domain.first && !c.start_closed()))
       {
         domain.first = first;
-        domain.openStart = c.start_open();
+        domain.closedStart = c.start_closed();
       }
       const auto last = convert_time(c.end().value_or(c.time(c.size() - 1)), c.unit(), m_unit);
-      if (last < domain.last || (last == domain.last && c.end_open()))
+      if (last < domain.last || (last == domain.last && !c.end_closed()))
       {
         domain.last = last;
-        domain.openEnd = c.end_open();
+        domain.closedEnd = c.end_closed();
       }
     }
     return domain;
@@ -468,8 +468,8 @@ namespace sb
   void TimeSeries<T>::check_observed(float64_t t) const
   {
     const auto domain = this->domain();
-    if (t < domain.first || t > domain.last || (domain.openStart && t == domain.first)
-        || (domain.openEnd && t == domain.last))
+    if (t < domain.first || t > domain.last || (!domain.closedStart && t == domain.first)
+        || (!domain.closedEnd && t == domain.last))
     {
       // The shortest text that reads back as the same number, so a bound
       // such as 0.8999999999999999 does not show as 0.9.
@@ -478,8 +478,8 @@ namespace sb
         const auto result = std::to_chars(buffer.data(), buffer.data() + buffer.size(), x);
         return std::string(buffer.data(), result.ptr);
       };
-      throw std::domain_error("Time " + text(t) + " is outside the domain " + (domain.openStart ? "(" : "[")
-                              + text(domain.first) + ", " + text(domain.last) + (domain.openEnd ? ")" : "]"));
+      throw std::domain_error("Time " + text(t) + " is outside the domain " + (domain.closedStart ? "[" : "(")
+                              + text(domain.first) + ", " + text(domain.last) + (domain.closedEnd ? "]" : ")"));
     }
   }
 }

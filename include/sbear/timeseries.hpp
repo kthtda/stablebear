@@ -254,25 +254,26 @@ namespace sb
     [[nodiscard]] Channel take(Times times, std::vector<size_t> indices) const;
 
     /// This channel with the end @p end, in its unit: it can be evaluated
-    /// after its last timestamp up to @p end, and at @p end unless @p open.
+    /// after its last timestamp up to @p end, and at @p end if @p closed.
     /// @p end must come after the last timestamp. Views made by stack_at
     /// keep the end.
-    [[nodiscard]] Channel until(float64_t end, bool open = true) const;
+    [[nodiscard]] Channel until(float64_t end, bool closed = false) const;
 
     /// The end set by until(), if any; without one, the channel can be
     /// evaluated up to and at its last timestamp.
     [[nodiscard]] std::optional<float64_t> end() const noexcept { return m_end; }
 
-    /// Whether end() is set and outside the domain.
-    [[nodiscard]] bool end_open() const noexcept { return m_end && m_endOpen; }
+    /// Whether the end, end() if set and else the last timestamp, is in the
+    /// domain.
+    [[nodiscard]] bool end_closed() const noexcept { return !m_end || m_endClosed; }
 
-    /// This channel with an open start: its first timestamp is outside the
-    /// domain, though its first observation stays in effect after it. Views
-    /// made by stack_at keep the open start.
-    [[nodiscard]] Channel with_open_start() const;
+    /// This channel with its first timestamp in the domain if @p closed. If
+    /// not, the first observation still stays in effect after it. Views made
+    /// by stack_at keep the start.
+    [[nodiscard]] Channel with_start_closed(bool closed) const;
 
-    /// Whether the first timestamp is outside the domain.
-    [[nodiscard]] bool start_open() const noexcept { return m_startOpen; }
+    /// Whether the first timestamp is in the domain.
+    [[nodiscard]] bool start_closed() const noexcept { return m_startClosed; }
 
     /// The observation with the largest timestamp at or before @p t, in the
     /// channel's own unit, a tensor of shape shape(). A query below an
@@ -364,8 +365,8 @@ namespace sb
     std::vector<float64_t> m_lags;
     std::vector<size_t> m_shape;
     std::optional<float64_t> m_end;
-    bool m_endOpen = true;
-    bool m_startOpen = false;
+    bool m_endClosed = false;
+    bool m_startClosed = true;
     float64_t m_snapTolerance = DefaultSnapTolerance;
     float64_t m_snapEps = DefaultSnapEps;
   };
@@ -424,8 +425,8 @@ namespace sb
     {
       float64_t first;
       float64_t last;
-      bool openStart;  // first itself is outside the domain
-      bool openEnd;    // last itself is outside the domain
+      bool closedStart;  // first itself is in the domain
+      bool closedEnd;    // last itself is in the domain
     };
 
     /// The domain of the series. Requires every channel to have

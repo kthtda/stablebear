@@ -49,8 +49,8 @@ namespace sb
       // last timestamp up to its end, so the embedding can too, and keeps
       // that end, and an open start, through stack_at.
       const auto end = channel.end().value_or(channel.time(n - 1));
-      const auto open = channel.end_open();
-      const auto past = [&](float64_t s) { return open ? s >= end : s > end; };
+      const auto closed = channel.end_closed();
+      const auto past = [&](float64_t s) { return closed ? s > end : s >= end; };
       if (past(start))
       {
         throw std::invalid_argument("The series is too short for this embedding: no time has its full history");
