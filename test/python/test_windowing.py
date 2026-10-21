@@ -54,6 +54,23 @@ def test_windowing_raises_when_no_window_fits(series, match):
         Window(size=5.0, step=1.0)(series)
 
 
+@pytest.mark.parametrize("size, step, match", [
+    pytest.param(0.0, 1.0, "size", id="zero-size"),
+    pytest.param(-1.0, 1.0, "size", id="negative-size"),
+    pytest.param(np.inf, 1.0, "size", id="infinite-size"),
+    pytest.param(-np.inf, 1.0, "size", id="negative-infinite-size"),
+    pytest.param(np.nan, 1.0, "size", id="nan-size"),
+    pytest.param(1.0, 0.0, "step", id="zero-step"),
+    pytest.param(1.0, -1.0, "step", id="negative-step"),
+    pytest.param(1.0, np.inf, "step", id="infinite-step"),
+    pytest.param(1.0, -np.inf, "step", id="negative-infinite-step"),
+    pytest.param(1.0, np.nan, "step", id="nan-step"),
+])
+def test_window_raises_on_a_size_or_step_that_is_not_finite_and_positive(size, step, match):
+    with pytest.raises(ValueError, match=match):
+        Window(size=size, step=step)
+
+
 def test_a_window_can_be_evaluated_from_its_start_up_to_its_end():
     # The window [1.0, 3.0) holds the value at 1.0, observed at 0.5, then 1.5
     # and 2.5.

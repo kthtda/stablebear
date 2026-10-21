@@ -1028,8 +1028,8 @@ observation it came from.
     `ValueError`. **Catches:** reversed bounds or bounds outside the domain
     accepted.
 
-- [ ] **45. Window parameter errors.** Test, parametrized `ValueError`:
-  `size=0.0`, `size=-1.0`, `step=0.0`, `step=-1.0`, and `step=inf`.
+- [x] **45. Window parameter errors.** Test, parametrized `ValueError`:
+  `size` and `step` each `0.0`, `-1.0`, `inf`, `-inf`, and `nan`.
   **Catches:** windows that never advance or never repeat.
   (Done with item 43: windowing raises `ValueError` when no window fits,
   for `size=5.0` on the source series and for a series without
