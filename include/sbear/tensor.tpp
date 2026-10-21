@@ -1431,10 +1431,6 @@ namespace sb
     {
       return m_indexedLocator.size();
     }
-    else if (m_shape.empty())
-    {
-      return 0_uz;
-    }
     return std::accumulate(m_shape.begin(), m_shape.end(), 1_uz, std::multiplies<size_t>());
   }
 

@@ -5,6 +5,7 @@
 #include <sbear/executor.hpp>
 
 #include <random>
+#include <stdexcept>
 
 TEST(WalkRandom, SameSeedProducesSameValues)
 {
@@ -67,6 +68,31 @@ TEST(WalkRandom, ParallelWalkMatchesSequentialWalk)
   }, sb::default_executor());
 
   EXPECT_TRUE(sb::allclose(seq, par));
+}
+
+TEST(WalkRandom, ParallelWalkRethrowsAnException)
+{
+  sb::Tensor<double> t({8, 10});
+
+  EXPECT_THROW(sb::parallel_walk(t, [](const std::vector<size_t>& idx) {
+    if (idx[0] == 3)
+    {
+      throw std::domain_error("element 3");
+    }
+  }, sb::default_executor()), std::domain_error);
+}
+
+TEST(WalkRandom, ParallelWalkWithRandomRethrowsAnException)
+{
+  sb::Tensor<double> t({8, 10});
+  sb::DefaultRandomGenerator gen(123);
+
+  EXPECT_THROW(sb::parallel_walk(t, gen, [](const std::vector<size_t>& idx, auto&) {
+    if (idx[0] == 3)
+    {
+      throw std::domain_error("element 3");
+    }
+  }, sb::default_executor()), std::domain_error);
 }
 
 TEST(WalkRandom, ParallelWalkIsDeterministicAcrossRuns)

@@ -546,8 +546,17 @@ namespace
   TYPED_TEST(TensorTppTyped, SizeOfEmptyTensor)
   {
     using T = TypeParam;
-    sb::Tensor<T> t;
+    sb::Tensor<T> t(std::vector<size_t>{0});
     EXPECT_EQ(t.size(), 0u);
+  }
+
+  TYPED_TEST(TensorTppTyped, SizeOfRankZeroTensor)
+  {
+    using T = TypeParam;
+    // A default tensor has shape () and holds one element.
+    sb::Tensor<T> t;
+    EXPECT_EQ(t.rank(), 0u);
+    EXPECT_EQ(t.size(), 1u);
   }
 
   TYPED_TEST(TensorTppTyped, Size1d)

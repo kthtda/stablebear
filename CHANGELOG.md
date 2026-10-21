@@ -1,3 +1,9 @@
+## Unreleased
+
+### Bug fixes
+
+* **Errors in parallel work are raised** — An exception thrown while processing one element in parallel, such as a failed allocation in `point_process.sample_poisson`, now reaches Python. Previously the element was silently left at its default value. ([#34](https://github.com/kthtda/stablebear/issues/34))
+
 ## 0.5.1
 
 ### Breaking changes

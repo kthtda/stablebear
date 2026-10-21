@@ -61,3 +61,22 @@ def test_noisy_trig_zero_points_raises(fn):
 def test_noisy_trig_one_point_ok(fn):
     out = fn((3,), n_points=1)
     assert out.shape == (3,)
+
+
+# ---------------------------------------------------------------------------
+# Bug #35: generators returned an unfilled element for a 0-d shape (), which
+# holds one element.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("fn", [sb.random.noisy_sin, sb.random.noisy_cos])
+def test_noisy_trig_fills_the_element_of_a_0d_shape(fn):
+    out = fn((), n_points=6, generator=_gen())
+
+    assert not out.array_equal(sb.zeros((), dtype=sb.pcf32))
+
+
+def test_sample_poisson_fills_the_element_of_a_0d_shape():
+    X = poisson.sample_poisson((), dim=2, rate=5.0, generator=_gen())
+
+    assert not X.array_equal(sb.zeros((), dtype=sb.pcloud64))
