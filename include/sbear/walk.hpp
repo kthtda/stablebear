@@ -157,7 +157,8 @@ namespace sb
   }
 
   /**
-   * Like parallel_walk_async(), but blocks until complete.
+   * Like parallel_walk_async(), but blocks until complete and rethrows an
+   * exception thrown by f.
    */
   template <IsTensor TTensor, typename UnaryFunc>
 #ifndef __CUDACC__
@@ -165,7 +166,7 @@ namespace sb
 #endif
   void parallel_walk(const TTensor& tensor, UnaryFunc&& f, Executor& exec)
   {
-    parallel_walk_async(tensor, std::forward<UnaryFunc>(f), exec).wait();
+    parallel_walk_async(tensor, std::forward<UnaryFunc>(f), exec).get();
   }
 
   // ============================================================================
@@ -209,7 +210,8 @@ namespace sb
   }
 
   /**
-   * Like parallel_walk_async() with random, but blocks until complete.
+   * Like parallel_walk_async() with random, but blocks until complete and
+   * rethrows an exception thrown by f.
    */
   template <IsTensor TTensor, typename EngineT, typename BinaryFunc>
 #ifndef __CUDACC__
@@ -218,7 +220,7 @@ namespace sb
   void parallel_walk(const TTensor& tensor, RandomGenerator<EngineT>& gen,
                      BinaryFunc&& f, Executor& exec)
   {
-    parallel_walk_async(tensor, gen, std::forward<BinaryFunc>(f), exec).wait();
+    parallel_walk_async(tensor, gen, std::forward<BinaryFunc>(f), exec).get();
   }
 
   // ============================================================================
