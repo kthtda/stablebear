@@ -114,9 +114,8 @@ This assumes the recommended option of each decision.
   arguments and wraps results.
 - `series(t)` looks up each channel on its own grid, in its own unit, and
   returns the value for one channel or a `NestedTensor` with one leaf per
-  channel for several. `Window(size, step)(series)` is a series of windows,
-  `series.window(a, b)` is one window, and `series[i]` selects channels by
-  index. `Window(size, step)(series)` is a tensor of windows, and
+  channel for several. `series[i]` selects channels by index.
+  `Window(size, step)(series)` is a tensor of windows, and
   `return_bounds=True` adds their start and end times.
 - Every channel is a view: a `shared_ptr` to its storage plus a descriptor
   (domain, lags, unit scale). Windows, delay embeddings, channel selection,
@@ -301,8 +300,7 @@ parallel threshold.
   - A `TimeSeries` exposes `n_channels`, `dtype`, `unit`, `times`
     (a `Times` for one channel, a `NestedTensor` with one leaf per channel in
     the query unit for several), `to(unit)`, `evaluate(t)`, `series(t)` (the
-    same as `evaluate(t)`), `series.window(a, b)` (a window),
-    and `series[i]` or `series[[i, j]]` (channel selection by index; negative
+    same as `evaluate(t)`), and `series[i]` or `series[[i, j]]` (channel selection by index; negative
     indices count from the end). A
     series also exposes `values`, `shape`, `n_observations`,
     `snap_tolerance`, and `snap_eps`: for one channel a tensor of shape
@@ -1019,7 +1017,7 @@ observation it came from.
     when `(t - a_k) + a_k` rounded below `t`. Windows now read their
     observations by index, so no time is added back.)
 
-- [ ] **44. `series.window(a, b)`.** One window, with the same rules as item
+- [x] **44. `series.window(a, b)`.** (skipped: `Window` covers it; later items take one window as `Window(size=2.0, step=1.0)(series)[1]`, the window at 1.0) One window, with the same rules as item
   43 and `size = b - a`; `t_0 <= a <= b <= t_{n-1}` is required. Tests with
   the source series:
   - `w = series.window(1.0, 3.0)` has times `[0.0, 0.5, 1.5]` and values
@@ -1040,7 +1038,8 @@ observation it came from.
   that fails later, far from its cause.)
 
 - [ ] **46. Embedding a window, and windowing an embedding.** Tests:
-  - `TimeDelayEmbedding(dimension=2, delay=1.0)` of `series.window(1.0, 3.0)`
+  - `TimeDelayEmbedding(dimension=2, delay=1.0)` of the window at 1.0 of
+    `Window(size=2.0, step=1.0)`
     (times `[0.0, 0.5, 1.5]`, open end 2) has times `[1.0, 1.5]` and points
     `[[5, 15], [15, 25]]`; evaluating it at 0.75 and at 2.0 raises
     `ValueError`. **Catches:** history taken from before the window, the
@@ -1082,11 +1081,12 @@ Items 48-50 use the source series of items 43-46 and the embedding of item
   it into storage of its own (decision 4), its observations at its times,
   including the one at 0, and keeps its open end; a write changes nothing
   but the written values. Neither the source nor other windows change.
-  Test: with `w = series.window(1.0, 3.0)`, `w.values[1] = 30.0` gives
+  Test: with `windows = Window(size=2.0, step=1.0)(series)` and
+  `w = windows[1]`, `w.values[1] = 30.0` gives
   `w(0.5) == 30.0`, `w.times == [0.0, 0.5, 1.5]`, `len(w) == 3`, and
   `w(2.0)` still raises;
   `RegularSampler(n_points=2)(w)` is `[[5], [30]]`; and
-  `series(1.5) == 15.0` and `series.window(0.0, 2.0)` are unchanged.
+  `series(1.5) == 15.0` and `windows[0]` are unchanged.
   **Catches:** the write reaching the source or a sibling window, the value
   at 0 lost on materializing.
 
@@ -1101,7 +1101,8 @@ Items 48-50 use the source series of items 43-46 and the embedding of item
   returns the `Times` `start + size * k / n_points` for `k = 0, ...,
   n_points - 1`, where `start` is the window's start in its own timestamps,
   always 0; the end is never sampled. Test:
-  `RegularSampler(n_points=4).times(series.window(1.0, 3.0))` gives
+  `RegularSampler(n_points=4).times(w)`, for the window `w` at 1.0 of
+  `Window(size=2.0, step=1.0)`, gives
   `[0.0, 0.5, 1.0, 1.5]` in seconds. **Catches:** the end point included,
   spacing `size / (n - 1)`.
 
