@@ -354,3 +354,14 @@ def test_windows_of_channels_of_different_shapes_evaluate_to_leaves_of_each_shap
         [[0.0, 0.0], [-5.0, -10.0]],
         [[-10.0, -20.0], [-15.0, -30.0]],
     ])
+
+
+def test_evaluating_windows_outside_a_window_raises_naming_its_position():
+    # The windows are [0.0, 2.0) and the partial window [2.0, 3.0], which can
+    # be evaluated from 0 to 1.
+    series = TimeSeries([0.0, 10.0, 20.0, 30.0], times=[0.0, 1.0, 2.0, 3.0])
+    windows = Window(size=2.0, step=2.0, closed="left", partial=True)(series)
+
+    message = "TimeSeries at position (1): Time 1.5 is outside the domain [0, 1]"
+    with pytest.raises(ValueError, match=re.escape(message)):
+        windows([0.0, 1.5])

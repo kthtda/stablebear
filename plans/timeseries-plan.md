@@ -1225,11 +1225,17 @@ embedding of item 40.
   channels transposed, channel B read in the query unit.
 
 - [ ] **53. Evaluation errors.** A time outside a window's domain raises
-  `ValueError` naming the window's index and its domain. Test: with
-  `Window(size=3.0, step=3.0, closed="left", partial=True)` of item 51's
-  series (window 1 holds `[0, 1]`), `windows([0.0, 2.0])` raises naming
-  window 1 and `[0, 1]`. **Catches:** a partial window evaluated past its
-  end, an error that does not say which window.
+  `ValueError` naming the window's index and its domain, as in
+  `TimeSeries at position (1): Time 1.5 is outside the domain [0, 1]`, as for
+  any tensor of series. Every domain is
+  checked in order before the parallel evaluation, so the error names the
+  first such window whichever worker would reach it, using
+  `Domain::contains` and `Domain::to_string`. Test: times
+  `[0.0, 1.0, 2.0, 3.0]` with values `10 * t` and `Window(size=2.0,
+  step=2.0, closed="left", partial=True)` give `[0, 2)` and the partial
+  window `[2, 3]`, which can be evaluated from 0 to 1; `windows([0.0, 1.5])`
+  raises naming window 1 and `[0, 1]`. **Catches:** a partial window
+  evaluated past its end, an error that does not say which window.
 
 - [x] **54. Sampler errors.** (dropped with the sampler, item 51)
 

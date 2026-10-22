@@ -427,6 +427,15 @@ namespace sb
       float64_t last;
       bool closedStart;  // first itself is in the domain
       bool closedEnd;    // last itself is in the domain
+
+      /// Whether @p t is in the domain; NaN is not.
+      [[nodiscard]] bool contains(float64_t t) const noexcept
+      {
+        return (t > first || (closedStart && t == first)) && (t < last || (closedEnd && t == last));
+      }
+
+      /// The domain as text, such as "[0, 2)".
+      [[nodiscard]] std::string to_string() const;
     };
 
     /// The domain of the series. Requires every channel to have
@@ -451,8 +460,8 @@ namespace sb
     [[nodiscard]] NestedTensor<T> evaluate(const Tensor<float64_t>& t) const;
 
   private:
-    /// Throw unless @p t, in the series' unit, lies between the first and
-    /// last observations of every channel. The check is exact: it compares
+    /// Throw std::domain_error, naming the domain, unless @p t, in the
+    /// series' unit, lies in the domain. The check is exact: it compares
     /// against the timestamps converted to the series' unit, not the query
     /// converted to each channel's unit.
     void check_observed(float64_t t) const;
@@ -474,8 +483,10 @@ namespace sb
   /// unit, as TimeSeries::evaluate does: one leaf per channel, in channel
   /// order, of shape (*series.shape(), *t.shape(), *shape) of that channel.
   /// Requires every series to have the same number of channels and channel
-  /// shapes, and @p series to be non-empty. The series are evaluated in
-  /// parallel on @p exec.
+  /// shapes, and @p series to be non-empty. A time outside the domain of a
+  /// series throws std::domain_error naming the first such series'
+  /// position, as in "TimeSeries at position (1, 2)".
+  /// The series are evaluated in parallel on @p exec.
   template <typename T>
   [[nodiscard]] NestedTensor<T> evaluate(const Tensor<TimeSeries<T>>& series, const Tensor<float64_t>& t,
                                          Executor& exec = default_executor());

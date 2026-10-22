@@ -6,6 +6,18 @@
 
 namespace sb
 {
+  namespace detail
+  {
+    /// The shortest text that reads back as @p x, so a bound such as
+    /// 0.8999999999999999 does not show as 0.9.
+    inline std::string shortest_text(float64_t x)
+    {
+      std::array<char, 32> buffer;
+      const auto result = std::to_chars(buffer.data(), buffer.data() + buffer.size(), x);
+      return std::string(buffer.data(), result.ptr);
+    }
+  }
+
   template <typename T>
   Channel<T>::Channel(Times times, const Tensor<T>& values, float64_t snapTolerance, float64_t snapEps)
   {
@@ -468,19 +480,17 @@ namespace sb
   void TimeSeries<T>::check_observed(float64_t t) const
   {
     const auto domain = this->domain();
-    if (t < domain.first || t > domain.last || (!domain.closedStart && t == domain.first)
-        || (!domain.closedEnd && t == domain.last))
+    if (!domain.contains(t))
     {
-      // The shortest text that reads back as the same number, so a bound
-      // such as 0.8999999999999999 does not show as 0.9.
-      const auto text = [](float64_t x) {
-        std::array<char, 32> buffer;
-        const auto result = std::to_chars(buffer.data(), buffer.data() + buffer.size(), x);
-        return std::string(buffer.data(), result.ptr);
-      };
-      throw std::domain_error("Time " + text(t) + " is outside the domain " + (domain.closedStart ? "[" : "(")
-                              + text(domain.first) + ", " + text(domain.last) + (domain.closedEnd ? "]" : ")"));
+      throw std::domain_error("Time " + detail::shortest_text(t) + " is outside the domain " + domain.to_string());
     }
+  }
+
+  template <typename T>
+  std::string TimeSeries<T>::Domain::to_string() const
+  {
+    return (closedStart ? "[" : "(") + detail::shortest_text(first) + ", " + detail::shortest_text(last)
+           + (closedEnd ? "]" : ")");
   }
 
   template <typename T>
@@ -491,43 +501,84 @@ namespace sb
       throw std::invalid_argument("Cannot evaluate an empty tensor of series");
     }
 
+    // The queries are sorted once for every series, as TimeSeries::evaluate
+    // sorts them for one.
+    std::vector<float64_t> queries;
+    walk(t, [&](const std::vector<size_t>& index) { queries.push_back(t(index)); });
+    std::vector<size_t> order(queries.size());
+    std::iota(order.begin(), order.end(), size_t{0});
+    std::sort(order.begin(), order.end(), [&](size_t a, size_t b) { return queries[a] < queries[b]; });
+
     // Leaf c holds, in block k, the values of channel c of the k-th series
-    // in row-major order, shaped as the first series' channel c.
+    // in row-major order.
     const auto& first = series(std::vector<size_t>(series.rank(), 0));
-    std::vector<std::vector<size_t>> leafShapes;
     std::vector<Tensor<T>> leaves;
     for (size_t c = 0; c < first.n_channels(); ++c)
     {
-      std::vector<size_t> leafShape(t.shape().begin(), t.shape().end());
-      leafShape.insert(leafShape.end(), first.channel(c).shape().begin(), first.channel(c).shape().end());
       std::vector<size_t> shape(series.shape().begin(), series.shape().end());
-      shape.insert(shape.end(), leafShape.begin(), leafShape.end());
-      leafShapes.push_back(std::move(leafShape));
+      shape.insert(shape.end(), t.shape().begin(), t.shape().end());
+      shape.insert(shape.end(), first.channel(c).shape().begin(), first.channel(c).shape().end());
       leaves.emplace_back(shape);
     }
 
-    parallel_walk(series, [&](const std::vector<size_t>& index) {
-      size_t k = 0;
-      for (size_t i = 0; i < index.size(); ++i)
-      {
-        k = k * series.shape(i) + index[i];
-      }
-      const auto values = series(index).evaluate(t);
-      const auto& nested = values.nested();
-      if (nested.size() != leaves.size())
+    // Check every series in order first, so that an error names the first
+    // series that cannot be evaluated, whichever worker would reach it.
+    walk(series, [&](const std::vector<size_t>& index) {
+      const auto& one = series(index);
+      if (one.n_channels() != first.n_channels())
       {
         throw std::invalid_argument("Every series must have the same number of channels");
       }
-      for (size_t c = 0; c < leaves.size(); ++c)
+      for (size_t c = 0; c < one.n_channels(); ++c)
       {
-        const auto& leaf = nested(c).leaf();
-        if (leaf.shape() != leafShapes[c])
+        if (one.channel(c).shape() != first.channel(c).shape())
         {
           throw std::invalid_argument("Every series must have the same channel shapes");
         }
-        std::copy(leaf.data(), leaf.data() + leaf.size(), leaves[c].data() + static_cast<std::ptrdiff_t>(k * leaf.size()));
       }
-    }, exec);
+      if (order.empty())
+      {
+        return;
+      }
+      const auto domain = one.domain();
+      for (const auto x : {queries[order.front()], queries[order.back()]})
+      {
+        if (!domain.contains(x))
+        {
+          std::string position;
+          for (const auto i : index)
+          {
+            position += (position.empty() ? "" : ", ") + std::to_string(i);
+          }
+          throw std::domain_error("TimeSeries at position (" + position + "): Time " + detail::shortest_text(x)
+                                  + " is outside the domain " + domain.to_string());
+        }
+      }
+    });
+
+    if (!order.empty())
+    {
+      parallel_walk(series, [&](const std::vector<size_t>& index) {
+        size_t k = 0;
+        for (size_t i = 0; i < index.size(); ++i)
+        {
+          k = k * series.shape(i) + index[i];
+        }
+        const auto& one = series(index);
+        thread_local std::vector<float64_t> sorted;
+        sorted.resize(order.size());
+        for (size_t c = 0; c < leaves.size(); ++c)
+        {
+          const auto& channel = one.channel(c);
+          for (size_t q = 0; q < order.size(); ++q)
+          {
+            sorted[q] = convert_time(queries[order[q]], one.unit(), channel.unit());
+          }
+          const auto blockSize = leaves[c].size() / series.size();
+          channel.lookup_sorted(sorted, order, leaves[c].data() + static_cast<std::ptrdiff_t>(k * blockSize));
+        }
+      }, exec);
+    }
 
     Tensor<NestedTensor<T>> out({leaves.size()});
     for (size_t c = 0; c < leaves.size(); ++c)
