@@ -331,3 +331,15 @@ def test_leaves_of_every_element_type(make_values):
     assert nested.dtype is values.dtype
     assert nested[0].array_equal(short)
     assert nested[1].array_equal(full)
+
+
+@pytest.mark.parametrize("make_values", TWO_ELEMENTS_OF_EVERY_DTYPE)
+def test_a_leaf_of_every_element_type_makes_a_scalar_nested_tensor(make_values):
+    values = make_values()
+
+    nested = sb.NestedTensor(values)
+
+    assert nested.shape == ()
+    assert nested.depth == 2
+    assert nested.dtype is values.dtype
+    assert nested[()].array_equal(values)

@@ -174,8 +174,6 @@ class NestedTensor(Tensor):
     """
 
     def __init__(self, data, *, dtype=None, depth=None):
-        from .base_tensor import FloatTensor, IntTensor
-
         super().__init__()
         depth = _normalize_depth(depth)
         if dtype is not None and dtype not in _NESTED_CPP_TYPES:
@@ -192,7 +190,7 @@ class NestedTensor(Tensor):
                 raise ValueError(
                     f"NestedTensor depth is {root.depth}, not requested depth {depth}"
                 )
-        elif isinstance(data, (FloatTensor, IntTensor, np.ndarray)):
+        elif isinstance(data, (Tensor, np.ndarray)):
             leaf = _leaf_tensor(data, dtype=dtype)
             dtype = leaf.dtype
             node_type, tensor_type = _NESTED_CPP_TYPES[dtype]
