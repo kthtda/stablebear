@@ -5,7 +5,7 @@ import pytest
 
 import stablebear as sb
 from stablebear.persistence import compute_persistent_homology
-from stablebear.timeseries import TimeDelayEmbedding, Times, TimeSeries
+from stablebear.timeseries import TimeDelayEmbedding, Times, TimeSeries, Window
 
 from _element_values import TWO_ELEMENTS_OF_EVERY_DTYPE
 from _round_trip import ROUND_TRIPS
@@ -252,6 +252,18 @@ def test_persistence_of_an_embedding_matches_its_stored_points():
 @pytest.mark.parametrize("round_trip", ROUND_TRIPS)
 def test_embedding_survives_saving(round_trip):
     embedding = TimeDelayEmbedding(dimension=3, delay=1.0)(_ms_series())
+
+    loaded = round_trip(embedding)
+
+    assert loaded.array_equal(embedding)
+
+
+@pytest.mark.parametrize("round_trip", ROUND_TRIPS)
+def test_embedding_of_a_window_with_a_closed_end_survives_saving(round_trip):
+    source = TimeSeries([0.0, 10.0, 20.0, 40.0], times=[0.0, 1.0, 2.0, 4.0])
+    # The embedding of the window (1, 3] is observed at its closed end, 2.
+    window = Window(size=2.0, step=1.0, closed="right")(source)[1]
+    embedding = TimeDelayEmbedding(dimension=2, delay=1.0)(window)
 
     loaded = round_trip(embedding)
 

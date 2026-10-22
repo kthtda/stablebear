@@ -139,7 +139,8 @@ namespace sb
     view.m_base = std::move(base);
     view.m_lags.assign(lags.begin(), lags.end());
     view.m_shape.insert(view.m_shape.begin(), lags.size());
-    return view;
+    // A closed end at the new last timestamp is dropped, as until drops it.
+    return view.m_end ? view.until(*view.m_end, view.m_endClosed) : view;
   }
 
   template <typename T>
