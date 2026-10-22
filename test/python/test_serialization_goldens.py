@@ -46,6 +46,21 @@ def _assert_array(actual, expected):
     assert np.array_equal(actual_array, expected_array, equal_nan=True)
 
 
+def _assert_series(actual, expected):
+    assert actual.unit == expected["unit"]
+    assert actual.n_channels == len(expected["channels"])
+    for i, channel in enumerate(expected["channels"]):
+        one = actual[i]
+        _assert_array(one.times, channel["times"])
+        _assert_expected(one.values, channel["values"])
+        for evaluation in channel["evaluations"]:
+            if evaluation.get("outside"):
+                with pytest.raises(ValueError, match="outside the domain"):
+                    one(evaluation["t"])
+            else:
+                _assert_array(one(evaluation["t"]), evaluation["value"])
+
+
 def _assert_expected(actual, expected):
     assert type(actual).__name__ in expected["accepted_types"]
     comparison = expected["comparison"]
@@ -65,6 +80,11 @@ def _assert_expected(actual, expected):
     elif comparison == "elements":
         for element in expected["elements"]:
             _assert_array(actual[tuple(element["index"])], element["array"])
+    elif comparison == "series":
+        _assert_series(actual, expected)
+    elif comparison == "series_elements":
+        for element in expected["elements"]:
+            _assert_series(actual[tuple(element["index"])], element["series"])
     else:
         raise AssertionError(f"Unknown golden comparison {comparison!r}")
 

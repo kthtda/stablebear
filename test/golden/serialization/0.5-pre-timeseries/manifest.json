@@ -1,0 +1,1579 @@
+{
+  "schema_version": 1,
+  "producer": {
+    "package": "stablebear",
+    "version": "0.5.1",
+    "commit": "8c33a4e3abe26974261078f3471ff009b35a20e9",
+    "format_version": 3,
+    "python": "3.10.12",
+    "numpy": "2.2.6",
+    "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.35",
+    "pickle_protocol": 4,
+    "backend": "stablebear._sb_cuda12"
+  },
+  "artifacts": [
+    {
+      "name": "series_barcode32",
+      "description": "Series of barcodes of three point clouds",
+      "serialization": "binary",
+      "file": "series_barcode32.sb",
+      "bytes": 348,
+      "sha256": "c1ab92a9184912708929e2b23b056973f1232da263b2bdeb3085851ae1060680",
+      "expected": {
+        "accepted_types": [
+          "TimeSeries"
+        ],
+        "comparison": "series",
+        "dtype": "barcode32",
+        "unit": "ms",
+        "channels": [
+          {
+            "times": {
+              "dtype": "float64",
+              "shape": [
+                3
+              ],
+              "values": [
+                0.0,
+                1.3,
+                4.0
+              ]
+            },
+            "values": {
+              "accepted_types": [
+                "BarcodeTensor"
+              ],
+              "comparison": "elements",
+              "dtype": "barcode32",
+              "shape": [
+                3,
+                2
+              ],
+              "elements": [
+                {
+                  "index": [
+                    0,
+                    0
+                  ],
+                  "array": {
+                    "dtype": "float32",
+                    "shape": [
+                      2,
+                      2
+                    ],
+                    "values": [
+                      [
+                        0,
+                        Infinity
+                      ],
+                      [
+                        0,
+                        1
+                      ]
+                    ]
+                  }
+                },
+                {
+                  "index": [
+                    0,
+                    1
+                  ],
+                  "array": {
+                    "dtype": "float32",
+                    "shape": [
+                      0,
+                      2
+                    ],
+                    "values": []
+                  }
+                },
+                {
+                  "index": [
+                    1,
+                    0
+                  ],
+                  "array": {
+                    "dtype": "float32",
+                    "shape": [
+                      4,
+                      2
+                    ],
+                    "values": [
+                      [
+                        0,
+                        Infinity
+                      ],
+                      [
+                        0,
+                        1
+                      ],
+                      [
+                        0,
+                        1
+                      ],
+                      [
+                        0,
+                        1
+                      ]
+                    ]
+                  }
+                },
+                {
+                  "index": [
+                    1,
+                    1
+                  ],
+                  "array": {
+                    "dtype": "float32",
+                    "shape": [
+                      1,
+                      2
+                    ],
+                    "values": [
+                      [
+                        1,
+                        1.4142135381698608
+                      ]
+                    ]
+                  }
+                },
+                {
+                  "index": [
+                    2,
+                    0
+                  ],
+                  "array": {
+                    "dtype": "float32",
+                    "shape": [
+                      3,
+                      2
+                    ],
+                    "values": [
+                      [
+                        0,
+                        Infinity
+                      ],
+                      [
+                        0,
+                        2
+                      ],
+                      [
+                        0,
+                        3
+                      ]
+                    ]
+                  }
+                },
+                {
+                  "index": [
+                    2,
+                    1
+                  ],
+                  "array": {
+                    "dtype": "float32",
+                    "shape": [
+                      0,
+                      2
+                    ],
+                    "values": []
+                  }
+                }
+              ]
+            },
+            "evaluations": []
+          }
+        ]
+      }
+    },
+    {
+      "name": "series_barcode32",
+      "description": "Series of barcodes of three point clouds",
+      "serialization": "pickle",
+      "file": "series_barcode32.pkl",
+      "bytes": 400,
+      "sha256": "06ec53158bb27340f0aa46cfdf4f88883bace9990f2e78338ebb9f351c1ce536",
+      "expected": {
+        "accepted_types": [
+          "TimeSeries"
+        ],
+        "comparison": "series",
+        "dtype": "barcode32",
+        "unit": "ms",
+        "channels": [
+          {
+            "times": {
+              "dtype": "float64",
+              "shape": [
+                3
+              ],
+              "values": [
+                0.0,
+                1.3,
+                4.0
+              ]
+            },
+            "values": {
+              "accepted_types": [
+                "BarcodeTensor"
+              ],
+              "comparison": "elements",
+              "dtype": "barcode32",
+              "shape": [
+                3,
+                2
+              ],
+              "elements": [
+                {
+                  "index": [
+                    0,
+                    0
+                  ],
+                  "array": {
+                    "dtype": "float32",
+                    "shape": [
+                      2,
+                      2
+                    ],
+                    "values": [
+                      [
+                        0,
+                        Infinity
+                      ],
+                      [
+                        0,
+                        1
+                      ]
+                    ]
+                  }
+                },
+                {
+                  "index": [
+                    0,
+                    1
+                  ],
+                  "array": {
+                    "dtype": "float32",
+                    "shape": [
+                      0,
+                      2
+                    ],
+                    "values": []
+                  }
+                },
+                {
+                  "index": [
+                    1,
+                    0
+                  ],
+                  "array": {
+                    "dtype": "float32",
+                    "shape": [
+                      4,
+                      2
+                    ],
+                    "values": [
+                      [
+                        0,
+                        Infinity
+                      ],
+                      [
+                        0,
+                        1
+                      ],
+                      [
+                        0,
+                        1
+                      ],
+                      [
+                        0,
+                        1
+                      ]
+                    ]
+                  }
+                },
+                {
+                  "index": [
+                    1,
+                    1
+                  ],
+                  "array": {
+                    "dtype": "float32",
+                    "shape": [
+                      1,
+                      2
+                    ],
+                    "values": [
+                      [
+                        1,
+                        1.4142135381698608
+                      ]
+                    ]
+                  }
+                },
+                {
+                  "index": [
+                    2,
+                    0
+                  ],
+                  "array": {
+                    "dtype": "float32",
+                    "shape": [
+                      3,
+                      2
+                    ],
+                    "values": [
+                      [
+                        0,
+                        Infinity
+                      ],
+                      [
+                        0,
+                        2
+                      ],
+                      [
+                        0,
+                        3
+                      ]
+                    ]
+                  }
+                },
+                {
+                  "index": [
+                    2,
+                    1
+                  ],
+                  "array": {
+                    "dtype": "float32",
+                    "shape": [
+                      0,
+                      2
+                    ],
+                    "values": []
+                  }
+                }
+              ]
+            },
+            "evaluations": []
+          }
+        ]
+      }
+    },
+    {
+      "name": "series_channels_float64",
+      "description": "Series of two channels in different units",
+      "serialization": "binary",
+      "file": "series_channels_float64.sb",
+      "bytes": 355,
+      "sha256": "434406df9cf58bcf8859302acb6683abd71ceb57db339e81731802bc78ce6583",
+      "expected": {
+        "accepted_types": [
+          "TimeSeries"
+        ],
+        "comparison": "series",
+        "dtype": "float64",
+        "unit": "s",
+        "channels": [
+          {
+            "times": {
+              "dtype": "float64",
+              "shape": [
+                3
+              ],
+              "values": [
+                0.0,
+                1.0,
+                2.5
+              ]
+            },
+            "values": {
+              "accepted_types": [
+                "FloatTensor"
+              ],
+              "comparison": "array",
+              "dtype": "float64",
+              "shape": [
+                3
+              ],
+              "array": {
+                "dtype": "float64",
+                "shape": [
+                  3
+                ],
+                "values": [
+                  10.0,
+                  20.0,
+                  30.0
+                ]
+              }
+            },
+            "evaluations": [
+              {
+                "t": 0.0,
+                "value": {
+                  "dtype": "float64",
+                  "shape": [],
+                  "values": 10.0
+                }
+              },
+              {
+                "t": 1.75,
+                "value": {
+                  "dtype": "float64",
+                  "shape": [],
+                  "values": 20.0
+                }
+              },
+              {
+                "t": 2.5,
+                "value": {
+                  "dtype": "float64",
+                  "shape": [],
+                  "values": 30.0
+                }
+              },
+              {
+                "t": 3.0,
+                "outside": true
+              }
+            ]
+          },
+          {
+            "times": {
+              "dtype": "float64",
+              "shape": [
+                3
+              ],
+              "values": [
+                0.5,
+                1.5,
+                3.0
+              ]
+            },
+            "values": {
+              "accepted_types": [
+                "FloatTensor"
+              ],
+              "comparison": "array",
+              "dtype": "float64",
+              "shape": [
+                3
+              ],
+              "array": {
+                "dtype": "float64",
+                "shape": [
+                  3
+                ],
+                "values": [
+                  -1.0,
+                  -2.0,
+                  -3.0
+                ]
+              }
+            },
+            "evaluations": [
+              {
+                "t": 0.0,
+                "outside": true
+              },
+              {
+                "t": 1.0,
+                "value": {
+                  "dtype": "float64",
+                  "shape": [],
+                  "values": -1.0
+                }
+              },
+              {
+                "t": 3.0,
+                "value": {
+                  "dtype": "float64",
+                  "shape": [],
+                  "values": -3.0
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "series_channels_float64",
+      "description": "Series of two channels in different units",
+      "serialization": "pickle",
+      "file": "series_channels_float64.pkl",
+      "bytes": 407,
+      "sha256": "eb7641f8cd5bd3f44164de2b00d3fc5a647d2455fc8d9d43cccffd03a9694a91",
+      "expected": {
+        "accepted_types": [
+          "TimeSeries"
+        ],
+        "comparison": "series",
+        "dtype": "float64",
+        "unit": "s",
+        "channels": [
+          {
+            "times": {
+              "dtype": "float64",
+              "shape": [
+                3
+              ],
+              "values": [
+                0.0,
+                1.0,
+                2.5
+              ]
+            },
+            "values": {
+              "accepted_types": [
+                "FloatTensor"
+              ],
+              "comparison": "array",
+              "dtype": "float64",
+              "shape": [
+                3
+              ],
+              "array": {
+                "dtype": "float64",
+                "shape": [
+                  3
+                ],
+                "values": [
+                  10.0,
+                  20.0,
+                  30.0
+                ]
+              }
+            },
+            "evaluations": [
+              {
+                "t": 0.0,
+                "value": {
+                  "dtype": "float64",
+                  "shape": [],
+                  "values": 10.0
+                }
+              },
+              {
+                "t": 1.75,
+                "value": {
+                  "dtype": "float64",
+                  "shape": [],
+                  "values": 20.0
+                }
+              },
+              {
+                "t": 2.5,
+                "value": {
+                  "dtype": "float64",
+                  "shape": [],
+                  "values": 30.0
+                }
+              },
+              {
+                "t": 3.0,
+                "outside": true
+              }
+            ]
+          },
+          {
+            "times": {
+              "dtype": "float64",
+              "shape": [
+                3
+              ],
+              "values": [
+                0.5,
+                1.5,
+                3.0
+              ]
+            },
+            "values": {
+              "accepted_types": [
+                "FloatTensor"
+              ],
+              "comparison": "array",
+              "dtype": "float64",
+              "shape": [
+                3
+              ],
+              "array": {
+                "dtype": "float64",
+                "shape": [
+                  3
+                ],
+                "values": [
+                  -1.0,
+                  -2.0,
+                  -3.0
+                ]
+              }
+            },
+            "evaluations": [
+              {
+                "t": 0.0,
+                "outside": true
+              },
+              {
+                "t": 1.0,
+                "value": {
+                  "dtype": "float64",
+                  "shape": [],
+                  "values": -1.0
+                }
+              },
+              {
+                "t": 3.0,
+                "value": {
+                  "dtype": "float64",
+                  "shape": [],
+                  "values": -3.0
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "windows_open_float64",
+      "description": "Windows with open starts and ends",
+      "serialization": "binary",
+      "file": "windows_open_float64.sb",
+      "bytes": 506,
+      "sha256": "3828fb58f6af148c52d875674745103a71eadd8d21b511883775305558559e22",
+      "expected": {
+        "accepted_types": [
+          "TimeSeriesTensor"
+        ],
+        "comparison": "series_elements",
+        "dtype": "series(float64)",
+        "shape": [
+          3
+        ],
+        "elements": [
+          {
+            "index": [
+              0
+            ],
+            "series": {
+              "accepted_types": [
+                "TimeSeries"
+              ],
+              "comparison": "series",
+              "dtype": "float64",
+              "unit": "s",
+              "channels": [
+                {
+                  "times": {
+                    "dtype": "float64",
+                    "shape": [
+                      2
+                    ],
+                    "values": [
+                      0.0,
+                      1.0
+                    ]
+                  },
+                  "values": {
+                    "accepted_types": [
+                      "FloatTensor"
+                    ],
+                    "comparison": "array",
+                    "dtype": "float64",
+                    "shape": [
+                      2
+                    ],
+                    "array": {
+                      "dtype": "float64",
+                      "shape": [
+                        2
+                      ],
+                      "values": [
+                        0.0,
+                        10.0
+                      ]
+                    }
+                  },
+                  "evaluations": [
+                    {
+                      "t": 0.0,
+                      "outside": true
+                    },
+                    {
+                      "t": 0.5,
+                      "value": {
+                        "dtype": "float64",
+                        "shape": [],
+                        "values": 0.0
+                      }
+                    },
+                    {
+                      "t": 1.5,
+                      "value": {
+                        "dtype": "float64",
+                        "shape": [],
+                        "values": 10.0
+                      }
+                    },
+                    {
+                      "t": 2.0,
+                      "outside": true
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "index": [
+              1
+            ],
+            "series": {
+              "accepted_types": [
+                "TimeSeries"
+              ],
+              "comparison": "series",
+              "dtype": "float64",
+              "unit": "s",
+              "channels": [
+                {
+                  "times": {
+                    "dtype": "float64",
+                    "shape": [
+                      2
+                    ],
+                    "values": [
+                      0.0,
+                      1.0
+                    ]
+                  },
+                  "values": {
+                    "accepted_types": [
+                      "FloatTensor"
+                    ],
+                    "comparison": "array",
+                    "dtype": "float64",
+                    "shape": [
+                      2
+                    ],
+                    "array": {
+                      "dtype": "float64",
+                      "shape": [
+                        2
+                      ],
+                      "values": [
+                        10.0,
+                        20.0
+                      ]
+                    }
+                  },
+                  "evaluations": [
+                    {
+                      "t": 0.0,
+                      "outside": true
+                    },
+                    {
+                      "t": 0.5,
+                      "value": {
+                        "dtype": "float64",
+                        "shape": [],
+                        "values": 10.0
+                      }
+                    },
+                    {
+                      "t": 1.5,
+                      "value": {
+                        "dtype": "float64",
+                        "shape": [],
+                        "values": 20.0
+                      }
+                    },
+                    {
+                      "t": 2.0,
+                      "outside": true
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "index": [
+              2
+            ],
+            "series": {
+              "accepted_types": [
+                "TimeSeries"
+              ],
+              "comparison": "series",
+              "dtype": "float64",
+              "unit": "s",
+              "channels": [
+                {
+                  "times": {
+                    "dtype": "float64",
+                    "shape": [
+                      1
+                    ],
+                    "values": [
+                      0.0
+                    ]
+                  },
+                  "values": {
+                    "accepted_types": [
+                      "FloatTensor"
+                    ],
+                    "comparison": "array",
+                    "dtype": "float64",
+                    "shape": [
+                      1
+                    ],
+                    "array": {
+                      "dtype": "float64",
+                      "shape": [
+                        1
+                      ],
+                      "values": [
+                        20.0
+                      ]
+                    }
+                  },
+                  "evaluations": [
+                    {
+                      "t": 0.0,
+                      "outside": true
+                    },
+                    {
+                      "t": 1.5,
+                      "value": {
+                        "dtype": "float64",
+                        "shape": [],
+                        "values": 20.0
+                      }
+                    },
+                    {
+                      "t": 2.0,
+                      "outside": true
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "windows_open_float64",
+      "description": "Windows with open starts and ends",
+      "serialization": "pickle",
+      "file": "windows_open_float64.pkl",
+      "bytes": 558,
+      "sha256": "54252d84ef8410e6e32bc48f91fce2b91735d57fd0831b1a1e6105f89fccb84d",
+      "expected": {
+        "accepted_types": [
+          "TimeSeriesTensor"
+        ],
+        "comparison": "series_elements",
+        "dtype": "series(float64)",
+        "shape": [
+          3
+        ],
+        "elements": [
+          {
+            "index": [
+              0
+            ],
+            "series": {
+              "accepted_types": [
+                "TimeSeries"
+              ],
+              "comparison": "series",
+              "dtype": "float64",
+              "unit": "s",
+              "channels": [
+                {
+                  "times": {
+                    "dtype": "float64",
+                    "shape": [
+                      2
+                    ],
+                    "values": [
+                      0.0,
+                      1.0
+                    ]
+                  },
+                  "values": {
+                    "accepted_types": [
+                      "FloatTensor"
+                    ],
+                    "comparison": "array",
+                    "dtype": "float64",
+                    "shape": [
+                      2
+                    ],
+                    "array": {
+                      "dtype": "float64",
+                      "shape": [
+                        2
+                      ],
+                      "values": [
+                        0.0,
+                        10.0
+                      ]
+                    }
+                  },
+                  "evaluations": [
+                    {
+                      "t": 0.0,
+                      "outside": true
+                    },
+                    {
+                      "t": 0.5,
+                      "value": {
+                        "dtype": "float64",
+                        "shape": [],
+                        "values": 0.0
+                      }
+                    },
+                    {
+                      "t": 1.5,
+                      "value": {
+                        "dtype": "float64",
+                        "shape": [],
+                        "values": 10.0
+                      }
+                    },
+                    {
+                      "t": 2.0,
+                      "outside": true
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "index": [
+              1
+            ],
+            "series": {
+              "accepted_types": [
+                "TimeSeries"
+              ],
+              "comparison": "series",
+              "dtype": "float64",
+              "unit": "s",
+              "channels": [
+                {
+                  "times": {
+                    "dtype": "float64",
+                    "shape": [
+                      2
+                    ],
+                    "values": [
+                      0.0,
+                      1.0
+                    ]
+                  },
+                  "values": {
+                    "accepted_types": [
+                      "FloatTensor"
+                    ],
+                    "comparison": "array",
+                    "dtype": "float64",
+                    "shape": [
+                      2
+                    ],
+                    "array": {
+                      "dtype": "float64",
+                      "shape": [
+                        2
+                      ],
+                      "values": [
+                        10.0,
+                        20.0
+                      ]
+                    }
+                  },
+                  "evaluations": [
+                    {
+                      "t": 0.0,
+                      "outside": true
+                    },
+                    {
+                      "t": 0.5,
+                      "value": {
+                        "dtype": "float64",
+                        "shape": [],
+                        "values": 10.0
+                      }
+                    },
+                    {
+                      "t": 1.5,
+                      "value": {
+                        "dtype": "float64",
+                        "shape": [],
+                        "values": 20.0
+                      }
+                    },
+                    {
+                      "t": 2.0,
+                      "outside": true
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "index": [
+              2
+            ],
+            "series": {
+              "accepted_types": [
+                "TimeSeries"
+              ],
+              "comparison": "series",
+              "dtype": "float64",
+              "unit": "s",
+              "channels": [
+                {
+                  "times": {
+                    "dtype": "float64",
+                    "shape": [
+                      1
+                    ],
+                    "values": [
+                      0.0
+                    ]
+                  },
+                  "values": {
+                    "accepted_types": [
+                      "FloatTensor"
+                    ],
+                    "comparison": "array",
+                    "dtype": "float64",
+                    "shape": [
+                      1
+                    ],
+                    "array": {
+                      "dtype": "float64",
+                      "shape": [
+                        1
+                      ],
+                      "values": [
+                        20.0
+                      ]
+                    }
+                  },
+                  "evaluations": [
+                    {
+                      "t": 0.0,
+                      "outside": true
+                    },
+                    {
+                      "t": 1.5,
+                      "value": {
+                        "dtype": "float64",
+                        "shape": [],
+                        "values": 20.0
+                      }
+                    },
+                    {
+                      "t": 2.0,
+                      "outside": true
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "windows_closed_float64",
+      "description": "Windows with closed starts and ends",
+      "serialization": "binary",
+      "file": "windows_closed_float64.sb",
+      "bytes": 522,
+      "sha256": "7c8440437cec1980362d72f75eb57ec22ce211da4eef0b3cbf7171c9fa77649b",
+      "expected": {
+        "accepted_types": [
+          "TimeSeriesTensor"
+        ],
+        "comparison": "series_elements",
+        "dtype": "series(float64)",
+        "shape": [
+          3
+        ],
+        "elements": [
+          {
+            "index": [
+              0
+            ],
+            "series": {
+              "accepted_types": [
+                "TimeSeries"
+              ],
+              "comparison": "series",
+              "dtype": "float64",
+              "unit": "s",
+              "channels": [
+                {
+                  "times": {
+                    "dtype": "float64",
+                    "shape": [
+                      3
+                    ],
+                    "values": [
+                      0.0,
+                      1.0,
+                      2.0
+                    ]
+                  },
+                  "values": {
+                    "accepted_types": [
+                      "FloatTensor"
+                    ],
+                    "comparison": "array",
+                    "dtype": "float64",
+                    "shape": [
+                      3
+                    ],
+                    "array": {
+                      "dtype": "float64",
+                      "shape": [
+                        3
+                      ],
+                      "values": [
+                        0.0,
+                        10.0,
+                        20.0
+                      ]
+                    }
+                  },
+                  "evaluations": [
+                    {
+                      "t": 0.0,
+                      "value": {
+                        "dtype": "float64",
+                        "shape": [],
+                        "values": 0.0
+                      }
+                    },
+                    {
+                      "t": 1.5,
+                      "value": {
+                        "dtype": "float64",
+                        "shape": [],
+                        "values": 10.0
+                      }
+                    },
+                    {
+                      "t": 2.0,
+                      "value": {
+                        "dtype": "float64",
+                        "shape": [],
+                        "values": 20.0
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "index": [
+              1
+            ],
+            "series": {
+              "accepted_types": [
+                "TimeSeries"
+              ],
+              "comparison": "series",
+              "dtype": "float64",
+              "unit": "s",
+              "channels": [
+                {
+                  "times": {
+                    "dtype": "float64",
+                    "shape": [
+                      2
+                    ],
+                    "values": [
+                      0.0,
+                      1.0
+                    ]
+                  },
+                  "values": {
+                    "accepted_types": [
+                      "FloatTensor"
+                    ],
+                    "comparison": "array",
+                    "dtype": "float64",
+                    "shape": [
+                      2
+                    ],
+                    "array": {
+                      "dtype": "float64",
+                      "shape": [
+                        2
+                      ],
+                      "values": [
+                        10.0,
+                        20.0
+                      ]
+                    }
+                  },
+                  "evaluations": [
+                    {
+                      "t": 0.0,
+                      "value": {
+                        "dtype": "float64",
+                        "shape": [],
+                        "values": 10.0
+                      }
+                    },
+                    {
+                      "t": 1.5,
+                      "value": {
+                        "dtype": "float64",
+                        "shape": [],
+                        "values": 20.0
+                      }
+                    },
+                    {
+                      "t": 2.0,
+                      "value": {
+                        "dtype": "float64",
+                        "shape": [],
+                        "values": 20.0
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "index": [
+              2
+            ],
+            "series": {
+              "accepted_types": [
+                "TimeSeries"
+              ],
+              "comparison": "series",
+              "dtype": "float64",
+              "unit": "s",
+              "channels": [
+                {
+                  "times": {
+                    "dtype": "float64",
+                    "shape": [
+                      2
+                    ],
+                    "values": [
+                      0.0,
+                      2.0
+                    ]
+                  },
+                  "values": {
+                    "accepted_types": [
+                      "FloatTensor"
+                    ],
+                    "comparison": "array",
+                    "dtype": "float64",
+                    "shape": [
+                      2
+                    ],
+                    "array": {
+                      "dtype": "float64",
+                      "shape": [
+                        2
+                      ],
+                      "values": [
+                        20.0,
+                        40.0
+                      ]
+                    }
+                  },
+                  "evaluations": [
+                    {
+                      "t": 0.0,
+                      "value": {
+                        "dtype": "float64",
+                        "shape": [],
+                        "values": 20.0
+                      }
+                    },
+                    {
+                      "t": 1.5,
+                      "value": {
+                        "dtype": "float64",
+                        "shape": [],
+                        "values": 20.0
+                      }
+                    },
+                    {
+                      "t": 2.0,
+                      "value": {
+                        "dtype": "float64",
+                        "shape": [],
+                        "values": 40.0
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "windows_closed_float64",
+      "description": "Windows with closed starts and ends",
+      "serialization": "pickle",
+      "file": "windows_closed_float64.pkl",
+      "bytes": 574,
+      "sha256": "dd87d35c52577022c56440e7d78bb8dcdb7ae65b724c34272e93516563ba73b8",
+      "expected": {
+        "accepted_types": [
+          "TimeSeriesTensor"
+        ],
+        "comparison": "series_elements",
+        "dtype": "series(float64)",
+        "shape": [
+          3
+        ],
+        "elements": [
+          {
+            "index": [
+              0
+            ],
+            "series": {
+              "accepted_types": [
+                "TimeSeries"
+              ],
+              "comparison": "series",
+              "dtype": "float64",
+              "unit": "s",
+              "channels": [
+                {
+                  "times": {
+                    "dtype": "float64",
+                    "shape": [
+                      3
+                    ],
+                    "values": [
+                      0.0,
+                      1.0,
+                      2.0
+                    ]
+                  },
+                  "values": {
+                    "accepted_types": [
+                      "FloatTensor"
+                    ],
+                    "comparison": "array",
+                    "dtype": "float64",
+                    "shape": [
+                      3
+                    ],
+                    "array": {
+                      "dtype": "float64",
+                      "shape": [
+                        3
+                      ],
+                      "values": [
+                        0.0,
+                        10.0,
+                        20.0
+                      ]
+                    }
+                  },
+                  "evaluations": [
+                    {
+                      "t": 0.0,
+                      "value": {
+                        "dtype": "float64",
+                        "shape": [],
+                        "values": 0.0
+                      }
+                    },
+                    {
+                      "t": 1.5,
+                      "value": {
+                        "dtype": "float64",
+                        "shape": [],
+                        "values": 10.0
+                      }
+                    },
+                    {
+                      "t": 2.0,
+                      "value": {
+                        "dtype": "float64",
+                        "shape": [],
+                        "values": 20.0
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "index": [
+              1
+            ],
+            "series": {
+              "accepted_types": [
+                "TimeSeries"
+              ],
+              "comparison": "series",
+              "dtype": "float64",
+              "unit": "s",
+              "channels": [
+                {
+                  "times": {
+                    "dtype": "float64",
+                    "shape": [
+                      2
+                    ],
+                    "values": [
+                      0.0,
+                      1.0
+                    ]
+                  },
+                  "values": {
+                    "accepted_types": [
+                      "FloatTensor"
+                    ],
+                    "comparison": "array",
+                    "dtype": "float64",
+                    "shape": [
+                      2
+                    ],
+                    "array": {
+                      "dtype": "float64",
+                      "shape": [
+                        2
+                      ],
+                      "values": [
+                        10.0,
+                        20.0
+                      ]
+                    }
+                  },
+                  "evaluations": [
+                    {
+                      "t": 0.0,
+                      "value": {
+                        "dtype": "float64",
+                        "shape": [],
+                        "values": 10.0
+                      }
+                    },
+                    {
+                      "t": 1.5,
+                      "value": {
+                        "dtype": "float64",
+                        "shape": [],
+                        "values": 20.0
+                      }
+                    },
+                    {
+                      "t": 2.0,
+                      "value": {
+                        "dtype": "float64",
+                        "shape": [],
+                        "values": 20.0
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "index": [
+              2
+            ],
+            "series": {
+              "accepted_types": [
+                "TimeSeries"
+              ],
+              "comparison": "series",
+              "dtype": "float64",
+              "unit": "s",
+              "channels": [
+                {
+                  "times": {
+                    "dtype": "float64",
+                    "shape": [
+                      2
+                    ],
+                    "values": [
+                      0.0,
+                      2.0
+                    ]
+                  },
+                  "values": {
+                    "accepted_types": [
+                      "FloatTensor"
+                    ],
+                    "comparison": "array",
+                    "dtype": "float64",
+                    "shape": [
+                      2
+                    ],
+                    "array": {
+                      "dtype": "float64",
+                      "shape": [
+                        2
+                      ],
+                      "values": [
+                        20.0,
+                        40.0
+                      ]
+                    }
+                  },
+                  "evaluations": [
+                    {
+                      "t": 0.0,
+                      "value": {
+                        "dtype": "float64",
+                        "shape": [],
+                        "values": 20.0
+                      }
+                    },
+                    {
+                      "t": 1.5,
+                      "value": {
+                        "dtype": "float64",
+                        "shape": [],
+                        "values": 20.0
+                      }
+                    },
+                    {
+                      "t": 2.0,
+                      "value": {
+                        "dtype": "float64",
+                        "shape": [],
+                        "values": 40.0
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "unsupported": []
+}

@@ -1296,6 +1296,13 @@ embedding of item 40.
   pickle files, and teach `test_serialization_goldens.py` to compare series
   (number of channels, unit, times, values at listed times). **Catches:** a later
   change to a payload that breaks saved files.
+  `generate_timeseries_v3.py` writes `0.5-pre-timeseries` with explicit
+  values: item 28's barcodes are built from listed bars rather than computed,
+  and item 56's windows are two tensors over times `[0, 1, 2, 4]`, with
+  `closed="none"` (open starts, open ends after the last observation) and
+  `closed="both"` (closed starts, a closed end after the last observation),
+  each channel listing times where it raises as outside its domain. The
+  comparisons are `series` and `series_elements`, for tensors of series.
 
 ## Documentation and release
 
