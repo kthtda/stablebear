@@ -317,3 +317,21 @@ def test_windows_evaluate_at_times_of_any_shape():
         [[10.0, 20.0], [25.0, 15.0]],
         [[20.0, 30.0], [35.0, 25.0]],
     ])
+
+
+def test_windows_of_several_channels_evaluate_to_one_leaf_per_channel():
+    # A's observations are 10 * t and B's are -10 * t, with t in seconds; B
+    # starts 0.5 s after A. Both are observed from 0.5 to 2.5, so the windows
+    # are [0.5, 1.5) and [1.5, 2.5).
+    a = TimeSeries([0.0, 5.0, 10.0, 15.0, 20.0, 25.0],
+                   times=Times([0.0, 0.5, 1.0, 1.5, 2.0, 2.5], unit="s"))
+    b = TimeSeries([-5.0, -10.0, -15.0, -20.0, -25.0, -30.0],
+                   times=Times([500.0, 1000.0, 1500.0, 2000.0, 2500.0, 3000.0], unit="ms"))
+    series = TimeSeries.from_channels([a, b], unit="s")
+    windows = Window(size=1.0, step=1.0, closed="left", partial=False)(series)
+
+    values = windows([0.0, 0.5])
+
+    assert isinstance(values, sb.NestedTensor)
+    assert np.array_equal(np.asarray(values[0]), [[5.0, 10.0], [15.0, 20.0]])
+    assert np.array_equal(np.asarray(values[1]), [[-5.0, -10.0], [-15.0, -20.0]])

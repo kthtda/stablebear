@@ -1211,14 +1211,15 @@ embedding of item 40.
   Partial windows, which a grid on `[0, size)` cannot cover, are tested in
   item 53.
 
-- [ ] **52. Evaluating several channels.** A tensor of series with several
+- [x] **52. Evaluating several channels.** A tensor of series with several
   channels evaluates to a `NestedTensor` with one leaf per channel, each of
   shape `(*windows.shape, *t_shape, *shape)` of its channel, as
-  `series(t)` gives one leaf per channel. Test: `Window(size=1.0,
-  step=1.0, closed="left", partial=False)` of item 47's series of channels
-  A (`10 * t`) and B (`-10 * t`, in ms) has windows at 0.5 and 1.5, and
-  `windows([0.0, 0.5])` has leaves `[[0, 10], [10, 10]]` and
-  `[[-5, -5], [-15, -15]]`. **Catches:** channels swapped, windows and
+  `series(t)` gives one leaf per channel. Test: channel A with `10 * t` at
+  `[0.0, 0.5, ..., 2.5]` s and channel B with `-10 * t` at
+  `[500, 1000, ..., 3000]` ms; `Window(size=1.0, step=1.0, closed="left",
+  partial=False)` has windows at 0.5 and 1.5, and `windows([0.0, 0.5])`
+  has leaves `[[5, 10], [15, 20]]` and `[[-5, -10], [-15, -20]]`, every
+  value from a different observation. **Catches:** channels swapped, windows and
   channels transposed, channel B read in the query unit.
 
 - [ ] **53. Evaluation errors.** A time outside a window's domain raises
