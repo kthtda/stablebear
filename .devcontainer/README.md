@@ -138,7 +138,8 @@ Copies are one-way. Changes made in the container, such as a refreshed login or
 new session history, stay in `.devcontainer/.local/home/` and do not reach your
 home directory. On the next start, the script copies host files that are newer
 than the staged ones and keeps the rest. Delete `.devcontainer/.local/home/` to
-start over from the host state.
+start over from the host state. When a start replaces a copy with a symlink,
+the script renames the copy with a `.kept-<date>` suffix instead of deleting it.
 
 ## Codex sandbox
 

@@ -60,8 +60,12 @@ stage() {
         fi
         echo "Copied $source for the devcontainer (container changes stay in $destination)"
     else
+        # Keep a copy from an earlier copy run; the container may have changed it.
         if [[ -e "$destination" && ! -L "$destination" ]]; then
-            rm -rf -- "$destination"
+            local kept
+            kept=$destination.kept-$(date +%Y%m%d-%H%M%S)
+            mv -- "$destination" "$kept"
+            echo "Kept the earlier copy of $source at $kept; merge any changes you need by hand"
         fi
         ln -sfn -- "$source" "$destination"
     fi
