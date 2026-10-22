@@ -1289,7 +1289,7 @@ embedding of item 40.
   new format; reading one now raises. A tensor of series is written as any
   tensor is, each element a series record.
 
-- [ ] **57. Golden files.** Pin the formats (TESTING.md principle 11) with a
+- [x] **57. Golden files.** Pin the formats (TESTING.md principle 11) with a
   generator modeled on `test/golden/serialization/generate_point_cloud_v3.py`,
   which records explicit expected values. Write item 28's barcode32 result,
   the series of channels A and B, and item 56's tensor of windows as `.sb` and
