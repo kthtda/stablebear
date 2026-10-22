@@ -63,6 +63,38 @@ namespace sb::io::detail
       NestedTensor<int64_t>,
       NestedTensor<uint32_t>,
       NestedTensor<uint64_t>,
+      NestedTensor<bool>,
+      NestedTensor<Pcf<float32_t, float32_t>>,
+      NestedTensor<Pcf<float64_t, float64_t>>,
+      NestedTensor<Pcf<int32_t, int32_t>>,
+      NestedTensor<Pcf<int64_t, int64_t>>,
+      NestedTensor<PointCloud<float32_t>>,
+      NestedTensor<PointCloud<float64_t>>,
+      NestedTensor<DistanceMatrix<float32_t>>,
+      NestedTensor<DistanceMatrix<float64_t>>,
+      NestedTensor<SymmetricMatrix<float32_t>>,
+      NestedTensor<SymmetricMatrix<float64_t>>,
+      NestedTensor<ph::Barcode<float32_t>>,
+      NestedTensor<ph::Barcode<float64_t>>,
+      NestedTensor<TimeSeries<bool>>,
+      NestedTensor<TimeSeries<float32_t>>,
+      NestedTensor<TimeSeries<float64_t>>,
+      NestedTensor<TimeSeries<int32_t>>,
+      NestedTensor<TimeSeries<int64_t>>,
+      NestedTensor<TimeSeries<uint32_t>>,
+      NestedTensor<TimeSeries<uint64_t>>,
+      NestedTensor<TimeSeries<Pcf<float32_t, float32_t>>>,
+      NestedTensor<TimeSeries<Pcf<float64_t, float64_t>>>,
+      NestedTensor<TimeSeries<Pcf<int32_t, int32_t>>>,
+      NestedTensor<TimeSeries<Pcf<int64_t, int64_t>>>,
+      NestedTensor<TimeSeries<PointCloud<float32_t>>>,
+      NestedTensor<TimeSeries<PointCloud<float64_t>>>,
+      NestedTensor<TimeSeries<DistanceMatrix<float32_t>>>,
+      NestedTensor<TimeSeries<DistanceMatrix<float64_t>>>,
+      NestedTensor<TimeSeries<SymmetricMatrix<float32_t>>>,
+      NestedTensor<TimeSeries<SymmetricMatrix<float64_t>>>,
+      NestedTensor<TimeSeries<ph::Barcode<float32_t>>>,
+      NestedTensor<TimeSeries<ph::Barcode<float64_t>>>,
 
       Tensor<Pcf<float32_t, float32_t>>,
       Tensor<Pcf<float64_t, float64_t>>,
@@ -697,6 +729,29 @@ namespace sb::io::detail
       throw std::runtime_error("Nested tensor depth does not match its children");
     }
     return result;
+  }
+
+  /// Read a nested tensor of whichever leaf type @p format names. Nothing if
+  /// none matches.
+  template <size_t I = 0>
+  std::optional<StreamableTensor> read_any_nested_tensor(BinaryReader& reader, TensorFormat format)
+  {
+    if constexpr (I == std::variant_size_v<StreamableTensor>)
+    {
+      return std::nullopt;
+    }
+    else
+    {
+      using Alternative = std::variant_alternative_t<I, StreamableTensor>;
+      if constexpr (is_nested_tensor_v<Alternative>)
+      {
+        if (matches_nested_tensor_format<Alternative>(reader, format))
+        {
+          return read_nested_tensor_element<typename is_nested_tensor<Alternative>::leaf_type>(reader);
+        }
+      }
+      return read_any_nested_tensor<I + 1>(reader, format);
+    }
   }
 
   template <typename ScalarT>

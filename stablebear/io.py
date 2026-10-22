@@ -22,8 +22,12 @@ _BINARY_MAGIC = b"\x01MPCF"
 
 
 def _save(item: Tensor, file):
+    if isinstance(item, NestedTensor):
+        cpp.IoOps.save_nested_tensor(item._root, file)
+        return
+
     cpp_p = cpp.persistence
-    data = item._root if isinstance(item, NestedTensor) else item._data
+    data = item._data
     _SAVE_DISPATCH = {
         cpp.Float32Tensor: cpp.IoOps.save_float32_tensor,
         cpp.Float64Tensor: cpp.IoOps.save_float64_tensor,
@@ -32,12 +36,6 @@ def _save(item: Tensor, file):
         cpp.Uint32Tensor: cpp.IoOps.save_uint32_tensor,
         cpp.Uint64Tensor: cpp.IoOps.save_uint64_tensor,
         cpp.BoolTensor: cpp.IoOps.save_bool_tensor,
-        cpp.NestedFloat32: cpp.IoOps.save_nested_float32_tensor,
-        cpp.NestedFloat64: cpp.IoOps.save_nested_float64_tensor,
-        cpp.NestedInt32: cpp.IoOps.save_nested_int32_tensor,
-        cpp.NestedInt64: cpp.IoOps.save_nested_int64_tensor,
-        cpp.NestedUint32: cpp.IoOps.save_nested_uint32_tensor,
-        cpp.NestedUint64: cpp.IoOps.save_nested_uint64_tensor,
         cpp.Pcf32Tensor: cpp.IoOps.save_pcf32_tensor,
         cpp.Pcf64Tensor: cpp.IoOps.save_pcf64_tensor,
         cpp.Pcf32iTensor: cpp.IoOps.save_pcf32i_tensor,
