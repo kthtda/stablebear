@@ -18,15 +18,15 @@ namespace
   {
     m.def("evaluate_series", [](const sb::Tensor<sb::TimeSeries<T>>& series, const sb::Tensor<sb::float64_t>& t) {
       return sb::evaluate(series, t);
-    }, py::arg("series"), py::arg("t"));
+    }, py::arg("series"), py::arg("t"), py::call_guard<py::gil_scoped_release>());
     m.def("delay_embed", [](const sb::TimeSeries<T>& series, size_t dimension, sb::float64_t delay) {
       return sb::delay_embed(series, dimension, delay);
-    }, py::arg("series"), py::arg("dimension"), py::arg("delay"));
+    }, py::arg("series"), py::arg("dimension"), py::arg("delay"), py::call_guard<py::gil_scoped_release>());
     m.def("windows", [](const sb::TimeSeries<T>& series, sb::float64_t size, sb::float64_t step, bool closedStart,
                         bool closedEnd, bool partial) {
       return sb::windows(series, size, step, closedStart, closedEnd, partial);
     }, py::arg("series"), py::arg("size"), py::arg("step"), py::arg("closed_start"), py::arg("closed_end"),
-       py::arg("partial"));
+       py::arg("partial"), py::call_guard<py::gil_scoped_release>());
   }
 }
 
