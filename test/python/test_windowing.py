@@ -8,6 +8,9 @@ from stablebear import FloatTensor
 from stablebear.timeseries import TimeDelayEmbedding, Times, TimeSeries, Window
 from stablebear.timeseries.series import TimeSeriesTensor
 
+from _element_values import TWO_ELEMENTS_OF_EVERY_DTYPE
+from _round_trip import ROUND_TRIPS
+
 
 def _windows_source():
     # Each observation is 10 * t.
@@ -365,3 +368,29 @@ def test_evaluating_windows_outside_a_window_raises_naming_its_position():
     message = "TimeSeries at position (1): Time 1.5 is outside the domain [0, 1]"
     with pytest.raises(ValueError, match=re.escape(message)):
         windows([0.0, 1.5])
+
+
+@pytest.mark.parametrize("round_trip", ROUND_TRIPS)
+@pytest.mark.parametrize("make_values", TWO_ELEMENTS_OF_EVERY_DTYPE)
+def test_windows_of_every_dtype_survive_saving(make_values, round_trip):
+    # The observations are a, b, b, a, so the windows [0.0, 1.0] and
+    # [0.5, 1.5] hold a, b, b and b, b, a.
+    two = make_values()
+    series = TimeSeries(sb.concatenate([two, two[[1, 0]]]), times=[0.0, 0.5, 1.0, 1.5])
+    windows = Window(size=1.0, step=0.5, closed="both", partial=False)(series)
+
+    loaded = round_trip(windows)
+
+    assert isinstance(loaded, TimeSeriesTensor)
+    assert loaded.dtype is windows.dtype
+    assert loaded.array_equal(windows)
+
+
+@pytest.mark.parametrize("round_trip", ROUND_TRIPS)
+@pytest.mark.parametrize("closed", ["left", "right", "both", "none"])
+def test_window_ends_survive_saving(closed, round_trip):
+    windows = Window(size=1.0, step=1.0, closed=closed, partial=False)(_closed_source())
+
+    loaded = round_trip(windows)
+
+    assert loaded.array_equal(windows)

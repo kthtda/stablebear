@@ -1273,21 +1273,16 @@ embedding of item 40.
     out of order.
   A loaded embedding evaluates exactly as the view, since views evaluate by
   previous value on their own points with their own snapping (decision 8).
-  - Item 51's windows load in order, and evaluating them at
-    `[0.0, 1.0]` gives item 51's values. **Catches:** windows reordered or their values at the
-    bounds lost on saving.
   - Parametrized over every element type: `Window(size=1.0, step=0.5,
     closed="both", partial=False)` of the observations `a, b, b, a` at times
     `[0.0, 0.5, 1.0, 1.5]` loads with the same dtype, the windows holding
     `a, b, b` and `b, b, a` at `[0.0, 0.5, 1.0]`.
     **Catches:** a tensor of series of some element type that cannot be
-    saved or loads as another type.
-  - Parametrized over `closed`, the window at 1.0 of item 47b loads
-    evaluating as before at its edges: `"left"` is 10 at 0 and raises at 1
-    naming `[0, 1)`, `"right"` raises at 0 naming `(0, 1]` and is 20 at 1,
-    `"both"` is 10 at 0 and 20 at 1, and `"none"` raises at both naming
-    `(0, 1)`; each is 15 at 0.75. **Catches:** an open start saved as
-    closed, an end after the last observation lost or saved as closed.
+    saved or loads as another type, windows reordered.
+  - Parametrized over `closed`, item 47b's windows of size 1.0 load equal
+    to the originals (`array_equal`, which compares each channel's start
+    and end). **Catches:** an open start saved as closed, an end after the
+    last observation lost or saved as closed.
   Each channel record gains whether its start and end are closed and its
   end, if set. Without an end the end is always closed, but the flag is
   written anyway, so that an open end at the last timestamp would need no
