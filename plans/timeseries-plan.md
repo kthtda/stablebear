@@ -1224,7 +1224,7 @@ embedding of item 40.
   leaves of shapes `(2, 2)` and `(2, 2, 2)`. **Catches:** channels swapped, windows and
   channels transposed, channel B read in the query unit.
 
-- [ ] **53. Evaluation errors.** A time outside a window's domain raises
+- [x] **53. Evaluation errors.** A time outside a window's domain raises
   `ValueError` naming the window's index and its domain, as in
   `TimeSeries at position (1): Time 1.5 is outside the domain [0, 1]`, as for
   any tensor of series. Every domain is
