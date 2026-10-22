@@ -16,6 +16,28 @@ namespace sb
       const auto result = std::to_chars(buffer.data(), buffer.data() + buffer.size(), x);
       return std::string(buffer.data(), result.ptr);
     }
+
+    /// The queries in @p t in row-major order, and their positions sorted by
+    /// time. A NaN sorts first, so checking the first and last sorted queries
+    /// against a domain rejects it.
+    struct SortedQueries
+    {
+      std::vector<float64_t> values;
+      std::vector<size_t> order;
+    };
+
+    inline SortedQueries sort_queries(const Tensor<float64_t>& t)
+    {
+      SortedQueries queries;
+      walk(t, [&](const std::vector<size_t>& index) { queries.values.push_back(t(index)); });
+      queries.order.resize(queries.values.size());
+      std::iota(queries.order.begin(), queries.order.end(), size_t{0});
+      const auto& v = queries.values;
+      std::sort(queries.order.begin(), queries.order.end(), [&](size_t a, size_t b) {
+        return std::isnan(v[a]) ? !std::isnan(v[b]) : v[a] < v[b];
+      });
+      return queries;
+    }
   }
 
   template <typename T>
@@ -414,17 +436,12 @@ namespace sb
   template <typename T>
   NestedTensor<T> TimeSeries<T>::evaluate(const Tensor<float64_t>& t) const
   {
-    std::vector<float64_t> queries;
-    walk(t, [&](const std::vector<size_t>& index) { queries.push_back(t(index)); });
-    if (!queries.empty())
+    const auto [queries, order] = detail::sort_queries(t);
+    if (!order.empty())
     {
-      const auto [lo, hi] = std::minmax_element(queries.begin(), queries.end());
-      check_observed(*lo);
-      check_observed(*hi);
+      check_observed(queries[order.front()]);
+      check_observed(queries[order.back()]);
     }
-    std::vector<size_t> order(queries.size());
-    std::iota(order.begin(), order.end(), size_t{0});
-    std::sort(order.begin(), order.end(), [&](size_t a, size_t b) { return queries[a] < queries[b]; });
 
     Tensor<NestedTensor<T>> values({m_channels.size()});
     std::vector<float64_t> sorted(queries.size());
@@ -503,11 +520,7 @@ namespace sb
 
     // The queries are sorted once for every series, as TimeSeries::evaluate
     // sorts them for one.
-    std::vector<float64_t> queries;
-    walk(t, [&](const std::vector<size_t>& index) { queries.push_back(t(index)); });
-    std::vector<size_t> order(queries.size());
-    std::iota(order.begin(), order.end(), size_t{0});
-    std::sort(order.begin(), order.end(), [&](size_t a, size_t b) { return queries[a] < queries[b]; });
+    const auto [queries, order] = detail::sort_queries(t);
 
     // Leaf c holds, in block k, the values of channel c of the k-th series
     // in row-major order.

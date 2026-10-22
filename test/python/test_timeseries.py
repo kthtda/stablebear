@@ -399,6 +399,8 @@ def test_many_times_snap_and_check_the_domain_like_single_times():
     assert np.array_equal(np.asarray(series(queries)), [series(t) for t in queries])
     with pytest.raises(ValueError, match="outside the domain"):
         series([0.0, 4.5])
+    with pytest.raises(ValueError, match="outside the domain"):
+        series([0.0, np.nan, 4.0])
 
 
 @pytest.mark.parametrize("index", [1, -1])

@@ -368,6 +368,9 @@ def test_evaluating_windows_outside_a_window_raises_naming_its_position():
     message = "TimeSeries at position (1): Time 1.5 is outside the domain [0, 1]"
     with pytest.raises(ValueError, match=re.escape(message)):
         windows([0.0, 1.5])
+    message = "TimeSeries at position (0): Time nan is outside the domain [0, 2)"
+    with pytest.raises(ValueError, match=re.escape(message)):
+        windows([0.0, np.nan, 1.0])
 
 
 @pytest.mark.parametrize("round_trip", ROUND_TRIPS)
