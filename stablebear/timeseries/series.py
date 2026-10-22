@@ -501,3 +501,33 @@ class TimeSeriesTensor(Tensor):
 
     def _get_valid_setitem_dtypes(self):
         return [TimeSeries, TimeSeriesTensor]
+
+    def evaluate(self, t):
+        """Every series evaluated at the times ``t``, as
+        :meth:`TimeSeries.evaluate` does, each in its own unit.
+
+        ``t`` is a single time or an array-like or ``FloatTensor`` of times
+        of shape ``t_shape``. For series with one channel, returns a tensor
+        of shape ``(*self.shape, *t_shape, *shape)``, as evaluating a
+        ``PcfTensor`` gives ``(*self.shape, *t_shape)``. For windows of a
+        delay embedding evaluated on a grid of ``n`` times, the last two
+        axes are clouds of ``n`` points, which
+        :func:`~stablebear.persistence.compute_persistent_homology` reads
+        as point clouds.
+
+        Raises
+        ------
+        ValueError
+            If a time is outside the domain of a series, or the tensor is
+            empty or its series differ in channels or shapes.
+        """
+        times = FloatTensor(np.asarray(t, dtype=np.float64))
+        values = NestedTensor._from_cpp(cpp.evaluate_series(self._data, times._data))
+        if values.shape[0] > 1:
+            return values
+        leaf = values[0]
+        return leaf[()] if leaf.ndim == 0 else leaf
+
+    def __call__(self, t):
+        """``windows(t)`` is ``windows.evaluate(t)``."""
+        return self.evaluate(t)

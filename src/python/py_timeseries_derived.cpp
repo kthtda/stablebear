@@ -16,6 +16,9 @@ namespace
   template <typename T>
   void register_derived_element(py::module_& m)
   {
+    m.def("evaluate_series", [](const sb::Tensor<sb::TimeSeries<T>>& series, const sb::Tensor<sb::float64_t>& t) {
+      return sb::evaluate(series, t);
+    }, py::arg("series"), py::arg("t"));
     m.def("delay_embed", [](const sb::TimeSeries<T>& series, size_t dimension, sb::float64_t delay) {
       return sb::delay_embed(series, dimension, delay);
     }, py::arg("series"), py::arg("dimension"), py::arg("delay"));

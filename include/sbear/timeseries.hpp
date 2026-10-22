@@ -469,6 +469,16 @@ namespace sb
 
   template <typename T>
   inline constexpr bool is_timeseries_v = is_timeseries<T>::value;
+
+  /// Every series of @p series evaluated at the times @p t, each in its own
+  /// unit, as TimeSeries::evaluate does: one leaf per channel, in channel
+  /// order, of shape (*series.shape(), *t.shape(), *shape) of that channel.
+  /// Requires every series to have the same number of channels and channel
+  /// shapes, and @p series to be non-empty. The series are evaluated in
+  /// parallel on @p exec.
+  template <typename T>
+  [[nodiscard]] NestedTensor<T> evaluate(const Tensor<TimeSeries<T>>& series, const Tensor<float64_t>& t,
+                                         Executor& exec = default_executor());
 }
 
 #include "timeseries.tpp"

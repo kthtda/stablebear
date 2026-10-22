@@ -288,3 +288,32 @@ def test_windows_cut_every_channel_at_the_same_bounds():
     assert windows[0](0.5)[1][()] == -5.0
     with pytest.raises(ValueError, match=r"outside the domain \[0, 1\)"):
         windows[0](1.0)
+
+
+def _overlapping_windows():
+    # Windows at 0.0, 1.0, and 2.0.
+    series = TimeSeries([0.0, 5.0, 10.0, 15.0, 20.0, 25.0, 30.0, 35.0, 40.0],
+                        times=[0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0])
+    return Window(size=2.0, step=1.0, closed="left", partial=False)(series)
+
+
+def test_windows_evaluate_at_times_in_window_order():
+    windows = _overlapping_windows()
+
+    values = windows([0.0, 1.0])
+
+    assert isinstance(values, FloatTensor)
+    assert np.array_equal(np.asarray(values), [[0.0, 10.0], [10.0, 20.0], [20.0, 30.0]])
+    assert np.array_equal(np.asarray(windows(1.5)), [15.0, 25.0, 35.0])
+
+
+def test_windows_evaluate_at_times_of_any_shape():
+    windows = _overlapping_windows()
+
+    values = windows([[0.0, 1.0], [1.5, 0.5]])
+
+    assert np.array_equal(np.asarray(values), [
+        [[0.0, 10.0], [15.0, 5.0]],
+        [[10.0, 20.0], [25.0, 15.0]],
+        [[20.0, 30.0], [35.0, 25.0]],
+    ])

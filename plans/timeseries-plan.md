@@ -1183,7 +1183,7 @@ embedding of item 40.
   source unchanged. **Catches:** a write into a view reaching the source or
   another point that shares its stored observations.
 
-- [ ] **51. Evaluating a tensor of series.** (revised: there is no
+- [x] **51. Evaluating a tensor of series.** (revised: there is no
   `RegularSampler`, nor items 51-54 as first planned, a sampler's query
   times, sampling windows into a `PointCloudTensor`, sampling several
   channels, and sampler errors. Its open questions, where `size` comes from
@@ -1198,14 +1198,18 @@ embedding of item 40.
   windows of an embedding on a grid, such as
   `windows(np.arange(n) * size / n)`, gives clouds of `n` points in the
   last two axes, which `compute_persistent_homology` reads as point clouds
-  (item 55). Tests with times `[0.0, 1.0, 2.0, 3.0, 4.0]` and values
-  `10 * t`, and `Window(size=2.0, step=1.0, closed="left", partial=False)`
-  (windows at 0, 1, and 2):
+  (item 55). Tests with times `[0.0, 0.5, ..., 4.0]` and values `10 * t`,
+  and `Window(size=2.0, step=1.0, closed="left", partial=False)` (windows
+  at 0, 1, and 2):
   - `windows([0.0, 1.0])` is `[[0, 10], [10, 20], [20, 30]]`, and
-    `windows(1.5)` is `[10, 20, 30]`. **Catches:** windows out of order,
+    `windows(1.5)` is `[15, 25, 35]`. **Catches:** windows out of order,
     windows and times transposed, a number given a time axis.
-  - `windows([[0.0, 1.0], [0.5, 1.5]])` has shape `(3, 2, 2)`, with window
-    1's values `[[10, 20], [10, 20]]`. **Catches:** the query shape lost.
+  - `windows([[0.0, 1.0], [1.5, 0.5]])` is
+    `[[[0, 10], [15, 5]], [[10, 20], [25, 15]], [[20, 30], [35, 25]]]`.
+    **Catches:** the query shape lost, results in sorted rather than query
+    order.
+  Partial windows, which a grid on `[0, size)` cannot cover, are tested in
+  item 53.
 
 - [ ] **52. Evaluating several channels.** A tensor of series with several
   channels evaluates to a `NestedTensor` with one leaf per channel, each of

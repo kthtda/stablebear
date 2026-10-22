@@ -482,6 +482,60 @@ namespace sb
                               + text(domain.first) + ", " + text(domain.last) + (domain.closedEnd ? "]" : ")"));
     }
   }
+
+  template <typename T>
+  NestedTensor<T> evaluate(const Tensor<TimeSeries<T>>& series, const Tensor<float64_t>& t, Executor& exec)
+  {
+    if (series.size() == 0)
+    {
+      throw std::invalid_argument("Cannot evaluate an empty tensor of series");
+    }
+
+    // Leaf c holds, in block k, the values of channel c of the k-th series
+    // in row-major order, shaped as the first series' channel c.
+    const auto& first = series(std::vector<size_t>(series.rank(), 0));
+    std::vector<std::vector<size_t>> leafShapes;
+    std::vector<Tensor<T>> leaves;
+    for (size_t c = 0; c < first.n_channels(); ++c)
+    {
+      std::vector<size_t> leafShape(t.shape().begin(), t.shape().end());
+      leafShape.insert(leafShape.end(), first.channel(c).shape().begin(), first.channel(c).shape().end());
+      std::vector<size_t> shape(series.shape().begin(), series.shape().end());
+      shape.insert(shape.end(), leafShape.begin(), leafShape.end());
+      leafShapes.push_back(std::move(leafShape));
+      leaves.emplace_back(shape);
+    }
+
+    parallel_walk(series, [&](const std::vector<size_t>& index) {
+      size_t k = 0;
+      for (size_t i = 0; i < index.size(); ++i)
+      {
+        k = k * series.shape(i) + index[i];
+      }
+      const auto values = series(index).evaluate(t);
+      const auto& nested = values.nested();
+      if (nested.size() != leaves.size())
+      {
+        throw std::invalid_argument("Every series must have the same number of channels");
+      }
+      for (size_t c = 0; c < leaves.size(); ++c)
+      {
+        const auto& leaf = nested(c).leaf();
+        if (leaf.shape() != leafShapes[c])
+        {
+          throw std::invalid_argument("Every series must have the same channel shapes");
+        }
+        std::copy(leaf.data(), leaf.data() + leaf.size(), leaves[c].data() + static_cast<std::ptrdiff_t>(k * leaf.size()));
+      }
+    }, exec);
+
+    Tensor<NestedTensor<T>> out({leaves.size()});
+    for (size_t c = 0; c < leaves.size(); ++c)
+    {
+      out(c) = NestedTensor<T>::from_leaf_view(std::move(leaves[c]));
+    }
+    return NestedTensor<T>::from_outer_view(std::move(out), 1);
+  }
 }
 
 #endif // STABLEBEAR_TIMESERIES_TPP
