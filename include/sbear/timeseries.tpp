@@ -258,7 +258,7 @@ namespace sb
       const auto& stored = m_storage->values;
       for (size_t v = 0; v < blockSize; ++v)
       {
-        out[static_cast<std::ptrdiff_t>(v)] = stored[k * blockSize + v];
+        out[static_cast<std::ptrdiff_t>(v)] = detail::store_copy(stored[k * blockSize + v]);
       }
       return;
     }

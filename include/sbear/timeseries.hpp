@@ -203,9 +203,9 @@ namespace sb
   /// times the magnitude of the timestamps.
   inline constexpr float64_t DefaultSnapEps = 1024;
 
-  /// One channel of a time series: a view of storage that other views may
-  /// share. A write materializes the view first unless it owns the storage
-  /// alone, so other views never see it. Timestamps never change.
+  /// One channel of a time series: an immutable view of storage that other
+  /// views may share. Observations leave the channel as deep copies, so
+  /// mutating them never changes the channel or its views.
   ///
   /// A channel either holds stored observations or is a view whose
   /// observations are those of a source channel: stacked at lagged times by

@@ -3,7 +3,7 @@ import numpy as np
 import pytest
 
 import stablebear as sb
-from stablebear.timeseries import Times, TimeSeries, Window
+from stablebear.timeseries import TimeDelayEmbedding, Times, TimeSeries, Window
 
 from _element_values import TWO_ELEMENTS_OF_EVERY_DTYPE
 from _round_trip import ROUND_TRIPS
@@ -440,6 +440,29 @@ def test_values_are_a_copy():
     assert values[1] == 0.0
     assert series(1.0) == 20.0
 
+
+
+@pytest.mark.parametrize("make_values", [
+    p for p in TWO_ELEMENTS_OF_EVERY_DTYPE
+    if p.id in ("pcloud64", "distmat64", "symmat64")
+])
+@pytest.mark.parametrize("read", [
+    pytest.param(lambda series, embedding: series.values[0], id="values"),
+    pytest.param(lambda series, embedding: series(0.0), id="evaluation"),
+    pytest.param(lambda series, embedding: embedding.values[0, 0], id="embedding values"),
+])
+def test_mutating_an_observation_leaves_the_series_unchanged(make_values, read):
+    values = make_values()
+    expected = np.asarray(values[0]).copy()
+    series = TimeSeries(values, times=[0.0, 1.0])
+    embedding = TimeDelayEmbedding(dimension=2, delay=1.0)(series)
+
+    observation = read(series, embedding)
+    observation[0, 1] = 99.0
+
+    assert observation[0, 1] == 99.0
+    assert np.array_equal(np.asarray(series(0.0)), expected)
+    assert np.array_equal(np.asarray(embedding.values[0, 0]), expected)
 
 def test_values_of_several_channels_have_one_leaf_per_channel():
     series = TimeSeries.from_channels([_channel_a(), _channel_b()], unit="s")
