@@ -225,6 +225,7 @@ To check whether two tensors are entirely equal (as a single ``bool``), use
 
    A.array_equal(B)   # True
    A.array_equal(np.array([1.0, 2.0, 3.0]))  # also accepts NumPy arrays
+   A.array_equal([1.0, 2.0, 3.0])  # and nested lists
 
    C = sb.FloatTensor(np.array([1.0, 9.0, 3.0]))
    A.array_equal(C)   # False
