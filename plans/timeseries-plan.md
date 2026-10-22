@@ -1247,8 +1247,8 @@ embedding of item 40.
   0.5, 1.5, and 2.5), evaluation at `[0.0, 0.25, 0.5, 0.75]`, and
   `compute_persistent_homology(..., max_dim=1)` give a float tensor of
   shape `(3, 4, 2)`, three clouds of four 2-D points, and a
-  `BarcodeTensor` of shape `(3, 2)`, and the bounds start at
-  `[0.5, 1.5, 2.5]`. **Catches:** steps that do not compose.
+  `BarcodeTensor` of shape `(3, 2)`. Where the windows of an embedding
+  start is tested in `test_windowing.py`. **Catches:** steps that do not compose.
 
 - [ ] **56. Saving embeddings and windows.** An embedding is saved
   materialized (decision 9): its support and values, as an ordinary series.
