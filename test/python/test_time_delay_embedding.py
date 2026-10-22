@@ -7,6 +7,9 @@ import stablebear as sb
 from stablebear.persistence import compute_persistent_homology
 from stablebear.timeseries import TimeDelayEmbedding, Times, TimeSeries
 
+from _element_values import TWO_ELEMENTS_OF_EVERY_DTYPE
+from _round_trip import ROUND_TRIPS
+
 
 def _ms_series():
     # Each observation is 10 * t, so a value carried from an earlier
@@ -244,3 +247,26 @@ def test_persistence_of_an_embedding_matches_its_stored_points():
     assert result.values.is_isomorphic_to(
         compute_persistent_homology(stored, max_dim=0).values, atol=0, rtol=0
     )
+
+
+@pytest.mark.parametrize("round_trip", ROUND_TRIPS)
+def test_embedding_survives_saving(round_trip):
+    embedding = TimeDelayEmbedding(dimension=3, delay=1.0)(_ms_series())
+
+    loaded = round_trip(embedding)
+
+    assert loaded.array_equal(embedding)
+
+
+@pytest.mark.parametrize("round_trip", ROUND_TRIPS)
+@pytest.mark.parametrize("make_values", TWO_ELEMENTS_OF_EVERY_DTYPE)
+def test_embeddings_of_every_dtype_survive_saving(make_values, round_trip):
+    # The observations are a, b, b, a, so the points (a, b), (b, b), and
+    # (b, a) differ.
+    two = make_values()
+    series = TimeSeries(sb.concatenate([two, two[[1, 0]]]), times=[0.0, 1.0, 2.0, 3.0])
+    embedding = TimeDelayEmbedding(dimension=2, delay=1.0)(series)
+
+    loaded = round_trip(embedding)
+
+    assert loaded.array_equal(embedding)

@@ -1263,13 +1263,36 @@ embedding of item 40.
   overlapping windows an observation is written once per window holding
   it. Tests, parametrized
   over `save`/`load` and `pickle`:
-  - Item 40's embedding loads with the same times and the same values at 2.5
-    and 3.25. **Catches:** the embedded points lost on saving.
+  - Item 40's embedding loads with the same times and values. **Catches:**
+    the embedded points lost on saving.
+  - Parametrized over every element type: `TimeDelayEmbedding(dimension=2,
+    delay=1.0)` of the observations `a, b, b, a` at times
+    `[0.0, 1.0, 2.0, 3.0]` loads with the same dtype and the points
+    `(a, b)`, `(b, b)`, and `(b, a)` at `[1.0, 2.0, 3.0]`. **Catches:** an
+    embedding of some element type that cannot be saved, components saved
+    out of order.
   A loaded embedding evaluates exactly as the view, since views evaluate by
   previous value on their own points with their own snapping (decision 8).
   - Item 51's windows load in order, and evaluating them at
     `[0.0, 1.0]` gives item 51's values. **Catches:** windows reordered or their values at the
     bounds lost on saving.
+  - Parametrized over every element type: `Window(size=1.0, step=0.5,
+    closed="both", partial=False)` of the observations `a, b, b, a` at times
+    `[0.0, 0.5, 1.0, 1.5]` loads with the same dtype, the windows holding
+    `a, b, b` and `b, b, a` at `[0.0, 0.5, 1.0]`.
+    **Catches:** a tensor of series of some element type that cannot be
+    saved or loads as another type.
+  - Parametrized over `closed`, the window at 1.0 of item 47b loads
+    evaluating as before at its edges: `"left"` is 10 at 0 and raises at 1
+    naming `[0, 1)`, `"right"` raises at 0 naming `(0, 1]` and is 20 at 1,
+    `"both"` is 10 at 0 and 20 at 1, and `"none"` raises at both naming
+    `(0, 1)`; each is 15 at 0.75. **Catches:** an open start saved as
+    closed, an end after the last observation lost or saved as closed.
+  Each channel record gains whether its start and end are closed and its
+  end, if set. Without an end the end is always closed, but the flag is
+  written anyway, so that an open end at the last timestamp would need no
+  new format; reading one now raises. A tensor of series is written as any
+  tensor is, each element a series record.
 
 - [ ] **57. Golden files.** Pin the formats (TESTING.md principle 11) with a
   generator modeled on `test/golden/serialization/generate_point_cloud_v3.py`,

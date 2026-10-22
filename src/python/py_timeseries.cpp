@@ -63,6 +63,7 @@ namespace
       .def("channel", &Series::channel, py::arg("index"), py::return_value_policy::reference_internal)
       .def_property_readonly("n_channels", &Series::n_channels)
       .def("select", &Series::select, py::arg("indices"))
+      .def("array_equal", [](const Series& self, const Series& other) { return self == other; }, py::arg("other"))
       .def("evaluate", py::overload_cast<sb::float64_t>(&Series::evaluate, py::const_), py::arg("t"))
       .def("evaluate", py::overload_cast<const sb::Tensor<sb::float64_t>&>(&Series::evaluate, py::const_),
            py::arg("t"))

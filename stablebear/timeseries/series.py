@@ -400,6 +400,13 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         """
         return TimeSeries._from_cpp(self._data.to(unit))
 
+    def array_equal(self, other) -> bool:
+        """Whether ``other`` is a series of the same dtype and unit whose
+        channels have the same timestamps, values, snap settings, and
+        start and end."""
+        return (isinstance(other, TimeSeries) and other.dtype is self.dtype
+                and self._data.array_equal(other._data))
+
     def evaluate(self, t):
         """Each channel's observation with the largest timestamp at or before ``t``.
 

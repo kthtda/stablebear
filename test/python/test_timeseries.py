@@ -1,13 +1,12 @@
-import io
-import pickle
 
 import numpy as np
 import pytest
 
 import stablebear as sb
-from stablebear.timeseries import Times, TimeSeries
+from stablebear.timeseries import Times, TimeSeries, Window
 
 from _element_values import TWO_ELEMENTS_OF_EVERY_DTYPE
+from _round_trip import ROUND_TRIPS
 
 
 def test_times_keeps_values_and_unit():
@@ -475,19 +474,7 @@ def test_channel_index_out_of_range_raises():
         series[2]
 
 
-def _save_and_load(series):
-    buffer = io.BytesIO()
-    sb.save(series, buffer)
-    buffer.seek(0)
-    return sb.load(buffer)
-
-
-def _pickle_and_unpickle(series):
-    return pickle.loads(pickle.dumps(series))
-
-
-@pytest.mark.parametrize("round_trip", [_save_and_load, _pickle_and_unpickle],
-                         ids=["save", "pickle"])
+@pytest.mark.parametrize("round_trip", ROUND_TRIPS)
 @pytest.mark.parametrize("as_shape", [False, True], ids=["scalar", "shape-2"])
 @pytest.mark.parametrize("make_values", TWO_ELEMENTS_OF_EVERY_DTYPE)
 def test_one_channel_survives_saving(make_values, as_shape, round_trip):
@@ -509,8 +496,7 @@ def test_one_channel_survives_saving(make_values, as_shape, round_trip):
     assert loaded.values.array_equal(values)
 
 
-@pytest.mark.parametrize("round_trip", [_save_and_load, _pickle_and_unpickle],
-                         ids=["save", "pickle"])
+@pytest.mark.parametrize("round_trip", ROUND_TRIPS)
 def test_several_channels_survive_saving(round_trip):
     series = TimeSeries.from_channels([_channel_a(), _channel_b()], unit="s")
 
@@ -528,3 +514,74 @@ def test_series_dtype_is_one_object_per_inner_dtype():
     assert sb.series(sb.float64) is sb.series(sb.float64)
     assert sb.series(sb.float64) is not sb.series(sb.float32)
     assert sb.series(sb.float64).inner is sb.float64
+
+
+def _array_equal_series():
+    return TimeSeries([0.0, 10.0], times=Times([0.0, 1.0], unit="ms"), snap_tolerance=0.25, snap_eps=8.0)
+
+
+def test_series_array_equal_an_equal_series():
+    assert _array_equal_series().array_equal(_array_equal_series())
+
+
+@pytest.mark.parametrize("other", [
+    pytest.param(TimeSeries([0.0, 20.0], times=Times([0.0, 1.0], unit="ms"), snap_tolerance=0.25, snap_eps=8.0),
+                 id="values"),
+    pytest.param(TimeSeries([0.0, 10.0], times=Times([0.0, 2.0], unit="ms"), snap_tolerance=0.25, snap_eps=8.0),
+                 id="times"),
+    pytest.param(TimeSeries([0.0, 10.0], times=Times([0.0, 1.0], unit="s"), snap_tolerance=0.25, snap_eps=8.0),
+                 id="unit"),
+    pytest.param(TimeSeries([0.0, 10.0], times=Times([0.0, 1.0], unit="ms"), snap_tolerance=0.5, snap_eps=8.0),
+                 id="snap-tolerance"),
+    pytest.param(TimeSeries([0.0, 10.0], times=Times([0.0, 1.0], unit="ms"), snap_tolerance=0.25, snap_eps=16.0),
+                 id="snap-eps"),
+    pytest.param(TimeSeries([[0.0], [10.0]], times=Times([0.0, 1.0], unit="ms"), snap_tolerance=0.25, snap_eps=8.0),
+                 id="shape"),
+    pytest.param(TimeSeries.from_channels([_array_equal_series(), _array_equal_series()]), id="channels"),
+    pytest.param(TimeSeries(np.array([0.0, 10.0], dtype=np.float32), times=Times([0.0, 1.0], unit="ms"),
+                            snap_tolerance=0.25, snap_eps=8.0),
+                 id="dtype"),
+    pytest.param(sb.FloatTensor(np.array([0.0, 10.0])), id="tensor"),
+])
+def test_series_array_equal_rejects_a_different_series(other):
+    assert not _array_equal_series().array_equal(other)
+
+
+def _window_at_one(closed):
+    # Each observation is 10 * t; the window at 1.0 holds 10.0 at 0 and 15.0
+    # at 0.5, and 20.0 at 1 when its end is closed.
+    series = TimeSeries([0.0, 5.0, 10.0, 15.0, 20.0], times=[0.0, 0.5, 1.0, 1.5, 2.0])
+    return Window(size=1.0, step=1.0, closed=closed, partial=False)(series)[1]
+
+
+def test_series_array_equal_compares_the_start():
+    # The windows differ only in whether their start is closed.
+    assert not _window_at_one("both").array_equal(_window_at_one("right"))
+
+
+def test_series_array_equal_compares_the_end():
+    # The window [0, 1) can be evaluated after its last observation at 0.5;
+    # the series cannot.
+    assert not _window_at_one("left").array_equal(TimeSeries([10.0, 15.0], times=[0.0, 0.5]))
+
+
+def _gap_window_at_one(size, closed):
+    # Each observation is 10 * t, with none at 3.0; the window at 1.0 holds
+    # 10.0 at 0 and 20.0 at 1 and ends after its last observation.
+    series = TimeSeries([0.0, 10.0, 20.0, 40.0], times=[0.0, 1.0, 2.0, 4.0])
+    return Window(size=size, step=1.0, closed=closed, partial=False)(series)[1]
+
+
+def test_series_array_equal_compares_where_the_end_is():
+    assert not _gap_window_at_one(2.0, "left").array_equal(_gap_window_at_one(1.5, "left"))
+
+
+def test_series_array_equal_compares_whether_the_end_is_closed():
+    assert not _gap_window_at_one(2.0, "right").array_equal(_gap_window_at_one(2.0, "none"))
+
+
+def test_series_array_equal_compares_the_channel_order():
+    a = _array_equal_series()
+    b = TimeSeries([5.0, 15.0], times=Times([0.0, 1.0], unit="ms"), snap_tolerance=0.25, snap_eps=8.0)
+
+    assert not TimeSeries.from_channels([a, b]).array_equal(TimeSeries.from_channels([b, a]))
