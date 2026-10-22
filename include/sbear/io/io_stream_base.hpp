@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <vector>
 #include <iostream>
+#include <optional>
 #include <string_view>
 
 //#define SB_IO_DEBUG
@@ -61,6 +62,42 @@ namespace sb::io::detail
       throw std::runtime_error("Unexpected EOF");
     }
     return ret;
+  }
+
+  template <typename T>
+  struct is_optional : std::false_type {};
+
+  template <typename T>
+  struct is_optional<std::optional<T>> : std::true_type {};
+
+  template <typename T>
+  void write_bytes(std::ostream& os, const T& v);
+
+  template <typename T>
+  T read_bytes(std::istream& is);
+
+  /// An optional is serialized as a bool for whether it holds a value,
+  /// followed by the value if it does.
+  template <typename T>
+    requires is_optional<T>::value
+  void write_bytes(std::ostream& os, const T& v)
+  {
+    write_bytes<bool>(os, v.has_value());
+    if (v)
+    {
+      write_bytes<typename T::value_type>(os, *v);
+    }
+  }
+
+  template <typename T>
+    requires is_optional<T>::value
+  T read_bytes(std::istream& is)
+  {
+    if (!read_bytes<bool>(is))
+    {
+      return std::nullopt;
+    }
+    return read_bytes<typename T::value_type>(is);
   }
 
   template <typename T>

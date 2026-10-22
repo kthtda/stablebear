@@ -41,9 +41,12 @@ namespace sb::io::detail
 
   /// A series is written as its query unit and one record per channel: the
   /// channel's unit, timestamps, values as a tensor with time along axis 0,
-  /// and snap settings. Each channel is written on its own, as the values it
-  /// shows, so a file holds no views or shared storage. read_timeseries
-  /// reads it back.
+  /// snap settings, whether its start and end are closed, and its end, if
+  /// set. The end is always closed without one, but its flag is written
+  /// anyway so that an open end at the last timestamp needs no new format.
+  /// Each channel is written on its own, as the
+  /// values it shows, so a file holds no views or shared storage.
+  /// read_timeseries reads it back.
   template <typename T>
   void write_value(std::ostream& os, const TimeSeries<T>& series)
   {
@@ -58,6 +61,9 @@ namespace sb::io::detail
       write_tensor(os, channel.values());
       write_bytes<float64_t>(os, channel.snap_tolerance());
       write_bytes<float64_t>(os, channel.snap_eps());
+      write_bytes<bool>(os, channel.start_closed());
+      write_bytes<bool>(os, channel.end_closed());
+      write_bytes<std::optional<float64_t>>(os, channel.end());
     }
   }
 
@@ -79,8 +85,20 @@ namespace sb::io::detail
         auto values = read_element<Tensor<T>>(reader);
         const auto snapTolerance = read_bytes<float64_t>(is);
         const auto snapEps = read_bytes<float64_t>(is);
+        const auto startClosed = read_bytes<bool>(is);
+        const auto endClosed = read_bytes<bool>(is);
 
-        channels.emplace_back(Times(std::move(times), channelUnit), values, snapTolerance, snapEps);
+        auto channel = Channel<T>(Times(std::move(times), channelUnit), values, snapTolerance, snapEps)
+                           .with_start_closed(startClosed);
+        if (const auto end = read_bytes<std::optional<float64_t>>(is))
+        {
+          channel = channel.until(*end, endClosed);
+        }
+        else if (!endClosed)
+        {
+          throw std::invalid_argument("An open end at the last timestamp is not supported");
+        }
+        channels.push_back(std::move(channel));
       }
       return TimeSeries<T>(std::move(channels), unit);
     }
@@ -111,6 +129,29 @@ namespace sb::io::detail
         }
       }
       return read_any_timeseries<I + 1>(reader, format);
+    }
+  }
+
+  /// Read a tensor of series of whichever element type @p format names, as
+  /// read_any_timeseries reads one series. Nothing if none matches.
+  template <size_t I = 0>
+  std::optional<StreamableTensor> read_any_timeseries_tensor(BinaryReader& reader, TensorFormat format)
+  {
+    if constexpr (I == std::variant_size_v<StreamableTensor>)
+    {
+      return std::nullopt;
+    }
+    else
+    {
+      using Alternative = std::variant_alternative_t<I, StreamableTensor>;
+      if constexpr (is_timeseries_v<typename Alternative::value_type>)
+      {
+        if (reader.format_version() >= 3 && format.matches_type<Alternative>(reader.format_version()))
+        {
+          return read_tensor<typename Alternative::value_type>(reader);
+        }
+      }
+      return read_any_timeseries_tensor<I + 1>(reader, format);
     }
   }
 }

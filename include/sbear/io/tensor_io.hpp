@@ -84,7 +84,27 @@ namespace sb::io::detail
       Tensor<DistanceMatrix<float32_t>>,
       Tensor<DistanceMatrix<float64_t>>,
       Tensor<DistanceMatrix<float32_t>, TensorProperty::Indexed>,
-      Tensor<DistanceMatrix<float64_t>, TensorProperty::Indexed>
+      Tensor<DistanceMatrix<float64_t>, TensorProperty::Indexed>,
+
+      Tensor<TimeSeries<bool>>,
+      Tensor<TimeSeries<float32_t>>,
+      Tensor<TimeSeries<float64_t>>,
+      Tensor<TimeSeries<int32_t>>,
+      Tensor<TimeSeries<int64_t>>,
+      Tensor<TimeSeries<uint32_t>>,
+      Tensor<TimeSeries<uint64_t>>,
+      Tensor<TimeSeries<Pcf<float32_t, float32_t>>>,
+      Tensor<TimeSeries<Pcf<float64_t, float64_t>>>,
+      Tensor<TimeSeries<Pcf<int32_t, int32_t>>>,
+      Tensor<TimeSeries<Pcf<int64_t, int64_t>>>,
+      Tensor<TimeSeries<PointCloud<float32_t>>>,
+      Tensor<TimeSeries<PointCloud<float64_t>>>,
+      Tensor<TimeSeries<DistanceMatrix<float32_t>>>,
+      Tensor<TimeSeries<DistanceMatrix<float64_t>>>,
+      Tensor<TimeSeries<SymmetricMatrix<float32_t>>>,
+      Tensor<TimeSeries<SymmetricMatrix<float64_t>>>,
+      Tensor<TimeSeries<ph::Barcode<float32_t>>>,
+      Tensor<TimeSeries<ph::Barcode<float64_t>>>
       >;
 
   using StreamableObject = std::variant<
@@ -314,6 +334,13 @@ namespace sb::io::detail
   {
     io::detail::write_tensor(os, t);
   }
+
+  // Defined in timeseries_io.hpp; declared here so tensors of series find them.
+  template <typename T>
+  void write_value(std::ostream& os, const TimeSeries<T>& series);
+
+  template <typename T>
+  TimeSeries<T> read_timeseries(BinaryReader& reader);
 
   template <typename T>
   Tensor<T> read_tensor(BinaryReader& reader);
@@ -634,6 +661,8 @@ namespace sb::io::detail
       }
       else if constexpr (is_nested_tensor_v<T>)
         *elem = read_nested_tensor_element<typename is_nested_tensor<T>::leaf_type>(reader);
+      else if constexpr (is_timeseries_v<T>)
+        *elem = read_timeseries<typename T::value_type>(reader);
       else
       {
         *elem = read_element<T>(is);

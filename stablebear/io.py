@@ -15,7 +15,7 @@ from .base_tensor import (
 )
 from .nested_tensor import NestedTensor
 from .point_cloud import PointCloud, PointCloudTensor
-from .timeseries.series import _SERIES_NATIVE, TimeSeries
+from .timeseries.series import _SERIES_NATIVE, _SERIES_TENSOR_TO_DTYPE, TimeSeries, TimeSeriesTensor
 
 
 _BINARY_MAGIC = b"\x01MPCF"
@@ -55,6 +55,8 @@ def _save(item: Tensor, file):
         cpp._IndexedDistanceMatrix32Tensor: cpp.IoOps.save_indexed_distance_matrix32_tensor,
         cpp._IndexedDistanceMatrix64Tensor: cpp.IoOps.save_indexed_distance_matrix64_tensor,
     }
+    for native in _SERIES_TENSOR_TO_DTYPE:
+        _SAVE_DISPATCH[native] = native._save
 
     fn = _SAVE_DISPATCH.get(type(data))
     if fn is None:
@@ -90,6 +92,8 @@ def _load(file):
         cpp._IndexedDistanceMatrix32Tensor: DistanceMatrixTensor,
         cpp._IndexedDistanceMatrix64Tensor: DistanceMatrixTensor,
     }
+    for native in _SERIES_TENSOR_TO_DTYPE:
+        _LOAD_DISPATCH[native] = TimeSeriesTensor
 
     cpp_tensor = cpp.IoOps.load_tensor_from_file(file)
     if NestedTensor._is_cpp_nested_tensor(cpp_tensor):

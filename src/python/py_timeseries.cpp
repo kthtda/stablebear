@@ -80,6 +80,12 @@ namespace
   {
     register_timeseries_element<T>(m, suffix);
     sb_py::register_tensor_element<sb::TimeSeries<T>>(m, "TimeSeries" + suffix);
+    py::reinterpret_borrow<py::class_<sb::Tensor<sb::TimeSeries<T>>>>(m.attr(("TimeSeries" + suffix + "Tensor").c_str()))
+      .def("_save", [](const sb::Tensor<sb::TimeSeries<T>>& self, py::object file) {
+        sb_py::PythonOStreamBuf buf(file);
+        std::ostream os(&buf);
+        sb::write(self, os);
+      }, py::arg("file"));
   }
 }
 
