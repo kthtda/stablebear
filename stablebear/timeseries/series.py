@@ -186,13 +186,21 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
     ``sb.save``, loaded with ``sb.load``, and pickled; each channel keeps its
     times, unit, and snap settings.
 
+    Each channel has a domain: the times at which it can be evaluated. For
+    a series built from observations, it runs from the first to the last
+    observation, both included. A window (:class:`Window`) runs from its
+    start to its end, which may exclude its start and extend past its last
+    observation, and a delay embedding (:class:`TimeDelayEmbedding`) keeps
+    the ends of its channel's domain. A series can be evaluated where all
+    of its channels can.
+
     Element-wise operations, such as
     :func:`~stablebear.persistence.compute_persistent_homology`, accept a
     series wherever they accept a tensor of the same elements. They apply to
     every channel's observations and return a series with the same channels,
-    times, unit, and snap settings. An operation that consumes trailing axes
-    or adds axes to each element changes each channel's observation shape
-    the same way it changes a tensor's shape.
+    times, domains, unit, and snap settings. An operation that consumes
+    trailing axes or adds axes to each element changes each channel's
+    observation shape the same way it changes a tensor's shape.
 
     Parameters
     ----------
@@ -412,8 +420,8 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
 
         A ``t`` just below a timestamp snaps forward to it, by each
         channel's own ``snap_tolerance`` and ``snap_eps``; see the
-        constructor. ``t`` is in the series' unit and must lie between the
-        first and last observations of every channel, both included.
+        constructor. ``t`` is in the series' unit and must lie in the domain
+        of every channel; see :class:`TimeSeries`.
 
         ``t`` is a single time or an array-like or ``FloatTensor`` of times
         of shape ``t_shape``. Many times are evaluated together: they are
@@ -429,8 +437,8 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         Raises
         ------
         ValueError
-            If a time is before the first or after the last observation of
-            any channel, or a channel has no observations.
+            If a time is outside the domain of any channel, or a channel has
+            no observations.
         """
         if isinstance(t, (int, float, np.integer, np.floating)):
             values = NestedTensor._from_cpp(self._data.evaluate(float(t)))
@@ -516,9 +524,11 @@ class TimeSeriesTensor(Tensor):
         ``t`` is a single time or an array-like or ``FloatTensor`` of times
         of shape ``t_shape``. For series with one channel, returns a tensor
         of shape ``(*self.shape, *t_shape, *shape)``, as evaluating a
-        ``PcfTensor`` gives ``(*self.shape, *t_shape)``. For windows of a
-        delay embedding evaluated on a grid of ``n`` times, the last two
-        axes are clouds of ``n`` points, which
+        ``PcfTensor`` gives ``(*self.shape, *t_shape)``. For several
+        channels, returns a ``NestedTensor`` with one such tensor per
+        channel, in channel order, each with that channel's ``shape``. For
+        windows of a delay embedding evaluated on a grid of ``n`` times, the
+        last two axes are clouds of ``n`` points, which
         :func:`~stablebear.persistence.compute_persistent_homology` reads
         as point clouds.
 

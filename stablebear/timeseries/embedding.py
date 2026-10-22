@@ -12,11 +12,12 @@ class TimeDelayEmbedding:
 
     The embedding of a channel ``x`` with ``dimension`` ``m`` and ``delay``
     ``d`` evaluates at every time ``t`` from ``t_0 + (m - 1) * d`` to the
-    channel's last observation, both included, or up to but not at the end
-    of a window (:class:`Window`), to the point
+    end of the channel's domain, its last observation or, for a window
+    (:class:`Window`), the window's end. Each end is included when the
+    channel's is. It evaluates to the point
     ``(x(t - (m - 1) * d), ..., x(t - d), x(t))``, oldest first, so each
-    observation gains a leading axis of length ``m``. Its times are the ends
-    of that domain and the times between where a component reaches an
+    observation gains a leading axis of length ``m``. Its times are the start
+    of that domain and the times in it where a component reaches an
     observation, ``t_i + k * d`` for ``k`` from 0 to ``m - 1``, so it has at
     most ``m`` times per observation of the channel. Shifted times that
     differ only by rounding and give the same point appear once, at the time
