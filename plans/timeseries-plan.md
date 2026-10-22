@@ -1252,7 +1252,7 @@ embedding of item 40.
   `BarcodeTensor` of shape `(3, 2)`. Where the windows of an embedding
   start is tested in `test_windowing.py`. **Catches:** steps that do not compose.
 
-- [ ] **56. Saving embeddings and windows.** An embedding is saved
+- [x] **56. Saving embeddings and windows.** An embedding is saved
   materialized (decision 9): its support and values, as an ordinary series.
   A tensor of windows is saved as a tensor of series, each window
   materialized: its observations at its times, with its value at 0 and
