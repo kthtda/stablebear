@@ -809,7 +809,9 @@ observation it came from.
     source timestamp after `t_0 + (m - 1) * delay` (2.5), points whose
     components reach before the series starts.
 
-- [ ] **40a. (revisit after item 55) Embedding stride.** An embedding has a
+- [x] **40a. Embedding stride.** (skipped: an embedding can be evaluated
+  at any time in its domain, so a grid of query times thins its points
+  instead of a stride.) An embedding has a
   point at every change time (item 40), a superset of the points at
   observation times that giotto-tda, GUDHI, DelayEmbeddings.jl, and nolds
   give by default. giotto-tda (`stride`) and GUDHI (`skip`) can keep only
