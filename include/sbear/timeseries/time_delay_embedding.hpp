@@ -3,10 +3,12 @@
 
 #include "../timeseries.hpp"
 
-#include <algorithm>
 #include <cmath>
+#include <functional>
 #include <limits>
+#include <queue>
 #include <stdexcept>
+#include <utility>
 #include <vector>
 
 namespace sb
@@ -15,12 +17,12 @@ namespace sb
   /// @p delay apart, in the channel's unit. Its value at t is
   /// (x(t - (dimension - 1) * delay), ..., x(t - delay), x(t)), oldest first
   /// as in Kantz and Schreiber's convention, for every t from
-  /// t_0 + (dimension - 1) * delay to the last observation, so each
-  /// observation gains a leading axis of length @p dimension. Its times are
-  /// the ends of that domain and the times between where a component reaches
-  /// an observation, t_i + k * delay; times that round to the same point are
-  /// recorded once, at the time they snap to. It is a view of the channel's
-  /// storage.
+  /// t_0 + (dimension - 1) * delay to the end of the channel's domain, each
+  /// end included when the channel's is, so each observation gains a leading
+  /// axis of length @p dimension. Its times are the start of that domain and
+  /// the times in it where a component reaches an observation,
+  /// t_i + k * delay; times that round to the same point are recorded once,
+  /// at the time they snap to. It is a view of the channel's storage.
   template <typename T>
   Channel<T> delay_embed(const Channel<T>& channel, size_t dimension, float64_t delay)
   {
@@ -56,15 +58,22 @@ namespace sb
         throw std::invalid_argument("The series is too short for this embedding: no time has its full history");
       }
       // Component j changes where its lagged time reaches an observation: at
-      // the timestamps shifted by lags[j]. Walk the shifted copies in one
-      // merged pass, from start to end, without storing them.
+      // the timestamps shifted by lags[j]. A queue holds each component's next
+      // shifted time, so the shifted copies are merged in one pass, from start
+      // to end, without storing them.
       std::vector<size_t> shifted(dimension, 0);
       const auto pending = [&](size_t j) { return channel.time(shifted[j]) + lags[j]; };
+      using Event = std::pair<float64_t, size_t>;
+      std::priority_queue<Event, std::vector<Event>, std::greater<>> queue;
       for (size_t j = 0; j < dimension; ++j)
       {
         while (shifted[j] < n && pending(j) < start)
         {
           ++shifted[j];
+        }
+        if (shifted[j] < n)
+        {
+          queue.emplace(pending(j), j);
         }
       }
 
@@ -74,7 +83,11 @@ namespace sb
       // index_at decides which observation, with the channel's
       // snap_tolerance and snap_eps, as evaluation does. A component's index
       // never decreases with time, so a run of the same point ends where some
-      // component's index differs from the one at the time before.
+      // component's index differs from the one at the time before. Only a
+      // component whose next shifted time is at s, or within snapping
+      // distance after it, can read a different observation at s. Snapping
+      // moves a time by at most snap_eps machine epsilons times its
+      // magnitude; a few more cover the rounding of the lags.
       //
       // Record each run at the time its members snap to: the channel's own
       // timestamp if the run has one, else its latest time, since snapping
@@ -82,35 +95,51 @@ namespace sb
       // The first point stays at the start, so the domain keeps its start.
       // The last observation is a timestamp, so the domain keeps its end,
       // unless the first run reaches it.
-      std::vector<size_t> previous(dimension, 0);
-      bool runHasTimestamp = false;
-      while (true)
+      const auto reach = (channel.snap_eps() + 4) * std::numeric_limits<float64_t>::epsilon();
+      std::vector<size_t> previous(dimension);
+      for (size_t j = 0; j < dimension; ++j)
       {
-        auto s = std::numeric_limits<float64_t>::infinity();
-        for (size_t j = 0; j < dimension; ++j)
+        previous[j] = channel.index_at(start - lags[j]);
+      }
+      std::vector<size_t> reached;
+      std::vector<Event> near;
+      bool runHasTimestamp = false;
+      while (!queue.empty() && !past(queue.top().first))
+      {
+        const auto s = queue.top().first;
+        reached.clear();
+        bool isTimestamp = false;
+        while (!queue.empty() && queue.top().first == s)
         {
-          if (shifted[j] < n)
-          {
-            s = std::min(s, pending(j));
-          }
-        }
-        if (past(s))
-        {
-          break;
-        }
-        // The newest component has lag 0, so its pending times are the
-        // channel's own timestamps.
-        const bool isTimestamp = shifted.back() < n && pending(dimension - 1) == s;
-        for (size_t j = 0; j < dimension; ++j)
-        {
+          const auto j = queue.top().second;
+          queue.pop();
           while (shifted[j] < n && pending(j) == s)
           {
             ++shifted[j];
           }
+          if (shifted[j] < n)
+          {
+            queue.emplace(pending(j), j);
+          }
+          reached.push_back(j);
+          // The newest component has lag 0, so its shifted times are the
+          // channel's own timestamps.
+          isTimestamp = isTimestamp || j == dimension - 1;
+        }
+        near.clear();
+        while (!queue.empty() && queue.top().first <= s + reach * (std::abs(s) + lags.front()))
+        {
+          near.push_back(queue.top());
+          queue.pop();
+          reached.push_back(near.back().second);
+        }
+        for (const auto& event : near)
+        {
+          queue.push(event);
         }
 
         bool changes = at.empty();
-        for (size_t j = 0; j < dimension; ++j)
+        for (const auto j : reached)
         {
           const auto index = channel.index_at(s - lags[j], previous[j]);
           if (index != previous[j])
