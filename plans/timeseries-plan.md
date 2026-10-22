@@ -1309,7 +1309,7 @@ embedding of item 40.
 Code items update the docstrings they touch (AGENTS.md). These items add the
 pages.
 
-- [ ] **58. API reference.** `docs/api_timeseries.rst` is in the toctree in
+- [x] **58. API reference.** `docs/api_timeseries.rst` is in the toctree in
   `docs/stablebear.rst` (added with item 20). Check that the docstrings state the contracts of
   decisions 1-4 and 6-8: the domain, previous-value
   evaluation and snapping, units, query units and conversion, channels and
