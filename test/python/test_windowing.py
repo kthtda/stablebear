@@ -335,3 +335,22 @@ def test_windows_of_several_channels_evaluate_to_one_leaf_per_channel():
     assert isinstance(values, sb.NestedTensor)
     assert np.array_equal(np.asarray(values[0]), [[5.0, 10.0], [15.0, 20.0]])
     assert np.array_equal(np.asarray(values[1]), [[-5.0, -10.0], [-15.0, -20.0]])
+
+
+def test_windows_of_channels_of_different_shapes_evaluate_to_leaves_of_each_shape():
+    # A's observations are 10 * t and B's are the points (-10 * t, -20 * t).
+    # The windows are [0.0, 1.0) and [1.0, 2.0).
+    times = [0.0, 0.5, 1.0, 1.5, 2.0, 2.5]
+    a = TimeSeries([0.0, 5.0, 10.0, 15.0, 20.0, 25.0], times=times)
+    b = TimeSeries([[0.0, 0.0], [-5.0, -10.0], [-10.0, -20.0],
+                    [-15.0, -30.0], [-20.0, -40.0], [-25.0, -50.0]], times=times)
+    series = TimeSeries.from_channels([a, b], unit="s")
+    windows = Window(size=1.0, step=1.0, closed="left", partial=False)(series)
+
+    values = windows([0.0, 0.5])
+
+    assert np.array_equal(np.asarray(values[0]), [[0.0, 5.0], [10.0, 15.0]])
+    assert np.array_equal(np.asarray(values[1]), [
+        [[0.0, 0.0], [-5.0, -10.0]],
+        [[-10.0, -20.0], [-15.0, -30.0]],
+    ])

@@ -1219,7 +1219,9 @@ embedding of item 40.
   `[500, 1000, ..., 3000]` ms; `Window(size=1.0, step=1.0, closed="left",
   partial=False)` has windows at 0.5 and 1.5, and `windows([0.0, 0.5])`
   has leaves `[[5, 10], [15, 20]]` and `[[-5, -10], [-15, -20]]`, every
-  value from a different observation. **Catches:** channels swapped, windows and
+  value from a different observation. (Added) Channel B of points
+  `(-10 * t, -20 * t)` and A of scalars, at `[0.0, 0.5, ..., 2.5]` s, give
+  leaves of shapes `(2, 2)` and `(2, 2, 2)`. **Catches:** channels swapped, windows and
   channels transposed, channel B read in the query unit.
 
 - [ ] **53. Evaluation errors.** A time outside a window's domain raises
