@@ -1239,7 +1239,7 @@ embedding of item 40.
 
 - [x] **54. Sampler errors.** (dropped with the sampler, item 51)
 
-- [ ] **55. The delay workflow end to end.** Test in
+- [x] **55. The delay workflow end to end.** Test in
   `test/python/test_integration.py`: times `[0.0, 0.5, ..., 3.5]` and values
   `[0, 1, 0, -1, 0, 1, 0, -1]` through
   `TimeDelayEmbedding(dimension=2, delay=0.5)` (domain `[0.5, 3.5]`),
