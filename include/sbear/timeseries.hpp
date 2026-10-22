@@ -255,8 +255,9 @@ namespace sb
 
     /// This channel with the end @p end, in its unit: it can be evaluated
     /// after its last timestamp up to @p end, and at @p end if @p closed.
-    /// @p end must come after the last timestamp. Views made by stack_at
-    /// keep the end.
+    /// @p end must come after the last timestamp, or be at it if @p closed,
+    /// which is the same as setting no end. Views made by stack_at keep the
+    /// end.
     [[nodiscard]] Channel until(float64_t end, bool closed = false) const;
 
     /// The end set by until(), if any; without one, the channel can be

@@ -147,9 +147,9 @@ namespace sb
   };
 
   /// Time series: the calls of all channels' observations, channel by channel.
-  /// Each output channel keeps its input's times and snap settings, and its
-  /// shape is the input shape without the core dimensions, followed by
-  /// extra_dims; the result keeps the query unit.
+  /// Each output channel keeps its input's times, domain, and snap settings,
+  /// and its shape is the input shape without the core dimensions, followed
+  /// by extra_dims; the result keeps the query unit.
   template <typename In, size_t CoreRank, typename Out>
   class UfuncAdapter<TimeSeries<In>, CoreRank, Out>
   {
@@ -216,8 +216,14 @@ namespace sb
         const auto& source = m_input.channel(c);
         auto shape = m_batches[c];
         shape.insert(shape.end(), m_extraDims.begin(), m_extraDims.end());
-        channels.emplace_back(source.times(), std::move(shape), std::move(m_outputs[c]),
-                              source.snap_tolerance(), source.snap_eps());
+        auto channel = Channel<Out>(source.times(), std::move(shape), std::move(m_outputs[c]),
+                                    source.snap_tolerance(), source.snap_eps())
+                           .with_start_closed(source.start_closed());
+        if (const auto end = source.end())
+        {
+          channel = channel.until(*end, source.end_closed());
+        }
+        channels.push_back(std::move(channel));
       }
       return TimeSeries<Out>(std::move(channels), m_input.unit());
     }

@@ -177,12 +177,13 @@ namespace sb
   template <typename T>
   Channel<T> Channel<T>::until(float64_t end, bool closed) const
   {
-    if (std::isnan(end) || (size() > 0 && end <= time(size() - 1)))
+    const auto atLast = size() > 0 && end == time(size() - 1);
+    if (std::isnan(end) || (size() > 0 && end < time(size() - 1)) || (atLast && !closed))
     {
       throw std::invalid_argument("The end of a channel must come after its last timestamp");
     }
     auto channel = *this;
-    channel.m_end = end;
+    channel.m_end = atLast ? std::nullopt : std::optional(end);
     channel.m_endClosed = closed;
     return channel;
   }
