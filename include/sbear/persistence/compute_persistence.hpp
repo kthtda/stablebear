@@ -85,14 +85,13 @@ namespace sb::ph
       }
     }
 
-    /// Build a Euclidean distance matrix from the points in @p coords, rows of
-    /// @p dim coordinates stored one after another, and run Ripser into @p out.
-    /// Requires dim > 0.
-    template <typename T>
-    void run_euclidean_ripser(std::span<const T> coords, size_t dim, std::span<Barcode<T>> out,
+    /// Build a Euclidean distance matrix from @p nPoints points of @p dim
+    /// coordinates, coordinate(i, j) being coordinate j of point i, and run
+    /// Ripser into @p out. Requires dim > 0.
+    template <typename T, typename Coordinate>
+    void run_euclidean_ripser(size_t nPoints, size_t dim, Coordinate coordinate, std::span<Barcode<T>> out,
                               size_t maxDim, bool reducedHomology)
     {
-      const size_t nPoints = coords.size() / dim;
       std::vector<std::vector<rips::value_t>> rpoints;
       rpoints.reserve(nPoints);
 
@@ -103,7 +102,7 @@ namespace sb::ph
         curRPoint.resize(dim);
         for (auto j = 0_uz; j < dim; ++j)
         {
-          curRPoint[j] = coords[i * dim + j];
+          curRPoint[j] = coordinate(i, j);
         }
       }
 
@@ -117,18 +116,8 @@ namespace sb::ph
     void run_euclidean_ripser(const PointCloud<T>& points, std::span<Barcode<T>> out,
                               size_t maxDim, bool reducedHomology)
     {
-      const size_t nPoints = points.n_points();
-      const size_t dim = points.dim();
-      std::vector<T> coords;
-      coords.reserve(nPoints * dim);
-      for (auto i = 0_uz; i < nPoints; ++i)
-      {
-        for (auto j = 0_uz; j < dim; ++j)
-        {
-          coords.push_back(points(i, j));
-        }
-      }
-      run_euclidean_ripser<T>(coords, dim, out, maxDim, reducedHomology);
+      run_euclidean_ripser<T>(points.n_points(), points.dim(), [&](size_t i, size_t j) { return points(i, j); },
+                              out, maxDim, reducedHomology);
     }
   }
 
@@ -193,7 +182,8 @@ namespace sb::ph
       {
         return;
       }
-      detail::run_euclidean_ripser<T>(points.values, dim, out, maxDim, reducedHomology);
+      detail::run_euclidean_ripser<T>(nPoints, dim, [&](size_t i, size_t j) { return points.values[i * dim + j]; },
+                                      out, maxDim, reducedHomology);
     }
   };
 
