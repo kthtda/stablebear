@@ -84,8 +84,8 @@ class NumericTensor(Tensor, ArithmeticTensorMixin):
         return self._compare(other, operator.ne, "!=")
 
     def array_equal(self, other) -> bool:
-        if isinstance(other, np.ndarray):
-            return np.array_equal(np.asarray(self), other)
+        if not isinstance(other, Tensor):
+            return np.array_equal(np.asarray(self), np.asarray(other))
         return super().array_equal(other)
 
     def __floordiv__(self, rhs):

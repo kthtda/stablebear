@@ -161,6 +161,14 @@ def test_array_equal_numpy():
     assert a.array_equal(np_b) == np.array_equal(np_a, np_b)
 
 
+def test_array_equal_list():
+    np_a = np.array([[1.0, 2.0], [3.0, 4.0]])
+    a = sb.FloatTensor(np_a)
+    assert a.array_equal([[1.0, 2.0], [3.0, 4.0]]) == np.array_equal(np_a, [[1.0, 2.0], [3.0, 4.0]])
+    assert a.array_equal([[1.0, 2.0], [3.0, 9.0]]) == np.array_equal(np_a, [[1.0, 2.0], [3.0, 9.0]])
+    assert a.array_equal([1.0, 2.0, 3.0, 4.0]) == np.array_equal(np_a, [1.0, 2.0, 3.0, 4.0])
+
+
 # --- PCF tensor elementwise eq ---
 
 
