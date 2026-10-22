@@ -186,6 +186,12 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
     ``sb.save``, loaded with ``sb.load``, and pickled; each channel keeps its
     times, unit, and snap settings.
 
+    A series cannot be changed. The constructor copies ``values``, and
+    :attr:`values` and :meth:`evaluate` return copies, so changing the
+    input or a result leaves the series unchanged. Channel selection,
+    :meth:`to`, windows, and delay embeddings share the observations
+    instead of copying them.
+
     Each channel has a domain: the times at which it can be evaluated. For
     a series built from observations, it runs from the first to the last
     observation, both included. A window (:class:`Window`) runs from its
@@ -204,11 +210,13 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
 
     Parameters
     ----------
-    values : array_like or FloatTensor
+    values : array_like or Tensor
         Observations with time along axis 0. Each observation has shape
-        ``values.shape[1:]``. Arrays get the dtype ``sb.tensor`` would give
-        them: float32, int32, uint32, uint64, and bool are kept, other
-        floats become float64, and other integers become int64.
+        ``values.shape[1:]``. A tensor of any element type, such as a
+        ``PointCloudTensor`` or ``BarcodeTensor``, keeps its dtype. Arrays
+        get the dtype ``sb.tensor`` would give them: float32, int32,
+        uint32, uint64, and bool are kept, other floats become float64,
+        and other integers become int64.
     times : Times or array_like
         One timestamp per observation. A plain array is in seconds.
     snap_tolerance : float, optional
@@ -527,10 +535,12 @@ class TimeSeriesTensor(Tensor):
         ``PcfTensor`` gives ``(*self.shape, *t_shape)``. For several
         channels, returns a ``NestedTensor`` with one such tensor per
         channel, in channel order, each with that channel's ``shape``. For
-        windows of a delay embedding evaluated on a grid of ``n`` times, the
-        last two axes are clouds of ``n`` points, which
+        windows of a delay embedding of a scalar series evaluated on a grid
+        of ``n`` times, the last two axes are clouds of ``n`` points, which
         :func:`~stablebear.persistence.compute_persistent_homology` reads
-        as point clouds.
+        as point clouds. Observations of shape ``S``, embedded with
+        dimension ``m``, give the axes ``(n, m, *S)`` instead; reshape them
+        to ``(n, m * prod(S))`` to get clouds of ``n`` points.
 
         Raises
         ------

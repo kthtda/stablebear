@@ -38,9 +38,10 @@ class Window:
     A bound computed in floating point that falls just short of an
     observation reaches it, with the channel's snapping, as evaluation does:
     a window whose start reaches one is shifted by its time, and an end that
-    reaches one excludes it, or includes it if closed. Each channel snaps with its own timestamps and
-    settings, so channels of one window can snap differently; the bounds are therefore the times
-    ``a_k`` and ``a_k + size`` as computed, before any snapping. For
+    reaches one excludes it, or includes it if closed. Each channel snaps
+    with its own timestamps and settings, so channels of one window can
+    snap differently; the bounds are therefore the times ``a_k`` and
+    ``a_k + size`` as computed, before any snapping. For
     example, ``3 * 0.3`` computes just below 0.9: a window starting there
     starts at an observation at 0.9, but its bound reads
     ``0.8999999999999999``.

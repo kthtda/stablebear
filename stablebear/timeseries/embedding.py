@@ -41,7 +41,7 @@ class TimeDelayEmbedding:
     ------
     ValueError
         On an invalid ``dimension`` or ``delay``, or when
-        ``t_0 + (m - 1) * d`` is after the last observation of a channel.
+        ``t_0 + (m - 1) * d`` is not in the domain of a channel.
     """
 
     def __init__(self, dimension: int, delay: float):
