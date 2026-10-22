@@ -146,6 +146,31 @@ def test_float_series_of_matrices_reads_rows_as_points(np_dtype, barcode_dtype):
         assert result[i].values.is_isomorphic_to(expected[i].values, atol=0, rtol=0)
 
 
+@pytest.mark.parametrize("np_dtype", [np.float32, np.float64])
+def test_float_series_with_several_clouds_per_observation(np_dtype):
+    # Each observation holds two clouds of two 1-D points, at distances 1 to 4
+    # in channel 0 and 5 and 6 in channel 1.
+    def clouds(distances):
+        return np.array([[[[0], [d]] for d in pair] for pair in distances], dtype=np_dtype)
+
+    series = TimeSeries.from_channels([
+        TimeSeries(clouds([(1, 2), (3, 4)]), times=[0.0, 1.0]),
+        TimeSeries(clouds([(5, 6)]), times=[0.5]),
+    ])
+
+    result = compute_persistent_homology(series, max_dim=0, reduced=True)
+
+    assert result.shape == ((2, 1), (2, 1))
+    for i, distances in enumerate([[(1, 2), (3, 4)], [(5, 6)]]):
+        values = result[i].values
+        assert result[i].times == series[i].times
+        assert values.shape == (len(distances), 2, 1)
+        for k, pair in enumerate(distances):
+            for b, d in enumerate(pair):
+                expected = Barcode(np.array([[0, d]], dtype=np_dtype))
+                assert values[k, b, 0].is_isomorphic_to(expected, atol=0, rtol=0)
+
+
 @pytest.mark.parametrize("make_series", [
     pytest.param(lambda: TimeSeries([1.0, 2.0], times=[0.0, 1.0]), id="float-scalar"),
     pytest.param(lambda: TimeSeries(sb.zeros((2,), dtype=sb.barcode64), times=[0.0, 1.0]),
