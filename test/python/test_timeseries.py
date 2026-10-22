@@ -443,15 +443,15 @@ def test_values_are_a_copy():
     assert series(1.0) == 20.0
 
 
-
 @pytest.mark.parametrize("make_values", [
     p for p in TWO_ELEMENTS_OF_EVERY_DTYPE
     if p.id in ("pcloud64", "distmat64", "symmat64")
 ])
 @pytest.mark.parametrize("read", [
-    pytest.param(lambda series, embedding: series.values[0], id="values"),
-    pytest.param(lambda series, embedding: series(0.0), id="evaluation"),
-    pytest.param(lambda series, embedding: embedding.values[0, 0], id="embedding values"),
+    pytest.param(lambda values, series, embedding: values[0], id="input"),
+    pytest.param(lambda values, series, embedding: series.values[0], id="values"),
+    pytest.param(lambda values, series, embedding: series(0.0), id="evaluation"),
+    pytest.param(lambda values, series, embedding: embedding.values[0, 0], id="embedding values"),
 ])
 def test_mutating_an_observation_leaves_the_series_unchanged(make_values, read):
     values = make_values()
@@ -459,12 +459,13 @@ def test_mutating_an_observation_leaves_the_series_unchanged(make_values, read):
     series = TimeSeries(values, times=[0.0, 1.0])
     embedding = TimeDelayEmbedding(dimension=2, delay=1.0)(series)
 
-    observation = read(series, embedding)
+    observation = read(values, series, embedding)
     observation[0, 1] = 99.0
 
     assert observation[0, 1] == 99.0
     assert np.array_equal(np.asarray(series(0.0)), expected)
     assert np.array_equal(np.asarray(embedding.values[0, 0]), expected)
+
 
 def test_values_of_several_channels_have_one_leaf_per_channel():
     series = TimeSeries.from_channels([_channel_a(), _channel_b()], unit="s")

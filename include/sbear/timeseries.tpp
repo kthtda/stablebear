@@ -60,11 +60,9 @@ namespace sb
         std::move(times),
         std::vector<size_t>(values.shape().begin() + 1, values.shape().end()),
         {}});
-    // ponytail: copies on construction; adopt the caller's storage if this shows up in profiles
-    auto owned = values.copy();
-    storage->values.reserve(owned.size());
-    walk(owned, [&](const std::vector<size_t>& index) {
-      storage->values.push_back(owned(index));
+    storage->values.reserve(values.size());
+    walk(values, [&](const std::vector<size_t>& index) {
+      storage->values.push_back(detail::store_copy(values(index)));
     });
     m_storage = std::move(storage);
     m_shape = m_storage->shape;
