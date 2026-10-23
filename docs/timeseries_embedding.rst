@@ -82,10 +82,12 @@ Takens's theorem
 ----------------
 
 Delay embeddings are justified by Takens's theorem
-:footcite:`Takens1981`. Suppose the signal is a smooth measurement of a
-dynamical system whose states lie on a compact manifold of dimension
-:math:`n`. For a generic system and measurement, the delay embedding with
-dimension :math:`m \ge 2n + 1` is an embedding of the state space: distinct
+:footcite:`Takens1981`, which concerns a series of numbers,
+:math:`x \colon \mathbb{R} \to \mathbb{R}`, embedded in :math:`\mathbb{R}^m`.
+Suppose the signal is a smooth measurement of a dynamical system whose
+states lie on a compact manifold of dimension :math:`n`. For a generic
+system and measurement, the delay embedding with dimension
+:math:`m \ge 2n + 1` is an embedding of the state space: distinct
 states give distinct points, and the embedded points have the same topology
 as the states. The persistence of embedded sample points can therefore
 estimate the topology of the states, not only of the signal. The sine above
