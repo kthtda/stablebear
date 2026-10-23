@@ -18,10 +18,7 @@
     // gh token passthrough for hosts that keep it in the OS keyring rather
     // than hosts.yml (where copying the config alone would not carry it).
     // Empty when unset on the host; gh treats that as absent.
-    "GH_TOKEN": "${localEnv:GH_TOKEN}",
-    // The repository's path on the host, so the Stablebear panel can open
-    // built files in the host's browser.
-    "SB_HOST_WORKSPACE": "${localWorkspaceFolder}"
+    "GH_TOKEN": "${localEnv:GH_TOKEN}"
   },
 
   // Stage gh config for the image build and Claude/Codex state for the mounts
