@@ -64,6 +64,48 @@ def plot_timeseries_channels():
 
 
 # -- included in docs via literalinclude :pyobject: --
+def plot_timeseries_vector_channel():
+    a = TimeSeries([1.0, 2.0, 3.0, 4.0], times=[0.0, 0.1, 0.2, 0.3])
+    v = TimeSeries([[1.0, 0.0], [0.0, 1.0], [-1.0, 2.0]],
+                   times=[0.05, 0.1, 0.15])
+    series = TimeSeries.from_channels([a, v])
+    query = 0.125
+    values = series(query)
+    color = plt.rcParams["lines.color"]
+
+    def column(x):
+        return rf"$\binom{{{x[0]:g}}}{{{x[1]:g}}}$"
+
+    fig, (ax_a, ax_v) = plt.subplots(2, 1, figsize=(6, 3.5), sharex=True)
+    for ax in (ax_a, ax_v):
+        ax.axvspan(0.05, 0.15, color="gray", alpha=0.2, linewidth=0)
+    ax_a.axvline(query, color="gray", linestyle="--", linewidth=1)
+
+    _plot_steps(ax_a, a, color)
+    ax_a.plot(query, float(values[0]), "s", color="tab:orange", markersize=7,
+              zorder=6)
+    ax_a.set_ylim(0, 5)
+    ax_a.set_xlabel("")
+    ax_a.set_ylabel("a")
+
+    # Channel v: the time axis as a line, with each vector above its time
+    # and the queried vector below.
+    ax_v.axhline(0, color=color, linewidth=1)
+    for t, x in zip(np.asarray(v.times), np.asarray(v.values)):
+        ax_v.plot(t, 0, "o", color=color, markersize=6, zorder=5)
+        ax_v.text(t, 0.25, column(x), ha="center", va="bottom", fontsize=14)
+    ax_v.plot(query, 0, "s", color="tab:orange", markersize=7, zorder=6)
+    ax_v.text(query, -0.25, column(np.asarray(values[1])), ha="center",
+              va="top", fontsize=14, color="tab:orange")
+    ax_v.set_ylim(-1.3, 1.3)
+    ax_v.set_yticks([])
+    ax_v.set_ylabel("v")
+    ax_v.set_xlabel("time (s)")
+    fig.tight_layout()
+    return fig
+
+
+# -- included in docs via literalinclude :pyobject: --
 def plot_timeseries_rounding():
     exact = TimeSeries([1.0, 2.0, 3.0, 4.0], times=[0.0, 0.1, 0.2, 0.3],
                        snap_tolerance=0.0)
@@ -174,6 +216,7 @@ DARK = ("dark_background", "#14181e", "#e0e0e0", "#5dade2")
 if __name__ == "__main__":
     for name, plot_func in [("timeseries_evaluation", plot_timeseries_evaluation),
                             ("timeseries_channels", plot_timeseries_channels),
+                            ("timeseries_vector_channel", plot_timeseries_vector_channel),
                             ("timeseries_rounding", plot_timeseries_rounding),
                             ("timeseries_snap_distances", plot_timeseries_snap_distances)]:
         _save_themed(plot_func, *LIGHT, HERE / f"{name}_light.png")

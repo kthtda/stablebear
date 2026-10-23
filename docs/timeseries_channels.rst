@@ -63,6 +63,50 @@ them::
 
 ``series[i]`` selects channel ``i`` as a series of its own.
 
+Channels with different shapes
+------------------------------
+
+Channels can hold observations of different shapes. Here channel ``v``
+holds vectors of length 2 at 0.05, 0.1, and 0.15 s, next to channel ``a``
+from above::
+
+   v = TimeSeries([[1.0, 0.0], [0.0, 1.0], [-1.0, 2.0]],
+                  times=[0.05, 0.1, 0.15])
+   mixed = TimeSeries.from_channels([a, v])
+
+The figure shows ``a`` as a step function and ``v`` with each vector above
+its timestamp. The shared domain is shaded, and the squares are a query at
+``t = 0.125``; the vector below the line is the one the query returns.
+
+.. image:: _static/timeseries_vector_channel_light.png
+   :width: 80%
+   :class: only-light
+   :alt: A scalar channel as a step function above a channel of vectors
+
+.. image:: _static/timeseries_vector_channel_dark.png
+   :width: 80%
+   :class: only-dark
+   :alt: A scalar channel as a step function above a channel of vectors
+
+.. dropdown:: Show plotting code
+   :color: secondary
+
+   .. literalinclude:: _static/gen_timeseries_snap_fig.py
+      :pyobject: plot_timeseries_vector_channel
+      :language: python
+
+Each entry of the result has the shape of its channel's observations::
+
+   values = mixed(0.125)
+   float(values[0])  # 2.0, from a
+   values[1]         # FloatTensor [0.0, 1.0], from v
+
+With several query times, the entry for ``v`` holds one vector per query
+time::
+
+   values = mixed([0.06, 0.125])
+   values[1]  # FloatTensor [[1.0, 0.0], [0.0, 1.0]], shape (2, 2)
+
 Embedding and windowing channels
 --------------------------------
 
