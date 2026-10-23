@@ -592,7 +592,7 @@ def _window_at_one(closed):
     # Each observation is 10 * t; the window at 1.0 holds 10.0 at 0 and 15.0
     # at 0.5, and 20.0 at 1 when its end is closed.
     series = TimeSeries([0.0, 5.0, 10.0, 15.0, 20.0], times=[0.0, 0.5, 1.0, 1.5, 2.0])
-    return Window(size=1.0, step=1.0, closed=closed, partial=False)(series)[1]
+    return Window(size=1.0, step=1.0, closed=closed, partial=False, anchor="start")(series)[1]
 
 
 def test_series_array_equal_compares_the_start():
@@ -610,7 +610,7 @@ def _gap_window_at_one(size, closed):
     # Each observation is 10 * t, with none at 3.0; the window at 1.0 holds
     # 10.0 at 0 and 20.0 at 1 and ends after its last observation.
     series = TimeSeries([0.0, 10.0, 20.0, 40.0], times=[0.0, 1.0, 2.0, 4.0])
-    return Window(size=size, step=1.0, closed=closed, partial=False)(series)[1]
+    return Window(size=size, step=1.0, closed=closed, partial=False, anchor="start")(series)[1]
 
 
 def test_series_array_equal_compares_where_the_end_is():

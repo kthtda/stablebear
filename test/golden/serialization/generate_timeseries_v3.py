@@ -88,7 +88,7 @@ def _windows(closed, windows):
     # Each observation is 10 * t, with none at 3.0, so the window at 1.0 ends
     # after its last observation.
     series = TimeSeries([0.0, 10.0, 20.0, 40.0], times=[0.0, 1.0, 2.0, 4.0])
-    tensor = Window(size=2.0, step=1.0, closed=closed, partial=False)(series)
+    tensor = Window(size=2.0, step=1.0, closed=closed, partial=False, anchor="start")(series)
     expected = {
         "accepted_types": ["TimeSeriesTensor"], "comparison": "series_elements",
         "dtype": "series(float64)", "shape": [len(windows)],

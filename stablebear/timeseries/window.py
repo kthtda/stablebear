@@ -11,15 +11,15 @@ from .series import TimeSeries, TimeSeriesTensor
 class Window:
     """Consecutive windows of a time series.
 
-    ``Window(size, step)(series)`` returns a 1-D tensor of dtype
-    ``sb.series(series.dtype)`` with one window per start time
+    ``Window(size, step, anchor="start")(series)`` returns a 1-D tensor of
+    dtype ``sb.series(series.dtype)`` with one window per start time
     ``a_k = t_0 + k * step``, while ``a_k + size`` is at most the last time
     at which every channel of ``series`` can be evaluated; ``t_0`` is the
     first such time. With ``partial=True``, windows continue while
     ``a_k`` is in the domain, and a window that would end after it ends where
     ``series`` does instead, as the last windows of Polars
-    ``group_by_dynamic`` do. With ``anchor="end"``, the windows are taken
-    from the end of ``series`` going back instead: they end at
+    ``group_by_dynamic`` do. With ``anchor="end"``, the default, the windows
+    are taken from the end of ``series`` going back instead: they end at
     ``b_k = t_1 - k * step``, ``t_1`` being the last time at which every
     channel can be evaluated, while ``b_k - size`` is at least ``t_0``. With
     ``partial=True`` they continue while ``b_k`` is in the domain, and a
@@ -77,7 +77,7 @@ class Window:
     partial : bool, default False
         Whether to keep the windows away from the anchor that are shorter
         than ``size``.
-    anchor : {"start", "end"}, default "start"
+    anchor : {"start", "end"}, default "end"
         Whether the windows are taken from the start of the series going
         forward, or from its end going back.
 
@@ -95,7 +95,7 @@ class Window:
 
     def __init__(self, size: float, step: float | None = None,
                  closed: Literal["left", "right", "both", "none"] | None = None, partial: bool = False,
-                 anchor: Literal["start", "end"] = "start"):
+                 anchor: Literal["start", "end"] = "end"):
         self.size = float(size)
         if not (math.isfinite(self.size) and self.size > 0):
             raise ValueError("The window size must be finite and positive")

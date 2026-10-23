@@ -215,7 +215,7 @@ def test_summary_of_a_series_keeps_channels_and_times(summary):
 def test_persistence_and_summaries_keep_the_domain_of_a_window():
     series = TimeSeries(_clouds(sb.pcloud64, np.float64), times=[0.0, 1.0, 3.0])
     # The window (0, 2) holds the clouds at 0 and 1.
-    window = Window(size=2.0, step=2.0, closed="none")(series)[0]
+    window = Window(size=2.0, step=2.0, closed="none", anchor="start")(series)[0]
 
     barcodes = compute_persistent_homology(window, max_dim=0)
     stable_ranks = barcode_to_stable_rank(barcodes)

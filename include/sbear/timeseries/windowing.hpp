@@ -43,8 +43,8 @@ namespace sb
   /// observations or no window fits.
   template <typename T>
   std::pair<Tensor<TimeSeries<T>>, Tensor<float64_t>> windows(const TimeSeries<T>& series, float64_t size, float64_t step,
-                                                              bool closedStart = true, bool closedEnd = false,
-                                                              bool partial = false, bool anchorEnd = false)
+                                                              bool closedStart = false, bool closedEnd = true,
+                                                              bool partial = false, bool anchorEnd = true)
   {
     if (std::isnan(size) || std::isinf(size) || size <= 0)
     {

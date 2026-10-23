@@ -299,7 +299,7 @@ def test_forward_embedding_of_a_window_ends_one_span_before_the_window():
     source = TimeSeries([0.0, 10.0, 20.0, 40.0], times=[0.0, 1.0, 2.0, 4.0])
     # The window (1, 3] holds 10 from 0 and 20 from 1, up to its closed
     # end, 2, in window time.
-    window = Window(size=2.0, step=1.0, closed="right")(source)[1]
+    window = Window(size=2.0, step=1.0, closed="right", anchor="start")(source)[1]
 
     embedding = TimeDelayEmbedding(dimension=2, delay=1.0, direction="forward")(window)
 
@@ -316,7 +316,7 @@ def test_embedding_of_a_window_with_a_closed_end_survives_saving(direction, roun
     source = TimeSeries([0.0, 10.0, 20.0, 40.0], times=[0.0, 1.0, 2.0, 4.0])
     # The embedding of the window (1, 3] is observed at its closed end: 2
     # looking back, and 2 - 1 looking forward.
-    window = Window(size=2.0, step=1.0, closed="right")(source)[1]
+    window = Window(size=2.0, step=1.0, closed="right", anchor="start")(source)[1]
     embedding = TimeDelayEmbedding(dimension=2, delay=1.0, direction=direction)(window)
 
     loaded = round_trip(embedding)

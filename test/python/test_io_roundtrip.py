@@ -85,7 +85,7 @@ def test_scalar_point_cloud_tensor_preserves_cloud(
 @pytest.mark.parametrize("make_values", TWO_ELEMENTS_OF_EVERY_DTYPE)
 def test_nested_tensor_of_every_leaf_dtype_survives_roundtrip(make_values, round_trip):
     two = make_values()
-    window = Window(size=1.0, closed="both", partial=False)
+    window = Window(size=1.0, closed="both", partial=False, anchor="start")
     forward = window(TimeSeries(two, times=[0.0, 1.0]))
     backward = window(TimeSeries(two[[1, 0]], times=[0.0, 1.0]))
 

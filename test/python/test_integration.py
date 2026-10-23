@@ -116,7 +116,7 @@ def test_delay_embedding_to_windows_to_persistence():
 
     # The embedding has domain [0.5, 3.5], so three windows fit.
     embedding = TimeDelayEmbedding(dimension=2, delay=0.5)(series)
-    windows = Window(size=1.0, step=1.0, closed="left", partial=False)(embedding)
+    windows = Window(size=1.0, step=1.0, closed="left", partial=False, anchor="start")(embedding)
 
     clouds = windows([0.0, 0.25, 0.5, 0.75])
     assert isinstance(clouds, sb.FloatTensor)
