@@ -19,8 +19,8 @@ reads query times in milliseconds, so ``series_ms(1500.0)`` equals
 ``series(1.5)``.
 
 This page covers evaluation and units, which every other operation on a
-series builds on. The pages listed at the end cover channels, operations on
-the observations, delay embeddings, and windows.
+series builds on. The pages listed at the end cover channels, delay
+embeddings, and windows.
 
 Evaluation
 ----------
@@ -92,10 +92,9 @@ Working with time series
 ------------------------
 
 The following pages build on evaluation. Channels combine signals with
-different timestamps and units into one series. Element-wise operations,
-such as persistent homology, apply to every observation and keep the times.
-A delay embedding turns a signal into points that trace its dynamics, and
-windows cut a series into pieces that can be compared with each other.
+different timestamps and units into one series. A delay embedding turns a
+signal into points that trace its dynamics, and windows cut a series into
+pieces that can be compared with each other.
 Snapping covers query times such as ``0.3 - 0.1`` that land a rounding error
 below the timestamp they mean.
 
@@ -104,7 +103,6 @@ below the timestamp they mean.
 
    timeseries_units
    timeseries_channels
-   timeseries_operations
    timeseries_embedding
    timeseries_windows
    timeseries_snapping
