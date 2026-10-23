@@ -52,8 +52,8 @@ window ``i`` at ``t[j]``::
    windows(1.0)[1]      # 1.0, the value of signal at 3 s
    windows([0.0, 1.0])  # [[0.0, 0.0], [0.0, 1.0], [2.0, 3.0]], shape (3, 2)
 
-Anchoring the windows
----------------------
+Anchoring
+---------
 
 With ``anchor="start"``, as above, the windows start where the time series
 starts. With ``anchor="end"``, the default, they end where it ends. The two
