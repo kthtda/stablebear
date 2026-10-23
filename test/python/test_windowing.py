@@ -50,13 +50,32 @@ def test_windows_start_every_step_while_they_fit(window, starts):
     assert np.array_equal(np.asarray(bounds)[:, 1], np.add(starts, window.size))
 
 
+@pytest.mark.parametrize("window, bounds", [
+    pytest.param(Window(size=2.0, step=1.0, closed="right", partial=False, anchor="end"),
+                 [[0.0, 2.0],
+                  [1.0, 3.0],
+                  [2.0, 4.0]], id="step"),
+    pytest.param(Window(size=1.0, step=1.5, closed="right", partial=False, anchor="end"),
+                 [[0.0, 1.0],
+                  [1.5, 2.5],
+                  [3.0, 4.0]], id="gaps"),
+])
+def test_windows_anchored_at_the_end_end_every_step_back_while_they_fit(window, bounds):
+    _, window_bounds = window(_windows_source(), return_bounds=True)
+
+    # The last window ends where the series does, at 4.0, and the windows
+    # come in chronological order.
+    assert np.array_equal(np.asarray(window_bounds), bounds)
+
+
+@pytest.mark.parametrize("anchor", ["start", "end"])
 @pytest.mark.parametrize("series, match", [
     pytest.param(_windows_source(), "longer than the series", id="longer-than-the-series"),
     pytest.param(TimeSeries([], times=[]), "without observations", id="empty"),
 ])
-def test_windowing_raises_when_no_window_fits(series, match):
+def test_windowing_raises_when_no_window_fits(series, match, anchor):
     with pytest.raises(ValueError, match=match):
-        Window(size=5.0, step=1.0, closed="left", partial=False)(series)
+        Window(size=5.0, step=1.0, closed="left", partial=False, anchor=anchor)(series)
 
 
 @pytest.mark.parametrize("size, step, match", [
@@ -79,6 +98,19 @@ def test_window_raises_on_a_size_or_step_that_is_not_finite_and_positive(size, s
 def test_window_raises_on_an_unknown_closed():
     with pytest.raises(ValueError, match="closed"):
         Window(size=1.0, step=1.0, closed="middle")
+
+
+def test_window_raises_on_an_unknown_anchor():
+    with pytest.raises(ValueError, match="anchor"):
+        Window(size=1.0, step=1.0, closed="left", anchor="middle")
+
+
+@pytest.mark.parametrize("anchor, closed", [
+    pytest.param("start", "left", id="start"),
+    pytest.param("end", "right", id="end"),
+])
+def test_windows_are_closed_at_their_anchor_by_default(anchor, closed):
+    assert Window(size=1.0, step=1.0, anchor=anchor).closed == closed
 
 
 def _closed_source():
@@ -151,6 +183,37 @@ def test_a_partial_window_ends_where_the_series_does():
     assert window(1.0) == 40.0
     with pytest.raises(ValueError, match=re.escape("outside the domain [0, 1]")):
         window(1.5)
+
+
+def test_a_window_anchored_at_the_end_holds_the_last_observation():
+    # The window (1.0, 4.0] holds the value at 1.0 just after its start,
+    # then the observations at 2.0, 3.0, and 4.0.
+    window = Window(size=3.0, step=3.0, closed="right", partial=False, anchor="end")(_partial_source())[0]
+
+    assert np.array_equal(np.asarray(window.times), [0.0, 1.0, 2.0, 3.0])
+    assert np.array_equal(np.asarray(window.values), [10.0, 20.0, 30.0, 40.0])
+    assert window(3.0) == 40.0
+
+
+def test_a_partial_window_anchored_at_the_end_starts_where_the_series_does():
+    windows, bounds = Window(size=3.0, step=3.0, closed="right", partial=True, anchor="end")(
+        _partial_source(), return_bounds=True)
+
+    # The window ending at 1.0 would start at -2.0, before the series starts
+    # at 0.0, so it is [0.0, 1.0], closed at the start as the series is.
+    assert np.array_equal(np.asarray(bounds), [
+        [0.0, 1.0],
+        [1.0, 4.0],
+    ])
+    assert np.array_equal(np.asarray(windows[0].times), [0.0, 1.0])
+    assert np.array_equal(np.asarray(windows[0].values), [0.0, 10.0])
+    assert windows[0](0.0) == 0.0
+    assert windows[0](1.0) == 10.0
+    # The full window (1.0, 4.0] holds the value at 1.0 just after its start,
+    # then the observations at 2.0, 3.0, and 4.0.
+    assert np.array_equal(np.asarray(windows[1].times), [0.0, 1.0, 2.0, 3.0])
+    assert np.array_equal(np.asarray(windows[1].values), [10.0, 20.0, 30.0, 40.0])
+    assert windows[1](3.0) == 40.0
 
 
 def test_a_left_closed_partial_window_can_start_at_the_last_observation():

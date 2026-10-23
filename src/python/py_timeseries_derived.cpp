@@ -40,10 +40,10 @@ namespace
     }, py::arg("series"), py::arg("dimension"), py::arg("delay"), py::arg("forward"),
        py::call_guard<py::gil_scoped_release>());
     m.def("windows", [](const sb::TimeSeries<T>& series, sb::float64_t size, sb::float64_t step, bool closedStart,
-                        bool closedEnd, bool partial) {
-      return sb::windows(series, size, step, closedStart, closedEnd, partial);
+                        bool closedEnd, bool partial, bool anchorEnd) {
+      return sb::windows(series, size, step, closedStart, closedEnd, partial, anchorEnd);
     }, py::arg("series"), py::arg("size"), py::arg("step"), py::arg("closed_start"), py::arg("closed_end"),
-       py::arg("partial"), py::call_guard<py::gil_scoped_release>());
+       py::arg("partial"), py::arg("anchor_end"), py::call_guard<py::gil_scoped_release>());
   }
 }
 

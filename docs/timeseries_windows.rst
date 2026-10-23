@@ -4,7 +4,8 @@ Windows
 A window restricts a series to an interval of time, so that pieces of one
 signal can be compared with each other. :py:class:`~stablebear.timeseries.Window`
 cuts a series into windows of a fixed size at a fixed step, starting where
-the series starts. Each window is a series whose times start at 0.
+the series starts or, from the end, ending where it ends. Each window is a
+series whose times start at 0.
 
 Here the windows cut the :doc:`delay embedding <timeseries_embedding>` of a
 sine with period 2 s, whose domain is :math:`[0.5, 5.9]`, into pieces of
@@ -35,3 +36,26 @@ same longest H1 bar, of length about 1.47. A change in the dynamics of the
 signal would show up as a change in the bars from one window to the next.
 On a series with several :doc:`channels <timeseries_channels>`, each channel
 is windowed separately.
+
+Windows from the end
+--------------------
+
+By default the first window starts where the series starts, and time at
+the end that no full window covers is left out. With ``anchor="end"``, the
+last window ends where the series ends instead, and the time left out is at
+the start::
+
+   series = TimeSeries([0.0, 10.0, 20.0, 30.0, 40.0, 50.0],
+                       times=[0.0, 1.0, 2.0, 3.0, 4.0, 5.0])
+
+   _, bounds = Window(size=2.0)(series, return_bounds=True)
+   bounds  # [[0.0, 2.0], [2.0, 4.0]]
+
+   _, bounds = Window(size=2.0, anchor="end")(series, return_bounds=True)
+   bounds  # [[1.0, 3.0], [3.0, 5.0]]
+
+The windows still come in chronological order. By default each window is
+closed at its anchor end, :math:`[a, a + \text{size})` from the start and
+:math:`(a, a + \text{size}]` from the end, so the observation at 5 s is in
+the last window. With ``partial=True``, the time left out becomes a shorter
+window, at the end of the series or, with ``anchor="end"``, at its start.

@@ -18,15 +18,19 @@ namespace sb
   /// the window ends in the series' domain, t_0 being its start, and a float
   /// tensor of shape (n_windows, 2) whose row k is (a_k, a_k + size) as
   /// computed, before any snapping, since each channel snaps on its own.
+  /// With @p anchorEnd, the windows instead end at b_k = t_1 - k * @p step,
+  /// while they start in the domain, t_1 being its end, and come in
+  /// chronological order, so the last one ends at t_1.
   /// Window k covers a_k to a_k + size, each end included when
   /// @p closedStart or @p closedEnd says so: it has the channels of
   /// @p series, each holding the observation in effect at a_k, at time 0,
   /// then its observations at times t with a_k < t < a_k + size, and one at
   /// a_k + size if the end is closed, at the times t - a_k in the channel's
   /// unit, with the end size (Channel::until). With @p partial, windows
-  /// continue while their start is in the domain, and a window that would
-  /// end past the domain ends where the series does instead, with its
-  /// closedness, and its bounds row ends there too. An open start leaves 0
+  /// continue while their start, or with @p anchorEnd their end, is in the
+  /// domain, and a window that would reach past the domain is cut where the
+  /// series starts or ends instead, with its closedness, and its bounds row
+  /// is cut there too. An open start leaves 0
   /// outside the domain, though the observation there stays in effect after
   /// it. With an open end, an observation at a_k + size belongs only to the
   /// next window. A bound
@@ -40,7 +44,7 @@ namespace sb
   template <typename T>
   std::pair<Tensor<TimeSeries<T>>, Tensor<float64_t>> windows(const TimeSeries<T>& series, float64_t size, float64_t step,
                                                               bool closedStart = true, bool closedEnd = false,
-                                                              bool partial = false)
+                                                              bool partial = false, bool anchorEnd = false)
   {
     if (std::isnan(size) || std::isinf(size) || size <= 0)
     {
@@ -58,45 +62,82 @@ namespace sb
         throw std::invalid_argument("Cannot window a series with a channel without observations");
       }
     }
-    // A window fits when a + size is at most the last time, whether that is
-    // a last timestamp or an end; a closed window end must come before an
-    // open one of the series.
+
+    // The bounds of each window and whether they are included.
+    struct Bounds
+    {
+      float64_t start;
+      float64_t stop;
+      bool startClosed;
+      bool stopClosed;
+    };
+    std::vector<Bounds> bounds;
     const auto [first, last, seriesClosedStart, seriesClosedEnd] = series.domain();
-    const auto fits = [&](float64_t start) {
-      return start + size < last || (start + size == last && (seriesClosedEnd || !closedEnd));
-    };
-    // The first window starts where the series does, so it cannot be
-    // evaluated at 0 if the series cannot at its start.
-    const auto startClosed = [&](size_t k) { return closedStart && (k > 0 || seriesClosedStart); };
-    // A partial window needs its start in the domain.
-    const auto startsIn = [&](float64_t start, size_t k) {
-      return start < last || (start == last && startClosed(k) && seriesClosedEnd);
-    };
-    if (!fits(first) && !(partial && startsIn(first, 0)))
+    if (!anchorEnd)
+    {
+      // A window fits when a + size is at most the last time, whether that
+      // is a last timestamp or an end; a closed window end must come before
+      // an open one of the series.
+      const auto fits = [&](float64_t start) {
+        return start + size < last || (start + size == last && (seriesClosedEnd || !closedEnd));
+      };
+      // The first window starts where the series does, so it cannot be
+      // evaluated at 0 if the series cannot at its start.
+      const auto startClosed = [&](size_t k) { return closedStart && (k > 0 || seriesClosedStart); };
+      // A partial window needs its start in the domain.
+      const auto startsIn = [&](float64_t start, size_t k) {
+        return start < last || (start == last && startClosed(k) && seriesClosedEnd);
+      };
+      for (size_t k = 0;; ++k)
+      {
+        const auto start = first + static_cast<float64_t>(k) * step;
+        const bool full = fits(start);
+        if (!full && !(partial && startsIn(start, k)))
+        {
+          break;
+        }
+        // A partial window ends where the series does.
+        bounds.push_back({start, full ? start + size : last, startClosed(k), full ? closedEnd : seriesClosedEnd});
+      }
+    }
+    else
+    {
+      // The same, mirrored: a window fits when b - size is at least the first
+      // time, the last window ends where the series does, and a partial
+      // window needs its end in the domain and starts where the series does.
+      const auto fits = [&](float64_t stop) {
+        return stop - size > first || (stop - size == first && (seriesClosedStart || !closedStart));
+      };
+      const auto stopClosed = [&](size_t k) { return closedEnd && (k > 0 || seriesClosedEnd); };
+      const auto stopsIn = [&](float64_t stop, size_t k) {
+        return stop > first || (stop == first && stopClosed(k) && seriesClosedStart);
+      };
+      for (size_t k = 0;; ++k)
+      {
+        const auto stop = last - static_cast<float64_t>(k) * step;
+        const bool full = fits(stop);
+        if (!full && !(partial && stopsIn(stop, k)))
+        {
+          break;
+        }
+        bounds.push_back({full ? stop - size : first, stop, full ? closedStart : seriesClosedStart, stopClosed(k)});
+      }
+      std::reverse(bounds.begin(), bounds.end());
+    }
+    if (bounds.empty())
     {
       std::ostringstream ss;
       ss << "The window size " << size << " is longer than the series, from " << first << " to " << last;
       throw std::invalid_argument(ss.str());
     }
 
-    std::vector<float64_t> starts;
-    std::vector<float64_t> stops;
     std::vector<TimeSeries<T>> contents;
     // Each channel's observations at the last window's start and end,
     // hints for the next window's, which are close by.
     std::vector<size_t> atFrom(series.n_channels(), 0);
     std::vector<size_t> atTo(series.n_channels(), 0);
-    for (size_t k = 0;; ++k)
+    for (const auto& [start, stop, startClosed, stopClosed] : bounds)
     {
-      const auto start = first + static_cast<float64_t>(k) * step;
-      const bool full = fits(start);
-      if (!full && !(partial && startsIn(start, k)))
-      {
-        break;
-      }
-      // A partial window ends where the series does.
-      const auto stop = full ? start + size : last;
-      const bool stopClosed = full ? closedEnd : seriesClosedEnd;
       std::vector<Channel<T>> channels;
       channels.reserve(series.n_channels());
       for (size_t c = 0; c < series.n_channels(); ++c)
@@ -136,23 +177,21 @@ namespace sb
           window = window.until(std::max(end, std::nextafter(lastAt, std::numeric_limits<float64_t>::infinity())),
                                 stopClosed);
         }
-        window = window.with_start_closed(startClosed(k));
+        window = window.with_start_closed(startClosed);
         channels.push_back(std::move(window));
       }
-      starts.push_back(start);
-      stops.push_back(stop);
       contents.emplace_back(std::move(channels), series.unit());
     }
 
     Tensor<TimeSeries<T>> windowTensor({contents.size()});
-    Tensor<float64_t> bounds({contents.size(), 2});
+    Tensor<float64_t> boundsTensor({contents.size(), 2});
     for (size_t k = 0; k < contents.size(); ++k)
     {
       windowTensor(k) = std::move(contents[k]);
-      bounds({k, 0}) = starts[k];
-      bounds({k, 1}) = stops[k];
+      boundsTensor({k, 0}) = bounds[k].start;
+      boundsTensor({k, 1}) = bounds[k].stop;
     }
-    return {std::move(windowTensor), std::move(bounds)};
+    return {std::move(windowTensor), std::move(boundsTensor)};
   }
 }
 
