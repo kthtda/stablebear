@@ -14,7 +14,11 @@ HERE = Path(__file__).parent
 def _plot_steps(ax, series, color):
     times = np.asarray(series.times)
     values = np.asarray(series.values)
-    ax.step(times, values, where="post", color=color, linewidth=2)
+    # Each step [t_i, t_{i+1}) is closed on the left and open on the right.
+    for t0, t1, v in zip(times[:-1], times[1:], values[:-1]):
+        ax.plot([t0, t1], [v, v], color=color, linewidth=2)
+        ax.plot(t1, v, "o", color=color, markersize=6, zorder=5,
+                markerfacecolor=plt.rcParams["axes.facecolor"])
     ax.plot(times, values, "o", color=color, markersize=6, zorder=5)
     ax.set_xlabel("time (s)")
     ax.set_ylabel("value")

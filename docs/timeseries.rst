@@ -34,15 +34,11 @@ For observations :math:`x_0, \dots, x_{n-1}` at timestamps
    x(t) = x_i \quad \text{for } t_i \le t < t_{i+1},
    \qquad x(t_{n-1}) = x_{n-1},
 
-on the domain :math:`[t_0, t_{n-1}]`::
-
-   series(0.5)   # 1.0
-   series(1.5)   # 2.0
-   series(2.75)  # 2.0
-   series(4.0)   # ValueError: Time 4 is outside the domain [0, 3.5]
-
-The figure shows the series as a step function. The circles are the
-observations, and the squares are the three queries above.
+on the domain :math:`[t_0, t_{n-1}]`. The figure shows ``series`` from the
+example above as a step function on its domain :math:`[0, 3.5]`. The filled
+circles are the observations, and an open circle marks the right end of a
+step, which belongs to the next step. The squares are queries at ``t = 0.5``,
+``1.5``, and ``2.75``.
 
 .. image:: _static/timeseries_evaluation_light.png
    :width: 80%
@@ -60,6 +56,14 @@ observations, and the squares are the three queries above.
    .. literalinclude:: _static/gen_timeseries_snap_fig.py
       :pyobject: plot_timeseries_evaluation
       :language: python
+
+Each query returns the value of the step it falls on. A query past the last
+timestamp is outside the domain and raises an error::
+
+   series(0.5)   # 1.0
+   series(1.5)   # 2.0
+   series(2.75)  # 2.0
+   series(4.0)   # ValueError: Time 4 is outside the domain [0, 3.5]
 
 A query at a timestamp gets the observation recorded there, as at
 ``t = 1.5``.
