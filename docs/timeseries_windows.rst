@@ -8,19 +8,19 @@ the series ends or, from the start, starting where it starts. Each window is
 a series whose times start at 0.
 
 Here the windows cut the :doc:`delay embedding <timeseries_embedding>` of a
-sine with period 2 s, whose domain is :math:`[0.5, 5.9]`, into pieces of
-2 s, one every second, the last ending at 5.9 s::
+sine with period 2 s, whose domain is :math:`[0.5, 6]`, into pieces of
+2 s, one every second, the last ending at 6 s::
 
    import numpy as np
    from stablebear.persistence import compute_persistent_homology
    from stablebear.timeseries import TimeDelayEmbedding, TimeSeries, Window
 
-   t = np.arange(0.0, 6.0, 0.1)
+   t = np.linspace(0.0, 6.0, 49)
    signal = TimeSeries(np.sin(np.pi * t), times=t)
    embedded = TimeDelayEmbedding(dimension=2, delay=0.5)(signal)
 
    windows, bounds = Window(size=2.0, step=1.0)(embedded, return_bounds=True)
-   bounds  # [[0.9, 2.9], [1.9, 3.9], [2.9, 4.9], [3.9, 5.9]], up to rounding
+   bounds  # [[1.0, 3.0], [2.0, 4.0], [3.0, 5.0], [4.0, 6.0]]
 
 Each window is :math:`(a, a + 2]`, so it can be evaluated on a grid of 40
 times in :math:`(0, 2]`. Evaluating every window there with
@@ -33,7 +33,7 @@ The persistence of each point cloud measures the loop::
    barcodes = compute_persistent_homology(points, max_dim=1)
 
 Each window holds one full period of the circle, so every window gives the
-same longest H1 bar, of length about 1.47. A change in the dynamics of the
+same longest H1 bar, of length about 1.46. A change in the dynamics of the
 signal would show up as a change in the bars from one window to the next.
 On a series with several :doc:`channels <timeseries_channels>`, each channel
 is windowed separately.

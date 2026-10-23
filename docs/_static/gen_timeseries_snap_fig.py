@@ -1,4 +1,4 @@
-"""Generate the time series evaluation and snapping figures for the docs."""
+"""Generate the time series figures for the docs."""
 
 import matplotlib
 matplotlib.use("Agg")
@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from pathlib import Path
 
-from stablebear.timeseries import Times, TimeSeries
+from stablebear.timeseries import TimeDelayEmbedding, Times, TimeSeries
 
 HERE = Path(__file__).parent
 
@@ -192,6 +192,38 @@ def plot_timeseries_snap_distances():
     return fig
 
 
+# -- included in docs via literalinclude :pyobject: --
+def plot_timeseries_embedding():
+    t = np.linspace(0.0, 6.0, 49)
+    signal = TimeSeries(np.sin(np.pi * t), times=t)
+    embedded = TimeDelayEmbedding(dimension=2, delay=0.5)(signal)
+    query = 1.0
+    color = plt.rcParams["lines.color"]
+
+    fig, (ax_signal, ax_points) = plt.subplots(
+        1, 2, figsize=(7, 2.8), gridspec_kw={"width_ratios": [1.6, 1]})
+
+    ax_signal.step(t, np.asarray(signal.values), where="post", color=color,
+                   linewidth=1.5)
+    for s in (query - 0.5, query):
+        ax_signal.axvline(s, color="gray", linestyle="--", linewidth=1)
+        ax_signal.plot(s, signal(s), "s", color="tab:orange", markersize=7,
+                       zorder=6)
+    ax_signal.set_xlabel("time (s)")
+    ax_signal.set_ylabel("x(t)")
+
+    points = np.array([np.asarray(embedded(s)) for s in t[t >= 0.5]])
+    ax_points.plot(points[:, 0], points[:, 1], "o", color=color,
+                   markersize=4)
+    ax_points.plot(*np.asarray(embedded(query)), "s", color="tab:orange",
+                   markersize=7, zorder=6)
+    ax_points.set_aspect("equal")
+    ax_points.set_xlabel("x(t - 0.5)")
+    ax_points.set_ylabel("x(t)")
+    fig.tight_layout()
+    return fig
+
+
 # -- Generate light and dark variants --
 def _save_themed(plot_func, style, bg_color, fg_color, line_color, outfile):
     with plt.style.context(style), \
@@ -218,6 +250,7 @@ if __name__ == "__main__":
                             ("timeseries_channels", plot_timeseries_channels),
                             ("timeseries_vector_channel", plot_timeseries_vector_channel),
                             ("timeseries_rounding", plot_timeseries_rounding),
-                            ("timeseries_snap_distances", plot_timeseries_snap_distances)]:
+                            ("timeseries_snap_distances", plot_timeseries_snap_distances),
+                            ("timeseries_embedding", plot_timeseries_embedding)]:
         _save_themed(plot_func, *LIGHT, HERE / f"{name}_light.png")
         _save_themed(plot_func, *DARK, HERE / f"{name}_dark.png")

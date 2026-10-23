@@ -16,17 +16,38 @@ For a sine with period 2 s, a delay of a quarter period traces a circle::
    import numpy as np
    from stablebear.timeseries import TimeDelayEmbedding, TimeSeries
 
-   t = np.arange(0.0, 6.0, 0.1)
+   t = np.linspace(0.0, 6.0, 49)
    signal = TimeSeries(np.sin(np.pi * t), times=t)
    embedded = TimeDelayEmbedding(dimension=2, delay=0.5)(signal)
 
    embedded.shape  # (2,)
    embedded(1.0)   # [1.0, 0.0], the values at 0.5 s and 1 s
 
-The embedding has the full history only from :math:`(m-1)\delta` after the
-series starts, so its domain is :math:`[0.5, 5.9]`::
+The figure shows ``signal`` on the left and the embedded points on the
+right, one per observation. The squares mark the values at 0.5 s and 1 s
+and the point they form at ``t = 1``.
 
-   embedded(0.4)   # ValueError: Time 0.4 is outside the domain [0.5, 5.9]
+.. image:: _static/timeseries_embedding_light.png
+   :width: 90%
+   :class: only-light
+   :alt: A sampled sine and its two-dimensional delay embedding, a circle
+
+.. image:: _static/timeseries_embedding_dark.png
+   :width: 90%
+   :class: only-dark
+   :alt: A sampled sine and its two-dimensional delay embedding, a circle
+
+.. dropdown:: Show plotting code
+   :color: secondary
+
+   .. literalinclude:: _static/gen_timeseries_snap_fig.py
+      :pyobject: plot_timeseries_embedding
+      :language: python
+
+The embedding has the full history only from :math:`(m-1)\delta` after the
+series starts, so its domain is :math:`[0.5, 6]`::
+
+   embedded(0.4)   # ValueError: Time 0.4 is outside the domain [0.5, 6]
 
 More generally, the observations can be arrays or elements such as point
 clouds. For a series :math:`x \colon \mathbb{R} \to X` with observations in
@@ -55,4 +76,4 @@ before the series does::
    forward = TimeDelayEmbedding(dimension=2, delay=0.5, direction="forward")(signal)
 
    forward(0.5)  # [1.0, 0.0], the values at 0.5 s and 1 s
-   forward(5.5)  # ValueError: Time 5.5 is outside the domain [0, 5.4]
+   forward(5.6)  # ValueError: Time 5.6 is outside the domain [0, 5.5]
