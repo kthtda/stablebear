@@ -15,6 +15,7 @@
 #include <pybind11/stl.h>
 
 #include <algorithm>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -64,10 +65,13 @@ namespace
       .def_property_readonly("n_channels", &Series::n_channels)
       .def("select", &Series::select, py::arg("indices"))
       .def("array_equal", [](const Series& self, const Series& other) { return self == other; }, py::arg("other"))
-      .def("evaluate", py::overload_cast<sb::float64_t>(&Series::evaluate, py::const_), py::arg("t"),
-           py::call_guard<py::gil_scoped_release>())
-      .def("evaluate", py::overload_cast<const sb::Tensor<sb::float64_t>&>(&Series::evaluate, py::const_),
-           py::arg("t"), py::call_guard<py::gil_scoped_release>())
+      .def("evaluate", [](const Series& self, sb::float64_t t, const std::optional<std::string>& unit) {
+        return unit ? self.to(sb::parse_time_unit(*unit)).evaluate(t) : self.evaluate(t);
+      }, py::arg("t"), py::arg("unit") = py::none(), py::call_guard<py::gil_scoped_release>())
+      .def("evaluate", [](const Series& self, const sb::Tensor<sb::float64_t>& t,
+                          const std::optional<std::string>& unit) {
+        return unit ? self.to(sb::parse_time_unit(*unit)).evaluate(t) : self.evaluate(t);
+      }, py::arg("t"), py::arg("unit") = py::none(), py::call_guard<py::gil_scoped_release>())
       .def("_save", [](const Series& self, py::object file) {
         sb_py::PythonOStreamBuf buf(file);
         std::ostream os(&buf);

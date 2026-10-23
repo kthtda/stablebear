@@ -423,13 +423,14 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         return (isinstance(other, TimeSeries) and other.dtype is self.dtype
                 and self._data.array_equal(other._data))
 
-    def evaluate(self, t):
+    def evaluate(self, t, unit: str | None = None):
         """Each channel's observation with the largest timestamp at or before ``t``.
 
         A ``t`` just below a timestamp snaps forward to it, by each
         channel's own ``snap_tolerance`` and ``snap_eps``; see the
-        constructor. ``t`` is in the series' unit and must lie in the domain
-        of every channel; see :class:`TimeSeries`.
+        constructor. ``t`` is in ``unit``, which defaults to the series'
+        unit and accepts the units of :class:`Times`, and must lie in the
+        domain of every channel; see :class:`TimeSeries`.
 
         ``t`` is a single time or an array-like or ``FloatTensor`` of times
         of shape ``t_shape``. Many times are evaluated together: they are
@@ -446,21 +447,21 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         ------
         ValueError
             If a time is outside the domain of any channel, or a channel has
-            no observations.
+            no observations, or if ``unit`` is unknown.
         """
         if isinstance(t, (int, float, np.integer, np.floating)):
-            values = NestedTensor._from_cpp(self._data.evaluate(float(t)))
+            values = NestedTensor._from_cpp(self._data.evaluate(float(t), unit))
             if self.n_channels > 1:
                 return values
             leaf = values[0]
             return leaf[()] if leaf.ndim == 0 else leaf
         times = FloatTensor(np.asarray(t, dtype=np.float64))
-        values = NestedTensor._from_cpp(self._data.evaluate(times._data))
+        values = NestedTensor._from_cpp(self._data.evaluate(times._data, unit))
         return values if self.n_channels > 1 else values[0]
 
-    def __call__(self, t):
-        """``series(t)`` is ``series.evaluate(t)``."""
-        return self.evaluate(t)
+    def __call__(self, t, unit: str | None = None):
+        """``series(t, unit)`` is ``series.evaluate(t, unit)``."""
+        return self.evaluate(t, unit)
 
     def __len__(self) -> int:
         """The number of recorded observations of a one-channel series.
@@ -525,9 +526,10 @@ class TimeSeriesTensor(Tensor):
     def _get_valid_setitem_dtypes(self):
         return [TimeSeries, TimeSeriesTensor]
 
-    def evaluate(self, t):
+    def evaluate(self, t, unit: str | None = None):
         """Every series evaluated at the times ``t``, as
-        :meth:`TimeSeries.evaluate` does, each in its own unit.
+        :meth:`TimeSeries.evaluate` does. ``t`` is in ``unit`` for every
+        series, or in each series' own unit if ``unit`` is omitted.
 
         ``t`` is a single time or an array-like or ``FloatTensor`` of times
         of shape ``t_shape``. For series with one channel, returns a tensor
@@ -546,15 +548,17 @@ class TimeSeriesTensor(Tensor):
         ------
         ValueError
             If a time is outside the domain of a series, or the tensor is
-            empty or its series differ in channels or shapes.
+            empty or its series differ in channels or shapes, or if
+            ``unit`` is unknown.
         """
         times = FloatTensor(np.asarray(t, dtype=np.float64))
-        values = NestedTensor._from_cpp(cpp.evaluate_series(self._data, times._data))
+        values = NestedTensor._from_cpp(
+            cpp.evaluate_series(self._data, times._data, unit))
         if values.shape[0] > 1:
             return values
         leaf = values[0]
         return leaf[()] if leaf.ndim == 0 else leaf
 
-    def __call__(self, t):
-        """``windows(t)`` is ``windows.evaluate(t)``."""
-        return self.evaluate(t)
+    def __call__(self, t, unit: str | None = None):
+        """``windows(t, unit)`` is ``windows.evaluate(t, unit)``."""
+        return self.evaluate(t, unit)

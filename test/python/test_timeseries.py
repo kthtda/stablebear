@@ -271,6 +271,21 @@ def test_to_changes_the_query_unit():
     assert series(500.0) == 20.0  # the last observation, in the new unit
 
 
+def test_evaluate_reads_times_in_the_given_unit():
+    series = TimeSeries([10.0, 20.0], times=Times([0.0, 500.0], unit="ms"))
+
+    assert series(250000.0, "us") == 10.0
+    assert series(500000.0, "us") == 20.0
+    assert series.unit == "ms"
+
+
+def test_evaluate_rejects_an_unknown_unit():
+    series = TimeSeries([10.0, 20.0], times=Times([0.0, 0.5], unit="s"))
+
+    with pytest.raises(ValueError, match="Unknown time unit"):
+        series(0.25, "fortnight")
+
+
 def _channel_a():
     return TimeSeries([10.0, 20.0, 30.0], times=Times([0.0, 1.0, 2.5], unit="s"))
 

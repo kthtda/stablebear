@@ -322,6 +322,21 @@ def test_windows_evaluate_at_times_of_any_shape():
     ])
 
 
+def test_windows_evaluate_at_times_in_the_given_unit():
+    windows = _overlapping_windows()
+
+    values = windows([0.0, 1000.0], "ms")
+
+    assert np.array_equal(np.asarray(values), [[0.0, 10.0], [10.0, 20.0], [20.0, 30.0]])
+
+
+def test_windows_reject_an_unknown_unit():
+    windows = _overlapping_windows()
+
+    with pytest.raises(ValueError, match="Unknown time unit"):
+        windows([0.0, 1.0], "fortnight")
+
+
 def test_windows_of_several_channels_evaluate_to_one_leaf_per_channel():
     # A's observations are 10 * t and B's are -10 * t, with t in seconds; B
     # starts 0.5 s after A. Both are observed from 0.5 to 2.5, so the windows

@@ -9,6 +9,12 @@
 #include <sbear/timeseries/time_delay_embedding.hpp>
 #include <sbear/timeseries/windowing.hpp>
 
+#include <pybind11/stl.h>
+
+#include <optional>
+#include <string>
+#include <vector>
+
 namespace py = pybind11;
 
 namespace
@@ -16,9 +22,19 @@ namespace
   template <typename T>
   void register_derived_element(py::module_& m)
   {
-    m.def("evaluate_series", [](const sb::Tensor<sb::TimeSeries<T>>& series, const sb::Tensor<sb::float64_t>& t) {
-      return sb::evaluate(series, t);
-    }, py::arg("series"), py::arg("t"), py::call_guard<py::gil_scoped_release>());
+    m.def("evaluate_series", [](const sb::Tensor<sb::TimeSeries<T>>& series, const sb::Tensor<sb::float64_t>& t,
+                                const std::optional<std::string>& unit) {
+      if (!unit)
+      {
+        return sb::evaluate(series, t);
+      }
+      // Each series reads the queries in @p unit; the copies share their
+      // observations with @p series.
+      const auto target = sb::parse_time_unit(*unit);
+      sb::Tensor<sb::TimeSeries<T>> converted(std::vector<size_t>(series.shape().begin(), series.shape().end()));
+      sb::walk(series, [&](const std::vector<size_t>& index) { converted(index) = series(index).to(target); });
+      return sb::evaluate(converted, t);
+    }, py::arg("series"), py::arg("t"), py::arg("unit") = py::none(), py::call_guard<py::gil_scoped_release>());
     m.def("delay_embed", [](const sb::TimeSeries<T>& series, size_t dimension, sb::float64_t delay) {
       return sb::delay_embed(series, dimension, delay);
     }, py::arg("series"), py::arg("dimension"), py::arg("delay"), py::call_guard<py::gil_scoped_release>());

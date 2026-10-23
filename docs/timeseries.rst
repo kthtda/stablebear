@@ -89,7 +89,11 @@ exact integer factor::
 
 A series reads query times, window sizes, and delays in its unit, which
 :py:meth:`TimeSeries.to <stablebear.timeseries.TimeSeries.to>` changes
-without converting the stored timestamps.
+without converting the stored timestamps. A unit passed as the second
+argument of :py:meth:`~stablebear.timeseries.TimeSeries.evaluate` applies to
+that query only::
+
+   series(1500.0, "ms")  # 2.0, the same as series(1.5)
 
 Working with time series
 ------------------------
