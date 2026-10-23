@@ -270,17 +270,32 @@ def plot_timeseries_windows():
     return fig
 
 
-def _plot_window_rows(rows):
-    """Plot ``signal`` above one row of window bars per (label, Window)."""
+def _plot_window_rows(rows, stacked=False):
+    """Plot ``signal`` above one row of window bars per (label, Window), or
+    with ``stacked``, the windows of the one Window each on its own row."""
     signal = TimeSeries([0.0, 0.0, 0.0, 1.0, 2.0, 3.0, 2.0, 1.0, 0.0],
                         times=np.arange(9.0))
     color = plt.rcParams["lines.color"]
     hollow = plt.rcParams["axes.facecolor"]
     t0, t1 = 0.0, 8.0
+    bars = []  # (row, height offset, a, b, window)
+    for row, (label, window) in enumerate(rows):
+        _, bounds = window(signal, return_bounds=True)
+        for k, (a, b) in enumerate(np.asarray(bounds)):
+            if stacked:
+                bars.append((k, 0.0, a, b, window))
+            else:
+                # Consecutive windows alternate in height so that shared
+                # ends stay visible.
+                bars.append((row, 0.15 if k % 2 else -0.15, a, b, window))
+    labels = ([f"window {k}" for k in range(len(bars))] if stacked
+              else [label for label, _ in rows])
+    n_rows = len(labels)
+    row_height = 0.3 if stacked else 0.6
 
     fig, (ax_signal, ax_rows) = plt.subplots(
-        2, 1, figsize=(7, 1.9 + 0.7 * len(rows)), sharex=True,
-        gridspec_kw={"height_ratios": [1.6, 0.6 * len(rows)]})
+        2, 1, figsize=(7, 1.9 + (row_height + 0.1) * n_rows), sharex=True,
+        gridspec_kw={"height_ratios": [1.6, row_height * n_rows]})
     ax_signal.step(np.asarray(signal.times.to("s")), np.asarray(signal.values),
                    where="post", color=color, linewidth=1.5)
     ax_signal.set_ylim(-0.3, 3.4)
@@ -288,23 +303,20 @@ def _plot_window_rows(rows):
     ax_signal.set_ylabel("signal")
 
     # Closed ends are filled, open ends hollow. Partial windows are dashed
-    # and closed where they are cut at the end of the series. Consecutive
-    # windows alternate in height so that shared ends stay visible.
-    for row, (label, window) in enumerate(rows):
-        _, bounds = window(signal, return_bounds=True)
-        for k, (a, b) in enumerate(np.asarray(bounds)):
-            y = len(rows) - 1 - row + (0.15 if k % 2 else -0.15)
-            partial = b - a < window.size
-            closed_a = window.closed in ("left", "both") or (partial and a == t0)
-            closed_b = window.closed in ("right", "both") or (partial and b == t1)
-            ax_rows.plot([a, b], [y, y], color="tab:orange", linewidth=2,
-                         linestyle="--" if partial else "-")
-            for x, closed in ((a, closed_a), (b, closed_b)):
-                ax_rows.plot(x, y, "o", color="tab:orange", markersize=6,
-                             zorder=5, markerfacecolor=None if closed else hollow)
-    ax_rows.set_ylim(-0.5, len(rows) - 0.5)
-    ax_rows.set_yticks(range(len(rows)))
-    ax_rows.set_yticklabels([label for label, _ in reversed(rows)])
+    # and closed where they are cut at the end of the series.
+    for row, offset, a, b, window in bars:
+        y = n_rows - 1 - row + offset
+        partial = b - a < window.size
+        closed_a = window.closed in ("left", "both") or (partial and a == t0)
+        closed_b = window.closed in ("right", "both") or (partial and b == t1)
+        ax_rows.plot([a, b], [y, y], color="tab:orange", linewidth=2,
+                     linestyle="--" if partial else "-")
+        for x, closed in ((a, closed_a), (b, closed_b)):
+            ax_rows.plot(x, y, "o", color="tab:orange", markersize=6,
+                         zorder=5, markerfacecolor=None if closed else hollow)
+    ax_rows.set_ylim(-0.5, n_rows - 0.5)
+    ax_rows.set_yticks(range(n_rows))
+    ax_rows.set_yticklabels(list(reversed(labels)))
     ax_rows.set_xlim(-0.3, 8.3)
     ax_rows.set_xticks(range(9))
     ax_rows.set_xlabel("time (s)")
@@ -326,6 +338,13 @@ def plot_timeseries_window_partial():
         ('anchor="start"', Window(size=3.0, anchor="start", partial=True)),
         ('anchor="end"', Window(size=3.0, partial=True)),
     ])
+
+
+# -- included in docs via literalinclude :pyobject: --
+def plot_timeseries_window_partial_overlap():
+    return _plot_window_rows([
+        ("", Window(size=6.0, step=3.0, anchor="start", partial=True)),
+    ], stacked=True)
 
 
 # -- Generate light and dark variants --
@@ -358,6 +377,7 @@ if __name__ == "__main__":
                             ("timeseries_embedding", plot_timeseries_embedding),
                             ("timeseries_windows", plot_timeseries_windows),
                             ("timeseries_window_anchors", plot_timeseries_window_anchors),
-                            ("timeseries_window_partial", plot_timeseries_window_partial)]:
+                            ("timeseries_window_partial", plot_timeseries_window_partial),
+                            ("timeseries_window_partial_overlap", plot_timeseries_window_partial_overlap)]:
         _save_themed(plot_func, *LIGHT, HERE / f"{name}_light.png")
         _save_themed(plot_func, *DARK, HERE / f"{name}_dark.png")

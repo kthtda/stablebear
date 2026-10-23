@@ -139,6 +139,36 @@ In the figure, the dashed windows are the ones cut short.
       :pyobject: plot_timeseries_window_partial
       :language: python
 
+When the step is shorter than the size, several windows can be cut short.
+With windows of 6 s every 3 s from the start, the last two are cut
+short::
+
+   _, bounds = Window(size=6.0, step=3.0, anchor="start", partial=True)(
+       signal, return_bounds=True)
+   bounds  # [[0.0, 6.0], [3.0, 8.0], [6.0, 8.0]]
+
+The figure shows each window on its own row.
+
+.. image:: _static/timeseries_window_partial_overlap_light.png
+   :width: 90%
+   :class: only-light
+   :alt: Three windows of 6 s every 3 s, the last two cut short at 8 s
+
+.. image:: _static/timeseries_window_partial_overlap_dark.png
+   :width: 90%
+   :class: only-dark
+   :alt: Three windows of 6 s every 3 s, the last two cut short at 8 s
+
+.. dropdown:: Show plotting code
+   :color: secondary
+
+   .. literalinclude:: _static/gen_timeseries_snap_fig.py
+      :pyobject: plot_timeseries_window_partial_overlap
+      :language: python
+
+A window that starts exactly at :math:`T` becomes :math:`[T, T]` and holds
+only the last observation.
+
 Windows of several channels
 ---------------------------
 
