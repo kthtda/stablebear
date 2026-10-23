@@ -25,14 +25,14 @@ installation is required.
 ### Configure, build, and install
 ```bash
 cmake -B cmake-build-debug
-cmake --build cmake-build-debug -j$(nproc --ignore=4)
+cmake --build cmake-build-debug -j$(nproc --ignore=14)
 cmake --install cmake-build-debug
 ```
 This works when `SKBUILD` is off (plain CMake). Builds `_sb_cpu` (always) and `_sb_cudaXX` (when CUDA available). Extensions are symlinked into `stablebear/` for immediate use.
 
-For local builds, leave four CPUs worth of capacity for the editor and host:
-use `-j$(nproc --ignore=4)` on Linux, including targeted and incremental builds.
-This uses `max(1, available CPUs - 4)` jobs. On other platforms, calculate the
+For local builds, leave 14 CPUs worth of capacity for the editor and host:
+use `-j$(nproc --ignore=14)` on Linux, including targeted and incremental builds.
+This uses `max(1, available CPUs - 14)` jobs. On other platforms, calculate the
 equivalent from the available CPU count. Respect any explicitly requested lower
 job limit; CPU-based sizing alone does not guarantee enough memory for a build.
 
@@ -58,7 +58,7 @@ Test dependencies are in the `test` dependency group in `pyproject.toml`.
 Install them with `pip install --group test` (pip 25.1 or newer).
 
 ```bash
-cmake --build cmake-build-debug -j$(nproc --ignore=4) && cmake --install cmake-build-debug
+cmake --build cmake-build-debug -j$(nproc --ignore=14) && cmake --install cmake-build-debug
 cd test && python -m pytest python               # all Python tests
 cd test && python -m pytest python/test_pdist.py  # single test file
 cd test && SB_RUN_STATISTICAL=1 python -m pytest python  # include large statistical checks
@@ -70,7 +70,7 @@ counts. They are skipped unless `SB_RUN_STATISTICAL=1` is set. CI runs them in
 
 ### C++ tests (GoogleTest)
 ```bash
-cmake --build cmake-build-debug --target sb_test -j$(nproc --ignore=4)
+cmake --build cmake-build-debug --target sb_test -j$(nproc --ignore=14)
 cd test && ../cmake-build-debug/sb_test  # run from test/ directory
 ```
 

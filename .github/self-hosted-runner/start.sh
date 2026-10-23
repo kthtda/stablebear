@@ -16,6 +16,11 @@ if [[ -z "${REPO:-}" ]]; then
 fi
 : "${REPO:?Could not detect repo. Set REPO=owner/repo}"
 
+# Pin the container to the first RUNNER_CPUS host CPUs (default: all but
+# 14 of them, minimum 1). A cpuset, unlike --cpus, also lowers nproc inside
+# the container, so `-j$(nproc)` and CMAKE_BUILD_PARALLEL_LEVEL shrink with it.
+RUNNER_CPUS="${RUNNER_CPUS:-$(nproc --ignore=14)}"
+
 get_token() {
     gh api -X POST "repos/${REPO}/actions/runners/registration-token" --jq .token
 }
@@ -24,6 +29,7 @@ echo "[cuda12] Waiting for jobs..."
 while true; do
     TOKEN="$(get_token)"
     docker run --rm --gpus all \
+        --cpuset-cpus="0-$(( RUNNER_CPUS - 1 ))" \
         -e REPO_URL="https://github.com/${REPO}" \
         -e TOKEN="$TOKEN" \
         -e RUNNER_NAME="$(hostname)-cuda12" \
