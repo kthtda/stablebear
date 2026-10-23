@@ -35,9 +35,10 @@ namespace
       sb::walk(series, [&](const std::vector<size_t>& index) { converted(index) = series(index).to(target); });
       return sb::evaluate(converted, t);
     }, py::arg("series"), py::arg("t"), py::arg("unit") = py::none(), py::call_guard<py::gil_scoped_release>());
-    m.def("delay_embed", [](const sb::TimeSeries<T>& series, size_t dimension, sb::float64_t delay) {
-      return sb::delay_embed(series, dimension, delay);
-    }, py::arg("series"), py::arg("dimension"), py::arg("delay"), py::call_guard<py::gil_scoped_release>());
+    m.def("delay_embed", [](const sb::TimeSeries<T>& series, size_t dimension, sb::float64_t delay, bool forward) {
+      return sb::delay_embed(series, dimension, delay, forward);
+    }, py::arg("series"), py::arg("dimension"), py::arg("delay"), py::arg("forward"),
+       py::call_guard<py::gil_scoped_release>());
     m.def("windows", [](const sb::TimeSeries<T>& series, sb::float64_t size, sb::float64_t step, bool closedStart,
                         bool closedEnd, bool partial) {
       return sb::windows(series, size, step, closedStart, closedEnd, partial);

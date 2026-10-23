@@ -17,21 +17,28 @@ def _ms_series():
     return TimeSeries([0.0, 10.0, 25.0, 40.0], times=Times([0.0, 1.0, 2.5, 4.0], unit="ms"))
 
 
-def test_embedding_has_a_point_wherever_a_component_reaches_an_observation():
-    embedding = TimeDelayEmbedding(dimension=3, delay=1.0)(_ms_series())
+@pytest.mark.parametrize("direction, times, between", [
+    # (x(t - 2), x(t - 1), x(t)) changes where x does, at 0.0, 1.0, 2.5, and
+    # 4.0, and 1 and 2 later, from 0.0 + 2 on.
+    pytest.param("backward", [2.0, 2.5, 3.0, 3.5, 4.0], 3.25, id="backward"),
+    # (x(t), x(t + 1), x(t + 2)) changes there and 1 and 2 earlier, up to
+    # 4.0 - 2.
+    pytest.param("forward", [0.0, 0.5, 1.0, 1.5, 2.0], 1.25, id="forward"),
+])
+def test_embedding_has_a_point_wherever_a_component_reaches_an_observation(direction, times, between):
+    embedding = TimeDelayEmbedding(dimension=3, delay=1.0, direction=direction)(_ms_series())
 
-    # x changes at 0.0, 1.0, 2.5, and 4.0, so (x(t - 2), x(t - 1), x(t)),
-    # oldest first, changes at those times and 1 and 2 later, from 2.0 on.
-    assert np.array_equal(np.asarray(embedding.times), [2.0, 2.5, 3.0, 3.5, 4.0])
+    assert np.array_equal(np.asarray(embedding.times), times)
+    # Both directions give the same points, oldest first, at times 2 apart.
     assert np.array_equal(np.asarray(embedding.values), [
-        [0.0, 10.0, 10.0],    # 2.0: x(0.0), x(1.0), x(2.0)
-        [0.0, 10.0, 25.0],    # 2.5: x(0.5), x(1.5), x(2.5)
-        [10.0, 10.0, 25.0],   # 3.0: x(1.0), x(2.0), x(3.0)
-        [10.0, 25.0, 25.0],   # 3.5: x(1.5), x(2.5), x(3.5)
-        [10.0, 25.0, 40.0],   # 4.0: x(2.0), x(3.0), x(4.0)
+        [0.0, 10.0, 10.0],    # x(0.0), x(1.0), x(2.0)
+        [0.0, 10.0, 25.0],    # x(0.5), x(1.5), x(2.5)
+        [10.0, 10.0, 25.0],   # x(1.0), x(2.0), x(3.0)
+        [10.0, 25.0, 25.0],   # x(1.5), x(2.5), x(3.5)
+        [10.0, 25.0, 40.0],   # x(2.0), x(3.0), x(4.0)
     ])
     # (x(1.25), x(2.25), x(3.25)), between two times.
-    assert np.array_equal(np.asarray(embedding(3.25)), [10.0, 10.0, 25.0])
+    assert np.array_equal(np.asarray(embedding(between)), [10.0, 10.0, 25.0])
 
 
 def test_embedding_starts_where_every_component_has_a_value():
@@ -43,6 +50,15 @@ def test_embedding_starts_where_every_component_has_a_value():
     assert np.array_equal(np.asarray(embedding(2.0)), [0.0, 10.0, 10.0])
     with pytest.raises(ValueError, match="outside the domain"):
         embedding(1.75)
+
+
+def test_forward_embedding_ends_where_every_component_has_a_value():
+    embedding = TimeDelayEmbedding(dimension=3, delay=1.0, direction="forward")(_ms_series())
+
+    # The domain ends at 4.0 - 2 * 1.0.
+    assert np.array_equal(np.asarray(embedding(2.0)), [10.0, 25.0, 40.0])
+    with pytest.raises(ValueError, match="outside the domain"):
+        embedding(2.25)
 
 
 def test_embedding_of_shaped_observations_adds_a_leading_axis():
@@ -78,8 +94,12 @@ def test_embedding_of_pcfs_stacks_delayed_pcfs():
     pytest.param(lambda: TimeDelayEmbedding(dimension=0, delay=1.0), ValueError, id="dimension-0"),
     pytest.param(lambda: TimeDelayEmbedding(dimension=2, delay=0.0), ValueError, id="delay-0"),
     pytest.param(lambda: TimeDelayEmbedding(dimension=2, delay=-1.0), ValueError, id="delay-negative"),
+    pytest.param(lambda: TimeDelayEmbedding(dimension=2, delay=1.0, direction="ahead"), ValueError,
+                 id="direction-unknown"),
     pytest.param(lambda: TimeDelayEmbedding(dimension=3, delay=1.0)(
         TimeSeries([0.0, 10.0], times=[0.0, 1.0])), ValueError, id="too-short"),
+    pytest.param(lambda: TimeDelayEmbedding(dimension=3, delay=1.0, direction="forward")(
+        TimeSeries([0.0, 10.0], times=[0.0, 1.0])), ValueError, id="too-short-forward"),
 ])
 def test_embedding_rejects_invalid_input(make_embedding, error):
     with pytest.raises(error):
@@ -165,6 +185,23 @@ def test_embedding_records_a_point_once_at_the_time_its_rounded_times_snap_to(ca
 
     assert np.array_equal(np.asarray(embedding.times), case.embedding_times)
     assert np.array_equal(np.asarray(embedding.values), case.points)
+
+
+def test_forward_embedding_records_a_point_at_the_observation_its_rounded_time_snaps_to():
+    series = TimeSeries([1.0, 2.0, 3.0, 4.0], times=[0.1, 0.2, 0.3, 0.4])
+
+    embedding = TimeDelayEmbedding(dimension=2, delay=0.1, direction="forward")(series)
+
+    # 0.3 - 0.1 is 0.19999999999999998, just below the observation at 0.2,
+    # so the point is recorded at 0.2.
+    assert np.array_equal(np.asarray(embedding.times), [0.1, 0.2, 0.3])
+    assert np.array_equal(np.asarray(embedding.values), [
+        [1.0, 2.0],   # 0.1: x(0.1), x(0.2)
+        [2.0, 3.0],   # 0.2: x(0.2), x(0.3)
+        [3.0, 4.0],   # 0.3: x(0.3), x(0.4)
+    ])
+    # The domain ends at 0.4 - 0.1, which is 0.30000000000000004.
+    assert np.array_equal(np.asarray(embedding(0.4 - 0.1)), [3.0, 4.0])
 
 
 def test_embedding_reaches_components_many_observations_back():
@@ -258,12 +295,29 @@ def test_embedding_survives_saving(round_trip):
     assert loaded.array_equal(embedding)
 
 
-@pytest.mark.parametrize("round_trip", ROUND_TRIPS)
-def test_embedding_of_a_window_with_a_closed_end_survives_saving(round_trip):
+def test_forward_embedding_of_a_window_ends_one_span_before_the_window():
     source = TimeSeries([0.0, 10.0, 20.0, 40.0], times=[0.0, 1.0, 2.0, 4.0])
-    # The embedding of the window (1, 3] is observed at its closed end, 2.
+    # The window (1, 3] holds 10 from 0 and 20 from 1, up to its closed
+    # end, 2, in window time.
     window = Window(size=2.0, step=1.0, closed="right")(source)[1]
-    embedding = TimeDelayEmbedding(dimension=2, delay=1.0)(window)
+
+    embedding = TimeDelayEmbedding(dimension=2, delay=1.0, direction="forward")(window)
+
+    # (x(t), x(t + 1)) for t in (0, 2 - 1].
+    assert np.array_equal(np.asarray(embedding(0.5)), [10.0, 20.0])
+    assert np.array_equal(np.asarray(embedding(1.0)), [20.0, 20.0])
+    with pytest.raises(ValueError, match="outside the domain"):
+        embedding(1.5)
+
+
+@pytest.mark.parametrize("round_trip", ROUND_TRIPS)
+@pytest.mark.parametrize("direction", ["backward", "forward"])
+def test_embedding_of_a_window_with_a_closed_end_survives_saving(direction, round_trip):
+    source = TimeSeries([0.0, 10.0, 20.0, 40.0], times=[0.0, 1.0, 2.0, 4.0])
+    # The embedding of the window (1, 3] is observed at its closed end: 2
+    # looking back, and 2 - 1 looking forward.
+    window = Window(size=2.0, step=1.0, closed="right")(source)[1]
+    embedding = TimeDelayEmbedding(dimension=2, delay=1.0, direction=direction)(window)
 
     loaded = round_trip(embedding)
 

@@ -33,3 +33,22 @@ them, and the delay is read in the unit of the series. To study the shape
 of the embedded points over time, cut the embedding into
 :doc:`windows <timeseries_windows>`. On a series with several
 :doc:`channels <timeseries_channels>`, each channel is embedded separately.
+
+Looking forward
+---------------
+
+With ``direction="forward"``, the components look ahead of :math:`t`
+instead:
+
+.. math::
+
+   (x(t), x(t + d), \dots, x(t + (m-1)d)).
+
+The components keep the same order, so the forward point at :math:`t` is the
+backward point at :math:`t + (m-1)d`. The domain now ends :math:`(m-1)d`
+before the series does::
+
+   forward = TimeDelayEmbedding(dimension=2, delay=0.5, direction="forward")(signal)
+
+   forward(0.5)  # [1.0, 0.0], the values at 0.5 s and 1 s
+   forward(5.5)  # ValueError: Time 5.5 is outside the domain [0, 5.4]

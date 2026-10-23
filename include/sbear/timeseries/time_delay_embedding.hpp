@@ -3,6 +3,7 @@
 
 #include "../timeseries.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <functional>
 #include <limits>
@@ -14,17 +15,20 @@
 namespace sb
 {
   /// The delay embedding of @p channel with @p dimension components spaced
-  /// @p delay apart, in the channel's unit. Its value at t is
-  /// (x(t - (dimension - 1) * delay), ..., x(t - delay), x(t)), oldest first
-  /// as in Kantz and Schreiber's convention, for every t from
-  /// t_0 + (dimension - 1) * delay to the end of the channel's domain, each
-  /// end included when the channel's is, so each observation gains a leading
-  /// axis of length @p dimension. Its times are the start of that domain and
-  /// the times in it where a component reaches an observation,
-  /// t_i + k * delay; times that round to the same point are recorded once,
-  /// at the time they snap to. It is a view of the channel's storage.
+  /// @p delay apart, in the channel's unit, with w = (dimension - 1) * delay.
+  /// Its value at t is (x(t - w), ..., x(t - delay), x(t)), oldest first as
+  /// in Kantz and Schreiber's convention, for every t from t_0 + w to the end
+  /// of the channel's domain. If @p forward, it is instead
+  /// (x(t), x(t + delay), ..., x(t + w)), also oldest first, for every t from
+  /// t_0 to the end of the domain minus w. Each end is included when the
+  /// channel's is, and each observation gains a leading axis of length
+  /// @p dimension. Its times are the start of its domain and the times in it
+  /// where a component reaches an observation, t_i + k * delay, or
+  /// t_i - k * delay if @p forward; times that round to the same point are
+  /// recorded once, at the time they snap to. It is a view of the channel's
+  /// storage.
   template <typename T>
-  Channel<T> delay_embed(const Channel<T>& channel, size_t dimension, float64_t delay)
+  Channel<T> delay_embed(const Channel<T>& channel, size_t dimension, float64_t delay, bool forward = false)
   {
     if (dimension == 0)
     {
@@ -35,27 +39,29 @@ namespace sb
       throw std::invalid_argument("The embedding delay must be finite and positive");
     }
 
-    // Component j, oldest first, reads the channel lags[j] before t.
+    // Component j, oldest first, reads the channel lags[j] before t. Looking
+    // forward, the lags are negative: component j reads j * delay after t.
     std::vector<float64_t> lags(dimension);
     for (size_t j = 0; j < dimension; ++j)
     {
-      lags[j] = static_cast<float64_t>(dimension - 1 - j) * delay;
+      lags[j] = forward ? -(static_cast<float64_t>(j) * delay) : static_cast<float64_t>(dimension - 1 - j) * delay;
     }
+    const auto [lowest, highest] = std::minmax_element(lags.begin(), lags.end());
 
     const auto n = channel.size();
     std::vector<float64_t> at;
     if (n > 0)
     {
-      const auto start = channel.time(0) + lags.front();
+      const auto start = channel.time(0) + *highest;
       // A channel with an end, such as a window, can be evaluated past its
-      // last timestamp up to its end, so the embedding can too, and keeps
-      // that end, and an open start, through stack_at.
-      const auto end = channel.end().value_or(channel.time(n - 1));
+      // last timestamp up to its end, so the embedding can too, up to that
+      // end plus the lowest lag. It keeps an open start through stack_at.
+      const auto end = channel.end().value_or(channel.time(n - 1)) + *lowest;
       const auto closed = channel.end_closed();
       const auto past = [&](float64_t s) { return closed ? s > end : s >= end; };
       if (past(start))
       {
-        throw std::invalid_argument("The series is too short for this embedding: no time has its full history");
+        throw std::invalid_argument("The series is too short for this embedding: no time has all of its components");
       }
       // Component j changes where its lagged time reaches an observation: at
       // the timestamps shifted by lags[j]. A queue holds each component's next
@@ -93,8 +99,6 @@ namespace sb
       // timestamp if the run has one, else its latest time, since snapping
       // moves a time forward onto the observation it falls just short of.
       // The first point stays at the start, so the domain keeps its start.
-      // The last observation is a timestamp, so the domain keeps its end,
-      // unless the first run reaches it.
       const auto reach = (channel.snap_eps() + 4) * std::numeric_limits<float64_t>::epsilon();
       std::vector<size_t> previous(dimension);
       for (size_t j = 0; j < dimension; ++j)
@@ -122,12 +126,12 @@ namespace sb
             queue.emplace(pending(j), j);
           }
           reached.push_back(j);
-          // The newest component has lag 0, so its shifted times are the
-          // channel's own timestamps.
-          isTimestamp = isTimestamp || j == dimension - 1;
+          // The component with lag 0 has the channel's own timestamps as its
+          // shifted times.
+          isTimestamp = isTimestamp || lags[j] == 0;
         }
         near.clear();
-        while (!queue.empty() && queue.top().first <= s + reach * (std::abs(s) + lags.front()))
+        while (!queue.empty() && queue.top().first <= s + reach * (std::abs(s) + *highest - *lowest))
         {
           near.push_back(queue.top());
           queue.pop();
@@ -159,26 +163,29 @@ namespace sb
           runHasTimestamp = runHasTimestamp || isTimestamp;
         }
       }
-      if (!channel.end() && at.back() != end)
-      {
-        at.push_back(end);
-      }
     }
 
-    return channel.stack_at(Times(std::move(at), channel.unit()), lags);
+    auto embedding = channel.stack_at(Times(std::move(at), channel.unit()), lags);
+    if (n == 0)
+    {
+      return embedding;
+    }
+    // The domain ends at the channel's end plus the lowest lag, which a run
+    // recorded at an earlier time may not reach.
+    return embedding.until(channel.end().value_or(channel.time(n - 1)) + *lowest, channel.end_closed());
   }
 
   /// The delay embedding of every channel of @p series, with @p delay given
   /// in the series' unit and converted into each channel's unit.
   template <typename T>
-  TimeSeries<T> delay_embed(const TimeSeries<T>& series, size_t dimension, float64_t delay)
+  TimeSeries<T> delay_embed(const TimeSeries<T>& series, size_t dimension, float64_t delay, bool forward = false)
   {
     std::vector<Channel<T>> channels;
     channels.reserve(series.n_channels());
     for (size_t c = 0; c < series.n_channels(); ++c)
     {
       const auto& channel = series.channel(c);
-      channels.push_back(delay_embed(channel, dimension, convert_time(delay, series.unit(), channel.unit())));
+      channels.push_back(delay_embed(channel, dimension, convert_time(delay, series.unit(), channel.unit()), forward));
     }
     return TimeSeries<T>(std::move(channels), series.unit());
   }
