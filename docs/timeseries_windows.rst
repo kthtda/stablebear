@@ -108,10 +108,9 @@ and the windows from the end are
 Closed ends
 -----------
 
-The ``closed`` argument chooses which ends every window includes. It
-defaults to the anchor end, ``"left"`` with ``anchor="start"`` and
-``"right"`` with ``anchor="end"``, so that the observation at the anchor
-is in a window. Of the four choices, ``"left"`` gives
+The ``closed`` argument chooses which ends every window includes. Its
+default, the anchor end as above, puts the observation at the anchor in a
+window. Of the four choices, ``"left"`` gives
 :math:`[s_k, s_k + \text{size})`, ``"right"`` gives
 :math:`(s_k, s_k + \text{size}]`, ``"both"`` gives
 :math:`[s_k, s_k + \text{size}]`, and ``"none"`` gives
@@ -153,8 +152,9 @@ series, and those that would run past it are cut short there. With
 :math:`[s_k, s_k + \text{size})` from the start with
 :math:`s_k + \text{size} > T` becomes :math:`[s_k, T]`, and a window
 :math:`(s_k, s_k + \text{size}]` from the end with :math:`s_k < t_0`
-becomes :math:`[t_0, s_k + \text{size}]`. The rows of ``bounds`` hold the
-ends after cutting::
+becomes :math:`[t_0, s_k + \text{size}]`. A window cut short includes the
+end of the time series it is cut at, whatever ``closed`` is. The rows of
+``bounds`` hold the ends after cutting::
 
    _, bounds = Window(size=3.0, anchor="start", partial=True)(
        signal, return_bounds=True)

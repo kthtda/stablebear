@@ -332,8 +332,10 @@ namespace sb
     // below the observation it means; snap it forward. As in the tolerant
     // comparison of APL, the distance is relative to the magnitude of the
     // timestamps, so it scales with their rounding errors and does not
-    // depend on the unit. Capping it at a quarter of the gap keeps a query
-    // nearer the previous observation from snapping and never skips one.
+    // depend on the unit. On large timestamps close together, it can exceed
+    // the gap, so that even a query at the previous timestamp would snap past
+    // the observation recorded there; capping it at a quarter of the gap
+    // keeps a query nearer the previous observation where it is.
     if (next < times.size() && m_snapTolerance > 0)
     {
       const auto prev = times[next - 1];

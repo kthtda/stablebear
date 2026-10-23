@@ -271,7 +271,8 @@ namespace sb
     /// comparison of APL, a query below an observation by at most
     /// snap_tolerance() times the larger magnitude of it and the previous
     /// timestamp counts as reaching it, as long as it is also within a
-    /// quarter of the gap to the previous timestamp.
+    /// quarter of the gap to the previous timestamp, so that a query at the
+    /// previous timestamp still gets the observation recorded there.
     ///
     /// The caller checks that @p t lies between the first and last
     /// observations, in its own unit: a time converted into the channel's

@@ -1,5 +1,9 @@
 ## Unreleased
 
+### New features
+
+* **Time series** — `timeseries.TimeSeries` holds observations of any element type, such as numbers, vectors, point clouds, or barcodes, at explicit timestamps with a time unit, and evaluates by previous value. Several channels with their own timestamps and units combine with `TimeSeries.from_channels`. Queries that miss a timestamp by a rounding error snap to it by tolerant comparison, as in APL. `timeseries.TimeDelayEmbedding` and `timeseries.Window` build delay embeddings and windows, which evaluate on a grid to point clouds for persistent homology. Series and tensors of series support saving, loading, and pickling. ([#242](https://github.com/kthtda/stablebear/issues/242))
+
 ### Bug fixes
 
 * **Errors in parallel work are raised** — An exception thrown while processing one element in parallel, such as a failed allocation in `point_process.sample_poisson`, now reaches Python. Previously the element was silently left at its default value. ([#34](https://github.com/kthtda/stablebear/issues/34))

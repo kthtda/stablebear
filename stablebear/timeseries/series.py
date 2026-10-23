@@ -236,10 +236,11 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
 
         t >= t[i] - min(tol * max(|t[i-1]|, |t[i]|), (t[i] - t[i-1]) / 4).
 
-    The quarter of the gap keeps a query nearer the previous observation
-    from snapping, so the shifted thresholds stay strictly increasing and
-    no observation is skipped. With tol = 0, the series is the last
-    observation at or before t.
+    On large timestamps close together, ``tol * max(|t[i-1]|, |t[i]|)`` can
+    exceed the gap, so that a query at t[i-1] itself would get x[i]; the
+    quarter of the gap keeps a query nearer the previous observation from
+    snapping. With tol = 0, the series is the last observation at or
+    before t.
     """
 
     def __init__(self, values, times, *, snap_tolerance: float = 1e-14):

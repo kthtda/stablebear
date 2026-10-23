@@ -93,9 +93,10 @@ A quarter of the gap
 A tolerance relative to the size of the timestamps is generous when the
 timestamps are large and close together. Unix timestamps in seconds are near
 ``1.7e9``, where the tolerance allows ``1.7e-5`` s, more than a microsecond
-gap between observations. Snapping therefore also stops at a quarter of the
-gap to the previous timestamp, so that a query nearer the previous
-observation never snaps forward and no observation is skipped. The figure
+gap between observations. Without a further limit, a query exactly at one
+observation's timestamp would snap to the next observation. Snapping
+therefore also stops at a quarter of the gap to the previous timestamp, so
+that a query nearer the previous observation never snaps forward. The figure
 shows the float64 values between two observations a microsecond apart at
 this size, about ``2.4e-7`` s apart. A query one of them below the later
 observation snaps to it, and one two below does not.
