@@ -68,18 +68,6 @@ timestamp is outside the domain and raises an error::
 A query at a timestamp gets the observation recorded there, as at
 ``t = 1.5``.
 
-Queries computed in floating point
-----------------------------------
-
-Query times are often computed, for example as ``0.3 - 0.1``, and rounding
-can put them just below the timestamp they mean. Evaluation snaps such
-queries forward to that timestamp, so on a series with a timestamp at 0.2,
-the query ``0.3 - 0.1`` returns the observation recorded there rather than
-the one before it. Only queries within a rounding error of a timestamp
-snap; the defaults fit most data. The ``snap_tolerance`` and ``snap_eps``
-arguments of :py:class:`~stablebear.timeseries.TimeSeries` set the limits,
-and :doc:`timeseries_snapping` explains them in detail.
-
 Units
 -----
 
@@ -107,6 +95,8 @@ different timestamps and units into one series. Element-wise operations,
 such as persistent homology, apply to every observation and keep the times.
 A delay embedding turns a signal into points that trace its dynamics, and
 windows cut a series into pieces that can be compared with each other.
+Snapping covers query times such as ``0.3 - 0.1`` that land a rounding error
+below the timestamp they mean.
 
 .. toctree::
    :maxdepth: 1
