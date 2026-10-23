@@ -52,29 +52,92 @@ window ``i`` at ``t[j]``::
    windows(1.0)[1]      # 1.0, the value of signal at 3 s
    windows([0.0, 1.0])  # [[0.0, 0.0], [0.0, 1.0], [2.0, 3.0]], shape (3, 2)
 
-Windows from the start
-----------------------
+Anchoring the windows
+---------------------
 
-By default the last window ends where the time series ends, and time at the
-start that no full window covers is left out. With ``anchor="start"``, the
-first window starts where the time series starts instead, and the time left out
-is at the end::
+With ``anchor="start"``, as above, the windows start where the time series
+starts. With ``anchor="end"``, the default, they end where it ends. The two
+differ when the windows do not fit exactly, as windows of 3 s on the 8 s of
+``signal`` do not::
 
-   series = TimeSeries([0.0, 10.0, 20.0, 30.0, 40.0, 50.0],
-                       times=[0.0, 1.0, 2.0, 3.0, 4.0, 5.0])
+   _, bounds = Window(size=3.0, anchor="start")(signal, return_bounds=True)
+   bounds  # [[0.0, 3.0], [3.0, 6.0]]
 
-   _, bounds = Window(size=2.0)(series, return_bounds=True)
-   bounds  # [[1.0, 3.0], [3.0, 5.0]]
+   _, bounds = Window(size=3.0)(signal, return_bounds=True)
+   bounds  # [[2.0, 5.0], [5.0, 8.0]]
 
-   _, bounds = Window(size=2.0, anchor="start")(series, return_bounds=True)
-   bounds  # [[0.0, 2.0], [2.0, 4.0]]
+The figure shows both sets of windows below ``signal``. Filled circles
+mark the ends a window includes, and hollow circles the ends it leaves out.
 
-Either way the windows come in chronological order. By default each window
-is closed at its anchor end, :math:`(a, a + \text{size}]` from the end and
-:math:`[a, a + \text{size})` from the start, so the observation at 5 s is in
-the last window, and the one at 0 s is in the first window from the start.
-With ``partial=True``, the time left out becomes a shorter window, at the
-start of the time series or, with ``anchor="start"``, at its end.
+.. image:: _static/timeseries_window_anchors_light.png
+   :width: 90%
+   :class: only-light
+   :alt: Windows of 3 s anchored at the start and at the end of the signal
+
+.. image:: _static/timeseries_window_anchors_dark.png
+   :width: 90%
+   :class: only-dark
+   :alt: Windows of 3 s anchored at the start and at the end of the signal
+
+.. dropdown:: Show plotting code
+   :color: secondary
+
+   .. literalinclude:: _static/gen_timeseries_snap_fig.py
+      :pyobject: plot_timeseries_window_anchors
+      :language: python
+
+Either way the windows are returned in chronological order. By default
+each window is closed at its anchor end and open at the other. With
+:math:`s_k` the start of the :math:`k`-th window, as in ``bounds``, the
+windows from the start are
+
+.. math::
+
+   [s_1, s_1 + \text{size}), [s_2, s_2 + \text{size}), \dots, [s_n, s_n + \text{size}),
+
+and the windows from the end are
+
+.. math::
+
+   (s_1, s_1 + \text{size}], (s_2, s_2 + \text{size}], \dots, (s_n, s_n + \text{size}].
+
+Partial windows
+---------------
+
+With ``partial=True``, the windows continue to the far end of the time
+series, and those that would run past it are cut short there. With
+:math:`t_0` and :math:`T` the start and end of the time series, a window
+:math:`[s_k, s_k + \text{size})` from the start with
+:math:`s_k + \text{size} > T` becomes :math:`[s_k, T]`, and a window
+:math:`(s_k, s_k + \text{size}]` from the end with :math:`s_k < t_0`
+becomes :math:`[t_0, s_k + \text{size}]`. The rows of ``bounds`` hold the
+ends after cutting::
+
+   _, bounds = Window(size=3.0, anchor="start", partial=True)(
+       signal, return_bounds=True)
+   bounds  # [[0.0, 3.0], [3.0, 6.0], [6.0, 8.0]]
+
+   _, bounds = Window(size=3.0, partial=True)(signal, return_bounds=True)
+   bounds  # [[0.0, 2.0], [2.0, 5.0], [5.0, 8.0]]
+
+In the figure, the dashed windows are the ones cut short.
+
+.. image:: _static/timeseries_window_partial_light.png
+   :width: 90%
+   :class: only-light
+   :alt: Windows of 3 s with partial windows, dashed, at the far end of the signal
+
+.. image:: _static/timeseries_window_partial_dark.png
+   :width: 90%
+   :class: only-dark
+   :alt: Windows of 3 s with partial windows, dashed, at the far end of the signal
+
+.. dropdown:: Show plotting code
+   :color: secondary
+
+   .. literalinclude:: _static/gen_timeseries_snap_fig.py
+      :pyobject: plot_timeseries_window_partial
+      :language: python
 
 Windows of several channels
 ---------------------------
