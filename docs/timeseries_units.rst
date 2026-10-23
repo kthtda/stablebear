@@ -3,7 +3,7 @@ Time units
 
 :py:class:`~stablebear.timeseries.Times` and
 :py:class:`~stablebear.timeseries.TimeSeries` accept the following units; see
-:doc:`timeseries` for how a series uses its unit. Names are case-sensitive.
+:doc:`timeseries` for how a time series uses its unit. Names are case-sensitive.
 :py:attr:`Times.unit <stablebear.timeseries.Times.unit>` reports the short
 name, whichever spelling was passed.
 

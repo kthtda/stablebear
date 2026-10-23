@@ -5,7 +5,7 @@ Signals recorded by different instruments rarely share timestamps or units.
 :py:meth:`TimeSeries.from_channels
 <stablebear.timeseries.TimeSeries.from_channels>` keeps each signal as a
 channel with its own timestamps, unit, and snapping (see
-:doc:`timeseries_snapping`). Every query is converted from the series' unit
+:doc:`timeseries_snapping`). Every query is converted from the time series' unit
 into each channel's unit (see :doc:`timeseries_units`).
 
 Here channel ``a`` is sampled every 0.1 s from 0 s, and channel ``b`` every
@@ -18,7 +18,7 @@ Here channel ``a`` is sampled every 0.1 s from 0 s, and channel ``b`` every
                   times=Times([50.0, 90.0, 130.0], unit="ms"))
    series = TimeSeries.from_channels([a, b], unit="s")
 
-A series can be evaluated only where all of its channels can, here from
+A time series can be evaluated only where all of its channels can, here from
 0.05 s, when ``b`` starts, to 0.13 s, when ``b`` ends. The figure shows both
 channels with this domain shaded. The squares are a query at ``t = 0.1``.
 
@@ -61,7 +61,7 @@ them::
    values[0]  # FloatTensor [1.0, 2.0], from a
    values[1]  # FloatTensor [10.0, 20.0], from b
 
-``series[i]`` selects channel ``i`` as a series of its own.
+``series[i]`` selects channel ``i`` as a time series of its own.
 
 Channels with different shapes
 ------------------------------

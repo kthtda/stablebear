@@ -11,7 +11,7 @@ miss a timestamp by a rounding error, and how the ``snap_tolerance`` and
 Rounding errors in queries
 --------------------------
 
-Query times are often computed rather than typed in. Take a series sampled
+Query times are often computed rather than typed in. Take a time series sampled
 every 0.1 s and ask for the value 0.1 s before the last observation, at
 ``0.3 - 0.1``. The intended query is 0.2, which should return the
 observation 3.0 recorded there. The figure shows what happens instead.
@@ -33,7 +33,7 @@ observation 3.0 recorded there. The figure shows what happens instead.
       :pyobject: plot_timeseries_rounding
       :language: python
 
-At the scale of the whole series, the query (dashed) sits on 0.2. Zoomed
+At the scale of the whole time series, the query (dashed) sits on 0.2. Zoomed
 in, the gray ticks on the time axis mark the float64 values near 0.2, about
 ``2.8e-17`` s apart. Neither 0.1 nor 0.3 is exactly representable, and
 ``0.3 - 0.1`` rounds to ``0.19999999999999998``, the float64 value just
@@ -106,7 +106,7 @@ The rule
 Precisely, let :math:`r` be ``snap_tolerance``, :math:`k` be
 ``snap_eps``, and :math:`\varepsilon` be machine epsilon, and let the
 timestamps be :math:`t_0 < t_1 < \cdots < t_{n-1}`. At a time
-:math:`t \geq t_0`, the series takes observation :math:`i`, where :math:`i`
+:math:`t \geq t_0`, the time series takes observation :math:`i`, where :math:`i`
 is the largest index such that :math:`i = 0` or
 
 .. math::

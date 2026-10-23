@@ -1,11 +1,10 @@
 Windows
 =======
 
-A window restricts a series to an interval of time, so that pieces of one
+A window restricts a time series to an interval of time, so that pieces of one
 signal can be compared with each other. :py:class:`~stablebear.timeseries.Window`
-cuts a series into windows of a fixed size at a fixed step, ending where
-the series ends or, from the start, starting where it starts. Each window is
-a series whose times start at 0.
+cuts a time series into windows of a fixed size at a fixed step. Each window is
+a time series whose times start at 0.
 
 Here the windows cut the :doc:`delay embedding <timeseries_embedding>` of a
 sine with period 2 s, whose domain is :math:`[0.5, 6]`, into pieces of
@@ -35,15 +34,15 @@ The persistence of each point cloud measures the loop::
 Each window holds one full period of the circle, so every window gives the
 same longest H1 bar, of length about 1.46. A change in the dynamics of the
 signal would show up as a change in the bars from one window to the next.
-On a series with several :doc:`channels <timeseries_channels>`, each channel
+On a time series with several :doc:`channels <timeseries_channels>`, each channel
 is windowed separately.
 
 Windows from the start
 ----------------------
 
-By default the last window ends where the series ends, and time at the
+By default the last window ends where the time series ends, and time at the
 start that no full window covers is left out. With ``anchor="start"``, the
-first window starts where the series starts instead, and the time left out
+first window starts where the time series starts instead, and the time left out
 is at the end::
 
    series = TimeSeries([0.0, 10.0, 20.0, 30.0, 40.0, 50.0],
@@ -60,4 +59,4 @@ is closed at its anchor end, :math:`(a, a + \text{size}]` from the end and
 :math:`[a, a + \text{size})` from the start, so the observation at 5 s is in
 the last window, and the one at 0 s is in the first window from the start.
 With ``partial=True``, the time left out becomes a shorter window, at the
-start of the series or, with ``anchor="start"``, at its end.
+start of the time series or, with ``anchor="start"``, at its end.

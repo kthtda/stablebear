@@ -2,7 +2,7 @@ Delay embeddings
 ================
 
 A delay embedding turns a signal into points built from its values at
-several delayed times. Let :math:`x \colon \mathbb{R} \to \mathbb{R}` be a series of
+several delayed times. Let :math:`x \colon \mathbb{R} \to \mathbb{R}` be a time series of
 numbers, evaluated as in :doc:`timeseries`. With
 :py:class:`~stablebear.timeseries.TimeDelayEmbedding` of dimension :math:`m`
 and delay :math:`\delta > 0`, the value of :math:`x` at time :math:`t` becomes
@@ -45,18 +45,18 @@ and the point they form at ``t = 1``.
       :language: python
 
 The embedding has the full history only from :math:`(m-1)\delta` after the
-series starts, so its domain is :math:`[0.5, 6]`::
+time series starts, so its domain is :math:`[0.5, 6]`::
 
    embedded(0.4)   # ValueError: Time 0.4 is outside the domain [0.5, 6]
 
 More generally, the observations can be arrays or elements such as point
-clouds. For a series :math:`x \colon \mathbb{R} \to X` with observations in
+clouds. For a time series :math:`x \colon \mathbb{R} \to X` with observations in
 a space :math:`X`, the embedding takes values in :math:`X^m`.
 
 The embedding shares the observations of ``signal`` instead of copying
 them, and the delay is read in the unit of the series. To study the shape
 of the embedded points over time, cut the embedding into
-:doc:`windows <timeseries_windows>`. On a series with several
+:doc:`windows <timeseries_windows>`. On a time series with several
 :doc:`channels <timeseries_channels>`, each channel is embedded separately.
 
 Looking forward
@@ -71,7 +71,7 @@ instead:
 
 The components keep the same order, so the forward point at :math:`t` is the
 backward point at :math:`t + (m-1)\delta`. The domain now ends :math:`(m-1)\delta`
-before the series does::
+before the time series does::
 
    forward = TimeDelayEmbedding(dimension=2, delay=0.5, direction="forward")(signal)
 
@@ -82,7 +82,7 @@ Takens's theorem
 ----------------
 
 Delay embeddings are justified by Takens's theorem
-:footcite:`Takens1981`, which concerns a series of numbers,
+:footcite:`Takens1981`, which concerns a time series of numbers,
 :math:`x \colon \mathbb{R} \to \mathbb{R}`, embedded in :math:`\mathbb{R}^m`.
 Suppose the signal is a smooth measurement of a dynamical system whose
 states lie on a compact manifold of dimension :math:`n`. For a generic
