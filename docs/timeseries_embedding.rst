@@ -77,3 +77,23 @@ before the series does::
 
    forward(0.5)  # [1.0, 0.0], the values at 0.5 s and 1 s
    forward(5.6)  # ValueError: Time 5.6 is outside the domain [0, 5.5]
+
+Takens's theorem
+----------------
+
+Delay embeddings are justified by Takens's theorem
+:footcite:`Takens1981`. Suppose the signal is a smooth measurement of a
+dynamical system whose states lie on a compact manifold of dimension
+:math:`n`. For a generic system and measurement, the delay embedding with
+dimension :math:`m \ge 2n + 1` is an embedding of the state space: distinct
+states give distinct points, and the embedded points have the same topology
+as the states. The persistence of embedded sample points can therefore
+estimate the topology of the states, not only of the signal. The sine above
+comes from a periodic system, whose states form a circle (:math:`n = 1`).
+Its embedding is already a circle at :math:`m = 2`: the bound
+:math:`2n + 1` is sufficient, not necessary.
+
+References
+----------
+
+.. footbibliography::
