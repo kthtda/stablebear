@@ -96,16 +96,12 @@ time in two::
        series, return_bounds=True)
    bounds  # [[0.05, 0.09], [0.09, 0.13]]
 
-In the second window, ``a`` holds the value 1.0 in effect at 0.09 s,
-followed by its observation 2.0 at 0.1 s, while ``b`` holds only its
-observation 20.0 at 0.09 s::
-
-   windows[1][0].values  # [1.0, 2.0], at times 0 and 0.01
-   windows[1][1].values  # [20.0], at time 0
-
 Evaluating the windows gives one tensor per channel, as evaluating a time
-series with several channels does::
+series with several channels does, each with one axis for the windows
+followed by the axes of the times. In the second window, ``a`` changes from
+1.0 to 2.0 at 0.01 s, with its observation at 0.1 s, while ``b`` keeps its
+observation 20.0 from 0.09 s::
 
-   values = windows(0.02)
-   values[0]  # [1.0, 2.0], from a
-   values[1]  # [10.0, 20.0], from b
+   values = windows([0.0, 0.02])
+   values[0]  # [[1.0, 1.0], [1.0, 2.0]], from a
+   values[1]  # [[10.0, 10.0], [20.0, 20.0]], from b
