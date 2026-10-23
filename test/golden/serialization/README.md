@@ -31,7 +31,7 @@ After building/installing, generate a new corpus from `test/` with
 `python golden/serialization/generate_point_cloud_v3.py`. It refuses to
 overwrite a corpus or run with uncommitted implementation changes.
 
-`0.5-pre-timeseries` pins 8 V3 time-series artifacts, binary and protocol-4
+`0.6-pre-timeseries` pins 8 V3 time-series artifacts, binary and protocol-4
 pickle, to the producer implementation commit recorded in its manifest: a
 series of barcode32 observations, a float64 series of two channels in
 different units, and two tensors of float64 windows, one with open starts and

@@ -132,4 +132,4 @@ def _cases():
 
 
 if __name__ == "__main__":
-    write_pinned_corpus("0.5-pre-timeseries", _cases())
+    write_pinned_corpus("0.6-pre-timeseries", _cases())
