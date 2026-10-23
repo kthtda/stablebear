@@ -10,9 +10,9 @@ and one timestamp per observation; plain timestamp arrays are in seconds, and
    from stablebear.timeseries import Times, TimeSeries
 
    series = TimeSeries([1.0, 3.0, 2.0, 4.0], times=[0.0, 1.0, 1.5, 3.5])
-   series_ms = TimeSeries([1.0, 3.0, 2.0, 4.0],
-                          times=Times([0.0, 1000.0, 1500.0, 3500.0],
-                                      unit="ms"))
+
+   times_ms = Times([0.0, 1000.0, 1500.0, 3500.0], unit="ms")
+   series_ms = TimeSeries([1.0, 3.0, 2.0, 4.0], times=times_ms)
 
 Both series hold the same observations at the same times; ``series_ms``
 reads query times in milliseconds, so ``series_ms(1500.0)`` equals
