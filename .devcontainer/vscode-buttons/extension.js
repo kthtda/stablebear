@@ -7,6 +7,7 @@
 // raise "version" in package.json (VS Code caches an extension by version),
 // run install.sh, then run "Developer: Reload Window".
 const fs = require("fs");
+const http = require("http");
 const path = require("path");
 const vscode = require("vscode");
 
@@ -26,19 +27,73 @@ const ACTIONS = [
   },
 ];
 
-// The browser runs on the host, so it needs the host's path to the
-// repository, which the devcontainer passes as SB_HOST_WORKSPACE.
-function openInBrowser(action) {
+const MIME = {
+  ".html": "text/html",
+  ".css": "text/css",
+  ".js": "text/javascript",
+  ".json": "application/json",
+  ".svg": "image/svg+xml",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".gif": "image/gif",
+  ".ico": "image/x-icon",
+  ".woff": "font/woff",
+  ".woff2": "font/woff2",
+  ".txt": "text/plain",
+};
+
+// Servers by the directory they serve, each started on first use.
+const servers = new Map();
+
+function serve(root) {
+  if (!servers.has(root)) {
+    servers.set(root, new Promise((resolve) => {
+      const server = http.createServer((request, response) => {
+        let urlPath;
+        try {
+          urlPath = decodeURIComponent(new URL(request.url, "http://localhost").pathname);
+        } catch {
+          response.writeHead(400).end();
+          return;
+        }
+        let file = path.join(root, urlPath);
+        if (!file.startsWith(root + path.sep) && file !== root) {
+          response.writeHead(403).end();
+          return;
+        }
+        if (fs.statSync(file, { throwIfNoEntry: false })?.isDirectory()) {
+          file = path.join(file, "index.html");
+        }
+        fs.readFile(file, (error, data) => {
+          if (error) {
+            response.writeHead(404).end();
+            return;
+          }
+          response.writeHead(200, { "Content-Type": MIME[path.extname(file)] ?? "application/octet-stream" });
+          response.end(data);
+        });
+      });
+      server.listen(0, "127.0.0.1", () => resolve(server.address().port));
+    }));
+  }
+  return servers.get(root);
+}
+
+// A remote window does not pass file URIs to the host's browser, so serve the
+// files over HTTP; asExternalUri forwards the port to the host.
+async function openInBrowser(action) {
   const folder = vscode.workspace.workspaceFolders?.[0];
   if (!folder) {
     return;
   }
-  if (!fs.existsSync(path.join(folder.uri.fsPath, action.open))) {
+  const file = path.join(folder.uri.fsPath, action.open);
+  if (!fs.existsSync(file)) {
     vscode.window.showWarningMessage(`${action.open} does not exist yet. Build the docs first.`);
     return;
   }
-  const root = process.env.SB_HOST_WORKSPACE || folder.uri.fsPath;
-  vscode.env.openExternal(vscode.Uri.file(path.posix.join(root, action.open)));
+  const port = await serve(path.dirname(file));
+  const uri = await vscode.env.asExternalUri(vscode.Uri.parse(`http://localhost:${port}/${path.basename(file)}`));
+  vscode.env.openExternal(uri);
 }
 
 function run(action) {
