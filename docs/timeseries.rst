@@ -92,7 +92,7 @@ Working with time series
 ------------------------
 
 The following pages build on evaluation. Channels combine signals with
-different timestamps and units into one series. A delay embedding turns a
+different timestamps and units into one time series. A delay embedding turns a
 signal into points that trace its dynamics, and windows cut a time series into
 pieces that can be compared with each other.
 Snapping covers query times such as ``0.3 - 0.1`` that land a rounding error

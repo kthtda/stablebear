@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from pathlib import Path
 
-from stablebear.timeseries import TimeDelayEmbedding, Times, TimeSeries
+from stablebear.timeseries import TimeDelayEmbedding, Times, TimeSeries, Window
 
 HERE = Path(__file__).parent
 
@@ -224,6 +224,52 @@ def plot_timeseries_embedding():
     return fig
 
 
+# -- included in docs via literalinclude :pyobject: --
+def plot_timeseries_windows():
+    signal = TimeSeries([0.0, 0.0, 0.0, 1.0, 2.0, 3.0, 2.0, 1.0, 0.0],
+                        times=np.arange(9.0))
+    windows, bounds = Window(size=4.0, step=2.0, anchor="start")(
+        signal, return_bounds=True)
+    bounds = np.asarray(bounds)
+    color = plt.rcParams["lines.color"]
+
+    fig = plt.figure(figsize=(7, 4.4))
+    grid = fig.add_gridspec(2, len(bounds), height_ratios=[1.4, 1])
+    ax_signal = fig.add_subplot(grid[0, :])
+    ax_signal.step(np.asarray(signal.times.to("s")), np.asarray(signal.values),
+                   where="post", color=color, linewidth=1.5)
+    # One bar per window above the signal, staggered so they do not overlap.
+    # Each window is [a, b): closed at the start, open at the end.
+    for i, (a, b) in enumerate(bounds):
+        y = 3.6 + 0.7 * i
+        ax_signal.plot([a, b], [y, y], color="tab:orange", linewidth=2)
+        ax_signal.plot(a, y, "o", color="tab:orange", markersize=6, zorder=5)
+        ax_signal.plot(b, y, "o", color="tab:orange", markersize=6,
+                       zorder=5, markerfacecolor=plt.rcParams["axes.facecolor"])
+        ax_signal.text((a + b) / 2, y + 0.08, f"window {i}: [{a:g}, {b:g})",
+                       ha="center", va="bottom", fontsize=8)
+    ax_signal.set_xlim(-0.3, 8.3)
+    ax_signal.set_ylim(-0.3, 5.6)
+    ax_signal.set_xticks(range(9))
+    ax_signal.set_yticks([0, 1, 2, 3])
+    ax_signal.set_xlabel("time (s)")
+    ax_signal.set_ylabel("signal")
+
+    # Each window is evaluated on its domain [0, 4).
+    times = np.linspace(0.0, 4.0, 400, endpoint=False)
+    for i in range(len(bounds)):
+        ax = fig.add_subplot(grid[1, i])
+        ax.plot(times, np.asarray(windows[i](times)), color=color,
+                linewidth=1.5, drawstyle="steps-post")
+        ax.set_xlim(0.0, 4.0)
+        ax.set_ylim(-0.3, 3.3)
+        ax.set_xticks(range(5))
+        ax.set_yticks([0, 1, 2, 3] if i == 0 else [])
+        ax.set_title(f"window {i}", fontsize=9)
+    fig.tight_layout()
+    return fig
+
+
 # -- Generate light and dark variants --
 def _save_themed(plot_func, style, bg_color, fg_color, line_color, outfile):
     with plt.style.context(style), \
@@ -251,6 +297,7 @@ if __name__ == "__main__":
                             ("timeseries_vector_channel", plot_timeseries_vector_channel),
                             ("timeseries_rounding", plot_timeseries_rounding),
                             ("timeseries_snap_distances", plot_timeseries_snap_distances),
-                            ("timeseries_embedding", plot_timeseries_embedding)]:
+                            ("timeseries_embedding", plot_timeseries_embedding),
+                            ("timeseries_windows", plot_timeseries_windows)]:
         _save_themed(plot_func, *LIGHT, HERE / f"{name}_light.png")
         _save_themed(plot_func, *DARK, HERE / f"{name}_dark.png")

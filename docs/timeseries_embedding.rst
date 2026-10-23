@@ -54,7 +54,7 @@ clouds. For a time series :math:`x \colon \mathbb{R} \to X` with observations in
 a space :math:`X`, the embedding takes values in :math:`X^m`.
 
 The embedding shares the observations of ``signal`` instead of copying
-them, and the delay is read in the unit of the series. To study the shape
+them, and the delay is read in the unit of the time series. To study the shape
 of the embedded points over time, cut the embedding into
 :doc:`windows <timeseries_windows>`. On a time series with several
 :doc:`channels <timeseries_channels>`, each channel is embedded separately.

@@ -6,34 +6,47 @@ signal can be compared with each other. :py:class:`~stablebear.timeseries.Window
 cuts a time series into windows of a fixed size at a fixed step. Each window is
 a time series whose times start at 0.
 
-Here the windows cut the :doc:`delay embedding <timeseries_embedding>` of a
-sine with period 2 s, whose domain is :math:`[0.5, 6]`, into pieces of
-2 s, one every second, the last ending at 6 s::
+Here three windows of 4 s, one every 2 s, cut a signal observed once a
+second. Its observations stay at 0, rise by 1 each second to 3, and fall
+back to 0::
 
    import numpy as np
-   from stablebear.persistence import compute_persistent_homology
-   from stablebear.timeseries import TimeDelayEmbedding, TimeSeries, Window
+   from stablebear.timeseries import TimeSeries, Window
 
-   t = np.linspace(0.0, 6.0, 49)
-   signal = TimeSeries(np.sin(np.pi * t), times=t)
-   embedded = TimeDelayEmbedding(dimension=2, delay=0.5)(signal)
+   signal = TimeSeries([0.0, 0.0, 0.0, 1.0, 2.0, 3.0, 2.0, 1.0, 0.0],
+                       times=np.arange(9.0))
 
-   windows, bounds = Window(size=2.0, step=1.0)(embedded, return_bounds=True)
-   bounds  # [[1.0, 3.0], [2.0, 4.0], [3.0, 5.0], [4.0, 6.0]]
+   windows, bounds = Window(size=4.0, step=2.0, anchor="start")(
+       signal, return_bounds=True)
+   bounds  # [[0.0, 4.0], [2.0, 6.0], [4.0, 8.0]]
 
-Each window is :math:`(a, a + 2]`, so it can be evaluated on a grid of 40
-times in :math:`(0, 2]`. Evaluating every window there with
-:py:meth:`TimeSeriesTensor.evaluate
-<stablebear.timeseries.series.TimeSeriesTensor.evaluate>` gives a tensor of
-shape ``(4, 40, 2)``: one point cloud of 40 points in the plane per window.
-The persistence of each point cloud measures the loop::
+The figure shows ``signal`` with the domains of the three windows marked
+above it, and below it each window as a time series of its own, evaluated
+on its domain :math:`[0, 4)`.
 
-   points = windows(np.arange(1, 41) * 2.0 / 40)
-   barcodes = compute_persistent_homology(points, max_dim=1)
+.. image:: _static/timeseries_windows_light.png
+   :width: 90%
+   :class: only-light
+   :alt: A flat, rising, then falling signal cut into three overlapping windows
 
-Each window holds one full period of the circle, so every window gives the
-same longest H1 bar, of length about 1.46. A change in the dynamics of the
-signal would show up as a change in the bars from one window to the next.
+.. image:: _static/timeseries_windows_dark.png
+   :width: 90%
+   :class: only-dark
+   :alt: A flat, rising, then falling signal cut into three overlapping windows
+
+.. dropdown:: Show plotting code
+   :color: secondary
+
+   .. literalinclude:: _static/gen_timeseries_snap_fig.py
+      :pyobject: plot_timeseries_windows
+      :language: python
+
+``windows[i]`` is window ``i``, and evaluating ``windows`` evaluates every
+window at the same times::
+
+   windows[1](1.0)  # 1.0, the value of signal at 3 s
+   windows(1.0)     # [0.0, 1.0, 3.0]
+
 On a time series with several :doc:`channels <timeseries_channels>`, each channel
 is windowed separately.
 
