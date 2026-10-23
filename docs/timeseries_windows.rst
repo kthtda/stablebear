@@ -83,6 +83,10 @@ mark the ends a window includes, and hollow circles the ends it leaves out.
    :color: secondary
 
    .. literalinclude:: _static/gen_timeseries_snap_fig.py
+      :pyobject: _plot_window_rows
+      :language: python
+
+   .. literalinclude:: _static/gen_timeseries_snap_fig.py
       :pyobject: plot_timeseries_window_anchors
       :language: python
 
@@ -100,6 +104,45 @@ and the windows from the end are
 .. math::
 
    (s_1, s_1 + \text{size}], (s_2, s_2 + \text{size}], \dots, (s_n, s_n + \text{size}].
+
+Closed ends
+-----------
+
+The ``closed`` argument chooses which ends every window includes. It
+defaults to the anchor end, ``"left"`` with ``anchor="start"`` and
+``"right"`` with ``anchor="end"``, so that the observation at the anchor
+is in a window. Of the four choices, ``"left"`` gives
+:math:`[s_k, s_k + \text{size})`, ``"right"`` gives
+:math:`(s_k, s_k + \text{size}]`, ``"both"`` gives
+:math:`[s_k, s_k + \text{size}]`, and ``"none"`` gives
+:math:`(s_k, s_k + \text{size})`. A window can be evaluated at an end only
+if it includes that end, and an observation where two windows meet belongs
+to each window that includes it::
+
+   windows = Window(size=3.0, anchor="start", closed="both")(signal)
+   windows(3.0)  # [1.0, 2.0], the values of signal at 3 s and 6 s
+
+   windows = Window(size=3.0, anchor="start")(signal)  # closed="left"
+   windows(3.0)  # ValueError: Time 3 is outside the domain [0, 3)
+
+The figure shows the windows of 3 s from the start for each choice.
+
+.. image:: _static/timeseries_window_closed_light.png
+   :width: 90%
+   :class: only-light
+   :alt: Windows of 3 s from the start with each choice of closed ends
+
+.. image:: _static/timeseries_window_closed_dark.png
+   :width: 90%
+   :class: only-dark
+   :alt: Windows of 3 s from the start with each choice of closed ends
+
+.. dropdown:: Show plotting code
+   :color: secondary
+
+   .. literalinclude:: _static/gen_timeseries_snap_fig.py
+      :pyobject: plot_timeseries_window_closed
+      :language: python
 
 Partial windows
 ---------------
@@ -136,6 +179,10 @@ In the figure, the dashed windows are the ones cut short.
    :color: secondary
 
    .. literalinclude:: _static/gen_timeseries_snap_fig.py
+      :pyobject: _plot_window_rows
+      :language: python
+
+   .. literalinclude:: _static/gen_timeseries_snap_fig.py
       :pyobject: plot_timeseries_window_partial
       :language: python
 
@@ -161,6 +208,10 @@ The figure shows each window on its own row.
 
 .. dropdown:: Show plotting code
    :color: secondary
+
+   .. literalinclude:: _static/gen_timeseries_snap_fig.py
+      :pyobject: _plot_window_rows
+      :language: python
 
    .. literalinclude:: _static/gen_timeseries_snap_fig.py
       :pyobject: plot_timeseries_window_partial_overlap

@@ -333,6 +333,37 @@ def plot_timeseries_window_anchors():
 
 
 # -- included in docs via literalinclude :pyobject: --
+def plot_timeseries_window_closed():
+    signal = TimeSeries([0.0, 0.0, 0.0, 1.0, 2.0, 3.0, 2.0, 1.0, 0.0],
+                        times=np.arange(9.0))
+    choices = ["left", "right", "both", "none"]
+    hollow = plt.rcParams["axes.facecolor"]
+
+    fig, ax = plt.subplots(figsize=(7, 3.0))
+    for row, closed in enumerate(choices):
+        window = Window(size=3.0, anchor="start", closed=closed)
+        _, bounds = window(signal, return_bounds=True)
+        for k, (a, b) in enumerate(np.asarray(bounds)):
+            # Alternate heights so that the shared end at 3 s stays visible.
+            y = len(choices) - 1 - row + (0.15 if k % 2 else -0.15)
+            ax.plot([a, b], [y, y], color="tab:orange", linewidth=2)
+            # Filled circles mark the ends a window includes, hollow
+            # circles the ends it leaves out.
+            for x, included in ((a, closed in ("left", "both")),
+                                (b, closed in ("right", "both"))):
+                ax.plot(x, y, "o", color="tab:orange", markersize=6, zorder=5,
+                        markerfacecolor=None if included else hollow)
+    ax.set_ylim(-0.5, len(choices) - 0.5)
+    ax.set_yticks(range(len(choices)))
+    ax.set_yticklabels([f'closed="{c}"' for c in reversed(choices)])
+    ax.set_xlim(-0.3, 8.3)
+    ax.set_xticks(range(9))
+    ax.set_xlabel("time (s)")
+    fig.tight_layout()
+    return fig
+
+
+# -- included in docs via literalinclude :pyobject: --
 def plot_timeseries_window_partial():
     return _plot_window_rows([
         ('anchor="start"', Window(size=3.0, anchor="start", partial=True)),
@@ -377,6 +408,7 @@ if __name__ == "__main__":
                             ("timeseries_embedding", plot_timeseries_embedding),
                             ("timeseries_windows", plot_timeseries_windows),
                             ("timeseries_window_anchors", plot_timeseries_window_anchors),
+                            ("timeseries_window_closed", plot_timeseries_window_closed),
                             ("timeseries_window_partial", plot_timeseries_window_partial),
                             ("timeseries_window_partial_overlap", plot_timeseries_window_partial_overlap)]:
         _save_themed(plot_func, *LIGHT, HERE / f"{name}_light.png")
