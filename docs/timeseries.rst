@@ -72,7 +72,8 @@ Units
 -----
 
 A :py:class:`~stablebear.timeseries.Times` holds timestamps in one physical
-unit, from attoseconds (``"as"``) to days (``"d"``).
+unit, from attoseconds (``"as"``) to days (``"d"``); :doc:`timeseries_units`
+lists them all.
 :py:meth:`Times.to <stablebear.timeseries.Times.to>` converts them by an
 exact integer factor::
 
@@ -101,6 +102,7 @@ below the timestamp they mean.
 .. toctree::
    :maxdepth: 1
 
+   timeseries_units
    timeseries_channels
    timeseries_operations
    timeseries_embedding
