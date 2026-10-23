@@ -41,11 +41,16 @@ on its domain :math:`[0, 4)`.
       :pyobject: plot_timeseries_windows
       :language: python
 
-``windows[i]`` is window ``i``, and evaluating ``windows`` evaluates every
-window at the same times::
+The windows are returned as a
+:py:class:`~stablebear.timeseries.series.TimeSeriesTensor` of shape
+``(n,)``, where ``n`` is the number of windows (here ``n = 3``).
+Evaluating the tensor at some times evaluates every window at those times,
+in the time of the window. The result is a tensor with one axis for the
+windows followed by the axes of the times, so here ``windows(t)[i, j]`` is
+window ``i`` at ``t[j]``::
 
-   windows[1](1.0)  # 1.0, the value of signal at 3 s
-   windows(1.0)     # [0.0, 1.0, 3.0]
+   windows(1.0)[1]      # 1.0, the value of signal at 3 s
+   windows([0.0, 1.0])  # [[0.0, 0.0], [0.0, 1.0], [2.0, 3.0]], shape (3, 2)
 
 On a time series with several :doc:`channels <timeseries_channels>`, each channel
 is windowed separately.
