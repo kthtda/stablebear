@@ -38,12 +38,11 @@ namespace
       })
       .def_property_readonly("values", &Channel::values)
       .def_property_readonly("snap_tolerance", &Channel::snap_tolerance)
-      .def_property_readonly("snap_eps", &Channel::snap_eps)
       .def("__len__", &Channel::size);
 
     py::class_<Series>(m, ("TimeSeries" + suffix).c_str())
-      .def(py::init<sb::Times, const sb::Tensor<T>&, sb::float64_t, sb::float64_t>(),
-           py::arg("times"), py::arg("values"), py::arg("snap_tolerance"), py::arg("snap_eps"))
+      .def(py::init<sb::Times, const sb::Tensor<T>&, sb::float64_t>(),
+           py::arg("times"), py::arg("values"), py::arg("snap_tolerance"))
       .def_static("from_channels",
                   [](const std::vector<Series>& parts,
                      const std::optional<std::string>& unit) {

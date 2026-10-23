@@ -195,15 +195,13 @@ def test_singleton_series_evaluates_at_its_time():
 
 
 def test_query_just_below_an_observation_snaps_to_it():
-    series = TimeSeries([1.0, 2.0, 3.0], times=[0.0, 0.25, 0.5], snap_tolerance=1e-6,
-                        snap_eps=1024)
+    series = TimeSeries([1.0, 2.0, 3.0], times=[0.0, 0.25, 0.5], snap_tolerance=1e-14)
 
     assert series(np.nextafter(0.25, 0.0)) == 2.0
 
 
 def test_query_further_below_an_observation_does_not_snap():
-    series = TimeSeries([1.0, 2.0, 3.0], times=[0.0, 0.25, 0.5], snap_tolerance=1e-6,
-                        snap_eps=1024)
+    series = TimeSeries([1.0, 2.0, 3.0], times=[0.0, 0.25, 0.5], snap_tolerance=1e-14)
 
     assert series(0.24) == 1.0
 
@@ -215,51 +213,50 @@ def test_query_further_below_an_observation_does_not_snap():
     ([1.7e9, 1.7e9 + 1e-6, 1.7e9 + 2e-6], 1.7e9 + 1.5e-6, 20.0),
 ])
 def test_snapping_does_not_cross_a_gap(times, t, expected):
-    series = TimeSeries([10.0, 20.0, 30.0], times=times, snap_tolerance=1e-6,
-                        snap_eps=1024)
+    series = TimeSeries([10.0, 20.0, 30.0], times=times, snap_tolerance=1e-14)
 
     assert series(t) == expected
 
 
-def test_snapping_is_capped_for_wide_gaps():
-    series = TimeSeries([1.0, 2.0], times=[0.0, 86400.0], snap_tolerance=1e-6,
-                        snap_eps=1024)
+def test_a_query_one_float_spacing_below_an_epoch_timestamp_snaps_to_it():
+    times = [1.7e9, 1.7e9 + 1e-6, 1.7e9 + 2e-6]
+    series = TimeSeries([10.0, 20.0, 30.0], times=times, snap_tolerance=1e-14)
 
-    assert series(np.nextafter(86400.0, 0.0)) == 2.0
-    assert series(86400.0 - 0.05) == 1.0
+    assert series(np.nextafter(times[1], 0.0)) == 20.0
+
+
+def test_the_snap_distance_is_relative_to_the_magnitude_of_the_timestamps():
+    # With a tolerance of 2**-20, the snap distance is 2**-10 below 1024 but
+    # only 2**-20 below 1.
+    large = TimeSeries([1.0, 2.0], times=[0.0, 1024.0], snap_tolerance=2.0**-20)
+    small = TimeSeries([1.0, 2.0], times=[0.0, 1.0], snap_tolerance=2.0**-20)
+
+    assert large(1024.0 - 2.0**-11) == 2.0
+    assert large(1024.0 - 2.0**-9) == 1.0
+    assert small(1.0 - 2.0**-11) == 1.0
+
+
+def test_snapping_reaches_at_most_a_quarter_of_the_gap():
+    # The tolerance allows 2**-10 below 1024, but the gap is 2**-9, so a
+    # quarter of it, 2**-11, is the snap distance.
+    series = TimeSeries([1.0, 2.0], times=[1024.0 - 2.0**-9, 1024.0],
+                        snap_tolerance=2.0**-20)
+
+    assert series(1024.0 - 2.0**-12) == 2.0
+    assert series(1024.0 - 3 * 2.0**-12) == 1.0
 
 
 def test_snap_tolerance_zero_disables_snapping():
-    series = TimeSeries([1.0, 2.0, 3.0], times=[0.0, 0.25, 0.5], snap_tolerance=0.0,
-                        snap_eps=1024)
+    series = TimeSeries([1.0, 2.0, 3.0], times=[0.0, 0.25, 0.5], snap_tolerance=0.0)
 
     assert series.snap_tolerance == 0.0
     assert series(np.nextafter(0.25, 0.0)) == 1.0
 
 
-@pytest.mark.parametrize("tolerance", [-0.1, 1.0])
+@pytest.mark.parametrize("tolerance", [-0.1, 1.0, np.nan])
 def test_snap_tolerance_outside_unit_interval_raises(tolerance):
     with pytest.raises(ValueError):
         TimeSeries([1.0, 2.0], times=[0.0, 1.0], snap_tolerance=tolerance)
-
-
-def test_snap_eps_bounds_the_snap_distance():
-    times = [0.0, 1.0]
-    query = 1.0 - 4 * np.finfo(np.float64).eps
-    loose = TimeSeries([1.0, 2.0], times=times, snap_tolerance=0.5,
-                       snap_eps=8.0)
-    tight = TimeSeries([1.0, 2.0], times=times, snap_tolerance=0.5,
-                       snap_eps=2.0)
-
-    assert loose.snap_eps == 8.0
-    assert loose(query) == 2.0
-    assert tight(query) == 1.0
-
-
-@pytest.mark.parametrize("eps", [-1.0, np.inf, np.nan])
-def test_snap_eps_must_be_finite_and_nonnegative(eps):
-    with pytest.raises(ValueError):
-        TimeSeries([1.0, 2.0], times=[0.0, 1.0], snap_eps=eps)
 
 
 def test_to_changes_the_query_unit():
@@ -524,7 +521,7 @@ def test_one_channel_survives_saving(make_values, as_shape, round_trip):
         # Two observations of shape (2,): [a, b] and [b, a].
         values = sb.concatenate([values, values[[1, 0]]]).reshape((2, 2))
     times = Times(0.25 * np.arange(values.shape[0]), unit="ms")
-    series = TimeSeries(values, times=times, snap_tolerance=0.25, snap_eps=8.0)
+    series = TimeSeries(values, times=times, snap_tolerance=0.25)
 
     loaded = round_trip(series)
 
@@ -533,7 +530,7 @@ def test_one_channel_survives_saving(make_values, as_shape, round_trip):
     assert loaded.shape == series.shape
     assert loaded.times == series.times
     assert loaded.unit == "ms"
-    assert (loaded.snap_tolerance, loaded.snap_eps) == (0.25, 8.0)
+    assert loaded.snap_tolerance == 0.25
     assert loaded.values.array_equal(values)
 
 
@@ -558,7 +555,7 @@ def test_series_dtype_is_one_object_per_inner_dtype():
 
 
 def _array_equal_series():
-    return TimeSeries([0.0, 10.0], times=Times([0.0, 1.0], unit="ms"), snap_tolerance=0.25, snap_eps=8.0)
+    return TimeSeries([0.0, 10.0], times=Times([0.0, 1.0], unit="ms"), snap_tolerance=0.25)
 
 
 def test_series_array_equal_an_equal_series():
@@ -566,21 +563,19 @@ def test_series_array_equal_an_equal_series():
 
 
 @pytest.mark.parametrize("other", [
-    pytest.param(TimeSeries([0.0, 20.0], times=Times([0.0, 1.0], unit="ms"), snap_tolerance=0.25, snap_eps=8.0),
+    pytest.param(TimeSeries([0.0, 20.0], times=Times([0.0, 1.0], unit="ms"), snap_tolerance=0.25),
                  id="values"),
-    pytest.param(TimeSeries([0.0, 10.0], times=Times([0.0, 2.0], unit="ms"), snap_tolerance=0.25, snap_eps=8.0),
+    pytest.param(TimeSeries([0.0, 10.0], times=Times([0.0, 2.0], unit="ms"), snap_tolerance=0.25),
                  id="times"),
-    pytest.param(TimeSeries([0.0, 10.0], times=Times([0.0, 1.0], unit="s"), snap_tolerance=0.25, snap_eps=8.0),
+    pytest.param(TimeSeries([0.0, 10.0], times=Times([0.0, 1.0], unit="s"), snap_tolerance=0.25),
                  id="unit"),
-    pytest.param(TimeSeries([0.0, 10.0], times=Times([0.0, 1.0], unit="ms"), snap_tolerance=0.5, snap_eps=8.0),
+    pytest.param(TimeSeries([0.0, 10.0], times=Times([0.0, 1.0], unit="ms"), snap_tolerance=0.5),
                  id="snap-tolerance"),
-    pytest.param(TimeSeries([0.0, 10.0], times=Times([0.0, 1.0], unit="ms"), snap_tolerance=0.25, snap_eps=16.0),
-                 id="snap-eps"),
-    pytest.param(TimeSeries([[0.0], [10.0]], times=Times([0.0, 1.0], unit="ms"), snap_tolerance=0.25, snap_eps=8.0),
+    pytest.param(TimeSeries([[0.0], [10.0]], times=Times([0.0, 1.0], unit="ms"), snap_tolerance=0.25),
                  id="shape"),
     pytest.param(TimeSeries.from_channels([_array_equal_series(), _array_equal_series()]), id="channels"),
     pytest.param(TimeSeries(np.array([0.0, 10.0], dtype=np.float32), times=Times([0.0, 1.0], unit="ms"),
-                            snap_tolerance=0.25, snap_eps=8.0),
+                            snap_tolerance=0.25),
                  id="dtype"),
     pytest.param(sb.FloatTensor(np.array([0.0, 10.0])), id="tensor"),
 ])
@@ -623,6 +618,6 @@ def test_series_array_equal_compares_whether_the_end_is_closed():
 
 def test_series_array_equal_compares_the_channel_order():
     a = _array_equal_series()
-    b = TimeSeries([5.0, 15.0], times=Times([0.0, 1.0], unit="ms"), snap_tolerance=0.25, snap_eps=8.0)
+    b = TimeSeries([5.0, 15.0], times=Times([0.0, 1.0], unit="ms"), snap_tolerance=0.25)
 
     assert not TimeSeries.from_channels([a, b]).array_equal(TimeSeries.from_channels([b, a]))

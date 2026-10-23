@@ -161,10 +161,10 @@ def plot_timeseries_rounding():
 # -- included in docs via literalinclude :pyobject: --
 def plot_timeseries_snap_distances():
     series = TimeSeries([1.0, 2.0, 3.0, 4.0], times=[0.0, 0.1, 0.2, 0.3])
-    by_spacing = series.snap_tolerance * (0.2 - 0.1)
-    by_eps = series.snap_eps * np.finfo(np.float64).eps * 0.2
-    cutoff = min(by_spacing, by_eps)
-    queries = [("0.3 - 0.1", 0.3 - 0.1), ("0.2 - 1e-9", 0.2 - 1e-9),
+    by_tolerance = series.snap_tolerance * 0.2
+    by_gap = (0.2 - 0.1) / 4
+    reach = min(by_tolerance, by_gap)
+    queries = [("0.3 - 0.1", 0.3 - 0.1), ("0.2 - 1e-14", 0.2 - 1e-14),
                ("0.19", 0.19)]
     color = plt.rcParams["lines.color"]
 
@@ -172,15 +172,14 @@ def plot_timeseries_snap_distances():
     ax.set_xscale("log")
     ax.set_xlim(0.1, 1e-18)  # time runs left to right, toward 0.2
     ax.set_ylim(0, 1)
-    ax.axvspan(1e-18, cutoff, facecolor="tab:orange", alpha=0.3,
+    ax.axvspan(1e-18, reach, facecolor="tab:orange", alpha=0.3,
                hatch="///", edgecolor="tab:orange", linewidth=0)
-    ax.axvline(by_eps, color="tab:orange", linewidth=1.5)
-    ax.axvline(by_spacing, color="gray", linestyle="--", linewidth=1)
-    ax.text(by_eps, 0.05, "1024 \u00d7 eps \u00d7 0.2 ", ha="right",
-            fontsize=8)
-    ax.text(by_spacing, 0.05, "1e-6 \u00d7 0.1 ", ha="right", fontsize=8)
+    ax.axvline(by_tolerance, color="tab:orange", linewidth=1.5)
+    ax.axvline(by_gap, color="gray", linestyle="--", linewidth=1)
+    ax.text(by_tolerance, 0.05, "1e-14 \u00d7 0.2 ", ha="right", fontsize=8)
+    ax.text(by_gap, 0.05, "0.1 / 4 ", ha="right", fontsize=8)
     ax.text(1e-16, 0.82, "returns 3.0", ha="center", fontsize=8)
-    ax.text(1e-4, 0.82, "returns 2.0", ha="center", fontsize=8)
+    ax.text(1e-6, 0.82, "returns 2.0", ha="center", fontsize=8)
     for label, t in queries:
         d = 0.2 - t
         ax.plot(d, 0.35, "s", color=color, markersize=7)
@@ -188,6 +187,40 @@ def plot_timeseries_snap_distances():
                     textcoords="offset points", ha="center", fontsize=8)
     ax.set_yticks([])
     ax.set_xlabel("distance of the query below 0.2 (s), log scale")
+    fig.tight_layout()
+    return fig
+
+
+# -- included in docs via literalinclude :pyobject: --
+def plot_timeseries_snap_quarter():
+    times = [1.7e9, 1.7e9 + 1e-6, 1.7e9 + 2e-6]
+    series = TimeSeries([1.0, 2.0, 3.0], times=times)
+    t, gap = times[1], times[1] - times[0]
+    reach = min(series.snap_tolerance * t, gap / 4)
+    spacing = np.spacing(t)
+    us = 1e6  # plot distances in microseconds
+    color = plt.rcParams["lines.color"]
+
+    fig, ax = plt.subplots(figsize=(7, 2.0))
+    ax.set_xlim(1.1 * gap * us, 0.0)  # time runs left to right, toward t
+    ax.set_ylim(0, 1)
+    ax.axvspan(0.0, reach * us, facecolor="tab:orange", alpha=0.3,
+               hatch="///", edgecolor="tab:orange", linewidth=0)
+    ax.axvline(gap / 4 * us, color="gray", linestyle="--", linewidth=1)
+    ax.text(gap / 4 * us, 0.05, "gap / 4 ", ha="right", fontsize=8)
+    ax.axvline(gap * us, color=color, linewidth=1.5)
+    ax.text(gap * us, 0.05, " previous observation", ha="left", fontsize=8)
+    # The float64 values between the two observations.
+    ax.plot(np.arange(5) * spacing * us, [0.0] * 5, "|", color="gray",
+            markersize=10, clip_on=False)
+    for k in (1, 2):
+        query = t - k * spacing
+        ax.plot((t - query) * us, 0.4, "s", color=color, markersize=7)
+        ax.annotate(f"returns {series(query):g}", ((t - query) * us, 0.4),
+                    xytext=(0, 8), textcoords="offset points", ha="center",
+                    fontsize=8)
+    ax.set_yticks([])
+    ax.set_xlabel("distance of the query below 1.7e9 + 1e-6 s (\u00b5s)")
     fig.tight_layout()
     return fig
 
@@ -405,6 +438,7 @@ if __name__ == "__main__":
                             ("timeseries_vector_channel", plot_timeseries_vector_channel),
                             ("timeseries_rounding", plot_timeseries_rounding),
                             ("timeseries_snap_distances", plot_timeseries_snap_distances),
+                            ("timeseries_snap_quarter", plot_timeseries_snap_quarter),
                             ("timeseries_embedding", plot_timeseries_embedding),
                             ("timeseries_windows", plot_timeseries_windows),
                             ("timeseries_window_anchors", plot_timeseries_window_anchors),

@@ -41,10 +41,9 @@ namespace sb
   }
 
   template <typename T>
-  Channel<T>::Channel(Times times, const Tensor<T>& values, float64_t snapTolerance, float64_t snapEps)
+  Channel<T>::Channel(Times times, const Tensor<T>& values, float64_t snapTolerance)
   {
     set_snap_tolerance(snapTolerance);
-    set_snap_eps(snapEps);
     if (values.rank() == 0)
     {
       throw std::invalid_argument("Values must have a time axis");
@@ -69,11 +68,9 @@ namespace sb
   }
 
   template <typename T>
-  Channel<T>::Channel(Times times, std::vector<size_t> shape, std::vector<T> values, float64_t snapTolerance,
-                      float64_t snapEps)
+  Channel<T>::Channel(Times times, std::vector<size_t> shape, std::vector<T> values, float64_t snapTolerance)
   {
     set_snap_tolerance(snapTolerance);
-    set_snap_eps(snapEps);
     const size_t blockSize = std::accumulate(shape.begin(), shape.end(), size_t{1}, std::multiplies<>());
     if (values.size() != times.size() * blockSize)
     {
@@ -94,16 +91,6 @@ namespace sb
       throw std::invalid_argument("The snap tolerance must be in [0, 1)");
     }
     m_snapTolerance = tolerance;
-  }
-
-  template <typename T>
-  void Channel<T>::set_snap_eps(float64_t eps)
-  {
-    if (std::isnan(eps) || std::isinf(eps) || eps < 0)
-    {
-      throw std::invalid_argument("snap_eps must be finite and nonnegative");
-    }
-    m_snapEps = eps;
   }
 
   template <typename T>
@@ -198,7 +185,7 @@ namespace sb
   template <typename T>
   bool Channel<T>::operator==(const Channel& other) const
   {
-    return m_snapTolerance == other.m_snapTolerance && m_snapEps == other.m_snapEps && m_shape == other.m_shape
+    return m_snapTolerance == other.m_snapTolerance && m_shape == other.m_shape
            && m_end == other.m_end && end_closed() == other.end_closed() && m_startClosed == other.m_startClosed
            && held_times() == other.held_times() && values() == other.values();
   }
@@ -342,17 +329,17 @@ namespace sb
       return 0;
     }
     // A query computed in floating point, such as 0.3 - 0.1, can land just
-    // below the observation it means; snap it forward. Measuring against
-    // the gap keeps the rule independent of the unit and of how large the
-    // timestamps are, and a tolerance below 1 never skips an observation.
-    // The epsilon cap keeps widely spaced observations from snapping
-    // queries that are far off in absolute terms but small next to the gap.
-    if (next < times.size())
+    // below the observation it means; snap it forward. As in the tolerant
+    // comparison of APL, the distance is relative to the magnitude of the
+    // timestamps, so it scales with their rounding errors and does not
+    // depend on the unit. Capping it at a quarter of the gap keeps a query
+    // nearer the previous observation from snapping and never skips one.
+    if (next < times.size() && m_snapTolerance > 0)
     {
       const auto prev = times[next - 1];
       const auto magnitude = std::max(std::abs(prev), std::abs(times[next]));
-      const auto cap = m_snapEps * std::numeric_limits<float64_t>::epsilon() * magnitude;
-      if (times[next] - t <= std::min(m_snapTolerance * (times[next] - prev), cap))
+      const auto reach = std::min(m_snapTolerance * magnitude, (times[next] - prev) / 4);
+      if (times[next] - t <= reach)
       {
         return next;
       }

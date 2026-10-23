@@ -196,12 +196,9 @@ namespace sb
     std::vector<T> values;
   };
 
-  /// Default snap tolerance, as a fraction of the gap between observations.
-  inline constexpr float64_t DefaultSnapTolerance = 1e-6;
-
-  /// Default cap on the snap distance, in multiples of machine epsilon
-  /// times the magnitude of the timestamps.
-  inline constexpr float64_t DefaultSnapEps = 1024;
+  /// Default snap tolerance, relative to the magnitude of the timestamps:
+  /// the default comparison tolerance of APL.
+  inline constexpr float64_t DefaultSnapTolerance = 1e-14;
 
   /// One channel of a time series: an immutable view of storage that other
   /// views may share. Observations leave the channel as deep copies, so
@@ -221,25 +218,18 @@ namespace sb
   {
   public:
     /// Copy @p values, whose axis 0 is time, into new storage.
-    Channel(Times times, const Tensor<T>& values, float64_t snapTolerance = DefaultSnapTolerance,
-            float64_t snapEps = DefaultSnapEps);
+    Channel(Times times, const Tensor<T>& values, float64_t snapTolerance = DefaultSnapTolerance);
 
     /// Adopt @p values, the observations stored flat in row-major order with
     /// prod(@p shape) values each.
     Channel(Times times, std::vector<size_t> shape, std::vector<T> values,
-            float64_t snapTolerance = DefaultSnapTolerance, float64_t snapEps = DefaultSnapEps);
+            float64_t snapTolerance = DefaultSnapTolerance);
 
-    /// The snap tolerance used when evaluating, as a fraction of the gap
-    /// between observations; 0 disables snapping.
+    /// The snap tolerance used when evaluating, relative to the magnitude
+    /// of the timestamps; 0 disables snapping.
     [[nodiscard]] float64_t snap_tolerance() const noexcept { return m_snapTolerance; }
 
     void set_snap_tolerance(float64_t tolerance);
-
-    /// The cap on the snap distance, in multiples of machine epsilon times
-    /// the magnitude of the timestamps.
-    [[nodiscard]] float64_t snap_eps() const noexcept { return m_snapEps; }
-
-    void set_snap_eps(float64_t eps);
 
     /// A view of this channel whose times are @p times, in the channel's
     /// unit, and whose observation k stacks, along a new leading axis, this
@@ -277,10 +267,11 @@ namespace sb
     [[nodiscard]] bool start_closed() const noexcept { return m_startClosed; }
 
     /// The observation with the largest timestamp at or before @p t, in the
-    /// channel's own unit, a tensor of shape shape(). A query below an
-    /// observation by at most snap_tolerance() times the gap to the previous
-    /// observation, and by at most snap_eps() times machine epsilon times the
-    /// larger magnitude of the two timestamps, counts as reaching it.
+    /// channel's own unit, a tensor of shape shape(). As in the tolerant
+    /// comparison of APL, a query below an observation by at most
+    /// snap_tolerance() times the larger magnitude of it and the previous
+    /// timestamp counts as reaching it, as long as it is also within a
+    /// quarter of the gap to the previous timestamp.
     ///
     /// The caller checks that @p t lies between the first and last
     /// observations, in its own unit: a time converted into the channel's
@@ -369,7 +360,6 @@ namespace sb
     bool m_endClosed = false;
     bool m_startClosed = true;
     float64_t m_snapTolerance = DefaultSnapTolerance;
-    float64_t m_snapEps = DefaultSnapEps;
   };
 
   /// Named channels of one element type, queried in one time unit.
@@ -382,16 +372,15 @@ namespace sb
     /// An empty one-channel series in seconds, so that series can be tensor
     /// elements.
     TimeSeries()
-      : TimeSeries(Times(std::vector<float64_t>{}), Tensor<T>(std::vector<size_t>{0}), DefaultSnapTolerance,
-                   DefaultSnapEps)
+      : TimeSeries(Times(std::vector<float64_t>{}), Tensor<T>(std::vector<size_t>{0}), DefaultSnapTolerance)
     {
     }
 
     TimeSeries(std::vector<Channel<T>> channels, TimeUnit unit);
 
     /// A series with one channel, queried in the unit of its times.
-    TimeSeries(Times times, const Tensor<T>& values, float64_t snapTolerance, float64_t snapEps)
-      : TimeSeries({Channel<T>(times, values, snapTolerance, snapEps)}, times.unit())
+    TimeSeries(Times times, const Tensor<T>& values, float64_t snapTolerance)
+      : TimeSeries({Channel<T>(times, values, snapTolerance)}, times.unit())
     {
     }
 

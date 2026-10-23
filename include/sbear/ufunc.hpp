@@ -217,7 +217,7 @@ namespace sb
         auto shape = m_batches[c];
         shape.insert(shape.end(), m_extraDims.begin(), m_extraDims.end());
         auto channel = Channel<Out>(source.times(), std::move(shape), std::move(m_outputs[c]),
-                                    source.snap_tolerance(), source.snap_eps())
+                                    source.snap_tolerance())
                            .with_start_closed(source.start_closed());
         if (const auto end = source.end())
         {

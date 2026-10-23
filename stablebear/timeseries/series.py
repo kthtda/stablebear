@@ -221,40 +221,33 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         One timestamp per observation. A plain array is in seconds.
     snap_tolerance : float, optional
         How close below an observation a query may land and still get that
-        observation, as a fraction of the gap to the previous observation.
-        This lets a time computed in floating point, such as ``0.3 - 0.1``,
-        reach the observation it means. Must be in ``[0, 1)``; 0 disables
-        snapping. Defaults to ``1e-6``.
-    snap_eps : float, optional
-        A cap on the same distance, in multiples of machine epsilon
-        (``np.finfo(np.float64).eps``, about ``2.2e-16``) times the
-        magnitude of the timestamps. This keeps widely spaced observations
-        from capturing queries that are clearly earlier. Must be finite
-        and nonnegative; 0 disables snapping. Defaults to ``1024``.
+        observation, relative to the magnitude of the timestamps, as in the
+        tolerant comparison of APL. This lets a time computed in floating
+        point, such as ``0.3 - 0.1``, reach the observation it means. Must
+        be in ``[0, 1)``; 0 disables snapping. Defaults to ``1e-14``, about
+        45 times machine epsilon, the default comparison tolerance of APL.
 
     Notes
     -----
-    Let tol be ``snap_tolerance``, k be ``snap_eps``, and
-    eps be machine epsilon, and let the timestamps be
+    Let tol be ``snap_tolerance``, and let the timestamps be
     t[0] < t[1] < ... < t[n-1], with observations x[0], x[1], ..., x[n-1].
     At a time t >= t[0], the series is x[i] for the largest i such that
     i = 0 or ::
 
-        t >= t[i] - min(tol * (t[i] - t[i-1]),
-                        k * eps * max(|t[i-1]|, |t[i]|)).
+        t >= t[i] - min(tol * max(|t[i-1]|, |t[i]|), (t[i] - t[i-1]) / 4).
 
-    With either parameter 0, this is the last observation at or before t.
-    Since tol < 1, the shifted thresholds stay strictly increasing, so no
-    observation is skipped.
+    The quarter of the gap keeps a query nearer the previous observation
+    from snapping, so the shifted thresholds stay strictly increasing and
+    no observation is skipped. With tol = 0, the series is the last
+    observation at or before t.
     """
 
-    def __init__(self, values, times, *, snap_tolerance: float = 1e-6,
-                 snap_eps: float = 1024):
+    def __init__(self, values, times, *, snap_tolerance: float = 1e-14):
         if not isinstance(times, Times):
             times = Times(times)
         tensor = _values_tensor(values)
         self._data = _SERIES_NATIVE[tensor.dtype](
-            times._data, tensor._data, snap_tolerance, snap_eps
+            times._data, tensor._data, snap_tolerance
         )
 
     @classmethod
@@ -270,9 +263,9 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
     def from_channels(cls, channels, unit: str | None = None) -> TimeSeries:
         """Combine one-channel series into one series with several channels.
 
-        Each channel keeps its own times, unit, ``snap_tolerance``, and
-        ``snap_eps``; queries are converted from the series' unit into each
-        channel's unit.
+        Each channel keeps its own times, unit, and ``snap_tolerance``;
+        queries are converted from the series' unit into each channel's
+        unit.
 
         Parameters
         ----------
@@ -398,15 +391,6 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         """
         return self._per_channel("snap_tolerance")
 
-    @property
-    def snap_eps(self) -> float | FloatTensor:
-        """The cap on snapping used when evaluating; see the constructor.
-
-        A float for a series with one channel; for several, a float64
-        ``FloatTensor`` with one entry per channel.
-        """
-        return self._per_channel("snap_eps")
-
     def to(self, unit: str) -> TimeSeries:
         """Return the same series with queries and reported times in ``unit``.
 
@@ -418,7 +402,7 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
 
     def array_equal(self, other) -> bool:
         """Whether ``other`` is a series of the same dtype and unit whose
-        channels have the same timestamps, values, snap settings, and
+        channels have the same timestamps, values, snap tolerance, and
         start and end."""
         return (isinstance(other, TimeSeries) and other.dtype is self.dtype
                 and self._data.array_equal(other._data))
@@ -427,8 +411,7 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         """Each channel's observation with the largest timestamp at or before ``t``.
 
         A ``t`` just below a timestamp snaps forward to it, by each
-        channel's own ``snap_tolerance`` and ``snap_eps``; see the
-        constructor. ``t`` is in ``unit``, which defaults to the series'
+        channel's own ``snap_tolerance``; see the constructor. ``t`` is in ``unit``, which defaults to the series'
         unit and accepts the units of :class:`Times`, and must lie in the
         domain of every channel; see :class:`TimeSeries`.
 

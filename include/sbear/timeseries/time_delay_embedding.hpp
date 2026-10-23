@@ -87,19 +87,19 @@ namespace sb
       // so one point can come up at times an ulp apart. Two times give the
       // same point when every component reads the same observation at both;
       // index_at decides which observation, with the channel's
-      // snap_tolerance and snap_eps, as evaluation does. A component's index
+      // snap_tolerance, as evaluation does. A component's index
       // never decreases with time, so a run of the same point ends where some
       // component's index differs from the one at the time before. Only a
       // component whose next shifted time is at s, or within snapping
       // distance after it, can read a different observation at s. Snapping
-      // moves a time by at most snap_eps machine epsilons times its
-      // magnitude; a few more cover the rounding of the lags.
+      // moves a time by at most snap_tolerance times its magnitude; a few
+      // machine epsilons more cover the rounding of the lags.
       //
       // Record each run at the time its members snap to: the channel's own
       // timestamp if the run has one, else its latest time, since snapping
       // moves a time forward onto the observation it falls just short of.
       // The first point stays at the start, so the domain keeps its start.
-      const auto reach = (channel.snap_eps() + 4) * std::numeric_limits<float64_t>::epsilon();
+      const auto reach = channel.snap_tolerance() + 4 * std::numeric_limits<float64_t>::epsilon();
       std::vector<size_t> previous(dimension);
       for (size_t j = 0; j < dimension; ++j)
       {
