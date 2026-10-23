@@ -12,9 +12,33 @@ namespace sb
     /// 0.8999999999999999 does not show as 0.9.
     inline std::string shortest_text(float64_t x)
     {
+      // std::to_chars for floating point needs macOS 13.3, and wheels target
+      // macOS 11, so try increasing precision until the text reads back.
       std::array<char, 32> buffer;
-      const auto result = std::to_chars(buffer.data(), buffer.data() + buffer.size(), x);
-      return std::string(buffer.data(), result.ptr);
+      for (int precision = 1; precision <= 17; ++precision)
+      {
+        std::snprintf(buffer.data(), buffer.size(), "%.*g", precision, x);
+        if (std::strtod(buffer.data(), nullptr) == x)
+        {
+          break;
+        }
+      }
+
+      // %g turns to scientific notation once the exponent reaches the
+      // precision, so 906680 shows as 9.0668e+05. Like std::to_chars, use
+      // fixed notation when it is no longer.
+      std::string text = buffer.data();
+      const auto e = text.find('e');
+      if (e != std::string::npos)
+      {
+        const int exponent = std::atoi(text.c_str() + e + 1);
+        if (exponent >= 0 && (x < 0) + exponent + 1 <= static_cast<int>(text.size()))
+        {
+          std::snprintf(buffer.data(), buffer.size(), "%.0f", x);
+          text = buffer.data();
+        }
+      }
+      return text;
     }
 
     /// The queries in @p t in row-major order, and their positions sorted by
