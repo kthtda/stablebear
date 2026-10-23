@@ -61,7 +61,8 @@ them::
    values[0]  # FloatTensor [1.0, 2.0], from a
    values[1]  # FloatTensor [10.0, 20.0], from b
 
-``series[i]`` selects channel ``i`` as a time series of its own.
+Indexing with ``series[i]`` selects channel ``i`` as a time series of its
+own.
 
 Channels with different shapes
 ------------------------------

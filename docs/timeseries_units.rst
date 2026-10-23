@@ -56,5 +56,5 @@ name, whichever spelling was passed.
      - 86400 s
      - ``"day"``, ``"days"``
 
-``"µs"`` is accepted with either the micro sign (U+00B5) or the Greek letter
-mu (U+03BC).
+The unit ``"µs"`` is accepted with either the micro sign (U+00B5) or the
+Greek letter mu (U+03BC).

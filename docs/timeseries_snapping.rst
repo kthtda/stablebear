@@ -71,8 +71,9 @@ involved, so ``0.3 - 0.1`` is within both limits, while an ordinary query such a
 The figure places three queries by how far they fall below 0.2, on a log
 scale. Only queries in the shaded range, within both limits, return the
 observation at 0.2. The rounding error of ``0.3 - 0.1`` is well inside it.
-``0.2 - 1e-9`` is within the spacing limit (dashed) but not the epsilon
-limit (solid), so it returns the observation at 0.1, as does ``0.19``.
+The query ``0.2 - 1e-9`` is within the spacing limit (dashed) but not the
+epsilon limit (solid), so it returns the observation at 0.1, as does
+``0.19``.
 
 .. image:: _static/timeseries_snap_distances_light.png
    :width: 100%
