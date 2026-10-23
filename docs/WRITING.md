@@ -162,7 +162,10 @@ wherever those appear; it does not require adding them to every entry.
 5. **Keep mathematical prose natural and precise.** Introduce symbols before
    using them and state assumptions where they matter. Integrate notation
    into grammatical sentences rather than placing disconnected expressions
-   next to each other. Use standard mathematical terminology and typography.
+   next to each other. Do not start a sentence with a symbol, formula, or
+   code; lead with a word that names it, as in "The query `0.2 - 1e-9`" or
+   "Indexing with `series[i]`." Use standard mathematical terminology and
+   typography.
    A formula should make a statement more precise; the surrounding prose
    should explain its role rather than laboriously read it aloud.
    Punctuate displayed equations as parts of sentences. Keep notation
