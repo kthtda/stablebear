@@ -22,7 +22,10 @@
     // gh token passthrough for hosts that keep it in the OS keyring rather
     // than hosts.yml (where copying the config alone would not carry it).
     // Empty when unset on the host; gh treats that as absent.
-    "GH_TOKEN": "${localEnv:GH_TOKEN}"
+    "GH_TOKEN": "${localEnv:GH_TOKEN}",
+    // The repository's path on the host, so the Stablebear panel can open
+    // built files in the host's browser.
+    "SB_HOST_WORKSPACE": "${localWorkspaceFolder}"
   },
 
   // Stage gh config for the image build and Claude/Codex state for the mounts
@@ -59,6 +62,10 @@
   // already matches installMethod=native in the bind-mounted ~/.claude.json, so
   // no /doctor-quieting symlink is needed here anymore.
   "postCreateCommand": "sudo chown ubuntu:ubuntu cmake-build-debug && git submodule update --init --recursive",
+
+  // Rebuilding the container discards installed extensions, so reinstall the
+  // Stablebear panel from .devcontainer/vscode-buttons on each attach.
+  "postAttachCommand": "bash .devcontainer/vscode-buttons/install.sh",
 
   "customizations": {
     "vscode": {
