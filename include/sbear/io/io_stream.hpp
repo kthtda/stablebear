@@ -9,6 +9,7 @@
 #include "point_io.hpp"
 #include "point_cloud_io.hpp"
 #include "compressed_matrix_io.hpp"
+#include "timeseries_io.hpp"
 
 #include <cstddef>
 #include <vector>

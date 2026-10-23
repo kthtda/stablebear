@@ -87,6 +87,13 @@ protect. These principles apply when writing, reviewing, or changing tests.
     rather than `Gaussian()`, so the reader sees every value the expected
     outcome depends on. Rely on a default only in a test of that default.
 
+19. **Prefer whole numbers.** Choose inputs and parameters so that the
+    expected values are easy to work out in one's head. A point cloud
+    `[[0, 0], [3, 0], [3, 4]]`, with distances 3, 4, and 5, is easier to
+    follow than `[[0, 0], [1.5, 0.2], [2.5, 4.1]]`. When a test needs
+    fractions, use ones that are exact in binary floating point, such as
+    0.5 and 0.25, unless it tests rounding.
+
 The review question is: **What bug would make this test fail, and can I see
 that immediately?**
 

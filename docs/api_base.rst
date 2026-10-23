@@ -37,6 +37,12 @@ distance_matrix
 .. autoclass:: stablebear.distance_matrix.DistanceMatrixTensor
    :members:
 
+nested_tensor
+-------------
+
+.. autoclass:: stablebear.nested_tensor.NestedTensor
+   :members:
+
 tensor_create
 -------------
 

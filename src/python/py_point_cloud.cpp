@@ -44,10 +44,8 @@ namespace sb_py
     register_point_cloud<sb::float32_t>(m, "32");
     register_point_cloud<sb::float64_t>(m, "64");
 
-    register_indexable_tensor_bindings<sb::PointCloud<sb::float32_t>>(
-      m, "PointCloud32");
-    register_indexable_tensor_bindings<sb::PointCloud<sb::float64_t>>(
-      m, "PointCloud64");
+    register_tensor_element<sb::PointCloud<sb::float32_t>>(m, "PointCloud32");
+    register_tensor_element<sb::PointCloud<sb::float64_t>>(m, "PointCloud64");
 
     m.def("cast_pcloud32_pcloud64", [](const sb::Tensor<sb::PointCloud<sb::float32_t>>& src) {
       return sb::pcloud_cast<sb::float64_t>(src);

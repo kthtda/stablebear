@@ -68,6 +68,7 @@ By default, stablebear uses all available hardware threads. To restrict this::
    sb.system.limit_cpus(4)
 
 This can be useful in multi-user environments or when running multiple processes in parallel.
+:py:func:`~stablebear.system.get_cpu_limit` returns the current limit, for example to restore it later.
 
 Limiting GPU count
 -------------------

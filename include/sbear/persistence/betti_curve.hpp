@@ -72,11 +72,12 @@ namespace sb::ph
     return PcfT(std::move(points));
   }
 
-  template <typename T>
-  auto make_betti_curve_task(const Tensor<Barcode<T>>& barcodes, Tensor<Pcf<T, T>>& out)
+  template <typename Container>
+  auto make_betti_curve_task(Container barcodes)
   {
-    return std::make_unique<BarcodeSummaryTask<T, decltype(&barcode_to_betti_curve<T>)>>(
-        barcodes, out, barcode_to_betti_curve<T>,
+    using T = barcode_scalar_t<Container>;
+    return make_barcode_summary_task(
+        std::move(barcodes), [](const Barcode<T>& bc) { return barcode_to_betti_curve(bc); },
         "Converting barcodes to Betti curves");
   }
 }

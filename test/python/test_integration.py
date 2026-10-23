@@ -5,6 +5,7 @@ import numpy.testing as npt
 
 import stablebear as sb
 import stablebear.persistence as pers
+from stablebear.timeseries import TimeDelayEmbedding, TimeSeries, Window
 
 
 def test_pcf_generation_to_distance_to_persistence():
@@ -106,3 +107,21 @@ def test_io_roundtrip_preserves_distances(tmp_path):
     dm_after = sb.pdist(X_loaded, verbose=False)
 
     npt.assert_allclose(dm_before.to_dense(), dm_after.to_dense(), atol=1e-12)
+
+
+def test_delay_embedding_to_windows_to_persistence():
+    """Pipeline: series -> delay embedding -> windows -> point clouds -> persistence."""
+    series = TimeSeries([0.0, 1.0, 0.0, -1.0, 0.0, 1.0, 0.0, -1.0],
+                        times=[0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5])
+
+    # The embedding has domain [0.5, 3.5], so three windows fit.
+    embedding = TimeDelayEmbedding(dimension=2, delay=0.5)(series)
+    windows = Window(size=1.0, step=1.0, closed="left", partial=False, anchor="start")(embedding)
+
+    clouds = windows([0.0, 0.25, 0.5, 0.75])
+    assert isinstance(clouds, sb.FloatTensor)
+    assert clouds.shape == (3, 4, 2)
+
+    bcs = pers.compute_persistent_homology(clouds, max_dim=1, verbose=False)
+    assert isinstance(bcs, pers.BarcodeTensor)
+    assert bcs.shape == (3, 2)

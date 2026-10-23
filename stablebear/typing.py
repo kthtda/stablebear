@@ -69,6 +69,65 @@ distmat64 = dtype("distmat64", "64-bit distance matrix dtype.")
 boolean = dtype("boolean", "Boolean dtype.")
 
 
+# Each tensor element dtype and the suffix of its native class names, such
+# as cpp.TimeSeriesFloat64.
+_NATIVE_SUFFIX = {
+    boolean: "Bool",
+    float32: "Float32", float64: "Float64",
+    int32: "Int32", int64: "Int64",
+    uint32: "Uint32", uint64: "Uint64",
+    pcf32: "Pcf32", pcf64: "Pcf64",
+    pcf32i: "Pcf32i", pcf64i: "Pcf64i",
+    pcloud32: "PointCloud32", pcloud64: "PointCloud64",
+    distmat32: "DistanceMatrix32", distmat64: "DistanceMatrix64",
+    symmat32: "SymmetricMatrix32", symmat64: "SymmetricMatrix64",
+    barcode32: "Barcode32", barcode64: "Barcode64",
+}
+
+
+class _SeriesDtype(dtype):
+    def __init__(self, inner: dtype):
+        super().__init__(
+            f"series({inner.name})",
+            f"Dtype of time series whose observations have dtype {inner.name}.",
+        )
+        self._inner = inner
+
+    @property
+    def inner(self) -> dtype:
+        """The dtype of the observations of each series."""
+        return self._inner
+
+    def __repr__(self):
+        return f"stablebear.series(stablebear.{self._inner.name})"
+
+    def __reduce__(self):
+        return series, (self._inner,)
+
+
+_SERIES_DTYPES = {}
+
+
+def series(inner: dtype) -> dtype:
+    """The dtype of time series whose observations have dtype ``inner``.
+
+    It is the dtype of a tensor of series, such as the windows of a series
+    of ``inner`` observations. The same ``inner`` always gives the same
+    object, so dtypes compare with ``is``, and :attr:`inner` reads it back.
+
+    Raises
+    ------
+    TypeError
+        If ``inner`` is not the dtype of a tensor element, such as
+        ``float64`` or ``pcloud32``.
+    """
+    if inner not in _NATIVE_SUFFIX:
+        raise TypeError(f"Series hold tensor elements, not {inner!r}")
+    if inner not in _SERIES_DTYPES:
+        _SERIES_DTYPES[inner] = _SeriesDtype(inner)
+    return _SERIES_DTYPES[inner]
+
+
 Dtype = dtype  # Alias for type annotations
 
 

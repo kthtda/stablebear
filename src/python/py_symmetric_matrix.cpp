@@ -9,8 +9,8 @@ namespace sb_py
     register_symmetric_matrix_bindings<sb::float32_t>(m, "_f32");
     register_symmetric_matrix_bindings<sb::float64_t>(m, "_f64");
 
-    register_typed_tensor_bindings<sb::SymmetricMatrix<sb::float32_t>>(m, "SymmetricMatrix32", "");
-    register_typed_tensor_bindings<sb::SymmetricMatrix<sb::float64_t>>(m, "SymmetricMatrix64", "");
+    register_tensor_element<sb::SymmetricMatrix<sb::float32_t>>(m, "SymmetricMatrix32");
+    register_tensor_element<sb::SymmetricMatrix<sb::float64_t>>(m, "SymmetricMatrix64");
   }
 
 }

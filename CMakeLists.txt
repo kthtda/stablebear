@@ -573,6 +573,8 @@ SET(SB_PY_SOURCES
     py_io.hpp py_io.cpp
     py_symmetric_matrix.hpp py_symmetric_matrix.cpp
     py_distance_matrix.hpp py_distance_matrix.cpp
+    py_timeseries.hpp py_timeseries.cpp
+    py_timeseries_derived.hpp py_timeseries_derived.cpp
     ${SB_PY_PERSISTENCE_SOURCES}
     ${SB_PY_POINT_PROCESS_SOURCES}
 )
@@ -814,6 +816,8 @@ if (BUILD_TESTER)
       test/test_subdivide.cpp
       test/test_homological_kernel.cpp
       test/test_union_find.cpp
+      test/test_stoppable_task.cpp
+      test/test_gallop.cpp
   )
 
   if (BUILD_CUDA_TESTER)

@@ -7,6 +7,7 @@
 #include "fixed_rank_tensor_io.hpp"
 #include "../tensor.hpp"
 #include "../nested_tensor.hpp"
+#include "../timeseries.hpp"
 #include "../point_cloud.hpp"
 #include "../functional/pcf.hpp"
 #include "../persistence/barcode.hpp"
@@ -20,6 +21,7 @@ namespace sb::io::detail
   {
     static constexpr std::uint32_t None = 0;
     static constexpr std::uint32_t Nested = 1 << 0;
+    static constexpr std::uint32_t TimeSeries = 1 << 1;
   };
 
   template <typename T>
@@ -61,6 +63,38 @@ namespace sb::io::detail
       NestedTensor<int64_t>,
       NestedTensor<uint32_t>,
       NestedTensor<uint64_t>,
+      NestedTensor<bool>,
+      NestedTensor<Pcf<float32_t, float32_t>>,
+      NestedTensor<Pcf<float64_t, float64_t>>,
+      NestedTensor<Pcf<int32_t, int32_t>>,
+      NestedTensor<Pcf<int64_t, int64_t>>,
+      NestedTensor<PointCloud<float32_t>>,
+      NestedTensor<PointCloud<float64_t>>,
+      NestedTensor<DistanceMatrix<float32_t>>,
+      NestedTensor<DistanceMatrix<float64_t>>,
+      NestedTensor<SymmetricMatrix<float32_t>>,
+      NestedTensor<SymmetricMatrix<float64_t>>,
+      NestedTensor<ph::Barcode<float32_t>>,
+      NestedTensor<ph::Barcode<float64_t>>,
+      NestedTensor<TimeSeries<bool>>,
+      NestedTensor<TimeSeries<float32_t>>,
+      NestedTensor<TimeSeries<float64_t>>,
+      NestedTensor<TimeSeries<int32_t>>,
+      NestedTensor<TimeSeries<int64_t>>,
+      NestedTensor<TimeSeries<uint32_t>>,
+      NestedTensor<TimeSeries<uint64_t>>,
+      NestedTensor<TimeSeries<Pcf<float32_t, float32_t>>>,
+      NestedTensor<TimeSeries<Pcf<float64_t, float64_t>>>,
+      NestedTensor<TimeSeries<Pcf<int32_t, int32_t>>>,
+      NestedTensor<TimeSeries<Pcf<int64_t, int64_t>>>,
+      NestedTensor<TimeSeries<PointCloud<float32_t>>>,
+      NestedTensor<TimeSeries<PointCloud<float64_t>>>,
+      NestedTensor<TimeSeries<DistanceMatrix<float32_t>>>,
+      NestedTensor<TimeSeries<DistanceMatrix<float64_t>>>,
+      NestedTensor<TimeSeries<SymmetricMatrix<float32_t>>>,
+      NestedTensor<TimeSeries<SymmetricMatrix<float64_t>>>,
+      NestedTensor<TimeSeries<ph::Barcode<float32_t>>>,
+      NestedTensor<TimeSeries<ph::Barcode<float64_t>>>,
 
       Tensor<Pcf<float32_t, float32_t>>,
       Tensor<Pcf<float64_t, float64_t>>,
@@ -82,7 +116,27 @@ namespace sb::io::detail
       Tensor<DistanceMatrix<float32_t>>,
       Tensor<DistanceMatrix<float64_t>>,
       Tensor<DistanceMatrix<float32_t>, TensorProperty::Indexed>,
-      Tensor<DistanceMatrix<float64_t>, TensorProperty::Indexed>
+      Tensor<DistanceMatrix<float64_t>, TensorProperty::Indexed>,
+
+      Tensor<TimeSeries<bool>>,
+      Tensor<TimeSeries<float32_t>>,
+      Tensor<TimeSeries<float64_t>>,
+      Tensor<TimeSeries<int32_t>>,
+      Tensor<TimeSeries<int64_t>>,
+      Tensor<TimeSeries<uint32_t>>,
+      Tensor<TimeSeries<uint64_t>>,
+      Tensor<TimeSeries<Pcf<float32_t, float32_t>>>,
+      Tensor<TimeSeries<Pcf<float64_t, float64_t>>>,
+      Tensor<TimeSeries<Pcf<int32_t, int32_t>>>,
+      Tensor<TimeSeries<Pcf<int64_t, int64_t>>>,
+      Tensor<TimeSeries<PointCloud<float32_t>>>,
+      Tensor<TimeSeries<PointCloud<float64_t>>>,
+      Tensor<TimeSeries<DistanceMatrix<float32_t>>>,
+      Tensor<TimeSeries<DistanceMatrix<float64_t>>>,
+      Tensor<TimeSeries<SymmetricMatrix<float32_t>>>,
+      Tensor<TimeSeries<SymmetricMatrix<float64_t>>>,
+      Tensor<TimeSeries<ph::Barcode<float32_t>>>,
+      Tensor<TimeSeries<ph::Barcode<float64_t>>>
       >;
 
   using StreamableObject = std::variant<
@@ -102,7 +156,27 @@ namespace sb::io::detail
       SymmetricMatrix<float64_t>,
 
       DistanceMatrix<float32_t>,
-      DistanceMatrix<float64_t>
+      DistanceMatrix<float64_t>,
+
+      TimeSeries<bool>,
+      TimeSeries<float32_t>,
+      TimeSeries<float64_t>,
+      TimeSeries<int32_t>,
+      TimeSeries<int64_t>,
+      TimeSeries<uint32_t>,
+      TimeSeries<uint64_t>,
+      TimeSeries<Pcf<float32_t, float32_t>>,
+      TimeSeries<Pcf<float64_t, float64_t>>,
+      TimeSeries<Pcf<int32_t, int32_t>>,
+      TimeSeries<Pcf<int64_t, int64_t>>,
+      TimeSeries<PointCloud<float32_t>>,
+      TimeSeries<PointCloud<float64_t>>,
+      TimeSeries<DistanceMatrix<float32_t>>,
+      TimeSeries<DistanceMatrix<float64_t>>,
+      TimeSeries<SymmetricMatrix<float32_t>>,
+      TimeSeries<SymmetricMatrix<float64_t>>,
+      TimeSeries<ph::Barcode<float32_t>>,
+      TimeSeries<ph::Barcode<float64_t>>
       >;
 
   struct TensorFormat
@@ -157,6 +231,12 @@ namespace sb::io::detail
         .tensorProperties = leafFormat.tensorProperties,
         .formatFlags = leafFormat.formatFlags | TensorFormatFlag::Nested
       };
+    }
+    else if constexpr (is_timeseries_v<T>)
+    {
+      auto format = tensorFormatV3<typename is_timeseries<T>::value_type>();
+      format.formatFlags |= TensorFormatFlag::TimeSeries;
+      return format;
     }
     else if constexpr (IsTensor<T>)
     {
@@ -256,6 +336,13 @@ namespace sb::io::detail
         return matches(expected, fileFormatVersion);
       }
     }
+    else if constexpr (is_timeseries_v<std::decay_t<T>>)
+    {
+      // Time series exist only from version 3 on; older files carry no
+      // flags, so their element formats would otherwise match.
+      return fileFormatVersion >= 3
+        && matches(tensorFormatV3<std::decay_t<T>>(), fileFormatVersion);
+    }
     else
     {
       return matches(tensorFormatV3<std::decay_t<T>>(), fileFormatVersion);
@@ -279,6 +366,13 @@ namespace sb::io::detail
   {
     io::detail::write_tensor(os, t);
   }
+
+  // Defined in timeseries_io.hpp; declared here so tensors of series find them.
+  template <typename T>
+  void write_value(std::ostream& os, const TimeSeries<T>& series);
+
+  template <typename T>
+  TimeSeries<T> read_timeseries(BinaryReader& reader);
 
   template <typename T>
   Tensor<T> read_tensor(BinaryReader& reader);
@@ -599,6 +693,8 @@ namespace sb::io::detail
       }
       else if constexpr (is_nested_tensor_v<T>)
         *elem = read_nested_tensor_element<typename is_nested_tensor<T>::leaf_type>(reader);
+      else if constexpr (is_timeseries_v<T>)
+        *elem = read_timeseries<typename T::value_type>(reader);
       else
       {
         *elem = read_element<T>(is);
@@ -633,6 +729,29 @@ namespace sb::io::detail
       throw std::runtime_error("Nested tensor depth does not match its children");
     }
     return result;
+  }
+
+  /// Read a nested tensor of whichever leaf type @p format names. Nothing if
+  /// none matches.
+  template <size_t I = 0>
+  std::optional<StreamableTensor> read_any_nested_tensor(BinaryReader& reader, TensorFormat format)
+  {
+    if constexpr (I == std::variant_size_v<StreamableTensor>)
+    {
+      return std::nullopt;
+    }
+    else
+    {
+      using Alternative = std::variant_alternative_t<I, StreamableTensor>;
+      if constexpr (is_nested_tensor_v<Alternative>)
+      {
+        if (matches_nested_tensor_format<Alternative>(reader, format))
+        {
+          return read_nested_tensor_element<typename is_nested_tensor<Alternative>::leaf_type>(reader);
+        }
+      }
+      return read_any_nested_tensor<I + 1>(reader, format);
+    }
   }
 
   template <typename ScalarT>

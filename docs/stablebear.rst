@@ -10,3 +10,4 @@ Python API reference
    api_distributions
    api_point_process
    api_persistence
+   api_timeseries

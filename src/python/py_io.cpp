@@ -1,6 +1,7 @@
 #include "py_io.hpp"
 
 #include <string_view>
+#include <type_traits>
 
 #include <sbear/tensor.hpp>
 #include <sbear/nested_tensor.hpp>
@@ -55,6 +56,19 @@ namespace
     }
   };
 
+  /// Bind save_nested_tensor for every nested tensor that can be loaded.
+  template <typename... Ts>
+  void def_nested_saves(py::class_<IoOps>& cls, std::type_identity<std::variant<Ts...>>)
+  {
+    ([&] {
+      if constexpr (sb::is_nested_tensor_v<Ts>)
+      {
+        cls.def_static("save_nested_tensor",
+                       &IoOps::save_nested_tensor_to_file<typename sb::is_nested_tensor<Ts>::leaf_type>);
+      }
+    }(), ...);
+  }
+
 }
 
 namespace sb_py
@@ -62,7 +76,8 @@ namespace sb_py
 
   void register_io(py::module_& m)
   {
-    py::class_<IoOps>(m, "IoOps")
+    py::class_<IoOps> ioOps(m, "IoOps");
+    ioOps
         .def_static("save_float32_tensor",       &IoOps::save_tensor_to_file<sb::float32_t>)
         .def_static("save_float64_tensor",       &IoOps::save_tensor_to_file<sb::float64_t>)
 
@@ -71,12 +86,6 @@ namespace sb_py
         .def_static("save_uint32_tensor",        &IoOps::save_tensor_to_file<sb::uint32_t>)
         .def_static("save_uint64_tensor",        &IoOps::save_tensor_to_file<sb::uint64_t>)
         .def_static("save_bool_tensor",          &IoOps::save_tensor_to_file<bool>)
-        .def_static("save_nested_float32_tensor", &IoOps::save_nested_tensor_to_file<sb::float32_t>)
-        .def_static("save_nested_float64_tensor", &IoOps::save_nested_tensor_to_file<sb::float64_t>)
-        .def_static("save_nested_int32_tensor", &IoOps::save_nested_tensor_to_file<sb::int32_t>)
-        .def_static("save_nested_int64_tensor", &IoOps::save_nested_tensor_to_file<sb::int64_t>)
-        .def_static("save_nested_uint32_tensor", &IoOps::save_nested_tensor_to_file<sb::uint32_t>)
-        .def_static("save_nested_uint64_tensor", &IoOps::save_nested_tensor_to_file<sb::uint64_t>)
 
         .def_static("save_pcf32_tensor",         &IoOps::save_tensor_to_file<sb::Pcf<sb::float32_t, sb::float32_t>>)
         .def_static("save_pcf64_tensor",         &IoOps::save_tensor_to_file<sb::Pcf<sb::float64_t, sb::float64_t>>)
@@ -122,6 +131,7 @@ namespace sb_py
         .def_static("load_object_from_file", &IoOps::load_object_from_file)
 
         ;
+    def_nested_saves(ioOps, std::type_identity<sb::io::detail::StreamableTensor>{});
   }
 
 }

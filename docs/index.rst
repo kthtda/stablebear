@@ -18,7 +18,6 @@ The core data structures are NumPy-like multidimensional tensors supporting slic
    :caption: Reference:
 
    stablebear
-   glossary
 
 .. toctree::
    :hidden:

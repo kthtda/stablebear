@@ -46,6 +46,9 @@ an NVIDIA GPU). Everything below is shared unless noted.
 - **CLI (GPU)**: `devcontainer up --workspace-folder .`
 - **CLI (CPU)**: `devcontainer up --workspace-folder . --config .devcontainer/cpu/devcontainer.json`
 - Then `devcontainer exec --workspace-folder . bash`.
+- **Script (GPU)**: `./devcontainer-cli.sh` runs both steps through `npx`, so the
+  CLI need not be installed. It needs Node.js 18 or newer, and loads nvm from
+  `${NVM_DIR:-~/.nvm}` if present. Extra arguments go to `devcontainer up`.
 
 First start runs `postCreateCommand`: submodule init, then the cmake build + install
 (`debug` preset for GPU, `debug-nocuda` for CPU). The extensions are built and
@@ -115,6 +118,28 @@ Both devcontainer configs bind-mount the host's `~/.codex/auth.json` to
 `/home/ubuntu/.codex/auth.json`, so a file-based Codex login is available in
 the container and survives rebuilds. The host file must exist before opening
 the devcontainer. Codex configuration and rules remain container-specific.
+
+## Home directories on AFS
+
+The Claude Code and Codex mounts above do not point at your home directory
+directly. Before each start, `initializeCommand` runs
+`.devcontainer/prepare-home.sh` as your host user. It stages each source in the
+Git-ignored `.devcontainer/.local/home/`, and the mounts use those staged paths:
+
+- If the source is on AFS, the script copies it. Docker reads mount sources as
+  root, and root has no AFS tokens, so a direct mount would show every file as
+  "Permission denied" in the container.
+- Otherwise, the script creates a symlink to the source, so the mount shows the
+  live host files as before.
+
+Set `SB_DEVCONTAINER_COPY_HOME=1` on the host to copy on any filesystem.
+
+Copies are one-way. Changes made in the container, such as a refreshed login or
+new session history, stay in `.devcontainer/.local/home/` and do not reach your
+home directory. On the next start, the script copies host files that are newer
+than the staged ones and keeps the rest. Delete `.devcontainer/.local/home/` to
+start over from the host state. When a start replaces a copy with a symlink,
+the script renames the copy with a `.kept-<date>` suffix instead of deleting it.
 
 ## Codex sandbox
 

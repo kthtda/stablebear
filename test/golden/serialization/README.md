@@ -31,6 +31,19 @@ After building/installing, generate a new corpus from `test/` with
 `python golden/serialization/generate_point_cloud_v3.py`. It refuses to
 overwrite a corpus or run with uncommitted implementation changes.
 
+`0.6-pre-timeseries` pins 8 V3 time-series artifacts, binary and protocol-4
+pickle, to the producer implementation commit recorded in its manifest: a
+series of barcode32 observations, a float64 series of two channels in
+different units, and two tensors of float64 windows, one with open starts and
+ends after the last observation and one with closed starts and ends. Each
+channel's times, values, and values at listed times (or that a time is outside
+its domain) are explicit in `generate_timeseries_v3.py`. Generate a new corpus
+from `test/` with `python golden/serialization/generate_timeseries_v3.py`.
+
+Both of these generators write through `pinned_corpus.py`, which records the
+producing commit in the manifest, writes every case as binary and pickle, and
+refuses to overwrite a corpus or run with uncommitted implementation changes.
+
 The `0.4.7-matrices-3x3` directory supplements the original 0.4.7 fixtures
 with 16 binary/pickle artifacts exported using the actual 0.4.7 release.
 It covers standalone and tensor distance/symmetric matrices at both precisions.

@@ -189,3 +189,23 @@ def test_persistence_accepts_whole_indexed_tensors_and_outer_views(
 
         assert indexed._data.has_indices()
         assert actual.is_isomorphic_to(expected)
+
+
+@pytest.mark.parametrize("np_dtype", [np.float32, np.float64])
+def test_float_tensor_of_rank_three_is_a_batch_of_clouds(np_dtype):
+    # X = big[::2] is a non-contiguous view of clouds 0 and 2; clouds 1 and 3
+    # are filler that reading X as contiguous would pick up.
+    big = sb.FloatTensor(np.array([
+        [[0, 0], [1, 0], [0, 1]],
+        [[9, 9], [9, 9], [9, 9]],
+        [[0, 0], [2, 0], [5, 0]],
+        [[9, 9], [9, 9], [9, 9]],
+    ], dtype=np_dtype))
+    X = big[::2]
+
+    bcs = pers.compute_persistent_homology(X, max_dim=1)
+
+    assert bcs.shape == (2, 2)
+    for i in range(2):
+        expected = pers.compute_persistent_homology(sb.PointCloud(np.asarray(X[i])), max_dim=1)
+        assert bcs[i].is_isomorphic_to(expected, atol=0, rtol=0)

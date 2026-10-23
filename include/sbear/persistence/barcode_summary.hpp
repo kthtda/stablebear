@@ -1,56 +1,65 @@
 #ifndef STABLEBEAR_BARCODE_SUMMARY_H
 #define STABLEBEAR_BARCODE_SUMMARY_H
 
-#include "../task.hpp"
+#include "../ufunc.hpp"
 #include "../functional/pcf.hpp"
 #include "barcode.hpp"
 
+#include <memory>
+#include <span>
 #include <string>
+#include <utility>
+#include <vector>
 
 namespace sb::ph
 {
   /**
-   * Generic task that applies a barcode-to-PCF transformation across a
-   * tensor of barcodes in parallel.
+   * A barcode-to-PCF transformation as an operation without extra dimensions:
+   * each barcode maps to one PCF.
    *
    * @tparam T       Scalar type (e.g. float32_t, float64_t)
    * @tparam Func    A callable with signature Pcf<T,T>(const Barcode<T>&)
    */
   template <typename T, typename Func>
-  class BarcodeSummaryTask : public StoppableTask<void>
+  struct BarcodeSummaryOperation
   {
-  public:
-    BarcodeSummaryTask(const Tensor<Barcode<T>>& barcodes, Tensor<Pcf<T, T>>& ret,
-                       Func func, std::string progressLabel)
-        : m_barcodes(barcodes), m_ret(ret), m_func(std::move(func)),
-          m_progressLabel(std::move(progressLabel))
+    using input_type = Barcode<T>;
+    using output_type = Pcf<T, T>;
+
+    Func func;
+
+    [[nodiscard]] std::vector<size_t> extra_dims() const { return {}; }
+
+    void operator()(const Barcode<T>& barcode, std::span<Pcf<T, T>> out) const
     {
+      out[0] = func(barcode);
     }
-
-  private:
-    tf::Future<void> run_async(Executor& exec) override
-    {
-      tf::Taskflow flow;
-
-      next_step(m_barcodes.size(), m_progressLabel, "barcode");
-
-      m_ret = Tensor<Pcf<T, T>>(m_barcodes.shape());
-
-      sb::walk(m_barcodes, [this, &flow](const std::vector<size_t>& index) {
-        flow.emplace([this, index] {
-          m_ret(index) = m_func(m_barcodes(index));
-          add_progress(1);
-        });
-      });
-
-      return exec.cpu()->run(std::move(flow));
-    }
-
-    const Tensor<Barcode<T>>& m_barcodes;
-    Tensor<Pcf<T, T>>& m_ret;
-    Func m_func;
-    std::string m_progressLabel;
   };
+
+  template <typename B>
+  struct barcode_scalar;
+
+  template <typename T>
+  struct barcode_scalar<Barcode<T>>
+  {
+    using type = T;
+  };
+
+  /// The scalar type of the barcodes in a container, such as a tensor or a
+  /// time series of barcodes.
+  template <typename Container>
+  using barcode_scalar_t = typename barcode_scalar<typename Container::value_type>::type;
+
+  /// Apply @p func to every barcode in @p barcodes, a tensor or a time
+  /// series, in parallel.
+  template <typename Container, typename Func>
+  auto make_barcode_summary_task(Container barcodes, Func func, std::string description)
+  {
+    using T = barcode_scalar_t<Container>;
+    return make_ufunc_task(
+        std::move(barcodes), BarcodeSummaryOperation<T, Func>{std::move(func)},
+        std::move(description), "barcode");
+  }
 
 } // namespace sb::ph
 

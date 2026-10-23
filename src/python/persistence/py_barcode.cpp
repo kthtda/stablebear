@@ -108,8 +108,8 @@ namespace sb_py
     PyPersistenceBarcodeBindings<sb::float32_t>::register_bindings(m, "32");
     PyPersistenceBarcodeBindings<sb::float64_t>::register_bindings(m, "64");
 
-    register_typed_tensor_bindings<sb::ph::Barcode<sb::float32_t>>(m, "Barcode32", "");
-    register_typed_tensor_bindings<sb::ph::Barcode<sb::float64_t>>(m, "Barcode64", "");
+    register_tensor_element<sb::ph::Barcode<sb::float32_t>>(m, "Barcode32");
+    register_tensor_element<sb::ph::Barcode<sb::float64_t>>(m, "Barcode64");
     register_barcode_tensor_isomorphism<sb::float32_t>(m);
     register_barcode_tensor_isomorphism<sb::float64_t>(m);
   }

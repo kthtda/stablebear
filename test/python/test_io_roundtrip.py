@@ -5,6 +5,10 @@ import numpy as np
 import pytest
 
 import stablebear as sb
+from stablebear.timeseries import TimeSeries, Window
+
+from _element_values import TWO_ELEMENTS_OF_EVERY_DTYPE
+from _round_trip import ROUND_TRIPS
 
 
 def _roundtrip(tensor):
@@ -75,6 +79,21 @@ def test_scalar_point_cloud_tensor_preserves_cloud(
     restored = roundtrip(sb.PointCloudTensor(coordinates, dtype=pcloud_dtype))
     assert restored.shape == ()
     np.testing.assert_array_equal(np.asarray(restored[()]), coordinates)
+
+
+@pytest.mark.parametrize("round_trip", ROUND_TRIPS)
+@pytest.mark.parametrize("make_values", TWO_ELEMENTS_OF_EVERY_DTYPE)
+def test_nested_tensor_of_every_leaf_dtype_survives_roundtrip(make_values, round_trip):
+    two = make_values()
+    window = Window(size=1.0, closed="both", partial=False, anchor="start")
+    forward = window(TimeSeries(two, times=[0.0, 1.0]))
+    backward = window(TimeSeries(two[[1, 0]], times=[0.0, 1.0]))
+
+    for nested in (sb.NestedTensor([two, two[:1]]), sb.NestedTensor([forward, backward])):
+        restored = round_trip(nested)
+
+        assert restored.dtype == nested.dtype
+        assert restored.array_equal(nested)
 
 
 # --- Float tensors ---

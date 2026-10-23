@@ -88,15 +88,15 @@ namespace sb::ph
     return PcfT(std::move(points));
   }
 
-  template <typename T>
-  auto make_accumulated_persistence_task(const Tensor<Barcode<T>>& barcodes, Tensor<Pcf<T, T>>& out,
+  template <typename Container, typename T = barcode_scalar_t<Container>>
+  auto make_accumulated_persistence_task(Container barcodes,
       T max_death = std::numeric_limits<T>::infinity())
   {
     auto func = [max_death](const Barcode<T>& bc) {
       return barcode_to_accumulated_persistence(bc, max_death);
     };
-    return std::make_unique<BarcodeSummaryTask<T, decltype(func)>>(
-        barcodes, out, std::move(func),
+    return make_barcode_summary_task(
+        std::move(barcodes), std::move(func),
         "Converting barcodes to accumulated persistence functions");
   }
 }

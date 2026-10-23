@@ -1,0 +1,68 @@
+{
+  "name": "stablebear-buttons",
+  "displayName": "Stablebear buttons",
+  "description": "A Stablebear panel with actions for common development commands.",
+  "publisher": "stablebear",
+  "version": "0.0.11",
+  "private": true,
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "main": "./extension.js",
+  "files": [
+    "extension.js",
+    "logo.svg"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "stablebear.openPanel",
+        "title": "Stablebear",
+        "icon": "logo.svg"
+      },
+      {
+        "command": "stablebear.buildDocs",
+        "title": "Stablebear: Build docs"
+      },
+      {
+        "command": "stablebear.openDocs",
+        "title": "Stablebear: Open docs"
+      }
+    ],
+    "taskDefinitions": [
+      {
+        "type": "stablebear",
+        "properties": {}
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "stablebear.openPanel",
+          "group": "navigation"
+        }
+      ]
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "stablebear",
+          "title": "Stablebear",
+          "icon": "logo.svg"
+        }
+      ]
+    },
+    "views": {
+      "stablebear": [
+        {
+          "id": "stablebear.actions",
+          "name": "Actions",
+          "type": "webview"
+        }
+      ]
+    }
+  }
+}

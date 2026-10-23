@@ -267,12 +267,7 @@ namespace sb
 
     else if (format.matches_type<bool>(reader.format_version()))     { return io::detail::read_tensor<bool>(reader); }
 
-    else if (io::detail::matches_nested_tensor_format<NestedTensor<float32_t>>(reader, format)) { return io::detail::read_nested_tensor_element<float32_t>(reader); }
-    else if (io::detail::matches_nested_tensor_format<NestedTensor<float64_t>>(reader, format)) { return io::detail::read_nested_tensor_element<float64_t>(reader); }
-    else if (io::detail::matches_nested_tensor_format<NestedTensor<int32_t>>(reader, format)) { return io::detail::read_nested_tensor_element<int32_t>(reader); }
-    else if (io::detail::matches_nested_tensor_format<NestedTensor<int64_t>>(reader, format)) { return io::detail::read_nested_tensor_element<int64_t>(reader); }
-    else if (io::detail::matches_nested_tensor_format<NestedTensor<uint32_t>>(reader, format)) { return io::detail::read_nested_tensor_element<uint32_t>(reader); }
-    else if (io::detail::matches_nested_tensor_format<NestedTensor<uint64_t>>(reader, format)) { return io::detail::read_nested_tensor_element<uint64_t>(reader); }
+    else if (auto nested = io::detail::read_any_nested_tensor(reader, format)) { return std::move(*nested); }
 
     else if (format.matches_type<Pcf<float32_t, float32_t>>(reader.format_version())) { return io::detail::read_tensor<Pcf<float32_t, float32_t>>(reader); }
     else if (format.matches_type<Pcf<float64_t, float64_t>>(reader.format_version())) { return io::detail::read_tensor<Pcf<float64_t, float64_t>>(reader); }
@@ -295,6 +290,8 @@ namespace sb
 
     else if (format.matches_type<ph::Barcode<float32_t>>(reader.format_version())) { return io::detail::read_tensor<ph::Barcode<float32_t>>(reader); }
     else if (format.matches_type<ph::Barcode<float64_t>>(reader.format_version())) { return io::detail::read_tensor<ph::Barcode<float64_t>>(reader); }
+
+    else if (auto series = io::detail::read_any_timeseries_tensor(reader, format)) { return std::move(*series); }
 
     else
     {
@@ -341,6 +338,8 @@ namespace sb
 
     else if (format.matches_type<DistanceMatrix<float32_t>>(reader.format_version())) { return io::detail::read_compressed_matrix<DistanceMatrix<float32_t>>(is); }
     else if (format.matches_type<DistanceMatrix<float64_t>>(reader.format_version())) { return io::detail::read_compressed_matrix<DistanceMatrix<float64_t>>(is); }
+
+    else if (auto series = io::detail::read_any_timeseries(reader, format)) { return std::move(*series); }
 
     else
     {
