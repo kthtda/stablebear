@@ -52,9 +52,6 @@ window ``i`` at ``t[j]``::
    windows(1.0)[1]      # 1.0, the value of signal at 3 s
    windows([0.0, 1.0])  # [[0.0, 0.0], [0.0, 1.0], [2.0, 3.0]], shape (3, 2)
 
-On a time series with several :doc:`channels <timeseries_channels>`, each channel
-is windowed separately.
-
 Windows from the start
 ----------------------
 
@@ -78,3 +75,37 @@ is closed at its anchor end, :math:`(a, a + \text{size}]` from the end and
 the last window, and the one at 0 s is in the first window from the start.
 With ``partial=True``, the time left out becomes a shorter window, at the
 start of the time series or, with ``anchor="start"``, at its end.
+
+Windows of several channels
+---------------------------
+
+On a time series with several :doc:`channels <timeseries_channels>`, the
+windows cover only the time where every channel can be evaluated, and every
+window has the same channels. Each channel is windowed separately, with its
+own timestamps, so a window can hold a different number of observations in
+each channel. The channels ``a`` and ``b`` from :doc:`timeseries_channels`
+can both be evaluated from 0.05 s to 0.13 s, and windows of 40 ms cut this
+time in two::
+
+   a = TimeSeries([1.0, 2.0, 3.0, 4.0], times=[0.0, 0.1, 0.2, 0.3])
+   b = TimeSeries([10.0, 20.0, 30.0],
+                  times=Times([50.0, 90.0, 130.0], unit="ms"))
+   series = TimeSeries.from_channels([a, b], unit="s")
+
+   windows, bounds = Window(size=0.04, anchor="start")(
+       series, return_bounds=True)
+   bounds  # [[0.05, 0.09], [0.09, 0.13]]
+
+In the second window, ``a`` holds the value 1.0 in effect at 0.09 s,
+followed by its observation 2.0 at 0.1 s, while ``b`` holds only its
+observation 20.0 at 0.09 s::
+
+   windows[1][0].values  # [1.0, 2.0], at times 0 and 0.01
+   windows[1][1].values  # [20.0], at time 0
+
+Evaluating the windows gives one tensor per channel, as evaluating a time
+series with several channels does::
+
+   values = windows(0.02)
+   values[0]  # [1.0, 2.0], from a
+   values[1]  # [10.0, 20.0], from b
