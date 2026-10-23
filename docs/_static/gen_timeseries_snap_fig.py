@@ -6,13 +6,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 from pathlib import Path
 
-from stablebear.timeseries import TimeSeries
+from stablebear.timeseries import Times, TimeSeries
 
 HERE = Path(__file__).parent
 
 
 def _plot_steps(ax, series, color):
-    times = np.asarray(series.times)
+    times = np.asarray(series.times.to("s"))
     values = np.asarray(series.values)
     # Each step [t_i, t_{i+1}) is closed on the left and open on the right.
     for t0, t1, v in zip(times[:-1], times[1:], values[:-1]):
@@ -36,6 +36,29 @@ def plot_timeseries_evaluation():
         ax.plot(t, series(t), "s", color="tab:orange", markersize=7,
                 zorder=6)
     ax.set_ylim(0, 5)
+    fig.tight_layout()
+    return fig
+
+
+# -- included in docs via literalinclude :pyobject: --
+def plot_timeseries_channels():
+    a = TimeSeries([1.0, 2.0, 3.0, 4.0], times=[0.0, 0.1, 0.2, 0.3])
+    b = TimeSeries([10.0, 20.0, 30.0],
+                   times=Times([50.0, 90.0, 130.0], unit="ms"))
+    series = TimeSeries.from_channels([a, b], unit="s")
+    query = 0.1
+    values = series(query)
+
+    fig, axes = plt.subplots(2, 1, figsize=(6, 3.5), sharex=True)
+    for i, (ax, channel, top) in enumerate(zip(axes, (a, b), (5, 40))):
+        ax.axvspan(0.05, 0.13, color="gray", alpha=0.2, linewidth=0)
+        _plot_steps(ax, channel, plt.rcParams["lines.color"])
+        ax.axvline(query, color="gray", linestyle="--", linewidth=1)
+        ax.plot(query, np.asarray(values[i]), "s", color="tab:orange",
+                markersize=7, zorder=6)
+        ax.set_ylim(0, top)
+        ax.set_ylabel("ab"[i])
+    axes[0].set_xlabel("")
     fig.tight_layout()
     return fig
 
@@ -150,6 +173,7 @@ DARK = ("dark_background", "#14181e", "#e0e0e0", "#5dade2")
 
 if __name__ == "__main__":
     for name, plot_func in [("timeseries_evaluation", plot_timeseries_evaluation),
+                            ("timeseries_channels", plot_timeseries_channels),
                             ("timeseries_rounding", plot_timeseries_rounding),
                             ("timeseries_snap_distances", plot_timeseries_snap_distances)]:
         _save_themed(plot_func, *LIGHT, HERE / f"{name}_light.png")
