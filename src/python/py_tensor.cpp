@@ -121,15 +121,7 @@ namespace sb_py
     register_tensor_element<sb::float64_t>(m, "Float64");
     register_tensor_element<sb::float32_t>(m, "Float32");
 
-    register_tensor_element<sb::int32_t>(m, "Int32");
-    register_tensor_element<sb::int64_t>(m, "Int64");
-    register_tensor_element<uint32_t>(m, "Uint32");
-    register_tensor_element<uint64_t>(m, "Uint64");
-
-    register_tensor_element<sb::Pcf_f32>(m, "Pcf32");
-    register_tensor_element<sb::Pcf_f64>(m, "Pcf64");
-    register_tensor_element<sb::Pcf_i32>(m, "Pcf32i");
-    register_tensor_element<sb::Pcf_i64>(m, "Pcf64i");
-
+    register_tensor_int_bindings(m);
+    register_tensor_pcf_bindings(m);
   }
 }

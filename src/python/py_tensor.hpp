@@ -22,6 +22,11 @@ namespace sb_py
 {
   void register_tensor_bindings(pybind11::module_& m);
 
+  // The element types are bound in several translation units so that they
+  // compile in parallel.
+  void register_tensor_int_bindings(pybind11::module_& m);
+  void register_tensor_pcf_bindings(pybind11::module_& m);
+
   template <typename T>
   struct scalar_of
   {
