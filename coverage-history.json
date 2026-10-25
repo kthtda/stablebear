@@ -1950,5 +1950,15 @@
     "py": 90.0,
     "cuda": 100.0,
     "release_tag": "v0.5.1"
+  },
+  {
+    "utc_iso": "2026-10-25T12:00:00Z",
+    "sha": "07cbc87",
+    "branch": "main",
+    "detail_path": "reports/2026-10-25_12-00-00_07cbc87/report.html",
+    "cpp": 90.7,
+    "py": 90.0,
+    "cuda": 100.0,
+    "release_tag": null
   }
 ]

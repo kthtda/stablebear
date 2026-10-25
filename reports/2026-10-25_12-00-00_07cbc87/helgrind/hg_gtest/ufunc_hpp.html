@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>/home/runner/actions-runner/_work/stablebear/stablebear/include/sbear/persistence/../ufunc.hpp</title>
+    <link href='valgrind.css' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+    <script src="https://code.jquery.com/jquery-3.4.1.js"></script>
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.0.0/styles/default.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.0.0/highlight.min.js"></script>
+    <script src="valgrind.js"></script>
+</head>
+
+<body>
+    <div class="global">
+        <div class="header">
+            <h1>/home/runner/actions-runner/_work/stablebear/stablebear/include/sbear/persistence/../ufunc.hpp</h1>
+            <p><b>2</b> errors</p>
+            <button class="next_error">Goto First Error</button>
+        </div>
+        <div class="listing">
+            <pre class="code">
+<code class="c++"><span class="line_number">1</span>#ifndef STABLEBEAR_UFUNC_H
+<span class="line_number">2</span>#define STABLEBEAR_UFUNC_H
+<span class="line_number">3</span>
+<span class="line_number">4</span>#include &#34;executor.hpp&#34;
+<span class="line_number">5</span>#include &#34;task.hpp&#34;
+<span class="line_number">6</span>#include &#34;tensor.hpp&#34;
+<span class="line_number">7</span>#include &#34;timeseries.hpp&#34;
+<span class="line_number">8</span>
+<span class="line_number">9</span>#include &lt;taskflow/algorithm/for_each.hpp&gt;
+<span class="line_number">10</span>
+<span class="line_number">11</span>#include &lt;algorithm&gt;
+<span class="line_number">12</span>#include &lt;functional&gt;
+<span class="line_number">13</span>#include &lt;numeric&gt;
+<span class="line_number">14</span>#include &lt;optional&gt;
+<span class="line_number">15</span>#include &lt;span&gt;
+<span class="line_number">16</span>#include &lt;stdexcept&gt;
+<span class="line_number">17</span>#include &lt;string&gt;
+<span class="line_number">18</span>#include &lt;type_traits&gt;
+<span class="line_number">19</span>#include &lt;utility&gt;
+<span class="line_number">20</span>#include &lt;vector&gt;
+<span class="line_number">21</span>
+<span class="line_number">22</span>namespace sb
+<span class="line_number">23</span>{
+<span class="line_number">24</span>  /// A contiguous block of input for an operation with core dimensions: its
+<span class="line_number">25</span>  /// values in row-major order and its shape (the core dimensions).
+<span class="line_number">26</span>  template &lt;typename T&gt;
+<span class="line_number">27</span>  struct CoreBlock
+<span class="line_number">28</span>  {
+<span class="line_number">29</span>    std::span&lt;const T&gt; values;
+<span class="line_number">30</span>    std::span&lt;const size_t&gt; shape;
+<span class="line_number">31</span>  };
+<span class="line_number">32</span>
+<span class="line_number">33</span>  /// The number of trailing input dimensions an operation consumes per call,
+<span class="line_number">34</span>  /// like the core dimensions of a NumPy gufunc signature; 0 unless the
+<span class="line_number">35</span>  /// operation declares a core_rank.
+<span class="line_number">36</span>  template &lt;typename Op&gt;
+<span class="line_number">37</span>  inline constexpr size_t core_rank_v = [] {
+<span class="line_number">38</span>    if constexpr (requires { Op::core_rank; })
+<span class="line_number">39</span>      return size_t{Op::core_rank};
+<span class="line_number">40</span>    else
+<span class="line_number">41</span>      return size_t{0};
+<span class="line_number">42</span>  }();
+<span class="line_number">43</span>
+<span class="line_number">44</span>  /// What an operation receives per call: one element, or a CoreBlock of its
+<span class="line_number">45</span>  /// core dimensions.
+<span class="line_number">46</span>  template &lt;typename Op&gt;
+<span class="line_number">47</span>  using operation_input_t = std::conditional_t&lt;
+<span class="line_number">48</span>      core_rank_v&lt;Op&gt; == 0, const typename Op::input_type&amp;, CoreBlock&lt;typename Op::input_type&gt;&gt;;
+<span class="line_number">49</span>
+<span class="line_number">50</span>  /// An operation in the style of a NumPy (g)ufunc. It maps one input element,
+<span class="line_number">51</span>  /// or one block of core_rank trailing input dimensions, to a block of output
+<span class="line_number">52</span>  /// elements of shape extra_dims(), the same for every call. Parameters are
+<span class="line_number">53</span>  /// bound in the operation.
+<span class="line_number">54</span>  template &lt;typename Op&gt;
+<span class="line_number">55</span>  concept Operation = requires(const Op&amp; op, operation_input_t&lt;Op&gt; in,
+<span class="line_number">56</span>                               std::span&lt;typename Op::output_type&gt; out)
+<span class="line_number">57</span>  {
+<span class="line_number">58</span>    { op.extra_dims() } -&gt; std::convertible_to&lt;std::vector&lt;size_t&gt;&gt;;
+<span class="line_number">59</span>    op(in, out);
+<span class="line_number">60</span>  };
+<span class="line_number">61</span>
+<span class="line_number">62</span>  namespace detail
+<span class="line_number">63</span>  {
+<span class="line_number">64</span>    [[nodiscard]] inline size_t product(std::span&lt;const size_t&gt; dims)
+<span class="line_number">65</span>    {
+<span class="line_number">66</span>      return std::accumulate(dims.begin(), dims.end(), size_t{1}, std::multiplies&lt;&gt;());
+<span class="line_number">67</span>    }
+<span class="line_number">68</span>
+<span class="line_number">69</span>    /// Split @p shape into its leading batch dimensions and its trailing
+<span class="line_number">70</span>    /// @p coreRank core dimensions.
+<span class="line_number">71</span>    [[nodiscard]] inline std::pair&lt;std::vector&lt;size_t&gt;, std::vector&lt;size_t&gt;&gt;
+<span class="line_number">72</span>    split_core(std::span&lt;const size_t&gt; shape, size_t coreRank)
+<span class="line_number">73</span>    {
+<span class="line_number">74</span>      if (shape.size() &lt; coreRank)
+<span class="line_number">75</span>      {
+<span class="line_number">76</span>        throw std::invalid_argument(
+<span class="line_number">77</span>            &#34;Expected input of rank at least &#34; + std::to_string(coreRank) + &#34;, got rank &#34;
+<span class="line_number">78</span>            + std::to_string(shape.size()));
+<span class="line_number">79</span>      }
+<span class="line_number">80</span>      const auto split = shape.begin() + static_cast&lt;std::ptrdiff_t&gt;(shape.size() - coreRank);
+<span class="line_number">81</span>      return {std::vector&lt;size_t&gt;(shape.begin(), split), std::vector&lt;size_t&gt;(split, shape.end())};
+<span class="line_number">82</span>    }
+<span class="line_number">83</span>  }
+<span class="line_number">84</span>
+<span class="line_number">85</span>  /// Says where a container&#39;s inputs are and how to build the output of an
+<span class="line_number">86</span>  /// operation with core rank CoreRank and output element type Out. An
+<span class="line_number">87</span>  /// adapter numbers the calls 0, ..., size() - 1; input(i) is call i&#39;s input,
+<span class="line_number">88</span>  /// an element or a CoreBlock, and block(i) points at its block of output
+<span class="line_number">89</span>  /// elements, which finish() turns into the result.
+<span class="line_number">90</span>  template &lt;typename Container, size_t CoreRank, typename Out&gt;
+<span class="line_number">91</span>  class UfuncAdapter;
+<span class="line_number">92</span>
+<span class="line_number">93</span>  /// Tensor: the result has the input&#39;s batch shape (its shape without the
+<span class="line_number">94</span>  /// core dimensions) followed by extra_dims.
+<span class="line_number">95</span>  template &lt;typename In, TensorProperties Properties, size_t CoreRank, typename Out&gt;
+<span class="line_number">96</span>  class UfuncAdapter&lt;Tensor&lt;In, Properties&gt;, CoreRank, Out&gt;
+<span class="line_number">97</span>  {
+<span class="line_number">98</span>  public:
+<span class="line_number">99</span>    using result_type = Tensor&lt;Out&gt;;
+<span class="line_number">100</span>
+<span class="line_number">101</span>    UfuncAdapter(const Tensor&lt;In, Properties&gt;&amp; input, const std::vector&lt;size_t&gt;&amp; extraDims)
+<span class="line_number">102</span>      : m_input(input), m_blockSize(detail::product(extraDims))
+<span class="line_number">103</span>    {
+<span class="line_number">104</span>      auto [batch, core] = detail::split_core(input.shape(), CoreRank);
+<span class="line_number">105</span>      m_size = detail::product(batch);  // a 0-d batch is one call
+<span class="line_number">106</span>      m_core = std::move(core);
+<span class="line_number">107</span>      m_coreSize = detail::product(m_core);
+<span class="line_number">108</span>      if constexpr (CoreRank &gt; 0)
+<span class="line_number">109</span>      {
+<span class="line_number">110</span>        // Blocks are read as contiguous spans.
+<span class="line_number">111</span>        if (!m_input.is_contiguous())
+<span class="line_number">112</span>        {
+<span class="line_number">113</span>          m_input = m_input.copy();
+<span class="line_number">114</span>        }
+<span class="line_number">115</span>      }
+<span class="line_number">116</span>      batch.insert(batch.end(), extraDims.begin(), extraDims.end());
+<span class="line_number">117</span>      m_output = Tensor&lt;Out&gt;(batch);
+<span class="line_number">118</span>    }
+<span class="line_number">119</span>
+<span class="line_number">120</span>    [[nodiscard]] size_t size() const { return m_size; }
+<span class="line_number">121</span>
+<span class="line_number">122</span>    [[nodiscard]] decltype(auto) input(size_t i) const
+<span class="line_number">123</span>    {
+<span class="line_number">124</span>      if constexpr (CoreRank == 0)
+<span class="line_number">125</span>      {
+<span class="line_number">126</span>        return m_input.flat(i);
+<span class="line_number">127</span>      }
+<span class="line_number">128</span>      else
+<span class="line_number">129</span>      {
+<span class="line_number">130</span>        return CoreBlock&lt;In&gt;{std::span&lt;const In&gt;(m_input.data() + i * m_coreSize, m_coreSize), m_core};
+<span class="line_number">131</span>      }
+<span class="line_number">132</span>    }
+<span class="line_number">133</span>
+<span class="line_number">134</span>    /// The output is freshly allocated, so it is contiguous and call i&#39;s
+<span class="line_number">135</span>    /// block starts at i * blockSize.
+</code></pre>
+            <div class="issue">
+                <div>
+                    <span class="what">Possible data race during read of size 8 at 0x4EB0BF0 by thread #25</span>
+                    <div class="navigation">
+                        <button class="next_error">Next</button>
+                        <button class="prev_error">Previous</button>
+                    </div>
+                </div>
+                <div>
+                    <table class="call_stack">
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/actions-runner/_work/stablebear/stablebear/include/sbear/persistence/../ufunc.hpp:291<br>
+                                    <code class="cpp">sb::UfuncTask&lt;sb::ph::BarcodeSummaryOperation&lt;float, sb::ph::make_stable_rank_task&lt;sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt; &gt;(sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt;)::{lambda(sb::ph::Barcode&lt;float&gt; const&amp;)#1}&gt;, sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}::operator()(unsigned long) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">288</span>        {
+<span class="line_number">289</span>          return;
+<span class="line_number">290</span>        }
+<span class="line_number">291</span><span class="error">        m_op(m_adapter-&gt;input(i), std::span&lt;output_type&gt;(m_adapter-&gt;block(i), blockSize));
+</span><span class="line_number">292</span>        add_progress(1);
+<span class="line_number">293</span>      });
+<span class="line_number">294</span>      auto finish = flow.emplace([this] { m_result = m_adapter-&gt;finish(); });
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/actions-runner/_work/stablebear/stablebear/3rd/taskflow/taskflow/algorithm/for_each.hpp:134<br>
+                                    <code class="cpp">tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::ph::BarcodeSummaryOperation&lt;float, sb::ph::make_stable_rank_task&lt;sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt; &gt;(sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt;)::{lambda(sb::ph::Barcode&lt;float&gt; const&amp;)#1}&gt;, sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::ph::BarcodeSummaryOperation&lt;float, sb::ph::make_stable_rank_task&lt;sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt; &gt;(sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt;)::{lambda(sb::ph::Barcode&lt;float&gt; const&amp;)#1}&gt;, sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}::operator()()::{lambda(unsigned long, unsigned long)#1}::operator()(unsigned long, unsigned long)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">131</span>          part.loop(N, W, *next, [=] (size_t part_b, size_t part_e) mutable {
+<span class="line_number">132</span>            auto idx = static_cast&lt;B_t&gt;(part_b) * inc + beg;
+<span class="line_number">133</span>            for(size_t x=part_b; x&lt;part_e; x++, idx += inc) {
+<span class="line_number">134</span><span class="error">              c(idx);
+</span><span class="line_number">135</span>            }
+<span class="line_number">136</span>          });
+<span class="line_number">137</span>        });
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/actions-runner/_work/stablebear/stablebear/3rd/taskflow/taskflow/core/../algorithm/partitioner.hpp:316<br>
+                                    <code class="cpp">void tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;::loop&lt;tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::ph::BarcodeSummaryOperation&lt;float, sb::ph::make_stable_rank_task&lt;sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt; &gt;(sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt;)::{lambda(sb::ph::Barcode&lt;float&gt; const&amp;)#1}&gt;, sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::ph::BarcodeSummaryOperation&lt;float, sb::ph::make_stable_rank_task&lt;sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt; &gt;(sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt;)::{lambda(sb::ph::Barcode&lt;float&gt; const&amp;)#1}&gt;, sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}::operator()()::{lambda(unsigned long, unsigned long)#1}, (void*)0&gt;(unsigned long, unsigned long, std::atomic&lt;unsigned long&gt;&amp;, tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::ph::BarcodeSummaryOperation&lt;float, sb::ph::make_stable_rank_task&lt;sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt; &gt;(sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt;)::{lambda(sb::ph::Barcode&lt;float&gt; const&amp;)#1}&gt;, sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::ph::BarcodeSummaryOperation&lt;float, sb::ph::make_stable_rank_task&lt;sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt; &gt;(sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt;)::{lambda(sb::ph::Barcode&lt;float&gt; const&amp;)#1}&gt;, sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}::operator()()::{lambda(unsigned long, unsigned long)#1}&amp;&amp;) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">313</span>          if(curr_b &gt;= N) {
+<span class="line_number">314</span>            return;
+<span class="line_number">315</span>          }
+<span class="line_number">316</span><span class="error">          func(curr_b, (std::min)(curr_b + chunk_size, N));
+</span><span class="line_number">317</span>        }
+<span class="line_number">318</span>        break;
+<span class="line_number">319</span>      }
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/actions-runner/_work/stablebear/stablebear/3rd/taskflow/taskflow/algorithm/for_each.hpp:131<br>
+                                    <code class="cpp">tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::ph::BarcodeSummaryOperation&lt;float, sb::ph::make_stable_rank_task&lt;sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt; &gt;(sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt;)::{lambda(sb::ph::Barcode&lt;float&gt; const&amp;)#1}&gt;, sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::ph::BarcodeSummaryOperation&lt;float, sb::ph::make_stable_rank_task&lt;sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt; &gt;(sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt;)::{lambda(sb::ph::Barcode&lt;float&gt; const&amp;)#1}&gt;, sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}::operator()()</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">128</span>      auto next = std::make_shared&lt;std::atomic&lt;size_t&gt;&gt;(0);
+<span class="line_number">129</span>      for(size_t w=0; w&lt;W;) {
+<span class="line_number">130</span>        auto task = part([=] () mutable {
+<span class="line_number">131</span><span class="error">          part.loop(N, W, *next, [=] (size_t part_b, size_t part_e) mutable {
+</span><span class="line_number">132</span>            auto idx = static_cast&lt;B_t&gt;(part_b) * inc + beg;
+<span class="line_number">133</span>            for(size_t x=part_b; x&lt;part_e; x++, idx += inc) {
+<span class="line_number">134</span>              c(idx);
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/actions-runner/_work/stablebear/stablebear/3rd/taskflow/taskflow/algorithm/for_each.hpp:138<br>
+                                    <code class="cpp">tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::ph::BarcodeSummaryOperation&lt;float, sb::ph::make_stable_rank_task&lt;sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt; &gt;(sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt;)::{lambda(sb::ph::Barcode&lt;float&gt; const&amp;)#1}&gt;, sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::ph::BarcodeSummaryOperation&lt;float, sb::ph::make_stable_rank_task&lt;sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt; &gt;(sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt;)::{lambda(sb::ph::Barcode&lt;float&gt; const&amp;)#1}&gt;, sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">135</span>            }
+<span class="line_number">136</span>          });
+<span class="line_number">137</span>        });
+<span class="line_number">138</span><span class="error">        (++w == W) ? task() : rt.silent_async(task);
+</span><span class="line_number">139</span>      }
+<span class="line_number">140</span>    }
+<span class="line_number">141</span>  };
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:61<br>
+                                    <code class="cpp">void std::__invoke_impl&lt;void, tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::ph::BarcodeSummaryOperation&lt;float, sb::ph::make_stable_rank_task&lt;sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt; &gt;(sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt;)::{lambda(sb::ph::Barcode&lt;float&gt; const&amp;)#1}&gt;, sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::ph::BarcodeSummaryOperation&lt;float, sb::ph::make_stable_rank_task&lt;sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt; &gt;(sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt;)::{lambda(sb::ph::Barcode&lt;float&gt; const&amp;)#1}&gt;, sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}&amp;, tf::Runtime&amp;&gt;(std::__invoke_other, tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::ph::BarcodeSummaryOperation&lt;float, sb::ph::make_stable_rank_task&lt;sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt; &gt;(sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt;)::{lambda(sb::ph::Barcode&lt;float&gt; const&amp;)#1}&gt;, sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::ph::BarcodeSummaryOperation&lt;float, sb::ph::make_stable_rank_task&lt;sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt; &gt;(sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt;)::{lambda(sb::ph::Barcode&lt;float&gt; const&amp;)#1}&gt;, sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}&amp;, tf::Runtime&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">58</span>  template&lt;typename _Res, typename _Fn, typename... _Args&gt;
+<span class="line_number">59</span>    constexpr _Res
+<span class="line_number">60</span>    __invoke_impl(__invoke_other, _Fn&amp;&amp; __f, _Args&amp;&amp;... __args)
+<span class="line_number">61</span><span class="error">    { return std::forward&lt;_Fn&gt;(__f)(std::forward&lt;_Args&gt;(__args)...); }
+</span><span class="line_number">62</span>
+<span class="line_number">63</span>  template&lt;typename _Res, typename _MemFun, typename _Tp, typename... _Args&gt;
+<span class="line_number">64</span>    constexpr _Res
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:111<br>
+                                    <code class="cpp">std::enable_if&lt;is_invocable_r_v&lt;void, tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::ph::BarcodeSummaryOperation&lt;float, sb::ph::make_stable_rank_task&lt;sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt; &gt;(sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt;)::{lambda(sb::ph::Barcode&lt;float&gt; const&amp;)#1}&gt;, sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::ph::BarcodeSummaryOperation&lt;float, sb::ph::make_stable_rank_task&lt;sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt; &gt;(sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt;)::{lambda(sb::ph::Barcode&lt;float&gt; const&amp;)#1}&gt;, sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}&amp;, tf::Runtime&amp;&gt;, void&gt;::type std::__invoke_r&lt;void, tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::ph::BarcodeSummaryOperation&lt;float, sb::ph::make_stable_rank_task&lt;sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt; &gt;(sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt;)::{lambda(sb::ph::Barcode&lt;float&gt; const&amp;)#1}&gt;, sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::ph::BarcodeSummaryOperation&lt;float, sb::ph::make_stable_rank_task&lt;sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt; &gt;(sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt;)::{lambda(sb::ph::Barcode&lt;float&gt; const&amp;)#1}&gt;, sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}&amp;, tf::Runtime&amp;&gt;(tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::ph::BarcodeSummaryOperation&lt;float, sb::ph::make_stable_rank_task&lt;sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt; &gt;(sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt;)::{lambda(sb::ph::Barcode&lt;float&gt; const&amp;)#1}&gt;, sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::ph::BarcodeSummaryOperation&lt;float, sb::ph::make_stable_rank_task&lt;sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt; &gt;(sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt;)::{lambda(sb::ph::Barcode&lt;float&gt; const&amp;)#1}&gt;, sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}&amp;, tf::Runtime&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">108</span>      using __type = typename __result::type;
+<span class="line_number">109</span>      using __tag = typename __result::__invoke_type;
+<span class="line_number">110</span>      if constexpr (is_void_v&lt;_Res&gt;)
+<span class="line_number">111</span><span class="error">	std::__invoke_impl&lt;__type&gt;(__tag{}, std::forward&lt;_Callable&gt;(__fn),
+</span><span class="line_number">112</span>					std::forward&lt;_Args&gt;(__args)...);
+<span class="line_number">113</span>      else
+<span class="line_number">114</span>	return std::__invoke_impl&lt;__type&gt;(__tag{},
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/std_function.h:290<br>
+                                    <code class="cpp">std::_Function_handler&lt;void (tf::Runtime&amp;), tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::ph::BarcodeSummaryOperation&lt;float, sb::ph::make_stable_rank_task&lt;sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt; &gt;(sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt;)::{lambda(sb::ph::Barcode&lt;float&gt; const&amp;)#1}&gt;, sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::ph::BarcodeSummaryOperation&lt;float, sb::ph::make_stable_rank_task&lt;sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt; &gt;(sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt;)::{lambda(sb::ph::Barcode&lt;float&gt; const&amp;)#1}&gt;, sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}&gt;::_M_invoke(std::_Any_data const&amp;, tf::Runtime&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">287</span>      static _Res
+<span class="line_number">288</span>      _M_invoke(const _Any_data&amp; __functor, _ArgTypes&amp;&amp;... __args)
+<span class="line_number">289</span>      {
+<span class="line_number">290</span><span class="error">	return std::__invoke_r&lt;_Res&gt;(*_Base::_M_get_pointer(__functor),
+</span><span class="line_number">291</span>				     std::forward&lt;_ArgTypes&gt;(__args)...);
+<span class="line_number">292</span>      }
+<span class="line_number">293</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/std_function.h:591<br>
+                                    <code class="cpp">std::function&lt;void (tf::Runtime&amp;)&gt;::operator()(tf::Runtime&amp;) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">588</span>      {
+<span class="line_number">589</span>	if (_M_empty())
+<span class="line_number">590</span>	  __throw_bad_function_call();
+<span class="line_number">591</span><span class="error">	return _M_invoker(_M_functor, std::forward&lt;_ArgTypes&gt;(__args)...);
+</span><span class="line_number">592</span>      }
+<span class="line_number">593</span>
+<span class="line_number">594</span>#if __cpp_rtti
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/actions-runner/_work/stablebear/stablebear/3rd/taskflow/taskflow/core/runtime.hpp:826<br>
+                                    <code class="cpp">tf::Executor::_invoke_runtime_task_impl(tf::Worker&amp;, tf::Node*, std::function&lt;void (tf::Runtime&amp;)&gt;&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">823</span>    node-&gt;_join_counter.fetch_add(1, std::memory_order_release);
+<span class="line_number">824</span>
+<span class="line_number">825</span>    _observer_prologue(worker, node);
+<span class="line_number">826</span><span class="error">    TF_EXECUTOR_EXCEPTION_HANDLER(worker, node, {
+</span><span class="line_number">827</span>      work(rt);
+<span class="line_number">828</span>    });
+<span class="line_number">829</span>    _observer_epilogue(worker, node);
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/actions-runner/_work/stablebear/stablebear/3rd/taskflow/taskflow/core/runtime.hpp:807<br>
+                                    <code class="cpp">tf::Executor::_invoke_runtime_task(tf::Worker&amp;, tf::Node*)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">804</span>
+<span class="line_number">805</span>// Procedure: _invoke_runtime_task
+<span class="line_number">806</span>inline bool Executor::_invoke_runtime_task(Worker&amp; worker, Node* node) {
+<span class="line_number">807</span><span class="error">  return _invoke_runtime_task_impl(
+</span><span class="line_number">808</span>    worker, node, std::get_if&lt;Node::Runtime&gt;(&amp;node-&gt;_handle)-&gt;work
+<span class="line_number">809</span>  );
+<span class="line_number">810</span>}
+</code></pre>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            <pre class="code">
+<code class="c++"><span class="line_number">136</span><span class="error">    [[nodiscard]] Out* block(size_t i) { return m_output.data() + i * m_blockSize; }</span>
+<span class="line_number">137</span>
+<span class="line_number">138</span>    [[nodiscard]] result_type finish() { return std::move(m_output); }
+<span class="line_number">139</span>
+<span class="line_number">140</span>  private:
+<span class="line_number">141</span>    Tensor&lt;In, Properties&gt; m_input;
+<span class="line_number">142</span>    size_t m_blockSize;
+<span class="line_number">143</span>    size_t m_size = 0;
+<span class="line_number">144</span>    std::vector&lt;size_t&gt; m_core;
+<span class="line_number">145</span>    size_t m_coreSize = 1;
+<span class="line_number">146</span>    Tensor&lt;Out&gt; m_output;
+<span class="line_number">147</span>  };
+<span class="line_number">148</span>
+<span class="line_number">149</span>  /// Time series: the calls of all channels&#39; observations, channel by channel.
+<span class="line_number">150</span>  /// Each output channel keeps its input&#39;s times, domain, and snap settings,
+<span class="line_number">151</span>  /// and its shape is the input shape without the core dimensions, followed
+<span class="line_number">152</span>  /// by extra_dims; the result keeps the query unit.
+<span class="line_number">153</span>  template &lt;typename In, size_t CoreRank, typename Out&gt;
+<span class="line_number">154</span>  class UfuncAdapter&lt;TimeSeries&lt;In&gt;, CoreRank, Out&gt;
+<span class="line_number">155</span>  {
+<span class="line_number">156</span>  public:
+<span class="line_number">157</span>    using result_type = TimeSeries&lt;Out&gt;;
+<span class="line_number">158</span>
+<span class="line_number">159</span>    UfuncAdapter(const TimeSeries&lt;In&gt;&amp; input, const std::vector&lt;size_t&gt;&amp; extraDims)
+<span class="line_number">160</span>      : m_input(input), m_extraDims(extraDims), m_blockSize(detail::product(extraDims))
+<span class="line_number">161</span>    {
+<span class="line_number">162</span>      size_t offset = 0;
+<span class="line_number">163</span>      for (size_t c = 0; c &lt; input.n_channels(); ++c)
+<span class="line_number">164</span>      {
+<span class="line_number">165</span>        const auto&amp; channel = input.channel(c);
+<span class="line_number">166</span>        auto [batch, core] = detail::split_core(channel.shape(), CoreRank);
+<span class="line_number">167</span>        const auto coreSize = detail::product(core);
+<span class="line_number">168</span>        const auto count = channel.size() * detail::product(batch);
+<span class="line_number">169</span>        m_offsets.push_back(offset);
+<span class="line_number">170</span>        m_batches.push_back(std::move(batch));
+<span class="line_number">171</span>        m_cores.push_back(std::move(core));
+<span class="line_number">172</span>        m_coreSizes.push_back(coreSize);
+<span class="line_number">173</span>        m_outputs.emplace_back(count * m_blockSize);
+<span class="line_number">174</span>        offset += count;
+<span class="line_number">175</span>      }
+<span class="line_number">176</span>      m_size = offset;
+<span class="line_number">177</span>    }
+<span class="line_number">178</span>
+<span class="line_number">179</span>    [[nodiscard]] size_t size() const { return m_size; }
+<span class="line_number">180</span>
+<span class="line_number">181</span>    [[nodiscard]] decltype(auto) input(size_t i) const
+<span class="line_number">182</span>    {
+<span class="line_number">183</span>      const auto c = channel_of(i);
+<span class="line_number">184</span>      const auto&amp; channel = m_input.channel(c);
+<span class="line_number">185</span>      if constexpr (CoreRank == 0)
+<span class="line_number">186</span>      {
+<span class="line_number">187</span>        return channel.flat_value(i - m_offsets[c]);
+<span class="line_number">188</span>      }
+<span class="line_number">189</span>      else
+<span class="line_number">190</span>      {
+<span class="line_number">191</span>        // The block is copied into scratch for this worker thread; the
+<span class="line_number">192</span>        // operation uses it before the thread makes its next call.
+<span class="line_number">193</span>        thread_local std::vector&lt;In&gt; scratch;
+<span class="line_number">194</span>        const auto coreSize = m_coreSizes[c];
+<span class="line_number">195</span>        const auto first = (i - m_offsets[c]) * coreSize;
+<span class="line_number">196</span>        scratch.resize(coreSize);
+<span class="line_number">197</span>        for (size_t e = 0; e &lt; coreSize; ++e)
+<span class="line_number">198</span>        {
+<span class="line_number">199</span>          scratch[e] = channel.flat_value(first + e);
+<span class="line_number">200</span>        }
+<span class="line_number">201</span>        return CoreBlock&lt;In&gt;{std::span&lt;const In&gt;(scratch.data(), coreSize), m_cores[c]};
+<span class="line_number">202</span>      }
+<span class="line_number">203</span>    }
+<span class="line_number">204</span>
+<span class="line_number">205</span>    [[nodiscard]] Out* block(size_t i)
+<span class="line_number">206</span>    {
+<span class="line_number">207</span>      const auto c = channel_of(i);
+<span class="line_number">208</span>      return m_outputs[c].data() + (i - m_offsets[c]) * m_blockSize;
+<span class="line_number">209</span>    }
+<span class="line_number">210</span>
+<span class="line_number">211</span>    [[nodiscard]] result_type finish()
+<span class="line_number">212</span>    {
+<span class="line_number">213</span>      std::vector&lt;Channel&lt;Out&gt;&gt; channels;
+<span class="line_number">214</span>      for (size_t c = 0; c &lt; m_input.n_channels(); ++c)
+<span class="line_number">215</span>      {
+<span class="line_number">216</span>        const auto&amp; source = m_input.channel(c);
+<span class="line_number">217</span>        auto shape = m_batches[c];
+<span class="line_number">218</span>        shape.insert(shape.end(), m_extraDims.begin(), m_extraDims.end());
+<span class="line_number">219</span>        auto channel = Channel&lt;Out&gt;(source.times(), std::move(shape), std::move(m_outputs[c]),
+<span class="line_number">220</span>                                    source.snap_tolerance())
+<span class="line_number">221</span>                           .with_start_closed(source.start_closed());
+<span class="line_number">222</span>        if (const auto end = source.end())
+<span class="line_number">223</span>        {
+<span class="line_number">224</span>          channel = channel.until(*end, source.end_closed());
+<span class="line_number">225</span>        }
+<span class="line_number">226</span>        channels.push_back(std::move(channel));
+<span class="line_number">227</span>      }
+<span class="line_number">228</span>      return TimeSeries&lt;Out&gt;(std::move(channels), m_input.unit());
+<span class="line_number">229</span>    }
+<span class="line_number">230</span>
+<span class="line_number">231</span>  private:
+<span class="line_number">232</span>    /// The channel holding call i: the last one starting at or before it.
+<span class="line_number">233</span>    [[nodiscard]] size_t channel_of(size_t i) const
+<span class="line_number">234</span>    {
+<span class="line_number">235</span>      return static_cast&lt;size_t&gt;(std::upper_bound(m_offsets.begin(), m_offsets.end(), i) - m_offsets.begin()) - 1;
+<span class="line_number">236</span>    }
+<span class="line_number">237</span>
+<span class="line_number">238</span>    const TimeSeries&lt;In&gt;&amp; m_input;
+<span class="line_number">239</span>    std::vector&lt;size_t&gt; m_extraDims;
+<span class="line_number">240</span>    size_t m_blockSize;
+<span class="line_number">241</span>    std::vector&lt;size_t&gt; m_offsets;
+<span class="line_number">242</span>    std::vector&lt;std::vector&lt;size_t&gt;&gt; m_batches;
+<span class="line_number">243</span>    std::vector&lt;std::vector&lt;size_t&gt;&gt; m_cores;
+<span class="line_number">244</span>    std::vector&lt;size_t&gt; m_coreSizes;
+<span class="line_number">245</span>    std::vector&lt;std::vector&lt;Out&gt;&gt; m_outputs;
+<span class="line_number">246</span>    size_t m_size = 0;
+<span class="line_number">247</span>  };
+<span class="line_number">248</span>
+<span class="line_number">249</span>  /// Applies an operation to every element of a container in parallel; the
+<span class="line_number">250</span>  /// container&#39;s UfuncAdapter decides the result&#39;s shape.
+<span class="line_number">251</span>  template &lt;Operation Op, typename Container = Tensor&lt;typename Op::input_type&gt;&gt;
+<span class="line_number">252</span>  class UfuncTask : public StoppableTask&lt;void&gt;
+<span class="line_number">253</span>  {
+<span class="line_number">254</span>  public:
+<span class="line_number">255</span>    using input_type = typename Op::input_type;
+<span class="line_number">256</span>    using output_type = typename Op::output_type;
+<span class="line_number">257</span>    using Adapter = UfuncAdapter&lt;Container, core_rank_v&lt;Op&gt;, output_type&gt;;
+<span class="line_number">258</span>
+<span class="line_number">259</span>    UfuncTask(Container input, Op op, std::string description, std::string unit)
+<span class="line_number">260</span>      : m_input(std::move(input)), m_op(std::move(op)),
+<span class="line_number">261</span>        m_description(std::move(description)), m_unit(std::move(unit))
+<span class="line_number">262</span>    { }
+<span class="line_number">263</span>
+<span class="line_number">264</span>    /// The output, available once the task has finished.
+<span class="line_number">265</span>    [[nodiscard]] const typename Adapter::result_type&amp; result() const
+<span class="line_number">266</span>    {
+<span class="line_number">267</span>      if (!m_result)
+<span class="line_number">268</span>      {
+<span class="line_number">269</span>        throw std::logic_error(&#34;The task has not finished&#34;);
+<span class="line_number">270</span>      }
+<span class="line_number">271</span>      return *m_result;
+<span class="line_number">272</span>    }
+<span class="line_number">273</span>
+<span class="line_number">274</span>  private:
+<span class="line_number">275</span>    tf::Future&lt;void&gt; run_async(Executor&amp; exec) override
+<span class="line_number">276</span>    {
+<span class="line_number">277</span>      const auto extraDims = std::vector&lt;size_t&gt;(m_op.extra_dims());
+<span class="line_number">278</span>      const size_t blockSize = std::accumulate(
+<span class="line_number">279</span>          extraDims.begin(), extraDims.end(), size_t{1}, std::multiplies&lt;&gt;());
+<span class="line_number">280</span>      m_adapter.emplace(m_input, extraDims);
+<span class="line_number">281</span>
+<span class="line_number">282</span>      const size_t n = m_adapter-&gt;size();
+<span class="line_number">283</span>      next_step(n, m_description, m_unit);
+<span class="line_number">284</span>
+<span class="line_number">285</span>      tf::Taskflow flow;
+<span class="line_number">286</span>      auto apply = flow.for_each_index(size_t{0}, n, size_t{1}, [this, blockSize](size_t i) {
+<span class="line_number">287</span>        if (stop_requested())
+<span class="line_number">288</span>        {
+<span class="line_number">289</span>          return;
+<span class="line_number">290</span>        }
+<span class="line_number">291</span>        m_op(m_adapter-&gt;input(i), std::span&lt;output_type&gt;(m_adapter-&gt;block(i), blockSize));
+<span class="line_number">292</span>        add_progress(1);
+<span class="line_number">293</span>      });
+</code></pre>
+            <div class="issue">
+                <div>
+                    <span class="what">Possible data race during read of size 8 at 0x4EB1590 by thread #25</span>
+                    <div class="navigation">
+                        <button class="next_error">Next</button>
+                        <button class="prev_error">Previous</button>
+                    </div>
+                </div>
+                <div>
+                    <table class="call_stack">
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:61<br>
+                                    <code class="cpp">void std::__invoke_impl&lt;void, sb::UfuncTask&lt;sb::ph::BarcodeSummaryOperation&lt;float, sb::ph::make_stable_rank_task&lt;sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt; &gt;(sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt;)::{lambda(sb::ph::Barcode&lt;float&gt; const&amp;)#1}&gt;, sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda()#1}&amp;&gt;(std::__invoke_other, sb::UfuncTask&lt;sb::ph::BarcodeSummaryOperation&lt;float, sb::ph::make_stable_rank_task&lt;sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt; &gt;(sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt;)::{lambda(sb::ph::Barcode&lt;float&gt; const&amp;)#1}&gt;, sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda()#1}&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">58</span>  template&lt;typename _Res, typename _Fn, typename... _Args&gt;
+<span class="line_number">59</span>    constexpr _Res
+<span class="line_number">60</span>    __invoke_impl(__invoke_other, _Fn&amp;&amp; __f, _Args&amp;&amp;... __args)
+<span class="line_number">61</span><span class="error">    { return std::forward&lt;_Fn&gt;(__f)(std::forward&lt;_Args&gt;(__args)...); }
+</span><span class="line_number">62</span>
+<span class="line_number">63</span>  template&lt;typename _Res, typename _MemFun, typename _Tp, typename... _Args&gt;
+<span class="line_number">64</span>    constexpr _Res
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:111<br>
+                                    <code class="cpp">std::enable_if&lt;is_invocable_r_v&lt;void, sb::UfuncTask&lt;sb::ph::BarcodeSummaryOperation&lt;float, sb::ph::make_stable_rank_task&lt;sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt; &gt;(sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt;)::{lambda(sb::ph::Barcode&lt;float&gt; const&amp;)#1}&gt;, sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda()#1}&amp;&gt;, void&gt;::type std::__invoke_r&lt;void, sb::UfuncTask&lt;sb::ph::BarcodeSummaryOperation&lt;float, sb::ph::make_stable_rank_task&lt;sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt; &gt;(sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt;)::{lambda(sb::ph::Barcode&lt;float&gt; const&amp;)#1}&gt;, sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda()#1}&amp;&gt;(sb::UfuncTask&lt;sb::ph::BarcodeSummaryOperation&lt;float, sb::ph::make_stable_rank_task&lt;sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt; &gt;(sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt;)::{lambda(sb::ph::Barcode&lt;float&gt; const&amp;)#1}&gt;, sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda()#1}&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">108</span>      using __type = typename __result::type;
+<span class="line_number">109</span>      using __tag = typename __result::__invoke_type;
+<span class="line_number">110</span>      if constexpr (is_void_v&lt;_Res&gt;)
+<span class="line_number">111</span><span class="error">	std::__invoke_impl&lt;__type&gt;(__tag{}, std::forward&lt;_Callable&gt;(__fn),
+</span><span class="line_number">112</span>					std::forward&lt;_Args&gt;(__args)...);
+<span class="line_number">113</span>      else
+<span class="line_number">114</span>	return std::__invoke_impl&lt;__type&gt;(__tag{},
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/std_function.h:290<br>
+                                    <code class="cpp">std::_Function_handler&lt;void (), sb::UfuncTask&lt;sb::ph::BarcodeSummaryOperation&lt;float, sb::ph::make_stable_rank_task&lt;sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt; &gt;(sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt;)::{lambda(sb::ph::Barcode&lt;float&gt; const&amp;)#1}&gt;, sb::Tensor&lt;sb::ph::Barcode&lt;float&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda()#1}&gt;::_M_invoke(std::_Any_data const&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">287</span>      static _Res
+<span class="line_number">288</span>      _M_invoke(const _Any_data&amp; __functor, _ArgTypes&amp;&amp;... __args)
+<span class="line_number">289</span>      {
+<span class="line_number">290</span><span class="error">	return std::__invoke_r&lt;_Res&gt;(*_Base::_M_get_pointer(__functor),
+</span><span class="line_number">291</span>				     std::forward&lt;_ArgTypes&gt;(__args)...);
+<span class="line_number">292</span>      }
+<span class="line_number">293</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/std_function.h:591<br>
+                                    <code class="cpp">std::function&lt;void ()&gt;::operator()() const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">588</span>      {
+<span class="line_number">589</span>	if (_M_empty())
+<span class="line_number">590</span>	  __throw_bad_function_call();
+<span class="line_number">591</span><span class="error">	return _M_invoker(_M_functor, std::forward&lt;_ArgTypes&gt;(__args)...);
+</span><span class="line_number">592</span>      }
+<span class="line_number">593</span>
+<span class="line_number">594</span>#if __cpp_rtti
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/actions-runner/_work/stablebear/stablebear/3rd/taskflow/taskflow/core/executor.hpp:1887<br>
+                                    <code class="cpp">tf::Executor::_invoke_static_task(tf::Worker&amp;, tf::Node*)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1884</span>// Procedure: _invoke_static_task
+<span class="line_number">1885</span>inline void Executor::_invoke_static_task(Worker&amp; worker, Node* node) {
+<span class="line_number">1886</span>  _observer_prologue(worker, node);
+<span class="line_number">1887</span><span class="error">  TF_EXECUTOR_EXCEPTION_HANDLER(worker, node, {
+</span><span class="line_number">1888</span>    std::get_if&lt;Node::Static&gt;(&amp;node-&gt;_handle)-&gt;work();
+<span class="line_number">1889</span>  });
+<span class="line_number">1890</span>  _observer_epilogue(worker, node);
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/actions-runner/_work/stablebear/stablebear/3rd/taskflow/taskflow/core/executor.hpp:1662<br>
+                                    <code class="cpp">tf::Executor::_invoke(tf::Worker&amp;, tf::Node*)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1659</span>  switch(node-&gt;_handle.index()) {
+<span class="line_number">1660</span>    // static task
+<span class="line_number">1661</span>    case Node::STATIC:{
+<span class="line_number">1662</span><span class="error">      _invoke_static_task(worker, node);
+</span><span class="line_number">1663</span>    }
+<span class="line_number">1664</span>    break;
+<span class="line_number">1665</span>    
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/actions-runner/_work/stablebear/stablebear/3rd/taskflow/taskflow/core/executor.hpp:1424<br>
+                                    <code class="cpp">tf::Executor::_exploit_task(tf::Worker&amp;, tf::Node*&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1421</span>// Procedure: _exploit_task
+<span class="line_number">1422</span>inline void Executor::_exploit_task(Worker&amp; w, Node*&amp; t) {
+<span class="line_number">1423</span>  while(t) {
+<span class="line_number">1424</span><span class="error">    _invoke(w, t);
+</span><span class="line_number">1425</span>    t = w._wsq.pop();
+<span class="line_number">1426</span>  }
+<span class="line_number">1427</span>}
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/actions-runner/_work/stablebear/stablebear/3rd/taskflow/taskflow/core/executor.hpp:1327<br>
+                                    <code class="cpp">tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}::operator()() const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1324</span>        while(1) {
+<span class="line_number">1325</span>
+<span class="line_number">1326</span>          // drains out the local queue first
+<span class="line_number">1327</span><span class="error">          _exploit_task(worker, t);
+</span><span class="line_number">1328</span>
+<span class="line_number">1329</span>          // steals and waits for tasks
+<span class="line_number">1330</span>          if(_wait_for_task(worker, t) == false) {
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:61<br>
+                                    <code class="cpp">void std::__invoke_impl&lt;void, tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}&gt;(std::__invoke_other, tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}&amp;&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">58</span>  template&lt;typename _Res, typename _Fn, typename... _Args&gt;
+<span class="line_number">59</span>    constexpr _Res
+<span class="line_number">60</span>    __invoke_impl(__invoke_other, _Fn&amp;&amp; __f, _Args&amp;&amp;... __args)
+<span class="line_number">61</span><span class="error">    { return std::forward&lt;_Fn&gt;(__f)(std::forward&lt;_Args&gt;(__args)...); }
+</span><span class="line_number">62</span>
+<span class="line_number">63</span>  template&lt;typename _Res, typename _MemFun, typename _Tp, typename... _Args&gt;
+<span class="line_number">64</span>    constexpr _Res
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:96<br>
+                                    <code class="cpp">std::__invoke_result&lt;tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}&gt;::type std::__invoke&lt;tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}&gt;(tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}&amp;&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">93</span>      using __result = __invoke_result&lt;_Callable, _Args...&gt;;
+<span class="line_number">94</span>      using __type = typename __result::type;
+<span class="line_number">95</span>      using __tag = typename __result::__invoke_type;
+<span class="line_number">96</span><span class="error">      return std::__invoke_impl&lt;__type&gt;(__tag{}, std::forward&lt;_Callable&gt;(__fn),
+</span><span class="line_number">97</span>					std::forward&lt;_Args&gt;(__args)...);
+<span class="line_number">98</span>    }
+<span class="line_number">99</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/std_thread.h:292<br>
+                                    <code class="cpp">void std::thread::_Invoker&lt;std::tuple&lt;tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}&gt; &gt;::_M_invoke&lt;0ul&gt;(std::_Index_tuple&lt;0ul&gt;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">289</span>	template&lt;size_t... _Ind&gt;
+<span class="line_number">290</span>	  typename __result&lt;_Tuple&gt;::type
+<span class="line_number">291</span>	  _M_invoke(_Index_tuple&lt;_Ind...&gt;)
+<span class="line_number">292</span><span class="error">	  { return std::__invoke(std::get&lt;_Ind&gt;(std::move(_M_t))...); }
+</span><span class="line_number">293</span>
+<span class="line_number">294</span>	typename __result&lt;_Tuple&gt;::type
+<span class="line_number">295</span>	operator()()
+</code></pre>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            <pre class="code">
+<code class="c++"><span class="line_number">294</span><span class="error">      auto finish = flow.emplace([this] { m_result = m_adapter-&gt;finish(); });</span>
+<span class="line_number">295</span>      apply.precede(finish);
+<span class="line_number">296</span>      return exec.cpu()-&gt;run(std::move(flow));
+<span class="line_number">297</span>    }
+<span class="line_number">298</span>
+<span class="line_number">299</span>    Container m_input;
+<span class="line_number">300</span>    Op m_op;
+<span class="line_number">301</span>    std::optional&lt;Adapter&gt; m_adapter;
+<span class="line_number">302</span>    std::optional&lt;typename Adapter::result_type&gt; m_result;
+<span class="line_number">303</span>    std::string m_description;
+<span class="line_number">304</span>    std::string m_unit;
+<span class="line_number">305</span>  };
+<span class="line_number">306</span>
+<span class="line_number">307</span>  /// A task applying @p op to every element of @p input, a tensor or a time
+<span class="line_number">308</span>  /// series; the container type is deduced.
+<span class="line_number">309</span>  template &lt;typename Container, Operation Op&gt;
+<span class="line_number">310</span>  auto make_ufunc_task(Container input, Op op, std::string description, std::string unit)
+<span class="line_number">311</span>  {
+<span class="line_number">312</span>    return std::make_unique&lt;UfuncTask&lt;Op, Container&gt;&gt;(
+<span class="line_number">313</span>        std::move(input), std::move(op), std::move(description), std::move(unit));
+<span class="line_number">314</span>  }
+<span class="line_number">315</span>}
+<span class="line_number">316</span>
+<span class="line_number">317</span>#endif // STABLEBEAR_UFUNC_H
+</code>
+            </pre>
+        </div>
+    </div>
+</body>
+
+</html>
