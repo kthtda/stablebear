@@ -97,6 +97,9 @@ signal into points that trace its dynamics, and windows cut a time series into
 pieces that can be compared with each other.
 Snapping covers query times such as ``0.3 - 0.1`` that land a rounding error
 below the timestamp they mean.
+The notebook :doc:`tutorial_notebooks/timeseries_tides` combines delay
+embeddings and windows to follow the tides in a tide gauge record with
+stable ranks.
 
 .. toctree::
    :maxdepth: 1

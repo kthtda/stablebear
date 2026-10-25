@@ -7,6 +7,7 @@ Tutorials
    tutorial_notebooks/stablebear_intro_mnist_vis
    tutorial_notebooks/pytorch_tda_classifier
    tutorial_notebooks/relative_subsampling
+   tutorial_notebooks/timeseries_tides
 
 :doc:`Visualizing the space of handwritten digits using stablebear <tutorial_notebooks/stablebear_intro_mnist_vis>`
    Getting started with stablebear and doing basic topological data visualization on the MNIST dataset.
@@ -22,3 +23,6 @@ This notebook is described in the following video tutorial from the `Applied Alg
 
 :doc:`Relative subsampling and stable ranks <tutorial_notebooks/relative_subsampling>`
    Visualize distance-weighted samples, individual stable ranks, and averages across samples.
+
+:doc:`Tidal cycles in delay embeddings <tutorial_notebooks/timeseries_tides>`
+   Delay embeddings of tide gauge data, with stable ranks of the whole record and of windows that follow the spring–neap cycle.
