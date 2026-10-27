@@ -523,6 +523,7 @@ SET(SB_HEADER_FILES
 
 SET(SB_SRC_FILES
     executor.cpp
+    io.cpp
     io_stream.cpp)
 
 list(TRANSFORM SB_HEADER_FILES PREPEND "include/sbear/")
@@ -590,7 +591,7 @@ SET(SB_VERSION_SOURCE ${CMAKE_CURRENT_BINARY_DIR}/version.cpp)
 source_group("Functional"               REGULAR_EXPRESSION "include/sbear/functional/.*")
 source_group("Functional/Bindings"      REGULAR_EXPRESSION "src/python/functional/.*")
 source_group("Algorithms"               REGULAR_EXPRESSION "include/sbear/algorithms/.*")
-source_group("IO"                       REGULAR_EXPRESSION "(include/sbear/io[./].*|src/io_stream\\.cpp)")
+source_group("IO"                       REGULAR_EXPRESSION "(include/sbear/io[./].*|src/io(_stream)?\\.cpp)")
 source_group("IO/Bindings"             REGULAR_EXPRESSION "src/python/py_io\\.(h|cpp)")
 source_group("Persistence"             REGULAR_EXPRESSION "include/sbear/persistence/.*")
 source_group("Persistence/Bindings"    REGULAR_EXPRESSION "src/python/persistence/.*")
