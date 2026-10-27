@@ -31,18 +31,22 @@ cmake --install cmake-build-debug
 This works when `SKBUILD` is off (plain CMake). Builds `_sb_cpu` (always) and `_sb_cudaXX` (when CUDA available). Extensions are symlinked into `stablebear/` for immediate use.
 
 For local builds, size the job count by both CPU and memory. Leave 2 CPUs
-worth of capacity for the editor and host, and budget 4 GB of RAM per job:
-the Python binding translation units (`py_timeseries*.cpp`, `py_tensor*.cpp`)
-each peak at 2-4.3 GB in Debug, and both `_sb_cpu` and `_sb_cudaXX` compile
-them, so a header change rebuilds many of them at once. On Linux, compute
+worth of capacity for the editor and host, and budget 2 GB of RAM per job:
+the Python binding translation units (`py_tensor*.cpp`, `py_io.cpp`,
+`py_timeseries*.cpp`) each peak at 1.3-2.4 GB in Debug, and both `_sb_cpu`
+and `_sb_cudaXX` compile them, so a header change rebuilds many of them at
+once. Few of the heaviest compile together, though: a clean build averages
+under 1.5 GB per job. In a container, the memory limit of its cgroup can be far below what
+`/proc/meminfo` reports, so take the smaller of the two. On Linux, compute
 `JOBS` in the same shell command as the build, including targeted and
 incremental builds:
 ```bash
-JOBS=$(awk -v c=$(nproc --ignore=2) '/MemAvailable/{m=int($2/4194304); print (m<c?(m<1?1:m):c)}' /proc/meminfo)
+JOBS=$(awk -v c=$(nproc --ignore=2) -v lim=$(cat /sys/fs/cgroup/memory.max /sys/fs/cgroup/memory/memory.limit_in_bytes 2>/dev/null | head -1) '/MemAvailable/{m=$2*1024; if (lim ~ /^[0-9]+$/ && lim+0 < m) m=lim; m=int(m/2147483648); print (m<c?(m<1?1:m):c)}' /proc/meminfo)
 ```
-This uses `max(1, min(available CPUs - 2, available GB / 4))` jobs. On other
-platforms, calculate the equivalent. Respect any explicitly requested lower
-job limit.
+This uses `max(1, min(available CPUs - 2, memory GB / 2))` jobs, where the
+memory is the smaller of the available memory and the cgroup limit (v2 or
+v1). On other platforms, calculate the equivalent. Respect any explicitly
+requested lower job limit.
 
 ### CUDA control
 - `BUILD_WITH_CUDA=0` env var disables CUDA (auto-detected otherwise, always off on macOS)

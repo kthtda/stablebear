@@ -14,14 +14,21 @@
 #include <string>
 #include <vector>
 
-// The element types are bound in several translation units so that they
-// compile in parallel; each one instantiates the templates below.
+// The element types are bound two to a translation unit, as each one costs
+// about half a gigabyte to compile; each unit instantiates the templates
+// below.
 
 namespace sb_py
 {
+  void register_timeseries_float(pybind11::module_& m);
+  void register_timeseries_int(pybind11::module_& m);
+  void register_timeseries_uint(pybind11::module_& m);
   void register_timeseries_pcf(pybind11::module_& m);
+  void register_timeseries_pcf_int(pybind11::module_& m);
   void register_timeseries_point_cloud(pybind11::module_& m);
-  void register_timeseries_matrix_barcode(pybind11::module_& m);
+  void register_timeseries_distance_matrix(pybind11::module_& m);
+  void register_timeseries_symmetric_matrix(pybind11::module_& m);
+  void register_timeseries_barcode(pybind11::module_& m);
 
   /// Bind the channel and series classes for element type T, as
   /// register_tensor_element does for tensors.
