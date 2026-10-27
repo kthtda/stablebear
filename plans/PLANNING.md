@@ -30,7 +30,7 @@ Keep them in separate files, and link the plan to its spec.
 
 5. **Check an item in the commit after it, with its hash.** Once an item's
    commit exists, check the item and add the commit's short hash as
-   evidence, as in `- [x] **B2b.** (9629137bd, d37757337) ...`. The tick and
+   evidence, as in `- [x] **B2b.** [3] (9629137bd, d37757337) ...`. The tick and
    hash go into the next item's commit. A commit cannot record its own
    hash, because amending it to add the hash changes the hash.
 
@@ -74,27 +74,39 @@ Keep them in separate files, and link the plan to its spec.
     as a surprise found while doing it, helps the next items. Do not turn the
     plan into a log.
 
+14. **Estimate each item and keep a weighted progress line at the top.**
+    Give every item without subitems, and every subitem, a size in points
+    after its label: 1 for a small change, 2 for a typical item, 3 for a
+    large one, 5 for one that is nearly too large to review, as in
+    `- [ ] **B3.** [3] ...`. Under the title, write
+    `Progress: 7 of 47 items, 14 of 89 points (16%)`: the checked items
+    against all items, and their points against all points, with the
+    percentage of points. Update it with each tick. Re-estimate an item
+    when it is split; the numbers are rough.
+
 ## Example
 
 ```markdown
 # Time series epochs: implementation plan
 
+Progress: 0 of 5 items, 0 of 9 points (0%)
+
 Spec: [timeseries-dates-and-plotting-spec.md](timeseries-dates-and-plotting-spec.md)
 
 ## Phase A: Epoch on `Times`
 
-- [ ] **A1.** C++: add `Epoch` (count and unit) and an optional epoch on
+- [ ] **A1.** [2] C++: add `Epoch` (count and unit) and an optional epoch on
   `Times`; `to` keeps it, `operator==` compares it.
   Tests: default empty; kept by `to`; equality.
-- [ ] **A2.** Save/load the epoch in the version 3 `Times` record.
+- [ ] **A2.** [2] Save/load the epoch in the version 3 `Times` record.
   Tests: round trip with an epoch, without one, at `as` and `d` resolution.
 - [ ] **A3.** Python: `Times(..., epoch=)` and `Times.epoch`.
-  - [ ] **A3a.** Accept `str`, `datetime64`, and naive `datetime`.
+  - [ ] **A3a.** [2] Accept `str`, `datetime64`, and naive `datetime`.
     Tests: all three agree; default is `None`.
-  - [ ] **A3b.** Reject invalid epochs.
+  - [ ] **A3b.** [1] Reject invalid epochs.
     Tests: timezone-aware `datetime` raises; `M` resolution raises.
 
 ## Phase B: Building `Times` from dates
 
-- [ ] **B1.** ...
+- [ ] **B1.** [2] ...
 ```
