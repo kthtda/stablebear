@@ -14,14 +14,14 @@ Python cannot observe gets a new `test/test_timeseries.cpp`.
 
 ## Phase A: Domain accessor
 
-- [ ] **A1.** `Domain` and `TimeSeries.domain`.
+- [x] **A1.** `Domain` and `TimeSeries.domain`.
   - [x] **A1a.** Bind the C++ `TimeSeries::domain()` and add the
     `stablebear.timeseries.Domain` named tuple and the `domain` property,
     converted to the series' unit. Export `Domain`.
     Tests: series built from observations gives first and last timestamps,
     both closed; after `to("ms")`, ends scaled by 1000; field access and
     tuple unpacking.
-  - [ ] **A1b.** Tests for windows and channels (no new code expected).
+  - [x] **A1b.** Tests for windows and channels (no new code expected).
     Tests: windows for `closed` = `"left"`, `"right"`, `"both"`,
     `"none"` have ends 0 and `size` with matching flags; a partial
     window's cut end and flag follow the series; two channels give the

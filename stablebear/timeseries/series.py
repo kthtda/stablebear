@@ -185,9 +185,13 @@ class Domain(NamedTuple):
     themselves are included.
     """
 
+    #: The first time in the domain, or its lower bound if not included.
     start: float
+    #: The last time in the domain, or its upper bound if not included.
     end: float
+    #: Whether ``start`` is in the domain.
     start_closed: bool
+    #: Whether ``end`` is in the domain.
     end_closed: bool
 
 
@@ -211,7 +215,7 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
     start to its end, which may exclude its start and extend past its last
     observation, and a delay embedding (:class:`TimeDelayEmbedding`) keeps
     the ends of its channel's domain. A series can be evaluated where all
-    of its channels can.
+    of its channels can; :attr:`domain` gives these times.
 
     Element-wise operations, such as
     :func:`~stablebear.persistence.compute_persistent_homology`, accept a
