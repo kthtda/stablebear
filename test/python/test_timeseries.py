@@ -1,5 +1,6 @@
 
 import datetime
+import re
 import pickle
 
 import numpy as np
@@ -500,6 +501,18 @@ def test_series_rejects_a_mix_of_dates_and_numbers():
 def test_series_rejects_a_date_with_a_timezone():
     with pytest.raises(ValueError):
         _dated_series()(datetime.datetime(2023, 1, 1, tzinfo=datetime.timezone.utc))
+
+
+def test_series_at_a_date_outside_its_domain_names_the_dates():
+    with pytest.raises(ValueError, match=re.escape("2023-01-01T05:00 is outside the domain [2023-01-01T00:00, 2023-01-01T04:00]")):
+        _dated_series()(np.array(["2023-01-01T01:00", "2023-01-01T05:00"], dtype="datetime64[m]"))
+
+
+def test_window_at_a_date_outside_it_names_its_dates():
+    window = Window(size=2.0, step=1.0, closed="left", partial=False, anchor="start")(_dated_series())[1]
+
+    with pytest.raises(ValueError, match=re.escape("is outside the domain [2023-01-01T01:00, 2023-01-01T03:00)")):
+        window("2023-01-01T03:00")
 
 
 def test_window_at_a_date_equals_its_series_at_that_date():

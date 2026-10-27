@@ -636,6 +636,25 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         offset = date - self.epoch.to_datetime64()
         return offset / np.timedelta64(1, _UNIT_TO_NUMPY[self.unit]) - self._data.origin(channel)
 
+    def _check_date_in_domain(self, date, t, channel):
+        """Raise naming ``date`` and the domain of channel ``channel`` as dates
+        if a time ``t`` is outside it."""
+        start, end, start_closed, end_closed = self._data.select([channel]).domain
+        t = np.asarray(t)
+        inside = (((t > start) | (start_closed & (t == start)))
+                  & ((t < end) | (end_closed & (t == end))))
+        if inside.all():
+            return
+        first = np.asarray(date).reshape(-1)[np.argmin(inside.reshape(-1))]
+        origin = self._data.origin(channel)
+        ends = Times([start + origin, end + origin], unit=self.unit, epoch=self.epoch).to_datetime64()
+        # Formatted at one precision, the coarsest that shows all three.
+        dates = np.array([first, *ends], dtype=ends.dtype)
+        precision = next(code for code in ("m", "s", "ms", "us") if (dates == dates.astype(f"datetime64[{code}]")).all())
+        first, start, end = np.datetime_as_string(dates, unit=precision)
+        domain = ("[" if start_closed else "(") + f"{start}, {end}" + ("]" if end_closed else ")")
+        raise ValueError(f"{first} is outside the domain {domain}")
+
     def _evaluate_date(self, date):
         """Evaluate at ``date``, one date or an array of them, placing it in
         each channel by its origin."""
@@ -644,6 +663,7 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
 
         def query(channel):
             t = self._time_of_date(date, channel)
+            self._check_date_in_domain(date, t, channel)
             return float(t) if np.ndim(t) == 0 else FloatTensor(np.asarray(t, dtype=np.float64))
 
         if self.n_channels == 1:
