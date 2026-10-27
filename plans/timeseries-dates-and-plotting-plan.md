@@ -1,6 +1,6 @@
 # Time series dates and plotting: implementation plan
 
-Progress: 32 of 47 items, 56 of 89 points (63%)
+Progress: 33 of 47 items, 59 of 86 points (69%)
 
 Spec: [timeseries-dates-and-plotting-spec.md](timeseries-dates-and-plotting-spec.md)
 
@@ -181,7 +181,7 @@ Python cannot observe gets a new `test/test_timeseries.cpp`.
     Tests: `epoch + origin + start/end` at `us` and at `s`; no epoch
     raises; window start dates match those computed from `return_bounds`
     and the epoch.
-- [ ] **E6.** [3] Docs: a section on epochs, building `Times` from dates, date
+- [x] **E6.** [3] (e40f2ffee) Docs: a section on epochs, building `Times` from dates, date
   queries, durations, and `bounds` in `docs/timeseries.rst` or
   `docs/timeseries_units.rst`; docstrings of the new parameters.
 
@@ -230,12 +230,12 @@ Python cannot observe gets a new `test/test_timeseries.cpp`.
     on one date axis land at their own dates.
 - [ ] **F8.** [1] Non-numeric dtypes raise `TypeError` naming the dtype.
   Tests: a point cloud series and a barcode series raise.
-- [ ] **F9.** [5] Docs: "Time series" section in `docs/plotting.rst` with three
-  figures (scalar series; two channels in different units; windows in
-  place and with `relative=True`), light and dark images, and code
-  dropdowns from `docs/_static/gen_plotting_gallery.py`; update
-  `docs/api_plotting.rst` and point to it from `docs/timeseries.rst`.
-  Rebuild the docs.
+- [ ] **F9.** [2] Docs: point to `docs/timeseries_plotting.rst` from
+  `docs/plotting.rst` and update `docs/api_plotting.rst`; check that the
+  page covers every option.
+  Note: from F1 on, each item adds its figures to
+  `docs/timeseries_plotting.rst`, made by `docs/_static/gen_timeseries_plotting_fig.py`,
+  so the plots can be seen as they are built.
 
 ## Phase G: Tutorial and changelog
 

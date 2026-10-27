@@ -356,3 +356,55 @@ def plot_barcode(bc, ax=None, y_offset=0, **kwargs):
     ax.yaxis.set_ticks([])
 
     return y_offset + len(bars)
+
+
+def _time_axis_unit(ax, unit):
+    """The time unit of the x axis of ``ax``, storing ``unit`` on it first if
+    it has none."""
+    if ax.xaxis.get_units() is None:
+        ax.xaxis.set_units(unit)
+    return ax.xaxis.get_units()
+
+
+def plot_timeseries(series, ax=None, **kwargs):
+    """Plot a time series as the step function it evaluates to.
+
+    Each channel is drawn from its first observation to the end of its
+    domain, holding each value until the next observation, at the times
+    where it lies in the series it was cut from: a window is drawn where it
+    was cut, at its :attr:`~stablebear.timeseries.TimeSeries.origin` plus its
+    own times.
+
+    Parameters
+    ----------
+    series : TimeSeries
+        A time series with one channel of scalar observations.
+    ax : matplotlib axes, optional
+        Axes to draw on. If ``None``, uses the current axes.
+    **kwargs
+        Passed to ``Axes.plot``, such as ``color``, ``linewidth``, or
+        ``label``.
+
+    Returns
+    -------
+    list of matplotlib.lines.Line2D
+        The lines drawn.
+
+    Notes
+    -----
+    The x axis keeps one time unit, stored on it by the first time series
+    drawn, and is labeled ``time (<unit>)`` unless it already has a label.
+    """
+    ax = plt.gca() if ax is None else ax
+    series = series.to(_time_axis_unit(ax, series.unit))
+    times = np.asarray(series.times) + series.origin
+    values = np.asarray(series.values)
+    end = series.domain.end + series.origin
+    if end > times[-1]:
+        # The last value holds until the end of the domain.
+        times = np.append(times, end)
+        values = np.append(values, values[-1])
+    lines = ax.plot(times, values, drawstyle="steps-post", **kwargs)
+    if not ax.get_xlabel():
+        ax.set_xlabel(f"time ({series.unit})")
+    return lines
