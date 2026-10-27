@@ -411,6 +411,11 @@ namespace sb
       {
         throw std::invalid_argument("The channels differ in unit; pass unit= to choose one");
       }
+      // One epoch for the series: every channel has the same one, or none.
+      if (channels.back().epoch() != parts.front().m_channels.front().epoch())
+      {
+        throw std::invalid_argument("The channels have different epochs; count their times from one shared epoch");
+      }
     }
     return TimeSeries(std::move(channels), unit.value_or(parts.front().unit()));
   }

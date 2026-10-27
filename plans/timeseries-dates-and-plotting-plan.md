@@ -1,6 +1,6 @@
 # Time series dates and plotting: implementation plan
 
-Progress: 16 of 47 items, 30 of 89 points (34%)
+Progress: 17 of 47 items, 33 of 89 points (37%)
 
 Spec: [timeseries-dates-and-plotting-spec.md](timeseries-dates-and-plotting-spec.md)
 
@@ -113,7 +113,7 @@ Python cannot observe gets a new `test/test_timeseries.cpp`.
   Tests: `datetime64[m]` with `unit="min"` gives the first stamp as epoch
   and exact whole minutes; with `unit="h"`, divided once; with an explicit
   epoch, offsets from it.
-- [ ] **C5.** [3] Series epoch: `TimeSeries.epoch` (one value), read from
+- [x] **C5.** [3] (04d29c4ec) Series epoch: `TimeSeries.epoch` (one value), read from
   `Channel::epoch()`; windowing and delay embeddings keep it through
   `times_like` (B3).
   Note: channel selection and element-wise operations pass `Times` along

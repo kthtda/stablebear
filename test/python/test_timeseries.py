@@ -392,6 +392,20 @@ def test_series_epoch_is_one_value_for_several_channels():
     assert TimeSeries.from_channels([a, b], unit="h").epoch == DateTime("2023-01-01")
 
 
+@pytest.mark.parametrize("epoch_b", [
+    pytest.param("2023-01-02", id="different"),
+    pytest.param(None, id="missing"),
+    # The same instant in microseconds; the epoch of channel a counts days.
+    pytest.param(datetime.datetime(2023, 1, 1), id="other-resolution"),
+])
+def test_series_channels_must_share_their_epoch(epoch_b):
+    a = TimeSeries([10.0, 20.0], times=Times([0.0, 1.0], unit="h", epoch="2023-01-01"))
+    b = TimeSeries([-10.0, -20.0], times=Times([0.0, 1.0], unit="h", epoch=epoch_b))
+
+    with pytest.raises(ValueError, match="different epochs"):
+        TimeSeries.from_channels([a, b])
+
+
 def test_series_origin_is_zero_for_recorded_observations():
     series = TimeSeries([10.0, 20.0, 30.0], times=[0.5, 1.5, 4.0])
 

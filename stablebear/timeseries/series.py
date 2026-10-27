@@ -348,8 +348,11 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         Raises
         ------
         ValueError
-            If there are no channels, a channel has several channels, or
-            ``unit`` is omitted while the channels' units differ.
+            If there are no channels, a channel has several channels,
+            ``unit`` is omitted while the channels' units differ, or the
+            channels do not share their :attr:`epoch`: all the same, at the
+            same resolution, or none. To combine dated channels, count each
+            one's times from one shared epoch with ``Times(..., epoch=...)``.
         TypeError
             If a channel is not a ``TimeSeries`` or the channels have
             different element types.
