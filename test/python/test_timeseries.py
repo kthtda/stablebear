@@ -430,6 +430,7 @@ def _dated_series():
     pytest.param(np.datetime64("2023-01-01T02:00"), 2.0, id="datetime64"),
     pytest.param(datetime.datetime(2023, 1, 1, 4), 4.0, id="datetime"),
     pytest.param(datetime.date(2023, 1, 1), 0.0, id="date"),
+    pytest.param("2023-01-01T02:00", 2.0, id="str"),
 ])
 def test_series_at_a_date_equals_the_series_at_its_time(date, t):
     series = _dated_series()
@@ -446,6 +447,16 @@ def test_series_at_an_array_of_dates_equals_the_series_at_their_times():
 
     assert values.shape == (2, 2)
     assert values.array_equal(series([[0.5, 2.0], [4.0, 1.5]]))
+
+
+@pytest.mark.parametrize("dates", [
+    pytest.param(["2023-01-01T00:30", "2023-01-01T02:00"], id="strings"),
+    pytest.param([datetime.datetime(2023, 1, 1, 0, 30), datetime.datetime(2023, 1, 1, 2)], id="datetimes"),
+])
+def test_series_at_a_list_of_dates_equals_the_series_at_their_times(dates):
+    series = _dated_series()
+
+    assert series(dates).array_equal(series([0.5, 2.0]))
 
 
 def test_series_of_several_channels_at_a_date_gives_each_channel():
@@ -467,6 +478,28 @@ def test_series_of_several_channels_at_an_array_of_dates_gives_each_channel():
 
     assert values[0].array_equal(sb.FloatTensor([10.0, 10.0], dtype=sb.float64))
     assert values[1].array_equal(sb.FloatTensor([-10.0, -20.0], dtype=sb.float64))
+
+
+def test_series_without_an_epoch_cannot_be_evaluated_at_a_date():
+    series = TimeSeries([10.0, 20.0], times=[0.0, 1.0])
+
+    with pytest.raises(ValueError, match="with_epoch"):
+        series(np.datetime64("2023-01-01T00:30"))
+
+
+def test_series_at_a_date_takes_no_unit():
+    with pytest.raises(TypeError):
+        _dated_series()(np.datetime64("2023-01-01T00:30"), "h")
+
+
+def test_series_rejects_a_mix_of_dates_and_numbers():
+    with pytest.raises(TypeError, match="mix"):
+        _dated_series()([np.datetime64("2023-01-01T00:30"), 0.5])
+
+
+def test_series_rejects_a_date_with_a_timezone():
+    with pytest.raises(ValueError):
+        _dated_series()(datetime.datetime(2023, 1, 1, tzinfo=datetime.timezone.utc))
 
 
 def test_window_at_a_date_equals_its_series_at_that_date():

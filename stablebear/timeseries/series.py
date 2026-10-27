@@ -584,7 +584,8 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         sorted once and merged with each channel's timestamps. Numeric times
         count from the series' own time 0, which for a window is its start.
         For a series with an :attr:`epoch`, ``t`` may also be a date and
-        time, as a ``np.datetime64``, a naive ``datetime``, or a ``date``. A
+        time, as anything :class:`DateTime` accepts, such as
+        ``"2023-01-01T12:30"``, or an array of them. A
         date names an instant, not an offset: it is placed at
         ``t - epoch - origin`` in each channel, so a window gives the value
         it held at that instant, as the series it was cut from does.
@@ -602,14 +603,19 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
             If a time is outside the domain of any channel, or a channel has
             no observations, or if ``unit`` is unknown.
         """
-        if isinstance(t, (datetime.date, np.datetime64)):
+        if isinstance(t, (str, datetime.date, np.datetime64)):
             if unit is not None:
                 raise TypeError("A date and time has no unit; pass unit only with numeric times")
             return self._evaluate_date(DateTime(t).to_datetime64())
-        if isinstance(t, (list, tuple, np.ndarray)) and np.asarray(t).dtype.kind == "M":
+        if isinstance(t, (list, tuple, np.ndarray)) and np.asarray(t).dtype.kind in "MOUS":
+            # Dates and times, as datetime64, strings, or datetimes.
+            try:
+                dates = np.asarray(t, dtype="datetime64")
+            except (TypeError, ValueError):
+                raise TypeError("Times must be all numbers or all dates and times, not a mix") from None
             if unit is not None:
                 raise TypeError("Dates and times have no unit; pass unit only with numeric times")
-            return self._evaluate_date(_checked_dates(np.asarray(t)))
+            return self._evaluate_date(_checked_dates(dates))
         if isinstance(t, (int, float, np.integer, np.floating)):
             values = NestedTensor._from_cpp(self._data.evaluate(float(t), unit))
             if self.n_channels > 1:

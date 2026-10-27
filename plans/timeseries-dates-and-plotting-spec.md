@@ -312,9 +312,10 @@ unit, as for plain arrays. Pass a `Times` to choose the unit.
   (including subclasses such as `pandas.Timestamp`);
 - an array-like of `datetime64`.
 
-Strings are not accepted, so that `series("2023-01-01")` cannot be confused
-with a unit; wrap them in `np.datetime64`. A timezone-aware `datetime`
-raises `ValueError`, as for epochs.
+Strings are accepted as `DateTime` accepts them, such as
+`series("2023-01-01T12:30")`, and so are lists of strings or of `datetime`s.
+A timezone-aware `datetime` raises `ValueError`, as for epochs, and a mix of
+dates and numbers raises `TypeError`.
 
 Conversion, per channel: the query date `q` is at time
 `t = (q - epoch) - origin` in the channel's unit. `q - epoch` is computed in

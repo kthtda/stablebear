@@ -1,6 +1,6 @@
 # Time series dates and plotting: implementation plan
 
-Progress: 24 of 47 items, 44 of 89 points (49%)
+Progress: 25 of 47 items, 45 of 89 points (51%)
 
 Spec: [timeseries-dates-and-plotting-spec.md](timeseries-dates-and-plotting-spec.md)
 
@@ -151,12 +151,13 @@ Python cannot observe gets a new `test/test_timeseries.cpp`.
     converted per channel as `(q - epoch) - origin`.
     Tests: each equals the numeric query at `q - epoch`; on a window,
     equals the parent series at that date.
-  - [ ] **E3b.** [1] Arrays of `datetime64`.
+  - [x] **E3b.** [1] (09eb9d90e) Arrays of `datetime64`.
     Tests: equals the numeric array query; shape preserved.
   - [ ] **E3c.** [2] Errors.
     Tests: no epoch raises `ValueError` mentioning `with_epoch`; `unit` with
-    a date raises `TypeError`; a string raises; mixed dates and numbers
-    raise `TypeError`; a timezone-aware `datetime` raises `ValueError`.
+    a date raises `TypeError`; mixed dates and numbers raise `TypeError`; a
+    timezone-aware `datetime` raises `ValueError`. Strings and lists of
+    strings or `datetime`s are accepted as dates.
   - [ ] **E3d.** [2] Out-of-domain message in dates.
     Tests: the message names the date and the domain as dates.
   - [ ] **E3e.** [1] Snapping (no new code expected).
