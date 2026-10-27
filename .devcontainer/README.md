@@ -67,17 +67,19 @@ Presets live in repo-root `CMakePresets.json`:
 
 ```bash
 cmake --preset debug          # configure
-cmake --build --preset debug -j$(nproc --ignore=14)  # build _sb_cpu (+_sb_cuda12)
+JOBS=$(awk -v c=$(nproc --ignore=2) '/MemAvailable/{m=int($2/5242880); print (m<c?(m<1?1:m):c)}' /proc/meminfo)
+cmake --build --preset debug -j$JOBS  # build _sb_cpu (+_sb_cuda12)
 cmake --install cmake-build-debug   # symlink extensions into stablebear/
 ```
 
-`nproc --ignore=14` leaves 14 CPUs worth of capacity for the host, with a
-minimum of one build job. Use fewer jobs if memory is tight.
+`JOBS` leaves 2 CPUs for the host and budgets 5 GB of RAM per job, with a
+minimum of one build job. The Python binding translation units each peak at up
+to 4.3 GB in Debug. Compute `JOBS` in the same shell as the build.
 
 C++ tests:
 
 ```bash
-cmake --build --preset tests -j$(nproc --ignore=14)
+cmake --build --preset tests -j$JOBS
 cd test && ../cmake-build-debug/sb_test
 ```
 
@@ -90,7 +92,7 @@ cd test && python -m pytest python
 Benchmarks/perf -> always use the release preset:
 
 ```bash
-cmake --preset release && cmake --build --preset release -j$(nproc --ignore=14) && cmake --install cmake-build-release
+cmake --preset release && cmake --build --preset release -j$JOBS && cmake --install cmake-build-release
 ```
 
 CUDA-off build: `cmake --preset debug-nocuda`.

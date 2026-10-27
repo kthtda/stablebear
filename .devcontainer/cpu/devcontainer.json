@@ -13,6 +13,10 @@
     }
   },
 
+  // Cap memory so a heavy parallel build OOM-kills inside the container
+  // instead of taking down the host. Swap equal to memory disables swap.
+  "runArgs": ["--memory=24g", "--memory-swap=24g"],
+
   "containerEnv": {
     "BUILD_WITH_CUDA": "0",
     // gh token passthrough for hosts that keep it in the OS keyring rather
@@ -42,7 +46,7 @@
   // `cmake --install` symlinks it into stablebear/. Python deps are already installed
   // at image-build time (see Dockerfile). The chown gives the ubuntu user ownership
   // of the freshly-created (root-owned) build volume.
-  "postCreateCommand": "sudo chown ubuntu:ubuntu cmake-build-debug && git submodule update --init --recursive && cmake --preset debug-nocuda && cmake --build --preset debug-nocuda -j$(nproc --ignore=14) && cmake --install cmake-build-debug",
+  "postCreateCommand": "sudo chown ubuntu:ubuntu cmake-build-debug && git submodule update --init --recursive && cmake --preset debug-nocuda && JOBS=$(awk -v c=$(nproc --ignore=2) '/MemAvailable/{m=int($2/5242880); print (m<c?(m<1?1:m):c)}' /proc/meminfo) && cmake --build --preset debug-nocuda -j$JOBS && cmake --install cmake-build-debug",
 
   // Rebuilding the container discards installed extensions, so reinstall the
   // Stablebear panel from .devcontainer/vscode-buttons on each attach.

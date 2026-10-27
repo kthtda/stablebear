@@ -25,16 +25,24 @@ installation is required.
 ### Configure, build, and install
 ```bash
 cmake -B cmake-build-debug
-cmake --build cmake-build-debug -j$(nproc --ignore=14)
+cmake --build cmake-build-debug -j$JOBS
 cmake --install cmake-build-debug
 ```
 This works when `SKBUILD` is off (plain CMake). Builds `_sb_cpu` (always) and `_sb_cudaXX` (when CUDA available). Extensions are symlinked into `stablebear/` for immediate use.
 
-For local builds, leave 14 CPUs worth of capacity for the editor and host:
-use `-j$(nproc --ignore=14)` on Linux, including targeted and incremental builds.
-This uses `max(1, available CPUs - 14)` jobs. On other platforms, calculate the
-equivalent from the available CPU count. Respect any explicitly requested lower
-job limit; CPU-based sizing alone does not guarantee enough memory for a build.
+For local builds, size the job count by both CPU and memory. Leave 2 CPUs
+worth of capacity for the editor and host, and budget 5 GB of RAM per job:
+the Python binding translation units (`py_timeseries*.cpp`, `py_tensor*.cpp`)
+each peak at 2-4.3 GB in Debug, and both `_sb_cpu` and `_sb_cudaXX` compile
+them, so a header change rebuilds many of them at once. On Linux, compute
+`JOBS` in the same shell command as the build, including targeted and
+incremental builds:
+```bash
+JOBS=$(awk -v c=$(nproc --ignore=2) '/MemAvailable/{m=int($2/5242880); print (m<c?(m<1?1:m):c)}' /proc/meminfo)
+```
+This uses `max(1, min(available CPUs - 2, available GB / 5))` jobs. On other
+platforms, calculate the equivalent. Respect any explicitly requested lower
+job limit.
 
 ### CUDA control
 - `BUILD_WITH_CUDA=0` env var disables CUDA (auto-detected otherwise, always off on macOS)
@@ -58,7 +66,7 @@ Test dependencies are in the `test` dependency group in `pyproject.toml`.
 Install them with `pip install --group test` (pip 25.1 or newer).
 
 ```bash
-cmake --build cmake-build-debug -j$(nproc --ignore=14) && cmake --install cmake-build-debug
+cmake --build cmake-build-debug -j$JOBS && cmake --install cmake-build-debug
 cd test && python -m pytest python               # all Python tests
 cd test && python -m pytest python/test_pdist.py  # single test file
 cd test && SB_RUN_STATISTICAL=1 python -m pytest python  # include large statistical checks
@@ -70,7 +78,7 @@ counts. They are skipped unless `SB_RUN_STATISTICAL=1` is set. CI runs them in
 
 ### C++ tests (GoogleTest)
 ```bash
-cmake --build cmake-build-debug --target sb_test -j$(nproc --ignore=14)
+cmake --build cmake-build-debug --target sb_test -j$JOBS
 cd test && ../cmake-build-debug/sb_test  # run from test/ directory
 ```
 

@@ -10,7 +10,10 @@
 
   // GPU passthrough. Requires nvidia-container-toolkit on the host (present).
   "runArgs": [
-    "--gpus", "all"
+    "--gpus", "all",
+    // Cap memory so a heavy parallel build OOM-kills inside the container
+    // instead of taking down the host. Swap equal to memory disables swap.
+    "--memory=24g", "--memory-swap=24g"
   ],
   "hostRequirements": {
     "gpu": true
@@ -53,8 +56,8 @@
   // postCreate also avoids wedging container creation when the persistent
   // cmake-build-debug volume holds a cache from a different generator/toolchain
   // (e.g. an old Unix Makefiles cache vs. the Ninja preset). Build manually with
-  // the commands documented in AGENTS.md:
-  //   cmake --preset debug && cmake --build --preset debug -j$(nproc --ignore=14) && cmake --install cmake-build-debug
+  // the commands documented in AGENTS.md (which defines JOBS):
+  //   cmake --preset debug && cmake --build --preset debug -j$JOBS && cmake --install cmake-build-debug
   // Claude Code is installed natively into ~/.local/bin by the Dockerfile, which
   // already matches installMethod=native in the bind-mounted ~/.claude.json, so
   // no /doctor-quieting symlink is needed here anymore.
