@@ -394,8 +394,9 @@ def _plot_channels(series, axes, *, unit, **options):
     """Plot each channel of ``series`` on its own axes, in one time unit."""
     # The unit is resolved once, from the first row, so that every row uses
     # it even on axes that do not share x.
-    requested = None if unit is None else series.to(unit).unit
-    unit = _time_axis_unit(axes[0], requested or series.unit, requested)
+    if series.epoch is None or options["relative"]:
+        requested = None if unit is None else series.to(unit).unit
+        unit = _time_axis_unit(axes[0], requested or series.unit, requested)
     unlabeled = [not row.get_xlabel() for row in axes]
     lines = [line for i, row in enumerate(axes) for line in plot_timeseries(series[i], ax=row, unit=unit, **options)]
     # Only the last row keeps the time label.
@@ -458,12 +459,15 @@ def plot_timeseries(series, ax=None, *, unit=None, relative=False, markers=False
 
     Notes
     -----
-    The x axis keeps one time unit, stored on it by the first time series
+    A time series with an :attr:`~stablebear.timeseries.TimeSeries.epoch` is
+    drawn at dates and times, ``epoch + origin + t`` rounded to
+    microseconds, on a date axis with no label, unless ``relative`` is
+    true. Otherwise the x axis keeps one time unit, stored on it by the first time series
     drawn, and each time series is converted into it exactly, so series in
     different units line up. The axis is labeled ``time (<unit>)`` unless it
     already has a label.
     """
-    from .timeseries.series import TimeSeriesTensor
+    from .timeseries.series import Times, TimeSeriesTensor
 
     options = dict(unit=unit, relative=relative, markers=markers, **kwargs)
     if isinstance(series, TimeSeriesTensor):
@@ -477,8 +481,10 @@ def plot_timeseries(series, ax=None, *, unit=None, relative=False, markers=False
         return _plot_channels(series, _channel_rows(series.n_channels) if ax is None else _rows(ax, series.n_channels),
                               **options)
     ax = plt.gca() if ax is None else ax
-    requested = None if unit is None else series.to(unit).unit
-    series = series.to(_time_axis_unit(ax, requested or series.unit, requested))
+    dated = series.epoch is not None and not relative
+    if not dated:
+        requested = None if unit is None else series.to(unit).unit
+        series = series.to(_time_axis_unit(ax, requested or series.unit, requested))
     offset = 0.0 if relative else series.origin
     times = np.asarray(series.times) + offset
     values = np.asarray(series.values)
@@ -491,6 +497,10 @@ def plot_timeseries(series, ax=None, *, unit=None, relative=False, markers=False
         # The last value holds until the end of the domain.
         times = np.append(times, end)
         values = np.append(values, values[-1])
+    if dated:
+        # Dates at epoch + origin + t, at microseconds; the axis is a date axis.
+        times = Times(times, unit=series.unit, epoch=series.epoch).to_datetime64()
+        return ax.plot(times, values, drawstyle="steps-post", **kwargs)
     lines = ax.plot(times, values, drawstyle="steps-post", **kwargs)
     if not ax.get_xlabel():
         ax.set_xlabel(f"time ({series.unit})")

@@ -251,3 +251,42 @@ other::
 
 The upper axes sets the unit, seconds, and the lower axes draws
 ``milliseconds`` in it, so both share one time scale.
+
+Dates and times
+---------------
+
+A time series with an epoch (see :doc:`timeseries_dates`) is drawn at its
+dates and times, on a date axis, and so are its windows. Here observations
+recorded through a day are drawn with the window from 10:00 to 14:00::
+
+   import numpy as np
+
+   stamps = np.array(["2023-01-01T06:00", "2023-01-01T09:30", "2023-01-01T11:00",
+                      "2023-01-01T15:45", "2023-01-01T18:00"], dtype="datetime64[m]")
+   series = TimeSeries([2.0, 3.5, 1.0, 2.5, 3.0], times=Times(stamps, unit="h"))
+   windows = Window(size=4.0, anchor="start")(series)
+
+   fig, ax = plt.subplots()
+   plot_timeseries(series, ax=ax, color="gray", linewidth=1, markers=True)
+   plot_timeseries(windows[1], ax=ax, linewidth=3)
+
+.. image:: _static/timeseries_plot_dates_light.png
+   :width: 80%
+   :class: only-light
+   :alt: A time series recorded through a day on a date axis, with one window
+
+.. image:: _static/timeseries_plot_dates_dark.png
+   :width: 80%
+   :class: only-dark
+   :alt: A time series recorded through a day on a date axis, with one window
+
+.. dropdown:: Show plotting code
+   :color: secondary
+
+   .. literalinclude:: _static/gen_timeseries_plotting_fig.py
+      :pyobject: plot_timeseries_dates
+      :language: python
+
+The dates are ``epoch + origin + t``, rounded to microseconds, and the date
+axis is formatted and labeled as matplotlib does for any dates. With
+``relative=True``, the times are drawn as numbers from 0 instead.

@@ -209,3 +209,34 @@ def test_several_channels_need_one_axes_each(n_axes):
     with pytest.raises(ValueError, match=r"series\[i\]"):
         plot_timeseries(_channels(), ax=ax)
     plt.close(fig)
+
+
+def _dated():
+    return TimeSeries([10.0, 20.0, 30.0], times=Times([0.0, 1.5, 4.0], unit="h", epoch="2023-01-01"))
+
+
+def test_a_series_with_an_epoch_is_drawn_at_its_dates(ax):
+    (line,) = plot_timeseries(_dated(), ax=ax)
+
+    expected = np.array(["2023-01-01T00:00", "2023-01-01T01:30", "2023-01-01T04:00"], dtype="datetime64[us]")
+    assert np.array_equal(line.get_xdata(), expected)
+    assert ax.get_xlabel() == ""
+
+
+def test_windows_with_an_epoch_are_drawn_at_their_dates(ax):
+    windows = Window(size=2.0, step=2.0, closed="left", partial=False, anchor="start")(_dated())
+
+    lines = plot_timeseries(windows, ax=ax)
+
+    # The window at 2 h holds 20 from 02:00 and ends at 04:00.
+    expected = np.array(["2023-01-01T02:00", "2023-01-01T04:00"], dtype="datetime64[us]")
+    assert np.array_equal(lines[1].get_xdata(), expected)
+
+
+def test_dates_are_rounded_to_microseconds(ax):
+    series = TimeSeries([1.0, 2.0], times=Times([0.0, 1500.4], unit="ns", epoch="2023-01-01"))
+
+    (line,) = plot_timeseries(series, ax=ax)
+
+    expected = np.array(["2023-01-01T00:00:00.000000", "2023-01-01T00:00:00.000002"], dtype="datetime64[us]")
+    assert np.array_equal(line.get_xdata(), expected)

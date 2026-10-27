@@ -1,6 +1,6 @@
 # Time series dates and plotting: implementation plan
 
-Progress: 39 of 47 items, 72 of 86 points (84%)
+Progress: 40 of 47 items, 73 of 86 points (85%)
 
 Spec: [timeseries-dates-and-plotting-spec.md](timeseries-dates-and-plotting-spec.md)
 
@@ -212,11 +212,11 @@ Python cannot observe gets a new `test/test_timeseries.cpp`.
   default each starts at its origin and matches the series' points there;
   with `relative=True` each starts at 0; an empty tensor draws nothing;
   a 2-D tensor raises.
-- [ ] **F6.** Several channels as rows.
+- [x] **F6.** Several channels as rows.
   - [x] **F6a.** [2] (3e39d1b3f) `ax=None` creates `n_channels` rows sharing x.
     Tests: three rows, lines in channel order; x label on the last row
     only; channels in `s` and `ms` both drawn in `s`.
-  - [ ] **F6b.** [1] `ax` as a sequence.
+  - [x] **F6b.** [1] (ffd354de1) `ax` as a sequence.
     Tests: three axes used in order; a single `Axes` and a sequence of two
     raise `ValueError` mentioning `series[i]`. (The case of a vector channel
     waits for F4.)

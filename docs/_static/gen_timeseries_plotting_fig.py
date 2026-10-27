@@ -3,6 +3,7 @@
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+import numpy as np
 from pathlib import Path
 
 from gen_timeseries_snap_fig import DARK, LIGHT, _save_themed
@@ -104,6 +105,21 @@ def plot_timeseries_channels():
     return fig
 
 
+# -- included in docs via literalinclude :pyobject: --
+def plot_timeseries_dates():
+    stamps = np.array(["2023-01-01T06:00", "2023-01-01T09:30", "2023-01-01T11:00",
+                       "2023-01-01T15:45", "2023-01-01T18:00"], dtype="datetime64[m]")
+    series = TimeSeries([2.0, 3.5, 1.0, 2.5, 3.0], times=Times(stamps, unit="h"))
+    windows = Window(size=4.0, anchor="start")(series)
+
+    fig, ax = plt.subplots(figsize=(6, 2.5))
+    plot_timeseries(series, ax=ax, color="gray", linewidth=1, markers=True)
+    plot_timeseries(windows[1], ax=ax, linewidth=3)
+    fig.autofmt_xdate()
+    fig.tight_layout()
+    return fig
+
+
 if __name__ == "__main__":
     for name, plot_func in [("timeseries_plot_steps", plot_timeseries_steps),
                             ("timeseries_plot_window_in_place", plot_timeseries_window_in_place),
@@ -111,6 +127,7 @@ if __name__ == "__main__":
                             ("timeseries_plot_sharex", plot_timeseries_sharex),
                             ("timeseries_plot_windows_relative", plot_timeseries_windows_relative),
                             ("timeseries_plot_some_windows", plot_timeseries_some_windows),
-                            ("timeseries_plot_channels", plot_timeseries_channels)]:
+                            ("timeseries_plot_channels", plot_timeseries_channels),
+                            ("timeseries_plot_dates", plot_timeseries_dates)]:
         _save_themed(plot_func, *LIGHT, HERE / f"{name}_light.png")
         _save_themed(plot_func, *DARK, HERE / f"{name}_dark.png")
