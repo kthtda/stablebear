@@ -220,7 +220,7 @@ namespace sb
     [[nodiscard]] size_t size() const noexcept { return m_values.size(); }
 
     /// The instant time 0 stands for, if any.
-    [[nodiscard]] std::optional<Epoch> epoch() const noexcept { return m_epoch; }
+    [[nodiscard]] const std::optional<Epoch>& epoch() const noexcept { return m_epoch; }
 
     /// The same timestamps counted from @p epoch, or from none; no time is
     /// shifted.

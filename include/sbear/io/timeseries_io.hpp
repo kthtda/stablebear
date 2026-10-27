@@ -41,8 +41,9 @@ namespace sb::io::detail
 
   /// A series is written as its query unit and one record per channel: the
   /// channel's unit, timestamps, values as a tensor with time along axis 0,
-  /// snap tolerance, whether its start and end are closed, and its end, if
-  /// set. The end is always closed without one, but its flag is written
+  /// snap tolerance, whether its start and end are closed, its end, if set,
+  /// its origin, and the epoch of its timestamps, if set, as a count and its
+  /// unit. The end is always closed without one, but its flag is written
   /// anyway so that an open end at the last timestamp needs no new format.
   /// Each channel is written on its own, as the
   /// values it shows, so a file holds no views or shared storage.
@@ -63,6 +64,14 @@ namespace sb::io::detail
       write_bytes<bool>(os, channel.start_closed());
       write_bytes<bool>(os, channel.end_closed());
       write_bytes<std::optional<float64_t>>(os, channel.end());
+      write_bytes<float64_t>(os, channel.origin());
+      const auto& epoch = times.epoch();
+      write_bytes<bool>(os, epoch.has_value());
+      if (epoch)
+      {
+        write_bytes<int64_t>(os, epoch->count);
+        write_time_unit(os, epoch->unit);
+      }
     }
   }
 
@@ -85,10 +94,19 @@ namespace sb::io::detail
         const auto snapTolerance = read_bytes<float64_t>(is);
         const auto startClosed = read_bytes<bool>(is);
         const auto endClosed = read_bytes<bool>(is);
+        const auto end = read_bytes<std::optional<float64_t>>(is);
+        const auto origin = read_bytes<float64_t>(is);
+        std::optional<Epoch> epoch;
+        if (read_bytes<bool>(is))
+        {
+          const auto count = read_bytes<int64_t>(is);
+          epoch = Epoch(count, read_time_unit(is));
+        }
 
-        auto channel = Channel<T>(Times(std::move(times), channelUnit), values, snapTolerance)
-                           .with_start_closed(startClosed);
-        if (const auto end = read_bytes<std::optional<float64_t>>(is))
+        auto channel = Channel<T>(Times(std::move(times), channelUnit, epoch), values, snapTolerance)
+                           .with_start_closed(startClosed)
+                           .with_origin(origin);
+        if (end)
         {
           channel = channel.until(*end, endClosed);
         }

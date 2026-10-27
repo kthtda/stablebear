@@ -44,7 +44,7 @@ Python cannot observe gets a new `test/test_timeseries.cpp`.
   `operator==` compares origins and the round-trip tests compare tensors of
   windows. Saving therefore comes first, together with the epoch, so the
   file format changes once (moved here from C1 and D1).
-  - [ ] **B2a.** C++ `Epoch` (an `int64_t` count and a `TimeUnit`) and
+  - [x] **B2a.** C++ `Epoch` (an `int64_t` count and a `TimeUnit`) and
     `std::optional<Epoch>` on `Times`; `to` copies it, `operator==` compares
     it, `with_epoch` replaces it; `Epoch` can be built from a
     `std::chrono::sys_time`. Not bound to Python yet.
