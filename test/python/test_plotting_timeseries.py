@@ -188,3 +188,24 @@ def test_only_the_last_row_is_labeled():
 
     assert [line.axes.get_xlabel() for line in lines] == ["", "", "time (s)"]
     plt.close(lines[0].axes.figure)
+
+
+def test_several_channels_are_drawn_on_given_axes_in_order():
+    import matplotlib.pyplot as plt
+    fig, axes = plt.subplots(1, 3)
+
+    lines = plot_timeseries(_channels(), ax=axes)
+
+    assert [line.axes for line in lines] == list(axes)
+    plt.close(fig)
+
+
+@pytest.mark.parametrize("n_axes", [1, 2])
+def test_several_channels_need_one_axes_each(n_axes):
+    import matplotlib.pyplot as plt
+    fig, axes = plt.subplots(1, n_axes, squeeze=False)
+    ax = axes[0, 0] if n_axes == 1 else list(axes[0])
+
+    with pytest.raises(ValueError, match=r"series\[i\]"):
+        plot_timeseries(_channels(), ax=ax)
+    plt.close(fig)

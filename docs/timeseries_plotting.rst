@@ -168,6 +168,15 @@ series, whatever its own unit::
 Channel ``b``, recorded in milliseconds, is drawn in seconds, the unit of
 ``series``, and only the last row is labeled with it.
 
+To draw the channels on axes of your own, such as side by side, pass one
+axes per channel; to draw a single channel, select it with ``series[i]``::
+
+   fig, (left, right) = plt.subplots(1, 2)
+   plot_timeseries(series, ax=[left, right])
+
+   fig, ax = plt.subplots()
+   plot_timeseries(series[1], ax=ax)
+
 Time units
 ----------
 

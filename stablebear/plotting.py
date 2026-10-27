@@ -380,6 +380,16 @@ def _channel_rows(n_channels):
     return list(axes[:, 0])
 
 
+def _rows(ax, n_channels):
+    """``ax``, a sequence of one axes per channel, as a list."""
+    import matplotlib.axes
+    rows = [ax] if isinstance(ax, matplotlib.axes.Axes) else list(np.asarray(ax, dtype=object).ravel())
+    if len(rows) != n_channels:
+        raise ValueError(f"Expected {n_channels} axes, one per channel, got {len(rows)}; "
+                         "to draw one channel on one axes, pass series[i]")
+    return rows
+
+
 def _plot_channels(series, axes, *, unit, **options):
     """Plot each channel of ``series`` on its own axes, in one time unit."""
     # The unit is resolved once, from the first row, so that every row uses
@@ -412,9 +422,11 @@ def plot_timeseries(series, ax=None, *, unit=None, relative=False, markers=False
         axes unless ``color`` is given. A time series with several channels
         is drawn with one row per channel, in channel order, on axes that
         share the time axis; only the last row is labeled.
-    ax : matplotlib axes, optional
+    ax : matplotlib axes or sequence of them, optional
         Axes to draw on. If ``None``, uses the current axes, or for several
-        channels creates a new figure with one row per channel.
+        channels creates a new figure with one row per channel. For several
+        channels, a sequence of one axes per channel, used in order and as
+        given, without making them share x.
     unit : str, optional
         The time unit of the x axis, one of the units of
         :class:`~stablebear.timeseries.Times`. Defaults to the unit the axis
@@ -462,7 +474,8 @@ def plot_timeseries(series, ax=None, *, unit=None, relative=False, markers=False
             ax = _channel_rows(tensor[0].n_channels)
         return [line for k in range(tensor.shape[0]) for line in plot_timeseries(tensor[k], ax=ax, **options)]
     if series.n_channels > 1:
-        return _plot_channels(series, _channel_rows(series.n_channels) if ax is None else ax, **options)
+        return _plot_channels(series, _channel_rows(series.n_channels) if ax is None else _rows(ax, series.n_channels),
+                              **options)
     ax = plt.gca() if ax is None else ax
     requested = None if unit is None else series.to(unit).unit
     series = series.to(_time_axis_unit(ax, requested or series.unit, requested))
