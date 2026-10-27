@@ -54,6 +54,11 @@ job limit.
 - `SKIP_BACK_COPY=1` — skip symlinking built extensions back to source tree
 - `ENABLE_COVERAGE=1` — build with coverage instrumentation (GCC or Clang)
 
+## Planning
+
+Read and follow the [planning manifesto](plans/PLANNING.md) when writing or
+following implementation plans.
+
 ## Testing
 
 Read and follow the [testing manifesto](test/TESTING.md) when writing,
