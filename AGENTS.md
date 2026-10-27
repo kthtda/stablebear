@@ -31,16 +31,16 @@ cmake --install cmake-build-debug
 This works when `SKBUILD` is off (plain CMake). Builds `_sb_cpu` (always) and `_sb_cudaXX` (when CUDA available). Extensions are symlinked into `stablebear/` for immediate use.
 
 For local builds, size the job count by both CPU and memory. Leave 2 CPUs
-worth of capacity for the editor and host, and budget 5 GB of RAM per job:
+worth of capacity for the editor and host, and budget 4 GB of RAM per job:
 the Python binding translation units (`py_timeseries*.cpp`, `py_tensor*.cpp`)
 each peak at 2-4.3 GB in Debug, and both `_sb_cpu` and `_sb_cudaXX` compile
 them, so a header change rebuilds many of them at once. On Linux, compute
 `JOBS` in the same shell command as the build, including targeted and
 incremental builds:
 ```bash
-JOBS=$(awk -v c=$(nproc --ignore=2) '/MemAvailable/{m=int($2/5242880); print (m<c?(m<1?1:m):c)}' /proc/meminfo)
+JOBS=$(awk -v c=$(nproc --ignore=2) '/MemAvailable/{m=int($2/4194304); print (m<c?(m<1?1:m):c)}' /proc/meminfo)
 ```
-This uses `max(1, min(available CPUs - 2, available GB / 5))` jobs. On other
+This uses `max(1, min(available CPUs - 2, available GB / 4))` jobs. On other
 platforms, calculate the equivalent. Respect any explicitly requested lower
 job limit.
 
