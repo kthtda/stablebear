@@ -1,6 +1,6 @@
 # Time series dates and plotting: implementation plan
 
-Progress: 42 of 47 items, 78 of 86 points (91%)
+Progress: 43 of 47 items, 79 of 86 points (92%)
 
 Spec: [timeseries-dates-and-plotting-spec.md](timeseries-dates-and-plotting-spec.md)
 
@@ -230,7 +230,7 @@ Python cannot observe gets a new `test/test_timeseries.cpp`.
     date axis raises `TypeError`; one with an epoch on a unit axis raises
     `ValueError`; several channels make every row a date axis; two epochs
     on one date axis land at their own dates.
-- [ ] **F8.** [1] Non-numeric dtypes raise `TypeError` naming the dtype.
+- [x] **F8.** [1] (b0008787d) Non-numeric dtypes raise `TypeError` naming the dtype.
   Tests: a point cloud series and a barcode series raise.
 - [ ] **F9.** [2] Docs: point to `docs/timeseries_plotting.rst` from
   `docs/plotting.rst` and update `docs/api_plotting.rst`; check that the
