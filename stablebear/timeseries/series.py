@@ -14,7 +14,7 @@ from ..functional.pcf import Pcf
 from ..nested_tensor import NestedTensor, _leaf_wrappers
 from ..point_cloud import PointCloud
 from ..symmetric_matrix import SymmetricMatrix
-from .date_time import DateTime
+from .date_time import _NUMPY_TO_UNIT, DateTime
 from ..typing import (
     _NATIVE_SUFFIX,
     barcode32,
@@ -42,6 +42,26 @@ from ..typing import (
 T = TypeVar("T")
 
 
+def _times_from_datetimes(stamps, unit, epoch):
+    """The native times of ``datetime64`` stamps counted from ``epoch``, or
+    from the first stamp, in ``unit``."""
+    if epoch is None:
+        if stamps.size == 0:
+            raise ValueError("Pass an epoch for an empty array of dates and times")
+        epoch = stamps.reshape(-1)[0]
+    epoch = DateTime(epoch)
+    # Integer differences at the finer of the two resolutions; Times.to then
+    # converts them to unit by one exact factor.
+    offsets = stamps - epoch.to_datetime64()
+    if np.isnat(offsets).any():
+        raise ValueError("Dates and times cannot be NaT")
+    code, step = np.datetime_data(offsets.dtype)
+    if code not in _NUMPY_TO_UNIT:
+        raise ValueError(f"Dates and times need a resolution of fixed length, not {code!r}")
+    counts = offsets.astype(np.int64).astype(np.float64) * step
+    return cpp.Times(counts, _NUMPY_TO_UNIT[code], epoch._data).to(unit)
+
+
 class Times:
     """Finite, strictly increasing timestamps in one physical time unit.
 
@@ -52,7 +72,11 @@ class Times:
     Parameters
     ----------
     times : array_like
-        One-dimensional timestamps, converted to float64.
+        One-dimensional timestamps, converted to float64, or a ``datetime64``
+        array of dates and times. Dates and times are counted from
+        ``epoch``, which defaults to the first of them, and converted to
+        ``unit``: the differences are taken in integers and converted by one
+        exact factor, so whole multiples of ``unit`` are exact.
     unit : str, optional
         One of ``"as"``, ``"fs"``, ``"ps"``, ``"ns"``, ``"us"``, ``"ms"``,
         ``"s"``, ``"min"``, ``"h"``, and ``"d"``, or an alias such as
@@ -70,6 +94,10 @@ class Times:
     """
 
     def __init__(self, times, unit: str = "s", *, epoch=None):
+        times = np.asarray(times)
+        if np.issubdtype(times.dtype, np.datetime64):
+            self._data = _times_from_datetimes(times, unit, epoch)
+            return
         if epoch is not None:
             epoch = DateTime(epoch)._data
         self._data = cpp.Times(np.asarray(times, dtype=np.float64), unit, epoch)

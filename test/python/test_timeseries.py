@@ -171,13 +171,37 @@ def test_times_with_epoch_sets_replaces_and_removes_the_epoch():
 def test_times_with_epoch_keeps_the_timestamps_and_unit():
     times = Times([0.0, 1.5], unit="ms").with_epoch("2023-01-01")
 
-    assert np.array_equal(np.asarray(times), [0.0, 1.5])
+    assert sb.FloatTensor([0.0, 1.5], dtype=sb.float64).array_equal(sb.tensor(times))
     assert times.unit == "ms"
 
 
 def test_times_with_epoch_rejects_an_invalid_epoch():
     with pytest.raises(ValueError):
         Times([0.0, 1.5], unit="s").with_epoch(np.datetime64("2023-01", "M"))
+
+
+def _stamps():
+    return np.array(["2023-01-01T06:00", "2023-01-01T07:30", "2023-01-02T06:00"], dtype="datetime64[m]")
+
+
+def test_times_from_datetimes_count_whole_units_from_the_first():
+    times = Times(_stamps(), unit="min")
+
+    assert times.epoch == DateTime(np.datetime64("2023-01-01T06:00", "m"))
+    assert sb.FloatTensor([0.0, 90.0, 1440.0], dtype=sb.float64).array_equal(sb.tensor(times))
+
+
+def test_times_from_datetimes_are_converted_to_the_unit():
+    times = Times(_stamps(), unit="h")
+
+    assert sb.FloatTensor([0.0, 1.5, 24.0], dtype=sb.float64).array_equal(sb.tensor(times))
+
+
+def test_times_from_datetimes_count_from_an_explicit_epoch():
+    times = Times(_stamps(), unit="h", epoch="2023-01-01")
+
+    assert times.epoch == DateTime("2023-01-01")
+    assert sb.FloatTensor([6.0, 7.5, 30.0], dtype=sb.float64).array_equal(sb.tensor(times))
 
 
 def test_times_repr_shows_the_epoch():
