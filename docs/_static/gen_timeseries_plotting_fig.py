@@ -63,10 +63,40 @@ def plot_timeseries_sharex():
     return fig
 
 
+# -- included in docs via literalinclude :pyobject: --
+def plot_timeseries_windows_relative():
+    series = TimeSeries([0.5, 2.0, 1.0, 3.5, 2.5, 0.0, 3.0, 1.5],
+                        times=[0.0, 0.7, 1.9, 2.4, 3.6, 4.9, 5.5, 7.2])
+    windows = Window(size=2.4, anchor="start")(series)
+
+    fig, (ax_in_place, ax_relative) = plt.subplots(1, 2, figsize=(8, 2.5))
+    plot_timeseries(windows, ax=ax_in_place, markers=True)
+    plot_timeseries(windows, ax=ax_relative, relative=True, markers=True)
+    ax_in_place.set_title("in place", fontsize=10)
+    ax_relative.set_title("relative=True", fontsize=10)
+    fig.tight_layout()
+    return fig
+
+
+# -- included in docs via literalinclude :pyobject: --
+def plot_timeseries_some_windows():
+    series = TimeSeries([0.5, 2.0, 1.0, 3.5, 2.5, 0.0, 3.0, 1.5],
+                        times=[0.0, 0.7, 1.9, 2.4, 3.6, 4.9, 5.5, 7.2])
+    windows = Window(size=2.4, anchor="start")(series)
+
+    fig, ax = plt.subplots(figsize=(6, 2.5))
+    plot_timeseries(series, ax=ax, color="gray", linewidth=1)
+    plot_timeseries(windows[[0, 2]], ax=ax, linewidth=3)
+    fig.tight_layout()
+    return fig
+
+
 if __name__ == "__main__":
     for name, plot_func in [("timeseries_plot_steps", plot_timeseries_steps),
                             ("timeseries_plot_window_in_place", plot_timeseries_window_in_place),
                             ("timeseries_plot_units", plot_timeseries_units),
-                            ("timeseries_plot_sharex", plot_timeseries_sharex)]:
+                            ("timeseries_plot_sharex", plot_timeseries_sharex),
+                            ("timeseries_plot_windows_relative", plot_timeseries_windows_relative),
+                            ("timeseries_plot_some_windows", plot_timeseries_some_windows)]:
         _save_themed(plot_func, *LIGHT, HERE / f"{name}_light.png")
         _save_themed(plot_func, *DARK, HERE / f"{name}_dark.png")

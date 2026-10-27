@@ -374,25 +374,31 @@ def _time_axis_unit(ax, unit, requested):
     return current
 
 
-def plot_timeseries(series, ax=None, *, unit=None, markers=False, **kwargs):
+def plot_timeseries(series, ax=None, *, unit=None, relative=False, markers=False, **kwargs):
     """Plot a time series as the step function it evaluates to.
 
     Each channel is drawn from its first observation to the end of its
     domain, holding each value until the next observation, at the times
     where it lies in the series it was cut from: a window is drawn where it
     was cut, at its :attr:`~stablebear.timeseries.TimeSeries.origin` plus its
-    own times.
+    own times, unless ``relative`` is true.
 
     Parameters
     ----------
-    series : TimeSeries
-        A time series with one channel of scalar observations.
+    series : TimeSeries or TimeSeriesTensor
+        A time series with one channel of scalar observations, or a 1-D
+        tensor of them, such as windows, drawn one line each, each taking
+        the next color of the axes unless ``color`` is given.
     ax : matplotlib axes, optional
         Axes to draw on. If ``None``, uses the current axes.
     unit : str, optional
         The time unit of the x axis, one of the units of
         :class:`~stablebear.timeseries.Times`. Defaults to the unit the axis
         already has, or else the unit of ``series``.
+    relative : bool, default False
+        Whether to draw each time series at its own times, from 0, instead
+        of where it lies in the series it was cut from. Windows are then
+        drawn on top of each other, to compare their shapes.
     markers : bool, default False
         Whether to mark each observation with a dot, which also shows a
         last value that holds only at the end of the domain.
@@ -408,7 +414,9 @@ def plot_timeseries(series, ax=None, *, unit=None, markers=False, **kwargs):
     Raises
     ------
     ValueError
-        If ``unit`` differs from the unit the x axis already has.
+        If ``unit`` differs from the unit the x axis already has, the
+        observations are not scalars, or a tensor has more than one
+        dimension.
     TypeError
         If the x axis holds dates or other values that are not times.
 
@@ -419,14 +427,25 @@ def plot_timeseries(series, ax=None, *, unit=None, markers=False, **kwargs):
     different units line up. The axis is labeled ``time (<unit>)`` unless it
     already has a label.
     """
+    from .timeseries.series import TimeSeriesTensor
+
     ax = plt.gca() if ax is None else ax
+    if isinstance(series, TimeSeriesTensor):
+        tensor = series.squeeze() if len(series.shape) != 1 else series
+        if len(tensor.shape) != 1:
+            raise ValueError(f"Expected a 1-D tensor of time series, got shape {series.shape}")
+        return [line for k in range(tensor.shape[0])
+                for line in plot_timeseries(tensor[k], ax=ax, unit=unit, relative=relative, markers=markers, **kwargs)]
     requested = None if unit is None else series.to(unit).unit
     series = series.to(_time_axis_unit(ax, requested or series.unit, requested))
-    times = np.asarray(series.times) + series.origin
+    offset = 0.0 if relative else series.origin
+    times = np.asarray(series.times) + offset
     values = np.asarray(series.values)
+    if values.ndim != 1:
+        raise ValueError(f"Can only plot scalar observations, not observations of shape {series.shape}")
     if markers:
         kwargs = {"marker": "o", "markevery": list(range(len(times))), **kwargs}
-    end = series.domain.end + series.origin
+    end = series.domain.end + offset
     if end > times[-1]:
         # The last value holds until the end of the domain.
         times = np.append(times, end)

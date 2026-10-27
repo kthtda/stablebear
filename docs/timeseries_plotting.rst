@@ -69,6 +69,69 @@ starting at 3 s is drawn over the series it was cut from::
       :pyobject: plot_timeseries_window_in_place
       :language: python
 
+Comparing windows
+-----------------
+
+A tensor of time series, such as the windows of a time series, is drawn as
+one line per time series. By default each window is drawn where it was cut;
+with ``relative=True``, each is drawn from 0, on top of the others, to
+compare their shapes::
+
+   series = TimeSeries([0.5, 2.0, 1.0, 3.5, 2.5, 0.0, 3.0, 1.5],
+                       times=[0.0, 0.7, 1.9, 2.4, 3.6, 4.9, 5.5, 7.2])
+   windows = Window(size=2.4, anchor="start")(series)
+
+   fig, (ax_in_place, ax_relative) = plt.subplots(1, 2)
+   plot_timeseries(windows, ax=ax_in_place, markers=True)
+   plot_timeseries(windows, ax=ax_relative, relative=True, markers=True)
+
+.. image:: _static/timeseries_plot_windows_relative_light.png
+   :width: 100%
+   :class: only-light
+   :alt: Three windows drawn in place and from 0
+
+.. image:: _static/timeseries_plot_windows_relative_dark.png
+   :width: 100%
+   :class: only-dark
+   :alt: Three windows drawn in place and from 0
+
+.. dropdown:: Show plotting code
+   :color: secondary
+
+   .. literalinclude:: _static/gen_timeseries_plotting_fig.py
+      :pyobject: plot_timeseries_windows_relative
+      :language: python
+
+Each window takes the next color of the axes. The three windows of 2.4 s
+start at 0, 2.4, and 4.8 s. In place, they color the series by window;
+drawn from 0, they lie on top of each other, from 0 to 2.4 s. Overlapping
+windows, with a ``step`` smaller than ``size``, are drawn over each other
+in place, so ``relative=True`` shows them more clearly.
+
+Indexing the tensor picks out windows to draw, with an integer, a slice,
+or a list of positions, as for any tensor (see :doc:`indexing`). Here the
+first and the last window are drawn over the series::
+
+   plot_timeseries(series, ax=ax, color="gray", linewidth=1)
+   plot_timeseries(windows[[0, 2]], ax=ax, linewidth=3)
+
+.. image:: _static/timeseries_plot_some_windows_light.png
+   :width: 80%
+   :class: only-light
+   :alt: The first and last of three windows drawn over their time series
+
+.. image:: _static/timeseries_plot_some_windows_dark.png
+   :width: 80%
+   :class: only-dark
+   :alt: The first and last of three windows drawn over their time series
+
+.. dropdown:: Show plotting code
+   :color: secondary
+
+   .. literalinclude:: _static/gen_timeseries_plotting_fig.py
+      :pyobject: plot_timeseries_some_windows
+      :language: python
+
 Time units
 ----------
 

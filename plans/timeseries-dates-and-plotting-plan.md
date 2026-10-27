@@ -1,6 +1,6 @@
 # Time series dates and plotting: implementation plan
 
-Progress: 36 of 47 items, 65 of 86 points (76%)
+Progress: 37 of 47 items, 67 of 86 points (78%)
 
 Spec: [timeseries-dates-and-plotting-spec.md](timeseries-dates-and-plotting-spec.md)
 
@@ -195,16 +195,18 @@ Python cannot observe gets a new `test/test_timeseries.cpp`.
   value to `size`; a user-set label is kept.
 - [x] **F2.** [1] (65357d2ec) `markers=True` and `**kwargs` forwarding.
   Tests: markers at each observation; `color` and `label` reach the line.
-- [ ] **F3.** Time axis rules.
+- [x] **F3.** Time axis rules.
   - [x] **F3a.** [2] (1b5d049f1) `unit=` and conversion into an existing axis unit.
     Tests: `unit="ms"` on a series in `s` scales by exactly 1000 and labels
     `time (ms)`; a series in `ms` after one in `s` is converted to `s`.
-  - [ ] **F3b.** [2] Shared axes and conflicts.
+  - [x] **F3b.** [2] (78c447ced) Shared axes and conflicts.
     Tests: two `sharex` axes agree; `unit="ms"` on an axis in `s` raises
     `ValueError`; an axis with a date converter raises `TypeError`.
 - [ ] **F4.** [1] Vector channels: one line per component.
   Tests: `(3,)` gives three lines labeled `x[0]`..`x[2]`; an explicit
   `label` is used as-is; `(2, 2)` raises `ValueError`.
+  Deferred: whether to draw every component, or to select components of
+  the observations as a time series first, is still open.
 - [ ] **F5.** [3] `TimeSeriesTensor` input and `relative`.
   Tests: three windows give three lines in successive cycle colors; by
   default each starts at its origin and matches the series' points there;

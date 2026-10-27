@@ -117,3 +117,40 @@ def test_an_axis_of_dates_raises(ax):
 
     with pytest.raises(TypeError):
         plot_timeseries(_series(), ax=ax)
+
+
+def _windows():
+    # Windows of 2 s at 0, 2, and 4 s.
+    series = TimeSeries([0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0], times=[0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0])
+    return Window(size=2.0, step=2.0, closed="left", partial=False, anchor="start")(series)
+
+
+def test_a_tensor_of_windows_is_drawn_one_line_each_in_place(ax):
+    lines = plot_timeseries(_windows(), ax=ax)
+
+    assert [list(line.get_xdata()) for line in lines] == [[0.0, 1.0, 2.0], [2.0, 3.0, 4.0], [4.0, 5.0, 6.0]]
+    assert len({line.get_color() for line in lines}) == 3
+
+
+def test_relative_draws_each_window_from_zero(ax):
+    lines = plot_timeseries(_windows(), ax=ax, relative=True)
+
+    assert [list(line.get_xdata()) for line in lines] == [[0.0, 1.0, 2.0]] * 3
+
+
+def test_an_empty_tensor_draws_nothing(ax):
+    assert plot_timeseries(_windows()[0:0], ax=ax) == []
+    assert ax.get_lines() == []
+
+
+def test_a_tensor_with_two_dimensions_raises(ax):
+    series = TimeSeries([0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0], times=np.arange(9.0))
+    windows = Window(size=2.0, step=2.0, closed="left", partial=False, anchor="start")(series).reshape((2, 2))
+
+    with pytest.raises(ValueError, match="1-D"):
+        plot_timeseries(windows, ax=ax)
+
+
+def test_vector_observations_raise(ax):
+    with pytest.raises(ValueError, match="scalar"):
+        plot_timeseries(TimeSeries([[1.0, 2.0], [3.0, 4.0]], times=[0.0, 1.0]), ax=ax)
