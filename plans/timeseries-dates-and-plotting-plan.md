@@ -1,6 +1,6 @@
 # Time series dates and plotting: implementation plan
 
-Progress: 27 of 47 items, 49 of 89 points (55%)
+Progress: 28 of 47 items, 50 of 89 points (56%)
 
 Spec: [timeseries-dates-and-plotting-spec.md](timeseries-dates-and-plotting-spec.md)
 
@@ -146,7 +146,7 @@ Python cannot observe gets a new `test/test_timeseries.cpp`.
 - [x] **E2.** [2] (1a1254c4b) `Times.to_datetime64(resolution="us")`.
   Tests: default `us`; `ns` and `s`; rounding to nearest; no epoch raises
   `ValueError` mentioning `with_epoch`.
-- [ ] **E3.** Date queries.
+- [x] **E3.** Date queries.
   - [x] **E3a.** [3] (8857cc6c5) Scalar dates: `np.datetime64`, naive `datetime`, `date`,
     converted per channel as `(q - epoch) - origin`.
     Tests: each equals the numeric query at `q - epoch`; on a window,
@@ -160,7 +160,7 @@ Python cannot observe gets a new `test/test_timeseries.cpp`.
     strings or `datetime`s are accepted as dates.
   - [x] **E3d.** [2] (82cb67f93) Out-of-domain message in dates.
     Tests: the message names the date and the domain as dates.
-  - [ ] **E3e.** [1] Snapping (no new code expected).
+  - [x] **E3e.** [1] (7255a6325) Snapping (no new code expected).
     Tests: a date that converts to just below a timestamp gets that
     observation.
 - [ ] **E4.** Durations.

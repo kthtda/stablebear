@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime
+import math
 
 import numpy as np
 
@@ -93,3 +94,33 @@ class DateTime:
 
     def __repr__(self):
         return f"DateTime({str(self.to_datetime64())!r})"
+
+
+def _duration(value, message):
+    """``value`` as a positive duration: a ``np.timedelta64`` for a
+    ``timedelta`` or ``timedelta64``, kept as given, or else a float. Raises
+    ``ValueError`` with ``message`` if it is not positive, and for months and
+    years, which have no fixed length."""
+    if isinstance(value, datetime.timedelta):
+        value = np.timedelta64(value)
+    if isinstance(value, np.timedelta64):
+        if np.isnat(value):
+            raise ValueError(message)
+        code, _ = np.datetime_data(value.dtype)
+        if code not in _NUMPY_TO_UNIT:
+            raise ValueError(f"A duration needs a unit of fixed length, not {code!r}")
+        if value <= np.timedelta64(0, code):
+            raise ValueError(message)
+        return value
+    value = float(value)
+    if not (math.isfinite(value) and value > 0):
+        raise ValueError(message)
+    return value
+
+
+def _in_unit(duration, unit):
+    """A duration from :func:`_duration` as a number of ``unit``, a Times unit;
+    a ``timedelta64`` is divided by ``unit`` once."""
+    if isinstance(duration, np.timedelta64):
+        return float(duration / np.timedelta64(1, _UNIT_TO_NUMPY[unit]))
+    return duration

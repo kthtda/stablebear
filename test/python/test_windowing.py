@@ -1,3 +1,4 @@
+import datetime
 import re
 
 import numpy as np
@@ -651,3 +652,40 @@ def test_window_dates_include_their_origin():
     dates = window.times.to_datetime64("ms")
 
     assert np.array_equal(dates, np.array(["2023-01-01T00:00:02", "2023-01-01T00:00:02.5"], dtype="datetime64[ms]"))
+
+
+@pytest.mark.parametrize("size, step", [
+    pytest.param(np.timedelta64(2, "h"), np.timedelta64(1, "h"), id="timedelta64"),
+    pytest.param(datetime.timedelta(hours=2), datetime.timedelta(hours=1), id="timedelta"),
+])
+@pytest.mark.parametrize("unit, numeric_size, numeric_step", [
+    pytest.param("min", 120.0, 60.0, id="minutes"),
+    pytest.param("h", 2.0, 1.0, id="hours"),
+])
+def test_windows_of_a_duration_match_windows_of_the_same_number(size, step, unit, numeric_size, numeric_step):
+    series = TimeSeries([0.0, 1.0, 2.0, 3.0, 4.0], times=Times([0.0, 1.0, 2.0, 3.0, 4.0], unit="h")).to(unit)
+
+    windows, bounds = Window(size=size, step=step, closed="left", partial=False, anchor="start")(
+        series, return_bounds=True)
+    expected, expected_bounds = Window(size=numeric_size, step=numeric_step, closed="left", partial=False,
+                                       anchor="start")(series, return_bounds=True)
+
+    assert windows.array_equal(expected)
+    assert bounds.array_equal(expected_bounds)
+
+
+def test_window_repr_shows_its_durations():
+    window = Window(size=np.timedelta64(2, "h"), step=np.timedelta64(30, "m"), closed="left", partial=False,
+                    anchor="start")
+
+    assert "size=np.timedelta64(2,'h')" in repr(window)
+    assert "step=np.timedelta64(30,'m')" in repr(window)
+
+
+@pytest.mark.parametrize("size", [
+    pytest.param(np.timedelta64(1, "M"), id="months"),
+    pytest.param(np.timedelta64(1, "Y"), id="years"),
+])
+def test_window_rejects_durations_without_a_fixed_length(size):
+    with pytest.raises(ValueError, match="fixed length"):
+        Window(size=size)
