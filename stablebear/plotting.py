@@ -366,7 +366,7 @@ def _time_axis_unit(ax, unit):
     return ax.xaxis.get_units()
 
 
-def plot_timeseries(series, ax=None, *, markers=False, **kwargs):
+def plot_timeseries(series, ax=None, *, unit=None, markers=False, **kwargs):
     """Plot a time series as the step function it evaluates to.
 
     Each channel is drawn from its first observation to the end of its
@@ -381,6 +381,10 @@ def plot_timeseries(series, ax=None, *, markers=False, **kwargs):
         A time series with one channel of scalar observations.
     ax : matplotlib axes, optional
         Axes to draw on. If ``None``, uses the current axes.
+    unit : str, optional
+        The time unit of the x axis, one of the units of
+        :class:`~stablebear.timeseries.Times`. Defaults to the unit the axis
+        already has, or else the unit of ``series``.
     markers : bool, default False
         Whether to mark each observation with a dot, which also shows a
         last value that holds only at the end of the domain.
@@ -396,10 +400,12 @@ def plot_timeseries(series, ax=None, *, markers=False, **kwargs):
     Notes
     -----
     The x axis keeps one time unit, stored on it by the first time series
-    drawn, and is labeled ``time (<unit>)`` unless it already has a label.
+    drawn, and each time series is converted into it exactly, so series in
+    different units line up. The axis is labeled ``time (<unit>)`` unless it
+    already has a label.
     """
     ax = plt.gca() if ax is None else ax
-    series = series.to(_time_axis_unit(ax, series.unit))
+    series = series.to(_time_axis_unit(ax, series.to(unit or series.unit).unit))
     times = np.asarray(series.times) + series.origin
     values = np.asarray(series.values)
     if markers:

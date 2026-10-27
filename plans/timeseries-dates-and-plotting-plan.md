@@ -1,6 +1,6 @@
 # Time series dates and plotting: implementation plan
 
-Progress: 34 of 47 items, 62 of 86 points (72%)
+Progress: 35 of 47 items, 63 of 86 points (73%)
 
 Spec: [timeseries-dates-and-plotting-spec.md](timeseries-dates-and-plotting-spec.md)
 
@@ -193,7 +193,7 @@ Python cannot observe gets a new `test/test_timeseries.cpp`.
   lines.
   Tests: x/y data equal the step vertices; a window extends its last
   value to `size`; a user-set label is kept.
-- [ ] **F2.** [1] `markers=True` and `**kwargs` forwarding.
+- [x] **F2.** [1] (65357d2ec) `markers=True` and `**kwargs` forwarding.
   Tests: markers at each observation; `color` and `label` reach the line.
 - [ ] **F3.** Time axis rules.
   - [ ] **F3a.** [2] `unit=` and conversion into an existing axis unit.

@@ -7,7 +7,7 @@ from pathlib import Path
 
 from gen_timeseries_snap_fig import DARK, LIGHT, _save_themed
 from stablebear.plotting import plot_timeseries
-from stablebear.timeseries import TimeSeries, Window
+from stablebear.timeseries import Times, TimeSeries, Window
 
 HERE = Path(__file__).parent
 
@@ -35,8 +35,23 @@ def plot_timeseries_window_in_place():
     return fig
 
 
+# -- included in docs via literalinclude :pyobject: --
+def plot_timeseries_units():
+    seconds = TimeSeries([1.0, 3.0, 2.0], times=[0.0, 1.0, 2.5])
+    milliseconds = TimeSeries([0.5, 1.5, 2.5],
+                              times=Times([500.0, 1500.0, 3000.0], unit="ms"))
+
+    fig, ax = plt.subplots(figsize=(6, 2.5))
+    plot_timeseries(seconds, ax=ax, markers=True, label="in s")
+    plot_timeseries(milliseconds, ax=ax, markers=True, label="in ms")
+    ax.legend()
+    fig.tight_layout()
+    return fig
+
+
 if __name__ == "__main__":
     for name, plot_func in [("timeseries_plot_steps", plot_timeseries_steps),
-                            ("timeseries_plot_window_in_place", plot_timeseries_window_in_place)]:
+                            ("timeseries_plot_window_in_place", plot_timeseries_window_in_place),
+                            ("timeseries_plot_units", plot_timeseries_units)]:
         _save_themed(plot_func, *LIGHT, HERE / f"{name}_light.png")
         _save_themed(plot_func, *DARK, HERE / f"{name}_dark.png")

@@ -74,3 +74,20 @@ def test_keyword_arguments_reach_the_line(ax):
 
     assert line.get_color() == "red"
     assert line.get_label() == "signal"
+
+
+def test_unit_sets_the_unit_of_the_time_axis(ax):
+    (line,) = plot_timeseries(_series(), ax=ax, unit="ms")
+
+    assert np.array_equal(line.get_xdata(), [0.0, 1500.0, 4000.0])
+    assert ax.get_xlabel() == "time (ms)"
+
+
+def test_a_series_in_another_unit_is_drawn_in_the_unit_of_the_axis(ax):
+    plot_timeseries(_series(), ax=ax)
+    milliseconds = TimeSeries([1.0, 2.0], times=Times([500.0, 2500.0], unit="ms"))
+
+    (line,) = plot_timeseries(milliseconds, ax=ax)
+
+    assert np.array_equal(line.get_xdata(), [0.5, 2.5])
+    assert ax.get_xlabel() == "time (s)"
