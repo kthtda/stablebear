@@ -25,46 +25,52 @@ Keep them in separate files, and link the plan to its spec.
    them in the order that is easier to review.
 
 4. **Use a checkbox per item and subitem.** Write `- [ ] **B2.** ...`, and
-   indent subitems under their item as `- [ ] **B2a.** ...`. Check a subitem
-   once its work is committed, and an item once all its subitems are.
+   indent subitems under their item as `- [ ] **B2a.** ...`. Check an item
+   once all its subitems are checked.
+
+5. **Check an item in the commit after it, with its hash.** Once an item's
+   commit exists, check the item and add the commit's short hash as
+   evidence, as in `- [x] **B2b.** (9629137bd, d37757337) ...`. The tick and
+   hash go into the next item's commit. A commit cannot record its own
+   hash, because amending it to add the hash changes the hash.
 
 ## Item size
 
-5. **One item is one reviewable change.** It should fit in one commit that a
+6. **One item is one reviewable change.** It should fit in one commit that a
    reviewer can read in one sitting. If a description needs "and" to join
    unrelated changes, split it.
 
-6. **Each item leaves the build and the tests passing.** No item should
+7. **Each item leaves the build and the tests passing.** No item should
    depend on a later one to compile or pass. Introduce a function before its
    callers, and a type before its users.
 
-7. **Say what is done, not just what to work on.** "Add `Times.epoch`,
+8. **Say what is done, not just what to work on.** "Add `Times.epoch`,
    stored in C++, read-only in Python" is an item; "Work on epochs" is not.
    Name the files or functions involved when they are known.
 
 ## Tests and docs
 
-8. **Write tests with the code they cover.** Tests belong in the same item
+9. **Write tests with the code they cover.** Tests belong in the same item
    as the behavior they check, or in the item right after it. Do not
    collect them into a testing phase at the end.
 
-9. **Name the tests in each item.** List the few cases an item adds, such as
-   "tests: default is `None`; `to` keeps it; `__eq__` compares it". An item
-   should add a handful of tests, not "write the tests for X". Follow the
-   [testing manifesto](../test/TESTING.md).
+10. **Name the tests in each item.** List the few cases an item adds, such
+    as "tests: default is `None`; `to` keeps it; `__eq__` compares it". An
+    item should add a handful of tests, not "write the tests for X". Follow
+    the [testing manifesto](../test/TESTING.md).
 
-10. **Update docs in the item that changes behavior.** A public API change
+11. **Update docs in the item that changes behavior.** A public API change
     and its docstring belong together. Larger guide pages may be their own
     item at the end of a phase. Follow the
     [writing manifesto](../docs/WRITING.md).
 
 ## Keeping the plan current
 
-11. **Change the plan when the work changes.** If an item turns out to be
+12. **Change the plan when the work changes.** If an item turns out to be
     too large, split it before starting. If a decision changes the design,
     update the spec first, then the plan.
 
-12. **Record what was learned, briefly.** A short note under an item, such
+13. **Record what was learned, briefly.** A short note under an item, such
     as a surprise found while doing it, helps the next items. Do not turn the
     plan into a log.
 
