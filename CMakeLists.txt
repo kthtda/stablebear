@@ -575,7 +575,9 @@ SET(SB_PY_SOURCES
     py_symmetric_matrix.hpp py_symmetric_matrix.cpp
     py_distance_matrix.hpp py_distance_matrix.cpp
     py_timeseries.hpp py_timeseries.cpp py_timeseries_bind.hpp
-    py_timeseries_pcf.cpp py_timeseries_point_cloud.cpp py_timeseries_matrix_barcode.cpp
+    py_timeseries_float.cpp py_timeseries_int.cpp py_timeseries_uint.cpp
+    py_timeseries_pcf.cpp py_timeseries_pcf_int.cpp py_timeseries_point_cloud.cpp
+    py_timeseries_distance_matrix.cpp py_timeseries_symmetric_matrix.cpp py_timeseries_barcode.cpp
     py_timeseries_derived.hpp py_timeseries_derived.cpp
     ${SB_PY_PERSISTENCE_SOURCES}
     ${SB_PY_POINT_PROCESS_SOURCES}

@@ -51,14 +51,14 @@ namespace sb_py
       .def("__eq__", [](const sb::Times& self, const sb::Times& other) { return self == other; });
 
     register_typed_timeseries<bool>(m, "Bool");
-    register_typed_timeseries<sb::float32_t>(m, "Float32");
-    register_typed_timeseries<sb::float64_t>(m, "Float64");
-    register_typed_timeseries<sb::int32_t>(m, "Int32");
-    register_typed_timeseries<sb::int64_t>(m, "Int64");
-    register_typed_timeseries<uint32_t>(m, "Uint32");
-    register_typed_timeseries<uint64_t>(m, "Uint64");
+    register_timeseries_float(m);
+    register_timeseries_int(m);
+    register_timeseries_uint(m);
     register_timeseries_pcf(m);
+    register_timeseries_pcf_int(m);
     register_timeseries_point_cloud(m);
-    register_timeseries_matrix_barcode(m);
+    register_timeseries_distance_matrix(m);
+    register_timeseries_symmetric_matrix(m);
+    register_timeseries_barcode(m);
   }
 }
