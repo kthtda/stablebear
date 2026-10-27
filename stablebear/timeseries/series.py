@@ -383,6 +383,21 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         return shapes[0] if len(shapes) == 1 else shapes
 
     @property
+    def origin(self) -> float | FloatTensor:
+        """The time in the series a channel was cut from that its time 0
+        stands for, in :attr:`unit`.
+
+        0 for a series built from observations. Evaluation does not use it;
+        it places a window in the series it was cut from. A float for a
+        series with one channel; for several, a float64 ``FloatTensor`` with
+        one entry per channel.
+        """
+        origins = [self._data.origin(i) for i in range(self.n_channels)]
+        if len(origins) == 1:
+            return origins[0]
+        return FloatTensor(origins, dtype=float64)
+
+    @property
     def domain(self) -> Domain:
         """The times at which every channel can be evaluated, in :attr:`unit`.
 

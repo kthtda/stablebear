@@ -207,11 +207,23 @@ namespace sb
   }
 
   template <typename T>
+  Channel<T> Channel<T>::with_origin(float64_t origin) const
+  {
+    if (!std::isfinite(origin))
+    {
+      throw std::invalid_argument("The origin of a channel must be finite");
+    }
+    auto channel = *this;
+    channel.m_origin = origin;
+    return channel;
+  }
+
+  template <typename T>
   bool Channel<T>::operator==(const Channel& other) const
   {
     return m_snapTolerance == other.m_snapTolerance && m_shape == other.m_shape
            && m_end == other.m_end && end_closed() == other.end_closed() && m_startClosed == other.m_startClosed
-           && held_times() == other.held_times() && values() == other.values();
+           && m_origin == other.m_origin && held_times() == other.held_times() && values() == other.values();
   }
 
   template <typename T>

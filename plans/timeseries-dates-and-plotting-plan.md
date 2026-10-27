@@ -26,7 +26,7 @@ Python cannot observe gets a new `test/test_timeseries.cpp`.
     `"none"` have ends 0 and `size` with matching flags; a partial
     window's cut end and flag follow the series; two channels give the
     intersection, with the flags of the ends that bound it.
-- [ ] **A2.** Point the `TimeSeries` docstring's prose on domains to the
+- [x] **A2.** Point the `TimeSeries` docstring's prose on domains to the
   property; add `Domain` to `docs/api_timeseries.rst`.
 
 ## Phase B: Origin

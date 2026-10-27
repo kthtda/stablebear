@@ -239,6 +239,28 @@ def test_series_domain_of_several_channels_excludes_an_end_any_channel_excludes(
     assert series.domain == expected
 
 
+def test_series_origin_is_zero_for_recorded_observations():
+    series = TimeSeries([10.0, 20.0, 30.0], times=[0.5, 1.5, 4.0])
+
+    assert series.origin == 0.0
+
+
+def test_series_origin_has_one_entry_per_channel():
+    a = TimeSeries([10.0, 20.0], times=[0.0, 1.0])
+    b = TimeSeries([-10.0, -20.0], times=Times([0.0, 1000.0], unit="ms"))
+
+    origin = TimeSeries.from_channels([a, b], unit="s").origin
+
+    assert sb.tensor([0.0, 0.0], dtype=sb.float64).array_equal(origin)
+
+
+def test_series_origin_cannot_be_assigned_to():
+    series = TimeSeries([10.0, 20.0], times=[0.0, 1.0])
+
+    with pytest.raises(AttributeError):
+        series.origin = 1.0
+
+
 def test_query_just_below_an_observation_snaps_to_it():
     series = TimeSeries([1.0, 2.0, 3.0], times=[0.0, 0.25, 0.5], snap_tolerance=1e-14)
 

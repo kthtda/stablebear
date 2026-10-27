@@ -61,6 +61,10 @@ namespace sb_py
       .def("to", [](const Series& self, const std::string& unit) { return self.to(sb::parse_time_unit(unit)); },
            py::arg("unit"))
       .def("times", &Series::times, py::arg("index"))
+      .def("origin", [](const Series& self, size_t index) {
+        const auto& channel = self.channel(index);
+        return sb::convert_time(channel.origin(), channel.unit(), self.unit());
+      }, py::arg("index"))
       .def("channel", &Series::channel, py::arg("index"), py::return_value_policy::reference_internal)
       .def_property_readonly("n_channels", &Series::n_channels)
       .def_property_readonly("domain", [](const Series& self) {

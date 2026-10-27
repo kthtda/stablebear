@@ -241,7 +241,8 @@ namespace sb
 
     /// A view of this channel whose times are @p times and whose observation
     /// k is this channel's observation @p indices[k], with no new axis. It
-    /// shares this channel and its snap settings, but not its start or end.
+    /// shares this channel, its snap settings, and its origin, but not its
+    /// start or end.
     [[nodiscard]] Channel take(Times times, std::vector<size_t> indices) const;
 
     /// This channel with the end @p end, in its unit: it can be evaluated
@@ -266,6 +267,15 @@ namespace sb
 
     /// Whether the first timestamp is in the domain.
     [[nodiscard]] bool start_closed() const noexcept { return m_startClosed; }
+
+    /// The time, in the channel's unit, that time 0 stands for in the series
+    /// this channel was cut from; 0 for recorded observations. Evaluation
+    /// does not use it.
+    [[nodiscard]] float64_t origin() const noexcept { return m_origin; }
+
+    /// This channel with the origin @p origin, in its unit, which must be
+    /// finite.
+    [[nodiscard]] Channel with_origin(float64_t origin) const;
 
     /// The observation with the largest timestamp at or before @p t, in the
     /// channel's own unit, a tensor of shape shape(). As in the tolerant
@@ -311,7 +321,8 @@ namespace sb
     [[nodiscard]] const std::vector<size_t>& shape() const noexcept { return m_shape; }
     [[nodiscard]] size_t size() const noexcept { return held_times().size(); }
 
-    /// The same timestamps, start, end, shape, values, and snap settings.
+    /// The same timestamps, start, end, origin, shape, values, and snap
+    /// settings.
     [[nodiscard]] bool operator==(const Channel& other) const;
 
     /// Element @p i of the observations at times(), flattened in row-major
@@ -361,6 +372,7 @@ namespace sb
     std::optional<float64_t> m_end;
     bool m_endClosed = false;
     bool m_startClosed = true;
+    float64_t m_origin = 0.0;
     float64_t m_snapTolerance = DefaultSnapTolerance;
   };
 
