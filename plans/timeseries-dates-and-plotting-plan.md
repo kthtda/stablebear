@@ -1,6 +1,6 @@
 # Time series dates and plotting: implementation plan
 
-Progress: 11 of 47 items, 23 of 89 points (26%)
+Progress: 12 of 47 items, 25 of 89 points (28%)
 
 Spec: [timeseries-dates-and-plotting-spec.md](timeseries-dates-and-plotting-spec.md)
 
@@ -92,7 +92,7 @@ Python cannot observe gets a new `test/test_timeseries.cpp`.
 
 ## Phase C: Epoch on `Times`
 
-- [ ] **C1.** [2] Bind the C++ `DateTime` and the epoch on `Times`, and add
+- [x] **C1.** [2] (acf2f855b) Bind the C++ `DateTime` and the epoch on `Times`, and add
   `stablebear.timeseries.DateTime`, which wraps it and converts from and to
   `np.datetime64`.
   Tests: `str`, `np.datetime64`, naive `datetime`, and `date` give the same

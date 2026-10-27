@@ -14,6 +14,7 @@ from ..functional.pcf import Pcf
 from ..nested_tensor import NestedTensor, _leaf_wrappers
 from ..point_cloud import PointCloud
 from ..symmetric_matrix import SymmetricMatrix
+from .date_time import DateTime
 from ..typing import (
     _NATIVE_SUFFIX,
     barcode32,
@@ -57,6 +58,9 @@ class Times:
         ``"s"``, ``"min"``, ``"h"``, and ``"d"``, or an alias such as
         ``"sec"``, ``"seconds"``, ``"hr"``, ``"\u00b5s"``, or ``"msec"``.
         Defaults to seconds. :attr:`unit` reports the short name.
+    epoch : DateTime or a value DateTime accepts, optional
+        The date and time that time 0 stands for, such as
+        ``"2023-01-01"``. Defaults to none: the timestamps are durations.
 
     Raises
     ------
@@ -65,8 +69,10 @@ class Times:
         increasing, or if the unit is unknown.
     """
 
-    def __init__(self, times, unit: str = "s"):
-        self._data = cpp.Times(np.asarray(times, dtype=np.float64), unit)
+    def __init__(self, times, unit: str = "s", *, epoch=None):
+        if epoch is not None:
+            epoch = DateTime(epoch)._data
+        self._data = cpp.Times(np.asarray(times, dtype=np.float64), unit, epoch)
 
     @classmethod
     def _from_cpp(cls, data):
@@ -79,8 +85,14 @@ class Times:
         """The time unit, such as ``"s"`` or ``"ms"``."""
         return self._data.unit
 
+    @property
+    def epoch(self) -> DateTime | None:
+        """The date and time that time 0 stands for, or ``None``."""
+        data = self._data.epoch
+        return None if data is None else DateTime._from_cpp(data)
+
     def to(self, unit: str) -> Times:
-        """Return the same timestamps in another unit.
+        """Return the same timestamps in another unit, from the same epoch.
 
         The conversion multiplies or divides each timestamp by an exact
         integer factor, so each result is rounded once. Only the factor
@@ -104,7 +116,8 @@ class Times:
         return self._data == other._data
 
     def __repr__(self):
-        return f"Times({np.asarray(self).tolist()!r}, unit={self.unit!r})"
+        epoch = "" if self.epoch is None else f", epoch={self.epoch!r}"
+        return f"Times({np.asarray(self).tolist()!r}, unit={self.unit!r}{epoch})"
 
 
 # Element dtype -> native series class. The tensor class wrapping the values

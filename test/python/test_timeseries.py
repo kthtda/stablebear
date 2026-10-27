@@ -131,6 +131,37 @@ def test_date_time_rejects_a_number():
         DateTime(0)
 
 
+def test_times_have_no_epoch_by_default():
+    assert Times([0.0, 1.5], unit="s").epoch is None
+
+
+def test_times_epoch_from_a_string_equals_one_from_a_date_time():
+    from_string = Times([0.0, 1.5], unit="s", epoch="2023-01-01")
+    from_date_time = Times([0.0, 1.5], unit="s", epoch=DateTime("2023-01-01"))
+
+    assert from_string.epoch == DateTime("2023-01-01")
+    assert from_string == from_date_time
+
+
+def test_times_keep_their_epoch_in_another_unit():
+    times = Times([0.0, 1.5], unit="s", epoch="2023-01-01").to("ms")
+
+    assert times.epoch == DateTime("2023-01-01")
+
+
+def test_times_with_different_epochs_are_not_equal():
+    times = Times([0.0, 1.5], unit="s", epoch="2023-01-01")
+
+    assert times != Times([0.0, 1.5], unit="s", epoch="2023-01-02")
+    assert times != Times([0.0, 1.5], unit="s")
+
+
+def test_times_repr_shows_the_epoch():
+    times = Times([0.0, 1.5], unit="s", epoch="2023-01-01")
+
+    assert repr(times) == "Times([0.0, 1.5], unit='s', epoch=DateTime('2023-01-01'))"
+
+
 def test_series_keeps_explicit_unit():
     series = TimeSeries([1.0, 2.0], times=Times([0.0, 0.5], unit="ms"))
 
