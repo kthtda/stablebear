@@ -1,6 +1,6 @@
 # Time series dates and plotting: implementation plan
 
-Progress: 10 of 47 items, 21 of 89 points (24%)
+Progress: 11 of 47 items, 23 of 89 points (26%)
 
 Spec: [timeseries-dates-and-plotting-spec.md](timeseries-dates-and-plotting-spec.md)
 
@@ -46,9 +46,9 @@ Python cannot observe gets a new `test/test_timeseries.cpp`.
   `operator==` compares origins and the round-trip tests compare tensors of
   windows. Saving therefore comes first, together with the epoch, so the
   file format changes once (moved here from C1 and D1).
-  - [x] **B2a.** [2] (6d050da0e) C++ `Epoch` (an `int64_t` count and a `TimeUnit`) and
-    `std::optional<Epoch>` on `Times`; `to` copies it, `operator==` compares
-    it, `with_epoch` replaces it; `Epoch` can be built from a
+  - [x] **B2a.** [2] (6d050da0e) C++ `DateTime` (an `int64_t` count and a `TimeUnit`) and
+    `std::optional<DateTime>` on `Times`; `to` copies it, `operator==` compares
+    it, `with_epoch` replaces it; `DateTime` can be built from a
     `std::chrono::sys_time`. Not bound to Python yet.
     Tests: none here; the epoch is tested through Python once it is bound
     (C2, C3, D1).
@@ -87,21 +87,25 @@ Python cannot observe gets a new `test/test_timeseries.cpp`.
   Tests: two windows with the same contents from different places are
   `array_equal` with different origins; two tensors of such windows are
   `array_equal`.
-- [ ] **B5.** [2] Docs: `origin` docstring; `Window` docstring on origin versus
+- [x] **B5.** [2] (cd085ad2d) Docs: `origin` docstring; `Window` docstring on origin versus
   the unsnapped bounds; a paragraph in `docs/timeseries_windows.rst`.
 
 ## Phase C: Epoch on `Times`
 
-- [ ] **C1.** [1] Bind the C++ epoch on `Times` (B2a) to Python, internally;
-  the public API follows in C2. (The C++ work moved to B2a.)
+- [ ] **C1.** [2] Bind the C++ `DateTime` and the epoch on `Times`, and add
+  `stablebear.timeseries.DateTime`, which wraps it and converts from and to
+  `np.datetime64`.
+  Tests: `str`, `np.datetime64`, naive `datetime`, and `date` give the same
+  instant, each at its own resolution; `to_datetime64()` gives the value
+  back; `__eq__` compares count and unit; `repr` shows the date;
+  timezone-aware `datetime`, `W`/`M`/`Y`, and `NaT` raise `ValueError`, and
+  a number raises `TypeError`.
 - [ ] **C2.** Python `Times(..., epoch=)` and `Times.epoch`.
-  - [ ] **C2a.** [2] Accept and convert.
-    Tests: `str`, `np.datetime64`, and naive `datetime` give the same
-    instant, each at its own resolution; default `None`; `to` keeps it;
-    `__eq__` compares count and resolution; `repr` shows it.
-  - [ ] **C2b.** [1] Reject.
-    Tests: timezone-aware `datetime` raises `ValueError`; `W`, `M`, `Y`
-    resolutions raise; `NaT` and a non-date raise.
+  - [ ] **C2a.** [2] Accept a `DateTime` or anything `DateTime` accepts; `Times.epoch`
+    returns a `DateTime`.
+    Tests: default `None`; a string and a `DateTime` give the same epoch; `to`
+    keeps it; `__eq__` compares it; `repr` shows it.
+  - [ ] **C2b.** [0] Reject. (Covered by the `DateTime` tests in C1.)
 - [ ] **C3.** [1] `Times.with_epoch`.
   Tests: sets, replaces, and removes (`None`); timestamps and unit
   unchanged; invalid epochs raise as in the constructor.

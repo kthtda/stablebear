@@ -178,20 +178,35 @@ A timestamp `t` is then the date `epoch + t`, and a window observation is
 ### Python
 
 ```python
+class DateTime:
+    def __init__(self, value): ...
+    count: int
+    unit: str
+    def to_datetime64(self) -> np.datetime64: ...
+
 class Times:
     def __init__(self, times, unit: str = "s", *, epoch=None): ...
 
     @property
-    def epoch(self) -> np.datetime64 | None: ...
+    def epoch(self) -> DateTime | None: ...
 ```
 
-- `epoch`: anything `np.datetime64` accepts, such as `"2023-01-01T00:00"`, a
-  `np.datetime64`, or a naive `datetime.datetime`. Its resolution must be one
-  of the `Times` units, attoseconds to days; `W`, `M`, and `Y` are rejected
-  because months and years have no fixed length. A timezone-aware `datetime`
-  raises `ValueError`, because `np.datetime64` has no timezone and only warns
-  while dropping it; convert to a naive UTC time first. `NaT` and values that
-  are not dates raise `TypeError`/`ValueError`.
+- `stablebear.timeseries.DateTime` wraps the C++ `DateTime`, a calendar
+  date and time: a count of `unit` after 1970-01-01T00:00. The epoch of
+  `Times` is a `DateTime`. `DateTime(value)` takes a `str` such as
+  `"2023-01-01T00:00"`, a `np.datetime64`, a naive `datetime.datetime` or
+  `datetime.date`, or another `DateTime`, and keeps the value's resolution.
+  `to_datetime64()` gives it back as a `np.datetime64` at that resolution.
+- The resolution must be one of the `Times` units, attoseconds to days;
+  `W`, `M`, and `Y` raise `ValueError` because months and years have no
+  fixed length. A timezone-aware `datetime` raises `ValueError`, because
+  `np.datetime64` has no timezone and only warns while dropping it; convert
+  to a naive UTC time first. `NaT` raises `ValueError`, and values of other
+  types `TypeError`.
+- `DateTime.__eq__` compares count and unit, as the C++ `DateTime` does; compare
+  `to_datetime64()` values to compare instants. `repr` shows the date, as in
+  `DateTime('2023-01-01')`.
+- `epoch=` accepts a `DateTime` or anything `DateTime` accepts.
 - `times` may also be a `datetime64` array. The epoch then defaults to its
   first element, and each timestamp is `(stamp - epoch)` in `unit`, computed
   in integer `timedelta64` arithmetic and divided by the unit once, so whole
@@ -206,7 +221,7 @@ class Times:
   `np.datetime64`, compare as instants in NumPy.
 - `repr` shows `epoch=...` when set.
 
-`TimeSeries` exposes it as `series.epoch`, a `np.datetime64` or `None`. It
+`TimeSeries` exposes it as `series.epoch`, a `DateTime` or `None`. It
 is a single value even for several channels: `from_channels` and
 `with_epoch` keep every channel of a series on the same epoch, and nothing
 else sets one, so the channels never disagree.
@@ -233,8 +248,8 @@ TimeSeries.with_epoch(epoch) -> TimeSeries
   usually simpler.
 - `TimeSeriesTensor` gets no `with_epoch`; set it on the series before
   windowing, or per element.
-- C++: `Times::with_epoch(std::optional<Epoch>)` and
-  `TimeSeries::with_epoch(std::optional<Epoch>)`.
+- C++: `Times::with_epoch(std::optional<DateTime>)` and
+  `TimeSeries::with_epoch(std::optional<DateTime>)`.
 
 ### Propagation
 
@@ -250,7 +265,7 @@ TimeSeries.with_epoch(epoch) -> TimeSeries
 
 ### C++
 
-- `Times` gains `std::optional<Epoch> m_epoch`, where `Epoch` is an `int64_t`
+- `Times` gains `std::optional<DateTime> m_epoch`, where `DateTime` is an `int64_t`
   count and a `TimeUnit`, the exact value of a `datetime64` at its own
   resolution. No float is involved, so an epoch round-trips exactly. Two
   epochs are equal when they have the same count at the same resolution;
@@ -260,8 +275,8 @@ TimeSeries.with_epoch(epoch) -> TimeSeries
   Gregorian calendar, and 86400 seconds in every day, so leap seconds are
   not counted. Across a leap second, `epoch + t` can differ from UTC by up
   to a second, as in NumPy, pandas, and Python's `datetime`.
-- `Epoch` can be built from a `std::chrono::sys_time` at any resolution
-  that is a `TimeUnit`, such as `Epoch(sys_days{2023y / January / 1})`.
+- `DateTime` can be built from a `std::chrono::sys_time` at any resolution
+  that is a `TimeUnit`, such as `DateTime(sys_days{2023y / January / 1})`.
 - `Times::to` copies it; `Times::operator==` compares it.
 - Windowing, which builds new `Times` for each window channel, copies the
   source channel's epoch.
@@ -272,7 +287,7 @@ TimeSeries.with_epoch(epoch) -> TimeSeries
   for the origin.
 
 The `datetime64` array constructor is Python-only; C++ takes numbers and an
-optional `Epoch`.
+optional `DateTime`.
 
 ## Dates as time points
 

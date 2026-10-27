@@ -1,9 +1,11 @@
 
+import datetime
+
 import numpy as np
 import pytest
 
 import stablebear as sb
-from stablebear.timeseries import Domain, TimeDelayEmbedding, Times, TimeSeries, Window
+from stablebear.timeseries import DateTime, Domain, TimeDelayEmbedding, Times, TimeSeries, Window
 
 from _element_values import TWO_ELEMENTS_OF_EVERY_DTYPE
 from _round_trip import ROUND_TRIPS
@@ -36,6 +38,7 @@ def test_times_rejects_invalid_input(times, unit):
     ("seconds", "s"),
     ("hr", "h"),
     ("msec", "ms"),
+    ("D", "d"),
     ("\u00b5s", "us"),  # micro sign
     ("\u03bcs", "us"),  # Greek small letter mu
 ])
@@ -73,6 +76,59 @@ def test_series_defaults_to_seconds_and_one_channel():
     assert series.shape == ()
     assert len(series) == 3
     assert np.array_equal(np.asarray(series.values), [10.0, 20.0, 30.0])
+
+
+@pytest.mark.parametrize("value, unit, expected", [
+    pytest.param("2023-01-01", "d", np.datetime64("2023-01-01", "D"), id="str"),
+    pytest.param(np.datetime64("2023-01-01T12:30", "m"), "min", np.datetime64("2023-01-01T12:30", "m"),
+                 id="datetime64"),
+    pytest.param(datetime.datetime(2023, 1, 1, 12, 30), "us", np.datetime64("2023-01-01T12:30", "us"),
+                 id="datetime"),
+    pytest.param(datetime.date(2023, 1, 1), "d", np.datetime64("2023-01-01", "D"), id="date"),
+])
+def test_date_time_keeps_the_resolution_of_its_value(value, unit, expected):
+    date_time = DateTime(value)
+
+    assert date_time.unit == unit
+    assert date_time.to_datetime64() == expected
+    assert date_time.to_datetime64().dtype == expected.dtype
+
+
+def test_date_time_converts_back_to_the_same_datetime64():
+    value = np.datetime64("2023-01-01T12:30:15.250", "ms")
+
+    result = DateTime(value).to_datetime64()
+
+    assert result == value
+    assert result.dtype == value.dtype
+
+
+def test_date_times_are_equal_only_at_the_same_resolution():
+    # A string date and a date count days; a datetime counts microseconds.
+    assert DateTime("2023-01-01") == DateTime(datetime.date(2023, 1, 1))
+    assert DateTime("2023-01-01") != DateTime("2023-01-02")
+    assert DateTime("2023-01-01") != DateTime(datetime.datetime(2023, 1, 1))
+
+
+def test_date_time_repr_shows_the_date():
+    assert repr(DateTime("2023-01-01T12:30")) == "DateTime('2023-01-01T12:30')"
+
+
+@pytest.mark.parametrize("value", [
+    pytest.param(datetime.datetime(2023, 1, 1, tzinfo=datetime.timezone.utc), id="timezone"),
+    pytest.param(np.datetime64("2023-01-02", "W"), id="weeks"),
+    pytest.param(np.datetime64("2023-01", "M"), id="months"),
+    pytest.param(np.datetime64("2023", "Y"), id="years"),
+    pytest.param(np.datetime64("NaT"), id="nat"),
+])
+def test_date_time_rejects_values_without_a_fixed_instant_or_resolution(value):
+    with pytest.raises(ValueError):
+        DateTime(value)
+
+
+def test_date_time_rejects_a_number():
+    with pytest.raises(TypeError):
+        DateTime(0)
 
 
 def test_series_keeps_explicit_unit():

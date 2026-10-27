@@ -86,7 +86,7 @@ namespace sb
       {"sec", TimeUnit::Seconds}, {"second", TimeUnit::Seconds}, {"seconds", TimeUnit::Seconds},
       {"minute", TimeUnit::Minutes}, {"minutes", TimeUnit::Minutes},
       {"hr", TimeUnit::Hours}, {"hour", TimeUnit::Hours}, {"hours", TimeUnit::Hours},
-      {"day", TimeUnit::Days}, {"days", TimeUnit::Days},
+      {"day", TimeUnit::Days}, {"days", TimeUnit::Days}, {"D", TimeUnit::Days},  // NumPy's spelling
       {"msec", TimeUnit::Milliseconds}, {"usec", TimeUnit::Microseconds},
     });
 
@@ -172,25 +172,25 @@ namespace sb
   /// a NumPy datetime64 at its own resolution. As in NumPy and
   /// std::chrono::sys_time, dates follow the Gregorian calendar and every day
   /// has 86400 seconds: leap seconds are not counted.
-  struct Epoch
+  struct DateTime
   {
     int64_t count;
     TimeUnit unit;
 
-    constexpr Epoch(int64_t count, TimeUnit unit) noexcept : count(count), unit(unit) {}
+    constexpr DateTime(int64_t count, TimeUnit unit) noexcept : count(count), unit(unit) {}
 
     /// The instant @p time, at its resolution, such as
-    /// Epoch(std::chrono::sys_days{2023y / January / 1}).
+    /// DateTime(std::chrono::sys_days{2023y / January / 1}).
     template <typename Duration>
       requires std::integral<typename Duration::rep>
-    constexpr explicit Epoch(std::chrono::sys_time<Duration> time) noexcept
-      : Epoch(static_cast<int64_t>(time.time_since_epoch().count()), detail::time_unit_of<typename Duration::period>())
+    constexpr explicit DateTime(std::chrono::sys_time<Duration> time) noexcept
+      : DateTime(static_cast<int64_t>(time.time_since_epoch().count()), detail::time_unit_of<typename Duration::period>())
     {
     }
 
     /// The same count at the same resolution; the same instant at another
-    /// resolution is a different epoch.
-    bool operator==(const Epoch&) const = default;
+    /// resolution is a different DateTime.
+    bool operator==(const DateTime&) const = default;
   };
 
   /// One-dimensional, finite, strictly increasing timestamps in one unit,
@@ -200,7 +200,7 @@ namespace sb
   {
   public:
     explicit Times(std::vector<float64_t> values, TimeUnit unit = TimeUnit::Seconds,
-                   std::optional<Epoch> epoch = std::nullopt)
+                   std::optional<DateTime> epoch = std::nullopt)
       : m_values(std::move(values)), m_unit(unit), m_epoch(epoch)
     {
       for (size_t i = 0; i < m_values.size(); ++i)
@@ -221,11 +221,11 @@ namespace sb
     [[nodiscard]] size_t size() const noexcept { return m_values.size(); }
 
     /// The instant time 0 stands for, if any.
-    [[nodiscard]] const std::optional<Epoch>& epoch() const noexcept { return m_epoch; }
+    [[nodiscard]] const std::optional<DateTime>& epoch() const noexcept { return m_epoch; }
 
     /// The same timestamps counted from @p epoch, or from none; no time is
     /// shifted.
-    [[nodiscard]] Times with_epoch(std::optional<Epoch> epoch) const
+    [[nodiscard]] Times with_epoch(std::optional<DateTime> epoch) const
     {
       auto times = *this;
       times.m_epoch = epoch;
@@ -276,7 +276,7 @@ namespace sb
   private:
     std::vector<float64_t> m_values;
     TimeUnit m_unit;
-    std::optional<Epoch> m_epoch;
+    std::optional<DateTime> m_epoch;
     float64_t m_origin = 0.0;
   };
 
