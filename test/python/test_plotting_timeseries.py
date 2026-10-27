@@ -3,6 +3,8 @@ import pytest
 
 from plot_helpers import FigureGallery, gallery_fixture, ax_fixture
 
+import stablebear as sb
+from stablebear.persistence import Barcode, BarcodeTensor
 from stablebear.plotting import plot_timeseries
 from stablebear.timeseries import Times, TimeSeries, Window
 
@@ -277,3 +279,16 @@ def test_series_with_different_epochs_land_at_their_own_dates(ax):
     second, = plot_timeseries(later, ax=ax)
 
     assert second.get_xdata()[0] - first.get_xdata()[0] == np.timedelta64(1, "D")
+
+
+@pytest.mark.parametrize("values, dtype_name", [
+    pytest.param(lambda: sb.PointCloudTensor([np.zeros((1, 2)), np.ones((2, 2))], dtype=sb.pcloud64), "pcloud64",
+                 id="point-clouds"),
+    pytest.param(lambda: BarcodeTensor([Barcode(np.array([[0.0, 1.0]])), Barcode(np.array([[0.0, 2.0]]))]),
+                 "barcode64", id="barcodes"),
+])
+def test_time_series_of_non_numbers_raise(values, dtype_name, ax):
+    series = TimeSeries(values(), times=[0.0, 1.0])
+
+    with pytest.raises(TypeError, match=dtype_name):
+        plot_timeseries(series, ax=ax)

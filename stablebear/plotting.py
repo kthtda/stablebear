@@ -7,6 +7,7 @@ from .persistence.barcode import Barcode
 from .persistence.ph_tensor import BarcodeTensor
 from .reductions import max_time as max_time_reduction
 from .base_tensor import IntPcfTensor, PcfContainerLike, PcfTensor, _to_tensor_pcf
+from .typing import boolean, float32, float64, int32, int64, uint32, uint64
 
 
 def plot(f: PcfContainerLike, fmt="", ax=None, auto_label=False, max_time=None, **kwargs):
@@ -374,6 +375,9 @@ def _time_axis_unit(ax, unit, requested):
     return current
 
 
+_NUMERIC_DTYPES = (float32, float64, int32, int64, uint32, uint64, boolean)
+
+
 def _channel_rows(n_channels):
     """A new figure with one row of axes per channel, sharing the x axis."""
     _, axes = plt.subplots(n_channels, 1, sharex=True, squeeze=False)
@@ -456,8 +460,9 @@ def plot_timeseries(series, ax=None, *, unit=None, relative=False, markers=False
         dimension; for a time series with an epoch, if ``unit`` is given
         or the x axis has a time unit, unless ``relative`` is true.
     TypeError
-        If the x axis holds dates or other values that are not times, for a
-        time series drawn at times.
+        If the observations are not numbers, such as point clouds or
+        barcodes, or if the x axis holds dates or other values that are not
+        times, for a time series drawn at times.
 
     Notes
     -----
@@ -482,6 +487,8 @@ def plot_timeseries(series, ax=None, *, unit=None, relative=False, markers=False
     if series.n_channels > 1:
         return _plot_channels(series, _channel_rows(series.n_channels) if ax is None else _rows(ax, series.n_channels),
                               **options)
+    if series.dtype not in _NUMERIC_DTYPES:
+        raise TypeError(f"Can only plot time series of numbers, not of {series.dtype}")
     ax = plt.gca() if ax is None else ax
     dated = series.epoch is not None and not relative
     if dated:
