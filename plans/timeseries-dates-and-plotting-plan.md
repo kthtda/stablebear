@@ -1,6 +1,6 @@
 # Time series dates and plotting: implementation plan
 
-Progress: 43 of 47 items, 79 of 86 points (92%)
+Progress: 44 of 47 items, 81 of 86 points (94%)
 
 Spec: [timeseries-dates-and-plotting-spec.md](timeseries-dates-and-plotting-spec.md)
 
@@ -232,7 +232,7 @@ Python cannot observe gets a new `test/test_timeseries.cpp`.
     on one date axis land at their own dates.
 - [x] **F8.** [1] (b0008787d) Non-numeric dtypes raise `TypeError` naming the dtype.
   Tests: a point cloud series and a barcode series raise.
-- [ ] **F9.** [2] Docs: point to `docs/timeseries_plotting.rst` from
+- [x] **F9.** [2] (352eb0a01) Docs: point to `docs/timeseries_plotting.rst` from
   `docs/plotting.rst` and update `docs/api_plotting.rst`; check that the
   page covers every option.
   Note: from F1 on, each item adds its figures to
