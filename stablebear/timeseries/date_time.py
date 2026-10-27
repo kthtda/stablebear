@@ -21,7 +21,7 @@ class DateTime:
     1970-01-01T00:00, as a ``np.datetime64`` stores it. The epoch of
     :class:`Times`, the instant its time 0 stands for, is one.
 
-    As in NumPy, dates follow the Gregorian calendar and every day has 86400
+    Dates follow the Gregorian calendar and every day has 86400
     seconds: leap seconds are not counted.
 
     Parameters
