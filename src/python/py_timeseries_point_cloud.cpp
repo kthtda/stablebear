@@ -1,6 +1,5 @@
 #include "py_timeseries_bind.hpp"
 
-#include <sbear/distance_matrix.hpp>
 #include <sbear/point_cloud.hpp>
 
 namespace sb_py
@@ -9,7 +8,5 @@ namespace sb_py
   {
     register_typed_timeseries<sb::PointCloud<sb::float32_t>>(m, "PointCloud32");
     register_typed_timeseries<sb::PointCloud<sb::float64_t>>(m, "PointCloud64");
-    register_typed_timeseries<sb::DistanceMatrix<sb::float32_t>>(m, "DistanceMatrix32");
-    register_typed_timeseries<sb::DistanceMatrix<sb::float64_t>>(m, "DistanceMatrix64");
   }
 }

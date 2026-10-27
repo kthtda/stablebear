@@ -169,7 +169,10 @@ namespace sb
         // The window can be evaluated up to its end, and at it if closed. A
         // closed end at or before the last time held needs no end: the
         // window ends at that timestamp.
-        auto window = channel.take(Times(std::move(at), channel.unit()), std::move(indices));
+        // Time 0 of the window is the shift in the channel; the origin
+        // places it in the first series the channel was cut from.
+        auto window = channel.take(channel.times_like(std::move(at)).with_origin(channel.origin() + shift),
+                                   std::move(indices));
         const auto end = to - shift;
         const auto lastAt = window.time(window.size() - 1);
         if (!(stopClosed && end <= lastAt))

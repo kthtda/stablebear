@@ -523,6 +523,7 @@ SET(SB_HEADER_FILES
 
 SET(SB_SRC_FILES
     executor.cpp
+    io.cpp
     io_stream.cpp)
 
 list(TRANSFORM SB_HEADER_FILES PREPEND "include/sbear/")
@@ -574,7 +575,9 @@ SET(SB_PY_SOURCES
     py_symmetric_matrix.hpp py_symmetric_matrix.cpp
     py_distance_matrix.hpp py_distance_matrix.cpp
     py_timeseries.hpp py_timeseries.cpp py_timeseries_bind.hpp
-    py_timeseries_pcf.cpp py_timeseries_point_cloud.cpp py_timeseries_matrix_barcode.cpp
+    py_timeseries_float.cpp py_timeseries_int.cpp py_timeseries_uint.cpp
+    py_timeseries_pcf.cpp py_timeseries_pcf_int.cpp py_timeseries_point_cloud.cpp
+    py_timeseries_distance_matrix.cpp py_timeseries_symmetric_matrix.cpp py_timeseries_barcode.cpp
     py_timeseries_derived.hpp py_timeseries_derived.cpp
     ${SB_PY_PERSISTENCE_SOURCES}
     ${SB_PY_POINT_PROCESS_SOURCES}
@@ -590,7 +593,7 @@ SET(SB_VERSION_SOURCE ${CMAKE_CURRENT_BINARY_DIR}/version.cpp)
 source_group("Functional"               REGULAR_EXPRESSION "include/sbear/functional/.*")
 source_group("Functional/Bindings"      REGULAR_EXPRESSION "src/python/functional/.*")
 source_group("Algorithms"               REGULAR_EXPRESSION "include/sbear/algorithms/.*")
-source_group("IO"                       REGULAR_EXPRESSION "(include/sbear/io[./].*|src/io_stream\\.cpp)")
+source_group("IO"                       REGULAR_EXPRESSION "(include/sbear/io[./].*|src/io(_stream)?\\.cpp)")
 source_group("IO/Bindings"             REGULAR_EXPRESSION "src/python/py_io\\.(h|cpp)")
 source_group("Persistence"             REGULAR_EXPRESSION "include/sbear/persistence/.*")
 source_group("Persistence/Bindings"    REGULAR_EXPRESSION "src/python/persistence/.*")

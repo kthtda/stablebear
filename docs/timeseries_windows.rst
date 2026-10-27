@@ -52,6 +52,20 @@ window ``i`` at ``t[j]``::
    windows(1.0)[1]      # 1.0, the value of signal at 3 s
    windows([0.0, 1.0])  # [[0.0, 0.0], [0.0, 1.0], [2.0, 3.0]], shape (3, 2)
 
+A window also keeps where it was cut from.
+:py:attr:`~stablebear.timeseries.TimeSeries.origin` is the time in
+``signal`` that the window's time 0 stands for, so an observation at time
+``t`` in the window was at ``origin + t`` in ``signal``::
+
+   windows[1].origin  # 2.0
+
+Here the origins are the starts in ``bounds``. They differ only when a start
+falls just short of an observation and snaps to it (see
+:doc:`timeseries_snapping`): the bound keeps the computed start, and the
+origin is the observation's time. Evaluation does not use the origin, and
+:py:meth:`~stablebear.timeseries.TimeSeries.array_equal` ignores it, so
+windows with the same contents cut from different places are equal.
+
 Anchoring
 ---------
 

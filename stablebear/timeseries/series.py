@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+import datetime
 import operator
-from typing import Generic, TypeVar
+from typing import Generic, NamedTuple, TypeVar
 
 import numpy as np
 
@@ -14,6 +15,7 @@ from ..functional.pcf import Pcf
 from ..nested_tensor import NestedTensor, _leaf_wrappers
 from ..point_cloud import PointCloud
 from ..symmetric_matrix import SymmetricMatrix
+from .date_time import _NUMPY_TO_UNIT, _UNIT_TO_NUMPY, DateTime
 from ..typing import (
     _NATIVE_SUFFIX,
     barcode32,
@@ -41,6 +43,37 @@ from ..typing import (
 T = TypeVar("T")
 
 
+def _checked_dates(dates):
+    """``dates``, a ``datetime64`` array, with no ``NaT`` and a resolution of
+    fixed length."""
+    if np.isnat(dates).any():
+        raise ValueError("Dates and times cannot be NaT")
+    code, _ = np.datetime_data(dates.dtype)
+    if code not in _NUMPY_TO_UNIT:
+        raise ValueError(f"Dates and times need a resolution of fixed length, not {code!r}")
+    return dates
+
+
+def _times_from_datetimes(stamps, unit, epoch):
+    """The native times of ``datetime64`` stamps counted from ``epoch``, or
+    from the first stamp, in ``unit``."""
+    if epoch is None:
+        if stamps.size == 0:
+            raise ValueError("Pass an epoch for an empty array of dates and times")
+        epoch = stamps.reshape(-1)[0]
+    epoch = DateTime(epoch)
+    # Integer differences at the finer of the two resolutions; Times.to then
+    # converts them to unit by one exact factor.
+    offsets = stamps - epoch.to_datetime64()
+    if np.isnat(offsets).any():
+        raise ValueError("Dates and times cannot be NaT")
+    code, step = np.datetime_data(offsets.dtype)
+    if code not in _NUMPY_TO_UNIT:
+        raise ValueError(f"Dates and times need a resolution of fixed length, not {code!r}")
+    counts = offsets.astype(np.int64).astype(np.float64) * step
+    return cpp.Times(counts, _NUMPY_TO_UNIT[code], epoch._data).to(unit)
+
+
 class Times:
     """Finite, strictly increasing timestamps in one physical time unit.
 
@@ -51,12 +84,19 @@ class Times:
     Parameters
     ----------
     times : array_like
-        One-dimensional timestamps, converted to float64.
+        One-dimensional timestamps, converted to float64, or a ``datetime64``
+        array of dates and times. Dates and times are counted from
+        ``epoch``, which defaults to the first of them, and converted to
+        ``unit``: the differences are taken in integers and converted by one
+        exact factor, so whole multiples of ``unit`` are exact.
     unit : str, optional
         One of ``"as"``, ``"fs"``, ``"ps"``, ``"ns"``, ``"us"``, ``"ms"``,
         ``"s"``, ``"min"``, ``"h"``, and ``"d"``, or an alias such as
         ``"sec"``, ``"seconds"``, ``"hr"``, ``"\u00b5s"``, or ``"msec"``.
         Defaults to seconds. :attr:`unit` reports the short name.
+    epoch : DateTime or a value DateTime accepts, optional
+        The date and time that time 0 stands for, such as
+        ``"2023-01-01"``. Defaults to none: the timestamps are durations.
 
     Raises
     ------
@@ -65,8 +105,14 @@ class Times:
         increasing, or if the unit is unknown.
     """
 
-    def __init__(self, times, unit: str = "s"):
-        self._data = cpp.Times(np.asarray(times, dtype=np.float64), unit)
+    def __init__(self, times, unit: str = "s", *, epoch=None):
+        times = np.asarray(times)
+        if np.issubdtype(times.dtype, np.datetime64):
+            self._data = _times_from_datetimes(times, unit, epoch)
+            return
+        if epoch is not None:
+            epoch = DateTime(epoch)._data
+        self._data = cpp.Times(np.asarray(times, dtype=np.float64), unit, epoch)
 
     @classmethod
     def _from_cpp(cls, data):
@@ -79,8 +125,46 @@ class Times:
         """The time unit, such as ``"s"`` or ``"ms"``."""
         return self._data.unit
 
+    @property
+    def epoch(self) -> DateTime | None:
+        """The date and time that time 0 stands for, or ``None``."""
+        data = self._data.epoch
+        return None if data is None else DateTime._from_cpp(data)
+
+    def with_epoch(self, epoch) -> Times:
+        """Return the same timestamps counted from ``epoch``.
+
+        ``epoch`` is a :class:`DateTime` or a value it accepts, or ``None``
+        to remove the epoch. No timestamp is shifted.
+        """
+        if epoch is not None:
+            epoch = DateTime(epoch)._data
+        return Times._from_cpp(self._data.with_epoch(epoch))
+
+    def to_datetime64(self, resolution: str = "us") -> np.ndarray:
+        """The timestamps as dates and times.
+
+        Each timestamp ``t`` becomes ``epoch + origin + t``, rounded to the
+        nearest step of ``resolution``, where ``origin`` places a window in
+        the series it was cut from. ``resolution`` is one of the units of
+        :class:`Times`. The default, microseconds, reaches about 290,000
+        years either side of 1970; nanoseconds reach 1678 to 2262.
+
+        Raises
+        ------
+        ValueError
+            If the timestamps have no epoch, or ``resolution`` is unknown.
+        """
+        if self.epoch is None:
+            raise ValueError("These times have no epoch; set one with with_epoch")
+        # One exact factor to the resolution, then one rounding.
+        converted = self._data.to(resolution)
+        code = _UNIT_TO_NUMPY[converted.unit]
+        steps = np.rint(np.asarray(converted.values) + converted.origin).astype(np.int64)
+        return self.epoch.to_datetime64().astype(f"datetime64[{code}]") + steps.astype(f"timedelta64[{code}]")
+
     def to(self, unit: str) -> Times:
-        """Return the same timestamps in another unit.
+        """Return the same timestamps in another unit, from the same epoch.
 
         The conversion multiplies or divides each timestamp by an exact
         integer factor, so each result is rounded once. Only the factor
@@ -104,7 +188,8 @@ class Times:
         return self._data == other._data
 
     def __repr__(self):
-        return f"Times({np.asarray(self).tolist()!r}, unit={self.unit!r})"
+        epoch = "" if self.epoch is None else f", epoch={self.epoch!r}"
+        return f"Times({np.asarray(self).tolist()!r}, unit={self.unit!r}{epoch})"
 
 
 # Element dtype -> native series class. The tensor class wrapping the values
@@ -178,6 +263,23 @@ def _values_tensor(values):
     return values
 
 
+class Domain(NamedTuple):
+    """The times at which a series can be evaluated, from ``start`` to ``end``.
+
+    ``start_closed`` and ``end_closed`` say whether ``start`` and ``end``
+    themselves are included.
+    """
+
+    #: The first time in the domain, or its lower bound if not included.
+    start: float
+    #: The last time in the domain, or its upper bound if not included.
+    end: float
+    #: Whether ``start`` is in the domain.
+    start_closed: bool
+    #: Whether ``end`` is in the domain.
+    end_closed: bool
+
+
 class TimeSeries(_BinaryIoMixin, Generic[T]):
     """Observations recorded at known times, in one or more channels.
 
@@ -198,7 +300,7 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
     start to its end, which may exclude its start and extend past its last
     observation, and a delay embedding (:class:`TimeDelayEmbedding`) keeps
     the ends of its channel's domain. A series can be evaluated where all
-    of its channels can.
+    of its channels can; :attr:`domain` gives these times.
 
     Element-wise operations, such as
     :func:`~stablebear.persistence.compute_persistent_homology`, accept a
@@ -218,7 +320,10 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         uint32, uint64, and bool are kept, other floats become float64,
         and other integers become int64.
     times : Times or array_like
-        One timestamp per observation. A plain array is in seconds.
+        One timestamp per observation. A plain array is in seconds; a
+        ``datetime64`` array is counted in seconds from its first date and
+        time, which becomes the epoch. Pass :class:`Times` to choose the
+        unit or the epoch.
     snap_tolerance : float, optional
         How close below an observation a query may land and still get that
         observation, relative to the magnitude of the timestamps, as in the
@@ -280,8 +385,11 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         Raises
         ------
         ValueError
-            If there are no channels, a channel has several channels, or
-            ``unit`` is omitted while the channels' units differ.
+            If there are no channels, a channel has several channels,
+            ``unit`` is omitted while the channels' units differ, or the
+            channels do not share their :attr:`epoch`: all the same, at the
+            same resolution, or none. To combine dated channels, count each
+            one's times from one shared epoch with ``Times(..., epoch=...)``.
         TypeError
             If a channel is not a ``TimeSeries`` or the channels have
             different element types.
@@ -366,6 +474,94 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         return shapes[0] if len(shapes) == 1 else shapes
 
     @property
+    def origin(self) -> float | FloatTensor:
+        """The time in the series a channel was cut from that its time 0
+        stands for, in :attr:`unit`.
+
+        0 for a series built from observations. Evaluation does not use it;
+        it places a window in the series it was cut from. A float for a
+        series with one channel; for several, a float64 ``FloatTensor`` with
+        one entry per channel.
+        """
+        origins = [self._data.origin(i) for i in range(self.n_channels)]
+        if len(origins) == 1:
+            return origins[0]
+        return FloatTensor(origins, dtype=float64)
+
+    @property
+    def epoch(self) -> DateTime | None:
+        """The date and time that time 0 stands for, or ``None``.
+
+        One value even for several channels, which share their epoch.
+        """
+        data = self._data.epoch
+        return None if data is None else DateTime._from_cpp(data)
+
+    def with_epoch(self, epoch) -> TimeSeries:
+        """Return the same series with every channel counted from ``epoch``.
+
+        ``epoch`` is a :class:`DateTime` or a value it accepts, or ``None``
+        to remove the epoch. No time is shifted, and the observations are
+        shared, not copied. The epoch is the date of time 0 of the series a
+        window was cut from, so a window keeps its :attr:`origin`.
+        """
+        if epoch is not None:
+            epoch = DateTime(epoch)._data
+        return TimeSeries._from_cpp(self._data.with_epoch(epoch))
+
+    @property
+    def domain(self) -> Domain:
+        """The times at which every channel can be evaluated, in :attr:`unit`.
+
+        For several channels, the intersection of their domains, which
+        :meth:`evaluate` checks queries against.
+
+        Raises
+        ------
+        ValueError
+            If a channel has no observations.
+        """
+        return Domain(*self._data.domain)
+
+    def bounds(self, *, dates: bool = False, resolution: str = "us") -> Domain | tuple[Domain, ...]:
+        """Where each channel lies in the series it was cut from.
+
+        The :attr:`domain` of each channel, where it is evaluated, with its
+        :attr:`origin` added to both ends, in :attr:`unit`, and the same closed ends. For a series
+        built from observations, the origin is 0 and these are its domains.
+        For a window, they are where it lies in the series it was cut from,
+        after snapping; the bounds returned by :class:`Window` are the
+        times before snapping, shared by all channels.
+
+        A :class:`Domain` for a series with one channel; for several, a
+        tuple with one per channel, in channel order. The channels are not
+        intersected, because their origins can differ.
+
+        With ``dates=True``, the ends are dates and times instead,
+        ``np.datetime64`` values at ``resolution`` as
+        :meth:`Times.to_datetime64` gives them.
+
+        Raises
+        ------
+        ValueError
+            If ``dates`` is true and the series has no :attr:`epoch`.
+        """
+        if dates and self.epoch is None:
+            raise ValueError("This series has no epoch to give dates and times; set one with with_epoch")
+
+        def end_of(t):
+            if not dates:
+                return t
+            return Times([t], unit=self.unit, epoch=self.epoch).to_datetime64(resolution)[0]
+
+        bounds = []
+        for i in range(self.n_channels):
+            start, end, start_closed, end_closed = self._data.select([i]).domain
+            origin = self._data.origin(i)
+            bounds.append(Domain(end_of(start + origin), end_of(end + origin), start_closed, end_closed))
+        return bounds[0] if len(bounds) == 1 else tuple(bounds)
+
+    @property
     def n_observations(self) -> int | IntTensor:
         """The number of recorded observations.
 
@@ -404,7 +600,12 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
     def array_equal(self, other) -> bool:
         """Whether ``other`` is a series of the same dtype and unit whose
         channels have the same timestamps, values, snap tolerance, and
-        start and end."""
+        start and end.
+
+        :attr:`origin` is not compared: it places a series but does not
+        change how it evaluates, so two windows with the same contents cut
+        from different places are equal.
+        """
         return (isinstance(other, TimeSeries) and other.dtype is self.dtype
                 and self._data.array_equal(other._data))
 
@@ -418,7 +619,14 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
 
         ``t`` is a single time or an array-like or ``FloatTensor`` of times
         of shape ``t_shape``. Many times are evaluated together: they are
-        sorted once and merged with each channel's timestamps.
+        sorted once and merged with each channel's timestamps. Numeric times
+        count from the series' own time 0, which for a window is its start.
+        For a series with an :attr:`epoch`, ``t`` may also be a date and
+        time, as anything :class:`DateTime` accepts, such as
+        ``"2023-01-01T12:30"``, or an array of them. A
+        date names an instant, not an offset: it is placed at
+        ``t - epoch - origin`` in each channel, so a window gives the value
+        it held at that instant, as the series it was cut from does.
 
         For one channel and a single time, returns a scalar or element for
         observations of shape ``()``, otherwise a tensor of that shape; for
@@ -433,6 +641,19 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
             If a time is outside the domain of any channel, or a channel has
             no observations, or if ``unit`` is unknown.
         """
+        if isinstance(t, (str, datetime.date, np.datetime64)):
+            if unit is not None:
+                raise TypeError("A date and time has no unit; pass unit only with numeric times")
+            return self._evaluate_date(DateTime(t).to_datetime64())
+        if isinstance(t, (list, tuple, np.ndarray)) and np.asarray(t).dtype.kind in "MOUS":
+            # Dates and times, as datetime64, strings, or datetimes.
+            try:
+                dates = np.asarray(t, dtype="datetime64")
+            except (TypeError, ValueError):
+                raise TypeError("Times must be all numbers or all dates and times, not a mix") from None
+            if unit is not None:
+                raise TypeError("Dates and times have no unit; pass unit only with numeric times")
+            return self._evaluate_date(_checked_dates(dates))
         if isinstance(t, (int, float, np.integer, np.floating)):
             values = NestedTensor._from_cpp(self._data.evaluate(float(t), unit))
             if self.n_channels > 1:
@@ -446,6 +667,53 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
     def __call__(self, t, unit: str | None = None):
         """``series(t, unit)`` is ``series.evaluate(t, unit)``."""
         return self.evaluate(t, unit)
+
+    def _time_of_date(self, date, channel):
+        """The time of ``date`` in channel ``channel``, in :attr:`unit`:
+        ``date - epoch - origin``, with the difference taken in integers."""
+        offset = date - self.epoch.to_datetime64()
+        return offset / np.timedelta64(1, _UNIT_TO_NUMPY[self.unit]) - self._data.origin(channel)
+
+    def _check_date_in_domain(self, date, t, channel):
+        """Raise naming ``date`` and the domain of channel ``channel`` as dates
+        if a time ``t`` is outside it."""
+        start, end, start_closed, end_closed = self._data.select([channel]).domain
+        t = np.asarray(t)
+        inside = (((t > start) | (start_closed & (t == start)))
+                  & ((t < end) | (end_closed & (t == end))))
+        if inside.all():
+            return
+        first = np.asarray(date).reshape(-1)[np.argmin(inside.reshape(-1))]
+        origin = self._data.origin(channel)
+        ends = Times([start + origin, end + origin], unit=self.unit, epoch=self.epoch).to_datetime64()
+        # Formatted at one precision, the coarsest that shows all three.
+        dates = np.array([first, *ends], dtype=ends.dtype)
+        precision = next(code for code in ("m", "s", "ms", "us") if (dates == dates.astype(f"datetime64[{code}]")).all())
+        first, start, end = np.datetime_as_string(dates, unit=precision)
+        domain = ("[" if start_closed else "(") + f"{start}, {end}" + ("]" if end_closed else ")")
+        raise ValueError(f"{first} is outside the domain {domain}")
+
+    def _evaluate_date(self, date):
+        """Evaluate at ``date``, one date or an array of them, placing it in
+        each channel by its origin."""
+        if self.epoch is None:
+            raise ValueError("This series has no epoch to place dates and times; set one with with_epoch")
+
+        def query(channel):
+            t = self._time_of_date(date, channel)
+            self._check_date_in_domain(date, t, channel)
+            return float(t) if np.ndim(t) == 0 else FloatTensor(np.asarray(t, dtype=np.float64))
+
+        if self.n_channels == 1:
+            return self.evaluate(query(0))
+        # Channels of a window can have different origins, so each is
+        # queried at its own time.
+        leaves = []
+        for i in range(self.n_channels):
+            t = query(i)
+            native = self._data.select([i]).evaluate(t if isinstance(t, float) else t._data, None)
+            leaves.append(NestedTensor._from_cpp(native)[0])
+        return NestedTensor(leaves)
 
     def __len__(self) -> int:
         """The number of recorded observations of a one-channel series.

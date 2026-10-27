@@ -9,7 +9,9 @@
 
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <cmath>
+#include <concepts>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -20,6 +22,7 @@
 #include <numeric>
 #include <span>
 #include <optional>
+#include <ratio>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -83,7 +86,7 @@ namespace sb
       {"sec", TimeUnit::Seconds}, {"second", TimeUnit::Seconds}, {"seconds", TimeUnit::Seconds},
       {"minute", TimeUnit::Minutes}, {"minutes", TimeUnit::Minutes},
       {"hr", TimeUnit::Hours}, {"hour", TimeUnit::Hours}, {"hours", TimeUnit::Hours},
-      {"day", TimeUnit::Days}, {"days", TimeUnit::Days},
+      {"day", TimeUnit::Days}, {"days", TimeUnit::Days}, {"D", TimeUnit::Days},  // NumPy's spelling
       {"msec", TimeUnit::Milliseconds}, {"usec", TimeUnit::Microseconds},
     });
 
@@ -145,12 +148,60 @@ namespace sb
     return den == 1 ? value * num : value / den;
   }
 
-  /// One-dimensional, finite, strictly increasing timestamps in one unit.
+  namespace detail
+  {
+    /// The time unit of a std::chrono period, at compile time.
+    template <typename Period>
+    constexpr TimeUnit time_unit_of()
+    {
+      if constexpr (std::ratio_equal_v<Period, std::atto>) return TimeUnit::Attoseconds;
+      else if constexpr (std::ratio_equal_v<Period, std::femto>) return TimeUnit::Femtoseconds;
+      else if constexpr (std::ratio_equal_v<Period, std::pico>) return TimeUnit::Picoseconds;
+      else if constexpr (std::ratio_equal_v<Period, std::nano>) return TimeUnit::Nanoseconds;
+      else if constexpr (std::ratio_equal_v<Period, std::micro>) return TimeUnit::Microseconds;
+      else if constexpr (std::ratio_equal_v<Period, std::milli>) return TimeUnit::Milliseconds;
+      else if constexpr (std::ratio_equal_v<Period, std::ratio<1>>) return TimeUnit::Seconds;
+      else if constexpr (std::ratio_equal_v<Period, std::ratio<60>>) return TimeUnit::Minutes;
+      else if constexpr (std::ratio_equal_v<Period, std::ratio<3600>>) return TimeUnit::Hours;
+      else if constexpr (std::ratio_equal_v<Period, std::ratio<86400>>) return TimeUnit::Days;
+      else static_assert(sizeof(Period) == 0, "No time unit has this period");
+    }
+  }
+
+  /// A calendar instant: @p count units after 1970-01-01T00:00, the value of
+  /// a NumPy datetime64 at its own resolution. As in NumPy and
+  /// std::chrono::sys_time, dates follow the Gregorian calendar and every day
+  /// has 86400 seconds: leap seconds are not counted.
+  struct DateTime
+  {
+    int64_t count;
+    TimeUnit unit;
+
+    constexpr DateTime(int64_t count, TimeUnit unit) noexcept : count(count), unit(unit) {}
+
+    /// The instant @p time, at its resolution, such as
+    /// DateTime(std::chrono::sys_days{2023y / January / 1}).
+    template <typename Duration>
+      requires std::integral<typename Duration::rep>
+    constexpr explicit DateTime(std::chrono::sys_time<Duration> time) noexcept
+      : DateTime(static_cast<int64_t>(time.time_since_epoch().count()), detail::time_unit_of<typename Duration::period>())
+    {
+    }
+
+    /// The same count at the same resolution; the same instant at another
+    /// resolution is a different DateTime.
+    bool operator==(const DateTime&) const = default;
+  };
+
+  /// One-dimensional, finite, strictly increasing timestamps in one unit,
+  /// optionally counted from an epoch, and placed by an origin in the series
+  /// they were cut from.
   class Times
   {
   public:
-    explicit Times(std::vector<float64_t> values, TimeUnit unit = TimeUnit::Seconds)
-      : m_values(std::move(values)), m_unit(unit)
+    explicit Times(std::vector<float64_t> values, TimeUnit unit = TimeUnit::Seconds,
+                   std::optional<DateTime> epoch = std::nullopt)
+      : m_values(std::move(values)), m_unit(unit), m_epoch(epoch)
     {
       for (size_t i = 0; i < m_values.size(); ++i)
       {
@@ -169,7 +220,45 @@ namespace sb
     [[nodiscard]] TimeUnit unit() const noexcept { return m_unit; }
     [[nodiscard]] size_t size() const noexcept { return m_values.size(); }
 
-    /// The same timestamps in another unit.
+    /// The instant time 0 stands for, if any.
+    [[nodiscard]] const std::optional<DateTime>& epoch() const noexcept { return m_epoch; }
+
+    /// The same timestamps counted from @p epoch, or from none; no time is
+    /// shifted.
+    [[nodiscard]] Times with_epoch(std::optional<DateTime> epoch) const
+    {
+      auto times = *this;
+      times.m_epoch = epoch;
+      return times;
+    }
+
+    /// The time, in this unit, that time 0 stands for in the series these
+    /// times were cut from; 0 for recorded observations. Evaluation does not
+    /// use it.
+    [[nodiscard]] float64_t origin() const noexcept { return m_origin; }
+
+    /// The same timestamps with the origin @p origin, which must be finite.
+    [[nodiscard]] Times with_origin(float64_t origin) const
+    {
+      if (!std::isfinite(origin))
+      {
+        throw std::invalid_argument("The origin of times must be finite");
+      }
+      auto times = *this;
+      times.m_origin = origin;
+      return times;
+    }
+
+    /// The timestamps @p values in this unit, from this epoch and origin.
+    [[nodiscard]] Times with_values(std::vector<float64_t> values) const
+    {
+      Times times(std::move(values), m_unit, m_epoch);
+      times.m_origin = m_origin;
+      return times;
+    }
+
+    /// The same timestamps in another unit, from the same epoch, with the
+    /// origin converted alike.
     [[nodiscard]] Times to(TimeUnit unit) const
     {
       std::vector<float64_t> converted(m_values.size());
@@ -177,7 +266,9 @@ namespace sb
       {
         converted[i] = convert_time(m_values[i], m_unit, unit);
       }
-      return Times(std::move(converted), unit);
+      Times times(std::move(converted), unit, m_epoch);
+      times.m_origin = convert_time(m_origin, m_unit, unit);
+      return times;
     }
 
     bool operator==(const Times&) const = default;
@@ -185,6 +276,8 @@ namespace sb
   private:
     std::vector<float64_t> m_values;
     TimeUnit m_unit;
+    std::optional<DateTime> m_epoch;
+    float64_t m_origin = 0.0;
   };
 
   /// Recorded observations of one channel: one observation per timestamp,
@@ -264,8 +357,18 @@ namespace sb
     /// by stack_at keep the start.
     [[nodiscard]] Channel with_start_closed(bool closed) const;
 
+    /// This channel with its times counted from @p epoch, or from none. It
+    /// shares the observations; no time is shifted.
+    [[nodiscard]] Channel with_epoch(std::optional<DateTime> epoch) const;
+
     /// Whether the first timestamp is in the domain.
     [[nodiscard]] bool start_closed() const noexcept { return m_startClosed; }
+
+    /// The origin of the channel's times, in its unit.
+    [[nodiscard]] float64_t origin() const noexcept { return held_times().origin(); }
+
+    /// The epoch of the channel's times, if any.
+    [[nodiscard]] const std::optional<DateTime>& epoch() const noexcept { return held_times().epoch(); }
 
     /// The observation with the largest timestamp at or before @p t, in the
     /// channel's own unit, a tensor of shape shape(). As in the tolerant
@@ -304,6 +407,13 @@ namespace sb
     /// with index_at().
     [[nodiscard]] Times times() const { return held_times(); }
 
+    /// The timestamps @p values on this channel's time axis: its unit,
+    /// epoch, and origin, without copying its own timestamps.
+    [[nodiscard]] Times times_like(std::vector<float64_t> values) const
+    {
+      return held_times().with_values(std::move(values));
+    }
+
     /// Timestamp @p k, in the channel's unit, to build new times from.
     [[nodiscard]] float64_t time(size_t k) const { return held_times().values()[k]; }
 
@@ -311,8 +421,13 @@ namespace sb
     [[nodiscard]] const std::vector<size_t>& shape() const noexcept { return m_shape; }
     [[nodiscard]] size_t size() const noexcept { return held_times().size(); }
 
-    /// The same timestamps, start, end, shape, values, and snap settings.
+    /// The same timestamps, start, end, shape, values, and snap settings;
+    /// the timestamps include their epoch and origin.
     [[nodiscard]] bool operator==(const Channel& other) const;
+
+    /// operator== without the epoch and origin of the timestamps, which
+    /// place a channel but do not change how it evaluates.
+    [[nodiscard]] bool same_observations(const Channel& other) const;
 
     /// Element @p i of the observations at times(), flattened in row-major
     /// order: observation i / prod(shape()), element i % prod(shape()).
@@ -354,7 +469,7 @@ namespace sb
 
     std::shared_ptr<ChannelStorage<T>> m_storage;  // null for a view
     std::shared_ptr<const Channel> m_source;       // null for stored observations
-    std::shared_ptr<const Times> m_times;
+    std::shared_ptr<const Times> m_times;  // set for a view, or to relabel stored times
     std::shared_ptr<const std::vector<size_t>> m_base;
     std::vector<float64_t> m_lags;
     std::vector<size_t> m_shape;
@@ -406,6 +521,10 @@ namespace sb
     /// converted.
     [[nodiscard]] TimeSeries to(TimeUnit unit) const;
 
+    /// The same series with every channel's times counted from @p epoch, or
+    /// from none, sharing the observations; no time is shifted.
+    [[nodiscard]] TimeSeries with_epoch(std::optional<DateTime> epoch) const;
+
     /// The timestamps of channel @p i, converted to the query unit.
     [[nodiscard]] Times times(size_t i) const { return channel(i).times().to(m_unit); }
 
@@ -436,6 +555,15 @@ namespace sb
 
     /// The same unit and channels.
     [[nodiscard]] bool operator==(const TimeSeries& other) const = default;
+
+    /// The same unit, and channels with the same observations; see
+    /// Channel::same_observations().
+    [[nodiscard]] bool same_observations(const TimeSeries& other) const
+    {
+      return m_unit == other.m_unit && std::ranges::equal(m_channels, other.m_channels, [](const auto& a, const auto& b) {
+               return a.same_observations(b);
+             });
+    }
 
     /// Every channel's value at @p t, given in the series' unit: one leaf per
     /// channel, in channel order, each a tensor of that channel's shape.

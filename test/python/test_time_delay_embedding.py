@@ -1,3 +1,4 @@
+import datetime
 from dataclasses import dataclass
 
 import numpy as np
@@ -336,3 +337,28 @@ def test_embeddings_of_every_dtype_survive_saving(make_values, round_trip):
     loaded = round_trip(embedding)
 
     assert loaded.array_equal(embedding)
+
+
+@pytest.mark.parametrize("delay", [
+    pytest.param(np.timedelta64(30, "m"), id="timedelta64"),
+    pytest.param(datetime.timedelta(minutes=30), id="timedelta"),
+])
+@pytest.mark.parametrize("unit, numeric_delay", [
+    pytest.param("min", 30.0, id="minutes"),
+    pytest.param("h", 0.5, id="hours"),
+])
+def test_embedding_with_a_duration_matches_the_same_number(delay, unit, numeric_delay):
+    series = TimeSeries([0.0, 1.0, 0.0, -1.0, 0.0], times=Times([0.0, 0.5, 1.0, 1.5, 2.0], unit="h")).to(unit)
+
+    embedding = TimeDelayEmbedding(dimension=2, delay=delay)(series)
+
+    assert embedding.array_equal(TimeDelayEmbedding(dimension=2, delay=numeric_delay)(series))
+
+
+def test_embedding_repr_shows_its_duration():
+    assert "delay=np.timedelta64(30,'m')" in repr(TimeDelayEmbedding(dimension=2, delay=np.timedelta64(30, "m")))
+
+
+def test_embedding_rejects_a_delay_without_a_fixed_length():
+    with pytest.raises(ValueError, match="fixed length"):
+        TimeDelayEmbedding(dimension=2, delay=np.timedelta64(1, "M"))

@@ -201,6 +201,14 @@ The same pipeline using a barcode plot and Betti curves:
       :start-after: docs snippet start betti_pipeline --
       :end-before: docs snippet end betti_pipeline --
 
+Time series
+===========
+
+Use :py:func:`~stablebear.plotting.plot_timeseries` to draw a time series as
+the step function it evaluates to, with its windows in place or from 0, its
+channels as rows, and its dates and times on a date axis. See
+:doc:`timeseries_plotting` for examples.
+
 max_time
 ========
 

@@ -14,14 +14,21 @@
 #include <string>
 #include <vector>
 
-// The element types are bound in several translation units so that they
-// compile in parallel; each one instantiates the templates below.
+// The element types are bound two to a translation unit, as each one costs
+// about half a gigabyte to compile; each unit instantiates the templates
+// below.
 
 namespace sb_py
 {
+  void register_timeseries_float(pybind11::module_& m);
+  void register_timeseries_int(pybind11::module_& m);
+  void register_timeseries_uint(pybind11::module_& m);
   void register_timeseries_pcf(pybind11::module_& m);
+  void register_timeseries_pcf_int(pybind11::module_& m);
   void register_timeseries_point_cloud(pybind11::module_& m);
-  void register_timeseries_matrix_barcode(pybind11::module_& m);
+  void register_timeseries_distance_matrix(pybind11::module_& m);
+  void register_timeseries_symmetric_matrix(pybind11::module_& m);
+  void register_timeseries_barcode(pybind11::module_& m);
 
   /// Bind the channel and series classes for element type T, as
   /// register_tensor_element does for tensors.
@@ -61,10 +68,21 @@ namespace sb_py
       .def("to", [](const Series& self, const std::string& unit) { return self.to(sb::parse_time_unit(unit)); },
            py::arg("unit"))
       .def("times", &Series::times, py::arg("index"))
+      .def("origin", [](const Series& self, size_t index) {
+        const auto& channel = self.channel(index);
+        return sb::convert_time(channel.origin(), channel.unit(), self.unit());
+      }, py::arg("index"))
       .def("channel", &Series::channel, py::arg("index"), py::return_value_policy::reference_internal)
       .def_property_readonly("n_channels", &Series::n_channels)
+      .def_property_readonly("epoch", [](const Series& self) { return self.channel(0).epoch(); })
+      .def("with_epoch", &Series::with_epoch, py::arg("epoch"))
+      .def_property_readonly("domain", [](const Series& self) {
+        const auto domain = self.domain();
+        return py::make_tuple(domain.first, domain.last, domain.closedStart, domain.closedEnd);
+      })
       .def("select", &Series::select, py::arg("indices"))
-      .def("array_equal", [](const Series& self, const Series& other) { return self == other; }, py::arg("other"))
+      .def("array_equal", [](const Series& self, const Series& other) { return self.same_observations(other); },
+           py::arg("other"))
       .def("evaluate", [](const Series& self, sb::float64_t t, const std::optional<std::string>& unit) {
         return unit ? self.to(sb::parse_time_unit(*unit)).evaluate(t) : self.evaluate(t);
       }, py::arg("t"), py::arg("unit") = py::none(), py::call_guard<py::gil_scoped_release>())

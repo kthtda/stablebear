@@ -1,9 +1,13 @@
 
+import datetime
+import re
+import pickle
+
 import numpy as np
 import pytest
 
 import stablebear as sb
-from stablebear.timeseries import TimeDelayEmbedding, Times, TimeSeries, Window
+from stablebear.timeseries import DateTime, Domain, TimeDelayEmbedding, Times, TimeSeries, Window
 
 from _element_values import TWO_ELEMENTS_OF_EVERY_DTYPE
 from _round_trip import ROUND_TRIPS
@@ -36,6 +40,7 @@ def test_times_rejects_invalid_input(times, unit):
     ("seconds", "s"),
     ("hr", "h"),
     ("msec", "ms"),
+    ("D", "d"),
     ("\u00b5s", "us"),  # micro sign
     ("\u03bcs", "us"),  # Greek small letter mu
 ])
@@ -73,6 +78,168 @@ def test_series_defaults_to_seconds_and_one_channel():
     assert series.shape == ()
     assert len(series) == 3
     assert np.array_equal(np.asarray(series.values), [10.0, 20.0, 30.0])
+
+
+@pytest.mark.parametrize("value, unit, expected", [
+    pytest.param("2023-01-01", "d", np.datetime64("2023-01-01", "D"), id="str"),
+    pytest.param(np.datetime64("2023-01-01T12:30", "m"), "min", np.datetime64("2023-01-01T12:30", "m"),
+                 id="datetime64"),
+    pytest.param(datetime.datetime(2023, 1, 1, 12, 30), "us", np.datetime64("2023-01-01T12:30", "us"),
+                 id="datetime"),
+    pytest.param(datetime.date(2023, 1, 1), "d", np.datetime64("2023-01-01", "D"), id="date"),
+])
+def test_date_time_keeps_the_resolution_of_its_value(value, unit, expected):
+    date_time = DateTime(value)
+
+    assert date_time.unit == unit
+    assert date_time.to_datetime64() == expected
+    assert date_time.to_datetime64().dtype == expected.dtype
+
+
+def test_date_time_converts_back_to_the_same_datetime64():
+    value = np.datetime64("2023-01-01T12:30:15.250", "ms")
+
+    result = DateTime(value).to_datetime64()
+
+    assert result == value
+    assert result.dtype == value.dtype
+
+
+def test_date_times_are_equal_only_at_the_same_resolution():
+    # A string date and a date count days; a datetime counts microseconds.
+    assert DateTime("2023-01-01") == DateTime(datetime.date(2023, 1, 1))
+    assert DateTime("2023-01-01") != DateTime("2023-01-02")
+    assert DateTime("2023-01-01") != DateTime(datetime.datetime(2023, 1, 1))
+
+
+def test_date_time_survives_pickling():
+    date_time = DateTime(np.datetime64("2023-01-01T12:30", "m"))
+
+    assert pickle.loads(pickle.dumps(date_time)) == date_time
+
+
+def test_date_time_repr_shows_the_date():
+    assert repr(DateTime("2023-01-01T12:30")) == "DateTime('2023-01-01T12:30')"
+
+
+@pytest.mark.parametrize("value", [
+    pytest.param(datetime.datetime(2023, 1, 1, tzinfo=datetime.timezone.utc), id="timezone"),
+    pytest.param(np.datetime64("2023-01-02", "W"), id="weeks"),
+    pytest.param(np.datetime64("2023-01", "M"), id="months"),
+    pytest.param(np.datetime64("2023", "Y"), id="years"),
+    pytest.param(np.datetime64("NaT"), id="nat"),
+])
+def test_date_time_rejects_values_without_a_fixed_instant_or_resolution(value):
+    with pytest.raises(ValueError):
+        DateTime(value)
+
+
+def test_date_time_rejects_a_number():
+    with pytest.raises(TypeError):
+        DateTime(0)
+
+
+def test_times_have_no_epoch_by_default():
+    assert Times([0.0, 1.5], unit="s").epoch is None
+
+
+def test_times_epoch_from_a_string_equals_one_from_a_date_time():
+    from_string = Times([0.0, 1.5], unit="s", epoch="2023-01-01")
+    from_date_time = Times([0.0, 1.5], unit="s", epoch=DateTime("2023-01-01"))
+
+    assert from_string.epoch == DateTime("2023-01-01")
+    assert from_string == from_date_time
+
+
+def test_times_keep_their_epoch_in_another_unit():
+    times = Times([0.0, 1.5], unit="s", epoch="2023-01-01").to("ms")
+
+    assert times.epoch == DateTime("2023-01-01")
+
+
+def test_times_with_different_epochs_are_not_equal():
+    times = Times([0.0, 1.5], unit="s", epoch="2023-01-01")
+
+    assert times != Times([0.0, 1.5], unit="s", epoch="2023-01-02")
+    assert times != Times([0.0, 1.5], unit="s")
+
+
+def test_times_with_epoch_sets_replaces_and_removes_the_epoch():
+    times = Times([0.0, 1.5], unit="s")
+
+    with_epoch = times.with_epoch("2023-01-01")
+    replaced = with_epoch.with_epoch(DateTime("2023-01-02"))
+    removed = replaced.with_epoch(None)
+
+    assert with_epoch.epoch == DateTime("2023-01-01")
+    assert replaced.epoch == DateTime("2023-01-02")
+    assert removed.epoch is None
+
+
+def test_times_with_epoch_keeps_the_timestamps_and_unit():
+    times = Times([0.0, 1.5], unit="ms").with_epoch("2023-01-01")
+
+    assert sb.FloatTensor([0.0, 1.5], dtype=sb.float64).array_equal(sb.tensor(times))
+    assert times.unit == "ms"
+
+
+def test_times_with_epoch_rejects_an_invalid_epoch():
+    with pytest.raises(ValueError):
+        Times([0.0, 1.5], unit="s").with_epoch(np.datetime64("2023-01", "M"))
+
+
+def _stamps():
+    return np.array(["2023-01-01T06:00", "2023-01-01T07:30", "2023-01-02T06:00"], dtype="datetime64[m]")
+
+
+def test_times_from_datetimes_count_whole_units_from_the_first():
+    times = Times(_stamps(), unit="min")
+
+    assert times.epoch == DateTime(np.datetime64("2023-01-01T06:00", "m"))
+    assert sb.FloatTensor([0.0, 90.0, 1440.0], dtype=sb.float64).array_equal(sb.tensor(times))
+
+
+def test_times_from_datetimes_are_converted_to_the_unit():
+    times = Times(_stamps(), unit="h")
+
+    assert sb.FloatTensor([0.0, 1.5, 24.0], dtype=sb.float64).array_equal(sb.tensor(times))
+
+
+def test_times_from_datetimes_count_from_an_explicit_epoch():
+    times = Times(_stamps(), unit="h", epoch="2023-01-01")
+
+    assert times.epoch == DateTime("2023-01-01")
+    assert sb.FloatTensor([6.0, 7.5, 30.0], dtype=sb.float64).array_equal(sb.tensor(times))
+
+
+def test_times_to_datetime64_defaults_to_microseconds():
+    dates = Times([0.0, 1.5], unit="h", epoch="2023-01-01").to_datetime64()
+
+    assert dates.dtype == np.dtype("datetime64[us]")
+    assert np.array_equal(dates, np.array(["2023-01-01T00:00", "2023-01-01T01:30"], dtype="datetime64[us]"))
+
+
+@pytest.mark.parametrize("resolution, expected", [
+    pytest.param("ns", np.array(["2023-01-01T00:00:00", "2023-01-01T00:00:01.5"], dtype="datetime64[ns]"), id="ns"),
+    pytest.param("s", np.array(["2023-01-01T00:00:00", "2023-01-01T00:00:02"], dtype="datetime64[s]"), id="s"),
+])
+def test_times_to_datetime64_rounds_to_the_resolution(resolution, expected):
+    # 1.5 s rounds to 2 s, the nearest even step.
+    dates = Times([0.0, 1.5], unit="s", epoch="2023-01-01").to_datetime64(resolution)
+
+    assert dates.dtype == expected.dtype
+    assert np.array_equal(dates, expected)
+
+
+def test_times_to_datetime64_needs_an_epoch():
+    with pytest.raises(ValueError, match="with_epoch"):
+        Times([0.0, 1.5], unit="s").to_datetime64()
+
+
+def test_times_repr_shows_the_epoch():
+    times = Times([0.0, 1.5], unit="s", epoch="2023-01-01")
+
+    assert repr(times) == "Times([0.0, 1.5], unit='s', epoch=DateTime('2023-01-01'))"
 
 
 def test_series_keeps_explicit_unit():
@@ -192,6 +359,250 @@ def test_singleton_series_evaluates_at_its_time():
     series = TimeSeries([7.0], times=[2.0])
 
     assert series(2.0) == 7.0
+
+
+def test_series_domain_runs_from_first_to_last_timestamp_closed():
+    series = TimeSeries([10.0, 20.0, 30.0], times=[0.5, 1.5, 4.0])
+
+    assert series.domain == Domain(0.5, 4.0, True, True)
+
+
+def test_series_domain_is_in_the_query_unit():
+    series = TimeSeries([10.0, 20.0, 30.0], times=[0.5, 1.5, 4.0]).to("ms")
+
+    assert series.domain == Domain(500.0, 4000.0, True, True)
+
+
+def test_series_domain_fields_by_name_and_by_unpacking():
+    domain = TimeSeries([10.0, 20.0], times=[0.5, 4.0]).domain
+
+    start, end, start_closed, end_closed = domain
+
+    assert (domain.start, domain.end) == (0.5, 4.0)
+    assert (domain.start_closed, domain.end_closed) == (True, True)
+    assert (start, end, start_closed, end_closed) == (0.5, 4.0, True, True)
+
+
+def test_series_domain_of_several_channels_is_their_intersection():
+    a = TimeSeries([10.0, 20.0, 30.0], times=Times([0.0, 1.0, 2.5], unit="s"))
+    b = TimeSeries([-10.0, -20.0], times=Times([500.0, 3000.0], unit="ms"))
+
+    series = TimeSeries.from_channels([a, b], unit="s")
+
+    assert series.domain == Domain(0.5, 2.5, True, True)
+
+
+@pytest.mark.parametrize("closed, expected", [
+    pytest.param("left", Domain(0.0, 2.0, True, False), id="open-end"),
+    pytest.param("right", Domain(0.0, 2.0, False, True), id="open-start"),
+])
+def test_series_domain_of_several_channels_excludes_an_end_any_channel_excludes(closed, expected):
+    source = TimeSeries([10.0, 20.0, 30.0, 40.0], times=[0.0, 1.0, 2.0, 3.0])
+    window = Window(size=2.0, step=2.0, closed=closed, partial=False, anchor="start")(source)[0]
+    observed = TimeSeries([-10.0, -20.0, -30.0], times=[0.0, 1.0, 2.0])
+
+    series = TimeSeries.from_channels([window, observed])
+
+    assert series.domain == expected
+
+
+def test_series_epoch_is_the_epoch_of_its_times():
+    series = TimeSeries([10.0, 20.0], times=Times([0.0, 1.0], unit="h", epoch="2023-01-01"))
+
+    assert series.epoch == DateTime("2023-01-01")
+    assert series.to("min").epoch == DateTime("2023-01-01")
+
+
+def test_series_from_datetimes_counts_seconds_from_the_first():
+    stamps = np.array(["2023-01-01T06:00", "2023-01-01T06:01", "2023-01-01T07:00"], dtype="datetime64[m]")
+
+    series = TimeSeries([10.0, 20.0, 30.0], times=stamps)
+
+    assert series.unit == "s"
+    assert series.epoch == DateTime(np.datetime64("2023-01-01T06:00", "m"))
+    assert sb.FloatTensor([0.0, 60.0, 3600.0], dtype=sb.float64).array_equal(sb.tensor(series.times))
+
+
+def _dated_series():
+    return TimeSeries([10.0, 20.0, 30.0], times=Times([0.0, 1.5, 4.0], unit="h", epoch="2023-01-01"))
+
+
+@pytest.mark.parametrize("date, t", [
+    pytest.param(np.datetime64("2023-01-01T02:00"), 2.0, id="datetime64"),
+    pytest.param(datetime.datetime(2023, 1, 1, 4), 4.0, id="datetime"),
+    pytest.param(datetime.date(2023, 1, 1), 0.0, id="date"),
+    pytest.param("2023-01-01T02:00", 2.0, id="str"),
+])
+def test_series_at_a_date_equals_the_series_at_its_time(date, t):
+    series = _dated_series()
+
+    assert series(date) == series(t)
+
+
+def test_series_at_an_array_of_dates_equals_the_series_at_their_times():
+    series = _dated_series()
+    dates = np.array([["2023-01-01T00:30", "2023-01-01T02:00"],
+                      ["2023-01-01T04:00", "2023-01-01T01:30"]], dtype="datetime64[m]")
+
+    values = series(dates)
+
+    assert values.shape == (2, 2)
+    assert values.array_equal(series([[0.5, 2.0], [4.0, 1.5]]))
+
+
+@pytest.mark.parametrize("dates", [
+    pytest.param(["2023-01-01T00:30", "2023-01-01T02:00"], id="strings"),
+    pytest.param([datetime.datetime(2023, 1, 1, 0, 30), datetime.datetime(2023, 1, 1, 2)], id="datetimes"),
+])
+def test_series_at_a_list_of_dates_equals_the_series_at_their_times(dates):
+    series = _dated_series()
+
+    assert series(dates).array_equal(series([0.5, 2.0]))
+
+
+def test_series_of_several_channels_at_a_date_gives_each_channel():
+    a = TimeSeries([10.0, 20.0], times=Times([0.0, 1.0], unit="h", epoch="2023-01-01"))
+    b = TimeSeries([-10.0, -20.0, -30.0], times=Times([0.0, 30.0, 60.0], unit="min", epoch="2023-01-01"))
+    series = TimeSeries.from_channels([a, b], unit="h")
+
+    values = series(np.datetime64("2023-01-01T00:45"))
+
+    assert (float(values[0]), float(values[1])) == (10.0, -20.0)
+
+
+def test_series_of_several_channels_at_an_array_of_dates_gives_each_channel():
+    a = TimeSeries([10.0, 20.0], times=Times([0.0, 1.0], unit="h", epoch="2023-01-01"))
+    b = TimeSeries([-10.0, -20.0, -30.0], times=Times([0.0, 30.0, 60.0], unit="min", epoch="2023-01-01"))
+    series = TimeSeries.from_channels([a, b], unit="h")
+
+    values = series(np.array(["2023-01-01T00:15", "2023-01-01T00:45"], dtype="datetime64[m]"))
+
+    assert values[0].array_equal(sb.FloatTensor([10.0, 10.0], dtype=sb.float64))
+    assert values[1].array_equal(sb.FloatTensor([-10.0, -20.0], dtype=sb.float64))
+
+
+def test_series_without_an_epoch_cannot_be_evaluated_at_a_date():
+    series = TimeSeries([10.0, 20.0], times=[0.0, 1.0])
+
+    with pytest.raises(ValueError, match="with_epoch"):
+        series(np.datetime64("2023-01-01T00:30"))
+
+
+def test_series_at_a_date_takes_no_unit():
+    with pytest.raises(TypeError):
+        _dated_series()(np.datetime64("2023-01-01T00:30"), "h")
+
+
+def test_series_rejects_a_mix_of_dates_and_numbers():
+    with pytest.raises(TypeError, match="mix"):
+        _dated_series()([np.datetime64("2023-01-01T00:30"), 0.5])
+
+
+def test_series_rejects_a_date_with_a_timezone():
+    with pytest.raises(ValueError):
+        _dated_series()(datetime.datetime(2023, 1, 1, tzinfo=datetime.timezone.utc))
+
+
+def test_series_at_a_date_outside_its_domain_names_the_dates():
+    with pytest.raises(ValueError, match=re.escape("2023-01-01T05:00 is outside the domain [2023-01-01T00:00, 2023-01-01T04:00]")):
+        _dated_series()(np.array(["2023-01-01T01:00", "2023-01-01T05:00"], dtype="datetime64[m]"))
+
+
+def test_window_at_a_date_outside_it_names_its_dates():
+    window = Window(size=2.0, step=1.0, closed="left", partial=False, anchor="start")(_dated_series())[1]
+
+    with pytest.raises(ValueError, match=re.escape("is outside the domain [2023-01-01T01:00, 2023-01-01T03:00)")):
+        window("2023-01-01T03:00")
+
+
+def test_a_date_just_below_a_timestamp_snaps_to_it():
+    # 0.1 + 0.2 computes as 0.30000000000000004, so 300 ms after the epoch
+    # converts to just below it.
+    series = TimeSeries([1.0, 2.0, 3.0], times=Times([0.0, 0.1, 0.1 + 0.2], unit="s", epoch="2023-01-01"))
+
+    assert series(np.datetime64("2023-01-01T00:00:00.300")) == 3.0
+
+
+def test_window_at_a_date_equals_its_series_at_that_date():
+    series = _dated_series()
+    # The window covers 01:00 to 03:00; the value changes from 10 to 20 at
+    # 01:30.
+    window = Window(size=2.0, step=1.0, closed="left", partial=False, anchor="start")(series)[1]
+
+    assert window(np.datetime64("2023-01-01T01:15")) == 10.0
+    assert window(np.datetime64("2023-01-01T02:30")) == 20.0
+
+
+def test_series_without_an_epoch_has_none():
+    assert TimeSeries([10.0, 20.0], times=[0.0, 1.0]).epoch is None
+
+
+def test_series_epoch_is_one_value_for_several_channels():
+    a = TimeSeries([10.0, 20.0], times=Times([0.0, 1.0], unit="h", epoch="2023-01-01"))
+    b = TimeSeries([-10.0, -20.0], times=Times([0.0, 60.0], unit="min", epoch="2023-01-01"))
+
+    assert TimeSeries.from_channels([a, b], unit="h").epoch == DateTime("2023-01-01")
+
+
+def test_series_with_epoch_sets_the_epoch_of_every_channel():
+    a = TimeSeries([10.0, 20.0], times=Times([0.0, 1.0], unit="h"))
+    b = TimeSeries([-10.0, -20.0], times=Times([0.0, 60.0], unit="min"))
+
+    series = TimeSeries.from_channels([a, b], unit="h").with_epoch("2023-01-01")
+
+    assert series[0].epoch == DateTime("2023-01-01")
+    assert series[1].epoch == DateTime("2023-01-01")
+
+
+def test_series_with_epoch_keeps_its_times_and_values():
+    series = TimeSeries([10.0, 20.0], times=[0.0, 1.5])
+
+    dated = series.with_epoch("2023-01-01")
+
+    assert dated.array_equal(series)
+    assert dated(1.5) == 20.0
+
+
+def test_series_with_epoch_none_removes_the_epoch():
+    series = TimeSeries([10.0, 20.0], times=Times([0.0, 1.5], unit="s", epoch="2023-01-01"))
+
+    assert series.with_epoch(None).epoch is None
+
+
+@pytest.mark.parametrize("epoch_b", [
+    pytest.param("2023-01-02", id="different"),
+    pytest.param(None, id="missing"),
+    # The same instant in microseconds; the epoch of channel a counts days.
+    pytest.param(datetime.datetime(2023, 1, 1), id="other-resolution"),
+])
+def test_series_channels_must_share_their_epoch(epoch_b):
+    a = TimeSeries([10.0, 20.0], times=Times([0.0, 1.0], unit="h", epoch="2023-01-01"))
+    b = TimeSeries([-10.0, -20.0], times=Times([0.0, 1.0], unit="h", epoch=epoch_b))
+
+    with pytest.raises(ValueError, match="different epochs"):
+        TimeSeries.from_channels([a, b])
+
+
+def test_series_origin_is_zero_for_recorded_observations():
+    series = TimeSeries([10.0, 20.0, 30.0], times=[0.5, 1.5, 4.0])
+
+    assert series.origin == 0.0
+
+
+def test_series_origin_has_one_entry_per_channel():
+    a = TimeSeries([10.0, 20.0], times=[0.0, 1.0])
+    b = TimeSeries([-10.0, -20.0], times=Times([0.0, 1000.0], unit="ms"))
+
+    origin = TimeSeries.from_channels([a, b], unit="s").origin
+
+    assert sb.tensor([0.0, 0.0], dtype=sb.float64).array_equal(origin)
+
+
+def test_series_origin_cannot_be_assigned_to():
+    series = TimeSeries([10.0, 20.0], times=[0.0, 1.0])
+
+    with pytest.raises(AttributeError):
+        series.origin = 1.0
 
 
 def test_query_just_below_an_observation_snaps_to_it():
@@ -621,3 +1032,40 @@ def test_series_array_equal_compares_the_channel_order():
     b = TimeSeries([5.0, 15.0], times=Times([0.0, 1.0], unit="ms"), snap_tolerance=0.25)
 
     assert not TimeSeries.from_channels([a, b]).array_equal(TimeSeries.from_channels([b, a]))
+
+
+@pytest.mark.parametrize("round_trip", ROUND_TRIPS)
+@pytest.mark.parametrize("value", [
+    # The finest resolutions reach only a short way from 1970-01-01:
+    # attoseconds about 9.2 s, femtoseconds 2.6 h, and picoseconds 106 days.
+    pytest.param(np.datetime64("1970-01-01T00:00:01.000000000000000001", "as"), id="as"),
+    pytest.param(np.datetime64("1970-01-01T01:00:00.000000000000001", "fs"), id="fs"),
+    pytest.param(np.datetime64("1970-02-01T00:00:00.000000000001", "ps"), id="ps"),
+    pytest.param(np.datetime64("2023-01-01T12:30:00.000000001", "ns"), id="ns"),
+    pytest.param(np.datetime64("2023-01-01T12:30:00.000001", "us"), id="us"),
+    pytest.param(np.datetime64("2023-01-01T12:30:00.001", "ms"), id="ms"),
+    pytest.param(np.datetime64("2023-01-01T12:30:01", "s"), id="s"),
+    pytest.param(np.datetime64("2023-01-01T12:30", "m"), id="min"),
+    pytest.param(np.datetime64("2023-01-01T12", "h"), id="h"),
+    pytest.param(np.datetime64("2023-01-01", "D"), id="d"),
+    pytest.param(np.datetime64("1900-01-01", "D"), id="before-1970"),
+])
+@pytest.mark.parametrize("as_epoch", [
+    pytest.param(lambda value: value, id="datetime64"),
+    pytest.param(DateTime, id="DateTime"),
+])
+def test_series_epoch_survives_saving(value, as_epoch, round_trip):
+    series = TimeSeries([10.0, 20.0], times=Times([0.0, 1.5], unit="s", epoch=as_epoch(value)))
+
+    loaded = round_trip(series)
+
+    assert loaded.epoch == DateTime(value)
+    assert loaded.epoch.to_datetime64() == value
+    assert loaded.epoch.to_datetime64().dtype == value.dtype
+
+
+@pytest.mark.parametrize("round_trip", ROUND_TRIPS)
+def test_series_without_an_epoch_loads_without_one(round_trip):
+    loaded = round_trip(TimeSeries([10.0, 20.0], times=[0.0, 1.5]))
+
+    assert loaded.epoch is None

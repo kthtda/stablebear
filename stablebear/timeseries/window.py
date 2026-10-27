@@ -1,9 +1,12 @@
 from __future__ import annotations
 
-import math
+import datetime
 from typing import Literal, overload
 
+import numpy as np
+
 from .. import _sb_cpp as cpp
+from .date_time import _duration, _in_unit
 from ..base_tensor import FloatTensor
 from .series import TimeSeries, TimeSeriesTensor
 
@@ -53,18 +56,23 @@ class Window:
     ``a_k + size`` as computed, before any snapping. For
     example, ``3 * 0.3`` computes just below 0.9: a window starting there
     starts at an observation at 0.9, but its bound reads
-    ``0.8999999999999999``.
+    ``0.8999999999999999``. The :attr:`~TimeSeries.origin` of each channel of
+    a window is where its time 0 lies in ``series``, after its own snapping:
+    0.9 in this example.
     Each window shares its observations with ``series`` and copies none; it
     evaluates by previous value on its own times, so it shows only the
     observations it holds.
 
     Parameters
     ----------
-    size : float
-        The length of each window, positive and in the series' unit.
-    step : float, optional
-        The time between the starts of consecutive windows, positive and in
-        the series' unit. Defaults to ``size``, so windows touch without
+    size : float, np.timedelta64, or datetime.timedelta
+        The length of each window, positive. A number is in the series'
+        unit; a duration such as ``np.timedelta64(25, "h")`` is converted
+        to the unit of each series the windows are taken from. Months and
+        years have no fixed length and are rejected.
+    step : float, np.timedelta64, or datetime.timedelta, optional
+        The time between the starts of consecutive windows, positive, as
+        for ``size``. Defaults to ``size``, so windows touch without
         overlapping; a smaller step makes them overlap by ``size - step``,
         and a larger one leaves gaps between them.
     closed : {"left", "right", "both", "none"}, optional
@@ -93,15 +101,12 @@ class Window:
 
     _CLOSED = {"left": (True, False), "right": (False, True), "both": (True, True), "none": (False, False)}
 
-    def __init__(self, size: float, step: float | None = None,
+    def __init__(self, size: float | np.timedelta64 | datetime.timedelta,
+                 step: float | np.timedelta64 | datetime.timedelta | None = None,
                  closed: Literal["left", "right", "both", "none"] | None = None, partial: bool = False,
                  anchor: Literal["start", "end"] = "end"):
-        self.size = float(size)
-        if not (math.isfinite(self.size) and self.size > 0):
-            raise ValueError("The window size must be finite and positive")
-        self.step = self.size if step is None else float(step)
-        if not (math.isfinite(self.step) and self.step > 0):
-            raise ValueError("The window step must be finite and positive")
+        self.size = _duration(size, "The window size must be finite and positive")
+        self.step = self.size if step is None else _duration(step, "The window step must be finite and positive")
         if anchor not in ("start", "end"):
             raise ValueError(f"anchor must be 'start' or 'end', not {anchor!r}")
         self.anchor = anchor
@@ -119,12 +124,12 @@ class Window:
     def __call__(self, series: TimeSeries, return_bounds: Literal[True]) -> tuple[TimeSeriesTensor, FloatTensor]: ...
 
     def __call__(self, series: TimeSeries, return_bounds: bool = False):
-        windows, bounds = cpp.windows(series._data, self.size, self.step, *self._CLOSED[self.closed], self.partial,
-                                      self.anchor == "end")
+        windows, bounds = cpp.windows(series._data, _in_unit(self.size, series.unit), _in_unit(self.step, series.unit),
+                                      *self._CLOSED[self.closed], self.partial, self.anchor == "end")
         if return_bounds:
             return TimeSeriesTensor(windows), FloatTensor(bounds)
         return TimeSeriesTensor(windows)
 
     def __repr__(self):
-        return (f"Window(size={self.size}, step={self.step}, closed={self.closed!r}, partial={self.partial}, "
+        return (f"Window(size={self.size!r}, step={self.step!r}, closed={self.closed!r}, partial={self.partial}, "
                 f"anchor={self.anchor!r})")

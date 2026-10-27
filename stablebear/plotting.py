@@ -7,6 +7,7 @@ from .persistence.barcode import Barcode
 from .persistence.ph_tensor import BarcodeTensor
 from .reductions import max_time as max_time_reduction
 from .base_tensor import IntPcfTensor, PcfContainerLike, PcfTensor, _to_tensor_pcf
+from .typing import boolean, float32, float64, int32, int64, uint32, uint64
 
 
 def plot(f: PcfContainerLike, fmt="", ax=None, auto_label=False, max_time=None, **kwargs):
@@ -356,3 +357,166 @@ def plot_barcode(bc, ax=None, y_offset=0, **kwargs):
     ax.yaxis.set_ticks([])
 
     return y_offset + len(bars)
+
+
+def _time_axis_unit(ax, unit, requested):
+    """The time unit of the x axis of ``ax``, storing ``unit`` on it first if
+    it has none. ``requested`` is the unit asked for, if any, which must
+    match a unit the axis already has."""
+    if ax.xaxis.get_converter() is not None:
+        raise TypeError("The x axis holds dates or other values that are not times in a unit")
+    current = ax.xaxis.get_units()
+    if current is None:
+        # Axes made with sharex share this unit.
+        ax.xaxis.set_units(unit)
+        return unit
+    if requested is not None and requested != current:
+        raise ValueError(f"The time axis is in {current!r}, not {requested!r}")
+    return current
+
+
+_NUMERIC_DTYPES = (float32, float64, int32, int64, uint32, uint64, boolean)
+
+
+def _channel_rows(n_channels):
+    """A new figure with one row of axes per channel, sharing the x axis."""
+    _, axes = plt.subplots(n_channels, 1, sharex=True, squeeze=False)
+    return list(axes[:, 0])
+
+
+def _rows(ax, n_channels):
+    """``ax``, a sequence of one axes per channel, as a list."""
+    import matplotlib.axes
+    rows = [ax] if isinstance(ax, matplotlib.axes.Axes) else list(np.asarray(ax, dtype=object).ravel())
+    if len(rows) != n_channels:
+        raise ValueError(f"Expected {n_channels} axes, one per channel, got {len(rows)}; "
+                         "to draw one channel on one axes, pass series[i]")
+    return rows
+
+
+def _plot_channels(series, axes, *, unit, **options):
+    """Plot each channel of ``series`` on its own axes, in one time unit."""
+    # The unit is resolved once, from the first row, so that every row uses
+    # it even on axes that do not share x.
+    if series.epoch is None or options["relative"]:
+        requested = None if unit is None else series.to(unit).unit
+        unit = _time_axis_unit(axes[0], requested or series.unit, requested)
+    unlabeled = [not row.get_xlabel() for row in axes]
+    lines = [line for i, row in enumerate(axes) for line in plot_timeseries(series[i], ax=row, unit=unit, **options)]
+    # Only the last row keeps the time label.
+    for row, was_unlabeled in zip(axes[:-1], unlabeled[:-1]):
+        if was_unlabeled:
+            row.set_xlabel("")
+    return lines
+
+
+def plot_timeseries(series, ax=None, *, unit=None, relative=False, markers=False, **kwargs):
+    """Plot a time series as the step function it evaluates to.
+
+    Each channel is drawn from its first observation to the end of its
+    domain, holding each value until the next observation, at the times
+    where it lies in the series it was cut from: a window is drawn where it
+    was cut, at its :attr:`~stablebear.timeseries.TimeSeries.origin` plus its
+    own times, unless ``relative`` is true.
+
+    Parameters
+    ----------
+    series : TimeSeries or TimeSeriesTensor
+        A time series of scalar observations, or a 1-D tensor of them, such
+        as windows, drawn one line each, each taking the next color of the
+        axes unless ``color`` is given. A time series with several channels
+        is drawn with one row per channel, in channel order, on axes that
+        share the time axis; only the last row is labeled.
+    ax : matplotlib axes or sequence of them, optional
+        Axes to draw on. If ``None``, uses the current axes, or for several
+        channels creates a new figure with one row per channel. For several
+        channels, a sequence of one axes per channel, used in order and as
+        given, without making them share x.
+    unit : str, optional
+        The time unit of the x axis, one of the units of
+        :class:`~stablebear.timeseries.Times`. Defaults to the unit the axis
+        already has, or else the unit of ``series``.
+    relative : bool, default False
+        Whether to draw each time series at its own times, from 0, instead
+        of where it lies in the series it was cut from. Windows are then
+        drawn on top of each other, to compare their shapes.
+    markers : bool, default False
+        Whether to mark each observation with a dot, which also shows a
+        last value that holds only at the end of the domain.
+    **kwargs
+        Passed to ``Axes.plot``, such as ``color``, ``linewidth``, or
+        ``label``.
+
+    Returns
+    -------
+    list of matplotlib.lines.Line2D
+        The lines drawn.
+
+    Raises
+    ------
+    ValueError
+        If ``unit`` differs from the unit the x axis already has, the
+        observations are not scalars, or a tensor has more than one
+        dimension; for a time series with an epoch, if ``unit`` is given
+        or the x axis has a time unit, unless ``relative`` is true.
+    TypeError
+        If the observations are not numbers, such as point clouds or
+        barcodes, or if the x axis holds dates or other values that are not
+        times, for a time series drawn at times.
+
+    Notes
+    -----
+    A time series with an :attr:`~stablebear.timeseries.TimeSeries.epoch` is
+    drawn at dates and times, ``epoch + origin + t`` rounded to
+    microseconds, on a date axis with no label, unless ``relative`` is
+    true. Otherwise the x axis keeps one time unit, stored on it by the first time series
+    drawn, and each time series is converted into it exactly, so series in
+    different units line up. The axis is labeled ``time (<unit>)`` unless it
+    already has a label.
+    """
+    from .timeseries.series import Times, TimeSeriesTensor
+
+    options = dict(unit=unit, relative=relative, markers=markers, **kwargs)
+    if isinstance(series, TimeSeriesTensor):
+        tensor = series.squeeze() if len(series.shape) != 1 else series
+        if len(tensor.shape) != 1:
+            raise ValueError(f"Expected a 1-D tensor of time series, got shape {series.shape}")
+        if ax is None and tensor.shape[0] > 0 and tensor[0].n_channels > 1:
+            ax = _channel_rows(tensor[0].n_channels)
+        return [line for k in range(tensor.shape[0]) for line in plot_timeseries(tensor[k], ax=ax, **options)]
+    if series.n_channels > 1:
+        return _plot_channels(series, _channel_rows(series.n_channels) if ax is None else _rows(ax, series.n_channels),
+                              **options)
+    if series.dtype not in _NUMERIC_DTYPES:
+        raise TypeError(f"Can only plot time series of numbers, not of {series.dtype}")
+    ax = plt.gca() if ax is None else ax
+    dated = series.epoch is not None and not relative
+    if dated:
+        if unit is not None:
+            raise ValueError("A time series with an epoch is drawn at dates, which have no unit; "
+                             "pass unit only with relative=True")
+        if isinstance(ax.xaxis.get_units(), str):
+            raise ValueError(f"The x axis is a time axis in {ax.xaxis.get_units()!r}, not a date axis")
+    else:
+        requested = None if unit is None else series.to(unit).unit
+        series = series.to(_time_axis_unit(ax, requested or series.unit, requested))
+    offset = 0.0 if relative else series.origin
+    times = np.asarray(series.times) + offset
+    values = np.asarray(series.values)
+    if values.ndim != 1:
+        raise ValueError(f"Can only plot scalar observations, not observations of shape {series.shape}")
+    if markers:
+        kwargs = {"marker": "o", "markevery": list(range(len(times))), **kwargs}
+    end = series.domain.end + offset
+    if end > times[-1]:
+        # The last value holds until the end of the domain.
+        times = np.append(times, end)
+        values = np.append(values, values[-1])
+    if dated:
+        # Dates at epoch + origin + t, at microseconds; the axis is a date axis.
+        times = Times(times, unit=series.unit, epoch=series.epoch).to_datetime64()
+        return ax.plot(times, values, drawstyle="steps-post", **kwargs)
+    lines = ax.plot(times, values, drawstyle="steps-post", **kwargs)
+    if not ax.get_xlabel():
+        ax.set_xlabel(f"time ({series.unit})")
+    return lines

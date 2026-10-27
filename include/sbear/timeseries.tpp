@@ -199,6 +199,14 @@ namespace sb
   }
 
   template <typename T>
+  Channel<T> Channel<T>::with_epoch(std::optional<DateTime> epoch) const
+  {
+    auto channel = *this;
+    channel.m_times = std::make_shared<const Times>(held_times().with_epoch(epoch));
+    return channel;
+  }
+
+  template <typename T>
   Channel<T> Channel<T>::with_start_closed(bool closed) const
   {
     auto channel = *this;
@@ -209,9 +217,17 @@ namespace sb
   template <typename T>
   bool Channel<T>::operator==(const Channel& other) const
   {
+    return same_observations(other) && held_times() == other.held_times();
+  }
+
+  template <typename T>
+  bool Channel<T>::same_observations(const Channel& other) const
+  {
+    const auto& times = held_times();
+    const auto& otherTimes = other.held_times();
     return m_snapTolerance == other.m_snapTolerance && m_shape == other.m_shape
            && m_end == other.m_end && end_closed() == other.end_closed() && m_startClosed == other.m_startClosed
-           && held_times() == other.held_times() && values() == other.values();
+           && times.unit() == otherTimes.unit() && times.values() == otherTimes.values() && values() == other.values();
   }
 
   template <typename T>
@@ -403,6 +419,11 @@ namespace sb
       {
         throw std::invalid_argument("The channels differ in unit; pass unit= to choose one");
       }
+      // One epoch for the series: every channel has the same one, or none.
+      if (channels.back().epoch() != parts.front().m_channels.front().epoch())
+      {
+        throw std::invalid_argument("The channels have different epochs; count their times from one shared epoch");
+      }
     }
     return TimeSeries(std::move(channels), unit.value_or(parts.front().unit()));
   }
@@ -430,6 +451,17 @@ namespace sb
   {
     auto series = *this;
     series.m_unit = unit;
+    return series;
+  }
+
+  template <typename T>
+  TimeSeries<T> TimeSeries<T>::with_epoch(std::optional<DateTime> epoch) const
+  {
+    auto series = *this;
+    for (auto& channel : series.m_channels)
+    {
+      channel = channel.with_epoch(epoch);
+    }
     return series;
   }
 
