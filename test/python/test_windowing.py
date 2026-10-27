@@ -632,3 +632,13 @@ def test_windows_with_the_same_contents_from_different_places_are_array_equal():
 
 def test_tensors_of_windows_with_the_same_contents_from_different_places_are_array_equal():
     assert _windows_of_pattern(0.0).array_equal(_windows_of_pattern(10.0))
+
+
+def test_series_differing_only_in_epoch_are_array_equal():
+    assert _dated_source().array_equal(_windows_source())
+
+
+def test_tensors_of_windows_differing_only_in_epoch_are_array_equal():
+    window = Window(size=1.0, step=1.0, closed="left", partial=False, anchor="start")
+
+    assert window(_dated_source()).array_equal(window(_windows_source()))
