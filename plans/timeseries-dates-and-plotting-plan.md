@@ -1,6 +1,6 @@
 # Time series dates and plotting: implementation plan
 
-Progress: 28 of 47 items, 50 of 89 points (56%)
+Progress: 29 of 47 items, 52 of 89 points (58%)
 
 Spec: [timeseries-dates-and-plotting-spec.md](timeseries-dates-and-plotting-spec.md)
 
@@ -164,7 +164,7 @@ Python cannot observe gets a new `test/test_timeseries.cpp`.
     Tests: a date that converts to just below a timestamp gets that
     observation.
 - [ ] **E4.** Durations.
-  - [ ] **E4a.** [2] `Window` size and step as `timedelta64` or `timedelta`,
+  - [x] **E4a.** [2] (d2482b397) `Window` size and step as `timedelta64` or `timedelta`,
     converted when applied.
     Tests: same windows as the numeric equivalent on a series in `min` and
     one in `h`; `repr` shows the duration; `M` and `Y` raise.
