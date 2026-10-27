@@ -358,12 +358,20 @@ def plot_barcode(bc, ax=None, y_offset=0, **kwargs):
     return y_offset + len(bars)
 
 
-def _time_axis_unit(ax, unit):
+def _time_axis_unit(ax, unit, requested):
     """The time unit of the x axis of ``ax``, storing ``unit`` on it first if
-    it has none."""
-    if ax.xaxis.get_units() is None:
+    it has none. ``requested`` is the unit asked for, if any, which must
+    match a unit the axis already has."""
+    if ax.xaxis.get_converter() is not None:
+        raise TypeError("The x axis holds dates or other values that are not times in a unit")
+    current = ax.xaxis.get_units()
+    if current is None:
+        # Axes made with sharex share this unit.
         ax.xaxis.set_units(unit)
-    return ax.xaxis.get_units()
+        return unit
+    if requested is not None and requested != current:
+        raise ValueError(f"The time axis is in {current!r}, not {requested!r}")
+    return current
 
 
 def plot_timeseries(series, ax=None, *, unit=None, markers=False, **kwargs):
@@ -397,6 +405,13 @@ def plot_timeseries(series, ax=None, *, unit=None, markers=False, **kwargs):
     list of matplotlib.lines.Line2D
         The lines drawn.
 
+    Raises
+    ------
+    ValueError
+        If ``unit`` differs from the unit the x axis already has.
+    TypeError
+        If the x axis holds dates or other values that are not times.
+
     Notes
     -----
     The x axis keeps one time unit, stored on it by the first time series
@@ -405,7 +420,8 @@ def plot_timeseries(series, ax=None, *, unit=None, markers=False, **kwargs):
     already has a label.
     """
     ax = plt.gca() if ax is None else ax
-    series = series.to(_time_axis_unit(ax, series.to(unit or series.unit).unit))
+    requested = None if unit is None else series.to(unit).unit
+    series = series.to(_time_axis_unit(ax, requested or series.unit, requested))
     times = np.asarray(series.times) + series.origin
     values = np.asarray(series.values)
     if markers:

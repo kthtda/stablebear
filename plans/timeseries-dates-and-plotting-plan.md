@@ -1,6 +1,6 @@
 # Time series dates and plotting: implementation plan
 
-Progress: 35 of 47 items, 63 of 86 points (73%)
+Progress: 36 of 47 items, 65 of 86 points (76%)
 
 Spec: [timeseries-dates-and-plotting-spec.md](timeseries-dates-and-plotting-spec.md)
 
@@ -196,7 +196,7 @@ Python cannot observe gets a new `test/test_timeseries.cpp`.
 - [x] **F2.** [1] (65357d2ec) `markers=True` and `**kwargs` forwarding.
   Tests: markers at each observation; `color` and `label` reach the line.
 - [ ] **F3.** Time axis rules.
-  - [ ] **F3a.** [2] `unit=` and conversion into an existing axis unit.
+  - [x] **F3a.** [2] (1b5d049f1) `unit=` and conversion into an existing axis unit.
     Tests: `unit="ms"` on a series in `s` scales by exactly 1000 and labels
     `time (ms)`; a series in `ms` after one in `s` is converted to `s`.
   - [ ] **F3b.** [2] Shared axes and conflicts.

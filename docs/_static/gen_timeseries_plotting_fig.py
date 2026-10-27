@@ -49,9 +49,24 @@ def plot_timeseries_units():
     return fig
 
 
+# -- included in docs via literalinclude :pyobject: --
+def plot_timeseries_sharex():
+    seconds = TimeSeries([1.0, 3.0, 2.0], times=[0.0, 1.0, 2.5])
+    milliseconds = TimeSeries([0.5, 1.5, 2.5],
+                              times=Times([500.0, 1500.0, 3000.0], unit="ms"))
+
+    fig, (top, bottom) = plt.subplots(2, 1, figsize=(6, 3.5), sharex=True)
+    plot_timeseries(seconds, ax=top, markers=True)
+    plot_timeseries(milliseconds, ax=bottom, markers=True, color="tab:orange")
+    top.set_xlabel("")
+    fig.tight_layout()
+    return fig
+
+
 if __name__ == "__main__":
     for name, plot_func in [("timeseries_plot_steps", plot_timeseries_steps),
                             ("timeseries_plot_window_in_place", plot_timeseries_window_in_place),
-                            ("timeseries_plot_units", plot_timeseries_units)]:
+                            ("timeseries_plot_units", plot_timeseries_units),
+                            ("timeseries_plot_sharex", plot_timeseries_sharex)]:
         _save_themed(plot_func, *LIGHT, HERE / f"{name}_light.png")
         _save_themed(plot_func, *DARK, HERE / f"{name}_dark.png")

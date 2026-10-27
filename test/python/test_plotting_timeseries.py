@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 
 from plot_helpers import FigureGallery, gallery_fixture, ax_fixture
 
@@ -91,3 +92,28 @@ def test_a_series_in_another_unit_is_drawn_in_the_unit_of_the_axis(ax):
 
     assert np.array_equal(line.get_xdata(), [0.5, 2.5])
     assert ax.get_xlabel() == "time (s)"
+
+
+def test_axes_that_share_x_share_the_time_unit():
+    import matplotlib.pyplot as plt
+    fig, (top, bottom) = plt.subplots(2, 1, sharex=True)
+    plot_timeseries(_series(), ax=top)
+
+    (line,) = plot_timeseries(TimeSeries([1.0, 2.0], times=Times([500.0, 2500.0], unit="ms")), ax=bottom)
+
+    assert np.array_equal(line.get_xdata(), [0.5, 2.5])
+    plt.close(fig)
+
+
+def test_a_unit_other_than_that_of_the_axis_raises(ax):
+    plot_timeseries(_series(), ax=ax)
+
+    with pytest.raises(ValueError, match="'s', not 'ms'"):
+        plot_timeseries(_series(), ax=ax, unit="ms")
+
+
+def test_an_axis_of_dates_raises(ax):
+    ax.plot(np.array(["2023-01-01", "2023-01-02"], dtype="datetime64[D]"), [0.0, 1.0])
+
+    with pytest.raises(TypeError):
+        plot_timeseries(_series(), ax=ax)

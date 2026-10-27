@@ -89,10 +89,6 @@ seconds and the other in milliseconds::
    plot_timeseries(seconds, ax=ax, markers=True, label="in s")
    plot_timeseries(milliseconds, ax=ax, markers=True, label="in ms")
 
-The time axis is in seconds, set by ``seconds``, and the observations of
-``milliseconds`` at 500, 1500, and 3000 ms are drawn at 0.5, 1.5, and
-3 s.
-
 .. image:: _static/timeseries_plot_units_light.png
    :width: 80%
    :class: only-light
@@ -109,3 +105,41 @@ The time axis is in seconds, set by ``seconds``, and the observations of
    .. literalinclude:: _static/gen_timeseries_plotting_fig.py
       :pyobject: plot_timeseries_units
       :language: python
+
+The time axis is in seconds, set by ``seconds``, and the observations of
+``milliseconds`` at 500, 1500, and 3000 ms are drawn at 0.5, 1.5, and
+3 s.
+
+Passing a ``unit=`` other than the unit an axis already has raises an
+error, as does drawing on an axis of dates.
+
+Shared time axes
+----------------
+
+Axes made with ``sharex=True`` share their time unit as well as their
+limits, so time series in different units can be drawn one above the
+other::
+
+   fig, (top, bottom) = plt.subplots(2, 1, sharex=True)
+   plot_timeseries(seconds, ax=top, markers=True)
+   plot_timeseries(milliseconds, ax=bottom, markers=True)
+
+.. image:: _static/timeseries_plot_sharex_light.png
+   :width: 80%
+   :class: only-light
+   :alt: Two time series in seconds and milliseconds on axes sharing their time axis
+
+.. image:: _static/timeseries_plot_sharex_dark.png
+   :width: 80%
+   :class: only-dark
+   :alt: Two time series in seconds and milliseconds on axes sharing their time axis
+
+.. dropdown:: Show plotting code
+   :color: secondary
+
+   .. literalinclude:: _static/gen_timeseries_plotting_fig.py
+      :pyobject: plot_timeseries_sharex
+      :language: python
+
+The upper axes sets the unit, seconds, and the lower axes draws
+``milliseconds`` in it, so both share one time scale.
