@@ -330,6 +330,40 @@ def test_window_bounds_just_below_an_observation_reach_it():
     assert np.array_equal(np.asarray(windows[3].values), [9.0])
 
 
+def test_a_window_start_that_snaps_to_an_observation_has_its_time_as_origin():
+    series = TimeSeries([0.0, 3.0, 6.0, 9.0, 12.0], times=[0.0, 0.3, 0.6, 0.9, 1.2])
+
+    windows, bounds = Window(size=0.3, step=0.3, closed="left", partial=False, anchor="start")(
+        series, return_bounds=True)
+
+    # Window 3 starts at 3 * 0.3, just below 0.9, and snaps to the
+    # observation at 0.9.
+    assert bounds[3, 0] == 3 * 0.3
+    assert windows[3].origin == 0.9
+
+
+def test_channels_that_snap_differently_have_different_origins():
+    # Channel a has an observation at 0.9 for window 3's start to snap to;
+    # channel b does not.
+    a = TimeSeries([0.0, 3.0, 6.0, 9.0, 12.0], times=[0.0, 0.3, 0.6, 0.9, 1.2])
+    b = TimeSeries([0.0, -5.0, -10.0, -12.0], times=[0.0, 0.5, 1.0, 1.2])
+    series = TimeSeries.from_channels([a, b])
+
+    window = Window(size=0.3, step=0.3, closed="left", partial=False, anchor="start")(series)[3]
+
+    assert FloatTensor([0.9, 3 * 0.3], dtype=sb.float64).array_equal(window.origin)
+
+
+def test_a_window_of_a_window_has_its_origin_in_the_first_series():
+    series = TimeSeries(np.arange(9.0), times=np.arange(9.0))
+    window = Window(size=4.0, step=4.0, closed="left", partial=False, anchor="start")(series)[1]
+
+    # The window starts at 4.0; its windows start at 0.0 and 2.0 within it.
+    inner = Window(size=2.0, step=2.0, closed="left", partial=False, anchor="start")(window)
+
+    assert (inner[0].origin, inner[1].origin) == (4.0, 6.0)
+
+
 def test_an_embedding_of_a_window_keeps_its_open_end():
     # The window [1.0, 3.0) holds 5, 15, and 25 at 0.0, 0.5, and 1.5. With a
     # delay of 0.4, the newer component reaches 1.5 at 1.9, between the
