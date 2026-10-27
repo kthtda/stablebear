@@ -1,6 +1,6 @@
 # Time series dates and plotting: implementation plan
 
-Progress: 22 of 47 items, 39 of 89 points (44%)
+Progress: 23 of 47 items, 41 of 89 points (46%)
 
 Spec: [timeseries-dates-and-plotting-spec.md](timeseries-dates-and-plotting-spec.md)
 
@@ -143,7 +143,7 @@ Python cannot observe gets a new `test/test_timeseries.cpp`.
 - [x] **E1.** [1] (b48f80ff8) `TimeSeries(values, times=stamps)` with a `datetime64` array
   builds `Times(stamps, unit="s")`.
   Tests: unit `s`, epoch the first stamp, timestamps in seconds.
-- [ ] **E2.** [2] `Times.to_datetime64(resolution="us")`.
+- [x] **E2.** [2] (1a1254c4b) `Times.to_datetime64(resolution="us")`.
   Tests: default `us`; `ns` and `s`; rounding to nearest; no epoch raises
   `ValueError` mentioning `with_epoch`.
 - [ ] **E3.** Date queries.

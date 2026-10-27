@@ -422,6 +422,41 @@ def test_series_from_datetimes_counts_seconds_from_the_first():
     assert sb.FloatTensor([0.0, 60.0, 3600.0], dtype=sb.float64).array_equal(sb.tensor(series.times))
 
 
+def _dated_series():
+    return TimeSeries([10.0, 20.0, 30.0], times=Times([0.0, 1.5, 4.0], unit="h", epoch="2023-01-01"))
+
+
+@pytest.mark.parametrize("date, t", [
+    pytest.param(np.datetime64("2023-01-01T02:00"), 2.0, id="datetime64"),
+    pytest.param(datetime.datetime(2023, 1, 1, 4), 4.0, id="datetime"),
+    pytest.param(datetime.date(2023, 1, 1), 0.0, id="date"),
+])
+def test_series_at_a_date_equals_the_series_at_its_time(date, t):
+    series = _dated_series()
+
+    assert series(date) == series(t)
+
+
+def test_series_of_several_channels_at_a_date_gives_each_channel():
+    a = TimeSeries([10.0, 20.0], times=Times([0.0, 1.0], unit="h", epoch="2023-01-01"))
+    b = TimeSeries([-10.0, -20.0, -30.0], times=Times([0.0, 30.0, 60.0], unit="min", epoch="2023-01-01"))
+    series = TimeSeries.from_channels([a, b], unit="h")
+
+    values = series(np.datetime64("2023-01-01T00:45"))
+
+    assert (float(values[0]), float(values[1])) == (10.0, -20.0)
+
+
+def test_window_at_a_date_equals_its_series_at_that_date():
+    series = _dated_series()
+    # The window covers 01:00 to 03:00; the value changes from 10 to 20 at
+    # 01:30.
+    window = Window(size=2.0, step=1.0, closed="left", partial=False, anchor="start")(series)[1]
+
+    assert window(np.datetime64("2023-01-01T01:15")) == 10.0
+    assert window(np.datetime64("2023-01-01T02:30")) == 20.0
+
+
 def test_series_without_an_epoch_has_none():
     assert TimeSeries([10.0, 20.0], times=[0.0, 1.0]).epoch is None
 

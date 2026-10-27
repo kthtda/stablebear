@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import datetime
 import operator
 from typing import Generic, NamedTuple, TypeVar
 
@@ -569,7 +570,13 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
 
         ``t`` is a single time or an array-like or ``FloatTensor`` of times
         of shape ``t_shape``. Many times are evaluated together: they are
-        sorted once and merged with each channel's timestamps.
+        sorted once and merged with each channel's timestamps. Numeric times
+        count from the series' own time 0, which for a window is its start.
+        For a series with an :attr:`epoch`, ``t`` may also be a date and
+        time, as a ``np.datetime64``, a naive ``datetime``, or a ``date``. A
+        date names an instant, not an offset: it is placed at
+        ``t - epoch - origin`` in each channel, so a window gives the value
+        it held at that instant, as the series it was cut from does.
 
         For one channel and a single time, returns a scalar or element for
         observations of shape ``()``, otherwise a tensor of that shape; for
@@ -584,6 +591,10 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
             If a time is outside the domain of any channel, or a channel has
             no observations, or if ``unit`` is unknown.
         """
+        if isinstance(t, (datetime.date, np.datetime64)):
+            if unit is not None:
+                raise TypeError("A date and time has no unit; pass unit only with numeric times")
+            return self._evaluate_date(DateTime(t).to_datetime64())
         if isinstance(t, (int, float, np.integer, np.floating)):
             values = NestedTensor._from_cpp(self._data.evaluate(float(t), unit))
             if self.n_channels > 1:
@@ -597,6 +608,25 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
     def __call__(self, t, unit: str | None = None):
         """``series(t, unit)`` is ``series.evaluate(t, unit)``."""
         return self.evaluate(t, unit)
+
+    def _time_of_date(self, date, channel):
+        """The time of ``date`` in channel ``channel``, in :attr:`unit`:
+        ``date - epoch - origin``, with the difference taken in integers."""
+        offset = date - self.epoch.to_datetime64()
+        return offset / np.timedelta64(1, _UNIT_TO_NUMPY[self.unit]) - self._data.origin(channel)
+
+    def _evaluate_date(self, date):
+        """Evaluate at ``date``, placing it in each channel by its origin."""
+        if self.epoch is None:
+            raise ValueError("This series has no epoch to place dates and times; set one with with_epoch")
+        if self.n_channels == 1:
+            return self.evaluate(float(self._time_of_date(date, 0)))
+        # Channels of a window can have different origins, so each is
+        # queried at its own time.
+        return NestedTensor([
+            NestedTensor._from_cpp(self._data.select([i]).evaluate(float(self._time_of_date(date, i)), None))[0]
+            for i in range(self.n_channels)
+        ])
 
     def __len__(self) -> int:
         """The number of recorded observations of a one-channel series.
