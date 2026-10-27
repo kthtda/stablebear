@@ -1,6 +1,6 @@
 # Time series dates and plotting: implementation plan
 
-Progress: 23 of 47 items, 41 of 89 points (46%)
+Progress: 24 of 47 items, 44 of 89 points (49%)
 
 Spec: [timeseries-dates-and-plotting-spec.md](timeseries-dates-and-plotting-spec.md)
 
@@ -147,7 +147,7 @@ Python cannot observe gets a new `test/test_timeseries.cpp`.
   Tests: default `us`; `ns` and `s`; rounding to nearest; no epoch raises
   `ValueError` mentioning `with_epoch`.
 - [ ] **E3.** Date queries.
-  - [ ] **E3a.** [3] Scalar dates: `np.datetime64`, naive `datetime`, `date`,
+  - [x] **E3a.** [3] (8857cc6c5) Scalar dates: `np.datetime64`, naive `datetime`, `date`,
     converted per channel as `(q - epoch) - origin`.
     Tests: each equals the numeric query at `q - epoch`; on a window,
     equals the parent series at that date.

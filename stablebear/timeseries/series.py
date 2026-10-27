@@ -43,6 +43,17 @@ from ..typing import (
 T = TypeVar("T")
 
 
+def _checked_dates(dates):
+    """``dates``, a ``datetime64`` array, with no ``NaT`` and a resolution of
+    fixed length."""
+    if np.isnat(dates).any():
+        raise ValueError("Dates and times cannot be NaT")
+    code, _ = np.datetime_data(dates.dtype)
+    if code not in _NUMPY_TO_UNIT:
+        raise ValueError(f"Dates and times need a resolution of fixed length, not {code!r}")
+    return dates
+
+
 def _times_from_datetimes(stamps, unit, epoch):
     """The native times of ``datetime64`` stamps counted from ``epoch``, or
     from the first stamp, in ``unit``."""
@@ -595,6 +606,10 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
             if unit is not None:
                 raise TypeError("A date and time has no unit; pass unit only with numeric times")
             return self._evaluate_date(DateTime(t).to_datetime64())
+        if isinstance(t, (list, tuple, np.ndarray)) and np.asarray(t).dtype.kind == "M":
+            if unit is not None:
+                raise TypeError("Dates and times have no unit; pass unit only with numeric times")
+            return self._evaluate_date(_checked_dates(np.asarray(t)))
         if isinstance(t, (int, float, np.integer, np.floating)):
             values = NestedTensor._from_cpp(self._data.evaluate(float(t), unit))
             if self.n_channels > 1:
@@ -616,17 +631,25 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         return offset / np.timedelta64(1, _UNIT_TO_NUMPY[self.unit]) - self._data.origin(channel)
 
     def _evaluate_date(self, date):
-        """Evaluate at ``date``, placing it in each channel by its origin."""
+        """Evaluate at ``date``, one date or an array of them, placing it in
+        each channel by its origin."""
         if self.epoch is None:
             raise ValueError("This series has no epoch to place dates and times; set one with with_epoch")
+
+        def query(channel):
+            t = self._time_of_date(date, channel)
+            return float(t) if np.ndim(t) == 0 else FloatTensor(np.asarray(t, dtype=np.float64))
+
         if self.n_channels == 1:
-            return self.evaluate(float(self._time_of_date(date, 0)))
+            return self.evaluate(query(0))
         # Channels of a window can have different origins, so each is
         # queried at its own time.
-        return NestedTensor([
-            NestedTensor._from_cpp(self._data.select([i]).evaluate(float(self._time_of_date(date, i)), None))[0]
-            for i in range(self.n_channels)
-        ])
+        leaves = []
+        for i in range(self.n_channels):
+            t = query(i)
+            native = self._data.select([i]).evaluate(t if isinstance(t, float) else t._data, None)
+            leaves.append(NestedTensor._from_cpp(native)[0])
+        return NestedTensor(leaves)
 
     def __len__(self) -> int:
         """The number of recorded observations of a one-channel series.

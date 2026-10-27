@@ -437,6 +437,17 @@ def test_series_at_a_date_equals_the_series_at_its_time(date, t):
     assert series(date) == series(t)
 
 
+def test_series_at_an_array_of_dates_equals_the_series_at_their_times():
+    series = _dated_series()
+    dates = np.array([["2023-01-01T00:30", "2023-01-01T02:00"],
+                      ["2023-01-01T04:00", "2023-01-01T01:30"]], dtype="datetime64[m]")
+
+    values = series(dates)
+
+    assert values.shape == (2, 2)
+    assert values.array_equal(series([[0.5, 2.0], [4.0, 1.5]]))
+
+
 def test_series_of_several_channels_at_a_date_gives_each_channel():
     a = TimeSeries([10.0, 20.0], times=Times([0.0, 1.0], unit="h", epoch="2023-01-01"))
     b = TimeSeries([-10.0, -20.0, -30.0], times=Times([0.0, 30.0, 60.0], unit="min", epoch="2023-01-01"))
@@ -445,6 +456,17 @@ def test_series_of_several_channels_at_a_date_gives_each_channel():
     values = series(np.datetime64("2023-01-01T00:45"))
 
     assert (float(values[0]), float(values[1])) == (10.0, -20.0)
+
+
+def test_series_of_several_channels_at_an_array_of_dates_gives_each_channel():
+    a = TimeSeries([10.0, 20.0], times=Times([0.0, 1.0], unit="h", epoch="2023-01-01"))
+    b = TimeSeries([-10.0, -20.0, -30.0], times=Times([0.0, 30.0, 60.0], unit="min", epoch="2023-01-01"))
+    series = TimeSeries.from_channels([a, b], unit="h")
+
+    values = series(np.array(["2023-01-01T00:15", "2023-01-01T00:45"], dtype="datetime64[m]"))
+
+    assert values[0].array_equal(sb.FloatTensor([10.0, 10.0], dtype=sb.float64))
+    assert values[1].array_equal(sb.FloatTensor([-10.0, -20.0], dtype=sb.float64))
 
 
 def test_window_at_a_date_equals_its_series_at_that_date():
