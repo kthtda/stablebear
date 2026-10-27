@@ -523,6 +523,27 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         """
         return Domain(*self._data.domain)
 
+    def bounds(self) -> Domain | tuple[Domain, ...]:
+        """Where each channel lies in the series it was cut from.
+
+        The :attr:`domain` of each channel, where it is evaluated, with its
+        :attr:`origin` added to both ends, in :attr:`unit`, and the same closed ends. For a series
+        built from observations, the origin is 0 and these are its domains.
+        For a window, they are where it lies in the series it was cut from,
+        after snapping; the bounds returned by :class:`Window` are the
+        times before snapping, shared by all channels.
+
+        A :class:`Domain` for a series with one channel; for several, a
+        tuple with one per channel, in channel order. The channels are not
+        intersected, because their origins can differ.
+        """
+        bounds = []
+        for i in range(self.n_channels):
+            start, end, start_closed, end_closed = self._data.select([i]).domain
+            origin = self._data.origin(i)
+            bounds.append(Domain(start + origin, end + origin, start_closed, end_closed))
+        return bounds[0] if len(bounds) == 1 else tuple(bounds)
+
     @property
     def n_observations(self) -> int | IntTensor:
         """The number of recorded observations.

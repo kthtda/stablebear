@@ -689,3 +689,28 @@ def test_window_repr_shows_its_durations():
 def test_window_rejects_durations_without_a_fixed_length(size):
     with pytest.raises(ValueError, match="fixed length"):
         Window(size=size)
+
+
+def test_bounds_of_a_series_built_from_observations_are_its_domain():
+    series = _windows_source()
+
+    assert series.bounds() == series.domain
+
+
+def test_bounds_of_a_window_are_its_domain_moved_by_its_origin():
+    windows, bounds = Window(size=1.0, step=1.0, closed="left", partial=False, anchor="start")(
+        _windows_source(), return_bounds=True)
+
+    # Window 2 is evaluated on [0, 1) and lies on [2, 3) of the series; no
+    # start snaps, so its bounds match the row.
+    assert windows[2].domain == Domain(0.0, 1.0, True, False)
+    assert windows[2].bounds() == Domain(2.0, 3.0, True, False)
+    assert (windows[2].bounds().start, windows[2].bounds().end) == (bounds[2, 0], bounds[2, 1])
+
+
+def test_bounds_of_several_channels_are_one_per_channel():
+    window = Window(size=0.3, step=0.3, closed="left", partial=False, anchor="start")(_snapping_channels())[3]
+
+    a, b = window.bounds()
+
+    assert (a.start, b.start) == (0.9, 3 * 0.3)
