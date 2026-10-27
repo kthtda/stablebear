@@ -366,7 +366,7 @@ def _time_axis_unit(ax, unit):
     return ax.xaxis.get_units()
 
 
-def plot_timeseries(series, ax=None, **kwargs):
+def plot_timeseries(series, ax=None, *, markers=False, **kwargs):
     """Plot a time series as the step function it evaluates to.
 
     Each channel is drawn from its first observation to the end of its
@@ -381,6 +381,9 @@ def plot_timeseries(series, ax=None, **kwargs):
         A time series with one channel of scalar observations.
     ax : matplotlib axes, optional
         Axes to draw on. If ``None``, uses the current axes.
+    markers : bool, default False
+        Whether to mark each observation with a dot, which also shows a
+        last value that holds only at the end of the domain.
     **kwargs
         Passed to ``Axes.plot``, such as ``color``, ``linewidth``, or
         ``label``.
@@ -399,6 +402,8 @@ def plot_timeseries(series, ax=None, **kwargs):
     series = series.to(_time_axis_unit(ax, series.unit))
     times = np.asarray(series.times) + series.origin
     values = np.asarray(series.values)
+    if markers:
+        kwargs = {"marker": "o", "markevery": list(range(len(times))), **kwargs}
     end = series.domain.end + series.origin
     if end > times[-1]:
         # The last value holds until the end of the domain.

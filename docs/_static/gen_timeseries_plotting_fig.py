@@ -17,7 +17,7 @@ def plot_timeseries_steps():
     series = TimeSeries([1.0, 3.0, 2.0, 4.0], times=[0.0, 1.0, 1.5, 3.5])
 
     fig, ax = plt.subplots(figsize=(6, 2.5))
-    plot_timeseries(series, ax=ax)
+    plot_timeseries(series, ax=ax, markers=True)
     fig.tight_layout()
     return fig
 

@@ -4,7 +4,9 @@ Plotting
 :py:func:`~stablebear.plotting.plot_timeseries` draws a time series as the
 step function it evaluates to, with matplotlib. Each value holds from its
 observation until the next one, and the last until the end of the domain.
-The time axis is labeled with the unit of the time series.
+The time axis is labeled with the unit of the time series. With
+``markers=True``, each observation is marked with a dot, which also shows
+the last value, held only at the end of the domain, here 4 at 3.5 s.
 
 .. image:: _static/timeseries_plot_steps_light.png
    :width: 80%

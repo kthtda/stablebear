@@ -1,6 +1,6 @@
 # Time series dates and plotting: implementation plan
 
-Progress: 33 of 47 items, 59 of 86 points (69%)
+Progress: 34 of 47 items, 62 of 86 points (72%)
 
 Spec: [timeseries-dates-and-plotting-spec.md](timeseries-dates-and-plotting-spec.md)
 
@@ -187,7 +187,7 @@ Python cannot observe gets a new `test/test_timeseries.cpp`.
 
 ## Phase F: `plot_timeseries`
 
-- [ ] **F1.** [3] A scalar series on one axes: steps from the first
+- [x] **F1.** [3] (cb6a6f405) A scalar series on one axes: steps from the first
   observation to the domain end, `ax=None` uses the current axes, axis unit
   stored with `set_units`, label `time (<unit>)` if empty; returns the
   lines.

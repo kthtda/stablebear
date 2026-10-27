@@ -56,3 +56,21 @@ def test_no_axes_draws_on_the_current_axes(ax):
     plot_timeseries(_series())
 
     assert len(ax.get_lines()) == 1
+
+
+def test_markers_mark_each_observation(ax):
+    window = Window(size=3.0, step=2.0, closed="left", partial=False, anchor="start")(
+        TimeSeries([10.0, 20.0, 30.0, 40.0], times=[0.0, 1.5, 4.0, 6.0]))[1]
+
+    (line,) = plot_timeseries(window, ax=ax, markers=True)
+
+    # The observations at 2 and 4, not the end of the window at 5.
+    assert line.get_marker() == "o"
+    assert line.get_markevery() == [0, 1]
+
+
+def test_keyword_arguments_reach_the_line(ax):
+    (line,) = plot_timeseries(_series(), ax=ax, color="red", label="signal")
+
+    assert line.get_color() == "red"
+    assert line.get_label() == "signal"
