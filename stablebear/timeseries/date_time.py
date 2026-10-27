@@ -85,6 +85,9 @@ class DateTime:
             return NotImplemented
         return self._data == other._data
 
+    def __reduce__(self):
+        return DateTime, (self.to_datetime64(),)
+
     def __hash__(self):
         return hash((self.count, self.unit))
 

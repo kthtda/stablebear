@@ -1,5 +1,6 @@
 
 import datetime
+import pickle
 
 import numpy as np
 import pytest
@@ -108,6 +109,12 @@ def test_date_times_are_equal_only_at_the_same_resolution():
     assert DateTime("2023-01-01") == DateTime(datetime.date(2023, 1, 1))
     assert DateTime("2023-01-01") != DateTime("2023-01-02")
     assert DateTime("2023-01-01") != DateTime(datetime.datetime(2023, 1, 1))
+
+
+def test_date_time_survives_pickling():
+    date_time = DateTime(np.datetime64("2023-01-01T12:30", "m"))
+
+    assert pickle.loads(pickle.dumps(date_time)) == date_time
 
 
 def test_date_time_repr_shows_the_date():
@@ -880,3 +887,40 @@ def test_series_array_equal_compares_the_channel_order():
     b = TimeSeries([5.0, 15.0], times=Times([0.0, 1.0], unit="ms"), snap_tolerance=0.25)
 
     assert not TimeSeries.from_channels([a, b]).array_equal(TimeSeries.from_channels([b, a]))
+
+
+@pytest.mark.parametrize("round_trip", ROUND_TRIPS)
+@pytest.mark.parametrize("value", [
+    # The finest resolutions reach only a short way from 1970-01-01:
+    # attoseconds about 9.2 s, femtoseconds 2.6 h, and picoseconds 106 days.
+    pytest.param(np.datetime64("1970-01-01T00:00:01.000000000000000001", "as"), id="as"),
+    pytest.param(np.datetime64("1970-01-01T01:00:00.000000000000001", "fs"), id="fs"),
+    pytest.param(np.datetime64("1970-02-01T00:00:00.000000000001", "ps"), id="ps"),
+    pytest.param(np.datetime64("2023-01-01T12:30:00.000000001", "ns"), id="ns"),
+    pytest.param(np.datetime64("2023-01-01T12:30:00.000001", "us"), id="us"),
+    pytest.param(np.datetime64("2023-01-01T12:30:00.001", "ms"), id="ms"),
+    pytest.param(np.datetime64("2023-01-01T12:30:01", "s"), id="s"),
+    pytest.param(np.datetime64("2023-01-01T12:30", "m"), id="min"),
+    pytest.param(np.datetime64("2023-01-01T12", "h"), id="h"),
+    pytest.param(np.datetime64("2023-01-01", "D"), id="d"),
+    pytest.param(np.datetime64("1900-01-01", "D"), id="before-1970"),
+])
+@pytest.mark.parametrize("as_epoch", [
+    pytest.param(lambda value: value, id="datetime64"),
+    pytest.param(DateTime, id="DateTime"),
+])
+def test_series_epoch_survives_saving(value, as_epoch, round_trip):
+    series = TimeSeries([10.0, 20.0], times=Times([0.0, 1.5], unit="s", epoch=as_epoch(value)))
+
+    loaded = round_trip(series)
+
+    assert loaded.epoch == DateTime(value)
+    assert loaded.epoch.to_datetime64() == value
+    assert loaded.epoch.to_datetime64().dtype == value.dtype
+
+
+@pytest.mark.parametrize("round_trip", ROUND_TRIPS)
+def test_series_without_an_epoch_loads_without_one(round_trip):
+    loaded = round_trip(TimeSeries([10.0, 20.0], times=[0.0, 1.5]))
+
+    assert loaded.epoch is None
