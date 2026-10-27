@@ -199,6 +199,14 @@ namespace sb
   }
 
   template <typename T>
+  Channel<T> Channel<T>::with_epoch(std::optional<DateTime> epoch) const
+  {
+    auto channel = *this;
+    channel.m_times = std::make_shared<const Times>(held_times().with_epoch(epoch));
+    return channel;
+  }
+
+  template <typename T>
   Channel<T> Channel<T>::with_start_closed(bool closed) const
   {
     auto channel = *this;
@@ -443,6 +451,17 @@ namespace sb
   {
     auto series = *this;
     series.m_unit = unit;
+    return series;
+  }
+
+  template <typename T>
+  TimeSeries<T> TimeSeries<T>::with_epoch(std::optional<DateTime> epoch) const
+  {
+    auto series = *this;
+    for (auto& channel : series.m_channels)
+    {
+      channel = channel.with_epoch(epoch);
+    }
     return series;
   }
 

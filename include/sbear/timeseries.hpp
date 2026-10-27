@@ -357,6 +357,10 @@ namespace sb
     /// by stack_at keep the start.
     [[nodiscard]] Channel with_start_closed(bool closed) const;
 
+    /// This channel with its times counted from @p epoch, or from none. It
+    /// shares the observations; no time is shifted.
+    [[nodiscard]] Channel with_epoch(std::optional<DateTime> epoch) const;
+
     /// Whether the first timestamp is in the domain.
     [[nodiscard]] bool start_closed() const noexcept { return m_startClosed; }
 
@@ -465,7 +469,7 @@ namespace sb
 
     std::shared_ptr<ChannelStorage<T>> m_storage;  // null for a view
     std::shared_ptr<const Channel> m_source;       // null for stored observations
-    std::shared_ptr<const Times> m_times;
+    std::shared_ptr<const Times> m_times;  // set for a view, or to relabel stored times
     std::shared_ptr<const std::vector<size_t>> m_base;
     std::vector<float64_t> m_lags;
     std::vector<size_t> m_shape;
@@ -516,6 +520,10 @@ namespace sb
     /// The same series queried in @p unit; the channels are shared, not
     /// converted.
     [[nodiscard]] TimeSeries to(TimeUnit unit) const;
+
+    /// The same series with every channel's times counted from @p epoch, or
+    /// from none, sharing the observations; no time is shifted.
+    [[nodiscard]] TimeSeries with_epoch(std::optional<DateTime> epoch) const;
 
     /// The timestamps of channel @p i, converted to the query unit.
     [[nodiscard]] Times times(size_t i) const { return channel(i).times().to(m_unit); }

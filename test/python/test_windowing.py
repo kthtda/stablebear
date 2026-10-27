@@ -392,6 +392,15 @@ def test_an_embedding_keeps_the_epoch_of_its_series():
     assert embedding.epoch == DateTime("2023-01-01")
 
 
+def test_a_window_with_an_epoch_keeps_its_origin():
+    window = Window(size=1.0, step=1.0, closed="left", partial=False, anchor="start")(_windows_source())[2]
+
+    dated = window.with_epoch("2023-01-01")
+
+    assert dated.epoch == DateTime("2023-01-01")
+    assert dated.origin == 2.0
+
+
 def test_a_window_origin_is_reported_in_the_query_unit():
     window = Window(size=1.0, step=1.0, closed="left", partial=False, anchor="start")(_windows_source())[2]
 

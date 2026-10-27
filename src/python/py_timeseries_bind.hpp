@@ -68,6 +68,7 @@ namespace sb_py
       .def("channel", &Series::channel, py::arg("index"), py::return_value_policy::reference_internal)
       .def_property_readonly("n_channels", &Series::n_channels)
       .def_property_readonly("epoch", [](const Series& self) { return self.channel(0).epoch(); })
+      .def("with_epoch", &Series::with_epoch, py::arg("epoch"))
       .def_property_readonly("domain", [](const Series& self) {
         const auto domain = self.domain();
         return py::make_tuple(domain.first, domain.last, domain.closedStart, domain.closedEnd);

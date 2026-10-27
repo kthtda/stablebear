@@ -1,6 +1,6 @@
 # Time series dates and plotting: implementation plan
 
-Progress: 17 of 47 items, 33 of 89 points (37%)
+Progress: 18 of 47 items, 34 of 89 points (38%)
 
 Spec: [timeseries-dates-and-plotting-spec.md](timeseries-dates-and-plotting-spec.md)
 
@@ -120,7 +120,7 @@ Python cannot observe gets a new `test/test_timeseries.cpp`.
   whole, so they cannot drop the epoch and need no tests of their own.
   Tests: kept by windows, delay embeddings, and `TimeSeries.to`; `None`
   without one; one value for a series with several channels.
-- [ ] **C6.** [1] `from_channels` epoch rule.
+- [x] **C6.** [1] (dd3b678d1) `from_channels` epoch rule.
   Tests: equal epochs kept; different epochs raise `ValueError`; some
   `None` and some set raise `ValueError`.
 - [ ] **C7.** [2] `TimeSeries.with_epoch` (C++ and Python), sharing

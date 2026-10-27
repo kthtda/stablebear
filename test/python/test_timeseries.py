@@ -392,6 +392,31 @@ def test_series_epoch_is_one_value_for_several_channels():
     assert TimeSeries.from_channels([a, b], unit="h").epoch == DateTime("2023-01-01")
 
 
+def test_series_with_epoch_sets_the_epoch_of_every_channel():
+    a = TimeSeries([10.0, 20.0], times=Times([0.0, 1.0], unit="h"))
+    b = TimeSeries([-10.0, -20.0], times=Times([0.0, 60.0], unit="min"))
+
+    series = TimeSeries.from_channels([a, b], unit="h").with_epoch("2023-01-01")
+
+    assert series[0].epoch == DateTime("2023-01-01")
+    assert series[1].epoch == DateTime("2023-01-01")
+
+
+def test_series_with_epoch_keeps_its_times_and_values():
+    series = TimeSeries([10.0, 20.0], times=[0.0, 1.5])
+
+    dated = series.with_epoch("2023-01-01")
+
+    assert dated.array_equal(series)
+    assert dated(1.5) == 20.0
+
+
+def test_series_with_epoch_none_removes_the_epoch():
+    series = TimeSeries([10.0, 20.0], times=Times([0.0, 1.5], unit="s", epoch="2023-01-01"))
+
+    assert series.with_epoch(None).epoch is None
+
+
 @pytest.mark.parametrize("epoch_b", [
     pytest.param("2023-01-02", id="different"),
     pytest.param(None, id="missing"),

@@ -460,6 +460,18 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         data = self._data.epoch
         return None if data is None else DateTime._from_cpp(data)
 
+    def with_epoch(self, epoch) -> TimeSeries:
+        """Return the same series with every channel counted from ``epoch``.
+
+        ``epoch`` is a :class:`DateTime` or a value it accepts, or ``None``
+        to remove the epoch. No time is shifted, and the observations are
+        shared, not copied. The epoch is the date of time 0 of the series a
+        window was cut from, so a window keeps its :attr:`origin`.
+        """
+        if epoch is not None:
+            epoch = DateTime(epoch)._data
+        return TimeSeries._from_cpp(self._data.with_epoch(epoch))
+
     @property
     def domain(self) -> Domain:
         """The times at which every channel can be evaluated, in :attr:`unit`.
