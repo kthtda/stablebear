@@ -216,6 +216,29 @@ def test_series_domain_fields_by_name_and_by_unpacking():
     assert (start, end, start_closed, end_closed) == (0.5, 4.0, True, True)
 
 
+def test_series_domain_of_several_channels_is_their_intersection():
+    a = TimeSeries([10.0, 20.0, 30.0], times=Times([0.0, 1.0, 2.5], unit="s"))
+    b = TimeSeries([-10.0, -20.0], times=Times([500.0, 3000.0], unit="ms"))
+
+    series = TimeSeries.from_channels([a, b], unit="s")
+
+    assert series.domain == Domain(0.5, 2.5, True, True)
+
+
+@pytest.mark.parametrize("closed, expected", [
+    pytest.param("left", Domain(0.0, 2.0, True, False), id="open-end"),
+    pytest.param("right", Domain(0.0, 2.0, False, True), id="open-start"),
+])
+def test_series_domain_of_several_channels_excludes_an_end_any_channel_excludes(closed, expected):
+    source = TimeSeries([10.0, 20.0, 30.0, 40.0], times=[0.0, 1.0, 2.0, 3.0])
+    window = Window(size=2.0, step=2.0, closed=closed, partial=False, anchor="start")(source)[0]
+    observed = TimeSeries([-10.0, -20.0, -30.0], times=[0.0, 1.0, 2.0])
+
+    series = TimeSeries.from_channels([window, observed])
+
+    assert series.domain == expected
+
+
 def test_query_just_below_an_observation_snaps_to_it():
     series = TimeSeries([1.0, 2.0, 3.0], times=[0.0, 0.25, 0.5], snap_tolerance=1e-14)
 

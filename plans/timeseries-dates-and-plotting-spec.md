@@ -562,7 +562,7 @@ data, not images.
     - Several channels: the intersection, with the closed flags of the ends
       that bound it.
     - Windows for each `closed` setting (`"left"`, `"right"`, `"both"`,
-      `"neither"`): ends at 0 and `size`, with the matching flags.
+      `"none"`): ends at 0 and `size`, with the matching flags.
     - A partial window: cut end at the series' end, with the series' flag.
     - Unit conversion via `to`.
     - Field access and tuple unpacking.

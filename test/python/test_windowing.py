@@ -5,7 +5,7 @@ import pytest
 
 import stablebear as sb
 from stablebear import FloatTensor
-from stablebear.timeseries import TimeDelayEmbedding, Times, TimeSeries, Window
+from stablebear.timeseries import Domain, TimeDelayEmbedding, Times, TimeSeries, Window
 from stablebear.timeseries.series import TimeSeriesTensor
 
 from _element_values import TWO_ELEMENTS_OF_EVERY_DTYPE
@@ -162,6 +162,18 @@ def test_a_window_closed_on_neither_side_includes_neither_end():
         window(1.0)
 
 
+@pytest.mark.parametrize("closed, start_closed, end_closed", [
+    pytest.param("left", True, False, id="left"),
+    pytest.param("right", False, True, id="right"),
+    pytest.param("both", True, True, id="both"),
+    pytest.param("none", False, False, id="none"),
+])
+def test_a_window_domain_runs_from_zero_to_its_size_with_its_closed_ends(closed, start_closed, end_closed):
+    window = Window(size=2.0, step=2.0, closed=closed, partial=False, anchor="start")(_windows_source())[0]
+
+    assert window.domain == Domain(0.0, 2.0, start_closed, end_closed)
+
+
 def _partial_source():
     # Each observation is 10 * t.
     return TimeSeries([0.0, 10.0, 20.0, 30.0, 40.0], times=[0.0, 1.0, 2.0, 3.0, 4.0])
@@ -219,6 +231,14 @@ def test_a_partial_window_anchored_at_the_end_starts_where_the_series_does():
     assert np.array_equal(np.asarray(windows[1].times), [0.0, 1.0, 2.0, 3.0])
     assert np.array_equal(np.asarray(windows[1].values), [10.0, 20.0, 30.0, 40.0])
     assert windows[1](3.0) == 40.0
+
+
+def test_a_partial_window_domain_ends_where_the_series_does():
+    # The window at 3.0 would end at 6.0; it ends at the series' closed end
+    # at 4.0 instead.
+    window = Window(size=3.0, step=3.0, closed="left", partial=True, anchor="start")(_partial_source())[1]
+
+    assert window.domain == Domain(0.0, 1.0, True, True)
 
 
 def test_a_left_closed_partial_window_can_start_at_the_last_observation():
