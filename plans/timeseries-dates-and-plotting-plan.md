@@ -1,6 +1,6 @@
 # Time series dates and plotting: implementation plan
 
-Progress: 30 of 47 items, 53 of 89 points (60%)
+Progress: 31 of 47 items, 55 of 89 points (62%)
 
 Spec: [timeseries-dates-and-plotting-spec.md](timeseries-dates-and-plotting-spec.md)
 
@@ -172,7 +172,7 @@ Python cannot observe gets a new `test/test_timeseries.cpp`.
     Tests: same embedding as the numeric delay on series in `min` and `h`;
     `repr`; `M` raises.
 - [ ] **E5.** `TimeSeries.bounds`.
-  - [ ] **E5a.** [2] Numeric bounds.
+  - [x] **E5a.** [2] (6c3002a43) Numeric bounds.
     Tests: equal to `domain` for a series built from observations; a
     window's ends are `origin` plus its domain ends with the same flags,
     and match its `return_bounds` row without snapping; one `Domain` per

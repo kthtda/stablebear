@@ -714,3 +714,32 @@ def test_bounds_of_several_channels_are_one_per_channel():
     a, b = window.bounds()
 
     assert (a.start, b.start) == (0.9, 3 * 0.3)
+
+
+@pytest.mark.parametrize("resolution, start, end", [
+    pytest.param("us", np.datetime64("2023-01-01T00:00:02", "us"), np.datetime64("2023-01-01T00:00:03", "us"), id="us"),
+    pytest.param("s", np.datetime64("2023-01-01T00:00:02", "s"), np.datetime64("2023-01-01T00:00:03", "s"), id="s"),
+])
+def test_bounds_as_dates_add_the_epoch(resolution, start, end):
+    window = Window(size=1.0, step=1.0, closed="left", partial=False, anchor="start")(_dated_source())[2]
+
+    bounds = window.bounds(dates=True, resolution=resolution)
+
+    assert (bounds.start, bounds.end) == (start, end)
+    assert bounds.start.dtype == start.dtype
+    assert (bounds.start_closed, bounds.end_closed) == (True, False)
+
+
+def test_bounds_as_dates_need_an_epoch():
+    with pytest.raises(ValueError, match="with_epoch"):
+        _windows_source().bounds(dates=True)
+
+
+def test_window_start_dates_match_the_bounds_from_windowing():
+    windows, bounds = Window(size=1.0, step=1.0, closed="left", partial=False, anchor="start")(
+        _dated_source(), return_bounds=True)
+
+    starts = [windows[k].bounds(dates=True).start for k in range(windows.shape[0])]
+
+    expected = Times([bounds[k, 0] for k in range(windows.shape[0])], unit="s", epoch="2023-01-01").to_datetime64()
+    assert np.array_equal(starts, expected)

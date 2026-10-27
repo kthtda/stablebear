@@ -523,7 +523,7 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         """
         return Domain(*self._data.domain)
 
-    def bounds(self) -> Domain | tuple[Domain, ...]:
+    def bounds(self, *, dates: bool = False, resolution: str = "us") -> Domain | tuple[Domain, ...]:
         """Where each channel lies in the series it was cut from.
 
         The :attr:`domain` of each channel, where it is evaluated, with its
@@ -536,12 +536,29 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         A :class:`Domain` for a series with one channel; for several, a
         tuple with one per channel, in channel order. The channels are not
         intersected, because their origins can differ.
+
+        With ``dates=True``, the ends are dates and times instead,
+        ``np.datetime64`` values at ``resolution`` as
+        :meth:`Times.to_datetime64` gives them.
+
+        Raises
+        ------
+        ValueError
+            If ``dates`` is true and the series has no :attr:`epoch`.
         """
+        if dates and self.epoch is None:
+            raise ValueError("This series has no epoch to give dates and times; set one with with_epoch")
+
+        def end_of(t):
+            if not dates:
+                return t
+            return Times([t], unit=self.unit, epoch=self.epoch).to_datetime64(resolution)[0]
+
         bounds = []
         for i in range(self.n_channels):
             start, end, start_closed, end_closed = self._data.select([i]).domain
             origin = self._data.origin(i)
-            bounds.append(Domain(start + origin, end + origin, start_closed, end_closed))
+            bounds.append(Domain(end_of(start + origin), end_of(end + origin), start_closed, end_closed))
         return bounds[0] if len(bounds) == 1 else tuple(bounds)
 
     @property
