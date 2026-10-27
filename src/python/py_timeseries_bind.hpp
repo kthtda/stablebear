@@ -63,6 +63,10 @@ namespace sb_py
       .def("times", &Series::times, py::arg("index"))
       .def("channel", &Series::channel, py::arg("index"), py::return_value_policy::reference_internal)
       .def_property_readonly("n_channels", &Series::n_channels)
+      .def_property_readonly("domain", [](const Series& self) {
+        const auto domain = self.domain();
+        return py::make_tuple(domain.first, domain.last, domain.closedStart, domain.closedEnd);
+      })
       .def("select", &Series::select, py::arg("indices"))
       .def("array_equal", [](const Series& self, const Series& other) { return self == other; }, py::arg("other"))
       .def("evaluate", [](const Series& self, sb::float64_t t, const std::optional<std::string>& unit) {

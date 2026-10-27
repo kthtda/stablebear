@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import operator
-from typing import Generic, TypeVar
+from typing import Generic, NamedTuple, TypeVar
 
 import numpy as np
 
@@ -176,6 +176,19 @@ def _values_tensor(values):
     if isinstance(values, IndexedElementTensor) and values._has_indexed_storage():
         values = values.to_dense()
     return values
+
+
+class Domain(NamedTuple):
+    """The times at which a series can be evaluated, from ``start`` to ``end``.
+
+    ``start_closed`` and ``end_closed`` say whether ``start`` and ``end``
+    themselves are included.
+    """
+
+    start: float
+    end: float
+    start_closed: bool
+    end_closed: bool
 
 
 class TimeSeries(_BinaryIoMixin, Generic[T]):
@@ -364,6 +377,20 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         """
         shapes = tuple(self._data.channel(i).shape for i in range(self.n_channels))
         return shapes[0] if len(shapes) == 1 else shapes
+
+    @property
+    def domain(self) -> Domain:
+        """The times at which every channel can be evaluated, in :attr:`unit`.
+
+        For several channels, the intersection of their domains, which
+        :meth:`evaluate` checks queries against.
+
+        Raises
+        ------
+        ValueError
+            If a channel has no observations.
+        """
+        return Domain(*self._data.domain)
 
     @property
     def n_observations(self) -> int | IntTensor:

@@ -3,7 +3,7 @@ import numpy as np
 import pytest
 
 import stablebear as sb
-from stablebear.timeseries import TimeDelayEmbedding, Times, TimeSeries, Window
+from stablebear.timeseries import Domain, TimeDelayEmbedding, Times, TimeSeries, Window
 
 from _element_values import TWO_ELEMENTS_OF_EVERY_DTYPE
 from _round_trip import ROUND_TRIPS
@@ -192,6 +192,28 @@ def test_singleton_series_evaluates_at_its_time():
     series = TimeSeries([7.0], times=[2.0])
 
     assert series(2.0) == 7.0
+
+
+def test_series_domain_runs_from_first_to_last_timestamp_closed():
+    series = TimeSeries([10.0, 20.0, 30.0], times=[0.5, 1.5, 4.0])
+
+    assert series.domain == Domain(0.5, 4.0, True, True)
+
+
+def test_series_domain_is_in_the_query_unit():
+    series = TimeSeries([10.0, 20.0, 30.0], times=[0.5, 1.5, 4.0]).to("ms")
+
+    assert series.domain == Domain(500.0, 4000.0, True, True)
+
+
+def test_series_domain_fields_by_name_and_by_unpacking():
+    domain = TimeSeries([10.0, 20.0], times=[0.5, 4.0]).domain
+
+    start, end, start_closed, end_closed = domain
+
+    assert (domain.start, domain.end) == (0.5, 4.0)
+    assert (domain.start_closed, domain.end_closed) == (True, True)
+    assert (start, end, start_closed, end_closed) == (0.5, 4.0, True, True)
 
 
 def test_query_just_below_an_observation_snaps_to_it():
