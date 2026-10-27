@@ -363,6 +363,9 @@ namespace sb
     /// The origin of the channel's times, in its unit.
     [[nodiscard]] float64_t origin() const noexcept { return held_times().origin(); }
 
+    /// The epoch of the channel's times, if any.
+    [[nodiscard]] const std::optional<DateTime>& epoch() const noexcept { return held_times().epoch(); }
+
     /// The observation with the largest timestamp at or before @p t, in the
     /// channel's own unit, a tensor of shape shape(). As in the tolerant
     /// comparison of APL, a query below an observation by at most

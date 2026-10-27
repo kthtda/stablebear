@@ -374,6 +374,24 @@ def test_series_domain_of_several_channels_excludes_an_end_any_channel_excludes(
     assert series.domain == expected
 
 
+def test_series_epoch_is_the_epoch_of_its_times():
+    series = TimeSeries([10.0, 20.0], times=Times([0.0, 1.0], unit="h", epoch="2023-01-01"))
+
+    assert series.epoch == DateTime("2023-01-01")
+    assert series.to("min").epoch == DateTime("2023-01-01")
+
+
+def test_series_without_an_epoch_has_none():
+    assert TimeSeries([10.0, 20.0], times=[0.0, 1.0]).epoch is None
+
+
+def test_series_epoch_is_one_value_for_several_channels():
+    a = TimeSeries([10.0, 20.0], times=Times([0.0, 1.0], unit="h", epoch="2023-01-01"))
+    b = TimeSeries([-10.0, -20.0], times=Times([0.0, 60.0], unit="min", epoch="2023-01-01"))
+
+    assert TimeSeries.from_channels([a, b], unit="h").epoch == DateTime("2023-01-01")
+
+
 def test_series_origin_is_zero_for_recorded_observations():
     series = TimeSeries([10.0, 20.0, 30.0], times=[0.5, 1.5, 4.0])
 

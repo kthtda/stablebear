@@ -449,6 +449,15 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         return FloatTensor(origins, dtype=float64)
 
     @property
+    def epoch(self) -> DateTime | None:
+        """The date and time that time 0 stands for, or ``None``.
+
+        One value even for several channels, which share their epoch.
+        """
+        data = self._data.epoch
+        return None if data is None else DateTime._from_cpp(data)
+
+    @property
     def domain(self) -> Domain:
         """The times at which every channel can be evaluated, in :attr:`unit`.
 

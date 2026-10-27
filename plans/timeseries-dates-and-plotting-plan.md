@@ -1,6 +1,6 @@
 # Time series dates and plotting: implementation plan
 
-Progress: 15 of 47 items, 28 of 89 points (31%)
+Progress: 16 of 47 items, 30 of 89 points (34%)
 
 Spec: [timeseries-dates-and-plotting-spec.md](timeseries-dates-and-plotting-spec.md)
 
@@ -109,15 +109,17 @@ Python cannot observe gets a new `test/test_timeseries.cpp`.
 - [x] **C3.** [1] (f878df80a) `Times.with_epoch`.
   Tests: sets, replaces, and removes (`None`); timestamps and unit
   unchanged; invalid epochs raise as in the constructor.
-- [ ] **C4.** [2] `Times` from a `datetime64` array.
+- [x] **C4.** [2] (0b8245878) `Times` from a `datetime64` array.
   Tests: `datetime64[m]` with `unit="min"` gives the first stamp as epoch
   and exact whole minutes; with `unit="h"`, divided once; with an explicit
   epoch, offsets from it.
-- [ ] **C5.** [3] Series epoch: `TimeSeries.epoch` (one value), and windowing
-  copies the source channel's epoch into each window's `Times`.
-  Tests: kept by windows, delay embeddings, `series[i]`, an element-wise
-  operation, and `TimeSeries.to`; one value for a series with several
-  channels.
+- [ ] **C5.** [3] Series epoch: `TimeSeries.epoch` (one value), read from
+  `Channel::epoch()`; windowing and delay embeddings keep it through
+  `times_like` (B3).
+  Note: channel selection and element-wise operations pass `Times` along
+  whole, so they cannot drop the epoch and need no tests of their own.
+  Tests: kept by windows, delay embeddings, and `TimeSeries.to`; `None`
+  without one; one value for a series with several channels.
 - [ ] **C6.** [1] `from_channels` epoch rule.
   Tests: equal epochs kept; different epochs raise `ValueError`; some
   `None` and some set raise `ValueError`.
