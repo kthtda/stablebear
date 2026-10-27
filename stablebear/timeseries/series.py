@@ -14,7 +14,7 @@ from ..functional.pcf import Pcf
 from ..nested_tensor import NestedTensor, _leaf_wrappers
 from ..point_cloud import PointCloud
 from ..symmetric_matrix import SymmetricMatrix
-from .date_time import _NUMPY_TO_UNIT, DateTime
+from .date_time import _NUMPY_TO_UNIT, _UNIT_TO_NUMPY, DateTime
 from ..typing import (
     _NATIVE_SUFFIX,
     barcode32,
@@ -128,6 +128,28 @@ class Times:
         if epoch is not None:
             epoch = DateTime(epoch)._data
         return Times._from_cpp(self._data.with_epoch(epoch))
+
+    def to_datetime64(self, resolution: str = "us") -> np.ndarray:
+        """The timestamps as dates and times.
+
+        Each timestamp ``t`` becomes ``epoch + origin + t``, rounded to the
+        nearest step of ``resolution``, where ``origin`` places a window in
+        the series it was cut from. ``resolution`` is one of the units of
+        :class:`Times`. The default, microseconds, reaches about 290,000
+        years either side of 1970; nanoseconds reach 1678 to 2262.
+
+        Raises
+        ------
+        ValueError
+            If the timestamps have no epoch, or ``resolution`` is unknown.
+        """
+        if self.epoch is None:
+            raise ValueError("These times have no epoch; set one with with_epoch")
+        # One exact factor to the resolution, then one rounding.
+        converted = self._data.to(resolution)
+        code = _UNIT_TO_NUMPY[converted.unit]
+        steps = np.rint(np.asarray(converted.values) + converted.origin).astype(np.int64)
+        return self.epoch.to_datetime64().astype(f"datetime64[{code}]") + steps.astype(f"timedelta64[{code}]")
 
     def to(self, unit: str) -> Times:
         """Return the same timestamps in another unit, from the same epoch.

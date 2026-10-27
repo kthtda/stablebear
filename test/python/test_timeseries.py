@@ -211,6 +211,30 @@ def test_times_from_datetimes_count_from_an_explicit_epoch():
     assert sb.FloatTensor([6.0, 7.5, 30.0], dtype=sb.float64).array_equal(sb.tensor(times))
 
 
+def test_times_to_datetime64_defaults_to_microseconds():
+    dates = Times([0.0, 1.5], unit="h", epoch="2023-01-01").to_datetime64()
+
+    assert dates.dtype == np.dtype("datetime64[us]")
+    assert np.array_equal(dates, np.array(["2023-01-01T00:00", "2023-01-01T01:30"], dtype="datetime64[us]"))
+
+
+@pytest.mark.parametrize("resolution, expected", [
+    pytest.param("ns", np.array(["2023-01-01T00:00:00", "2023-01-01T00:00:01.5"], dtype="datetime64[ns]"), id="ns"),
+    pytest.param("s", np.array(["2023-01-01T00:00:00", "2023-01-01T00:00:02"], dtype="datetime64[s]"), id="s"),
+])
+def test_times_to_datetime64_rounds_to_the_resolution(resolution, expected):
+    # 1.5 s rounds to 2 s, the nearest even step.
+    dates = Times([0.0, 1.5], unit="s", epoch="2023-01-01").to_datetime64(resolution)
+
+    assert dates.dtype == expected.dtype
+    assert np.array_equal(dates, expected)
+
+
+def test_times_to_datetime64_needs_an_epoch():
+    with pytest.raises(ValueError, match="with_epoch"):
+        Times([0.0, 1.5], unit="s").to_datetime64()
+
+
 def test_times_repr_shows_the_epoch():
     times = Times([0.0, 1.5], unit="s", epoch="2023-01-01")
 

@@ -43,6 +43,7 @@ namespace sb_py
         return std::string(sb::time_unit_name(self.unit()));
       })
       .def_property_readonly("epoch", &sb::Times::epoch)
+      .def_property_readonly("origin", &sb::Times::origin)
       .def("with_epoch", &sb::Times::with_epoch, py::arg("epoch"))
       .def("to", [](const sb::Times& self, const std::string& unit) {
         return self.to(sb::parse_time_unit(unit));

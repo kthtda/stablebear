@@ -642,3 +642,12 @@ def test_tensors_of_windows_differing_only_in_epoch_are_array_equal():
     window = Window(size=1.0, step=1.0, closed="left", partial=False, anchor="start")
 
     assert window(_dated_source()).array_equal(window(_windows_source()))
+
+
+def test_window_dates_include_their_origin():
+    window = Window(size=1.0, step=1.0, closed="left", partial=False, anchor="start")(_dated_source())[2]
+
+    # Window 2 starts at 2 s and holds the observation at 2.5 s.
+    dates = window.times.to_datetime64("ms")
+
+    assert np.array_equal(dates, np.array(["2023-01-01T00:00:02", "2023-01-01T00:00:02.5"], dtype="datetime64[ms]"))

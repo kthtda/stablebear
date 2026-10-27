@@ -1,6 +1,6 @@
 # Time series dates and plotting: implementation plan
 
-Progress: 21 of 47 items, 38 of 89 points (43%)
+Progress: 22 of 47 items, 39 of 89 points (44%)
 
 Spec: [timeseries-dates-and-plotting-spec.md](timeseries-dates-and-plotting-spec.md)
 
@@ -140,7 +140,7 @@ Python cannot observe gets a new `test/test_timeseries.cpp`.
 
 ## Phase E: Dates as time points
 
-- [ ] **E1.** [1] `TimeSeries(values, times=stamps)` with a `datetime64` array
+- [x] **E1.** [1] (b48f80ff8) `TimeSeries(values, times=stamps)` with a `datetime64` array
   builds `Times(stamps, unit="s")`.
   Tests: unit `s`, epoch the first stamp, timestamps in seconds.
 - [ ] **E2.** [2] `Times.to_datetime64(resolution="us")`.
