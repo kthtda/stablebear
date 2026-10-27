@@ -9,7 +9,9 @@
 
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <cmath>
+#include <concepts>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -20,6 +22,7 @@
 #include <numeric>
 #include <span>
 #include <optional>
+#include <ratio>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -145,12 +148,59 @@ namespace sb
     return den == 1 ? value * num : value / den;
   }
 
-  /// One-dimensional, finite, strictly increasing timestamps in one unit.
+  namespace detail
+  {
+    /// The time unit of a std::chrono period, at compile time.
+    template <typename Period>
+    constexpr TimeUnit time_unit_of()
+    {
+      if constexpr (std::ratio_equal_v<Period, std::atto>) return TimeUnit::Attoseconds;
+      else if constexpr (std::ratio_equal_v<Period, std::femto>) return TimeUnit::Femtoseconds;
+      else if constexpr (std::ratio_equal_v<Period, std::pico>) return TimeUnit::Picoseconds;
+      else if constexpr (std::ratio_equal_v<Period, std::nano>) return TimeUnit::Nanoseconds;
+      else if constexpr (std::ratio_equal_v<Period, std::micro>) return TimeUnit::Microseconds;
+      else if constexpr (std::ratio_equal_v<Period, std::milli>) return TimeUnit::Milliseconds;
+      else if constexpr (std::ratio_equal_v<Period, std::ratio<1>>) return TimeUnit::Seconds;
+      else if constexpr (std::ratio_equal_v<Period, std::ratio<60>>) return TimeUnit::Minutes;
+      else if constexpr (std::ratio_equal_v<Period, std::ratio<3600>>) return TimeUnit::Hours;
+      else if constexpr (std::ratio_equal_v<Period, std::ratio<86400>>) return TimeUnit::Days;
+      else static_assert(sizeof(Period) == 0, "No time unit has this period");
+    }
+  }
+
+  /// A calendar instant: @p count units after 1970-01-01T00:00, the value of
+  /// a NumPy datetime64 at its own resolution. As in NumPy and
+  /// std::chrono::sys_time, dates follow the Gregorian calendar and every day
+  /// has 86400 seconds: leap seconds are not counted.
+  struct Epoch
+  {
+    int64_t count;
+    TimeUnit unit;
+
+    constexpr Epoch(int64_t count, TimeUnit unit) noexcept : count(count), unit(unit) {}
+
+    /// The instant @p time, at its resolution, such as
+    /// Epoch(std::chrono::sys_days{2023y / January / 1}).
+    template <typename Duration>
+      requires std::integral<typename Duration::rep>
+    constexpr explicit Epoch(std::chrono::sys_time<Duration> time) noexcept
+      : Epoch(static_cast<int64_t>(time.time_since_epoch().count()), detail::time_unit_of<typename Duration::period>())
+    {
+    }
+
+    /// The same count at the same resolution; the same instant at another
+    /// resolution is a different epoch.
+    bool operator==(const Epoch&) const = default;
+  };
+
+  /// One-dimensional, finite, strictly increasing timestamps in one unit,
+  /// optionally counted from an epoch.
   class Times
   {
   public:
-    explicit Times(std::vector<float64_t> values, TimeUnit unit = TimeUnit::Seconds)
-      : m_values(std::move(values)), m_unit(unit)
+    explicit Times(std::vector<float64_t> values, TimeUnit unit = TimeUnit::Seconds,
+                   std::optional<Epoch> epoch = std::nullopt)
+      : m_values(std::move(values)), m_unit(unit), m_epoch(epoch)
     {
       for (size_t i = 0; i < m_values.size(); ++i)
       {
@@ -169,7 +219,19 @@ namespace sb
     [[nodiscard]] TimeUnit unit() const noexcept { return m_unit; }
     [[nodiscard]] size_t size() const noexcept { return m_values.size(); }
 
-    /// The same timestamps in another unit.
+    /// The instant time 0 stands for, if any.
+    [[nodiscard]] std::optional<Epoch> epoch() const noexcept { return m_epoch; }
+
+    /// The same timestamps counted from @p epoch, or from none; no time is
+    /// shifted.
+    [[nodiscard]] Times with_epoch(std::optional<Epoch> epoch) const
+    {
+      auto times = *this;
+      times.m_epoch = epoch;
+      return times;
+    }
+
+    /// The same timestamps in another unit, from the same epoch.
     [[nodiscard]] Times to(TimeUnit unit) const
     {
       std::vector<float64_t> converted(m_values.size());
@@ -177,7 +239,7 @@ namespace sb
       {
         converted[i] = convert_time(m_values[i], m_unit, unit);
       }
-      return Times(std::move(converted), unit);
+      return Times(std::move(converted), unit, m_epoch);
     }
 
     bool operator==(const Times&) const = default;
@@ -185,6 +247,7 @@ namespace sb
   private:
     std::vector<float64_t> m_values;
     TimeUnit m_unit;
+    std::optional<Epoch> m_epoch;
   };
 
   /// Recorded observations of one channel: one observation per timestamp,

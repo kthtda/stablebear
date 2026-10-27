@@ -31,7 +31,7 @@ Python cannot observe gets a new `test/test_timeseries.cpp`.
 
 ## Phase B: Origin
 
-- [ ] **B1.** C++ `Channel` origin: `m_origin` (default 0), `origin()`,
+- [x] **B1.** C++ `Channel` origin: `m_origin` (default 0), `origin()`,
   `with_origin()`; kept by `take`, `until`, `with_start_closed`, and
   converted with the times when the channel changes unit; compared by
   `operator==`. Bind it and add `TimeSeries.origin` (float for one channel,
@@ -40,10 +40,29 @@ Python cannot observe gets a new `test/test_timeseries.cpp`.
   several; read-only.
 - [ ] **B2.** `windows()` sets each window channel's origin to
   `channel.origin() + shift`.
-  - [ ] **B2a.** Code and the basic case.
+  Note: once windows have non-zero origins, saving must keep them, because
+  `operator==` compares origins and the round-trip tests compare tensors of
+  windows. Saving therefore comes first, together with the epoch, so the
+  file format changes once (moved here from C1 and D1).
+  - [ ] **B2a.** C++ `Epoch` (an `int64_t` count and a `TimeUnit`) and
+    `std::optional<Epoch>` on `Times`; `to` copies it, `operator==` compares
+    it, `with_epoch` replaces it; `Epoch` can be built from a
+    `std::chrono::sys_time`. Not bound to Python yet.
+    Tests: none here; the epoch is tested through Python once it is bound
+    (C2, C3, D1).
+  - [ ] **B2b.** Write and read each channel's origin and its times' epoch
+    in the version 3 record (`include/sbear/io/timeseries_io.hpp`), and
+    replace the pre-release `test/golden/serialization/0.6-pre-timeseries`
+    corpus, which no longer loads. Time series are unreleased, so this
+    replaces the corpus rather than adding a version; confirm with the
+    maintainer before deleting it.
+    Tests: the existing round-trip tests still pass; origins are tested
+    through Python in B2c, and epochs in D1.
+  - [ ] **B2c.** Windows set the origin.
     Tests: with no snapping, each window's origin equals its `return_bounds`
-    start; `origin + t` is within a few ulps of the original timestamps.
-  - [ ] **B2b.** Snapping and nesting (no new code expected).
+    start; `origin + t` is within a few ulps of the original timestamps;
+    save/load and pickle keep the origins of a window tensor.
+  - [ ] **B2d.** Snapping and nesting (no new code expected).
     Tests: a start that snaps onto an observation gives that observation's
     time; two channels that snap differently get different origins; a
     window of a window has its origin in the first series.
@@ -52,27 +71,27 @@ Python cannot observe gets a new `test/test_timeseries.cpp`.
   Tests: kept by delay embeddings, by an element-wise operation (persistent
   homology on a point cloud series), by `series[i]`, and by
   `from_channels`; converted exactly by `TimeSeries.to`.
-- [ ] **B4.** `array_equal` ignores the origin: add a C++ comparison that
-  skips it and bind `array_equal` to it instead of `operator==`
-  (`src/python/py_timeseries_bind.hpp:67`). Add `test/test_timeseries.cpp`.
+- [ ] **B4.** `array_equal` ignores the origin, for series and for tensors
+  of series: add a C++ comparison that skips it, and use it in
+  `TimeSeries.array_equal` (`src/python/py_timeseries_bind.hpp`) and in
+  `TimeSeriesTensor.array_equal` (`src/python/py_tensor.hpp` compares
+  elements with `operator==`).
   Tests: two windows with the same contents from different places are
-  `array_equal` with different origins; in C++, `operator==` is false for
-  them and the new comparison is true.
+  `array_equal` with different origins; two tensors of such windows are
+  `array_equal`; in C++, `operator==` is false for them and the new
+  comparison is true.
 - [ ] **B5.** Docs: `origin` docstring; `Window` docstring on origin versus
   the unsnapped bounds; a paragraph in `docs/timeseries_windows.rst`.
 
 ## Phase C: Epoch on `Times`
 
-- [ ] **C1.** C++ `Epoch` (an `int64_t` count and a `TimeUnit`) and
-  `std::optional<Epoch>` on `Times`; `to` copies it, `operator==` compares
-  it, `with_epoch` replaces it. Bind them.
-  Tests (C++): default empty; `to` keeps it; equality distinguishes
-  epochs; `with_epoch` replaces and clears.
+- [ ] **C1.** Bind the C++ epoch on `Times` (B2a) to Python, internally;
+  the public API follows in C2. (The C++ work moved to B2a.)
 - [ ] **C2.** Python `Times(..., epoch=)` and `Times.epoch`.
   - [ ] **C2a.** Accept and convert.
     Tests: `str`, `np.datetime64`, and naive `datetime` give the same
-    epoch; default `None`; `to` keeps it; `__eq__` compares it; `repr` shows
-    it.
+    instant, each at its own resolution; default `None`; `to` keeps it;
+    `__eq__` compares count and resolution; `repr` shows it.
   - [ ] **C2b.** Reject.
     Tests: timezone-aware `datetime` raises `ValueError`; `W`, `M`, `Y`
     resolutions raise; `NaT` and a non-date raise.
@@ -95,22 +114,16 @@ Python cannot observe gets a new `test/test_timeseries.cpp`.
   observations.
   Tests: sets every channel; values, times, and origins unchanged;
   `None` removes; works on a window.
-- [ ] **C8.** `array_equal` also ignores the epoch (extend the B4
-  comparison).
-  Tests: series differing only in epoch are `array_equal`; C++
-  `operator==` is false for them.
+- [ ] **C8.** `array_equal` also ignores the epoch, for series and tensors
+  of series (extend the B4 comparison).
+  Tests: series differing only in epoch are `array_equal`, and so are
+  tensors of them; C++ `operator==` is false for them.
 
 ## Phase D: Saving origin and epoch
 
-- [ ] **D1.** Write and read each channel's origin and its times' epoch in
-  the version 3 record (`include/sbear/io/timeseries_io.hpp`), and replace
-  the pre-release `test/golden/serialization/0.6-pre-timeseries` corpus,
-  which no longer loads. Time series are unreleased, so this replaces the
-  corpus rather than adding a version; confirm with the maintainer before
-  deleting it.
-  Tests: save/load and pickle keep the origins of a window tensor; keep an
-  epoch exactly at `as` and `d` resolution; a series without an epoch
-  loads without one.
+- [ ] **D1.** Python tests that save/load and pickle keep an epoch set
+  with `Times(..., epoch=)`, at `as` and `d` resolution, and that a series
+  without an epoch loads without one. (Writing and reading moved to B2b.)
 
 ## Phase E: Dates as time points
 

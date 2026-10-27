@@ -144,6 +144,9 @@ def origin(self) -> float | FloatTensor:
   is drawn, so two windows with the same contents cut from different places
   are `array_equal`. Callers that care about placement compare `origin` as
   well. No separate comparison function is added. See Q6.
+- `TimeSeriesTensor.array_equal` ignores origins the same way, element by
+  element: two tensors of windows with the same contents cut from different
+  places are `array_equal`.
 - C++ `TimeSeries::operator==` and `Channel::operator==` compare the origin
   too, so C++ round-trip tests catch a lost origin. The Python binding of
   `array_equal` therefore stops using `operator==`
@@ -191,8 +194,11 @@ class Times:
   epoch instead. This replaces the tides notebook's
   `(stamps - stamps[0]).astype(float)` step.
 - `Times.to(unit)` keeps the epoch.
-- `Times.__eq__` compares the epoch: the same numbers from different epochs
-  are different instants.
+- `Times.__eq__` compares the epoch, count and resolution: the same numbers
+  from different epochs are different instants, and an epoch kept at day
+  resolution (`"2023-01-01"`) differs from the same instant kept at
+  microseconds (`datetime(2023, 1, 1)`). The `epoch` values themselves, as
+  `np.datetime64`, compare as instants in NumPy.
 - `repr` shows `epoch=...` when set.
 
 `TimeSeries` exposes it as `series.epoch`, a `np.datetime64` or `None`. It
@@ -241,7 +247,16 @@ TimeSeries.with_epoch(epoch) -> TimeSeries
 
 - `Times` gains `std::optional<Epoch> m_epoch`, where `Epoch` is an `int64_t`
   count and a `TimeUnit`, the exact value of a `datetime64` at its own
-  resolution. No float is involved, so an epoch round-trips exactly.
+  resolution. No float is involved, so an epoch round-trips exactly. Two
+  epochs are equal when they have the same count at the same resolution;
+  the same instant at another resolution is a different epoch, which keeps
+  the comparison exact without converting between resolutions.
+- Epochs follow NumPy `datetime64` and C++ `std::chrono::sys_time`: the
+  Gregorian calendar, and 86400 seconds in every day, so leap seconds are
+  not counted. Across a leap second, `epoch + t` can differ from UTC by up
+  to a second, as in NumPy, pandas, and Python's `datetime`.
+- `Epoch` can be built from a `std::chrono::sys_time` at any resolution
+  that is a `TimeUnit`, such as `Epoch(sys_days{2023y / January / 1})`.
 - `Times::to` copies it; `Times::operator==` compares it.
 - Windowing, which builds new `Times` for each window channel, copies the
   source channel's epoch.
