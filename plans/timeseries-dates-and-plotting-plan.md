@@ -1,6 +1,6 @@
 # Time series dates and plotting: implementation plan
 
-Progress: 9 of 47 items, 18 of 89 points (20%)
+Progress: 10 of 47 items, 21 of 89 points (24%)
 
 Spec: [timeseries-dates-and-plotting-spec.md](timeseries-dates-and-plotting-spec.md)
 
@@ -76,7 +76,7 @@ Python cannot observe gets a new `test/test_timeseries.cpp`.
   dropped the origin; with the origin on `Times`, no such path can.
   Tests: kept by delay embeddings; converted exactly by `TimeSeries.to`;
   the existing origin and round-trip tests still pass.
-- [ ] **B4.** [3] `array_equal` ignores the origin, for series and for tensors
+- [x] **B4.** [3] (df765bf7e) `array_equal` ignores the origin, for series and for tensors
   of series: add `same_observations()` to `Channel` and `TimeSeries`, which
   skips the origin and epoch of the times, and use it in
   `TimeSeries.array_equal` (`src/python/py_timeseries_bind.hpp`) and, for

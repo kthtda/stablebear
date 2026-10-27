@@ -450,7 +450,12 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
     def array_equal(self, other) -> bool:
         """Whether ``other`` is a series of the same dtype and unit whose
         channels have the same timestamps, values, snap tolerance, and
-        start and end."""
+        start and end.
+
+        :attr:`origin` is not compared: it places a series but does not
+        change how it evaluates, so two windows with the same contents cut
+        from different places are equal.
+        """
         return (isinstance(other, TimeSeries) and other.dtype is self.dtype
                 and self._data.array_equal(other._data))
 

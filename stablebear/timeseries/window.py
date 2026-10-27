@@ -53,7 +53,9 @@ class Window:
     ``a_k + size`` as computed, before any snapping. For
     example, ``3 * 0.3`` computes just below 0.9: a window starting there
     starts at an observation at 0.9, but its bound reads
-    ``0.8999999999999999``.
+    ``0.8999999999999999``. The :attr:`~TimeSeries.origin` of each channel of
+    a window is where its time 0 lies in ``series``, after its own snapping:
+    0.9 in this example.
     Each window shares its observations with ``series`` and copies none; it
     evaluates by previous value on its own times, so it shows only the
     observations it holds.
