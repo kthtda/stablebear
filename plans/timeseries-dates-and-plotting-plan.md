@@ -1,6 +1,6 @@
 # Time series dates and plotting: implementation plan
 
-Progress: 12 of 47 items, 25 of 89 points (28%)
+Progress: 14 of 47 items, 27 of 89 points (30%)
 
 Spec: [timeseries-dates-and-plotting-spec.md](timeseries-dates-and-plotting-spec.md)
 
@@ -100,12 +100,12 @@ Python cannot observe gets a new `test/test_timeseries.cpp`.
   back; `__eq__` compares count and unit; `repr` shows the date;
   timezone-aware `datetime`, `W`/`M`/`Y`, and `NaT` raise `ValueError`, and
   a number raises `TypeError`.
-- [ ] **C2.** Python `Times(..., epoch=)` and `Times.epoch`.
-  - [ ] **C2a.** [2] Accept a `DateTime` or anything `DateTime` accepts; `Times.epoch`
+- [x] **C2.** Python `Times(..., epoch=)` and `Times.epoch`.
+  - [x] **C2a.** [2] (3b8344d5b) Accept a `DateTime` or anything `DateTime` accepts; `Times.epoch`
     returns a `DateTime`.
     Tests: default `None`; a string and a `DateTime` give the same epoch; `to`
     keeps it; `__eq__` compares it; `repr` shows it.
-  - [ ] **C2b.** [0] Reject. (Covered by the `DateTime` tests in C1.)
+  - [x] **C2b.** [0] (3b8344d5b) Reject. (Covered by the `DateTime` tests in C1.)
 - [ ] **C3.** [1] `Times.with_epoch`.
   Tests: sets, replaces, and removes (`None`); timestamps and unit
   unchanged; invalid epochs raise as in the constructor.

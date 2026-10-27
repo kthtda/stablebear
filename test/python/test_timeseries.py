@@ -156,6 +156,30 @@ def test_times_with_different_epochs_are_not_equal():
     assert times != Times([0.0, 1.5], unit="s")
 
 
+def test_times_with_epoch_sets_replaces_and_removes_the_epoch():
+    times = Times([0.0, 1.5], unit="s")
+
+    with_epoch = times.with_epoch("2023-01-01")
+    replaced = with_epoch.with_epoch(DateTime("2023-01-02"))
+    removed = replaced.with_epoch(None)
+
+    assert with_epoch.epoch == DateTime("2023-01-01")
+    assert replaced.epoch == DateTime("2023-01-02")
+    assert removed.epoch is None
+
+
+def test_times_with_epoch_keeps_the_timestamps_and_unit():
+    times = Times([0.0, 1.5], unit="ms").with_epoch("2023-01-01")
+
+    assert np.array_equal(np.asarray(times), [0.0, 1.5])
+    assert times.unit == "ms"
+
+
+def test_times_with_epoch_rejects_an_invalid_epoch():
+    with pytest.raises(ValueError):
+        Times([0.0, 1.5], unit="s").with_epoch(np.datetime64("2023-01", "M"))
+
+
 def test_times_repr_shows_the_epoch():
     times = Times([0.0, 1.5], unit="s", epoch="2023-01-01")
 

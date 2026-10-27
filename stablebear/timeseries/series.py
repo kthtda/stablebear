@@ -91,6 +91,16 @@ class Times:
         data = self._data.epoch
         return None if data is None else DateTime._from_cpp(data)
 
+    def with_epoch(self, epoch) -> Times:
+        """Return the same timestamps counted from ``epoch``.
+
+        ``epoch`` is a :class:`DateTime` or a value it accepts, or ``None``
+        to remove the epoch. No timestamp is shifted.
+        """
+        if epoch is not None:
+            epoch = DateTime(epoch)._data
+        return Times._from_cpp(self._data.with_epoch(epoch))
+
     def to(self, unit: str) -> Times:
         """Return the same timestamps in another unit, from the same epoch.
 
