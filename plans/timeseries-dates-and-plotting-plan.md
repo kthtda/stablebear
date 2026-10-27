@@ -15,23 +15,23 @@ Python cannot observe gets a new `test/test_timeseries.cpp`.
 ## Phase A: Domain accessor
 
 - [x] **A1.** `Domain` and `TimeSeries.domain`.
-  - [x] **A1a.** Bind the C++ `TimeSeries::domain()` and add the
+  - [x] **A1a.** (06ebd30e5) Bind the C++ `TimeSeries::domain()` and add the
     `stablebear.timeseries.Domain` named tuple and the `domain` property,
     converted to the series' unit. Export `Domain`.
     Tests: series built from observations gives first and last timestamps,
     both closed; after `to("ms")`, ends scaled by 1000; field access and
     tuple unpacking.
-  - [x] **A1b.** Tests for windows and channels (no new code expected).
+  - [x] **A1b.** (9abe983a5) Tests for windows and channels (no new code expected).
     Tests: windows for `closed` = `"left"`, `"right"`, `"both"`,
     `"none"` have ends 0 and `size` with matching flags; a partial
     window's cut end and flag follow the series; two channels give the
     intersection, with the flags of the ends that bound it.
-- [x] **A2.** Point the `TimeSeries` docstring's prose on domains to the
+- [x] **A2.** (b3163cb59) Point the `TimeSeries` docstring's prose on domains to the
   property; add `Domain` to `docs/api_timeseries.rst`.
 
 ## Phase B: Origin
 
-- [x] **B1.** C++ `Channel` origin: `m_origin` (default 0), `origin()`,
+- [x] **B1.** (018d84cdb) C++ `Channel` origin: `m_origin` (default 0), `origin()`,
   `with_origin()`; kept by `take`, `until`, `with_start_closed`, and
   converted with the times when the channel changes unit; compared by
   `operator==`. Bind it and add `TimeSeries.origin` (float for one channel,
@@ -44,13 +44,13 @@ Python cannot observe gets a new `test/test_timeseries.cpp`.
   `operator==` compares origins and the round-trip tests compare tensors of
   windows. Saving therefore comes first, together with the epoch, so the
   file format changes once (moved here from C1 and D1).
-  - [x] **B2a.** C++ `Epoch` (an `int64_t` count and a `TimeUnit`) and
+  - [x] **B2a.** (6d050da0e) C++ `Epoch` (an `int64_t` count and a `TimeUnit`) and
     `std::optional<Epoch>` on `Times`; `to` copies it, `operator==` compares
     it, `with_epoch` replaces it; `Epoch` can be built from a
     `std::chrono::sys_time`. Not bound to Python yet.
     Tests: none here; the epoch is tested through Python once it is bound
     (C2, C3, D1).
-  - [ ] **B2b.** Write and read each channel's origin and its times' epoch
+  - [x] **B2b.** (9629137bd, d37757337) Write and read each channel's origin and its times' epoch
     in the version 3 record (`include/sbear/io/timeseries_io.hpp`), and
     replace the pre-release `test/golden/serialization/0.6-pre-timeseries`
     corpus, which no longer loads. Time series are unreleased, so this

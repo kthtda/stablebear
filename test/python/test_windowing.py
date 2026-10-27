@@ -174,6 +174,28 @@ def test_a_window_domain_runs_from_zero_to_its_size_with_its_closed_ends(closed,
     assert window.domain == Domain(0.0, 2.0, start_closed, end_closed)
 
 
+def test_a_window_origin_is_its_start_in_the_series():
+    windows, bounds = Window(size=1.0, step=1.0, closed="left", partial=False, anchor="start")(
+        _windows_source(), return_bounds=True)
+
+    # The windows start at 0.0, 1.0, 2.0, and 3.0; none starts at an
+    # observation it would snap to.
+    origins = FloatTensor([windows[k].origin for k in range(windows.shape[0])], dtype=sb.float64)
+    assert origins.array_equal(bounds[:, 0])
+
+
+def test_a_window_origin_places_its_observations_at_their_times_in_the_series():
+    # Each observation is 10 * t.
+    series = TimeSeries([3.0, 7.0, 9.0], times=[0.3, 0.7, 0.9])
+
+    # The window [0.3, 0.8) holds the observations at 0.3 and 0.7, at times
+    # 0 and 0.7 - 0.3, which rounds to 0.39999999999999997.
+    window = Window(size=0.5, step=0.5, closed="left", partial=False, anchor="start")(series)[0]
+
+    placed = window.origin + sb.tensor(window.times)
+    assert sb.allclose(placed, FloatTensor([0.3, 0.7], dtype=sb.float64), atol=0.0, rtol=4e-16)
+
+
 def _partial_source():
     # Each observation is 10 * t.
     return TimeSeries([0.0, 10.0, 20.0, 30.0, 40.0], times=[0.0, 1.0, 2.0, 3.0, 4.0])
@@ -505,3 +527,13 @@ def test_window_ends_survive_saving(closed, round_trip):
     loaded = round_trip(windows)
 
     assert loaded.array_equal(windows)
+
+
+@pytest.mark.parametrize("round_trip", ROUND_TRIPS)
+def test_window_origins_survive_saving(round_trip):
+    windows = Window(size=1.0, step=1.0, closed="left", partial=False, anchor="start")(_windows_source())
+
+    loaded = round_trip(windows)
+
+    origins = FloatTensor([loaded[k].origin for k in range(loaded.shape[0])], dtype=sb.float64)
+    assert origins.array_equal(FloatTensor([0.0, 1.0, 2.0, 3.0], dtype=sb.float64))

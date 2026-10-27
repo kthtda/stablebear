@@ -177,7 +177,9 @@ namespace sb
           window = window.until(std::max(end, std::nextafter(lastAt, std::numeric_limits<float64_t>::infinity())),
                                 stopClosed);
         }
-        window = window.with_start_closed(startClosed);
+        // Time 0 of the window is the shift in the channel; the origin
+        // places it in the first series the channel was cut from.
+        window = window.with_start_closed(startClosed).with_origin(channel.origin() + shift);
         channels.push_back(std::move(window));
       }
       contents.emplace_back(std::move(channels), series.unit());
