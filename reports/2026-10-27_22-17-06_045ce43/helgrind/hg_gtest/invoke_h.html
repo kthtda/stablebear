@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>/usr/include/c++/13/bits/invoke.h</title>
+    <link href='valgrind.css' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+    <script src="https://code.jquery.com/jquery-3.4.1.js"></script>
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.0.0/styles/default.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.0.0/highlight.min.js"></script>
+    <script src="valgrind.js"></script>
+</head>
+
+<body>
+    <div class="global">
+        <div class="header">
+            <h1>/usr/include/c++/13/bits/invoke.h</h1>
+            <p><b>1</b> errors</p>
+            <button class="next_error">Goto First Error</button>
+        </div>
+        <div class="listing">
+            <pre class="code">
+<code class="c++"><span class="line_number">1</span>// Implementation of INVOKE -*- C++ -*-
+<span class="line_number">2</span>
+<span class="line_number">3</span>// Copyright (C) 2016-2023 Free Software Foundation, Inc.
+<span class="line_number">4</span>//
+<span class="line_number">5</span>// This file is part of the GNU ISO C++ Library.  This library is free
+<span class="line_number">6</span>// software; you can redistribute it and/or modify it under the
+<span class="line_number">7</span>// terms of the GNU General Public License as published by the
+<span class="line_number">8</span>// Free Software Foundation; either version 3, or (at your option)
+<span class="line_number">9</span>// any later version.
+<span class="line_number">10</span>
+<span class="line_number">11</span>// This library is distributed in the hope that it will be useful,
+<span class="line_number">12</span>// but WITHOUT ANY WARRANTY; without even the implied warranty of
+<span class="line_number">13</span>// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+<span class="line_number">14</span>// GNU General Public License for more details.
+<span class="line_number">15</span>
+<span class="line_number">16</span>// Under Section 7 of GPL version 3, you are granted additional
+<span class="line_number">17</span>// permissions described in the GCC Runtime Library Exception, version
+<span class="line_number">18</span>// 3.1, as published by the Free Software Foundation.
+<span class="line_number">19</span>
+<span class="line_number">20</span>// You should have received a copy of the GNU General Public License and
+<span class="line_number">21</span>// a copy of the GCC Runtime Library Exception along with this program;
+<span class="line_number">22</span>// see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
+<span class="line_number">23</span>// &lt;http://www.gnu.org/licenses/&gt;.
+<span class="line_number">24</span>
+<span class="line_number">25</span>/** @file include/bits/invoke.h
+<span class="line_number">26</span> *  This is an internal header file, included by other library headers.
+<span class="line_number">27</span> *  Do not attempt to use it directly. @headername{functional}
+<span class="line_number">28</span> */
+<span class="line_number">29</span>
+<span class="line_number">30</span>#ifndef _GLIBCXX_INVOKE_H
+<span class="line_number">31</span>#define _GLIBCXX_INVOKE_H 1
+<span class="line_number">32</span>
+<span class="line_number">33</span>#pragma GCC system_header
+<span class="line_number">34</span>
+<span class="line_number">35</span>#if __cplusplus &lt; 201103L
+<span class="line_number">36</span># include &lt;bits/c++0x_warning.h&gt;
+<span class="line_number">37</span>#else
+<span class="line_number">38</span>
+<span class="line_number">39</span>#include &lt;type_traits&gt;
+<span class="line_number">40</span>#include &lt;bits/move.h&gt; // forward
+<span class="line_number">41</span>
+<span class="line_number">42</span>namespace std _GLIBCXX_VISIBILITY(default)
+<span class="line_number">43</span>{
+<span class="line_number">44</span>_GLIBCXX_BEGIN_NAMESPACE_VERSION
+<span class="line_number">45</span>
+<span class="line_number">46</span>  /**
+<span class="line_number">47</span>   *  @addtogroup utilities
+<span class="line_number">48</span>   *  @{
+<span class="line_number">49</span>   */
+<span class="line_number">50</span>
+<span class="line_number">51</span>  // Used by __invoke_impl instead of std::forward&lt;_Tp&gt; so that a
+<span class="line_number">52</span>  // reference_wrapper is converted to an lvalue-reference.
+<span class="line_number">53</span>  template&lt;typename _Tp, typename _Up = typename __inv_unwrap&lt;_Tp&gt;::type&gt;
+<span class="line_number">54</span>    constexpr _Up&amp;&amp;
+<span class="line_number">55</span>    __invfwd(typename remove_reference&lt;_Tp&gt;::type&amp; __t) noexcept
+<span class="line_number">56</span>    { return static_cast&lt;_Up&amp;&amp;&gt;(__t); }
+<span class="line_number">57</span>
+<span class="line_number">58</span>  template&lt;typename _Res, typename _Fn, typename... _Args&gt;
+<span class="line_number">59</span>    constexpr _Res
+<span class="line_number">60</span>    __invoke_impl(__invoke_other, _Fn&amp;&amp; __f, _Args&amp;&amp;... __args)
+</code></pre>
+            <div class="issue">
+                <div>
+                    <span class="what">Possible data race during read of size 1 at 0x4BFE24C by thread #18</span>
+                    <div class="navigation">
+                        <button class="next_error">Next</button>
+                        <button class="prev_error">Previous</button>
+                    </div>
+                </div>
+                <div>
+                    <table class="call_stack">
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:111<br>
+                                    <code class="cpp">_ZSt10__invoke_rIvRZZN2tf24make_for_each_index_taskImmmZN2sb6detail18parallel_walk_implINS2_6TensorIdLi0EEEZNS2_19parallel_walk_asyncIS6_ZN47WalkRandom_ParallelWalkRethrowsAnException_Test8TestBodyEvEUlRKSt6vectorImSaImEEE_EENS0_6FutureIvEERKT_OT0_RNS2_8ExecutorEEUlSD_mE_EESG_SJ_SL_SN_EUlmE0_NS0_17GuidedPartitionerINS0_21DefaultClosureWrapperEEEEEDaSH_SK_T1_T2_T3_ENUlRNS0_7RuntimeEE_clESX_EUlvE0_JEENSt9enable_ifIX16is_invocable_r_vISH_SK_DpT1_EESH_E4typeESL_DpOS12_</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">108</span>      using __type = typename __result::type;
+<span class="line_number">109</span>      using __tag = typename __result::__invoke_type;
+<span class="line_number">110</span>      if constexpr (is_void_v&lt;_Res&gt;)
+<span class="line_number">111</span><span class="error">	std::__invoke_impl&lt;__type&gt;(__tag{}, std::forward&lt;_Callable&gt;(__fn),
+</span><span class="line_number">112</span>					std::forward&lt;_Args&gt;(__args)...);
+<span class="line_number">113</span>      else
+<span class="line_number">114</span>	return std::__invoke_impl&lt;__type&gt;(__tag{},
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/std_function.h:290<br>
+                                    <code class="cpp">std::_Function_handler&lt;void (), tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;double, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;double, 0&gt;, WalkRandom_ParallelWalkRethrowsAnException_Test::TestBody()::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;double, 0&gt; const&amp;, WalkRandom_ParallelWalkRethrowsAnException_Test::TestBody()::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;double, 0&gt; const&amp;, WalkRandom_ParallelWalkRethrowsAnException_Test::TestBody()::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;double, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;double, 0&gt;, WalkRandom_ParallelWalkRethrowsAnException_Test::TestBody()::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&gt;(sb::Tensor&lt;double, 0&gt; const&amp;, WalkRandom_ParallelWalkRethrowsAnException_Test::TestBody()::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;double, 0&gt; const&amp;, WalkRandom_ParallelWalkRethrowsAnException_Test::TestBody()::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}&gt;::_M_invoke(std::_Any_data const&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">287</span>      static _Res
+<span class="line_number">288</span>      _M_invoke(const _Any_data&amp; __functor, _ArgTypes&amp;&amp;... __args)
+<span class="line_number">289</span>      {
+<span class="line_number">290</span><span class="error">	return std::__invoke_r&lt;_Res&gt;(*_Base::_M_get_pointer(__functor),
+</span><span class="line_number">291</span>				     std::forward&lt;_ArgTypes&gt;(__args)...);
+<span class="line_number">292</span>      }
+<span class="line_number">293</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/std_function.h:591<br>
+                                    <code class="cpp">std::function&lt;void ()&gt;::operator()() const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">588</span>      {
+<span class="line_number">589</span>	if (_M_empty())
+<span class="line_number">590</span>	  __throw_bad_function_call();
+<span class="line_number">591</span><span class="error">	return _M_invoker(_M_functor, std::forward&lt;_ArgTypes&gt;(__args)...);
+</span><span class="line_number">592</span>      }
+<span class="line_number">593</span>
+<span class="line_number">594</span>#if __cpp_rtti
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/actions-runner/_work/stablebear/stablebear/3rd/taskflow/taskflow/core/executor.hpp:2002<br>
+                                    <code class="cpp">tf::Executor::_invoke_async_task(tf::Worker&amp;, tf::Node*)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1999</span>    // void()
+<span class="line_number">2000</span>    case 0:
+<span class="line_number">2001</span>      _observer_prologue(worker, node);
+<span class="line_number">2002</span><span class="error">      TF_EXECUTOR_EXCEPTION_HANDLER(worker, node, {
+</span><span class="line_number">2003</span>        std::get_if&lt;0&gt;(&amp;work)-&gt;operator()();
+<span class="line_number">2004</span>      });
+<span class="line_number">2005</span>      _observer_epilogue(worker, node);
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/actions-runner/_work/stablebear/stablebear/3rd/taskflow/taskflow/core/executor.hpp:1710<br>
+                                    <code class="cpp">tf::Executor::_invoke(tf::Worker&amp;, tf::Node*)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1707</span>
+<span class="line_number">1708</span>    // async task
+<span class="line_number">1709</span>    case Node::ASYNC: {
+<span class="line_number">1710</span><span class="error">      if(_invoke_async_task(worker, node)) {
+</span><span class="line_number">1711</span>        return;
+<span class="line_number">1712</span>      }
+<span class="line_number">1713</span>      _tear_down_async(worker, node, cache);
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/actions-runner/_work/stablebear/stablebear/3rd/taskflow/taskflow/core/executor.hpp:1424<br>
+                                    <code class="cpp">tf::Executor::_exploit_task(tf::Worker&amp;, tf::Node*&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1421</span>// Procedure: _exploit_task
+<span class="line_number">1422</span>inline void Executor::_exploit_task(Worker&amp; w, Node*&amp; t) {
+<span class="line_number">1423</span>  while(t) {
+<span class="line_number">1424</span><span class="error">    _invoke(w, t);
+</span><span class="line_number">1425</span>    t = w._wsq.pop();
+<span class="line_number">1426</span>  }
+<span class="line_number">1427</span>}
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/actions-runner/_work/stablebear/stablebear/3rd/taskflow/taskflow/core/executor.hpp:1327<br>
+                                    <code class="cpp">tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}::operator()() const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1324</span>        while(1) {
+<span class="line_number">1325</span>
+<span class="line_number">1326</span>          // drains out the local queue first
+<span class="line_number">1327</span><span class="error">          _exploit_task(worker, t);
+</span><span class="line_number">1328</span>
+<span class="line_number">1329</span>          // steals and waits for tasks
+<span class="line_number">1330</span>          if(_wait_for_task(worker, t) == false) {
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:61<br>
+                                    <code class="cpp">void std::__invoke_impl&lt;void, tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}&gt;(std::__invoke_other, tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)::{lambda()#1}&amp;&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">58</span>  template&lt;typename _Res, typename _Fn, typename... _Args&gt;
+<span class="line_number">59</span>    constexpr _Res
+<span class="line_number">60</span>    __invoke_impl(__invoke_other, _Fn&amp;&amp; __f, _Args&amp;&amp;... __args)
+<span class="line_number">61</span><span class="error">    { return std::forward&lt;_Fn&gt;(__f)(std::forward&lt;_Args&gt;(__args)...); }
+</span><span class="line_number">62</span>
+<span class="line_number">63</span>  template&lt;typename _Res, typename _MemFun, typename _Tp, typename... _Args&gt;
+<span class="line_number">64</span>    constexpr _Res
+</code></pre>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            <pre class="code">
+<code class="c++"><span class="line_number">61</span><span class="error">    { return std::forward&lt;_Fn&gt;(__f)(std::forward&lt;_Args&gt;(__args)...); }</span>
+<span class="line_number">62</span>
+<span class="line_number">63</span>  template&lt;typename _Res, typename _MemFun, typename _Tp, typename... _Args&gt;
+<span class="line_number">64</span>    constexpr _Res
+<span class="line_number">65</span>    __invoke_impl(__invoke_memfun_ref, _MemFun&amp;&amp; __f, _Tp&amp;&amp; __t,
+<span class="line_number">66</span>		  _Args&amp;&amp;... __args)
+<span class="line_number">67</span>    { return (__invfwd&lt;_Tp&gt;(__t).*__f)(std::forward&lt;_Args&gt;(__args)...); }
+<span class="line_number">68</span>
+<span class="line_number">69</span>  template&lt;typename _Res, typename _MemFun, typename _Tp, typename... _Args&gt;
+<span class="line_number">70</span>    constexpr _Res
+<span class="line_number">71</span>    __invoke_impl(__invoke_memfun_deref, _MemFun&amp;&amp; __f, _Tp&amp;&amp; __t,
+<span class="line_number">72</span>		  _Args&amp;&amp;... __args)
+<span class="line_number">73</span>    {
+<span class="line_number">74</span>      return ((*std::forward&lt;_Tp&gt;(__t)).*__f)(std::forward&lt;_Args&gt;(__args)...);
+<span class="line_number">75</span>    }
+<span class="line_number">76</span>
+<span class="line_number">77</span>  template&lt;typename _Res, typename _MemPtr, typename _Tp&gt;
+<span class="line_number">78</span>    constexpr _Res
+<span class="line_number">79</span>    __invoke_impl(__invoke_memobj_ref, _MemPtr&amp;&amp; __f, _Tp&amp;&amp; __t)
+<span class="line_number">80</span>    { return __invfwd&lt;_Tp&gt;(__t).*__f; }
+<span class="line_number">81</span>
+<span class="line_number">82</span>  template&lt;typename _Res, typename _MemPtr, typename _Tp&gt;
+<span class="line_number">83</span>    constexpr _Res
+<span class="line_number">84</span>    __invoke_impl(__invoke_memobj_deref, _MemPtr&amp;&amp; __f, _Tp&amp;&amp; __t)
+<span class="line_number">85</span>    { return (*std::forward&lt;_Tp&gt;(__t)).*__f; }
+<span class="line_number">86</span>
+<span class="line_number">87</span>  /// Invoke a callable object.
+<span class="line_number">88</span>  template&lt;typename _Callable, typename... _Args&gt;
+<span class="line_number">89</span>    constexpr typename __invoke_result&lt;_Callable, _Args...&gt;::type
+<span class="line_number">90</span>    __invoke(_Callable&amp;&amp; __fn, _Args&amp;&amp;... __args)
+<span class="line_number">91</span>    noexcept(__is_nothrow_invocable&lt;_Callable, _Args...&gt;::value)
+<span class="line_number">92</span>    {
+<span class="line_number">93</span>      using __result = __invoke_result&lt;_Callable, _Args...&gt;;
+<span class="line_number">94</span>      using __type = typename __result::type;
+<span class="line_number">95</span>      using __tag = typename __result::__invoke_type;
+<span class="line_number">96</span>      return std::__invoke_impl&lt;__type&gt;(__tag{}, std::forward&lt;_Callable&gt;(__fn),
+<span class="line_number">97</span>					std::forward&lt;_Args&gt;(__args)...);
+<span class="line_number">98</span>    }
+<span class="line_number">99</span>
+<span class="line_number">100</span>#if __cplusplus &gt;= 201703L
+<span class="line_number">101</span>  // INVOKE&lt;R&gt;: Invoke a callable object and convert the result to R.
+<span class="line_number">102</span>  template&lt;typename _Res, typename _Callable, typename... _Args&gt;
+<span class="line_number">103</span>    constexpr enable_if_t&lt;is_invocable_r_v&lt;_Res, _Callable, _Args...&gt;, _Res&gt;
+<span class="line_number">104</span>    __invoke_r(_Callable&amp;&amp; __fn, _Args&amp;&amp;... __args)
+<span class="line_number">105</span>    noexcept(is_nothrow_invocable_r_v&lt;_Res, _Callable, _Args...&gt;)
+<span class="line_number">106</span>    {
+<span class="line_number">107</span>      using __result = __invoke_result&lt;_Callable, _Args...&gt;;
+<span class="line_number">108</span>      using __type = typename __result::type;
+<span class="line_number">109</span>      using __tag = typename __result::__invoke_type;
+<span class="line_number">110</span>      if constexpr (is_void_v&lt;_Res&gt;)
+<span class="line_number">111</span>	std::__invoke_impl&lt;__type&gt;(__tag{}, std::forward&lt;_Callable&gt;(__fn),
+<span class="line_number">112</span>					std::forward&lt;_Args&gt;(__args)...);
+<span class="line_number">113</span>      else
+<span class="line_number">114</span>	return std::__invoke_impl&lt;__type&gt;(__tag{},
+<span class="line_number">115</span>					  std::forward&lt;_Callable&gt;(__fn),
+<span class="line_number">116</span>					  std::forward&lt;_Args&gt;(__args)...);
+<span class="line_number">117</span>    }
+<span class="line_number">118</span>#else // C++11 or C++14
+<span class="line_number">119</span>  // This is a non-SFINAE-friendly std::invoke_r&lt;R&gt;(fn, args...) for C++11/14.
+<span class="line_number">120</span>  // It&#39;s used in std::function, std::bind, and std::packaged_task. Only
+<span class="line_number">121</span>  // std::function is constrained on is_invocable_r, but that is checked on
+<span class="line_number">122</span>  // construction so doesn&#39;t need to be checked again when calling __invoke_r.
+<span class="line_number">123</span>  // Consequently, these __invoke_r overloads do not check for invocable
+<span class="line_number">124</span>  // arguments, nor check that the invoke result is convertible to R.
+<span class="line_number">125</span>
+<span class="line_number">126</span>  // INVOKE&lt;R&gt;: Invoke a callable object and convert the result to R.
+<span class="line_number">127</span>  template&lt;typename _Res, typename _Callable, typename... _Args&gt;
+<span class="line_number">128</span>    constexpr __enable_if_t&lt;!is_void&lt;_Res&gt;::value, _Res&gt;
+<span class="line_number">129</span>    __invoke_r(_Callable&amp;&amp; __fn, _Args&amp;&amp;... __args)
+<span class="line_number">130</span>    {
+<span class="line_number">131</span>      using __result = __invoke_result&lt;_Callable, _Args...&gt;;
+<span class="line_number">132</span>      using __type = typename __result::type;
+<span class="line_number">133</span>#if __has_builtin(__reference_converts_from_temporary)
+<span class="line_number">134</span>      static_assert(!__reference_converts_from_temporary(_Res, __type),
+<span class="line_number">135</span>		    &#34;INVOKE&lt;R&gt; must not create a dangling reference&#34;);
+<span class="line_number">136</span>#endif
+<span class="line_number">137</span>      using __tag = typename __result::__invoke_type;
+<span class="line_number">138</span>      return std::__invoke_impl&lt;__type&gt;(__tag{}, std::forward&lt;_Callable&gt;(__fn),
+<span class="line_number">139</span>					std::forward&lt;_Args&gt;(__args)...);
+<span class="line_number">140</span>    }
+<span class="line_number">141</span>
+<span class="line_number">142</span>  // INVOKE&lt;R&gt; when R is cv void
+<span class="line_number">143</span>  template&lt;typename _Res, typename _Callable, typename... _Args&gt;
+<span class="line_number">144</span>    _GLIBCXX14_CONSTEXPR __enable_if_t&lt;is_void&lt;_Res&gt;::value, _Res&gt;
+<span class="line_number">145</span>    __invoke_r(_Callable&amp;&amp; __fn, _Args&amp;&amp;... __args)
+<span class="line_number">146</span>    {
+<span class="line_number">147</span>      using __result = __invoke_result&lt;_Callable, _Args...&gt;;
+<span class="line_number">148</span>      using __type = typename __result::type;
+<span class="line_number">149</span>      using __tag = typename __result::__invoke_type;
+<span class="line_number">150</span>      std::__invoke_impl&lt;__type&gt;(__tag{}, std::forward&lt;_Callable&gt;(__fn),
+<span class="line_number">151</span>				 std::forward&lt;_Args&gt;(__args)...);
+<span class="line_number">152</span>    }
+<span class="line_number">153</span>#endif // C++11 or C++14
+<span class="line_number">154</span>
+<span class="line_number">155</span>_GLIBCXX_END_NAMESPACE_VERSION
+<span class="line_number">156</span>} // namespace std
+<span class="line_number">157</span>
+<span class="line_number">158</span>#endif // C++11
+<span class="line_number">159</span>
+<span class="line_number">160</span>#endif // _GLIBCXX_INVOKE_H
+</code>
+            </pre>
+        </div>
+    </div>
+</body>
+
+</html>
