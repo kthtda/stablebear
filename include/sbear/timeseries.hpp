@@ -418,6 +418,10 @@ namespace sb
     /// the timestamps include their epoch and origin.
     [[nodiscard]] bool operator==(const Channel& other) const;
 
+    /// operator== without the epoch and origin of the timestamps, which
+    /// place a channel but do not change how it evaluates.
+    [[nodiscard]] bool same_observations(const Channel& other) const;
+
     /// Element @p i of the observations at times(), flattened in row-major
     /// order: observation i / prod(shape()), element i % prod(shape()).
     [[nodiscard]] typename std::vector<T>::const_reference flat_value(size_t i) const;
@@ -540,6 +544,15 @@ namespace sb
 
     /// The same unit and channels.
     [[nodiscard]] bool operator==(const TimeSeries& other) const = default;
+
+    /// The same unit, and channels with the same observations; see
+    /// Channel::same_observations().
+    [[nodiscard]] bool same_observations(const TimeSeries& other) const
+    {
+      return m_unit == other.m_unit && std::ranges::equal(m_channels, other.m_channels, [](const auto& a, const auto& b) {
+               return a.same_observations(b);
+             });
+    }
 
     /// Every channel's value at @p t, given in the series' unit: one leaf per
     /// channel, in channel order, each a tensor of that channel's shape.

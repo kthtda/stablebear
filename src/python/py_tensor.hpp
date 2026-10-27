@@ -22,6 +22,31 @@ namespace sb_py
 {
   void register_tensor_bindings(pybind11::module_& m);
 
+  /// Whether two tensors are equal for array_equal. Elements with
+  /// same_observations(), such as time series, are compared with it instead
+  /// of ==, so that where they are placed does not count.
+  template <typename TLhs, typename TRhs>
+  bool array_equal(const TLhs& lhs, const TRhs& rhs)
+  {
+    using T = typename TLhs::value_type;
+    if constexpr (requires(const T& element) { element.same_observations(element); })
+    {
+      if (lhs.shape() != rhs.shape())
+      {
+        return false;
+      }
+      bool equal = true;
+      sb::walk(lhs, [&](const std::vector<size_t>& idx) {
+        return (equal &= lhs(idx).same_observations(rhs(idx)));
+      });
+      return equal;
+    }
+    else
+    {
+      return lhs == rhs;
+    }
+  }
+
   // The element types are bound in several translation units so that they
   // compile in parallel.
   void register_tensor_int_bindings(pybind11::module_& m);
@@ -228,7 +253,7 @@ namespace sb_py
         return sb::elementwise_ne(self, rhs);
       })
       .def("array_equal", [](const TTensor& self, const TPlain& rhs) {
-        return self == rhs;
+        return sb_py::array_equal(self, rhs);
       })
       .def("_set_element", [](TTensor& self,
           const std::vector<size_t>& index, const T& value) {
@@ -339,7 +364,7 @@ namespace sb_py
           return sb::elementwise_ne(self, rhs);
         })
         .def("array_equal", [](const TTensor& self, const TIndexed& rhs) {
-          return self == rhs;
+          return sb_py::array_equal(self, rhs);
         })
         .def("masked_assign", [](TTensor& self, const sb::Tensor<bool>& mask,
             const TIndexed& values) { sb::masked_assign(self, mask, values); })

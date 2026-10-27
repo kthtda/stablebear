@@ -209,9 +209,17 @@ namespace sb
   template <typename T>
   bool Channel<T>::operator==(const Channel& other) const
   {
+    return same_observations(other) && held_times() == other.held_times();
+  }
+
+  template <typename T>
+  bool Channel<T>::same_observations(const Channel& other) const
+  {
+    const auto& times = held_times();
+    const auto& otherTimes = other.held_times();
     return m_snapTolerance == other.m_snapTolerance && m_shape == other.m_shape
            && m_end == other.m_end && end_closed() == other.end_closed() && m_startClosed == other.m_startClosed
-           && held_times() == other.held_times() && values() == other.values();
+           && times.unit() == otherTimes.unit() && times.values() == otherTimes.values() && values() == other.values();
   }
 
   template <typename T>

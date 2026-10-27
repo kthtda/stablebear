@@ -1,6 +1,6 @@
 # Time series dates and plotting: implementation plan
 
-Progress: 8 of 47 items, 15 of 89 points (17%)
+Progress: 9 of 47 items, 18 of 89 points (20%)
 
 Spec: [timeseries-dates-and-plotting-spec.md](timeseries-dates-and-plotting-spec.md)
 
@@ -68,7 +68,7 @@ Python cannot observe gets a new `test/test_timeseries.cpp`.
     Tests: a start that snaps onto an observation gives that observation's
     time; two channels that snap differently get different origins; a
     window of a window has its origin in the first series.
-- [ ] **B3.** [3] Move the origin from `Channel` into `Times`, next to the
+- [x] **B3.** [3] (846a7808d) Move the origin from `Channel` into `Times`, next to the
   epoch, so that every path that passes a channel's times along keeps both.
   Add `Times::with_values` and use it where windowing and delay embeddings
   build new timestamps; `Times::to` converts the origin.
@@ -77,14 +77,16 @@ Python cannot observe gets a new `test/test_timeseries.cpp`.
   Tests: kept by delay embeddings; converted exactly by `TimeSeries.to`;
   the existing origin and round-trip tests still pass.
 - [ ] **B4.** [3] `array_equal` ignores the origin, for series and for tensors
-  of series: add a C++ comparison that skips it, and use it in
-  `TimeSeries.array_equal` (`src/python/py_timeseries_bind.hpp`) and in
-  `TimeSeriesTensor.array_equal` (`src/python/py_tensor.hpp` compares
-  elements with `operator==`).
+  of series: add `same_observations()` to `Channel` and `TimeSeries`, which
+  skips the origin and epoch of the times, and use it in
+  `TimeSeries.array_equal` (`src/python/py_timeseries_bind.hpp`) and, for
+  elements that have it, in tensor `array_equal` (`src/python/py_tensor.hpp`).
+  Note: with the origin and epoch both on `Times`, this also ignores the
+  epoch, so C8 only adds its tests. Python cannot observe `operator==`; the
+  round-trip tests compare origins directly instead.
   Tests: two windows with the same contents from different places are
   `array_equal` with different origins; two tensors of such windows are
-  `array_equal`; in C++, `operator==` is false for them and the new
-  comparison is true.
+  `array_equal`.
 - [ ] **B5.** [2] Docs: `origin` docstring; `Window` docstring on origin versus
   the unsnapped bounds; a paragraph in `docs/timeseries_windows.rst`.
 
@@ -119,10 +121,10 @@ Python cannot observe gets a new `test/test_timeseries.cpp`.
   observations.
   Tests: sets every channel; values, times, and origins unchanged;
   `None` removes; works on a window.
-- [ ] **C8.** [1] `array_equal` also ignores the epoch, for series and tensors
-  of series (extend the B4 comparison).
+- [ ] **C8.** [1] Tests that `array_equal` ignores the epoch, for series and
+  tensors of series (the comparison from B4 already skips it).
   Tests: series differing only in epoch are `array_equal`, and so are
-  tensors of them; C++ `operator==` is false for them.
+  tensors of them.
 
 ## Phase D: Saving origin and epoch
 

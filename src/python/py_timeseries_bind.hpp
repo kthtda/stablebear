@@ -72,7 +72,8 @@ namespace sb_py
         return py::make_tuple(domain.first, domain.last, domain.closedStart, domain.closedEnd);
       })
       .def("select", &Series::select, py::arg("indices"))
-      .def("array_equal", [](const Series& self, const Series& other) { return self == other; }, py::arg("other"))
+      .def("array_equal", [](const Series& self, const Series& other) { return self.same_observations(other); },
+           py::arg("other"))
       .def("evaluate", [](const Series& self, sb::float64_t t, const std::optional<std::string>& unit) {
         return unit ? self.to(sb::parse_time_unit(*unit)).evaluate(t) : self.evaluate(t);
       }, py::arg("t"), py::arg("unit") = py::none(), py::call_guard<py::gil_scoped_release>())

@@ -587,3 +587,21 @@ def test_window_origins_survive_saving(round_trip):
 
     origins = FloatTensor([loaded[k].origin for k in range(loaded.shape[0])], dtype=sb.float64)
     assert origins.array_equal(FloatTensor([0.0, 1.0, 2.0, 3.0], dtype=sb.float64))
+
+
+def _windows_of_pattern(start):
+    # The pattern 0, 1 repeats every 2 seconds from start.
+    series = TimeSeries([0.0, 1.0, 0.0, 1.0, 0.0], times=start + np.arange(5.0))
+    return Window(size=2.0, step=2.0, closed="left", partial=False, anchor="start")(series)
+
+
+def test_windows_with_the_same_contents_from_different_places_are_array_equal():
+    early = _windows_of_pattern(0.0)
+    late = _windows_of_pattern(10.0)
+
+    assert early[0].array_equal(late[0])
+    assert (early[0].origin, late[0].origin) == (0.0, 10.0)
+
+
+def test_tensors_of_windows_with_the_same_contents_from_different_places_are_array_equal():
+    assert _windows_of_pattern(0.0).array_equal(_windows_of_pattern(10.0))
