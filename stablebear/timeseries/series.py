@@ -286,7 +286,10 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         uint32, uint64, and bool are kept, other floats become float64,
         and other integers become int64.
     times : Times or array_like
-        One timestamp per observation. A plain array is in seconds.
+        One timestamp per observation. A plain array is in seconds; a
+        ``datetime64`` array is counted in seconds from its first date and
+        time, which becomes the epoch. Pass :class:`Times` to choose the
+        unit or the epoch.
     snap_tolerance : float, optional
         How close below an observation a query may land and still get that
         observation, relative to the magnitude of the timestamps, as in the

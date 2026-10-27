@@ -388,6 +388,16 @@ def test_series_epoch_is_the_epoch_of_its_times():
     assert series.to("min").epoch == DateTime("2023-01-01")
 
 
+def test_series_from_datetimes_counts_seconds_from_the_first():
+    stamps = np.array(["2023-01-01T06:00", "2023-01-01T06:01", "2023-01-01T07:00"], dtype="datetime64[m]")
+
+    series = TimeSeries([10.0, 20.0, 30.0], times=stamps)
+
+    assert series.unit == "s"
+    assert series.epoch == DateTime(np.datetime64("2023-01-01T06:00", "m"))
+    assert sb.FloatTensor([0.0, 60.0, 3600.0], dtype=sb.float64).array_equal(sb.tensor(series.times))
+
+
 def test_series_without_an_epoch_has_none():
     assert TimeSeries([10.0, 20.0], times=[0.0, 1.0]).epoch is None
 

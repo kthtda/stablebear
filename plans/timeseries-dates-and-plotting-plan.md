@@ -1,6 +1,6 @@
 # Time series dates and plotting: implementation plan
 
-Progress: 19 of 47 items, 36 of 89 points (40%)
+Progress: 21 of 47 items, 38 of 89 points (43%)
 
 Spec: [timeseries-dates-and-plotting-spec.md](timeseries-dates-and-plotting-spec.md)
 
@@ -127,14 +127,14 @@ Python cannot observe gets a new `test/test_timeseries.cpp`.
   observations.
   Tests: sets every channel; values, times, and origins unchanged;
   `None` removes; works on a window.
-- [ ] **C8.** [1] Tests that `array_equal` ignores the epoch, for series and
+- [x] **C8.** [1] (e506263b6) Tests that `array_equal` ignores the epoch, for series and
   tensors of series (the comparison from B4 already skips it).
   Tests: series differing only in epoch are `array_equal`, and so are
   tensors of them.
 
 ## Phase D: Saving origin and epoch
 
-- [ ] **D1.** [1] Python tests that save/load and pickle keep an epoch set
+- [x] **D1.** [1] (6e9f79b1d) Python tests that save/load and pickle keep an epoch set
   with `Times(..., epoch=)`, at `as` and `d` resolution, and that a series
   without an epoch loads without one. (Writing and reading moved to B2b.)
 
