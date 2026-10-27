@@ -132,6 +132,42 @@ first and the last window are drawn over the series::
       :pyobject: plot_timeseries_some_windows
       :language: python
 
+Several channels
+----------------
+
+A time series with several channels (see :doc:`timeseries_channels`) is
+drawn with one row per channel, in channel order, in a new figure whose
+rows share the time axis. Every channel is drawn in the unit of the time
+series, whatever its own unit::
+
+   from stablebear.timeseries import Times
+
+   a = TimeSeries([1.0, 2.0, 3.0, 4.0], times=[0.0, 0.1, 0.2, 0.3])
+   b = TimeSeries([10.0, 20.0, 30.0], times=Times([50.0, 90.0, 130.0], unit="ms"))
+   series = TimeSeries.from_channels([a, b], unit="s")
+
+   plot_timeseries(series, markers=True)
+
+.. image:: _static/timeseries_plot_channels_light.png
+   :width: 80%
+   :class: only-light
+   :alt: Two channels in seconds and milliseconds drawn as rows sharing a time axis
+
+.. image:: _static/timeseries_plot_channels_dark.png
+   :width: 80%
+   :class: only-dark
+   :alt: Two channels in seconds and milliseconds drawn as rows sharing a time axis
+
+.. dropdown:: Show plotting code
+   :color: secondary
+
+   .. literalinclude:: _static/gen_timeseries_plotting_fig.py
+      :pyobject: plot_timeseries_channels
+      :language: python
+
+Channel ``b``, recorded in milliseconds, is drawn in seconds, the unit of
+``series``, and only the last row is labeled with it.
+
 Time units
 ----------
 

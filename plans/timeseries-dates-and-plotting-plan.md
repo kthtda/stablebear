@@ -1,6 +1,6 @@
 # Time series dates and plotting: implementation plan
 
-Progress: 37 of 47 items, 67 of 86 points (78%)
+Progress: 38 of 47 items, 70 of 86 points (81%)
 
 Spec: [timeseries-dates-and-plotting-spec.md](timeseries-dates-and-plotting-spec.md)
 
@@ -207,7 +207,7 @@ Python cannot observe gets a new `test/test_timeseries.cpp`.
   `label` is used as-is; `(2, 2)` raises `ValueError`.
   Deferred: whether to draw every component, or to select components of
   the observations as a time series first, is still open.
-- [ ] **F5.** [3] `TimeSeriesTensor` input and `relative`.
+- [x] **F5.** [3] (a9a3c6b1d) `TimeSeriesTensor` input and `relative`.
   Tests: three windows give three lines in successive cycle colors; by
   default each starts at its origin and matches the series' points there;
   with `relative=True` each starts at 0; an empty tensor draws nothing;

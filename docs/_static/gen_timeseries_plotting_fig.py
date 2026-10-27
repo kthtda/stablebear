@@ -91,12 +91,26 @@ def plot_timeseries_some_windows():
     return fig
 
 
+# -- included in docs via literalinclude :pyobject: --
+def plot_timeseries_channels():
+    a = TimeSeries([1.0, 2.0, 3.0, 4.0], times=[0.0, 0.1, 0.2, 0.3])
+    b = TimeSeries([10.0, 20.0, 30.0], times=Times([50.0, 90.0, 130.0], unit="ms"))
+    series = TimeSeries.from_channels([a, b], unit="s")
+
+    lines = plot_timeseries(series, markers=True)
+    fig = lines[0].figure
+    fig.set_size_inches(6, 3.5)
+    fig.tight_layout()
+    return fig
+
+
 if __name__ == "__main__":
     for name, plot_func in [("timeseries_plot_steps", plot_timeseries_steps),
                             ("timeseries_plot_window_in_place", plot_timeseries_window_in_place),
                             ("timeseries_plot_units", plot_timeseries_units),
                             ("timeseries_plot_sharex", plot_timeseries_sharex),
                             ("timeseries_plot_windows_relative", plot_timeseries_windows_relative),
-                            ("timeseries_plot_some_windows", plot_timeseries_some_windows)]:
+                            ("timeseries_plot_some_windows", plot_timeseries_some_windows),
+                            ("timeseries_plot_channels", plot_timeseries_channels)]:
         _save_themed(plot_func, *LIGHT, HERE / f"{name}_light.png")
         _save_themed(plot_func, *DARK, HERE / f"{name}_dark.png")

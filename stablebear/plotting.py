@@ -374,6 +374,27 @@ def _time_axis_unit(ax, unit, requested):
     return current
 
 
+def _channel_rows(n_channels):
+    """A new figure with one row of axes per channel, sharing the x axis."""
+    _, axes = plt.subplots(n_channels, 1, sharex=True, squeeze=False)
+    return list(axes[:, 0])
+
+
+def _plot_channels(series, axes, *, unit, **options):
+    """Plot each channel of ``series`` on its own axes, in one time unit."""
+    # The unit is resolved once, from the first row, so that every row uses
+    # it even on axes that do not share x.
+    requested = None if unit is None else series.to(unit).unit
+    unit = _time_axis_unit(axes[0], requested or series.unit, requested)
+    unlabeled = [not row.get_xlabel() for row in axes]
+    lines = [line for i, row in enumerate(axes) for line in plot_timeseries(series[i], ax=row, unit=unit, **options)]
+    # Only the last row keeps the time label.
+    for row, was_unlabeled in zip(axes[:-1], unlabeled[:-1]):
+        if was_unlabeled:
+            row.set_xlabel("")
+    return lines
+
+
 def plot_timeseries(series, ax=None, *, unit=None, relative=False, markers=False, **kwargs):
     """Plot a time series as the step function it evaluates to.
 
@@ -386,11 +407,14 @@ def plot_timeseries(series, ax=None, *, unit=None, relative=False, markers=False
     Parameters
     ----------
     series : TimeSeries or TimeSeriesTensor
-        A time series with one channel of scalar observations, or a 1-D
-        tensor of them, such as windows, drawn one line each, each taking
-        the next color of the axes unless ``color`` is given.
+        A time series of scalar observations, or a 1-D tensor of them, such
+        as windows, drawn one line each, each taking the next color of the
+        axes unless ``color`` is given. A time series with several channels
+        is drawn with one row per channel, in channel order, on axes that
+        share the time axis; only the last row is labeled.
     ax : matplotlib axes, optional
-        Axes to draw on. If ``None``, uses the current axes.
+        Axes to draw on. If ``None``, uses the current axes, or for several
+        channels creates a new figure with one row per channel.
     unit : str, optional
         The time unit of the x axis, one of the units of
         :class:`~stablebear.timeseries.Times`. Defaults to the unit the axis
@@ -429,13 +453,17 @@ def plot_timeseries(series, ax=None, *, unit=None, relative=False, markers=False
     """
     from .timeseries.series import TimeSeriesTensor
 
-    ax = plt.gca() if ax is None else ax
+    options = dict(unit=unit, relative=relative, markers=markers, **kwargs)
     if isinstance(series, TimeSeriesTensor):
         tensor = series.squeeze() if len(series.shape) != 1 else series
         if len(tensor.shape) != 1:
             raise ValueError(f"Expected a 1-D tensor of time series, got shape {series.shape}")
-        return [line for k in range(tensor.shape[0])
-                for line in plot_timeseries(tensor[k], ax=ax, unit=unit, relative=relative, markers=markers, **kwargs)]
+        if ax is None and tensor.shape[0] > 0 and tensor[0].n_channels > 1:
+            ax = _channel_rows(tensor[0].n_channels)
+        return [line for k in range(tensor.shape[0]) for line in plot_timeseries(tensor[k], ax=ax, **options)]
+    if series.n_channels > 1:
+        return _plot_channels(series, _channel_rows(series.n_channels) if ax is None else ax, **options)
+    ax = plt.gca() if ax is None else ax
     requested = None if unit is None else series.to(unit).unit
     series = series.to(_time_axis_unit(ax, requested or series.unit, requested))
     offset = 0.0 if relative else series.origin

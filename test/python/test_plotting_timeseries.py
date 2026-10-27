@@ -154,3 +154,37 @@ def test_a_tensor_with_two_dimensions_raises(ax):
 def test_vector_observations_raise(ax):
     with pytest.raises(ValueError, match="scalar"):
         plot_timeseries(TimeSeries([[1.0, 2.0], [3.0, 4.0]], times=[0.0, 1.0]), ax=ax)
+
+
+def _channels():
+    a = TimeSeries([1.0, 2.0], times=Times([0.0, 2.0], unit="s"))
+    b = TimeSeries([10.0, 20.0, 30.0], times=Times([0.0, 1000.0, 2000.0], unit="ms"))
+    c = TimeSeries([-1.0, -2.0], times=Times([0.0, 2.0], unit="s"))
+    return TimeSeries.from_channels([a, b, c], unit="s")
+
+
+def test_several_channels_are_drawn_on_new_rows_sharing_time():
+    import matplotlib.pyplot as plt
+    lines = plot_timeseries(_channels())
+
+    rows = [line.axes for line in lines]
+    assert len(set(rows)) == 3
+    assert [list(line.get_ydata()) for line in lines] == [[1.0, 2.0], [10.0, 20.0, 30.0], [-1.0, -2.0]]
+    assert rows[0].get_shared_x_axes().joined(rows[0], rows[2])
+    plt.close(rows[0].figure)
+
+
+def test_channels_in_other_units_are_drawn_in_the_unit_of_the_series():
+    import matplotlib.pyplot as plt
+    lines = plot_timeseries(_channels())
+
+    assert list(lines[1].get_xdata()) == [0.0, 1.0, 2.0]
+    plt.close(lines[0].axes.figure)
+
+
+def test_only_the_last_row_is_labeled():
+    import matplotlib.pyplot as plt
+    lines = plot_timeseries(_channels())
+
+    assert [line.axes.get_xlabel() for line in lines] == ["", "", "time (s)"]
+    plt.close(lines[0].axes.figure)
