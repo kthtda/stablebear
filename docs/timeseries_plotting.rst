@@ -287,6 +287,11 @@ recorded through a day are drawn with the window from 10:00 to 14:00::
       :pyobject: plot_timeseries_dates
       :language: python
 
-The dates are ``epoch + origin + t``, rounded to microseconds, and the date
+The dates are ``epoch + origin + t``, rounded to microseconds, so epochs
+are not recommended for times much finer than that, such as picoseconds
+(see :doc:`timeseries_dates`). The date
 axis is formatted and labeled as matplotlib does for any dates. With
-``relative=True``, the times are drawn as numbers from 0 instead.
+``relative=True``, the times are drawn as numbers from 0 instead, and only
+then does ``unit=`` apply. A time series with an epoch and one without
+cannot share an axes: one needs a date axis, the other a time axis in a
+unit. Time series with different epochs can, each at its own dates.

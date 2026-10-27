@@ -240,3 +240,40 @@ def test_dates_are_rounded_to_microseconds(ax):
 
     expected = np.array(["2023-01-01T00:00:00.000000", "2023-01-01T00:00:00.000002"], dtype="datetime64[us]")
     assert np.array_equal(line.get_xdata(), expected)
+
+
+def test_relative_draws_a_series_with_an_epoch_at_its_times(ax):
+    (line,) = plot_timeseries(_dated(), ax=ax, relative=True, unit="min")
+
+    assert list(line.get_xdata()) == [0.0, 90.0, 240.0]
+    assert ax.get_xlabel() == "time (min)"
+
+
+def test_unit_with_an_epoch_raises(ax):
+    with pytest.raises(ValueError, match="relative=True"):
+        plot_timeseries(_dated(), ax=ax, unit="h")
+
+
+def test_a_series_with_an_epoch_on_a_time_axis_raises(ax):
+    plot_timeseries(_series(), ax=ax)
+
+    with pytest.raises(ValueError, match="time axis"):
+        plot_timeseries(_dated(), ax=ax)
+
+
+def test_several_channels_with_an_epoch_are_drawn_at_their_dates():
+    import matplotlib.pyplot as plt
+    series = _dated()
+    lines = plot_timeseries(TimeSeries.from_channels([series, series]))
+
+    assert all(line.get_xdata().dtype == np.dtype("datetime64[us]") for line in lines)
+    plt.close(lines[0].axes.figure)
+
+
+def test_series_with_different_epochs_land_at_their_own_dates(ax):
+    later = _dated().with_epoch("2023-01-02")
+
+    first, = plot_timeseries(_dated(), ax=ax)
+    second, = plot_timeseries(later, ax=ax)
+
+    assert second.get_xdata()[0] - first.get_xdata()[0] == np.timedelta64(1, "D")

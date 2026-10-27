@@ -453,9 +453,11 @@ def plot_timeseries(series, ax=None, *, unit=None, relative=False, markers=False
     ValueError
         If ``unit`` differs from the unit the x axis already has, the
         observations are not scalars, or a tensor has more than one
-        dimension.
+        dimension; for a time series with an epoch, if ``unit`` is given
+        or the x axis has a time unit, unless ``relative`` is true.
     TypeError
-        If the x axis holds dates or other values that are not times.
+        If the x axis holds dates or other values that are not times, for a
+        time series drawn at times.
 
     Notes
     -----
@@ -482,7 +484,13 @@ def plot_timeseries(series, ax=None, *, unit=None, relative=False, markers=False
                               **options)
     ax = plt.gca() if ax is None else ax
     dated = series.epoch is not None and not relative
-    if not dated:
+    if dated:
+        if unit is not None:
+            raise ValueError("A time series with an epoch is drawn at dates, which have no unit; "
+                             "pass unit only with relative=True")
+        if isinstance(ax.xaxis.get_units(), str):
+            raise ValueError(f"The x axis is a time axis in {ax.xaxis.get_units()!r}, not a date axis")
+    else:
         requested = None if unit is None else series.to(unit).unit
         series = series.to(_time_axis_unit(ax, requested or series.unit, requested))
     offset = 0.0 if relative else series.origin

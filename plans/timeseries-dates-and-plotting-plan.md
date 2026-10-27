@@ -1,6 +1,6 @@
 # Time series dates and plotting: implementation plan
 
-Progress: 40 of 47 items, 73 of 86 points (85%)
+Progress: 41 of 47 items, 76 of 86 points (88%)
 
 Spec: [timeseries-dates-and-plotting-spec.md](timeseries-dates-and-plotting-spec.md)
 
@@ -221,7 +221,7 @@ Python cannot observe gets a new `test/test_timeseries.cpp`.
     raise `ValueError` mentioning `series[i]`. (The case of a vector channel
     waits for F4.)
 - [ ] **F7.** Date axes for series with an epoch.
-  - [ ] **F7a.** [3] Placement at `epoch + origin + t`, microsecond rounding.
+  - [x] **F7a.** [3] (5d171d1e5) Placement at `epoch + origin + t`, microsecond rounding.
     Tests: a series in `h` matches `mdates.date2num` of the expected dates;
     windows at their dates; `ns` times rounded to the nearest microsecond.
   - [ ] **F7b.** [2] Rules and errors.

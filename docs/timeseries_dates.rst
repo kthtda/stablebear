@@ -48,6 +48,14 @@ and every day has 86400 seconds: leap seconds are not counted. Resolutions of
 weeks, months, and years are rejected, since months and years have no fixed
 length.
 
+.. note::
+
+   Epochs are not recommended for times much finer than microseconds, such
+   as picoseconds. Dates computed from them, by
+   :py:meth:`Times.to_datetime64 <stablebear.timeseries.Times.to_datetime64>`
+   by default and by plotting, are rounded to microseconds, so such times
+   collapse onto the same dates. Keep these times as numbers instead.
+
 All channels of a time series share one epoch, so
 :py:meth:`TimeSeries.from_channels
 <stablebear.timeseries.TimeSeries.from_channels>` raises if their epochs
