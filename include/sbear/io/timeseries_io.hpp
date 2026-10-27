@@ -103,9 +103,9 @@ namespace sb::io::detail
           epoch = Epoch(count, read_time_unit(is));
         }
 
-        auto channel = Channel<T>(Times(std::move(times), channelUnit, epoch), values, snapTolerance)
-                           .with_start_closed(startClosed)
-                           .with_origin(origin);
+        auto channel = Channel<T>(Times(std::move(times), channelUnit, epoch).with_origin(origin), values,
+                                  snapTolerance)
+                           .with_start_closed(startClosed);
         if (end)
         {
           channel = channel.until(*end, endClosed);

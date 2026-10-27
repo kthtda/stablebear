@@ -342,14 +342,16 @@ def test_a_window_start_that_snaps_to_an_observation_has_its_time_as_origin():
     assert windows[3].origin == 0.9
 
 
-def test_channels_that_snap_differently_have_different_origins():
+def _snapping_channels():
     # Channel a has an observation at 0.9 for window 3's start to snap to;
     # channel b does not.
     a = TimeSeries([0.0, 3.0, 6.0, 9.0, 12.0], times=[0.0, 0.3, 0.6, 0.9, 1.2])
     b = TimeSeries([0.0, -5.0, -10.0, -12.0], times=[0.0, 0.5, 1.0, 1.2])
-    series = TimeSeries.from_channels([a, b])
+    return TimeSeries.from_channels([a, b])
 
-    window = Window(size=0.3, step=0.3, closed="left", partial=False, anchor="start")(series)[3]
+
+def test_channels_that_snap_differently_have_different_origins():
+    window = Window(size=0.3, step=0.3, closed="left", partial=False, anchor="start")(_snapping_channels())[3]
 
     assert FloatTensor([0.9, 3 * 0.3], dtype=sb.float64).array_equal(window.origin)
 
@@ -362,6 +364,20 @@ def test_a_window_of_a_window_has_its_origin_in_the_first_series():
     inner = Window(size=2.0, step=2.0, closed="left", partial=False, anchor="start")(window)
 
     assert (inner[0].origin, inner[1].origin) == (4.0, 6.0)
+
+
+def test_an_embedding_of_a_window_keeps_its_origin():
+    window = Window(size=2.0, step=2.0, closed="left", partial=False, anchor="start")(_windows_source())[1]
+
+    embedding = TimeDelayEmbedding(dimension=2, delay=0.5)(window)
+
+    assert embedding.origin == 2.0
+
+
+def test_a_window_origin_is_reported_in_the_query_unit():
+    window = Window(size=1.0, step=1.0, closed="left", partial=False, anchor="start")(_windows_source())[2]
+
+    assert window.to("ms").origin == 2000.0
 
 
 def test_an_embedding_of_a_window_keeps_its_open_end():

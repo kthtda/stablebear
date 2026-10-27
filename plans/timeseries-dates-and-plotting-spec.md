@@ -106,16 +106,21 @@ distance; a per-channel origin is exact.
 
 ### C++
 
-- `Channel` gains `float64_t m_origin`, in the channel's unit, default 0,
-  with `origin()` and `with_origin(float64_t)`.
-- `windows()` sets each window channel's origin to
+- The origin belongs to the time axis, so `Times` holds it, next to the
+  epoch: `float64_t m_origin`, in the unit of the times, default 0, with
+  `origin()` and `with_origin(float64_t)`. `Channel::origin()` reads it from
+  the channel's times.
+- Everything that passes a channel's `Times` along keeps the origin and the
+  epoch without further code: element-wise operations, channel selection,
+  `from_channels`, `until`, `with_start_closed`, and reading a file.
+- Code that builds new timestamps for a channel, windowing and delay
+  embeddings, builds them with `Times::with_values`, which keeps the unit,
+  epoch, and origin of the times it is called on.
+- `windows()` then sets each window channel's origin to
   `channel.origin() + shift`. A window of a window therefore points into the
   first series, not the intermediate window.
-- Everything that keeps a channel's times keeps its origin: delay embeddings,
-  `until`, `with_start_closed`, element-wise operations, channel selection,
-  and `from_channels`.
-- Converting a channel to another unit converts its origin by the same exact
-  factor.
+- `Times::to` converts the origin by the same exact factor as the
+  timestamps.
 - `TimeSeries::origin()` is not added; origins are per channel, as `unit`
   and `snap_tolerance` are.
 

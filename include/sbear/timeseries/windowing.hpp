@@ -169,7 +169,10 @@ namespace sb
         // The window can be evaluated up to its end, and at it if closed. A
         // closed end at or before the last time held needs no end: the
         // window ends at that timestamp.
-        auto window = channel.take(Times(std::move(at), channel.unit()), std::move(indices));
+        // Time 0 of the window is the shift in the channel; the origin
+        // places it in the first series the channel was cut from.
+        auto window = channel.take(channel.times_like(std::move(at)).with_origin(channel.origin() + shift),
+                                   std::move(indices));
         const auto end = to - shift;
         const auto lastAt = window.time(window.size() - 1);
         if (!(stopClosed && end <= lastAt))
@@ -177,9 +180,7 @@ namespace sb
           window = window.until(std::max(end, std::nextafter(lastAt, std::numeric_limits<float64_t>::infinity())),
                                 stopClosed);
         }
-        // Time 0 of the window is the shift in the channel; the origin
-        // places it in the first series the channel was cut from.
-        window = window.with_start_closed(startClosed).with_origin(channel.origin() + shift);
+        window = window.with_start_closed(startClosed);
         channels.push_back(std::move(window));
       }
       contents.emplace_back(std::move(channels), series.unit());

@@ -194,7 +194,8 @@ namespace sb
   };
 
   /// One-dimensional, finite, strictly increasing timestamps in one unit,
-  /// optionally counted from an epoch.
+  /// optionally counted from an epoch, and placed by an origin in the series
+  /// they were cut from.
   class Times
   {
   public:
@@ -231,7 +232,33 @@ namespace sb
       return times;
     }
 
-    /// The same timestamps in another unit, from the same epoch.
+    /// The time, in this unit, that time 0 stands for in the series these
+    /// times were cut from; 0 for recorded observations. Evaluation does not
+    /// use it.
+    [[nodiscard]] float64_t origin() const noexcept { return m_origin; }
+
+    /// The same timestamps with the origin @p origin, which must be finite.
+    [[nodiscard]] Times with_origin(float64_t origin) const
+    {
+      if (!std::isfinite(origin))
+      {
+        throw std::invalid_argument("The origin of times must be finite");
+      }
+      auto times = *this;
+      times.m_origin = origin;
+      return times;
+    }
+
+    /// The timestamps @p values in this unit, from this epoch and origin.
+    [[nodiscard]] Times with_values(std::vector<float64_t> values) const
+    {
+      Times times(std::move(values), m_unit, m_epoch);
+      times.m_origin = m_origin;
+      return times;
+    }
+
+    /// The same timestamps in another unit, from the same epoch, with the
+    /// origin converted alike.
     [[nodiscard]] Times to(TimeUnit unit) const
     {
       std::vector<float64_t> converted(m_values.size());
@@ -239,7 +266,9 @@ namespace sb
       {
         converted[i] = convert_time(m_values[i], m_unit, unit);
       }
-      return Times(std::move(converted), unit, m_epoch);
+      Times times(std::move(converted), unit, m_epoch);
+      times.m_origin = convert_time(m_origin, m_unit, unit);
+      return times;
     }
 
     bool operator==(const Times&) const = default;
@@ -248,6 +277,7 @@ namespace sb
     std::vector<float64_t> m_values;
     TimeUnit m_unit;
     std::optional<Epoch> m_epoch;
+    float64_t m_origin = 0.0;
   };
 
   /// Recorded observations of one channel: one observation per timestamp,
@@ -304,8 +334,7 @@ namespace sb
 
     /// A view of this channel whose times are @p times and whose observation
     /// k is this channel's observation @p indices[k], with no new axis. It
-    /// shares this channel, its snap settings, and its origin, but not its
-    /// start or end.
+    /// shares this channel and its snap settings, but not its start or end.
     [[nodiscard]] Channel take(Times times, std::vector<size_t> indices) const;
 
     /// This channel with the end @p end, in its unit: it can be evaluated
@@ -331,14 +360,8 @@ namespace sb
     /// Whether the first timestamp is in the domain.
     [[nodiscard]] bool start_closed() const noexcept { return m_startClosed; }
 
-    /// The time, in the channel's unit, that time 0 stands for in the series
-    /// this channel was cut from; 0 for recorded observations. Evaluation
-    /// does not use it.
-    [[nodiscard]] float64_t origin() const noexcept { return m_origin; }
-
-    /// This channel with the origin @p origin, in its unit, which must be
-    /// finite.
-    [[nodiscard]] Channel with_origin(float64_t origin) const;
+    /// The origin of the channel's times, in its unit.
+    [[nodiscard]] float64_t origin() const noexcept { return held_times().origin(); }
 
     /// The observation with the largest timestamp at or before @p t, in the
     /// channel's own unit, a tensor of shape shape(). As in the tolerant
@@ -377,6 +400,13 @@ namespace sb
     /// with index_at().
     [[nodiscard]] Times times() const { return held_times(); }
 
+    /// The timestamps @p values on this channel's time axis: its unit,
+    /// epoch, and origin, without copying its own timestamps.
+    [[nodiscard]] Times times_like(std::vector<float64_t> values) const
+    {
+      return held_times().with_values(std::move(values));
+    }
+
     /// Timestamp @p k, in the channel's unit, to build new times from.
     [[nodiscard]] float64_t time(size_t k) const { return held_times().values()[k]; }
 
@@ -384,8 +414,8 @@ namespace sb
     [[nodiscard]] const std::vector<size_t>& shape() const noexcept { return m_shape; }
     [[nodiscard]] size_t size() const noexcept { return held_times().size(); }
 
-    /// The same timestamps, start, end, origin, shape, values, and snap
-    /// settings.
+    /// The same timestamps, start, end, shape, values, and snap settings;
+    /// the timestamps include their epoch and origin.
     [[nodiscard]] bool operator==(const Channel& other) const;
 
     /// Element @p i of the observations at times(), flattened in row-major
@@ -435,7 +465,6 @@ namespace sb
     std::optional<float64_t> m_end;
     bool m_endClosed = false;
     bool m_startClosed = true;
-    float64_t m_origin = 0.0;
     float64_t m_snapTolerance = DefaultSnapTolerance;
   };
 

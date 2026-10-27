@@ -1,6 +1,6 @@
 # Time series dates and plotting: implementation plan
 
-Progress: 7 of 47 items, 14 of 89 points (16%)
+Progress: 8 of 47 items, 15 of 89 points (17%)
 
 Spec: [timeseries-dates-and-plotting-spec.md](timeseries-dates-and-plotting-spec.md)
 
@@ -40,7 +40,7 @@ Python cannot observe gets a new `test/test_timeseries.cpp`.
   `FloatTensor` for several).
   Tests: 0 for a series built from observations; one value per channel for
   several; read-only.
-- [ ] **B2.** `windows()` sets each window channel's origin to
+- [x] **B2.** `windows()` sets each window channel's origin to
   `channel.origin() + shift`.
   Note: once windows have non-zero origins, saving must keep them, because
   `operator==` compares origins and the round-trip tests compare tensors of
@@ -64,15 +64,18 @@ Python cannot observe gets a new `test/test_timeseries.cpp`.
     Tests: with no snapping, each window's origin equals its `return_bounds`
     start; `origin + t` is within a few ulps of the original timestamps;
     save/load and pickle keep the origins of a window tensor.
-  - [ ] **B2d.** [1] Snapping and nesting (no new code expected).
+  - [x] **B2d.** [1] (76f270503) Snapping and nesting (no new code expected).
     Tests: a start that snaps onto an observation gives that observation's
     time; two channels that snap differently get different origins; a
     window of a window has its origin in the first series.
-- [ ] **B3.** [3] Origin propagation through operations that rebuild channels.
-  Check each path; fix the ones that drop the origin.
-  Tests: kept by delay embeddings, by an element-wise operation (persistent
-  homology on a point cloud series), by `series[i]`, and by
-  `from_channels`; converted exactly by `TimeSeries.to`.
+- [ ] **B3.** [3] Move the origin from `Channel` into `Times`, next to the
+  epoch, so that every path that passes a channel's times along keeps both.
+  Add `Times::with_values` and use it where windowing and delay embeddings
+  build new timestamps; `Times::to` converts the origin.
+  Note: element-wise operations rebuilt channels from their parts and
+  dropped the origin; with the origin on `Times`, no such path can.
+  Tests: kept by delay embeddings; converted exactly by `TimeSeries.to`;
+  the existing origin and round-trip tests still pass.
 - [ ] **B4.** [3] `array_equal` ignores the origin, for series and for tensors
   of series: add a C++ comparison that skips it, and use it in
   `TimeSeries.array_equal` (`src/python/py_timeseries_bind.hpp`) and in

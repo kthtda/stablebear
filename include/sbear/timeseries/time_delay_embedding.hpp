@@ -165,7 +165,7 @@ namespace sb
       }
     }
 
-    auto embedding = channel.stack_at(Times(std::move(at), channel.unit()), lags);
+    auto embedding = channel.stack_at(channel.times_like(std::move(at)), lags);
     if (n == 0)
     {
       return embedding;
