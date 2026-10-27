@@ -515,6 +515,14 @@ def test_window_at_a_date_outside_it_names_its_dates():
         window("2023-01-01T03:00")
 
 
+def test_a_date_just_below_a_timestamp_snaps_to_it():
+    # 0.1 + 0.2 computes as 0.30000000000000004, so 300 ms after the epoch
+    # converts to just below it.
+    series = TimeSeries([1.0, 2.0, 3.0], times=Times([0.0, 0.1, 0.1 + 0.2], unit="s", epoch="2023-01-01"))
+
+    assert series(np.datetime64("2023-01-01T00:00:00.300")) == 3.0
+
+
 def test_window_at_a_date_equals_its_series_at_that_date():
     series = _dated_series()
     # The window covers 01:00 to 03:00; the value changes from 10 to 20 at

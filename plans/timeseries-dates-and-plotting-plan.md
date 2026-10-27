@@ -1,6 +1,6 @@
 # Time series dates and plotting: implementation plan
 
-Progress: 26 of 47 items, 47 of 89 points (53%)
+Progress: 27 of 47 items, 49 of 89 points (55%)
 
 Spec: [timeseries-dates-and-plotting-spec.md](timeseries-dates-and-plotting-spec.md)
 
@@ -158,7 +158,7 @@ Python cannot observe gets a new `test/test_timeseries.cpp`.
     a date raises `TypeError`; mixed dates and numbers raise `TypeError`; a
     timezone-aware `datetime` raises `ValueError`. Strings and lists of
     strings or `datetime`s are accepted as dates.
-  - [ ] **E3d.** [2] Out-of-domain message in dates.
+  - [x] **E3d.** [2] (82cb67f93) Out-of-domain message in dates.
     Tests: the message names the date and the domain as dates.
   - [ ] **E3e.** [1] Snapping (no new code expected).
     Tests: a date that converts to just below a timestamp gets that
