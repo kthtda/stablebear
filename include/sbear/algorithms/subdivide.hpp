@@ -11,6 +11,11 @@ namespace sb
   subdivide(size_t blockSize, size_t nItems)
   {
     std::vector<std::pair<size_t, size_t>> boundaries;
+    if (nItems == 0)
+    {
+      return boundaries;
+    }
+
     for (size_t i = 0ul;; i += blockSize)
     {
       if (!boundaries.empty() && boundaries.back().second == nItems - 1)
