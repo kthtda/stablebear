@@ -2,7 +2,11 @@
 
 Issue: [#258](https://github.com/kthtda/stablebear/issues/258)
 
-Plan: [pandas-timeseries-plan.md](pandas-timeseries-plan.md)
+Plan: [pandas-timeseries-plan.md](pandas-timeseries-plan.md), phases A, B,
+and H to K
+
+The [durations spec](timeseries-durations-spec.md) changes how times are
+given and returned; where the two differ, it takes precedence.
 
 ## Goal
 
@@ -27,8 +31,9 @@ These settle the open questions of the issue.
 4. **Index order.** An unsorted index or one with duplicates is rejected,
    as `Times` rejects such timestamps. The error names `sort_index()` or
    `index.duplicated()`.
-5. **Resolution.** The default `unit` is seconds, as for `datetime64` arrays
-   today, whatever the resolution of the index.
+5. **Resolution.** The default `unit`, which sets only how the times are
+   stored, is seconds, as for `datetime64` arrays, whatever the resolution
+   of the index.
 6. **Return types.** `Window` and `TimeDelayEmbedding` return the same
    stablebear types for pandas input as for a `TimeSeries`, so results feed
    straight into `compute_persistent_homology`. `evaluate` at dates returns
@@ -77,12 +82,14 @@ These settle the open questions of the issue.
 - Column names and the series name are not kept; a `TimeSeries` has no
   channel names.
 
-### `Times.to_pandas(resolution="us")` and `TimeSeries.to_pandas(resolution="us")`
+### `Times.to_pandas(resolution=None)` and `TimeSeries.to_pandas(resolution=None)`
 
-- `Times.to_pandas()` returns a `DatetimeIndex` of `to_datetime64(resolution)`
-  when the times have an epoch, else a float64 `Index` of the timestamps in
-  their unit. `resolution` is one of `"s"`, `"ms"`, `"us"`, and `"ns"`, the
-  resolutions pandas supports.
+- `Times.to_pandas()` returns a `DatetimeIndex` when the times have an
+  epoch, else a `TimedeltaIndex`, as `np.asarray(times)` gives them (see
+  the [durations spec](timeseries-durations-spec.md)). `resolution` is one
+  of `"s"`, `"ms"`, `"us"`, and `"ns"`, the resolutions pandas supports. It
+  defaults to the resolution of `np.asarray(times)`, or nanoseconds if that
+  is finer.
 - `TimeSeries.to_pandas()` returns, for one channel, a `Series` indexed by
   its `times.to_pandas()`. For several channels it returns a `DataFrame`
   with columns `0` to `n_channels - 1`, indexed by the union of the
