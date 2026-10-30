@@ -377,8 +377,15 @@ jobs:
   # simulated by PantheonSim (https://github.com/pantheongpu/pantheonsim). The
   # simulator checks results, not performance. Kernels are built for sm_75
   # with PTX, which every simulated NVIDIA profile from the T4 on runs.
+  #
+  # GitHub-hosted runs test the CUDA 12 and 13 modules that the wheels ship;
+  # the self-hosted runner has CUDA 12. CUDA coverage comes from CUDA 12.
   cuda_test:
-    name: CUDA build, test & coverage
+    name: CUDA ${{ matrix.cuda }} build, test & coverage
+    strategy:
+      fail-fast: false
+      matrix:
+        cuda: ${{ inputs.use_github_runners && fromJSON('["12.6", "13.0"]') || fromJSON('["12"]') }}
     runs-on: ${{ inputs.use_github_runners && 'ubuntu-24.04' || fromJSON('["self-hosted", "gpu", "cuda12"]') }}
     timeout-minutes: ${{ inputs.use_github_runners && 90 || 15 }}
     env:
@@ -433,7 +440,7 @@ jobs:
         with:
           gpu: nvidia/t4
           count: 2
-          cuda-toolkit: '12.6'
+          cuda-toolkit: ${{ matrix.cuda }}
 
       - name: Configure CMake (with CUDA coverage)
         run: |
@@ -471,6 +478,7 @@ jobs:
           $RUN python3 -m pytest . -vv
 
       - name: Collect CUDA coverage
+        if: startsWith(matrix.cuda, '12')
         run: |
           gpucov collect \
             --dump "covreport/cuda/cuda_*.bin" \
@@ -484,6 +492,7 @@ jobs:
           cp covreport/cuda/html/index.html covreport/cuda/index.html || true
 
       - name: Upload CUDA coverage artifact
+        if: startsWith(matrix.cuda, '12')
         uses: actions/upload-artifact@v6
         with:
           name: cuda-coverage
@@ -491,6 +500,7 @@ jobs:
           retention-days: 1
 
       - name: Upload CUDA coverage to Codecov
+        if: startsWith(matrix.cuda, '12')
         uses: codecov/codecov-action@v5
         with:
           files: ./covreport/cuda/cuda.info
