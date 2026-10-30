@@ -1,6 +1,12 @@
 name: BuildAndPublishPyPI
 
-on: [workflow_dispatch]
+on:
+  workflow_dispatch:
+    inputs:
+      use_github_runners:
+        description: 'Use GitHub-hosted runners instead of self-hosted'
+        type: boolean
+        default: true
 
 jobs:
   check_version:
@@ -21,13 +27,13 @@ jobs:
           fi
           echo "✅ $PACKAGE==$VERSION not found on PyPI, proceeding..."
 
-  # All jobs run on GitHub-hosted runners, with the CUDA tests on simulated
-  # GPUs (see analysis.yaml).
+  # sdist, analysis, and statistical run on GitHub-hosted runners by default,
+  # with the CUDA tests on simulated GPUs (see analysis.yaml).
   sdist:
     uses: ./.github/workflows/sdist.yaml
     needs: check_version
     with:
-      use_github_runners: true
+      use_github_runners: ${{ inputs.use_github_runners }}
 
   build:
     uses: ./.github/workflows/wheels.yaml
@@ -71,13 +77,13 @@ jobs:
     uses: ./.github/workflows/analysis.yaml
     needs: check_version
     with:
-      use_github_runners: true
+      use_github_runners: ${{ inputs.use_github_runners }}
 
   statistical:
     uses: ./.github/workflows/statistical.yaml
     needs: check_version
     with:
-      use_github_runners: true
+      use_github_runners: ${{ inputs.use_github_runners }}
 
   publish:
     runs-on: ubuntu-latest
