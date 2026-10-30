@@ -80,13 +80,8 @@ namespace
   int getNumGpus()
   {
 #ifdef BUILD_WITH_CUDA
-    int deviceCount = 0;
-    cudaError_t error = cudaGetDeviceCount(&deviceCount);
-    if (error != cudaSuccess)
-    {
-      throw std::runtime_error(cudaGetErrorString(error));
-    }
-    return deviceCount;
+    // 0 when no device is usable, matching the executor's device count
+    return static_cast<int>(sb::get_num_cuda_devices());
 #else
     throw std::runtime_error("This version of stablebear is compiled without GPU support.");
 #endif

@@ -32,6 +32,7 @@
 #include "cuda_util.cuh"
 
 #include <taskflow/taskflow.hpp>
+#include <taskflow/algorithm/for_each.hpp>
 
 #include <atomic>
 #include <functional>
@@ -114,12 +115,14 @@ namespace sb
         BlockOp& blockOp,
         const CudaBlockScheduler& scheduler,
         ResultWriter& writer,
-        std::function<void(size_t)> progressCb = [](size_t) {})
+        std::function<void(size_t)> progressCb = [](size_t) {},
+        std::function<bool()> stopRequested = [] { return false; })
       : m_gpuThreads(gpuThreads)
       , m_blockOp(blockOp)
       , m_scheduler(scheduler)
       , m_writer(writer)
       , m_progressCb(progressCb)
+      , m_stopRequested(stopRequested)
       , m_nGpus(gpuThreads.num_workers())
     {
       m_canceled.store(false);
@@ -133,7 +136,10 @@ namespace sb
 
       tf::Taskflow flow;
       flow.for_each_index<size_t, size_t, size_t>(0ul, blocks.size(), 1ul, [this, &blocks, blockDim](size_t i) {
-        if (m_canceled.load())
+        // Checked per block so a stop request (e.g. Ctrl-C via
+        // StoppableTask::request_stop) interrupts a running computation at
+        // block granularity instead of after the whole matrix.
+        if (m_canceled.load() || m_stopRequested())
         {
           return;
         }
@@ -334,6 +340,7 @@ namespace sb
     const CudaBlockScheduler& m_scheduler;
     ResultWriter& m_writer;
     std::function<void(size_t)> m_progressCb;
+    std::function<bool()> m_stopRequested;
     size_t m_nGpus;
 
     std::vector<GpuBlockStorage> m_gpuStorages;
