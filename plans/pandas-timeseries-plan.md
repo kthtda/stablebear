@@ -1,6 +1,6 @@
 # pandas input and durations for time series: implementation plan
 
-Progress: 6 of 36 items, 8 of 63 points (13%)
+Progress: 7 of 36 items, 10 of 63 points (16%)
 
 Specs: [pandas-timeseries-spec.md](pandas-timeseries-spec.md) (phases A, B,
 and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
@@ -45,7 +45,7 @@ and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
   `RangeIndex` has no epoch; `NaN` kept; int and bool dtypes kept.
 ## Phase C: `TimeDelta`
 
-- [ ] **C1.** [2] `TimeDelta(value, unit=None)` in
+- [x] **C1.** [2] (f620e0328, 1121a3b92) `TimeDelta(value, unit=None)` in
   `stablebear/timeseries/date_time.py`, exported from
   `stablebear.timeseries`: `count`, `unit`, `to_timedelta64`, `==`, `hash`,
   `repr`, pickling; with its docstring, which `api_timeseries.rst` picks

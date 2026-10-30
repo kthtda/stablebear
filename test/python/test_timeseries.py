@@ -232,6 +232,68 @@ def test_time_delta_rejects_a_number_without_a_unit():
         TimeDelta(3)
 
 
+def test_time_deltas_add_and_subtract_in_the_finer_unit():
+    assert TimeDelta(1, "h") + TimeDelta(30, "min") == TimeDelta(90, "min")
+    assert TimeDelta(1, "h") - TimeDelta(30, "min") == TimeDelta(30, "min")
+
+
+def test_time_delta_with_a_float_count_adds_in_the_finer_unit():
+    # 1.5 h is 90.0 minutes; 90.0 + 30 is a whole number of minutes
+    assert TimeDelta(1.5, "h") + TimeDelta(30, "min") == TimeDelta(120, "min")
+
+
+def test_time_delta_adds_numpy_and_python_durations():
+    assert np.timedelta64(30, "m") + TimeDelta(1, "h") == TimeDelta(90, "min")
+    assert TimeDelta(1, "h") + datetime.timedelta(minutes=30) == TimeDelta(5_400_000_000, "us")
+    assert TimeDelta(1, "h") - np.timedelta64(30, "m") == TimeDelta(30, "min")
+    assert np.timedelta64(90, "m") - TimeDelta(1, "h") == TimeDelta(30, "min")
+
+
+def test_time_delta_negates_and_multiplies_in_its_unit():
+    assert -TimeDelta(90, "min") == TimeDelta(-90, "min")
+    assert TimeDelta(30, "min") * 3 == TimeDelta(90, "min")
+    assert 3 * TimeDelta(30, "min") == TimeDelta(90, "min")
+    assert TimeDelta(3, "h") * 0.5 == TimeDelta(1.5, "h")
+
+
+def test_time_deltas_compare_lengths():
+    assert TimeDelta(1, "h") < TimeDelta(61, "min")
+    assert TimeDelta(1, "h") <= TimeDelta(60, "min")
+    assert TimeDelta(1, "h") >= TimeDelta(60, "min")
+    assert TimeDelta(1.5, "h") > TimeDelta(89, "min")
+
+
+def test_time_delta_rejects_adding_a_number():
+    with pytest.raises(TypeError):
+        TimeDelta(1, "h") + 1
+
+
+def test_date_time_plus_time_delta_is_at_the_finer_resolution():
+    assert DateTime("2023-01-01T00:00") + TimeDelta(90, "s") == DateTime(np.datetime64("2023-01-01T00:01:30", "s"))
+    assert TimeDelta(90, "s") + DateTime("2023-01-01T00:00") == DateTime(np.datetime64("2023-01-01T00:01:30", "s"))
+    assert DateTime("2023-01-01T00:00") - TimeDelta(1, "h") == DateTime(np.datetime64("2022-12-31T23:00", "m"))
+
+
+def test_date_time_plus_time_delta_with_a_float_count_is_in_microseconds():
+    assert DateTime("2023-01-01T00:00") + TimeDelta(1.5, "h") == DateTime(np.datetime64("2023-01-01T01:30", "us"))
+
+
+def test_date_time_plus_numpy_duration():
+    assert DateTime("2023-01-01T00:00") + np.timedelta64(90, "m") == DateTime(np.datetime64("2023-01-01T01:30", "m"))
+
+
+def test_date_time_minus_date_time_is_a_time_delta():
+    assert DateTime("2023-01-02") - DateTime("2023-01-01") == TimeDelta(1, "d")
+    assert DateTime("2023-01-01T01:30") - DateTime("2023-01-01") == TimeDelta(90, "min")
+
+
+def test_date_times_compare_instants():
+    assert DateTime("2023-01-01") < DateTime("2023-01-01T00:01")
+    assert DateTime("2023-01-01") <= DateTime(datetime.datetime(2023, 1, 1))
+    assert DateTime("2023-01-01") >= DateTime(datetime.datetime(2023, 1, 1))
+    assert DateTime("2023-01-02") > DateTime("2023-01-01T23:59")
+
+
 def test_times_have_no_epoch_by_default():
     assert Times([0.0, 1.5], unit="s").epoch is None
 

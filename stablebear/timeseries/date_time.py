@@ -51,8 +51,18 @@ class DateTime:
     -----
     Two values are equal when they have the same count of the same unit; the
     same instant at another resolution is a different value. Compare
-    :meth:`to_datetime64` values to compare instants.
+    :meth:`to_datetime64` values to compare instants. ``<``, ``<=``, ``>``,
+    and ``>=`` compare instants.
+
+    Adding or subtracting a :class:`TimeDelta`, or a duration it accepts,
+    gives a ``DateTime`` at the finer of the two resolutions; a duration with
+    a float count is first rounded as :meth:`TimeDelta.to_timedelta64`
+    rounds it. Subtracting a ``DateTime`` gives the :class:`TimeDelta`
+    between them.
     """
+
+    # NumPy defers to the operators below instead of making object arrays.
+    __array_ufunc__ = None
 
     def __init__(self, value):
         if isinstance(value, DateTime):
@@ -97,6 +107,42 @@ class DateTime:
             return NotImplemented
         return self._data == other._data
 
+    def __lt__(self, other):
+        if not isinstance(other, DateTime):
+            return NotImplemented
+        return self.to_datetime64() < other.to_datetime64()
+
+    def __le__(self, other):
+        if not isinstance(other, DateTime):
+            return NotImplemented
+        return self.to_datetime64() <= other.to_datetime64()
+
+    def __gt__(self, other):
+        if not isinstance(other, DateTime):
+            return NotImplemented
+        return self.to_datetime64() > other.to_datetime64()
+
+    def __ge__(self, other):
+        if not isinstance(other, DateTime):
+            return NotImplemented
+        return self.to_datetime64() >= other.to_datetime64()
+
+    def __add__(self, other):
+        other = _as_time_delta(other)
+        if other is None:
+            return NotImplemented
+        return DateTime(self.to_datetime64() + other.to_timedelta64())
+
+    __radd__ = __add__
+
+    def __sub__(self, other):
+        if isinstance(other, DateTime):
+            return TimeDelta(self.to_datetime64() - other.to_datetime64())
+        other = _as_time_delta(other)
+        if other is None:
+            return NotImplemented
+        return DateTime(self.to_datetime64() - other.to_timedelta64())
+
     def __reduce__(self):
         return DateTime, (self.to_datetime64(),)
 
@@ -139,8 +185,17 @@ class TimeDelta:
     -----
     Two values are equal when they have the same count of the same unit; the
     same length in another unit is a different value. Compare
-    :meth:`to_timedelta64` values to compare lengths.
+    :meth:`to_timedelta64` values to compare lengths. ``<``, ``<=``, ``>``,
+    and ``>=`` compare lengths.
+
+    Adding or subtracting another duration, which may be any value
+    ``TimeDelta`` accepts, gives a ``TimeDelta`` in the finer of the two
+    units; each count is converted by an exact factor. Negating it or
+    multiplying it by a number keeps its unit.
     """
+
+    # NumPy defers to the operators below instead of making object arrays.
+    __array_ufunc__ = None
 
     def __init__(self, value, unit: str | None = None):
         if unit is not None:
@@ -211,6 +266,57 @@ class TimeDelta:
             return NotImplemented
         return (self._count, self._unit) == (other._count, other._unit)
 
+    def _length(self):
+        """The duration in attoseconds, exactly."""
+        return Fraction(self._count) * _ATTOSECONDS[self._unit]
+
+    def __lt__(self, other):
+        other = _as_time_delta(other)
+        return NotImplemented if other is None else self._length() < other._length()
+
+    def __le__(self, other):
+        other = _as_time_delta(other)
+        return NotImplemented if other is None else self._length() <= other._length()
+
+    def __gt__(self, other):
+        other = _as_time_delta(other)
+        return NotImplemented if other is None else self._length() > other._length()
+
+    def __ge__(self, other):
+        other = _as_time_delta(other)
+        return NotImplemented if other is None else self._length() >= other._length()
+
+    def _in(self, unit):
+        """The count in ``unit``, a unit at least as fine, by an exact factor."""
+        return self._count * (_ATTOSECONDS[self._unit] // _ATTOSECONDS[unit])
+
+    def __add__(self, other):
+        other = _as_time_delta(other)
+        if other is None:
+            return NotImplemented
+        unit = min(self._unit, other._unit, key=_ATTOSECONDS.__getitem__)
+        return TimeDelta(self._in(unit) + other._in(unit), unit)
+
+    __radd__ = __add__
+
+    def __sub__(self, other):
+        other = _as_time_delta(other)
+        return NotImplemented if other is None else self + -other
+
+    def __rsub__(self, other):
+        other = _as_time_delta(other)
+        return NotImplemented if other is None else other + -self
+
+    def __neg__(self):
+        return TimeDelta(-self._count, self._unit)
+
+    def __mul__(self, factor):
+        if not isinstance(factor, numbers.Real):
+            return NotImplemented
+        return TimeDelta(self._count * factor, self._unit)
+
+    __rmul__ = __mul__
+
     def __reduce__(self):
         return TimeDelta, (self._count, self._unit)
 
@@ -219,6 +325,15 @@ class TimeDelta:
 
     def __repr__(self):
         return f"TimeDelta({self._count}, {self._unit!r})"
+
+
+def _as_time_delta(value):
+    """``value`` as a :class:`TimeDelta` if it is a duration, else ``None``."""
+    if isinstance(value, TimeDelta):
+        return value
+    if isinstance(value, (np.timedelta64, datetime.timedelta)) or hasattr(value, "to_timedelta64"):
+        return TimeDelta(value)
+    return None
 
 
 def _as_array(values):
