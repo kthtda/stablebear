@@ -185,7 +185,7 @@ jobs:
   memory_check:
     name: Memory check (Valgrind + Helgrind)
     runs-on: ${{ inputs.use_github_runners && 'ubuntu-24.04' || fromJSON('["self-hosted", "gpu", "cuda12"]') }}
-    timeout-minutes: 30
+    timeout-minutes: ${{ inputs.use_github_runners && 120 || 30 }}
     env:
       BUILD_WITH_CUDA: 0
       SKIP_STUBGEN: 1
