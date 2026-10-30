@@ -319,7 +319,7 @@ The following example creates a multidimensional tensor of random point clouds, 
 The Barcode class
 =================
 
-Individual barcodes are represented by :py:class:`~stablebear.persistence.Barcode`. A barcode can be constructed from an :math:`n \times 2` NumPy array of ``(birth, death)`` pairs::
+Individual barcodes are represented by :py:class:`~stablebear.persistence.Barcode`. A barcode can be constructed from :math:`n \times 2` ``(birth, death)`` pairs, given as an array or a nested list. A ``float32`` array gives a ``barcode32``; any other real-valued input gives a ``barcode64``::
 
    from stablebear.persistence import Barcode
 

@@ -1,6 +1,7 @@
 """Edge case tests for persistent homology computation."""
 
 import numpy as np
+import pytest
 
 import stablebear as sb
 import stablebear.persistence as pers
@@ -135,3 +136,31 @@ def test_pcloud_tensor_single_point_per_cloud():
     for i in range(3):
         assert bcs[i, 0].is_isomorphic_to(_bc([[0.0, np.inf]]))
         assert bcs[i, 1].is_isomorphic_to(_bc([]))
+
+
+def test_barcode_from_list_is_barcode64():
+    bc = Barcode([[0.0, 1.0], [2.0, 5.0]])
+    assert bc.dtype == sb.barcode64
+    np.testing.assert_array_equal(np.asarray(bc), [[0.0, 1.0], [2.0, 5.0]])
+
+
+def test_barcode_from_int_array_is_barcode64():
+    bc = Barcode(np.array([[0, 1], [2, 5]], dtype=np.int64))
+    assert bc.dtype == sb.barcode64
+    np.testing.assert_array_equal(np.asarray(bc), [[0.0, 1.0], [2.0, 5.0]])
+
+
+def test_barcode_from_empty_list_has_no_bars():
+    bc = Barcode([])
+    assert bc.dtype == sb.barcode64
+    assert np.asarray(bc).shape == (0, 2)
+
+
+def test_barcode_from_float32_array_is_barcode32():
+    bc = Barcode(np.array([[0.0, 1.0]], dtype=np.float32))
+    assert bc.dtype == sb.barcode32
+
+
+def test_barcode_from_strings_raises_type_error():
+    with pytest.raises(TypeError, match="real-valued"):
+        Barcode([["a", "b"]])

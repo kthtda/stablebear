@@ -1,6 +1,6 @@
 # Backlog crash and wrong-result bugs: implementation plan
 
-Progress: 5 of 7 items, 8 of 11 points (73%)
+Progress: 6 of 7 items, 10 of 11 points (91%)
 
 Spec: the GitHub issues linked from each item. Branch:
 `fix/backlog-crash-bugs`.
@@ -48,16 +48,21 @@ enabling it could stop GPU detection on hosts without NVIDIA DRM nodes.
   Tests (`test/python/test_tensor.py`): a one-element `0` is `False` and `2`
   is `True`, for FloatTensor and IntTensor; a 0-d tensor gives its value; two
   elements raise `ValueError`; zero elements raise `ValueError`.
-- [ ] **B2.** [2] #51: both `allclose` overloads in `include/sbear/tensor.tpp`
-  use one element check, `detail::is_close`, that compares infinities with
-  `==`, so equal infinities are close and opposite infinities are not. The
-  matrix overload also stops treating NaN as close.
+- [x] **B2.** [2] (1b0002ad2) #51: both `allclose` overloads in
+  `include/sbear/tensor.tpp` use one element check, `detail::is_close`, that
+  compares infinities with `==`, so equal infinities are close and opposite
+  infinities are not. The matrix overload also stops treating NaN as close.
   Tests (`test/python/test_allclose.py`): `[1, inf, -inf]` is close to a
   copy; `[inf]` is not close to `[-inf]`; `[inf]` is not close to `[1e300]`;
   the same for `DistanceMatrix` (no negative entries) and `SymmetricMatrix`;
   a `SymmetricMatrix` with NaN is not close to itself.
-- [ ] **B3.** [1] #183: `Barcode()` with a list or an integer array raises the
-  intended `TypeError` instead of `AttributeError`, by raising as soon as the
-  input is rejected in `stablebear/persistence/barcode.py`.
-  Tests (`test/python/persistence/`): a list raises `TypeError`; an `int64`
-  array raises `TypeError`.
+- [ ] **B3.** [1] #183: `Barcode()` in `stablebear/persistence/barcode.py`
+  accepts any real-valued array-like input: a `float32` array gives a
+  `barcode32`, and anything else, including lists and integer arrays, is
+  converted to a `barcode64`. Input that is not real-valued raises
+  `TypeError` instead of the `AttributeError` from reading `self._data`
+  before it was set.
+  Tests (`test/python/persistence/test_persistence_edge_cases.py`): a list
+  gives a `barcode64` with its bars; an `int64` array gives a `barcode64`;
+  `[]` gives an empty barcode; a `float32` array gives a `barcode32`; strings
+  raise `TypeError`.
