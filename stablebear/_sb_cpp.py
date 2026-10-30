@@ -172,7 +172,11 @@ _check_x86_64_baseline()
 
 _backend = None
 
-if os.environ.get("SB_FORCE_CPU", "0") == "0" and _has_nvidia_gpu():
+# SB_FORCE_CUDA=1 tries the CUDA backend even when no NVIDIA GPU is detected,
+# for GPUs the detection cannot see.
+_force_cuda = os.environ.get("SB_FORCE_CUDA", "0") != "0"
+
+if os.environ.get("SB_FORCE_CPU", "0") == "0" and (_force_cuda or _has_nvidia_gpu()):
     try:
         _preload_cudart()
         _cuda_backend = _find_cuda_backend_name()

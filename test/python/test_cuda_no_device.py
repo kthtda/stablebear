@@ -7,11 +7,14 @@ import pytest
 # Runs in a fresh process because CUDA reads CUDA_VISIBLE_DEVICES when it
 # initializes
 _SUBPROC = r"""
+import sys
+
 import numpy as np
 import stablebear as sb
 from stablebear import _sb_cpp as cpp
 
-print(sb.system.build_type())
+if sb.system.build_type() != "CUDA":
+    sys.exit(10)
 print(cpp.get_ngpus())
 
 sb.system.set_cuda_threshold(0)
@@ -35,14 +38,14 @@ def _run_without_devices():
         text=True,
         env=env,
     )
+    if result.returncode == 10:
+        pytest.skip("Requires the CUDA backend to load")
     assert result.returncode == 0, result.stderr
     return result.stdout.split()
 
 
 def test_cuda_build_without_usable_devices_falls_back_to_cpu():
-    build_type, ngpus, pdist, cdist, l2_kernel = _run_without_devices()
-    if build_type != "CUDA":
-        pytest.skip("Requires the CUDA backend to load")
+    ngpus, pdist, cdist, l2_kernel = _run_without_devices()
 
     assert ngpus == "0"
     # ||f - g||_1 = |4 - 1| * 1 = 3, and <f, g> = 4 * 1 * 1 = 4

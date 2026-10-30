@@ -51,7 +51,7 @@ namespace
 
         }
 
-        std::string type_name = nb::str(other.type().attr("__name__")).c_str();
+        auto type_name = nb::cast<std::string>(other.type().attr("__name__"));
         throw std::runtime_error("Unsupported comparison with object of type " + type_name);
       })
 

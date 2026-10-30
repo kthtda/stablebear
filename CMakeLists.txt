@@ -167,7 +167,10 @@ if (BUILD_WITH_CUDA)
   endif ()
 
   if (NOT SKBUILD)
-    set(CMAKE_CUDA_ARCHITECTURES native)
+    # A local build targets this machine's GPUs unless architectures are given
+    if (NOT CMAKE_CUDA_ARCHITECTURES)
+      set(CMAKE_CUDA_ARCHITECTURES native)
+    endif ()
   else()
     # Query the CUDA version before enabling the CUDA language,
     # because CMAKE_CUDA_ARCHITECTURES must be set before the try-compile
@@ -877,8 +880,9 @@ if (BUILD_TESTER)
     set_target_properties(sb_nopy PROPERTIES
         CUDA_RUNTIME_LIBRARY Shared  # Must match the Python module's runtime
     )
+    # Shared, so that a simulated GPU's runtime can stand in for NVIDIA's
     set_target_properties(sb_test PROPERTIES
-        CUDA_RUNTIME_LIBRARY Static
+        CUDA_RUNTIME_LIBRARY Shared
     )
   endif ()
 
@@ -888,7 +892,7 @@ if (BUILD_TESTER)
   target_link_libraries(sb_test PUBLIC GTest::gtest_main sb_nopy)
 
   if (BUILD_CUDA_TESTER)
-    target_link_libraries(sb_test PUBLIC sb_cuda CUDA::cudart_static)
+    target_link_libraries(sb_test PUBLIC sb_cuda CUDA::cudart)
   endif ()
 
   if (ENABLE_COVERAGE)
