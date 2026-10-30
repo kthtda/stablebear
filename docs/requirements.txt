@@ -4,6 +4,7 @@ sphinx-tippy==0.4.3
 numpy
 tqdm
 matplotlib
+pandas
 sphinxcontrib-youtube
 sphinxcontrib-mermaid
 sphinxcontrib-tikz==0.4.20

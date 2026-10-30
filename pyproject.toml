@@ -31,7 +31,7 @@ classifiers = [
 dependencies = [ "numpy>=2.0", "tqdm", "matplotlib" ]
 
 [dependency-groups]
-test = ["pytest", "scipy"]
+test = ["pytest", "scipy", "pandas>=2.2.2"]
 
 [tool.scikit-build]
 minimum-version = "build-system.requires"

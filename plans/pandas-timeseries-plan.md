@@ -6,9 +6,8 @@ Spec: [pandas-timeseries-spec.md](pandas-timeseries-spec.md)
 
 ## Phase A: pandas values in the existing time series API
 
-- [ ] **A1.** [1] Make pandas optional: a `pandas = ["pandas>=2.2.2"]` extra
-  in `pyproject.toml`, and pandas in the `test` group and
-  `docs/requirements.txt`.
+- [ ] **A1.** [1] Add pandas to the `test` group in `pyproject.toml` and to
+  `docs/requirements.txt`, but not to the runtime dependencies.
   Tests: in a subprocess with `sys.modules["pandas"] = None`, stablebear
   imports and builds, windows, and embeds a `TimeSeries`.
 - [ ] **A2.** [1] Keep the resolution of `pd.Timestamp` in `DateTime` and of
@@ -56,10 +55,10 @@ Spec: [pandas-timeseries-spec.md](pandas-timeseries-spec.md)
 
 - [ ] **C1.** [1] `Times.to_pandas(resolution="us")`: a `DatetimeIndex`
   with an epoch, else a float64 `Index`. Add `stablebear/_pandas.py` with
-  the import that raises `ImportError` naming `stablebear[pandas]`.
+  the import that raises `ImportError` naming `pip install pandas`.
   Tests: dated times give `to_datetime64(resolution)`; undated give the
   timestamps; `resolution="h"` raises; with `sys.modules["pandas"] = None`
-  the `ImportError` names the extra.
+  the `ImportError` names `pip install pandas`.
 - [ ] **C2.** [2] `TimeSeries.to_pandas(resolution="us")` for one channel of
   scalar numbers or booleans gives a `Series` indexed by
   `times.to_pandas()`.

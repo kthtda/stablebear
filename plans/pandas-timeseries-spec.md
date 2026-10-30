@@ -89,7 +89,7 @@ These settle the open questions of the issue.
 - Only observations of shape `()` that are numbers or booleans can be
   converted; other series raise `TypeError`.
 - If pandas is not installed, both raise `ImportError` naming
-  `pip install stablebear[pandas]`.
+  `pip install pandas`.
 
 ### `Window` and `TimeDelayEmbedding` on pandas input
 
@@ -109,10 +109,11 @@ it says they have no NumPy equivalent.
 
 ### Dependency
 
-pandas stays optional. The `pandas` extra installs it, and the `test`
-dependency group and `docs/requirements.txt` include it. stablebear never
-imports pandas at module level. Code that receives a pandas object uses it
-through that object's module, so only `to_pandas` needs to import it.
+pandas stays optional, and stablebear declares no extra for it: users
+install it themselves. The `test` dependency group and
+`docs/requirements.txt` include it. stablebear never imports pandas at
+module level. Code that receives a pandas object uses it through that
+object's module, so only `to_pandas` needs to import it.
 
 ## Out of scope
 
