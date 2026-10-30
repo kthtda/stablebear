@@ -1,6 +1,6 @@
 # Backlog crash and wrong-result bugs: implementation plan
 
-Progress: 1 of 7 items, 1 of 11 points (9%)
+Progress: 2 of 7 items, 3 of 11 points (27%)
 
 Spec: the GitHub issues linked from each item. Branch:
 `fix/backlog-crash-bugs`.
@@ -16,7 +16,7 @@ enabling it could stop GPU detection on hosts without NVIDIA DRM nodes.
   `nItems == 0`, instead of one block ending at `SIZE_MAX`.
   Tests (`test/test_subdivide.cpp`): zero items gives no blocks, for block
   sizes 1 and 5.
-- [ ] **A2.** [2] #186: `parallel_reduce()` in
+- [x] **A2.** [2] (27ef00f70) #186: `parallel_reduce()` in
   `include/sbear/algorithms/functional/reduce.hpp` returns the zero function
   for an empty range, and `average()` in `include/sbear/functional/pcf.hpp`
   returns it for an empty vector instead of dividing by zero.

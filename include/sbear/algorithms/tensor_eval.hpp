@@ -41,6 +41,11 @@ namespace sb
     std::vector<DomainT> domain_values;
     std::vector<std::vector<size_t>> domain_indices;
     auto n = domain.size();
+    if (n == 0)
+    {
+      return;
+    }
+
     domain_values.reserve(n);
     domain_indices.reserve(n);
     walk(domain, [&](const std::vector<size_t>& idx) {
