@@ -1,6 +1,12 @@
 ## Unreleased
 
+### Breaking changes
+
+* **`allclose` broadcasts tensor shapes** — Tensors with different shapes are broadcast together, as in arithmetic, and shapes that cannot be broadcast raise `ValueError`. Previously any shape mismatch returned `False`. ([#52](https://github.com/kthtda/stablebear/issues/52))
+
 ### New features
+
+* **`allclose` accepts more types** — `allclose` compares `IntTensor` and `BoolTensor`, tensors of different dtypes, and matrices of different precisions, and accepts an array or list as one input when the other is a tensor. ([#100](https://github.com/kthtda/stablebear/issues/100))
 
 * **Time series** — `timeseries.TimeSeries` holds observations of any element type, such as numbers, vectors, point clouds, or barcodes, at explicit timestamps with a time unit, and evaluates by previous value. Several channels with their own timestamps and units combine with `TimeSeries.from_channels`. Queries that miss a timestamp by a rounding error snap to it by tolerant comparison, as in APL. `timeseries.TimeDelayEmbedding` and `timeseries.Window` build delay embeddings and windows, which evaluate on a grid to point clouds for persistent homology. Persistent homology and barcode summaries such as stable rank apply to each observation of a series. Series and tensors of series support saving, loading, and pickling. ([#242](https://github.com/kthtda/stablebear/issues/242))
 * **Nested tensors of any element type** — `NestedTensor` leaves can be boolean, PCF, point-cloud, distance-matrix, symmetric-matrix, barcode, and time series tensors, not only numeric ones, and nested tensors of them can be saved, loaded, and pickled. ([#255](https://github.com/kthtda/stablebear/pull/255))
