@@ -1,6 +1,6 @@
 # Backlog crash and wrong-result bugs: implementation plan
 
-Progress: 3 of 7 items, 5 of 11 points (45%)
+Progress: 4 of 7 items, 6 of 11 points (55%)
 
 Spec: the GitHub issues linked from each item. Branch:
 `fix/backlog-crash-bugs`.
@@ -29,7 +29,7 @@ enabling it could stop GPU detection on hosts without NVIDIA DRM nodes.
   Tests (`test/python/test_pcf_tensor_eval.py`): a `(2,)` PcfTensor at
   `np.array([])` gives shape `(2, 0)`, for pcf32 and pcf64; a `(2, 2)`
   PcfTensor gives shape `(2, 2, 0)`.
-- [ ] **A4.** [1] #36: `sample_poisson` in
+- [x] **A4.** [1] (db98ad791) #36: `sample_poisson` in
   `include/sbear/point_process/poisson.hpp` requires a positive rate,
   `lo < hi` in every dimension, and a positive `rate * volume`, so
   `std::poisson_distribution` never gets a mean of 0, which aborts in builds

@@ -44,6 +44,18 @@ _INTPCF_CPP_TO_DTYPE = {
     cpp.Pcf64iTensor: pcf64i,
 }
 
+
+def _single_element_bool(tensor):
+    if tensor.size == 1:
+        return bool(tensor._data._get_element([0] * tensor.ndim))
+    if tensor.size == 0:
+        raise ValueError("The truth value of an empty tensor is ambiguous.")
+    raise ValueError(
+        "The truth value of a tensor with more than one element is ambiguous. "
+        "Use array_equal() for whole-tensor comparison."
+    )
+
+
 class NumericTensor(Tensor, ArithmeticTensorMixin):
     def __init__(self):
         super().__init__()
@@ -59,6 +71,8 @@ class NumericTensor(Tensor, ArithmeticTensorMixin):
 
     def __int__(self):
         return int(self.__float__())
+
+    __bool__ = _single_element_bool
 
     def _get_valid_setitem_dtypes(self):
         return [NumericTensor, float, int, np.ndarray]
@@ -281,17 +295,7 @@ class BoolTensor(Tensor):
     def _get_valid_setitem_dtypes(self):
         return [BoolTensor, bool]
 
-    def __bool__(self):
-        total = 1
-        for d in self.shape:
-            total *= d
-        if total == 1:
-            idx = [0] * len(self.shape)
-            return bool(self._data._get_element(idx))
-        raise ValueError(
-            "The truth value of a tensor with more than one element is ambiguous. "
-            "Use array_equal() for whole-tensor comparison."
-        )
+    __bool__ = _single_element_bool
 
     def __array__(self, dtype=None, copy=None):
         if self._data.is_contiguous():
