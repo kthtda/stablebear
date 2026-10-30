@@ -50,6 +50,32 @@ def test_datetime_of_timestamp_with_a_timezone_is_its_utc_instant():
     assert date_time == DateTime(pd.Timestamp("2023-01-01T11:00:00.000000001"))
 
 
+def test_times_of_index_with_a_timezone_equal_times_of_its_utc_index():
+    stockholm = pd.DatetimeIndex(["2023-01-01T01:00", "2023-01-01T03:00"]).tz_localize("Europe/Stockholm")
+    utc = pd.DatetimeIndex(["2023-01-01T00:00", "2023-01-01T02:00"])
+
+    assert Times(stockholm, unit="h") == Times(utc, unit="h")
+
+
+def test_times_of_series_of_dates_equal_times_of_its_values():
+    stockholm = pd.DatetimeIndex(["2023-01-01T01:00", "2023-01-01T03:00"]).tz_localize("Europe/Stockholm")
+
+    assert Times(pd.Series(stockholm), unit="h") == Times(stockholm, unit="h")
+
+
+def test_times_of_index_with_nat_raises():
+    with pytest.raises(ValueError, match="NaT"):
+        Times(pd.DatetimeIndex(["2023-01-01T00:00", None]), unit="h")
+
+
+def test_series_with_index_with_a_timezone_has_its_utc_epoch():
+    stockholm = pd.DatetimeIndex(["2023-01-01T01:00", "2023-01-01T03:00"]).tz_localize("Europe/Stockholm")
+
+    series = TimeSeries(np.array([10.0, 20.0]), stockholm)
+
+    assert series.epoch.to_datetime64() == np.datetime64("2023-01-01T00:00")
+
+
 def test_window_size_of_one_nanosecond_timedelta():
     series = TimeSeries(np.array([1.0, 2.0, 3.0, 4.0]), Times([0.0, 1.0, 2.0, 3.0], unit="ns"))
 

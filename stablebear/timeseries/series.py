@@ -15,7 +15,7 @@ from ..functional.pcf import Pcf
 from ..nested_tensor import NestedTensor, _leaf_wrappers
 from ..point_cloud import PointCloud
 from ..symmetric_matrix import SymmetricMatrix
-from .date_time import _NUMPY_TO_UNIT, _UNIT_TO_NUMPY, DateTime
+from .date_time import _NUMPY_TO_UNIT, _UNIT_TO_NUMPY, DateTime, _as_array
 from ..typing import (
     _NATIVE_SUFFIX,
     barcode32,
@@ -84,8 +84,10 @@ class Times:
     Parameters
     ----------
     times : array_like
-        One-dimensional timestamps, converted to float64, or a ``datetime64``
-        array of dates and times. Dates and times are counted from
+        One-dimensional timestamps, converted to float64, or dates and
+        times: a ``datetime64`` array, or a pandas ``DatetimeIndex`` or
+        ``Series`` of dates, whose timezone, if any, is converted to UTC and
+        dropped. Dates and times are counted from
         ``epoch``, which defaults to the first of them, and converted to
         ``unit``: the differences are taken in integers and converted by one
         exact factor, so whole multiples of ``unit`` are exact.
@@ -106,7 +108,7 @@ class Times:
     """
 
     def __init__(self, times, unit: str = "s", *, epoch=None):
-        times = np.asarray(times)
+        times = _as_array(times)
         if np.issubdtype(times.dtype, np.datetime64):
             self._data = _times_from_datetimes(times, unit, epoch)
             return
@@ -320,10 +322,11 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         uint32, uint64, and bool are kept, other floats become float64,
         and other integers become int64.
     times : Times or array_like
-        One timestamp per observation. A plain array is in seconds; a
-        ``datetime64`` array is counted in seconds from its first date and
-        time, which becomes the epoch. Pass :class:`Times` to choose the
-        unit or the epoch.
+        One timestamp per observation. A plain array is in seconds; dates
+        and times, such as a ``datetime64`` array or a pandas
+        ``DatetimeIndex``, are counted in seconds from the first of them,
+        which becomes the epoch. Pass :class:`Times` to choose the unit or
+        the epoch.
     snap_tolerance : float, optional
         How close below an observation a query may land and still get that
         observation, relative to the magnitude of the timestamps, as in the

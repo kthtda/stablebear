@@ -100,6 +100,15 @@ class DateTime:
         return f"DateTime({str(self.to_datetime64())!r})"
 
 
+def _as_array(values):
+    """``values`` as an array. Dates with a timezone, as pandas holds them,
+    become naive UTC ``datetime64`` at their resolution."""
+    dtype = getattr(values, "dtype", None)
+    if getattr(dtype, "tz", None) is not None:
+        return values.to_numpy(dtype=f"datetime64[{dtype.unit}]")
+    return np.asarray(values)
+
+
 def _duration(value, message):
     """``value`` as a positive duration: a ``np.timedelta64`` for a
     ``timedelta``, ``pd.Timedelta``, or ``timedelta64``, kept as given, or
