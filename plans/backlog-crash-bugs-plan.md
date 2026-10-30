@@ -1,6 +1,6 @@
 # Backlog crash and wrong-result bugs: implementation plan
 
-Progress: 4 of 7 items, 6 of 11 points (55%)
+Progress: 5 of 7 items, 8 of 11 points (73%)
 
 Spec: the GitHub issues linked from each item. Branch:
 `fix/backlog-crash-bugs`.
@@ -41,19 +41,21 @@ enabling it could stop GPU detection on hosts without NVIDIA DRM nodes.
 
 ## Phase B: NumPy-consistent truth values and comparisons
 
-- [ ] **B1.** [2] #45: `FloatTensor` and `IntTensor` get the `__bool__` that
-  `BoolTensor` has in `stablebear/base_tensor.py`: a single element gives its
-  truth value, and any other size raises `ValueError`. Share one function
-  between `NumericTensor` and `BoolTensor`.
+- [x] **B1.** [2] (c742398bd) #45: `FloatTensor` and `IntTensor` get the
+  `__bool__` that `BoolTensor` has in `stablebear/base_tensor.py`: a single
+  element gives its truth value, and any other size raises `ValueError`.
+  Share one function between `NumericTensor` and `BoolTensor`.
   Tests (`test/python/test_tensor.py`): a one-element `0` is `False` and `2`
   is `True`, for FloatTensor and IntTensor; a 0-d tensor gives its value; two
   elements raise `ValueError`; zero elements raise `ValueError`.
 - [ ] **B2.** [2] #51: both `allclose` overloads in `include/sbear/tensor.tpp`
-  use one element check that compares infinities with `==`, so equal
-  infinities are close and opposite infinities are not.
-  Tests (`test/python/test_allclose.py`): `[1, inf]` is close to itself;
-  `[inf]` is not close to `[-inf]`; `[inf]` is not close to `[1e300]`; the
-  same three for `DistanceMatrix` and `SymmetricMatrix`.
+  use one element check, `detail::is_close`, that compares infinities with
+  `==`, so equal infinities are close and opposite infinities are not. The
+  matrix overload also stops treating NaN as close.
+  Tests (`test/python/test_allclose.py`): `[1, inf, -inf]` is close to a
+  copy; `[inf]` is not close to `[-inf]`; `[inf]` is not close to `[1e300]`;
+  the same for `DistanceMatrix` (no negative entries) and `SymmetricMatrix`;
+  a `SymmetricMatrix` with NaN is not close to itself.
 - [ ] **B3.** [1] #183: `Barcode()` with a list or an integer array raises the
   intended `TypeError` instead of `AttributeError`, by raising as soon as the
   input is rejected in `stablebear/persistence/barcode.py`.

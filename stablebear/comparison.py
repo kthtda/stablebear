@@ -15,6 +15,9 @@ def allclose(a, b, atol=1e-8, rtol=1e-5) -> bool:
 
         |a_i - b_i| \leq \texttt{atol} + \texttt{rtol} \cdot |b_i|.
 
+    An infinite element is close only to an equal infinity, and NaN is never
+    close to anything.
+
     Parameters
     ----------
     a : FloatTensor | DistanceMatrix | SymmetricMatrix

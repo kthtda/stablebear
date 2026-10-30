@@ -34,6 +34,16 @@ class TestAllcloseFloatTensor:
         b = sb.FloatTensor(np.ones((3, 4), dtype=np.float32))
         assert sb.allclose(a, b)
 
+    def test_equal_infinities_are_close(self):
+        a = sb.FloatTensor([1.0, np.inf, -np.inf])
+        assert sb.allclose(a, a.copy())
+
+    def test_opposite_infinities_are_not_close(self):
+        assert not sb.allclose(sb.FloatTensor([np.inf]), sb.FloatTensor([-np.inf]))
+
+    def test_infinity_is_not_close_to_finite(self):
+        assert not sb.allclose(sb.FloatTensor([np.inf]), sb.FloatTensor([1e300]))
+
 
 class TestAllcloseDistanceMatrix:
     def test_indexed_matches_dense(self):
@@ -69,6 +79,20 @@ class TestAllcloseDistanceMatrix:
         b[0, 1] = 2.0
         assert not sb.allclose(a, b)
 
+    def test_equal_infinities_are_close(self):
+        a = sb.DistanceMatrix(3, dtype=sb.float64)
+        b = sb.DistanceMatrix(3, dtype=sb.float64)
+        a[0, 1] = np.inf
+        b[0, 1] = np.inf
+        assert sb.allclose(a, b)
+
+    def test_infinity_is_not_close_to_finite(self):
+        a = sb.DistanceMatrix(3, dtype=sb.float64)
+        b = sb.DistanceMatrix(3, dtype=sb.float64)
+        a[0, 1] = np.inf
+        b[0, 1] = 1e300
+        assert not sb.allclose(a, b)
+
 
 class TestAllcloseSymmetricMatrix:
     def test_identical(self):
@@ -85,6 +109,32 @@ class TestAllcloseSymmetricMatrix:
         assert sb.allclose(a, b)
         b[entry] = 2.0
         assert not sb.allclose(a, b)
+
+    def test_equal_infinities_are_close(self):
+        a = sb.SymmetricMatrix(3, dtype=sb.float64)
+        b = sb.SymmetricMatrix(3, dtype=sb.float64)
+        a[0, 1] = np.inf
+        b[0, 1] = np.inf
+        assert sb.allclose(a, b)
+
+    def test_opposite_infinities_are_not_close(self):
+        a = sb.SymmetricMatrix(3, dtype=sb.float64)
+        b = sb.SymmetricMatrix(3, dtype=sb.float64)
+        a[0, 1] = np.inf
+        b[0, 1] = -np.inf
+        assert not sb.allclose(a, b)
+
+    def test_infinity_is_not_close_to_finite(self):
+        a = sb.SymmetricMatrix(3, dtype=sb.float64)
+        b = sb.SymmetricMatrix(3, dtype=sb.float64)
+        a[0, 1] = np.inf
+        b[0, 1] = 1e300
+        assert not sb.allclose(a, b)
+
+    def test_nan_is_not_close_to_itself(self):
+        a = sb.SymmetricMatrix(3, dtype=sb.float64)
+        a[0, 1] = np.nan
+        assert not sb.allclose(a, a)
 
 
 @pytest.mark.parametrize("matrix_type", [sb.DistanceMatrix, sb.SymmetricMatrix])
