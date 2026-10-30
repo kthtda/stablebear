@@ -55,7 +55,13 @@ namespace sb_py
       nb::object array = nb::cast(view(nb::cast<const T&>(self), self));
       if (!dtype.is_none())
       {
-        array = array.attr("astype")(dtype, nb::arg("copy") = false);
+        nb::object converted = array.attr("astype")(dtype, nb::arg("copy") = false);
+        // copy=False forbids copying, as NumPy requires of __array__
+        if (!converted.is(array) && nb::isinstance<nb::bool_>(copy) && !nb::cast<bool>(copy))
+        {
+          throw nb::value_error("Unable to avoid copy while creating an array as requested.");
+        }
+        array = converted;
       }
       if (nb::isinstance<nb::bool_>(copy) && nb::cast<bool>(copy))
       {

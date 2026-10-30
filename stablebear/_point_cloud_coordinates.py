@@ -2,6 +2,7 @@
 
 import numpy as np
 
+from ._tensor_base import _array_for_protocol
 from .base_tensor import FloatTensor, NumericTensor
 from .typing import float32
 
@@ -91,22 +92,15 @@ class CoordinateView(FloatTensor):
     def __array__(self, dtype=None, copy=None):
         cloud = self._cloud._current_point_cloud()
         if cloud.is_indexed:
-            if copy is False:
-                raise ValueError("indexed coordinates require a copy for a NumPy array")
-            array = self._read(self._rows, self._columns)
-        else:
-            array = self._view(cloud._storage_array())
-            owner = self._cloud._owner
-            if self._readonly or (owner is not None and any(
-                    size > 1 and stride == 0
-                    for size, stride in zip(owner.shape, owner.strides))):
-                array = array.view()
-                array.flags.writeable = False
-        if dtype is not None and np.dtype(dtype) != array.dtype:
-            if copy is False:
-                raise ValueError("dtype conversion requires a copy")
-            array = array.astype(dtype)
-        return array.copy() if copy else array
+            return _array_for_protocol(self._read(self._rows, self._columns), dtype, copy, copied=True)
+        array = self._view(cloud._storage_array())
+        owner = self._cloud._owner
+        if self._readonly or (owner is not None and any(
+                size > 1 and stride == 0
+                for size, stride in zip(owner.shape, owner.strides))):
+            array = array.view()
+            array.flags.writeable = False
+        return _array_for_protocol(array, dtype, copy, copied=False)
 
     def __ipow__(self, exponent):
         self[...] = np.asarray(self) ** exponent
