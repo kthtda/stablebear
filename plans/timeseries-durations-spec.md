@@ -30,24 +30,31 @@ are in beta, so the old forms are removed rather than deprecated.
 
 ## `TimeDelta`
 
-`TimeDelta(value, unit=None)` is a whole number of a fixed-length unit, as
-`DateTime` is a whole number of a unit after 1970-01-01T00:00.
+`TimeDelta(value, unit=None)` is a count of a fixed-length unit. The count
+is an integer, as `np.timedelta64` and `DateTime` store theirs, or a float,
+as a time series stores its times.
 
 - `value` is an `np.timedelta64`, `datetime.timedelta`, `pd.Timedelta`, or
-  `TimeDelta`, kept at its resolution. With `unit`, `value` is an integer
-  count of `unit`, as in `TimeDelta(3, "h")`.
-- It has `count`, `unit`, `to_timedelta64()`, `==`, `hash`, `repr`, and
-  pickling, as `DateTime` does. Equality compares count and unit; compare
-  `to_timedelta64()` values to compare lengths.
-- Arithmetic follows `np.timedelta64`, and results come back as `TimeDelta`
-  and `DateTime`:
-  - `TimeDelta` plus or minus `TimeDelta`, negation, multiplication by an
-    integer, and comparisons;
+  `TimeDelta`, kept at its resolution with an integer count. With `unit`,
+  `value` is a number of `unit`, as in `TimeDelta(1.5, "h")`; a float that
+  is a whole number becomes an integer.
+- It has `count`, `unit`, `to_timedelta64(resolution=None)`, `==`, `hash`,
+  `repr`, and pickling, as `DateTime` does. Equality compares count and
+  unit; compare `to_timedelta64()` values to compare lengths.
+  `to_timedelta64` rounds to `resolution`, which defaults to the unit for
+  an integer count and to the finer of the unit and microseconds for a
+  float.
+- Arithmetic gives `TimeDelta` and `DateTime` results:
+  - `TimeDelta` plus or minus `TimeDelta`, negation, multiplication by a
+    number, and comparisons, in the finer of the operands' units,
+    converted by exact factors;
   - `DateTime` plus or minus `TimeDelta`, and `DateTime` minus `DateTime`;
+    a float count is first rounded as `to_timedelta64` rounds it;
   - comparisons of `DateTime`.
-
-  A result is at the finer of its operands' resolutions.
-- It rejects `NaT`, fractional counts, and weeks, months, and years.
+- It rejects `NaT`, counts that are not finite, and weeks, months, and
+  years.
+- A `TimeDelta` given to `Window`, `TimeDelayEmbedding`, or `evaluate` is
+  converted to the series' unit by an exact factor, without rounding.
 - `TimeDelta` is Python only; nothing in C++ stores a duration.
 
 ## Inputs

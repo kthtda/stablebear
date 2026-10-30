@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import datetime
 import math
+import numbers
+from fractions import Fraction
 
 import numpy as np
 
@@ -14,6 +16,11 @@ _NUMPY_TO_UNIT = {
     "s": "s", "m": "min", "h": "h", "D": "d",
 }
 _UNIT_TO_NUMPY = {unit: code for code, unit in _NUMPY_TO_UNIT.items()}
+# The length of each Times unit in attoseconds, the finest of them.
+_ATTOSECONDS = {
+    "as": 1, "fs": 10**3, "ps": 10**6, "ns": 10**9, "us": 10**12, "ms": 10**15,
+    "s": 10**18, "min": 60 * 10**18, "h": 3600 * 10**18, "d": 86400 * 10**18,
+}
 
 
 class DateTime:
@@ -98,6 +105,120 @@ class DateTime:
 
     def __repr__(self):
         return f"DateTime({str(self.to_datetime64())!r})"
+
+
+class TimeDelta:
+    """A duration: a count of a time unit, such as 1.5 hours.
+
+    The count is an integer, as a ``np.timedelta64`` stores it, or a float,
+    as a time series stores its times. Every day has 86400 seconds; weeks,
+    months, and years, which have no fixed length, are not units.
+
+    Parameters
+    ----------
+    value : np.timedelta64, datetime.timedelta, pd.Timedelta, TimeDelta, or number
+        The duration, such as ``np.timedelta64(3, "h")``. Its resolution is
+        kept: a ``timedelta`` counts microseconds, and a ``pd.Timedelta``
+        counts its own unit, such as nanoseconds. With ``unit``, a number of
+        ``unit``, as in ``TimeDelta(1.5, "h")``; a float that is a whole
+        number becomes an integer.
+    unit : str, optional
+        The unit of a number ``value``: one of ``"as"``, ``"fs"``, ``"ps"``,
+        ``"ns"``, ``"us"``, ``"ms"``, ``"s"``, ``"min"``, ``"h"``, and
+        ``"d"``.
+
+    Raises
+    ------
+    TypeError
+        If ``value`` is of another type, or is a number without ``unit``.
+    ValueError
+        If ``value`` is ``NaT``, not finite, or has a resolution of weeks,
+        months, or years, or ``unit`` is unknown.
+
+    Notes
+    -----
+    Two values are equal when they have the same count of the same unit; the
+    same length in another unit is a different value. Compare
+    :meth:`to_timedelta64` values to compare lengths.
+    """
+
+    def __init__(self, value, unit: str | None = None):
+        if unit is not None:
+            if unit not in _UNIT_TO_NUMPY:
+                raise ValueError(f"Unknown unit {unit!r}; expected one of {', '.join(_UNIT_TO_NUMPY)}")
+            if not isinstance(value, numbers.Real):
+                raise TypeError(f"Expected a number of {unit!r}; got {type(value).__name__}")
+            if isinstance(value, numbers.Integral):
+                self._count = int(value)
+            else:
+                value = float(value)
+                if not math.isfinite(value):
+                    raise ValueError("A TimeDelta needs a finite count")
+                self._count = int(value) if value.is_integer() else value
+            self._unit = unit
+            return
+        if isinstance(value, TimeDelta):
+            self._count, self._unit = value._count, value._unit
+            return
+        if hasattr(value, "to_timedelta64"):
+            # A pd.Timedelta, at its own resolution.
+            value = value.to_timedelta64()
+        elif isinstance(value, datetime.timedelta):
+            value = np.timedelta64(value)
+        elif not isinstance(value, np.timedelta64):
+            raise TypeError(f"Expected a timedelta, timedelta64, or TimeDelta; got {type(value).__name__}")
+        if np.isnat(value):
+            raise ValueError("A TimeDelta cannot be NaT")
+        code, step = np.datetime_data(value.dtype)
+        if code not in _NUMPY_TO_UNIT:
+            raise ValueError(f"A TimeDelta needs a unit of fixed length, not {code!r}")
+        self._count = int(value.astype(np.int64)) * step
+        self._unit = _NUMPY_TO_UNIT[code]
+
+    @property
+    def count(self) -> int | float:
+        """The number of :attr:`unit` in the duration."""
+        return self._count
+
+    @property
+    def unit(self) -> str:
+        """The resolution, as a ``Times`` unit such as ``"h"`` or ``"us"``."""
+        return self._unit
+
+    def to_timedelta64(self, resolution: str | None = None) -> np.timedelta64:
+        """The value as a ``np.timedelta64``, rounded to the nearest step of
+        ``resolution``.
+
+        ``resolution`` is one of the units of :class:`TimeDelta`. It
+        defaults to :attr:`unit` for an integer count, and otherwise to the
+        finer of :attr:`unit` and microseconds.
+
+        Raises
+        ------
+        ValueError
+            If ``resolution`` is unknown.
+        """
+        if resolution is None:
+            fine = isinstance(self._count, int) or _ATTOSECONDS[self._unit] < _ATTOSECONDS["us"]
+            resolution = self._unit if fine else "us"
+        if resolution not in _ATTOSECONDS:
+            raise ValueError(f"Unknown resolution {resolution!r}; expected one of {', '.join(_ATTOSECONDS)}")
+        steps = round(Fraction(self._count) * _ATTOSECONDS[self._unit] / _ATTOSECONDS[resolution])
+        return np.timedelta64(steps, _UNIT_TO_NUMPY[resolution])
+
+    def __eq__(self, other):
+        if not isinstance(other, TimeDelta):
+            return NotImplemented
+        return (self._count, self._unit) == (other._count, other._unit)
+
+    def __reduce__(self):
+        return TimeDelta, (self._count, self._unit)
+
+    def __hash__(self):
+        return hash((self._count, self._unit))
+
+    def __repr__(self):
+        return f"TimeDelta({self._count}, {self._unit!r})"
 
 
 def _as_array(values):

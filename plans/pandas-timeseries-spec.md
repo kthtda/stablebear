@@ -3,7 +3,7 @@
 Issue: [#258](https://github.com/kthtda/stablebear/issues/258)
 
 Plan: [pandas-timeseries-plan.md](pandas-timeseries-plan.md), phases A, B,
-and H to K
+and H to L
 
 The [durations spec](timeseries-durations-spec.md) changes how times are
 given and returned; where the two differ, it takes precedence.
@@ -65,8 +65,9 @@ These settle the open questions of the issue.
 ### `TimeSeries.from_pandas(obj, unit="s", *, snap_tolerance=1e-14)`
 
 - A `Series` gives one channel; a `DataFrame` gives one channel per column,
-  in column order. The values of a `DataFrame` take one common dtype, that
-  of `df.to_numpy()`, since all channels of a series have one element type.
+  in column order. Each column is converted as a `Series` is, so `pd.NA`
+  becomes `NaN`, and the columns then take one common dtype, since all
+  channels of a series have one element type.
 - The index gives the times:
   - `DatetimeIndex`: counted from the first timestamp, which becomes the
     epoch, and converted to `unit`, as for `datetime64` arrays.

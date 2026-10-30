@@ -3,7 +3,7 @@
 Progress: 6 of 36 items, 8 of 63 points (13%)
 
 Specs: [pandas-timeseries-spec.md](pandas-timeseries-spec.md) (phases A, B,
-and H to K) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
+and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
 (phases C to G)
 
 ## Phase A: pandas values in the existing time series API
@@ -43,34 +43,28 @@ and H to K) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
   Tests: datetime index equals `TimeSeries(values, Times(index))`, epoch
   the first stamp; timedelta index in `unit="ms"`;
   `RangeIndex` has no epoch; `NaN` kept; int and bool dtypes kept.
-- [ ] **B2.** [2] A `DataFrame` gives one channel per column, sharing the
-  index's times, with values from `df.to_numpy()`.
-  Tests: channel `i` equals `from_pandas(df.iloc[:, i])`; int and float
-  columns give float64 channels; a string column raises `TypeError`; no
-  columns raises `ValueError`.
-- [ ] **B3.** [1] Reject bad input with errors that say what to do.
-  Tests: `NaT` in the index; unsorted index names `sort_index()`;
-  duplicates name `index.duplicated()`; `PeriodIndex` and `MultiIndex`
-  raise `TypeError`; an ndarray raises `TypeError`.
-
 ## Phase C: `TimeDelta`
 
 - [ ] **C1.** [2] `TimeDelta(value, unit=None)` in
   `stablebear/timeseries/date_time.py`, exported from
   `stablebear.timeseries`: `count`, `unit`, `to_timedelta64`, `==`, `hash`,
-  `repr`, pickling; with its docstring and a line in `api_timeseries.rst`.
+  `repr`, pickling; with its docstring, which `api_timeseries.rst` picks
+  up from the module. A count is an integer or a float.
   Tests: from `np.timedelta64`, `datetime.timedelta`, and `pd.Timedelta` at
-  their resolutions; `TimeDelta(3, "h")`; `NaT`, months, and a fractional
-  count raise; pickling round trip.
-- [ ] **C2.** [2] Arithmetic on `TimeDelta` and `DateTime`, following
-  `np.timedelta64`.
+  their resolutions; `TimeDelta(3, "h")` and `TimeDelta(1.5, "h")`;
+  `to_timedelta64` at its default and a given resolution; `NaT`, months,
+  and `NaN` raise; pickling round trip.
+- [ ] **C2.** [2] Arithmetic on `TimeDelta` and `DateTime`, in the finer
+  unit by exact factors.
   Tests: `TimeDelta(1, "h") + TimeDelta(30, "min")` is 90 minutes;
-  negation and `* 3`; `DateTime - DateTime` and `DateTime + TimeDelta`;
+  negation, `* 3`, and `* 0.5`; `DateTime + TimeDelta(1.5, "h")`; `DateTime - DateTime` and `DateTime + TimeDelta`;
   comparisons across resolutions.
-- [ ] **C3.** [1] `_duration` accepts `TimeDelta`, so `Window` and
-  `TimeDelayEmbedding` take it.
+- [ ] **C3.** [1] `_duration` keeps a `TimeDelta` and `_in_unit` converts its
+  count to the series' unit by an exact factor, so `Window` and
+  `TimeDelayEmbedding` take it without rounding.
   Tests: `Window(TimeDelta(2, "h"))` equals `Window(np.timedelta64(2, "h"))`
-  on a series in hours.
+  on a series in hours; `TimeDelta(1 / 3, "h")` gives the same windows as
+  `20` minutes on a series in minutes.
 
 ## Phase D: durations as input
 
@@ -137,29 +131,42 @@ and H to K) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
 - [ ] **G3.** [1] `Window` and `TimeDelayEmbedding` reject numbers.
   Tests: `Window(3.0)` and `TimeDelayEmbedding(2, 1.0)` raise `TypeError`.
 
-## Phase H: back to pandas
+## Phase H: `TimeSeries.from_pandas` for DataFrames and bad input
 
-- [ ] **H1.** [1] `Times.to_pandas(resolution=None)`: a `DatetimeIndex`
+- [ ] **H1.** [2] A `DataFrame` gives one channel per column, sharing the
+  index's times, each column converted as a `Series` is, then in one
+  common dtype.
+  Tests: channel `i` equals `from_pandas(df.iloc[:, i])`; int and float
+  columns give float64 channels; `pd.NA` in a column becomes `NaN`; a string column raises `TypeError`; no
+  columns raises `ValueError`.
+- [ ] **H2.** [1] Reject bad input with errors that say what to do.
+  Tests: `NaT` in the index; unsorted index names `sort_index()`;
+  duplicates name `index.duplicated()`; `PeriodIndex` and `MultiIndex`
+  raise `TypeError`; an ndarray raises `TypeError`.
+
+## Phase I: back to pandas
+
+- [ ] **I1.** [1] `Times.to_pandas(resolution=None)`: a `DatetimeIndex`
   with an epoch, else a `TimedeltaIndex`, by default at the resolution of
   `np.asarray(times)`, at most nanoseconds. Add `stablebear/_pandas.py` with
   the import that raises `ImportError` naming `pip install pandas`.
   Tests: dated times; undated times; a picosecond unit gives nanoseconds;
   `resolution="h"` raises; with `sys.modules["pandas"] = None`
   the `ImportError` names `pip install pandas`.
-- [ ] **H2.** [2] `TimeSeries.to_pandas(resolution=None)` for one channel of
+- [ ] **I2.** [2] `TimeSeries.to_pandas(resolution=None)` for one channel of
   scalar numbers or booleans gives a `Series` indexed by
   `times.to_pandas()`.
   Tests: round trip of a `Series` with a `DatetimeIndex` (times, epoch,
   values, dtype); a window's index starts
   at its start date; a PCF series raises `TypeError`.
-- [ ] **H3.** [2] Several channels give a `DataFrame` indexed by the union of
+- [ ] **I3.** [2] Several channels give a `DataFrame` indexed by the union of
   the channels' times, with `NaN` where a channel has no observation.
   Tests: round trip of a `DataFrame`; channels with different times give
   the union with `NaN`.
 
-## Phase I: windows and embeddings of pandas input
+## Phase J: windows and embeddings of pandas input
 
-- [ ] **I1.** [2] `Window` and `TimeDelayEmbedding` convert a pandas `Series`
+- [ ] **J1.** [2] `Window` and `TimeDelayEmbedding` convert a pandas `Series`
   or `DataFrame` with `TimeSeries.from_pandas`, and raise `TypeError` on
   other objects that are not a `TimeSeries`; update their docstrings and
   type hints.
@@ -168,9 +175,9 @@ and H to K) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
   `DataFrame` equals that of `from_pandas(df)`; an ndarray raises
   `TypeError` naming `TimeSeries(values, times)`.
 
-## Phase J: a clearer error for NumPy ufuncs on tensors
+## Phase K: a clearer error for NumPy ufuncs on tensors
 
-- [ ] **J1.** [2] Replace `__array_ufunc__ = None` in
+- [ ] **K1.** [2] Replace `__array_ufunc__ = None` in
   `stablebear/_tensor_base.py` by a method that calls the tensor's
   reflected operator for the binary ufuncs that have one, so
   `ndarray + tensor` still works, and otherwise raises `TypeError`
@@ -179,14 +186,14 @@ and H to K) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
   is a `BoolTensor`; `np.sin(FloatTensor)` raises naming `np.asarray`;
   `np.sin` of a `PcfTensor` raises.
 
-## Phase K: pandas in the user guide and tutorial
+## Phase L: pandas in the user guide and tutorial
 
-- [ ] **K1.** [2] A "From pandas" page, `docs/timeseries_pandas.rst`, in the
+- [ ] **L1.** [2] A "From pandas" page, `docs/timeseries_pandas.rst`, in the
   time series guide: `from_pandas` for a `Series` and a `DataFrame`,
   windows of a `Series`, time zones, `NaN`, and `to_pandas`.
-- [ ] **K2.** [2] The tide gauge tutorial
+- [ ] **L2.** [2] The tide gauge tutorial
   (`docs/tutorial_notebooks/timeseries_tides.ipynb`) loads its data with
   `pd.read_csv` and `TimeSeries.from_pandas`, and uses `pd.Timedelta` for
   window sizes and delays.
-- [ ] **K3.** [1] `CHANGELOG.md` entries for the new pandas API, the
+- [ ] **L3.** [1] `CHANGELOG.md` entries for the new pandas API, the
   changed `DateTime` time zone behavior, and durations instead of numbers.
