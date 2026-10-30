@@ -43,6 +43,13 @@ def test_datetime_keeps_nanoseconds_of_timestamp():
     assert date_time.to_datetime64() == np.datetime64("2023-01-01T00:00:00.000000001")
 
 
+def test_datetime_of_timestamp_with_a_timezone_is_its_utc_instant():
+    date_time = DateTime(pd.Timestamp("2023-01-01T12:00:00.000000001", tz="Europe/Stockholm"))
+
+    # Stockholm is at +01:00 in January
+    assert date_time == DateTime(pd.Timestamp("2023-01-01T11:00:00.000000001"))
+
+
 def test_window_size_of_one_nanosecond_timedelta():
     series = TimeSeries(np.array([1.0, 2.0, 3.0, 4.0]), Times([0.0, 1.0, 2.0, 3.0], unit="ns"))
 

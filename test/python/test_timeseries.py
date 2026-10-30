@@ -123,7 +123,6 @@ def test_date_time_repr_shows_the_date():
 
 
 @pytest.mark.parametrize("value", [
-    pytest.param(datetime.datetime(2023, 1, 1, tzinfo=datetime.timezone.utc), id="timezone"),
     pytest.param(np.datetime64("2023-01-02", "W"), id="weeks"),
     pytest.param(np.datetime64("2023-01", "M"), id="months"),
     pytest.param(np.datetime64("2023", "Y"), id="years"),
@@ -132,6 +131,12 @@ def test_date_time_repr_shows_the_date():
 def test_date_time_rejects_values_without_a_fixed_instant_or_resolution(value):
     with pytest.raises(ValueError):
         DateTime(value)
+
+
+def test_date_time_with_a_timezone_is_its_utc_instant():
+    plus_two = datetime.timezone(datetime.timedelta(hours=2))
+
+    assert DateTime(datetime.datetime(2023, 1, 1, 12, tzinfo=plus_two)) == DateTime(datetime.datetime(2023, 1, 1, 10))
 
 
 def test_date_time_rejects_a_number():
@@ -498,9 +503,11 @@ def test_series_rejects_a_mix_of_dates_and_numbers():
         _dated_series()([np.datetime64("2023-01-01T00:30"), 0.5])
 
 
-def test_series_rejects_a_date_with_a_timezone():
-    with pytest.raises(ValueError):
-        _dated_series()(datetime.datetime(2023, 1, 1, tzinfo=datetime.timezone.utc))
+def test_series_at_a_date_with_a_timezone_is_at_its_utc_instant():
+    plus_two = datetime.timezone(datetime.timedelta(hours=2))
+
+    # 02:00 at +02:00 is 00:00 UTC, time 0 of the series
+    assert _dated_series()(datetime.datetime(2023, 1, 1, 2, tzinfo=plus_two)) == 10.0
 
 
 def test_series_at_a_date_outside_its_domain_names_the_dates():

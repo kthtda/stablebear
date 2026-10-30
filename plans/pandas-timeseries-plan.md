@@ -1,6 +1,6 @@
 # pandas and NumPy input for time series: implementation plan
 
-Progress: 1 of 16 items, 1 of 25 points (4%)
+Progress: 2 of 16 items, 2 of 25 points (8%)
 
 Spec: [pandas-timeseries-spec.md](pandas-timeseries-spec.md)
 
@@ -10,7 +10,7 @@ Spec: [pandas-timeseries-spec.md](pandas-timeseries-spec.md)
   `docs/requirements.txt`, but not to the runtime dependencies.
   Tests: in a subprocess with `sys.modules["pandas"] = None`, stablebear
   imports and builds, windows, and embeds a `TimeSeries`.
-- [ ] **A2.** [1] Keep the resolution of `pd.Timestamp` in `DateTime` and of
+- [x] **A2.** [1] (352d6ce08) Keep the resolution of `pd.Timestamp` in `DateTime` and of
   `pd.Timedelta` in `_duration` (`stablebear/timeseries/date_time.py`), via
   their `to_datetime64` and `to_timedelta64` methods, found by attribute so
   pandas is not imported.

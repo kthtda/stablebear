@@ -36,8 +36,9 @@ Epochs
 
 An epoch is a :py:class:`~stablebear.timeseries.DateTime`. It is built from
 a string such as ``"2023-01-01T06:00"``, a ``np.datetime64``, or a
-``datetime.datetime`` or ``datetime.date`` without a timezone, and keeps the
-resolution of its value: a date string counts days and a ``datetime`` counts
+``datetime.datetime`` or ``datetime.date``. A ``datetime`` with a timezone
+is converted to UTC and its timezone dropped. An epoch keeps the resolution
+of its value: a date string counts days and a ``datetime`` counts
 microseconds. Two epochs are equal only at the same resolution::
 
    DateTime("2023-01-01") == DateTime(datetime.datetime(2023, 1, 1))  # False

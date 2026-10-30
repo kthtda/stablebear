@@ -29,15 +29,16 @@ class DateTime:
     value : str, np.datetime64, datetime.datetime, datetime.date, or DateTime
         The instant, such as ``"2023-01-01T12:30"``. Its resolution is kept:
         ``"2023-01-01"`` counts days, a ``datetime`` counts microseconds, and
-        a ``pd.Timestamp`` counts its own unit, such as nanoseconds.
+        a ``pd.Timestamp`` counts its own unit, such as nanoseconds. A
+        timezone-aware value is converted to UTC and its timezone dropped.
 
     Raises
     ------
     TypeError
         If ``value`` is of another type.
     ValueError
-        If ``value`` is ``NaT``, a timezone-aware ``datetime``, or has a
-        resolution of weeks, months, or years, which have no fixed length.
+        If ``value`` is ``NaT`` or has a resolution of weeks, months, or
+        years, which have no fixed length.
 
     Notes
     -----
@@ -53,7 +54,7 @@ class DateTime:
         if not isinstance(value, (str, datetime.date, np.datetime64)):
             raise TypeError(f"Expected a date, datetime, datetime64, or string; got {type(value).__name__}")
         if isinstance(value, datetime.datetime) and value.tzinfo is not None:
-            raise ValueError("A DateTime cannot have a timezone; convert it to naive UTC first")
+            value = value.astimezone(datetime.timezone.utc).replace(tzinfo=None)
         # A pd.Timestamp converts at its own resolution, such as nanoseconds.
         to_datetime64 = getattr(value, "to_datetime64", None)
         value = np.datetime64(value) if to_datetime64 is None else to_datetime64()
