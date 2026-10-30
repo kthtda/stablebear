@@ -626,7 +626,8 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         count from the series' own time 0, which for a window is its start.
         For a series with an :attr:`epoch`, ``t`` may also be a date and
         time, as anything :class:`DateTime` accepts, such as
-        ``"2023-01-01T12:30"``, or an array of them. A
+        ``"2023-01-01T12:30"``, or an array, pandas ``DatetimeIndex``, or
+        pandas ``Series`` of them. A
         date names an instant, not an offset: it is placed at
         ``t - epoch - origin`` in each channel, so a window gives the value
         it held at that instant, as the series it was cut from does.
@@ -648,7 +649,10 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
             if unit is not None:
                 raise TypeError("A date and time has no unit; pass unit only with numeric times")
             return self._evaluate_date(DateTime(t).to_datetime64())
-        if isinstance(t, (list, tuple, np.ndarray)) and np.asarray(t).dtype.kind in "MOUS":
+        if not isinstance(t, (Tensor, int, float, np.integer, np.floating)):
+            # Lists, arrays, and pandas objects, such as a DatetimeIndex.
+            t = _as_array(t)
+        if isinstance(t, np.ndarray) and t.dtype.kind in "MOUS":
             # Dates and times, as datetime64, strings, or datetimes.
             try:
                 dates = np.asarray(t, dtype="datetime64")

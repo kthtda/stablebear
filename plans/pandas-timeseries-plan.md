@@ -1,6 +1,6 @@
 # pandas and NumPy input for time series: implementation plan
 
-Progress: 3 of 16 items, 3 of 25 points (12%)
+Progress: 4 of 16 items, 5 of 25 points (20%)
 
 Spec: [pandas-timeseries-spec.md](pandas-timeseries-spec.md)
 
@@ -18,12 +18,12 @@ Spec: [pandas-timeseries-spec.md](pandas-timeseries-spec.md)
   `Window(size=pd.Timedelta("1ns"))` on a series in `"ns"`;
   `TimeDelayEmbedding(delay=pd.Timedelta("3h"))` equals one with
   `np.timedelta64(3, "h")`.
-- [ ] **A3.** Timezone-aware dates become naive UTC.
+- [x] **A3.** Timezone-aware dates become naive UTC.
   - [x] **A3a.** [1] (79218327d) `DateTime` converts an aware `datetime` or `Timestamp`
     to UTC instead of raising; update its docstring.
     Tests: `datetime` at +02:00 equals the UTC value two hours earlier;
     aware `Timestamp` likewise.
-  - [ ] **A3b.** [2] `Times` accepts a `DatetimeIndex` or a `Series` of
+  - [x] **A3b.** [2] (93943a310) `Times` accepts a `DatetimeIndex` or a `Series` of
     dates, naive or aware, so `TimeSeries(s, s.index)` works for both;
     update the `Times` and `TimeSeries` docstrings.
     Tests: aware index equals the naive UTC index; `Series` of dates equals

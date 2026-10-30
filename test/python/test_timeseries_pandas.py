@@ -4,6 +4,8 @@ import sys
 import numpy as np
 import pytest
 
+import stablebear as sb
+
 from stablebear.timeseries import DateTime, TimeDelayEmbedding, Times, TimeSeries, Window
 
 pd = pytest.importorskip("pandas")
@@ -74,6 +76,31 @@ def test_series_with_index_with_a_timezone_has_its_utc_epoch():
     series = TimeSeries(np.array([10.0, 20.0]), stockholm)
 
     assert series.epoch.to_datetime64() == np.datetime64("2023-01-01T00:00")
+
+
+def _dated_series():
+    return TimeSeries(np.array([10.0, 20.0, 30.0]), Times([0.0, 1.5, 4.0], unit="h", epoch="2023-01-01"))
+
+
+def test_series_at_index_of_dates_equals_series_at_its_values():
+    index = pd.DatetimeIndex(["2023-01-01T01:00", "2023-01-01T02:00", "2023-01-01T04:00"])
+
+    at_index = _dated_series()(index)
+
+    assert at_index.array_equal(_dated_series()(index.to_numpy()))
+    assert at_index.array_equal(sb.FloatTensor([10.0, 20.0, 30.0]))
+
+
+def test_series_at_index_with_a_timezone_equals_series_at_its_utc_index():
+    stockholm = pd.DatetimeIndex(["2023-01-01T02:00", "2023-01-01T03:00"]).tz_localize("Europe/Stockholm")
+    utc = pd.DatetimeIndex(["2023-01-01T01:00", "2023-01-01T02:00"])
+
+    assert _dated_series()(stockholm).array_equal(_dated_series()(utc))
+
+
+def test_series_at_timestamp_with_a_timezone_is_at_its_utc_instant():
+    # 03:00 in Stockholm is 02:00 UTC, after the observation at 01:30
+    assert _dated_series()(pd.Timestamp("2023-01-01T03:00", tz="Europe/Stockholm")) == 20.0
 
 
 def test_window_size_of_one_nanosecond_timedelta():
