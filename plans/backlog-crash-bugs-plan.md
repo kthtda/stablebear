@@ -1,6 +1,6 @@
 # Backlog crash and wrong-result bugs: implementation plan
 
-Progress: 2 of 7 items, 3 of 11 points (27%)
+Progress: 3 of 7 items, 5 of 11 points (45%)
 
 Spec: the GitHub issues linked from each item. Branch:
 `fix/backlog-crash-bugs`.
@@ -23,20 +23,21 @@ enabling it could stop GPU detection on hosts without NVIDIA DRM nodes.
   Tests (`test/test_parallel_reduce.cpp`): `parallel_reduce` over an empty
   vector gives the zero function; `average` of an empty vector gives the
   zero function.
-- [ ] **A3.** [2] #192: evaluating a tensor at an empty time array returns an
-  empty result of shape `elems.shape() + (0,)` instead of reading
-  `domain_indices[0]` in `include/sbear/algorithms/tensor_eval.hpp`.
-  Tests (`test/python/test_pcf_tensor_eval.py`): a `(3,)` PcfTensor at
-  `np.array([])` gives shape `(3, 0)`, for pcf32 and pcf64; a `(2, 3)`
-  PcfTensor gives shape `(2, 3, 0)`.
+- [x] **A3.** [2] (a4e12cccd) #192: evaluating a tensor at an empty time
+  array returns an empty result of shape `elems.shape() + (0,)` instead of
+  reading `domain_indices[0]` in `include/sbear/algorithms/tensor_eval.hpp`.
+  Tests (`test/python/test_pcf_tensor_eval.py`): a `(2,)` PcfTensor at
+  `np.array([])` gives shape `(2, 0)`, for pcf32 and pcf64; a `(2, 2)`
+  PcfTensor gives shape `(2, 2, 0)`.
 - [ ] **A4.** [1] #36: `sample_poisson` in
-  `include/sbear/point_process/poisson.hpp` emits empty clouds when
-  `lambda == 0` instead of constructing `std::poisson_distribution` with mean
-  0, which aborts in builds with libstdc++ assertions. The negative-rate
-  check the issue asks for is already in place.
-  Tests (`test/python/test_bugscan_pointprocess.py`): a box with `lo == hi`
-  in one dimension and `rate=1.0` gives empty clouds. The existing zero-rate
-  test covers `rate=0`.
+  `include/sbear/point_process/poisson.hpp` requires a positive rate,
+  `lo < hi` in every dimension, and a positive `rate * volume`, so
+  `std::poisson_distribution` never gets a mean of 0, which aborts in builds
+  with libstdc++ assertions. This replaces the `rate >= 0` and `lo <= hi`
+  rules from #118.
+  Tests (`test/python/test_bugscan_pointprocess.py`): `rate=0` raises;
+  `lo == hi` and `lo > hi` in one dimension raise; a box whose volume
+  underflows to 0 raises.
 
 ## Phase B: NumPy-consistent truth values and comparisons
 

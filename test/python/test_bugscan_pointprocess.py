@@ -12,12 +12,13 @@ def _gen():
 # ---------------------------------------------------------------------------
 # Bugs #32 & #33: sample_poisson segfaulted on a non-finite mean -- lambda =
 # rate * volume reached std::poisson_distribution, whose behavior is undefined
-# for a non-finite mean. A non-finite (or negative) rate, or a non-finite
-# lo/hi, must now raise a clean ValueError instead of crashing the interpreter.
+# for a non-finite or non-positive mean. A non-finite or non-positive rate, or
+# a non-finite or degenerate lo/hi, must raise a clean ValueError instead of
+# crashing the interpreter.
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("rate", [float("inf"), float("-inf"), float("nan"), -5.0])
+@pytest.mark.parametrize("rate", [float("inf"), float("-inf"), float("nan"), -5.0, 0.0])
 def test_sample_poisson_bad_rate_raises(rate):
     with pytest.raises(ValueError):
         poisson.sample_poisson((1,), dim=2, rate=rate, generator=_gen())
@@ -37,11 +38,23 @@ def test_sample_poisson_nonfinite_bounds_raise(lo, hi):
         poisson.sample_poisson((1,), dim=2, rate=1.0, lo=lo, hi=hi, generator=_gen())
 
 
-def test_sample_poisson_zero_rate_is_empty_clouds():
-    """rate 0 is finite and non-negative: lambda 0 -> every cloud is empty."""
-    X = poisson.sample_poisson((4,), dim=2, rate=0.0, generator=_gen())
-    assert X.shape == (4,)
-    assert all(np.asarray(X[i]).shape[0] == 0 for i in range(4))
+@pytest.mark.parametrize(
+    "lo, hi",
+    [
+        ([0.0, 2.0], [1.0, 2.0]),
+        ([0.0, 3.0], [1.0, 2.0]),
+    ],
+)
+def test_sample_poisson_degenerate_box_raises(lo, hi):
+    with pytest.raises(ValueError):
+        poisson.sample_poisson((1,), dim=2, rate=1.0, lo=lo, hi=hi, generator=_gen())
+
+
+def test_sample_poisson_underflowing_mean_raises():
+    with pytest.raises(ValueError):
+        poisson.sample_poisson(
+            (1,), dim=2, rate=1.0, lo=[0.0, 0.0], hi=[1e-200, 1e-200], generator=_gen()
+        )
 
 
 # ---------------------------------------------------------------------------

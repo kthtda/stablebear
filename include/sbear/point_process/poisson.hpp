@@ -32,9 +32,9 @@ namespace sb::pp
       throw std::invalid_argument("lo and hi must have length equal to dim");
     }
 
-    if (!std::isfinite(static_cast<double>(rate)) || rate < static_cast<T>(0))
+    if (!std::isfinite(static_cast<double>(rate)) || !(rate > static_cast<T>(0)))
     {
-      throw std::invalid_argument("rate must be finite and non-negative");
+      throw std::invalid_argument("rate must be finite and positive");
     }
 
     for (size_t i = 0; i < dim; ++i)
@@ -44,9 +44,9 @@ namespace sb::pp
       {
         throw std::invalid_argument("lo and hi must be finite in every dimension");
       }
-      if (lo[i] > hi[i])
+      if (!(lo[i] < hi[i]))
       {
-        throw std::invalid_argument("lo must be <= hi in every dimension");
+        throw std::invalid_argument("lo must be < hi in every dimension");
       }
     }
 
@@ -58,14 +58,18 @@ namespace sb::pp
 
     T lambda = rate * volume;
 
-    // A finite, non-negative rate and a finite box keep lambda well-defined,
-    // but a finite-yet-enormous box can still overflow volume to +inf. Guard
-    // the mean before it reaches std::poisson_distribution, whose behavior is
-    // undefined for a non-finite mean.
+    // A positive rate and a nondegenerate box can still give a mean that
+    // overflows to +inf or underflows to 0. std::poisson_distribution
+    // requires a finite, positive mean.
     if (!std::isfinite(static_cast<double>(lambda)))
     {
       throw std::invalid_argument(
           "rate * volume is not finite (the sampling region is too large)");
+    }
+    if (!(lambda > static_cast<T>(0)))
+    {
+      throw std::invalid_argument(
+          "rate * volume is zero (the sampling region is too small)");
     }
 
     sb::parallel_walk(out, gen, [dim, lambda, &lo, &hi, &out](const std::vector<size_t>& idx, auto& engine) {

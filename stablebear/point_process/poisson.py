@@ -31,11 +31,12 @@ def sample_poisson(shape, dim=2, rate=1.0, lo=None, hi=None, generator=None, dty
     dim : int, optional
         Spatial dimension, by default 2.
     rate : float, optional
-        Intensity :math:`\lambda` of the Poisson process, by default 1.0.
+        Intensity :math:`\lambda > 0` of the Poisson process, by default 1.0.
     lo : array_like, optional
         Lower bounds per spatial dimension. Default is zeros.
     hi : array_like, optional
-        Upper bounds per spatial dimension. Default is ones.
+        Upper bounds per spatial dimension, each greater than the
+        corresponding lower bound. Default is ones.
     generator : Generator, optional
         Random number generator. If ``None``, the global generator is used.
     dtype : type, optional
