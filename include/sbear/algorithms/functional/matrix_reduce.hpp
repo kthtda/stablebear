@@ -27,7 +27,7 @@ namespace sb
   // Validate a reduction dimension against a tensor shape. An out-of-range dim
   // would otherwise index/erase past the end of the shape vector (UB: wrong
   // result for dim == ndim, heap corruption for dim > ndim). Throwing here
-  // surfaces a clean, catchable exception (pybind11 maps std::out_of_range to
+  // surfaces a clean, catchable exception (nanobind maps std::out_of_range to
   // a Python IndexError).
   inline void check_reduce_dim(size_t dim, size_t ndim)
   {
@@ -125,7 +125,7 @@ namespace sb
     // max has no identity element, so it cannot reduce an empty range: the
     // body below seeds from *first and reduces [first + 1, last), both UB when
     // the slice is empty (inDimSize == 0). Reject up front with a clean,
-    // catchable exception (pybind11 maps std::invalid_argument to a Python
+    // catchable exception (nanobind maps std::invalid_argument to a Python
     // ValueError) instead of dereferencing a past-the-end iterator -- mirrors
     // numpy's "zero-size array to reduction operation" error. Validate dim
     // first so shape[dim] is in range.

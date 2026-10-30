@@ -5,45 +5,45 @@
 
 #include <sstream>
 
-#include <pybind11/stl.h>
 
-namespace py = pybind11;
+namespace nb = nanobind;
 
 namespace
 {
 
-  void register_common_bindings(pybind11::module_& m)
+  void register_common_bindings(nb::module_& m)
   {
-    pybind11::class_<sb_py::Shape>(m, "Shape")
-      .def(pybind11::init<std::vector<size_t>>())
-      .def(pybind11::init<>([](size_t n){ return sb_py::Shape{std::vector<size_t>{n}}; })) // 1d construction (Python recognizes (n) as "parenthesis int parenthesis" rather than a tuple of ints)
+    nb::class_<sb_py::Shape>(m, "Shape")
+      .def(nb::init<std::vector<size_t>>())
+      .def("__init__", [](sb_py::Shape* self, size_t n){ new (self) sb_py::Shape{std::vector<size_t>{n}}; }) // 1d construction (Python recognizes (n) as "parenthesis int parenthesis" rather than a tuple of ints)
 
-      .def("__eq__", [](const sb_py::Shape& self, pybind11::object other) {
-        if (pybind11::isinstance<sb_py::Shape>(other))
+      .def("__eq__", [](const sb_py::Shape& self, nb::object other) {
+        if (nb::isinstance<sb_py::Shape>(other))
         {
-          return self.data == other.cast<sb_py::Shape>().data;
+          return self.data == nb::cast<const sb_py::Shape&>(other).data;
         }
-        else if (pybind11::isinstance<std::vector<size_t>>(other))
+        else if (nb::isinstance<nb::list>(other))
         {
-          return self.data == other.cast<std::vector<size_t>>();
+          std::vector<size_t> values;
+          return nb::try_cast(other, values) && self.data == values;
         }
-        else if (pybind11::isinstance<size_t>(other) || pybind11::isinstance<pybind11::int_>(other))
+        else if (nb::isinstance<nb::int_>(other))
         {
-          return self == sb_py::Shape(other.cast<size_t>());
+          return self == sb_py::Shape(nb::cast<size_t>(other));
         }
-        else if (pybind11::isinstance<pybind11::tuple>(other))
+        else if (nb::isinstance<nb::tuple>(other))
         {
-          auto t = other.cast<pybind11::tuple>();
+          auto t = nb::borrow<nb::tuple>(other);
 
           if (t.size() != self.data.size())
           {
             return false;
           }
 
-          return std::equal(self.data.begin(), self.data.end(), t.begin(), [](size_t a, pybind11::handle b) {
-            if (pybind11::isinstance<pybind11::int_>(b))
+          return std::equal(self.data.begin(), self.data.end(), t.begin(), [](size_t a, nb::handle b) {
+            if (nb::isinstance<nb::int_>(b))
             {
-              return a == b.cast<size_t>();
+              return a == nb::cast<size_t>(b);
             }
 
             return false;
@@ -51,7 +51,7 @@ namespace
 
         }
 
-        std::string type_name = pybind11::str(pybind11::type::handle_of(other).attr("__name__"));
+        std::string type_name = nb::str(other.type().attr("__name__")).c_str();
         throw std::runtime_error("Unsupported comparison with object of type " + type_name);
       })
 
@@ -61,9 +61,9 @@ namespace
       .def("__str__", &sb_py::Shape::dunder_str)
     ;
 
-    pybind11::class_<sb::SliceAll>(m, "SliceAll");
-    pybind11::class_<sb::SliceIndex>(m, "SliceIndex");
-    pybind11::class_<sb::SliceRange>(m, "SliceRange");
+    nb::class_<sb::SliceAll>(m, "SliceAll");
+    nb::class_<sb::SliceIndex>(m, "SliceIndex");
+    nb::class_<sb::SliceRange>(m, "SliceRange");
 
     m.def("slice_all", [](){ return sb::all(); });
     m.def("slice_index", [](ptrdiff_t idx){ return sb::index(idx); });
@@ -112,7 +112,7 @@ namespace
 
 namespace sb_py
 {
-  void register_tensor_bindings(py::module_& m)
+  void register_tensor_bindings(nb::module_& m)
   {
     register_common_bindings(m);
 

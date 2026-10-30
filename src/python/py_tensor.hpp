@@ -3,10 +3,8 @@
 #ifndef STABLEBEAR_PY_TENSOR_H
 #define STABLEBEAR_PY_TENSOR_H
 
-#include "pybind.hpp"
+#include "nb.hpp"
 #include "py_np_support.hpp"
-#include <pybind11/stl.h>
-#include <pybind11/numpy.h>
 
 #include <sbear/tensor.hpp>
 #include <sbear/nested_tensor.hpp>
@@ -20,7 +18,7 @@
 
 namespace sb_py
 {
-  void register_tensor_bindings(pybind11::module_& m);
+  void register_tensor_bindings(nb::module_& m);
 
   /// Whether two tensors are equal for array_equal. Elements with
   /// same_observations(), such as time series, are compared with it instead
@@ -49,8 +47,8 @@ namespace sb_py
 
   // The element types are bound in several translation units so that they
   // compile in parallel.
-  void register_tensor_int_bindings(pybind11::module_& m);
-  void register_tensor_pcf_bindings(pybind11::module_& m);
+  void register_tensor_int_bindings(nb::module_& m);
+  void register_tensor_pcf_bindings(nb::module_& m);
 
   template <typename T>
   struct scalar_of
@@ -110,7 +108,7 @@ namespace sb_py
     {
       if (idx >= data.size())
       {
-        throw pybind11::index_error("Attempted to get index >= len");
+        throw nb::index_error("Attempted to get index >= len");
       }
       return data[idx];
     }
@@ -150,7 +148,7 @@ namespace sb_py
     if (index.size() != tensor.shape().size()
       || !std::equal(index.begin(), index.end(), tensor.shape().begin(), [](size_t i, size_t s){ return i < s; })) // Check that all indices i are < shape[i]
     {
-      throw pybind11::index_error("Index out of range");
+      throw nb::index_error("Index out of range");
     }
   }
 
@@ -160,7 +158,7 @@ namespace sb_py
     bool ok = tensor.shape().size() == 1 && index < tensor.shape()[0];
     if (!ok)
     {
-      throw pybind11::index_error("Index out of range");
+      throw nb::index_error("Index out of range");
     }
   }
 
@@ -174,13 +172,13 @@ namespace sb_py
   }
 
   template <typename TTensor>
-  void bind_tensor_view_operations(pybind11::class_<TTensor>& cls)
+  void bind_tensor_view_operations(nb::class_<TTensor>& cls)
   {
     cls
-      .def_property_readonly("shape", [](const TTensor& self){ return Shape{self.shape()}; })
-      .def_property_readonly("size", [](const TTensor& self){ return self.size(); })
-      .def_property_readonly("strides", [](const TTensor& self){ return self.strides(); })
-      .def_property_readonly("offset", [](const TTensor& self) {
+      .def_prop_ro("shape", [](const TTensor& self){ return Shape{self.shape()}; })
+      .def_prop_ro("size", [](const TTensor& self){ return self.size(); })
+      .def_prop_ro("strides", [](const TTensor& self){ return self.strides(); })
+      .def_prop_ro("offset", [](const TTensor& self) {
         if constexpr (TTensor::IsIndexed)
           return ptrdiff_t{0};
         else
@@ -201,19 +199,19 @@ namespace sb_py
         const std::vector<size_t>& index) -> decltype(auto) {
         assert_valid_index(self, index);
         return writable_element(self, index);
-      }, pybind11::return_value_policy::reference_internal)
+      }, nb::rv_policy::reference_internal)
       .def("_get_writeable_element", [](TTensor& self, size_t index) -> decltype(auto) {
         assert_valid_index(self, index);
         return writable_element(self, index);
-      }, pybind11::return_value_policy::reference_internal)
+      }, nb::rv_policy::reference_internal)
       .def("copy", &TTensor::copy)
       .def("flatten", &TTensor::flatten)
       .def("reshape", &TTensor::reshape)
-      .def("transpose", &TTensor::transpose, pybind11::arg("axes") = std::vector<size_t>{})
-      .def("swapaxes", &TTensor::swapaxes, pybind11::arg("axis1"), pybind11::arg("axis2"))
+      .def("transpose", &TTensor::transpose, nb::arg("axes") = std::vector<size_t>{})
+      .def("swapaxes", &TTensor::swapaxes, nb::arg("axis1"), nb::arg("axis2"))
       .def("squeeze", [](const TTensor& self) { return self.squeeze(); })
-      .def("squeeze", [](const TTensor& self, size_t axis) { return self.squeeze(axis); }, pybind11::arg("axis"))
-      .def("expand_dims", &TTensor::expand_dims, pybind11::arg("axis"))
+      .def("squeeze", [](const TTensor& self, size_t axis) { return self.squeeze(axis); }, nb::arg("axis"))
+      .def("expand_dims", &TTensor::expand_dims, nb::arg("axis"))
       .def("broadcast_to", [](const TTensor& self, const std::vector<size_t>& shape) {
         return self.broadcast_to(shape);
       })
@@ -235,7 +233,7 @@ namespace sb_py
   /// property bitmask controls storage behavior in C++; Python sees the same
   /// API for ordinary and indexed tensors.
   template <typename T, sb::TensorProperties Properties>
-  void bind_tensor_operations(pybind11::class_<sb::Tensor<T, Properties>>& cls)
+  void bind_tensor_operations(nb::class_<sb::Tensor<T, Properties>>& cls)
   {
     using TTensor = sb::Tensor<T, Properties>;
     static constexpr sb::TensorProperties PlainProperties =
@@ -260,52 +258,52 @@ namespace sb_py
         assert_valid_index(self, index);
         writable_element(self, index) = sb::detail::store_copy(value);
       })
-      .def_static("concatenate", [](const pybind11::iterable& values, size_t axis) {
+      .def_static("concatenate", [](const nb::iterable& values, size_t axis) {
         std::vector<TPlain> tensors;
         for (const auto item : values)
         {
-          if (pybind11::isinstance<TPlain>(item))
-            tensors.push_back(pybind11::cast<TPlain>(item));
+          if (nb::isinstance<TPlain>(item))
+            tensors.push_back(nb::cast<TPlain>(item));
           else if constexpr (sb::IndexableTensorElement<T>)
           {
-            if (pybind11::isinstance<TIndexed>(item))
-              tensors.push_back(pybind11::cast<TIndexed>(item).materialize());
+            if (nb::isinstance<TIndexed>(item))
+              tensors.push_back(nb::cast<TIndexed>(item).materialize());
             else
-              throw pybind11::type_error("all tensors must have the same element type and properties");
+              throw nb::type_error("all tensors must have the same element type and properties");
           }
           else
-            throw pybind11::type_error("all tensors must have the same element type and properties");
+            throw nb::type_error("all tensors must have the same element type and properties");
         }
         return sb::concatenate(tensors, axis);
-      }, pybind11::arg("tensors"), pybind11::arg("axis") = 0)
-      .def_static("stack", [](const pybind11::iterable& values, ptrdiff_t axis) {
+      }, nb::arg("tensors"), nb::arg("axis") = 0)
+      .def_static("stack", [](const nb::iterable& values, ptrdiff_t axis) {
         std::vector<TPlain> tensors;
         for (const auto item : values)
         {
-          if (pybind11::isinstance<TPlain>(item))
-            tensors.push_back(pybind11::cast<TPlain>(item));
+          if (nb::isinstance<TPlain>(item))
+            tensors.push_back(nb::cast<TPlain>(item));
           else if constexpr (sb::IndexableTensorElement<T>)
           {
-            if (pybind11::isinstance<TIndexed>(item))
-              tensors.push_back(pybind11::cast<TIndexed>(item).materialize());
+            if (nb::isinstance<TIndexed>(item))
+              tensors.push_back(nb::cast<TIndexed>(item).materialize());
             else
-              throw pybind11::type_error("all tensors must have the same element type and properties");
+              throw nb::type_error("all tensors must have the same element type and properties");
           }
           else
-            throw pybind11::type_error("all tensors must have the same element type and properties");
+            throw nb::type_error("all tensors must have the same element type and properties");
         }
         return sb::stack(tensors, axis);
-      }, pybind11::arg("tensors"), pybind11::arg("axis") = 0)
+      }, nb::arg("tensors"), nb::arg("axis") = 0)
       .def_static("split_sections", [](const TTensor& tensor,
           size_t sections, size_t axis) { return sb::split(tensor, sections, axis); },
-          pybind11::arg("tensor"), pybind11::arg("n_sections"), pybind11::arg("axis") = 0)
+          nb::arg("tensor"), nb::arg("n_sections"), nb::arg("axis") = 0)
       .def_static("split_indices", [](const TTensor& tensor,
           const std::vector<size_t>& indices, size_t axis) {
         return sb::split(tensor, indices, axis);
-      }, pybind11::arg("tensor"), pybind11::arg("indices"), pybind11::arg("axis") = 0)
+      }, nb::arg("tensor"), nb::arg("indices"), nb::arg("axis") = 0)
       .def_static("array_split", [](const TTensor& tensor,
           size_t sections, size_t axis) { return sb::array_split(tensor, sections, axis); },
-          pybind11::arg("tensor"), pybind11::arg("n_sections"), pybind11::arg("axis") = 0)
+          nb::arg("tensor"), nb::arg("n_sections"), nb::arg("axis") = 0)
       .def("masked_select", [](const TTensor& self, const sb::Tensor<bool>& mask) {
         return sb::masked_select(self, mask);
       })
@@ -396,8 +394,8 @@ namespace sb_py
           {
             return sb::make_indexed_tensor(self, indices, alignment);
           }
-        }, pybind11::arg("indices"),
-          pybind11::arg("exact_leading_dimensions") = false);
+        }, nb::arg("indices"),
+          nb::arg("exact_leading_dimensions") = false);
     }
 
     using ScalarT = scalar_of_t<T>;
@@ -437,48 +435,24 @@ namespace sb_py
 
   template <typename T,
     sb::TensorProperties Properties = sb::TensorProperty::None>
-  void register_typed_tensor_bindings(pybind11::module_& m, const std::string& prefix, const std::string& suffix)
+  void register_typed_tensor_bindings(nb::module_& m, const std::string& prefix, const std::string& suffix)
   {
     using TTensor = sb::Tensor<T, Properties>;
 
-    pybind11::class_<TTensor> cls = [&m, &prefix, &suffix]
+    nb::class_<TTensor> cls(m, (prefix + "Tensor" + suffix).c_str());
+
+    if constexpr (!TTensor::IsIndexed && std::is_trivially_copyable_v<T>)
     {
-      if constexpr (!TTensor::IsIndexed && std::is_trivially_copyable_v<T>)
+      bind_array_view(cls, [](const TTensor& self, nb::handle owner)
       {
-        pybind11::class_<TTensor> cls(m, (prefix + "Tensor" + suffix).c_str(), pybind11::buffer_protocol());
-
-        cls.def_buffer([](const TTensor& self) -> pybind11::buffer_info
+        if (!self.is_contiguous())
         {
-          if (!self.is_contiguous())
-          {
-            throw std::runtime_error("Noncontiguous tensor not supported.");
-          }
-
-          std::vector<pybind11::ssize_t> shape(self.shape().size(), 0);
-          std::transform(self.shape().begin(), self.shape().end(), shape.begin(),
-              [](size_t v) { return static_cast<pybind11::ssize_t>(v); });
-
-          std::vector<pybind11::ssize_t> strides(self.strides().size(), 0);
-          std::transform(self.strides().begin(), self.strides().end(), strides.begin(),
-              [](ptrdiff_t v) { return static_cast<pybind11::ssize_t>(v * sizeof(T)); });
-
-          return pybind11::buffer_info(
-              static_cast<void*>(self.data() + self.offset()),
-              sizeof(T),
-              pybind11::format_descriptor<T>::format(),
-              self.rank(),
-              shape,
-              strides
-          );
-        });
-
-        return cls;
-      }
-      else
-      {
-        return pybind11::class_<TTensor>(m, (prefix + "Tensor" + suffix).c_str());
-      }
-    }();
+          throw std::runtime_error("Noncontiguous tensor not supported.");
+        }
+        std::vector<int64_t> strides(self.strides().begin(), self.strides().end());
+        return sb_py::array_view<T>(const_cast<T*>(self.data() + self.offset()), self.shape(), strides, owner);
+      });
+    }
 
     bind_tensor_view_operations(cls);
     bind_tensor_operations<T, Properties>(cls);
@@ -490,14 +464,14 @@ namespace sb_py
     else
     {
       cls
-        .def(pybind11::init([](const Shape& shape)
+        .def("__init__", [](TTensor* self, const Shape& shape)
         {
-          return TTensor(shape.data);
-        }))
-        .def(pybind11::init([](const Shape& shape, const T& init)
+          new (self) TTensor(shape.data);
+        })
+        .def("__init__", [](TTensor* self, const Shape& shape, const T& init)
         {
-          return TTensor(shape.data, init);
-        }));
+          new (self) TTensor(shape.data, init);
+        });
     }
 
     // Unary negation
@@ -510,7 +484,7 @@ namespace sb_py
     {
       cls.def("allclose", [](const TTensor& self, const TTensor& rhs, double atol, double rtol){
         return sb::allclose(self, rhs, T(atol), T(rtol));
-      }, py::arg("other"), py::arg("atol") = 1e-8, py::arg("rtol") = 1e-5);
+      }, nb::arg("other"), nb::arg("atol") = 1e-8, nb::arg("rtol") = 1e-5);
     }
 
     // Ordered comparisons (broadcasting, returns BoolTensor)
@@ -662,11 +636,9 @@ namespace sb_py
         return sb_py::pcf_tensor_eval_scalar<Tt, Tv>(self, t);
       });
 
-      cls.def("__call__", [](const TTensor& self, py::array_t<Tt> times) {
-        NumpyTensor<Tt> t_in(times);
-        auto sh = sb_py::eval_out_shape(self, t_in);
-        std::vector<py::ssize_t> out_shape(sh.begin(), sh.end());
-        py::array_t<Tv> result(out_shape);
+      cls.def("__call__", [](const TTensor& self, NpIn<Tt> times) {
+        NumpyTensor<const Tt> t_in(times);
+        auto result = new_array<Tv>(sb_py::eval_out_shape(self, t_in));
         NumpyTensor<Tv> out(result);
         sb::tensor_eval<Tt, Tv>(self, t_in, out);
         return result;
@@ -677,30 +649,48 @@ namespace sb_py
         sb::tensor_eval<Tt, Tv>(self, times, out);
         return out;
       });
+
+      // Times of other numeric types are cast to Tt, and the values to the
+      // type of the times.
+      auto bindCastingCall = [&cls]<typename OtherTt>() {
+        if constexpr (!std::is_same_v<OtherTt, Tt>)
+        {
+          cls.def("__call__", [](const TTensor& self, const sb::Tensor<OtherTt>& times) {
+            auto cast = sb::tensor_cast<Tt>(times);
+            sb::Tensor<Tv> out(sb_py::eval_out_shape(self, cast));
+            sb::tensor_eval<Tt, Tv>(self, cast, out);
+            return sb::tensor_cast<OtherTt>(out);
+          });
+        }
+      };
+      bindCastingCall.template operator()<sb::float32_t>();
+      bindCastingCall.template operator()<sb::float64_t>();
+      bindCastingCall.template operator()<sb::int32_t>();
+      bindCastingCall.template operator()<sb::int64_t>();
     }
 
   }
 
   /// Bind NestedTensor<T> nodes as Nested<name>.
   template <typename T>
-  void register_nested_tensor_node(pybind11::module_& m, const std::string& name)
+  void register_nested_tensor_node(nb::module_& m, const std::string& name)
   {
     using Nested = sb::NestedTensor<T>;
-    pybind11::class_<Nested>(m, ("Nested" + name).c_str())
-        .def(pybind11::init([](const sb::Tensor<T>& values) {
-          return Nested::from_values(values);
-        }))
-        .def(pybind11::init([](const typename Nested::nested_tensor_type& values, size_t childDepth) {
-          return Nested::from_values(values, childDepth);
-        }),
-             pybind11::arg("tensor"), pybind11::arg("child_depth") = 0)
+    nb::class_<Nested>(m, ("Nested" + name).c_str())
+        .def("__init__", [](Nested* self, const sb::Tensor<T>& values) {
+          new (self) Nested(Nested::from_values(values));
+        })
+        .def("__init__", [](Nested* self, const typename Nested::nested_tensor_type& values, size_t childDepth) {
+          new (self) Nested(Nested::from_values(values, childDepth));
+        },
+             nb::arg("tensor"), nb::arg("child_depth") = 0)
         .def_static("_from_leaf_view", &Nested::from_leaf_view)
         .def_static("_from_outer_view", &Nested::from_outer_view,
-             pybind11::arg("tensor"), pybind11::arg("child_depth"))
-        .def_property_readonly("is_leaf", &Nested::is_leaf)
-        .def_property_readonly("depth", &Nested::depth)
-        .def_property_readonly("leaf", &Nested::leaf)
-        .def_property_readonly("nested", &Nested::nested)
+             nb::arg("tensor"), nb::arg("child_depth"))
+        .def_prop_ro("is_leaf", &Nested::is_leaf)
+        .def_prop_ro("depth", &Nested::depth)
+        .def_prop_ro("leaf", &Nested::leaf)
+        .def_prop_ro("nested", &Nested::nested)
         .def("copy", &Nested::copy);
   }
 
@@ -709,7 +699,7 @@ namespace sb_py
   /// supports selections, NestedTensor<T> nodes as Nested<name>, and
   /// Tensor<NestedTensor<T>> as Nested<name>Tensor.
   template <typename T>
-  void register_tensor_element(pybind11::module_& m, const std::string& name)
+  void register_tensor_element(nb::module_& m, const std::string& name)
   {
     register_typed_tensor_bindings<T>(m, name, "");
     if constexpr (sb::IndexableTensorElement<T>)

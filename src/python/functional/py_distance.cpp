@@ -20,7 +20,7 @@
 #include <functional>
 #include <memory>
 
-namespace py = pybind11;
+namespace nb = nanobind;
 
 namespace
 {
@@ -37,7 +37,7 @@ namespace
     using CudaFactory = std::function<std::unique_ptr<sb::StoppableTask<void>>(sb::DistanceMatrix<Tv>&, const std::vector<PcfT>&, Tv, Tv)>;
 
     template <typename TOperation>
-    static py::tuple pdist_impl(TensorT fs, TOperation op, [[maybe_unused]] CudaFactory cudaFactory)
+    static nb::tuple pdist_impl(TensorT fs, TOperation op, [[maybe_unused]] CudaFactory cudaFactory)
     {
       auto n = static_cast<size_t>(fs.shape(0));
       auto distmat = sb::DistanceMatrix<Tv>(n);
@@ -45,7 +45,7 @@ namespace
       if (n == 0)
       {
         std::unique_ptr<sb::StoppableTask<void>> empty_task = sb_py::execute_empty_task();
-        return py::make_tuple(std::move(empty_task), distmat);
+        return nb::make_tuple(std::move(empty_task), distmat);
       }
 
       auto begin = sb::begin1dValues(fs);
@@ -63,7 +63,7 @@ namespace
         std::vector<PcfT> pcfs(begin, end);
         auto task = cudaFactory(distmat, pcfs, Tv(0), std::numeric_limits<Tv>::max());
         task->start_async(sb::default_executor());
-        return py::make_tuple(std::move(task), distmat);
+        return nb::make_tuple(std::move(task), distmat);
       }
 #endif
 
@@ -73,10 +73,10 @@ namespace
       }
 
       std::unique_ptr<sb::StoppableTask<void>> task = sb_py::execute_stoppable_task<sb::CpuPairwiseIntegrationTask<TOperation, decltype(begin), sb::DistanceMatrix<Tv>, false>>(distmat, begin, end, op);
-      return py::make_tuple(std::move(task), distmat);
+      return nb::make_tuple(std::move(task), distmat);
     }
 
-    static py::tuple pdist_l1(TensorT fs)
+    static nb::tuple pdist_l1(TensorT fs)
     {
       CudaFactory cuda;
 #ifdef BUILD_WITH_CUDA
@@ -87,7 +87,7 @@ namespace
       return pdist_impl(fs, sb::OperationL1Dist<Tt, Tv>{}, cuda);
     }
 
-    static py::tuple pdist_lp(TensorT fs, Tv p)
+    static nb::tuple pdist_lp(TensorT fs, Tv p)
     {
       CudaFactory cuda;
 #ifdef BUILD_WITH_CUDA
@@ -151,7 +151,7 @@ namespace
     }
 
     template <typename TOperation>
-    static py::tuple cdist_impl(TensorT X, TensorT Y, TOperation op, [[maybe_unused]] CudaCdistFactory cudaFactory)
+    static nb::tuple cdist_impl(TensorT X, TensorT Y, TOperation op, [[maybe_unused]] CudaCdistFactory cudaFactory)
     {
       std::vector<size_t> outShape;
       for (auto d : X.shape()) outShape.push_back(d);
@@ -165,7 +165,7 @@ namespace
       if (xTotal == 0 || yTotal == 0)
       {
         std::unique_ptr<sb::StoppableTask<void>> empty_task = sb_py::execute_empty_task();
-        return py::make_tuple(std::move(empty_task), outTensor);
+        return nb::make_tuple(std::move(empty_task), outTensor);
       }
 
 #ifdef BUILD_WITH_CUDA
@@ -181,13 +181,13 @@ namespace
         auto colPcfs = collect_all_pcfs(Y);
         auto task = cudaFactory(outTensor, rowPcfs, colPcfs, Tv(0), std::numeric_limits<Tv>::max());
         task->start_async(sb::default_executor());
-        return py::make_tuple(std::move(task), outTensor);
+        return nb::make_tuple(std::move(task), outTensor);
       }
 #endif
 
       std::unique_ptr<sb::StoppableTask<void>> task =
           sb_py::execute_stoppable_task<CdistTask<TOperation>>(X, Y, outTensor, op);
-      return py::make_tuple(std::move(task), outTensor);
+      return nb::make_tuple(std::move(task), outTensor);
     }
 
     static Tv lp_distance_l1(const PcfT& f, const PcfT& g)
@@ -200,7 +200,7 @@ namespace
       return sb::lp_distance(f, g, p);
     }
 
-    static py::tuple cdist_l1(TensorT X, TensorT Y)
+    static nb::tuple cdist_l1(TensorT X, TensorT Y)
     {
       CudaCdistFactory cuda;
 #ifdef BUILD_WITH_CUDA
@@ -211,7 +211,7 @@ namespace
       return cdist_impl(X, Y, sb::OperationL1Dist<Tt, Tv>{}, cuda);
     }
 
-    static py::tuple cdist_lp(TensorT X, TensorT Y, Tv p)
+    static nb::tuple cdist_lp(TensorT X, TensorT Y, Tv p)
     {
       CudaCdistFactory cuda;
 #ifdef BUILD_WITH_CUDA
@@ -222,9 +222,9 @@ namespace
       return cdist_impl(X, Y, sb::OperationLpDist<Tt, Tv>(p), cuda);
     }
 
-    static void register_bindings(py::handle m, const std::string& suffix)
+    static void register_bindings(nb::handle m, const std::string& suffix)
     {
-      py::class_<PyDistanceBindings> cls(m, ("Distance" + suffix).c_str());
+      nb::class_<PyDistanceBindings> cls(m, ("Distance" + suffix).c_str());
 
       cls
           .def_static("pdist_l1", &PyDistanceBindings::pdist_l1)
@@ -243,7 +243,7 @@ namespace
 namespace sb_py
 {
 
-  void register_distance(py::module_& m)
+  void register_distance(nb::module_& m)
   {
     PyDistanceBindings<sb::float32_t, sb::float32_t>::register_bindings(m, "_f32_f32");
     PyDistanceBindings<sb::float64_t, sb::float64_t>::register_bindings(m, "_f64_f64");

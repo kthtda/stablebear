@@ -115,8 +115,11 @@ set(BUILD_BENCHMARKS OFF)
 # Discover all components together after project() initializes the target platform.
 # Honor Python_EXECUTABLE and Python_FIND_ABI supplied by the caller or backend.
 # Python::Module supplies the import library and Py_GIL_DISABLED on Windows;
-# pybind11_add_module propagates both to every extension, including _gpu_detect.
-find_package(Python 3.10 REQUIRED COMPONENTS Interpreter Development.Module)
+# nanobind_add_module propagates both to every extension, including _gpu_detect.
+# Development.SABIModule lets nanobind build stable ABI (abi3) modules on
+# Python 3.12 and newer.
+find_package(Python 3.10 REQUIRED COMPONENTS Interpreter Development.Module
+             OPTIONAL_COMPONENTS Development.SABIModule)
 
 
 if (BUILD_WITH_CUDA)
@@ -454,8 +457,7 @@ endif ()
 
 include_directories("3rd/taskflow")
 
-set(PYBIND11_FINDPYTHON ON)
-add_subdirectory(3rd/pybind11)
+add_subdirectory(3rd/nanobind)
 
 # Adapted from https://community.gigperformer.com/t/getting-cmake-variables-from-c/17711
 string(TIMESTAMP TODAY "%d/%m/%Y")
@@ -555,7 +557,7 @@ SET(SB_PY_POINT_PROCESS_SOURCES
 list(TRANSFORM SB_PY_POINT_PROCESS_SOURCES PREPEND "point_process/")
 
 SET(SB_PY_SOURCES
-    pybind.hpp
+    nb.hpp
     pymodule.cpp
     py_distributions.hpp py_distributions.cpp
     functional/py_random.hpp functional/py_random.cpp
@@ -603,13 +605,12 @@ source_group("CUDA"                    REGULAR_EXPRESSION "(include/sbear/cuda/.
 source_group("Tensor"                  REGULAR_EXPRESSION "include/sbear/tensor[^/]*")
 source_group("Tensor/Bindings"         REGULAR_EXPRESSION "src/python/py_(np_tensor_convert|tensor)\\.(h|cpp)")
 source_group("Core"                    REGULAR_EXPRESSION "include/sbear/(config|concepts|version|platform|executor|task|point_cloud|special_tensors|random|block_matrix_support|algorithm|tensor_to_string)\\.")
-source_group("Core/Bindings"          REGULAR_EXPRESSION "src/python/(pybind|pymodule|py_np_support|pypcf_support|py_future)\\.(h|cpp)")
+source_group("Core/Bindings"          REGULAR_EXPRESSION "src/python/(nb|pymodule|py_np_support|pypcf_support|py_future)\\.(h|cpp)")
 source_group("Core Sources"           REGULAR_EXPRESSION "src/[^/]+\\.cpp")
 source_group("IO" FILES src/io_stream.cpp)
 
 # Standalone GPU detection module (no CUDA dependency)
-pybind11_add_module(_gpu_detect MODULE src/gpu_detect/gpu_detect.cpp)
-target_link_libraries(_gpu_detect PRIVATE pybind11::headers)
+nanobind_add_module(_gpu_detect STABLE_ABI src/gpu_detect/gpu_detect.cpp)
 if (APPLE)
   target_link_libraries(_gpu_detect PRIVATE "-framework IOKit" "-framework CoreFoundation")
 elseif (WIN32)
@@ -683,12 +684,16 @@ if (BUILD_WITH_CUDA)
 endif ()
 
 # Create both CPU and (optionally) CUDA Python modules
-pybind11_add_module(${CPP_MODULE_NAME_CPU} MODULE ${SB_LIB_SOURCES} ${SB_PY_SOURCES} ${SB_VERSION_SOURCE})
+# NOMINSIZE keeps the library code in the module at the build type's
+# optimization level instead of nanobind's default of optimizing for size.
+# STABLE_ABI targets the stable ABI on Python 3.12 and newer, so that one wheel
+# serves all of them; it has no effect on older or free-threaded Python.
+nanobind_add_module(${CPP_MODULE_NAME_CPU} NOMINSIZE STABLE_ABI ${SB_LIB_SOURCES} ${SB_PY_SOURCES} ${SB_VERSION_SOURCE})
 # Do NOT define BUILD_WITH_CUDA for the CPU module: code uses #ifdef BUILD_WITH_CUDA,
 # so a value of 0 would still enable CUDA code paths.
 
 if (BUILD_WITH_CUDA)
-  pybind11_add_module(${CPP_MODULE_NAME_CUDA} MODULE ${SB_LIB_SOURCES} ${SB_LIB_SOURCES_CUDA} ${SB_PY_SOURCES} ${SB_VERSION_SOURCE})
+  nanobind_add_module(${CPP_MODULE_NAME_CUDA} NOMINSIZE STABLE_ABI ${SB_LIB_SOURCES} ${SB_LIB_SOURCES_CUDA} ${SB_PY_SOURCES} ${SB_VERSION_SOURCE})
   target_compile_definitions(${CPP_MODULE_NAME_CUDA} PRIVATE BUILD_WITH_CUDA=1)
   target_include_directories(${CPP_MODULE_NAME_CUDA} PRIVATE ${SB_CUDA_INCLUDE_DIRS})
   if (CUDAToolkit_ROOT AND EXISTS "${CUDAToolkit_ROOT}/include/cuda_runtime.h")
@@ -704,7 +709,6 @@ foreach(MOD_NAME IN LISTS CPP_MODULE_NAMES)
   target_compile_definitions(${MOD_NAME} PRIVATE SB_MODULE_NAME=${MOD_NAME})
   target_include_directories(${MOD_NAME} PRIVATE ${SB_PRIVATE_INCLUDES})
   target_include_directories(${MOD_NAME} PUBLIC ${SB_PUBLIC_INCLUDES})
-  target_link_libraries(${MOD_NAME} PRIVATE pybind11::headers)
   target_compile_definitions(${MOD_NAME} PRIVATE VERSION_INFO=${PROJECT_VERSION_FULL})
   sb_apply_cpu_arch_flags(${MOD_NAME})
 endforeach()
@@ -969,9 +973,9 @@ if ((LINUX OR (NOT SKBUILD)) AND (NOT SKIP_STUBGEN)) # Stubgen does not seem hap
     add_custom_command(
         TARGET ${MOD_NAME}
         POST_BUILD
-        COMMAND ${Python_EXECUTABLE} -m pybind11_stubgen ${MOD_NAME}
-        --output-dir "${CMAKE_CURRENT_BINARY_DIR}/stubs"
-        --ignore-invalid-expressions comment
+        COMMAND ${Python_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/3rd/nanobind/src/stubgen.py" -m ${MOD_NAME} -r -q
+        -i "$<TARGET_FILE_DIR:${MOD_NAME}>"
+        -O "${CMAKE_CURRENT_BINARY_DIR}/stubs"
         COMMENT "Generating Python stubs for ${MOD_NAME}..."
     )
 

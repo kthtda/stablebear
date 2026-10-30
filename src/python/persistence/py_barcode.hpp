@@ -3,11 +3,11 @@
 
 #include <sbear/persistence/persistence_pair.hpp>
 
-#include "../pybind.hpp"
+#include "../nb.hpp"
 
 namespace sb_py
 {
-  void register_persistence_barcode_tensor(pybind11::module_& m);
+  void register_persistence_barcode_tensor(nb::module_& m);
 }
 
 #endif //STABLEBEAR_PY_BARCODE_H

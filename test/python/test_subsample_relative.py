@@ -351,7 +351,7 @@ def test_draws_with_replacement_follow_the_weights(
     )
 
     weights = density(np.abs(x))
-    counts = np.bincount(np.asarray(samples.indices[0, 0]), minlength=n_reference)
+    counts = np.bincount(np.asarray(samples.indices[0, 0], dtype=np.intp), minlength=n_reference)
     assert_histogram_matches_exact(counts, weights / weights.sum())
 
 
@@ -406,7 +406,7 @@ def test_draws_without_replacement_follow_the_weights(
 
     weights = density(np.abs(x))
     indices = samples.indices
-    drawn = np.concatenate([np.asarray(indices[0, s]) for s in range(n_samples)])
+    drawn = np.concatenate([np.asarray(indices[0, s], dtype=np.intp) for s in range(n_samples)])
     # Each point appears at most once per sample, so this is the fraction of
     # samples that include it.
     frequencies = np.bincount(drawn, minlength=n_reference) / n_samples
@@ -494,7 +494,7 @@ def test_equal_far_tail_weights_keep_a_random_order(n_samples):
     )
 
     indices = samples.indices
-    draws = np.array([np.asarray(indices[0, s]) for s in range(n_samples)])
+    draws = np.array([np.asarray(indices[0, s], dtype=np.intp) for s in range(n_samples)])
     first_draws = draws[:, 0]
     second_draws = draws[:, 1]
     npt.assert_array_equal(first_draws, 0)

@@ -4,10 +4,10 @@
 
 #include <sbear/persistence/linkage.hpp>
 
-#include <pybind11/numpy.h>
+#include <nanobind/ndarray.h>
 #include <utility>
 
-namespace py = pybind11;
+namespace nb = nanobind;
 
 namespace
 {
@@ -15,29 +15,29 @@ namespace
   class PyLinkageBindings
   {
   public:
-    static py::tuple linkage_to_barcode(py::array_t<T, 0> input, bool reduced)
+    static nb::tuple linkage_to_barcode(sb_py::NpIn<T> input, bool reduced)
     {
-      const NumpyTensor<T> matrix(input);
+      const NumpyTensor<const T> matrix(input);
       bool hasNonMonotoneHeights = false;
       auto barcode = [&] {
-        py::gil_scoped_release release;
+        nb::gil_scoped_release release;
         return sb::ph::linkage_to_barcode(matrix, reduced, &hasNonMonotoneHeights);
       }();
-      return py::make_tuple(std::move(barcode), hasNonMonotoneHeights);
+      return nb::make_tuple(std::move(barcode), hasNonMonotoneHeights);
     }
 
-    static void register_bindings(py::module_& m, const std::string& suffix)
+    static void register_bindings(nb::module_& m, const std::string& suffix)
     {
-      py::class_<PyLinkageBindings>(m, ("Linkage" + suffix).c_str())
+      nb::class_<PyLinkageBindings>(m, ("Linkage" + suffix).c_str())
         .def_static("linkage_to_barcode", &PyLinkageBindings::linkage_to_barcode,
-                    py::arg("Z").noconvert(), py::arg("reduced") = false);
+                    nb::arg("Z").noconvert(), nb::arg("reduced") = false);
     }
   };
 }
 
 namespace sb_py
 {
-  void register_persistence_linkage(py::module_& m)
+  void register_persistence_linkage(nb::module_& m)
   {
     PyLinkageBindings<sb::float32_t>::register_bindings(m, "32");
     PyLinkageBindings<sb::float64_t>::register_bindings(m, "64");

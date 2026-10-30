@@ -13,7 +13,7 @@
 #include <limits>
 #include <utility>
 
-namespace py = pybind11;
+namespace nb = nanobind;
 
 namespace
 {
@@ -37,9 +37,9 @@ namespace
       return task;
     }
 
-    static void register_bindings(py::module_& m, const std::string& suffix)
+    static void register_bindings(nb::module_& m, const std::string& suffix)
     {
-      py::class_<PyBarcodeSummaryBindings> cls(m, ("PersistenceBarcodeSummary" + suffix).c_str());
+      nb::class_<PyBarcodeSummaryBindings> cls(m, ("PersistenceBarcodeSummary" + suffix).c_str());
 
       // Each summary takes any container of barcodes or a single barcode; a
       // single barcode runs as a 0-d tensor.
@@ -61,7 +61,7 @@ namespace
         });
         cls.def_static("spawn_barcode_to_accumulated_persistence_task", [](const Container& bcs, T max_death) {
           return start(sb::ph::make_accumulated_persistence_task(bcs, max_death));
-        }, py::arg("barcodes"), py::arg("max_death") = std::numeric_limits<T>::infinity());
+        }, nb::arg("barcodes"), nb::arg("max_death") = std::numeric_limits<T>::infinity());
       });
 
       cls.def_static("spawn_barcode_to_stable_rank_task", [](const BarcodeT& bc) {
@@ -72,7 +72,7 @@ namespace
       });
       cls.def_static("spawn_barcode_to_accumulated_persistence_task", [](const BarcodeT& bc, T max_death) {
         return start(sb::ph::make_accumulated_persistence_task(as_tensor(bc), max_death));
-      }, py::arg("barcode"), py::arg("max_death") = std::numeric_limits<T>::infinity());
+      }, nb::arg("barcode"), nb::arg("max_death") = std::numeric_limits<T>::infinity());
     }
   };
 
@@ -80,7 +80,7 @@ namespace
 
 namespace sb_py
 {
-  void register_persistence_barcode_summary(pybind11::module_ &m)
+  void register_persistence_barcode_summary(nb::module_ &m)
   {
     PyBarcodeSummaryBindings<sb::float32_t>::register_bindings(m, "32");
     PyBarcodeSummaryBindings<sb::float64_t>::register_bindings(m, "64");

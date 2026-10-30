@@ -1,11 +1,11 @@
 #ifndef STABLEBEAR_PY_DISTANCE_H
 #define STABLEBEAR_PY_DISTANCE_H
 
-#include "../pybind.hpp"
+#include "../nb.hpp"
 
 namespace sb_py
 {
-  void register_distance(pybind11::module_& m);
+  void register_distance(nb::module_& m);
 }
 
 

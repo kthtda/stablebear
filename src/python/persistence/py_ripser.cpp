@@ -10,7 +10,7 @@
 
 #include <type_traits>
 
-namespace py = pybind11;
+namespace nb = nanobind;
 
 namespace
 {
@@ -42,7 +42,7 @@ namespace
     /// Bind one spawn function, overloaded on every container of ElemT and,
     /// for clouds and matrices, on a single element, with its task classes.
     template <typename ElemT>
-    static void register_spawn(py::module_& m, py::class_<PyRipserBindings>& cls,
+    static void register_spawn(nb::module_& m, nb::class_<PyRipserBindings>& cls,
                                const std::string& spawnName, const std::string& taskName)
     {
       sb_py::bind_ufunc_containers<ElemT>([&]<typename Container>(const std::string& variant) {
@@ -55,9 +55,9 @@ namespace
       }
     }
 
-    static void register_bindings(py::module_& m, const std::string& suffix)
+    static void register_bindings(nb::module_& m, const std::string& suffix)
     {
-      py::class_<PyRipserBindings> cls(
+      nb::class_<PyRipserBindings> cls(
         m, ("PersistenceRipser" + suffix).c_str());
       register_spawn<sb::PointCloud<T>>(
           m, cls, "spawn_ripser_pcloud_euclidean_task", "_PersistenceTaskPointCloud" + suffix);
@@ -72,7 +72,7 @@ namespace
 
 namespace sb_py
 {
-  void register_persistence_ripser(pybind11::module_ &m)
+  void register_persistence_ripser(nb::module_ &m)
   {
     PyRipserBindings<sb::float32_t>::register_bindings(m, "32");
     PyRipserBindings<sb::float64_t>::register_bindings(m, "64");

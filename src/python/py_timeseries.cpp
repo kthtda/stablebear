@@ -1,53 +1,54 @@
 #include "py_timeseries.hpp"
 #include "py_timeseries_bind.hpp"
 
-#include <pybind11/numpy.h>
+#include <nanobind/ndarray.h>
 
 #include <algorithm>
 #include <optional>
 #include <string>
 
-namespace py = pybind11;
+namespace nb = nanobind;
 
 namespace sb_py
 {
-  void register_timeseries(py::module_& m)
+  void register_timeseries(nb::module_& m)
   {
-    py::class_<sb::DateTime>(m, "DateTime")
-      .def(py::init([](int64_t count, const std::string& unit) { return sb::DateTime(count, sb::parse_time_unit(unit)); }),
-           py::arg("count"), py::arg("unit"))
-      .def_readonly("count", &sb::DateTime::count)
-      .def_property_readonly("unit", [](const sb::DateTime& self) {
+    nb::class_<sb::DateTime>(m, "DateTime")
+      .def("__init__", [](sb::DateTime* self, int64_t count, const std::string& unit) {
+        new (self) sb::DateTime(count, sb::parse_time_unit(unit));
+      }, nb::arg("count"), nb::arg("unit"))
+      .def_ro("count", &sb::DateTime::count)
+      .def_prop_ro("unit", [](const sb::DateTime& self) {
         return std::string(sb::time_unit_name(self.unit));
       })
       .def("__eq__", [](const sb::DateTime& self, const sb::DateTime& other) { return self == other; });
 
-    py::class_<sb::Times>(m, "Times")
-      .def(py::init([](py::array_t<sb::float64_t, py::array::c_style | py::array::forcecast> values,
-                       const std::string& unit, const std::optional<sb::DateTime>& epoch) {
+    nb::class_<sb::Times>(m, "Times")
+      .def("__init__", [](sb::Times* self, nb::ndarray<const sb::float64_t, nb::c_contig, nb::device::cpu> values,
+                          const std::string& unit, const std::optional<sb::DateTime>& epoch) {
         if (values.ndim() != 1)
         {
-          throw py::value_error(
+          throw std::invalid_argument(
               "Timestamps must be one-dimensional, got " + std::to_string(values.ndim()) + " dimensions");
         }
         std::vector<sb::float64_t> data(values.data(), values.data() + values.size());
-        return sb::Times(std::move(data), sb::parse_time_unit(unit), epoch);
-      }), py::arg("values"), py::arg("unit"), py::arg("epoch") = py::none())
-      .def_property_readonly("values", [](const sb::Times& self) {
+        new (self) sb::Times(std::move(data), sb::parse_time_unit(unit), epoch);
+      }, nb::arg("values"), nb::arg("unit"), nb::arg("epoch") = nb::none())
+      .def_prop_ro("values", [](const sb::Times& self) {
         // A copy: timestamps cannot change after validation.
         sb::Tensor<sb::float64_t> out({self.size()});
         std::copy(self.values().begin(), self.values().end(), out.data());
         return out;
       })
-      .def_property_readonly("unit", [](const sb::Times& self) {
+      .def_prop_ro("unit", [](const sb::Times& self) {
         return std::string(sb::time_unit_name(self.unit()));
       })
-      .def_property_readonly("epoch", &sb::Times::epoch)
-      .def_property_readonly("origin", &sb::Times::origin)
-      .def("with_epoch", &sb::Times::with_epoch, py::arg("epoch"))
+      .def_prop_ro("epoch", &sb::Times::epoch)
+      .def_prop_ro("origin", &sb::Times::origin)
+      .def("with_epoch", &sb::Times::with_epoch, nb::arg("epoch"))
       .def("to", [](const sb::Times& self, const std::string& unit) {
         return self.to(sb::parse_time_unit(unit));
-      }, py::arg("unit"))
+      }, nb::arg("unit"))
       .def("__len__", &sb::Times::size)
       .def("__eq__", [](const sb::Times& self, const sb::Times& other) { return self == other; });
 

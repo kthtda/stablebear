@@ -3,8 +3,7 @@
 #ifndef STABLEBEAR_PY_SYMMETRIC_MATRIX_H
 #define STABLEBEAR_PY_SYMMETRIC_MATRIX_H
 
-#include "pybind.hpp"
-#include <pybind11/numpy.h>
+#include "nb.hpp"
 
 #include <sbear/symmetric_matrix.hpp>
 #include <sbear/tensor.hpp>
@@ -66,39 +65,32 @@ namespace sb_py
     };
   }
 
-  void register_symmetric_matrix(pybind11::module_& m);
+  void register_symmetric_matrix(nb::module_& m);
 
   template <typename T>
-  void register_symmetric_matrix_bindings(pybind11::module_& m, const std::string& suffix)
+  void register_symmetric_matrix_bindings(nb::module_& m, const std::string& suffix)
   {
-    namespace py = pybind11;
+    namespace nb = nanobind;
     using MatT = sb::SymmetricMatrix<T>;
 
-    py::class_<MatT>(m, ("SymmetricMatrix" + suffix).c_str(), py::buffer_protocol())
-      .def(py::init<size_t>(), py::arg("n"))
-      .def(py::init<size_t, T>(), py::arg("n"), py::arg("init"))
-      .def_property_readonly("size", &MatT::size)
-      .def_property_readonly("storage_count", &MatT::storage_count)
+    nb::class_<MatT> cls(m, ("SymmetricMatrix" + suffix).c_str());
+    bind_array_view(cls, [](const MatT& self, nb::handle owner) {
+      return nb::ndarray<nb::numpy, const T>(self.data(), {self.storage_count()}, owner);
+    });
+    cls
+      .def(nb::init<size_t>(), nb::arg("n"))
+      .def(nb::init<size_t, T>(), nb::arg("n"), nb::arg("init"))
+      .def_prop_ro("size", &MatT::size)
+      .def_prop_ro("storage_count", &MatT::storage_count)
       .def("__getitem__", [](const MatT& self, std::pair<size_t, size_t> ij) {
         return self(ij.first, ij.second);
       })
       .def("__setitem__", [](MatT& self, std::pair<size_t, size_t> ij, T val) {
         self(ij.first, ij.second) = val;
       })
-      .def_buffer([](const MatT& self) -> py::buffer_info {
-        return py::buffer_info(
-          const_cast<T*>(self.data()),
-          sizeof(T),
-          py::format_descriptor<T>::format(),
-          1,
-          { self.storage_count() },
-          { sizeof(T) },
-          true  // readonly
-        );
-      })
       .def("to_dense", [](const MatT& self) {
         auto n = self.size();
-        py::array_t<T> out({n, n});
+        auto out = new_array<T>({n, n});
         NumpyTensor<T> buf(out);
         for (size_t i = 0; i < n; ++i)
         {
@@ -113,7 +105,7 @@ namespace sb_py
       .def_static("from_dense", &detail::matrix_from_numpy_dense<MatT>)
       .def("allclose", [](const MatT& self, const MatT& rhs, double atol, double rtol){
         return sb::allclose(self, rhs, T(atol), T(rtol));
-      }, py::arg("other"), py::arg("atol") = 1e-8, py::arg("rtol") = 1e-5)
+      }, nb::arg("other"), nb::arg("atol") = 1e-8, nb::arg("rtol") = 1e-5)
       .def("__repr__", [suffix](const MatT& self) {
         std::ostringstream oss;
         oss << "SymmetricMatrix" << suffix << "(size=" << self.size() << ")";

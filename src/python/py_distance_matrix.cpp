@@ -4,7 +4,7 @@
 namespace sb_py
 {
 
-  void register_distance_matrix(pybind11::module_& m)
+  void register_distance_matrix(nb::module_& m)
   {
     register_distance_matrix_bindings<sb::float32_t>(m, "_f32");
     register_distance_matrix_bindings<sb::float64_t>(m, "_f64");
