@@ -128,18 +128,24 @@ RUN pip install 'cmake>=4,<5'
 
 # Install Python deps straight from the repo's canonical sources, so there's
 # no second copy to keep in sync:
-#   - runtime + test deps -> pyproject.toml ([project].dependencies and
-#     [tool.cibuildwheel].test-requires), extracted with tomli (py3.10 has no
-#     stdlib tomllib)
-#   - docs (Sphinx) deps  -> docs/requirements.txt
+#   - runtime deps -> pyproject.toml [project].dependencies, extracted with
+#     tomli (py3.10 has no stdlib tomllib)
+#   - test deps    -> the `test` dependency group in pyproject.toml
+#   - docs (Sphinx) deps -> docs/requirements.txt
 # The cmake build's tooling (numpy, pybind11-stubgen) arrives via these too.
 # The C++/CUDA extension itself is NOT pip-installed here; it is built and
 # symlinked into stablebear/ by `cmake --install` in postCreateCommand.
 COPY --chown=ubuntu pyproject.toml /tmp/build/pyproject.toml
 COPY --chown=ubuntu docs/requirements.txt /tmp/build/docs-requirements.txt
 RUN pip install tomli \
-    && python3 -c "import tomli; d=tomli.load(open('/tmp/build/pyproject.toml','rb')); print('\n'.join(d['project']['dependencies'] + d.get('tool',{}).get('cibuildwheel',{}).get('test-requires',[])))" > /tmp/build/pyproject-deps.txt \
-    && pip install -r /tmp/build/pyproject-deps.txt -r /tmp/build/docs-requirements.txt
+    && python3 -c "import tomli; d=tomli.load(open('/tmp/build/pyproject.toml','rb')); print('\n'.join(d['project']['dependencies']))" > /tmp/build/pyproject-deps.txt \
+    && pip install -r /tmp/build/pyproject-deps.txt -r /tmp/build/docs-requirements.txt \
+        --group /tmp/build/pyproject.toml:test
+
+# Pyright, the type checker pyrightconfig.json configures. The pip wrapper
+# downloads its Node.js package on first run; run it once here so that
+# happens at image-build time.
+RUN pip install pyright && pyright --version
 
 # Codex runs inside the devcontainer, so a second OS sandbox is unnecessary
 # and may fail on container kernels that disable unprivileged user namespaces.

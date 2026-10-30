@@ -18,10 +18,11 @@ an NVIDIA GPU). Everything below is shared unless noted.
 - **Python 3.10** in a venv at `/opt/venv` (auto on `PATH`). Deps are
   installed at image-build time straight from the repo's canonical lists, so
   there's no second copy to maintain:
-  - runtime + test deps from `pyproject.toml` (`[project].dependencies` +
-    `[tool.cibuildwheel].test-requires`), read via `tomli`;
+  - runtime deps from `pyproject.toml` (`[project].dependencies`), read via
+    `tomli`, and test deps from its `test` dependency group;
   - Sphinx docs deps from `docs/requirements.txt`.
 - **Node 20** + `@anthropic-ai/claude-code` (run `claude` in the terminal).
+- **Pyright** in the venv (run `pyright`), configured by `pyrightconfig.json`.
 - **Codex**: the CLI and VS Code extension trust `/workspaces/stablebear` and
   use `danger-full-access` inside the container, avoiding a redundant nested
   OS sandbox. State-changing Git commands still require explicit user
@@ -118,8 +119,17 @@ edit `devcontainer.json` and narrow the first mount to
 
 Both devcontainer configs bind-mount the host's `~/.codex/auth.json` to
 `/home/ubuntu/.codex/auth.json`, so a file-based Codex login is available in
-the container and survives rebuilds. The host file must exist before opening
-the devcontainer. Codex configuration and rules remain container-specific.
+the container and survives rebuilds. Codex configuration and rules remain
+container-specific.
+
+## Hosts without Claude Code or Codex
+
+`~/.claude`, `~/.claude.json`, and `~/.codex/auth.json` need not exist on the
+host. For each one missing, `.devcontainer/prepare-home.sh` stages an empty
+one (an empty directory, or `{}`) in `.devcontainer/.local/home/`, so the
+mounts still work and the tool starts logged out. A login or other state
+saved in the container stays there across rebuilds. If the host file appears
+later, the next start uses it, as described below.
 
 ## Home directories on AFS
 
