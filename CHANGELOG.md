@@ -3,11 +3,13 @@
 ### Breaking changes
 
 * **`allclose` broadcasts tensor shapes** — Tensors with different shapes are broadcast together, as in arithmetic, and shapes that cannot be broadcast raise `ValueError`. Previously any shape mismatch returned `False`. ([#52](https://github.com/kthtda/stablebear/issues/52))
+* **`sample_poisson` requires a positive mean** — `point_process.sample_poisson` raises `ValueError` when `rate` is 0, when `lo` is not less than `hi` in some dimension, or when `rate` times the volume of the box underflows to 0. Previously these gave empty point clouds, or aborted the interpreter in builds with libstdc++ assertions. ([#36](https://github.com/kthtda/stablebear/issues/36))
+* **`bool()` on numeric tensors** — `bool()` on a `FloatTensor` or `IntTensor` gives the truth value of its single element, and raises `ValueError` for a tensor with no elements or more than one. Previously it gave whether the tensor was nonempty. ([#45](https://github.com/kthtda/stablebear/issues/45))
 
 ### New features
 
 * **`allclose` accepts more types** — `allclose` compares `IntTensor` and `BoolTensor`, tensors of different dtypes, and matrices of different precisions, and accepts an array or list as one input when the other is a tensor. ([#100](https://github.com/kthtda/stablebear/issues/100))
-
+* **`Barcode` accepts lists and integer arrays** — `persistence.Barcode` builds a `barcode64` from any real-valued (n, 2) input, such as a nested list or an integer array, and an empty barcode from `[]`. A `float32` array still gives a `barcode32`. Other input raises `TypeError`; previously it raised `AttributeError`. ([#183](https://github.com/kthtda/stablebear/issues/183))
 * **Time series** — `timeseries.TimeSeries` holds observations of any element type, such as numbers, vectors, point clouds, or barcodes, at explicit timestamps with a time unit, and evaluates by previous value. Several channels with their own timestamps and units combine with `TimeSeries.from_channels`. Queries that miss a timestamp by a rounding error snap to it by tolerant comparison, as in APL. `timeseries.TimeDelayEmbedding` and `timeseries.Window` build delay embeddings and windows, which evaluate on a grid to point clouds for persistent homology. Persistent homology and barcode summaries such as stable rank apply to each observation of a series. Series and tensors of series support saving, loading, and pickling. ([#242](https://github.com/kthtda/stablebear/issues/242))
 * **Nested tensors of any element type** — `NestedTensor` leaves can be boolean, PCF, point-cloud, distance-matrix, symmetric-matrix, barcode, and time series tensors, not only numeric ones, and nested tensors of them can be saved, loaded, and pickled. ([#255](https://github.com/kthtda/stablebear/pull/255))
 * **`system.get_cpu_limit`** — Returns the number of CPU threads available for computations, as set by `system.limit_cpus`. ([#255](https://github.com/kthtda/stablebear/pull/255))
@@ -17,6 +19,8 @@
 
 * **Errors in parallel work are raised** — An exception thrown while processing one element in parallel, such as a failed allocation in `point_process.sample_poisson`, now reaches Python. Previously the element was silently left at its default value. ([#34](https://github.com/kthtda/stablebear/issues/34))
 * **Generators fill 0-d shapes** — `random.noisy_sin`, `random.noisy_cos`, and `point_process.sample_poisson` called with the shape `()` now generate its one element. Previously they returned it unfilled, as zeros. ([#35](https://github.com/kthtda/stablebear/issues/35))
+* **Evaluating at no times** — Evaluating a PCF tensor at an empty time array returns an empty result of shape `X.shape + (0,)`. Previously it crashed the interpreter. ([#192](https://github.com/kthtda/stablebear/issues/192))
+* **`allclose` and infinities** — Equal infinities are close and opposite infinities are not. Previously `allclose(x, x)` was `False` when `x` held an infinity, and `inf` was close to `-inf`. NaN in a `DistanceMatrix` or `SymmetricMatrix` is no longer close to itself. ([#51](https://github.com/kthtda/stablebear/issues/51))
 
 ## 0.5.1
 
