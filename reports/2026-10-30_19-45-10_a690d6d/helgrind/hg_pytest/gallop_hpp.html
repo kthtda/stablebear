@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>/home/runner/work/stablebear/stablebear/include/sbear/io/../algorithms/gallop.hpp</title>
+    <link href='valgrind.css' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+    <script src="https://code.jquery.com/jquery-3.4.1.js"></script>
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.0.0/styles/default.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.0.0/highlight.min.js"></script>
+    <script src="valgrind.js"></script>
+</head>
+
+<body>
+    <div class="global">
+        <div class="header">
+            <h1>/home/runner/work/stablebear/stablebear/include/sbear/io/../algorithms/gallop.hpp</h1>
+            <p><b>3</b> errors</p>
+            <button class="next_error">Goto First Error</button>
+        </div>
+        <div class="listing">
+            <pre class="code">
+<code class="c++"><span class="line_number">1</span>#ifndef SB_ALGORITHMS_GALLOP_H
+<span class="line_number">2</span>#define SB_ALGORITHMS_GALLOP_H
+<span class="line_number">3</span>
+<span class="line_number">4</span>#include &lt;algorithm&gt;
+<span class="line_number">5</span>#include &lt;iterator&gt;
+<span class="line_number">6</span>
+<span class="line_number">7</span>namespace sb
+<span class="line_number">8</span>{
+<span class="line_number">9</span>  /// std::upper_bound(first, last, value) for an ascending range, found by
+<span class="line_number">10</span>  /// galloping from @p hint, any position in [first, last]: step 1, 2, 4, ...
+<span class="line_number">11</span>  /// elements toward the answer until stepping past it, then bisect the last
+<span class="line_number">12</span>  /// step. An answer d elements from the hint costs O(log d) comparisons,
+<span class="line_number">13</span>  /// which beats a binary search over the whole range when the hint is close,
+<span class="line_number">14</span>  /// as when queries arrive in order or near a known position.
+<span class="line_number">15</span>  template &lt;std::random_access_iterator It, typename T&gt;
+<span class="line_number">16</span>  [[nodiscard]] It gallop_upper_bound(It first, It last, It hint, const T&amp; value)
+<span class="line_number">17</span>  {
+<span class="line_number">18</span>    typename std::iterator_traits&lt;It&gt;::difference_type step = 1;
+</code></pre>
+            <div class="issue">
+                <div>
+                    <span class="what">Possible data race during read of size 8 at 0x2C149540 by thread #13</span>
+                    <div class="navigation">
+                        <button class="next_error">Next</button>
+                        <button class="prev_error">Previous</button>
+                    </div>
+                </div>
+                <div>
+                    <table class="call_stack">
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/timeseries.tpp:360<br>
+                                    <code class="cpp">sb::Channel&lt;double&gt;::index_at(double, unsigned long) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">357</span>    const auto&amp; times = held_times().values();
+<span class="line_number">358</span>    const auto begin = times.begin();
+<span class="line_number">359</span>    const auto from = begin + static_cast&lt;std::ptrdiff_t&gt;(std::min(hint, times.size()));
+<span class="line_number">360</span><span class="error">    return snap(static_cast&lt;size_t&gt;(gallop_upper_bound(begin, times.end(), from, t) - begin), t);
+</span><span class="line_number">361</span>  }
+<span class="line_number">362</span>
+<span class="line_number">363</span>  template &lt;typename T&gt;
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/timeseries.tpp:346<br>
+                                    <code class="cpp">sb::Channel&lt;double&gt;::indices_sorted(std::span&lt;double const, 18446744073709551615ul&gt;) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">343</span>    size_t hint = 0;
+<span class="line_number">344</span>    for (const auto t : sortedTimes)
+<span class="line_number">345</span>    {
+<span class="line_number">346</span><span class="error">      hint = index_at(t, hint);
+</span><span class="line_number">347</span>      indices.push_back(hint);
+<span class="line_number">348</span>    }
+<span class="line_number">349</span>    return indices;
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/io/../timeseries.tpp:248<br>
+                                    <code class="cpp">void sb::Channel&lt;double&gt;::lookup_sorted&lt;double*&gt;(std::span&lt;double const, 18446744073709551615ul&gt;, std::span&lt;unsigned long const, 18446744073709551615ul&gt;, double*) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">245</span>  void Channel&lt;T&gt;::lookup_sorted(std::span&lt;const float64_t&gt; sortedTimes, std::span&lt;const size_t&gt; order, Out out) const
+<span class="line_number">246</span>  {
+<span class="line_number">247</span>    const auto blockSize = block_size();
+<span class="line_number">248</span><span class="error">    const auto indices = indices_sorted(sortedTimes);
+</span><span class="line_number">249</span>    for (size_t k = 0; k &lt; sortedTimes.size(); ++k)
+<span class="line_number">250</span>    {
+<span class="line_number">251</span>      copy_observation(indices[k], out + static_cast&lt;std::ptrdiff_t&gt;(order[k] * blockSize));
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/timeseries.tpp:636<br>
+                                    <code class="cpp">sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}::operator()(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">633</span>            sorted[q] = convert_time(queries[order[q]], one.unit(), channel.unit());
+<span class="line_number">634</span>          }
+<span class="line_number">635</span>          const auto blockSize = leaves[c].size() / series.size();
+<span class="line_number">636</span><span class="error">          channel.lookup_sorted(sorted, order, leaves[c].data() + static_cast&lt;std::ptrdiff_t&gt;(k * blockSize));
+</span><span class="line_number">637</span>        }
+<span class="line_number">638</span>      }, exec);
+<span class="line_number">639</span>    }
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/walk.hpp:155<br>
+                                    <code class="cpp">sb::parallel_walk_async&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}::operator()(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">152</span>  tf::Future&lt;void&gt; parallel_walk_async(const TTensor&amp; tensor, UnaryFunc&amp;&amp; f, Executor&amp; exec)
+<span class="line_number">153</span>  {
+<span class="line_number">154</span>    return detail::parallel_walk_impl(tensor, [f = std::forward&lt;UnaryFunc&gt;(f)](const std::vector&lt;size_t&gt;&amp; idx, size_t) {
+<span class="line_number">155</span><span class="error">      f(idx);
+</span><span class="line_number">156</span>    }, exec);
+<span class="line_number">157</span>  }
+<span class="line_number">158</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/walk.hpp:118<br>
+                                    <code class="cpp">sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}::operator()(unsigned long) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">115</span>          rem /= shape[i];
+<span class="line_number">116</span>        }
+<span class="line_number">117</span>
+<span class="line_number">118</span><span class="error">        f(idx, flat);
+</span><span class="line_number">119</span>      });
+<span class="line_number">120</span>
+<span class="line_number">121</span>      return exec.cpu()-&gt;run(std::move(flow));
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/algorithm/for_each.hpp:134<br>
+                                    <code class="cpp">tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}::operator()()::{lambda(unsigned long, unsigned long)#1}::operator()(unsigned long, unsigned long)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">131</span>          part.loop(N, W, *next, [=] (size_t part_b, size_t part_e) mutable {
+<span class="line_number">132</span>            auto idx = static_cast&lt;B_t&gt;(part_b) * inc + beg;
+<span class="line_number">133</span>            for(size_t x=part_b; x&lt;part_e; x++, idx += inc) {
+<span class="line_number">134</span><span class="error">              c(idx);
+</span><span class="line_number">135</span>            }
+<span class="line_number">136</span>          });
+<span class="line_number">137</span>        });
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/../algorithm/partitioner.hpp:316<br>
+                                    <code class="cpp">void tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;::loop&lt;tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}::operator()()::{lambda(unsigned long, unsigned long)#1}, (void*)0&gt;(unsigned long, unsigned long, std::atomic&lt;unsigned long&gt;&amp;, tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}::operator()()::{lambda(unsigned long, unsigned long)#1}&amp;&amp;) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">313</span>          if(curr_b &gt;= N) {
+<span class="line_number">314</span>            return;
+<span class="line_number">315</span>          }
+<span class="line_number">316</span><span class="error">          func(curr_b, (std::min)(curr_b + chunk_size, N));
+</span><span class="line_number">317</span>        }
+<span class="line_number">318</span>        break;
+<span class="line_number">319</span>      }
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/algorithm/for_each.hpp:131<br>
+                                    <code class="cpp">tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}::operator()()</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">128</span>      auto next = std::make_shared&lt;std::atomic&lt;size_t&gt;&gt;(0);
+<span class="line_number">129</span>      for(size_t w=0; w&lt;W;) {
+<span class="line_number">130</span>        auto task = part([=] () mutable {
+<span class="line_number">131</span><span class="error">          part.loop(N, W, *next, [=] (size_t part_b, size_t part_e) mutable {
+</span><span class="line_number">132</span>            auto idx = static_cast&lt;B_t&gt;(part_b) * inc + beg;
+<span class="line_number">133</span>            for(size_t x=part_b; x&lt;part_e; x++, idx += inc) {
+<span class="line_number">134</span>              c(idx);
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/algorithm/for_each.hpp:138<br>
+                                    <code class="cpp">tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">135</span>            }
+<span class="line_number">136</span>          });
+<span class="line_number">137</span>        });
+<span class="line_number">138</span><span class="error">        (++w == W) ? task() : rt.silent_async(task);
+</span><span class="line_number">139</span>      }
+<span class="line_number">140</span>    }
+<span class="line_number">141</span>  };
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:61<br>
+                                    <code class="cpp">void std::__invoke_impl&lt;void, tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}&amp;, tf::Runtime&amp;&gt;(std::__invoke_other, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, tf::Runtime&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">58</span>  template&lt;typename _Res, typename _Fn, typename... _Args&gt;
+<span class="line_number">59</span>    constexpr _Res
+<span class="line_number">60</span>    __invoke_impl(__invoke_other, _Fn&amp;&amp; __f, _Args&amp;&amp;... __args)
+<span class="line_number">61</span><span class="error">    { return std::forward&lt;_Fn&gt;(__f)(std::forward&lt;_Args&gt;(__args)...); }
+</span><span class="line_number">62</span>
+<span class="line_number">63</span>  template&lt;typename _Res, typename _MemFun, typename _Tp, typename... _Args&gt;
+<span class="line_number">64</span>    constexpr _Res
+</code></pre>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            <pre class="code">
+<code class="c++"><span class="line_number">19</span><span class="error">    if (hint == last || value &lt; *hint)</span>
+<span class="line_number">20</span>    {
+<span class="line_number">21</span>      // The answer is at or before hint.
+<span class="line_number">22</span>      auto hi = hint;
+<span class="line_number">23</span>      while (hi != first)
+<span class="line_number">24</span>      {
+<span class="line_number">25</span>        const auto probe = hi - first &gt; step ? hi - step : first;
+</code></pre>
+            <div class="issue">
+                <div>
+                    <span class="what">Possible data race during read of size 8 at 0x3260D598 by thread #13</span>
+                    <div class="navigation">
+                        <button class="next_error">Next</button>
+                        <button class="prev_error">Previous</button>
+                    </div>
+                </div>
+                <div>
+                    <table class="call_stack">
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/io/../timeseries.tpp:334<br>
+                                    <code class="cpp">sb::Channel&lt;double&gt;::source_index(unsigned long, unsigned long) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">331</span>    const auto&amp; times = m_source-&gt;held_times().values();
+<span class="line_number">332</span>    const auto t = time(k) - m_lags[j];
+<span class="line_number">333</span>    const auto afterBase = times.begin() + static_cast&lt;std::ptrdiff_t&gt;((*m_base)[k] + 1);
+<span class="line_number">334</span><span class="error">    const auto next = gallop_upper_bound(times.begin(), times.end(), afterBase, t);
+</span><span class="line_number">335</span>    return m_source-&gt;snap(static_cast&lt;size_t&gt;(next - times.begin()), t);
+<span class="line_number">336</span>  }
+<span class="line_number">337</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/io/../timeseries.tpp:317<br>
+                                    <code class="cpp">void sb::Channel&lt;double&gt;::copy_observation&lt;double*&gt;(unsigned long, double*) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">314</span>    const auto sourceBlock = m_source-&gt;block_size();
+<span class="line_number">315</span>    for (size_t j = 0; j &lt; m_lags.size(); ++j)
+<span class="line_number">316</span>    {
+<span class="line_number">317</span><span class="error">      m_source-&gt;copy_observation(source_index(k, j), out + static_cast&lt;std::ptrdiff_t&gt;(j * sourceBlock));
+</span><span class="line_number">318</span>    }
+<span class="line_number">319</span>  }
+<span class="line_number">320</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/io/../timeseries.tpp:317<br>
+                                    <code class="cpp">void sb::Channel&lt;double&gt;::copy_observation&lt;double*&gt;(unsigned long, double*) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">314</span>    const auto sourceBlock = m_source-&gt;block_size();
+<span class="line_number">315</span>    for (size_t j = 0; j &lt; m_lags.size(); ++j)
+<span class="line_number">316</span>    {
+<span class="line_number">317</span><span class="error">      m_source-&gt;copy_observation(source_index(k, j), out + static_cast&lt;std::ptrdiff_t&gt;(j * sourceBlock));
+</span><span class="line_number">318</span>    }
+<span class="line_number">319</span>  }
+<span class="line_number">320</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/timeseries.tpp:251<br>
+                                    <code class="cpp">void sb::Channel&lt;double&gt;::lookup_sorted&lt;double*&gt;(std::span&lt;double const, 18446744073709551615ul&gt;, std::span&lt;unsigned long const, 18446744073709551615ul&gt;, double*) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">248</span>    const auto indices = indices_sorted(sortedTimes);
+<span class="line_number">249</span>    for (size_t k = 0; k &lt; sortedTimes.size(); ++k)
+<span class="line_number">250</span>    {
+<span class="line_number">251</span><span class="error">      copy_observation(indices[k], out + static_cast&lt;std::ptrdiff_t&gt;(order[k] * blockSize));
+</span><span class="line_number">252</span>    }
+<span class="line_number">253</span>  }
+<span class="line_number">254</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/timeseries.tpp:636<br>
+                                    <code class="cpp">sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}::operator()(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">633</span>            sorted[q] = convert_time(queries[order[q]], one.unit(), channel.unit());
+<span class="line_number">634</span>          }
+<span class="line_number">635</span>          const auto blockSize = leaves[c].size() / series.size();
+<span class="line_number">636</span><span class="error">          channel.lookup_sorted(sorted, order, leaves[c].data() + static_cast&lt;std::ptrdiff_t&gt;(k * blockSize));
+</span><span class="line_number">637</span>        }
+<span class="line_number">638</span>      }, exec);
+<span class="line_number">639</span>    }
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/walk.hpp:155<br>
+                                    <code class="cpp">sb::parallel_walk_async&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}::operator()(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">152</span>  tf::Future&lt;void&gt; parallel_walk_async(const TTensor&amp; tensor, UnaryFunc&amp;&amp; f, Executor&amp; exec)
+<span class="line_number">153</span>  {
+<span class="line_number">154</span>    return detail::parallel_walk_impl(tensor, [f = std::forward&lt;UnaryFunc&gt;(f)](const std::vector&lt;size_t&gt;&amp; idx, size_t) {
+<span class="line_number">155</span><span class="error">      f(idx);
+</span><span class="line_number">156</span>    }, exec);
+<span class="line_number">157</span>  }
+<span class="line_number">158</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/walk.hpp:118<br>
+                                    <code class="cpp">sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}::operator()(unsigned long) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">115</span>          rem /= shape[i];
+<span class="line_number">116</span>        }
+<span class="line_number">117</span>
+<span class="line_number">118</span><span class="error">        f(idx, flat);
+</span><span class="line_number">119</span>      });
+<span class="line_number">120</span>
+<span class="line_number">121</span>      return exec.cpu()-&gt;run(std::move(flow));
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/algorithm/for_each.hpp:134<br>
+                                    <code class="cpp">tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}::operator()()::{lambda(unsigned long, unsigned long)#1}::operator()(unsigned long, unsigned long)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">131</span>          part.loop(N, W, *next, [=] (size_t part_b, size_t part_e) mutable {
+<span class="line_number">132</span>            auto idx = static_cast&lt;B_t&gt;(part_b) * inc + beg;
+<span class="line_number">133</span>            for(size_t x=part_b; x&lt;part_e; x++, idx += inc) {
+<span class="line_number">134</span><span class="error">              c(idx);
+</span><span class="line_number">135</span>            }
+<span class="line_number">136</span>          });
+<span class="line_number">137</span>        });
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/../algorithm/partitioner.hpp:316<br>
+                                    <code class="cpp">void tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;::loop&lt;tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}::operator()()::{lambda(unsigned long, unsigned long)#1}, (void*)0&gt;(unsigned long, unsigned long, std::atomic&lt;unsigned long&gt;&amp;, tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}::operator()()::{lambda(unsigned long, unsigned long)#1}&amp;&amp;) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">313</span>          if(curr_b &gt;= N) {
+<span class="line_number">314</span>            return;
+<span class="line_number">315</span>          }
+<span class="line_number">316</span><span class="error">          func(curr_b, (std::min)(curr_b + chunk_size, N));
+</span><span class="line_number">317</span>        }
+<span class="line_number">318</span>        break;
+<span class="line_number">319</span>      }
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/algorithm/for_each.hpp:131<br>
+                                    <code class="cpp">tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}::operator()()</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">128</span>      auto next = std::make_shared&lt;std::atomic&lt;size_t&gt;&gt;(0);
+<span class="line_number">129</span>      for(size_t w=0; w&lt;W;) {
+<span class="line_number">130</span>        auto task = part([=] () mutable {
+<span class="line_number">131</span><span class="error">          part.loop(N, W, *next, [=] (size_t part_b, size_t part_e) mutable {
+</span><span class="line_number">132</span>            auto idx = static_cast&lt;B_t&gt;(part_b) * inc + beg;
+<span class="line_number">133</span>            for(size_t x=part_b; x&lt;part_e; x++, idx += inc) {
+<span class="line_number">134</span>              c(idx);
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/algorithm/for_each.hpp:138<br>
+                                    <code class="cpp">tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">135</span>            }
+<span class="line_number">136</span>          });
+<span class="line_number">137</span>        });
+<span class="line_number">138</span><span class="error">        (++w == W) ? task() : rt.silent_async(task);
+</span><span class="line_number">139</span>      }
+<span class="line_number">140</span>    }
+<span class="line_number">141</span>  };
+</code></pre>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            <pre class="code">
+<code class="c++"><span class="line_number">26</span><span class="error">        if (!(value &lt; *probe))</span>
+<span class="line_number">27</span>        {
+<span class="line_number">28</span>          return std::upper_bound(probe + 1, hi, value);
+<span class="line_number">29</span>        }
+<span class="line_number">30</span>        hi = probe;
+<span class="line_number">31</span>        step *= 2;
+<span class="line_number">32</span>      }
+<span class="line_number">33</span>      return first;
+<span class="line_number">34</span>    }
+<span class="line_number">35</span>    // The answer is after hint.
+<span class="line_number">36</span>    auto lo = hint;
+<span class="line_number">37</span>    while (true)
+<span class="line_number">38</span>    {
+<span class="line_number">39</span>      const auto probe = last - lo &gt; step ? lo + step : last;
+</code></pre>
+            <div class="issue">
+                <div>
+                    <span class="what">Possible data race during read of size 8 at 0x2C149548 by thread #13</span>
+                    <div class="navigation">
+                        <button class="next_error">Next</button>
+                        <button class="prev_error">Previous</button>
+                    </div>
+                </div>
+                <div>
+                    <table class="call_stack">
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/timeseries.tpp:360<br>
+                                    <code class="cpp">sb::Channel&lt;double&gt;::index_at(double, unsigned long) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">357</span>    const auto&amp; times = held_times().values();
+<span class="line_number">358</span>    const auto begin = times.begin();
+<span class="line_number">359</span>    const auto from = begin + static_cast&lt;std::ptrdiff_t&gt;(std::min(hint, times.size()));
+<span class="line_number">360</span><span class="error">    return snap(static_cast&lt;size_t&gt;(gallop_upper_bound(begin, times.end(), from, t) - begin), t);
+</span><span class="line_number">361</span>  }
+<span class="line_number">362</span>
+<span class="line_number">363</span>  template &lt;typename T&gt;
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/timeseries.tpp:346<br>
+                                    <code class="cpp">sb::Channel&lt;double&gt;::indices_sorted(std::span&lt;double const, 18446744073709551615ul&gt;) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">343</span>    size_t hint = 0;
+<span class="line_number">344</span>    for (const auto t : sortedTimes)
+<span class="line_number">345</span>    {
+<span class="line_number">346</span><span class="error">      hint = index_at(t, hint);
+</span><span class="line_number">347</span>      indices.push_back(hint);
+<span class="line_number">348</span>    }
+<span class="line_number">349</span>    return indices;
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/io/../timeseries.tpp:248<br>
+                                    <code class="cpp">void sb::Channel&lt;double&gt;::lookup_sorted&lt;double*&gt;(std::span&lt;double const, 18446744073709551615ul&gt;, std::span&lt;unsigned long const, 18446744073709551615ul&gt;, double*) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">245</span>  void Channel&lt;T&gt;::lookup_sorted(std::span&lt;const float64_t&gt; sortedTimes, std::span&lt;const size_t&gt; order, Out out) const
+<span class="line_number">246</span>  {
+<span class="line_number">247</span>    const auto blockSize = block_size();
+<span class="line_number">248</span><span class="error">    const auto indices = indices_sorted(sortedTimes);
+</span><span class="line_number">249</span>    for (size_t k = 0; k &lt; sortedTimes.size(); ++k)
+<span class="line_number">250</span>    {
+<span class="line_number">251</span>      copy_observation(indices[k], out + static_cast&lt;std::ptrdiff_t&gt;(order[k] * blockSize));
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/timeseries.tpp:636<br>
+                                    <code class="cpp">sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}::operator()(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">633</span>            sorted[q] = convert_time(queries[order[q]], one.unit(), channel.unit());
+<span class="line_number">634</span>          }
+<span class="line_number">635</span>          const auto blockSize = leaves[c].size() / series.size();
+<span class="line_number">636</span><span class="error">          channel.lookup_sorted(sorted, order, leaves[c].data() + static_cast&lt;std::ptrdiff_t&gt;(k * blockSize));
+</span><span class="line_number">637</span>        }
+<span class="line_number">638</span>      }, exec);
+<span class="line_number">639</span>    }
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/walk.hpp:155<br>
+                                    <code class="cpp">sb::parallel_walk_async&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}::operator()(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">152</span>  tf::Future&lt;void&gt; parallel_walk_async(const TTensor&amp; tensor, UnaryFunc&amp;&amp; f, Executor&amp; exec)
+<span class="line_number">153</span>  {
+<span class="line_number">154</span>    return detail::parallel_walk_impl(tensor, [f = std::forward&lt;UnaryFunc&gt;(f)](const std::vector&lt;size_t&gt;&amp; idx, size_t) {
+<span class="line_number">155</span><span class="error">      f(idx);
+</span><span class="line_number">156</span>    }, exec);
+<span class="line_number">157</span>  }
+<span class="line_number">158</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/walk.hpp:118<br>
+                                    <code class="cpp">sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}::operator()(unsigned long) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">115</span>          rem /= shape[i];
+<span class="line_number">116</span>        }
+<span class="line_number">117</span>
+<span class="line_number">118</span><span class="error">        f(idx, flat);
+</span><span class="line_number">119</span>      });
+<span class="line_number">120</span>
+<span class="line_number">121</span>      return exec.cpu()-&gt;run(std::move(flow));
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/algorithm/for_each.hpp:134<br>
+                                    <code class="cpp">tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}::operator()()::{lambda(unsigned long, unsigned long)#1}::operator()(unsigned long, unsigned long)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">131</span>          part.loop(N, W, *next, [=] (size_t part_b, size_t part_e) mutable {
+<span class="line_number">132</span>            auto idx = static_cast&lt;B_t&gt;(part_b) * inc + beg;
+<span class="line_number">133</span>            for(size_t x=part_b; x&lt;part_e; x++, idx += inc) {
+<span class="line_number">134</span><span class="error">              c(idx);
+</span><span class="line_number">135</span>            }
+<span class="line_number">136</span>          });
+<span class="line_number">137</span>        });
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/../algorithm/partitioner.hpp:316<br>
+                                    <code class="cpp">void tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;::loop&lt;tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}::operator()()::{lambda(unsigned long, unsigned long)#1}, (void*)0&gt;(unsigned long, unsigned long, std::atomic&lt;unsigned long&gt;&amp;, tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}::operator()()::{lambda(unsigned long, unsigned long)#1}&amp;&amp;) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">313</span>          if(curr_b &gt;= N) {
+<span class="line_number">314</span>            return;
+<span class="line_number">315</span>          }
+<span class="line_number">316</span><span class="error">          func(curr_b, (std::min)(curr_b + chunk_size, N));
+</span><span class="line_number">317</span>        }
+<span class="line_number">318</span>        break;
+<span class="line_number">319</span>      }
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/algorithm/for_each.hpp:131<br>
+                                    <code class="cpp">tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}::operator()()</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">128</span>      auto next = std::make_shared&lt;std::atomic&lt;size_t&gt;&gt;(0);
+<span class="line_number">129</span>      for(size_t w=0; w&lt;W;) {
+<span class="line_number">130</span>        auto task = part([=] () mutable {
+<span class="line_number">131</span><span class="error">          part.loop(N, W, *next, [=] (size_t part_b, size_t part_e) mutable {
+</span><span class="line_number">132</span>            auto idx = static_cast&lt;B_t&gt;(part_b) * inc + beg;
+<span class="line_number">133</span>            for(size_t x=part_b; x&lt;part_e; x++, idx += inc) {
+<span class="line_number">134</span>              c(idx);
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/algorithm/for_each.hpp:138<br>
+                                    <code class="cpp">tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">135</span>            }
+<span class="line_number">136</span>          });
+<span class="line_number">137</span>        });
+<span class="line_number">138</span><span class="error">        (++w == W) ? task() : rt.silent_async(task);
+</span><span class="line_number">139</span>      }
+<span class="line_number">140</span>    }
+<span class="line_number">141</span>  };
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:61<br>
+                                    <code class="cpp">void std::__invoke_impl&lt;void, tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}&amp;, tf::Runtime&amp;&gt;(std::__invoke_other, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, tf::Runtime&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">58</span>  template&lt;typename _Res, typename _Fn, typename... _Args&gt;
+<span class="line_number">59</span>    constexpr _Res
+<span class="line_number">60</span>    __invoke_impl(__invoke_other, _Fn&amp;&amp; __f, _Args&amp;&amp;... __args)
+<span class="line_number">61</span><span class="error">    { return std::forward&lt;_Fn&gt;(__f)(std::forward&lt;_Args&gt;(__args)...); }
+</span><span class="line_number">62</span>
+<span class="line_number">63</span>  template&lt;typename _Res, typename _MemFun, typename _Tp, typename... _Args&gt;
+<span class="line_number">64</span>    constexpr _Res
+</code></pre>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            <pre class="code">
+<code class="c++"><span class="line_number">40</span><span class="error">      if (probe == last || value &lt; *probe)</span>
+<span class="line_number">41</span>      {
+<span class="line_number">42</span>        return std::upper_bound(lo + 1, probe, value);
+<span class="line_number">43</span>      }
+<span class="line_number">44</span>      lo = probe;
+<span class="line_number">45</span>      step *= 2;
+<span class="line_number">46</span>    }
+<span class="line_number">47</span>  }
+<span class="line_number">48</span>}
+<span class="line_number">49</span>
+<span class="line_number">50</span>#endif // SB_ALGORITHMS_GALLOP_H
+</code>
+            </pre>
+        </div>
+    </div>
+</body>
+
+</html>

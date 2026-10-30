@@ -1,0 +1,566 @@
+/home/runner/work/_temp/SourceCode/./Include/cpython/pyatomic_gcc.h:
+4 errors
+	line 343: Race	(1 errors)
+	line 359: Race	(1 errors)
+	line 477: Race	(2 errors)
+/home/runner/work/_temp/SourceCode/./Include/internal/pycore_call.h:
+26 errors
+	line 168: Race	(26 errors)
+/home/runner/work/_temp/SourceCode/./Include/internal/pycore_llist.h:
+5 errors
+	line 72: Race	(1 errors)
+	line 81: Race	(1 errors)
+	line 83: Race	(1 errors)
+	line 84: Race	(1 errors)
+	line 85: Race	(1 errors)
+/home/runner/work/_temp/SourceCode/./Modules/_threadmodule.c:
+2 errors
+	line 464: Race	(2 errors)
+/home/runner/work/_temp/SourceCode/Objects/unicodeobject.c:
+4 errors
+	line 2114: Race	(4 errors)
+/home/runner/work/_temp/SourceCode/Python/ceval_gil.c:
+3 errors
+	line 297: Race	(1 errors)
+	line 649: Race	(1 errors)
+	line 653: Race	(1 errors)
+/home/runner/work/_temp/SourceCode/Python/condvar.h:
+1 errors
+	line 74: Dubious	(1 errors)
+/home/runner/work/_temp/SourceCode/Python/generated_cases.c.h:
+13 errors
+	line 446: Race	(11 errors)
+	line 5803: Race	(2 errors)
+/home/runner/work/_temp/SourceCode/Python/parking_lot.c:
+6 errors
+	line 282: Race	(2 errors)
+	line 284: Race	(1 errors)
+	line 287: Race	(2 errors)
+	line 288: Race	(1 errors)
+/home/runner/work/_temp/SourceCode/Python/pystate.c:
+2 errors
+	line 74: Race	(1 errors)
+	line 2086: Race	(1 errors)
+/home/runner/work/stablebear/stablebear/3rd/nanobind/include/nanobind/nb_misc.h:
+1 errors
+	line 42: Race	(1 errors)
+/home/runner/work/stablebear/stablebear/3rd/nanobind/include/nanobind/ndarray.h:
+6 errors
+	line 536: Race	(4 errors)
+	line 679: Race	(2 errors)
+/home/runner/work/stablebear/stablebear/3rd/nanobind/src/nb_func.cpp:
+6 errors
+	line 629: Race	(1 errors)
+	line 1313: Race	(5 errors)
+/home/runner/work/stablebear/stablebear/3rd/nanobind/src/nb_internals.cpp:
+5 errors
+	line 157: Race	(1 errors)
+	line 163: Race	(2 errors)
+	line 173: Race	(2 errors)
+/home/runner/work/stablebear/stablebear/3rd/nanobind/src/nb_ndarray.cpp:
+6 errors
+	line 1068: Race	(6 errors)
+/home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/algorithm/../core/async.hpp:
+1 errors
+	line 75: Race	(1 errors)
+/home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/algorithm/../core/executor.hpp:
+5 errors
+	line 2100: Race	(2 errors)
+	line 2291: Race	(1 errors)
+	line 2293: Race	(1 errors)
+	line 2294: Race	(1 errors)
+/home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/algorithm/../core/runtime.hpp:
+18 errors
+	line 687: Race	(16 errors)
+	line 817: Race	(2 errors)
+/home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/algorithm/for_each.hpp:
+391 errors
+	line 85: Race	(70 errors)
+	line 86: Race	(70 errors)
+	line 87: Race	(70 errors)
+	line 99: Race	(6 errors)
+	line 130: Race	(171 errors)
+	line 131: Race	(4 errors)
+/home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/../algorithm/partitioner.hpp:
+71 errors
+	line 164: Race	(70 errors)
+	line 299: Race	(1 errors)
+/home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/../utility/small_vector.hpp:
+11 errors
+	line 153: Race	(1 errors)
+	line 179: Race	(3 errors)
+	line 180: Race	(3 errors)
+	line 181: Race	(1 errors)
+	line 182: Race	(3 errors)
+/home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/async.hpp:
+1 errors
+	line 80: Race	(1 errors)
+/home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/executor.hpp:
+43 errors
+	line 1288: Race	(30 errors)
+	line 1632: Race	(1 errors)
+	line 1749: Race	(1 errors)
+	line 1772: Race	(1 errors)
+	line 1773: Race	(1 errors)
+	line 1774: Race	(1 errors)
+	line 1792: Race	(2 errors)
+	line 1794: Race	(1 errors)
+	line 1853: Race	(1 errors)
+	line 1856: Race	(1 errors)
+	line 2292: Race	(1 errors)
+	line 2311: Race	(1 errors)
+	line 2365: Race	(1 errors)
+/home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/graph.hpp:
+10 errors
+	line 701: Race	(2 errors)
+	line 735: Race	(2 errors)
+	line 737: Race	(1 errors)
+	line 744: Race	(1 errors)
+	line 745: Race	(1 errors)
+	line 746: Race	(2 errors)
+	line 863: Race	(1 errors)
+/home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/runtime.hpp:
+29 errors
+	line 687: Race	(18 errors)
+	line 821: Race	(4 errors)
+	line 833: Race	(3 errors)
+	line 847: Race	(2 errors)
+	line 992: Race	(1 errors)
+	line 993: Race	(1 errors)
+/home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/wsq.hpp:
+1 errors
+	line 855: Race	(1 errors)
+/home/runner/work/stablebear/stablebear/include/sbear/algorithms/functional/matrix_integrate.hpp:
+4 errors
+	line 86: Race	(2 errors)
+	line 87: Race	(2 errors)
+/home/runner/work/stablebear/stablebear/include/sbear/algorithms/functional/matrix_reduce.hpp:
+2 errors
+	line 80: Race	(2 errors)
+/home/runner/work/stablebear/stablebear/include/sbear/algorithms/tensor_eval.hpp:
+9 errors
+	line 24: Race	(2 errors)
+	line 70: Race	(2 errors)
+	line 76: Race	(1 errors)
+	line 77: Race	(2 errors)
+	line 79: Race	(2 errors)
+/home/runner/work/stablebear/stablebear/include/sbear/distance_matrix.hpp:
+97 errors
+	line 17: Race	(2 errors)
+	line 52: Race	(32 errors)
+	line 54: Race	(6 errors)
+	line 186: Race	(44 errors)
+	line 229: Race	(13 errors)
+/home/runner/work/stablebear/stablebear/include/sbear/functional/../algorithms/functional/iterate_rectangles.hpp:
+42 errors
+	line 29: Race	(2 errors)
+	line 57: Race	(13 errors)
+	line 58: Race	(15 errors)
+	line 65: Race	(11 errors)
+	line 95: Race	(1 errors)
+/home/runner/work/stablebear/stablebear/include/sbear/functional/pcf.hpp:
+12 errors
+	line 149: Race	(4 errors)
+	line 194: Race	(1 errors)
+	line 202: Race	(1 errors)
+	line 213: Race	(2 errors)
+	line 222: Race	(2 errors)
+	line 227: Race	(2 errors)
+/home/runner/work/stablebear/stablebear/include/sbear/functional/time_point.hpp:
+2 errors
+	line 46: Race	(2 errors)
+/home/runner/work/stablebear/stablebear/include/sbear/io/../algorithms/gallop.hpp:
+6 errors
+	line 19: Race	(3 errors)
+	line 26: Race	(2 errors)
+	line 40: Race	(1 errors)
+/home/runner/work/stablebear/stablebear/include/sbear/io/../distance_matrix.hpp:
+27 errors
+	line 17: Race	(4 errors)
+	line 229: Race	(13 errors)
+	line 244: Race	(10 errors)
+/home/runner/work/stablebear/stablebear/include/sbear/io/../point_cloud.hpp:
+30 errors
+	line 134: Race	(12 errors)
+	line 213: Race	(5 errors)
+	line 249: Race	(13 errors)
+/home/runner/work/stablebear/stablebear/include/sbear/io/../timeseries.hpp:
+115 errors
+	line 199: Race	(80 errors)
+	line 220: Race	(3 errors)
+	line 324: Race	(6 errors)
+	line 349: Race	(6 errors)
+	line 353: Race	(2 errors)
+	line 365: Race	(4 errors)
+	line 418: Race	(4 errors)
+	line 484: Race	(6 errors)
+	line 518: Race	(4 errors)
+/home/runner/work/stablebear/stablebear/include/sbear/io/../timeseries.tpp:
+10 errors
+	line 310: Race	(2 errors)
+	line 327: Race	(1 errors)
+	line 333: Race	(2 errors)
+	line 379: Race	(3 errors)
+	line 381: Race	(1 errors)
+	line 382: Race	(1 errors)
+/home/runner/work/stablebear/stablebear/include/sbear/persistence/../distances.hpp:
+32 errors
+	line 43: Race	(32 errors)
+/home/runner/work/stablebear/stablebear/include/sbear/persistence/../point_cloud.hpp:
+22 errors
+	line 38: Race	(7 errors)
+	line 54: Race	(1 errors)
+	line 134: Race	(10 errors)
+	line 231: Race	(4 errors)
+/home/runner/work/stablebear/stablebear/include/sbear/persistence/../ufunc.hpp:
+89 errors
+	line 130: Race	(3 errors)
+	line 136: Race	(16 errors)
+	line 184: Race	(10 errors)
+	line 187: Race	(1 errors)
+	line 194: Race	(2 errors)
+	line 195: Race	(2 errors)
+	line 199: Race	(2 errors)
+	line 208: Race	(11 errors)
+	line 214: Race	(7 errors)
+	line 216: Race	(1 errors)
+	line 228: Race	(1 errors)
+	line 294: Race	(33 errors)
+/home/runner/work/stablebear/stablebear/include/sbear/persistence/accumulated_persistence.hpp:
+7 errors
+	line 48: Race	(2 errors)
+	line 51: Race	(1 errors)
+	line 54: Race	(2 errors)
+	line 96: Race	(2 errors)
+/home/runner/work/stablebear/stablebear/include/sbear/persistence/betti_curve.hpp:
+4 errors
+	line 41: Race	(2 errors)
+	line 42: Race	(2 errors)
+/home/runner/work/stablebear/stablebear/include/sbear/persistence/compute_homological_kernel.hpp:
+16 errors
+	line 254: Race	(8 errors)
+	line 258: Race	(8 errors)
+/home/runner/work/stablebear/stablebear/include/sbear/persistence/compute_persistence.hpp:
+48 errors
+	line 119: Race	(2 errors)
+	line 147: Race	(16 errors)
+	line 155: Race	(12 errors)
+	line 178: Race	(4 errors)
+	line 179: Race	(4 errors)
+	line 185: Race	(2 errors)
+	line 186: Race	(8 errors)
+/home/runner/work/stablebear/stablebear/include/sbear/persistence/stable_rank.hpp:
+5 errors
+	line 28: Race	(2 errors)
+	line 33: Race	(3 errors)
+/home/runner/work/stablebear/stablebear/include/sbear/point_cloud.hpp:
+17 errors
+	line 21: Race	(10 errors)
+	line 43: Race	(4 errors)
+	line 213: Race	(3 errors)
+/home/runner/work/stablebear/stablebear/include/sbear/point_process/../distance_matrix.hpp:
+17 errors
+	line 109: Race	(6 errors)
+	line 244: Race	(11 errors)
+/home/runner/work/stablebear/stablebear/include/sbear/point_process/../point_cloud.hpp:
+22 errors
+	line 37: Race	(7 errors)
+	line 52: Race	(2 errors)
+	line 249: Race	(13 errors)
+/home/runner/work/stablebear/stablebear/include/sbear/point_process/../random/distribution.hpp:
+2 errors
+	line 199: Race	(2 errors)
+/home/runner/work/stablebear/stablebear/include/sbear/point_process/../sampling/weighted_draw.hpp:
+18 errors
+	line 113: Race	(16 errors)
+	line 124: Race	(2 errors)
+/home/runner/work/stablebear/stablebear/include/sbear/point_process/../task.hpp:
+1 errors
+	line 155: Race	(1 errors)
+/home/runner/work/stablebear/stablebear/include/sbear/point_process/../tensor.tpp:
+50 errors
+	line 1981: Race	(23 errors)
+	line 1988: Race	(27 errors)
+/home/runner/work/stablebear/stablebear/include/sbear/point_process/../walk.hpp:
+8 errors
+	line 107: Race	(8 errors)
+/home/runner/work/stablebear/stablebear/include/sbear/point_process/poisson.hpp:
+4 errors
+	line 86: Race	(4 errors)
+/home/runner/work/stablebear/stablebear/include/sbear/point_process/subsample.hpp:
+48 errors
+	line 216: Race	(24 errors)
+	line 221: Race	(8 errors)
+	line 224: Race	(8 errors)
+	line 225: Race	(8 errors)
+/home/runner/work/stablebear/stablebear/include/sbear/point_process/subsample_relative.hpp:
+48 errors
+	line 31: Race	(6 errors)
+	line 185: Race	(4 errors)
+	line 215: Race	(4 errors)
+	line 217: Race	(4 errors)
+	line 221: Race	(2 errors)
+	line 222: Race	(5 errors)
+	line 227: Race	(2 errors)
+	line 229: Race	(3 errors)
+	line 233: Race	(5 errors)
+	line 252: Race	(12 errors)
+	line 257: Race	(1 errors)
+/home/runner/work/stablebear/stablebear/include/sbear/random/distribution.hpp:
+16 errors
+	line 91: Race	(8 errors)
+	line 115: Race	(8 errors)
+/home/runner/work/stablebear/stablebear/include/sbear/random_generator.hpp:
+10 errors
+	line 79: Race	(10 errors)
+/home/runner/work/stablebear/stablebear/include/sbear/tensor.hpp:
+211 errors
+	line 158: Race	(172 errors)
+	line 303: Race	(4 errors)
+	line 317: Race	(17 errors)
+	line 344: Race	(13 errors)
+	line 584: Race	(2 errors)
+	line 652: Race	(3 errors)
+/home/runner/work/stablebear/stablebear/include/sbear/tensor.tpp:
+199 errors
+	line 249: Race	(20 errors)
+	line 293: Race	(4 errors)
+	line 1981: Race	(98 errors)
+	line 1988: Race	(77 errors)
+/home/runner/work/stablebear/stablebear/include/sbear/timeseries.hpp:
+35 errors
+	line 311: Race	(5 errors)
+	line 324: Race	(3 errors)
+	line 349: Race	(12 errors)
+	line 365: Race	(5 errors)
+	line 484: Race	(4 errors)
+	line 518: Race	(6 errors)
+/home/runner/work/stablebear/stablebear/include/sbear/timeseries.tpp:
+6 errors
+	line 251: Race	(1 errors)
+	line 327: Race	(1 errors)
+	line 332: Race	(2 errors)
+	line 633: Race	(2 errors)
+/home/runner/work/stablebear/stablebear/include/sbear/walk.hpp:
+74 errors
+	line 107: Race	(74 errors)
+/home/runner/work/stablebear/stablebear/src/../include/sbear/io/../distance_matrix.hpp:
+3 errors
+	line 36: Race	(3 errors)
+/home/runner/work/stablebear/stablebear/src/../include/sbear/io/../point_cloud.hpp:
+16 errors
+	line 21: Race	(12 errors)
+	line 231: Race	(4 errors)
+/home/runner/work/stablebear/stablebear/src/../include/sbear/io/../symmetric_matrix.hpp:
+2 errors
+	line 31: Race	(2 errors)
+/home/runner/work/stablebear/stablebear/src/../include/sbear/io/../tensor.hpp:
+3 errors
+	line 344: Race	(3 errors)
+/home/runner/work/stablebear/stablebear/src/../include/sbear/io/../tensor.tpp:
+18 errors
+	line 1988: Race	(18 errors)
+/home/runner/work/stablebear/stablebear/src/../include/sbear/io/../timeseries.hpp:
+14 errors
+	line 311: Race	(10 errors)
+	line 418: Race	(2 errors)
+	line 484: Race	(2 errors)
+/home/runner/work/stablebear/stablebear/src/python/functional/py_distance.cpp:
+6 errors
+	line 126: Race	(4 errors)
+	line 127: Race	(2 errors)
+/home/runner/work/stablebear/stablebear/src/python/functional/py_reductions.cpp:
+4 errors
+	line 36: Race	(4 errors)
+/home/runner/work/stablebear/stablebear/src/python/py_np_support.hpp:
+6 errors
+	line 144: Race	(3 errors)
+	line 146: Race	(3 errors)
+/home/runner/work/stablebear/stablebear/src/python/py_symmetric_matrix.hpp:
+4 errors
+	line 86: Race	(2 errors)
+	line 99: Race	(2 errors)
+/home/runner/work/stablebear/stablebear/src/python/py_tensor.hpp:
+2 errors
+	line 192: Race	(2 errors)
+/home/runner/work/stablebear/stablebear/src/python/pymodule.cpp:
+5 errors
+	line 55: Dubious	(1 errors)
+	line 63: Race	(1 errors)
+	line 64: Race	(2 errors)
+	line 71: Dubious	(1 errors)
+/usr/include/c++/13/bits/atomic_base.h:
+190 errors
+	line 393: Race	(1 errors)
+	line 481: Race	(2 errors)
+	line 505: Race	(72 errors)
+	line 523: Race	(2 errors)
+	line 635: Race	(107 errors)
+	line 645: Race	(6 errors)
+/usr/include/c++/13/bits/basic_string.h:
+3 errors
+	line 223: Race	(1 errors)
+	line 266: Race	(2 errors)
+/usr/include/c++/13/bits/deque.tcc:
+5 errors
+	line 167: Race	(1 errors)
+	line 168: Race	(1 errors)
+	line 170: Race	(1 errors)
+	line 173: Race	(2 errors)
+/usr/include/c++/13/bits/exception_ptr.h:
+13 errors
+	line 99: Race	(1 errors)
+	line 163: Race	(1 errors)
+	line 200: Race	(1 errors)
+	line 207: Race	(3 errors)
+	line 224: Race	(3 errors)
+	line 225: Race	(4 errors)
+/usr/include/c++/13/bits/hashtable.h:
+5 errors
+	line 648: Race	(1 errors)
+	line 797: Race	(1 errors)
+	line 1954: Race	(2 errors)
+	line 1958: Race	(1 errors)
+/usr/include/c++/13/bits/move.h:
+12 errors
+	line 197: Race	(2 errors)
+	line 198: Race	(6 errors)
+	line 199: Race	(4 errors)
+/usr/include/c++/13/bits/predefined_ops.h:
+9 errors
+	line 98: Race	(9 errors)
+/usr/include/c++/13/bits/random.tcc:
+1 errors
+	line 1278: Race	(1 errors)
+/usr/include/c++/13/bits/shared_ptr_base.h:
+359 errors
+	line 134: Race	(4 errors)
+	line 175: Race	(1 errors)
+	line 230: Race	(1 errors)
+	line 337: Race	(18 errors)
+	line 343: Race	(28 errors)
+	line 346: Race	(11 errors)
+	line 347: Race	(9 errors)
+	line 608: Race	(6 errors)
+	line 726: Race	(6 errors)
+	line 802: Race	(3 errors)
+	line 806: Race	(3 errors)
+	line 832: Race	(3 errors)
+	line 842: Race	(3 errors)
+	line 847: Race	(3 errors)
+	line 856: Race	(3 errors)
+	line 908: Race	(4 errors)
+	line 1070: Race	(24 errors)
+	line 1071: Race	(1 errors)
+	line 1075: Race	(25 errors)
+	line 1099: Race	(7 errors)
+	line 1100: Race	(9 errors)
+	line 1101: Race	(2 errors)
+	line 1106: Race	(1 errors)
+	line 1522: Race	(39 errors)
+	line 1532: Race	(15 errors)
+	line 1535: Race	(17 errors)
+	line 1666: Race	(84 errors)
+	line 1670: Race	(29 errors)
+/usr/include/c++/13/bits/std_function.h:
+165 errors
+	line 142: Race	(72 errors)
+	line 175: Race	(72 errors)
+	line 243: Race	(6 errors)
+	line 244: Race	(3 errors)
+	line 247: Race	(6 errors)
+	line 591: Race	(6 errors)
+/usr/include/c++/13/bits/stl_algobase.h:
+28 errors
+	line 238: Race	(1 errors)
+	line 262: Race	(9 errors)
+	line 398: Race	(4 errors)
+	line 437: Race	(14 errors)
+/usr/include/c++/13/bits/stl_construct.h:
+8 errors
+	line 88: Race	(1 errors)
+	line 119: Race	(7 errors)
+/usr/include/c++/13/bits/stl_deque.h:
+40 errors
+	line 169: Race	(8 errors)
+	line 170: Race	(8 errors)
+	line 373: Race	(5 errors)
+	line 374: Race	(4 errors)
+	line 375: Race	(4 errors)
+	line 620: Race	(1 errors)
+	line 622: Race	(1 errors)
+	line 623: Race	(1 errors)
+	line 624: Race	(2 errors)
+	line 700: Race	(1 errors)
+	line 1577: Race	(1 errors)
+	line 1578: Race	(1 errors)
+	line 1580: Race	(1 errors)
+	line 1582: Race	(2 errors)
+/usr/include/c++/13/bits/stl_function.h:
+6 errors
+	line 210: Race	(2 errors)
+	line 287: Race	(3 errors)
+	line 378: Race	(1 errors)
+/usr/include/c++/13/bits/stl_iterator.h:
+259 errors
+	line 1077: Race	(259 errors)
+/usr/include/c++/13/bits/stl_numeric.h:
+37 errors
+	line 235: Race	(37 errors)
+/usr/include/c++/13/bits/stl_vector.h:
+905 errors
+	line 106: Race	(20 errors)
+	line 107: Race	(10 errors)
+	line 108: Race	(18 errors)
+	line 115: Race	(12 errors)
+	line 116: Race	(12 errors)
+	line 117: Race	(12 errors)
+	line 301: Race	(4 errors)
+	line 369: Race	(8 errors)
+	line 370: Race	(117 errors)
+	line 733: Race	(2 errors)
+	line 735: Race	(205 errors)
+	line 993: Race	(381 errors)
+	line 1129: Race	(49 errors)
+	line 1148: Race	(40 errors)
+	line 1261: Race	(10 errors)
+	line 1266: Race	(1 errors)
+	line 1606: Race	(1 errors)
+	line 1935: Race	(1 errors)
+	line 1937: Race	(1 errors)
+	line 1939: Race	(1 errors)
+/usr/include/c++/13/bits/unique_ptr.h:
+22 errors
+	line 186: Race	(2 errors)
+	line 199: Race	(6 errors)
+	line 217: Race	(1 errors)
+	line 218: Race	(1 errors)
+	line 403: Race	(5 errors)
+	line 404: Race	(2 errors)
+	line 405: Race	(5 errors)
+/usr/include/c++/13/ext/atomicity.h:
+15 errors
+	line 66: Race	(8 errors)
+	line 71: Race	(7 errors)
+/usr/include/c++/13/future:
+7 errors
+	line 229: Race	(1 errors)
+	line 344: Race	(1 errors)
+	line 667: Race	(4 errors)
+	line 743: Race	(1 errors)
+/usr/include/c++/13/optional:
+103 errors
+	line 280: Race	(22 errors)
+	line 286: Race	(7 errors)
+	line 317: Race	(6 errors)
+	line 473: Race	(68 errors)
+/usr/include/c++/13/tuple:
+1 errors
+	line 302: Race	(1 errors)
+/usr/include/c++/13/variant:
+28 errors
+	line 501: Race	(6 errors)
+	line 513: Race	(3 errors)
+	line 1625: Race	(3 errors)
+	line 1627: Race	(16 errors)
+

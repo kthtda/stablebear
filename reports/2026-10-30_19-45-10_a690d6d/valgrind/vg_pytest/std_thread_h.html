@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>/usr/include/c++/13/bits/std_thread.h</title>
+    <link href='valgrind.css' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+    <script src="https://code.jquery.com/jquery-3.4.1.js"></script>
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.0.0/styles/default.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.0.0/highlight.min.js"></script>
+    <script src="valgrind.js"></script>
+</head>
+
+<body>
+    <div class="global">
+        <div class="header">
+            <h1>/usr/include/c++/13/bits/std_thread.h</h1>
+            <p><b>1</b> errors</p>
+            <button class="next_error">Goto First Error</button>
+        </div>
+        <div class="listing">
+            <pre class="code">
+<code class="c++"><span class="line_number">1</span>// std::thread declarations -*- C++ -*-
+<span class="line_number">2</span>
+<span class="line_number">3</span>// Copyright (C) 2008-2023 Free Software Foundation, Inc.
+<span class="line_number">4</span>//
+<span class="line_number">5</span>// This file is part of the GNU ISO C++ Library.  This library is free
+<span class="line_number">6</span>// software; you can redistribute it and/or modify it under the
+<span class="line_number">7</span>// terms of the GNU General Public License as published by the
+<span class="line_number">8</span>// Free Software Foundation; either version 3, or (at your option)
+<span class="line_number">9</span>// any later version.
+<span class="line_number">10</span>
+<span class="line_number">11</span>// This library is distributed in the hope that it will be useful,
+<span class="line_number">12</span>// but WITHOUT ANY WARRANTY; without even the implied warranty of
+<span class="line_number">13</span>// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+<span class="line_number">14</span>// GNU General Public License for more details.
+<span class="line_number">15</span>
+<span class="line_number">16</span>// Under Section 7 of GPL version 3, you are granted additional
+<span class="line_number">17</span>// permissions described in the GCC Runtime Library Exception, version
+<span class="line_number">18</span>// 3.1, as published by the Free Software Foundation.
+<span class="line_number">19</span>
+<span class="line_number">20</span>// You should have received a copy of the GNU General Public License and
+<span class="line_number">21</span>// a copy of the GCC Runtime Library Exception along with this program;
+<span class="line_number">22</span>// see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
+<span class="line_number">23</span>// &lt;http://www.gnu.org/licenses/&gt;.
+<span class="line_number">24</span>
+<span class="line_number">25</span>/** @file bits/std_thread.h
+<span class="line_number">26</span> *  This is an internal header file, included by other library headers.
+<span class="line_number">27</span> *  Do not attempt to use it directly. @headername{thread}
+<span class="line_number">28</span> */
+<span class="line_number">29</span>
+<span class="line_number">30</span>#ifndef _GLIBCXX_THREAD_H
+<span class="line_number">31</span>#define _GLIBCXX_THREAD_H 1
+<span class="line_number">32</span>
+<span class="line_number">33</span>#pragma GCC system_header
+<span class="line_number">34</span>
+<span class="line_number">35</span>#if __cplusplus &gt;= 201103L
+<span class="line_number">36</span>#include &lt;bits/c++config.h&gt;
+<span class="line_number">37</span>
+<span class="line_number">38</span>#include &lt;iosfwd&gt;		// std::basic_ostream
+<span class="line_number">39</span>#include &lt;tuple&gt;		// std::tuple
+<span class="line_number">40</span>#include &lt;bits/functional_hash.h&gt; // std::hash
+<span class="line_number">41</span>#include &lt;bits/invoke.h&gt;	// std::__invoke
+<span class="line_number">42</span>#include &lt;bits/refwrap.h&gt;       // not required, but helpful to users
+<span class="line_number">43</span>#include &lt;bits/unique_ptr.h&gt;	// std::unique_ptr
+<span class="line_number">44</span>
+<span class="line_number">45</span>#ifdef _GLIBCXX_HAS_GTHREADS
+<span class="line_number">46</span># include &lt;bits/gthr.h&gt;
+<span class="line_number">47</span>#else
+<span class="line_number">48</span># include &lt;errno.h&gt;
+<span class="line_number">49</span># include &lt;bits/functexcept.h&gt;
+<span class="line_number">50</span>#endif
+<span class="line_number">51</span>
+<span class="line_number">52</span>namespace std _GLIBCXX_VISIBILITY(default)
+<span class="line_number">53</span>{
+<span class="line_number">54</span>_GLIBCXX_BEGIN_NAMESPACE_VERSION
+<span class="line_number">55</span>
+<span class="line_number">56</span>  /** @addtogroup threads
+<span class="line_number">57</span>   *  @{
+<span class="line_number">58</span>   */
+<span class="line_number">59</span>
+<span class="line_number">60</span>  /** A std::thread represents a new thread of execution.
+<span class="line_number">61</span>   *
+<span class="line_number">62</span>   * The default constructor creates an object that does not own a thread.
+<span class="line_number">63</span>   * The `thread(F&amp;&amp;, Args&amp;&amp;...)` constructor invokes a callable in a new
+<span class="line_number">64</span>   * thread, and owns that new thread. A `std::thread` that owns a thread
+<span class="line_number">65</span>   * is *joinable*. Joining a thread waits for it to finish executing,
+<span class="line_number">66</span>   * which happens when the callable running in that thread returns.
+<span class="line_number">67</span>   *
+<span class="line_number">68</span>   * A `std::thread` cannot be copied, but can be moved. Moving a joinable
+<span class="line_number">69</span>   * object transfers ownership of its thread to another object.
+<span class="line_number">70</span>   *
+<span class="line_number">71</span>   * A joinable `std::thread` must be explicitly joined (or detached) before
+<span class="line_number">72</span>   * it is destroyed or assigned to. Attempting to destroy a joinable thread
+<span class="line_number">73</span>   * will terminate the whole process.
+<span class="line_number">74</span>   *
+<span class="line_number">75</span>   * @headerfile thread
+<span class="line_number">76</span>   * @since C++11
+<span class="line_number">77</span>   */
+<span class="line_number">78</span>  class thread
+<span class="line_number">79</span>  {
+<span class="line_number">80</span>  public:
+<span class="line_number">81</span>#ifdef _GLIBCXX_HAS_GTHREADS
+<span class="line_number">82</span>    using native_handle_type = __gthread_t;
+<span class="line_number">83</span>#else
+<span class="line_number">84</span>    using native_handle_type = int;
+<span class="line_number">85</span>#endif
+<span class="line_number">86</span>
+<span class="line_number">87</span>    /** A std::thread::id is a unique identifier for a thread.
+<span class="line_number">88</span>     *
+<span class="line_number">89</span>     * @headerfile thread
+<span class="line_number">90</span>     * @since C++11
+<span class="line_number">91</span>     */
+<span class="line_number">92</span>    class id
+<span class="line_number">93</span>    {
+<span class="line_number">94</span>      native_handle_type	_M_thread;
+<span class="line_number">95</span>
+<span class="line_number">96</span>    public:
+<span class="line_number">97</span>      id() noexcept : _M_thread() { }
+<span class="line_number">98</span>
+<span class="line_number">99</span>      explicit
+<span class="line_number">100</span>      id(native_handle_type __id) : _M_thread(__id) { }
+<span class="line_number">101</span>
+<span class="line_number">102</span>    private:
+<span class="line_number">103</span>      friend class thread;
+<span class="line_number">104</span>      friend struct hash&lt;id&gt;;
+<span class="line_number">105</span>
+<span class="line_number">106</span>      friend bool
+<span class="line_number">107</span>      operator==(id __x, id __y) noexcept;
+<span class="line_number">108</span>
+<span class="line_number">109</span>#if __cpp_lib_three_way_comparison
+<span class="line_number">110</span>      friend strong_ordering
+<span class="line_number">111</span>      operator&lt;=&gt;(id __x, id __y) noexcept;
+<span class="line_number">112</span>#else
+<span class="line_number">113</span>      friend bool
+<span class="line_number">114</span>      operator&lt;(id __x, id __y) noexcept;
+<span class="line_number">115</span>#endif
+<span class="line_number">116</span>
+<span class="line_number">117</span>      template&lt;class _CharT, class _Traits&gt;
+<span class="line_number">118</span>	friend basic_ostream&lt;_CharT, _Traits&gt;&amp;
+<span class="line_number">119</span>	operator&lt;&lt;(basic_ostream&lt;_CharT, _Traits&gt;&amp; __out, id __id);
+<span class="line_number">120</span>    };
+<span class="line_number">121</span>
+<span class="line_number">122</span>  private:
+<span class="line_number">123</span>    id				_M_id;
+<span class="line_number">124</span>
+<span class="line_number">125</span>    // _GLIBCXX_RESOLVE_LIB_DEFECTS
+<span class="line_number">126</span>    // 2097.  packaged_task constructors should be constrained
+<span class="line_number">127</span>    // 3039. Unnecessary decay in thread and packaged_task
+<span class="line_number">128</span>    template&lt;typename _Tp&gt;
+<span class="line_number">129</span>      using __not_same = __not_&lt;is_same&lt;__remove_cvref_t&lt;_Tp&gt;, thread&gt;&gt;;
+<span class="line_number">130</span>
+<span class="line_number">131</span>  public:
+<span class="line_number">132</span>    thread() noexcept = default;
+<span class="line_number">133</span>
+<span class="line_number">134</span>#ifdef _GLIBCXX_HAS_GTHREADS
+<span class="line_number">135</span>  private:
+<span class="line_number">136</span>    // This adds to user code that creates std:thread objects (because
+<span class="line_number">137</span>    // it is called by the template ctor below) strong references to
+<span class="line_number">138</span>    // pthread_create and pthread_join, which ensures they are both
+<span class="line_number">139</span>    // linked in even during static linking.  We can&#39;t depend on
+<span class="line_number">140</span>    // gthread calls to bring them in, because those may use weak
+<span class="line_number">141</span>    // references.
+<span class="line_number">142</span>    static void
+<span class="line_number">143</span>    _M_thread_deps_never_run() {
+<span class="line_number">144</span>#ifdef GTHR_ACTIVE_PROXY
+<span class="line_number">145</span>      reinterpret_cast&lt;void (*)(void)&gt;(&amp;pthread_create)();
+<span class="line_number">146</span>      reinterpret_cast&lt;void (*)(void)&gt;(&amp;pthread_join)();
+<span class="line_number">147</span>#endif
+<span class="line_number">148</span>    }
+<span class="line_number">149</span>
+<span class="line_number">150</span>  public:
+<span class="line_number">151</span>    template&lt;typename _Callable, typename... _Args,
+<span class="line_number">152</span>	     typename = _Require&lt;__not_same&lt;_Callable&gt;&gt;&gt;
+<span class="line_number">153</span>      explicit
+<span class="line_number">154</span>      thread(_Callable&amp;&amp; __f, _Args&amp;&amp;... __args)
+<span class="line_number">155</span>      {
+<span class="line_number">156</span>	static_assert( __is_invocable&lt;typename decay&lt;_Callable&gt;::type,
+<span class="line_number">157</span>				      typename decay&lt;_Args&gt;::type...&gt;::value,
+<span class="line_number">158</span>	  &#34;std::thread arguments must be invocable after conversion to rvalues&#34;
+<span class="line_number">159</span>	  );
+<span class="line_number">160</span>
+<span class="line_number">161</span>	using _Wrapper = _Call_wrapper&lt;_Callable, _Args...&gt;;
+<span class="line_number">162</span>	// Create a call wrapper with DECAY_COPY(__f) as its target object
+<span class="line_number">163</span>	// and DECAY_COPY(__args)... as its bound argument entities.
+</code></pre>
+            <div class="issue">
+                <div>
+                    <span class="what">592 bytes in 1 blocks are possibly lost in loss record 12,337 of 14,090</span>
+                    <div class="navigation">
+                        <button class="next_error">Next</button>
+                        <button class="prev_error">Previous</button>
+                    </div>
+                </div>
+                <div>
+                    <table class="call_stack">
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/executor.hpp:1301<br>
+                                    <code class="cpp">tf::Executor::_spawn(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1298</span>inline void Executor::_spawn(size_t N, std::shared_ptr&lt;WorkerInterface&gt; wif) {
+<span class="line_number">1299</span>
+<span class="line_number">1300</span>  for(size_t id=0; id&lt;N; ++id) {
+<span class="line_number">1301</span><span class="error">    _workers[id]._thread = std::thread([&amp;, id, wif] () {
+</span><span class="line_number">1302</span>
+<span class="line_number">1303</span>      auto&amp; worker = _workers[id];
+<span class="line_number">1304</span>  
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/executor.hpp:1223<br>
+                                    <code class="cpp">tf::Executor::Executor(unsigned long, std::shared_ptr&lt;tf::WorkerInterface&gt;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1220</span>#ifndef TF_DISABLE_EXCEPTION_HANDLING
+<span class="line_number">1221</span>  try {
+<span class="line_number">1222</span>#endif
+<span class="line_number">1223</span><span class="error">    _spawn(N, std::move(wif));
+</span><span class="line_number">1224</span>#ifndef TF_DISABLE_EXCEPTION_HANDLING
+<span class="line_number">1225</span>  }
+<span class="line_number">1226</span>  catch(...) {
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/unique_ptr.h:1070<br>
+                                    <code class="cpp">std::__detail::_MakeUniq&lt;tf::Executor&gt;::__single_object std::make_unique&lt;tf::Executor, unsigned long&amp;&gt;(unsigned long&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">1067</span>    _GLIBCXX23_CONSTEXPR
+<span class="line_number">1068</span>    inline __detail::__unique_ptr_t&lt;_Tp&gt;
+<span class="line_number">1069</span>    make_unique(_Args&amp;&amp;... __args)
+<span class="line_number">1070</span><span class="error">    { return unique_ptr&lt;_Tp&gt;(new _Tp(std::forward&lt;_Args&gt;(__args)...)); }
+</span><span class="line_number">1071</span>
+<span class="line_number">1072</span>  /** Create an array owned by a `unique_ptr`.
+<span class="line_number">1073</span>   *  @tparam _Tp An array type of unknown bound, such as `U[]`.
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/executor.hpp:94<br>
+                                    <code class="cpp">sb::Executor::limit_cpu_workers(unsigned long)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">91</span>      {
+<span class="line_number">92</span>        m_upCpuExec-&gt;wait_for_all();
+<span class="line_number">93</span>        m_cpuExec = nullptr;
+<span class="line_number">94</span><span class="error">        m_upCpuExec = std::make_unique&lt;tf::Executor&gt;(nWorkers);
+</span><span class="line_number">95</span>        m_cpuExec = m_upCpuExec.get();
+<span class="line_number">96</span>      }
+<span class="line_number">97</span>      else
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/src/python/pymodule.cpp:150<br>
+                                    <code class="cpp">nanobind__sb_cpu_exec_impl(nanobind::module_)::{lambda(unsigned long)#5}::operator()(unsigned long) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">147</span>#endif
+<span class="line_number">148</span>  m.def(&#34;get_ngpus&#34;, &amp;getNumGpus);
+<span class="line_number">149</span>
+<span class="line_number">150</span><span class="error">  m.def(&#34;limit_cpus&#34;, [](size_t n){ sb::default_executor().limit_cpu_workers(n); });
+</span><span class="line_number">151</span>  m.def(&#34;get_cpu_limit&#34;, []{ return sb::default_executor().cpu_worker_count(); });
+<span class="line_number">152</span>
+<span class="line_number">153</span>  m.def(&#34;_build_type&#34;, [] {
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/nanobind/include/nanobind/nb_func.h:341<br>
+                                    <code class="cpp">nanobind::detail::func_create&lt;false, true, nanobind__sb_cpu_exec_impl(nanobind::module_)::{lambda(unsigned long)#5}, void, unsigned long, 0ul, nanobind::scope, nanobind::name&gt;(nanobind__sb_cpu_exec_impl(nanobind::module_)::{lambda(unsigned long)#5}&amp;&amp;, void (*)(unsigned long), std::integer_sequence&lt;unsigned long, 0ul&gt;, nanobind::scope const&amp;, nanobind::name const&amp;)::{lambda(void*, _object**, unsigned int, nanobind::detail::cleanup_list*)#1}::operator()(void*, _object**, unsigned int, nanobind::detail::cleanup_list*) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">338</span>#if defined(_WIN32) &amp;&amp; !defined(__CUDACC__) // temporary workaround for an internal compiler error in MSVC
+<span class="line_number">339</span>            cap-&gt;func(static_cast&lt;cast_t&lt;Args&gt;&gt;(in.template get&lt;Is&gt;())...);
+<span class="line_number">340</span>#else
+<span class="line_number">341</span><span class="error">            cap-&gt;func(in.template get&lt;Is&gt;().operator cast_t&lt;Args&gt;()...);
+</span><span class="line_number">342</span>#endif
+<span class="line_number">343</span>            result = none_ref();
+<span class="line_number">344</span>        } else {
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/nanobind/include/nanobind/nb_func.h:286<br>
+                                    <code class="cpp">nanobind::detail::func_create&lt;false, true, nanobind__sb_cpu_exec_impl(nanobind::module_)::{lambda(unsigned long)#5}, void, unsigned long, 0ul, nanobind::scope, nanobind::name&gt;(nanobind__sb_cpu_exec_impl(nanobind::module_)::{lambda(unsigned long)#5}&amp;&amp;, void (*)(unsigned long), std::integer_sequence&lt;unsigned long, 0ul&gt;, nanobind::scope const&amp;, nanobind::name const&amp;)::{lambda(void*, _object**, unsigned int, nanobind::detail::cleanup_list*)#1}::_FUN(void*, _object**, unsigned int, nanobind::detail::cleanup_list*)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">283</span>        };
+<span class="line_number">284</span>    }
+<span class="line_number">285</span>
+<span class="line_number">286</span><span class="error">    f.impl = [](void *p, PyObject **args, uint32_t call_flags,
+</span><span class="line_number">287</span>                cleanup_list *cleanup)
+<span class="line_number">288</span>                    NB_INLINE_LAMBDA -&gt; PyObject * {
+<span class="line_number">289</span>        (void) p; (void) args; (void) call_flags; (void) cleanup;
+</code></pre>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            <pre class="code">
+<code class="c++"><span class="line_number">164</span><span class="error">	_M_start_thread(_State_ptr(new _State_impl&lt;_Wrapper&gt;(</span>
+<span class="line_number">165</span>	      std::forward&lt;_Callable&gt;(__f), std::forward&lt;_Args&gt;(__args)...)),
+<span class="line_number">166</span>	    _M_thread_deps_never_run);
+<span class="line_number">167</span>      }
+<span class="line_number">168</span>#endif // _GLIBCXX_HAS_GTHREADS
+<span class="line_number">169</span>
+<span class="line_number">170</span>    ~thread()
+<span class="line_number">171</span>    {
+<span class="line_number">172</span>      if (joinable())
+<span class="line_number">173</span>	std::__terminate();
+<span class="line_number">174</span>    }
+<span class="line_number">175</span>
+<span class="line_number">176</span>    thread(const thread&amp;) = delete;
+<span class="line_number">177</span>
+<span class="line_number">178</span>    thread(thread&amp;&amp; __t) noexcept
+<span class="line_number">179</span>    { swap(__t); }
+<span class="line_number">180</span>
+<span class="line_number">181</span>    thread&amp; operator=(const thread&amp;) = delete;
+<span class="line_number">182</span>
+<span class="line_number">183</span>    thread&amp; operator=(thread&amp;&amp; __t) noexcept
+<span class="line_number">184</span>    {
+<span class="line_number">185</span>      if (joinable())
+<span class="line_number">186</span>	std::__terminate();
+<span class="line_number">187</span>      swap(__t);
+<span class="line_number">188</span>      return *this;
+<span class="line_number">189</span>    }
+<span class="line_number">190</span>
+<span class="line_number">191</span>    void
+<span class="line_number">192</span>    swap(thread&amp; __t) noexcept
+<span class="line_number">193</span>    { std::swap(_M_id, __t._M_id); }
+<span class="line_number">194</span>
+<span class="line_number">195</span>    bool
+<span class="line_number">196</span>    joinable() const noexcept
+<span class="line_number">197</span>    { return !(_M_id == id()); }
+<span class="line_number">198</span>
+<span class="line_number">199</span>    void
+<span class="line_number">200</span>    join();
+<span class="line_number">201</span>
+<span class="line_number">202</span>    void
+<span class="line_number">203</span>    detach();
+<span class="line_number">204</span>
+<span class="line_number">205</span>    id
+<span class="line_number">206</span>    get_id() const noexcept
+<span class="line_number">207</span>    { return _M_id; }
+<span class="line_number">208</span>
+<span class="line_number">209</span>    /** @pre thread is joinable
+<span class="line_number">210</span>     */
+<span class="line_number">211</span>    native_handle_type
+<span class="line_number">212</span>    native_handle()
+<span class="line_number">213</span>    { return _M_id._M_thread; }
+<span class="line_number">214</span>
+<span class="line_number">215</span>    // Returns a value that hints at the number of hardware thread contexts.
+<span class="line_number">216</span>    static unsigned int
+<span class="line_number">217</span>    hardware_concurrency() noexcept;
+<span class="line_number">218</span>
+<span class="line_number">219</span>#ifdef _GLIBCXX_HAS_GTHREADS
+<span class="line_number">220</span>#ifndef _GLIBCXX_THREAD_IMPL
+<span class="line_number">221</span>  private:
+<span class="line_number">222</span>#endif
+<span class="line_number">223</span>    // Abstract base class for types that wrap arbitrary functors to be
+<span class="line_number">224</span>    // invoked in the new thread of execution.
+<span class="line_number">225</span>    struct _State
+<span class="line_number">226</span>    {
+<span class="line_number">227</span>      virtual ~_State();
+<span class="line_number">228</span>      virtual void _M_run() = 0;
+<span class="line_number">229</span>    };
+<span class="line_number">230</span>    using _State_ptr = unique_ptr&lt;_State&gt;;
+<span class="line_number">231</span>
+<span class="line_number">232</span>  private:
+<span class="line_number">233</span>    template&lt;typename _Callable&gt;
+<span class="line_number">234</span>      struct _State_impl : public _State
+<span class="line_number">235</span>      {
+<span class="line_number">236</span>	_Callable		_M_func;
+<span class="line_number">237</span>
+<span class="line_number">238</span>	template&lt;typename... _Args&gt;
+<span class="line_number">239</span>	  _State_impl(_Args&amp;&amp;... __args)
+<span class="line_number">240</span>	  : _M_func(std::forward&lt;_Args&gt;(__args)...)
+<span class="line_number">241</span>	  { }
+<span class="line_number">242</span>
+<span class="line_number">243</span>	void
+<span class="line_number">244</span>	_M_run() { _M_func(); }
+<span class="line_number">245</span>      };
+<span class="line_number">246</span>
+<span class="line_number">247</span>    void
+<span class="line_number">248</span>    _M_start_thread(_State_ptr, void (*)());
+<span class="line_number">249</span>
+<span class="line_number">250</span>#if _GLIBCXX_THREAD_ABI_COMPAT
+<span class="line_number">251</span>  public:
+<span class="line_number">252</span>    struct _Impl_base;
+<span class="line_number">253</span>    typedef shared_ptr&lt;_Impl_base&gt;	__shared_base_type;
+<span class="line_number">254</span>    struct _Impl_base
+<span class="line_number">255</span>    {
+<span class="line_number">256</span>      __shared_base_type	_M_this_ptr;
+<span class="line_number">257</span>      virtual ~_Impl_base() = default;
+<span class="line_number">258</span>      virtual void _M_run() = 0;
+<span class="line_number">259</span>    };
+<span class="line_number">260</span>
+<span class="line_number">261</span>  private:
+<span class="line_number">262</span>    void
+<span class="line_number">263</span>    _M_start_thread(__shared_base_type, void (*)());
+<span class="line_number">264</span>
+<span class="line_number">265</span>    void
+<span class="line_number">266</span>    _M_start_thread(__shared_base_type);
+<span class="line_number">267</span>#endif
+<span class="line_number">268</span>
+<span class="line_number">269</span>  private:
+<span class="line_number">270</span>    // A call wrapper that does INVOKE(forwarded tuple elements...)
+<span class="line_number">271</span>    template&lt;typename _Tuple&gt;
+<span class="line_number">272</span>      struct _Invoker
+<span class="line_number">273</span>      {
+<span class="line_number">274</span>	template&lt;typename... _Args&gt;
+<span class="line_number">275</span>	  explicit
+<span class="line_number">276</span>	  _Invoker(_Args&amp;&amp;... __args)
+<span class="line_number">277</span>	  : _M_t(std::forward&lt;_Args&gt;(__args)...)
+<span class="line_number">278</span>	  { }
+<span class="line_number">279</span>
+<span class="line_number">280</span>	_Tuple _M_t;
+<span class="line_number">281</span>
+<span class="line_number">282</span>	template&lt;typename&gt;
+<span class="line_number">283</span>	  struct __result;
+<span class="line_number">284</span>	template&lt;typename _Fn, typename... _Args&gt;
+<span class="line_number">285</span>	  struct __result&lt;tuple&lt;_Fn, _Args...&gt;&gt;
+<span class="line_number">286</span>	  : __invoke_result&lt;_Fn, _Args...&gt;
+<span class="line_number">287</span>	  { };
+<span class="line_number">288</span>
+<span class="line_number">289</span>	template&lt;size_t... _Ind&gt;
+<span class="line_number">290</span>	  typename __result&lt;_Tuple&gt;::type
+<span class="line_number">291</span>	  _M_invoke(_Index_tuple&lt;_Ind...&gt;)
+<span class="line_number">292</span>	  { return std::__invoke(std::get&lt;_Ind&gt;(std::move(_M_t))...); }
+<span class="line_number">293</span>
+<span class="line_number">294</span>	typename __result&lt;_Tuple&gt;::type
+<span class="line_number">295</span>	operator()()
+<span class="line_number">296</span>	{
+<span class="line_number">297</span>	  using _Indices
+<span class="line_number">298</span>	    = typename _Build_index_tuple&lt;tuple_size&lt;_Tuple&gt;::value&gt;::__type;
+<span class="line_number">299</span>	  return _M_invoke(_Indices());
+<span class="line_number">300</span>	}
+<span class="line_number">301</span>      };
+<span class="line_number">302</span>
+<span class="line_number">303</span>  public:
+<span class="line_number">304</span>    /// @cond undocumented
+<span class="line_number">305</span>    template&lt;typename... _Tp&gt;
+<span class="line_number">306</span>      using _Call_wrapper = _Invoker&lt;tuple&lt;typename decay&lt;_Tp&gt;::type...&gt;&gt;;
+<span class="line_number">307</span>    /// @endcond
+<span class="line_number">308</span>#endif // _GLIBCXX_HAS_GTHREADS
+<span class="line_number">309</span>  };
+<span class="line_number">310</span>
+<span class="line_number">311</span>#ifndef _GLIBCXX_HAS_GTHREADS
+<span class="line_number">312</span>  inline void thread::join() { std::__throw_system_error(EINVAL); }
+<span class="line_number">313</span>  inline void thread::detach() { std::__throw_system_error(EINVAL); }
+<span class="line_number">314</span>  inline unsigned int thread::hardware_concurrency() noexcept { return 0; }
+<span class="line_number">315</span>#endif
+<span class="line_number">316</span>
+<span class="line_number">317</span>  /// @relates std::thread
+<span class="line_number">318</span>  inline void
+<span class="line_number">319</span>  swap(thread&amp; __x, thread&amp; __y) noexcept
+<span class="line_number">320</span>  { __x.swap(__y); }
+<span class="line_number">321</span>
+<span class="line_number">322</span>  /// @relates std::thread::id
+<span class="line_number">323</span>  inline bool
+<span class="line_number">324</span>  operator==(thread::id __x, thread::id __y) noexcept
+<span class="line_number">325</span>  {
+<span class="line_number">326</span>    // pthread_equal is undefined if either thread ID is not valid, so we
+<span class="line_number">327</span>    // can&#39;t safely use __gthread_equal on default-constructed values (nor
+<span class="line_number">328</span>    // the non-zero value returned by this_thread::get_id() for
+<span class="line_number">329</span>    // single-threaded programs using GNU libc). Assume EqualityComparable.
+<span class="line_number">330</span>    return __x._M_thread == __y._M_thread;
+<span class="line_number">331</span>  }
+<span class="line_number">332</span>
+<span class="line_number">333</span>  // N.B. other comparison operators are defined in &lt;thread&gt;
+<span class="line_number">334</span>
+<span class="line_number">335</span>  // DR 889.
+<span class="line_number">336</span>  /// std::hash specialization for thread::id.
+<span class="line_number">337</span>  template&lt;&gt;
+<span class="line_number">338</span>    struct hash&lt;thread::id&gt;
+<span class="line_number">339</span>    : public __hash_base&lt;size_t, thread::id&gt;
+<span class="line_number">340</span>    {
+<span class="line_number">341</span>      size_t
+<span class="line_number">342</span>      operator()(const thread::id&amp; __id) const noexcept
+<span class="line_number">343</span>      { return std::_Hash_impl::hash(__id._M_thread); }
+<span class="line_number">344</span>    };
+<span class="line_number">345</span>
+<span class="line_number">346</span>  namespace this_thread
+<span class="line_number">347</span>  {
+<span class="line_number">348</span>    /// The unique identifier of the current thread.
+<span class="line_number">349</span>    inline thread::id
+<span class="line_number">350</span>    get_id() noexcept
+<span class="line_number">351</span>    {
+<span class="line_number">352</span>#ifndef _GLIBCXX_HAS_GTHREADS
+<span class="line_number">353</span>      return thread::id(1);
+<span class="line_number">354</span>#elif defined _GLIBCXX_NATIVE_THREAD_ID
+<span class="line_number">355</span>      return thread::id(_GLIBCXX_NATIVE_THREAD_ID);
+<span class="line_number">356</span>#else
+<span class="line_number">357</span>      return thread::id(__gthread_self());
+<span class="line_number">358</span>#endif
+<span class="line_number">359</span>    }
+<span class="line_number">360</span>
+<span class="line_number">361</span>    /// Allow the implementation to schedule a different thread.
+<span class="line_number">362</span>    inline void
+<span class="line_number">363</span>    yield() noexcept
+<span class="line_number">364</span>    {
+<span class="line_number">365</span>#if defined _GLIBCXX_HAS_GTHREADS &amp;&amp; defined _GLIBCXX_USE_SCHED_YIELD
+<span class="line_number">366</span>      __gthread_yield();
+<span class="line_number">367</span>#endif
+<span class="line_number">368</span>    }
+<span class="line_number">369</span>
+<span class="line_number">370</span>  } // namespace this_thread
+<span class="line_number">371</span>
+<span class="line_number">372</span>  /// @}
+<span class="line_number">373</span>
+<span class="line_number">374</span>_GLIBCXX_END_NAMESPACE_VERSION
+<span class="line_number">375</span>} // namespace
+<span class="line_number">376</span>#endif // C++11
+<span class="line_number">377</span>
+<span class="line_number">378</span>#endif // _GLIBCXX_THREAD_H
+</code>
+            </pre>
+        </div>
+    </div>
+</body>
+
+</html>

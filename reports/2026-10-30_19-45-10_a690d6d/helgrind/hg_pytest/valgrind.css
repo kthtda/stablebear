@@ -1,0 +1,130 @@
+div.global {
+    margin-left: auto;
+    margin-right: auto;
+    width: 100ch;
+    background-color: #fafafa;
+}
+
+div.header {
+    margin: 1ch;
+}
+
+h1 {
+    text-align: center;
+}
+
+div.listing {
+    border: solid lightgray 1px;
+    background-color: white;
+    counter-reset: listing;
+    padding-top: 1ch;
+}
+
+pre.code {
+    white-space: pre-wrap;
+    margin: 0;
+    margin-top: 0.5ch;
+    margin-left: 50pt;
+    margin-bottom: 0.5ch;
+}
+
+pre.code code {
+    counter-increment: listing;
+}
+
+span.line_number span {
+    display: inline-block;
+    color: #707070;
+    background-color: #e8e8e8;
+    text-align: right;
+    width: 5ch;
+    margin-right: 1ch;
+}
+
+code.hljs .error {
+    background-color: lightpink;
+}
+
+code.hljs {
+    background-color: white;
+    padding: 0;
+    display: inline;
+}
+
+table {
+    border: solid 1px black;
+    background-color: white;
+    width: 100%;
+}
+
+th {
+    background-color: lightgray;
+    padding: 0.5ch;
+}
+
+td {
+    padding: 0.3ch;
+    border-bottom: solid 1px lightgray;
+}
+
+td:first-child {
+    padding-left: 1ch;
+}
+
+td:last-child {
+    text-align: center;
+}
+
+div.issue {
+    margin: 0 1ch;
+}
+
+table.call_stack {
+    border: 0;
+    font-size: 11pt;
+    border-spacing: 0.5ch;
+    background-color: transparent;
+}
+
+table.call_stack th {
+    text-align: left;
+    padding-left: 0;
+    background-color: white;
+}
+
+table.call_stack button {
+    margin: 0 0.25ch;
+}
+
+table.call_stack td {
+    text-align: left;
+    border: solid 1px lightgray;
+    padding: 0;
+}
+
+table.call_stack div.ui-widget-header {
+    padding: 0.5ch;
+}
+
+table.call_stack .ui-widget-header code {
+    background-color: transparent;
+    font-weight: normal;
+}
+
+table.call_stack pre {
+    font-size: 9pt;
+    margin: 0;
+    padding: 1ch;
+    padding-left: 2ch;
+    background-color: white;
+}
+
+div.navigation {
+    float: right;
+    font-size: 0.8em;
+    transform: translateY(-0.25em);
+}
+
+div.issue div:last-child {
+    background-color: #f8f0ff;
+}

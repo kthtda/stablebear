@@ -1,0 +1,82 @@
+/home/runner/work/_temp/SourceCode/./Include/internal/pycore_call.h:
+13 errors
+	line 168: Leak_PossiblyLost	(13 errors)
+/home/runner/work/_temp/SourceCode/./Include/internal/pycore_object_alloc.h:
+1095 errors
+	line 46: Leak_PossiblyLost	(1070 errors)
+	line 61: Leak_PossiblyLost	(25 errors)
+/home/runner/work/_temp/SourceCode/./Modules/_collectionsmodule.c:
+3 errors
+	line 181: Leak_PossiblyLost	(3 errors)
+/home/runner/work/_temp/SourceCode/./Modules/_io/bufferedio.c:
+1 errors
+	line 833: Leak_PossiblyLost	(1 errors)
+/home/runner/work/_temp/SourceCode/./Python/dynload_shlib.c:
+1 errors
+	line 80: Leak_DefinitelyLost	(1 errors)
+/home/runner/work/_temp/SourceCode/Objects/bytesobject.c:
+161 errors
+	line 123: Leak_PossiblyLost	(158 errors)
+	line 3210: Leak_PossiblyLost	(3 errors)
+/home/runner/work/_temp/SourceCode/Objects/codeobject.c:
+3 errors
+	line 350: Leak_PossiblyLost	(3 errors)
+/home/runner/work/_temp/SourceCode/Objects/complexobject.c:
+1 errors
+	line 232: Leak_PossiblyLost	(1 errors)
+/home/runner/work/_temp/SourceCode/Objects/descrobject.c:
+1 errors
+	line 420: Leak_PossiblyLost	(1 errors)
+/home/runner/work/_temp/SourceCode/Objects/dictobject.c:
+143 errors
+	line 823: Leak_PossiblyLost	(101 errors)
+	line 888: Leak_PossiblyLost	(7 errors)
+	line 977: Leak_PossiblyLost	(35 errors)
+/home/runner/work/_temp/SourceCode/Objects/floatobject.c:
+22 errors
+	line 147: Leak_PossiblyLost	(22 errors)
+/home/runner/work/_temp/SourceCode/Objects/listobject.c:
+7 errors
+	line 181: Leak_PossiblyLost	(4 errors)
+	line 220: Leak_PossiblyLost	(1 errors)
+	line 298: Leak_PossiblyLost	(2 errors)
+/home/runner/work/_temp/SourceCode/Objects/longobject.c:
+29 errors
+	line 157: Leak_PossiblyLost	(12 errors)
+	line 209: Leak_PossiblyLost	(16 errors)
+	line 367: Leak_PossiblyLost	(1 errors)
+/home/runner/work/_temp/SourceCode/Objects/methodobject.c:
+14 errors
+	line 440: Leak_PossiblyLost	(12 errors)
+	line 550: Leak_PossiblyLost	(2 errors)
+/home/runner/work/_temp/SourceCode/Objects/object.c:
+67 errors
+	line 534: Leak_PossiblyLost	(2 errors)
+	line 547: Leak_PossiblyLost	(65 errors)
+/home/runner/work/_temp/SourceCode/Objects/odictobject.c:
+2 errors
+	line 565: Leak_PossiblyLost	(1 errors)
+	line 694: Leak_PossiblyLost	(1 errors)
+/home/runner/work/_temp/SourceCode/Objects/setobject.c:
+5 errors
+	line 300: Leak_PossiblyLost	(5 errors)
+/home/runner/work/_temp/SourceCode/Objects/typeobject.c:
+14 errors
+	line 3851: Leak_PossiblyLost	(10 errors)
+	line 4547: Leak_PossiblyLost	(2 errors)
+	line 4589: Leak_PossiblyLost	(2 errors)
+/home/runner/work/_temp/SourceCode/Objects/unicodeobject.c:
+23 errors
+	line 1188: Leak_DefinitelyLost	(13 errors)
+	           Leak_PossiblyLost	(8 errors)
+	line 15006: Leak_PossiblyLost	(2 errors)
+/home/runner/work/_temp/SourceCode/Python/import.c:
+1 errors
+	line 791: Leak_PossiblyLost	(1 errors)
+/home/runner/work/_temp/SourceCode/Python/thread_pthread.h:
+2 errors
+	line 460: Leak_PossiblyLost	(2 errors)
+/usr/include/c++/13/bits/std_thread.h:
+1 errors
+	line 164: Leak_PossiblyLost	(1 errors)
+

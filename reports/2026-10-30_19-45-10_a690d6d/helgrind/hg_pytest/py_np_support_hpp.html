@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>/home/runner/work/stablebear/stablebear/src/python/py_np_support.hpp</title>
+    <link href='valgrind.css' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+    <script src="https://code.jquery.com/jquery-3.4.1.js"></script>
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.0.0/styles/default.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.0.0/highlight.min.js"></script>
+    <script src="valgrind.js"></script>
+</head>
+
+<body>
+    <div class="global">
+        <div class="header">
+            <h1>/home/runner/work/stablebear/stablebear/src/python/py_np_support.hpp</h1>
+            <p><b>2</b> errors</p>
+            <button class="next_error">Goto First Error</button>
+        </div>
+        <div class="listing">
+            <pre class="code">
+<code class="c++"><span class="line_number">1</span>#ifndef STABLEBEAR_PY_NP_SUPPORT_H
+<span class="line_number">2</span>#define STABLEBEAR_PY_NP_SUPPORT_H
+<span class="line_number">3</span>
+<span class="line_number">4</span>#include &#34;nb.hpp&#34;
+<span class="line_number">5</span>
+<span class="line_number">6</span>#include &lt;nanobind/ndarray.h&gt;
+<span class="line_number">7</span>
+<span class="line_number">8</span>#include &lt;sbear/concepts.hpp&gt;
+<span class="line_number">9</span>#include &lt;sbear/config.hpp&gt;
+<span class="line_number">10</span>
+<span class="line_number">11</span>#include &lt;cstdint&gt;
+<span class="line_number">12</span>#include &lt;functional&gt;
+<span class="line_number">13</span>#include &lt;numeric&gt;
+<span class="line_number">14</span>#include &lt;string&gt;
+<span class="line_number">15</span>#include &lt;sstream&gt;
+<span class="line_number">16</span>#include &lt;vector&gt;
+<span class="line_number">17</span>
+<span class="line_number">18</span>namespace sb_py
+<span class="line_number">19</span>{
+<span class="line_number">20</span>  /// A NumPy array argument: any CPU array, converted to T if its dtype
+<span class="line_number">21</span>  /// differs. Read-only arrays are accepted.
+<span class="line_number">22</span>  template &lt;typename T&gt;
+<span class="line_number">23</span>  using NpIn = nb::ndarray&lt;const T, nb::device::cpu&gt;;
+<span class="line_number">24</span>
+<span class="line_number">25</span>  /// A NumPy array returned to Python.
+<span class="line_number">26</span>  template &lt;typename T&gt;
+<span class="line_number">27</span>  using NpArray = nb::ndarray&lt;nb::numpy, T&gt;;
+<span class="line_number">28</span>
+<span class="line_number">29</span>  /// A new zero-initialized C-ordered NumPy array that owns its memory.
+<span class="line_number">30</span>  template &lt;typename T&gt;
+<span class="line_number">31</span>  NpArray&lt;T&gt; new_array(const std::vector&lt;size_t&gt;&amp; shape)
+<span class="line_number">32</span>  {
+<span class="line_number">33</span>    const size_t n = std::accumulate(shape.begin(), shape.end(), size_t{1}, std::multiplies&lt;&gt;());
+<span class="line_number">34</span>    T* data = new T[n]();
+<span class="line_number">35</span>    nb::capsule owner(data, [](void* p) noexcept { delete[] static_cast&lt;T*&gt;(p); });
+<span class="line_number">36</span>    return NpArray&lt;T&gt;(data, shape.size(), shape.data(), owner);
+<span class="line_number">37</span>  }
+<span class="line_number">38</span>
+<span class="line_number">39</span>  /// A NumPy array viewing memory owned by `owner`, with strides in elements.
+<span class="line_number">40</span>  template &lt;typename T&gt;
+<span class="line_number">41</span>  NpArray&lt;T&gt; array_view(T* data, const std::vector&lt;size_t&gt;&amp; shape, const std::vector&lt;int64_t&gt;&amp; strides,
+<span class="line_number">42</span>                        nb::handle owner)
+<span class="line_number">43</span>  {
+<span class="line_number">44</span>    return NpArray&lt;T&gt;(data, shape.size(), shape.data(), owner, strides.data());
+<span class="line_number">45</span>  }
+<span class="line_number">46</span>
+<span class="line_number">47</span>  /// Bind __array__ so that np.asarray(obj) gives a NumPy array viewing
+<span class="line_number">48</span>  /// obj&#39;s memory. `view` takes the object and its Python handle, which the
+<span class="line_number">49</span>  /// array keeps alive.
+<span class="line_number">50</span>  template &lt;typename Cls, typename View&gt;
+<span class="line_number">51</span>  void bind_array_view(Cls&amp; cls, View view)
+<span class="line_number">52</span>  {
+<span class="line_number">53</span>    using T = typename Cls::Type;
+<span class="line_number">54</span>    cls.def(&#34;__array__&#34;, [view](nb::handle self, nb::handle dtype, nb::handle copy) -&gt; nb::object {
+<span class="line_number">55</span>      nb::object array = nb::cast(view(nb::cast&lt;const T&amp;&gt;(self), self));
+<span class="line_number">56</span>      if (!dtype.is_none())
+<span class="line_number">57</span>      {
+<span class="line_number">58</span>        nb::object converted = array.attr(&#34;astype&#34;)(dtype, nb::arg(&#34;copy&#34;) = false);
+<span class="line_number">59</span>        // copy=False forbids copying, as NumPy requires of __array__
+<span class="line_number">60</span>        if (!converted.is(array) &amp;&amp; nb::isinstance&lt;nb::bool_&gt;(copy) &amp;&amp; !nb::cast&lt;bool&gt;(copy))
+<span class="line_number">61</span>        {
+<span class="line_number">62</span>          throw nb::value_error(&#34;Unable to avoid copy while creating an array as requested.&#34;);
+<span class="line_number">63</span>        }
+<span class="line_number">64</span>        array = converted;
+<span class="line_number">65</span>      }
+<span class="line_number">66</span>      if (nb::isinstance&lt;nb::bool_&gt;(copy) &amp;&amp; nb::cast&lt;bool&gt;(copy))
+<span class="line_number">67</span>      {
+<span class="line_number">68</span>        array = array.attr(&#34;copy&#34;)();
+<span class="line_number">69</span>      }
+<span class="line_number">70</span>      return array;
+<span class="line_number">71</span>    }, nb::arg(&#34;dtype&#34;) = nb::none(), nb::arg(&#34;copy&#34;) = nb::none());
+<span class="line_number">72</span>  }
+<span class="line_number">73</span>}
+<span class="line_number">74</span>
+<span class="line_number">75</span>template &lt;typename Array&gt;
+<span class="line_number">76</span>std::string shape_to_string(const Array&amp; arr)
+<span class="line_number">77</span>{
+<span class="line_number">78</span>  std::stringstream ss;
+<span class="line_number">79</span>
+<span class="line_number">80</span>  ss &lt;&lt; &#34;(&#34;;
+<span class="line_number">81</span>  for (size_t i = 0; i &lt; arr.ndim(); ++i)
+<span class="line_number">82</span>  {
+<span class="line_number">83</span>    if (i != 0)
+<span class="line_number">84</span>    {
+<span class="line_number">85</span>      ss &lt;&lt; &#34;, &#34;;
+<span class="line_number">86</span>    }
+<span class="line_number">87</span>    ss &lt;&lt; arr.shape(i);
+<span class="line_number">88</span>  }
+<span class="line_number">89</span>  ss &lt;&lt; &#34;)&#34;;
+<span class="line_number">90</span>  return ss.str();
+<span class="line_number">91</span>}
+<span class="line_number">92</span>
+<span class="line_number">93</span>/// A strided view of an nb::ndarray as an sb tensor. T is const for a
+<span class="line_number">94</span>/// read-only view. The array must outlive the view.
+<span class="line_number">95</span>template &lt;typename T&gt;
+<span class="line_number">96</span>class NumpyTensor
+<span class="line_number">97</span>{
+<span class="line_number">98</span>public:
+<span class="line_number">99</span>  using value_type = std::remove_const_t&lt;T&gt;;
+<span class="line_number">100</span>
+<span class="line_number">101</span>  template &lt;typename... Args&gt;
+<span class="line_number">102</span>  explicit NumpyTensor(const nb::ndarray&lt;Args...&gt;&amp; arr)
+<span class="line_number">103</span>    : m_data(static_cast&lt;T*&gt;(arr.data()))
+<span class="line_number">104</span>    , m_shape(arr.ndim())
+<span class="line_number">105</span>    , m_strides(arr.ndim())
+<span class="line_number">106</span>  {
+<span class="line_number">107</span>    for (size_t i = 0; i &lt; arr.ndim(); ++i)
+<span class="line_number">108</span>    {
+<span class="line_number">109</span>      m_shape[i] = arr.shape(i);
+<span class="line_number">110</span>      m_strides[i] = arr.stride(i);
+<span class="line_number">111</span>    }
+<span class="line_number">112</span>  }
+<span class="line_number">113</span>
+<span class="line_number">114</span>  [[nodiscard]] std::vector&lt;size_t&gt; shape() const
+<span class="line_number">115</span>  {
+<span class="line_number">116</span>    return m_shape;
+<span class="line_number">117</span>  }
+<span class="line_number">118</span>
+<span class="line_number">119</span>  [[nodiscard]] size_t shape(size_t i) const
+<span class="line_number">120</span>  {
+<span class="line_number">121</span>    return m_shape[i];
+<span class="line_number">122</span>  }
+<span class="line_number">123</span>
+<span class="line_number">124</span>  [[nodiscard]] std::vector&lt;size_t&gt; strides() const
+<span class="line_number">125</span>  {
+<span class="line_number">126</span>    return std::vector&lt;size_t&gt;(m_strides.begin(), m_strides.end());
+<span class="line_number">127</span>  }
+<span class="line_number">128</span>
+<span class="line_number">129</span>  [[nodiscard]] size_t rank() const
+<span class="line_number">130</span>  {
+<span class="line_number">131</span>    return m_shape.size();
+<span class="line_number">132</span>  }
+<span class="line_number">133</span>
+<span class="line_number">134</span>  [[nodiscard]] size_t size() const
+<span class="line_number">135</span>  {
+<span class="line_number">136</span>    return std::accumulate(m_shape.begin(), m_shape.end(), size_t{1}, std::multiplies&lt;&gt;());
+<span class="line_number">137</span>  }
+<span class="line_number">138</span>
+<span class="line_number">139</span>  [[nodiscard]] T&amp; operator()(const std::vector&lt;std::size_t&gt;&amp; idx) const
+<span class="line_number">140</span>  {
+<span class="line_number">141</span>    int64_t offset = 0;
+<span class="line_number">142</span>    for (size_t i = 0; i &lt; idx.size(); ++i)
+<span class="line_number">143</span>    {
+</code></pre>
+            <div class="issue">
+                <div>
+                    <span class="what">Possible data race during read of size 8 at 0x2BF76690 by thread #15</span>
+                    <div class="navigation">
+                        <button class="next_error">Next</button>
+                        <button class="prev_error">Previous</button>
+                    </div>
+                </div>
+                <div>
+                    <table class="call_stack">
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/algorithms/tensor_eval.hpp:24<br>
+                                    <code class="cpp">sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}::operator()(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">21</span>  void tensor_eval(const TElemTensor&amp; elems, DomainT x, TOutTensor&amp; out)
+<span class="line_number">22</span>  {
+<span class="line_number">23</span>    auto eval = [&amp;](const std::vector&lt;size_t&gt;&amp; idx) {
+<span class="line_number">24</span><span class="error">      out(idx) = elems(idx).evaluate(x);
+</span><span class="line_number">25</span>    };
+<span class="line_number">26</span>
+<span class="line_number">27</span>    if (elems.size() &gt;= settings().parallelEvalThreshold)
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/walk.hpp:155<br>
+                                    <code class="cpp">sb::parallel_walk_async&lt;sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}::operator()(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">152</span>  tf::Future&lt;void&gt; parallel_walk_async(const TTensor&amp; tensor, UnaryFunc&amp;&amp; f, Executor&amp; exec)
+<span class="line_number">153</span>  {
+<span class="line_number">154</span>    return detail::parallel_walk_impl(tensor, [f = std::forward&lt;UnaryFunc&gt;(f)](const std::vector&lt;size_t&gt;&amp; idx, size_t) {
+<span class="line_number">155</span><span class="error">      f(idx);
+</span><span class="line_number">156</span>    }, exec);
+<span class="line_number">157</span>  }
+<span class="line_number">158</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/walk.hpp:118<br>
+                                    <code class="cpp">sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}::operator()(unsigned long) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">115</span>          rem /= shape[i];
+<span class="line_number">116</span>        }
+<span class="line_number">117</span>
+<span class="line_number">118</span><span class="error">        f(idx, flat);
+</span><span class="line_number">119</span>      });
+<span class="line_number">120</span>
+<span class="line_number">121</span>      return exec.cpu()-&gt;run(std::move(flow));
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/algorithm/for_each.hpp:134<br>
+                                    <code class="cpp">tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}::operator()()::{lambda(unsigned long, unsigned long)#1}::operator()(unsigned long, unsigned long)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">131</span>          part.loop(N, W, *next, [=] (size_t part_b, size_t part_e) mutable {
+<span class="line_number">132</span>            auto idx = static_cast&lt;B_t&gt;(part_b) * inc + beg;
+<span class="line_number">133</span>            for(size_t x=part_b; x&lt;part_e; x++, idx += inc) {
+<span class="line_number">134</span><span class="error">              c(idx);
+</span><span class="line_number">135</span>            }
+<span class="line_number">136</span>          });
+<span class="line_number">137</span>        });
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/../algorithm/partitioner.hpp:316<br>
+                                    <code class="cpp">void tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;::loop&lt;tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}::operator()()::{lambda(unsigned long, unsigned long)#1}, (void*)0&gt;(unsigned long, unsigned long, std::atomic&lt;unsigned long&gt;&amp;, tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}::operator()()::{lambda(unsigned long, unsigned long)#1}&amp;&amp;) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">313</span>          if(curr_b &gt;= N) {
+<span class="line_number">314</span>            return;
+<span class="line_number">315</span>          }
+<span class="line_number">316</span><span class="error">          func(curr_b, (std::min)(curr_b + chunk_size, N));
+</span><span class="line_number">317</span>        }
+<span class="line_number">318</span>        break;
+<span class="line_number">319</span>      }
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/algorithm/for_each.hpp:131<br>
+                                    <code class="cpp">tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}::operator()()</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">128</span>      auto next = std::make_shared&lt;std::atomic&lt;size_t&gt;&gt;(0);
+<span class="line_number">129</span>      for(size_t w=0; w&lt;W;) {
+<span class="line_number">130</span>        auto task = part([=] () mutable {
+<span class="line_number">131</span><span class="error">          part.loop(N, W, *next, [=] (size_t part_b, size_t part_e) mutable {
+</span><span class="line_number">132</span>            auto idx = static_cast&lt;B_t&gt;(part_b) * inc + beg;
+<span class="line_number">133</span>            for(size_t x=part_b; x&lt;part_e; x++, idx += inc) {
+<span class="line_number">134</span>              c(idx);
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/algorithm/for_each.hpp:138<br>
+                                    <code class="cpp">tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">135</span>            }
+<span class="line_number">136</span>          });
+<span class="line_number">137</span>        });
+<span class="line_number">138</span><span class="error">        (++w == W) ? task() : rt.silent_async(task);
+</span><span class="line_number">139</span>      }
+<span class="line_number">140</span>    }
+<span class="line_number">141</span>  };
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:61<br>
+                                    <code class="cpp">void std::__invoke_impl&lt;void, tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}&amp;, tf::Runtime&amp;&gt;(std::__invoke_other, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;, tf::Runtime&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">58</span>  template&lt;typename _Res, typename _Fn, typename... _Args&gt;
+<span class="line_number">59</span>    constexpr _Res
+<span class="line_number">60</span>    __invoke_impl(__invoke_other, _Fn&amp;&amp; __f, _Args&amp;&amp;... __args)
+<span class="line_number">61</span><span class="error">    { return std::forward&lt;_Fn&gt;(__f)(std::forward&lt;_Args&gt;(__args)...); }
+</span><span class="line_number">62</span>
+<span class="line_number">63</span>  template&lt;typename _Res, typename _MemFun, typename _Tp, typename... _Args&gt;
+<span class="line_number">64</span>    constexpr _Res
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:111<br>
+                                    <code class="cpp">std::enable_if&lt;is_invocable_r_v&lt;void, tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}&amp;, tf::Runtime&amp;&gt;, void&gt;::type std::__invoke_r&lt;void, tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}&amp;, tf::Runtime&amp;&gt;(sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;, tf::Runtime&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">108</span>      using __type = typename __result::type;
+<span class="line_number">109</span>      using __tag = typename __result::__invoke_type;
+<span class="line_number">110</span>      if constexpr (is_void_v&lt;_Res&gt;)
+<span class="line_number">111</span><span class="error">	std::__invoke_impl&lt;__type&gt;(__tag{}, std::forward&lt;_Callable&gt;(__fn),
+</span><span class="line_number">112</span>					std::forward&lt;_Args&gt;(__args)...);
+<span class="line_number">113</span>      else
+<span class="line_number">114</span>	return std::__invoke_impl&lt;__type&gt;(__tag{},
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/std_function.h:290<br>
+                                    <code class="cpp">std::_Function_handler&lt;void (tf::Runtime&amp;), tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}&gt;::_M_invoke(std::_Any_data const&amp;, tf::Runtime&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">287</span>      static _Res
+<span class="line_number">288</span>      _M_invoke(const _Any_data&amp; __functor, _ArgTypes&amp;&amp;... __args)
+<span class="line_number">289</span>      {
+<span class="line_number">290</span><span class="error">	return std::__invoke_r&lt;_Res&gt;(*_Base::_M_get_pointer(__functor),
+</span><span class="line_number">291</span>				     std::forward&lt;_ArgTypes&gt;(__args)...);
+<span class="line_number">292</span>      }
+<span class="line_number">293</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/std_function.h:591<br>
+                                    <code class="cpp">std::function&lt;void (tf::Runtime&amp;)&gt;::operator()(tf::Runtime&amp;) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">588</span>      {
+<span class="line_number">589</span>	if (_M_empty())
+<span class="line_number">590</span>	  __throw_bad_function_call();
+<span class="line_number">591</span><span class="error">	return _M_invoker(_M_functor, std::forward&lt;_ArgTypes&gt;(__args)...);
+</span><span class="line_number">592</span>      }
+<span class="line_number">593</span>
+<span class="line_number">594</span>#if __cpp_rtti
+</code></pre>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            <pre class="code">
+<code class="c++"><span class="line_number">144</span><span class="error">      offset += static_cast&lt;int64_t&gt;(idx[i]) * m_strides[i];</span>
+<span class="line_number">145</span>    }
+</code></pre>
+            <div class="issue">
+                <div>
+                    <span class="what">Possible data race during read of size 8 at 0x1FFEFFD2F0 by thread #15</span>
+                    <div class="navigation">
+                        <button class="next_error">Next</button>
+                        <button class="prev_error">Previous</button>
+                    </div>
+                </div>
+                <div>
+                    <table class="call_stack">
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/algorithms/tensor_eval.hpp:24<br>
+                                    <code class="cpp">sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}::operator()(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">21</span>  void tensor_eval(const TElemTensor&amp; elems, DomainT x, TOutTensor&amp; out)
+<span class="line_number">22</span>  {
+<span class="line_number">23</span>    auto eval = [&amp;](const std::vector&lt;size_t&gt;&amp; idx) {
+<span class="line_number">24</span><span class="error">      out(idx) = elems(idx).evaluate(x);
+</span><span class="line_number">25</span>    };
+<span class="line_number">26</span>
+<span class="line_number">27</span>    if (elems.size() &gt;= settings().parallelEvalThreshold)
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/walk.hpp:155<br>
+                                    <code class="cpp">sb::parallel_walk_async&lt;sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}::operator()(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">152</span>  tf::Future&lt;void&gt; parallel_walk_async(const TTensor&amp; tensor, UnaryFunc&amp;&amp; f, Executor&amp; exec)
+<span class="line_number">153</span>  {
+<span class="line_number">154</span>    return detail::parallel_walk_impl(tensor, [f = std::forward&lt;UnaryFunc&gt;(f)](const std::vector&lt;size_t&gt;&amp; idx, size_t) {
+<span class="line_number">155</span><span class="error">      f(idx);
+</span><span class="line_number">156</span>    }, exec);
+<span class="line_number">157</span>  }
+<span class="line_number">158</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/walk.hpp:118<br>
+                                    <code class="cpp">sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}::operator()(unsigned long) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">115</span>          rem /= shape[i];
+<span class="line_number">116</span>        }
+<span class="line_number">117</span>
+<span class="line_number">118</span><span class="error">        f(idx, flat);
+</span><span class="line_number">119</span>      });
+<span class="line_number">120</span>
+<span class="line_number">121</span>      return exec.cpu()-&gt;run(std::move(flow));
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/algorithm/for_each.hpp:134<br>
+                                    <code class="cpp">tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}::operator()()::{lambda(unsigned long, unsigned long)#1}::operator()(unsigned long, unsigned long)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">131</span>          part.loop(N, W, *next, [=] (size_t part_b, size_t part_e) mutable {
+<span class="line_number">132</span>            auto idx = static_cast&lt;B_t&gt;(part_b) * inc + beg;
+<span class="line_number">133</span>            for(size_t x=part_b; x&lt;part_e; x++, idx += inc) {
+<span class="line_number">134</span><span class="error">              c(idx);
+</span><span class="line_number">135</span>            }
+<span class="line_number">136</span>          });
+<span class="line_number">137</span>        });
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/../algorithm/partitioner.hpp:316<br>
+                                    <code class="cpp">void tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;::loop&lt;tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}::operator()()::{lambda(unsigned long, unsigned long)#1}, (void*)0&gt;(unsigned long, unsigned long, std::atomic&lt;unsigned long&gt;&amp;, tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}::operator()()::{lambda(unsigned long, unsigned long)#1}&amp;&amp;) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">313</span>          if(curr_b &gt;= N) {
+<span class="line_number">314</span>            return;
+<span class="line_number">315</span>          }
+<span class="line_number">316</span><span class="error">          func(curr_b, (std::min)(curr_b + chunk_size, N));
+</span><span class="line_number">317</span>        }
+<span class="line_number">318</span>        break;
+<span class="line_number">319</span>      }
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/algorithm/for_each.hpp:131<br>
+                                    <code class="cpp">tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}::operator()()</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">128</span>      auto next = std::make_shared&lt;std::atomic&lt;size_t&gt;&gt;(0);
+<span class="line_number">129</span>      for(size_t w=0; w&lt;W;) {
+<span class="line_number">130</span>        auto task = part([=] () mutable {
+<span class="line_number">131</span><span class="error">          part.loop(N, W, *next, [=] (size_t part_b, size_t part_e) mutable {
+</span><span class="line_number">132</span>            auto idx = static_cast&lt;B_t&gt;(part_b) * inc + beg;
+<span class="line_number">133</span>            for(size_t x=part_b; x&lt;part_e; x++, idx += inc) {
+<span class="line_number">134</span>              c(idx);
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/algorithm/for_each.hpp:138<br>
+                                    <code class="cpp">tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">135</span>            }
+<span class="line_number">136</span>          });
+<span class="line_number">137</span>        });
+<span class="line_number">138</span><span class="error">        (++w == W) ? task() : rt.silent_async(task);
+</span><span class="line_number">139</span>      }
+<span class="line_number">140</span>    }
+<span class="line_number">141</span>  };
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:61<br>
+                                    <code class="cpp">void std::__invoke_impl&lt;void, tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}&amp;, tf::Runtime&amp;&gt;(std::__invoke_other, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;, tf::Runtime&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">58</span>  template&lt;typename _Res, typename _Fn, typename... _Args&gt;
+<span class="line_number">59</span>    constexpr _Res
+<span class="line_number">60</span>    __invoke_impl(__invoke_other, _Fn&amp;&amp; __f, _Args&amp;&amp;... __args)
+<span class="line_number">61</span><span class="error">    { return std::forward&lt;_Fn&gt;(__f)(std::forward&lt;_Args&gt;(__args)...); }
+</span><span class="line_number">62</span>
+<span class="line_number">63</span>  template&lt;typename _Res, typename _MemFun, typename _Tp, typename... _Args&gt;
+<span class="line_number">64</span>    constexpr _Res
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:111<br>
+                                    <code class="cpp">std::enable_if&lt;is_invocable_r_v&lt;void, tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}&amp;, tf::Runtime&amp;&gt;, void&gt;::type std::__invoke_r&lt;void, tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}&amp;, tf::Runtime&amp;&gt;(sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;, tf::Runtime&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">108</span>      using __type = typename __result::type;
+<span class="line_number">109</span>      using __tag = typename __result::__invoke_type;
+<span class="line_number">110</span>      if constexpr (is_void_v&lt;_Res&gt;)
+<span class="line_number">111</span><span class="error">	std::__invoke_impl&lt;__type&gt;(__tag{}, std::forward&lt;_Callable&gt;(__fn),
+</span><span class="line_number">112</span>					std::forward&lt;_Args&gt;(__args)...);
+<span class="line_number">113</span>      else
+<span class="line_number">114</span>	return std::__invoke_impl&lt;__type&gt;(__tag{},
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/std_function.h:290<br>
+                                    <code class="cpp">std::_Function_handler&lt;void (tf::Runtime&amp;), tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;&gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, sb::tensor_eval&lt;double, double, sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt;, NumpyTensor&lt;double&gt; &gt;(sb::Tensor&lt;sb::Pcf&lt;double, double&gt;, 0&gt; const&amp;, double, NumpyTensor&lt;double&gt;&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#1}&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}&gt;::_M_invoke(std::_Any_data const&amp;, tf::Runtime&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">287</span>      static _Res
+<span class="line_number">288</span>      _M_invoke(const _Any_data&amp; __functor, _ArgTypes&amp;&amp;... __args)
+<span class="line_number">289</span>      {
+<span class="line_number">290</span><span class="error">	return std::__invoke_r&lt;_Res&gt;(*_Base::_M_get_pointer(__functor),
+</span><span class="line_number">291</span>				     std::forward&lt;_ArgTypes&gt;(__args)...);
+<span class="line_number">292</span>      }
+<span class="line_number">293</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/std_function.h:591<br>
+                                    <code class="cpp">std::function&lt;void (tf::Runtime&amp;)&gt;::operator()(tf::Runtime&amp;) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">588</span>      {
+<span class="line_number">589</span>	if (_M_empty())
+<span class="line_number">590</span>	  __throw_bad_function_call();
+<span class="line_number">591</span><span class="error">	return _M_invoker(_M_functor, std::forward&lt;_ArgTypes&gt;(__args)...);
+</span><span class="line_number">592</span>      }
+<span class="line_number">593</span>
+<span class="line_number">594</span>#if __cpp_rtti
+</code></pre>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            <pre class="code">
+<code class="c++"><span class="line_number">146</span><span class="error">    return m_data[offset];</span>
+<span class="line_number">147</span>  }
+<span class="line_number">148</span>
+<span class="line_number">149</span>  template &lt;typename... Ix&gt;
+<span class="line_number">150</span>  [[nodiscard]] T&amp; operator()(Ix... index) const
+<span class="line_number">151</span>  {
+<span class="line_number">152</span>    int64_t offset = 0;
+<span class="line_number">153</span>    size_t i = 0;
+<span class="line_number">154</span>    ((offset += static_cast&lt;int64_t&gt;(index) * m_strides[i++]), ...);
+<span class="line_number">155</span>    return m_data[offset];
+<span class="line_number">156</span>  }
+<span class="line_number">157</span>
+<span class="line_number">158</span>private:
+<span class="line_number">159</span>  T* m_data;
+<span class="line_number">160</span>  std::vector&lt;size_t&gt; m_shape;
+<span class="line_number">161</span>  std::vector&lt;int64_t&gt; m_strides;
+<span class="line_number">162</span>};
+<span class="line_number">163</span>
+<span class="line_number">164</span>static_assert(sb::IsTensor&lt;NumpyTensor&lt;int&gt;&gt;);
+<span class="line_number">165</span>
+<span class="line_number">166</span>#endif //STABLEBEAR_PY_NP_SUPPORT_H
+</code>
+            </pre>
+        </div>
+    </div>
+</body>
+
+</html>
