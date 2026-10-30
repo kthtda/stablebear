@@ -324,6 +324,11 @@ namespace sb
   template <typename Tt, typename Tv>
   [[nodiscard]] Pcf<Tt, Tv> average(const std::vector<Pcf<Tt, Tv>>& fs, size_t chunksz = 2ul)
   {
+    if (fs.empty())
+    {
+      return Pcf<Tt, Tv>();
+    }
+
     auto f = parallel_reduce(fs.begin(), fs.end(), [](const typename Pcf<Tt, Tv>::rectangle_type& rect) {
       return rect.f_value + rect.g_value;
     }, chunksz);

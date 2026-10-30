@@ -1,6 +1,6 @@
 # Backlog crash and wrong-result bugs: implementation plan
 
-Progress: 0 of 7 items, 0 of 11 points (0%)
+Progress: 1 of 7 items, 1 of 11 points (9%)
 
 Spec: the GitHub issues linked from each item. Branch:
 `fix/backlog-crash-bugs`.
@@ -11,17 +11,18 @@ enabling it could stop GPU detection on hosts without NVIDIA DRM nodes.
 
 ## Phase A: No crashes on empty input or a zero Poisson mean
 
-- [ ] **A1.** [1] #186: `subdivide()` in
+- [x] **A1.** [1] (9d7a01d0f) #186: `subdivide()` in
   `include/sbear/algorithms/subdivide.hpp` returns no blocks when
   `nItems == 0`, instead of one block ending at `SIZE_MAX`.
   Tests (`test/test_subdivide.cpp`): zero items gives no blocks, for block
   sizes 1 and 5.
 - [ ] **A2.** [2] #186: `parallel_reduce()` in
-  `include/sbear/algorithms/functional/reduce.hpp` throws
-  `std::invalid_argument` on an empty range, so `average()` in
-  `include/sbear/functional/pcf.hpp` no longer divides by zero.
+  `include/sbear/algorithms/functional/reduce.hpp` returns the zero function
+  for an empty range, and `average()` in `include/sbear/functional/pcf.hpp`
+  returns it for an empty vector instead of dividing by zero.
   Tests (`test/test_parallel_reduce.cpp`): `parallel_reduce` over an empty
-  vector throws; `average` of an empty vector throws.
+  vector gives the zero function; `average` of an empty vector gives the
+  zero function.
 - [ ] **A3.** [2] #192: evaluating a tensor at an empty time array returns an
   empty result of shape `elems.shape() + (0,)` instead of reading
   `domain_indices[0]` in `include/sbear/algorithms/tensor_eval.hpp`.

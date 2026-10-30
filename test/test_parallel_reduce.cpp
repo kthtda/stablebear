@@ -17,3 +17,21 @@ TEST(ParallelReduce, AddThreeFunctions)
 
   EXPECT_EQ(res, (pcfs[0] + pcfs[1] + pcfs[2]));
 }
+
+TEST(ParallelReduce, EmptyRangeGivesZeroFunction)
+{
+  std::vector<sb::Pcf_f64> pcfs;
+
+  auto res = sb::parallel_reduce(pcfs.begin(), pcfs.end(), [](const typename sb::Pcf_f64::rectangle_type& rect) {
+    return rect.f_value + rect.g_value;
+    });
+
+  EXPECT_EQ(res, sb::Pcf_f64());
+}
+
+TEST(ParallelReduce, AverageOfEmptyVectorGivesZeroFunction)
+{
+  std::vector<sb::Pcf_f64> pcfs;
+
+  EXPECT_EQ(sb::average(pcfs), sb::Pcf_f64());
+}
