@@ -1123,12 +1123,12 @@ namespace
     EXPECT_TRUE(sb::allclose(a, a));
   }
 
-  TYPED_TEST(AllcloseTensorTyped, ShapeMismatch)
+  TYPED_TEST(AllcloseTensorTyped, IncompatibleShapesThrow)
   {
     using T = TypeParam;
     sb::Tensor<T> a({2, 3}, T(1));
     sb::Tensor<T> b({3, 2}, T(1));
-    EXPECT_FALSE(sb::allclose(a, b));
+    EXPECT_THROW(sb::allclose(a, b), std::invalid_argument);
   }
 
   TYPED_TEST(AllcloseTensorTyped, SmallPerturbationWithinTolerance)

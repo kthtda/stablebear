@@ -2058,17 +2058,17 @@ namespace sb
     }
   }
 
+  // Broadcasts a and b together; incompatible shapes throw std::invalid_argument.
   template <FloatType T>
   bool allclose(const Tensor<T>& a, const Tensor<T>& b, T atol, T rtol)
   {
-    if (a.shape() != b.shape())
-      return false;
+    auto shape = broadcast_shapes(a.shape(), b.shape());
+    auto av = a.broadcast_to(shape);
+    auto bv = b.broadcast_to(shape);
 
     bool close = true;
-    walk(a, [&close, &a, &b, atol, rtol](const std::vector<size_t>& idx) {
-      auto aval = a(idx);
-      auto bval = b(idx);
-      return (close = detail::is_close(aval, bval, atol, rtol));
+    walk(av, [&close, &av, &bv, atol, rtol](const std::vector<size_t>& idx) {
+      return (close = detail::is_close(av(idx), bv(idx), atol, rtol));
     });
     return close;
   }
