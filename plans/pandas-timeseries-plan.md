@@ -1,12 +1,12 @@
 # pandas and NumPy input for time series: implementation plan
 
-Progress: 0 of 16 items, 0 of 25 points (0%)
+Progress: 1 of 16 items, 1 of 25 points (4%)
 
 Spec: [pandas-timeseries-spec.md](pandas-timeseries-spec.md)
 
 ## Phase A: pandas values in the existing time series API
 
-- [ ] **A1.** [1] Add pandas to the `test` group in `pyproject.toml` and to
+- [x] **A1.** [1] (033f5e862) Add pandas to the `test` group in `pyproject.toml` and to
   `docs/requirements.txt`, but not to the runtime dependencies.
   Tests: in a subprocess with `sys.modules["pandas"] = None`, stablebear
   imports and builds, windows, and embeds a `TimeSeries`.

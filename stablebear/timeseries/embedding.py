@@ -44,7 +44,7 @@ class TimeDelayEmbedding:
     ----------
     dimension : int
         The number of components ``m``, at least 1.
-    delay : float, np.timedelta64, or datetime.timedelta
+    delay : float, np.timedelta64, datetime.timedelta, or pd.Timedelta
         The time between components, positive. A number is in the series'
         unit; a duration such as ``np.timedelta64(3, "h")`` is converted to
         the unit of each series embedded. Months and years have no fixed

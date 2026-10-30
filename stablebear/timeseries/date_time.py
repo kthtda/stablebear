@@ -28,7 +28,8 @@ class DateTime:
     ----------
     value : str, np.datetime64, datetime.datetime, datetime.date, or DateTime
         The instant, such as ``"2023-01-01T12:30"``. Its resolution is kept:
-        ``"2023-01-01"`` counts days and a ``datetime`` counts microseconds.
+        ``"2023-01-01"`` counts days, a ``datetime`` counts microseconds, and
+        a ``pd.Timestamp`` counts its own unit, such as nanoseconds.
 
     Raises
     ------
@@ -53,7 +54,9 @@ class DateTime:
             raise TypeError(f"Expected a date, datetime, datetime64, or string; got {type(value).__name__}")
         if isinstance(value, datetime.datetime) and value.tzinfo is not None:
             raise ValueError("A DateTime cannot have a timezone; convert it to naive UTC first")
-        value = np.datetime64(value)
+        # A pd.Timestamp converts at its own resolution, such as nanoseconds.
+        to_datetime64 = getattr(value, "to_datetime64", None)
+        value = np.datetime64(value) if to_datetime64 is None else to_datetime64()
         if np.isnat(value):
             raise ValueError("A DateTime cannot be NaT")
         code, step = np.datetime_data(value.dtype)
@@ -98,10 +101,13 @@ class DateTime:
 
 def _duration(value, message):
     """``value`` as a positive duration: a ``np.timedelta64`` for a
-    ``timedelta`` or ``timedelta64``, kept as given, or else a float. Raises
-    ``ValueError`` with ``message`` if it is not positive, and for months and
-    years, which have no fixed length."""
-    if isinstance(value, datetime.timedelta):
+    ``timedelta``, ``pd.Timedelta``, or ``timedelta64``, kept as given, or
+    else a float. Raises ``ValueError`` with ``message`` if it is not
+    positive, and for months and years, which have no fixed length."""
+    if hasattr(value, "to_timedelta64"):
+        # A pd.Timedelta, at its own resolution, such as nanoseconds.
+        value = value.to_timedelta64()
+    elif isinstance(value, datetime.timedelta):
         value = np.timedelta64(value)
     if isinstance(value, np.timedelta64):
         if np.isnat(value):

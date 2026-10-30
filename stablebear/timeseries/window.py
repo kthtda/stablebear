@@ -65,12 +65,12 @@ class Window:
 
     Parameters
     ----------
-    size : float, np.timedelta64, or datetime.timedelta
+    size : float, np.timedelta64, datetime.timedelta, or pd.Timedelta
         The length of each window, positive. A number is in the series'
         unit; a duration such as ``np.timedelta64(25, "h")`` is converted
         to the unit of each series the windows are taken from. Months and
         years have no fixed length and are rejected.
-    step : float, np.timedelta64, or datetime.timedelta, optional
+    step : float, np.timedelta64, datetime.timedelta, or pd.Timedelta, optional
         The time between the starts of consecutive windows, positive, as
         for ``size``. Defaults to ``size``, so windows touch without
         overlapping; a smaller step makes them overlap by ``size - step``,
