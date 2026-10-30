@@ -9,7 +9,7 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "stablebear"
-version = "0.6.0b2"
+version = "0.6.0b3"
 authors = [ { name="Bjorn H. Wehlin and the stablebear contributors", email="bwehlin@kth.se" } ]
 description = "Massively parallel computations for piecewise constant functions"
 readme = "README.md"
