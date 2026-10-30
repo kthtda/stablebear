@@ -1,6 +1,6 @@
 # pandas input and durations for time series: implementation plan
 
-Progress: 9 of 36 items, 13 of 63 points (21%)
+Progress: 10 of 36 items, 15 of 63 points (24%)
 
 Specs: [pandas-timeseries-spec.md](pandas-timeseries-spec.md) (phases A, B,
 and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
@@ -71,7 +71,7 @@ and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
 
 ## Phase D: durations as input
 
-- [ ] **D1.** [2] `Times` accepts durations: a `timedelta64` array, a
+- [x] **D1.** [2] (2e0ef181b) `Times` accepts durations: a `timedelta64` array, a
   sequence of `TimeDelta`, or a `TimedeltaIndex`, converted to `unit`
   exactly; `TimeSeries` takes them as `times`. Durations and dates are by
   default in their own resolution, not seconds.
