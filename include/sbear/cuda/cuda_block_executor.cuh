@@ -140,8 +140,8 @@ namespace sb
         exec_block(blocks[i], blockDim);
       });
 
-      m_gpuThreads.run(std::move(flow));
-      m_gpuThreads.wait_for_all();
+      // get() rethrows an exception from a block, such as a failed kernel launch
+      m_gpuThreads.run(std::move(flow)).get();
 
       // Flush any pending scatter on each GPU
       for (size_t iGpu = 0; iGpu < m_nGpus; ++iGpu)

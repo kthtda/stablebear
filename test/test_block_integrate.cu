@@ -11,6 +11,7 @@
 
 #ifdef BUILD_WITH_CUDA
 #include <sbear/cuda/cuda_matrix_integrate_api.hpp>
+#include <sbear/cuda/cuda_block_executor.cuh>
 #endif
 
 #include <vector>
@@ -323,6 +324,51 @@ namespace
     task->future().get();
 
     EXPECT_TRUE(sb::allclose(out, cpuDense, Tv(this->tol)));
+  }
+
+  // ==================== error propagation ====================
+
+  // A block op whose kernel launch fails
+  struct FailingBlockOp
+  {
+    struct GpuStorage { };
+
+    GpuStorage init_gpu_storage(size_t, const sb::CudaBlockScheduler&)
+    {
+      return {};
+    }
+
+    void exec_block(GpuStorage&, const sb::BlockInfo&, sb::CudaDeviceArray<float>&, dim3)
+    {
+      throw std::runtime_error("kernel launch failed");
+    }
+  };
+
+  struct DiscardingWriter
+  {
+    void scatter(const float*, const sb::BlockInfo&) { }
+  };
+
+  TEST(CudaBlockPipeline, BlockErrorPropagates)
+  {
+    if (sb::get_num_cuda_devices() == 0)
+    {
+      GTEST_SKIP() << "No CUDA devices available";
+    }
+
+    sb::CudaBlockScheduler scheduler({
+      .nRows = 4, .nCols = 4,
+      .maxOutputElements = 16,
+      .nSplitsHint = 1,
+      .triangleMode = sb::BlockTriangleMode::Full,
+      .minBlockSide = 1
+    });
+    FailingBlockOp blockOp;
+    DiscardingWriter writer;
+    tf::Executor gpuThreads(1);
+    sb::CudaBlockPipeline<float, FailingBlockOp, DiscardingWriter> pipeline(gpuThreads, blockOp, scheduler, writer);
+
+    EXPECT_THROW(pipeline.execute(dim3(1, 1, 1)), std::runtime_error);
   }
 
 #endif // BUILD_WITH_CUDA
