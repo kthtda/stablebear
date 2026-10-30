@@ -103,6 +103,49 @@ def test_series_at_timestamp_with_a_timezone_is_at_its_utc_instant():
     assert _dated_series()(pd.Timestamp("2023-01-01T03:00", tz="Europe/Stockholm")) == 20.0
 
 
+def test_from_pandas_with_index_of_dates_counts_from_the_first_date():
+    index = pd.DatetimeIndex(["2023-01-01T01:00", "2023-01-01T02:00", "2023-01-01T04:00"])
+
+    series = TimeSeries.from_pandas(pd.Series([10.0, 20.0, 30.0], index=index), unit="h")
+
+    assert series.times == Times([0.0, 1.0, 3.0], unit="h", epoch=np.datetime64("2023-01-01T01:00", "ns"))
+    assert series.values.array_equal(sb.FloatTensor([10.0, 20.0, 30.0]))
+
+
+def test_from_pandas_with_index_of_durations_has_no_epoch():
+    index = pd.to_timedelta([0, 500, 1500], unit="ms")
+
+    series = TimeSeries.from_pandas(pd.Series([10.0, 20.0, 30.0], index=index), unit="ms")
+
+    assert series.times == Times([0.0, 500.0, 1500.0], unit="ms")
+
+
+def test_from_pandas_with_range_index_counts_in_unit():
+    series = TimeSeries.from_pandas(pd.Series([10.0, 20.0, 30.0]), unit="min")
+
+    assert series.times == Times([0.0, 1.0, 2.0], unit="min")
+
+
+@pytest.mark.parametrize("values", [
+    pytest.param(pd.Series([10.0, np.nan, 30.0]), id="nan"),
+    pytest.param(pd.Series([10.0, None, 30.0], dtype="Float64"), id="na"),
+])
+def test_from_pandas_keeps_missing_values_as_nan(values):
+    series = TimeSeries.from_pandas(values, unit="s")
+
+    assert np.array_equal(np.asarray(series.values), [10.0, np.nan, 30.0], equal_nan=True)
+
+
+@pytest.mark.parametrize("values, dtype", [
+    pytest.param([10, 20, 30], sb.int64, id="int64"),
+    pytest.param([True, False, True], sb.boolean, id="bool"),
+])
+def test_from_pandas_keeps_the_dtype(values, dtype):
+    series = TimeSeries.from_pandas(pd.Series(values), unit="s")
+
+    assert series.dtype is dtype
+
+
 def test_window_size_of_one_nanosecond_timedelta():
     series = TimeSeries(np.array([1.0, 2.0, 3.0, 4.0]), Times([0.0, 1.0, 2.0, 3.0], unit="ns"))
 

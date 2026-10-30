@@ -1,6 +1,6 @@
 # pandas and NumPy input for time series: implementation plan
 
-Progress: 4 of 16 items, 5 of 25 points (20%)
+Progress: 5 of 16 items, 6 of 25 points (24%)
 
 Spec: [pandas-timeseries-spec.md](pandas-timeseries-spec.md)
 
@@ -28,18 +28,18 @@ Spec: [pandas-timeseries-spec.md](pandas-timeseries-spec.md)
     update the `Times` and `TimeSeries` docstrings.
     Tests: aware index equals the naive UTC index; `Series` of dates equals
     its index; `NaT` raises.
-- [ ] **A4.** [1] `TimeSeries.evaluate` takes a `DatetimeIndex` or a `Series`
+- [x] **A4.** [1] (725c6b968) `TimeSeries.evaluate` takes a `DatetimeIndex` or a `Series`
   of dates as dates, not numbers.
   Tests: equals evaluating `index.to_numpy()`; aware index equals its UTC
   equivalent; aware `Timestamp`.
 
 ## Phase B: `TimeSeries.from_pandas`
 
-- [ ] **B1.** [2] `TimeSeries.from_pandas(obj, unit="s", *, epoch=None,
+- [ ] **B1.** [2] `TimeSeries.from_pandas(obj, unit="s", *,
   snap_tolerance=1e-14)` for a `Series` with a `DatetimeIndex`,
   `TimedeltaIndex`, or numeric index, with its docstring.
   Tests: datetime index equals `TimeSeries(values, Times(index))`, epoch
-  the first stamp; `epoch=` overrides it; timedelta index in `unit="ms"`;
+  the first stamp; timedelta index in `unit="ms"`;
   `RangeIndex` has no epoch; `NaN` kept; int and bool dtypes kept.
 - [ ] **B2.** [2] A `DataFrame` gives one channel per column, sharing the
   index's times, with values from `df.to_numpy()`.

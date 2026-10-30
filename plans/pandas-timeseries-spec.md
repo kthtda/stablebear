@@ -57,18 +57,19 @@ These settle the open questions of the issue.
 - `TimeSeries.evaluate` accepts a `DatetimeIndex` or a `Series` of dates as
   it accepts a `datetime64` array. Today an index is taken as numbers.
 
-### `TimeSeries.from_pandas(obj, unit="s", *, epoch=None, snap_tolerance=1e-14)`
+### `TimeSeries.from_pandas(obj, unit="s", *, snap_tolerance=1e-14)`
 
 - A `Series` gives one channel; a `DataFrame` gives one channel per column,
   in column order. The values of a `DataFrame` take one common dtype, that
   of `df.to_numpy()`, since all channels of a series have one element type.
 - The index gives the times:
-  - `DatetimeIndex`: counted from `epoch`, which defaults to the first
-    timestamp, and converted to `unit`, as for `datetime64` arrays.
-  - `TimedeltaIndex`: converted to `unit`, with no epoch unless `epoch` is
-    given.
-  - Numeric index, including `RangeIndex`: numbers in `unit`, with no epoch
-    unless `epoch` is given.
+  - `DatetimeIndex`: counted from the first timestamp, which becomes the
+    epoch, and converted to `unit`, as for `datetime64` arrays.
+  - `TimedeltaIndex`: converted to `unit`, with no epoch.
+  - Numeric index, including `RangeIndex`: numbers in `unit`, with no
+    epoch.
+
+  There is no `epoch` keyword; `with_epoch` sets or changes the epoch.
 - Raises `TypeError` for other objects, other index types (such as
   `PeriodIndex` and `MultiIndex`), and values that are not numeric or
   boolean. Raises `ValueError` for `NaT` in the index, an unsorted index, a

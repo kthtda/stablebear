@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import datetime
 import operator
+import sys
 from typing import Generic, NamedTuple, TypeVar
 
 import numpy as np
@@ -412,6 +413,50 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         return cls._from_cpp(native.from_channels(
             [part._data for part in parts], unit
         ))
+
+    @classmethod
+    def from_pandas(cls, obj, unit: str = "s", *, snap_tolerance: float = 1e-14) -> TimeSeries:
+        """Build a series from a pandas ``Series``, whose index gives the times.
+
+        A ``DatetimeIndex`` is counted from its first date and time, which
+        becomes the :attr:`epoch`; one with a timezone is converted to UTC
+        first. A ``TimedeltaIndex`` or numeric index gives times with no
+        epoch; set one with :meth:`with_epoch`.
+
+        Parameters
+        ----------
+        obj : pandas.Series
+            Observations of numbers or booleans. Missing values, ``NaN`` and
+            ``pd.NA``, are kept as ``NaN``; call ``obj.dropna()`` first to
+            drop them.
+        unit : str, optional
+            The unit of the times, as for :class:`Times`. A numeric index
+            is in this unit. Defaults to seconds.
+        snap_tolerance : float, optional
+            As for the constructor.
+
+        Raises
+        ------
+        TypeError
+            If ``obj`` is not a pandas ``Series``, or its index holds
+            neither dates, durations, nor numbers.
+        """
+        pd = sys.modules.get("pandas")
+        if pd is None or not isinstance(obj, pd.Series):
+            raise TypeError(f"Expected a pandas Series; got {type(obj).__name__}")
+        index = obj.index
+        if isinstance(index, pd.DatetimeIndex):
+            times = Times(index, unit)
+        elif isinstance(index, pd.TimedeltaIndex):
+            # Durations as dates after 1970-01-01, so Times converts them
+            # to unit in integers.
+            origin = np.datetime64(0, np.datetime_data(index.dtype)[0])
+            times = Times(origin + index.to_numpy(), unit, epoch=origin).with_epoch(None)
+        elif index.dtype.kind in "iuf":
+            times = Times(np.asarray(index, dtype=np.float64), unit)
+        else:
+            raise TypeError(f"Expected an index of dates, durations, or numbers; got {type(index).__name__}")
+        return cls(np.asarray(obj), times, snap_tolerance=snap_tolerance)
 
     def _single_channel(self):
         if self._data.n_channels != 1:
