@@ -1,15 +1,15 @@
 name: CI
 
 # CPU-only mirror of BuildAndPublishPyPI: build the sdist + CPU wheels on every
-# platform, compare them, and generate coverage + memory reports (no CUDA, no
-# PyPI publish). Coverage/valgrind reports are still pushed to the gh-pages
+# platform, compare them, and generate coverage + memory reports (no CUDA
+# wheels, no PyPI publish). Coverage/valgrind reports are still pushed to the gh-pages
 # report site via the reusable analysis workflow.
 #
 # The heavy lifting is delegated to the same reusable workflows the release
 # pipeline uses, toggled into their CPU/GitHub-runner modes:
 #   - sdist.yaml      with use_github_runners: true
 #   - wheels.yaml     with cpu_only: true
-#   - analysis.yaml   with use_github_runners: true  (skips the cuda_test job)
+#   - analysis.yaml   with use_github_runners: true  (CUDA tests on simulated GPUs)
 
 on:
   pull_request:

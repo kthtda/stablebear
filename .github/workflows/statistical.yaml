@@ -6,13 +6,22 @@ name: StatisticalTests
 
 on:
   workflow_dispatch:
+    inputs:
+      use_github_runners:
+        description: 'Use GitHub-hosted runners instead of self-hosted'
+        type: boolean
+        default: false
   workflow_call:
+    inputs:
+      use_github_runners:
+        type: boolean
+        default: false
 
 jobs:
   statistical:
     name: Statistical tests
-    runs-on: self-hosted
-    timeout-minutes: 45
+    runs-on: ${{ inputs.use_github_runners && 'ubuntu-24.04' || 'self-hosted' }}
+    timeout-minutes: ${{ inputs.use_github_runners && 120 || 45 }}
     env:
       BUILD_WITH_CUDA: 0
       SKIP_STUBGEN: 1
@@ -25,15 +34,31 @@ jobs:
         with:
           submodules: 'recursive'
 
+      - name: Set up Python (GitHub runner)
+        if: inputs.use_github_runners
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+          cache: 'pip'
+
       # The runner image provides the Python dependencies, from
       # .github/self-hosted-runner/requirements.txt.
-      - name: Set up Python venv
+      - name: Set up Python venv (self-hosted)
+        if: ${{ !inputs.use_github_runners }}
         run: |
           python3 -m venv --system-site-packages ${{github.workspace}}/.venv
           echo "${{github.workspace}}/.venv/bin" >> $GITHUB_PATH
 
+      - name: Install Python dependencies (GitHub runner)
+        if: inputs.use_github_runners
+        run: |
+          bash .github/scripts/ci-retry.sh python -m pip install --upgrade pip
+          bash .github/scripts/ci-retry.sh pip install --group test 'cmake>=3.30.3' numpy tqdm matplotlib
+
       - name: Configure CMake
-        run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=Release
+        run: |
+          cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=Release \
+            -DPython_EXECUTABLE="$(which python3)"
 
       - name: Build module
         run: cmake --build build -j $(nproc)

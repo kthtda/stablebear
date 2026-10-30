@@ -83,7 +83,7 @@ cd test && SB_RUN_STATISTICAL=1 python -m pytest python  # include large statist
 
 Tests marked `statistical` rerun probability checks with large inputs and draw
 counts. They are skipped unless `SB_RUN_STATISTICAL=1` is set. CI runs them in
-`.github/workflows/statistical.yaml` on the self-hosted runner.
+`.github/workflows/statistical.yaml`.
 
 ### C++ tests (GoogleTest)
 ```bash

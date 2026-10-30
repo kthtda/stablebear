@@ -373,16 +373,24 @@ jobs:
             !test/reports/hg-*.xml
           retention-days: 1
 
+  # On GitHub-hosted runners, which have no GPU, the tests run on GPUs
+  # simulated by PantheonSim (https://github.com/pantheongpu/pantheonsim). The
+  # simulator checks results, not performance. Kernels are built for sm_75
+  # with PTX, which every simulated NVIDIA profile from the T4 on runs.
   cuda_test:
     name: CUDA build, test & coverage
-    if: ${{ !inputs.use_github_runners }}
-    runs-on: [self-hosted, gpu, cuda12]
-    timeout-minutes: 15
+    runs-on: ${{ inputs.use_github_runners && 'ubuntu-24.04' || fromJSON('["self-hosted", "gpu", "cuda12"]') }}
+    timeout-minutes: ${{ inputs.use_github_runners && 90 || 15 }}
     env:
+      BUILD_WITH_CUDA: 1
       SKIP_STUBGEN: 1
       SKIP_BACK_COPY: 1
       ENABLE_CUDA_COVERAGE: 1
       GPUCOV_OUTPUT: ${{ github.workspace }}/covreport/cuda/cuda_%p.bin
+      # Runs the tests on the simulated GPUs, which stablebear's GPU detection
+      # cannot see
+      RUN: ${{ inputs.use_github_runners && 'vgpu run --' || '' }}
+      SB_FORCE_CUDA: ${{ inputs.use_github_runners && '1' || '0' }}
       # Make pip more tolerant of transient PyPI/network hiccups.
       PIP_RETRIES: 5
       PIP_DEFAULT_TIMEOUT: 60
@@ -391,20 +399,47 @@ jobs:
         with:
           submodules: 'recursive'
 
+      - name: Set up Python (GitHub runner)
+        if: inputs.use_github_runners
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+          cache: 'pip'
+
       # The runner image provides the Python dependencies, from
       # .github/self-hosted-runner/requirements.txt.
-      - name: Set up Python venv
+      - name: Set up Python venv (self-hosted)
+        if: ${{ !inputs.use_github_runners }}
         run: |
           python3 -m venv --system-site-packages ${{github.workspace}}/.venv
           echo "${{github.workspace}}/.venv/bin" >> $GITHUB_PATH
+
+      - name: Install Python dependencies (GitHub runner)
+        if: inputs.use_github_runners
+        run: |
+          bash .github/scripts/ci-retry.sh python -m pip install --upgrade pip
+          bash .github/scripts/ci-retry.sh pip install --group test 'cmake>=3.30.3' numpy tqdm matplotlib
 
       - name: Install gpucov and lcov
         run: |
           bash .github/scripts/ci-retry.sh pip install ./gpucov
           bash .github/scripts/ci-retry.sh bash -c "sudo apt-get update && sudo apt-get install -y lcov"
 
+      # Installs nvcc, builds the simulator and puts its CUDA libraries on
+      # LD_LIBRARY_PATH.
+      - name: Set up PantheonSim (GitHub runner)
+        if: inputs.use_github_runners
+        uses: pantheongpu/pantheonsim@840bbf6c281b973d62ea300d27c9c3fd6e929941 # v0.2.0
+        with:
+          gpu: nvidia/t4
+          count: 2
+          cuda-toolkit: '12.6'
+
       - name: Configure CMake (with CUDA coverage)
-        run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=Debug
+        run: |
+          cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=Debug \
+            -DPython_EXECUTABLE="$(which python3)" \
+            ${{ inputs.use_github_runners && '-DCMAKE_CUDA_ARCHITECTURES=75' || '' }}
 
       - name: Build module
         run: cmake --build build -j $(nproc)
@@ -418,7 +453,7 @@ jobs:
       - name: Verify CUDA backend loaded
         run: |
           cd test
-          python3 -c "import stablebear._sb_cpp as m; print('Backend:', m.__name__)"
+          $RUN python3 -c "import stablebear as sb; print('Backend:', sb.system.build_type())"
 
       - name: Clear previous CUDA coverage data
         run: gpucov zerocounters --dump "covreport/cuda/cuda_*.bin"
@@ -426,14 +461,14 @@ jobs:
       - name: Run C++ tests
         run: |
           cd test
-          ../build/sb_test
+          $RUN ../build/sb_test
 
       - name: Run Python tests
         env:
           SB_REQUIRE_CUDA: 1
         run: |
           cd test
-          python3 -m pytest . -vv
+          $RUN python3 -m pytest . -vv
 
       - name: Collect CUDA coverage
         run: |
@@ -467,10 +502,9 @@ jobs:
     name: Publish reports to GitHub Pages
     runs-on: ubuntu-24.04
     needs: [coverage_report, memory_check, cuda_test]
-    # An explicit condition is required so cuda_test being skipped (CPU-only /
-    # use_github_runners runs) doesn't skip publishing too. For the CUDA release
-    # flow cuda_test runs normally, so `!= 'failure'` keeps the prior behavior
-    # (publish only when it succeeds). The last clause avoids attempting a
+    # An explicit condition is required so a skipped cuda_test doesn't skip
+    # publishing too; `!= 'failure'` still publishes only when cuda_test
+    # succeeds if it ran. The last clause avoids attempting a
     # gh-pages push from fork pull requests, whose GITHUB_TOKEN is read-only.
     if: >-
       ${{ !cancelled()
