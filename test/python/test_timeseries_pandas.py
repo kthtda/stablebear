@@ -6,7 +6,7 @@ import pytest
 
 import stablebear as sb
 
-from stablebear.timeseries import DateTime, TimeDelayEmbedding, Times, TimeSeries, Window
+from stablebear.timeseries import DateTime, TimeDelayEmbedding, TimeDelta, Times, TimeSeries, Window
 
 pd = pytest.importorskip("pandas")
 
@@ -145,6 +145,11 @@ def test_from_pandas_keeps_the_dtype(values, dtype):
 
     assert series.dtype is dtype
 
+
+def test_time_delta_keeps_nanoseconds_of_timedelta():
+    time_delta = TimeDelta(pd.Timedelta(1, "ns"))
+
+    assert time_delta == TimeDelta(1, "ns")
 
 def test_window_size_of_one_nanosecond_timedelta():
     series = TimeSeries(np.array([1.0, 2.0, 3.0, 4.0]), Times([0.0, 1.0, 2.0, 3.0], unit="ns"))

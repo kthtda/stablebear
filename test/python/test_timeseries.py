@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 
 import stablebear as sb
-from stablebear.timeseries import DateTime, Domain, TimeDelayEmbedding, Times, TimeSeries, Window
+from stablebear.timeseries import DateTime, Domain, TimeDelayEmbedding, TimeDelta, Times, TimeSeries, Window
 
 from _element_values import TWO_ELEMENTS_OF_EVERY_DTYPE
 from _round_trip import ROUND_TRIPS
@@ -142,6 +142,94 @@ def test_date_time_with_a_timezone_is_its_utc_instant():
 def test_date_time_rejects_a_number():
     with pytest.raises(TypeError):
         DateTime(0)
+
+
+@pytest.mark.parametrize("value, unit, expected", [
+    pytest.param(np.timedelta64(90, "m"), "min", np.timedelta64(90, "m"), id="timedelta64"),
+    pytest.param(datetime.timedelta(hours=1), "us", np.timedelta64(3_600_000_000, "us"), id="timedelta"),
+])
+def test_time_delta_keeps_the_resolution_of_its_value(value, unit, expected):
+    time_delta = TimeDelta(value)
+
+    assert time_delta.unit == unit
+    assert time_delta.to_timedelta64() == expected
+    assert time_delta.to_timedelta64().dtype == expected.dtype
+
+
+def test_time_delta_from_a_count_and_a_unit():
+    time_delta = TimeDelta(3, "h")
+
+    assert time_delta.count == 3
+    assert time_delta.unit == "h"
+    assert time_delta == TimeDelta(np.timedelta64(3, "h"))
+
+
+def test_time_deltas_are_equal_only_at_the_same_resolution():
+    assert TimeDelta(1, "h") != TimeDelta(60, "min")
+    assert TimeDelta(1, "h").to_timedelta64() == TimeDelta(60, "min").to_timedelta64()
+
+
+def test_time_delta_survives_pickling():
+    time_delta = TimeDelta(90, "min")
+
+    assert pickle.loads(pickle.dumps(time_delta)) == time_delta
+
+
+def test_time_delta_repr_shows_count_and_unit():
+    assert repr(TimeDelta(90, "min")) == "TimeDelta(90, 'min')"
+
+
+@pytest.mark.parametrize("value", [
+    pytest.param(np.timedelta64(1, "W"), id="weeks"),
+    pytest.param(np.timedelta64(1, "M"), id="months"),
+    pytest.param(np.timedelta64(1, "Y"), id="years"),
+    pytest.param(np.timedelta64("NaT", "s"), id="nat"),
+])
+def test_time_delta_rejects_values_without_a_fixed_length(value):
+    with pytest.raises(ValueError):
+        TimeDelta(value)
+
+
+def test_time_delta_keeps_a_fractional_count():
+    time_delta = TimeDelta(1.5, "h")
+
+    assert time_delta.count == 1.5
+    assert time_delta.unit == "h"
+
+
+def test_time_delta_of_a_whole_float_has_an_integer_count():
+    assert repr(TimeDelta(3.0, "h")) == "TimeDelta(3, 'h')"
+
+
+def test_time_delta_with_a_fractional_count_converts_to_microseconds():
+    assert TimeDelta(1.5, "h").to_timedelta64() == np.timedelta64(5_400_000_000, "us")
+    assert TimeDelta(1.5, "h").to_timedelta64().dtype == np.dtype("timedelta64[us]")
+
+
+def test_time_delta_converts_to_a_given_resolution():
+    assert TimeDelta(1, "h").to_timedelta64("s") == np.timedelta64(3600, "s")
+    # A third of a second, to the nearest millisecond
+    assert TimeDelta(1 / 3, "s").to_timedelta64("ms") == np.timedelta64(333, "ms")
+
+
+@pytest.mark.parametrize("count", [
+    pytest.param(np.nan, id="nan"),
+    pytest.param(np.inf, id="inf"),
+])
+def test_time_delta_rejects_a_count_that_is_not_finite(count):
+    with pytest.raises(ValueError):
+        TimeDelta(count, "h")
+
+
+def test_time_delta_rejects_an_unknown_unit():
+    # NumPy's "m" is minutes, but it could be read as months.
+    with pytest.raises(ValueError, match="Unknown unit"):
+        TimeDelta(3, "m")
+
+
+def test_time_delta_rejects_a_number_without_a_unit():
+    with pytest.raises(TypeError):
+        TimeDelta(3)
 
 
 def test_times_have_no_epoch_by_default():
