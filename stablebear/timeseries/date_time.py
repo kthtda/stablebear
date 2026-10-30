@@ -346,24 +346,18 @@ def _as_array(values):
 
 
 def _duration(value, message):
-    """``value`` as a positive duration: a ``np.timedelta64`` for a
-    ``timedelta``, ``pd.Timedelta``, or ``timedelta64``, kept as given, or
+    """``value`` as a positive duration: a :class:`TimeDelta` for a duration,
+    such as a ``timedelta64`` or ``pd.Timedelta``, kept at its resolution, or
     else a float. Raises ``ValueError`` with ``message`` if it is not
-    positive, and for months and years, which have no fixed length."""
-    if hasattr(value, "to_timedelta64"):
-        # A pd.Timedelta, at its own resolution, such as nanoseconds.
-        value = value.to_timedelta64()
-    elif isinstance(value, datetime.timedelta):
-        value = np.timedelta64(value)
-    if isinstance(value, np.timedelta64):
-        if np.isnat(value):
+    positive or is ``NaT``, and for months and years, which have no fixed
+    length."""
+    if isinstance(value, np.timedelta64) and np.isnat(value):
+        raise ValueError(message)
+    duration = _as_time_delta(value)
+    if duration is not None:
+        if duration.count <= 0:
             raise ValueError(message)
-        code, _ = np.datetime_data(value.dtype)
-        if code not in _NUMPY_TO_UNIT:
-            raise ValueError(f"A duration needs a unit of fixed length, not {code!r}")
-        if value <= np.timedelta64(0, code):
-            raise ValueError(message)
-        return value
+        return duration
     value = float(value)
     if not (math.isfinite(value) and value > 0):
         raise ValueError(message)
@@ -372,7 +366,7 @@ def _duration(value, message):
 
 def _in_unit(duration, unit):
     """A duration from :func:`_duration` as a number of ``unit``, a Times unit;
-    a ``timedelta64`` is divided by ``unit`` once."""
-    if isinstance(duration, np.timedelta64):
-        return float(duration / np.timedelta64(1, _UNIT_TO_NUMPY[unit]))
+    a :class:`TimeDelta` is converted by an exact factor and rounded once."""
+    if isinstance(duration, TimeDelta):
+        return float(Fraction(duration.count) * _ATTOSECONDS[duration.unit] / _ATTOSECONDS[unit])
     return duration

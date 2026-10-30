@@ -7,7 +7,7 @@ from typing import Literal
 import numpy as np
 
 from .. import _sb_cpp as cpp
-from .date_time import _duration, _in_unit
+from .date_time import TimeDelta, _duration, _in_unit
 from .series import TimeSeries
 
 
@@ -44,7 +44,7 @@ class TimeDelayEmbedding:
     ----------
     dimension : int
         The number of components ``m``, at least 1.
-    delay : float, np.timedelta64, datetime.timedelta, or pd.Timedelta
+    delay : float, TimeDelta, np.timedelta64, datetime.timedelta, or pd.Timedelta
         The time between components, positive. A number is in the series'
         unit; a duration such as ``np.timedelta64(3, "h")`` is converted to
         the unit of each series embedded. Months and years have no fixed
@@ -59,7 +59,7 @@ class TimeDelayEmbedding:
         channel spans less than ``(m - 1) * d``.
     """
 
-    def __init__(self, dimension: int, delay: float | np.timedelta64 | datetime.timedelta,
+    def __init__(self, dimension: int, delay: float | TimeDelta | np.timedelta64 | datetime.timedelta,
                  direction: Literal["backward", "forward"] = "backward"):
         self.dimension = operator.index(dimension)
         if self.dimension < 1:

@@ -356,7 +356,7 @@ def test_embedding_with_a_duration_matches_the_same_number(delay, unit, numeric_
 
 
 def test_embedding_repr_shows_its_duration():
-    assert "delay=np.timedelta64(30,'m')" in repr(TimeDelayEmbedding(dimension=2, delay=np.timedelta64(30, "m")))
+    assert "delay=TimeDelta(30, 'min')" in repr(TimeDelayEmbedding(dimension=2, delay=np.timedelta64(30, "m")))
 
 
 def test_embedding_rejects_a_delay_without_a_fixed_length():

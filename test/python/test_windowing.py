@@ -6,7 +6,7 @@ import pytest
 
 import stablebear as sb
 from stablebear import FloatTensor
-from stablebear.timeseries import DateTime, Domain, TimeDelayEmbedding, Times, TimeSeries, Window
+from stablebear.timeseries import DateTime, Domain, TimeDelayEmbedding, TimeDelta, Times, TimeSeries, Window
 from stablebear.timeseries.series import TimeSeriesTensor
 
 from _element_values import TWO_ELEMENTS_OF_EVERY_DTYPE
@@ -657,6 +657,7 @@ def test_window_dates_include_their_origin():
 @pytest.mark.parametrize("size, step", [
     pytest.param(np.timedelta64(2, "h"), np.timedelta64(1, "h"), id="timedelta64"),
     pytest.param(datetime.timedelta(hours=2), datetime.timedelta(hours=1), id="timedelta"),
+    pytest.param(TimeDelta(2, "h"), TimeDelta(1, "h"), id="time_delta"),
 ])
 @pytest.mark.parametrize("unit, numeric_size, numeric_step", [
     pytest.param("min", 120.0, 60.0, id="minutes"),
@@ -674,12 +675,24 @@ def test_windows_of_a_duration_match_windows_of_the_same_number(size, step, unit
     assert bounds.array_equal(expected_bounds)
 
 
+def test_windows_of_a_fractional_time_delta_convert_it_exactly():
+    # A third of a second is 333333333.33... ns; rounded to microseconds it
+    # would be 333333000 ns, and the observation at 333333100 ns would fall
+    # in the second window.
+    series = TimeSeries([1.0, 2.0, 3.0], times=Times([0.0, 333_333_100.0, 1_000_000_000.0], unit="ns"))
+
+    windows = Window(size=TimeDelta(1 / 3, "s"), step=TimeDelta(1 / 3, "s"), closed="left", partial=False,
+                     anchor="start")(series)
+
+    assert windows[0].n_observations == 2
+
+
 def test_window_repr_shows_its_durations():
     window = Window(size=np.timedelta64(2, "h"), step=np.timedelta64(30, "m"), closed="left", partial=False,
                     anchor="start")
 
-    assert "size=np.timedelta64(2,'h')" in repr(window)
-    assert "step=np.timedelta64(30,'m')" in repr(window)
+    assert "size=TimeDelta(2, 'h')" in repr(window)
+    assert "step=TimeDelta(30, 'min')" in repr(window)
 
 
 @pytest.mark.parametrize("size", [

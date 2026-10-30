@@ -1,6 +1,6 @@
 # pandas input and durations for time series: implementation plan
 
-Progress: 7 of 36 items, 10 of 63 points (16%)
+Progress: 8 of 36 items, 12 of 63 points (19%)
 
 Specs: [pandas-timeseries-spec.md](pandas-timeseries-spec.md) (phases A, B,
 and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
@@ -54,7 +54,7 @@ and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
   their resolutions; `TimeDelta(3, "h")` and `TimeDelta(1.5, "h")`;
   `to_timedelta64` at its default and a given resolution; `NaT`, months,
   and `NaN` raise; pickling round trip.
-- [ ] **C2.** [2] Arithmetic on `TimeDelta` and `DateTime`, in the finer
+- [x] **C2.** [2] (5f7112a5b) Arithmetic on `TimeDelta` and `DateTime`, in the finer
   unit by exact factors.
   Tests: `TimeDelta(1, "h") + TimeDelta(30, "min")` is 90 minutes;
   negation, `* 3`, and `* 0.5`; `DateTime + TimeDelta(1.5, "h")`; `DateTime - DateTime` and `DateTime + TimeDelta`;
@@ -63,8 +63,11 @@ and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
   count to the series' unit by an exact factor, so `Window` and
   `TimeDelayEmbedding` take it without rounding.
   Tests: `Window(TimeDelta(2, "h"))` equals `Window(np.timedelta64(2, "h"))`
-  on a series in hours; `TimeDelta(1 / 3, "h")` gives the same windows as
-  `20` minutes on a series in minutes.
+  on a series in hours; a first window of `TimeDelta(1 / 3, "s")` on a
+  series in nanoseconds holds an observation at 333333100 ns.
+  Note: `_duration` now turns every duration into a `TimeDelta`, so
+  `Window.size`, `Window.step`, and `TimeDelayEmbedding.delay` already are
+  one for duration input, and their reprs show it; E6 is left with numbers.
 
 ## Phase D: durations as input
 

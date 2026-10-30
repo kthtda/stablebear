@@ -6,7 +6,7 @@ from typing import Literal, overload
 import numpy as np
 
 from .. import _sb_cpp as cpp
-from .date_time import _duration, _in_unit
+from .date_time import TimeDelta, _duration, _in_unit
 from ..base_tensor import FloatTensor
 from .series import TimeSeries, TimeSeriesTensor
 
@@ -65,12 +65,12 @@ class Window:
 
     Parameters
     ----------
-    size : float, np.timedelta64, datetime.timedelta, or pd.Timedelta
+    size : float, TimeDelta, np.timedelta64, datetime.timedelta, or pd.Timedelta
         The length of each window, positive. A number is in the series'
         unit; a duration such as ``np.timedelta64(25, "h")`` is converted
         to the unit of each series the windows are taken from. Months and
         years have no fixed length and are rejected.
-    step : float, np.timedelta64, datetime.timedelta, or pd.Timedelta, optional
+    step : float, TimeDelta, np.timedelta64, datetime.timedelta, or pd.Timedelta, optional
         The time between the starts of consecutive windows, positive, as
         for ``size``. Defaults to ``size``, so windows touch without
         overlapping; a smaller step makes them overlap by ``size - step``,
@@ -101,8 +101,8 @@ class Window:
 
     _CLOSED = {"left": (True, False), "right": (False, True), "both": (True, True), "none": (False, False)}
 
-    def __init__(self, size: float | np.timedelta64 | datetime.timedelta,
-                 step: float | np.timedelta64 | datetime.timedelta | None = None,
+    def __init__(self, size: float | TimeDelta | np.timedelta64 | datetime.timedelta,
+                 step: float | TimeDelta | np.timedelta64 | datetime.timedelta | None = None,
                  closed: Literal["left", "right", "both", "none"] | None = None, partial: bool = False,
                  anchor: Literal["start", "end"] = "end"):
         self.size = _duration(size, "The window size must be finite and positive")
