@@ -16,7 +16,7 @@ from ..functional.pcf import Pcf
 from ..nested_tensor import NestedTensor, _leaf_wrappers
 from ..point_cloud import PointCloud
 from ..symmetric_matrix import SymmetricMatrix
-from .date_time import _NUMPY_TO_UNIT, _UNIT_TO_NUMPY, DateTime, _as_array
+from .date_time import _ATTOSECONDS, _NUMPY_TO_UNIT, _UNIT_TO_NUMPY, DateTime, _as_array, _as_time_delta, _in_unit
 from ..typing import (
     _NATIVE_SUFFIX,
     barcode32,
@@ -85,10 +85,13 @@ class Times:
     Parameters
     ----------
     times : array_like
-        One-dimensional timestamps, converted to float64, or dates and
-        times: a ``datetime64`` array, or a pandas ``DatetimeIndex`` or
-        ``Series`` of dates, whose timezone, if any, is converted to UTC and
-        dropped. Dates and times are counted from
+        One-dimensional timestamps, as numbers in ``unit``, as durations, or
+        as dates and times. Durations are a ``timedelta64`` array, a
+        sequence of :class:`TimeDelta` or other durations, or a pandas
+        ``TimedeltaIndex``, converted to ``unit`` by one exact factor each.
+        Dates and times are a ``datetime64`` array, or a pandas
+        ``DatetimeIndex`` or ``Series`` of dates, whose timezone, if any, is
+        converted to UTC and dropped. Dates and times are counted from
         ``epoch``, which defaults to the first of them, and converted to
         ``unit``: the differences are taken in integers and converted by one
         exact factor, so whole multiples of ``unit`` are exact.
@@ -96,7 +99,10 @@ class Times:
         One of ``"as"``, ``"fs"``, ``"ps"``, ``"ns"``, ``"us"``, ``"ms"``,
         ``"s"``, ``"min"``, ``"h"``, and ``"d"``, or an alias such as
         ``"sec"``, ``"seconds"``, ``"hr"``, ``"\u00b5s"``, or ``"msec"``.
-        Defaults to seconds. :attr:`unit` reports the short name.
+        Defaults to the resolution of the dates or durations, such as
+        minutes for a ``timedelta64[m]`` array and nanoseconds for most
+        pandas indexes, or the finest unit of a sequence of durations;
+        numbers default to seconds. :attr:`unit` reports the short name.
     epoch : DateTime or a value DateTime accepts, optional
         The date and time that time 0 stands for, such as
         ``"2023-01-01"``. Defaults to none: the timestamps are durations.
@@ -108,11 +114,33 @@ class Times:
         increasing, or if the unit is unknown.
     """
 
-    def __init__(self, times, unit: str = "s", *, epoch=None):
+    def __init__(self, times, unit: str | None = None, *, epoch=None):
         times = _as_array(times)
-        if np.issubdtype(times.dtype, np.datetime64):
-            self._data = _times_from_datetimes(times, unit, epoch)
+        if np.issubdtype(times.dtype, np.datetime64) or np.issubdtype(times.dtype, np.timedelta64):
+            code = np.datetime_data(times.dtype)[0]
+            # The resolution of the dates or durations; one without a fixed
+            # length is rejected when they are converted.
+            unit = unit or _NUMPY_TO_UNIT.get(code, "s")
+            if np.issubdtype(times.dtype, np.datetime64):
+                self._data = _times_from_datetimes(times, unit, epoch)
+                return
+            # Durations as dates after 1970-01-01, so that they are converted
+            # to unit in integers, as dates are.
+            origin = np.datetime64(0, code)
+            self._data = _times_from_datetimes(origin + times, unit, origin).with_epoch(
+                None if epoch is None else DateTime(epoch)._data)
             return
+        if times.dtype == object and times.size > 0:
+            durations = [_as_time_delta(value) for value in times.flat]
+            if all(duration is not None for duration in durations):
+                # TimeDelta and other durations, by default in the finest of
+                # their units, each converted by an exact factor; the short
+                # name of unit, which may be an alias.
+                if unit is None:
+                    unit = min((duration.unit for duration in durations), key=_ATTOSECONDS.__getitem__)
+                short = cpp.Times(np.zeros(0), unit, None).unit
+                times = np.array([_in_unit(duration, short) for duration in durations]).reshape(times.shape)
+        unit = unit or "s"
         if epoch is not None:
             epoch = DateTime(epoch)._data
         self._data = cpp.Times(np.asarray(times, dtype=np.float64), unit, epoch)
@@ -323,11 +351,13 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         uint32, uint64, and bool are kept, other floats become float64,
         and other integers become int64.
     times : Times or array_like
-        One timestamp per observation. A plain array is in seconds; dates
-        and times, such as a ``datetime64`` array or a pandas
-        ``DatetimeIndex``, are counted in seconds from the first of them,
-        which becomes the epoch. Pass :class:`Times` to choose the unit or
-        the epoch.
+        One timestamp per observation, as :class:`Times` accepts them, in
+        the unit :class:`Times` gives them: a plain array is in seconds, and
+        durations and dates are at their own resolution, such as minutes
+        for a ``timedelta64[m]`` array. Dates and times, such as a
+        ``datetime64`` array or a pandas ``DatetimeIndex``, are counted
+        from the first of them, which becomes the epoch. Pass
+        :class:`Times` to choose the unit or the epoch.
     snap_tolerance : float, optional
         How close below an observation a query may land and still get that
         observation, relative to the magnitude of the timestamps, as in the
@@ -415,7 +445,7 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         ))
 
     @classmethod
-    def from_pandas(cls, obj, unit: str = "s", *, snap_tolerance: float = 1e-14) -> TimeSeries:
+    def from_pandas(cls, obj, unit: str | None = None, *, snap_tolerance: float = 1e-14) -> TimeSeries:
         """Build a series from a pandas ``Series``, whose index gives the times.
 
         A ``DatetimeIndex`` is counted from its first date and time, which
@@ -430,8 +460,10 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
             ``pd.NA``, are kept as ``NaN``; call ``obj.dropna()`` first to
             drop them.
         unit : str, optional
-            The unit of the times, as for :class:`Times`. A numeric index
-            is in this unit. Defaults to seconds.
+            The unit of the times, as for :class:`Times`. Defaults to the
+            resolution of a ``DatetimeIndex`` or ``TimedeltaIndex``, usually
+            nanoseconds, and to seconds for a numeric index, which is in
+            this unit.
         snap_tolerance : float, optional
             As for the constructor.
 
@@ -445,13 +477,8 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         if pd is None or not isinstance(obj, pd.Series):
             raise TypeError(f"Expected a pandas Series; got {type(obj).__name__}")
         index = obj.index
-        if isinstance(index, pd.DatetimeIndex):
+        if isinstance(index, (pd.DatetimeIndex, pd.TimedeltaIndex)):
             times = Times(index, unit)
-        elif isinstance(index, pd.TimedeltaIndex):
-            # Durations as dates after 1970-01-01, so Times converts them
-            # to unit in integers.
-            origin = np.datetime64(0, np.datetime_data(index.dtype)[0])
-            times = Times(origin + index.to_numpy(), unit, epoch=origin).with_epoch(None)
         elif index.dtype.kind in "iuf":
             times = Times(np.asarray(index, dtype=np.float64), unit)
         else:

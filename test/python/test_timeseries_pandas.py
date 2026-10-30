@@ -151,6 +151,11 @@ def test_time_delta_keeps_nanoseconds_of_timedelta():
 
     assert time_delta == TimeDelta(1, "ns")
 
+def test_times_of_timedelta_index_equal_times_of_its_array():
+    index = pd.to_timedelta([0, 500, 1500], unit="ms")
+
+    assert Times(index, unit="s") == Times(index.to_numpy(), unit="s")
+
 def test_window_size_of_one_nanosecond_timedelta():
     series = TimeSeries(np.array([1.0, 2.0, 3.0, 4.0]), Times([0.0, 1.0, 2.0, 3.0], unit="ns"))
 

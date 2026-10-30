@@ -27,9 +27,10 @@ from the first one, in hours::
 The differences between the dates are taken in integers and converted to
 the unit once, so whole multiples of the unit, such as the 0.5 h here, are
 exact. Pass ``epoch=`` to :py:class:`~stablebear.timeseries.Times` to count
-from another date and time instead. A
+from another date and time instead. Without ``unit``, the times count in
+the resolution of the dates, minutes for these, as does a
 :py:class:`~stablebear.timeseries.TimeSeries` built from a ``datetime64``
-array directly counts in seconds.
+array directly.
 
 Epochs
 ------

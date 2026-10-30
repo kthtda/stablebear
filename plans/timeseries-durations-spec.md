@@ -65,8 +65,9 @@ as a time series stores its times.
   - dates, as today;
   - numbers, which need `unit`.
 
-  For durations and dates, `unit` defaults to seconds and sets only the
-  storage.
+  For durations and dates, `unit` defaults to their resolution, such as
+  minutes for a `timedelta64[m]` array, or to the finest unit of a sequence
+  of durations, and sets only the storage.
 - **`TimeSeries(values, times)`** takes `times` as a `Times`, or durations
   or dates as `Times` accepts them. Plain numbers raise `TypeError`, naming
   `Times(numbers, unit)`.

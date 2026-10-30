@@ -21,6 +21,50 @@ def test_times_keeps_values_and_unit():
     assert times.unit == "ms"
 
 
+def test_times_of_timedelta64_are_in_its_resolution():
+    times = Times(np.array([0, 90, 150], dtype="timedelta64[m]"))
+
+    assert times == Times([0.0, 90.0, 150.0], unit="min")
+    assert times.epoch is None
+
+
+@pytest.mark.parametrize("durations, expected", [
+    pytest.param([TimeDelta(0, "s"), TimeDelta(1500, "ms"), TimeDelta(3, "s")],
+                 Times([0.0, 1500.0, 3000.0], unit="ms"), id="time_delta"),
+    pytest.param([datetime.timedelta(0), datetime.timedelta(seconds=1.5), datetime.timedelta(seconds=3)],
+                 Times([0.0, 1_500_000.0, 3_000_000.0], unit="us"), id="timedelta"),
+])
+def test_times_of_durations_are_in_their_finest_unit(durations, expected):
+    assert Times(durations) == expected
+
+
+def test_times_of_durations_in_a_given_unit_are_exact():
+    times = Times(np.array([0, 1500, 3000], dtype="timedelta64[ms]"), unit="s")
+
+    assert times == Times([0.0, 1.5, 3.0], unit="s")
+
+
+def test_times_of_durations_in_a_unit_alias():
+    assert Times([TimeDelta(1, "min"), TimeDelta(2, "min")], unit="sec") == Times([60.0, 120.0], unit="s")
+
+
+def test_times_of_durations_take_an_epoch():
+    times = Times(np.array([0, 90], dtype="timedelta64[m]"), epoch="2023-01-01")
+
+    assert times == Times([0.0, 90.0], unit="min", epoch="2023-01-01")
+
+
+def test_times_of_durations_reject_nat():
+    with pytest.raises(ValueError, match="NaT"):
+        Times(np.array([0, "NaT"], dtype="timedelta64[s]"), unit="s")
+
+
+def test_series_takes_durations_as_times():
+    series = TimeSeries([10.0, 20.0, 30.0], times=np.array([0, 1, 2], dtype="timedelta64[m]"))
+
+    assert series.times == Times([0.0, 1.0, 2.0], unit="min")
+
+
 @pytest.mark.parametrize("times, unit", [
     ([0.0, 0.0], "s"),  # duplicate timestamps
     ([1.0, 0.0], "s"),  # decreasing timestamps
@@ -568,14 +612,14 @@ def test_series_epoch_is_the_epoch_of_its_times():
     assert series.to("min").epoch == DateTime("2023-01-01")
 
 
-def test_series_from_datetimes_counts_seconds_from_the_first():
+def test_series_from_datetimes_counts_their_resolution_from_the_first():
     stamps = np.array(["2023-01-01T06:00", "2023-01-01T06:01", "2023-01-01T07:00"], dtype="datetime64[m]")
 
     series = TimeSeries([10.0, 20.0, 30.0], times=stamps)
 
-    assert series.unit == "s"
+    assert series.unit == "min"
     assert series.epoch == DateTime(np.datetime64("2023-01-01T06:00", "m"))
-    assert sb.FloatTensor([0.0, 60.0, 3600.0], dtype=sb.float64).array_equal(sb.tensor(series.times))
+    assert sb.FloatTensor([0.0, 1.0, 60.0], dtype=sb.float64).array_equal(sb.tensor(series.times))
 
 
 def _dated_series():

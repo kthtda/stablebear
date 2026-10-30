@@ -32,8 +32,8 @@ These settle the open questions of the issue.
    as `Times` rejects such timestamps. The error names `sort_index()` or
    `index.duplicated()`.
 5. **Resolution.** The default `unit`, which sets only how the times are
-   stored, is seconds, as for `datetime64` arrays, whatever the resolution
-   of the index.
+   stored, is the resolution of a `DatetimeIndex` or `TimedeltaIndex`,
+   usually nanoseconds, as for `datetime64` and `timedelta64` arrays.
 6. **Return types.** `Window` and `TimeDelayEmbedding` return the same
    stablebear types for pandas input as for a `TimeSeries`, so results feed
    straight into `compute_persistent_homology`. `evaluate` at dates returns
@@ -62,7 +62,7 @@ These settle the open questions of the issue.
 - `TimeSeries.evaluate` accepts a `DatetimeIndex` or a `Series` of dates as
   it accepts a `datetime64` array. Today an index is taken as numbers.
 
-### `TimeSeries.from_pandas(obj, unit="s", *, snap_tolerance=1e-14)`
+### `TimeSeries.from_pandas(obj, unit=None, *, snap_tolerance=1e-14)`
 
 - A `Series` gives one channel; a `DataFrame` gives one channel per column,
   in column order. Each column is converted as a `Series` is, so `pd.NA`

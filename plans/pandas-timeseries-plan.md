@@ -1,6 +1,6 @@
 # pandas input and durations for time series: implementation plan
 
-Progress: 8 of 36 items, 12 of 63 points (19%)
+Progress: 9 of 36 items, 13 of 63 points (21%)
 
 Specs: [pandas-timeseries-spec.md](pandas-timeseries-spec.md) (phases A, B,
 and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
@@ -59,7 +59,7 @@ and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
   Tests: `TimeDelta(1, "h") + TimeDelta(30, "min")` is 90 minutes;
   negation, `* 3`, and `* 0.5`; `DateTime + TimeDelta(1.5, "h")`; `DateTime - DateTime` and `DateTime + TimeDelta`;
   comparisons across resolutions.
-- [ ] **C3.** [1] `_duration` keeps a `TimeDelta` and `_in_unit` converts its
+- [x] **C3.** [1] (3d7136917) `_duration` keeps a `TimeDelta` and `_in_unit` converts its
   count to the series' unit by an exact factor, so `Window` and
   `TimeDelayEmbedding` take it without rounding.
   Tests: `Window(TimeDelta(2, "h"))` equals `Window(np.timedelta64(2, "h"))`
@@ -73,9 +73,11 @@ and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
 
 - [ ] **D1.** [2] `Times` accepts durations: a `timedelta64` array, a
   sequence of `TimeDelta`, or a `TimedeltaIndex`, converted to `unit`
-  exactly; `TimeSeries` takes them as `times`.
-  Tests: `timedelta64[ms]` in `unit="s"` gives exact seconds; `TimeDelta`
-  list equals the array; `TimedeltaIndex` equals its array.
+  exactly; `TimeSeries` takes them as `times`. Durations and dates are by
+  default in their own resolution, not seconds.
+  Tests: `timedelta64[m]` is in minutes; a `TimeDelta` list is in its
+  finest unit; `timedelta64[ms]` in `unit="s"` gives exact seconds;
+  `datetime64[m]` is in minutes; `TimedeltaIndex` equals its array.
 - [ ] **D2.** [2] `TimeSeries.evaluate` accepts durations, single or arrays,
   as times from time 0, with or without an epoch.
   Tests: `TimeDelta(90, "min")` on a series in hours equals 1.5; a
