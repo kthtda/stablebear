@@ -114,6 +114,21 @@ class TestPcfTensorEvalArray:
         )
         npt.assert_array_almost_equal(result, expected)
 
+    def test_1d_tensor_empty_times(self, dtypes):
+        pcf_dtype, np_dtype = dtypes
+        X = make_1d_tensor(pcf_dtype, np_dtype)
+        t = np.array([], dtype=np_dtype)
+        result = X(t)
+        assert result.shape == (2, 0)
+        assert result.dtype == np_dtype
+
+    def test_2d_tensor_empty_times(self, dtypes):
+        pcf_dtype, np_dtype = dtypes
+        X = make_2d_tensor(pcf_dtype, np_dtype)
+        t = np.array([], dtype=np_dtype)
+        result = X(t)
+        assert result.shape == (2, 2, 0)
+
     def test_list_of_times(self, dtypes):
         pcf_dtype, np_dtype = dtypes
         X = make_1d_tensor(pcf_dtype, np_dtype)

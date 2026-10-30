@@ -197,6 +197,11 @@ namespace sb
 
     auto chunksz = 2;
     auto sz = std::distance(begin, end);
+    if (sz == 0)
+    {
+      return pcf_type();
+    }
+
     auto blocks = subdivide(chunkszFirst , sz);
 
     auto nAll = std::accumulate(begin, end, static_cast<size_t>(0ul), [](size_t n, const pcf_type& f){ return f.points().size() + n; });

@@ -2043,7 +2043,21 @@ namespace sb
     return result;
   }
 
-  // Follows the numpy convention: |a - b| <= atol + rtol * |b|
+  namespace detail
+  {
+    // Follows the numpy convention: |a - b| <= atol + rtol * |b|, except that
+    // an infinity is close only to an equal infinity. NaN is never close.
+    template <typename T>
+    bool is_close(T a, T b, T atol, T rtol)
+    {
+      if (std::isinf(a) || std::isinf(b))
+      {
+        return a == b;
+      }
+      return std::abs(a - b) <= atol + rtol * std::abs(b);
+    }
+  }
+
   template <FloatType T>
   bool allclose(const Tensor<T>& a, const Tensor<T>& b, T atol, T rtol)
   {
@@ -2054,7 +2068,7 @@ namespace sb
     walk(a, [&close, &a, &b, atol, rtol](const std::vector<size_t>& idx) {
       auto aval = a(idx);
       auto bval = b(idx);
-      return (close = (std::abs(aval - bval) <= atol + rtol * std::abs(bval)));
+      return (close = detail::is_close(aval, bval, atol, rtol));
     });
     return close;
   }
@@ -2073,8 +2087,10 @@ namespace sb
       {
         const auto aval = a(i, j);
         const auto bval = b(i, j);
-        if (std::abs(aval - bval) > atol + rtol * std::abs(bval))
+        if (!detail::is_close(aval, bval, atol, rtol))
+        {
           return false;
+        }
       }
     }
     return true;

@@ -152,3 +152,36 @@ def test_arithmetic_preserves_dtype(dtype):
     Z = -X
     assert type(Z) is type(X)
     assert Z.dtype == X.dtype
+
+
+NUMERIC_TENSORS = [
+    (sb.FloatTensor, np.float32),
+    (sb.FloatTensor, np.float64),
+    (sb.IntTensor, np.int32),
+    (sb.IntTensor, np.int64),
+]
+NUMERIC_IDS = [f"{cls.__name__}-{np_dtype.__name__}" for cls, np_dtype in NUMERIC_TENSORS]
+
+
+@pytest.mark.parametrize("cls, np_dtype", NUMERIC_TENSORS, ids=NUMERIC_IDS)
+def test_bool_of_one_element_tensor_is_its_truth_value(cls, np_dtype):
+    assert bool(cls(np.array([0], dtype=np_dtype))) is False
+    assert bool(cls(np.array([2], dtype=np_dtype))) is True
+
+
+@pytest.mark.parametrize("cls, np_dtype", NUMERIC_TENSORS, ids=NUMERIC_IDS)
+def test_bool_of_0d_tensor_is_its_truth_value(cls, np_dtype):
+    assert bool(cls(np.array(0, dtype=np_dtype))) is False
+    assert bool(cls(np.array(2, dtype=np_dtype))) is True
+
+
+@pytest.mark.parametrize("cls, np_dtype", NUMERIC_TENSORS, ids=NUMERIC_IDS)
+def test_bool_of_two_element_tensor_raises(cls, np_dtype):
+    with pytest.raises(ValueError, match="more than one element"):
+        bool(cls(np.array([0, 2], dtype=np_dtype)))
+
+
+@pytest.mark.parametrize("cls, np_dtype", NUMERIC_TENSORS, ids=NUMERIC_IDS)
+def test_bool_of_empty_tensor_raises(cls, np_dtype):
+    with pytest.raises(ValueError, match="empty"):
+        bool(cls(np.array([], dtype=np_dtype)))

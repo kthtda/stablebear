@@ -53,6 +53,12 @@ namespace
     EXPECT_EQ(blocks[0].second, 0u);
   }
 
+  TEST(Subdivide, ZeroItemsGivesNoBlocks)
+  {
+    EXPECT_TRUE(sb::subdivide(1, 0).empty());
+    EXPECT_TRUE(sb::subdivide(5, 0).empty());
+  }
+
   TEST(Subdivide, CoverageComplete)
   {
     // Verify all items are covered for various sizes

@@ -9,6 +9,21 @@ from ..typing import barcode32, barcode64
 cpp_p = cpp.persistence
 
 
+def _as_float64_bars(bc):
+    try:
+        arr = np.asarray(bc)
+    except ValueError as e:
+        raise TypeError(f"Barcode cannot be constructed from {type(bc)}: {e}") from None
+    if arr.dtype.kind not in "iuf":
+        raise TypeError(
+            f"Barcode cannot be constructed from {type(bc)} with dtype {arr.dtype}; "
+            "expected real-valued (birth, death) pairs"
+        )
+    if arr.shape == (0,):
+        return np.zeros((0, 2), dtype=np.float64)
+    return arr.astype(np.float64, copy=False)
+
+
 class Barcode(_BinaryIoMixin):
     """A persistence barcode, i.e. a collection of bars (birth-death intervals).
 
@@ -17,41 +32,29 @@ class Barcode(_BinaryIoMixin):
 
     Parameters
     ----------
-    bc : Barcode or numpy.ndarray
-        An existing ``Barcode`` to copy, or an (n, 2) NumPy array of
-        ``(birth, death)`` pairs (``float32`` or ``float64``).
+    bc : Barcode or array_like
+        An existing ``Barcode`` to copy, or (n, 2) ``(birth, death)`` pairs,
+        such as a nested list or an array. A ``float32`` array gives a
+        ``barcode32``; any other real-valued input gives a ``barcode64``.
     """
 
     def _binary_io_data(self):
         return self._data
 
     def __init__(self, bc):
-        fail = False
         if isinstance(bc, Barcode):
             self._data = bc._data
         elif isinstance(bc, cpp_p.Barcode32 | cpp_p.Barcode64):
             self._data = bc
-        elif isinstance(bc, np.ndarray):
-            if bc.dtype == np.float32:
-                self._data = cpp_p.Barcode32(bc)
-            elif bc.dtype == np.float64:
-                self._data = cpp_p.Barcode64(bc)
-            else:
-                fail = True
+        elif isinstance(bc, np.ndarray) and bc.dtype == np.float32:
+            self._data = cpp_p.Barcode32(bc)
         else:
-            fail = True
+            self._data = cpp_p.Barcode64(_as_float64_bars(bc))
 
         if isinstance(self._data, cpp_p.Barcode32):
             self.dtype = barcode32
-        elif isinstance(self._data, cpp_p.Barcode64):
-            self.dtype = barcode64
         else:
-            fail = True
-
-        if fail:
-            raise TypeError(
-                f"Barcode cannot be constructed with object of type {type(bc)}"
-            )
+            self.dtype = barcode64
 
     def __str__(self):
         return self._data.__str__()
