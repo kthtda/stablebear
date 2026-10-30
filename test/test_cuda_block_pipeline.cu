@@ -1,12 +1,6 @@
-// Regression tests for the CUDA block pipeline (issues #188 and #195):
-// - exceptions thrown inside exec_block must propagate out of execute()
-//   instead of being swallowed by wait_for_all (issue #188);
-// - a stop request must interrupt the pipeline at block granularity
-//   (issue #195), and cancel() must keep working.
-//
-// Uses stub BlockOps against the real pipeline so the behavior is exercised
-// without depending on kernel contents. Requires a CUDA device (the pipeline
-// allocates device buffers up front).
+// Tests for the CUDA block pipeline: block execution, exceptions, stop
+// requests and cancel(). Stub BlockOps run against the real pipeline, which
+// needs a CUDA device because it allocates device buffers up front.
 
 #include <gtest/gtest.h>
 
@@ -95,8 +89,7 @@ namespace
 
   TEST_F(CudaBlockPipelineTest, ExceptionInBlockPropagatesFromExecute)
   {
-    // Issue #188: the future from run() used to be discarded, so worker
-    // exceptions vanished and execute() returned normally.
+    // An exception in a block propagates out of execute()
     auto scheduler = make_scheduler();
 
     tf::Executor gpuThreads(1);
@@ -111,8 +104,7 @@ namespace
 
   TEST_F(CudaBlockPipelineTest, StopRequestSkipsRemainingBlocks)
   {
-    // Issue #195: a stop request is polled per block; requested up front,
-    // no block may execute.
+    // A stop request made before execute() skips every block
     auto scheduler = make_scheduler();
 
     tf::Executor gpuThreads(1);
