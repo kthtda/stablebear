@@ -127,7 +127,7 @@ def test_date_time_repr_shows_the_date():
     pytest.param(np.datetime64("2023-01-02", "W"), id="weeks"),
     pytest.param(np.datetime64("2023-01", "M"), id="months"),
     pytest.param(np.datetime64("2023", "Y"), id="years"),
-    pytest.param(np.datetime64("NaT"), id="nat"),
+    pytest.param(np.datetime64("NaT", "s"), id="nat"),
 ])
 def test_date_time_rejects_values_without_a_fixed_instant_or_resolution(value):
     with pytest.raises(ValueError):

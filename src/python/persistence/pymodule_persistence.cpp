@@ -7,11 +7,11 @@
 #include "py_persistence_pair.hpp"
 #include "py_ripser.hpp"
 
-namespace py = pybind11;
+namespace nb = nanobind;
 
 namespace sb_py
 {
-  void register_module_persistence(py::module_ &m)
+  void register_module_persistence(nb::module_ &m)
   {
     auto sm = m.def_submodule("persistence");
 

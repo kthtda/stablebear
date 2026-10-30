@@ -8,7 +8,6 @@
 #include <sbear/tensor.hpp>
 #include <sbear/timeseries.hpp>
 
-#include <pybind11/stl.h>
 
 #include <optional>
 #include <string>
@@ -20,37 +19,37 @@
 
 namespace sb_py
 {
-  void register_timeseries_float(pybind11::module_& m);
-  void register_timeseries_int(pybind11::module_& m);
-  void register_timeseries_uint(pybind11::module_& m);
-  void register_timeseries_pcf(pybind11::module_& m);
-  void register_timeseries_pcf_int(pybind11::module_& m);
-  void register_timeseries_point_cloud(pybind11::module_& m);
-  void register_timeseries_distance_matrix(pybind11::module_& m);
-  void register_timeseries_symmetric_matrix(pybind11::module_& m);
-  void register_timeseries_barcode(pybind11::module_& m);
+  void register_timeseries_float(nb::module_& m);
+  void register_timeseries_int(nb::module_& m);
+  void register_timeseries_uint(nb::module_& m);
+  void register_timeseries_pcf(nb::module_& m);
+  void register_timeseries_pcf_int(nb::module_& m);
+  void register_timeseries_point_cloud(nb::module_& m);
+  void register_timeseries_distance_matrix(nb::module_& m);
+  void register_timeseries_symmetric_matrix(nb::module_& m);
+  void register_timeseries_barcode(nb::module_& m);
 
   /// Bind the channel and series classes for element type T, as
   /// register_tensor_element does for tensors.
   template <typename T>
-  void register_timeseries_element(pybind11::module_& m, const std::string& suffix)
+  void register_timeseries_element(nb::module_& m, const std::string& suffix)
   {
-    namespace py = pybind11;
+    namespace nb = nanobind;
     using Channel = sb::Channel<T>;
     using Series = sb::TimeSeries<T>;
 
-    py::class_<Channel>(m, ("TimeSeriesChannel" + suffix).c_str())
-      .def_property_readonly("times", &Channel::times)
-      .def_property_readonly("shape", [](const Channel& self) {
-        return py::tuple(py::cast(self.shape()));
+    nb::class_<Channel>(m, ("TimeSeriesChannel" + suffix).c_str())
+      .def_prop_ro("times", &Channel::times)
+      .def_prop_ro("shape", [](const Channel& self) {
+        return nb::tuple(nb::cast(self.shape()));
       })
-      .def_property_readonly("values", &Channel::values)
-      .def_property_readonly("snap_tolerance", &Channel::snap_tolerance)
+      .def_prop_ro("values", &Channel::values)
+      .def_prop_ro("snap_tolerance", &Channel::snap_tolerance)
       .def("__len__", &Channel::size);
 
-    py::class_<Series>(m, ("TimeSeries" + suffix).c_str())
-      .def(py::init<sb::Times, const sb::Tensor<T>&, sb::float64_t>(),
-           py::arg("times"), py::arg("values"), py::arg("snap_tolerance"))
+    nb::class_<Series>(m, ("TimeSeries" + suffix).c_str())
+      .def(nb::init<sb::Times, const sb::Tensor<T>&, sb::float64_t>(),
+           nb::arg("times"), nb::arg("values"), nb::arg("snap_tolerance"))
       .def_static("from_channels",
                   [](const std::vector<Series>& parts,
                      const std::optional<std::string>& unit) {
@@ -61,56 +60,56 @@ namespace sb_py
                     }
                     return Series::from_channels(parts, parsed);
                   },
-                  py::arg("parts"), py::arg("unit"))
-      .def_property_readonly("unit", [](const Series& self) {
+                  nb::arg("parts"), nb::arg("unit"))
+      .def_prop_ro("unit", [](const Series& self) {
         return std::string(sb::time_unit_name(self.unit()));
       })
       .def("to", [](const Series& self, const std::string& unit) { return self.to(sb::parse_time_unit(unit)); },
-           py::arg("unit"))
-      .def("times", &Series::times, py::arg("index"))
+           nb::arg("unit"))
+      .def("times", &Series::times, nb::arg("index"))
       .def("origin", [](const Series& self, size_t index) {
         const auto& channel = self.channel(index);
         return sb::convert_time(channel.origin(), channel.unit(), self.unit());
-      }, py::arg("index"))
-      .def("channel", &Series::channel, py::arg("index"), py::return_value_policy::reference_internal)
-      .def_property_readonly("n_channels", &Series::n_channels)
-      .def_property_readonly("epoch", [](const Series& self) { return self.channel(0).epoch(); })
-      .def("with_epoch", &Series::with_epoch, py::arg("epoch"))
-      .def_property_readonly("domain", [](const Series& self) {
+      }, nb::arg("index"))
+      .def("channel", &Series::channel, nb::arg("index"), nb::rv_policy::reference_internal)
+      .def_prop_ro("n_channels", &Series::n_channels)
+      .def_prop_ro("epoch", [](const Series& self) { return self.channel(0).epoch(); })
+      .def("with_epoch", &Series::with_epoch, nb::arg("epoch"))
+      .def_prop_ro("domain", [](const Series& self) {
         const auto domain = self.domain();
-        return py::make_tuple(domain.first, domain.last, domain.closedStart, domain.closedEnd);
+        return nb::make_tuple(domain.first, domain.last, domain.closedStart, domain.closedEnd);
       })
-      .def("select", &Series::select, py::arg("indices"))
+      .def("select", &Series::select, nb::arg("indices"))
       .def("array_equal", [](const Series& self, const Series& other) { return self.same_observations(other); },
-           py::arg("other"))
+           nb::arg("other"))
       .def("evaluate", [](const Series& self, sb::float64_t t, const std::optional<std::string>& unit) {
         return unit ? self.to(sb::parse_time_unit(*unit)).evaluate(t) : self.evaluate(t);
-      }, py::arg("t"), py::arg("unit") = py::none(), py::call_guard<py::gil_scoped_release>())
+      }, nb::arg("t"), nb::arg("unit") = nb::none(), nb::call_guard<nb::gil_scoped_release>())
       .def("evaluate", [](const Series& self, const sb::Tensor<sb::float64_t>& t,
                           const std::optional<std::string>& unit) {
         return unit ? self.to(sb::parse_time_unit(*unit)).evaluate(t) : self.evaluate(t);
-      }, py::arg("t"), py::arg("unit") = py::none(), py::call_guard<py::gil_scoped_release>())
-      .def("_save", [](const Series& self, py::object file) {
+      }, nb::arg("t"), nb::arg("unit") = nb::none(), nb::call_guard<nb::gil_scoped_release>())
+      .def("_save", [](const Series& self, nb::object file) {
         sb_py::PythonOStreamBuf buf(file);
         std::ostream os(&buf);
         sb::write_object(self, os);
-      }, py::arg("file"));
+      }, nb::arg("file"));
   }
 
   /// Bind series of element type T, and tensors and nested tensors of them,
   /// as windows give.
   template <typename T>
-  void register_typed_timeseries(pybind11::module_& m, const std::string& suffix)
+  void register_typed_timeseries(nb::module_& m, const std::string& suffix)
   {
-    namespace py = pybind11;
+    namespace nb = nanobind;
     register_timeseries_element<T>(m, suffix);
     register_tensor_element<sb::TimeSeries<T>>(m, "TimeSeries" + suffix);
-    py::reinterpret_borrow<py::class_<sb::Tensor<sb::TimeSeries<T>>>>(m.attr(("TimeSeries" + suffix + "Tensor").c_str()))
-      .def("_save", [](const sb::Tensor<sb::TimeSeries<T>>& self, py::object file) {
+    nb::borrow<nb::class_<sb::Tensor<sb::TimeSeries<T>>>>(m.attr(("TimeSeries" + suffix + "Tensor").c_str()))
+      .def("_save", [](const sb::Tensor<sb::TimeSeries<T>>& self, nb::object file) {
         sb_py::PythonOStreamBuf buf(file);
         std::ostream os(&buf);
         sb::write(self, os);
-      }, py::arg("file"));
+      }, nb::arg("file"));
   }
 }
 

@@ -4,6 +4,8 @@ import operator
 from abc import ABC, abstractmethod
 from typing import Union
 
+import numpy as np
+
 from . import _sb_cpp as cpp
 from ._binary_io import _BinaryIoMixin
 
@@ -17,6 +19,17 @@ def _unpickle_tensor(data: bytes):
     # reducer. Keep the implementation centralized in stablebear.io.
     from .io import _unpickle_tensor as unpickle
     return unpickle(data)
+
+
+def _array_for_protocol(array: np.ndarray, dtype, copy, copied: bool) -> np.ndarray:
+    """``array`` as ``__array__(dtype, copy)`` returns it. ``copied`` says
+    whether ``array`` is already a copy. ``copy=False`` raises ``ValueError``
+    when a copy is needed, and ``copy=True`` always gives a copy."""
+    converted = array if dtype is None else array.astype(dtype, copy=False)
+    copied = copied or converted is not array
+    if copy is False and copied:
+        raise ValueError("Unable to avoid copy while creating an array as requested.")
+    return converted.copy() if copy and not copied else converted
 
 CppTensor = Union[
     cpp.Float32Tensor,

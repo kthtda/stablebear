@@ -251,14 +251,14 @@ Homepage: https://github.com/taskflow/taskflow
    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
    SOFTWARE.
 
-pybind11 (3rd/pybind11/LICENSE)
+nanobind (3rd/nanobind/LICENSE)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Homepage: https://github.com/pybind/pybind11
+Homepage: https://github.com/wjakob/nanobind
 
 ::
 
-   Copyright (c) 2016 Wenzel Jakob <wenzel.jakob@epfl.ch>, All rights reserved.
+   Copyright (c) 2022 Wenzel Jakob <wenzel.jakob@epfl.ch>, All rights reserved.
 
    Redistribution and use in source and binary forms, with or without
    modification, are permitted provided that the following conditions are met:
@@ -285,8 +285,34 @@ Homepage: https://github.com/pybind/pybind11
    OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
    OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-   Please also refer to the file .github/CONTRIBUTING.md, which clarifies licensing of
-   external contributions to this project including patches, pull requests, etc.
+robin-map (3rd/nanobind/ext/robin_map/LICENSE)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Homepage: https://github.com/Tessil/robin-map
+
+::
+
+   MIT License
+
+   Copyright (c) 2017 Thibaut Goetghebuer-Planchon <tessil@gmx.com>
+
+   Permission is hereby granted, free of charge, to any person obtaining a copy
+   of this software and associated documentation files (the "Software"), to deal
+   in the Software without restriction, including without limitation the rights
+   to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+   copies of the Software, and to permit persons to whom the Software is
+   furnished to do so, subject to the following conditions:
+
+   The above copyright notice and this permission notice shall be included in all
+   copies or substantial portions of the Software.
+
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+   AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+   SOFTWARE.
 
 GoogleTest (3rd/googletest/LICENSE)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

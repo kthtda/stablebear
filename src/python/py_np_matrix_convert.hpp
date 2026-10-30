@@ -3,7 +3,7 @@
 #ifndef STABLEBEAR_PY_NP_MATRIX_CONVERT_H
 #define STABLEBEAR_PY_NP_MATRIX_CONVERT_H
 
-#include <pybind11/numpy.h>
+#include "py_np_support.hpp"
 
 #include <cstddef>
 #include <stdexcept>
@@ -15,7 +15,7 @@ namespace sb_py::detail
   struct NumpyMatrixTraits;
 
   template <typename MatT>
-  MatT matrix_from_numpy_compact(pybind11::array_t<typename MatT::value_type> array)
+  MatT matrix_from_numpy_compact(NpIn<typename MatT::value_type> array)
   {
     using Traits = NumpyMatrixTraits<MatT>;
     using T = MatT::value_type;
@@ -25,7 +25,7 @@ namespace sb_py::detail
 
     const auto storageCount = static_cast<size_t>(array.shape(0));
     const size_t n = Traits::compact_matrix_size(storageCount);
-    auto values = array.template unchecked<1>();
+    NumpyTensor<const T> values(array);
 
     MatT result(n);
     size_t k = 0;
@@ -38,7 +38,7 @@ namespace sb_py::detail
   }
 
   template <typename MatT>
-  MatT matrix_from_numpy_dense(pybind11::array_t<typename MatT::value_type> array)
+  MatT matrix_from_numpy_dense(NpIn<typename MatT::value_type> array)
   {
     using Traits = NumpyMatrixTraits<MatT>;
     using T = MatT::value_type;
@@ -50,7 +50,7 @@ namespace sb_py::detail
     if (static_cast<size_t>(array.shape(1)) != n)
       throw std::invalid_argument("Expected a square array");
 
-    auto values = array.template unchecked<2>();
+    NumpyTensor<const T> values(array);
     MatT result(n);
     for (size_t i = 0; i < n; ++i)
     {
@@ -73,7 +73,7 @@ namespace sb_py::detail
   }
 
   template <typename MatT>
-  MatT matrix_from_numpy(pybind11::array_t<typename MatT::value_type> array)
+  MatT matrix_from_numpy(NpIn<typename MatT::value_type> array)
   {
     if (array.ndim() == 1)
       return matrix_from_numpy_compact<MatT>(array);

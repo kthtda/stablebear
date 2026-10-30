@@ -3,14 +3,14 @@
 #include <sbear/random.hpp>
 #include <sbear/random_generator.hpp>
 
-#include <pybind11/numpy.h>
+#include <nanobind/ndarray.h>
 
 #include "../py_np_support.hpp"
 
 #define _USE_MATH_DEFINES
 #include <math.h>
 
-namespace py = pybind11;
+namespace nb = nanobind;
 
 namespace
 {
@@ -40,26 +40,26 @@ namespace
         sb::noisy_function(out, nPoints, func);
     }
 
-    static void register_bindings(py::handle m, const std::string& suffix)
+    static void register_bindings(nb::handle m, const std::string& suffix)
     {
-      py::class_<PyRandomBindings> cls(m, ("Random" + suffix).c_str());
+      nb::class_<PyRandomBindings> cls(m, ("Random" + suffix).c_str());
 
       cls
           .def_static("noisy_sin", &PyRandomBindings::noisy_sin,
-                       py::arg("out"), py::arg("n_points"), py::arg("generator").none(true) = py::none())
+                       nb::arg("out"), nb::arg("n_points"), nb::arg("generator").none() = nb::none())
           .def_static("noisy_cos", &PyRandomBindings::noisy_cos,
-                       py::arg("out"), py::arg("n_points"), py::arg("generator").none(true) = py::none())
+                       nb::arg("out"), nb::arg("n_points"), nb::arg("generator").none() = nb::none())
           ;
     }
   };
 
 }
 
-void sb_py::register_random(py::module_& m)
+void sb_py::register_random(nb::module_& m)
 {
-  py::class_<sb::DefaultRandomGenerator>(m, "RandomGenerator")
-      .def(py::init<>())
-      .def(py::init<uint64_t>())
+  nb::class_<sb::DefaultRandomGenerator>(m, "RandomGenerator")
+      .def(nb::init<>())
+      .def(nb::init<uint64_t>())
       .def("seed", &sb::DefaultRandomGenerator::seed)
       ;
 

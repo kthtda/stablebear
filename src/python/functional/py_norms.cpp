@@ -8,7 +8,7 @@
 
 #include <memory>
 
-namespace py = pybind11;
+namespace nb = nanobind;
 
 namespace
 {
@@ -21,7 +21,7 @@ namespace
     using TensorT = sb::Tensor<PcfT>;
     using OutTensorT = sb::Tensor<Tv>;
 
-    static py::tuple lpnorm_l1(TensorT inTensor)
+    static nb::tuple lpnorm_l1(TensorT inTensor)
     {
       auto outTensor = OutTensorT(inTensor.shape(), Tv(0));
 
@@ -30,10 +30,10 @@ namespace
       };
 
       std::unique_ptr<sb::StoppableTask<void>> task = sb_py::execute_stoppable_task<sb::ApplyFunctional<TensorT, OutTensorT, decltype(f)>>(inTensor, outTensor, f);
-      return py::make_tuple(std::move(task), outTensor);
+      return nb::make_tuple(std::move(task), outTensor);
     }
 
-    static py::tuple lpnorm_lp(TensorT inTensor, Tv p)
+    static nb::tuple lpnorm_lp(TensorT inTensor, Tv p)
     {
       auto outTensor = OutTensorT(inTensor.shape(), Tv(0));
 
@@ -42,12 +42,12 @@ namespace
       };
 
       std::unique_ptr<sb::StoppableTask<void>> task = sb_py::execute_stoppable_task<sb::ApplyFunctional<TensorT, OutTensorT, decltype(f)>>(inTensor, outTensor, f);
-      return py::make_tuple(std::move(task), outTensor);
+      return nb::make_tuple(std::move(task), outTensor);
     }
 
-    static void register_bindings(py::handle m, const std::string& suffix)
+    static void register_bindings(nb::handle m, const std::string& suffix)
     {
-      py::class_<PyNormsBindings> cls(m, ("Norms" + suffix).c_str());
+      nb::class_<PyNormsBindings> cls(m, ("Norms" + suffix).c_str());
 
       cls
           .def_static("lpnorm_l1", &PyNormsBindings::lpnorm_l1)
@@ -62,7 +62,7 @@ namespace
 namespace sb_py
 {
 
-  void register_norms(py::module_& m)
+  void register_norms(nb::module_& m)
   {
     PyNormsBindings<sb::float32_t, sb::float32_t>::register_bindings(m, "_f32_f32");
     PyNormsBindings<sb::float64_t, sb::float64_t>::register_bindings(m, "_f64_f64");

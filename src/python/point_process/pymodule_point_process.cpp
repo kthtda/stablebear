@@ -3,11 +3,11 @@
 #include "py_poisson.hpp"
 #include "py_subsample.hpp"
 
-namespace py = pybind11;
+namespace nb = nanobind;
 
 namespace sb_py
 {
-  void register_module_point_process(py::module_& m)
+  void register_module_point_process(nb::module_& m)
   {
     auto sm = m.def_submodule("point_process");
 

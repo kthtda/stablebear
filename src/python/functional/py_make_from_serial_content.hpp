@@ -1,8 +1,8 @@
 #pragma once
 
-#include "../pybind.hpp"
+#include "../nb.hpp"
 
 namespace sb_py
 {
-  void register_make_from_serial_content(pybind11::module_& m);
+  void register_make_from_serial_content(nb::module_& m);
 }

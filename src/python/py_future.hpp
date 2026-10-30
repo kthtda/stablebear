@@ -1,7 +1,7 @@
 #ifndef STABLEBEAR_PY_FUTURE_H
 #define STABLEBEAR_PY_FUTURE_H
 
-#include "pybind.hpp"
+#include "nb.hpp"
 #include <future>
 #include <chrono>
 #include <type_traits>
@@ -54,12 +54,12 @@ namespace sb_py
   };
 
   template <typename RetT>
-  void register_bindings_future(pybind11::handle m, const std::string& suffix)
+  void register_bindings_future(nb::handle m, const std::string& suffix)
   {
-    pybind11::class_<Future<RetT>>(m, ("Future" + suffix).c_str())
-      .def(pybind11::init<>())
+    nb::class_<Future<RetT>>(m, ("Future" + suffix).c_str())
+      .def(nb::init<>())
       .def("wait_for", &Future<RetT>::wait_for,
-           pybind11::call_guard<pybind11::gil_scoped_release>());
+           nb::call_guard<nb::gil_scoped_release>());
   }
 }
 

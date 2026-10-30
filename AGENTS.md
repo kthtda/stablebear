@@ -54,7 +54,7 @@ requested lower job limit.
 - Produces version-specific modules: `_sb_cuda12`, `_sb_cuda13`
 
 ### Other env vars
-- `SKIP_STUBGEN=1` — skip pybind11_stubgen (useful if it causes issues)
+- `SKIP_STUBGEN=1` — skip nanobind's stub generator (useful if it causes issues)
 - `SKIP_BACK_COPY=1` — skip symlinking built extensions back to source tree
 - `ENABLE_COVERAGE=1` — build with coverage instrumentation (GCC or Clang)
 
@@ -101,8 +101,8 @@ cd test && ../cmake-build-debug/sb_test  # run from test/ directory
 
 ### Python ↔ C++ boundary
 - **`stablebear/_sb_cpp.py`** is the runtime backend selector. It detects GPU availability, preloads libcudart if needed, and imports `_sb_cuda{12,13}` or falls back to `_sb_cpu`. All other Python code imports through this module.
-- **`src/python/`** contains pybind11 bindings. Each `py_*.cpp` wraps a corresponding C++ subsystem.
-- **`src/gpu_detect/`** is a separate pybind11 module (`_gpu_detect`) with no CUDA dependency — used to detect GPUs without requiring the CUDA toolkit.
+- **`src/python/`** contains nanobind bindings. Each `py_*.cpp` wraps a corresponding C++ subsystem.
+- **`src/gpu_detect/`** is a separate nanobind module (`_gpu_detect`) with no CUDA dependency — used to detect GPUs without requiring the CUDA toolkit.
 - NumPy array ↔ C++ tensor conversion happens in `py_np_tensor_convert.{h,cpp}` (zero-copy where possible).
 
 ### C++ core (`include/sbear/`)
@@ -117,7 +117,7 @@ cd test && ../cmake-build-debug/sb_test  # run from test/ directory
 Each tensor class supports multiple precisions via a `dtype` parameter: `PcfTensor` (dtype=pcf32/pcf64), `IntPcfTensor` (dtype=pcf32i/pcf64i), `FloatTensor` (dtype=float32/float64), `PointCloudTensor` (dtype=pcloud32/pcloud64), `BarcodeTensor` (dtype=barcode32/barcode64), `DistanceMatrixTensor` (dtype=distmat32/distmat64), `SymmetricMatrixTensor` (dtype=symmat32/symmat64). Dtype sentinels live in `stablebear/typing.py`. The C++ layer still has separate types per precision (e.g. `cpp.Float32Tensor`, `cpp.Float64Tensor`); the Python classes dispatch internally.
 
 ### Python module layers
-1. **Low**: `_sb_cpp` (backend dispatch) → `_sb_cpu` / `_sb_cudaXX` (pybind11)
+1. **Low**: `_sb_cpp` (backend dispatch) → `_sb_cpu` / `_sb_cudaXX` (nanobind)
 2. **Mid**: `pcf.py`, `tensor.py`, `_tensor_base.py` (Python wrappers)
 3. **High**: `distance.py` (`pdist`), `reductions.py` (`mean`, `max_time`), `norms.py`, `persistence/`
 
@@ -125,7 +125,7 @@ Each tensor class supports multiple precisions via a `dtype` parameter: `PcfTens
 `force_cpu()`, `limit_cpus()`, `limit_gpus()`, `set_cuda_threshold()`, `set_device_verbose()` — all configure the backend at runtime.
 
 ## Third-party submodules (`3rd/`)
-- **pybind11** — Python/C++ bindings
+- **nanobind** — Python/C++ bindings
 - **taskflow** — CPU task parallelism (header-only, included directly)
 - **googletest** — C++ unit tests
 

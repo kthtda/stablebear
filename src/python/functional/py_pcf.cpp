@@ -1,8 +1,7 @@
 #include "py_pcf.hpp"
 #include "../py_future.hpp"
 
-#include <pybind11/numpy.h>
-#include <pybind11/stl.h>
+#include <nanobind/ndarray.h>
 
 #include <sbear/functional/pcf.hpp>
 #include "../pypcf_support.hpp"
@@ -16,7 +15,7 @@
 #include <iostream>
 #include <sstream>
 
-namespace py = pybind11;
+namespace nb = nanobind;
 
 namespace
 {
@@ -105,18 +104,23 @@ namespace
   class PyBindings
   {
   public:
-    static void register_bindings(py::module_& m, const std::string& suffix)
+    static void register_bindings(nb::module_& m, const std::string& suffix)
     {
       using TPcf = sb::Pcf<Tt, Tv>;
       using point_type = typename TPcf::point_type;
 
-      py::class_<sb::Pcf<Tt, Tv>>(m, ("Pcf" + suffix).c_str(), py::buffer_protocol())
-        .def(py::init<>())
-        .def(py::init<>([](py::array_t<Tt> arr){ return sb::detail::construct_pcf<Tt, Tv>(arr); }))
+      nb::class_<sb::Pcf<Tt, Tv>> cls(m, ("Pcf" + suffix).c_str());
+      sb_py::bind_array_view(cls, [](const TPcf& self, nb::handle owner) {
+        return sb::detail::to_numpy(self, owner);
+      });
+      cls
+        .def(nb::init<>())
+        .def("__init__", [](TPcf* self, sb_py::NpIn<Tt> arr) {
+          new (self) TPcf(sb::detail::construct_pcf<Tt, Tv>(arr));
+        })
         .def("get_time_type", [](TPcf& /* self */) -> std::string { return STRINGIFY(Tt); })
         .def("get_value_type", [](TPcf& /* self */) -> std::string { return STRINGIFY(Tv); })
         .def("debug_print", &TPcf::debug_print) \
-        .def_buffer([](TPcf& self) { return sb::detail::to_numpy<sb::Pcf<Tt, Tv>>(self); })
         .def("size", [](const TPcf& self){ return self.points().size(); })
         .def("copy", [](const TPcf& self){ return TPcf(self); })
         .def("__add__", [](const TPcf& self, const TPcf& rhs) -> TPcf { return self + rhs; })
@@ -146,53 +150,56 @@ namespace
           return result;
         })
         .def("__call__", [](const TPcf& self, Tt t) -> Tv { return self.evaluate(t); })
-        .def("__call__", [](const TPcf& self, py::array_t<Tt> times) -> py::array_t<Tv> {
-          // Flatten to 1D for processing, remember original shape
-          auto original_shape = std::vector<py::ssize_t>(times.shape(), times.shape() + times.ndim());
-          auto flat_times = times.reshape({times.size()});
-          NumpyTensor<Tt> in(flat_times);
-          auto n = static_cast<size_t>(flat_times.size());
+        .def("__call__", [](const TPcf& self, nb::ndarray<const Tt, nb::c_contig, nb::device::cpu> times) {
+          // Evaluate in flat order and give the result the shape of times
+          std::vector<size_t> shape(times.ndim());
+          for (size_t i = 0; i < times.ndim(); ++i)
+          {
+            shape[i] = times.shape(i);
+          }
+          const Tt* in = times.data();
+          auto n = static_cast<size_t>(times.size());
 
           // Argsort
           std::vector<size_t> order(n);
           std::iota(order.begin(), order.end(), 0);
-          std::sort(order.begin(), order.end(), [&in](size_t a, size_t b) {
-            return in(a) < in(b);
+          std::sort(order.begin(), order.end(), [in](size_t a, size_t b) {
+            return in[a] < in[b];
           });
 
           // Build sorted times and evaluate
-          py::array_t<Tt> sorted_times({static_cast<py::ssize_t>(n)});
+          auto sorted_times = sb_py::new_array<Tt>({n});
           NumpyTensor<Tt> sorted_in(sorted_times);
           for (size_t i = 0; i < n; ++i)
           {
-            sorted_in(i) = in(order[i]);
+            sorted_in(i) = in[order[i]];
           }
 
-          py::array_t<Tv> sorted_result({static_cast<py::ssize_t>(n)});
+          auto sorted_result = sb_py::new_array<Tv>({n});
           NumpyTensor<Tv> sorted_out(sorted_result);
           self.evaluate(sorted_in, sorted_out, n);
 
           // Unsort results back to original order
-          py::array_t<Tv> flat_result({static_cast<py::ssize_t>(n)});
-          NumpyTensor<Tv> out(flat_result);
+          auto result = sb_py::new_array<Tv>(shape);
+          Tv* out = result.data();
           for (size_t i = 0; i < n; ++i)
           {
-            out(order[i]) = sorted_out(i);
+            out[order[i]] = sorted_out(i);
           }
 
-          return flat_result.reshape(original_shape);
+          return result;
         })
 
         ;
 
       using RectT = sb::Rectangle<Tt, Tv>;
-      py::class_<RectT>(m, ("Rectangle" + suffix).c_str())
-        .def(py::init<>())
-        .def(py::init<Tt, Tt, Tv, Tv>(), py::arg("left"), py::arg("right"), py::arg("f_value"), py::arg("g_value"))
-        .def_readwrite("left", &RectT::left)
-        .def_readwrite("right", &RectT::right)
-        .def_readwrite("f_value", &RectT::f_value)
-        .def_readwrite("g_value", &RectT::g_value)
+      nb::class_<RectT>(m, ("Rectangle" + suffix).c_str())
+        .def(nb::init<>())
+        .def(nb::init<Tt, Tt, Tv, Tv>(), nb::arg("left"), nb::arg("right"), nb::arg("f_value"), nb::arg("g_value"))
+        .def_rw("left", &RectT::left)
+        .def_rw("right", &RectT::right)
+        .def_rw("f_value", &RectT::f_value)
+        .def_rw("g_value", &RectT::g_value)
         .def("__repr__", [](const RectT& r) {
           std::ostringstream os;
           os << "Rectangle(left=" << r.left << ", right=" << r.right
@@ -202,9 +209,9 @@ namespace
         .def("__eq__", &RectT::operator==)
         ;
 
-      py::class_<Backend<Tt, Tv>> backend(m, ("Backend" + suffix).c_str());
+      nb::class_<Backend<Tt, Tv>> backend(m, ("Backend" + suffix).c_str());
       backend
-        .def(py::init<>())
+        .def(nb::init<>())
         .def_static("add", &Backend<Tt, Tv>::add)
         .def_static("combine", &Backend<Tt, Tv>::combine)
         .def_static("average", &Backend<Tt, Tv>::average)
@@ -216,9 +223,9 @@ namespace
         .def_static("single_linfinity_norm", &Backend<Tt, Tv>::single_linfinity_norm)
 
         .def_static("iterate_rectangles", &Backend<Tt, Tv>::iterate_rectangles,
-          py::arg("f"), py::arg("g"),
-          py::arg("a") = point_type::zero_time(),
-          py::arg("b") = point_type::infinite_time())
+          nb::arg("f"), nb::arg("g"),
+          nb::arg("a") = point_type::zero_time(),
+          nb::arg("b") = point_type::infinite_time())
         ;
 
       sb_py::register_bindings_future<TPcf>(m, suffix);
@@ -227,7 +234,7 @@ namespace
 
 }
 
-void sb_py::register_pcf(pybind11::module_& m)
+void sb_py::register_pcf(nb::module_& m)
 {
   PyBindings<sb::float32_t, sb::float32_t>::register_bindings(m, "_f32_f32");
   PyBindings<sb::float64_t, sb::float64_t>::register_bindings(m, "_f64_f64");

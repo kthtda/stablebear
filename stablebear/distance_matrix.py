@@ -6,7 +6,7 @@ import numpy as np
 
 from . import _sb_cpp as cpp
 from ._binary_io import _BinaryIoMixin
-from ._tensor_base import IndexedElementTensor
+from ._tensor_base import IndexedElementTensor, _array_for_protocol
 from .typing import float32, float64, distmat32, distmat64
 
 _dtype_to_cpp = {
@@ -199,10 +199,7 @@ class DistanceMatrix(_BinaryIoMixin):
         object in a 0-d ``object`` array instead of materializing the matrix
         (see issue #75).
         """
-        arr = self.to_dense()
-        if dtype is not None:
-            arr = arr.astype(dtype, copy=False)
-        return arr
+        return _array_for_protocol(self.to_dense(), dtype, copy, copied=True)
 
     @classmethod
     def from_dense(cls, array):

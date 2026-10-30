@@ -1,11 +1,11 @@
 #ifndef STABLEBEAR_PY_POISSON_H
 #define STABLEBEAR_PY_POISSON_H
 
-#include <pybind11/pybind11.h>
+#include "../nb.hpp"
 
 namespace sb_py
 {
-  void register_point_process_poisson(pybind11::module_& m);
+  void register_point_process_poisson(nb::module_& m);
 }
 
 #endif

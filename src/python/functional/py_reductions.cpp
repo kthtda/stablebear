@@ -7,7 +7,7 @@
 #include <stdexcept>
 #include <algorithm>
 
-namespace py = pybind11;
+namespace nb = nanobind;
 
 namespace
 {
@@ -37,9 +37,9 @@ namespace
       }, [](Tt a, Tt b){ return std::max(a,b); });
     }
 
-    static void register_bindings(py::handle m, const std::string& suffix)
+    static void register_bindings(nb::handle m, const std::string& suffix)
     {
-      py::class_<PyReductionsBindings> cls(m, ("Reductions" + suffix).c_str());
+      nb::class_<PyReductionsBindings> cls(m, ("Reductions" + suffix).c_str());
 
       cls
           .def_static("sum", &PyReductionsBindings::sum)
@@ -55,7 +55,7 @@ namespace
 namespace sb_py
 {
 
-  void register_reductions(py::module_& m)
+  void register_reductions(nb::module_& m)
   {
     PyReductionsBindings<sb::float32_t, sb::float32_t>::register_bindings(m, "_f32_f32");
     PyReductionsBindings<sb::float64_t, sb::float64_t>::register_bindings(m, "_f64_f64");

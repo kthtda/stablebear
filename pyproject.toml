@@ -2,7 +2,8 @@
 requires = [
     'scikit-build-core>=0.12',
     'numpy>=2.0',
-    'pybind11_stubgen',
+    # nanobind's stub generator needs it on Python 3.10
+    'typing_extensions; python_version < "3.11"',
 ]
 build-backend = "scikit_build_core.build"
 
@@ -35,6 +36,9 @@ test = ["pytest", "scipy"]
 [tool.scikit-build]
 minimum-version = "build-system.requires"
 cmake.build-type = "Release"
+# One abi3 wheel for CPython 3.12 and newer; older and free-threaded
+# versions still get a wheel each.
+wheel.py-api = "cp312"
 wheel.packages = ["stablebear"]
 sdist.exclude = [
     ".*",
@@ -42,13 +46,9 @@ sdist.exclude = [
     "3rd/gcc-runtime",
     "3rd/msvc-runtime",
     "3rd/googletest",
-    "3rd/pybind11/docs",
-    "3rd/pybind11/tests",
-    "3rd/pybind11/noxfile.py",
-    "3rd/pybind11/setup.*",
-    "3rd/pybind11/pybind11",
-    "3rd/pybind11/.github",
-    "3rd/pybind11/pyproject.toml",
+    "3rd/nanobind/docs",
+    "3rd/nanobind/tests",
+    "3rd/nanobind/.github",
     "3rd/taskflow/adsfund.json",
     "3rd/taskflow/images",
     "3rd/ripser",

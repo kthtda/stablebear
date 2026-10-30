@@ -1,5 +1,4 @@
-#include <pybind11/pybind11.h>
-#include <pybind11/stl.h>
+#include <nanobind/nanobind.h>
 
 #include <string>
 #include <vector>
@@ -14,7 +13,7 @@
 #pragma comment(lib, "dxgi.lib")
 #endif
 
-namespace py = pybind11;
+namespace nb = nanobind;
 
 namespace
 {
@@ -148,14 +147,14 @@ std::vector<GpuInfo> detect_gpus()
 } // anonymous namespace
 
 
-PYBIND11_MODULE(_gpu_detect, m)
+NB_MODULE(_gpu_detect, m)
 {
   m.doc() = "Detect NVIDIA GPUs without CUDA dependencies";
 
-  py::class_<GpuInfo>(m, "GpuInfo")
-    .def_readonly("name", &GpuInfo::name)
-    .def_readonly("vendor_id", &GpuInfo::vendor_id)
-    .def_readonly("device_id", &GpuInfo::device_id)
+  nb::class_<GpuInfo>(m, "GpuInfo")
+    .def_ro("name", &GpuInfo::name)
+    .def_ro("vendor_id", &GpuInfo::vendor_id)
+    .def_ro("device_id", &GpuInfo::device_id)
     .def("__repr__", [](const GpuInfo& g) {
       return "GpuInfo(name='" + g.name + "', device_id=0x" +
         ([](uint32_t v) {

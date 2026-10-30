@@ -3,7 +3,7 @@
 
 #include <sbear/task.hpp>
 
-#include "pybind.hpp"
+#include "nb.hpp"
 
 #include <memory>
 #include <string>
@@ -27,9 +27,9 @@ namespace sb_py
   /// Bind a task class that exposes its output through result(). The task
   /// must have been started; result() is complete once the task has finished.
   template <typename TaskT>
-  void register_result_task(pybind11::module_& m, const std::string& name)
+  void register_result_task(nb::module_& m, const std::string& name)
   {
-    pybind11::class_<TaskT, sb::StoppableTask<void>>(m, name.c_str())
+    nb::class_<TaskT, sb::StoppableTask<void>>(m, name.c_str())
       .def("result", [](const TaskT& task) { return task.result(); });
   }
 }

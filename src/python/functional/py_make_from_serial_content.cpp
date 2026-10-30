@@ -5,11 +5,11 @@
 #include "../py_tensor.hpp"
 #include "../py_np_support.hpp"
 
-#include <pybind11/numpy.h>
+#include <nanobind/ndarray.h>
 
 #include <iostream>
 
-namespace py = pybind11;
+namespace nb = nanobind;
 
 namespace sb_py
 {
@@ -22,55 +22,50 @@ namespace sb_py
 
   template <typename Tt, typename Tv>
   sb::Tensor<sb::Pcf<Tt, Tv>>
-  make_from_serial_content(py::array_t<Tt> content, py::array_t<detail::EnumerationDt> enumeration)
+  make_from_serial_content(sb_py::NpIn<Tt> content, sb_py::NpIn<detail::EnumerationDt> enumeration)
   {
     using PcfT = sb::Pcf<Tt, Tv>;
     using PointT = typename PcfT::point_type;
     using TensorT = sb::Tensor<PcfT>;
 
-    auto content_buf = content.request();
-    auto enumeration_buf = enumeration.request();
-
-
-    if (content_buf.ndim != 2)
+    if (content.ndim() != 2)
     {
       throw std::runtime_error("content should have 2 dimensions (content has shape " + shape_to_string(content) + ").");
     }
 
-    if (enumeration_buf.ndim < 2)
+    if (enumeration.ndim() < 2)
     {
       throw std::runtime_error("enumeration must have at least 2 dimensions");
     }
 
-    std::vector<size_t> targetShape(enumeration_buf.ndim - 1);
-    for (auto i = 0; i < enumeration_buf.ndim - 1; ++i) // Last dim is always 2 for [start, end)
+    std::vector<size_t> targetShape(enumeration.ndim() - 1);
+    for (size_t i = 0; i < enumeration.ndim() - 1; ++i) // Last dim is always 2 for [start, end)
     {
       targetShape[i] = enumeration.shape(i);
     }
 
     TensorT target(targetShape);
 
-    sb::walk(target, [&target, &content, &enumeration](const std::vector<size_t>& idx) {
+    NumpyTensor<const Tt> contentView(content);
+    NumpyTensor<const detail::EnumerationDt> enumerationView(enumeration);
 
-      auto enumerationBaseOffset = std::inner_product(idx.begin(), idx.end(), enumeration.strides(), 0_uz);
-      enumerationBaseOffset /= enumeration.itemsize();
+    sb::walk(target, [&target, &content, &contentView, &enumerationView](const std::vector<size_t>& idx) {
 
-      auto* enumerationBuf = enumeration.unchecked().data();
-
-      auto lastStride = enumeration.strides(enumeration.ndim() - 1) / enumeration.itemsize();
-
-      auto start = *(enumerationBuf + enumerationBaseOffset);
-      auto stop = *(enumerationBuf + enumerationBaseOffset + lastStride);
+      auto enumerationIdx = idx;
+      enumerationIdx.push_back(0);
+      auto start = enumerationView(enumerationIdx);
+      enumerationIdx.back() = 1;
+      auto stop = enumerationView(enumerationIdx);
 
       if (start >= stop)
       {
-        throw py::value_error("Item in index " + sb::index_to_string(idx) + " in the enumeration has start >= stop (" + std::to_string(start) + " >= " + std::to_string(stop) + ")");
+        throw std::invalid_argument("Item in index " + sb::index_to_string(idx) + " in the enumeration has start >= stop (" + std::to_string(start) + " >= " + std::to_string(stop) + ")");
       }
 
       auto numRows = static_cast<detail::EnumerationDt>(content.shape(0));
       if (start < 0 || stop > numRows)
       {
-        throw py::value_error("Item in index " + sb::index_to_string(idx) + " in the enumeration is out of range for content with " + std::to_string(numRows) + " rows (start=" + std::to_string(start) + ", stop=" + std::to_string(stop) + "); requires 0 <= start < stop <= " + std::to_string(numRows) + ".");
+        throw std::invalid_argument("Item in index " + sb::index_to_string(idx) + " in the enumeration is out of range for content with " + std::to_string(numRows) + " rows (start=" + std::to_string(start) + ", stop=" + std::to_string(stop) + "); requires 0 <= start < stop <= " + std::to_string(numRows) + ".");
       }
 
       std::vector<PointT> pts;
@@ -78,8 +73,8 @@ namespace sb_py
 
       for (auto i = start; i < stop; ++i)
       {
-        auto t = get_element(content, { static_cast<py::ssize_t>(i), static_cast<py::ssize_t>(0) });
-        auto v = get_element(content, { static_cast<py::ssize_t>(i), static_cast<py::ssize_t>(1) });
+        auto t = contentView(static_cast<size_t>(i), size_t{0});
+        auto v = contentView(static_cast<size_t>(i), size_t{1});
         pts.emplace_back(t, v);
       }
 
@@ -89,7 +84,7 @@ namespace sb_py
     return target;
   }
 
-  void register_make_from_serial_content(py::module_& m)
+  void register_make_from_serial_content(nb::module_& m)
   {
     m.def("make_from_serial_content_32", &make_from_serial_content<sb::float32_t, sb::float32_t>);
     m.def("make_from_serial_content_64", &make_from_serial_content<sb::float64_t, sb::float64_t>);

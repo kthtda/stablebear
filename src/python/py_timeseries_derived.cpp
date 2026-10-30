@@ -9,18 +9,17 @@
 #include <sbear/timeseries/time_delay_embedding.hpp>
 #include <sbear/timeseries/windowing.hpp>
 
-#include <pybind11/stl.h>
 
 #include <optional>
 #include <string>
 #include <vector>
 
-namespace py = pybind11;
+namespace nb = nanobind;
 
 namespace
 {
   template <typename T>
-  void register_derived_element(py::module_& m)
+  void register_derived_element(nb::module_& m)
   {
     m.def("evaluate_series", [](const sb::Tensor<sb::TimeSeries<T>>& series, const sb::Tensor<sb::float64_t>& t,
                                 const std::optional<std::string>& unit) {
@@ -34,22 +33,22 @@ namespace
       sb::Tensor<sb::TimeSeries<T>> converted(std::vector<size_t>(series.shape().begin(), series.shape().end()));
       sb::walk(series, [&](const std::vector<size_t>& index) { converted(index) = series(index).to(target); });
       return sb::evaluate(converted, t);
-    }, py::arg("series"), py::arg("t"), py::arg("unit") = py::none(), py::call_guard<py::gil_scoped_release>());
+    }, nb::arg("series"), nb::arg("t"), nb::arg("unit") = nb::none(), nb::call_guard<nb::gil_scoped_release>());
     m.def("delay_embed", [](const sb::TimeSeries<T>& series, size_t dimension, sb::float64_t delay, bool forward) {
       return sb::delay_embed(series, dimension, delay, forward);
-    }, py::arg("series"), py::arg("dimension"), py::arg("delay"), py::arg("forward"),
-       py::call_guard<py::gil_scoped_release>());
+    }, nb::arg("series"), nb::arg("dimension"), nb::arg("delay"), nb::arg("forward"),
+       nb::call_guard<nb::gil_scoped_release>());
     m.def("windows", [](const sb::TimeSeries<T>& series, sb::float64_t size, sb::float64_t step, bool closedStart,
                         bool closedEnd, bool partial, bool anchorEnd) {
       return sb::windows(series, size, step, closedStart, closedEnd, partial, anchorEnd);
-    }, py::arg("series"), py::arg("size"), py::arg("step"), py::arg("closed_start"), py::arg("closed_end"),
-       py::arg("partial"), py::arg("anchor_end"), py::call_guard<py::gil_scoped_release>());
+    }, nb::arg("series"), nb::arg("size"), nb::arg("step"), nb::arg("closed_start"), nb::arg("closed_end"),
+       nb::arg("partial"), nb::arg("anchor_end"), nb::call_guard<nb::gil_scoped_release>());
   }
 }
 
 namespace sb_py
 {
-  void register_timeseries_derived(py::module_& m)
+  void register_timeseries_derived(nb::module_& m)
   {
     register_derived_element<bool>(m);
     register_derived_element<sb::float32_t>(m);

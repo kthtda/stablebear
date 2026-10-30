@@ -2,50 +2,62 @@
 
 #include "py_np_support.hpp"
 
-#include <pybind11/numpy.h>
-#include <pybind11/stl.h>
 #include <sbear/random/distribution.hpp>
 #include <sbear/walk.hpp>
 
 #include <cmath>
 
-namespace py = pybind11;
+namespace nb = nanobind;
 
 namespace
 {
-  using Values = py::array_t<long double, py::array::forcecast>;
-
-  /// Evaluate weights elementwise, preserving the input shape.
-  template <typename DistributionT>
-  py::array_t<double> evaluate(const DistributionT& distribution, const Values& values)
+  /// Evaluate weights elementwise, preserving the input shape. Values are
+  /// read as long double, so that 64-bit integers keep their precision.
+  template <typename DistributionT, typename ValueT>
+  sb_py::NpArray<double> evaluate(const DistributionT& distribution, sb_py::NpIn<ValueT> values)
   {
-    const NumpyTensor<long double> input(values);
-    py::array_t<double> result(std::vector<py::ssize_t>(values.shape(), values.shape() + values.ndim()));
+    const NumpyTensor<const ValueT> input(values);
+    auto result = sb_py::new_array<double>(input.shape());
     NumpyTensor<double> output(result);
     sb::walk(input, [&](const std::vector<size_t>& index) {
-      if (!std::isfinite(input(index)))
+      const auto value = static_cast<long double>(input(index));
+      if (!std::isfinite(value))
         throw std::invalid_argument("values must be finite");
-      output(index) = static_cast<double>(distribution.weight(input(index)));
+      output(index) = static_cast<double>(distribution.weight(value));
     });
     return result;
   }
+
+  /// Bind evaluate for float64, int64, and uint64 values; other arrays are
+  /// converted to float64. float64 comes first so that a conversion never
+  /// truncates floats to integers.
+  template <typename DistributionT, typename Cls>
+  void bind_evaluate(Cls& cls)
+  {
+    cls.def("evaluate", &evaluate<DistributionT, double>, nb::arg("values"))
+      .def("evaluate", &evaluate<DistributionT, int64_t>, nb::arg("values"))
+      .def("evaluate", &evaluate<DistributionT, uint64_t>, nb::arg("values"));
+  }
 }
 
-void sb_py::register_distributions(py::module_& m)
+void sb_py::register_distributions(nb::module_& m)
 {
   using namespace sb::random;
-  py::class_<Gaussian>(m, "_Gaussian")
-    .def(py::init<double, double>(), py::arg("mean"), py::arg("std"))
-    .def_property_readonly("mean", &Gaussian::mean)
-    .def_property_readonly("std", &Gaussian::standard_deviation)
-    .def("evaluate", &evaluate<Gaussian>, py::arg("values"));
-  py::class_<Uniform>(m, "_Uniform")
-    .def(py::init<double, double>(), py::arg("start"), py::arg("end"))
-    .def_property_readonly("start", &Uniform::start)
-    .def_property_readonly("end", &Uniform::end)
-    .def("evaluate", &evaluate<Uniform>, py::arg("values"));
-  py::class_<Mixture>(m, "_Mixture")
-    .def(py::init<const std::vector<std::pair<double, Distribution>>&>(), py::arg("terms"))
-    .def_property_readonly("terms", &Mixture::terms)
-    .def("evaluate", &evaluate<Mixture>, py::arg("values"));
+  nb::class_<Gaussian> gaussian(m, "_Gaussian");
+  bind_evaluate<Gaussian>(gaussian);
+  gaussian
+    .def(nb::init<double, double>(), nb::arg("mean"), nb::arg("std"))
+    .def_prop_ro("mean", &Gaussian::mean)
+    .def_prop_ro("std", &Gaussian::standard_deviation);
+  nb::class_<Uniform> uniform(m, "_Uniform");
+  bind_evaluate<Uniform>(uniform);
+  uniform
+    .def(nb::init<double, double>(), nb::arg("start"), nb::arg("end"))
+    .def_prop_ro("start", &Uniform::start)
+    .def_prop_ro("end", &Uniform::end);
+  nb::class_<Mixture> mixture(m, "_Mixture");
+  bind_evaluate<Mixture>(mixture);
+  mixture
+    .def(nb::init<const std::vector<std::pair<double, Distribution>>&>(), nb::arg("terms"))
+    .def_prop_ro("terms", &Mixture::terms);
 }

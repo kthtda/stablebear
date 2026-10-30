@@ -7,7 +7,7 @@
 #include <sbear/persistence/compute_homological_kernel.hpp>
 #include <sbear/tensor.hpp>
 
-namespace py = pybind11;
+namespace nb = nanobind;
 
 namespace
 {
@@ -53,9 +53,9 @@ namespace
           dmats, dmatsPrime, out);
     }
 
-    static void register_bindings(py::module_ &m, const std::string &suffix)
+    static void register_bindings(nb::module_ &m, const std::string &suffix)
     {
-      py::class_<PyHomologicalKernelBindings> cls(
+      nb::class_<PyHomologicalKernelBindings> cls(
         m, ("HomologicalKernel" + suffix).c_str());
       sb_py::bind_tensor_property_pairs(
         [&]<sb::TensorProperties Properties,
@@ -79,7 +79,7 @@ namespace
 
 namespace sb_py
 {
-  void register_persistence_homological_kernel(pybind11::module_ &m)
+  void register_persistence_homological_kernel(nb::module_ &m)
   {
     PyHomologicalKernelBindings<sb::float32_t>::register_bindings(m, "32");
     PyHomologicalKernelBindings<sb::float64_t>::register_bindings(m, "64");

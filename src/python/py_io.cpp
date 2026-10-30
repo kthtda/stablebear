@@ -7,9 +7,8 @@
 #include <sbear/nested_tensor.hpp>
 #include <sbear/io.hpp>
 
-#include <pybind11/stl.h>
 
-namespace py = pybind11;
+namespace nb = nanobind;
 
 namespace
 {
@@ -18,7 +17,7 @@ namespace
   public:
     template <typename T, sb::TensorProperties Properties = sb::TensorProperty::None>
     static void save_tensor_to_file(
-        const sb::Tensor<T, Properties>& tensor, py::object file)
+        const sb::Tensor<T, Properties>& tensor, nb::object file)
     {
       sb_py::PythonOStreamBuf buf(file);
       std::ostream os(&buf);
@@ -26,14 +25,14 @@ namespace
     }
 
     template <typename T>
-    static void save_nested_tensor_to_file(const sb::NestedTensor<T>& tensor, py::object file)
+    static void save_nested_tensor_to_file(const sb::NestedTensor<T>& tensor, nb::object file)
     {
       sb_py::PythonOStreamBuf buf(file);
       std::ostream os(&buf);
       sb::write(tensor, os);
     }
 
-    static sb::io::detail::StreamableTensor load_tensor_from_file(py::object file)
+    static sb::io::detail::StreamableTensor load_tensor_from_file(nb::object file)
     {
       sb_py::PythonIStreamBuf buf(file);
       std::istream is(&buf);
@@ -41,14 +40,14 @@ namespace
     }
 
     template <typename T>
-    static void save_object_to_file(const T& obj, py::object file)
+    static void save_object_to_file(const T& obj, nb::object file)
     {
       sb_py::PythonOStreamBuf buf(file);
       std::ostream os(&buf);
       sb::write_object(obj, os);
     }
 
-    static sb::io::detail::StreamableObject load_object_from_file(py::object file)
+    static sb::io::detail::StreamableObject load_object_from_file(nb::object file)
     {
       sb_py::PythonIStreamBuf buf(file);
       std::istream is(&buf);
@@ -58,7 +57,7 @@ namespace
 
   /// Bind save_nested_tensor for every nested tensor that can be loaded.
   template <typename... Ts>
-  void def_nested_saves(py::class_<IoOps>& cls, std::type_identity<std::variant<Ts...>>)
+  void def_nested_saves(nb::class_<IoOps>& cls, std::type_identity<std::variant<Ts...>>)
   {
     ([&] {
       if constexpr (sb::is_nested_tensor_v<Ts>)
@@ -74,9 +73,9 @@ namespace
 namespace sb_py
 {
 
-  void register_io(py::module_& m)
+  void register_io(nb::module_& m)
   {
-    py::class_<IoOps> ioOps(m, "IoOps");
+    nb::class_<IoOps> ioOps(m, "IoOps");
     ioOps
         .def_static("save_float32_tensor",       &IoOps::save_tensor_to_file<sb::float32_t>)
         .def_static("save_float64_tensor",       &IoOps::save_tensor_to_file<sb::float64_t>)

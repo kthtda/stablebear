@@ -4,7 +4,7 @@
 namespace sb_py
 {
 
-  void register_symmetric_matrix(pybind11::module_& m)
+  void register_symmetric_matrix(nb::module_& m)
   {
     register_symmetric_matrix_bindings<sb::float32_t>(m, "_f32");
     register_symmetric_matrix_bindings<sb::float64_t>(m, "_f64");

@@ -1,11 +1,11 @@
 #ifndef STABLEBEAR_PY_PCF_H
 #define STABLEBEAR_PY_PCF_H
 
-#include "../pybind.hpp"
+#include "../nb.hpp"
 
 namespace sb_py
 {
-  void register_pcf(pybind11::module_& m);
+  void register_pcf(nb::module_& m);
 }
 
 #endif //STABLEBEAR_PY_PCF_H

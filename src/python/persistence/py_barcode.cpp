@@ -6,25 +6,25 @@
 #include <sbear/persistence/barcode.hpp>
 #include <sbear/persistence/barcode_tensor.hpp>
 
-#include <pybind11/numpy.h>
+#include <nanobind/ndarray.h>
 
 #include <sstream>
 
-namespace py = pybind11;
+namespace nb = nanobind;
 
 namespace
 {
 
   template <typename T>
-  void register_barcode_tensor_isomorphism(py::module_& m)
+  void register_barcode_tensor_isomorphism(nb::module_& m)
   {
     using BarcodeTensor = sb::Tensor<sb::ph::Barcode<T>>;
     m.def("barcode_tensors_are_isomorphic",
       [](const BarcodeTensor& lhs, const BarcodeTensor& rhs,
           double atol, double rtol) {
         return sb::ph::are_isomorphic(lhs, rhs, atol, rtol);
-      }, py::arg("lhs"), py::arg("rhs"),
-      py::arg("atol") = 1e-8, py::arg("rtol") = 1e-5);
+      }, nb::arg("lhs"), nb::arg("rhs"),
+      nb::arg("atol") = 1e-8, nb::arg("rtol") = 1e-5);
   }
 
   template <typename T>
@@ -33,18 +33,18 @@ namespace
   public:
     using BcT = sb::ph::Barcode<T>;
 
-    static BcT construct(py::array_t<T> in)
+    static BcT construct(sb_py::NpIn<T> in)
     {
-      NumpyTensor<T> inTensor(in);
+      NumpyTensor<const T> inTensor(in);
 
       if (inTensor.rank() != 2)
       {
-        throw py::value_error("Input should have 2 dimensions (supplied input has " + std::to_string(inTensor.rank()) + " dimension(s)).");
+        throw std::invalid_argument("Input should have 2 dimensions (supplied input has " + std::to_string(inTensor.rank()) + " dimension(s)).");
       }
 
       if (inTensor.shape(1) != 2)
       {
-        throw py::value_error("Input should have shape (n, 2). Supplied input has shape " + sb::shape_to_string(inTensor.shape()) + ".");
+        throw std::invalid_argument("Input should have shape (n, 2). Supplied input has shape " + sb::shape_to_string(inTensor.shape()) + ".");
       }
 
       std::vector<sb::ph::PersistencePair<T>> bars;
@@ -65,23 +65,17 @@ namespace
       return ss.str();
     }
 
-    static void register_bindings(py::module_& m, const std::string& suffix)
+    static void register_bindings(nb::module_& m, const std::string& suffix)
     {
-      py::class_<sb::ph::Barcode<T>>(m, ("Barcode" + suffix).c_str(), py::buffer_protocol())
-        .def(py::init([](py::array_t<T> arr) { return construct(arr); }))
-
-        .def_buffer([](const BcT& self) -> py::buffer_info {
-          auto& bars = self.bars();
-          return py::buffer_info(
-              const_cast<sb::ph::PersistencePair<T>*>(bars.data()),
-              sizeof(T),
-              py::format_descriptor<T>::format(),
-              2,
-              { static_cast<py::ssize_t>(bars.size()), py::ssize_t{2} },
-              { static_cast<py::ssize_t>(sizeof(sb::ph::PersistencePair<T>)),
-                static_cast<py::ssize_t>(sizeof(T)) }
-          );
-        })
+      nb::class_<BcT> cls(m, ("Barcode" + suffix).c_str());
+      sb_py::bind_array_view(cls, [](const BcT& self, nb::handle owner) {
+        auto& bars = self.bars();
+        constexpr auto pairStride = static_cast<int64_t>(sizeof(sb::ph::PersistencePair<T>) / sizeof(T));
+        return sb_py::array_view<T>(reinterpret_cast<T*>(const_cast<sb::ph::PersistencePair<T>*>(bars.data())),
+                                    {bars.size(), 2}, {pairStride, 1}, owner);
+      });
+      cls
+        .def("__init__", [](BcT* self, sb_py::NpIn<T> arr) { new (self) BcT(construct(arr)); })
 
         .def("__len__", [](const BcT& self) { return self.bars().size(); })
 
@@ -94,7 +88,7 @@ namespace
         })
 
         .def("is_isomorphic_to", &BcT::is_isomorphic_to,
-             py::arg("other"), py::arg("atol") = 1e-8, py::arg("rtol") = 1e-5)
+             nb::arg("other"), nb::arg("atol") = 1e-8, nb::arg("rtol") = 1e-5)
       ;
     }
   };
@@ -103,7 +97,7 @@ namespace
 namespace sb_py
 {
 
-  void register_persistence_barcode_tensor(pybind11::module_ &m)
+  void register_persistence_barcode_tensor(nb::module_ &m)
   {
     PyPersistenceBarcodeBindings<sb::float32_t>::register_bindings(m, "32");
     PyPersistenceBarcodeBindings<sb::float64_t>::register_bindings(m, "64");

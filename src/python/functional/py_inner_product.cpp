@@ -16,7 +16,7 @@
 
 #include <memory>
 
-namespace py = pybind11;
+namespace nb = nanobind;
 
 namespace
 {
@@ -28,7 +28,7 @@ namespace
     using PcfT = sb::Pcf<Tt, Tv>;
     using TensorT = sb::Tensor<PcfT>;
 
-    static py::tuple l2(TensorT fs)
+    static nb::tuple l2(TensorT fs)
     {
       auto op = sb::OperationL2InnerProduct<Tt, Tv>();
       auto n = static_cast<size_t>(fs.shape(0));
@@ -38,7 +38,7 @@ namespace
       if (n == 0)
       {
         std::unique_ptr<sb::StoppableTask<void>> empty_task = sb_py::execute_empty_task();
-        return py::make_tuple(std::move(empty_task), symmat);
+        return nb::make_tuple(std::move(empty_task), symmat);
       }
 
       auto begin = sb::begin1dValues(fs);
@@ -55,7 +55,7 @@ namespace
         std::vector<PcfT> pcfs(begin, end);
         auto task = sb::create_cuda_block_integrate_l2_kernel_task(symmat, pcfs, Tv(0), std::numeric_limits<Tv>::max());
         task->start_async(sb::default_executor());
-        return py::make_tuple(std::move(task), symmat);
+        return nb::make_tuple(std::move(task), symmat);
       }
 #endif
 
@@ -65,12 +65,12 @@ namespace
       }
 
       std::unique_ptr<sb::StoppableTask<void>> task = sb_py::execute_stoppable_task<sb::CpuPairwiseIntegrationTask<decltype(op), decltype(begin), sb::SymmetricMatrix<Tv>, true>>(symmat, begin, end, op);
-      return py::make_tuple(std::move(task), symmat);
+      return nb::make_tuple(std::move(task), symmat);
     }
 
-    static void register_bindings(py::handle m, const std::string& suffix)
+    static void register_bindings(nb::handle m, const std::string& suffix)
     {
-      py::class_<PyInnerProductBindings> cls(m, ("InnerProduct" + suffix).c_str());
+      nb::class_<PyInnerProductBindings> cls(m, ("InnerProduct" + suffix).c_str());
 
       cls
           .def_static("l2", &PyInnerProductBindings::l2)
@@ -83,7 +83,7 @@ namespace
 namespace sb_py
 {
 
-  void register_inner_product(py::module_& m)
+  void register_inner_product(nb::module_& m)
   {
     PyInnerProductBindings<sb::float32_t, sb::float32_t>::register_bindings(m, "_f32_f32");
     PyInnerProductBindings<sb::float64_t, sb::float64_t>::register_bindings(m, "_f64_f64");

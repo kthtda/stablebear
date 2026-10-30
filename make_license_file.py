@@ -49,7 +49,8 @@ def _read_preamble_text() -> str:
 # Each entry: (display name, license file path relative to repo root, URL or None)
 THIRD_PARTY = [
     ("Taskflow", "3rd/taskflow/LICENSE", "https://github.com/taskflow/taskflow"),
-    ("pybind11", "3rd/pybind11/LICENSE", "https://github.com/pybind/pybind11"),
+    ("nanobind", "3rd/nanobind/LICENSE", "https://github.com/wjakob/nanobind"),
+    ("robin-map", "3rd/nanobind/ext/robin_map/LICENSE", "https://github.com/Tessil/robin-map"),
     ("GoogleTest", "3rd/googletest/LICENSE", "https://github.com/google/googletest"),
     ("Ripser", "3rd/ripser/LICENSE", "https://github.com/Ripser/ripser"),
     ("xoroshiro128++", "3rd/xoroshiro/LICENSE", "https://prng.di.unimi.it/xoroshiro128plusplus.c"),

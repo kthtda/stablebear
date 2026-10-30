@@ -3,8 +3,7 @@
 #ifndef STABLEBEAR_PY_DISTANCE_MATRIX_H
 #define STABLEBEAR_PY_DISTANCE_MATRIX_H
 
-#include "pybind.hpp"
-#include <pybind11/numpy.h>
+#include "nb.hpp"
 
 #include <sbear/distance_matrix.hpp>
 #include <sbear/tensor.hpp>
@@ -68,20 +67,20 @@ namespace sb_py
     };
   }
 
-  void register_distance_matrix(pybind11::module_& m);
+  void register_distance_matrix(nb::module_& m);
 
   template <typename T>
-  void register_distance_matrix_bindings(pybind11::module_& m, const std::string& suffix)
+  void register_distance_matrix_bindings(nb::module_& m, const std::string& suffix)
   {
-    namespace py = pybind11;
+    namespace nb = nanobind;
     using MatT = sb::DistanceMatrix<T>;
 
-    py::class_<MatT>(m, ("DistanceMatrix" + suffix).c_str())
-      .def(py::init<size_t>(), py::arg("n"))
-      .def_property_readonly("size", &MatT::size)
-      .def_property_readonly("storage_count", &MatT::storage_count)
-      .def_property_readonly("is_indexed", &MatT::is_indexed)
-      .def_property_readonly("indices", &MatT::indices)
+    nb::class_<MatT>(m, ("DistanceMatrix" + suffix).c_str())
+      .def(nb::init<size_t>(), nb::arg("n"))
+      .def_prop_ro("size", &MatT::size)
+      .def_prop_ro("storage_count", &MatT::storage_count)
+      .def_prop_ro("is_indexed", &MatT::is_indexed)
+      .def_prop_ro("indices", &MatT::indices)
       .def("copy", &MatT::copy)
       .def("_validate_assignment", [](const MatT&, size_t i, size_t j, T value) {
         T temporary{};
@@ -96,7 +95,7 @@ namespace sb_py
       })
       .def("to_dense", [](const MatT& self) {
         auto n = self.size();
-        py::array_t<T> out({n, n});
+        auto out = new_array<T>({n, n});
         NumpyTensor<T> buf(out);
         for (size_t i = 0; i < n; ++i)
         {
@@ -111,7 +110,7 @@ namespace sb_py
       .def_static("from_dense", &detail::matrix_from_numpy_dense<MatT>)
       .def("allclose", [](const MatT& self, const MatT& rhs, double atol, double rtol){
         return sb::allclose(self, rhs, T(atol), T(rtol));
-      }, py::arg("other"), py::arg("atol") = 1e-8, py::arg("rtol") = 1e-5)
+      }, nb::arg("other"), nb::arg("atol") = 1e-8, nb::arg("rtol") = 1e-5)
       .def("__repr__", [suffix](const MatT& self) {
         std::ostringstream oss;
         oss << "DistanceMatrix" << suffix << "(size=" << self.size() << ")";

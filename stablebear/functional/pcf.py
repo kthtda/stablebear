@@ -4,6 +4,7 @@ import numpy as np
 
 from .. import _sb_cpp as cpp
 from .._binary_io import _BinaryIoMixin
+from .._tensor_base import _array_for_protocol
 from ..typing import _assert_valid_dtype, _SB_TO_NP, _NP_TO_SB, float32, float64, int32, int64, pcf32, pcf32i, pcf64, pcf64i
 
 
@@ -278,10 +279,7 @@ class Pcf(_BinaryIoMixin):
         return f"<PCF size={self._data.size()}, dtype={dtname}>"
 
     def __array__(self, dtype=None, copy=None):
-        arr = np.asarray(self._data)
-        if dtype is not None:
-            arr = arr.astype(dtype, copy=False)
-        return arr
+        return _array_for_protocol(np.asarray(self._data), dtype, copy, copied=False)
 
     def __eq__(self, other):
         return np.array_equal(self.__array__(), np.asarray(other))

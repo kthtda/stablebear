@@ -135,7 +135,14 @@ jobs:
           # Test dependencies come from the `test` dependency group in pyproject.toml.
           # CUDA builds also pin cudart to the CUDA major the wheel was built against
           # (CUDA DLLs are not ABI-compatible across majors).
-          CIBW_TEST_REQUIRES: ${{ matrix.cuda == 1 && format('cuda-toolkit[cudart]=={0}.*', matrix.cuda_major) || '' }}
+          # Python 3.10, 3.12 (the abi3 build), 3.13 and 3.14 test against the
+          # oldest NumPy with wheels for them; 3.11 and 3.15 test against the
+          # latest. NumPy 2.0 and 2.1 have no Windows ARM64 wheels.
+          CIBW_TEST_REQUIRES: >-
+            ${{ matrix.cuda == 1 && format('cuda-toolkit[cudart]=={0}.*', matrix.cuda_major) || '' }}
+            "numpy==2.0.*; (python_version == '3.10' or python_version == '3.12') and platform_machine != 'ARM64'"
+            "numpy==2.1.*; python_version == '3.13' and platform_machine != 'ARM64'"
+            "numpy==2.3.*; python_version == '3.14'"
           # The test environment lives in pyproject.toml. The statistical
           # tests run separately, in statistical.yaml.
           CIBW_MANYLINUX_X86_64_IMAGE: "manylinux_2_28"

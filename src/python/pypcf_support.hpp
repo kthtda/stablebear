@@ -5,10 +5,11 @@
 
 #include <sstream>
 
-#include "pybind.hpp"
+#include "nb.hpp"
+#include "py_np_support.hpp"
 
 
-namespace py = pybind11;
+namespace nb = nanobind;
 
 namespace sb
 {
@@ -32,30 +33,28 @@ namespace sb
     }
 
     template <typename Tt, typename Tv>
-    sb::Pcf<Tt, Tv> construct_pcf(py::array_t<Tt> arr)
+    sb::Pcf<Tt, Tv> construct_pcf(sb_py::NpIn<Tt> arr)
     {
       using point_type = typename sb::Pcf<Tt, Tv>::point_type;
 
       std::vector<sb::TimePoint<Tt, Tv>> points;
 
-      py::buffer_info buf = arr.request();
-      if (buf.size == 0)
+      if (arr.size() == 0)
       {
         points.emplace_back(static_cast<Tt>(0), static_cast<Tv>(0));
         return sb::Pcf<Tt, Tv>(std::move(points));
       }
 
-      if (buf.ndim != 2)
+      if (arr.ndim() != 2)
       {
         throw std::runtime_error("Input array should have two dimensions (time + value).");
       }
 
-      auto data = arr.template unchecked<2>();
-
-      if (buf.shape.size() == 2 && buf.shape[1] == 2)
+      if (arr.shape(1) == 2)
       {
-        points.resize(buf.shape[0]);
-        for (auto i = 0; i < buf.shape[0]; ++i)
+        NumpyTensor<const Tt> data(arr);
+        points.resize(arr.shape(0));
+        for (size_t i = 0; i < arr.shape(0); ++i)
         {
           points[i].t = data(i, 0);
           points[i].v = data(i, 1);
@@ -63,7 +62,7 @@ namespace sb
       }
       else
       {
-        throw std::runtime_error("Input array should be Nx2 (supplied shape is " + shape_to_string(buf.shape) + ").");
+        throw std::runtime_error("Input array should be Nx2 (supplied shape is " + ::shape_to_string(arr) + ").");
       }
 
       auto sortByTime = [](const point_type& a, const point_type & b){
@@ -91,40 +90,19 @@ namespace sb
       return sb::Pcf<Tt, Tv>(std::move(points));
     }
 
-#if 0
+    /// A read-only (n, 2) view of the breakpoints of `pcf`, kept alive by
+    /// the Python object `owner`.
     template <typename TPcf>
-    py::memoryview to_numpy(const TPcf& pcf)
+    auto to_numpy(const TPcf& pcf, nb::handle owner)
     {
       using TTime = typename TPcf::time_type;
       using TVal = typename TPcf::value_type;
       static_assert(std::is_same<TTime, TVal>::value, "time and value type must be the same");
 
-      return py::memoryview::from_buffer(
-        reinterpret_cast<const TTime*>(pcf.points().data()), 
-        { Py_ssize_t(2), Py_ssize_t(pcf.points().size())},
-        { Py_ssize_t(sizeof(TTime)), Py_ssize_t(sizeof(TTime) * 2)});
+      return nb::ndarray<nb::numpy, const TVal>(
+        reinterpret_cast<const TVal*>(pcf.points().data()),
+        { pcf.points().size(), size_t{2} }, owner);
     }
-#endif
-
-    template <typename TPcf>
-    py::buffer_info to_numpy(const TPcf& pcf)
-    {
-      using TTime = typename TPcf::time_type;
-      using TVal = typename TPcf::value_type;
-      static_assert(std::is_same<TTime, TVal>::value, "time and value type must be the same");
-
-      return py::buffer_info(
-        const_cast<void*>(reinterpret_cast<const void*>(pcf.points().data())),
-        sizeof(TVal),
-        py::format_descriptor<TVal>::format(),
-        py::ssize_t(2),
-        { py::ssize_t(pcf.points().size()), py::ssize_t(2) },
-        { py::ssize_t(2 * sizeof(TVal)), py::ssize_t(sizeof(TVal)) },
-        true
-      );
-    }
-
-
   }
 }
 

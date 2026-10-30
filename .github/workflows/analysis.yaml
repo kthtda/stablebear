@@ -128,7 +128,7 @@ jobs:
           EXTRA_OBJS="$(find build -type f \( -name 'sb_test' -o -name '_sb*.so' \) | tail -n +2 | sed 's/^/-object /' | tr '\n' ' ')"
           echo "Objects for llvm-cov: $FIRST_OBJ $EXTRA_OBJS"
           INSTR_PROFILE="-instr-profile=covreport/cpp/default.profdata"
-          IGNORE="-ignore-filename-regex=(3rd/|/usr/include/|.*/site-packages/|.*/pybind11/|test/)"
+          IGNORE="-ignore-filename-regex=(3rd/|/usr/include/|.*/site-packages/|.*/nanobind/|test/)"
           PATH_EQUIV="-path-equivalence=${{github.workspace}},."
           # Generate compact HTML report (line counts only)
           mkdir -p covreport/cpp/detailed
@@ -258,8 +258,8 @@ jobs:
           valgrind --xml=yes --xml-file=./reports/vg-pytest.xml \
             --suppressions=${{github.workspace}}/test/vg_py.supp \
             --suppressions=${{github.workspace}}/test/reports/vg_cpython.supp \
-            --suppressions=${{github.workspace}}/3rd/pybind11/tests/valgrind-python.supp \
-            --suppressions=${{github.workspace}}/3rd/pybind11/tests/valgrind-numpy-scipy.supp \
+            --suppressions=${{github.workspace}}/test/vg_python_extra.supp \
+            --suppressions=${{github.workspace}}/test/vg_numpy_scipy.supp \
             python -m pytest . -vv -s 2>&1 | tee ./reports/vg-pytest.log || true
 
       - name: Run valgrind on GTest
@@ -268,8 +268,8 @@ jobs:
           valgrind --xml=yes --xml-file=./reports/vg-gtest.xml \
             --suppressions=${{github.workspace}}/test/vg_py.supp \
             --suppressions=${{github.workspace}}/test/reports/vg_cpython.supp \
-            --suppressions=${{github.workspace}}/3rd/pybind11/tests/valgrind-python.supp \
-            --suppressions=${{github.workspace}}/3rd/pybind11/tests/valgrind-numpy-scipy.supp \
+            --suppressions=${{github.workspace}}/test/vg_python_extra.supp \
+            --suppressions=${{github.workspace}}/test/vg_numpy_scipy.supp \
             ../build/sb_test 2>&1 | tee ./reports/vg-gtest.log || true
 
       - name: Run helgrind on Pytest
@@ -293,15 +293,15 @@ jobs:
             --log-file=./reports/vg-pytest-supp.log \
             --suppressions=${{github.workspace}}/test/vg_py.supp \
             --suppressions=${{github.workspace}}/test/reports/vg_cpython.supp \
-            --suppressions=${{github.workspace}}/3rd/pybind11/tests/valgrind-python.supp \
-            --suppressions=${{github.workspace}}/3rd/pybind11/tests/valgrind-numpy-scipy.supp \
+            --suppressions=${{github.workspace}}/test/vg_python_extra.supp \
+            --suppressions=${{github.workspace}}/test/vg_numpy_scipy.supp \
             python -m pytest . -vv -s || true
           valgrind --gen-suppressions=all \
             --log-file=./reports/vg-gtest-supp.log \
             --suppressions=${{github.workspace}}/test/vg_py.supp \
             --suppressions=${{github.workspace}}/test/reports/vg_cpython.supp \
-            --suppressions=${{github.workspace}}/3rd/pybind11/tests/valgrind-python.supp \
-            --suppressions=${{github.workspace}}/3rd/pybind11/tests/valgrind-numpy-scipy.supp \
+            --suppressions=${{github.workspace}}/test/vg_python_extra.supp \
+            --suppressions=${{github.workspace}}/test/vg_numpy_scipy.supp \
             ../build/sb_test || true
           valgrind --tool=helgrind --gen-suppressions=all \
             --log-file=./reports/hg-pytest-supp.log \

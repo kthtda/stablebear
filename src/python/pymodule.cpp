@@ -1,4 +1,4 @@
-#include "pybind.hpp"
+#include "nb.hpp"
 
 #include <sbear/executor.hpp>
 #include <sbear/task.hpp>
@@ -31,7 +31,7 @@
 
 #include <sbear/settings.hpp>
 
-namespace py = pybind11;
+namespace nb = nanobind;
 
 namespace
 {
@@ -93,14 +93,14 @@ namespace
   }
 
   template <typename RetT>
-  static void register_bindings_stoppable_task(py::handle m, const std::string& suffix)
+  static void register_bindings_stoppable_task(nb::handle m, const std::string& suffix)
   {
-    py::class_<sb::StoppableTask<RetT>> cls(m, ("StoppableTask" + suffix).c_str());
+    nb::class_<sb::StoppableTask<RetT>> cls(m, ("StoppableTask" + suffix).c_str());
 
     cls
         .def("request_stop", &sb::StoppableTask<RetT>::request_stop)
         .def("wait_for", [](sb::StoppableTask<RetT>& self, int ms) { return self.wait_for(std::chrono::milliseconds(ms)); },
-             py::call_guard<py::gil_scoped_release>())
+             nb::call_guard<nb::gil_scoped_release>())
         .def("work_total", &sb::StoppableTask<RetT>::work_total)
         .def("work_completed", &sb::StoppableTask<RetT>::work_completed)
         .def("work_step", &sb::StoppableTask<RetT>::work_step)
@@ -111,13 +111,13 @@ namespace
 
 }
 
-PYBIND11_MODULE(SB_MODULE_NAME, m) {
+NB_MODULE(SB_MODULE_NAME, m) {
   sb_py::register_pcf(m);
 
   register_bindings_stoppable_task<void>(m, "_void");
 
-  py::class_<GatedTask, sb::StoppableTask<void>>(m, "_GatedTask")
-    .def(py::init<size_t>())
+  nb::class_<GatedTask, sb::StoppableTask<void>>(m, "_GatedTask")
+    .def(nb::init<size_t>())
     .def("advance", &GatedTask::advance);
 
   m.def("_create_gated_task", [](size_t n_steps) {
@@ -126,16 +126,16 @@ PYBIND11_MODULE(SB_MODULE_NAME, m) {
     return task;
   });
 
-  py::enum_<std::future_status>(m, "FutureStatus")
+  nb::enum_<std::future_status>(m, "FutureStatus")
     .value("deferred", std::future_status::deferred)
     .value("ready", std::future_status::ready)
     .value("timeout", std::future_status::timeout)
     .export_values();
 
-  py::class_<sb_py::Future<void>>(m, "Future_void")
-    .def(py::init<>())
+  nb::class_<sb_py::Future<void>>(m, "Future_void")
+    .def(nb::init<>())
     .def("wait_for", &sb_py::Future<void>::wait_for,
-         py::call_guard<py::gil_scoped_release>());
+         nb::call_guard<nb::gil_scoped_release>());
 
   m.def("force_cpu", [](bool on){ sb::settings().forceCpu = on; });
   m.def("set_cuda_threshold", [](size_t n){ sb::settings().cudaThreshold = n; });

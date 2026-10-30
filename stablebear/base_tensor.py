@@ -9,6 +9,7 @@ from ._tensor_base import (
     ArithmeticTensorMixin,
     FunctionTensorMixin,
     Tensor,
+    _array_for_protocol,
     _tensor_from_nested,
 )
 from .functional.pcf import Pcf
@@ -69,13 +70,9 @@ class NumericTensor(Tensor, ArithmeticTensorMixin):
         return element
 
     def __array__(self, dtype=None, copy=None):
-        data = self._data if self._data.is_contiguous() else self.copy()._data
-
-        arr = np.array(data)
-
-        if dtype is not None:
-            arr = arr.astype(dtype, copy=False)
-        return arr
+        if self._data.is_contiguous():
+            return _array_for_protocol(np.asarray(self._data), dtype, copy, copied=False)
+        return _array_for_protocol(np.asarray(self.copy()._data), dtype, copy, copied=True)
 
     def __eq__(self, other):
         return self._compare(other, operator.eq, "==")
@@ -297,11 +294,9 @@ class BoolTensor(Tensor):
         )
 
     def __array__(self, dtype=None, copy=None):
-        data = self._data if self._data.is_contiguous() else self.copy()._data
-        arr = np.array(data)
-        if dtype is not None:
-            arr = arr.astype(dtype, copy=False)
-        return arr
+        if self._data.is_contiguous():
+            return _array_for_protocol(np.asarray(self._data), dtype, copy, copied=False)
+        return _array_for_protocol(np.asarray(self.copy()._data), dtype, copy, copied=True)
 
 
 PcfContainerLike = Tensor | list[Pcf] | Pcf
