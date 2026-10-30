@@ -1,6 +1,6 @@
 # Backlog crash and wrong-result bugs: implementation plan
 
-Progress: 6 of 7 items, 10 of 11 points (91%)
+Progress: 7 of 7 items, 11 of 11 points (100%)
 
 Spec: the GitHub issues linked from each item. Branch:
 `fix/backlog-crash-bugs`.
@@ -56,7 +56,7 @@ enabling it could stop GPU detection on hosts without NVIDIA DRM nodes.
   copy; `[inf]` is not close to `[-inf]`; `[inf]` is not close to `[1e300]`;
   the same for `DistanceMatrix` (no negative entries) and `SymmetricMatrix`;
   a `SymmetricMatrix` with NaN is not close to itself.
-- [ ] **B3.** [1] #183: `Barcode()` in `stablebear/persistence/barcode.py`
+- [x] **B3.** [1] (84a0dbcdb) #183: `Barcode()` in `stablebear/persistence/barcode.py`
   accepts any real-valued array-like input: a `float32` array gives a
   `barcode32`, and anything else, including lists and integer arrays, is
   converted to a `barcode64`. Input that is not real-valued raises
