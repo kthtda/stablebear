@@ -1,6 +1,6 @@
 # pandas input and durations for time series: implementation plan
 
-Progress: 22 of 43 items, 42 of 80 points (52%)
+Progress: 22 of 45 items, 42 of 86 points (49%)
 
 Specs: [pandas-timeseries-spec.md](pandas-timeseries-spec.md) (phases A, B,
 and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
@@ -68,7 +68,8 @@ and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
   Note: `_duration` now turns every duration into a `TimeDelta`, so
   `Window.size`, `Window.step`, and `TimeDelayEmbedding.delay` already are
   one for duration input, and their reprs show it; E6 is left with numbers.
-- [x] **C4.** `TimeDelta` and `DateTime` hold arrays of values in one unit.
+- [ ] **C4.** Arrays of durations and dates in one unit, as `TimeDeltaTensor`
+  and `DateTimeTensor`.
   - [x] **C4a.** [3] (5d5d0c882) `TimeDelta(counts, unit)` for a `FloatTensor`,
     `IntTensor`, `ndarray`, or nested list, kept as a `FloatTensor` or
     `IntTensor`, and a `timedelta64` array at its resolution: `count`,
@@ -100,6 +101,21 @@ and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
     Tests: `DateTime + TimeDelta([30, 90], "min")`; array `DateTime` minus
     a scalar `DateTime` is an array `TimeDelta`; array minus a scalar
     `TimeDelta` with a float count.
+  - [ ] **C4f.** [3] Move the arrays of `TimeDelta` into a new
+    `TimeDeltaTensor`, so that a `TimeDelta` holds one duration; an array
+    given to `TimeDelta` raises `TypeError` naming it. Update `evaluate`,
+    `Times`, the `DateTime` arithmetic, and the docstrings to use it.
+    Tests: the C4a, C4b, C4e, and D3 tests on `TimeDeltaTensor`; a
+    `TimeDeltaTensor` from a `TimeDelta` list equals one from its
+    `timedelta64` array; `TimeDelta` of an array raises.
+  - [ ] **C4g.** [3] Move the arrays of `DateTime` into a new
+    `DateTimeTensor`, so that a `DateTime` holds one instant; an array
+    given to `DateTime` raises `TypeError` naming it. Update the
+    arithmetic, `docs/timeseries_dates.rst`, and the docstrings.
+    Tests: the C4d and C4e tests on `DateTimeTensor`; `DateTime` of an
+    array raises; a `DateTimeTensor` epoch raises.
+  Note: C4f and C4g come after E3 in time; they split the array forms out
+  of the scalars before E4 gives a `TimeDeltaTensor` as `origin`.
 
 ## Phase D: durations as input
 
@@ -153,7 +169,7 @@ and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
 - [x] **E3.** [2] (924050b7f) `TimeSeries.domain` has `DateTime` or `TimeDelta` ends;
   a dated window's domain is where it lies.
   Tests: undated series; dated series; dated window; closed ends kept.
-- [ ] **E4.** [2] `TimeSeries.origin` is a `TimeDelta` or a tuple of them;
+- [ ] **E4.** [2] `TimeSeries.origin` is a `TimeDelta` or a `TimeDeltaTensor`;
   remove `TimeSeries.bounds` and update its callers and docs.
   Tests: window origins, including after snapping; several channels.
 - [ ] **E5.** [2] `Window(..., return_bounds=True)` gives a `datetime64` or
