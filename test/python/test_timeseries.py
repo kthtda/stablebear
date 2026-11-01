@@ -1251,14 +1251,12 @@ def test_several_channels_evaluate_only_where_all_are_observed(t):
 
 
 def test_times_of_several_channels_are_in_the_query_unit():
+    # Channel A is in s and channel B in ms.
     series = TimeSeries.from_channels([_channel_a(), _channel_b()], unit="s")
 
-    times = series.times
+    expected = TimesTensor([Times([0.0, 1.0, 2.5], unit="s"), Times([0.5, 1.5, 3.0], unit="s")])
 
-    assert isinstance(times, sb.NestedTensor)
-    assert times.shape == (2,)
-    assert np.array_equal(np.asarray(times[0]), [0.0, 1.0, 2.5])
-    assert np.array_equal(np.asarray(times[1]), [0.5, 1.5, 3.0])
+    assert series.times.array_equal(expected)
 
 
 @pytest.mark.parametrize("t, expected", [
@@ -1463,8 +1461,7 @@ def test_several_channels_survive_saving(round_trip):
 
     assert loaded.n_channels == 2
     assert loaded.unit == "s"
-    for i in range(2):
-        assert np.array_equal(np.asarray(loaded.times[i]), np.asarray(series.times[i]))
+    assert loaded.times.array_equal(series.times)
     for t in (0.5, 1.5):
         assert [loaded(t)[i][()] for i in range(2)] == [series(t)[i][()] for i in range(2)]
 

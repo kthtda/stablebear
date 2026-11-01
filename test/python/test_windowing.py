@@ -488,10 +488,10 @@ def test_windows_cut_every_channel_at_the_same_bounds():
     # [0.5, 1.5) and [1.5, 2.5).
     assert np.array_equal(np.asarray(bounds)[:, 0], [0.5, 1.5])
     # B's observation at 1500 ms is the end of the first window.
-    assert np.array_equal(np.asarray(windows[0].times[0]), [0.0, 0.5])
-    assert np.array_equal(np.asarray(windows[0].times[1]), [0.0])
-    assert np.array_equal(np.asarray(windows[1].times[0]), [0.0])
-    assert np.array_equal(np.asarray(windows[1].times[1]), [0.0])
+    assert np.array_equal(windows[0].times[0].to_floats(), [0.0, 0.5])
+    assert np.array_equal(windows[0].times[1].to_floats(), [0.0])
+    assert np.array_equal(windows[1].times[0].to_floats(), [0.0])
+    assert np.array_equal(windows[1].times[1].to_floats(), [0.0])
     assert windows[0](0.5)[0][()] == 10.0
     assert windows[0](0.5)[1][()] == -5.0
     with pytest.raises(ValueError, match=r"outside the domain \[0, 1\)"):

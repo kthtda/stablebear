@@ -559,20 +559,16 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         return _SERIES_CPP_TO_DTYPE[type(self._data)]
 
     @property
-    def times(self) -> Times | NestedTensor:
+    def times(self) -> Times | TimesTensor:
         """The timestamps of the recorded observations, in :attr:`unit`.
 
         A :class:`Times` for a series with one channel. For several
-        channels, a float64 ``NestedTensor`` with one leaf per channel, in
-        channel order, each holding that channel's timestamps converted
-        to :attr:`unit`.
+        channels, a :class:`TimesTensor` of shape ``(n_channels,)`` with one
+        ``Times`` per channel, in channel order, each holding that channel's
+        timestamps converted to :attr:`unit`.
         """
-        if self._data.n_channels == 1:
-            return Times._from_cpp(self._data.times(0))
-        return NestedTensor([
-            Times._from_cpp(self._data.times(i)).to_floats()
-            for i in range(self._data.n_channels)
-        ])
+        times = [Times._from_cpp(self._data.times(i)) for i in range(self._data.n_channels)]
+        return times[0] if len(times) == 1 else TimesTensor(times)
 
     @property
     def values(self) -> Tensor | NestedTensor:

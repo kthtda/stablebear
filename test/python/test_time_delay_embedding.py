@@ -118,8 +118,8 @@ def test_embedding_of_several_channels_converts_the_delay_per_channel():
     # after its first time on: A at 0.5, 1.0, 1.5, and 2.5 s, and B at 1000,
     # 1500, 2000, and 3000 ms, reported in s.
     times = embedding.times
-    assert np.array_equal(np.asarray(times[0]), [0.5, 1.0, 1.5, 2.5])
-    assert np.array_equal(np.asarray(times[1]), [1.0, 1.5, 2.0, 3.0])
+    assert np.array_equal(times[0].to_floats(), [0.5, 1.0, 1.5, 2.5])
+    assert np.array_equal(times[1].to_floats(), [1.0, 1.5, 2.0, 3.0])
     # (x(1.25 s), x(1.75 s)) in each channel.
     values = embedding(1.75)
     assert np.array_equal(np.asarray(values[0]), [20.0, 20.0])
