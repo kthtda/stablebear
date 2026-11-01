@@ -89,11 +89,7 @@ namespace sb_py
                           const std::optional<std::string>& unit) {
         return unit ? self.to(sb::parse_time_unit(*unit)).evaluate(t) : self.evaluate(t);
       }, nb::arg("t"), nb::arg("unit") = nb::none(), nb::call_guard<nb::gil_scoped_release>())
-      .def("_save", [](const Series& self, nb::object file) {
-        sb_py::PythonOStreamBuf buf(file);
-        std::ostream os(&buf);
-        sb::write_object(self, os);
-      }, nb::arg("file"));
+      .def("_save", &save_object<Series>, nb::arg("file"));
   }
 
   /// Bind series of element type T, and tensors and nested tensors of them,
@@ -105,11 +101,7 @@ namespace sb_py
     register_timeseries_element<T>(m, suffix);
     register_tensor_element<sb::TimeSeries<T>>(m, "TimeSeries" + suffix);
     nb::borrow<nb::class_<sb::Tensor<sb::TimeSeries<T>>>>(m.attr(("TimeSeries" + suffix + "Tensor").c_str()))
-      .def("_save", [](const sb::Tensor<sb::TimeSeries<T>>& self, nb::object file) {
-        sb_py::PythonOStreamBuf buf(file);
-        std::ostream os(&buf);
-        sb::write(self, os);
-      }, nb::arg("file"));
+      .def("_save", &save_tensor<sb::Tensor<sb::TimeSeries<T>>>, nb::arg("file"));
   }
 }
 

@@ -19,17 +19,13 @@ namespace
     static void save_tensor_to_file(
         const sb::Tensor<T, Properties>& tensor, nb::object file)
     {
-      sb_py::PythonOStreamBuf buf(file);
-      std::ostream os(&buf);
-      sb::write(tensor, os);
+      sb_py::save_tensor(tensor, file);
     }
 
     template <typename T>
     static void save_nested_tensor_to_file(const sb::NestedTensor<T>& tensor, nb::object file)
     {
-      sb_py::PythonOStreamBuf buf(file);
-      std::ostream os(&buf);
-      sb::write(tensor, os);
+      sb_py::save_tensor(tensor, file);
     }
 
     static sb::io::detail::StreamableTensor load_tensor_from_file(nb::object file)
@@ -42,9 +38,7 @@ namespace
     template <typename T>
     static void save_object_to_file(const T& obj, nb::object file)
     {
-      sb_py::PythonOStreamBuf buf(file);
-      std::ostream os(&buf);
-      sb::write_object(obj, os);
+      sb_py::save_object(obj, file);
     }
 
     static sb::io::detail::StreamableObject load_object_from_file(nb::object file)

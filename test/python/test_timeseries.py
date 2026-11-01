@@ -679,6 +679,21 @@ def test_times_tensors_are_equal_only_with_the_same_units_and_epochs(other):
     assert not TimesTensor([times]).array_equal(TimesTensor([other]))
 
 
+@pytest.mark.parametrize("round_trip", ROUND_TRIPS)
+def test_times_tensor_round_trips(round_trip):
+    series = TimeSeries([1.0, 2.0, 3.0, 4.0], times=Times([0.0, 1.0, 2.0, 3.0], unit="s"))
+    window = Window(size=2.0, step=1.0, closed="left", partial=False, anchor="start")(series)[1]
+    tensor = TimesTensor([
+        [Times([0.0, 1.0, 2.5], unit="s"), Times([500.0, 1500.0], unit="ms", epoch="2023-01-01")],
+        [window.times, Times([], unit="min")],
+    ])
+
+    loaded = round_trip(tensor)
+
+    assert isinstance(loaded, TimesTensor)
+    assert loaded.array_equal(tensor)
+
+
 def test_series_keeps_explicit_unit():
     series = TimeSeries([1.0, 2.0], times=Times([0.0, 0.5], unit="ms"))
 

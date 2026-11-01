@@ -1,6 +1,6 @@
 # pandas input and durations for time series: implementation plan
 
-Progress: 17 of 43 items, 32 of 80 points (40%)
+Progress: 18 of 43 items, 35 of 80 points (44%)
 
 Specs: [pandas-timeseries-spec.md](pandas-timeseries-spec.md) (phases A, B,
 and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
@@ -134,7 +134,7 @@ and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
   another unit.
 - [ ] **E2.** `TimesTensor`, and times of several channels and of tensors
   of series in it.
-  - [ ] **E2a.** [3] C++: an empty default `sb::Times`, and
+  - [x] **E2a.** [3] (70b224f9b) C++: an empty default `sb::Times`, and
     `Tensor<sb::Times>` registered in both modules. Python: `TimesTensor`
     with dtype `sb.times` in `stablebear/typing.py`, indexing to `Times`,
     assignment, `copy`, `array_equal`; with its docstring.
