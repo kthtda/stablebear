@@ -68,14 +68,38 @@ as a time series stores its times.
     `BoolTensor`, as tensors do; `==` compares count and unit, as for a
     scalar. `array_equal` tells whether two are equal as a whole;
   - it has `repr` and pickling but no hash.
-
-  `DateTime` arithmetic takes scalar `TimeDelta` only, since there is no
-  array of `DateTime`.
 - A `TimeDelta` given to `Window`, `TimeDelayEmbedding`, or `evaluate` is
   converted to the series' unit by an exact factor, without rounding.
   `evaluate` and `Times` take an array `TimeDelta` as an array of
   durations.
 - `TimeDelta` is Python only; nothing in C++ stores a duration.
+
+## `DateTime` arrays
+
+`DateTime` can also hold an array of instants in one unit, as `TimeDelta`
+holds an array of counts.
+
+- `value` is then a `datetime64` array, a pandas `DatetimeIndex` or
+  `Series` of dates, or a sequence of values a scalar `DateTime` accepts,
+  such as strings. The instants are kept at their resolution, or the finest
+  of a sequence, as an `IntTensor` of counts after 1970-01-01T00:00. A
+  timezone is converted to UTC and dropped, as for a scalar.
+- An array `DateTime` works as a scalar one does, elementwise:
+  - it has `shape`, `ndim`, `len`, iteration, and indexing, which gives a
+    scalar `DateTime` for one element and an array one otherwise;
+  - `count` is the tensor; `to_datetime64` gives a `datetime64` array;
+  - `<`, `<=`, `>`, `>=`, `==`, and `!=` give a `BoolTensor`; `==`
+    compares count and unit, as for a scalar. `array_equal` tells whether
+    two are equal as a whole;
+  - it has `repr` and pickling but no hash.
+- Arithmetic broadcasts scalars against arrays: `DateTime` plus or minus
+  `TimeDelta` gives a `DateTime`, and `DateTime` minus `DateTime` a
+  `TimeDelta`, an array one when either operand is an array, as in
+  `DateTime("2023-01-01") + TimeDelta([30, 90], "min")`.
+- It rejects `NaT` and resolutions of weeks, months, and years.
+- An epoch, of `Times` or `with_epoch`, is a scalar `DateTime`; an array
+  one raises `TypeError`.
+- Array `DateTime` is Python only; C++ stores only the scalar epoch.
 
 ## Inputs
 

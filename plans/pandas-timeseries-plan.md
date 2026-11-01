@@ -1,6 +1,6 @@
 # pandas input and durations for time series: implementation plan
 
-Progress: 12 of 39 items, 20 of 70 points (29%)
+Progress: 12 of 41 items, 20 of 75 points (27%)
 
 Specs: [pandas-timeseries-spec.md](pandas-timeseries-spec.md) (phases A, B,
 and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
@@ -84,12 +84,22 @@ and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
     Tests: array plus scalar in another unit; `* 0.5`; `<` against a
     scalar; `==` of the same lengths in different units is all false;
     `DateTime + array` raises `TypeError`.
-  - [ ] **C4c.** [2] `evaluate` and `Times` take an array `TimeDelta` as an
-    array of durations.
-    Tests: `TimeDelta(sb.FloatTensor([[30, 90], [240, 60]]), "min")` on a
-    series in hours equals evaluating `[[0.5, 1.5], [4.0, 1.0]]`;
-    `Times(TimeDelta(sb.IntTensor([0, 90]), "min"))` equals
-    `Times(np.array([0, 90], dtype="timedelta64[m]"))`.
+  - [ ] **C4d.** [3] `DateTime` holds an array of instants: from a
+    `datetime64` array, a `DatetimeIndex` or `Series` of dates, or a
+    sequence of values a scalar accepts, kept as an `IntTensor` at their
+    resolution; `shape`, `ndim`, `len`, iteration, indexing,
+    `to_datetime64`, comparisons, `==` and `!=` as `BoolTensor`,
+    `array_equal`, `repr`, and pickling; no hash; an array epoch raises.
+    Tests: a `datetime64[m]` array is in minutes; strings at their finest
+    resolution; an aware `DatetimeIndex` is its UTC instants; indexing one
+    element gives a scalar `DateTime`; `<` against a scalar; hashing
+    raises; pickling round trip; `Times(..., epoch=array)` raises
+    `TypeError`.
+  - [ ] **C4e.** [2] `DateTime` and `TimeDelta` arithmetic on arrays,
+    replacing the `TypeError` of C4b.
+    Tests: `DateTime + TimeDelta([30, 90], "min")`; array `DateTime` minus
+    a scalar `DateTime` is an array `TimeDelta`; array minus a scalar
+    `TimeDelta` with a float count.
 
 ## Phase D: durations as input
 
@@ -107,6 +117,12 @@ and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
 - [ ] **D3.** [2] `TimeSeriesTensor.evaluate` accepts durations.
   Tests: windows at `np.arange(3) * np.timedelta64(1, "h")` equal windows
   at `[0.0, 1.0, 2.0]` in hours.
+- [ ] **D4.** [2] `evaluate` and `Times` take an array `TimeDelta` as an
+  array of durations.
+  Tests: `TimeDelta(sb.FloatTensor([[30, 90], [240, 60]]), "min")` on a
+  series in hours equals evaluating `[[0.5, 1.5], [4.0, 1.0]]`;
+  `Times(TimeDelta(sb.IntTensor([0, 90]), "min"))` equals
+  `Times(np.array([0, 90], dtype="timedelta64[m]"))`.
 
 ## Phase E: durations and dates as output
 
