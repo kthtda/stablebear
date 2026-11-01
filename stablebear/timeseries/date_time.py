@@ -481,7 +481,14 @@ def _duration(value, message):
 
 def _in_unit(duration, unit):
     """A duration from :func:`_duration` as a number of ``unit``, a Times unit;
-    a :class:`TimeDelta` is converted by an exact factor and rounded once."""
-    if isinstance(duration, TimeDelta):
-        return float(Fraction(duration.count) * _ATTOSECONDS[duration.unit] / _ATTOSECONDS[unit])
-    return duration
+    a :class:`TimeDelta` is converted by an exact factor and rounded once, to
+    a float64 array for an array of counts."""
+    if not isinstance(duration, TimeDelta):
+        return duration
+    if duration.ndim:
+        # One unit is a whole multiple of the other, so one multiplication
+        # or division by an integer rounds each count once.
+        counts = np.asarray(duration.count, dtype=np.float64)
+        source, target = _ATTOSECONDS[duration.unit], _ATTOSECONDS[unit]
+        return counts * (source // target) if source >= target else counts / (target // source)
+    return float(Fraction(duration.count) * _ATTOSECONDS[duration.unit] / _ATTOSECONDS[unit])

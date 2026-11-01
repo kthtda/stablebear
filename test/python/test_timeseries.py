@@ -38,6 +38,12 @@ def test_times_of_durations_are_in_their_finest_unit(durations, expected):
     assert Times(durations) == expected
 
 
+def test_times_of_a_time_delta_of_counts_equal_times_of_their_timedelta64():
+    times = Times(TimeDelta(sb.IntTensor([0, 90]), "min"))
+
+    assert times == Times(np.array([0, 90], dtype="timedelta64[m]"))
+
+
 def test_times_of_durations_in_a_given_unit_are_exact():
     times = Times(np.array([0, 1500, 3000], dtype="timedelta64[ms]"), unit="s")
 
@@ -734,9 +740,14 @@ def test_series_at_a_duration_equals_the_series_at_its_time_in_the_unit(duration
     assert series(duration) == series(1.5)
 
 
-def test_series_at_an_array_of_durations_equals_the_series_at_their_times():
+@pytest.mark.parametrize("durations", [
+    pytest.param(np.array([[30, 90],
+                           [240, 60]], dtype="timedelta64[m]"), id="timedelta64"),
+    pytest.param(TimeDelta(sb.FloatTensor([[30, 90],
+                                           [240, 60]]), "min"), id="TimeDelta"),
+])
+def test_series_at_an_array_of_durations_equals_the_series_at_their_times(durations):
     series = _hourly_series()
-    durations = np.array([[30, 90], [240, 60]], dtype="timedelta64[m]")
 
     values = series(durations)
 

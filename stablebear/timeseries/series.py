@@ -16,7 +16,7 @@ from ..functional.pcf import Pcf
 from ..nested_tensor import NestedTensor, _leaf_wrappers
 from ..point_cloud import PointCloud
 from ..symmetric_matrix import SymmetricMatrix
-from .date_time import _ATTOSECONDS, _NUMPY_TO_UNIT, _UNIT_TO_NUMPY, DateTime, _as_array, _as_time_delta, _in_unit
+from .date_time import _ATTOSECONDS, _NUMPY_TO_UNIT, _UNIT_TO_NUMPY, DateTime, TimeDelta, _as_array, _as_time_delta, _in_unit
 from ..typing import (
     _NATIVE_SUFFIX,
     barcode32,
@@ -53,6 +53,20 @@ def _checked_dates(dates):
     if code not in _NUMPY_TO_UNIT:
         raise ValueError(f"Dates and times need a resolution of fixed length, not {code!r}")
     return dates
+
+
+def _finest_duration_unit(values):
+    """The resolution of ``values``, an array, if it holds durations: that of
+    a ``timedelta64`` array, or the finest unit of other durations; else
+    ``None``."""
+    if np.issubdtype(values.dtype, np.timedelta64):
+        # A resolution without a fixed length is rejected by _durations_in.
+        return _NUMPY_TO_UNIT.get(np.datetime_data(values.dtype)[0], "s")
+    if values.dtype == object and values.size > 0:
+        durations = [_as_time_delta(value) for value in values.flat]
+        if all(duration is not None for duration in durations):
+            return min((duration.unit for duration in durations), key=_ATTOSECONDS.__getitem__)
+    return None
 
 
 def _durations_in(values, unit):
@@ -105,9 +119,10 @@ class Times:
     ----------
     times : array_like
         One-dimensional timestamps, as numbers in ``unit``, as durations, or
-        as dates and times. Durations are a ``timedelta64`` array, a
-        sequence of :class:`TimeDelta` or other durations, or a pandas
-        ``TimedeltaIndex``, converted to ``unit`` by one exact factor each.
+        as dates and times. Durations are a :class:`TimeDelta` of an array
+        of counts, a ``timedelta64`` array, a sequence of ``TimeDelta`` or
+        other durations, or a pandas ``TimedeltaIndex``, converted to
+        ``unit`` by one exact factor each.
         Dates and times are a ``datetime64`` array, or a pandas
         ``DatetimeIndex`` or ``Series`` of dates, whose timezone, if any, is
         converted to UTC and dropped. Dates and times are counted from
@@ -120,7 +135,8 @@ class Times:
         ``"sec"``, ``"seconds"``, ``"hr"``, ``"\u00b5s"``, or ``"msec"``.
         Defaults to the resolution of the dates or durations, such as
         minutes for a ``timedelta64[m]`` array and nanoseconds for most
-        pandas indexes, or the finest unit of a sequence of durations;
+        pandas indexes, the unit of a ``TimeDelta``, or the finest unit of a
+        sequence of durations;
         numbers default to seconds. :attr:`unit` reports the short name.
     epoch : DateTime or a value DateTime accepts, optional
         The date and time that time 0 stands for, such as
@@ -134,6 +150,11 @@ class Times:
     """
 
     def __init__(self, times, unit: str | None = None, *, epoch=None):
+        if isinstance(times, TimeDelta):
+            # Counts in one unit, by default theirs, converted by one exact
+            # factor; the short name of unit, which may be an alias.
+            unit = unit or times.unit
+            times = _in_unit(times, cpp.Times(np.zeros(0), unit, None).unit)
         times = _as_array(times)
         if np.issubdtype(times.dtype, np.datetime64) or np.issubdtype(times.dtype, np.timedelta64):
             code = np.datetime_data(times.dtype)[0]
@@ -149,16 +170,13 @@ class Times:
             self._data = _times_from_datetimes(origin + times, unit, origin).with_epoch(
                 None if epoch is None else DateTime(epoch)._data)
             return
-        if times.dtype == object and times.size > 0:
-            durations = [_as_time_delta(value) for value in times.flat]
-            if all(duration is not None for duration in durations):
-                # TimeDelta and other durations, by default in the finest of
-                # their units, each converted by an exact factor; the short
-                # name of unit, which may be an alias.
-                if unit is None:
-                    unit = min((duration.unit for duration in durations), key=_ATTOSECONDS.__getitem__)
-                short = cpp.Times(np.zeros(0), unit, None).unit
-                times = np.array([_in_unit(duration, short) for duration in durations]).reshape(times.shape)
+        finest = _finest_duration_unit(times)
+        if finest is not None:
+            # TimeDelta and other durations, by default in the finest of
+            # their units, each converted by an exact factor; the short name
+            # of unit, which may be an alias.
+            unit = unit or finest
+            times = _durations_in(times, cpp.Times(np.zeros(0), unit, None).unit)
         unit = unit or "s"
         if epoch is not None:
             epoch = DateTime(epoch)._data
@@ -716,9 +734,10 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         sorted once and merged with each channel's timestamps. Numeric times
         and durations count from the series' own time 0, which for a window
         is its start. A duration is a :class:`TimeDelta` or a value it
-        accepts, such as ``np.timedelta64(90, "m")``, or an array, sequence,
-        or pandas ``TimedeltaIndex`` of them; it is converted to the series'
-        unit by an exact factor and takes no ``unit``. For a series with an
+        accepts, such as ``np.timedelta64(90, "m")``. Many durations are a
+        ``TimeDelta`` of an array of counts, or an array, sequence, or pandas
+        ``TimedeltaIndex`` of durations. Durations are converted to the
+        series' unit by an exact factor and take no ``unit``. For a series with an
         :attr:`epoch`, ``t`` may also be a date and time, as anything :class:`DateTime` accepts, such as
         ``"2023-01-01T12:30"``, or an array, pandas ``DatetimeIndex``, or
         pandas ``Series`` of them. A
@@ -891,8 +910,10 @@ class TimeSeriesTensor(Tensor):
 
     def evaluate(self, t, unit: str | None = None):
         """Every series evaluated at the times ``t``, as
-        :meth:`TimeSeries.evaluate` does. ``t`` is in ``unit`` for every
-        series, or in each series' own unit if ``unit`` is omitted.
+        :meth:`TimeSeries.evaluate` does. Numeric ``t`` is in ``unit`` for
+        every series, or in each series' own unit if ``unit`` is omitted.
+        Durations, as :meth:`TimeSeries.evaluate` takes them, count from each
+        series' time 0 and take no ``unit``.
 
         ``t`` is a single time or an array-like or ``FloatTensor`` of times
         of shape ``t_shape``. For series with one channel, returns a tensor
@@ -914,6 +935,20 @@ class TimeSeriesTensor(Tensor):
             empty or its series differ in channels or shapes, or if
             ``unit`` is unknown.
         """
+        duration = _as_time_delta(t)
+        if duration is not None:
+            if unit is not None:
+                raise TypeError("A duration has no unit; pass unit only with numeric times")
+            return self.evaluate(_in_unit(duration, duration.unit), duration.unit)
+        if not isinstance(t, (Tensor, int, float, np.integer, np.floating)):
+            t = _as_array(t)
+            finest = _finest_duration_unit(t)
+            if finest is not None:
+                if unit is not None:
+                    raise TypeError("Durations have no unit; pass unit only with numeric times")
+                # Queried in their own unit, to which C++ converts each
+                # series, so that the durations are not rounded.
+                return self.evaluate(_durations_in(t, finest), finest)
         times = FloatTensor(np.asarray(t, dtype=np.float64))
         values = NestedTensor._from_cpp(
             cpp.evaluate_series(self._data, times._data, unit))

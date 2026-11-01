@@ -535,6 +535,38 @@ def test_windows_evaluate_at_times_in_the_given_unit():
     assert np.array_equal(np.asarray(values), [[0.0, 10.0], [10.0, 20.0], [20.0, 30.0]])
 
 
+@pytest.mark.parametrize("duration", [
+    pytest.param(TimeDelta(1500, "ms"), id="TimeDelta"),
+    pytest.param(np.timedelta64(1500, "ms"), id="timedelta64"),
+    pytest.param(datetime.timedelta(milliseconds=1500), id="timedelta"),
+])
+def test_windows_at_a_duration_equal_the_windows_at_its_time_in_the_unit(duration):
+    windows = _overlapping_windows()
+
+    assert windows(duration).array_equal(windows(1.5))
+
+
+@pytest.mark.parametrize("durations", [
+    pytest.param(np.array([0, 500, 1000], dtype="timedelta64[ms]"), id="timedelta64"),
+    pytest.param(TimeDelta(sb.FloatTensor([0, 500, 1000]), "ms"), id="TimeDelta"),
+])
+def test_windows_at_an_array_of_durations_equal_the_windows_at_their_times(durations):
+    windows = _overlapping_windows()
+
+    assert windows(durations).array_equal(windows([0.0, 0.5, 1.0]))
+
+
+def test_windows_at_a_list_of_time_deltas_equal_the_windows_at_their_times():
+    windows = _overlapping_windows()
+
+    assert windows([TimeDelta(500, "ms"), TimeDelta(1, "s")]).array_equal(windows([0.5, 1.0]))
+
+
+def test_windows_at_a_duration_take_no_unit():
+    with pytest.raises(TypeError, match="no unit"):
+        _overlapping_windows()(np.timedelta64(1, "s"), "s")
+
+
 def test_windows_reject_an_unknown_unit():
     windows = _overlapping_windows()
 

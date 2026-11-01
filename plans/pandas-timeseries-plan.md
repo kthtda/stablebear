@@ -1,6 +1,6 @@
 # pandas input and durations for time series: implementation plan
 
-Progress: 14 of 41 items, 25 of 75 points (33%)
+Progress: 15 of 40 items, 27 of 74 points (36%)
 
 Specs: [pandas-timeseries-spec.md](pandas-timeseries-spec.md) (phases A, B,
 and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
@@ -68,7 +68,7 @@ and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
   Note: `_duration` now turns every duration into a `TimeDelta`, so
   `Window.size`, `Window.step`, and `TimeDelayEmbedding.delay` already are
   one for duration input, and their reprs show it; E6 is left with numbers.
-- [ ] **C4.** `TimeDelta` holds an array of counts in one unit.
+- [x] **C4.** `TimeDelta` and `DateTime` hold arrays of values in one unit.
   - [x] **C4a.** [3] (5d5d0c882) `TimeDelta(counts, unit)` for a `FloatTensor`,
     `IntTensor`, `ndarray`, or nested list, kept as a `FloatTensor` or
     `IntTensor`, and a `timedelta64` array at its resolution: `count`,
@@ -95,7 +95,7 @@ and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
     element gives a scalar `DateTime`; `<` against a scalar; hashing
     raises; pickling round trip; `Times(..., epoch=array)` raises
     `TypeError`.
-  - [ ] **C4e.** [2] `DateTime` and `TimeDelta` arithmetic on arrays,
+  - [x] **C4e.** [2] (9a4e16cd1) `DateTime` and `TimeDelta` arithmetic on arrays,
     replacing the `TypeError` of C4b.
     Tests: `DateTime + TimeDelta([30, 90], "min")`; array `DateTime` minus
     a scalar `DateTime` is an array `TimeDelta`; array minus a scalar
@@ -114,15 +114,16 @@ and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
   as times from time 0, with or without an epoch.
   Tests: `TimeDelta(90, "min")` on a series in hours equals 1.5; a
   `timedelta64` array; a window evaluated at a duration from its start.
-- [ ] **D3.** [2] `TimeSeriesTensor.evaluate` accepts durations.
-  Tests: windows at `np.arange(3) * np.timedelta64(1, "h")` equal windows
-  at `[0.0, 1.0, 2.0]` in hours.
-- [ ] **D4.** [2] `evaluate` and `Times` take an array `TimeDelta` as an
-  array of durations.
-  Tests: `TimeDelta(sb.FloatTensor([[30, 90], [240, 60]]), "min")` on a
-  series in hours equals evaluating `[[0.5, 1.5], [4.0, 1.0]]`;
+- [ ] **D3.** [3] `TimeSeriesTensor.evaluate` accepts durations, and
+  `evaluate` and `Times` take an array `TimeDelta` as an array of
+  durations.
+  Tests: windows at durations equal windows at their times in seconds;
+  `TimeDelta(sb.FloatTensor([[30, 90], [240, 60]]), "min")` on a series in
+  hours equals evaluating `[[0.5, 1.5], [4.0, 1.0]]`;
   `Times(TimeDelta(sb.IntTensor([0, 90]), "min"))` equals
   `Times(np.array([0, 90], dtype="timedelta64[m]"))`.
+  Note: absorbed D4. C++ converts each series to the durations' own unit,
+  since the series of a tensor can differ in unit.
 
 ## Phase E: durations and dates as output
 
