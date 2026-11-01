@@ -507,7 +507,7 @@ def plot_timeseries(series, ax=None, *, unit=None, relative=False, markers=False
         raise ValueError(f"Can only plot scalar observations, not observations of shape {series.shape}")
     if markers:
         kwargs = {"marker": "o", "markevery": list(range(len(times))), **kwargs}
-    end = series.domain.end + offset
+    end = series._data.domain[1] + offset
     if end > times[-1]:
         # The last value holds until the end of the domain.
         times = np.append(times, end)

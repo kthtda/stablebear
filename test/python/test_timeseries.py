@@ -872,13 +872,13 @@ def test_series_rejects_durations_without_a_fixed_length(durations):
 def test_series_domain_runs_from_first_to_last_timestamp_closed():
     series = TimeSeries([10.0, 20.0, 30.0], times=[0.5, 1.5, 4.0])
 
-    assert series.domain == Domain(0.5, 4.0, True, True)
+    assert series.domain == Domain(TimeDelta(0.5, "s"), TimeDelta(4.0, "s"), True, True)
 
 
 def test_series_domain_is_in_the_query_unit():
     series = TimeSeries([10.0, 20.0, 30.0], times=[0.5, 1.5, 4.0]).to("ms")
 
-    assert series.domain == Domain(500.0, 4000.0, True, True)
+    assert series.domain == Domain(TimeDelta(500.0, "ms"), TimeDelta(4000.0, "ms"), True, True)
 
 
 def test_series_domain_fields_by_name_and_by_unpacking():
@@ -886,9 +886,9 @@ def test_series_domain_fields_by_name_and_by_unpacking():
 
     start, end, start_closed, end_closed = domain
 
-    assert (domain.start, domain.end) == (0.5, 4.0)
+    assert (domain.start, domain.end) == (TimeDelta(0.5, "s"), TimeDelta(4.0, "s"))
     assert (domain.start_closed, domain.end_closed) == (True, True)
-    assert (start, end, start_closed, end_closed) == (0.5, 4.0, True, True)
+    assert (start, end, start_closed, end_closed) == (TimeDelta(0.5, "s"), TimeDelta(4.0, "s"), True, True)
 
 
 def test_series_domain_of_several_channels_is_their_intersection():
@@ -897,12 +897,12 @@ def test_series_domain_of_several_channels_is_their_intersection():
 
     series = TimeSeries.from_channels([a, b], unit="s")
 
-    assert series.domain == Domain(0.5, 2.5, True, True)
+    assert series.domain == Domain(TimeDelta(0.5, "s"), TimeDelta(2.5, "s"), True, True)
 
 
 @pytest.mark.parametrize("closed, expected", [
-    pytest.param("left", Domain(0.0, 2.0, True, False), id="open-end"),
-    pytest.param("right", Domain(0.0, 2.0, False, True), id="open-start"),
+    pytest.param("left", Domain(TimeDelta(0, "s"), TimeDelta(2, "s"), True, False), id="open-end"),
+    pytest.param("right", Domain(TimeDelta(0, "s"), TimeDelta(2, "s"), False, True), id="open-start"),
 ])
 def test_series_domain_of_several_channels_excludes_an_end_any_channel_excludes(closed, expected):
     source = TimeSeries([10.0, 20.0, 30.0, 40.0], times=[0.0, 1.0, 2.0, 3.0])
@@ -912,6 +912,27 @@ def test_series_domain_of_several_channels_excludes_an_end_any_channel_excludes(
     series = TimeSeries.from_channels([window, observed])
 
     assert series.domain == expected
+
+
+def test_dated_series_domain_has_date_time_ends():
+    series = TimeSeries([10.0, 20.0, 30.0], times=Times([0.5, 1.5, 4.0], unit="h", epoch="2023-01-01"))
+
+    domain = series.domain
+
+    assert domain.start.to_datetime64() == np.datetime64("2023-01-01T00:30")
+    assert domain.end.to_datetime64() == np.datetime64("2023-01-01T04:00")
+    assert (domain.start_closed, domain.end_closed) == (True, True)
+
+
+def test_dated_series_domain_of_several_channels_is_the_intersection_of_where_each_lies():
+    a = TimeSeries([10.0, 20.0, 30.0], times=Times([0.0, 1.0, 2.5], unit="h", epoch="2023-01-01"))
+    b = TimeSeries([-10.0, -20.0], times=Times([30.0, 180.0], unit="min", epoch="2023-01-01"))
+    series = TimeSeries.from_channels([a, b], unit="h")
+
+    domain = series.domain
+
+    assert domain.start.to_datetime64() == np.datetime64("2023-01-01T00:30")
+    assert domain.end.to_datetime64() == np.datetime64("2023-01-01T02:30")
 
 
 def test_series_epoch_is_the_epoch_of_its_times():

@@ -353,9 +353,9 @@ class Domain(NamedTuple):
     """
 
     #: The first time in the domain, or its lower bound if not included.
-    start: float
+    start: DateTime | TimeDelta
     #: The last time in the domain, or its upper bound if not included.
-    end: float
+    end: DateTime | TimeDelta
     #: Whether ``start`` is in the domain.
     start_closed: bool
     #: Whether ``end`` is in the domain.
@@ -633,17 +633,44 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
 
     @property
     def domain(self) -> Domain:
-        """The times at which every channel can be evaluated, in :attr:`unit`.
+        """The times at which every channel can be evaluated.
 
-        For several channels, the intersection of their domains, which
-        :meth:`evaluate` checks queries against.
+        Without an :attr:`epoch`, the ends are :class:`TimeDelta` durations
+        from time 0 in :attr:`unit`. For several channels, the domain is the
+        intersection of theirs, which :meth:`evaluate` checks queries
+        against.
+
+        With an epoch, the ends are :class:`DateTime` instants: the dates
+        and times at which the series can be evaluated, so a window's domain
+        is where it lies in the series it was cut from. For several
+        channels, it is the intersection of where each lies.
 
         Raises
         ------
         ValueError
             If a channel has no observations.
         """
-        return Domain(*self._data.domain)
+        if self.epoch is None:
+            start, end, start_closed, end_closed = self._data.domain
+            return Domain(TimeDelta(start, self.unit), TimeDelta(end, self.unit), start_closed, end_closed)
+        start, end, start_closed, end_closed = self._dated_domain()
+        epoch = self.epoch
+        return Domain(epoch + TimeDelta(start, self.unit), epoch + TimeDelta(end, self.unit), start_closed, end_closed)
+
+    def _dated_domain(self):
+        """The intersection of each channel's domain moved by its origin, in
+        :attr:`unit`, as C++ intersects channels: an open end at the same
+        time as a closed one excludes that time."""
+        start, end, start_closed, end_closed = -np.inf, np.inf, True, True
+        for i in range(self.n_channels):
+            first, last, first_closed, last_closed = self._data.select([i]).domain
+            origin = self._data.origin(i)
+            first, last = first + origin, last + origin
+            if first > start or (first == start and not first_closed):
+                start, start_closed = first, first_closed
+            if last < end or (last == end and not last_closed):
+                end, end_closed = last, last_closed
+        return start, end, start_closed, end_closed
 
     def bounds(self, *, dates: bool = False, resolution: str = "us") -> Domain | tuple[Domain, ...]:
         """Where each channel lies in the series it was cut from.

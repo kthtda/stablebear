@@ -94,7 +94,7 @@ to::
 
    windows = Window(size=np.timedelta64(1, "h"),
                     step=np.timedelta64(30, "m"), anchor="start")(series)
-   windows[1].domain  # [0, 1) in hours
+   windows[1].domain  # from 2023-01-01T06:30 to 07:30, without the end
 
 Dates of windows
 ----------------

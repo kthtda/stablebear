@@ -172,7 +172,7 @@ def test_a_window_closed_on_neither_side_includes_neither_end():
 def test_a_window_domain_runs_from_zero_to_its_size_with_its_closed_ends(closed, start_closed, end_closed):
     window = Window(size=2.0, step=2.0, closed=closed, partial=False, anchor="start")(_windows_source())[0]
 
-    assert window.domain == Domain(0.0, 2.0, start_closed, end_closed)
+    assert window.domain == Domain(TimeDelta(0, "s"), TimeDelta(2, "s"), start_closed, end_closed)
 
 
 def test_a_window_origin_is_its_start_in_the_series():
@@ -261,7 +261,7 @@ def test_a_partial_window_domain_ends_where_the_series_does():
     # at 4.0 instead.
     window = Window(size=3.0, step=3.0, closed="left", partial=True, anchor="start")(_partial_source())[1]
 
-    assert window.domain == Domain(0.0, 1.0, True, True)
+    assert window.domain == Domain(TimeDelta(0, "s"), TimeDelta(1, "s"), True, True)
 
 
 def test_a_left_closed_partial_window_can_start_at_the_last_observation():
@@ -397,6 +397,20 @@ def test_windows_keep_the_epoch_of_their_series():
     windows = Window(size=1.0, step=1.0, closed="left", partial=False, anchor="start")(_dated_source())
 
     assert windows[2].epoch == DateTime("2023-01-01")
+
+
+@pytest.mark.parametrize("closed, start_closed, end_closed", [
+    pytest.param("left", True, False, id="left"),
+    pytest.param("right", False, True, id="right"),
+])
+def test_a_dated_window_domain_is_where_it_lies(closed, start_closed, end_closed):
+    windows = Window(size=1.0, step=1.0, closed=closed, partial=False, anchor="start")(_dated_source())
+
+    domain = windows[2].domain
+
+    assert domain.start.to_datetime64() == np.datetime64("2023-01-01T00:00:02")
+    assert domain.end.to_datetime64() == np.datetime64("2023-01-01T00:00:03")
+    assert (domain.start_closed, domain.end_closed) == (start_closed, end_closed)
 
 
 def test_an_embedding_keeps_the_epoch_of_its_series():
@@ -784,19 +798,13 @@ def test_window_rejects_durations_without_a_fixed_length(size):
         Window(size=size)
 
 
-def test_bounds_of_a_series_built_from_observations_are_its_domain():
-    series = _windows_source()
-
-    assert series.bounds() == series.domain
-
-
 def test_bounds_of_a_window_are_its_domain_moved_by_its_origin():
     windows, bounds = Window(size=1.0, step=1.0, closed="left", partial=False, anchor="start")(
         _windows_source(), return_bounds=True)
 
     # Window 2 is evaluated on [0, 1) and lies on [2, 3) of the series; no
     # start snaps, so its bounds match the row.
-    assert windows[2].domain == Domain(0.0, 1.0, True, False)
+    assert windows[2].domain == Domain(TimeDelta(0, "s"), TimeDelta(1, "s"), True, False)
     assert windows[2].bounds() == Domain(2.0, 3.0, True, False)
     assert (windows[2].bounds().start, windows[2].bounds().end) == (bounds[2, 0], bounds[2, 1])
 
