@@ -276,6 +276,75 @@ def test_time_delta_rejects_a_number_without_a_unit():
         TimeDelta(3)
 
 
+def test_time_delta_of_integer_counts_keeps_them_as_an_int_tensor():
+    time_delta = TimeDelta([[30, 90],
+                            [240, 60]], "min")
+
+    assert isinstance(time_delta.count, sb.IntTensor)
+    assert time_delta.count.array_equal(sb.IntTensor(np.array([[30, 90],
+                                                               [240, 60]])))
+    assert time_delta.unit == "min"
+    assert time_delta.shape == (2, 2)
+
+
+def test_time_delta_of_float_counts_keeps_them_as_a_float_tensor():
+    time_delta = TimeDelta(sb.FloatTensor([0.5, 1.5]), "h")
+
+    assert time_delta.count.array_equal(sb.FloatTensor([0.5, 1.5]))
+
+
+def test_time_delta_of_a_timedelta64_array_is_in_its_resolution():
+    time_delta = TimeDelta(np.array([30, 90], dtype="timedelta64[m]"))
+
+    assert time_delta.array_equal(TimeDelta([30, 90], "min"))
+
+
+def test_time_delta_of_counts_indexes_to_time_deltas():
+    time_delta = TimeDelta([[30, 90],
+                            [240, 60]], "min")
+
+    assert time_delta[1, 0] == TimeDelta(240, "min")
+    assert time_delta[0].array_equal(TimeDelta([30, 90], "min"))
+    assert len(time_delta) == 2
+    assert [element.count for element in time_delta[1]] == [240, 60]
+
+
+def test_time_delta_of_float_counts_converts_to_microseconds():
+    durations = TimeDelta([0.5, 1.5], "h").to_timedelta64()
+
+    assert np.array_equal(durations, np.array([1_800_000_000, 5_400_000_000], dtype="timedelta64[us]"))
+    assert durations.dtype == np.dtype("timedelta64[us]")
+
+
+def test_time_delta_of_counts_is_unhashable():
+    with pytest.raises(TypeError, match="unhashable"):
+        hash(TimeDelta([30, 90], "min"))
+
+
+def test_time_delta_of_counts_survives_pickling():
+    time_delta = TimeDelta([0.5, 1.5], "h")
+
+    assert pickle.loads(pickle.dumps(time_delta)).array_equal(time_delta)
+
+
+def test_time_delta_of_counts_repr_shows_counts_and_unit():
+    assert repr(TimeDelta([30, 90], "min")) == "TimeDelta([30, 90], 'min')"
+
+
+@pytest.mark.parametrize("value, unit", [
+    pytest.param([1.0, np.nan], "h", id="nan"),
+    pytest.param(np.array([1, "NaT"], dtype="timedelta64[m]"), None, id="nat"),
+])
+def test_time_delta_rejects_counts_that_are_not_finite(value, unit):
+    with pytest.raises(ValueError):
+        TimeDelta(value, unit)
+
+
+def test_time_delta_rejects_counts_that_are_not_numbers():
+    with pytest.raises(TypeError):
+        TimeDelta([True, False], "h")
+
+
 def test_time_deltas_add_and_subtract_in_the_finer_unit():
     assert TimeDelta(1, "h") + TimeDelta(30, "min") == TimeDelta(90, "min")
     assert TimeDelta(1, "h") - TimeDelta(30, "min") == TimeDelta(30, "min")

@@ -8,6 +8,7 @@ from fractions import Fraction
 import numpy as np
 
 from .. import _sb_cpp as cpp
+from ..base_tensor import FloatTensor, IntTensor
 
 # NumPy datetime64 resolutions with a fixed length, and the matching Times
 # units. NumPy's "m" is minutes, which Times spells "min".
@@ -160,16 +161,25 @@ class TimeDelta:
     as a time series stores its times. Every day has 86400 seconds; weeks,
     months, and years, which have no fixed length, are not units.
 
+    A ``TimeDelta`` can also hold an array of counts in one unit, as in
+    ``TimeDelta(sb.FloatTensor([[30, 90], [240, 60]]), "min")``. Its
+    :attr:`count` is then an ``IntTensor`` of integers or a ``FloatTensor``
+    of floats. It has :attr:`shape`, ``len``, iteration, and indexing,
+    which gives a ``TimeDelta`` of one count or of an array of them, and
+    :meth:`to_timedelta64` gives a ``timedelta64`` array. It has no hash.
+
     Parameters
     ----------
-    value : np.timedelta64, datetime.timedelta, pd.Timedelta, TimeDelta, or number
-        The duration, such as ``np.timedelta64(3, "h")``. Its resolution is
-        kept: a ``timedelta`` counts microseconds, and a ``pd.Timedelta``
-        counts its own unit, such as nanoseconds. With ``unit``, a number of
-        ``unit``, as in ``TimeDelta(1.5, "h")``; a float that is a whole
-        number becomes an integer.
+    value : np.timedelta64, datetime.timedelta, pd.Timedelta, TimeDelta, number, or array_like
+        The duration, such as ``np.timedelta64(3, "h")``, or a
+        ``timedelta64`` array. Its resolution is kept: a ``timedelta``
+        counts microseconds, and a ``pd.Timedelta`` counts its own unit,
+        such as nanoseconds. With ``unit``, a number of ``unit``, as in
+        ``TimeDelta(1.5, "h")``, where a float that is a whole number
+        becomes an integer; or an ``IntTensor``, ``FloatTensor``, array, or
+        nested list of them.
     unit : str, optional
-        The unit of a number ``value``: one of ``"as"``, ``"fs"``, ``"ps"``,
+        The unit of numbers ``value``: one of ``"as"``, ``"fs"``, ``"ps"``,
         ``"ns"``, ``"us"``, ``"ms"``, ``"s"``, ``"min"``, ``"h"``, and
         ``"d"``.
 
@@ -178,8 +188,8 @@ class TimeDelta:
     TypeError
         If ``value`` is of another type, or is a number without ``unit``.
     ValueError
-        If ``value`` is ``NaT``, not finite, or has a resolution of weeks,
-        months, or years, or ``unit`` is unknown.
+        If ``value`` is or holds ``NaT``, is not finite, or has a resolution
+        of weeks, months, or years, or ``unit`` is unknown.
 
     Notes
     -----
@@ -202,8 +212,8 @@ class TimeDelta:
             if unit not in _UNIT_TO_NUMPY:
                 raise ValueError(f"Unknown unit {unit!r}; expected one of {', '.join(_UNIT_TO_NUMPY)}")
             if not isinstance(value, numbers.Real):
-                raise TypeError(f"Expected a number of {unit!r}; got {type(value).__name__}")
-            if isinstance(value, numbers.Integral):
+                self._count = _array_counts(value, unit)
+            elif isinstance(value, numbers.Integral):
                 self._count = int(value)
             else:
                 value = float(value)
@@ -220,20 +230,51 @@ class TimeDelta:
             value = value.to_timedelta64()
         elif isinstance(value, datetime.timedelta):
             value = np.timedelta64(value)
-        elif not isinstance(value, np.timedelta64):
+        elif not (isinstance(value, np.timedelta64)
+                  or (isinstance(value, np.ndarray) and np.issubdtype(value.dtype, np.timedelta64))):
             raise TypeError(f"Expected a timedelta, timedelta64, or TimeDelta; got {type(value).__name__}")
-        if np.isnat(value):
+        if np.isnat(value).any():
             raise ValueError("A TimeDelta cannot be NaT")
         code, step = np.datetime_data(value.dtype)
         if code not in _NUMPY_TO_UNIT:
             raise ValueError(f"A TimeDelta needs a unit of fixed length, not {code!r}")
-        self._count = int(value.astype(np.int64)) * step
+        counts = value.astype(np.int64) * step
+        self._count = IntTensor(counts) if counts.ndim else int(counts)
         self._unit = _NUMPY_TO_UNIT[code]
 
     @property
-    def count(self) -> int | float:
-        """The number of :attr:`unit` in the duration."""
+    def count(self) -> int | float | IntTensor | FloatTensor:
+        """The number of :attr:`unit` in the duration, or a tensor of them."""
         return self._count
+
+    @property
+    def shape(self) -> tuple[int, ...]:
+        """The shape of the counts, ``()`` for one duration."""
+        return tuple(self._count.shape) if isinstance(self._count, (IntTensor, FloatTensor)) else ()
+
+    @property
+    def ndim(self) -> int:
+        """The number of dimensions of the counts, 0 for one duration."""
+        return len(self.shape)
+
+    def __len__(self) -> int:
+        if not self.ndim:
+            raise TypeError("A single TimeDelta has no len()")
+        return self.shape[0]
+
+    def __getitem__(self, index) -> TimeDelta:
+        if not self.ndim:
+            raise TypeError("A single TimeDelta cannot be indexed")
+        return TimeDelta(self._count[index], self._unit)
+
+    def __iter__(self):
+        return (self[i] for i in range(len(self)))
+
+    def array_equal(self, other) -> bool:
+        """Whether ``other`` is a ``TimeDelta`` with the same shape, counts,
+        and unit."""
+        return (isinstance(other, TimeDelta) and self._unit == other._unit
+                and np.array_equal(np.asarray(self._count), np.asarray(other._count)))
 
     @property
     def unit(self) -> str:
@@ -254,10 +295,14 @@ class TimeDelta:
             If ``resolution`` is unknown.
         """
         if resolution is None:
-            fine = isinstance(self._count, int) or _ATTOSECONDS[self._unit] < _ATTOSECONDS["us"]
+            fine = isinstance(self._count, (int, IntTensor)) or _ATTOSECONDS[self._unit] < _ATTOSECONDS["us"]
             resolution = self._unit if fine else "us"
         if resolution not in _ATTOSECONDS:
             raise ValueError(f"Unknown resolution {resolution!r}; expected one of {', '.join(_ATTOSECONDS)}")
+        if self.ndim:
+            # Each count rounded exactly, as a single count is.
+            steps = [TimeDelta(count, self._unit).to_timedelta64(resolution) for count in np.asarray(self._count).flat]
+            return np.array(steps, dtype=f"timedelta64[{_UNIT_TO_NUMPY[resolution]}]").reshape(self.shape)
         steps = round(Fraction(self._count) * _ATTOSECONDS[self._unit] / _ATTOSECONDS[resolution])
         return np.timedelta64(steps, _UNIT_TO_NUMPY[resolution])
 
@@ -321,10 +366,28 @@ class TimeDelta:
         return TimeDelta, (self._count, self._unit)
 
     def __hash__(self):
+        if self.ndim:
+            raise TypeError("A TimeDelta of an array of counts is unhashable")
         return hash((self._count, self._unit))
 
     def __repr__(self):
-        return f"TimeDelta({self._count}, {self._unit!r})"
+        count = np.array2string(np.asarray(self._count), separator=", ") if self.ndim else self._count
+        return f"TimeDelta({count}, {self._unit!r})"
+
+
+def _array_counts(value, unit):
+    """``value``, an array-like of numbers of ``unit``, as an ``IntTensor`` of
+    integers or a ``FloatTensor`` of floats."""
+    counts = np.asarray(value)
+    if counts.ndim == 0:
+        raise TypeError(f"Expected a number or an array of numbers of {unit!r}; got {type(value).__name__}")
+    if np.issubdtype(counts.dtype, np.integer):
+        return IntTensor(counts.astype(np.int64))
+    if np.issubdtype(counts.dtype, np.floating):
+        if not np.isfinite(counts).all():
+            raise ValueError("A TimeDelta needs finite counts")
+        return FloatTensor(counts.astype(np.float64))
+    raise TypeError(f"Expected numbers of {unit!r}; got {counts.dtype} counts")
 
 
 def _as_time_delta(value):

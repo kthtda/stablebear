@@ -1,6 +1,6 @@
 # pandas input and durations for time series: implementation plan
 
-Progress: 10 of 39 items, 15 of 70 points (21%)
+Progress: 11 of 39 items, 17 of 70 points (24%)
 
 Specs: [pandas-timeseries-spec.md](pandas-timeseries-spec.md) (phases A, B,
 and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
@@ -100,7 +100,7 @@ and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
   Tests: `timedelta64[m]` is in minutes; a `TimeDelta` list is in its
   finest unit; `timedelta64[ms]` in `unit="s"` gives exact seconds;
   `datetime64[m]` is in minutes; `TimedeltaIndex` equals its array.
-- [ ] **D2.** [2] `TimeSeries.evaluate` accepts durations, single or arrays,
+- [x] **D2.** [2] (432122132) `TimeSeries.evaluate` accepts durations, single or arrays,
   as times from time 0, with or without an epoch.
   Tests: `TimeDelta(90, "min")` on a series in hours equals 1.5; a
   `timedelta64` array; a window evaluated at a duration from its start.
