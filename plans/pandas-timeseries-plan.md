@@ -1,6 +1,6 @@
 # pandas input and durations for time series: implementation plan
 
-Progress: 10 of 36 items, 15 of 63 points (24%)
+Progress: 10 of 39 items, 15 of 70 points (21%)
 
 Specs: [pandas-timeseries-spec.md](pandas-timeseries-spec.md) (phases A, B,
 and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
@@ -68,6 +68,28 @@ and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
   Note: `_duration` now turns every duration into a `TimeDelta`, so
   `Window.size`, `Window.step`, and `TimeDelayEmbedding.delay` already are
   one for duration input, and their reprs show it; E6 is left with numbers.
+- [ ] **C4.** `TimeDelta` holds an array of counts in one unit.
+  - [ ] **C4a.** [3] `TimeDelta(counts, unit)` for a `FloatTensor`,
+    `IntTensor`, `ndarray`, or nested list, kept as a `FloatTensor` or
+    `IntTensor`, and a `timedelta64` array at its resolution: `count`,
+    `shape`, `ndim`, `len`, iteration, indexing, `to_timedelta64`,
+    `array_equal`, `repr`, and pickling; no hash; update the docstring.
+    Tests: integer counts stay an `IntTensor`; a `timedelta64[m]` array is
+    in minutes; indexing one element gives a scalar `TimeDelta`;
+    `to_timedelta64` of float counts rounds to microseconds; hashing
+    raises; pickling round trip.
+  - [ ] **C4b.** [2] Elementwise arithmetic and comparisons on array
+    `TimeDelta`, in the finer unit by exact factors; `==` and `!=` give a
+    `BoolTensor`; `DateTime` arithmetic rejects array counts.
+    Tests: array plus scalar in another unit; `* 0.5`; `<` against a
+    scalar; `==` of the same lengths in different units is all false;
+    `DateTime + array` raises `TypeError`.
+  - [ ] **C4c.** [2] `evaluate` and `Times` take an array `TimeDelta` as an
+    array of durations.
+    Tests: `TimeDelta(sb.FloatTensor([[30, 90], [240, 60]]), "min")` on a
+    series in hours equals evaluating `[[0.5, 1.5], [4.0, 1.0]]`;
+    `Times(TimeDelta(sb.IntTensor([0, 90]), "min"))` equals
+    `Times(np.array([0, 90], dtype="timedelta64[m]"))`.
 
 ## Phase D: durations as input
 

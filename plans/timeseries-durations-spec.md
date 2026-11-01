@@ -53,8 +53,28 @@ as a time series stores its times.
   - comparisons of `DateTime`.
 - It rejects `NaT`, counts that are not finite, and weeks, months, and
   years.
+- The count can also be an array of counts in one unit, as in
+  `TimeDelta(sb.FloatTensor([[30, 90], [240, 60]]), "min")`. With `unit`,
+  `value` is then a `FloatTensor`, `IntTensor`, `ndarray`, or nested list
+  of numbers, kept as a `FloatTensor`, or an `IntTensor` for integers so
+  that their counts stay exact; a `timedelta64` array is kept likewise at
+  its resolution. An array `TimeDelta` works as a scalar one does,
+  elementwise:
+  - it has `shape`, `ndim`, `len`, iteration, and indexing, which gives a
+    scalar `TimeDelta` for one element and an array one otherwise;
+  - `count` is the tensor; `to_timedelta64` gives a `timedelta64` array;
+  - arithmetic, by an exact factor per element, gives an array
+    `TimeDelta`, and `<`, `<=`, `>`, `>=`, `==`, and `!=` give a
+    `BoolTensor`, as tensors do; `==` compares count and unit, as for a
+    scalar. `array_equal` tells whether two are equal as a whole;
+  - it has `repr` and pickling but no hash.
+
+  `DateTime` arithmetic takes scalar `TimeDelta` only, since there is no
+  array of `DateTime`.
 - A `TimeDelta` given to `Window`, `TimeDelayEmbedding`, or `evaluate` is
   converted to the series' unit by an exact factor, without rounding.
+  `evaluate` and `Times` take an array `TimeDelta` as an array of
+  durations.
 - `TimeDelta` is Python only; nothing in C++ stores a duration.
 
 ## Inputs
