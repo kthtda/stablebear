@@ -1,6 +1,6 @@
 # pandas input and durations for time series: implementation plan
 
-Progress: 13 of 41 items, 22 of 75 points (29%)
+Progress: 14 of 41 items, 25 of 75 points (33%)
 
 Specs: [pandas-timeseries-spec.md](pandas-timeseries-spec.md) (phases A, B,
 and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
@@ -84,7 +84,7 @@ and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
     Tests: array plus scalar in another unit; `* 0.5`; `<` against a
     scalar; `==` of the same lengths in different units is all false;
     `DateTime + array` raises `TypeError`.
-  - [ ] **C4d.** [3] `DateTime` holds an array of instants: from a
+  - [x] **C4d.** [3] (56199584d) `DateTime` holds an array of instants: from a
     `datetime64` array, a `DatetimeIndex` or `Series` of dates, or a
     sequence of values a scalar accepts, kept as an `IntTensor` at their
     resolution; `shape`, `ndim`, `len`, iteration, indexing,

@@ -105,9 +105,10 @@ class DateTime(_Counts):
     :attr:`count` is then an ``IntTensor``. It has :attr:`shape`, ``len``,
     iteration, and indexing, which gives a ``DateTime`` of one instant or
     of an array of them, and :meth:`to_datetime64` gives a ``datetime64``
-    array. Comparisons, ``==`` and ``!=`` included, give a ``BoolTensor``,
-    as they do on tensors; :meth:`array_equal` compares two as a whole. It
-    has no hash, and an epoch is a ``DateTime`` of one instant.
+    array. Arithmetic works elementwise, and comparisons, ``==`` and ``!=``
+    included, give a ``BoolTensor``, as they do on tensors;
+    :meth:`array_equal` compares two as a whole. It has no hash, and an
+    epoch is a ``DateTime`` of one instant.
 
     Parameters
     ----------
@@ -211,7 +212,7 @@ class DateTime(_Counts):
         return self._compare(other, operator.ge)
 
     def __add__(self, other):
-        other = _single_duration(other)
+        other = _as_time_delta(other)
         if other is None:
             return NotImplemented
         return DateTime(self.to_datetime64() + other.to_timedelta64())
@@ -221,7 +222,7 @@ class DateTime(_Counts):
     def __sub__(self, other):
         if isinstance(other, DateTime):
             return TimeDelta(self.to_datetime64() - other.to_datetime64())
-        other = _single_duration(other)
+        other = _as_time_delta(other)
         if other is None:
             return NotImplemented
         return DateTime(self.to_datetime64() - other.to_timedelta64())
@@ -250,8 +251,7 @@ class TimeDelta(_Counts):
     :meth:`to_timedelta64` gives a ``timedelta64`` array. Arithmetic works
     elementwise, and comparisons, ``==`` and ``!=`` included, give a
     ``BoolTensor``, as they do on tensors; :meth:`array_equal` compares two
-    as a whole. It has no hash, and a :class:`DateTime` takes only a
-    ``TimeDelta`` of one count.
+    as a whole. It has no hash.
 
     Parameters
     ----------
@@ -440,15 +440,6 @@ def _array_counts(value, unit):
 def _as_boolean(equal):
     """``equal``, a NumPy result, as a ``bool`` or a ``BoolTensor``."""
     return BoolTensor(equal) if np.ndim(equal) else bool(equal)
-
-
-def _single_duration(value):
-    """``value`` as a :class:`TimeDelta` of one count if it is a duration,
-    else ``None``."""
-    duration = _as_time_delta(value)
-    if duration is not None and duration.ndim:
-        raise TypeError("A DateTime takes a single duration, not an array of them")
-    return duration
 
 
 def _as_time_delta(value):

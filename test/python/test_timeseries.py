@@ -416,9 +416,23 @@ def test_time_deltas_of_counts_are_equal_only_at_the_same_resolution():
     assert (minutes != TimeDelta([0.5, 1.5], "h")).array_equal(sb.BoolTensor([True, True]))
 
 
-def test_date_time_rejects_a_time_delta_of_counts():
-    with pytest.raises(TypeError, match="single duration"):
-        DateTime("2023-01-01") + TimeDelta([30, 90], "min")
+def test_date_time_plus_time_delta_of_counts_gives_each_instant():
+    instants = DateTime("2023-01-01") + TimeDelta([30, 90], "min")
+
+    assert instants.array_equal(DateTime(["2023-01-01T00:30", "2023-01-01T01:30"]))
+
+
+def test_date_time_of_instants_minus_a_date_time_is_a_time_delta_of_counts():
+    durations = DateTime(["2023-01-01T00:30", "2023-01-01T01:30"]) - DateTime("2023-01-01")
+
+    assert durations.array_equal(TimeDelta([30, 90], "min"))
+
+
+def test_date_time_of_instants_minus_a_float_count_is_in_microseconds():
+    instants = DateTime(["2023-01-01T01:00", "2023-01-01T02:00"]) - TimeDelta(0.5, "min")
+
+    assert instants.array_equal(DateTime(np.array(["2023-01-01T00:59:30", "2023-01-01T01:59:30"],
+                                                  dtype="datetime64[us]")))
 
 
 def test_time_deltas_add_and_subtract_in_the_finer_unit():
