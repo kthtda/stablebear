@@ -1,6 +1,6 @@
 # pandas input and durations for time series: implementation plan
 
-Progress: 16 of 40 items, 30 of 74 points (41%)
+Progress: 17 of 43 items, 32 of 80 points (40%)
 
 Specs: [pandas-timeseries-spec.md](pandas-timeseries-spec.md) (phases A, B,
 and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
@@ -127,14 +127,29 @@ and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
 
 ## Phase E: durations and dates as output
 
-- [ ] **E1.** [2] `np.asarray(times)` gives `datetime64` or `timedelta64` at
+- [x] **E1.** [2] (2f30d0933) `np.asarray(times)` gives `datetime64` or `timedelta64` at
   the finer of the unit and microseconds; add `Times.to_floats(unit=None)`
   and use it in `plot_timeseries` and other internal callers.
   Tests: dated and undated times; nanosecond unit kept; `to_floats` in
   another unit.
-- [ ] **E2.** [2] `TimeSeries.times` of several channels is a tuple of
-  `Times`.
-  Tests: two channels with different times and units.
+- [ ] **E2.** `TimesTensor`, and times of several channels and of tensors
+  of series in it.
+  - [ ] **E2a.** [3] C++: an empty default `sb::Times`, and
+    `Tensor<sb::Times>` registered in both modules. Python: `TimesTensor`
+    with dtype `sb.times` in `stablebear/typing.py`, indexing to `Times`,
+    assignment, `copy`, `array_equal`; with its docstring.
+    Tests: a tensor of two `Times` in different units indexes back to
+    each; assigning a `Times`; `copy` is independent; `array_equal`
+    compares units and epochs.
+  - [ ] **E2b.** [2] Save and load a `TimesTensor`.
+    Tests: round trip with and without epochs, in two units.
+  - [ ] **E2c.** [1] `TimeSeries.times` of several channels is a
+    `TimesTensor` of shape `(n_channels,)`.
+    Tests: two channels with different times and units.
+  - [ ] **E2d.** [2] `TimeSeriesTensor.times` is a `TimesTensor` of its
+    shape, with a last axis of channels for series of several channels.
+    Tests: the times of windows equal each window's `times`; windows of
+    two channels have shape `(n_windows, 2)`.
 - [ ] **E3.** [2] `TimeSeries.domain` has `DateTime` or `TimeDelta` ends;
   a dated window's domain is where it lies.
   Tests: undated series; dated series; dated window; closed ends kept.

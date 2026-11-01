@@ -135,8 +135,12 @@ finer units narrow that range, to 1678-2262 for nanoseconds.
   floats. `Times.to_floats(unit=None)` gives the float64 timestamps, in
   `unit` or the unit of the times, for code that needs numbers.
   `to_datetime64` stays.
-- **`TimeSeries.times`** for several channels is a tuple of `Times`, one per
-  channel, instead of a float `NestedTensor`.
+- **`TimeSeries.times`** for several channels is a `TimesTensor` of shape
+  `(n_channels,)`, one `Times` per channel in the series' unit, instead of
+  a float `NestedTensor`.
+- **`TimeSeriesTensor.times`** is a `TimesTensor` of the tensor's shape,
+  one `Times` per series, such as the times of every window, with a last
+  axis of `n_channels` for series of several channels.
 - **`TimeSeries.domain`** has `DateTime` or `TimeDelta` ends. For a series
   with an epoch, these are the instants it can be evaluated at, so a
   window's domain is where it lies.
@@ -149,6 +153,20 @@ finer units narrow that range, to 1678-2262 for nanoseconds.
   `FloatTensor`.
 - **`Window.size`, `Window.step`, and `TimeDelayEmbedding.delay`** are
   `TimeDelta`.
+
+## `TimesTensor`
+
+`TimesTensor` is a tensor whose elements are `Times`, with dtype
+`sb.times`, as `TimeSeriesTensor` holds `TimeSeries`. Each element keeps
+its own timestamps, unit, and epoch.
+
+- It is a C++ `Tensor<sb::Times>`, registered with the other element types
+  in both the CPU and CUDA modules; `sb::Times` gains an empty default.
+- It has what other tensors of objects have: `shape`, indexing to a
+  `Times` or a `TimesTensor`, assignment of a `Times`, `copy`,
+  `array_equal`, iteration, and saving and loading.
+- It has no NumPy conversion, since its elements differ in length; index
+  it to get a `Times`, then convert that.
 
 ## Unchanged
 
