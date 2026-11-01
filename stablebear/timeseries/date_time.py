@@ -3,12 +3,13 @@ from __future__ import annotations
 import datetime
 import math
 import numbers
+import operator
 from fractions import Fraction
 
 import numpy as np
 
 from .. import _sb_cpp as cpp
-from ..base_tensor import FloatTensor, IntTensor
+from ..base_tensor import BoolTensor, FloatTensor, IntTensor
 
 # NumPy datetime64 resolutions with a fixed length, and the matching Times
 # units. NumPy's "m" is minutes, which Times spells "min".
@@ -129,7 +130,7 @@ class DateTime:
         return self.to_datetime64() >= other.to_datetime64()
 
     def __add__(self, other):
-        other = _as_time_delta(other)
+        other = _single_duration(other)
         if other is None:
             return NotImplemented
         return DateTime(self.to_datetime64() + other.to_timedelta64())
@@ -139,7 +140,7 @@ class DateTime:
     def __sub__(self, other):
         if isinstance(other, DateTime):
             return TimeDelta(self.to_datetime64() - other.to_datetime64())
-        other = _as_time_delta(other)
+        other = _single_duration(other)
         if other is None:
             return NotImplemented
         return DateTime(self.to_datetime64() - other.to_timedelta64())
@@ -166,7 +167,11 @@ class TimeDelta:
     :attr:`count` is then an ``IntTensor`` of integers or a ``FloatTensor``
     of floats. It has :attr:`shape`, ``len``, iteration, and indexing,
     which gives a ``TimeDelta`` of one count or of an array of them, and
-    :meth:`to_timedelta64` gives a ``timedelta64`` array. It has no hash.
+    :meth:`to_timedelta64` gives a ``timedelta64`` array. Arithmetic works
+    elementwise, and comparisons, ``==`` and ``!=`` included, give a
+    ``BoolTensor``, as they do on tensors; :meth:`array_equal` compares two
+    as a whole. It has no hash, and a :class:`DateTime` takes only a
+    ``TimeDelta`` of one count.
 
     Parameters
     ----------
@@ -306,34 +311,48 @@ class TimeDelta:
         steps = round(Fraction(self._count) * _ATTOSECONDS[self._unit] / _ATTOSECONDS[resolution])
         return np.timedelta64(steps, _UNIT_TO_NUMPY[resolution])
 
-    def __eq__(self, other):
+    def __eq__(self, other) -> bool | BoolTensor:
         if not isinstance(other, TimeDelta):
             return NotImplemented
-        return (self._count, self._unit) == (other._count, other._unit)
+        return _as_boolean(np.equal(self._counts(), other._counts()) & (self._unit == other._unit))
+
+    def __ne__(self, other) -> bool | BoolTensor:
+        if not isinstance(other, TimeDelta):
+            return NotImplemented
+        return _as_boolean(np.not_equal(self._counts(), other._counts()) | (self._unit != other._unit))
+
+    def _counts(self):
+        """The count, or an array of the counts."""
+        return np.asarray(self._count) if self.ndim else self._count
 
     def _length(self):
         """The duration in attoseconds, exactly."""
         return Fraction(self._count) * _ATTOSECONDS[self._unit]
 
-    def __lt__(self, other):
+    def _compare(self, other, compare):
         other = _as_time_delta(other)
-        return NotImplemented if other is None else self._length() < other._length()
+        if other is None:
+            return NotImplemented
+        if not (self.ndim or other.ndim):
+            return compare(self._length(), other._length())
+        unit = min(self._unit, other._unit, key=_ATTOSECONDS.__getitem__)
+        return BoolTensor(compare(self._in(unit), other._in(unit)))
 
-    def __le__(self, other):
-        other = _as_time_delta(other)
-        return NotImplemented if other is None else self._length() <= other._length()
+    def __lt__(self, other) -> bool | BoolTensor:
+        return self._compare(other, operator.lt)
 
-    def __gt__(self, other):
-        other = _as_time_delta(other)
-        return NotImplemented if other is None else self._length() > other._length()
+    def __le__(self, other) -> bool | BoolTensor:
+        return self._compare(other, operator.le)
 
-    def __ge__(self, other):
-        other = _as_time_delta(other)
-        return NotImplemented if other is None else self._length() >= other._length()
+    def __gt__(self, other) -> bool | BoolTensor:
+        return self._compare(other, operator.gt)
+
+    def __ge__(self, other) -> bool | BoolTensor:
+        return self._compare(other, operator.ge)
 
     def _in(self, unit):
         """The count in ``unit``, a unit at least as fine, by an exact factor."""
-        return self._count * (_ATTOSECONDS[self._unit] // _ATTOSECONDS[unit])
+        return self._counts() * (_ATTOSECONDS[self._unit] // _ATTOSECONDS[unit])
 
     def __add__(self, other):
         other = _as_time_delta(other)
@@ -353,12 +372,12 @@ class TimeDelta:
         return NotImplemented if other is None else other + -self
 
     def __neg__(self):
-        return TimeDelta(-self._count, self._unit)
+        return TimeDelta(-self._counts(), self._unit)
 
     def __mul__(self, factor):
         if not isinstance(factor, numbers.Real):
             return NotImplemented
-        return TimeDelta(self._count * factor, self._unit)
+        return TimeDelta(self._counts() * factor, self._unit)
 
     __rmul__ = __mul__
 
@@ -388,6 +407,20 @@ def _array_counts(value, unit):
             raise ValueError("A TimeDelta needs finite counts")
         return FloatTensor(counts.astype(np.float64))
     raise TypeError(f"Expected numbers of {unit!r}; got {counts.dtype} counts")
+
+
+def _as_boolean(equal):
+    """``equal``, a NumPy result, as a ``bool`` or a ``BoolTensor``."""
+    return BoolTensor(equal) if np.ndim(equal) else bool(equal)
+
+
+def _single_duration(value):
+    """``value`` as a :class:`TimeDelta` of one count if it is a duration,
+    else ``None``."""
+    duration = _as_time_delta(value)
+    if duration is not None and duration.ndim:
+        raise TypeError("A DateTime takes a single duration, not an array of them")
+    return duration
 
 
 def _as_time_delta(value):

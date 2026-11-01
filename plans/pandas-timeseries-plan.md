@@ -1,6 +1,6 @@
 # pandas input and durations for time series: implementation plan
 
-Progress: 11 of 39 items, 17 of 70 points (24%)
+Progress: 12 of 39 items, 20 of 70 points (29%)
 
 Specs: [pandas-timeseries-spec.md](pandas-timeseries-spec.md) (phases A, B,
 and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
@@ -69,7 +69,7 @@ and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
   `Window.size`, `Window.step`, and `TimeDelayEmbedding.delay` already are
   one for duration input, and their reprs show it; E6 is left with numbers.
 - [ ] **C4.** `TimeDelta` holds an array of counts in one unit.
-  - [ ] **C4a.** [3] `TimeDelta(counts, unit)` for a `FloatTensor`,
+  - [x] **C4a.** [3] (5d5d0c882) `TimeDelta(counts, unit)` for a `FloatTensor`,
     `IntTensor`, `ndarray`, or nested list, kept as a `FloatTensor` or
     `IntTensor`, and a `timedelta64` array at its resolution: `count`,
     `shape`, `ndim`, `len`, iteration, indexing, `to_timedelta64`,

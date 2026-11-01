@@ -345,6 +345,37 @@ def test_time_delta_rejects_counts_that_are_not_numbers():
         TimeDelta([True, False], "h")
 
 
+def test_time_delta_of_counts_plus_a_time_delta_is_in_the_finer_unit():
+    total = TimeDelta([30, 90], "min") + TimeDelta(1, "h")
+
+    assert total.array_equal(TimeDelta([90, 150], "min"))
+
+
+def test_time_delta_of_counts_multiplies_each_count():
+    product = TimeDelta([30, 90], "min") * 0.5
+
+    assert product.array_equal(TimeDelta([15.0, 45.0], "min"))
+
+
+def test_time_delta_of_counts_compares_each_length():
+    shorter = TimeDelta([30, 90], "min") < TimeDelta(1, "h")
+
+    assert shorter.array_equal(sb.BoolTensor(np.array([True, False])))
+
+
+def test_time_deltas_of_counts_are_equal_only_at_the_same_resolution():
+    minutes = TimeDelta([30, 90], "min")
+
+    assert (minutes == TimeDelta([30, 90], "min")).array_equal(sb.BoolTensor(np.array([True, True])))
+    assert (minutes == TimeDelta([0.5, 1.5], "h")).array_equal(sb.BoolTensor(np.array([False, False])))
+    assert (minutes != TimeDelta([0.5, 1.5], "h")).array_equal(sb.BoolTensor(np.array([True, True])))
+
+
+def test_date_time_rejects_a_time_delta_of_counts():
+    with pytest.raises(TypeError, match="single duration"):
+        DateTime("2023-01-01") + TimeDelta([30, 90], "min")
+
+
 def test_time_deltas_add_and_subtract_in_the_finer_unit():
     assert TimeDelta(1, "h") + TimeDelta(30, "min") == TimeDelta(90, "min")
     assert TimeDelta(1, "h") - TimeDelta(30, "min") == TimeDelta(30, "min")
