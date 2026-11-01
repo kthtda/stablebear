@@ -7,7 +7,7 @@ import pytest
 import stablebear as sb
 from stablebear import FloatTensor
 from stablebear.timeseries import DateTime, Domain, TimeDelayEmbedding, TimeDelta, Times, TimeSeries, Window
-from stablebear.timeseries.series import TimeSeriesTensor
+from stablebear.timeseries.series import TimeSeriesTensor, TimesTensor
 
 from _element_values import TWO_ELEMENTS_OF_EVERY_DTYPE
 from _round_trip import ROUND_TRIPS
@@ -496,6 +496,42 @@ def test_windows_cut_every_channel_at_the_same_bounds():
     assert windows[0](0.5)[1][()] == -5.0
     with pytest.raises(ValueError, match=r"outside the domain \[0, 1\)"):
         windows[0](1.0)
+
+
+def test_times_of_windows_are_the_times_of_each_window():
+    windows = Window(size=2.0, step=1.0, closed="left", partial=False, anchor="start")(_windows_source())
+
+    times = windows.times
+
+    assert isinstance(times, TimesTensor)
+    assert times.shape == windows.shape
+    for i in range(windows.shape[0]):
+        assert times[i] == windows[i].times
+
+
+def test_times_of_windows_of_several_channels_have_an_axis_of_channels():
+    a = TimeSeries([0.0, 10.0, 25.0], times=Times([0.0, 1.0, 2.5], unit="s"))
+    b = TimeSeries([-5.0, -15.0, -30.0], times=Times([500.0, 1500.0, 3000.0], unit="ms"))
+    series = TimeSeries.from_channels([a, b], unit="s")
+    windows = Window(size=1.0, step=1.0, closed="left", partial=False, anchor="start")(series)
+
+    times = windows.times
+
+    assert times.shape == (windows.shape[0], 2)
+    for i in range(windows.shape[0]):
+        assert times[i].array_equal(windows[i].times)
+
+
+def test_times_of_series_of_different_numbers_of_channels_raise():
+    a = TimeSeries([0.0, 10.0, 20.0], times=Times([0.0, 1.0, 2.0], unit="s"))
+    b = TimeSeries([5.0, 15.0, 25.0], times=Times([0.0, 1.0, 2.0], unit="s"))
+    # Two windows of both channels; the first is replaced by one channel.
+    windows = Window(size=1.0, step=1.0, closed="left", partial=False, anchor="start")(
+        TimeSeries.from_channels([a, b], unit="s"))
+    windows[0] = a
+
+    with pytest.raises(ValueError, match=r"differ in their number of channels: \[1, 2\]"):
+        windows.times
 
 
 def _overlapping_windows():

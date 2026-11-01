@@ -957,6 +957,28 @@ class TimeSeriesTensor(Tensor):
     def _get_valid_setitem_dtypes(self):
         return [TimeSeries, TimeSeriesTensor]
 
+    @property
+    def times(self) -> TimesTensor:
+        """The times of every series, as :attr:`TimeSeries.times` gives
+        them, in a :class:`TimesTensor` of the tensor's shape. For series of
+        several channels, a last axis of ``n_channels`` holds the times of
+        each channel.
+
+        Raises
+        ------
+        ValueError
+            If the series differ in their number of channels.
+        """
+        elements = [self[index] for index in np.ndindex(*self.shape)]
+        n_channels = {element.n_channels for element in elements}
+        if len(n_channels) > 1:
+            raise ValueError(f"The series differ in their number of channels: {sorted(n_channels)}")
+        n = n_channels.pop() if n_channels else 1
+        times = TimesTensor([
+            Times._from_cpp(element._data.times(i)) for element in elements for i in range(n)
+        ])
+        return times.reshape((*self.shape, n) if n > 1 else tuple(self.shape))
+
     def evaluate(self, t, unit: str | None = None):
         """Every series evaluated at the times ``t``, as
         :meth:`TimeSeries.evaluate` does. Numeric ``t`` is in ``unit`` for

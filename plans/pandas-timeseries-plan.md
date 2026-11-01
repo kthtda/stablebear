@@ -1,6 +1,6 @@
 # pandas input and durations for time series: implementation plan
 
-Progress: 19 of 43 items, 37 of 80 points (46%)
+Progress: 20 of 43 items, 38 of 80 points (48%)
 
 Specs: [pandas-timeseries-spec.md](pandas-timeseries-spec.md) (phases A, B,
 and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
@@ -143,7 +143,7 @@ and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
     compares units and epochs.
   - [x] **E2b.** [2] (870e78f63) Save and load a `TimesTensor`.
     Tests: round trip with and without epochs, in two units.
-  - [ ] **E2c.** [1] `TimeSeries.times` of several channels is a
+  - [x] **E2c.** [1] (6a2d71e44) `TimeSeries.times` of several channels is a
     `TimesTensor` of shape `(n_channels,)`.
     Tests: two channels with different times and units.
   - [ ] **E2d.** [2] `TimeSeriesTensor.times` is a `TimesTensor` of its

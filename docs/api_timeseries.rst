@@ -7,6 +7,6 @@ Observations recorded at known times.
    :members:
 
 .. autoclass:: stablebear.timeseries.series.TimeSeriesTensor
-   :members: evaluate
+   :members: evaluate, times
 
 .. autoclass:: stablebear.timeseries.series.TimesTensor
