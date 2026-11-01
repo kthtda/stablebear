@@ -1,6 +1,6 @@
 # pandas input and durations for time series: implementation plan
 
-Progress: 21 of 43 items, 40 of 80 points (50%)
+Progress: 22 of 43 items, 42 of 80 points (52%)
 
 Specs: [pandas-timeseries-spec.md](pandas-timeseries-spec.md) (phases A, B,
 and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
@@ -150,7 +150,7 @@ and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
     shape, with a last axis of channels for series of several channels.
     Tests: the times of windows equal each window's `times`; windows of
     two channels have shape `(n_windows, 2)`.
-- [ ] **E3.** [2] `TimeSeries.domain` has `DateTime` or `TimeDelta` ends;
+- [x] **E3.** [2] (924050b7f) `TimeSeries.domain` has `DateTime` or `TimeDelta` ends;
   a dated window's domain is where it lies.
   Tests: undated series; dated series; dated window; closed ends kept.
 - [ ] **E4.** [2] `TimeSeries.origin` is a `TimeDelta` or a tuple of them;
