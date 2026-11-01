@@ -199,6 +199,9 @@ namespace sb
   class Times
   {
   public:
+    /// No timestamps, in seconds, as an element of a new tensor.
+    Times() = default;
+
     explicit Times(std::vector<float64_t> values, TimeUnit unit = TimeUnit::Seconds,
                    std::optional<DateTime> epoch = std::nullopt)
       : m_values(std::move(values)), m_unit(unit), m_epoch(epoch)
@@ -275,7 +278,7 @@ namespace sb
 
   private:
     std::vector<float64_t> m_values;
-    TimeUnit m_unit;
+    TimeUnit m_unit = TimeUnit::Seconds;
     std::optional<DateTime> m_epoch;
     float64_t m_origin = 0.0;
   };

@@ -9,7 +9,7 @@ import numpy as np
 
 from .. import _sb_cpp as cpp
 from .._binary_io import _BinaryIoMixin
-from .._tensor_base import IndexedElementTensor, Tensor
+from .._tensor_base import IndexedElementTensor, Tensor, _tensor_from_nested
 from ..base_tensor import FloatTensor, IntTensor
 from ..distance_matrix import DistanceMatrix
 from ..functional.pcf import Pcf
@@ -40,6 +40,7 @@ from ..typing import (
     uint32,
     uint64,
 )
+from ..typing import times as _times_dtype
 
 T = TypeVar("T")
 
@@ -893,6 +894,45 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
             f"TimeSeries(n_channels={self.n_channels}, dtype={self.dtype}, "
             f"unit={self.unit!r})"
         )
+
+
+class TimesTensor(Tensor):
+    """Tensor whose elements are :class:`Times`, each with its own
+    timestamps, unit, and epoch, such as the times of each channel of a
+    series. Its dtype is ``sb.times``.
+
+    It has no conversion to an array, since its elements differ in length;
+    index it to get a ``Times``, then convert that.
+
+    Parameters
+    ----------
+    data : list of Times, or TimesTensor
+        The elements, as a possibly nested list whose nesting gives the
+        shape, or a tensor to share the elements of.
+    """
+
+    def __init__(self, data):
+        super().__init__()
+        if isinstance(data, TimesTensor):
+            data = data._data
+        elif isinstance(data, (list, tuple)):
+            data = _tensor_from_nested(data, {cpp.Times: cpp.TimesTensor})
+        elif not isinstance(data, cpp.TimesTensor):
+            raise TypeError(f"Cannot create TimesTensor from {type(data)}")
+        self._data = data
+        self.dtype = _times_dtype
+
+    def _to_py_tensor(self, data):
+        return TimesTensor(data)
+
+    def _decay_value(self, val):
+        return val._data
+
+    def _represent_element(self, element):
+        return Times._from_cpp(element)
+
+    def _get_valid_setitem_dtypes(self):
+        return [Times, TimesTensor]
 
 
 class TimeSeriesTensor(Tensor):
