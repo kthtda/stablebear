@@ -1,9 +1,9 @@
 {
   "name": "stablebear-buttons",
   "displayName": "Stablebear buttons",
-  "description": "A Stablebear panel with actions for common development commands.",
+  "description": "A Stablebear panel with actions for common development commands and the progress of a plan.",
   "publisher": "stablebear",
-  "version": "0.0.11",
+  "version": "0.0.12",
   "private": true,
   "engines": {
     "vscode": "^1.90.0"
@@ -11,6 +11,7 @@
   "main": "./extension.js",
   "files": [
     "extension.js",
+    "plan.js",
     "logo.svg"
   ],
   "activationEvents": [
@@ -30,6 +31,11 @@
       {
         "command": "stablebear.openDocs",
         "title": "Stablebear: Open docs"
+      },
+      {
+        "command": "stablebear.selectPlan",
+        "title": "Stablebear: Select plan",
+        "icon": "$(list-selection)"
       }
     ],
     "taskDefinitions": [
@@ -42,6 +48,13 @@
       "editor/title": [
         {
           "command": "stablebear.openPanel",
+          "group": "navigation"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "stablebear.selectPlan",
+          "when": "view == stablebear.plan",
           "group": "navigation"
         }
       ]
@@ -61,6 +74,10 @@
           "id": "stablebear.actions",
           "name": "Actions",
           "type": "webview"
+        },
+        {
+          "id": "stablebear.plan",
+          "name": "Plan"
         }
       ]
     }
