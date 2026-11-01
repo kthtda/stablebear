@@ -8,6 +8,13 @@ protect. These principles apply when writing, reviewing, or changing tests.
 
 2. **Test one behavior at a time.** Multiple assertions are fine when they
    establish that behavior. Independent guarantees belong in separate tests.
+   The expected value should depend only on the behavior under test, not on
+   behavior that other tests cover. When a test checks a new way to express
+   an input, compare against an equivalent form that is already tested. For
+   example, a test that a window takes a duration checks
+   `window(np.timedelta64(1750, "ms")) == window(1.75)`, not that the window
+   holds a particular value at 1750 ms, which the tests of evaluating a
+   window cover.
 
 3. **Make expectations obvious.** Prefer small, explicit inputs and expected
    values. Avoid clever expressions, unexplained indices, and reference
