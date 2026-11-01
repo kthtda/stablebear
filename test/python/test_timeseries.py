@@ -16,9 +16,38 @@ from _round_trip import ROUND_TRIPS
 def test_times_keeps_values_and_unit():
     times = Times([0.0, 1.5, 4.0], unit="ms")
 
-    assert np.asarray(times).dtype == np.float64
-    assert np.array_equal(np.asarray(times), [0.0, 1.5, 4.0])
+    assert times.to_floats().dtype is sb.float64
+    assert np.array_equal(times.to_floats(), [0.0, 1.5, 4.0])
     assert times.unit == "ms"
+
+
+def test_times_without_an_epoch_as_an_array_are_durations():
+    times = Times([0.0, 1.5], unit="h")
+
+    expected = np.array([0, 5_400_000_000], dtype="timedelta64[us]")
+    assert np.asarray(times).dtype == expected.dtype
+    assert np.array_equal(np.asarray(times), expected)
+
+
+def test_times_with_an_epoch_as_an_array_are_dates():
+    times = Times([0.0, 1.5], unit="h", epoch="2023-01-01")
+
+    expected = np.array(["2023-01-01T00:00", "2023-01-01T01:30"], dtype="datetime64[us]")
+    assert np.asarray(times).dtype == expected.dtype
+    assert np.array_equal(np.asarray(times), expected)
+
+
+def test_times_finer_than_microseconds_as_an_array_keep_their_unit():
+    times = Times([0.0, 1.0], unit="ns")
+
+    assert np.asarray(times).dtype == np.dtype("timedelta64[ns]")
+    assert np.array_equal(np.asarray(times), np.array([0, 1], dtype="timedelta64[ns]"))
+
+
+def test_times_to_floats_in_another_unit():
+    times = Times([0.0, 1.5], unit="h")
+
+    assert times.to_floats("min").array_equal(sb.FloatTensor([0.0, 90.0], dtype=sb.float64))
 
 
 def test_times_of_timedelta64_are_in_its_resolution():
@@ -104,7 +133,7 @@ def test_times_cannot_be_assigned_to():
     with pytest.raises(TypeError):
         times[0] = 5.0
 
-    assert np.array_equal(np.asarray(times), [0.0, 1.0])
+    assert np.array_equal(times.to_floats(), [0.0, 1.0])
 
 
 @pytest.mark.parametrize("times, unit, target, expected", [
@@ -115,7 +144,7 @@ def test_times_cannot_be_assigned_to():
 def test_times_converts_units(times, unit, target, expected):
     converted = Times(times, unit=unit).to(target)
 
-    assert np.array_equal(np.asarray(converted), expected)
+    assert np.array_equal(converted.to_floats(), expected)
     assert converted.unit == target
 
 
@@ -543,7 +572,7 @@ def test_times_with_epoch_sets_replaces_and_removes_the_epoch():
 def test_times_with_epoch_keeps_the_timestamps_and_unit():
     times = Times([0.0, 1.5], unit="ms").with_epoch("2023-01-01")
 
-    assert sb.FloatTensor([0.0, 1.5], dtype=sb.float64).array_equal(sb.tensor(times))
+    assert sb.FloatTensor([0.0, 1.5], dtype=sb.float64).array_equal(times.to_floats())
     assert times.unit == "ms"
 
 
@@ -560,20 +589,20 @@ def test_times_from_datetimes_count_whole_units_from_the_first():
     times = Times(_stamps(), unit="min")
 
     assert times.epoch == DateTime(np.datetime64("2023-01-01T06:00", "m"))
-    assert sb.FloatTensor([0.0, 90.0, 1440.0], dtype=sb.float64).array_equal(sb.tensor(times))
+    assert sb.FloatTensor([0.0, 90.0, 1440.0], dtype=sb.float64).array_equal(times.to_floats())
 
 
 def test_times_from_datetimes_are_converted_to_the_unit():
     times = Times(_stamps(), unit="h")
 
-    assert sb.FloatTensor([0.0, 1.5, 24.0], dtype=sb.float64).array_equal(sb.tensor(times))
+    assert sb.FloatTensor([0.0, 1.5, 24.0], dtype=sb.float64).array_equal(times.to_floats())
 
 
 def test_times_from_datetimes_count_from_an_explicit_epoch():
     times = Times(_stamps(), unit="h", epoch="2023-01-01")
 
     assert times.epoch == DateTime("2023-01-01")
-    assert sb.FloatTensor([6.0, 7.5, 30.0], dtype=sb.float64).array_equal(sb.tensor(times))
+    assert sb.FloatTensor([6.0, 7.5, 30.0], dtype=sb.float64).array_equal(times.to_floats())
 
 
 def test_times_to_datetime64_defaults_to_microseconds():
@@ -840,7 +869,7 @@ def test_series_from_datetimes_counts_their_resolution_from_the_first():
 
     assert series.unit == "min"
     assert series.epoch == DateTime(np.datetime64("2023-01-01T06:00", "m"))
-    assert sb.FloatTensor([0.0, 1.0, 60.0], dtype=sb.float64).array_equal(sb.tensor(series.times))
+    assert sb.FloatTensor([0.0, 1.0, 60.0], dtype=sb.float64).array_equal(series.times.to_floats())
 
 
 def _dated_series():
@@ -1096,7 +1125,7 @@ def test_to_changes_the_query_unit():
     series = TimeSeries([10.0, 20.0], times=Times([0.0, 0.5], unit="s")).to("ms")
 
     assert series.unit == "ms"
-    assert np.array_equal(np.asarray(series.times), [0.0, 500.0])
+    assert np.array_equal(series.times.to_floats(), [0.0, 500.0])
     assert series(250.0) == 10.0
     assert series(500.0) == 20.0  # the last observation, in the new unit
 

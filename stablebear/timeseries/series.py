@@ -111,9 +111,11 @@ def _times_from_datetimes(stamps, unit, epoch):
 class Times:
     """Finite, strictly increasing timestamps in one physical time unit.
 
-    ``np.asarray(times)`` gives the timestamps as a new float64 array and
-    ``sb.tensor(times)`` as a ``FloatTensor``; changing either leaves the
-    timestamps unchanged.
+    ``np.asarray(times)`` gives the timestamps as a new array of dates and
+    times, ``datetime64``, if they have an :attr:`epoch`, as
+    :meth:`to_datetime64` does, and else of durations from time 0,
+    ``timedelta64``. Either is at the finer of :attr:`unit` and
+    microseconds. :meth:`to_floats` gives the timestamps as numbers.
 
     Parameters
     ----------
@@ -240,12 +242,23 @@ class Times:
         """
         return Times._from_cpp(self._data.to(unit))
 
+    def to_floats(self, unit: str | None = None) -> FloatTensor:
+        """The timestamps as float64 numbers of ``unit``, which defaults to
+        :attr:`unit`, converted as :meth:`to` converts them."""
+        data = self._data if unit is None else self._data.to(unit)
+        return FloatTensor(np.array(data.values))
+
     def __array__(self, dtype=None, copy=None):
-        """Return a float64 copy of the timestamps, so ``np.asarray(times)`` works."""
-        arr = np.array(self._data.values)
-        if dtype is not None:
-            arr = arr.astype(dtype, copy=False)
-        return arr
+        """Return the timestamps as a new ``datetime64`` or ``timedelta64``
+        array, so ``np.asarray(times)`` works."""
+        resolution = self.unit if _ATTOSECONDS[self.unit] < _ATTOSECONDS["us"] else "us"
+        if self.epoch is not None:
+            arr = self.to_datetime64(resolution)
+        else:
+            # One exact factor to the resolution, then one rounding.
+            steps = np.rint(np.asarray(self._data.to(resolution).values)).astype(np.int64)
+            arr = steps.astype(f"timedelta64[{_UNIT_TO_NUMPY[resolution]}]")
+        return arr if dtype is None else arr.astype(dtype, copy=False)
 
     def __len__(self) -> int:
         return len(self._data)
@@ -257,7 +270,7 @@ class Times:
 
     def __repr__(self):
         epoch = "" if self.epoch is None else f", epoch={self.epoch!r}"
-        return f"Times({np.asarray(self).tolist()!r}, unit={self.unit!r}{epoch})"
+        return f"Times({np.array(self._data.values).tolist()!r}, unit={self.unit!r}{epoch})"
 
 
 # Element dtype -> native series class. The tensor class wrapping the values
@@ -556,7 +569,7 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         if self._data.n_channels == 1:
             return Times._from_cpp(self._data.times(0))
         return NestedTensor([
-            np.asarray(Times._from_cpp(self._data.times(i)))
+            Times._from_cpp(self._data.times(i)).to_floats()
             for i in range(self._data.n_channels)
         ])
 

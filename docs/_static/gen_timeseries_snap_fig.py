@@ -12,7 +12,7 @@ HERE = Path(__file__).parent
 
 
 def _plot_steps(ax, series, color):
-    times = np.asarray(series.times.to("s"))
+    times = np.asarray(series.times.to_floats("s"))
     values = np.asarray(series.values)
     # Each step [t_i, t_{i+1}) is closed on the left and open on the right.
     for t0, t1, v in zip(times[:-1], times[1:], values[:-1]):
@@ -91,7 +91,7 @@ def plot_timeseries_vector_channel():
     # Channel v: the time axis as a line, with each vector above its time
     # and the queried vector below.
     ax_v.axhline(0, color=color, linewidth=1)
-    for t, x in zip(np.asarray(v.times), np.asarray(v.values)):
+    for t, x in zip(np.asarray(v.times.to_floats()), np.asarray(v.values)):
         ax_v.plot(t, 0, "o", color=color, markersize=6, zorder=5)
         ax_v.text(t, 0.25, column(x), ha="center", va="bottom", fontsize=14)
     ax_v.plot(query, 0, "s", color="tab:orange", markersize=7, zorder=6)
@@ -269,7 +269,7 @@ def plot_timeseries_windows():
     fig = plt.figure(figsize=(7, 4.4))
     grid = fig.add_gridspec(2, len(bounds), height_ratios=[1.4, 1])
     ax_signal = fig.add_subplot(grid[0, :])
-    ax_signal.step(np.asarray(signal.times.to("s")), np.asarray(signal.values),
+    ax_signal.step(np.asarray(signal.times.to_floats("s")), np.asarray(signal.values),
                    where="post", color=color, linewidth=1.5)
     # One bar per window above the signal, staggered so they do not overlap.
     # Each window is [a, b): closed at the start, open at the end.
@@ -329,7 +329,7 @@ def _plot_window_rows(rows, stacked=False):
     fig, (ax_signal, ax_rows) = plt.subplots(
         2, 1, figsize=(7, 1.9 + (row_height + 0.1) * n_rows), sharex=True,
         gridspec_kw={"height_ratios": [1.6, row_height * n_rows]})
-    ax_signal.step(np.asarray(signal.times.to("s")), np.asarray(signal.values),
+    ax_signal.step(np.asarray(signal.times.to_floats("s")), np.asarray(signal.values),
                    where="post", color=color, linewidth=1.5)
     ax_signal.set_ylim(-0.3, 3.4)
     ax_signal.set_yticks([0, 1, 2, 3])

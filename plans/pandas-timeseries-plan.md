@@ -1,6 +1,6 @@
 # pandas input and durations for time series: implementation plan
 
-Progress: 15 of 40 items, 27 of 74 points (36%)
+Progress: 16 of 40 items, 30 of 74 points (41%)
 
 Specs: [pandas-timeseries-spec.md](pandas-timeseries-spec.md) (phases A, B,
 and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
@@ -114,7 +114,7 @@ and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
   as times from time 0, with or without an epoch.
   Tests: `TimeDelta(90, "min")` on a series in hours equals 1.5; a
   `timedelta64` array; a window evaluated at a duration from its start.
-- [ ] **D3.** [3] `TimeSeriesTensor.evaluate` accepts durations, and
+- [x] **D3.** [3] (6c9281336) `TimeSeriesTensor.evaluate` accepts durations, and
   `evaluate` and `Times` take an array `TimeDelta` as an array of
   durations.
   Tests: windows at durations equal windows at their times in seconds;

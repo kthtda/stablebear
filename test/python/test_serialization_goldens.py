@@ -51,7 +51,7 @@ def _assert_series(actual, expected):
     assert actual.n_channels == len(expected["channels"])
     for i, channel in enumerate(expected["channels"]):
         one = actual[i]
-        _assert_array(one.times, channel["times"])
+        _assert_array(one.times.to_floats(), channel["times"])
         _assert_expected(one.values, channel["values"])
         for evaluation in channel["evaluations"]:
             if evaluation.get("outside"):

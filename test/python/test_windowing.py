@@ -29,9 +29,9 @@ def test_windows_are_a_tensor_of_series_of_the_source_dtype():
     assert windows.shape == (2,)
     assert windows[0].dtype is sb.float64
     assert windows[1].dtype is sb.float64
-    assert np.array_equal(np.asarray(windows[0].times), [0.0, 0.5, 1.5])
+    assert np.array_equal(windows[0].times.to_floats(), [0.0, 0.5, 1.5])
     assert np.array_equal(np.asarray(windows[0].values), [0.0, 5.0, 15.0])
-    assert np.array_equal(np.asarray(windows[1].times), [0.0, 0.5])
+    assert np.array_equal(windows[1].times.to_floats(), [0.0, 0.5])
     assert np.array_equal(np.asarray(windows[1].values), [15.0, 25.0])
 
 
@@ -193,7 +193,7 @@ def test_a_window_origin_places_its_observations_at_their_times_in_the_series():
     # 0 and 0.7 - 0.3, which rounds to 0.39999999999999997.
     window = Window(size=0.5, step=0.5, closed="left", partial=False, anchor="start")(series)[0]
 
-    placed = window.origin + sb.tensor(window.times)
+    placed = window.origin + window.times.to_floats()
     assert sb.allclose(placed, FloatTensor([0.3, 0.7], dtype=sb.float64), atol=0.0, rtol=4e-16)
 
 
@@ -218,7 +218,7 @@ def test_a_partial_window_ends_where_the_series_does():
     # The window at 3.0 would end at 6.0, after the series ends at 4.0.
     window = Window(size=3.0, step=3.0, closed="left", partial=True, anchor="start")(_partial_source())[1]
 
-    assert np.array_equal(np.asarray(window.times), [0.0, 1.0])
+    assert np.array_equal(window.times.to_floats(), [0.0, 1.0])
     assert np.array_equal(np.asarray(window.values), [30.0, 40.0])
     assert window(1.0) == 40.0
     with pytest.raises(ValueError, match=re.escape("outside the domain [0, 1]")):
@@ -230,7 +230,7 @@ def test_a_window_anchored_at_the_end_holds_the_last_observation():
     # then the observations at 2.0, 3.0, and 4.0.
     window = Window(size=3.0, step=3.0, closed="right", partial=False, anchor="end")(_partial_source())[0]
 
-    assert np.array_equal(np.asarray(window.times), [0.0, 1.0, 2.0, 3.0])
+    assert np.array_equal(window.times.to_floats(), [0.0, 1.0, 2.0, 3.0])
     assert np.array_equal(np.asarray(window.values), [10.0, 20.0, 30.0, 40.0])
     assert window(3.0) == 40.0
 
@@ -245,13 +245,13 @@ def test_a_partial_window_anchored_at_the_end_starts_where_the_series_does():
         [0.0, 1.0],
         [1.0, 4.0],
     ])
-    assert np.array_equal(np.asarray(windows[0].times), [0.0, 1.0])
+    assert np.array_equal(windows[0].times.to_floats(), [0.0, 1.0])
     assert np.array_equal(np.asarray(windows[0].values), [0.0, 10.0])
     assert windows[0](0.0) == 0.0
     assert windows[0](1.0) == 10.0
     # The full window (1.0, 4.0] holds the value at 1.0 just after its start,
     # then the observations at 2.0, 3.0, and 4.0.
-    assert np.array_equal(np.asarray(windows[1].times), [0.0, 1.0, 2.0, 3.0])
+    assert np.array_equal(windows[1].times.to_floats(), [0.0, 1.0, 2.0, 3.0])
     assert np.array_equal(np.asarray(windows[1].values), [10.0, 20.0, 30.0, 40.0])
     assert windows[1](3.0) == 40.0
 
@@ -270,7 +270,7 @@ def test_a_left_closed_partial_window_can_start_at_the_last_observation():
 
     # The window at 4.0 holds only the last observation.
     assert np.array_equal(np.asarray(bounds)[:, 0], [0.0, 2.0, 4.0])
-    assert np.array_equal(np.asarray(windows[2].times), [0.0])
+    assert np.array_equal(windows[2].times.to_floats(), [0.0])
     assert windows[2](0.0) == 40.0
 
 
@@ -289,7 +289,7 @@ def test_a_window_can_be_evaluated_from_its_start_up_to_its_end():
     # and 2.5.
     window = Window(size=2.0, step=1.0, closed="left", partial=False, anchor="start")(_windows_source())[1]
 
-    assert np.array_equal(np.asarray(window.times), [0.0, 0.5, 1.5])
+    assert np.array_equal(window.times.to_floats(), [0.0, 0.5, 1.5])
     assert np.array_equal(np.asarray(window.values), [5.0, 15.0, 25.0])
     assert window(0.0) == 5.0
     assert window(1.75) == 25.0
@@ -321,7 +321,7 @@ def test_a_window_between_observations_holds_the_value_at_its_start():
     # The window [3.0, 3.5) falls between the observations at 2.5 and 4.0.
     window = Window(size=0.5, step=0.5, closed="left", partial=False, anchor="start")(_windows_source())[6]
 
-    assert np.array_equal(np.asarray(window.times), [0.0])
+    assert np.array_equal(window.times.to_floats(), [0.0])
     assert np.array_equal(np.asarray(window.values), [25.0])
     assert window(0.25) == 25.0
 
@@ -339,7 +339,7 @@ def test_window_bounds_just_below_an_observation_reach_it():
     # The observation at 0.9 is the end of window 2, so only window 3 holds
     # it, at time 0.
     assert np.array_equal(np.asarray(windows[2].values), [6.0])
-    assert np.array_equal(np.asarray(windows[3].times), [0.0])
+    assert np.array_equal(windows[3].times.to_floats(), [0.0])
     assert np.array_equal(np.asarray(windows[3].values), [9.0])
 
 
@@ -428,7 +428,7 @@ def test_an_embedding_of_a_window_keeps_its_open_end():
 
     embedding = TimeDelayEmbedding(dimension=2, delay=0.4)(window)
 
-    assert np.array_equal(np.asarray(embedding.times), [0.4, 0.5, 0.9, 1.5, 1.9])
+    assert np.array_equal(embedding.times.to_floats(), [0.4, 0.5, 0.9, 1.5, 1.9])
     assert np.array_equal(np.asarray(embedding(1.95)), [25.0, 25.0])
     with pytest.raises(ValueError, match=r"outside the domain \[0.4, 2\)"):
         embedding(2.0)
@@ -442,7 +442,7 @@ def test_an_embedding_of_a_window_keeps_its_open_start_and_closed_end():
 
     embedding = TimeDelayEmbedding(dimension=2, delay=1.0)(window)
 
-    assert np.array_equal(np.asarray(embedding.times), [1.0, 2.0])
+    assert np.array_equal(embedding.times.to_floats(), [1.0, 2.0])
     assert np.array_equal(np.asarray(embedding(2.0)), [20.0, 20.0])
     with pytest.raises(ValueError, match=re.escape("outside the domain (1, 2]")):
         embedding(1.0)
@@ -455,7 +455,7 @@ def test_an_embedding_of_a_window_takes_no_history_from_before_the_window():
 
     embedding = TimeDelayEmbedding(dimension=2, delay=1.0)(window)
 
-    assert np.array_equal(np.asarray(embedding.times), [1.0, 1.5])
+    assert np.array_equal(embedding.times.to_floats(), [1.0, 1.5])
     assert np.array_equal(np.asarray(embedding.values), [[5.0, 15.0], [15.0, 25.0]])
     with pytest.raises(ValueError, match=r"outside the domain \[1, 2\)"):
         embedding(0.75)
@@ -471,7 +471,7 @@ def test_windows_of_an_embedding_hold_its_points():
         embedding, return_bounds=True)
 
     assert np.array_equal(np.asarray(bounds)[:, 0], [1.0, 2.0])
-    assert np.array_equal(np.asarray(windows[0].times), [0.0, 0.5, 1.5])
+    assert np.array_equal(windows[0].times.to_floats(), [0.0, 0.5, 1.5])
     assert np.array_equal(np.asarray(windows[0].values), [[0.0, 5.0], [5.0, 15.0], [15.0, 25.0]])
 
 

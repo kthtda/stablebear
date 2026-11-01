@@ -29,7 +29,7 @@ def _ms_series():
 def test_embedding_has_a_point_wherever_a_component_reaches_an_observation(direction, times, between):
     embedding = TimeDelayEmbedding(dimension=3, delay=1.0, direction=direction)(_ms_series())
 
-    assert np.array_equal(np.asarray(embedding.times), times)
+    assert np.array_equal(embedding.times.to_floats(), times)
     # Both directions give the same points, oldest first, at times 2 apart.
     assert np.array_equal(np.asarray(embedding.values), [
         [0.0, 10.0, 10.0],    # x(0.0), x(1.0), x(2.0)
@@ -84,7 +84,7 @@ def test_embedding_of_pcfs_stacks_delayed_pcfs():
 
     assert embedding.dtype is sb.pcf64
     assert embedding.shape == (2,)
-    assert np.array_equal(np.asarray(embedding.times), [1.0, 2.0])
+    assert np.array_equal(embedding.times.to_floats(), [1.0, 2.0])
     assert embedding.values.array_equal(sb.tensor([
         [pcfs[0], pcfs[1]],   # 1.0: x(0.0), x(1.0)
         [pcfs[1], pcfs[2]],   # 2.0: x(1.0), x(2.0)
@@ -184,7 +184,7 @@ def test_embedding_records_a_point_once_at_the_time_its_rounded_times_snap_to(ca
 
     embedding = TimeDelayEmbedding(dimension=2, delay=0.1)(series)
 
-    assert np.array_equal(np.asarray(embedding.times), case.embedding_times)
+    assert np.array_equal(embedding.times.to_floats(), case.embedding_times)
     assert np.array_equal(np.asarray(embedding.values), case.points)
 
 
@@ -195,7 +195,7 @@ def test_forward_embedding_records_a_point_at_the_observation_its_rounded_time_s
 
     # 0.3 - 0.1 is 0.19999999999999998, just below the observation at 0.2,
     # so the point is recorded at 0.2.
-    assert np.array_equal(np.asarray(embedding.times), [0.1, 0.2, 0.3])
+    assert np.array_equal(embedding.times.to_floats(), [0.1, 0.2, 0.3])
     assert np.array_equal(np.asarray(embedding.values), [
         [1.0, 2.0],   # 0.1: x(0.1), x(0.2)
         [2.0, 3.0],   # 0.2: x(0.2), x(0.3)
@@ -214,7 +214,7 @@ def test_embedding_reaches_components_many_observations_back():
     embedding = TimeDelayEmbedding(dimension=2, delay=6.0)(series)
 
     # Each older component is six observations before the newer one.
-    assert np.array_equal(np.asarray(embedding.times), [6.0, 7.0, 8.0])
+    assert np.array_equal(embedding.times.to_floats(), [6.0, 7.0, 8.0])
     assert np.array_equal(np.asarray(embedding.values), [
         [0.0, 60.0],    # 6.0: x(0.0), x(6.0)
         [10.0, 70.0],   # 7.0: x(1.0), x(7.0)
@@ -231,7 +231,7 @@ def test_embedding_allows_delayed_times_that_round_to_one_value():
 
     embedding = TimeDelayEmbedding(dimension=2, delay=1.0)(series)
 
-    assert np.array_equal(np.asarray(embedding.times), [-2.0, -1.5, last])
+    assert np.array_equal(embedding.times.to_floats(), [-2.0, -1.5, last])
     assert np.array_equal(np.asarray(embedding.values), [
         [-30.0, -25.0],   # -2.0: x(-3.0), x(-2.0)
         [-25.0, -25.0],   # -1.5: x(-2.5), x(-1.5)
@@ -252,7 +252,7 @@ def test_embedding_of_an_embedding_stacks_points():
     outer = TimeDelayEmbedding(dimension=2, delay=1.5)(inner)
 
     assert outer.shape == (2, 3)
-    assert np.array_equal(np.asarray(outer.times), [3.5, 4.0])
+    assert np.array_equal(outer.times.to_floats(), [3.5, 4.0])
     assert np.array_equal(np.asarray(outer.values), [
         # 3.5: inner(2.0), inner(3.5)
         [[0.0, 10.0, 10.0],
