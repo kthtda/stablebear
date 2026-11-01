@@ -188,6 +188,51 @@ def test_date_time_rejects_a_number():
         DateTime(0)
 
 
+def test_date_time_of_a_datetime64_array_is_in_its_resolution():
+    date_time = DateTime(np.array(["2023-01-01T00:30", "2023-01-01T01:30"], dtype="datetime64[m]"))
+
+    assert date_time.unit == "min"
+    assert date_time.shape == (2,)
+    assert isinstance(date_time.count, sb.IntTensor)
+
+
+def test_date_time_of_strings_is_in_their_finest_resolution():
+    date_time = DateTime(["2023-01-01", "2023-01-01T00:30:15"])
+
+    expected = np.array(["2023-01-01T00:00:00", "2023-01-01T00:30:15"], dtype="datetime64[s]")
+    assert date_time.unit == "s"
+    assert np.array_equal(date_time.to_datetime64(), expected)
+
+
+def test_date_time_of_instants_indexes_to_date_times():
+    date_time = DateTime(["2023-01-01T00:30", "2023-01-01T01:30"])
+
+    assert date_time[1] == DateTime("2023-01-01T01:30")
+    assert len(date_time) == 2
+
+
+def test_date_time_of_instants_compares_each_instant():
+    earlier = DateTime(["2023-01-01T00:30", "2023-01-01T01:30"]) < DateTime("2023-01-01T01:00")
+
+    assert earlier.array_equal(sb.BoolTensor([True, False]))
+
+
+def test_date_time_of_instants_is_unhashable():
+    with pytest.raises(TypeError, match="unhashable"):
+        hash(DateTime(["2023-01-01T00:30", "2023-01-01T01:30"]))
+
+
+def test_date_time_of_instants_survives_pickling():
+    date_time = DateTime(["2023-01-01T00:30", "2023-01-01T01:30"])
+
+    assert pickle.loads(pickle.dumps(date_time)).array_equal(date_time)
+
+
+def test_times_reject_an_epoch_of_instants():
+    with pytest.raises(TypeError, match="single DateTime"):
+        Times([0.0, 1.0], unit="h", epoch=DateTime(["2023-01-01", "2023-01-02"]))
+
+
 @pytest.mark.parametrize("value, unit, expected", [
     pytest.param(np.timedelta64(90, "m"), "min", np.timedelta64(90, "m"), id="timedelta64"),
     pytest.param(datetime.timedelta(hours=1), "us", np.timedelta64(3_600_000_000, "us"), id="timedelta"),
@@ -281,8 +326,8 @@ def test_time_delta_of_integer_counts_keeps_them_as_an_int_tensor():
                             [240, 60]], "min")
 
     assert isinstance(time_delta.count, sb.IntTensor)
-    assert time_delta.count.array_equal(sb.IntTensor(np.array([[30, 90],
-                                                               [240, 60]])))
+    assert time_delta.count.array_equal(sb.IntTensor([[30, 90],
+                                                      [240, 60]]))
     assert time_delta.unit == "min"
     assert time_delta.shape == (2, 2)
 
@@ -360,15 +405,15 @@ def test_time_delta_of_counts_multiplies_each_count():
 def test_time_delta_of_counts_compares_each_length():
     shorter = TimeDelta([30, 90], "min") < TimeDelta(1, "h")
 
-    assert shorter.array_equal(sb.BoolTensor(np.array([True, False])))
+    assert shorter.array_equal(sb.BoolTensor([True, False]))
 
 
 def test_time_deltas_of_counts_are_equal_only_at_the_same_resolution():
     minutes = TimeDelta([30, 90], "min")
 
-    assert (minutes == TimeDelta([30, 90], "min")).array_equal(sb.BoolTensor(np.array([True, True])))
-    assert (minutes == TimeDelta([0.5, 1.5], "h")).array_equal(sb.BoolTensor(np.array([False, False])))
-    assert (minutes != TimeDelta([0.5, 1.5], "h")).array_equal(sb.BoolTensor(np.array([True, True])))
+    assert (minutes == TimeDelta([30, 90], "min")).array_equal(sb.BoolTensor([True, True]))
+    assert (minutes == TimeDelta([0.5, 1.5], "h")).array_equal(sb.BoolTensor([False, False]))
+    assert (minutes != TimeDelta([0.5, 1.5], "h")).array_equal(sb.BoolTensor([True, True]))
 
 
 def test_date_time_rejects_a_time_delta_of_counts():

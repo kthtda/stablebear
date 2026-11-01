@@ -1,6 +1,6 @@
 # pandas input and durations for time series: implementation plan
 
-Progress: 12 of 41 items, 20 of 75 points (27%)
+Progress: 13 of 41 items, 22 of 75 points (29%)
 
 Specs: [pandas-timeseries-spec.md](pandas-timeseries-spec.md) (phases A, B,
 and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
@@ -78,7 +78,7 @@ and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
     in minutes; indexing one element gives a scalar `TimeDelta`;
     `to_timedelta64` of float counts rounds to microseconds; hashing
     raises; pickling round trip.
-  - [ ] **C4b.** [2] Elementwise arithmetic and comparisons on array
+  - [x] **C4b.** [2] (6ee6aeb71) Elementwise arithmetic and comparisons on array
     `TimeDelta`, in the finer unit by exact factors; `==` and `!=` give a
     `BoolTensor`; `DateTime` arithmetic rejects array counts.
     Tests: array plus scalar in another unit; `* 0.5`; `<` against a
