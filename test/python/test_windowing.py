@@ -297,6 +297,18 @@ def test_a_window_can_be_evaluated_from_its_start_up_to_its_end():
         window(2.0)
 
 
+@pytest.mark.parametrize("duration", [
+    pytest.param(TimeDelta(1750, "ms"), id="TimeDelta"),
+    pytest.param(np.timedelta64(1750, "ms"), id="timedelta64"),
+    pytest.param(datetime.timedelta(milliseconds=1750), id="timedelta"),
+])
+def test_a_window_at_a_duration_equals_the_window_at_its_time_in_the_unit(duration):
+    # The window [1.0, 3.0) in seconds.
+    window = Window(size=2.0, step=1.0, closed="left", partial=False, anchor="start")(_windows_source())[1]
+
+    assert window(duration) == window(1.75)
+
+
 def test_an_observation_at_a_window_boundary_is_only_in_the_later_window():
     windows = Window(size=1.5, step=1.5, closed="left", partial=False, anchor="start")(_windows_source())
 

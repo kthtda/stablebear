@@ -560,6 +560,57 @@ def test_singleton_series_evaluates_at_its_time():
     assert series(2.0) == 7.0
 
 
+def _hourly_series():
+    return TimeSeries([10.0, 20.0, 30.0], times=Times([0.0, 1.5, 4.0], unit="h"))
+
+
+@pytest.mark.parametrize("duration", [
+    pytest.param(TimeDelta(90, "min"), id="TimeDelta"),
+    pytest.param(np.timedelta64(90, "m"), id="timedelta64"),
+    pytest.param(datetime.timedelta(minutes=90), id="timedelta"),
+])
+def test_series_at_a_duration_equals_the_series_at_its_time_in_the_unit(duration):
+    series = _hourly_series()
+
+    assert series(duration) == series(1.5)
+
+
+def test_series_at_an_array_of_durations_equals_the_series_at_their_times():
+    series = _hourly_series()
+    durations = np.array([[30, 90], [240, 60]], dtype="timedelta64[m]")
+
+    values = series(durations)
+
+    assert values.shape == (2, 2)
+    assert values.array_equal(series([[0.5, 1.5], [4.0, 1.0]]))
+
+
+def test_series_at_a_list_of_time_deltas_equals_the_series_at_their_times():
+    series = _hourly_series()
+
+    assert series([TimeDelta(30, "min"), TimeDelta(1.5, "h")]).array_equal(series([0.5, 1.5]))
+
+
+def test_dated_series_at_a_duration_counts_from_its_epoch():
+    series = TimeSeries([10.0, 20.0, 30.0], times=Times([0.0, 1.5, 4.0], unit="h", epoch="2023-01-01"))
+
+    assert series(np.timedelta64(2, "h")) == series("2023-01-01T02:00")
+
+
+def test_series_at_a_duration_takes_no_unit():
+    with pytest.raises(TypeError, match="no unit"):
+        _hourly_series()(np.timedelta64(1, "h"), "h")
+
+
+@pytest.mark.parametrize("durations", [
+    pytest.param(np.array([1, "NaT"], dtype="timedelta64[h]"), id="NaT"),
+    pytest.param(np.array([1], dtype="timedelta64[M]"), id="months"),
+])
+def test_series_rejects_durations_without_a_fixed_length(durations):
+    with pytest.raises(ValueError, match="Durations"):
+        _hourly_series()(durations)
+
+
 def test_series_domain_runs_from_first_to_last_timestamp_closed():
     series = TimeSeries([10.0, 20.0, 30.0], times=[0.5, 1.5, 4.0])
 

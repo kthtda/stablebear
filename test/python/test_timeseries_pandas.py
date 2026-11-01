@@ -103,6 +103,16 @@ def test_series_at_timestamp_with_a_timezone_is_at_its_utc_instant():
     assert _dated_series()(pd.Timestamp("2023-01-01T03:00", tz="Europe/Stockholm")) == 20.0
 
 
+def test_series_at_a_timedelta_equals_series_at_its_time_in_the_unit():
+    assert _dated_series()(pd.Timedelta("90min")) == _dated_series()(1.5)
+
+
+def test_series_at_index_of_durations_equals_series_at_its_values():
+    index = pd.TimedeltaIndex(["1h", "2h", "4h"])
+
+    assert _dated_series()(index).array_equal(_dated_series()(index.to_numpy()))
+
+
 def test_from_pandas_with_index_of_dates_counts_from_the_first_date():
     index = pd.DatetimeIndex(["2023-01-01T01:00", "2023-01-01T02:00", "2023-01-01T04:00"])
 

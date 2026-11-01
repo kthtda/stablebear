@@ -55,6 +55,25 @@ def _checked_dates(dates):
     return dates
 
 
+def _durations_in(values, unit):
+    """``values``, an array, as float64 numbers of ``unit``, a Times unit, if
+    it holds durations, else ``None``. Each is converted by an exact factor
+    and rounded once."""
+    if np.issubdtype(values.dtype, np.timedelta64):
+        if np.isnat(values).any():
+            raise ValueError("Durations cannot be NaT")
+        code, _ = np.datetime_data(values.dtype)
+        if code not in _NUMPY_TO_UNIT:
+            raise ValueError(f"Durations need a resolution of fixed length, not {code!r}")
+        # Both in integers of the finer resolution, divided once.
+        return values / np.timedelta64(1, _UNIT_TO_NUMPY[unit])
+    if values.dtype == object and values.size > 0:
+        durations = [_as_time_delta(value) for value in values.flat]
+        if all(duration is not None for duration in durations):
+            return np.array([_in_unit(duration, unit) for duration in durations]).reshape(values.shape)
+    return None
+
+
 def _times_from_datetimes(stamps, unit, epoch):
     """The native times of ``datetime64`` stamps counted from ``epoch``, or
     from the first stamp, in ``unit``."""
@@ -695,9 +714,12 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         ``t`` is a single time or an array-like or ``FloatTensor`` of times
         of shape ``t_shape``. Many times are evaluated together: they are
         sorted once and merged with each channel's timestamps. Numeric times
-        count from the series' own time 0, which for a window is its start.
-        For a series with an :attr:`epoch`, ``t`` may also be a date and
-        time, as anything :class:`DateTime` accepts, such as
+        and durations count from the series' own time 0, which for a window
+        is its start. A duration is a :class:`TimeDelta` or a value it
+        accepts, such as ``np.timedelta64(90, "m")``, or an array, sequence,
+        or pandas ``TimedeltaIndex`` of them; it is converted to the series'
+        unit by an exact factor and takes no ``unit``. For a series with an
+        :attr:`epoch`, ``t`` may also be a date and time, as anything :class:`DateTime` accepts, such as
         ``"2023-01-01T12:30"``, or an array, pandas ``DatetimeIndex``, or
         pandas ``Series`` of them. A
         date names an instant, not an offset: it is placed at
@@ -721,9 +743,19 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
             if unit is not None:
                 raise TypeError("A date and time has no unit; pass unit only with numeric times")
             return self._evaluate_date(DateTime(t).to_datetime64())
+        duration = _as_time_delta(t)
+        if duration is not None:
+            if unit is not None:
+                raise TypeError("A duration has no unit; pass unit only with numeric times")
+            return self.evaluate(_in_unit(duration, self.unit))
         if not isinstance(t, (Tensor, int, float, np.integer, np.floating)):
             # Lists, arrays, and pandas objects, such as a DatetimeIndex.
             t = _as_array(t)
+            durations = _durations_in(t, self.unit)
+            if durations is not None:
+                if unit is not None:
+                    raise TypeError("Durations have no unit; pass unit only with numeric times")
+                return self.evaluate(durations)
         if isinstance(t, np.ndarray) and t.dtype.kind in "MOUS":
             # Dates and times, as datetime64, strings, or datetimes.
             try:
