@@ -263,7 +263,7 @@ def plot_timeseries_windows():
                         times=np.arange(9.0))
     windows, bounds = Window(size=4.0, step=2.0, anchor="start")(
         signal, return_bounds=True)
-    bounds = np.asarray(bounds)
+    bounds = np.asarray(bounds.count)
     color = plt.rcParams["lines.color"]
 
     fig = plt.figure(figsize=(7, 4.4))
@@ -314,7 +314,7 @@ def _plot_window_rows(rows, stacked=False):
     bars = []  # (row, height offset, a, b, window)
     for row, (label, window) in enumerate(rows):
         _, bounds = window(signal, return_bounds=True)
-        for k, (a, b) in enumerate(np.asarray(bounds)):
+        for k, (a, b) in enumerate(np.asarray(bounds.count)):
             if stacked:
                 bars.append((k, 0.0, a, b, window))
             else:
@@ -376,7 +376,7 @@ def plot_timeseries_window_closed():
     for row, closed in enumerate(choices):
         window = Window(size=3.0, anchor="start", closed=closed)
         _, bounds = window(signal, return_bounds=True)
-        for k, (a, b) in enumerate(np.asarray(bounds)):
+        for k, (a, b) in enumerate(np.asarray(bounds.count)):
             # Alternate heights so that the shared end at 3 s stays visible.
             y = len(choices) - 1 - row + (0.15 if k % 2 else -0.15)
             ax.plot([a, b], [y, y], color="tab:orange", linewidth=2)

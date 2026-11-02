@@ -1,6 +1,6 @@
 # pandas input and durations for time series: implementation plan
 
-Progress: 24 of 45 items, 48 of 86 points (56%)
+Progress: 25 of 45 items, 50 of 86 points (58%)
 
 Specs: [pandas-timeseries-spec.md](pandas-timeseries-spec.md) (phases A, B,
 and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
@@ -170,11 +170,12 @@ and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
 - [x] **E3.** [2] (924050b7f) `TimeSeries.domain` has `DateTime` or `TimeDelta` ends;
   a dated window's domain is where it lies.
   Tests: undated series; dated series; dated window; closed ends kept.
-- [ ] **E4.** [2] `TimeSeries.origin` is a `TimeDelta` or a `TimeDeltaTensor`;
+- [x] **E4.** [2] (7ec48f8f9) `TimeSeries.origin` is a `TimeDelta` or a `TimeDeltaTensor`;
   remove `TimeSeries.bounds` and update its callers and docs.
   Tests: window origins, including after snapping; several channels.
-- [ ] **E5.** [2] `Window(..., return_bounds=True)` gives a `datetime64` or
-  `timedelta64` array of shape `(n_windows, 2)`.
+- [ ] **E5.** [2] `Window(..., return_bounds=True)` gives a
+  `TimeDeltaTensor` of shape `(n_windows, 2)` in the series' unit, or a
+  `DateTimeTensor` for a series with an epoch.
   Tests: dated and undated series; partial windows.
 - [ ] **E6.** [1] `Window.size`, `Window.step`, and
   `TimeDelayEmbedding.delay` are `TimeDelta`; update the reprs.

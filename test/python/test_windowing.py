@@ -6,7 +6,7 @@ import pytest
 
 import stablebear as sb
 from stablebear import FloatTensor
-from stablebear.timeseries import DateTime, Domain, TimeDelayEmbedding, TimeDelta, TimeDeltaTensor, Times, TimeSeries, Window
+from stablebear.timeseries import DateTime, DateTimeTensor, Domain, TimeDelayEmbedding, TimeDelta, TimeDeltaTensor, Times, TimeSeries, Window
 from stablebear.timeseries.series import TimeSeriesTensor, TimesTensor
 
 from _element_values import TWO_ELEMENTS_OF_EVERY_DTYPE
@@ -44,11 +44,11 @@ def test_windows_start_every_step_while_they_fit(window, starts):
     windows, bounds = window(_windows_source(), return_bounds=True)
 
     assert windows.shape == (len(starts),)
-    assert isinstance(bounds, FloatTensor)
-    assert bounds.dtype is sb.float64
+    assert isinstance(bounds, TimeDeltaTensor)
+    assert bounds.unit == "s"
     assert bounds.shape == (len(starts), 2)
-    assert np.array_equal(np.asarray(bounds)[:, 0], starts)
-    assert np.array_equal(np.asarray(bounds)[:, 1], np.add(starts, window.size))
+    assert np.array_equal(np.asarray(bounds.count)[:, 0], starts)
+    assert np.array_equal(np.asarray(bounds.count)[:, 1], np.add(starts, window.size))
 
 
 @pytest.mark.parametrize("window, bounds", [
@@ -66,7 +66,7 @@ def test_windows_anchored_at_the_end_end_every_step_back_while_they_fit(window, 
 
     # The last window ends where the series does, at 4.0, and the windows
     # come in chronological order.
-    assert np.array_equal(np.asarray(window_bounds), bounds)
+    assert np.array_equal(np.asarray(window_bounds.count), bounds)
 
 
 @pytest.mark.parametrize("anchor", ["start", "end"])
@@ -182,7 +182,7 @@ def test_a_window_origin_is_its_start_in_the_series():
     # The windows start at 0.0, 1.0, 2.0, and 3.0; none starts at an
     # observation it would snap to.
     origins = [windows[k].origin for k in range(windows.shape[0])]
-    assert origins == [TimeDelta(start, "s") for start in np.asarray(bounds[:, 0])]
+    assert origins == list(bounds[:, 0])
 
 
 def test_a_window_origin_places_its_observations_at_their_times_in_the_series():
@@ -211,7 +211,7 @@ def test_partial_windows_continue_to_the_end_of_the_series(partial, expected_bou
         _partial_source(), return_bounds=True)
 
     # A partial window's bounds end where the series does.
-    assert np.array_equal(np.asarray(bounds), expected_bounds)
+    assert np.array_equal(np.asarray(bounds.count), expected_bounds)
 
 
 def test_a_partial_window_ends_where_the_series_does():
@@ -241,7 +241,7 @@ def test_a_partial_window_anchored_at_the_end_starts_where_the_series_does():
 
     # The window ending at 1.0 would start at -2.0, before the series starts
     # at 0.0, so it is [0.0, 1.0], closed at the start as the series is.
-    assert np.array_equal(np.asarray(bounds), [
+    assert np.array_equal(np.asarray(bounds.count), [
         [0.0, 1.0],
         [1.0, 4.0],
     ])
@@ -269,7 +269,7 @@ def test_a_left_closed_partial_window_can_start_at_the_last_observation():
         _partial_source(), return_bounds=True)
 
     # The window at 4.0 holds only the last observation.
-    assert np.array_equal(np.asarray(bounds)[:, 0], [0.0, 2.0, 4.0])
+    assert np.array_equal(np.asarray(bounds.count)[:, 0], [0.0, 2.0, 4.0])
     assert np.array_equal(windows[2].times.to_floats(), [0.0])
     assert windows[2](0.0) == 40.0
 
@@ -280,7 +280,7 @@ def test_a_right_closed_window_holds_the_last_observation_without_a_partial_wind
 
     # The window (2.0, 4.0] ends at the last observation, and no window can
     # start there with an open start.
-    assert np.array_equal(np.asarray(bounds)[:, 0], [0.0, 2.0])
+    assert np.array_equal(np.asarray(bounds.count)[:, 0], [0.0, 2.0])
     assert windows[1](2.0) == 40.0
 
 
@@ -334,8 +334,8 @@ def test_window_bounds_just_below_an_observation_reach_it():
 
     # 3 * 0.3 computes just below 0.9, so window 2 ends and window 3 starts
     # there.
-    assert np.asarray(bounds)[2, 1] < 0.9
-    assert np.asarray(bounds)[3, 0] < 0.9
+    assert bounds[2, 1].count < 0.9
+    assert bounds[3, 0].count < 0.9
     # The observation at 0.9 is the end of window 2, so only window 3 holds
     # it, at time 0.
     assert np.array_equal(np.asarray(windows[2].values), [6.0])
@@ -351,7 +351,7 @@ def test_a_window_start_that_snaps_to_an_observation_has_its_time_as_origin():
 
     # Window 3 starts at 3 * 0.3, just below 0.9, and snaps to the
     # observation at 0.9.
-    assert bounds[3, 0] == 3 * 0.3
+    assert bounds[3, 0] == TimeDelta(3 * 0.3, "s")
     assert windows[3].origin == TimeDelta(0.9, "s")
 
 
@@ -411,6 +411,58 @@ def test_a_dated_window_domain_is_where_it_lies(closed, start_closed, end_closed
     assert domain.start.to_datetime64() == np.datetime64("2023-01-01T00:00:02")
     assert domain.end.to_datetime64() == np.datetime64("2023-01-01T00:00:03")
     assert (domain.start_closed, domain.end_closed) == (start_closed, end_closed)
+
+
+def test_bounds_of_a_dated_series_are_the_dates_of_its_windows():
+    _, bounds = Window(size=1.0, step=1.0, closed="left", partial=False, anchor="start")(
+        _dated_source(), return_bounds=True)
+
+    assert isinstance(bounds, DateTimeTensor)
+    assert bounds[2].array_equal(DateTimeTensor(np.array(["2023-01-01T00:00:02", "2023-01-01T00:00:03"],
+                                                         dtype="datetime64[us]")))
+
+
+def test_bounds_of_windows_of_a_dated_window_are_where_they_lie():
+    window = Window(size=2.0, step=2.0, closed="left", partial=False, anchor="start")(_dated_source())[1]
+
+    _, bounds = Window(size=1.0, step=1.0, closed="left", partial=False, anchor="start")(window, return_bounds=True)
+
+    assert bounds[:, 0].array_equal(DateTimeTensor(np.array(["2023-01-01T00:00:02", "2023-01-01T00:00:03"],
+                                                            dtype="datetime64[us]")))
+
+
+def test_dated_bounds_keep_a_unit_finer_than_microseconds():
+    series = TimeSeries([0.0, 1.0, 2.0], times=Times([0.0, 1.0, 2.0], unit="ns", epoch="2023-01-01"))
+
+    _, bounds = Window(size=1.0, step=1.0, closed="left", partial=False, anchor="start")(series, return_bounds=True)
+
+    assert bounds.unit == "ns"
+    assert bounds[1].array_equal(DateTimeTensor(np.array(["2023-01-01T00:00:00.000000001",
+                                                         "2023-01-01T00:00:00.000000002"], dtype="datetime64[ns]")))
+
+
+def test_dated_bounds_of_channels_at_origins_closer_than_their_resolution_are_their_dates():
+    # The origins of window 3 are 0.9 and 3 * 0.3, which round to the same
+    # microsecond.
+    window = Window(size=0.3, step=0.3, closed="left", partial=False, anchor="start")(_snapping_channels())[3]
+    dated = window.with_epoch("2023-01-01")
+
+    _, bounds = Window(size=0.1, step=0.1, closed="left", partial=False, anchor="start")(dated, return_bounds=True)
+
+    assert bounds[0, 0] == DateTime(np.datetime64("2023-01-01T00:00:00.900000", "us"))
+
+
+def test_dated_bounds_of_channels_at_origins_with_different_dates_raise():
+    # Channel a snaps the start of window 1, at 0.9999 s, to its
+    # observation at 1 s; channel b has none there.
+    a = TimeSeries([0.0, 1.0, 2.0, 3.0], times=[0.0, 1.0, 2.0, 3.0], snap_tolerance=1e-3)
+    b = TimeSeries([0.0, -2.0, -3.0], times=[0.0, 2.0, 3.0], snap_tolerance=1e-14)
+    window = Window(size=0.9999, step=0.9999, closed="left", partial=False, anchor="start")(
+        TimeSeries.from_channels([a, b]))[1]
+    dated = window.with_epoch("2023-01-01")
+
+    with pytest.raises(ValueError, match="different origins"):
+        Window(size=0.5, step=0.5, closed="left", partial=False, anchor="start")(dated, return_bounds=True)
 
 
 def test_an_embedding_keeps_the_epoch_of_its_series():
@@ -484,7 +536,7 @@ def test_windows_of_an_embedding_hold_its_points():
     windows, bounds = Window(size=2.0, step=1.0, closed="left", partial=False, anchor="start")(
         embedding, return_bounds=True)
 
-    assert np.array_equal(np.asarray(bounds)[:, 0], [1.0, 2.0])
+    assert np.array_equal(np.asarray(bounds.count)[:, 0], [1.0, 2.0])
     assert np.array_equal(windows[0].times.to_floats(), [0.0, 0.5, 1.5])
     assert np.array_equal(np.asarray(windows[0].values), [[0.0, 5.0], [5.0, 15.0], [15.0, 25.0]])
 
@@ -500,7 +552,7 @@ def test_windows_cut_every_channel_at_the_same_bounds():
 
     # Both channels are observed from 0.5 to 2.5, so the windows are
     # [0.5, 1.5) and [1.5, 2.5).
-    assert np.array_equal(np.asarray(bounds)[:, 0], [0.5, 1.5])
+    assert np.array_equal(np.asarray(bounds.count)[:, 0], [0.5, 1.5])
     # B's observation at 1500 ms is the end of the first window.
     assert np.array_equal(windows[0].times[0].to_floats(), [0.0, 0.5])
     assert np.array_equal(windows[0].times[1].to_floats(), [0.0])
@@ -813,5 +865,4 @@ def test_dated_window_domains_start_at_the_bounds_from_windowing():
 
     starts = [windows[k].domain.start.to_datetime64() for k in range(windows.shape[0])]
 
-    expected = Times([bounds[k, 0] for k in range(windows.shape[0])], unit="s", epoch="2023-01-01").to_datetime64()
-    assert np.array_equal(starts, expected)
+    assert np.array_equal(starts, bounds[:, 0].to_datetime64())

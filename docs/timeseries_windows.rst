@@ -18,7 +18,13 @@ back to 0::
 
    windows, bounds = Window(size=4.0, step=2.0, anchor="start")(
        signal, return_bounds=True)
-   bounds  # [[0.0, 4.0], [2.0, 6.0], [4.0, 8.0]]
+   bounds.count  # [[0.0, 4.0], [2.0, 6.0], [4.0, 8.0]]
+
+The bounds are a :py:class:`~stablebear.timeseries.TimeDeltaTensor` of
+durations from the time 0 of ``signal``, in its unit, so their counts are
+seconds here. For a time series with an epoch, they are a
+:py:class:`~stablebear.timeseries.DateTimeTensor` of dates instead (see
+:doc:`timeseries_dates`).
 
 The figure shows ``signal`` with the domains of the three windows marked
 above it, and below it each window as a time series of its own, evaluated
@@ -75,10 +81,10 @@ differ when the windows do not fit exactly, as windows of 3 s on the 8 s of
 ``signal`` do not::
 
    _, bounds = Window(size=3.0, anchor="start")(signal, return_bounds=True)
-   bounds  # [[0.0, 3.0], [3.0, 6.0]]
+   bounds.count  # [[0.0, 3.0], [3.0, 6.0]]
 
    _, bounds = Window(size=3.0)(signal, return_bounds=True)
-   bounds  # [[2.0, 5.0], [5.0, 8.0]]
+   bounds.count  # [[2.0, 5.0], [5.0, 8.0]]
 
 The figure shows both sets of windows below ``signal``. Filled circles
 mark the ends a window includes, and hollow circles the ends it leaves out.
@@ -172,10 +178,10 @@ end of the time series it is cut at, whatever ``closed`` is. The rows of
 
    _, bounds = Window(size=3.0, anchor="start", partial=True)(
        signal, return_bounds=True)
-   bounds  # [[0.0, 3.0], [3.0, 6.0], [6.0, 8.0]]
+   bounds.count  # [[0.0, 3.0], [3.0, 6.0], [6.0, 8.0]]
 
    _, bounds = Window(size=3.0, partial=True)(signal, return_bounds=True)
-   bounds  # [[0.0, 2.0], [2.0, 5.0], [5.0, 8.0]]
+   bounds.count  # [[0.0, 2.0], [2.0, 5.0], [5.0, 8.0]]
 
 In the figure, the dashed windows are the ones cut short.
 
@@ -206,7 +212,7 @@ short::
 
    _, bounds = Window(size=6.0, step=3.0, anchor="start", partial=True)(
        signal, return_bounds=True)
-   bounds  # [[0.0, 6.0], [3.0, 8.0], [6.0, 8.0]]
+   bounds.count  # [[0.0, 6.0], [3.0, 8.0], [6.0, 8.0]]
 
 The figure shows each window on its own row.
 
@@ -252,7 +258,7 @@ time in two::
 
    windows, bounds = Window(size=0.04, anchor="start")(
        series, return_bounds=True)
-   bounds  # [[0.05, 0.09], [0.09, 0.13]]
+   bounds.count  # [[0.05, 0.09], [0.09, 0.13]]
 
 Evaluating the windows gives one tensor per channel, as evaluating a time
 series with several channels does, each with one axis for the windows

@@ -6,8 +6,7 @@ from typing import Literal, overload
 import numpy as np
 
 from .. import _sb_cpp as cpp
-from .date_time import TimeDelta, _duration, _in_unit
-from ..base_tensor import FloatTensor
+from .date_time import DateTimeTensor, TimeDelta, TimeDeltaTensor, _duration, _in_unit
 from .series import TimeSeries, TimeSeriesTensor
 
 
@@ -28,10 +27,13 @@ class Window:
     ``partial=True`` they continue while ``b_k`` is in the domain, and a
     window that would start before ``t_0`` starts where ``series`` does.
     They still come in chronological order, so the last window ends at
-    ``t_1``. With ``return_bounds=True`` it returns the tensor and a float64
-    tensor of shape ``(n_windows, 2)`` whose row ``k`` is
-    ``(a_k, a_k + size)``, in the unit of ``series``; a partial window's
-    row starts or ends where the series does.
+    ``t_1``. With ``return_bounds=True`` it returns the tensor and a tensor
+    of shape ``(n_windows, 2)`` whose row ``k`` is ``(a_k, a_k + size)``: a
+    :class:`TimeDeltaTensor` of durations from the time 0 of ``series``, in
+    its unit, or for a series with an :attr:`~TimeSeries.epoch`, a
+    :class:`DateTimeTensor` of the dates where the windows lie, at the finer
+    of its unit and microseconds. A partial window's row starts or ends
+    where the series does.
 
     Window ``k`` covers ``a_k`` to ``a_k + size``, with the ends that
     ``closed`` includes, and is a series with the channels of ``series``.
@@ -55,7 +57,7 @@ class Window:
     snap differently; the bounds are therefore the times ``a_k`` and
     ``a_k + size`` as computed, before any snapping. For
     example, ``3 * 0.3`` computes just below 0.9: a window starting there
-    starts at an observation at 0.9, but its bound reads
+    starts at an observation at 0.9, but its bound has the count
     ``0.8999999999999999``. The :attr:`~TimeSeries.origin` of each channel of
     a window is where its time 0 lies in ``series``, after its own snapping:
     0.9 in this example.
@@ -121,15 +123,30 @@ class Window:
     def __call__(self, series: TimeSeries, return_bounds: Literal[False] = False) -> TimeSeriesTensor: ...
 
     @overload
-    def __call__(self, series: TimeSeries, return_bounds: Literal[True]) -> tuple[TimeSeriesTensor, FloatTensor]: ...
+    def __call__(self, series: TimeSeries, return_bounds: Literal[True]) -> tuple[TimeSeriesTensor, TimeDeltaTensor | DateTimeTensor]: ...
 
     def __call__(self, series: TimeSeries, return_bounds: bool = False):
         windows, bounds = cpp.windows(series._data, _in_unit(self.size, series.unit), _in_unit(self.step, series.unit),
                                       *self._CLOSED[self.closed], self.partial, self.anchor == "end")
         if return_bounds:
-            return TimeSeriesTensor(windows), FloatTensor(bounds)
+            return TimeSeriesTensor(windows), _bounds_as_instants(series, np.asarray(bounds))
         return TimeSeriesTensor(windows)
 
     def __repr__(self):
         return (f"Window(size={self.size!r}, step={self.step!r}, closed={self.closed!r}, partial={self.partial}, "
                 f"anchor={self.anchor!r})")
+
+
+def _bounds_as_instants(series, bounds):
+    """``bounds``, floats in the unit of ``series`` from its time 0, as
+    durations, or as dates placed by its epoch and origin. Raises
+    ``ValueError`` if the origins of its channels give different dates."""
+    if series.epoch is None:
+        return TimeDeltaTensor(bounds, series.unit)
+    # Each channel's origin places the bounds; channels that snap differently
+    # can differ by less than the resolution of the dates.
+    first, *others = (series.epoch + TimeDeltaTensor(bounds + origin, series.unit)
+                      for origin in np.unique(np.asarray(series.origin.count)))
+    if not all(first.array_equal(dates) for dates in others):
+        raise ValueError("The channels of this series lie at different origins, so its windows have no common dates")
+    return first

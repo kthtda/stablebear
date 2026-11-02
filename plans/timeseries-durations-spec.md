@@ -154,9 +154,11 @@ finer units narrow that range, to 1678-2262 for nanoseconds.
   time 0 lies in the series a window was cut from.
 - **`TimeSeries.bounds`** is removed. With an epoch, `domain` already gives
   where a window lies. Without one, that is `domain` shifted by `origin`.
-- **`Window(..., return_bounds=True)`** gives a `datetime64` or
-  `timedelta64` array of shape `(n_windows, 2)` instead of a
-  `FloatTensor`.
+- **`Window(..., return_bounds=True)`** gives a `TimeDeltaTensor` of
+  shape `(n_windows, 2)` in the series' unit, holding the bounds as
+  computed, instead of a `FloatTensor`. For a series with an epoch, it
+  gives a `DateTimeTensor` of where the windows lie, at the finer of the
+  series' unit and microseconds.
 - **`Window.size`, `Window.step`, and `TimeDelayEmbedding.delay`** are
   `TimeDelta`.
 
