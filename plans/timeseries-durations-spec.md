@@ -120,11 +120,17 @@ keeps its counts as one tensor in one unit.
   finest unit of a sequence of durations; `to(unit)` changes it. Plain
   numbers raise `TypeError`, naming `TimeDeltaTensor(numbers, unit)`.
 - **`epoch`** is the date that time 0 stands for, a `DateTime` or a value
-  it accepts. Dates are counted from it instead of from the first of them,
-  in integers and converted to the unit once, so whole multiples of the
-  unit are exact. With durations, it places time 0 at that date, as
-  `with_epoch` does. `with_epoch` stays, to set, replace, or remove the
-  epoch of a series without shifting its times.
+  it accepts. Dates keep their instants and are counted from it instead of
+  from the first of them, in integers and converted to the unit once, so
+  whole multiples of the unit are exact. Durations have their time 0 at
+  it, as `with_epoch` sets it. `with_epoch` stays, to set, replace, or
+  remove the epoch of a series without shifting its times.
+- **`TimeSeries.from_channels`** takes dated channels with different
+  epochs and counts them all from the earliest: each channel's times and
+  domain end are shifted by the difference of its epoch, converted to its
+  unit by an exact factor. Whole multiples of the unit stay exact only up
+  to that floating-point addition. Channels with and without an epoch
+  still raise.
 - **`TimeSeries.from_pandas`** takes `unit` for storage. A numeric index
   needs it.
 - **`TimeSeries.evaluate(t)` and `TimeSeriesTensor.evaluate(t)`** take a
@@ -178,7 +184,8 @@ to the time series:
 
 - building times from durations or dates: `TimeSeries(values, times)`;
 - a unit for numbers: `TimeDeltaTensor(numbers, unit)`;
-- an epoch: `TimeSeries(..., epoch=...)` and `with_epoch`;
+- an epoch: `TimeSeries(..., epoch=...)` for durations, `with_epoch`,
+  and `from_channels` for channels of different epochs;
 - converting the unit: `TimeSeries.to(unit)`;
 - the timestamps as floats or dates: `series.times.count` and
   `series.epoch + series.times`.

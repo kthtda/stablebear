@@ -1,6 +1,6 @@
 # pandas input and durations for time series: implementation plan
 
-Progress: 32 of 50 items, 65 of 99 points (66%)
+Progress: 32 of 51 items, 65 of 101 points (64%)
 
 Specs: [pandas-timeseries-spec.md](pandas-timeseries-spec.md) (phases A, B,
 and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
@@ -147,11 +147,19 @@ and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
   `dates.to_datetime64()`; a series with a `DateTimeTensor` as times has
   its first date as epoch.
   Note: added during F4, whose examples build series from dates.
-- [ ] **D6.** [2] `TimeSeries(values, times, *, epoch=None)`: dates are
-  counted from `epoch`, and durations have their time 0 at it.
-  Tests: dates with an epoch count from it, exact in whole units;
-  durations with an epoch equal the series `with_epoch` it; a
-  `DateTimeTensor` epoch raises `TypeError`.
+- [ ] **D6.** An epoch without `Times`.
+  - [ ] **D6a.** [1] `TimeSeries(values, times, *, epoch=None)` counts
+    dates from `epoch` and gives durations their time 0 at it.
+    Tests: dates with an epoch keep their instants and count from it,
+    exact in whole units; durations with an epoch equal the series
+    `with_epoch` it; a `DateTimeTensor` epoch raises `TypeError`.
+  - [ ] **D6b.** [3] `TimeSeries.from_channels` counts dated channels of
+    different epochs from the earliest, shifting each channel's times and
+    domain end in C++.
+    Tests: channels whose first dates differ combine, and evaluate at a
+    date to the values of each channel there; a window channel keeps
+    where it lies; channels with and without an epoch raise; the epochs
+    at different resolutions combine.
 
 ## Phase E: durations and dates as output
 

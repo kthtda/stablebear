@@ -410,8 +410,15 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         durations and dates are at their own resolution, such as minutes
         for a ``timedelta64[m]`` array. Dates and times, such as a
         :class:`DateTimeTensor`, a ``datetime64`` array, or a pandas
-        ``DatetimeIndex``, are counted from the first of them, which becomes
-        the epoch. Pass :class:`Times` to choose the unit or the epoch.
+        ``DatetimeIndex``, are counted from ``epoch``, which defaults to the
+        first of them.
+    epoch : DateTime or a value DateTime accepts, optional
+        The date and time that time 0 stands for, such as ``"2023-01-01"``.
+        Dates keep their instants and are counted from it, in integers and
+        converted to the unit once, so whole multiples of the unit are
+        exact. Durations have their time 0 at it, as with
+        :meth:`with_epoch`. Defaults to the first of the dates, or to none
+        for durations.
     snap_tolerance : float, optional
         How close below an observation a query may land and still get that
         observation, relative to the magnitude of the timestamps, as in the
@@ -436,9 +443,13 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
     before t.
     """
 
-    def __init__(self, values, times, *, snap_tolerance: float = 1e-14):
+    def __init__(self, values, times, *, epoch=None, snap_tolerance: float = 1e-14):
         if not isinstance(times, Times):
-            times = Times(times)
+            times = Times(times, epoch=epoch)
+        elif epoch is not None:
+            if times.epoch is not None:
+                raise ValueError("These times already have an epoch; pass their dates to count them from another")
+            times = times.with_epoch(epoch)
         tensor = _values_tensor(values)
         self._data = _SERIES_NATIVE[tensor.dtype](
             times._data, tensor._data, snap_tolerance

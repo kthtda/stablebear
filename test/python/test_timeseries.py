@@ -615,6 +615,31 @@ def test_series_takes_a_date_time_tensor_as_times():
     assert series.epoch == DateTime("2023-01-01T06:00")
 
 
+def test_series_counts_its_dates_from_its_epoch():
+    dates = DateTimeTensor(["2023-01-01T06:00", "2023-01-01T07:30"])
+
+    series = TimeSeries([10.0, 20.0], times=dates, epoch="2023-01-01")
+
+    assert series.epoch == DateTime("2023-01-01")
+    assert series.times == Times([360.0, 450.0], unit="min", epoch="2023-01-01")
+    assert series.domain == TimeSeries([10.0, 20.0], times=dates).domain
+
+
+def test_series_of_durations_with_an_epoch_equals_the_series_with_that_epoch():
+    times = TimeDeltaTensor([0.0, 1.5], "h")
+
+    series = TimeSeries([10.0, 20.0], times=times, epoch="2023-01-01")
+
+    assert series.array_equal(TimeSeries([10.0, 20.0], times=times).with_epoch("2023-01-01"))
+    assert series.epoch == DateTime("2023-01-01")
+
+
+def test_series_rejects_an_epoch_tensor():
+    with pytest.raises(TypeError, match="DateTimeTensor"):
+        TimeSeries([10.0, 20.0], times=TimeDeltaTensor([0.0, 1.5], "h"),
+                   epoch=DateTimeTensor(["2023-01-01", "2023-01-02"]))
+
+
 def test_times_from_datetimes_are_converted_to_the_unit():
     times = Times(_stamps(), unit="h")
 
