@@ -599,6 +599,22 @@ def test_times_from_datetimes_count_whole_units_from_the_first():
     assert sb.FloatTensor([0.0, 90.0, 1440.0], dtype=sb.float64).array_equal(times.to_floats())
 
 
+def test_times_of_a_date_time_tensor_equal_times_of_its_datetime64():
+    dates = DateTimeTensor(["2023-01-01T06:00", "2023-01-01T07:30"])
+
+    assert Times(dates, unit="h") == Times(dates.to_datetime64(), unit="h")
+    assert Times(dates) == Times(dates.to_datetime64())
+
+
+def test_series_takes_a_date_time_tensor_as_times():
+    dates = DateTimeTensor(["2023-01-01T06:00", "2023-01-01T07:30"])
+
+    series = TimeSeries([10.0, 20.0], times=dates)
+
+    assert series.times == Times(dates)
+    assert series.epoch == DateTime("2023-01-01T06:00")
+
+
 def test_times_from_datetimes_are_converted_to_the_unit():
     times = Times(_stamps(), unit="h")
 

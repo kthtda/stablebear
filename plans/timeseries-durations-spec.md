@@ -111,7 +111,8 @@ unit.
 - **`Times(times, unit=None, *, epoch=None)`** takes any of these:
   - durations, as a `timedelta64` array, a sequence of `TimeDelta`, or a
     pandas `TimedeltaIndex`;
-  - dates, as today;
+  - dates, as a `DateTimeTensor`, a `datetime64` array, or a pandas
+    `DatetimeIndex` or `Series` of dates;
   - numbers, which need `unit`.
 
   For durations and dates, `unit` defaults to their resolution, such as

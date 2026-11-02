@@ -16,7 +16,7 @@ from ..functional.pcf import Pcf
 from ..nested_tensor import NestedTensor, _leaf_wrappers
 from ..point_cloud import PointCloud
 from ..symmetric_matrix import SymmetricMatrix
-from .date_time import _ATTOSECONDS, _NUMPY_TO_UNIT, _UNIT_TO_NUMPY, DateTime, TimeDelta, TimeDeltaTensor, _as_array, _as_time_delta, _in_unit
+from .date_time import _ATTOSECONDS, _NUMPY_TO_UNIT, _UNIT_TO_NUMPY, DateTime, DateTimeTensor, TimeDelta, TimeDeltaTensor, _as_array, _as_time_delta, _in_unit
 from ..typing import (
     _NATIVE_SUFFIX,
     barcode32,
@@ -126,12 +126,13 @@ class Times:
         ``timedelta64`` array, a sequence of ``TimeDelta`` or
         other durations, or a pandas ``TimedeltaIndex``, converted to
         ``unit`` by one exact factor each.
-        Dates and times are a ``datetime64`` array, or a pandas
-        ``DatetimeIndex`` or ``Series`` of dates, whose timezone, if any, is
-        converted to UTC and dropped. Dates and times are counted from
-        ``epoch``, which defaults to the first of them, and converted to
-        ``unit``: the differences are taken in integers and converted by one
-        exact factor, so whole multiples of ``unit`` are exact.
+        Dates and times are a :class:`DateTimeTensor`, a ``datetime64``
+        array, or a pandas ``DatetimeIndex`` or ``Series`` of dates, whose
+        timezone, if any, is converted to UTC and dropped. Dates and times
+        are counted from ``epoch``, which defaults to the first of them, and
+        converted to ``unit``: the differences are taken in integers and
+        converted by one exact factor, so whole multiples of ``unit`` are
+        exact.
     unit : str, optional
         One of ``"as"``, ``"fs"``, ``"ps"``, ``"ns"``, ``"us"``, ``"ms"``,
         ``"s"``, ``"min"``, ``"h"``, and ``"d"``, or an alias such as
@@ -158,6 +159,8 @@ class Times:
             # factor; the short name of unit, which may be an alias.
             unit = unit or times.unit
             times = _in_unit(times, cpp.Times(np.zeros(0), unit, None).unit)
+        elif isinstance(times, DateTimeTensor):
+            times = times.to_datetime64()
         times = _as_array(times)
         if np.issubdtype(times.dtype, np.datetime64) or np.issubdtype(times.dtype, np.timedelta64):
             code = np.datetime_data(times.dtype)[0]
@@ -406,9 +409,9 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         the unit :class:`Times` gives them: a plain array is in seconds, and
         durations and dates are at their own resolution, such as minutes
         for a ``timedelta64[m]`` array. Dates and times, such as a
-        ``datetime64`` array or a pandas ``DatetimeIndex``, are counted
-        from the first of them, which becomes the epoch. Pass
-        :class:`Times` to choose the unit or the epoch.
+        :class:`DateTimeTensor`, a ``datetime64`` array, or a pandas
+        ``DatetimeIndex``, are counted from the first of them, which becomes
+        the epoch. Pass :class:`Times` to choose the unit or the epoch.
     snap_tolerance : float, optional
         How close below an observation a query may land and still get that
         observation, relative to the magnitude of the timestamps, as in the

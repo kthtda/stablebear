@@ -1,6 +1,6 @@
 # pandas input and durations for time series: implementation plan
 
-Progress: 30 of 46 items, 62 of 89 points (70%)
+Progress: 31 of 47 items, 64 of 90 points (71%)
 
 Specs: [pandas-timeseries-spec.md](pandas-timeseries-spec.md) (phases A, B,
 and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
@@ -141,6 +141,12 @@ and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
   `Times(np.array([0, 90], dtype="timedelta64[m]"))`.
   Note: absorbed D4. C++ converts each series to the durations' own unit,
   since the series of a tensor can differ in unit.
+- [ ] **D5.** [1] `Times` and `TimeSeries` take a `DateTimeTensor` as
+  dates, as its `datetime64` array.
+  Tests: `Times(dates, unit="h")` and `Times(dates)` equal the `Times` of
+  `dates.to_datetime64()`; a series with a `DateTimeTensor` as times has
+  its first date as epoch.
+  Note: added during F4, whose examples build series from dates.
 
 ## Phase E: durations and dates as output
 
@@ -203,7 +209,7 @@ so.
   `TimeDelta` durations and passes `TimeDelta` to `Window` and
   `evaluate`.
 - [x] **F2.** [3] (bb8279d1c) `test/python/test_timeseries.py` likewise.
-- [ ] **F3.** [2] `test_time_delay_embedding.py`, `test_plotting_timeseries.py`,
+- [x] **F3.** [2] (e5342aa45) `test_time_delay_embedding.py`, `test_plotting_timeseries.py`,
   `test_timeseries_pandas.py`, `persistence/test_timeseries_persistence.py`,
   `test_io_roundtrip.py`, and `test_integration.py` likewise.
 - [ ] **F4.** [3] The time series guide pages (`docs/timeseries*.rst`) use
