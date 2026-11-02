@@ -1,6 +1,6 @@
 # pandas input and durations for time series: implementation plan
 
-Progress: 31 of 47 items, 64 of 90 points (71%)
+Progress: 32 of 50 items, 65 of 99 points (66%)
 
 Specs: [pandas-timeseries-spec.md](pandas-timeseries-spec.md) (phases A, B,
 and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
@@ -141,12 +141,17 @@ and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
   `Times(np.array([0, 90], dtype="timedelta64[m]"))`.
   Note: absorbed D4. C++ converts each series to the durations' own unit,
   since the series of a tensor can differ in unit.
-- [ ] **D5.** [1] `Times` and `TimeSeries` take a `DateTimeTensor` as
+- [x] **D5.** [1] (9091b61df) `Times` and `TimeSeries` take a `DateTimeTensor` as
   dates, as its `datetime64` array.
   Tests: `Times(dates, unit="h")` and `Times(dates)` equal the `Times` of
   `dates.to_datetime64()`; a series with a `DateTimeTensor` as times has
   its first date as epoch.
   Note: added during F4, whose examples build series from dates.
+- [ ] **D6.** [2] `TimeSeries(values, times, *, epoch=None)`: dates are
+  counted from `epoch`, and durations have their time 0 at it.
+  Tests: dates with an epoch count from it, exact in whole units;
+  durations with an epoch equal the series `with_epoch` it; a
+  `DateTimeTensor` epoch raises `TypeError`.
 
 ## Phase E: durations and dates as output
 
@@ -196,6 +201,25 @@ and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
   Tests: a start that snaps keeps `3 * 0.3` as origin and holds the
   observation at 0.9 at time 0; channels that snap differently share an
   origin; dated bounds of windows of such a window are their dates.
+- [ ] **E8.** [2] `TimeSeries.times` is a `TimeDeltaTensor` from time 0 in
+  the series' unit, with or without an epoch. For several channels it
+  raises `ValueError` naming `series[i].times`, and
+  `TimeSeriesTensor.times` raises naming `windows[i].times`. Update
+  `plot_timeseries` and other internal callers.
+  Tests: undated and dated series; `epoch + times` gives the dates; a
+  window's times start at 0; several channels and a tensor raise.
+  Note: replaces E2c and E2d.
+- [ ] **E9.** [3] Tests, docstrings, and internal code build series from
+  `TimeDeltaTensor` and `DateTimeTensor` and set epochs with `epoch=`,
+  instead of `Times`.
+  Tests: the `Times` tests move to `TimeSeries` where they test its times,
+  and are removed where they test only `Times`.
+- [ ] **E10.** [2] Remove `Times`, `TimesTensor`, and `sb.times` from the
+  Python API, and the registration of `Tensor<sb::Times>` in C++, with
+  the saving and loading of a `TimesTensor`.
+  Tests: `stablebear.timeseries` has no `Times` or `TimesTensor`; the E2
+  tests are removed.
+  Note: undoes E1's `Times` conversions and E2.
 
 ## Phase F: tests and docs use durations
 
@@ -220,11 +244,10 @@ so.
 
 ## Phase G: numbers are rejected
 
-- [ ] **G1.** [2] `Times` needs `unit` for numbers; `TimeSeries` and
-  `from_pandas` reject numbers without a unit, naming `Times(numbers,
-  unit)`.
-  Tests: `TimeSeries(values, [0, 1, 2])` raises; `Times([0, 1, 2])` raises;
-  numeric index without `unit` raises.
+- [ ] **G1.** [2] `TimeSeries` rejects numbers as times, and `from_pandas`
+  a numeric index without a unit, naming `TimeDeltaTensor(numbers, unit)`.
+  Tests: `TimeSeries(values, [0, 1, 2])` raises `TypeError`; a numeric
+  index without `unit` raises.
 - [ ] **G2.** [1] `evaluate` on series and tensors rejects numbers; remove
   its `unit` argument.
   Tests: `series(1.5)` raises `TypeError`; tensor likewise.
@@ -246,19 +269,19 @@ so.
 
 ## Phase I: back to pandas
 
-- [ ] **I1.** [1] `Times.to_pandas(resolution=None)`: a `DatetimeIndex`
-  with an epoch, else a `TimedeltaIndex`, by default at the resolution of
-  `np.asarray(times)`, at most nanoseconds. Add `stablebear/_pandas.py` with
-  the import that raises `ImportError` naming `pip install pandas`.
-  Tests: dated times; undated times; a picosecond unit gives nanoseconds;
-  `resolution="h"` raises; with `sys.modules["pandas"] = None`
-  the `ImportError` names `pip install pandas`.
-- [ ] **I2.** [2] `TimeSeries.to_pandas(resolution=None)` for one channel of
-  scalar numbers or booleans gives a `Series` indexed by
-  `times.to_pandas()`.
+- [ ] **I2.** [3] `TimeSeries.to_pandas(resolution=None)` for one channel of
+  scalar numbers or booleans gives a `Series` indexed by a `DatetimeIndex`
+  of `epoch + times`, else a `TimedeltaIndex` of `times`, by default at the
+  finer of the unit and microseconds, at most nanoseconds. Add
+  `stablebear/_pandas.py` with the import that raises `ImportError` naming
+  `pip install pandas`.
   Tests: round trip of a `Series` with a `DatetimeIndex` (times, epoch,
-  values, dtype); a window's index starts
-  at its start date; a PCF series raises `TypeError`.
+  values, dtype); an undated series gives a `TimedeltaIndex`; a picosecond
+  unit gives nanoseconds; `resolution="h"` raises; a window's index starts
+  at its start date; a PCF series raises `TypeError`; with
+  `sys.modules["pandas"] = None` the `ImportError` names
+  `pip install pandas`.
+  Note: absorbed I1, `Times.to_pandas`, since `Times` is removed (E10).
 - [ ] **I3.** [2] Several channels give a `DataFrame` indexed by the union of
   the channels' times, with `NaN` where a channel has no observation.
   Tests: round trip of a `DataFrame`; channels with different times give
