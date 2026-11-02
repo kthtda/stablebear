@@ -19,9 +19,9 @@ it without converting first, and get results back as pandas.
 These settle the open questions of the issue.
 
 1. **Time zones.** Timezone-aware input is converted to UTC and the zone is
-   dropped. This applies to `DateTime`, `Times`, `evaluate`, and
-   `from_pandas`, for both `datetime` and pandas values. Nothing stores a
-   zone, so `to_pandas` returns naive UTC dates.
+   dropped. This applies to `DateTime`, `DateTimeTensor`, `TimeSeries`,
+   `evaluate`, and `from_pandas`, for both `datetime` and pandas values.
+   Nothing stores a zone, so `to_pandas` returns naive UTC dates.
 2. **Missing data.** `NaN` and `pd.NA` values are kept as observations, as
    `TimeSeries(values, times)` keeps them today. `NaT` in an index is
    rejected. Users call `dropna()` first if they want to drop rows.
@@ -29,8 +29,8 @@ These settle the open questions of the issue.
    channels share the times of the index. A vector-valued channel remains
    one call: `TimeSeries(df.to_numpy(), df.index)`.
 4. **Index order.** An unsorted index or one with duplicates is rejected,
-   as `Times` rejects such timestamps. The error names `sort_index()` or
-   `index.duplicated()`.
+   as `TimeSeries` rejects such timestamps. The error names `sort_index()`
+   or `index.duplicated()`.
 5. **Resolution.** The default `unit`, which sets only how the times are
    stored, is the resolution of a `DatetimeIndex` or `TimedeltaIndex`,
    usually nanoseconds, as for `datetime64` and `timedelta64` arrays.
@@ -56,9 +56,9 @@ These settle the open questions of the issue.
   and is accepted today, but rounded to microseconds.
 - `DateTime` converts a timezone-aware `datetime` or `pd.Timestamp` to the
   same instant in naive UTC instead of raising.
-- `Times(...)` and the `times` of `TimeSeries(...)` accept a
-  `DatetimeIndex` or a `Series` of dates, naive or timezone-aware. A naive
-  index works today; an aware one fails with an unclear `TypeError`.
+- The `times` of `TimeSeries(...)` accept a `DatetimeIndex` or a `Series`
+  of dates, naive or timezone-aware. A naive index works today; an aware
+  one fails with an unclear `TypeError`.
 - `TimeSeries.evaluate` accepts a `DatetimeIndex` or a `Series` of dates as
   it accepts a `datetime64` array. Today an index is taken as numbers.
 
@@ -83,21 +83,21 @@ These settle the open questions of the issue.
 - Column names and the series name are not kept; a `TimeSeries` has no
   channel names.
 
-### `Times.to_pandas(resolution=None)` and `TimeSeries.to_pandas(resolution=None)`
+### `TimeSeries.to_pandas(resolution=None)`
 
-- `Times.to_pandas()` returns a `DatetimeIndex` when the times have an
-  epoch, else a `TimedeltaIndex`, as `np.asarray(times)` gives them (see
-  the [durations spec](timeseries-durations-spec.md)). `resolution` is one
-  of `"s"`, `"ms"`, `"us"`, and `"ns"`, the resolutions pandas supports. It
-  defaults to the resolution of `np.asarray(times)`, or nanoseconds if that
-  is finer.
-- `TimeSeries.to_pandas()` returns, for one channel, a `Series` indexed by
-  its `times.to_pandas()`. For several channels it returns a `DataFrame`
-  with columns `0` to `n_channels - 1`, indexed by the union of the
-  channels' times, with `NaN` where a channel has no observation at a time.
+- The index of a series with an epoch is a `DatetimeIndex` of
+  `epoch + times`, else a `TimedeltaIndex` of `times` (see the
+  [durations spec](timeseries-durations-spec.md)). `resolution` is one of
+  `"s"`, `"ms"`, `"us"`, and `"ns"`, the resolutions pandas supports. It
+  defaults to the finer of the series' unit and microseconds, or
+  nanoseconds if that is finer.
+- `TimeSeries.to_pandas()` returns, for one channel, a `Series` with that
+  index. For several channels it returns a `DataFrame` with columns `0` to
+  `n_channels - 1`, indexed by the union of the channels' times, with
+  `NaN` where a channel has no observation at a time.
 - Only observations of shape `()` that are numbers or booleans can be
   converted; other series raise `TypeError`.
-- If pandas is not installed, both raise `ImportError` naming
+- If pandas is not installed, it raises `ImportError` naming
   `pip install pandas`.
 
 ### `Window` and `TimeDelayEmbedding` on pandas input

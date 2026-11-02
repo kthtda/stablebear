@@ -21,12 +21,14 @@ are in beta, so the old forms are removed rather than deprecated.
 - A **time** of a series is a duration measured from its time 0. For a
   series with an epoch, it can also be a date. A window's time 0 is its
   start.
-- A series without an epoch gives its times as durations, and a series with
-  an epoch gives them as dates.
+- A series without an epoch gives instants, such as its domain, as
+  durations, and a series with an epoch gives them as dates. Its own
+  timestamps are always durations from time 0, which are exact.
 - The `unit` of a series remains, but only as its storage: its times are
   floats in that unit. It sets their precision and the unit of a plot
-  axis. No number in the API is read in it, except when a `Times` is built
-  from numbers.
+  axis. No number in the API is read in it.
+- There is no `Times` type: durations are `TimeDelta` and
+  `TimeDeltaTensor`, and dates are `DateTime` and `DateTimeTensor`.
 
 ## `TimeDelta`
 
@@ -57,16 +59,15 @@ as a time series stores its times.
   them.
 - A `TimeDelta` given to `Window`, `TimeDelayEmbedding`, or `evaluate` is
   converted to the series' unit by an exact factor, without rounding.
-  `evaluate` and `Times` take a `TimeDeltaTensor` as an array of
+  `evaluate` and `TimeSeries` take a `TimeDeltaTensor` as an array of
   durations.
 - `TimeDelta` is Python only; nothing in C++ stores a duration.
 
 ## `TimeDeltaTensor` and `DateTimeTensor`
 
 `TimeDelta` and `DateTime` hold one value each. A tensor of durations is a
-`TimeDeltaTensor`, and a tensor of instants is a `DateTimeTensor`, as a
-`TimesTensor` holds `Times`. Each keeps its counts as one tensor in one
-unit.
+`TimeDeltaTensor`, and a tensor of instants is a `DateTimeTensor`. Each
+keeps its counts as one tensor in one unit.
 
 - `TimeDeltaTensor(counts, unit)` takes a `FloatTensor`, `IntTensor`,
   `ndarray`, or nested list of numbers, as in
@@ -101,26 +102,29 @@ unit.
   minus a date gives a `TimeDeltaTensor`.
 - They reject `NaT`, counts that are not finite, and weeks, months, and
   years.
-- An epoch, of `Times` or `with_epoch`, is a `DateTime`; a
+- An epoch, of `TimeSeries` or `with_epoch`, is a `DateTime`; a
   `DateTimeTensor` raises `TypeError`.
-- Both are Python only; unlike `TimesTensor`, they have no C++ element
-  type.
+- Both are Python only and have no C++ element type.
 
 ## Inputs
 
-- **`Times(times, unit=None, *, epoch=None)`** takes any of these:
-  - durations, as a `timedelta64` array, a sequence of `TimeDelta`, or a
-    pandas `TimedeltaIndex`;
+- **`TimeSeries(values, times, *, epoch=None)`** takes `times` as any of
+  these:
+  - durations, as a `TimeDeltaTensor`, a `timedelta64` array, a sequence
+    of `TimeDelta`, or a pandas `TimedeltaIndex`, measured from time 0;
   - dates, as a `DateTimeTensor`, a `datetime64` array, or a pandas
-    `DatetimeIndex` or `Series` of dates;
-  - numbers, which need `unit`.
+    `DatetimeIndex` or `Series` of dates.
 
-  For durations and dates, `unit` defaults to their resolution, such as
-  minutes for a `timedelta64[m]` array, or to the finest unit of a sequence
-  of durations, and sets only the storage.
-- **`TimeSeries(values, times)`** takes `times` as a `Times`, or durations
-  or dates as `Times` accepts them. Plain numbers raise `TypeError`, naming
-  `Times(numbers, unit)`.
+  The unit of the series is the resolution of the times, such as minutes
+  for a `timedelta64[m]` array, the unit of a `TimeDeltaTensor`, or the
+  finest unit of a sequence of durations; `to(unit)` changes it. Plain
+  numbers raise `TypeError`, naming `TimeDeltaTensor(numbers, unit)`.
+- **`epoch`** is the date that time 0 stands for, a `DateTime` or a value
+  it accepts. Dates are counted from it instead of from the first of them,
+  in integers and converted to the unit once, so whole multiples of the
+  unit are exact. With durations, it places time 0 at that date, as
+  `with_epoch` does. `with_epoch` stays, to set, replace, or remove the
+  epoch of a series without shifting its times.
 - **`TimeSeries.from_pandas`** takes `unit` for storage. A numeric index
   needs it.
 - **`TimeSeries.evaluate(t)` and `TimeSeriesTensor.evaluate(t)`** take a
@@ -137,16 +141,14 @@ otherwise. Arrays of them come out at the finer of the series' unit and
 microseconds. Microseconds keep dates within about 290,000 years of 1970;
 finer units narrow that range, to 1678-2262 for nanoseconds.
 
-- **`np.asarray(times)`** gives `datetime64` or `timedelta64` instead of
-  floats. `Times.to_floats(unit=None)` gives the float64 timestamps, in
-  `unit` or the unit of the times, for code that needs numbers.
-  `to_datetime64` stays.
-- **`TimeSeries.times`** for several channels is a `TimesTensor` of shape
-  `(n_channels,)`, one `Times` per channel in the series' unit, instead of
-  a float `NestedTensor`.
-- **`TimeSeriesTensor.times`** is a `TimesTensor` of the tensor's shape,
-  one `Times` per series, such as the times of every window, with a last
-  axis of `n_channels` for series of several channels.
+- **`TimeSeries.times`** is a `TimeDeltaTensor` of shape
+  `(n_observations,)`: the timestamps as float counts in the series'
+  unit, from its time 0, with or without an epoch. Their dates are
+  `series.epoch + series.times`, rounded as a `DateTimeTensor` is. `count`
+  gives the floats for code that needs numbers.
+- **`TimeSeries.times` of several channels** raises `ValueError`, since
+  the channels differ in length, naming `series[i].times`.
+- **`TimeSeriesTensor.times`** is removed, naming `windows[i].times`.
 - **`TimeSeries.domain`** has `DateTime` or `TimeDelta` ends. For a series
   with an epoch, these are the instants it can be evaluated at, so a
   window's domain is where it lies.
@@ -168,19 +170,21 @@ finer units narrow that range, to 1678-2262 for nanoseconds.
 - **`Window.size`, `Window.step`, and `TimeDelayEmbedding.delay`** are
   `TimeDelta`.
 
-## `TimesTensor`
+## No `Times`
 
-`TimesTensor` is a tensor whose elements are `Times`, with dtype
-`sb.times`, as `TimeSeriesTensor` holds `TimeSeries`. Each element keeps
-its own timestamps, unit, and epoch.
+`Times` and `TimesTensor` are removed from the Python API, with
+`sb.times` and the saving and loading of a `TimesTensor`. Their uses move
+to the time series:
 
-- It is a C++ `Tensor<sb::Times>`, registered with the other element types
-  in both the CPU and CUDA modules; `sb::Times` gains an empty default.
-- It has what other tensors of objects have: `shape`, indexing to a
-  `Times` or a `TimesTensor`, assignment of a `Times`, `copy`,
-  `array_equal`, iteration, and saving and loading.
-- It has no NumPy conversion, since its elements differ in length; index
-  it to get a `Times`, then convert that.
+- building times from durations or dates: `TimeSeries(values, times)`;
+- a unit for numbers: `TimeDeltaTensor(numbers, unit)`;
+- an epoch: `TimeSeries(..., epoch=...)` and `with_epoch`;
+- converting the unit: `TimeSeries.to(unit)`;
+- the timestamps as floats or dates: `series.times.count` and
+  `series.epoch + series.times`.
+
+C++ keeps `sb::Times` as the storage of a series; `Tensor<sb::Times>` is
+no longer registered.
 
 ## Unchanged
 
