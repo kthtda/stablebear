@@ -102,18 +102,19 @@ and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
     a scalar `DateTime` is an array `TimeDelta`; array minus a scalar
     `TimeDelta` with a float count.
   - [ ] **C4f.** [3] Move the arrays of `TimeDelta` into a new
-    `TimeDeltaTensor`, so that a `TimeDelta` holds one duration; an array
-    given to `TimeDelta` raises `TypeError` naming it. Update `evaluate`,
+    `TimeDeltaTensor`, so that a `TimeDelta` holds one duration. Update `evaluate`,
     `Times`, the `DateTime` arithmetic, and the docstrings to use it.
     Tests: the C4a, C4b, C4e, and D3 tests on `TimeDeltaTensor`; a
     `TimeDeltaTensor` from a `TimeDelta` list equals one from its
-    `timedelta64` array; `TimeDelta` of an array raises.
+    `timedelta64` array.
+    Note: a `TimeDelta` still has the `shape`, `ndim`, and `len` of
+    `_Counts`, which `DateTime` arrays need; C4g can move them to the
+    tensors.
   - [ ] **C4g.** [3] Move the arrays of `DateTime` into a new
-    `DateTimeTensor`, so that a `DateTime` holds one instant; an array
-    given to `DateTime` raises `TypeError` naming it. Update the
+    `DateTimeTensor`, so that a `DateTime` holds one instant. Update the
     arithmetic, `docs/timeseries_dates.rst`, and the docstrings.
-    Tests: the C4d and C4e tests on `DateTimeTensor`; `DateTime` of an
-    array raises; a `DateTimeTensor` epoch raises.
+    Tests: the C4d and C4e tests on `DateTimeTensor`; a `DateTimeTensor`
+    epoch raises.
   Note: C4f and C4g come after E3 in time; they split the array forms out
   of the scalars before E4 gives a `TimeDeltaTensor` as `origin`.
 

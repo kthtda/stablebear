@@ -16,7 +16,7 @@ from ..functional.pcf import Pcf
 from ..nested_tensor import NestedTensor, _leaf_wrappers
 from ..point_cloud import PointCloud
 from ..symmetric_matrix import SymmetricMatrix
-from .date_time import _ATTOSECONDS, _NUMPY_TO_UNIT, _UNIT_TO_NUMPY, DateTime, TimeDelta, _as_array, _as_time_delta, _in_unit
+from .date_time import _ATTOSECONDS, _NUMPY_TO_UNIT, _UNIT_TO_NUMPY, DateTime, TimeDelta, TimeDeltaTensor, _as_array, _as_time_delta, _in_unit
 from ..typing import (
     _NATIVE_SUFFIX,
     barcode32,
@@ -122,8 +122,8 @@ class Times:
     ----------
     times : array_like
         One-dimensional timestamps, as numbers in ``unit``, as durations, or
-        as dates and times. Durations are a :class:`TimeDelta` of an array
-        of counts, a ``timedelta64`` array, a sequence of ``TimeDelta`` or
+        as dates and times. Durations are a :class:`TimeDeltaTensor`, a
+        ``timedelta64`` array, a sequence of ``TimeDelta`` or
         other durations, or a pandas ``TimedeltaIndex``, converted to
         ``unit`` by one exact factor each.
         Dates and times are a ``datetime64`` array, or a pandas
@@ -138,7 +138,7 @@ class Times:
         ``"sec"``, ``"seconds"``, ``"hr"``, ``"\u00b5s"``, or ``"msec"``.
         Defaults to the resolution of the dates or durations, such as
         minutes for a ``timedelta64[m]`` array and nanoseconds for most
-        pandas indexes, the unit of a ``TimeDelta``, or the finest unit of a
+        pandas indexes, the unit of a ``TimeDeltaTensor``, or the finest unit of a
         sequence of durations;
         numbers default to seconds. :attr:`unit` reports the short name.
     epoch : DateTime or a value DateTime accepts, optional
@@ -153,7 +153,7 @@ class Times:
     """
 
     def __init__(self, times, unit: str | None = None, *, epoch=None):
-        if isinstance(times, TimeDelta):
+        if isinstance(times, TimeDeltaTensor):
             # Counts in one unit, by default theirs, converted by one exact
             # factor; the short name of unit, which may be an alias.
             unit = unit or times.unit
@@ -772,7 +772,7 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         and durations count from the series' own time 0, which for a window
         is its start. A duration is a :class:`TimeDelta` or a value it
         accepts, such as ``np.timedelta64(90, "m")``. Many durations are a
-        ``TimeDelta`` of an array of counts, or an array, sequence, or pandas
+        :class:`TimeDeltaTensor`, or an array, sequence, or pandas
         ``TimedeltaIndex`` of durations. Durations are converted to the
         series' unit by an exact factor and take no ``unit``. For a series with an
         :attr:`epoch`, ``t`` may also be a date and time, as anything :class:`DateTime` accepts, such as

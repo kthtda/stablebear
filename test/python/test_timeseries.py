@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 
 import stablebear as sb
-from stablebear.timeseries import DateTime, Domain, TimeDelayEmbedding, TimeDelta, Times, TimeSeries, Window
+from stablebear.timeseries import DateTime, Domain, TimeDelayEmbedding, TimeDelta, TimeDeltaTensor, Times, TimeSeries, Window
 from stablebear.timeseries.series import TimesTensor
 
 from _element_values import TWO_ELEMENTS_OF_EVERY_DTYPE
@@ -68,8 +68,8 @@ def test_times_of_durations_are_in_their_finest_unit(durations, expected):
     assert Times(durations) == expected
 
 
-def test_times_of_a_time_delta_of_counts_equal_times_of_their_timedelta64():
-    times = Times(TimeDelta(sb.IntTensor([0, 90]), "min"))
+def test_times_of_a_time_delta_tensor_equal_times_of_their_timedelta64():
+    times = Times(TimeDeltaTensor(sb.IntTensor([0, 90]), "min"))
 
     assert times == Times(np.array([0, 90], dtype="timedelta64[m]"))
 
@@ -357,8 +357,8 @@ def test_time_delta_rejects_a_number_without_a_unit():
         TimeDelta(3)
 
 
-def test_time_delta_of_integer_counts_keeps_them_as_an_int_tensor():
-    time_delta = TimeDelta([[30, 90],
+def test_time_delta_tensor_of_integer_counts_keeps_them_as_an_int_tensor():
+    time_delta = TimeDeltaTensor([[30, 90],
                             [240, 60]], "min")
 
     assert isinstance(time_delta.count, sb.IntTensor)
@@ -368,100 +368,106 @@ def test_time_delta_of_integer_counts_keeps_them_as_an_int_tensor():
     assert time_delta.shape == (2, 2)
 
 
-def test_time_delta_of_float_counts_keeps_them_as_a_float_tensor():
-    time_delta = TimeDelta(sb.FloatTensor([0.5, 1.5]), "h")
+def test_time_delta_tensor_of_float_counts_keeps_them_as_a_float_tensor():
+    time_delta = TimeDeltaTensor(sb.FloatTensor([0.5, 1.5]), "h")
 
     assert time_delta.count.array_equal(sb.FloatTensor([0.5, 1.5]))
 
 
-def test_time_delta_of_a_timedelta64_array_is_in_its_resolution():
-    time_delta = TimeDelta(np.array([30, 90], dtype="timedelta64[m]"))
+def test_time_delta_tensor_of_a_timedelta64_array_is_in_its_resolution():
+    time_delta = TimeDeltaTensor(np.array([30, 90], dtype="timedelta64[m]"))
 
-    assert time_delta.array_equal(TimeDelta([30, 90], "min"))
+    assert time_delta.array_equal(TimeDeltaTensor([30, 90], "min"))
 
 
-def test_time_delta_of_counts_indexes_to_time_deltas():
-    time_delta = TimeDelta([[30, 90],
+def test_time_delta_tensor_of_time_deltas_equals_one_of_their_timedelta64_array():
+    time_delta = TimeDeltaTensor([TimeDelta(30, "min"), TimeDelta(2, "h")])
+
+    assert time_delta.array_equal(TimeDeltaTensor(np.array([30, 120], dtype="timedelta64[m]")))
+
+
+def test_time_delta_tensor_indexes_to_time_deltas():
+    time_delta = TimeDeltaTensor([[30, 90],
                             [240, 60]], "min")
 
     assert time_delta[1, 0] == TimeDelta(240, "min")
-    assert time_delta[0].array_equal(TimeDelta([30, 90], "min"))
+    assert time_delta[0].array_equal(TimeDeltaTensor([30, 90], "min"))
     assert len(time_delta) == 2
     assert [element.count for element in time_delta[1]] == [240, 60]
 
 
-def test_time_delta_of_float_counts_converts_to_microseconds():
-    durations = TimeDelta([0.5, 1.5], "h").to_timedelta64()
+def test_time_delta_tensor_of_float_counts_converts_to_microseconds():
+    durations = TimeDeltaTensor([0.5, 1.5], "h").to_timedelta64()
 
     assert np.array_equal(durations, np.array([1_800_000_000, 5_400_000_000], dtype="timedelta64[us]"))
     assert durations.dtype == np.dtype("timedelta64[us]")
 
 
-def test_time_delta_of_counts_is_unhashable():
+def test_time_delta_tensor_is_unhashable():
     with pytest.raises(TypeError, match="unhashable"):
-        hash(TimeDelta([30, 90], "min"))
+        hash(TimeDeltaTensor([30, 90], "min"))
 
 
-def test_time_delta_of_counts_survives_pickling():
-    time_delta = TimeDelta([0.5, 1.5], "h")
+def test_time_delta_tensor_survives_pickling():
+    time_delta = TimeDeltaTensor([0.5, 1.5], "h")
 
     assert pickle.loads(pickle.dumps(time_delta)).array_equal(time_delta)
 
 
-def test_time_delta_of_counts_repr_shows_counts_and_unit():
-    assert repr(TimeDelta([30, 90], "min")) == "TimeDelta([30, 90], 'min')"
+def test_time_delta_tensor_repr_shows_counts_and_unit():
+    assert repr(TimeDeltaTensor([30, 90], "min")) == "TimeDeltaTensor([30, 90], 'min')"
 
 
 @pytest.mark.parametrize("value, unit", [
     pytest.param([1.0, np.nan], "h", id="nan"),
     pytest.param(np.array([1, "NaT"], dtype="timedelta64[m]"), None, id="nat"),
 ])
-def test_time_delta_rejects_counts_that_are_not_finite(value, unit):
+def test_time_delta_tensor_rejects_counts_that_are_not_finite(value, unit):
     with pytest.raises(ValueError):
-        TimeDelta(value, unit)
+        TimeDeltaTensor(value, unit)
 
 
-def test_time_delta_rejects_counts_that_are_not_numbers():
+def test_time_delta_tensor_rejects_counts_that_are_not_numbers():
     with pytest.raises(TypeError):
-        TimeDelta([True, False], "h")
+        TimeDeltaTensor([True, False], "h")
 
 
-def test_time_delta_of_counts_plus_a_time_delta_is_in_the_finer_unit():
-    total = TimeDelta([30, 90], "min") + TimeDelta(1, "h")
+def test_time_delta_tensor_plus_a_time_delta_is_in_the_finer_unit():
+    total = TimeDeltaTensor([30, 90], "min") + TimeDelta(1, "h")
 
-    assert total.array_equal(TimeDelta([90, 150], "min"))
-
-
-def test_time_delta_of_counts_multiplies_each_count():
-    product = TimeDelta([30, 90], "min") * 0.5
-
-    assert product.array_equal(TimeDelta([15.0, 45.0], "min"))
+    assert total.array_equal(TimeDeltaTensor([90, 150], "min"))
 
 
-def test_time_delta_of_counts_compares_each_length():
-    shorter = TimeDelta([30, 90], "min") < TimeDelta(1, "h")
+def test_time_delta_tensor_multiplies_each_count():
+    product = TimeDeltaTensor([30, 90], "min") * 0.5
+
+    assert product.array_equal(TimeDeltaTensor([15.0, 45.0], "min"))
+
+
+def test_time_delta_tensor_compares_each_length():
+    shorter = TimeDeltaTensor([30, 90], "min") < TimeDelta(1, "h")
 
     assert shorter.array_equal(sb.BoolTensor([True, False]))
 
 
-def test_time_deltas_of_counts_are_equal_only_at_the_same_resolution():
-    minutes = TimeDelta([30, 90], "min")
+def test_time_delta_tensors_are_equal_only_at_the_same_resolution():
+    minutes = TimeDeltaTensor([30, 90], "min")
 
-    assert (minutes == TimeDelta([30, 90], "min")).array_equal(sb.BoolTensor([True, True]))
-    assert (minutes == TimeDelta([0.5, 1.5], "h")).array_equal(sb.BoolTensor([False, False]))
-    assert (minutes != TimeDelta([0.5, 1.5], "h")).array_equal(sb.BoolTensor([True, True]))
+    assert (minutes == TimeDeltaTensor([30, 90], "min")).array_equal(sb.BoolTensor([True, True]))
+    assert (minutes == TimeDeltaTensor([0.5, 1.5], "h")).array_equal(sb.BoolTensor([False, False]))
+    assert (minutes != TimeDeltaTensor([0.5, 1.5], "h")).array_equal(sb.BoolTensor([True, True]))
 
 
-def test_date_time_plus_time_delta_of_counts_gives_each_instant():
-    instants = DateTime("2023-01-01") + TimeDelta([30, 90], "min")
+def test_date_time_plus_time_delta_tensor_gives_each_instant():
+    instants = DateTime("2023-01-01") + TimeDeltaTensor([30, 90], "min")
 
     assert instants.array_equal(DateTime(["2023-01-01T00:30", "2023-01-01T01:30"]))
 
 
-def test_date_time_of_instants_minus_a_date_time_is_a_time_delta_of_counts():
+def test_date_time_of_instants_minus_a_date_time_is_a_time_delta_tensor():
     durations = DateTime(["2023-01-01T00:30", "2023-01-01T01:30"]) - DateTime("2023-01-01")
 
-    assert durations.array_equal(TimeDelta([30, 90], "min"))
+    assert durations.array_equal(TimeDeltaTensor([30, 90], "min"))
 
 
 def test_date_time_of_instants_minus_a_float_count_is_in_microseconds():
@@ -831,8 +837,8 @@ def test_series_at_a_duration_equals_the_series_at_its_time_in_the_unit(duration
 @pytest.mark.parametrize("durations", [
     pytest.param(np.array([[30, 90],
                            [240, 60]], dtype="timedelta64[m]"), id="timedelta64"),
-    pytest.param(TimeDelta(sb.FloatTensor([[30, 90],
-                                           [240, 60]]), "min"), id="TimeDelta"),
+    pytest.param(TimeDeltaTensor(sb.FloatTensor([[30, 90],
+                                           [240, 60]]), "min"), id="TimeDeltaTensor"),
 ])
 def test_series_at_an_array_of_durations_equals_the_series_at_their_times(durations):
     series = _hourly_series()

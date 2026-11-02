@@ -6,7 +6,7 @@ import pytest
 
 import stablebear as sb
 from stablebear import FloatTensor
-from stablebear.timeseries import DateTime, Domain, TimeDelayEmbedding, TimeDelta, Times, TimeSeries, Window
+from stablebear.timeseries import DateTime, Domain, TimeDelayEmbedding, TimeDelta, TimeDeltaTensor, Times, TimeSeries, Window
 from stablebear.timeseries.series import TimeSeriesTensor, TimesTensor
 
 from _element_values import TWO_ELEMENTS_OF_EVERY_DTYPE
@@ -598,7 +598,7 @@ def test_windows_at_a_duration_equal_the_windows_at_its_time_in_the_unit(duratio
 
 @pytest.mark.parametrize("durations", [
     pytest.param(np.array([0, 500, 1000], dtype="timedelta64[ms]"), id="timedelta64"),
-    pytest.param(TimeDelta(sb.FloatTensor([0, 500, 1000]), "ms"), id="TimeDelta"),
+    pytest.param(TimeDeltaTensor(sb.FloatTensor([0, 500, 1000]), "ms"), id="TimeDeltaTensor"),
 ])
 def test_windows_at_an_array_of_durations_equal_the_windows_at_their_times(durations):
     windows = _overlapping_windows()

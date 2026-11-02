@@ -53,8 +53,8 @@ as a time series stores its times.
   - comparisons of `DateTime`.
 - It rejects `NaT`, counts that are not finite, and weeks, months, and
   years.
-- A `TimeDelta` holds one duration. An array given to it raises
-  `TypeError`, naming `TimeDeltaTensor`.
+- A `TimeDelta` holds one duration; a `TimeDeltaTensor` holds an array of
+  them.
 - A `TimeDelta` given to `Window`, `TimeDelayEmbedding`, or `evaluate` is
   converted to the series' unit by an exact factor, without rounding.
   `evaluate` and `Times` take a `TimeDeltaTensor` as an array of
