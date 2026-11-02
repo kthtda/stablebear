@@ -27,21 +27,10 @@ _ATTOSECONDS = {
 
 class _Counts:
     """A count of a unit, or a tensor of counts in one unit: the storage
-    that :class:`DateTime` and :class:`TimeDelta` share."""
+    that dates and durations share."""
 
     # NumPy defers to the operators below instead of making object arrays.
     __array_ufunc__ = None
-
-    @classmethod
-    def _of(cls, count, unit):
-        value = cls.__new__(cls)
-        value._count, value._unit = count, unit
-        return value
-
-    @property
-    def _family(self):
-        """The types that ``==`` compares with."""
-        return type(self)
 
     @property
     def unit(self) -> str:
@@ -49,37 +38,13 @@ class _Counts:
         return self._unit
 
     @property
-    def shape(self) -> tuple[int, ...]:
-        """The shape of the counts, ``()`` for a single value."""
-        return tuple(self._count.shape) if isinstance(self._count, (IntTensor, FloatTensor)) else ()
-
-    @property
-    def ndim(self) -> int:
-        """The number of dimensions of the counts, 0 for a single value."""
-        return len(self.shape)
+    def _array(self):
+        """Whether this holds a tensor of counts."""
+        return isinstance(self._count, (IntTensor, FloatTensor))
 
     def _counts(self):
         """The count, or an array of the counts."""
-        return np.asarray(self._count) if self.ndim else self._count
-
-    def __len__(self) -> int:
-        if not self.ndim:
-            raise TypeError(f"A single {type(self).__name__} has no len()")
-        return self.shape[0]
-
-    def __getitem__(self, index):
-        if not self.ndim:
-            raise TypeError(f"A single {type(self).__name__} cannot be indexed")
-        return self._of(self._count[index], self._unit)
-
-    def __iter__(self):
-        return (self[i] for i in range(len(self)))
-
-    def array_equal(self, other) -> bool:
-        """Whether ``other`` is of the same type, with the same shape,
-        counts, and unit."""
-        return (isinstance(other, type(self)) and self._unit == other._unit
-                and np.array_equal(np.asarray(self._count), np.asarray(other._count)))
+        return np.asarray(self._count) if self._array else self._count
 
     def __eq__(self, other) -> bool | BoolTensor:
         if not isinstance(other, self._family):
@@ -92,102 +57,54 @@ class _Counts:
         return _as_boolean(np.not_equal(self._counts(), other._counts()) | (self._unit != other._unit))
 
     def __hash__(self):
-        if self.ndim:
-            raise TypeError(f"A {type(self).__name__} of an array is unhashable")
         return hash((self._count, self._unit))
 
 
-class DateTime(_Counts):
-    """A calendar date and time: a count of a time unit after
-    1970-01-01T00:00, as a ``np.datetime64`` stores it. The epoch of
-    :class:`Times`, the instant its time 0 stands for, is one.
+class _CountsTensor:
+    """What :class:`DateTimeTensor` and :class:`TimeDeltaTensor` share."""
 
-    Dates follow the Gregorian calendar and every day has 86400
-    seconds: leap seconds are not counted.
-
-    A ``DateTime`` can also hold an array of instants in one unit, as in
-    ``DateTime(["2023-01-01T00:30", "2023-01-01T01:30"])``. Its
-    :attr:`count` is then an ``IntTensor``. It has :attr:`shape`, ``len``,
-    iteration, and indexing, which gives a ``DateTime`` of one instant or
-    of an array of them, and :meth:`to_datetime64` gives a ``datetime64``
-    array. Arithmetic works elementwise, and comparisons, ``==`` and ``!=``
-    included, give a ``BoolTensor``, as they do on tensors;
-    :meth:`array_equal` compares two as a whole. It has no hash, and an
-    epoch is a ``DateTime`` of one instant.
-
-    Parameters
-    ----------
-    value : str, np.datetime64, datetime.datetime, datetime.date, DateTime, or array_like
-        The instant, such as ``"2023-01-01T12:30"``. Its resolution is kept:
-        ``"2023-01-01"`` counts days, a ``datetime`` counts microseconds, and
-        a ``pd.Timestamp`` counts its own unit, such as nanoseconds. A
-        timezone-aware value is converted to UTC and its timezone dropped.
-        An array of instants is a ``datetime64`` array, a pandas
-        ``DatetimeIndex`` or ``Series`` of dates, or a sequence of values
-        a single ``DateTime`` accepts, kept at the finest of their
-        resolutions.
-
-    Raises
-    ------
-    TypeError
-        If ``value`` is of another type.
-    ValueError
-        If ``value`` is or holds ``NaT`` or has a resolution of weeks,
-        months, or years, which have no fixed length.
-
-    Notes
-    -----
-    Two values are equal when they have the same count of the same unit; the
-    same instant at another resolution is a different value. Compare
-    :meth:`to_datetime64` values to compare instants. ``<``, ``<=``, ``>``,
-    and ``>=`` compare instants.
-
-    Adding or subtracting a :class:`TimeDelta`, or a duration it accepts,
-    gives a ``DateTime`` at the finer of the two resolutions; a duration with
-    a float count is first rounded as :meth:`TimeDelta.to_timedelta64`
-    rounds it. A :class:`TimeDeltaTensor` gives an array of instants.
-    Subtracting a ``DateTime`` gives the :class:`TimeDelta` between them, or
-    a ``TimeDeltaTensor`` for an array of instants.
-    """
-
-    def __init__(self, value):
-        if isinstance(value, DateTime):
-            self._count, self._unit = value._count, value._unit
-            return
-        if isinstance(value, (str, datetime.date, np.datetime64)):
-            if isinstance(value, datetime.datetime) and value.tzinfo is not None:
-                value = value.astimezone(datetime.timezone.utc).replace(tzinfo=None)
-            # A pd.Timestamp converts at its own resolution, such as nanoseconds.
-            to_datetime64 = getattr(value, "to_datetime64", None)
-            value = np.datetime64(value) if to_datetime64 is None else to_datetime64()
-        else:
-            given, value = value, _as_array(value)
-            if value.ndim == 0 or value.dtype.kind not in "MOUS":
-                raise TypeError(f"Expected a date, datetime, datetime64, or string, or an array of them; "
-                                f"got {type(given).__name__}")
-            if value.dtype.kind != "M":
-                # Each converted as a single value is, at the finest of their
-                # resolutions.
-                value = np.array([DateTime(element).to_datetime64() for element in value.flat]).reshape(value.shape)
-        if np.isnat(value).any():
-            raise ValueError("A DateTime cannot be NaT")
-        code, step = np.datetime_data(value.dtype)
-        if code not in _NUMPY_TO_UNIT:
-            raise ValueError(f"A DateTime needs a resolution of fixed length, not {code!r}")
-        counts = value.astype(np.int64) * step
-        self._count = IntTensor(counts) if counts.ndim else int(counts)
-        self._unit = _NUMPY_TO_UNIT[code]
-
-    @classmethod
-    def _from_cpp(cls, data):
-        return cls._of(data.count, data.unit)
+    __hash__ = None
 
     @property
-    def _data(self):
-        """The native value, for an epoch."""
-        if self.ndim:
-            raise TypeError("An epoch is a single DateTime, not an array of them")
-        return cpp.DateTime(self._count, self._unit)
+    def shape(self) -> tuple[int, ...]:
+        """The shape of the tensor."""
+        return tuple(self._count.shape)
+
+    @property
+    def ndim(self) -> int:
+        """The number of dimensions of the tensor."""
+        return len(self.shape)
+
+    def __len__(self) -> int:
+        return self.shape[0]
+
+    def __getitem__(self, index):
+        return self._of(self._count[index], self._unit)
+
+    def __iter__(self):
+        return (self[i] for i in range(len(self)))
+
+    def array_equal(self, other) -> bool:
+        """Whether ``other`` is of the same type, with the same shape,
+        counts, and unit."""
+        return (isinstance(other, type(self)) and self._unit == other._unit
+                and np.array_equal(np.asarray(self._count), np.asarray(other._count)))
+
+
+class _Instants(_Counts):
+    """The arithmetic that :class:`DateTime` and :class:`DateTimeTensor`
+    share."""
+
+    @property
+    def _family(self):
+        return _Instants
+
+    @classmethod
+    def _of(cls, count, unit):
+        kind = DateTimeTensor if isinstance(count, IntTensor) else DateTime
+        value = kind.__new__(kind)
+        value._count, value._unit = count, unit
+        return value
 
     @property
     def count(self) -> int | IntTensor:
@@ -201,7 +118,7 @@ class DateTime(_Counts):
         return np.asarray(self._counts()).astype(f"datetime64[{_UNIT_TO_NUMPY[self._unit]}]")[()]
 
     def _compare(self, other, compare):
-        if not isinstance(other, DateTime):
+        if not isinstance(other, _Instants):
             return NotImplemented
         return _as_boolean(compare(self.to_datetime64(), other.to_datetime64()))
 
@@ -221,25 +138,143 @@ class DateTime(_Counts):
         other = _as_time_delta(other)
         if other is None:
             return NotImplemented
-        return DateTime(self.to_datetime64() + other.to_timedelta64())
+        return _date_time(self.to_datetime64() + other.to_timedelta64())
 
     __radd__ = __add__
 
     def __sub__(self, other):
-        if isinstance(other, DateTime):
+        if isinstance(other, _Instants):
             return _time_delta(self.to_datetime64() - other.to_datetime64())
         other = _as_time_delta(other)
         if other is None:
             return NotImplemented
-        return DateTime(self.to_datetime64() - other.to_timedelta64())
+        return _date_time(self.to_datetime64() - other.to_timedelta64())
 
     def __reduce__(self):
-        return DateTime, (self.to_datetime64(),)
+        return type(self), (self.to_datetime64(),)
+
+
+class DateTime(_Instants):
+    """A calendar date and time: a count of a time unit after
+    1970-01-01T00:00, as a ``np.datetime64`` stores it. The epoch of
+    :class:`Times`, the instant its time 0 stands for, is one.
+
+    Dates follow the Gregorian calendar and every day has 86400
+    seconds: leap seconds are not counted. A ``DateTime`` holds one
+    instant; :class:`DateTimeTensor` holds an array of them.
+
+    Parameters
+    ----------
+    value : str, np.datetime64, datetime.datetime, datetime.date, or DateTime
+        The instant, such as ``"2023-01-01T12:30"``. Its resolution is kept:
+        ``"2023-01-01"`` counts days, a ``datetime`` counts microseconds, and
+        a ``pd.Timestamp`` counts its own unit, such as nanoseconds. A
+        timezone-aware value is converted to UTC and its timezone dropped.
+
+    Raises
+    ------
+    TypeError
+        If ``value`` is of another type.
+    ValueError
+        If ``value`` is ``NaT`` or has a resolution of weeks, months, or
+        years, which have no fixed length.
+
+    Notes
+    -----
+    Two values are equal when they have the same count of the same unit; the
+    same instant at another resolution is a different value. Compare
+    :meth:`to_datetime64` values to compare instants. ``<``, ``<=``, ``>``,
+    and ``>=`` compare instants.
+
+    Adding or subtracting a :class:`TimeDelta`, or a duration it accepts,
+    gives a ``DateTime`` at the finer of the two resolutions; a duration with
+    a float count is first rounded as :meth:`TimeDelta.to_timedelta64`
+    rounds it. Subtracting a ``DateTime`` gives the :class:`TimeDelta`
+    between them. With a :class:`TimeDeltaTensor` or a ``DateTimeTensor``,
+    the result is a ``DateTimeTensor`` or a ``TimeDeltaTensor``.
+    """
+
+    def __init__(self, value):
+        if isinstance(value, DateTime):
+            self._count, self._unit = value._count, value._unit
+            return
+        if not isinstance(value, (str, datetime.date, np.datetime64)):
+            raise TypeError(f"Expected a date, datetime, datetime64, or string; got {type(value).__name__}")
+        if isinstance(value, datetime.datetime) and value.tzinfo is not None:
+            value = value.astimezone(datetime.timezone.utc).replace(tzinfo=None)
+        # A pd.Timestamp converts at its own resolution, such as nanoseconds.
+        to_datetime64 = getattr(value, "to_datetime64", None)
+        value = np.datetime64(value) if to_datetime64 is None else to_datetime64()
+        self._count, self._unit = _numpy_counts(value)
+
+    @classmethod
+    def _from_cpp(cls, data):
+        return cls._of(data.count, data.unit)
+
+    @property
+    def _data(self):
+        """The native value, for an epoch."""
+        return cpp.DateTime(self._count, self._unit)
 
     def __repr__(self):
-        if self.ndim:
-            return f"DateTime({np.array2string(self.to_datetime64(), separator=', ')})"
         return f"DateTime({str(self.to_datetime64())!r})"
+
+
+class DateTimeTensor(_CountsTensor, _Instants):
+    """A tensor of calendar dates and times in one unit.
+
+    Its :attr:`count` is an ``IntTensor`` of counts after
+    1970-01-01T00:00. It has :attr:`shape`, ``len``, iteration, and
+    indexing, which gives a :class:`DateTime` for one element and a
+    ``DateTimeTensor`` otherwise, and :meth:`to_datetime64` gives a
+    ``datetime64`` array. It has no hash, and it cannot be an epoch.
+
+    Parameters
+    ----------
+    value : array_like
+        A ``datetime64`` array, a pandas ``DatetimeIndex`` or ``Series`` of
+        dates, or a sequence of values :class:`DateTime` accepts, such as
+        ``["2023-01-01T00:30", "2023-01-01T01:30"]``, kept at the finest of
+        their resolutions. A timezone is converted to UTC and dropped.
+
+    Raises
+    ------
+    TypeError
+        If ``value`` is of another type or is not an array.
+    ValueError
+        If ``value`` holds ``NaT`` or has a resolution of weeks, months, or
+        years.
+
+    Notes
+    -----
+    Arithmetic and comparisons work elementwise, with a single date or
+    duration broadcast against the tensor, as :class:`DateTime` does them.
+    ``<``, ``<=``, ``>``, ``>=``, ``==``, and ``!=`` give a ``BoolTensor``,
+    as they do on tensors; ``==`` compares count and unit.
+    :meth:`array_equal` tells whether two are equal as a whole.
+    """
+
+    def __init__(self, value):
+        if isinstance(value, DateTimeTensor):
+            self._count, self._unit = value._count, value._unit
+            return
+        given, value = value, _as_array(value)
+        if value.ndim == 0 or value.dtype.kind not in "MOUS":
+            raise TypeError(f"Expected an array of dates and times; got {type(given).__name__}")
+        if value.dtype.kind != "M":
+            # Each converted as a single value is, at the finest of their
+            # resolutions.
+            value = np.array([DateTime(element).to_datetime64() for element in value.flat]).reshape(value.shape)
+        self._count, self._unit = _numpy_counts(value)
+
+    def __repr__(self):
+        return f"DateTimeTensor({np.array2string(self.to_datetime64(), separator=', ')})"
+
+
+def _date_time(value):
+    """A :class:`DateTime` of ``value``, a ``datetime64``, or a
+    :class:`DateTimeTensor` of an array of them."""
+    return (DateTimeTensor if np.ndim(value) else DateTime)(value)
 
 
 class _Duration(_Counts):
@@ -277,10 +312,10 @@ class _Duration(_Counts):
             resolution = self._unit if fine else "us"
         if resolution not in _ATTOSECONDS:
             raise ValueError(f"Unknown resolution {resolution!r}; expected one of {', '.join(_ATTOSECONDS)}")
-        if self.ndim:
+        if self._array:
             # Each count rounded exactly, as a single count is.
             steps = [TimeDelta(count, self._unit).to_timedelta64(resolution) for count in np.asarray(self._count).flat]
-            return np.array(steps, dtype=f"timedelta64[{_UNIT_TO_NUMPY[resolution]}]").reshape(self.shape)
+            return np.array(steps, dtype=f"timedelta64[{_UNIT_TO_NUMPY[resolution]}]").reshape(np.shape(self._counts()))
         steps = round(Fraction(self._count) * _ATTOSECONDS[self._unit] / _ATTOSECONDS[resolution])
         return np.timedelta64(steps, _UNIT_TO_NUMPY[resolution])
 
@@ -292,7 +327,7 @@ class _Duration(_Counts):
         other = _as_time_delta(other)
         if other is None:
             return NotImplemented
-        if not (self.ndim or other.ndim):
+        if not (self._array or other._array):
             return compare(self._length(), other._length())
         unit = min(self._unit, other._unit, key=_ATTOSECONDS.__getitem__)
         return BoolTensor(compare(self._in(unit), other._in(unit)))
@@ -412,13 +447,13 @@ class TimeDelta(_Duration):
             value = np.timedelta64(value)
         elif not isinstance(value, np.timedelta64):
             raise TypeError(f"Expected a timedelta, timedelta64, or TimeDelta; got {type(value).__name__}")
-        self._count, self._unit = _timedelta64_counts(value)
+        self._count, self._unit = _numpy_counts(value)
 
     def __repr__(self):
         return f"TimeDelta({self._count}, {self._unit!r})"
 
 
-class TimeDeltaTensor(_Duration):
+class TimeDeltaTensor(_CountsTensor, _Duration):
     """A tensor of durations in one unit, such as the times at which to
     evaluate a time series.
 
@@ -459,8 +494,6 @@ class TimeDeltaTensor(_Duration):
     whether two are equal as a whole.
     """
 
-    __hash__ = None
-
     def __init__(self, value, unit: str | None = None):
         if isinstance(value, TimeDeltaTensor):
             self._count, self._unit = value._count, value._unit
@@ -473,7 +506,7 @@ class TimeDeltaTensor(_Duration):
         if array.ndim == 0:
             raise TypeError(f"Expected an array of durations; got {type(value).__name__}")
         if array.dtype.kind == "m":
-            self._count, self._unit = _timedelta64_counts(array)
+            self._count, self._unit = _numpy_counts(array)
             return
         durations = [_as_time_delta(element) for element in array.flat] if array.dtype == object else [None]
         if None in durations:
@@ -483,7 +516,7 @@ class TimeDeltaTensor(_Duration):
         self._count, self._unit = _array_counts(counts, unit), unit
 
     def __repr__(self):
-        return f"TimeDeltaTensor({np.array2string(np.asarray(self._count), separator=', ')}, {self._unit!r})"
+        return f"TimeDeltaTensor({np.asarray(self._count).tolist()}, {self._unit!r})"
 
 
 def _time_delta(value, unit=None):
@@ -498,14 +531,14 @@ def _check_unit(unit):
         raise ValueError(f"Unknown unit {unit!r}; expected one of {', '.join(_UNIT_TO_NUMPY)}")
 
 
-def _timedelta64_counts(value):
+def _numpy_counts(value):
     """The integer count, or an ``IntTensor`` of counts, and the unit of
-    ``value``, a ``timedelta64`` or an array of them."""
+    ``value``, a ``datetime64`` or ``timedelta64``, or an array of them."""
     if np.isnat(value).any():
-        raise ValueError("A duration cannot be NaT")
+        raise ValueError("Dates, times, and durations cannot be NaT")
     code, step = np.datetime_data(value.dtype)
     if code not in _NUMPY_TO_UNIT:
-        raise ValueError(f"A duration needs a unit of fixed length, not {code!r}")
+        raise ValueError(f"Dates, times, and durations need a resolution of fixed length, not {code!r}")
     counts = value.astype(np.int64) * step
     return IntTensor(counts) if counts.ndim else int(counts), _NUMPY_TO_UNIT[code]
 
@@ -574,7 +607,7 @@ def _in_unit(duration, unit):
     and a :class:`TimeDeltaTensor` likewise to a float64 array."""
     if not isinstance(duration, _Duration):
         return duration
-    if duration.ndim:
+    if duration._array:
         # One unit is a whole multiple of the other, so one multiplication
         # or division by an integer rounds each count once.
         counts = np.asarray(duration.count, dtype=np.float64)

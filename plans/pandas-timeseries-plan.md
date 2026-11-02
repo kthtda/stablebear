@@ -1,6 +1,6 @@
 # pandas input and durations for time series: implementation plan
 
-Progress: 22 of 45 items, 42 of 86 points (49%)
+Progress: 23 of 45 items, 45 of 86 points (52%)
 
 Specs: [pandas-timeseries-spec.md](pandas-timeseries-spec.md) (phases A, B,
 and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
@@ -101,7 +101,7 @@ and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
     Tests: `DateTime + TimeDelta([30, 90], "min")`; array `DateTime` minus
     a scalar `DateTime` is an array `TimeDelta`; array minus a scalar
     `TimeDelta` with a float count.
-  - [ ] **C4f.** [3] Move the arrays of `TimeDelta` into a new
+  - [x] **C4f.** [3] (1cef3c791) Move the arrays of `TimeDelta` into a new
     `TimeDeltaTensor`, so that a `TimeDelta` holds one duration. Update `evaluate`,
     `Times`, the `DateTime` arithmetic, and the docstrings to use it.
     Tests: the C4a, C4b, C4e, and D3 tests on `TimeDeltaTensor`; a

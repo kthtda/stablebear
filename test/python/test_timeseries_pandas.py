@@ -6,7 +6,7 @@ import pytest
 
 import stablebear as sb
 
-from stablebear.timeseries import DateTime, TimeDelayEmbedding, TimeDelta, Times, TimeSeries, Window
+from stablebear.timeseries import DateTime, DateTimeTensor, TimeDelayEmbedding, TimeDelta, Times, TimeSeries, Window
 
 pd = pytest.importorskip("pandas")
 
@@ -103,10 +103,11 @@ def test_series_at_timestamp_with_a_timezone_is_at_its_utc_instant():
     assert _dated_series()(pd.Timestamp("2023-01-01T03:00", tz="Europe/Stockholm")) == 20.0
 
 
-def test_date_time_of_an_index_with_a_timezone_is_its_utc_instants():
+def test_date_time_tensor_of_an_index_with_a_timezone_is_its_utc_instants():
     stockholm = pd.DatetimeIndex(["2023-01-01T02:00", "2023-01-01T03:00"]).tz_localize("Europe/Stockholm")
 
-    assert DateTime(stockholm).array_equal(DateTime(pd.DatetimeIndex(["2023-01-01T01:00", "2023-01-01T02:00"])))
+    assert DateTimeTensor(stockholm).array_equal(DateTimeTensor(pd.DatetimeIndex(["2023-01-01T01:00",
+                                                                                  "2023-01-01T02:00"])))
 
 
 def test_series_at_a_timedelta_equals_series_at_its_time_in_the_unit():

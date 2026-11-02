@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 
 import stablebear as sb
-from stablebear.timeseries import DateTime, Domain, TimeDelayEmbedding, TimeDelta, TimeDeltaTensor, Times, TimeSeries, Window
+from stablebear.timeseries import DateTime, DateTimeTensor, Domain, TimeDelayEmbedding, TimeDelta, TimeDeltaTensor, Times, TimeSeries, Window
 from stablebear.timeseries.series import TimesTensor
 
 from _element_values import TWO_ELEMENTS_OF_EVERY_DTYPE
@@ -224,49 +224,49 @@ def test_date_time_rejects_a_number():
         DateTime(0)
 
 
-def test_date_time_of_a_datetime64_array_is_in_its_resolution():
-    date_time = DateTime(np.array(["2023-01-01T00:30", "2023-01-01T01:30"], dtype="datetime64[m]"))
+def test_date_time_tensor_of_a_datetime64_array_is_in_its_resolution():
+    instants = DateTimeTensor(np.array(["2023-01-01T00:30", "2023-01-01T01:30"], dtype="datetime64[m]"))
 
-    assert date_time.unit == "min"
-    assert date_time.shape == (2,)
-    assert isinstance(date_time.count, sb.IntTensor)
+    assert instants.unit == "min"
+    assert instants.shape == (2,)
+    assert isinstance(instants.count, sb.IntTensor)
 
 
-def test_date_time_of_strings_is_in_their_finest_resolution():
-    date_time = DateTime(["2023-01-01", "2023-01-01T00:30:15"])
+def test_date_time_tensor_of_strings_is_in_their_finest_resolution():
+    instants = DateTimeTensor(["2023-01-01", "2023-01-01T00:30:15"])
 
     expected = np.array(["2023-01-01T00:00:00", "2023-01-01T00:30:15"], dtype="datetime64[s]")
-    assert date_time.unit == "s"
-    assert np.array_equal(date_time.to_datetime64(), expected)
+    assert instants.unit == "s"
+    assert np.array_equal(instants.to_datetime64(), expected)
 
 
-def test_date_time_of_instants_indexes_to_date_times():
-    date_time = DateTime(["2023-01-01T00:30", "2023-01-01T01:30"])
+def test_date_time_tensor_indexes_to_date_times():
+    instants = DateTimeTensor(["2023-01-01T00:30", "2023-01-01T01:30"])
 
-    assert date_time[1] == DateTime("2023-01-01T01:30")
-    assert len(date_time) == 2
+    assert instants[1] == DateTime("2023-01-01T01:30")
+    assert len(instants) == 2
 
 
-def test_date_time_of_instants_compares_each_instant():
-    earlier = DateTime(["2023-01-01T00:30", "2023-01-01T01:30"]) < DateTime("2023-01-01T01:00")
+def test_date_time_tensor_compares_each_instant():
+    earlier = DateTimeTensor(["2023-01-01T00:30", "2023-01-01T01:30"]) < DateTime("2023-01-01T01:00")
 
     assert earlier.array_equal(sb.BoolTensor([True, False]))
 
 
-def test_date_time_of_instants_is_unhashable():
+def test_date_time_tensor_is_unhashable():
     with pytest.raises(TypeError, match="unhashable"):
-        hash(DateTime(["2023-01-01T00:30", "2023-01-01T01:30"]))
+        hash(DateTimeTensor(["2023-01-01T00:30", "2023-01-01T01:30"]))
 
 
-def test_date_time_of_instants_survives_pickling():
-    date_time = DateTime(["2023-01-01T00:30", "2023-01-01T01:30"])
+def test_date_time_tensor_survives_pickling():
+    instants = DateTimeTensor(["2023-01-01T00:30", "2023-01-01T01:30"])
 
-    assert pickle.loads(pickle.dumps(date_time)).array_equal(date_time)
+    assert pickle.loads(pickle.dumps(instants)).array_equal(instants)
 
 
-def test_times_reject_an_epoch_of_instants():
-    with pytest.raises(TypeError, match="single DateTime"):
-        Times([0.0, 1.0], unit="h", epoch=DateTime(["2023-01-01", "2023-01-02"]))
+def test_times_reject_an_epoch_tensor():
+    with pytest.raises(TypeError, match="DateTimeTensor"):
+        Times([0.0, 1.0], unit="h", epoch=DateTimeTensor(["2023-01-01", "2023-01-02"]))
 
 
 @pytest.mark.parametrize("value, unit, expected", [
@@ -461,20 +461,20 @@ def test_time_delta_tensors_are_equal_only_at_the_same_resolution():
 def test_date_time_plus_time_delta_tensor_gives_each_instant():
     instants = DateTime("2023-01-01") + TimeDeltaTensor([30, 90], "min")
 
-    assert instants.array_equal(DateTime(["2023-01-01T00:30", "2023-01-01T01:30"]))
+    assert instants.array_equal(DateTimeTensor(["2023-01-01T00:30", "2023-01-01T01:30"]))
 
 
-def test_date_time_of_instants_minus_a_date_time_is_a_time_delta_tensor():
-    durations = DateTime(["2023-01-01T00:30", "2023-01-01T01:30"]) - DateTime("2023-01-01")
+def test_date_time_tensor_minus_a_date_time_is_a_time_delta_tensor():
+    durations = DateTimeTensor(["2023-01-01T00:30", "2023-01-01T01:30"]) - DateTime("2023-01-01")
 
     assert durations.array_equal(TimeDeltaTensor([30, 90], "min"))
 
 
-def test_date_time_of_instants_minus_a_float_count_is_in_microseconds():
-    instants = DateTime(["2023-01-01T01:00", "2023-01-01T02:00"]) - TimeDelta(0.5, "min")
+def test_date_time_tensor_minus_a_float_count_is_in_microseconds():
+    instants = DateTimeTensor(["2023-01-01T01:00", "2023-01-01T02:00"]) - TimeDelta(0.5, "min")
 
-    assert instants.array_equal(DateTime(np.array(["2023-01-01T00:59:30", "2023-01-01T01:59:30"],
-                                                  dtype="datetime64[us]")))
+    assert instants.array_equal(DateTimeTensor(np.array(["2023-01-01T00:59:30", "2023-01-01T01:59:30"],
+                                                        dtype="datetime64[us]")))
 
 
 def test_time_deltas_add_and_subtract_in_the_finer_unit():

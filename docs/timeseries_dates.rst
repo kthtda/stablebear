@@ -15,7 +15,8 @@ from the first one, in hours::
    import datetime
 
    import numpy as np
-   from stablebear.timeseries import DateTime, Times, TimeSeries, Window
+   from stablebear.timeseries import (DateTime, DateTimeTensor, TimeDeltaTensor,
+                                      Times, TimeSeries, Window)
 
    stamps = np.array(["2023-01-01T06:00", "2023-01-01T06:30",
                       "2023-01-01T08:00"], dtype="datetime64[m]")
@@ -49,6 +50,19 @@ values to compare instants. Dates follow the Gregorian calendar
 and every day has 86400 seconds: leap seconds are not counted. Resolutions of
 weeks, months, and years are rejected, since months and years have no fixed
 length.
+
+An epoch is one instant. A
+:py:class:`~stablebear.timeseries.DateTimeTensor` holds an array of them in
+one resolution, and is what adding a
+:py:class:`~stablebear.timeseries.TimeDeltaTensor` to a date gives::
+
+   DateTime("2023-01-01") + TimeDeltaTensor([30, 90], "min")
+   # DateTimeTensor(['2023-01-01T00:30', '2023-01-01T01:30'])
+
+   DateTimeTensor(["2023-01-01T06:15", "2023-01-01T07:45"]) - series.epoch
+   # TimeDeltaTensor([15, 105], 'min')
+
+A ``DateTimeTensor`` cannot be an epoch.
 
 .. note::
 

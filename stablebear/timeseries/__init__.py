@@ -1,7 +1,7 @@
 __before = set(dir())
 
 from .embedding import TimeDelayEmbedding
-from .date_time import DateTime, TimeDelta, TimeDeltaTensor
+from .date_time import DateTime, DateTimeTensor, TimeDelta, TimeDeltaTensor
 from .series import Domain, Times, TimeSeries
 from .window import Window
 
