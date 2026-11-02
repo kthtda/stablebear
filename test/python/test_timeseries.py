@@ -1123,7 +1123,7 @@ def test_series_channels_must_share_their_epoch(epoch_b):
 def test_series_origin_is_zero_for_recorded_observations():
     series = TimeSeries([10.0, 20.0, 30.0], times=[0.5, 1.5, 4.0])
 
-    assert series.origin == 0.0
+    assert series.origin == TimeDelta(0, "s")
 
 
 def test_series_origin_has_one_entry_per_channel():
@@ -1132,7 +1132,7 @@ def test_series_origin_has_one_entry_per_channel():
 
     origin = TimeSeries.from_channels([a, b], unit="s").origin
 
-    assert sb.tensor([0.0, 0.0], dtype=sb.float64).array_equal(origin)
+    assert origin.array_equal(TimeDeltaTensor([0.0, 0.0], "s"))
 
 
 def test_series_origin_cannot_be_assigned_to():

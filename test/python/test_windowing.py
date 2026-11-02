@@ -181,8 +181,8 @@ def test_a_window_origin_is_its_start_in_the_series():
 
     # The windows start at 0.0, 1.0, 2.0, and 3.0; none starts at an
     # observation it would snap to.
-    origins = FloatTensor([windows[k].origin for k in range(windows.shape[0])], dtype=sb.float64)
-    assert origins.array_equal(bounds[:, 0])
+    origins = [windows[k].origin for k in range(windows.shape[0])]
+    assert origins == [TimeDelta(start, "s") for start in np.asarray(bounds[:, 0])]
 
 
 def test_a_window_origin_places_its_observations_at_their_times_in_the_series():
@@ -193,7 +193,7 @@ def test_a_window_origin_places_its_observations_at_their_times_in_the_series():
     # 0 and 0.7 - 0.3, which rounds to 0.39999999999999997.
     window = Window(size=0.5, step=0.5, closed="left", partial=False, anchor="start")(series)[0]
 
-    placed = window.origin + window.times.to_floats()
+    placed = window.origin.count + window.times.to_floats()
     assert sb.allclose(placed, FloatTensor([0.3, 0.7], dtype=sb.float64), atol=0.0, rtol=4e-16)
 
 
@@ -352,7 +352,7 @@ def test_a_window_start_that_snaps_to_an_observation_has_its_time_as_origin():
     # Window 3 starts at 3 * 0.3, just below 0.9, and snaps to the
     # observation at 0.9.
     assert bounds[3, 0] == 3 * 0.3
-    assert windows[3].origin == 0.9
+    assert windows[3].origin == TimeDelta(0.9, "s")
 
 
 def _snapping_channels():
@@ -366,7 +366,7 @@ def _snapping_channels():
 def test_channels_that_snap_differently_have_different_origins():
     window = Window(size=0.3, step=0.3, closed="left", partial=False, anchor="start")(_snapping_channels())[3]
 
-    assert FloatTensor([0.9, 3 * 0.3], dtype=sb.float64).array_equal(window.origin)
+    assert window.origin.array_equal(TimeDeltaTensor([0.9, 3 * 0.3], "s"))
 
 
 def test_a_window_of_a_window_has_its_origin_in_the_first_series():
@@ -376,7 +376,7 @@ def test_a_window_of_a_window_has_its_origin_in_the_first_series():
     # The window starts at 4.0; its windows start at 0.0 and 2.0 within it.
     inner = Window(size=2.0, step=2.0, closed="left", partial=False, anchor="start")(window)
 
-    assert (inner[0].origin, inner[1].origin) == (4.0, 6.0)
+    assert (inner[0].origin, inner[1].origin) == (TimeDelta(4, "s"), TimeDelta(6, "s"))
 
 
 def test_an_embedding_of_a_window_keeps_its_origin():
@@ -384,7 +384,7 @@ def test_an_embedding_of_a_window_keeps_its_origin():
 
     embedding = TimeDelayEmbedding(dimension=2, delay=0.5)(window)
 
-    assert embedding.origin == 2.0
+    assert embedding.origin == TimeDelta(2, "s")
 
 
 def _dated_source():
@@ -425,13 +425,13 @@ def test_a_window_with_an_epoch_keeps_its_origin():
     dated = window.with_epoch("2023-01-01")
 
     assert dated.epoch == DateTime("2023-01-01")
-    assert dated.origin == 2.0
+    assert dated.origin == TimeDelta(2, "s")
 
 
 def test_a_window_origin_is_reported_in_the_query_unit():
     window = Window(size=1.0, step=1.0, closed="left", partial=False, anchor="start")(_windows_source())[2]
 
-    assert window.to("ms").origin == 2000.0
+    assert window.to("ms").origin == TimeDelta(2000, "ms")
 
 
 def test_an_embedding_of_a_window_keeps_its_open_end():
@@ -707,8 +707,8 @@ def test_window_origins_survive_saving(round_trip):
 
     loaded = round_trip(windows)
 
-    origins = FloatTensor([loaded[k].origin for k in range(loaded.shape[0])], dtype=sb.float64)
-    assert origins.array_equal(FloatTensor([0.0, 1.0, 2.0, 3.0], dtype=sb.float64))
+    origins = [loaded[k].origin for k in range(loaded.shape[0])]
+    assert origins == [TimeDelta(start, "s") for start in [0, 1, 2, 3]]
 
 
 def _windows_of_pattern(start):
@@ -722,7 +722,7 @@ def test_windows_with_the_same_contents_from_different_places_are_array_equal():
     late = _windows_of_pattern(10.0)
 
     assert early[0].array_equal(late[0])
-    assert (early[0].origin, late[0].origin) == (0.0, 10.0)
+    assert (early[0].origin, late[0].origin) == (TimeDelta(0, "s"), TimeDelta(10, "s"))
 
 
 def test_tensors_of_windows_with_the_same_contents_from_different_places_are_array_equal():
@@ -798,49 +798,20 @@ def test_window_rejects_durations_without_a_fixed_length(size):
         Window(size=size)
 
 
-def test_bounds_of_a_window_are_its_domain_moved_by_its_origin():
-    windows, bounds = Window(size=1.0, step=1.0, closed="left", partial=False, anchor="start")(
-        _windows_source(), return_bounds=True)
+def test_a_window_lies_at_its_domain_moved_by_its_origin():
+    window = Window(size=1.0, step=1.0, closed="left", partial=False, anchor="start")(_windows_source())[2]
 
-    # Window 2 is evaluated on [0, 1) and lies on [2, 3) of the series; no
-    # start snaps, so its bounds match the row.
-    assert windows[2].domain == Domain(TimeDelta(0, "s"), TimeDelta(1, "s"), True, False)
-    assert windows[2].bounds() == Domain(2.0, 3.0, True, False)
-    assert (windows[2].bounds().start, windows[2].bounds().end) == (bounds[2, 0], bounds[2, 1])
+    # Window 2 is evaluated on [0, 1) and lies on [2, 3) of the series.
+    assert window.domain == Domain(TimeDelta(0, "s"), TimeDelta(1, "s"), True, False)
+    assert (window.domain.start + window.origin, window.domain.end + window.origin) == (TimeDelta(2, "s"),
+                                                                                          TimeDelta(3, "s"))
 
 
-def test_bounds_of_several_channels_are_one_per_channel():
-    window = Window(size=0.3, step=0.3, closed="left", partial=False, anchor="start")(_snapping_channels())[3]
-
-    a, b = window.bounds()
-
-    assert (a.start, b.start) == (0.9, 3 * 0.3)
-
-
-@pytest.mark.parametrize("resolution, start, end", [
-    pytest.param("us", np.datetime64("2023-01-01T00:00:02", "us"), np.datetime64("2023-01-01T00:00:03", "us"), id="us"),
-    pytest.param("s", np.datetime64("2023-01-01T00:00:02", "s"), np.datetime64("2023-01-01T00:00:03", "s"), id="s"),
-])
-def test_bounds_as_dates_add_the_epoch(resolution, start, end):
-    window = Window(size=1.0, step=1.0, closed="left", partial=False, anchor="start")(_dated_source())[2]
-
-    bounds = window.bounds(dates=True, resolution=resolution)
-
-    assert (bounds.start, bounds.end) == (start, end)
-    assert bounds.start.dtype == start.dtype
-    assert (bounds.start_closed, bounds.end_closed) == (True, False)
-
-
-def test_bounds_as_dates_need_an_epoch():
-    with pytest.raises(ValueError, match="with_epoch"):
-        _windows_source().bounds(dates=True)
-
-
-def test_window_start_dates_match_the_bounds_from_windowing():
+def test_dated_window_domains_start_at_the_bounds_from_windowing():
     windows, bounds = Window(size=1.0, step=1.0, closed="left", partial=False, anchor="start")(
         _dated_source(), return_bounds=True)
 
-    starts = [windows[k].bounds(dates=True).start for k in range(windows.shape[0])]
+    starts = [windows[k].domain.start.to_datetime64() for k in range(windows.shape[0])]
 
     expected = Times([bounds[k, 0] for k in range(windows.shape[0])], unit="s", epoch="2023-01-01").to_datetime64()
     assert np.array_equal(starts, expected)

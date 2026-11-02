@@ -114,11 +114,11 @@ Dates of windows
 ----------------
 
 :py:meth:`Times.to_datetime64 <stablebear.timeseries.Times.to_datetime64>`
-gives timestamps back as dates, by default at microsecond resolution, and
-:py:meth:`~stablebear.timeseries.TimeSeries.bounds` gives where a window lies
-in the series it was cut from, as dates with ``dates=True``::
+gives timestamps back as dates, by default at microsecond resolution. The
+:py:attr:`~stablebear.timeseries.TimeSeries.domain` of a window with an
+epoch is where it lies in the series it was cut from, as above, and the
+window is evaluated at those dates::
 
-   windows[1].bounds(dates=True)  # 06:30 to 07:30, closed at the start
    windows[1]("2023-01-01T07:00")  # 3.0, the same as windows[1](0.5)
 
 Microseconds reach about 290,000 years either side of 1970; nanoseconds,

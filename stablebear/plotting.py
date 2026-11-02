@@ -500,7 +500,7 @@ def plot_timeseries(series, ax=None, *, unit=None, relative=False, markers=False
     else:
         requested = None if unit is None else series.to(unit).unit
         series = series.to(_time_axis_unit(ax, requested or series.unit, requested))
-    offset = 0.0 if relative else series.origin
+    offset = 0.0 if relative else series.origin.count
     times = np.asarray(series.times.to_floats()) + offset
     values = np.asarray(series.values)
     if values.ndim != 1:

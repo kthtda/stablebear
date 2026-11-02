@@ -1,6 +1,6 @@
 # pandas input and durations for time series: implementation plan
 
-Progress: 23 of 45 items, 45 of 86 points (52%)
+Progress: 24 of 45 items, 48 of 86 points (56%)
 
 Specs: [pandas-timeseries-spec.md](pandas-timeseries-spec.md) (phases A, B,
 and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
@@ -68,7 +68,7 @@ and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
   Note: `_duration` now turns every duration into a `TimeDelta`, so
   `Window.size`, `Window.step`, and `TimeDelayEmbedding.delay` already are
   one for duration input, and their reprs show it; E6 is left with numbers.
-- [ ] **C4.** Arrays of durations and dates in one unit, as `TimeDeltaTensor`
+- [x] **C4.** Arrays of durations and dates in one unit, as `TimeDeltaTensor`
   and `DateTimeTensor`.
   - [x] **C4a.** [3] (5d5d0c882) `TimeDelta(counts, unit)` for a `FloatTensor`,
     `IntTensor`, `ndarray`, or nested list, kept as a `FloatTensor` or
@@ -110,7 +110,7 @@ and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
     Note: a `TimeDelta` still has the `shape`, `ndim`, and `len` of
     `_Counts`, which `DateTime` arrays need; C4g can move them to the
     tensors.
-  - [ ] **C4g.** [3] Move the arrays of `DateTime` into a new
+  - [x] **C4g.** [3] (9991218e7) Move the arrays of `DateTime` into a new
     `DateTimeTensor`, so that a `DateTime` holds one instant. Update the
     arithmetic, `docs/timeseries_dates.rst`, and the docstrings.
     Tests: the C4d and C4e tests on `DateTimeTensor`; a `DateTimeTensor`

@@ -57,7 +57,7 @@ A window also keeps where it was cut from.
 ``signal`` that the window's time 0 stands for, so an observation at time
 ``t`` in the window was at ``origin + t`` in ``signal``::
 
-   windows[1].origin  # 2.0
+   windows[1].origin  # TimeDelta(2, 's')
 
 Here the origins are the starts in ``bounds``. They differ only when a start
 falls just short of an observation and snaps to it (see

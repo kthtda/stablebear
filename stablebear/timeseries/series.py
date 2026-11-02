@@ -596,19 +596,20 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         return shapes[0] if len(shapes) == 1 else shapes
 
     @property
-    def origin(self) -> float | FloatTensor:
+    def origin(self) -> TimeDelta | TimeDeltaTensor:
         """The time in the series a channel was cut from that its time 0
-        stands for, in :attr:`unit`.
+        stands for, as a duration in :attr:`unit`.
 
         0 for a series built from observations. Evaluation does not use it;
-        it places a window in the series it was cut from. A float for a
-        series with one channel; for several, a float64 ``FloatTensor`` with
-        one entry per channel.
+        it places a window in the series it was cut from: without an
+        :attr:`epoch`, a channel lies at its :attr:`domain` moved by its
+        origin. A :class:`TimeDelta` for a series with one channel; for
+        several, a :class:`TimeDeltaTensor` with one entry per channel.
         """
         origins = [self._data.origin(i) for i in range(self.n_channels)]
         if len(origins) == 1:
-            return origins[0]
-        return FloatTensor(origins, dtype=float64)
+            return TimeDelta(origins[0], self.unit)
+        return TimeDeltaTensor(np.array(origins, dtype=np.float64), self.unit)
 
     @property
     def epoch(self) -> DateTime | None:
@@ -671,44 +672,6 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
             if last < end or (last == end and not last_closed):
                 end, end_closed = last, last_closed
         return start, end, start_closed, end_closed
-
-    def bounds(self, *, dates: bool = False, resolution: str = "us") -> Domain | tuple[Domain, ...]:
-        """Where each channel lies in the series it was cut from.
-
-        The :attr:`domain` of each channel, where it is evaluated, with its
-        :attr:`origin` added to both ends, in :attr:`unit`, and the same closed ends. For a series
-        built from observations, the origin is 0 and these are its domains.
-        For a window, they are where it lies in the series it was cut from,
-        after snapping; the bounds returned by :class:`Window` are the
-        times before snapping, shared by all channels.
-
-        A :class:`Domain` for a series with one channel; for several, a
-        tuple with one per channel, in channel order. The channels are not
-        intersected, because their origins can differ.
-
-        With ``dates=True``, the ends are dates and times instead,
-        ``np.datetime64`` values at ``resolution`` as
-        :meth:`Times.to_datetime64` gives them.
-
-        Raises
-        ------
-        ValueError
-            If ``dates`` is true and the series has no :attr:`epoch`.
-        """
-        if dates and self.epoch is None:
-            raise ValueError("This series has no epoch to give dates and times; set one with with_epoch")
-
-        def end_of(t):
-            if not dates:
-                return t
-            return Times([t], unit=self.unit, epoch=self.epoch).to_datetime64(resolution)[0]
-
-        bounds = []
-        for i in range(self.n_channels):
-            start, end, start_closed, end_closed = self._data.select([i]).domain
-            origin = self._data.origin(i)
-            bounds.append(Domain(end_of(start + origin), end_of(end + origin), start_closed, end_closed))
-        return bounds[0] if len(bounds) == 1 else tuple(bounds)
 
     @property
     def n_observations(self) -> int | IntTensor:
