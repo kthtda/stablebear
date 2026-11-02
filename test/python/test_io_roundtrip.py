@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 
 import stablebear as sb
-from stablebear.timeseries import TimeSeries, Window
+from stablebear.timeseries import TimeDelta, TimeDeltaTensor, TimeSeries, Window
 
 from _element_values import TWO_ELEMENTS_OF_EVERY_DTYPE
 from _round_trip import ROUND_TRIPS
@@ -85,9 +85,9 @@ def test_scalar_point_cloud_tensor_preserves_cloud(
 @pytest.mark.parametrize("make_values", TWO_ELEMENTS_OF_EVERY_DTYPE)
 def test_nested_tensor_of_every_leaf_dtype_survives_roundtrip(make_values, round_trip):
     two = make_values()
-    window = Window(size=1.0, closed="both", partial=False, anchor="start")
-    forward = window(TimeSeries(two, times=[0.0, 1.0]))
-    backward = window(TimeSeries(two[[1, 0]], times=[0.0, 1.0]))
+    window = Window(size=TimeDelta(1.0, "s"), closed="both", partial=False, anchor="start")
+    forward = window(TimeSeries(two, times=TimeDeltaTensor([0.0, 1.0], "s")))
+    backward = window(TimeSeries(two[[1, 0]], times=TimeDeltaTensor([0.0, 1.0], "s")))
 
     for nested in (sb.NestedTensor([two, two[:1]]), sb.NestedTensor([forward, backward])):
         restored = round_trip(nested)

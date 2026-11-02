@@ -16,11 +16,11 @@ import sys
 sys.modules["pandas"] = None
 
 import numpy as np
-from stablebear.timeseries import TimeDelayEmbedding, TimeSeries, Window
+from stablebear.timeseries import TimeDelayEmbedding, TimeDelta, TimeDeltaTensor, TimeSeries, Window
 
-series = TimeSeries(np.array([1.0, 2.0, 3.0, 4.0]), np.array([0.0, 1.0, 2.0, 3.0]))
-windows = Window(1.0, 1.0, closed="left", partial=False, anchor="start")(series)
-embedded = TimeDelayEmbedding(2, 1.0, direction="backward")(series)
+series = TimeSeries(np.array([1.0, 2.0, 3.0, 4.0]), TimeDeltaTensor([0.0, 1.0, 2.0, 3.0], "s"))
+windows = Window(TimeDelta(1.0, "s"), TimeDelta(1.0, "s"), closed="left", partial=False, anchor="start")(series)
+embedded = TimeDelayEmbedding(2, TimeDelta(1.0, "s"), direction="backward")(series)
 print(len(windows), embedded.n_observations)
 """
 
@@ -111,7 +111,7 @@ def test_date_time_tensor_of_an_index_with_a_timezone_is_its_utc_instants():
 
 
 def test_series_at_a_timedelta_equals_series_at_its_time_in_the_unit():
-    assert _dated_series()(pd.Timedelta("90min")) == _dated_series()(1.5)
+    assert _dated_series()(pd.Timedelta("90min")) == _dated_series()(TimeDelta(1.5, "h"))
 
 
 def test_series_at_index_of_durations_equals_series_at_its_values():

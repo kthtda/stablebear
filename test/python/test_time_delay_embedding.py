@@ -6,7 +6,7 @@ import pytest
 
 import stablebear as sb
 from stablebear.persistence import compute_persistent_homology
-from stablebear.timeseries import TimeDelayEmbedding, TimeDelta, Times, TimeSeries, Window
+from stablebear.timeseries import TimeDelayEmbedding, TimeDelta, TimeDeltaTensor, Times, TimeSeries, Window
 
 from _element_values import TWO_ELEMENTS_OF_EVERY_DTYPE
 from _round_trip import ROUND_TRIPS
@@ -21,13 +21,13 @@ def _ms_series():
 @pytest.mark.parametrize("direction, times, between", [
     # (x(t - 2), x(t - 1), x(t)) changes where x does, at 0.0, 1.0, 2.5, and
     # 4.0, and 1 and 2 later, from 0.0 + 2 on.
-    pytest.param("backward", [2.0, 2.5, 3.0, 3.5, 4.0], 3.25, id="backward"),
+    pytest.param("backward", [2.0, 2.5, 3.0, 3.5, 4.0], TimeDelta(3.25, "ms"), id="backward"),
     # (x(t), x(t + 1), x(t + 2)) changes there and 1 and 2 earlier, up to
     # 4.0 - 2.
-    pytest.param("forward", [0.0, 0.5, 1.0, 1.5, 2.0], 1.25, id="forward"),
+    pytest.param("forward", [0.0, 0.5, 1.0, 1.5, 2.0], TimeDelta(1.25, "ms"), id="forward"),
 ])
 def test_embedding_has_a_point_wherever_a_component_reaches_an_observation(direction, times, between):
-    embedding = TimeDelayEmbedding(dimension=3, delay=1.0, direction=direction)(_ms_series())
+    embedding = TimeDelayEmbedding(dimension=3, delay=TimeDelta(1.0, "ms"), direction=direction)(_ms_series())
 
     assert np.array_equal(embedding.times.to_floats(), times)
     # Both directions give the same points, oldest first, at times 2 apart.
@@ -43,30 +43,30 @@ def test_embedding_has_a_point_wherever_a_component_reaches_an_observation(direc
 
 
 def test_embedding_starts_where_every_component_has_a_value():
-    embedding = TimeDelayEmbedding(dimension=3, delay=1.0)(_ms_series())
+    embedding = TimeDelayEmbedding(dimension=3, delay=TimeDelta(1.0, "ms"))(_ms_series())
 
     assert embedding.unit == "ms"
     assert embedding.shape == (3,)
     # The domain starts at 0.0 + 2 * 1.0.
-    assert np.array_equal(np.asarray(embedding(2.0)), [0.0, 10.0, 10.0])
+    assert np.array_equal(np.asarray(embedding(TimeDelta(2.0, "ms"))), [0.0, 10.0, 10.0])
     with pytest.raises(ValueError, match="outside the domain"):
-        embedding(1.75)
+        embedding(TimeDelta(1.75, "ms"))
 
 
 def test_forward_embedding_ends_where_every_component_has_a_value():
-    embedding = TimeDelayEmbedding(dimension=3, delay=1.0, direction="forward")(_ms_series())
+    embedding = TimeDelayEmbedding(dimension=3, delay=TimeDelta(1.0, "ms"), direction="forward")(_ms_series())
 
     # The domain ends at 4.0 - 2 * 1.0.
-    assert np.array_equal(np.asarray(embedding(2.0)), [10.0, 25.0, 40.0])
+    assert np.array_equal(np.asarray(embedding(TimeDelta(2.0, "ms"))), [10.0, 25.0, 40.0])
     with pytest.raises(ValueError, match="outside the domain"):
-        embedding(2.25)
+        embedding(TimeDelta(2.25, "ms"))
 
 
 def test_embedding_of_shaped_observations_adds_a_leading_axis():
     # Each observation is (10 * t, -10 * t).
-    series = TimeSeries([[0.0, 0.0], [10.0, -10.0], [20.0, -20.0]], times=[0.0, 1.0, 2.0])
+    series = TimeSeries([[0.0, 0.0], [10.0, -10.0], [20.0, -20.0]], times=TimeDeltaTensor([0.0, 1.0, 2.0], "s"))
 
-    embedding = TimeDelayEmbedding(dimension=2, delay=1.0)(series)
+    embedding = TimeDelayEmbedding(dimension=2, delay=TimeDelta(1.0, "s"))(series)
 
     assert embedding.shape == (2, 2)
     assert np.array_equal(np.asarray(embedding.values), [
@@ -78,9 +78,9 @@ def test_embedding_of_shaped_observations_adds_a_leading_axis():
 def test_embedding_of_pcfs_stacks_delayed_pcfs():
     # PCFs of values 0, 10, and 20 at times 0.0, 1.0, and 2.0.
     pcfs = [sb.Pcf(np.array([[0.0, 10.0 * t], [1.0, 0.0]])) for t in [0.0, 1.0, 2.0]]
-    series = TimeSeries(sb.tensor(pcfs), times=[0.0, 1.0, 2.0])
+    series = TimeSeries(sb.tensor(pcfs), times=TimeDeltaTensor([0.0, 1.0, 2.0], "s"))
 
-    embedding = TimeDelayEmbedding(dimension=2, delay=1.0)(series)
+    embedding = TimeDelayEmbedding(dimension=2, delay=TimeDelta(1.0, "s"))(series)
 
     assert embedding.dtype is sb.pcf64
     assert embedding.shape == (2,)
@@ -92,15 +92,16 @@ def test_embedding_of_pcfs_stacks_delayed_pcfs():
 
 
 @pytest.mark.parametrize("make_embedding, error", [
-    pytest.param(lambda: TimeDelayEmbedding(dimension=0, delay=1.0), ValueError, id="dimension-0"),
-    pytest.param(lambda: TimeDelayEmbedding(dimension=2, delay=0.0), ValueError, id="delay-0"),
-    pytest.param(lambda: TimeDelayEmbedding(dimension=2, delay=-1.0), ValueError, id="delay-negative"),
-    pytest.param(lambda: TimeDelayEmbedding(dimension=2, delay=1.0, direction="ahead"), ValueError,
+    pytest.param(lambda: TimeDelayEmbedding(dimension=0, delay=TimeDelta(1.0, "s")), ValueError, id="dimension-0"),
+    pytest.param(lambda: TimeDelayEmbedding(dimension=2, delay=TimeDelta(0.0, "s")), ValueError, id="delay-0"),
+    pytest.param(lambda: TimeDelayEmbedding(dimension=2, delay=TimeDelta(-1.0, "s")), ValueError,
+                 id="delay-negative"),
+    pytest.param(lambda: TimeDelayEmbedding(dimension=2, delay=TimeDelta(1.0, "s"), direction="ahead"), ValueError,
                  id="direction-unknown"),
-    pytest.param(lambda: TimeDelayEmbedding(dimension=3, delay=1.0)(
-        TimeSeries([0.0, 10.0], times=[0.0, 1.0])), ValueError, id="too-short"),
-    pytest.param(lambda: TimeDelayEmbedding(dimension=3, delay=1.0, direction="forward")(
-        TimeSeries([0.0, 10.0], times=[0.0, 1.0])), ValueError, id="too-short-forward"),
+    pytest.param(lambda: TimeDelayEmbedding(dimension=3, delay=TimeDelta(1.0, "s"))(
+        TimeSeries([0.0, 10.0], times=TimeDeltaTensor([0.0, 1.0], "s"))), ValueError, id="too-short"),
+    pytest.param(lambda: TimeDelayEmbedding(dimension=3, delay=TimeDelta(1.0, "s"), direction="forward")(
+        TimeSeries([0.0, 10.0], times=TimeDeltaTensor([0.0, 1.0], "s"))), ValueError, id="too-short-forward"),
 ])
 def test_embedding_rejects_invalid_input(make_embedding, error):
     with pytest.raises(error):
@@ -112,7 +113,7 @@ def test_embedding_of_several_channels_converts_the_delay_per_channel():
     b = TimeSeries([-1.0, -2.0, -3.0], times=Times([500.0, 1500.0, 3000.0], unit="ms"))
     series = TimeSeries.from_channels([a, b], unit="s")
 
-    embedding = TimeDelayEmbedding(dimension=2, delay=0.5)(series)
+    embedding = TimeDelayEmbedding(dimension=2, delay=TimeDelta(0.5, "s"))(series)
 
     # Each channel changes at its own times and 0.5 s later, from 0.5 s
     # after its first time on: A at 0.5, 1.0, 1.5, and 2.5 s, and B at 1000,
@@ -121,13 +122,13 @@ def test_embedding_of_several_channels_converts_the_delay_per_channel():
     assert np.array_equal(times[0].to_floats(), [0.5, 1.0, 1.5, 2.5])
     assert np.array_equal(times[1].to_floats(), [1.0, 1.5, 2.0, 3.0])
     # (x(1.25 s), x(1.75 s)) in each channel.
-    values = embedding(1.75)
+    values = embedding(TimeDelta(1.75, "s"))
     assert np.array_equal(np.asarray(values[0]), [20.0, 20.0])
     assert np.array_equal(np.asarray(values[1]), [-1.0, -2.0])
-    embedding(1.0)
-    embedding(2.5)
+    embedding(TimeDelta(1.0, "s"))
+    embedding(TimeDelta(2.5, "s"))
     with pytest.raises(ValueError, match="outside the domain"):
-        embedding(0.75)
+        embedding(TimeDelta(0.75, "s"))
 
 
 @dataclass(frozen=True)
@@ -180,18 +181,18 @@ class RoundingCase:
     ), id="at-the-start"),
 ])
 def test_embedding_records_a_point_once_at_the_time_its_rounded_times_snap_to(case):
-    series = TimeSeries(case.values, times=case.times)
+    series = TimeSeries(case.values, times=TimeDeltaTensor(case.times, "s"))
 
-    embedding = TimeDelayEmbedding(dimension=2, delay=0.1)(series)
+    embedding = TimeDelayEmbedding(dimension=2, delay=TimeDelta(0.1, "s"))(series)
 
     assert np.array_equal(embedding.times.to_floats(), case.embedding_times)
     assert np.array_equal(np.asarray(embedding.values), case.points)
 
 
 def test_forward_embedding_records_a_point_at_the_observation_its_rounded_time_snaps_to():
-    series = TimeSeries([1.0, 2.0, 3.0, 4.0], times=[0.1, 0.2, 0.3, 0.4])
+    series = TimeSeries([1.0, 2.0, 3.0, 4.0], times=TimeDeltaTensor([0.1, 0.2, 0.3, 0.4], "s"))
 
-    embedding = TimeDelayEmbedding(dimension=2, delay=0.1, direction="forward")(series)
+    embedding = TimeDelayEmbedding(dimension=2, delay=TimeDelta(0.1, "s"), direction="forward")(series)
 
     # 0.3 - 0.1 is 0.19999999999999998, just below the observation at 0.2,
     # so the point is recorded at 0.2.
@@ -202,16 +203,16 @@ def test_forward_embedding_records_a_point_at_the_observation_its_rounded_time_s
         [3.0, 4.0],   # 0.3: x(0.3), x(0.4)
     ])
     # The domain ends at 0.4 - 0.1, which is 0.30000000000000004.
-    assert np.array_equal(np.asarray(embedding(0.4 - 0.1)), [3.0, 4.0])
+    assert np.array_equal(np.asarray(embedding(TimeDelta(0.4 - 0.1, "s"))), [3.0, 4.0])
 
 
 def test_embedding_reaches_components_many_observations_back():
     series = TimeSeries(
         [0.0, 10.0, 20.0, 30.0, 40.0, 50.0, 60.0, 70.0, 80.0],
-        times=[0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0],
+        times=TimeDeltaTensor([0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0], "s"),
     )
 
-    embedding = TimeDelayEmbedding(dimension=2, delay=6.0)(series)
+    embedding = TimeDelayEmbedding(dimension=2, delay=TimeDelta(6.0, "s"))(series)
 
     # Each older component is six observations before the newer one.
     assert np.array_equal(embedding.times.to_floats(), [6.0, 7.0, 8.0])
@@ -227,9 +228,10 @@ def test_embedding_allows_delayed_times_that_round_to_one_value():
     # but both minus 1.0 round to -2.5.
     last = np.nextafter(-1.5, 0.0)
     # Each value is 10 times its timestamp, with -15.0 for last.
-    series = TimeSeries([-30.0, -25.0, -15.0], times=[-3.0, -2.5, last], snap_tolerance=0.0)
+    series = TimeSeries([-30.0, -25.0, -15.0], times=TimeDeltaTensor([-3.0, -2.5, last], "s"),
+                        snap_tolerance=0.0)
 
-    embedding = TimeDelayEmbedding(dimension=2, delay=1.0)(series)
+    embedding = TimeDelayEmbedding(dimension=2, delay=TimeDelta(1.0, "s"))(series)
 
     assert np.array_equal(embedding.times.to_floats(), [-2.0, -1.5, last])
     assert np.array_equal(np.asarray(embedding.values), [
@@ -247,9 +249,9 @@ def test_embedding_of_an_embedding_stacks_points():
     #   3.5 -> (10, 25, 25)   4.0 -> (10, 25, 40)
     #
     # outer, dimension 2, delay 1.5: (inner(t - 1.5), inner(t)) from 2.0 + 1.5 on
-    inner = TimeDelayEmbedding(dimension=3, delay=1.0)(_ms_series())
+    inner = TimeDelayEmbedding(dimension=3, delay=TimeDelta(1.0, "ms"))(_ms_series())
 
-    outer = TimeDelayEmbedding(dimension=2, delay=1.5)(inner)
+    outer = TimeDelayEmbedding(dimension=2, delay=TimeDelta(1.5, "ms"))(inner)
 
     assert outer.shape == (2, 3)
     assert np.array_equal(outer.times.to_floats(), [3.5, 4.0])
@@ -265,9 +267,9 @@ def test_embedding_of_an_embedding_stacks_points():
 
 
 def test_embedding_evaluates_many_times_at_once():
-    embedding = TimeDelayEmbedding(dimension=3, delay=1.0)(_ms_series())
+    embedding = TimeDelayEmbedding(dimension=3, delay=TimeDelta(1.0, "ms"))(_ms_series())
 
-    assert np.array_equal(np.asarray(embedding([4.0, 3.25])), [
+    assert np.array_equal(np.asarray(embedding(TimeDeltaTensor([4.0, 3.25], "ms"))), [
         [10.0, 25.0, 40.0],   # 4.0: x(2.0), x(3.0), x(4.0)
         [10.0, 10.0, 25.0],   # 3.25: x(1.25), x(2.25), x(3.25)
     ])
@@ -276,8 +278,8 @@ def test_embedding_evaluates_many_times_at_once():
 def test_persistence_of_an_embedding_matches_its_stored_points():
     # Each point of a one-dimensional series embedded with dimension 3 is a
     # (3, 1) matrix: a cloud of three points on a line.
-    series = TimeSeries([[0.0], [10.0], [25.0], [40.0]], times=[0.0, 1.0, 2.5, 4.0])
-    embedding = TimeDelayEmbedding(dimension=3, delay=1.0)(series)
+    series = TimeSeries([[0.0], [10.0], [25.0], [40.0]], times=TimeDeltaTensor([0.0, 1.0, 2.5, 4.0], "s"))
+    embedding = TimeDelayEmbedding(dimension=3, delay=TimeDelta(1.0, "s"))(series)
     stored = TimeSeries(embedding.values, times=embedding.times)
 
     result = compute_persistent_homology(embedding, max_dim=0)
@@ -289,7 +291,7 @@ def test_persistence_of_an_embedding_matches_its_stored_points():
 
 @pytest.mark.parametrize("round_trip", ROUND_TRIPS)
 def test_embedding_survives_saving(round_trip):
-    embedding = TimeDelayEmbedding(dimension=3, delay=1.0)(_ms_series())
+    embedding = TimeDelayEmbedding(dimension=3, delay=TimeDelta(1.0, "ms"))(_ms_series())
 
     loaded = round_trip(embedding)
 
@@ -297,28 +299,30 @@ def test_embedding_survives_saving(round_trip):
 
 
 def test_forward_embedding_of_a_window_ends_one_span_before_the_window():
-    source = TimeSeries([0.0, 10.0, 20.0, 40.0], times=[0.0, 1.0, 2.0, 4.0])
+    source = TimeSeries([0.0, 10.0, 20.0, 40.0], times=TimeDeltaTensor([0.0, 1.0, 2.0, 4.0], "s"))
     # The window (1, 3] holds 10 from 0 and 20 from 1, up to its closed
     # end, 2, in window time.
-    window = Window(size=2.0, step=1.0, closed="right", anchor="start")(source)[1]
+    window = Window(size=TimeDelta(2.0, "s"), step=TimeDelta(1.0, "s"),
+                    closed="right", anchor="start")(source)[1]
 
-    embedding = TimeDelayEmbedding(dimension=2, delay=1.0, direction="forward")(window)
+    embedding = TimeDelayEmbedding(dimension=2, delay=TimeDelta(1.0, "s"), direction="forward")(window)
 
     # (x(t), x(t + 1)) for t in (0, 2 - 1].
-    assert np.array_equal(np.asarray(embedding(0.5)), [10.0, 20.0])
-    assert np.array_equal(np.asarray(embedding(1.0)), [20.0, 20.0])
+    assert np.array_equal(np.asarray(embedding(TimeDelta(0.5, "s"))), [10.0, 20.0])
+    assert np.array_equal(np.asarray(embedding(TimeDelta(1.0, "s"))), [20.0, 20.0])
     with pytest.raises(ValueError, match="outside the domain"):
-        embedding(1.5)
+        embedding(TimeDelta(1.5, "s"))
 
 
 @pytest.mark.parametrize("round_trip", ROUND_TRIPS)
 @pytest.mark.parametrize("direction", ["backward", "forward"])
 def test_embedding_of_a_window_with_a_closed_end_survives_saving(direction, round_trip):
-    source = TimeSeries([0.0, 10.0, 20.0, 40.0], times=[0.0, 1.0, 2.0, 4.0])
+    source = TimeSeries([0.0, 10.0, 20.0, 40.0], times=TimeDeltaTensor([0.0, 1.0, 2.0, 4.0], "s"))
     # The embedding of the window (1, 3] is observed at its closed end: 2
     # looking back, and 2 - 1 looking forward.
-    window = Window(size=2.0, step=1.0, closed="right", anchor="start")(source)[1]
-    embedding = TimeDelayEmbedding(dimension=2, delay=1.0, direction=direction)(window)
+    window = Window(size=TimeDelta(2.0, "s"), step=TimeDelta(1.0, "s"),
+                    closed="right", anchor="start")(source)[1]
+    embedding = TimeDelayEmbedding(dimension=2, delay=TimeDelta(1.0, "s"), direction=direction)(window)
 
     loaded = round_trip(embedding)
 
@@ -331,8 +335,8 @@ def test_embeddings_of_every_dtype_survive_saving(make_values, round_trip):
     # The observations are a, b, b, a, so the points (a, b), (b, b), and
     # (b, a) differ.
     two = make_values()
-    series = TimeSeries(sb.concatenate([two, two[[1, 0]]]), times=[0.0, 1.0, 2.0, 3.0])
-    embedding = TimeDelayEmbedding(dimension=2, delay=1.0)(series)
+    series = TimeSeries(sb.concatenate([two, two[[1, 0]]]), times=TimeDeltaTensor([0.0, 1.0, 2.0, 3.0], "s"))
+    embedding = TimeDelayEmbedding(dimension=2, delay=TimeDelta(1.0, "s"))(series)
 
     loaded = round_trip(embedding)
 

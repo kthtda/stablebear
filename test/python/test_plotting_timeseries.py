@@ -6,7 +6,7 @@ from plot_helpers import FigureGallery, gallery_fixture, ax_fixture
 import stablebear as sb
 from stablebear.persistence import Barcode, BarcodeTensor
 from stablebear.plotting import plot_timeseries
-from stablebear.timeseries import Times, TimeSeries, Window
+from stablebear.timeseries import TimeDelta, TimeDeltaTensor, Times, TimeSeries, Window
 
 _gallery = FigureGallery()
 _show_gallery = gallery_fixture(_gallery)
@@ -28,8 +28,8 @@ def test_a_series_is_drawn_as_steps_through_its_observations(ax):
 def test_a_window_holds_its_last_value_to_its_end(ax):
     # The window [2, 5) holds 20, observed at 1.5, then 30 at 4; it ends at
     # 5, after its last observation.
-    window = Window(size=3.0, step=2.0, closed="left", partial=False, anchor="start")(
-        TimeSeries([10.0, 20.0, 30.0, 40.0], times=[0.0, 1.5, 4.0, 6.0]))[1]
+    window = Window(size=TimeDelta(3.0, "s"), step=TimeDelta(2.0, "s"), closed="left", partial=False, anchor="start")(
+        TimeSeries([10.0, 20.0, 30.0, 40.0], times=TimeDeltaTensor([0.0, 1.5, 4.0, 6.0], "s")))[1]
 
     (line,) = plot_timeseries(window, ax=ax)
 
@@ -62,8 +62,8 @@ def test_no_axes_draws_on_the_current_axes(ax):
 
 
 def test_markers_mark_each_observation(ax):
-    window = Window(size=3.0, step=2.0, closed="left", partial=False, anchor="start")(
-        TimeSeries([10.0, 20.0, 30.0, 40.0], times=[0.0, 1.5, 4.0, 6.0]))[1]
+    window = Window(size=TimeDelta(3.0, "s"), step=TimeDelta(2.0, "s"), closed="left", partial=False, anchor="start")(
+        TimeSeries([10.0, 20.0, 30.0, 40.0], times=TimeDeltaTensor([0.0, 1.5, 4.0, 6.0], "s")))[1]
 
     (line,) = plot_timeseries(window, ax=ax, markers=True)
 
@@ -123,8 +123,10 @@ def test_an_axis_of_dates_raises(ax):
 
 def _windows():
     # Windows of 2 s at 0, 2, and 4 s.
-    series = TimeSeries([0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0], times=[0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0])
-    return Window(size=2.0, step=2.0, closed="left", partial=False, anchor="start")(series)
+    series = TimeSeries([0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0],
+                        times=TimeDeltaTensor([0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0], "s"))
+    return Window(size=TimeDelta(2.0, "s"), step=TimeDelta(2.0, "s"),
+                  closed="left", partial=False, anchor="start")(series)
 
 
 def test_a_tensor_of_windows_is_drawn_one_line_each_in_place(ax):
@@ -146,8 +148,9 @@ def test_an_empty_tensor_draws_nothing(ax):
 
 
 def test_a_tensor_with_two_dimensions_raises(ax):
-    series = TimeSeries([0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0], times=np.arange(9.0))
-    windows = Window(size=2.0, step=2.0, closed="left", partial=False, anchor="start")(series).reshape((2, 2))
+    series = TimeSeries([0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0], times=TimeDeltaTensor(np.arange(9.0), "s"))
+    windows = Window(size=TimeDelta(2.0, "s"), step=TimeDelta(2.0, "s"),
+                     closed="left", partial=False, anchor="start")(series).reshape((2, 2))
 
     with pytest.raises(ValueError, match="1-D"):
         plot_timeseries(windows, ax=ax)
@@ -155,7 +158,7 @@ def test_a_tensor_with_two_dimensions_raises(ax):
 
 def test_vector_observations_raise(ax):
     with pytest.raises(ValueError, match="scalar"):
-        plot_timeseries(TimeSeries([[1.0, 2.0], [3.0, 4.0]], times=[0.0, 1.0]), ax=ax)
+        plot_timeseries(TimeSeries([[1.0, 2.0], [3.0, 4.0]], times=TimeDeltaTensor([0.0, 1.0], "s")), ax=ax)
 
 
 def _channels():
@@ -226,7 +229,8 @@ def test_a_series_with_an_epoch_is_drawn_at_its_dates(ax):
 
 
 def test_windows_with_an_epoch_are_drawn_at_their_dates(ax):
-    windows = Window(size=2.0, step=2.0, closed="left", partial=False, anchor="start")(_dated())
+    windows = Window(size=TimeDelta(2.0, "h"), step=TimeDelta(2.0, "h"),
+                     closed="left", partial=False, anchor="start")(_dated())
 
     lines = plot_timeseries(windows, ax=ax)
 
@@ -288,7 +292,7 @@ def test_series_with_different_epochs_land_at_their_own_dates(ax):
                  "barcode64", id="barcodes"),
 ])
 def test_time_series_of_non_numbers_raise(values, dtype_name, ax):
-    series = TimeSeries(values(), times=[0.0, 1.0])
+    series = TimeSeries(values(), times=TimeDeltaTensor([0.0, 1.0], "s"))
 
     with pytest.raises(TypeError, match=dtype_name):
         plot_timeseries(series, ax=ax)

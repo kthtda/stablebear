@@ -1,6 +1,6 @@
 # pandas input and durations for time series: implementation plan
 
-Progress: 29 of 46 items, 59 of 89 points (66%)
+Progress: 30 of 46 items, 62 of 89 points (70%)
 
 Specs: [pandas-timeseries-spec.md](pandas-timeseries-spec.md) (phases A, B,
 and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
@@ -202,7 +202,7 @@ so.
 - [x] **F1.** [3] (d697d7a7b) `test/python/test_windowing.py` builds series from
   `TimeDelta` durations and passes `TimeDelta` to `Window` and
   `evaluate`.
-- [ ] **F2.** [3] `test/python/test_timeseries.py` likewise.
+- [x] **F2.** [3] (bb8279d1c) `test/python/test_timeseries.py` likewise.
 - [ ] **F3.** [2] `test_time_delay_embedding.py`, `test_plotting_timeseries.py`,
   `test_timeseries_pandas.py`, `persistence/test_timeseries_persistence.py`,
   `test_io_roundtrip.py`, and `test_integration.py` likewise.
