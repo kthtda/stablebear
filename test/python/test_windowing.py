@@ -833,9 +833,22 @@ def test_windows_of_a_fractional_time_delta_convert_it_exactly():
     assert windows[0].n_observations == 2
 
 
-def test_window_repr_shows_its_durations():
+def test_window_size_and_step_of_timedelta64_are_time_deltas():
     window = Window(size=np.timedelta64(2, "h"), step=np.timedelta64(30, "m"), closed="left", partial=False,
                     anchor="start")
+
+    assert window.size == TimeDelta(2, "h")
+    assert window.step == TimeDelta(30, "min")
+
+
+def test_window_step_defaults_to_its_size():
+    window = Window(size=np.timedelta64(2, "h"), closed="left", partial=False, anchor="start")
+
+    assert window.step == TimeDelta(2, "h")
+
+
+def test_window_repr_shows_its_durations():
+    window = Window(size=TimeDelta(2, "h"), step=TimeDelta(30, "min"), closed="left", partial=False, anchor="start")
 
     assert "size=TimeDelta(2, 'h')" in repr(window)
     assert "step=TimeDelta(30, 'min')" in repr(window)

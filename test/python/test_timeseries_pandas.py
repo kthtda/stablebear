@@ -183,6 +183,18 @@ def test_window_size_of_one_nanosecond_timedelta():
     assert len(windows) == 3
 
 
+def test_window_size_and_step_of_timedelta_are_time_deltas_in_nanoseconds():
+    window = Window(size=pd.Timedelta(2, "h"), step=pd.Timedelta(30, "min"), closed="left", partial=False,
+                    anchor="start")
+
+    assert window.size == TimeDelta(7_200_000_000_000, "ns")
+    assert window.step == TimeDelta(1_800_000_000_000, "ns")
+
+
+def test_embedding_delay_of_timedelta_is_a_time_delta_in_nanoseconds():
+    assert TimeDelayEmbedding(dimension=2, delay=pd.Timedelta(3, "h")).delay == TimeDelta(10_800_000_000_000, "ns")
+
+
 def test_embedding_delay_timedelta_equals_timedelta64():
     series = TimeSeries(np.array([1.0, 2.0, 3.0, 4.0]), Times([0.0, 1.0, 2.0, 3.0], unit="h"))
 

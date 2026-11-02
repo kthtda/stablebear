@@ -180,6 +180,9 @@ and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
 - [ ] **E6.** [1] `Window.size`, `Window.step`, and
   `TimeDelayEmbedding.delay` are `TimeDelta`; update the reprs.
   Tests: from `np.timedelta64` and `pd.Timedelta`; repr.
+  Note: C3 already made durations `TimeDelta` and showed them in the
+  reprs, so this item adds the tests. Numbers stay floats until G3, since
+  a number has no unit before the window meets a series.
 - [ ] **E7.** [3] The channels of a window share its origin, the computed
   start `a_k`, in `include/sbear/timeseries/windowing.hpp`; a snapped
   observation stays at time 0. Update the window docstring, the origin
@@ -190,17 +193,24 @@ and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
 
 ## Phase F: tests and docs use durations
 
+Tests and docs write durations as `TimeDelta` and dates as `DateTime`, or
+as `TimeDeltaTensor` and `DateTimeTensor` for several. `np.timedelta64`,
+`datetime.timedelta`, `pd.Timedelta`, and `datetime64` stay only in tests
+that check they are accepted, and in one place per guide page that says
+so.
+
 - [ ] **F1.** [3] `test/python/test_windowing.py` builds series from
-  durations and passes durations to `Window` and `evaluate`.
+  `TimeDelta` durations and passes `TimeDelta` to `Window` and
+  `evaluate`.
 - [ ] **F2.** [3] `test/python/test_timeseries.py` likewise.
 - [ ] **F3.** [2] `test_time_delay_embedding.py`, `test_plotting_timeseries.py`,
   `test_timeseries_pandas.py`, `persistence/test_timeseries_persistence.py`,
   `test_io_roundtrip.py`, and `test_integration.py` likewise.
 - [ ] **F4.** [3] The time series guide pages (`docs/timeseries*.rst`) use
-  durations and dates; `timeseries_units.rst` explains the unit as
+  `TimeDelta` and `DateTime`; `timeseries_units.rst` explains the unit as
   storage.
-- [ ] **F5.** [1] The tide gauge tutorial uses durations for its window
-  sizes, delays, and evaluation grid.
+- [ ] **F5.** [1] The tide gauge tutorial uses `TimeDelta` for its window
+  sizes and delays, and a `TimeDeltaTensor` for its evaluation grid.
 
 ## Phase G: numbers are rejected
 
@@ -277,7 +287,7 @@ and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
   windows of a `Series`, time zones, `NaN`, and `to_pandas`.
 - [ ] **L2.** [2] The tide gauge tutorial
   (`docs/tutorial_notebooks/timeseries_tides.ipynb`) loads its data with
-  `pd.read_csv` and `TimeSeries.from_pandas`, and uses `pd.Timedelta` for
-  window sizes and delays.
+  `pd.read_csv` and `TimeSeries.from_pandas`; its window sizes and delays
+  stay `TimeDelta`, as F5 left them.
 - [ ] **L3.** [1] `CHANGELOG.md` entries for the new pandas API, the
   changed `DateTime` time zone behavior, and durations instead of numbers.

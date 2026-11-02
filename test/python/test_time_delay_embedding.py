@@ -6,7 +6,7 @@ import pytest
 
 import stablebear as sb
 from stablebear.persistence import compute_persistent_homology
-from stablebear.timeseries import TimeDelayEmbedding, Times, TimeSeries, Window
+from stablebear.timeseries import TimeDelayEmbedding, TimeDelta, Times, TimeSeries, Window
 
 from _element_values import TWO_ELEMENTS_OF_EVERY_DTYPE
 from _round_trip import ROUND_TRIPS
@@ -355,8 +355,12 @@ def test_embedding_with_a_duration_matches_the_same_number(delay, unit, numeric_
     assert embedding.array_equal(TimeDelayEmbedding(dimension=2, delay=numeric_delay)(series))
 
 
+def test_embedding_delay_of_timedelta64_is_a_time_delta():
+    assert TimeDelayEmbedding(dimension=2, delay=np.timedelta64(30, "m")).delay == TimeDelta(30, "min")
+
+
 def test_embedding_repr_shows_its_duration():
-    assert "delay=TimeDelta(30, 'min')" in repr(TimeDelayEmbedding(dimension=2, delay=np.timedelta64(30, "m")))
+    assert "delay=TimeDelta(30, 'min')" in repr(TimeDelayEmbedding(dimension=2, delay=TimeDelta(30, "min")))
 
 
 def test_embedding_rejects_a_delay_without_a_fixed_length():
