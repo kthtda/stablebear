@@ -152,6 +152,11 @@ finer units narrow that range, to 1678-2262 for nanoseconds.
 - **`TimeSeries.origin`** is a `TimeDelta`, or a `TimeDeltaTensor` of
   shape `(n_channels,)` for several channels, in the series' unit: where
   time 0 lies in the series a window was cut from.
+- **The channels of a window share its origin**, the start `a_k` as
+  computed, which is also its bound. A channel whose observation the start
+  snaps to still holds that observation at time 0, so its placement in
+  the series is off by at most the snap tolerance. Channels combined with
+  `TimeSeries.from_channels` can still have different origins.
 - **`TimeSeries.bounds`** is removed. With an epoch, `domain` already gives
   where a window lies. Without one, that is `domain` shifted by `origin`.
 - **`Window(..., return_bounds=True)`** gives a `TimeDeltaTensor` of

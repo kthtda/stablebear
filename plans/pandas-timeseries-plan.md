@@ -1,6 +1,6 @@
 # pandas input and durations for time series: implementation plan
 
-Progress: 25 of 45 items, 50 of 86 points (58%)
+Progress: 26 of 46 items, 52 of 89 points (58%)
 
 Specs: [pandas-timeseries-spec.md](pandas-timeseries-spec.md) (phases A, B,
 and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
@@ -173,13 +173,20 @@ and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
 - [x] **E4.** [2] (7ec48f8f9) `TimeSeries.origin` is a `TimeDelta` or a `TimeDeltaTensor`;
   remove `TimeSeries.bounds` and update its callers and docs.
   Tests: window origins, including after snapping; several channels.
-- [ ] **E5.** [2] `Window(..., return_bounds=True)` gives a
+- [x] **E5.** [2] (f04d7b62f) `Window(..., return_bounds=True)` gives a
   `TimeDeltaTensor` of shape `(n_windows, 2)` in the series' unit, or a
   `DateTimeTensor` for a series with an epoch.
   Tests: dated and undated series; partial windows.
 - [ ] **E6.** [1] `Window.size`, `Window.step`, and
   `TimeDelayEmbedding.delay` are `TimeDelta`; update the reprs.
   Tests: from `np.timedelta64` and `pd.Timedelta`; repr.
+- [ ] **E7.** [3] The channels of a window share its origin, the computed
+  start `a_k`, in `include/sbear/timeseries/windowing.hpp`; a snapped
+  observation stays at time 0. Update the window docstring, the origin
+  part of `docs/timeseries_windows.rst`, and `docs/timeseries_snapping.rst`.
+  Tests: a start that snaps keeps `3 * 0.3` as origin and holds the
+  observation at 0.9 at time 0; channels that snap differently share an
+  origin; dated bounds of windows of such a window are their dates.
 
 ## Phase F: tests and docs use durations
 
