@@ -343,16 +343,18 @@ def test_window_bounds_just_below_an_observation_reach_it():
     assert np.array_equal(np.asarray(windows[3].values), [9.0])
 
 
-def test_a_window_start_that_snaps_to_an_observation_has_its_time_as_origin():
+def test_a_window_start_that_snaps_to_an_observation_keeps_its_start_as_origin():
     series = TimeSeries([0.0, 3.0, 6.0, 9.0, 12.0], times=[0.0, 0.3, 0.6, 0.9, 1.2])
 
     windows, bounds = Window(size=0.3, step=0.3, closed="left", partial=False, anchor="start")(
         series, return_bounds=True)
 
     # Window 3 starts at 3 * 0.3, just below 0.9, and snaps to the
-    # observation at 0.9.
-    assert bounds[3, 0] == TimeDelta(3 * 0.3, "s")
-    assert windows[3].origin == TimeDelta(0.9, "s")
+    # observation at 0.9, which it holds at time 0.
+    assert windows[3].origin == bounds[3, 0]
+    assert windows[3].origin == TimeDelta(3 * 0.3, "s")
+    assert np.array_equal(windows[3].times.to_floats(), [0.0])
+    assert windows[3](0.0) == 9.0
 
 
 def _snapping_channels():
@@ -363,10 +365,13 @@ def _snapping_channels():
     return TimeSeries.from_channels([a, b])
 
 
-def test_channels_that_snap_differently_have_different_origins():
+def test_channels_that_snap_differently_share_an_origin():
     window = Window(size=0.3, step=0.3, closed="left", partial=False, anchor="start")(_snapping_channels())[3]
 
-    assert window.origin.array_equal(TimeDeltaTensor([0.9, 3 * 0.3], "s"))
+    assert window.origin.array_equal(TimeDeltaTensor([3 * 0.3, 3 * 0.3], "s"))
+    # Channel a holds its observation at 0.9 at time 0; b holds the one at 0.5.
+    values = window(0.0)
+    assert (values[0][()], values[1][()]) == (9.0, -5.0)
 
 
 def test_a_window_of_a_window_has_its_origin_in_the_first_series():
@@ -441,9 +446,7 @@ def test_dated_bounds_keep_a_unit_finer_than_microseconds():
                                                          "2023-01-01T00:00:00.000000002"], dtype="datetime64[ns]")))
 
 
-def test_dated_bounds_of_channels_at_origins_closer_than_their_resolution_are_their_dates():
-    # The origins of window 3 are 0.9 and 3 * 0.3, which round to the same
-    # microsecond.
+def test_dated_bounds_of_windows_of_a_window_whose_channels_snap_differently_are_their_dates():
     window = Window(size=0.3, step=0.3, closed="left", partial=False, anchor="start")(_snapping_channels())[3]
     dated = window.with_epoch("2023-01-01")
 
@@ -452,17 +455,14 @@ def test_dated_bounds_of_channels_at_origins_closer_than_their_resolution_are_th
     assert bounds[0, 0] == DateTime(np.datetime64("2023-01-01T00:00:00.900000", "us"))
 
 
-def test_dated_bounds_of_channels_at_origins_with_different_dates_raise():
-    # Channel a snaps the start of window 1, at 0.9999 s, to its
-    # observation at 1 s; channel b has none there.
-    a = TimeSeries([0.0, 1.0, 2.0, 3.0], times=[0.0, 1.0, 2.0, 3.0], snap_tolerance=1e-3)
-    b = TimeSeries([0.0, -2.0, -3.0], times=[0.0, 2.0, 3.0], snap_tolerance=1e-14)
-    window = Window(size=0.9999, step=0.9999, closed="left", partial=False, anchor="start")(
-        TimeSeries.from_channels([a, b]))[1]
-    dated = window.with_epoch("2023-01-01")
+def test_dated_bounds_of_channels_at_different_origins_raise():
+    series = TimeSeries(np.arange(9.0), times=np.arange(9.0))
+    windows = Window(size=2.0, step=2.0, closed="left", partial=False, anchor="start")(series)
+    # The channels lie at 0 s and 2 s of the series.
+    dated = TimeSeries.from_channels([windows[0], windows[1]]).with_epoch("2023-01-01")
 
     with pytest.raises(ValueError, match="different origins"):
-        Window(size=0.5, step=0.5, closed="left", partial=False, anchor="start")(dated, return_bounds=True)
+        Window(size=1.0, step=1.0, closed="left", partial=False, anchor="start")(dated, return_bounds=True)
 
 
 def test_an_embedding_keeps_the_epoch_of_its_series():

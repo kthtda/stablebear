@@ -1,6 +1,6 @@
 # pandas input and durations for time series: implementation plan
 
-Progress: 26 of 46 items, 52 of 89 points (58%)
+Progress: 27 of 46 items, 53 of 89 points (60%)
 
 Specs: [pandas-timeseries-spec.md](pandas-timeseries-spec.md) (phases A, B,
 and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
@@ -177,7 +177,7 @@ and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
   `TimeDeltaTensor` of shape `(n_windows, 2)` in the series' unit, or a
   `DateTimeTensor` for a series with an epoch.
   Tests: dated and undated series; partial windows.
-- [ ] **E6.** [1] `Window.size`, `Window.step`, and
+- [x] **E6.** [1] (19485daf8) `Window.size`, `Window.step`, and
   `TimeDelayEmbedding.delay` are `TimeDelta`; update the reprs.
   Tests: from `np.timedelta64` and `pd.Timedelta`; repr.
   Note: C3 already made durations `TimeDelta` and showed them in the

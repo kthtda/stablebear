@@ -17,7 +17,7 @@ namespace sb
   /// tensor with one window per start time a_k = t_0 + k * @p step, while
   /// the window ends in the series' domain, t_0 being its start, and a float
   /// tensor of shape (n_windows, 2) whose row k is (a_k, a_k + size) as
-  /// computed, before any snapping, since each channel snaps on its own.
+  /// computed. Every channel of window k has its time 0 at a_k.
   /// With @p anchorEnd, the windows instead end at b_k = t_1 - k * @p step,
   /// while they start in the domain, t_1 being its end, and come in
   /// chronological order, so the last one ends at t_1.
@@ -35,9 +35,9 @@ namespace sb
   /// it. With an open end, an observation at a_k + size belongs only to the
   /// next window. A bound
   /// that falls just short of an observation reaches it, with the channel's
-  /// snapping, as evaluation does: a start that reaches one is shifted by
-  /// that observation's time, and an end that reaches one excludes it, or
-  /// includes it if closed. Each
+  /// snapping, as evaluation does: a start that reaches one holds it at
+  /// time 0, and an end that reaches one excludes it, or includes it if
+  /// closed. Each
   /// window channel is a view of its channel made by Channel::take, so it
   /// copies no values. Throws std::invalid_argument if a channel has no
   /// observations or no window fits.
@@ -146,34 +146,34 @@ namespace sb
         const auto from = convert_time(start, series.unit(), channel.unit());
         const auto to = convert_time(stop, series.unit(), channel.unit());
         // The observations in effect at from and at to, with snapping. The
-        // one at from is the window's first, at time 0; if from is at it or
-        // snaps forward onto it, the window is shifted by its time. An open
-        // window end excludes an observation at to, or that to snaps onto,
-        // and a closed one keeps it.
+        // one at from is the window's first, at time 0, also if from snaps
+        // forward onto it. An open window end excludes an observation at to,
+        // or that to snaps onto, and a closed one keeps it.
         atFrom[c] = channel.index_at(from, atFrom[c]);
         atTo[c] = channel.index_at(to, atTo[c]);
         const auto lo = atFrom[c];
         const bool atEnd = channel.time(atTo[c]) >= to;
         const auto lastIn = (atEnd && !stopClosed && atTo[c] > lo) ? atTo[c] - 1 : atTo[c];
-        const auto shift = std::max(channel.time(lo), from);
 
-        // Subtracting the shift can round two close times together; keep
-        // the times strictly increasing.
+        // Subtracting from can round two close times together, or put the
+        // observation after one that from snaps onto at or before 0; keep the
+        // times strictly increasing.
         std::vector<float64_t> at{0.0};
         std::vector<size_t> indices{lo};
         for (auto i = lo + 1; i <= lastIn; ++i)
         {
-          at.push_back(std::max(channel.time(i) - shift, std::nextafter(at.back(), std::numeric_limits<float64_t>::infinity())));
+          at.push_back(std::max(channel.time(i) - from, std::nextafter(at.back(), std::numeric_limits<float64_t>::infinity())));
           indices.push_back(i);
         }
         // The window can be evaluated up to its end, and at it if closed. A
         // closed end at or before the last time held needs no end: the
         // window ends at that timestamp.
-        // Time 0 of the window is the shift in the channel; the origin
-        // places it in the first series the channel was cut from.
-        auto window = channel.take(channel.times_like(std::move(at)).with_origin(channel.origin() + shift),
+        // Time 0 of the window is from in the channel, the same in every
+        // channel; the origin places it in the first series the channel was
+        // cut from.
+        auto window = channel.take(channel.times_like(std::move(at)).with_origin(channel.origin() + from),
                                    std::move(indices));
-        const auto end = to - shift;
+        const auto end = to - from;
         const auto lastAt = window.time(window.size() - 1);
         if (!(stopClosed && end <= lastAt))
         {

@@ -51,16 +51,15 @@ class Window:
     embedding of a window keeps its ends.
     A bound computed in floating point that falls just short of an
     observation reaches it, with the channel's snapping, as evaluation does:
-    a window whose start reaches one is shifted by its time, and an end that
+    a window whose start reaches one holds it at time 0, and an end that
     reaches one excludes it, or includes it if closed. Each channel snaps
     with its own timestamps and settings, so channels of one window can
-    snap differently; the bounds are therefore the times ``a_k`` and
-    ``a_k + size`` as computed, before any snapping. For
-    example, ``3 * 0.3`` computes just below 0.9: a window starting there
-    starts at an observation at 0.9, but its bound has the count
-    ``0.8999999999999999``. The :attr:`~TimeSeries.origin` of each channel of
-    a window is where its time 0 lies in ``series``, after its own snapping:
-    0.9 in this example.
+    snap differently, but all of them have their time 0 at ``a_k`` as
+    computed: the :attr:`~TimeSeries.origin` of window ``k`` is its bound
+    ``a_k``. For example, ``3 * 0.3`` computes just below 0.9: a window
+    starting there holds an observation at 0.9 at time 0, and its origin
+    has the count ``0.8999999999999999``. A snapped observation is thus
+    placed in ``series`` off by at most the snap tolerance.
     Each window shares its observations with ``series`` and copies none; it
     evaluates by previous value on its own times, so it shows only the
     observations it holds.
