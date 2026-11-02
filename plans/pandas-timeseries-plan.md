@@ -1,6 +1,6 @@
 # pandas input and durations for time series: implementation plan
 
-Progress: 27 of 46 items, 53 of 89 points (60%)
+Progress: 28 of 46 items, 56 of 89 points (63%)
 
 Specs: [pandas-timeseries-spec.md](pandas-timeseries-spec.md) (phases A, B,
 and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
@@ -183,7 +183,7 @@ and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
   Note: C3 already made durations `TimeDelta` and showed them in the
   reprs, so this item adds the tests. Numbers stay floats until G3, since
   a number has no unit before the window meets a series.
-- [ ] **E7.** [3] The channels of a window share its origin, the computed
+- [x] **E7.** [3] (dd05ac8e1) The channels of a window share its origin, the computed
   start `a_k`, in `include/sbear/timeseries/windowing.hpp`; a snapped
   observation stays at time 0. Update the window docstring, the origin
   part of `docs/timeseries_windows.rst`, and `docs/timeseries_snapping.rst`.

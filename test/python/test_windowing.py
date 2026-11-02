@@ -15,11 +15,12 @@ from _round_trip import ROUND_TRIPS
 
 def _windows_source():
     # Each observation is 10 * t.
-    return TimeSeries([0.0, 5.0, 15.0, 25.0, 40.0], times=[0.0, 0.5, 1.5, 2.5, 4.0])
+    return TimeSeries([0.0, 5.0, 15.0, 25.0, 40.0], times=TimeDeltaTensor([0.0, 0.5, 1.5, 2.5, 4.0], "s"))
 
 
 def test_windows_are_a_tensor_of_series_of_the_source_dtype():
-    windows = Window(size=2.0, step=2.0, closed="left", partial=False, anchor="start")(_windows_source())
+    windows = Window(size=TimeDelta(2, "s"), step=TimeDelta(2, "s"),
+                     closed="left", partial=False, anchor="start")(_windows_source())
 
     # The windows cover [0.0, 2.0) and [2.0, 4.0). The first holds 0.0, 0.5,
     # and 1.5; the second starts with the value at 2.0, observed at 1.5, and
@@ -36,9 +37,12 @@ def test_windows_are_a_tensor_of_series_of_the_source_dtype():
 
 
 @pytest.mark.parametrize("window, starts", [
-    pytest.param(Window(size=2.0, step=1.0, closed="left", partial=False, anchor="start"), [0.0, 1.0, 2.0], id="step"),
-    pytest.param(Window(size=1.0, step=1.5, closed="left", partial=False, anchor="start"), [0.0, 1.5, 3.0], id="gaps"),
-    pytest.param(Window(size=2.0, closed="left", partial=False, anchor="start"), [0.0, 2.0], id="default-step"),
+    pytest.param(Window(size=TimeDelta(2, "s"), step=TimeDelta(1, "s"),
+                        closed="left", partial=False, anchor="start"), [0.0, 1.0, 2.0], id="step"),
+    pytest.param(Window(size=TimeDelta(1, "s"), step=TimeDelta(1.5, "s"),
+                        closed="left", partial=False, anchor="start"), [0.0, 1.5, 3.0], id="gaps"),
+    pytest.param(Window(size=TimeDelta(2, "s"),
+                        closed="left", partial=False, anchor="start"), [0.0, 2.0], id="default-step"),
 ])
 def test_windows_start_every_step_while_they_fit(window, starts):
     windows, bounds = window(_windows_source(), return_bounds=True)
@@ -48,15 +52,15 @@ def test_windows_start_every_step_while_they_fit(window, starts):
     assert bounds.unit == "s"
     assert bounds.shape == (len(starts), 2)
     assert np.array_equal(np.asarray(bounds.count)[:, 0], starts)
-    assert np.array_equal(np.asarray(bounds.count)[:, 1], np.add(starts, window.size))
+    assert np.array_equal(np.asarray(bounds.count)[:, 1], np.add(starts, window.size.count))
 
 
 @pytest.mark.parametrize("window, bounds", [
-    pytest.param(Window(size=2.0, step=1.0, closed="right", partial=False, anchor="end"),
+    pytest.param(Window(size=TimeDelta(2, "s"), step=TimeDelta(1, "s"), closed="right", partial=False, anchor="end"),
                  [[0.0, 2.0],
                   [1.0, 3.0],
                   [2.0, 4.0]], id="step"),
-    pytest.param(Window(size=1.0, step=1.5, closed="right", partial=False, anchor="end"),
+    pytest.param(Window(size=TimeDelta(1, "s"), step=TimeDelta(1.5, "s"), closed="right", partial=False, anchor="end"),
                  [[0.0, 1.0],
                   [1.5, 2.5],
                   [3.0, 4.0]], id="gaps"),
@@ -72,38 +76,32 @@ def test_windows_anchored_at_the_end_end_every_step_back_while_they_fit(window, 
 @pytest.mark.parametrize("anchor", ["start", "end"])
 @pytest.mark.parametrize("series, match", [
     pytest.param(_windows_source(), "longer than the series", id="longer-than-the-series"),
-    pytest.param(TimeSeries([], times=[]), "without observations", id="empty"),
+    pytest.param(TimeSeries([], times=TimeDeltaTensor([], "s")), "without observations", id="empty"),
 ])
 def test_windowing_raises_when_no_window_fits(series, match, anchor):
     with pytest.raises(ValueError, match=match):
-        Window(size=5.0, step=1.0, closed="left", partial=False, anchor=anchor)(series)
+        Window(size=TimeDelta(5, "s"), step=TimeDelta(1, "s"), closed="left", partial=False, anchor=anchor)(series)
 
 
 @pytest.mark.parametrize("size, step, match", [
-    pytest.param(0.0, 1.0, "size", id="zero-size"),
-    pytest.param(-1.0, 1.0, "size", id="negative-size"),
-    pytest.param(np.inf, 1.0, "size", id="infinite-size"),
-    pytest.param(-np.inf, 1.0, "size", id="negative-infinite-size"),
-    pytest.param(np.nan, 1.0, "size", id="nan-size"),
-    pytest.param(1.0, 0.0, "step", id="zero-step"),
-    pytest.param(1.0, -1.0, "step", id="negative-step"),
-    pytest.param(1.0, np.inf, "step", id="infinite-step"),
-    pytest.param(1.0, -np.inf, "step", id="negative-infinite-step"),
-    pytest.param(1.0, np.nan, "step", id="nan-step"),
+    pytest.param(TimeDelta(0, "s"), TimeDelta(1, "s"), "size", id="zero-size"),
+    pytest.param(TimeDelta(-1, "s"), TimeDelta(1, "s"), "size", id="negative-size"),
+    pytest.param(TimeDelta(1, "s"), TimeDelta(0, "s"), "step", id="zero-step"),
+    pytest.param(TimeDelta(1, "s"), TimeDelta(-1, "s"), "step", id="negative-step"),
 ])
-def test_window_raises_on_a_size_or_step_that_is_not_finite_and_positive(size, step, match):
+def test_window_raises_on_a_size_or_step_that_is_not_positive(size, step, match):
     with pytest.raises(ValueError, match=match):
         Window(size=size, step=step)
 
 
 def test_window_raises_on_an_unknown_closed():
     with pytest.raises(ValueError, match="closed"):
-        Window(size=1.0, step=1.0, closed="middle")
+        Window(size=TimeDelta(1, "s"), step=TimeDelta(1, "s"), closed="middle")
 
 
 def test_window_raises_on_an_unknown_anchor():
     with pytest.raises(ValueError, match="anchor"):
-        Window(size=1.0, step=1.0, closed="left", anchor="middle")
+        Window(size=TimeDelta(1, "s"), step=TimeDelta(1, "s"), closed="left", anchor="middle")
 
 
 @pytest.mark.parametrize("anchor, closed", [
@@ -111,56 +109,60 @@ def test_window_raises_on_an_unknown_anchor():
     pytest.param("end", "right", id="end"),
 ])
 def test_windows_are_closed_at_their_anchor_by_default(anchor, closed):
-    assert Window(size=1.0, step=1.0, anchor=anchor).closed == closed
+    assert Window(size=TimeDelta(1, "s"), step=TimeDelta(1, "s"), anchor=anchor).closed == closed
 
 
 def test_windows_are_anchored_at_the_end_by_default():
-    assert Window(size=1.0, step=1.0, closed="right", partial=False).anchor == "end"
+    assert Window(size=TimeDelta(1, "s"), step=TimeDelta(1, "s"), closed="right", partial=False).anchor == "end"
 
 
 def _closed_source():
     # Each observation is 10 * t.
-    return TimeSeries([0.0, 5.0, 10.0, 15.0, 20.0], times=[0.0, 0.5, 1.0, 1.5, 2.0])
+    return TimeSeries([0.0, 5.0, 10.0, 15.0, 20.0], times=TimeDeltaTensor([0.0, 0.5, 1.0, 1.5, 2.0], "s"))
 
 
 def test_a_left_closed_window_includes_its_start_but_not_its_end():
     # The window [1.0, 2.0).
-    window = Window(size=1.0, step=1.0, closed="left", partial=False, anchor="start")(_closed_source())[1]
+    window = Window(size=TimeDelta(1, "s"), step=TimeDelta(1, "s"),
+                    closed="left", partial=False, anchor="start")(_closed_source())[1]
 
-    assert window(0.0) == 10.0
+    assert window(TimeDelta(0, "s")) == 10.0
     with pytest.raises(ValueError, match=re.escape("outside the domain [0, 1)")):
-        window(1.0)
+        window(TimeDelta(1, "s"))
 
 
 def test_a_right_closed_window_includes_its_end_but_not_its_start():
     # The window (1.0, 2.0]. The observation at 1.0 stays in effect just
     # after the start.
-    window = Window(size=1.0, step=1.0, closed="right", partial=False, anchor="start")(_closed_source())[1]
+    window = Window(size=TimeDelta(1, "s"), step=TimeDelta(1, "s"),
+                    closed="right", partial=False, anchor="start")(_closed_source())[1]
 
     with pytest.raises(ValueError, match=re.escape("outside the domain (0, 1]")):
-        window(0.0)
-    assert window(0.25) == 10.0
-    assert window(1.0) == 20.0
+        window(TimeDelta(0, "s"))
+    assert window(TimeDelta(0.25, "s")) == 10.0
+    assert window(TimeDelta(1, "s")) == 20.0
 
 
 def test_a_window_closed_on_both_sides_includes_its_start_and_its_end():
     # The window [1.0, 2.0].
-    window = Window(size=1.0, step=1.0, closed="both", partial=False, anchor="start")(_closed_source())[1]
+    window = Window(size=TimeDelta(1, "s"), step=TimeDelta(1, "s"),
+                    closed="both", partial=False, anchor="start")(_closed_source())[1]
 
-    assert window(0.0) == 10.0
-    assert window(1.0) == 20.0
+    assert window(TimeDelta(0, "s")) == 10.0
+    assert window(TimeDelta(1, "s")) == 20.0
 
 
 def test_a_window_closed_on_neither_side_includes_neither_end():
     # The window (1.0, 2.0). The observation at 1.0 stays in effect just
     # after the start.
-    window = Window(size=1.0, step=1.0, closed="none", partial=False, anchor="start")(_closed_source())[1]
+    window = Window(size=TimeDelta(1, "s"), step=TimeDelta(1, "s"),
+                    closed="none", partial=False, anchor="start")(_closed_source())[1]
 
     with pytest.raises(ValueError, match=re.escape("outside the domain (0, 1)")):
-        window(0.0)
-    assert window(0.25) == 10.0
+        window(TimeDelta(0, "s"))
+    assert window(TimeDelta(0.25, "s")) == 10.0
     with pytest.raises(ValueError, match=re.escape("outside the domain (0, 1)")):
-        window(1.0)
+        window(TimeDelta(1, "s"))
 
 
 @pytest.mark.parametrize("closed, start_closed, end_closed", [
@@ -170,13 +172,15 @@ def test_a_window_closed_on_neither_side_includes_neither_end():
     pytest.param("none", False, False, id="none"),
 ])
 def test_a_window_domain_runs_from_zero_to_its_size_with_its_closed_ends(closed, start_closed, end_closed):
-    window = Window(size=2.0, step=2.0, closed=closed, partial=False, anchor="start")(_windows_source())[0]
+    window = Window(size=TimeDelta(2, "s"), step=TimeDelta(2, "s"),
+                    closed=closed, partial=False, anchor="start")(_windows_source())[0]
 
     assert window.domain == Domain(TimeDelta(0, "s"), TimeDelta(2, "s"), start_closed, end_closed)
 
 
 def test_a_window_origin_is_its_start_in_the_series():
-    windows, bounds = Window(size=1.0, step=1.0, closed="left", partial=False, anchor="start")(
+    windows, bounds = Window(size=TimeDelta(1, "s"), step=TimeDelta(1, "s"),
+                             closed="left", partial=False, anchor="start")(
         _windows_source(), return_bounds=True)
 
     # The windows start at 0.0, 1.0, 2.0, and 3.0; none starts at an
@@ -187,11 +191,12 @@ def test_a_window_origin_is_its_start_in_the_series():
 
 def test_a_window_origin_places_its_observations_at_their_times_in_the_series():
     # Each observation is 10 * t.
-    series = TimeSeries([3.0, 7.0, 9.0], times=[0.3, 0.7, 0.9])
+    series = TimeSeries([3.0, 7.0, 9.0], times=TimeDeltaTensor([0.3, 0.7, 0.9], "s"))
 
     # The window [0.3, 0.8) holds the observations at 0.3 and 0.7, at times
     # 0 and 0.7 - 0.3, which rounds to 0.39999999999999997.
-    window = Window(size=0.5, step=0.5, closed="left", partial=False, anchor="start")(series)[0]
+    window = Window(size=TimeDelta(0.5, "s"), step=TimeDelta(0.5, "s"),
+                    closed="left", partial=False, anchor="start")(series)[0]
 
     placed = window.origin.count + window.times.to_floats()
     assert sb.allclose(placed, FloatTensor([0.3, 0.7], dtype=sb.float64), atol=0.0, rtol=4e-16)
@@ -199,7 +204,7 @@ def test_a_window_origin_places_its_observations_at_their_times_in_the_series():
 
 def _partial_source():
     # Each observation is 10 * t.
-    return TimeSeries([0.0, 10.0, 20.0, 30.0, 40.0], times=[0.0, 1.0, 2.0, 3.0, 4.0])
+    return TimeSeries([0.0, 10.0, 20.0, 30.0, 40.0], times=TimeDeltaTensor([0.0, 1.0, 2.0, 3.0, 4.0], "s"))
 
 
 @pytest.mark.parametrize("partial, expected_bounds", [
@@ -207,7 +212,7 @@ def _partial_source():
     pytest.param(True, [[0.0, 3.0], [3.0, 4.0]], id="partial"),
 ])
 def test_partial_windows_continue_to_the_end_of_the_series(partial, expected_bounds):
-    _, bounds = Window(size=3.0, step=3.0, closed="left", partial=partial, anchor="start")(
+    _, bounds = Window(size=TimeDelta(3, "s"), step=TimeDelta(3, "s"), closed="left", partial=partial, anchor="start")(
         _partial_source(), return_bounds=True)
 
     # A partial window's bounds end where the series does.
@@ -216,27 +221,30 @@ def test_partial_windows_continue_to_the_end_of_the_series(partial, expected_bou
 
 def test_a_partial_window_ends_where_the_series_does():
     # The window at 3.0 would end at 6.0, after the series ends at 4.0.
-    window = Window(size=3.0, step=3.0, closed="left", partial=True, anchor="start")(_partial_source())[1]
+    window = Window(size=TimeDelta(3, "s"), step=TimeDelta(3, "s"),
+                    closed="left", partial=True, anchor="start")(_partial_source())[1]
 
     assert np.array_equal(window.times.to_floats(), [0.0, 1.0])
     assert np.array_equal(np.asarray(window.values), [30.0, 40.0])
-    assert window(1.0) == 40.0
+    assert window(TimeDelta(1, "s")) == 40.0
     with pytest.raises(ValueError, match=re.escape("outside the domain [0, 1]")):
-        window(1.5)
+        window(TimeDelta(1.5, "s"))
 
 
 def test_a_window_anchored_at_the_end_holds_the_last_observation():
     # The window (1.0, 4.0] holds the value at 1.0 just after its start,
     # then the observations at 2.0, 3.0, and 4.0.
-    window = Window(size=3.0, step=3.0, closed="right", partial=False, anchor="end")(_partial_source())[0]
+    window = Window(size=TimeDelta(3, "s"), step=TimeDelta(3, "s"),
+                    closed="right", partial=False, anchor="end")(_partial_source())[0]
 
     assert np.array_equal(window.times.to_floats(), [0.0, 1.0, 2.0, 3.0])
     assert np.array_equal(np.asarray(window.values), [10.0, 20.0, 30.0, 40.0])
-    assert window(3.0) == 40.0
+    assert window(TimeDelta(3, "s")) == 40.0
 
 
 def test_a_partial_window_anchored_at_the_end_starts_where_the_series_does():
-    windows, bounds = Window(size=3.0, step=3.0, closed="right", partial=True, anchor="end")(
+    windows, bounds = Window(size=TimeDelta(3, "s"), step=TimeDelta(3, "s"),
+                             closed="right", partial=True, anchor="end")(
         _partial_source(), return_bounds=True)
 
     # The window ending at 1.0 would start at -2.0, before the series starts
@@ -247,54 +255,58 @@ def test_a_partial_window_anchored_at_the_end_starts_where_the_series_does():
     ])
     assert np.array_equal(windows[0].times.to_floats(), [0.0, 1.0])
     assert np.array_equal(np.asarray(windows[0].values), [0.0, 10.0])
-    assert windows[0](0.0) == 0.0
-    assert windows[0](1.0) == 10.0
+    assert windows[0](TimeDelta(0, "s")) == 0.0
+    assert windows[0](TimeDelta(1, "s")) == 10.0
     # The full window (1.0, 4.0] holds the value at 1.0 just after its start,
     # then the observations at 2.0, 3.0, and 4.0.
     assert np.array_equal(windows[1].times.to_floats(), [0.0, 1.0, 2.0, 3.0])
     assert np.array_equal(np.asarray(windows[1].values), [10.0, 20.0, 30.0, 40.0])
-    assert windows[1](3.0) == 40.0
+    assert windows[1](TimeDelta(3, "s")) == 40.0
 
 
 def test_a_partial_window_domain_ends_where_the_series_does():
     # The window at 3.0 would end at 6.0; it ends at the series' closed end
     # at 4.0 instead.
-    window = Window(size=3.0, step=3.0, closed="left", partial=True, anchor="start")(_partial_source())[1]
+    window = Window(size=TimeDelta(3, "s"), step=TimeDelta(3, "s"),
+                    closed="left", partial=True, anchor="start")(_partial_source())[1]
 
     assert window.domain == Domain(TimeDelta(0, "s"), TimeDelta(1, "s"), True, True)
 
 
 def test_a_left_closed_partial_window_can_start_at_the_last_observation():
-    windows, bounds = Window(size=2.0, step=2.0, closed="left", partial=True, anchor="start")(
+    windows, bounds = Window(size=TimeDelta(2, "s"), step=TimeDelta(2, "s"),
+                             closed="left", partial=True, anchor="start")(
         _partial_source(), return_bounds=True)
 
     # The window at 4.0 holds only the last observation.
     assert np.array_equal(np.asarray(bounds.count)[:, 0], [0.0, 2.0, 4.0])
     assert np.array_equal(windows[2].times.to_floats(), [0.0])
-    assert windows[2](0.0) == 40.0
+    assert windows[2](TimeDelta(0, "s")) == 40.0
 
 
 def test_a_right_closed_window_holds_the_last_observation_without_a_partial_window():
-    windows, bounds = Window(size=2.0, step=2.0, closed="right", partial=True, anchor="start")(
+    windows, bounds = Window(size=TimeDelta(2, "s"), step=TimeDelta(2, "s"),
+                             closed="right", partial=True, anchor="start")(
         _partial_source(), return_bounds=True)
 
     # The window (2.0, 4.0] ends at the last observation, and no window can
     # start there with an open start.
     assert np.array_equal(np.asarray(bounds.count)[:, 0], [0.0, 2.0])
-    assert windows[1](2.0) == 40.0
+    assert windows[1](TimeDelta(2, "s")) == 40.0
 
 
 def test_a_window_can_be_evaluated_from_its_start_up_to_its_end():
     # The window [1.0, 3.0) holds the value at 1.0, observed at 0.5, then 1.5
     # and 2.5.
-    window = Window(size=2.0, step=1.0, closed="left", partial=False, anchor="start")(_windows_source())[1]
+    window = Window(size=TimeDelta(2, "s"), step=TimeDelta(1, "s"),
+                    closed="left", partial=False, anchor="start")(_windows_source())[1]
 
     assert np.array_equal(window.times.to_floats(), [0.0, 0.5, 1.5])
     assert np.array_equal(np.asarray(window.values), [5.0, 15.0, 25.0])
-    assert window(0.0) == 5.0
-    assert window(1.75) == 25.0
+    assert window(TimeDelta(0, "s")) == 5.0
+    assert window(TimeDelta(1.75, "s")) == 25.0
     with pytest.raises(ValueError, match=r"outside the domain \[0, 2\)"):
-        window(2.0)
+        window(TimeDelta(2, "s"))
 
 
 @pytest.mark.parametrize("duration", [
@@ -304,13 +316,15 @@ def test_a_window_can_be_evaluated_from_its_start_up_to_its_end():
 ])
 def test_a_window_at_a_duration_equals_the_window_at_its_time_in_the_unit(duration):
     # The window [1.0, 3.0) in seconds.
-    window = Window(size=2.0, step=1.0, closed="left", partial=False, anchor="start")(_windows_source())[1]
+    window = Window(size=TimeDelta(2, "s"), step=TimeDelta(1, "s"),
+                    closed="left", partial=False, anchor="start")(_windows_source())[1]
 
-    assert window(duration) == window(1.75)
+    assert window(duration) == window(TimeDelta(1.75, "s"))
 
 
 def test_an_observation_at_a_window_boundary_is_only_in_the_later_window():
-    windows = Window(size=1.5, step=1.5, closed="left", partial=False, anchor="start")(_windows_source())
+    windows = Window(size=TimeDelta(1.5, "s"), step=TimeDelta(1.5, "s"),
+                     closed="left", partial=False, anchor="start")(_windows_source())
 
     # The observation at 1.5 starts the second window, not the first.
     assert np.array_equal(np.asarray(windows[0].values), [0.0, 5.0])
@@ -319,17 +333,19 @@ def test_an_observation_at_a_window_boundary_is_only_in_the_later_window():
 
 def test_a_window_between_observations_holds_the_value_at_its_start():
     # The window [3.0, 3.5) falls between the observations at 2.5 and 4.0.
-    window = Window(size=0.5, step=0.5, closed="left", partial=False, anchor="start")(_windows_source())[6]
+    window = Window(size=TimeDelta(0.5, "s"), step=TimeDelta(0.5, "s"),
+                    closed="left", partial=False, anchor="start")(_windows_source())[6]
 
     assert np.array_equal(window.times.to_floats(), [0.0])
     assert np.array_equal(np.asarray(window.values), [25.0])
-    assert window(0.25) == 25.0
+    assert window(TimeDelta(0.25, "s")) == 25.0
 
 
 def test_window_bounds_just_below_an_observation_reach_it():
-    series = TimeSeries([0.0, 3.0, 6.0, 9.0, 12.0], times=[0.0, 0.3, 0.6, 0.9, 1.2])
+    series = TimeSeries([0.0, 3.0, 6.0, 9.0, 12.0], times=TimeDeltaTensor([0.0, 0.3, 0.6, 0.9, 1.2], "s"))
 
-    windows, bounds = Window(size=0.3, step=0.3, closed="left", partial=False, anchor="start")(
+    windows, bounds = Window(size=TimeDelta(0.3, "s"), step=TimeDelta(0.3, "s"),
+                             closed="left", partial=False, anchor="start")(
         series, return_bounds=True)
 
     # 3 * 0.3 computes just below 0.9, so window 2 ends and window 3 starts
@@ -344,9 +360,10 @@ def test_window_bounds_just_below_an_observation_reach_it():
 
 
 def test_a_window_start_that_snaps_to_an_observation_keeps_its_start_as_origin():
-    series = TimeSeries([0.0, 3.0, 6.0, 9.0, 12.0], times=[0.0, 0.3, 0.6, 0.9, 1.2])
+    series = TimeSeries([0.0, 3.0, 6.0, 9.0, 12.0], times=TimeDeltaTensor([0.0, 0.3, 0.6, 0.9, 1.2], "s"))
 
-    windows, bounds = Window(size=0.3, step=0.3, closed="left", partial=False, anchor="start")(
+    windows, bounds = Window(size=TimeDelta(0.3, "s"), step=TimeDelta(0.3, "s"),
+                             closed="left", partial=False, anchor="start")(
         series, return_bounds=True)
 
     # Window 3 starts at 3 * 0.3, just below 0.9, and snaps to the
@@ -354,40 +371,43 @@ def test_a_window_start_that_snaps_to_an_observation_keeps_its_start_as_origin()
     assert windows[3].origin == bounds[3, 0]
     assert windows[3].origin == TimeDelta(3 * 0.3, "s")
     assert np.array_equal(windows[3].times.to_floats(), [0.0])
-    assert windows[3](0.0) == 9.0
+    assert windows[3](TimeDelta(0, "s")) == 9.0
 
 
 def _snapping_channels():
     # Channel a has an observation at 0.9 for window 3's start to snap to;
     # channel b does not.
-    a = TimeSeries([0.0, 3.0, 6.0, 9.0, 12.0], times=[0.0, 0.3, 0.6, 0.9, 1.2])
-    b = TimeSeries([0.0, -5.0, -10.0, -12.0], times=[0.0, 0.5, 1.0, 1.2])
+    a = TimeSeries([0.0, 3.0, 6.0, 9.0, 12.0], times=TimeDeltaTensor([0.0, 0.3, 0.6, 0.9, 1.2], "s"))
+    b = TimeSeries([0.0, -5.0, -10.0, -12.0], times=TimeDeltaTensor([0.0, 0.5, 1.0, 1.2], "s"))
     return TimeSeries.from_channels([a, b])
 
 
 def test_channels_that_snap_differently_share_an_origin():
-    window = Window(size=0.3, step=0.3, closed="left", partial=False, anchor="start")(_snapping_channels())[3]
+    window = Window(size=TimeDelta(0.3, "s"), step=TimeDelta(0.3, "s"),
+                    closed="left", partial=False, anchor="start")(_snapping_channels())[3]
 
     assert window.origin.array_equal(TimeDeltaTensor([3 * 0.3, 3 * 0.3], "s"))
     # Channel a holds its observation at 0.9 at time 0; b holds the one at 0.5.
-    values = window(0.0)
+    values = window(TimeDelta(0, "s"))
     assert (values[0][()], values[1][()]) == (9.0, -5.0)
 
 
 def test_a_window_of_a_window_has_its_origin_in_the_first_series():
-    series = TimeSeries(np.arange(9.0), times=np.arange(9.0))
-    window = Window(size=4.0, step=4.0, closed="left", partial=False, anchor="start")(series)[1]
+    series = TimeSeries(np.arange(9.0), times=TimeDeltaTensor(np.arange(9.0), "s"))
+    window = Window(size=TimeDelta(4, "s"), step=TimeDelta(4, "s"),
+                    closed="left", partial=False, anchor="start")(series)[1]
 
     # The window starts at 4.0; its windows start at 0.0 and 2.0 within it.
-    inner = Window(size=2.0, step=2.0, closed="left", partial=False, anchor="start")(window)
+    inner = Window(size=TimeDelta(2, "s"), step=TimeDelta(2, "s"), closed="left", partial=False, anchor="start")(window)
 
     assert (inner[0].origin, inner[1].origin) == (TimeDelta(4, "s"), TimeDelta(6, "s"))
 
 
 def test_an_embedding_of_a_window_keeps_its_origin():
-    window = Window(size=2.0, step=2.0, closed="left", partial=False, anchor="start")(_windows_source())[1]
+    window = Window(size=TimeDelta(2, "s"), step=TimeDelta(2, "s"),
+                    closed="left", partial=False, anchor="start")(_windows_source())[1]
 
-    embedding = TimeDelayEmbedding(dimension=2, delay=0.5)(window)
+    embedding = TimeDelayEmbedding(dimension=2, delay=TimeDelta(0.5, "s"))(window)
 
     assert embedding.origin == TimeDelta(2, "s")
 
@@ -399,7 +419,8 @@ def _dated_source():
 
 
 def test_windows_keep_the_epoch_of_their_series():
-    windows = Window(size=1.0, step=1.0, closed="left", partial=False, anchor="start")(_dated_source())
+    windows = Window(size=TimeDelta(1, "s"), step=TimeDelta(1, "s"),
+                     closed="left", partial=False, anchor="start")(_dated_source())
 
     assert windows[2].epoch == DateTime("2023-01-01")
 
@@ -409,7 +430,8 @@ def test_windows_keep_the_epoch_of_their_series():
     pytest.param("right", False, True, id="right"),
 ])
 def test_a_dated_window_domain_is_where_it_lies(closed, start_closed, end_closed):
-    windows = Window(size=1.0, step=1.0, closed=closed, partial=False, anchor="start")(_dated_source())
+    windows = Window(size=TimeDelta(1, "s"), step=TimeDelta(1, "s"),
+                     closed=closed, partial=False, anchor="start")(_dated_source())
 
     domain = windows[2].domain
 
@@ -419,7 +441,7 @@ def test_a_dated_window_domain_is_where_it_lies(closed, start_closed, end_closed
 
 
 def test_bounds_of_a_dated_series_are_the_dates_of_its_windows():
-    _, bounds = Window(size=1.0, step=1.0, closed="left", partial=False, anchor="start")(
+    _, bounds = Window(size=TimeDelta(1, "s"), step=TimeDelta(1, "s"), closed="left", partial=False, anchor="start")(
         _dated_source(), return_bounds=True)
 
     assert isinstance(bounds, DateTimeTensor)
@@ -428,18 +450,21 @@ def test_bounds_of_a_dated_series_are_the_dates_of_its_windows():
 
 
 def test_bounds_of_windows_of_a_dated_window_are_where_they_lie():
-    window = Window(size=2.0, step=2.0, closed="left", partial=False, anchor="start")(_dated_source())[1]
+    window = Window(size=TimeDelta(2, "s"), step=TimeDelta(2, "s"),
+                    closed="left", partial=False, anchor="start")(_dated_source())[1]
 
-    _, bounds = Window(size=1.0, step=1.0, closed="left", partial=False, anchor="start")(window, return_bounds=True)
+    _, bounds = Window(size=TimeDelta(1, "s"), step=TimeDelta(1, "s"),
+                       closed="left", partial=False, anchor="start")(window, return_bounds=True)
 
     assert bounds[:, 0].array_equal(DateTimeTensor(np.array(["2023-01-01T00:00:02", "2023-01-01T00:00:03"],
                                                             dtype="datetime64[us]")))
 
 
 def test_dated_bounds_keep_a_unit_finer_than_microseconds():
-    series = TimeSeries([0.0, 1.0, 2.0], times=Times([0.0, 1.0, 2.0], unit="ns", epoch="2023-01-01"))
+    series = TimeSeries([0.0, 1.0, 2.0], times=Times(TimeDeltaTensor([0.0, 1.0, 2.0], "ns"), epoch="2023-01-01"))
 
-    _, bounds = Window(size=1.0, step=1.0, closed="left", partial=False, anchor="start")(series, return_bounds=True)
+    _, bounds = Window(size=TimeDelta(1, "ns"), step=TimeDelta(1, "ns"),
+                       closed="left", partial=False, anchor="start")(series, return_bounds=True)
 
     assert bounds.unit == "ns"
     assert bounds[1].array_equal(DateTimeTensor(np.array(["2023-01-01T00:00:00.000000001",
@@ -447,32 +472,37 @@ def test_dated_bounds_keep_a_unit_finer_than_microseconds():
 
 
 def test_dated_bounds_of_windows_of_a_window_whose_channels_snap_differently_are_their_dates():
-    window = Window(size=0.3, step=0.3, closed="left", partial=False, anchor="start")(_snapping_channels())[3]
+    window = Window(size=TimeDelta(0.3, "s"), step=TimeDelta(0.3, "s"),
+                    closed="left", partial=False, anchor="start")(_snapping_channels())[3]
     dated = window.with_epoch("2023-01-01")
 
-    _, bounds = Window(size=0.1, step=0.1, closed="left", partial=False, anchor="start")(dated, return_bounds=True)
+    _, bounds = Window(size=TimeDelta(0.1, "s"), step=TimeDelta(0.1, "s"),
+                       closed="left", partial=False, anchor="start")(dated, return_bounds=True)
 
     assert bounds[0, 0] == DateTime(np.datetime64("2023-01-01T00:00:00.900000", "us"))
 
 
 def test_dated_bounds_of_channels_at_different_origins_raise():
-    series = TimeSeries(np.arange(9.0), times=np.arange(9.0))
-    windows = Window(size=2.0, step=2.0, closed="left", partial=False, anchor="start")(series)
+    series = TimeSeries(np.arange(9.0), times=TimeDeltaTensor(np.arange(9.0), "s"))
+    windows = Window(size=TimeDelta(2, "s"), step=TimeDelta(2, "s"),
+                     closed="left", partial=False, anchor="start")(series)
     # The channels lie at 0 s and 2 s of the series.
     dated = TimeSeries.from_channels([windows[0], windows[1]]).with_epoch("2023-01-01")
 
     with pytest.raises(ValueError, match="different origins"):
-        Window(size=1.0, step=1.0, closed="left", partial=False, anchor="start")(dated, return_bounds=True)
+        Window(size=TimeDelta(1, "s"), step=TimeDelta(1, "s"),
+               closed="left", partial=False, anchor="start")(dated, return_bounds=True)
 
 
 def test_an_embedding_keeps_the_epoch_of_its_series():
-    embedding = TimeDelayEmbedding(dimension=2, delay=0.5)(_dated_source())
+    embedding = TimeDelayEmbedding(dimension=2, delay=TimeDelta(0.5, "s"))(_dated_source())
 
     assert embedding.epoch == DateTime("2023-01-01")
 
 
 def test_a_window_with_an_epoch_keeps_its_origin():
-    window = Window(size=1.0, step=1.0, closed="left", partial=False, anchor="start")(_windows_source())[2]
+    window = Window(size=TimeDelta(1, "s"), step=TimeDelta(1, "s"),
+                    closed="left", partial=False, anchor="start")(_windows_source())[2]
 
     dated = window.with_epoch("2023-01-01")
 
@@ -481,7 +511,8 @@ def test_a_window_with_an_epoch_keeps_its_origin():
 
 
 def test_a_window_origin_is_reported_in_the_query_unit():
-    window = Window(size=1.0, step=1.0, closed="left", partial=False, anchor="start")(_windows_source())[2]
+    window = Window(size=TimeDelta(1, "s"), step=TimeDelta(1, "s"),
+                    closed="left", partial=False, anchor="start")(_windows_source())[2]
 
     assert window.to("ms").origin == TimeDelta(2000, "ms")
 
@@ -490,50 +521,54 @@ def test_an_embedding_of_a_window_keeps_its_open_end():
     # The window [1.0, 3.0) holds 5, 15, and 25 at 0.0, 0.5, and 1.5. With a
     # delay of 0.4, the newer component reaches 1.5 at 1.9, between the
     # window's last observation and its end.
-    window = Window(size=2.0, step=1.0, closed="left", partial=False, anchor="start")(_windows_source())[1]
+    window = Window(size=TimeDelta(2, "s"), step=TimeDelta(1, "s"),
+                    closed="left", partial=False, anchor="start")(_windows_source())[1]
 
-    embedding = TimeDelayEmbedding(dimension=2, delay=0.4)(window)
+    embedding = TimeDelayEmbedding(dimension=2, delay=TimeDelta(0.4, "s"))(window)
 
     assert np.array_equal(embedding.times.to_floats(), [0.4, 0.5, 0.9, 1.5, 1.9])
-    assert np.array_equal(np.asarray(embedding(1.95)), [25.0, 25.0])
+    assert np.array_equal(np.asarray(embedding(TimeDelta(1.95, "s"))), [25.0, 25.0])
     with pytest.raises(ValueError, match=r"outside the domain \[0.4, 2\)"):
-        embedding(2.0)
+        embedding(TimeDelta(2, "s"))
 
 
 def test_an_embedding_of_a_window_keeps_its_open_start_and_closed_end():
     # The window (1.0, 3.0] holds 10 and 20 at 0.0 and 1.0, and ends at 2.0,
     # after its last observation.
-    series = TimeSeries([0.0, 10.0, 20.0, 40.0], times=[0.0, 1.0, 2.0, 4.0])
-    window = Window(size=2.0, step=1.0, closed="right", partial=False, anchor="start")(series)[1]
+    series = TimeSeries([0.0, 10.0, 20.0, 40.0], times=TimeDeltaTensor([0.0, 1.0, 2.0, 4.0], "s"))
+    window = Window(size=TimeDelta(2, "s"), step=TimeDelta(1, "s"),
+                    closed="right", partial=False, anchor="start")(series)[1]
 
-    embedding = TimeDelayEmbedding(dimension=2, delay=1.0)(window)
+    embedding = TimeDelayEmbedding(dimension=2, delay=TimeDelta(1, "s"))(window)
 
     assert np.array_equal(embedding.times.to_floats(), [1.0, 2.0])
-    assert np.array_equal(np.asarray(embedding(2.0)), [20.0, 20.0])
+    assert np.array_equal(np.asarray(embedding(TimeDelta(2, "s"))), [20.0, 20.0])
     with pytest.raises(ValueError, match=re.escape("outside the domain (1, 2]")):
-        embedding(1.0)
+        embedding(TimeDelta(1, "s"))
 
 
 def test_an_embedding_of_a_window_takes_no_history_from_before_the_window():
     # The window [1.0, 3.0) holds 5, 15, and 25 at 0.0, 0.5, and 1.5. With a
     # delay of 1.0, the first point is at 1.0.
-    window = Window(size=2.0, step=1.0, closed="left", partial=False, anchor="start")(_windows_source())[1]
+    window = Window(size=TimeDelta(2, "s"), step=TimeDelta(1, "s"),
+                    closed="left", partial=False, anchor="start")(_windows_source())[1]
 
-    embedding = TimeDelayEmbedding(dimension=2, delay=1.0)(window)
+    embedding = TimeDelayEmbedding(dimension=2, delay=TimeDelta(1, "s"))(window)
 
     assert np.array_equal(embedding.times.to_floats(), [1.0, 1.5])
     assert np.array_equal(np.asarray(embedding.values), [[5.0, 15.0], [15.0, 25.0]])
     with pytest.raises(ValueError, match=r"outside the domain \[1, 2\)"):
-        embedding(0.75)
+        embedding(TimeDelta(0.75, "s"))
     with pytest.raises(ValueError, match=r"outside the domain \[1, 2\)"):
-        embedding(2.0)
+        embedding(TimeDelta(2, "s"))
 
 
 def test_windows_of_an_embedding_hold_its_points():
     # The embedding has points at 1.0, 1.5, 2.5, 3.5, and 4.0.
-    embedding = TimeDelayEmbedding(dimension=2, delay=1.0)(_windows_source())
+    embedding = TimeDelayEmbedding(dimension=2, delay=TimeDelta(1, "s"))(_windows_source())
 
-    windows, bounds = Window(size=2.0, step=1.0, closed="left", partial=False, anchor="start")(
+    windows, bounds = Window(size=TimeDelta(2, "s"), step=TimeDelta(1, "s"),
+                             closed="left", partial=False, anchor="start")(
         embedding, return_bounds=True)
 
     assert np.array_equal(np.asarray(bounds.count)[:, 0], [1.0, 2.0])
@@ -543,11 +578,12 @@ def test_windows_of_an_embedding_hold_its_points():
 
 def test_windows_cut_every_channel_at_the_same_bounds():
     # A's observations are 10 * t and B's are -10 * t, with t in seconds.
-    a = TimeSeries([0.0, 10.0, 25.0], times=Times([0.0, 1.0, 2.5], unit="s"))
-    b = TimeSeries([-5.0, -15.0, -30.0], times=Times([500.0, 1500.0, 3000.0], unit="ms"))
+    a = TimeSeries([0.0, 10.0, 25.0], times=TimeDeltaTensor([0.0, 1.0, 2.5], "s"))
+    b = TimeSeries([-5.0, -15.0, -30.0], times=TimeDeltaTensor([500.0, 1500.0, 3000.0], "ms"))
     series = TimeSeries.from_channels([a, b], unit="s")
 
-    windows, bounds = Window(size=1.0, step=1.0, closed="left", partial=False, anchor="start")(
+    windows, bounds = Window(size=TimeDelta(1, "s"), step=TimeDelta(1, "s"),
+                             closed="left", partial=False, anchor="start")(
         series, return_bounds=True)
 
     # Both channels are observed from 0.5 to 2.5, so the windows are
@@ -558,14 +594,15 @@ def test_windows_cut_every_channel_at_the_same_bounds():
     assert np.array_equal(windows[0].times[1].to_floats(), [0.0])
     assert np.array_equal(windows[1].times[0].to_floats(), [0.0])
     assert np.array_equal(windows[1].times[1].to_floats(), [0.0])
-    assert windows[0](0.5)[0][()] == 10.0
-    assert windows[0](0.5)[1][()] == -5.0
+    assert windows[0](TimeDelta(0.5, "s"))[0][()] == 10.0
+    assert windows[0](TimeDelta(0.5, "s"))[1][()] == -5.0
     with pytest.raises(ValueError, match=r"outside the domain \[0, 1\)"):
-        windows[0](1.0)
+        windows[0](TimeDelta(1, "s"))
 
 
 def test_times_of_windows_are_the_times_of_each_window():
-    windows = Window(size=2.0, step=1.0, closed="left", partial=False, anchor="start")(_windows_source())
+    windows = Window(size=TimeDelta(2, "s"), step=TimeDelta(1, "s"),
+                     closed="left", partial=False, anchor="start")(_windows_source())
 
     times = windows.times
 
@@ -576,10 +613,11 @@ def test_times_of_windows_are_the_times_of_each_window():
 
 
 def test_times_of_windows_of_several_channels_have_an_axis_of_channels():
-    a = TimeSeries([0.0, 10.0, 25.0], times=Times([0.0, 1.0, 2.5], unit="s"))
-    b = TimeSeries([-5.0, -15.0, -30.0], times=Times([500.0, 1500.0, 3000.0], unit="ms"))
+    a = TimeSeries([0.0, 10.0, 25.0], times=TimeDeltaTensor([0.0, 1.0, 2.5], "s"))
+    b = TimeSeries([-5.0, -15.0, -30.0], times=TimeDeltaTensor([500.0, 1500.0, 3000.0], "ms"))
     series = TimeSeries.from_channels([a, b], unit="s")
-    windows = Window(size=1.0, step=1.0, closed="left", partial=False, anchor="start")(series)
+    windows = Window(size=TimeDelta(1, "s"), step=TimeDelta(1, "s"),
+                     closed="left", partial=False, anchor="start")(series)
 
     times = windows.times
 
@@ -589,10 +627,10 @@ def test_times_of_windows_of_several_channels_have_an_axis_of_channels():
 
 
 def test_times_of_series_of_different_numbers_of_channels_raise():
-    a = TimeSeries([0.0, 10.0, 20.0], times=Times([0.0, 1.0, 2.0], unit="s"))
-    b = TimeSeries([5.0, 15.0, 25.0], times=Times([0.0, 1.0, 2.0], unit="s"))
+    a = TimeSeries([0.0, 10.0, 20.0], times=TimeDeltaTensor([0.0, 1.0, 2.0], "s"))
+    b = TimeSeries([5.0, 15.0, 25.0], times=TimeDeltaTensor([0.0, 1.0, 2.0], "s"))
     # Two windows of both channels; the first is replaced by one channel.
-    windows = Window(size=1.0, step=1.0, closed="left", partial=False, anchor="start")(
+    windows = Window(size=TimeDelta(1, "s"), step=TimeDelta(1, "s"), closed="left", partial=False, anchor="start")(
         TimeSeries.from_channels([a, b], unit="s"))
     windows[0] = a
 
@@ -603,24 +641,24 @@ def test_times_of_series_of_different_numbers_of_channels_raise():
 def _overlapping_windows():
     # Windows at 0.0, 1.0, and 2.0.
     series = TimeSeries([0.0, 5.0, 10.0, 15.0, 20.0, 25.0, 30.0, 35.0, 40.0],
-                        times=[0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0])
-    return Window(size=2.0, step=1.0, closed="left", partial=False, anchor="start")(series)
+                        times=TimeDeltaTensor([0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0], "s"))
+    return Window(size=TimeDelta(2, "s"), step=TimeDelta(1, "s"), closed="left", partial=False, anchor="start")(series)
 
 
 def test_windows_evaluate_at_times_in_window_order():
     windows = _overlapping_windows()
 
-    values = windows([0.0, 1.0])
+    values = windows(TimeDeltaTensor([0.0, 1.0], "s"))
 
     assert isinstance(values, FloatTensor)
     assert np.array_equal(np.asarray(values), [[0.0, 10.0], [10.0, 20.0], [20.0, 30.0]])
-    assert np.array_equal(np.asarray(windows(1.5)), [15.0, 25.0, 35.0])
+    assert np.array_equal(np.asarray(windows(TimeDelta(1.5, "s"))), [15.0, 25.0, 35.0])
 
 
 def test_windows_evaluate_at_times_of_any_shape():
     windows = _overlapping_windows()
 
-    values = windows([[0.0, 1.0], [1.5, 0.5]])
+    values = windows(TimeDeltaTensor([[0.0, 1.0], [1.5, 0.5]], "s"))
 
     assert np.array_equal(np.asarray(values), [
         [[0.0, 10.0], [15.0, 5.0]],
@@ -645,7 +683,7 @@ def test_windows_evaluate_at_times_in_the_given_unit():
 def test_windows_at_a_duration_equal_the_windows_at_its_time_in_the_unit(duration):
     windows = _overlapping_windows()
 
-    assert windows(duration).array_equal(windows(1.5))
+    assert windows(duration).array_equal(windows(TimeDelta(1.5, "s")))
 
 
 @pytest.mark.parametrize("durations", [
@@ -655,13 +693,15 @@ def test_windows_at_a_duration_equal_the_windows_at_its_time_in_the_unit(duratio
 def test_windows_at_an_array_of_durations_equal_the_windows_at_their_times(durations):
     windows = _overlapping_windows()
 
-    assert windows(durations).array_equal(windows([0.0, 0.5, 1.0]))
+    assert windows(durations).array_equal(windows(TimeDeltaTensor([0.0, 0.5, 1.0], "s")))
 
 
 def test_windows_at_a_list_of_time_deltas_equal_the_windows_at_their_times():
     windows = _overlapping_windows()
 
-    assert windows([TimeDelta(500, "ms"), TimeDelta(1, "s")]).array_equal(windows([0.5, 1.0]))
+    expected = windows(TimeDeltaTensor([0.5, 1.0], "s"))
+
+    assert windows([TimeDelta(500, "ms"), TimeDelta(1, "s")]).array_equal(expected)
 
 
 def test_windows_at_a_duration_take_no_unit():
@@ -681,13 +721,14 @@ def test_windows_of_several_channels_evaluate_to_one_leaf_per_channel():
     # starts 0.5 s after A. Both are observed from 0.5 to 2.5, so the windows
     # are [0.5, 1.5) and [1.5, 2.5).
     a = TimeSeries([0.0, 5.0, 10.0, 15.0, 20.0, 25.0],
-                   times=Times([0.0, 0.5, 1.0, 1.5, 2.0, 2.5], unit="s"))
+                   times=TimeDeltaTensor([0.0, 0.5, 1.0, 1.5, 2.0, 2.5], "s"))
     b = TimeSeries([-5.0, -10.0, -15.0, -20.0, -25.0, -30.0],
-                   times=Times([500.0, 1000.0, 1500.0, 2000.0, 2500.0, 3000.0], unit="ms"))
+                   times=TimeDeltaTensor([500.0, 1000.0, 1500.0, 2000.0, 2500.0, 3000.0], "ms"))
     series = TimeSeries.from_channels([a, b], unit="s")
-    windows = Window(size=1.0, step=1.0, closed="left", partial=False, anchor="start")(series)
+    windows = Window(size=TimeDelta(1, "s"), step=TimeDelta(1, "s"),
+                     closed="left", partial=False, anchor="start")(series)
 
-    values = windows([0.0, 0.5])
+    values = windows(TimeDeltaTensor([0.0, 0.5], "s"))
 
     assert isinstance(values, sb.NestedTensor)
     assert np.array_equal(np.asarray(values[0]), [[5.0, 10.0], [15.0, 20.0]])
@@ -697,14 +738,15 @@ def test_windows_of_several_channels_evaluate_to_one_leaf_per_channel():
 def test_windows_of_channels_of_different_shapes_evaluate_to_leaves_of_each_shape():
     # A's observations are 10 * t and B's are the points (-10 * t, -20 * t).
     # The windows are [0.0, 1.0) and [1.0, 2.0).
-    times = [0.0, 0.5, 1.0, 1.5, 2.0, 2.5]
+    times = TimeDeltaTensor([0.0, 0.5, 1.0, 1.5, 2.0, 2.5], "s")
     a = TimeSeries([0.0, 5.0, 10.0, 15.0, 20.0, 25.0], times=times)
     b = TimeSeries([[0.0, 0.0], [-5.0, -10.0], [-10.0, -20.0],
                     [-15.0, -30.0], [-20.0, -40.0], [-25.0, -50.0]], times=times)
     series = TimeSeries.from_channels([a, b], unit="s")
-    windows = Window(size=1.0, step=1.0, closed="left", partial=False, anchor="start")(series)
+    windows = Window(size=TimeDelta(1, "s"), step=TimeDelta(1, "s"),
+                     closed="left", partial=False, anchor="start")(series)
 
-    values = windows([0.0, 0.5])
+    values = windows(TimeDeltaTensor([0.0, 0.5], "s"))
 
     assert np.array_equal(np.asarray(values[0]), [[0.0, 5.0], [10.0, 15.0]])
     assert np.array_equal(np.asarray(values[1]), [
@@ -716,12 +758,13 @@ def test_windows_of_channels_of_different_shapes_evaluate_to_leaves_of_each_shap
 def test_evaluating_windows_outside_a_window_raises_naming_its_position():
     # The windows are [0.0, 2.0) and the partial window [2.0, 3.0], which can
     # be evaluated from 0 to 1.
-    series = TimeSeries([0.0, 10.0, 20.0, 30.0], times=[0.0, 1.0, 2.0, 3.0])
-    windows = Window(size=2.0, step=2.0, closed="left", partial=True, anchor="start")(series)
+    series = TimeSeries([0.0, 10.0, 20.0, 30.0], times=TimeDeltaTensor([0.0, 1.0, 2.0, 3.0], "s"))
+    windows = Window(size=TimeDelta(2, "s"), step=TimeDelta(2, "s"),
+                     closed="left", partial=True, anchor="start")(series)
 
     message = "TimeSeries at position (1): Time 1.5 is outside the domain [0, 1]"
     with pytest.raises(ValueError, match=re.escape(message)):
-        windows([0.0, 1.5])
+        windows(TimeDeltaTensor([0.0, 1.5], "s"))
     message = "TimeSeries at position (0): Time nan is outside the domain [0, 2)"
     with pytest.raises(ValueError, match=re.escape(message)):
         windows([0.0, np.nan, 1.0])
@@ -733,8 +776,9 @@ def test_windows_of_every_dtype_survive_saving(make_values, round_trip):
     # The observations are a, b, b, a, so the windows [0.0, 1.0] and
     # [0.5, 1.5] hold a, b, b and b, b, a.
     two = make_values()
-    series = TimeSeries(sb.concatenate([two, two[[1, 0]]]), times=[0.0, 0.5, 1.0, 1.5])
-    windows = Window(size=1.0, step=0.5, closed="both", partial=False, anchor="start")(series)
+    series = TimeSeries(sb.concatenate([two, two[[1, 0]]]), times=TimeDeltaTensor([0.0, 0.5, 1.0, 1.5], "s"))
+    windows = Window(size=TimeDelta(1, "s"), step=TimeDelta(0.5, "s"),
+                     closed="both", partial=False, anchor="start")(series)
 
     loaded = round_trip(windows)
 
@@ -746,7 +790,8 @@ def test_windows_of_every_dtype_survive_saving(make_values, round_trip):
 @pytest.mark.parametrize("round_trip", ROUND_TRIPS)
 @pytest.mark.parametrize("closed", ["left", "right", "both", "none"])
 def test_window_ends_survive_saving(closed, round_trip):
-    windows = Window(size=1.0, step=1.0, closed=closed, partial=False, anchor="start")(_closed_source())
+    windows = Window(size=TimeDelta(1, "s"), step=TimeDelta(1, "s"),
+                     closed=closed, partial=False, anchor="start")(_closed_source())
 
     loaded = round_trip(windows)
 
@@ -755,7 +800,8 @@ def test_window_ends_survive_saving(closed, round_trip):
 
 @pytest.mark.parametrize("round_trip", ROUND_TRIPS)
 def test_window_origins_survive_saving(round_trip):
-    windows = Window(size=1.0, step=1.0, closed="left", partial=False, anchor="start")(_windows_source())
+    windows = Window(size=TimeDelta(1, "s"), step=TimeDelta(1, "s"),
+                     closed="left", partial=False, anchor="start")(_windows_source())
 
     loaded = round_trip(windows)
 
@@ -765,8 +811,8 @@ def test_window_origins_survive_saving(round_trip):
 
 def _windows_of_pattern(start):
     # The pattern 0, 1 repeats every 2 seconds from start.
-    series = TimeSeries([0.0, 1.0, 0.0, 1.0, 0.0], times=start + np.arange(5.0))
-    return Window(size=2.0, step=2.0, closed="left", partial=False, anchor="start")(series)
+    series = TimeSeries([0.0, 1.0, 0.0, 1.0, 0.0], times=TimeDeltaTensor(start + np.arange(5.0), "s"))
+    return Window(size=TimeDelta(2, "s"), step=TimeDelta(2, "s"), closed="left", partial=False, anchor="start")(series)
 
 
 def test_windows_with_the_same_contents_from_different_places_are_array_equal():
@@ -786,13 +832,14 @@ def test_series_differing_only_in_epoch_are_array_equal():
 
 
 def test_tensors_of_windows_differing_only_in_epoch_are_array_equal():
-    window = Window(size=1.0, step=1.0, closed="left", partial=False, anchor="start")
+    window = Window(size=TimeDelta(1, "s"), step=TimeDelta(1, "s"), closed="left", partial=False, anchor="start")
 
     assert window(_dated_source()).array_equal(window(_windows_source()))
 
 
 def test_window_dates_include_their_origin():
-    window = Window(size=1.0, step=1.0, closed="left", partial=False, anchor="start")(_dated_source())[2]
+    window = Window(size=TimeDelta(1, "s"), step=TimeDelta(1, "s"),
+                    closed="left", partial=False, anchor="start")(_dated_source())[2]
 
     # Window 2 starts at 2 s and holds the observation at 2.5 s.
     dates = window.times.to_datetime64("ms")
@@ -810,7 +857,7 @@ def test_window_dates_include_their_origin():
     pytest.param("h", 2.0, 1.0, id="hours"),
 ])
 def test_windows_of_a_duration_match_windows_of_the_same_number(size, step, unit, numeric_size, numeric_step):
-    series = TimeSeries([0.0, 1.0, 2.0, 3.0, 4.0], times=Times([0.0, 1.0, 2.0, 3.0, 4.0], unit="h")).to(unit)
+    series = TimeSeries([0.0, 1.0, 2.0, 3.0, 4.0], times=TimeDeltaTensor([0.0, 1.0, 2.0, 3.0, 4.0], "h")).to(unit)
 
     windows, bounds = Window(size=size, step=step, closed="left", partial=False, anchor="start")(
         series, return_bounds=True)
@@ -825,7 +872,7 @@ def test_windows_of_a_fractional_time_delta_convert_it_exactly():
     # A third of a second is 333333333.33... ns; rounded to microseconds it
     # would be 333333000 ns, and the observation at 333333100 ns would fall
     # in the second window.
-    series = TimeSeries([1.0, 2.0, 3.0], times=Times([0.0, 333_333_100.0, 1_000_000_000.0], unit="ns"))
+    series = TimeSeries([1.0, 2.0, 3.0], times=TimeDeltaTensor([0.0, 333_333_100.0, 1_000_000_000.0], "ns"))
 
     windows = Window(size=TimeDelta(1 / 3, "s"), step=TimeDelta(1 / 3, "s"), closed="left", partial=False,
                      anchor="start")(series)
@@ -864,7 +911,8 @@ def test_window_rejects_durations_without_a_fixed_length(size):
 
 
 def test_a_window_lies_at_its_domain_moved_by_its_origin():
-    window = Window(size=1.0, step=1.0, closed="left", partial=False, anchor="start")(_windows_source())[2]
+    window = Window(size=TimeDelta(1, "s"), step=TimeDelta(1, "s"),
+                    closed="left", partial=False, anchor="start")(_windows_source())[2]
 
     # Window 2 is evaluated on [0, 1) and lies on [2, 3) of the series.
     assert window.domain == Domain(TimeDelta(0, "s"), TimeDelta(1, "s"), True, False)
@@ -873,7 +921,8 @@ def test_a_window_lies_at_its_domain_moved_by_its_origin():
 
 
 def test_dated_window_domains_start_at_the_bounds_from_windowing():
-    windows, bounds = Window(size=1.0, step=1.0, closed="left", partial=False, anchor="start")(
+    windows, bounds = Window(size=TimeDelta(1, "s"), step=TimeDelta(1, "s"),
+                             closed="left", partial=False, anchor="start")(
         _dated_source(), return_bounds=True)
 
     starts = [windows[k].domain.start.to_datetime64() for k in range(windows.shape[0])]
