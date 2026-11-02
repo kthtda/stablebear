@@ -1,6 +1,6 @@
 # pandas input and durations for time series: implementation plan
 
-Progress: 28 of 46 items, 56 of 89 points (63%)
+Progress: 29 of 46 items, 59 of 89 points (66%)
 
 Specs: [pandas-timeseries-spec.md](pandas-timeseries-spec.md) (phases A, B,
 and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
@@ -199,7 +199,7 @@ as `TimeDeltaTensor` and `DateTimeTensor` for several. `np.timedelta64`,
 that check they are accepted, and in one place per guide page that says
 so.
 
-- [ ] **F1.** [3] `test/python/test_windowing.py` builds series from
+- [x] **F1.** [3] (d697d7a7b) `test/python/test_windowing.py` builds series from
   `TimeDelta` durations and passes `TimeDelta` to `Window` and
   `evaluate`.
 - [ ] **F2.** [3] `test/python/test_timeseries.py` likewise.

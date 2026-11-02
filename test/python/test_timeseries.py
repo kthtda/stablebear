@@ -688,7 +688,8 @@ def test_times_tensors_are_equal_only_with_the_same_units_and_epochs(other):
 @pytest.mark.parametrize("round_trip", ROUND_TRIPS)
 def test_times_tensor_round_trips(round_trip):
     series = TimeSeries([1.0, 2.0, 3.0, 4.0], times=Times([0.0, 1.0, 2.0, 3.0], unit="s"))
-    window = Window(size=2.0, step=1.0, closed="left", partial=False, anchor="start")(series)[1]
+    window = Window(size=TimeDelta(2.0, "s"), step=TimeDelta(1.0, "s"),
+                    closed="left", partial=False, anchor="start")(series)[1]
     tensor = TimesTensor([
         [Times([0.0, 1.0, 2.5], unit="s"), Times([500.0, 1500.0], unit="ms", epoch="2023-01-01")],
         [window.times, Times([], unit="min")],
@@ -707,8 +708,8 @@ def test_series_keeps_explicit_unit():
 
 
 @pytest.mark.parametrize("times", [
-    [0.0, 1.0],
-    [0.0, 1.0, 2.0, 3.0],
+    TimeDeltaTensor([0.0, 1.0], "s"),
+    TimeDeltaTensor([0.0, 1.0, 2.0, 3.0], "s"),
 ])
 def test_series_needs_one_timestamp_per_observation(times):
     with pytest.raises(ValueError):
@@ -723,7 +724,7 @@ def test_series_needs_one_timestamp_per_observation(times):
     (np.array([True, False]), sb.boolean),
 ])
 def test_series_value_precision(values, dtype):
-    series = TimeSeries(values, times=[0.0, 1.0])
+    series = TimeSeries(values, times=TimeDeltaTensor([0.0, 1.0], "s"))
 
     assert series.dtype is dtype
 
@@ -734,7 +735,7 @@ def test_series_of_points():
         [2.0, -2.0],
         [3.0, -3.0],
     ]
-    series = TimeSeries(values, times=[0.0, 1.0, 2.0])
+    series = TimeSeries(values, times=TimeDeltaTensor([0.0, 1.0, 2.0], "s"))
 
     assert series.shape == (2,)
     assert len(series) == 3
@@ -749,7 +750,7 @@ def test_series_of_matrices():
         [[5.0, 6.0],
          [7.0, 8.0]],
     ]
-    series = TimeSeries(values, times=[0.0, 1.0])
+    series = TimeSeries(values, times=TimeDeltaTensor([0.0, 1.0], "s"))
 
     assert series.shape == (2, 2)
     assert np.array_equal(np.asarray(series.values), values)
@@ -759,7 +760,7 @@ def test_series_of_matrices():
 @pytest.mark.parametrize("make_values", TWO_ELEMENTS_OF_EVERY_DTYPE)
 def test_series_of_every_element_type(make_values):
     values = make_values()
-    series = TimeSeries(values, times=[0.0, 1.0])
+    series = TimeSeries(values, times=TimeDeltaTensor([0.0, 1.0], "s"))
 
     assert series.dtype is values.dtype
     assert len(series) == 2
@@ -782,41 +783,41 @@ def test_series_of_every_element_type(make_values):
 ])
 def test_series_rejects_unsupported_values(values):
     with pytest.raises(TypeError):
-        TimeSeries(values, times=[0.0, 1.0])
+        TimeSeries(values, times=TimeDeltaTensor([0.0, 1.0], "s"))
 
 
 def test_series_evaluates_to_previous_value():
-    series = TimeSeries([10.0, 20.0, 30.0], times=[0.0, 1.5, 4.0])
+    series = TimeSeries([10.0, 20.0, 30.0], times=TimeDeltaTensor([0.0, 1.5, 4.0], "s"))
 
-    assert series(0.0) == 10.0
-    assert series(1.0) == 10.0
-    assert series(1.5) == 20.0
-    assert series(3.75) == 20.0
-    assert series(4.0) == 30.0
+    assert series(TimeDelta(0.0, "s")) == 10.0
+    assert series(TimeDelta(1.0, "s")) == 10.0
+    assert series(TimeDelta(1.5, "s")) == 20.0
+    assert series(TimeDelta(3.75, "s")) == 20.0
+    assert series(TimeDelta(4.0, "s")) == 30.0
     assert series(1) == 10.0
 
 
-@pytest.mark.parametrize("t", [-0.5, 4.5])
+@pytest.mark.parametrize("t", [TimeDelta(-0.5, "s"), TimeDelta(4.5, "s")])
 def test_series_rejects_times_outside_observations(t):
-    series = TimeSeries([10.0, 20.0, 30.0], times=[0.0, 1.5, 4.0])
+    series = TimeSeries([10.0, 20.0, 30.0], times=TimeDeltaTensor([0.0, 1.5, 4.0], "s"))
 
     with pytest.raises(ValueError, match="outside the domain"):
         series(t)
 
 
 def test_empty_series_cannot_be_evaluated():
-    series = TimeSeries(sb.zeros((0,), dtype=sb.pcloud64), times=[])
+    series = TimeSeries(sb.zeros((0,), dtype=sb.pcloud64), times=TimeDeltaTensor([], "s"))
 
     assert len(series) == 0
     assert series.dtype is sb.pcloud64
     with pytest.raises(ValueError, match="without observations"):
-        series(0.0)
+        series(TimeDelta(0.0, "s"))
 
 
 def test_singleton_series_evaluates_at_its_time():
-    series = TimeSeries([7.0], times=[2.0])
+    series = TimeSeries([7.0], times=TimeDeltaTensor([2.0], "s"))
 
-    assert series(2.0) == 7.0
+    assert series(TimeDelta(2.0, "s")) == 7.0
 
 
 def _hourly_series():
@@ -831,7 +832,7 @@ def _hourly_series():
 def test_series_at_a_duration_equals_the_series_at_its_time_in_the_unit(duration):
     series = _hourly_series()
 
-    assert series(duration) == series(1.5)
+    assert series(duration) == series(TimeDelta(1.5, "h"))
 
 
 @pytest.mark.parametrize("durations", [
@@ -846,13 +847,13 @@ def test_series_at_an_array_of_durations_equals_the_series_at_their_times(durati
     values = series(durations)
 
     assert values.shape == (2, 2)
-    assert values.array_equal(series([[0.5, 1.5], [4.0, 1.0]]))
+    assert values.array_equal(series(TimeDeltaTensor([[0.5, 1.5], [4.0, 1.0]], "h")))
 
 
 def test_series_at_a_list_of_time_deltas_equals_the_series_at_their_times():
     series = _hourly_series()
 
-    assert series([TimeDelta(30, "min"), TimeDelta(1.5, "h")]).array_equal(series([0.5, 1.5]))
+    assert series([TimeDelta(30, "min"), TimeDelta(1.5, "h")]).array_equal(series(TimeDeltaTensor([0.5, 1.5], "h")))
 
 
 def test_dated_series_at_a_duration_counts_from_its_epoch():
@@ -876,19 +877,19 @@ def test_series_rejects_durations_without_a_fixed_length(durations):
 
 
 def test_series_domain_runs_from_first_to_last_timestamp_closed():
-    series = TimeSeries([10.0, 20.0, 30.0], times=[0.5, 1.5, 4.0])
+    series = TimeSeries([10.0, 20.0, 30.0], times=TimeDeltaTensor([0.5, 1.5, 4.0], "s"))
 
     assert series.domain == Domain(TimeDelta(0.5, "s"), TimeDelta(4.0, "s"), True, True)
 
 
 def test_series_domain_is_in_the_query_unit():
-    series = TimeSeries([10.0, 20.0, 30.0], times=[0.5, 1.5, 4.0]).to("ms")
+    series = TimeSeries([10.0, 20.0, 30.0], times=TimeDeltaTensor([0.5, 1.5, 4.0], "s")).to("ms")
 
     assert series.domain == Domain(TimeDelta(500.0, "ms"), TimeDelta(4000.0, "ms"), True, True)
 
 
 def test_series_domain_fields_by_name_and_by_unpacking():
-    domain = TimeSeries([10.0, 20.0], times=[0.5, 4.0]).domain
+    domain = TimeSeries([10.0, 20.0], times=TimeDeltaTensor([0.5, 4.0], "s")).domain
 
     start, end, start_closed, end_closed = domain
 
@@ -911,9 +912,10 @@ def test_series_domain_of_several_channels_is_their_intersection():
     pytest.param("right", Domain(TimeDelta(0, "s"), TimeDelta(2, "s"), False, True), id="open-start"),
 ])
 def test_series_domain_of_several_channels_excludes_an_end_any_channel_excludes(closed, expected):
-    source = TimeSeries([10.0, 20.0, 30.0, 40.0], times=[0.0, 1.0, 2.0, 3.0])
-    window = Window(size=2.0, step=2.0, closed=closed, partial=False, anchor="start")(source)[0]
-    observed = TimeSeries([-10.0, -20.0, -30.0], times=[0.0, 1.0, 2.0])
+    source = TimeSeries([10.0, 20.0, 30.0, 40.0], times=TimeDeltaTensor([0.0, 1.0, 2.0, 3.0], "s"))
+    window = Window(size=TimeDelta(2.0, "s"), step=TimeDelta(2.0, "s"),
+                    closed=closed, partial=False, anchor="start")(source)[0]
+    observed = TimeSeries([-10.0, -20.0, -30.0], times=TimeDeltaTensor([0.0, 1.0, 2.0], "s"))
 
     series = TimeSeries.from_channels([window, observed])
 
@@ -963,10 +965,10 @@ def _dated_series():
 
 
 @pytest.mark.parametrize("date, t", [
-    pytest.param(np.datetime64("2023-01-01T02:00"), 2.0, id="datetime64"),
-    pytest.param(datetime.datetime(2023, 1, 1, 4), 4.0, id="datetime"),
-    pytest.param(datetime.date(2023, 1, 1), 0.0, id="date"),
-    pytest.param("2023-01-01T02:00", 2.0, id="str"),
+    pytest.param(np.datetime64("2023-01-01T02:00"), TimeDelta(2.0, "h"), id="datetime64"),
+    pytest.param(datetime.datetime(2023, 1, 1, 4), TimeDelta(4.0, "h"), id="datetime"),
+    pytest.param(datetime.date(2023, 1, 1), TimeDelta(0.0, "h"), id="date"),
+    pytest.param("2023-01-01T02:00", TimeDelta(2.0, "h"), id="str"),
 ])
 def test_series_at_a_date_equals_the_series_at_its_time(date, t):
     series = _dated_series()
@@ -982,7 +984,7 @@ def test_series_at_an_array_of_dates_equals_the_series_at_their_times():
     values = series(dates)
 
     assert values.shape == (2, 2)
-    assert values.array_equal(series([[0.5, 2.0], [4.0, 1.5]]))
+    assert values.array_equal(series(TimeDeltaTensor([[0.5, 2.0], [4.0, 1.5]], "h")))
 
 
 @pytest.mark.parametrize("dates", [
@@ -992,7 +994,7 @@ def test_series_at_an_array_of_dates_equals_the_series_at_their_times():
 def test_series_at_a_list_of_dates_equals_the_series_at_their_times(dates):
     series = _dated_series()
 
-    assert series(dates).array_equal(series([0.5, 2.0]))
+    assert series(dates).array_equal(series(TimeDeltaTensor([0.5, 2.0], "h")))
 
 
 def test_series_of_several_channels_at_a_date_gives_each_channel():
@@ -1017,7 +1019,7 @@ def test_series_of_several_channels_at_an_array_of_dates_gives_each_channel():
 
 
 def test_series_without_an_epoch_cannot_be_evaluated_at_a_date():
-    series = TimeSeries([10.0, 20.0], times=[0.0, 1.0])
+    series = TimeSeries([10.0, 20.0], times=TimeDeltaTensor([0.0, 1.0], "s"))
 
     with pytest.raises(ValueError, match="with_epoch"):
         series(np.datetime64("2023-01-01T00:30"))
@@ -1046,7 +1048,8 @@ def test_series_at_a_date_outside_its_domain_names_the_dates():
 
 
 def test_window_at_a_date_outside_it_names_its_dates():
-    window = Window(size=2.0, step=1.0, closed="left", partial=False, anchor="start")(_dated_series())[1]
+    window = Window(size=TimeDelta(2.0, "h"), step=TimeDelta(1.0, "h"),
+                    closed="left", partial=False, anchor="start")(_dated_series())[1]
 
     with pytest.raises(ValueError, match=re.escape("is outside the domain [2023-01-01T01:00, 2023-01-01T03:00)")):
         window("2023-01-01T03:00")
@@ -1064,14 +1067,15 @@ def test_window_at_a_date_equals_its_series_at_that_date():
     series = _dated_series()
     # The window covers 01:00 to 03:00; the value changes from 10 to 20 at
     # 01:30.
-    window = Window(size=2.0, step=1.0, closed="left", partial=False, anchor="start")(series)[1]
+    window = Window(size=TimeDelta(2.0, "h"), step=TimeDelta(1.0, "h"),
+                    closed="left", partial=False, anchor="start")(series)[1]
 
     assert window(np.datetime64("2023-01-01T01:15")) == 10.0
     assert window(np.datetime64("2023-01-01T02:30")) == 20.0
 
 
 def test_series_without_an_epoch_has_none():
-    assert TimeSeries([10.0, 20.0], times=[0.0, 1.0]).epoch is None
+    assert TimeSeries([10.0, 20.0], times=TimeDeltaTensor([0.0, 1.0], "s")).epoch is None
 
 
 def test_series_epoch_is_one_value_for_several_channels():
@@ -1092,12 +1096,12 @@ def test_series_with_epoch_sets_the_epoch_of_every_channel():
 
 
 def test_series_with_epoch_keeps_its_times_and_values():
-    series = TimeSeries([10.0, 20.0], times=[0.0, 1.5])
+    series = TimeSeries([10.0, 20.0], times=TimeDeltaTensor([0.0, 1.5], "s"))
 
     dated = series.with_epoch("2023-01-01")
 
     assert dated.array_equal(series)
-    assert dated(1.5) == 20.0
+    assert dated(TimeDelta(1.5, "s")) == 20.0
 
 
 def test_series_with_epoch_none_removes_the_epoch():
@@ -1121,13 +1125,13 @@ def test_series_channels_must_share_their_epoch(epoch_b):
 
 
 def test_series_origin_is_zero_for_recorded_observations():
-    series = TimeSeries([10.0, 20.0, 30.0], times=[0.5, 1.5, 4.0])
+    series = TimeSeries([10.0, 20.0, 30.0], times=TimeDeltaTensor([0.5, 1.5, 4.0], "s"))
 
     assert series.origin == TimeDelta(0, "s")
 
 
 def test_series_origin_has_one_entry_per_channel():
-    a = TimeSeries([10.0, 20.0], times=[0.0, 1.0])
+    a = TimeSeries([10.0, 20.0], times=TimeDeltaTensor([0.0, 1.0], "s"))
     b = TimeSeries([-10.0, -20.0], times=Times([0.0, 1000.0], unit="ms"))
 
     origin = TimeSeries.from_channels([a, b], unit="s").origin
@@ -1136,29 +1140,29 @@ def test_series_origin_has_one_entry_per_channel():
 
 
 def test_series_origin_cannot_be_assigned_to():
-    series = TimeSeries([10.0, 20.0], times=[0.0, 1.0])
+    series = TimeSeries([10.0, 20.0], times=TimeDeltaTensor([0.0, 1.0], "s"))
 
     with pytest.raises(AttributeError):
-        series.origin = 1.0
+        series.origin = TimeDelta(1.0, "s")
 
 
 def test_query_just_below_an_observation_snaps_to_it():
-    series = TimeSeries([1.0, 2.0, 3.0], times=[0.0, 0.25, 0.5], snap_tolerance=1e-14)
+    series = TimeSeries([1.0, 2.0, 3.0], times=TimeDeltaTensor([0.0, 0.25, 0.5], "s"), snap_tolerance=1e-14)
 
-    assert series(np.nextafter(0.25, 0.0)) == 2.0
+    assert series(TimeDelta(np.nextafter(0.25, 0.0), "s")) == 2.0
 
 
 def test_query_further_below_an_observation_does_not_snap():
-    series = TimeSeries([1.0, 2.0, 3.0], times=[0.0, 0.25, 0.5], snap_tolerance=1e-14)
+    series = TimeSeries([1.0, 2.0, 3.0], times=TimeDeltaTensor([0.0, 0.25, 0.5], "s"), snap_tolerance=1e-14)
 
-    assert series(0.24) == 1.0
+    assert series(TimeDelta(0.24, "s")) == 1.0
 
 
 @pytest.mark.parametrize("times, t, expected", [
     # Sampled every 0.1 ns, in seconds.
-    ([0.0, 1e-10, 2e-10], 1.5e-10, 20.0),
+    (TimeDeltaTensor([0.0, 1e-10, 2e-10], "s"), TimeDelta(1.5e-10, "s"), 20.0),
     # Microsecond spacing on epoch-sized timestamps.
-    ([1.7e9, 1.7e9 + 1e-6, 1.7e9 + 2e-6], 1.7e9 + 1.5e-6, 20.0),
+    (TimeDeltaTensor([1.7e9, 1.7e9 + 1e-6, 1.7e9 + 2e-6], "s"), TimeDelta(1.7e9 + 1.5e-6, "s"), 20.0),
 ])
 def test_snapping_does_not_cross_a_gap(times, t, expected):
     series = TimeSeries([10.0, 20.0, 30.0], times=times, snap_tolerance=1e-14)
@@ -1167,44 +1171,44 @@ def test_snapping_does_not_cross_a_gap(times, t, expected):
 
 
 def test_a_query_one_float_spacing_below_an_epoch_timestamp_snaps_to_it():
-    times = [1.7e9, 1.7e9 + 1e-6, 1.7e9 + 2e-6]
+    times = TimeDeltaTensor([1.7e9, 1.7e9 + 1e-6, 1.7e9 + 2e-6], "s")
     series = TimeSeries([10.0, 20.0, 30.0], times=times, snap_tolerance=1e-14)
 
-    assert series(np.nextafter(times[1], 0.0)) == 20.0
+    assert series(TimeDelta(np.nextafter(times[1].count, 0.0), "s")) == 20.0
 
 
 def test_the_snap_distance_is_relative_to_the_magnitude_of_the_timestamps():
     # With a tolerance of 2**-20, the snap distance is 2**-10 below 1024 but
     # only 2**-20 below 1.
-    large = TimeSeries([1.0, 2.0], times=[0.0, 1024.0], snap_tolerance=2.0**-20)
-    small = TimeSeries([1.0, 2.0], times=[0.0, 1.0], snap_tolerance=2.0**-20)
+    large = TimeSeries([1.0, 2.0], times=TimeDeltaTensor([0.0, 1024.0], "s"), snap_tolerance=2.0**-20)
+    small = TimeSeries([1.0, 2.0], times=TimeDeltaTensor([0.0, 1.0], "s"), snap_tolerance=2.0**-20)
 
-    assert large(1024.0 - 2.0**-11) == 2.0
-    assert large(1024.0 - 2.0**-9) == 1.0
-    assert small(1.0 - 2.0**-11) == 1.0
+    assert large(TimeDelta(1024.0 - 2.0**-11, "s")) == 2.0
+    assert large(TimeDelta(1024.0 - 2.0**-9, "s")) == 1.0
+    assert small(TimeDelta(1.0 - 2.0**-11, "s")) == 1.0
 
 
 def test_snapping_reaches_at_most_a_quarter_of_the_gap():
     # The tolerance allows 2**-10 below 1024, but the gap is 2**-9, so a
     # quarter of it, 2**-11, is the snap distance.
-    series = TimeSeries([1.0, 2.0], times=[1024.0 - 2.0**-9, 1024.0],
+    series = TimeSeries([1.0, 2.0], times=TimeDeltaTensor([1024.0 - 2.0**-9, 1024.0], "s"),
                         snap_tolerance=2.0**-20)
 
-    assert series(1024.0 - 2.0**-12) == 2.0
-    assert series(1024.0 - 3 * 2.0**-12) == 1.0
+    assert series(TimeDelta(1024.0 - 2.0**-12, "s")) == 2.0
+    assert series(TimeDelta(1024.0 - 3 * 2.0**-12, "s")) == 1.0
 
 
 def test_snap_tolerance_zero_disables_snapping():
-    series = TimeSeries([1.0, 2.0, 3.0], times=[0.0, 0.25, 0.5], snap_tolerance=0.0)
+    series = TimeSeries([1.0, 2.0, 3.0], times=TimeDeltaTensor([0.0, 0.25, 0.5], "s"), snap_tolerance=0.0)
 
     assert series.snap_tolerance == 0.0
-    assert series(np.nextafter(0.25, 0.0)) == 1.0
+    assert series(TimeDelta(np.nextafter(0.25, 0.0), "s")) == 1.0
 
 
 @pytest.mark.parametrize("tolerance", [-0.1, 1.0, np.nan])
 def test_snap_tolerance_outside_unit_interval_raises(tolerance):
     with pytest.raises(ValueError):
-        TimeSeries([1.0, 2.0], times=[0.0, 1.0], snap_tolerance=tolerance)
+        TimeSeries([1.0, 2.0], times=TimeDeltaTensor([0.0, 1.0], "s"), snap_tolerance=tolerance)
 
 
 def test_to_changes_the_query_unit():
@@ -1212,8 +1216,8 @@ def test_to_changes_the_query_unit():
 
     assert series.unit == "ms"
     assert np.array_equal(series.times.to_floats(), [0.0, 500.0])
-    assert series(250.0) == 10.0
-    assert series(500.0) == 20.0  # the last observation, in the new unit
+    assert series(TimeDelta(250.0, "ms")) == 10.0
+    assert series(TimeDelta(500.0, "ms")) == 20.0  # the last observation, in the new unit
 
 
 def test_evaluate_reads_times_in_the_given_unit():
@@ -1248,7 +1252,7 @@ def test_from_channels_keeps_every_channel():
 
 def _point_cloud_channel():
     clouds = sb.zeros((2,), dtype=sb.pcloud64)
-    return TimeSeries(clouds, times=[0.0, 1.0])
+    return TimeSeries(clouds, times=TimeDeltaTensor([0.0, 1.0], "s"))
 
 
 @pytest.mark.parametrize("make_channels, unit, error", [
@@ -1264,15 +1268,15 @@ def test_from_channels_rejects_invalid_channels(make_channels, unit, error):
 
 
 @pytest.mark.parametrize("t", [
-    0.25,  # only channel A covers it
-    2.75,  # only channel B covers it
+    TimeDelta(0.25, "s"),  # only channel A covers it
+    TimeDelta(2.75, "s"),  # only channel B covers it
 ])
 def test_several_channels_evaluate_only_where_all_are_observed(t):
     series = TimeSeries.from_channels([_channel_a(), _channel_b()], unit="s")
 
     # Both ends of the shared domain, 0.5 (B's first) and 2.5 (A's last), work.
-    assert series(0.5)[1][()] == -1.0
-    assert series(2.5)[0][()] == 30.0
+    assert series(TimeDelta(0.5, "s"))[1][()] == -1.0
+    assert series(TimeDelta(2.5, "s"))[0][()] == 30.0
     with pytest.raises(ValueError, match="outside the domain"):
         series(t)
 
@@ -1287,8 +1291,8 @@ def test_times_of_several_channels_are_in_the_query_unit():
 
 
 @pytest.mark.parametrize("t, expected", [
-    (1.25, [20.0, -1.0]),  # between B's observations at 500 and 1500 ms
-    (1.5, [20.0, -2.0]),  # at B's observation at 1500 ms
+    (TimeDelta(1.25, "s"), [20.0, -1.0]),  # between B's observations at 500 and 1500 ms
+    (TimeDelta(1.5, "s"), [20.0, -2.0]),  # at B's observation at 1500 ms
 ])
 def test_several_channels_evaluate_to_one_leaf_per_channel(t, expected):
     series = TimeSeries.from_channels([_channel_a(), _channel_b()], unit="s")
@@ -1308,8 +1312,8 @@ def test_each_channel_snaps_by_its_own_settings():
     series = TimeSeries.from_channels([a, _channel_b()], unit="s")
 
     # Just below channel A's 1.0 s and channel B's 1500 ms.
-    assert series(np.nextafter(1.0, 0.0))[0][()] == 10.0
-    assert series(np.nextafter(1.5, 0.0))[1][()] == -2.0
+    assert series(TimeDelta(np.nextafter(1.0, 0.0), "s"))[0][()] == 10.0
+    assert series(TimeDelta(np.nextafter(1.5, 0.0), "s"))[1][()] == -2.0
 
 
 def test_several_point_cloud_channels_evaluate_to_their_clouds():
@@ -1321,11 +1325,11 @@ def test_several_point_cloud_channels_evaluate_to_their_clouds():
         np.array([[5.0, 5.0], [6.0, 6.0], [7.0, 7.0]]),
     ], dtype=sb.pcloud64)
     series = TimeSeries.from_channels([
-        TimeSeries(first, times=[0.0, 1.0]),
-        TimeSeries(second, times=[0.0]),
+        TimeSeries(first, times=TimeDeltaTensor([0.0, 1.0], "s")),
+        TimeSeries(second, times=TimeDeltaTensor([0.0], "s")),
     ])
 
-    values = series(0.0)
+    values = series(TimeDelta(0.0, "s"))
 
     assert values.dtype is sb.pcloud64
     assert np.array_equal(np.asarray(values[0][()]), [[0.0, 0.0]])
@@ -1333,17 +1337,17 @@ def test_several_point_cloud_channels_evaluate_to_their_clouds():
 
 
 def test_many_times_keep_the_caller_order_and_shape():
-    series = TimeSeries([10.0, 20.0, 30.0], times=[0.0, 1.5, 4.0])
+    series = TimeSeries([10.0, 20.0, 30.0], times=TimeDeltaTensor([0.0, 1.5, 4.0], "s"))
 
-    assert np.array_equal(np.asarray(series([4.0, 0.0, 1.0, 1.5])), [30.0, 10.0, 10.0, 20.0])
-    assert np.array_equal(np.asarray(series([[0.0, 4.0], [1.5, 1.0]])),
+    assert np.array_equal(np.asarray(series(TimeDeltaTensor([4.0, 0.0, 1.0, 1.5], "s"))), [30.0, 10.0, 10.0, 20.0])
+    assert np.array_equal(np.asarray(series(TimeDeltaTensor([[0.0, 4.0], [1.5, 1.0]], "s"))),
                           [[10.0, 30.0], [20.0, 10.0]])
 
 
 def test_many_times_on_several_channels():
     series = TimeSeries.from_channels([_channel_a(), _channel_b()], unit="s")
 
-    values = series([1.25, 1.5])
+    values = series(TimeDeltaTensor([1.25, 1.5], "s"))
 
     assert isinstance(values, sb.NestedTensor)
     assert np.array_equal(np.asarray(values[0]), [20.0, 20.0])
@@ -1351,12 +1355,12 @@ def test_many_times_on_several_channels():
 
 
 def test_many_times_snap_and_check_the_domain_like_single_times():
-    series = TimeSeries([10.0, 20.0, 30.0], times=[0.0, 1.5, 4.0])
-    queries = [0.0, np.nextafter(1.5, 0.0)]
+    series = TimeSeries([10.0, 20.0, 30.0], times=TimeDeltaTensor([0.0, 1.5, 4.0], "s"))
+    queries = TimeDeltaTensor([0.0, np.nextafter(1.5, 0.0)], "s")
 
     assert np.array_equal(np.asarray(series(queries)), [series(t) for t in queries])
     with pytest.raises(ValueError, match="outside the domain"):
-        series([0.0, 4.5])
+        series(TimeDeltaTensor([0.0, 4.5], "s"))
     with pytest.raises(ValueError, match="outside the domain"):
         series([0.0, np.nan, 4.0])
 
@@ -1369,13 +1373,13 @@ def test_selecting_one_channel_keeps_the_query_unit(index):
 
     assert selected.n_channels == 1
     assert selected.unit == "s"
-    assert selected(1.5) == -2.0
+    assert selected(TimeDelta(1.5, "s")) == -2.0
 
 
 def test_selecting_several_channels_keeps_their_order():
     series = TimeSeries.from_channels([_channel_a(), _channel_b()], unit="s")
 
-    values = series[[1, 0]](1.5)
+    values = series[[1, 0]](TimeDelta(1.5, "s"))
 
     assert [values[0][()], values[1][()]] == [-2.0, 20.0]
 
@@ -1392,13 +1396,13 @@ def test_selection_keeps_each_channel_snap_settings():
 
 
 def test_values_are_a_copy():
-    series = TimeSeries([10.0, 20.0, 30.0], times=[0.0, 1.0, 2.0])
+    series = TimeSeries([10.0, 20.0, 30.0], times=TimeDeltaTensor([0.0, 1.0, 2.0], "s"))
 
     values = series.values
     values[1] = 0.0
 
     assert values[1] == 0.0
-    assert series(1.0) == 20.0
+    assert series(TimeDelta(1.0, "s")) == 20.0
 
 
 @pytest.mark.parametrize("make_values", [
@@ -1408,20 +1412,20 @@ def test_values_are_a_copy():
 @pytest.mark.parametrize("read", [
     pytest.param(lambda values, series, embedding: values[0], id="input"),
     pytest.param(lambda values, series, embedding: series.values[0], id="values"),
-    pytest.param(lambda values, series, embedding: series(0.0), id="evaluation"),
+    pytest.param(lambda values, series, embedding: series(TimeDelta(0.0, "s")), id="evaluation"),
     pytest.param(lambda values, series, embedding: embedding.values[0, 0], id="embedding values"),
 ])
 def test_mutating_an_observation_leaves_the_series_unchanged(make_values, read):
     values = make_values()
     expected = np.asarray(values[0]).copy()
-    series = TimeSeries(values, times=[0.0, 1.0])
-    embedding = TimeDelayEmbedding(dimension=2, delay=1.0)(series)
+    series = TimeSeries(values, times=TimeDeltaTensor([0.0, 1.0], "s"))
+    embedding = TimeDelayEmbedding(dimension=2, delay=TimeDelta(1.0, "s"))(series)
 
     observation = read(values, series, embedding)
     observation[0, 1] = 99.0
 
     assert observation[0, 1] == 99.0
-    assert np.array_equal(np.asarray(series(0.0)), expected)
+    assert np.array_equal(np.asarray(series(TimeDelta(0.0, "s"))), expected)
     assert np.array_equal(np.asarray(embedding.values[0, 0]), expected)
 
 
@@ -1436,7 +1440,7 @@ def test_values_of_several_channels_have_one_leaf_per_channel():
 
 
 def test_shapes_and_counts_of_several_channels():
-    points = TimeSeries([[1.0, -1.0], [2.0, -2.0]], times=[0.0, 1.0])
+    points = TimeSeries([[1.0, -1.0], [2.0, -2.0]], times=TimeDeltaTensor([0.0, 1.0], "s"))
     series = TimeSeries.from_channels([_channel_a(), points])
 
     assert series.shape == ((), (2,))
@@ -1489,7 +1493,7 @@ def test_several_channels_survive_saving(round_trip):
     assert loaded.n_channels == 2
     assert loaded.unit == "s"
     assert loaded.times.array_equal(series.times)
-    for t in (0.5, 1.5):
+    for t in (TimeDelta(0.5, "s"), TimeDelta(1.5, "s")):
         assert [loaded(t)[i][()] for i in range(2)] == [series(t)[i][()] for i in range(2)]
 
 
@@ -1531,8 +1535,9 @@ def test_series_array_equal_rejects_a_different_series(other):
 def _window_at_one(closed):
     # Each observation is 10 * t; the window at 1.0 holds 10.0 at 0 and 15.0
     # at 0.5, and 20.0 at 1 when its end is closed.
-    series = TimeSeries([0.0, 5.0, 10.0, 15.0, 20.0], times=[0.0, 0.5, 1.0, 1.5, 2.0])
-    return Window(size=1.0, step=1.0, closed=closed, partial=False, anchor="start")(series)[1]
+    series = TimeSeries([0.0, 5.0, 10.0, 15.0, 20.0], times=TimeDeltaTensor([0.0, 0.5, 1.0, 1.5, 2.0], "s"))
+    return Window(size=TimeDelta(1.0, "s"), step=TimeDelta(1.0, "s"),
+                  closed=closed, partial=False, anchor="start")(series)[1]
 
 
 def test_series_array_equal_compares_the_start():
@@ -1543,22 +1548,24 @@ def test_series_array_equal_compares_the_start():
 def test_series_array_equal_compares_the_end():
     # The window [0, 1) can be evaluated after its last observation at 0.5;
     # the series cannot.
-    assert not _window_at_one("left").array_equal(TimeSeries([10.0, 15.0], times=[0.0, 0.5]))
+    assert not _window_at_one("left").array_equal(TimeSeries([10.0, 15.0], times=TimeDeltaTensor([0.0, 0.5], "s")))
 
 
 def _gap_window_at_one(size, closed):
     # Each observation is 10 * t, with none at 3.0; the window at 1.0 holds
     # 10.0 at 0 and 20.0 at 1 and ends after its last observation.
-    series = TimeSeries([0.0, 10.0, 20.0, 40.0], times=[0.0, 1.0, 2.0, 4.0])
-    return Window(size=size, step=1.0, closed=closed, partial=False, anchor="start")(series)[1]
+    series = TimeSeries([0.0, 10.0, 20.0, 40.0], times=TimeDeltaTensor([0.0, 1.0, 2.0, 4.0], "s"))
+    return Window(size=size, step=TimeDelta(1.0, "s"), closed=closed, partial=False, anchor="start")(series)[1]
 
 
 def test_series_array_equal_compares_where_the_end_is():
-    assert not _gap_window_at_one(2.0, "left").array_equal(_gap_window_at_one(1.5, "left"))
+    assert not _gap_window_at_one(TimeDelta(2.0, "s"), "left").array_equal(
+        _gap_window_at_one(TimeDelta(1.5, "s"), "left"))
 
 
 def test_series_array_equal_compares_whether_the_end_is_closed():
-    assert not _gap_window_at_one(2.0, "right").array_equal(_gap_window_at_one(2.0, "none"))
+    assert not _gap_window_at_one(TimeDelta(2.0, "s"), "right").array_equal(
+        _gap_window_at_one(TimeDelta(2.0, "s"), "none"))
 
 
 def test_series_array_equal_compares_the_channel_order():
@@ -1600,6 +1607,6 @@ def test_series_epoch_survives_saving(value, as_epoch, round_trip):
 
 @pytest.mark.parametrize("round_trip", ROUND_TRIPS)
 def test_series_without_an_epoch_loads_without_one(round_trip):
-    loaded = round_trip(TimeSeries([10.0, 20.0], times=[0.0, 1.5]))
+    loaded = round_trip(TimeSeries([10.0, 20.0], times=TimeDeltaTensor([0.0, 1.5], "s")))
 
     assert loaded.epoch is None
