@@ -1,37 +1,19 @@
 from __future__ import annotations
 
-from typing import Any, Literal, overload
-
-import numpy as np
+from typing import Literal
 
 from .. import _sb_cpp as cpp
-from .date_time import TimeDeltaTensor, _duration, _in_unit, _ScalarDuration
-from .series import TimeSeries, TimeSeriesTensor, _PandasLike, _as_series, _times_in
+from .date_time import _duration, _in_unit, _ScalarDuration
+from .series import TimeSeries, TimeSeriesTensor, _PandasLike, _as_series
 
 
 _CLOSED = {"left": (True, False), "right": (False, True), "both": (True, True), "none": (False, False)}
 
 
-@overload
 def cut_windows(series: TimeSeries | _PandasLike, size: float | _ScalarDuration,
                 step: float | _ScalarDuration | None = None, *,
                 closed: Literal["left", "right", "both", "none"] | None = None, partial: bool = False,
-                anchor: Literal["start", "end"] = "end",
-                return_bounds: Literal[False] = False) -> TimeSeriesTensor: ...
-
-
-@overload
-def cut_windows(series: TimeSeries | _PandasLike, size: float | _ScalarDuration,
-                step: float | _ScalarDuration | None = None, *,
-                closed: Literal["left", "right", "both", "none"] | None = None, partial: bool = False,
-                anchor: Literal["start", "end"] = "end",
-                return_bounds: Literal[True]) -> tuple[TimeSeriesTensor, Any]: ...  # Bounds are dates if the series has an epoch.
-
-
-def cut_windows(series: TimeSeries | _PandasLike, size: float | _ScalarDuration,
-                step: float | _ScalarDuration | None = None, *,
-                closed: Literal["left", "right", "both", "none"] | None = None, partial: bool = False,
-                anchor: Literal["start", "end"] = "end", return_bounds: bool = False):
+                anchor: Literal["start", "end"] = "end") -> TimeSeriesTensor:
     """Cut a time series into consecutive windows.
 
     ``cut_windows(series, size, step, anchor="start")`` returns a 1-D tensor of
@@ -48,14 +30,7 @@ def cut_windows(series: TimeSeries | _PandasLike, size: float | _ScalarDuration,
     ``partial=True`` they continue while ``b_k`` is in the domain, and a
     window that would start before ``t_0`` starts where ``series`` does.
     They still come in chronological order, so the last window ends at
-    ``t_1``. With ``return_bounds=True`` it also returns a tensor
-    of shape ``(n_windows, 2)`` whose row ``k`` is ``(a_k, a_k + size)``: a
-    :class:`TimeDeltaTensor` of durations from the time 0 of ``series``, in
-    its unit, or for a series with an :attr:`~TimeSeries.epoch`, a
-    :class:`DateTimeTensor` of the dates where the windows lie, at the finer
-    of its unit and microseconds. For a series without a unit, it is a
-    ``FloatTensor`` of numbers. A partial window's row starts or ends
-    where the series does. A pandas ``Series`` or ``DataFrame`` is converted
+    ``t_1``. A pandas ``Series`` or ``DataFrame`` is converted
     with :meth:`TimeSeries.from_pandas` first.
 
     Window ``k`` covers ``a_k`` to ``a_k + size``, with the ends that
@@ -114,13 +89,10 @@ def cut_windows(series: TimeSeries | _PandasLike, size: float | _ScalarDuration,
     anchor : {"start", "end"}, default "end"
         Whether the windows are taken from the start of the series going
         forward, or from its end going back.
-    return_bounds : bool, default False
-        Whether to also return the bounds of the windows.
-
     Returns
     -------
-    TimeSeriesTensor, or tuple of TimeSeriesTensor and bounds
-        The windows, and with ``return_bounds=True`` their bounds.
+    TimeSeriesTensor
+        The windows.
 
     Raises
     ------
@@ -144,23 +116,7 @@ def cut_windows(series: TimeSeries | _PandasLike, size: float | _ScalarDuration,
     if closed not in _CLOSED:
         raise ValueError(f"closed must be 'left', 'right', 'both', or 'none', not {closed!r}")
     series = _as_series(series)
-    windows, bounds = cpp.windows(series._data, _in_unit(size, series.unit), _in_unit(step, series.unit),
-                                  *_CLOSED[closed], bool(partial), anchor == "end")
-    if return_bounds:
-        return TimeSeriesTensor(windows), _bounds_as_instants(series, np.asarray(bounds))
+    windows, _ = cpp.windows(series._data, _in_unit(size, series.unit), _in_unit(step, series.unit),
+                             *_CLOSED[closed], bool(partial), anchor == "end")
     return TimeSeriesTensor(windows)
 
-
-def _bounds_as_instants(series, bounds):
-    """``bounds``, floats in the unit of ``series`` from its time 0, as
-    durations, or as dates placed by its epoch and origin. Raises
-    ``ValueError`` if the origins of its channels give different dates."""
-    if series.epoch is None:
-        return _times_in(bounds, series.unit)
-    # Each channel's origin places the bounds; channels that snap differently
-    # can differ by less than the resolution of the dates.
-    first, *others = (series.epoch + TimeDeltaTensor(bounds + origin, series.unit)
-                      for origin in np.unique(np.asarray(series.origin.count)))
-    if not all(first.array_equal(dates) for dates in others):
-        raise ValueError("The channels of this series lie at different origins, so its windows have no common dates")
-    return first

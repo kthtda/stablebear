@@ -12,9 +12,13 @@ Both become functions that take the series first.
 ## Behavior
 
 - `cut_windows(series, size, step=None, *, closed=None, partial=False,
-  anchor="end", return_bounds=False)` returns what
-  `Window(size, step, closed, partial, anchor)(series, return_bounds)`
-  returned: the windows, and with `return_bounds=True` also their bounds.
+  anchor="end")` returns the windows that
+  `Window(size, step, closed, partial, anchor)(series)` returned.
+- `return_bounds` is dropped. A new property, `TimeSeries.source_domain`,
+  gives where a window lies in the series it was cut from: the domain of
+  each channel moved by its origin, intersected, as a `Domain` of
+  durations, numbers, or dates. A series built from observations has its
+  domain as its source domain.
 - `delay_embed(series, dimension, delay, *, direction="backward")` returns
   what `TimeDelayEmbedding(dimension, delay, direction)(series)` returned.
 - Both take a `TimeSeries` or a pandas `Series` or `DataFrame`, and the

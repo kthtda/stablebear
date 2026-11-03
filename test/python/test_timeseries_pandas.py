@@ -395,14 +395,13 @@ def _hours():
 
 def test_windows_of_a_pandas_series_equal_those_of_its_time_series():
     hourly = pd.Series(np.arange(10.0), index=_hours())
-    windows, bounds = cut_windows(hourly, size=TimeDelta(3, "h"), step=TimeDelta(1, "h"), closed="left",
-                                  partial=False, anchor="start", return_bounds=True)
-    expected, expected_bounds = cut_windows(TimeSeries.from_pandas(hourly), size=TimeDelta(3, "h"),
-                                            step=TimeDelta(1, "h"), closed="left", partial=False, anchor="start",
-                                            return_bounds=True)
+    windows = cut_windows(hourly, size=TimeDelta(3, "h"), step=TimeDelta(1, "h"), closed="left", partial=False,
+                          anchor="start")
+    expected = cut_windows(TimeSeries.from_pandas(hourly), size=TimeDelta(3, "h"), step=TimeDelta(1, "h"),
+                           closed="left", partial=False, anchor="start")
 
     assert windows.array_equal(expected)
-    assert bounds.array_equal(expected_bounds)
+    assert [w.domain for w in windows] == [w.domain for w in expected]
 
 
 def test_embedding_of_a_data_frame_equals_that_of_its_time_series():

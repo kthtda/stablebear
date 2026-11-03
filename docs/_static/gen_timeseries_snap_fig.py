@@ -267,10 +267,11 @@ def plot_timeseries_embedding():
 def plot_timeseries_windows():
     signal = TimeSeries([0.0, 0.0, 0.0, 1.0, 2.0, 3.0, 2.0, 1.0, 0.0],
                         times=TimeDeltaTensor(np.arange(9.0), "s"))
-    windows, bounds = cut_windows(signal, size=TimeDelta(4, "s"),
-                                  step=TimeDelta(2, "s"), anchor="start",
-                                  return_bounds=True)
-    bounds = np.asarray(bounds.count)
+    windows = cut_windows(signal, size=TimeDelta(4, "s"),
+                          step=TimeDelta(2, "s"), anchor="start")
+    # Where each window lies in signal.
+    bounds = [(w.source_domain.start.count, w.source_domain.end.count)
+              for w in windows]
     color = plt.rcParams["lines.color"]
 
     fig = plt.figure(figsize=(7, 4.4))
@@ -321,8 +322,8 @@ def _plot_window_rows(rows, stacked=False):
     t0, t1 = 0.0, 8.0
     bars = []  # (row, height offset, a, b, window)
     for row, (label, window) in enumerate(rows):
-        _, bounds = cut_windows(signal, **window, return_bounds=True)
-        for k, (a, b) in enumerate(np.asarray(bounds.count)):
+        for k, w in enumerate(cut_windows(signal, **window)):
+            a, b = w.source_domain.start.count, w.source_domain.end.count
             if stacked:
                 bars.append((k, 0.0, a, b, window))
             else:
@@ -384,9 +385,10 @@ def plot_timeseries_window_closed():
 
     fig, ax = plt.subplots(figsize=(7, 3.0))
     for row, closed in enumerate(choices):
-        _, bounds = cut_windows(signal, size=TimeDelta(3, "s"), anchor="start",
-                                closed=closed, return_bounds=True)
-        for k, (a, b) in enumerate(np.asarray(bounds.count)):
+        windows = cut_windows(signal, size=TimeDelta(3, "s"), anchor="start",
+                              closed=closed)
+        for k, w in enumerate(windows):
+            a, b = w.source_domain.start.count, w.source_domain.end.count
             # Alternate heights so that the shared end at 3 s stays visible.
             y = len(choices) - 1 - row + (0.15 if k % 2 else -0.15)
             ax.plot([a, b], [y, y], color="tab:orange", linewidth=2)

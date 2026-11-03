@@ -700,9 +700,8 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         stands for, as a duration in :attr:`unit`.
 
         0 for a series built from observations. Evaluation does not use it;
-        it places a window in the series it was cut from: without an
-        :attr:`epoch`, a channel lies at its :attr:`domain` moved by its
-        origin. A :class:`TimeDelta` for a series with one channel; for
+        it places a window in the series it was cut from, at its
+        :attr:`source_domain`. A :class:`TimeDelta` for a series with one channel; for
         several, a :class:`TimeDeltaTensor` with one entry per channel. For
         a series without a unit, a float or a ``FloatTensor``.
         """
@@ -747,8 +746,9 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
 
         With an epoch, the ends are :class:`DateTime` instants: the dates
         and times at which the series can be evaluated, so a window's domain
-        is where it lies in the series it was cut from. For several
-        channels, it is the intersection of where each lies.
+        is where it lies in the series it was cut from, the same as its
+        :attr:`source_domain`. For several channels, it is the intersection
+        of where each lies.
 
         Raises
         ------
@@ -758,11 +758,33 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         if self.epoch is None:
             start, end, start_closed, end_closed = self._data.domain
             return Domain(_times_in(start, self.unit), _times_in(end, self.unit), start_closed, end_closed)
-        start, end, start_closed, end_closed = self._dated_domain()
+        return self.source_domain
+
+    @property
+    def source_domain(self) -> Domain:
+        """Where the series lies in the series it was cut from.
+
+        The :attr:`domain` of each channel moved by its :attr:`origin`, so
+        for a window, the times it covers in the series it was cut from,
+        with the ends it includes. For a series built from observations,
+        whose origin is 0, it equals its domain. The ends are as for
+        :attr:`domain`: durations from time 0 in :attr:`unit`, floats for a
+        series without a unit, or :class:`DateTime` instants for a series
+        with an :attr:`epoch`. For several channels, it is the intersection
+        of where each lies.
+
+        Raises
+        ------
+        ValueError
+            If a channel has no observations.
+        """
+        start, end, start_closed, end_closed = self._source_domain_counts()
         epoch = self.epoch
+        if epoch is None:
+            return Domain(_times_in(start, self.unit), _times_in(end, self.unit), start_closed, end_closed)
         return Domain(epoch + TimeDelta(start, self.unit), epoch + TimeDelta(end, self.unit), start_closed, end_closed)
 
-    def _dated_domain(self):
+    def _source_domain_counts(self):
         """The intersection of each channel's domain moved by its origin, in
         :attr:`unit`, as C++ intersects channels: an open end at the same
         time as a closed one excludes that time."""

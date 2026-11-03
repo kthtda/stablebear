@@ -11,15 +11,20 @@ Specs: [timeseries-functions-spec.md](timeseries-functions-spec.md)
 
 - [ ] **A1.** [3] `cut_windows` replaces `Window` in
   `stablebear/timeseries/window.py`, with its docstring, and in the
-  tests, internal callers, golden generator, and figure scripts.
-  Tests: the existing window tests call `cut_windows`; the tests of
-  `Window.size`, `Window.step`, and its `repr` become tests that durations
-  of each type give the same windows.
+  tests, internal callers, golden generator, and figure scripts, without
+  `return_bounds`; `TimeSeries.source_domain` gives where a window lies.
+  Tests: the existing window tests call `cut_windows`, and those of bounds
+  check each window's `source_domain`; `source_domain` of a series built
+  from observations, a dated window, a series without a unit, and
+  channels at different origins; the tests of `Window.size`,
+  `Window.step`, and its `repr` become tests that durations of each type
+  give the same windows.
 - [ ] **A2.** [3] `delay_embed` replaces `TimeDelayEmbedding` in
   `stablebear/timeseries/embedding.py` likewise.
   Tests: as for A1, with `delay`.
 - [ ] **A3.** [2] The guide pages and the tide gauge tutorial use
-  `cut_windows` and `delay_embed`.
+  `cut_windows` and `delay_embed`, and show where windows lie by their
+  `source_domain` instead of `return_bounds`.
 
 ## Phase B: point clouds from time series (#267)
 
