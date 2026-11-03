@@ -107,7 +107,7 @@ the algorithm, and its proof of correctness are developed in full in the
 master's thesis :footcite:`KampNorthman2026`.
 
 Ordinary persistent homology
-(:py:func:`~stablebear.persistence.compute_persistent_homology`) describes the
+(:py:func:`~stablebear.persistence.homology.compute_persistent_homology`) describes the
 shape of a *single* dataset -- its clusters and loops. The homological kernel
 answers a different question: it compares *two* structures on the same points
 and reports only where they disagree. The price is that you must construct the
@@ -119,12 +119,12 @@ needs careful thought in cases other than the standard diagonal projection.
 Computing the homological kernel
 ================================
 
-:py:func:`~stablebear.persistence.compute_homological_kernel` takes two inputs
+:py:func:`~stablebear.persistence.homological_kernel.compute_homological_kernel` takes two inputs
 of the same kind and shape. ``X`` carries the larger distance :math:`d` and
 ``Y`` the smaller distance :math:`d'`; the requirement :math:`d' \le d` for
 every pair of points is what makes the homological kernel well-defined, and
 the computation raises a ``RuntimeError`` if it is violated. The result is a
-:py:class:`~stablebear.persistence.BarcodeTensor` with one homological kernel
+:py:class:`~stablebear.persistence.ph_tensor.BarcodeTensor` with one homological kernel
 barcode per element; a pair on :math:`n` points always produces :math:`n - 1`
 bars, one per merge in the clustering hierarchy. The ``dim`` parameter selects
 the homology degree; only ``dim=0`` is currently supported.
@@ -210,7 +210,7 @@ Input flexibility
 -----------------
 
 Both ``X`` and ``Y`` accept the same forms as
-:py:func:`~stablebear.persistence.compute_persistent_homology`:
+:py:func:`~stablebear.persistence.homology.compute_persistent_homology`:
 
 - a ``PointCloud``, plain NumPy array, or ``FloatTensor`` (a single point cloud);
 - a ``DistanceMatrix`` (a single precomputed metric);
@@ -227,7 +227,7 @@ From homological kernel barcode to correlation score
 ====================================================
 
 Homological kernel barcodes are ordinary
-:py:class:`~stablebear.persistence.Barcode` objects, so every functional
+:py:class:`~stablebear.persistence.barcode.Barcode` objects, so every functional
 summary and tensor operation from :doc:`persistence` applies to them
 unchanged. The summary used for the
 correlation score is the **stable rank**, which here counts, for each

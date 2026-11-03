@@ -19,7 +19,7 @@ Automatic CPU/GPU dispatch
 
 By default, stablebear decides at runtime whether to run each operation on the CPU or GPU. The decision is based on problem size: small computations run on the CPU (where launch overhead would dominate), while large computations are dispatched to the GPU.
 
-For pairwise distance matrix computations (:py:func:`~stablebear.pdist`), the default threshold is **500 PCFs** -- below this, the CPU is used; above it, the GPU is used (if available).
+For pairwise distance matrix computations (:py:func:`~stablebear.distance.pdist`), the default threshold is **500 PCFs** -- below this, the CPU is used; above it, the GPU is used (if available).
 
 You do not need to change any code to benefit from GPU acceleration. The same code runs correctly on machines with or without GPUs.
 

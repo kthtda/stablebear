@@ -68,7 +68,7 @@ Higher-dimensional tensors work as well::
 Step 2: Computing persistent homology
 =======================================
 
-:py:func:`~stablebear.persistence.compute_persistent_homology` takes a tensor of point clouds and returns a tensor of persistence barcodes. Barcode computation is performed using Ripser :footcite:`Bauer2021` under the hood::
+:py:func:`~stablebear.persistence.homology.compute_persistent_homology` takes a tensor of point clouds and returns a tensor of persistence barcodes. Barcode computation is performed using Ripser :footcite:`Bauer2021` under the hood::
 
    from stablebear import persistence
 
@@ -86,7 +86,7 @@ To access the :math:`H_n` barcode for a specific point cloud, index with the poi
    bc_H0 = bcs[3, 0]   # H0 barcode of point cloud 3
    bc_H1 = bcs[3, 1]   # H1 barcode of point cloud 3
 
-Each element is a :py:class:`~stablebear.persistence.Barcode` object.
+Each element is a :py:class:`~stablebear.persistence.barcode.Barcode` object.
 
 Input flexibility
 -----------------
@@ -142,7 +142,7 @@ stablebear's tensor framework, enabling distances, means, and norms.
 Stable ranks
 -------------
 
-:py:func:`~stablebear.persistence.barcode_to_stable_rank` converts barcodes into
+:py:func:`~stablebear.persistence.barcode_summary.barcode_to_stable_rank` converts barcodes into
 stable rank PCFs. The stable rank counts, for each threshold :math:`t`, the
 number of bars with length (death minus birth) strictly greater than :math:`t`
 :footcite:`Chacholski2020`::
@@ -170,7 +170,7 @@ The output tensor has the same shape as the input.
 Betti curves
 -------------
 
-:py:func:`~stablebear.persistence.barcode_to_betti_curve` converts barcodes into
+:py:func:`~stablebear.persistence.barcode_summary.barcode_to_betti_curve` converts barcodes into
 Betti curves. The Betti curve counts, for each filtration value :math:`t`, the
 number of bars alive at :math:`t` (i.e., bars with birth :math:`\leq t <`
 death)::
@@ -198,7 +198,7 @@ The output tensor has the same shape as the input.
 Accumulated persistence functions
 ----------------------------------
 
-:py:func:`~stablebear.persistence.barcode_to_accumulated_persistence` converts
+:py:func:`~stablebear.persistence.barcode_summary.barcode_to_accumulated_persistence` converts
 barcodes into accumulated persistence functions (APFs) :footcite:`Biscio2019`. For each mean
 age :math:`m`, the APF sums the lifetimes of all bars whose midpoint is at
 most :math:`m`:
@@ -319,7 +319,7 @@ The following example creates a multidimensional tensor of random point clouds, 
 The Barcode class
 =================
 
-Individual barcodes are represented by :py:class:`~stablebear.persistence.Barcode`. A barcode can be constructed from :math:`n \times 2` ``(birth, death)`` pairs, given as an array or a nested list. A ``float32`` array gives a ``barcode32``; any other real-valued input gives a ``barcode64``::
+Individual barcodes are represented by :py:class:`~stablebear.persistence.barcode.Barcode`. A barcode can be constructed from :math:`n \times 2` ``(birth, death)`` pairs, given as an array or a nested list. A ``float32`` array gives a ``barcode32``; any other real-valued input gives a ``barcode64``::
 
    from stablebear.persistence import Barcode
 
@@ -338,7 +338,7 @@ You can also convert a single barcode to a stable rank::
 Comparing barcode tensors
 =========================
 
-Use :py:meth:`~stablebear.persistence.BarcodeTensor.is_isomorphic_to` to compare
+Use :py:meth:`~stablebear.persistence.ph_tensor.BarcodeTensor.is_isomorphic_to` to compare
 every aligned pair of barcodes and return one boolean. Bar order within each
 barcode does not matter::
 

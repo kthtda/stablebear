@@ -115,7 +115,7 @@ Lists are converted to NumPy arrays internally::
 Float tensor evaluation
 -----------------------
 
-Passing a :py:class:`~stablebear.FloatTensor`
+Passing a :py:class:`~stablebear.base_tensor.FloatTensor`
 returns a tensor of the same type::
 
    t = sb.FloatTensor(np.array([1, 2, 4], dtype=np.float32))
@@ -188,14 +188,14 @@ out-of-range ``dim`` raises ``IndexError``.
 sum
 ---
 
-:py:func:`~stablebear.sum` adds PCFs pointwise along a dimension::
+:py:func:`~stablebear.reductions.sum` adds PCFs pointwise along a dimension::
 
    total = sb.sum(X, dim=0)
 
 mean
 ----
 
-:py:func:`~stablebear.mean` computes the pointwise average of PCFs along a dimension::
+:py:func:`~stablebear.reductions.mean` computes the pointwise average of PCFs along a dimension::
 
    import stablebear as sb
    from stablebear.random import noisy_sin
@@ -219,7 +219,7 @@ For a higher-dimensional tensor, the specified dimension is collapsed::
 max_time
 --------
 
-:py:func:`~stablebear.max_time` finds the maximum time value (the rightmost breakpoint) across PCFs along a dimension::
+:py:func:`~stablebear.reductions.max_time` finds the maximum time value (the rightmost breakpoint) across PCFs along a dimension::
 
    t_max = sb.max_time(X, dim=0)
 

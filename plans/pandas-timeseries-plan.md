@@ -1,6 +1,6 @@
 # pandas input and durations for time series: implementation plan
 
-Progress: 54 of 57 items, 110 of 115 points (96%)
+Progress: 57 of 57 items, 115 of 115 points (100%)
 
 Specs: [pandas-timeseries-spec.md](pandas-timeseries-spec.md) (phases A, B,
 H to J, and L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
@@ -381,12 +381,12 @@ so.
 
 ## Phase L: pandas in the user guide and tutorial
 
-- [ ] **L1.** [2] A "From pandas" page, `docs/timeseries_pandas.rst`, in the
+- [x] **L1.** [2] (68493cc9d) A "From pandas" page, `docs/timeseries_pandas.rst`, in the
   time series guide: `from_pandas` for a `Series` and a `DataFrame`,
   windows of a `Series`, time zones, `NaN`, and `to_pandas`.
-- [ ] **L2.** [2] The tide gauge tutorial
+- [x] **L2.** [2] (68493cc9d) The tide gauge tutorial
   (`docs/tutorial_notebooks/timeseries_tides.ipynb`) loads its data with
   `pd.read_csv` and `TimeSeries.from_pandas`; its window sizes and delays
   stay `TimeDelta`, as F5 left them.
-- [ ] **L3.** [1] `CHANGELOG.md` entries for the new pandas API, the
+- [x] **L3.** [1] (68493cc9d) `CHANGELOG.md` entries for the new pandas API, the
   changed `DateTime` time zone behavior, and durations instead of numbers.

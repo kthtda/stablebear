@@ -38,34 +38,53 @@ class dtype:
 
 
 # Scalar dtypes
+#: 32-bit floating-point scalar dtype.
 float32 = dtype("float32", "32-bit floating-point scalar dtype.")
+#: 64-bit floating-point scalar dtype.
 float64 = dtype("float64", "64-bit floating-point scalar dtype.")
+#: 32-bit integer scalar dtype.
 int32 = dtype("int32", "32-bit integer scalar dtype.")
+#: 64-bit integer scalar dtype.
 int64 = dtype("int64", "64-bit integer scalar dtype.")
+#: 32-bit unsigned integer scalar dtype.
 uint32 = dtype("uint32", "32-bit unsigned integer scalar dtype.")
+#: 64-bit unsigned integer scalar dtype.
 uint64 = dtype("uint64", "64-bit unsigned integer scalar dtype.")
 
 # PCF dtypes
+#: 32-bit piecewise constant function dtype.
 pcf32 = dtype("pcf32", "32-bit piecewise constant function dtype.")
+#: 64-bit piecewise constant function dtype.
 pcf64 = dtype("pcf64", "64-bit piecewise constant function dtype.")
+#: 32-bit integer piecewise constant function dtype.
 pcf32i = dtype("pcf32i", "32-bit integer piecewise constant function dtype.")
+#: 64-bit integer piecewise constant function dtype.
 pcf64i = dtype("pcf64i", "64-bit integer piecewise constant function dtype.")
 
 # Point cloud dtypes
+#: 32-bit point cloud dtype.
 pcloud32 = dtype("pcloud32", "32-bit point cloud dtype.")
+#: 64-bit point cloud dtype.
 pcloud64 = dtype("pcloud64", "64-bit point cloud dtype.")
 
 # Barcode dtypes
+#: 32-bit persistence barcode dtype.
 barcode32 = dtype("barcode32", "32-bit persistence barcode dtype.")
+#: 64-bit persistence barcode dtype.
 barcode64 = dtype("barcode64", "64-bit persistence barcode dtype.")
 
 # Matrix dtypes
+#: 32-bit symmetric matrix dtype.
 symmat32 = dtype("symmat32", "32-bit symmetric matrix dtype.")
+#: 64-bit symmetric matrix dtype.
 symmat64 = dtype("symmat64", "64-bit symmetric matrix dtype.")
+#: 32-bit distance matrix dtype.
 distmat32 = dtype("distmat32", "32-bit distance matrix dtype.")
+#: 64-bit distance matrix dtype.
 distmat64 = dtype("distmat64", "64-bit distance matrix dtype.")
 
 # Boolean
+#: Boolean dtype.
 boolean = dtype("boolean", "Boolean dtype.")
 
 
@@ -113,7 +132,7 @@ def series(inner: dtype) -> _SeriesDtype:
 
     It is the dtype of a tensor of series, such as the windows of a series
     of ``inner`` observations. The same ``inner`` always gives the same
-    object, so dtypes compare with ``is``, and :attr:`inner` reads it back.
+    object, so dtypes compare with ``is``, and ``inner`` reads it back.
 
     Raises
     ------

@@ -97,7 +97,7 @@ as horizontal line segments. Each bar runs from its birth to its death value.
 Bars with infinite death are drawn as arrows extending to the right edge of the
 plot.
 
-Pass a :py:class:`~stablebear.persistence.BarcodeTensor` to draw several
+Pass a :py:class:`~stablebear.persistence.ph_tensor.BarcodeTensor` to draw several
 barcodes, such as one per homology dimension, in one call. They are stacked
 from bottom to top, and infinite bars in all of them end at the same x. To
 stack barcodes from separate calls instead, pass the value returned by one call

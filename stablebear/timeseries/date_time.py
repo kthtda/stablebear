@@ -155,7 +155,7 @@ class _Instants(_Counts[_CountT]):
 
     @property
     def count(self) -> _CountT:
-        """The number of :attr:`unit` after 1970-01-01T00:00, or a tensor of
+        """The number of ``unit`` after 1970-01-01T00:00, or a tensor of
         them."""
         return self._count
 
@@ -281,12 +281,12 @@ class DateTime(_Instants[int]):
     -----
     Two values are equal when they have the same count of the same unit; the
     same instant at another resolution is a different value. Compare
-    :meth:`to_datetime64` values to compare instants. ``<``, ``<=``, ``>``,
+    ``to_datetime64()`` values to compare instants. ``<``, ``<=``, ``>``,
     and ``>=`` compare instants.
 
     Adding or subtracting a :class:`TimeDelta`, or a duration it accepts,
     gives a ``DateTime`` at the finer of the two resolutions; a duration with
-    a float count is first rounded as :meth:`TimeDelta.to_timedelta64`
+    a float count is first rounded as ``TimeDelta.to_timedelta64()``
     rounds it. Subtracting a ``DateTime`` gives the :class:`TimeDelta`
     between them. With a :class:`TimeDeltaTensor` or a ``DateTimeTensor``,
     the result is a ``DateTimeTensor`` or a ``TimeDeltaTensor``.
@@ -321,10 +321,10 @@ class DateTime(_Instants[int]):
 class DateTimeTensor(_CountsTensor[IntTensor], _Instants[IntTensor]):
     """A tensor of calendar dates and times in one unit.
 
-    Its :attr:`count` is an ``IntTensor`` of counts after
-    1970-01-01T00:00. It has :attr:`shape`, ``len``, iteration, and
+    Its ``count`` is an ``IntTensor`` of counts after
+    1970-01-01T00:00. It has ``shape``, ``len``, iteration, and
     indexing, which gives a :class:`DateTime` for one element and a
-    ``DateTimeTensor`` otherwise, and :meth:`to_datetime64` gives a
+    ``DateTimeTensor`` otherwise, and ``to_datetime64()`` gives a
     ``datetime64`` array. It has no hash, and it cannot be an epoch.
 
     Parameters
@@ -349,7 +349,7 @@ class DateTimeTensor(_CountsTensor[IntTensor], _Instants[IntTensor]):
     duration broadcast against the tensor, as :class:`DateTime` does them.
     ``<``, ``<=``, ``>``, ``>=``, ``==``, and ``!=`` give a ``BoolTensor``,
     as they do on tensors; ``==`` compares count and unit.
-    :meth:`array_equal` tells whether two are equal as a whole.
+    ``array_equal()`` tells whether two are equal as a whole.
     """
 
     def __init__(self, value):
@@ -385,7 +385,7 @@ class _Duration(_Counts[_CountT]):
 
     @property
     def count(self) -> _CountT:
-        """The number of :attr:`unit` in the duration, or a tensor of them."""
+        """The number of ``unit`` in the duration, or a tensor of them."""
         return self._count
 
     @classmethod
@@ -406,8 +406,8 @@ class _Duration(_Counts[_CountT]):
         rounded to the nearest step of ``resolution``.
 
         ``resolution`` is one of the units of :class:`TimeDelta`. It
-        defaults to :attr:`unit` for integer counts, and otherwise to the
-        finer of :attr:`unit` and microseconds.
+        defaults to ``unit`` for integer counts, and otherwise to the
+        finer of ``unit`` and microseconds.
 
         Raises
         ------
@@ -566,7 +566,7 @@ class TimeDelta(_Duration[int | float]):
         The unit of a number ``value``: one of ``"as"``, ``"fs"``, ``"ps"``,
         ``"ns"``, ``"us"``, ``"ms"``, ``"s"``, ``"min"``, ``"h"``, and
         ``"d"``, or an alias such as ``"hours"`` or ``"\u00b5s"``.
-        :attr:`unit` reports the short name.
+        ``unit`` reports the short name.
 
     Raises
     ------
@@ -580,7 +580,7 @@ class TimeDelta(_Duration[int | float]):
     -----
     Two values are equal when they have the same count of the same unit; the
     same length in another unit is a different value. Compare
-    :meth:`to_timedelta64` values to compare lengths. ``<``, ``<=``, ``>``,
+    ``to_timedelta64()`` values to compare lengths. ``<``, ``<=``, ``>``,
     and ``>=`` compare lengths.
 
     Adding or subtracting another duration, which may be any value
@@ -624,10 +624,10 @@ class TimeDeltaTensor(_CountsTensor[IntTensor | FloatTensor], _Duration[IntTenso
     """A tensor of durations in one unit, such as the times at which to
     evaluate a time series.
 
-    Its :attr:`count` is an ``IntTensor`` of integer counts or a
-    ``FloatTensor`` of float counts. It has :attr:`shape`, ``len``,
+    Its ``count`` is an ``IntTensor`` of integer counts or a
+    ``FloatTensor`` of float counts. It has ``shape``, ``len``,
     iteration, and indexing, which gives a :class:`TimeDelta` for one
-    element and a ``TimeDeltaTensor`` otherwise, and :meth:`to_timedelta64`
+    element and a ``TimeDeltaTensor`` otherwise, and ``to_timedelta64()``
     gives a ``timedelta64`` array. It has no hash.
 
     Parameters
@@ -657,7 +657,7 @@ class TimeDeltaTensor(_CountsTensor[IntTensor | FloatTensor], _Duration[IntTenso
     Arithmetic and comparisons work elementwise, with a single duration
     broadcast against the tensor, as :class:`TimeDelta` does them. ``<``,
     ``<=``, ``>``, ``>=``, ``==``, and ``!=`` give a ``BoolTensor``, as they
-    do on tensors; ``==`` compares count and unit. :meth:`array_equal` tells
+    do on tensors; ``==`` compares count and unit. ``array_equal()`` tells
     whether two are equal as a whole.
     """
 

@@ -336,7 +336,7 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
     of its channels can; :attr:`domain` gives these times.
 
     Element-wise operations, such as
-    :func:`~stablebear.persistence.compute_persistent_homology`, accept a
+    :func:`~stablebear.persistence.homology.compute_persistent_homology`, accept a
     series wherever they accept a tensor of the same elements. They apply to
     every channel's observations and return a series with the same channels,
     times, domains, unit, and snap settings. An operation that consumes
@@ -1048,9 +1048,9 @@ class TimeSeriesTensor(Tensor):
 
     def evaluate(self, t, unit: str | None = None):
         """Every series evaluated at the times ``t``, as
-        :meth:`TimeSeries.evaluate` does: durations, or numbers of ``unit``,
-        for series with a unit, and plain numbers without ``unit`` for series
-        without one. Times count from each series' time 0.
+        :meth:`~stablebear.timeseries.TimeSeries.evaluate` does: durations, or
+        numbers of ``unit``, for series with a unit, and plain numbers without
+        ``unit`` for series without one. Times count from each series' time 0.
 
         ``t`` is a single time or an array-like or ``FloatTensor`` of times
         of shape ``t_shape``. For series with one channel, returns a tensor
@@ -1060,7 +1060,7 @@ class TimeSeriesTensor(Tensor):
         channel, in channel order, each with that channel's ``shape``. For
         windows of a delay embedding of a scalar series evaluated on a grid
         of ``n`` times, the last two axes are clouds of ``n`` points, which
-        :func:`~stablebear.persistence.compute_persistent_homology` reads
+        :func:`~stablebear.persistence.homology.compute_persistent_homology` reads
         as point clouds. Observations of shape ``S``, embedded with
         dimension ``m``, give the axes ``(n, m, *S)`` instead; reshape them
         to ``(n, m * prod(S))`` to get clouds of ``n`` points.

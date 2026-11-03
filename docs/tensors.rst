@@ -10,7 +10,7 @@ Creating tensors
 Using zeros
 -----------
 
-The most common way to create a tensor is :py:func:`~stablebear.zeros`, which allocates a tensor of a given shape filled with "zero" elements::
+The most common way to create a tensor is :py:func:`~stablebear.tensor_create.zeros`, which allocates a tensor of a given shape filled with "zero" elements::
 
    import stablebear as sb
 
@@ -137,7 +137,7 @@ Point-cloud, distance-matrix, and symmetric-matrix tensors can be built
 directly from a single NumPy array, avoiding an explicit element-assignment
 loop.
 
-For a :py:class:`~stablebear.PointCloudTensor`, the trailing two axes form each
+For a :py:class:`~stablebear.point_cloud.PointCloudTensor`, the trailing two axes form each
 ``(n_points, dim)`` point cloud and the leading axes form the tensor shape. Point
 clouds always have rank 2::
 
@@ -205,7 +205,7 @@ homology across many point clouds or distance matrices in one parallel call.
 Using the tensor factory
 ------------------------
 
-The :py:func:`~stablebear.tensor` factory is a NumPy-like front end that
+The :py:func:`~stablebear.tensor_create.tensor` factory is a NumPy-like front end that
 dispatches to the right constructor based on ``dtype``::
 
    X = sb.tensor([1.0, 2.0, 3.0])                  # FloatTensor (inferred)
@@ -213,14 +213,14 @@ dispatches to the right constructor based on ``dtype``::
    dmats = sb.tensor(distances, dtype=sb.distmat64)  # DistanceMatrixTensor
 
 When passed a ``Pcf`` or a nested collection of PCFs, the factory infers a
-:py:class:`~stablebear.PcfTensor` or :py:class:`~stablebear.IntPcfTensor` from
+:py:class:`~stablebear.base_tensor.PcfTensor` or :py:class:`~stablebear.base_tensor.IntPcfTensor` from
 the PCF value dtype. A single ``Pcf`` becomes a one-element tensor.
 
 
 From serialized NumPy data
 ---------------------------
 
-:py:func:`~stablebear.from_serial_content` constructs a tensor from PCF data already stored in NumPy arrays — a flat content array and an enumeration array that describes how to split it::
+:py:func:`~stablebear.serialize.from_serial_content` constructs a tensor from PCF data already stored in NumPy arrays — a flat content array and an enumeration array that describes how to split it::
 
    import numpy as np
    import stablebear as sb
@@ -244,7 +244,7 @@ The enumeration array can be multidimensional. If it has shape ``(n1, n2, ..., n
 Shape and copying
 =================
 
-Every tensor has a :py:attr:`shape` property, along with ``ndim``, ``size``,
+Every tensor has a ``shape`` property, along with ``ndim``, ``size``,
 and ``len()`` — matching the NumPy interface::
 
    X = sb.zeros((10, 5, 4))

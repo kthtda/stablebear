@@ -10,7 +10,7 @@ Standalone ``Pcf``, ``PointCloud``, ``Barcode``, ``DistanceMatrix``, and
 Saving
 ======
 
-Use :py:func:`~stablebear.save` to write a tensor to a file::
+Use :py:func:`~stablebear.io.save` to write a tensor to a file::
 
    import stablebear as sb
    from stablebear.random import noisy_sin
@@ -64,7 +64,7 @@ selections without first materializing their samples.
 Loading
 =======
 
-Use :py:func:`~stablebear.load` to read a tensor back::
+Use :py:func:`~stablebear.io.load` to read a tensor back::
 
    X = sb.load('my_pcfs.sb')
 
