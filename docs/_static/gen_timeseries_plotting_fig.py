@@ -8,14 +8,15 @@ from pathlib import Path
 
 from gen_timeseries_snap_fig import DARK, LIGHT, _save_themed
 from stablebear.plotting import plot_timeseries
-from stablebear.timeseries import TimeDelta, TimeDeltaTensor, TimeSeries, Window
+from stablebear.timeseries import DateTimeTensor, TimeDelta, TimeDeltaTensor, TimeSeries, Window
 
 HERE = Path(__file__).parent
 
 
 # -- included in docs via literalinclude :pyobject: --
 def plot_timeseries_steps():
-    series = TimeSeries([1.0, 3.0, 2.0, 4.0], times=[0.0, 1.0, 1.5, 3.5])
+    series = TimeSeries([1.0, 3.0, 2.0, 4.0],
+                        times=TimeDeltaTensor([0.0, 1.0, 1.5, 3.5], "s"))
 
     fig, ax = plt.subplots(figsize=(6, 2.5))
     plot_timeseries(series, ax=ax, markers=True)
@@ -26,8 +27,8 @@ def plot_timeseries_steps():
 # -- included in docs via literalinclude :pyobject: --
 def plot_timeseries_window_in_place():
     series = TimeSeries([0.0, 0.0, 0.0, 1.0, 2.0, 3.0, 2.0, 1.0, 0.0],
-                        times=[0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0])
-    window = Window(size=3.0, step=3.0, anchor="start")(series)[1]
+                        times=TimeDeltaTensor(np.arange(9.0), "s"))
+    window = Window(size=TimeDelta(3, "s"), anchor="start")(series)[1]
 
     fig, ax = plt.subplots(figsize=(6, 2.5))
     plot_timeseries(series, ax=ax, color="gray", linewidth=1)
@@ -38,7 +39,8 @@ def plot_timeseries_window_in_place():
 
 # -- included in docs via literalinclude :pyobject: --
 def plot_timeseries_units():
-    seconds = TimeSeries([1.0, 3.0, 2.0], times=TimeDeltaTensor([0.0, 1.0, 2.5], "s"))
+    seconds = TimeSeries([1.0, 3.0, 2.0],
+                         times=TimeDeltaTensor([0.0, 1.0, 2.5], "s"))
     milliseconds = TimeSeries([0.5, 1.5, 2.5],
                               times=TimeDeltaTensor([500.0, 1500.0, 3000.0], "ms"))
 
@@ -52,7 +54,8 @@ def plot_timeseries_units():
 
 # -- included in docs via literalinclude :pyobject: --
 def plot_timeseries_sharex():
-    seconds = TimeSeries([1.0, 3.0, 2.0], times=TimeDeltaTensor([0.0, 1.0, 2.5], "s"))
+    seconds = TimeSeries([1.0, 3.0, 2.0],
+                         times=TimeDeltaTensor([0.0, 1.0, 2.5], "s"))
     milliseconds = TimeSeries([0.5, 1.5, 2.5],
                               times=TimeDeltaTensor([500.0, 1500.0, 3000.0], "ms"))
 
@@ -66,9 +69,9 @@ def plot_timeseries_sharex():
 
 # -- included in docs via literalinclude :pyobject: --
 def plot_timeseries_windows_relative():
-    series = TimeSeries([0.5, 2.0, 1.0, 3.5, 2.5, 0.0, 3.0, 1.5],
-                        times=[0.0, 0.7, 1.9, 2.4, 3.6, 4.9, 5.5, 7.2])
-    windows = Window(size=2.4, anchor="start")(series)
+    times = TimeDeltaTensor([0.0, 0.7, 1.9, 2.4, 3.6, 4.9, 5.5, 7.2], "s")
+    series = TimeSeries([0.5, 2.0, 1.0, 3.5, 2.5, 0.0, 3.0, 1.5], times=times)
+    windows = Window(size=TimeDelta(2.4, "s"), anchor="start")(series)
 
     fig, (ax_in_place, ax_relative) = plt.subplots(1, 2, figsize=(8, 2.5))
     plot_timeseries(windows, ax=ax_in_place, markers=True)
@@ -81,9 +84,9 @@ def plot_timeseries_windows_relative():
 
 # -- included in docs via literalinclude :pyobject: --
 def plot_timeseries_some_windows():
-    series = TimeSeries([0.5, 2.0, 1.0, 3.5, 2.5, 0.0, 3.0, 1.5],
-                        times=[0.0, 0.7, 1.9, 2.4, 3.6, 4.9, 5.5, 7.2])
-    windows = Window(size=2.4, anchor="start")(series)
+    times = TimeDeltaTensor([0.0, 0.7, 1.9, 2.4, 3.6, 4.9, 5.5, 7.2], "s")
+    series = TimeSeries([0.5, 2.0, 1.0, 3.5, 2.5, 0.0, 3.0, 1.5], times=times)
+    windows = Window(size=TimeDelta(2.4, "s"), anchor="start")(series)
 
     fig, ax = plt.subplots(figsize=(6, 2.5))
     plot_timeseries(series, ax=ax, color="gray", linewidth=1)
@@ -94,8 +97,10 @@ def plot_timeseries_some_windows():
 
 # -- included in docs via literalinclude :pyobject: --
 def plot_timeseries_channels():
-    a = TimeSeries([1.0, 2.0, 3.0, 4.0], times=TimeDeltaTensor([0.0, 0.1, 0.2, 0.3], "s"))
-    b = TimeSeries([10.0, 20.0, 30.0], times=TimeDeltaTensor([50.0, 90.0, 130.0], "ms"))
+    a = TimeSeries([1.0, 2.0, 3.0, 4.0],
+                   times=TimeDeltaTensor([0.0, 0.1, 0.2, 0.3], "s"))
+    b = TimeSeries([10.0, 20.0, 30.0],
+                   times=TimeDeltaTensor([50.0, 90.0, 130.0], "ms"))
     series = TimeSeries.from_channels([a, b], unit="s")
 
     plot_timeseries(series, markers=True)
@@ -107,8 +112,9 @@ def plot_timeseries_channels():
 
 # -- included in docs via literalinclude :pyobject: --
 def plot_timeseries_dates():
-    stamps = np.array(["2023-01-01T06:00", "2023-01-01T09:30", "2023-01-01T11:00",
-                       "2023-01-01T15:45", "2023-01-01T18:00"], dtype="datetime64[m]")
+    stamps = DateTimeTensor(["2023-01-01T06:00", "2023-01-01T09:30",
+                             "2023-01-01T11:00", "2023-01-01T15:45",
+                             "2023-01-01T18:00"])
     series = TimeSeries([2.0, 3.5, 1.0, 2.5, 3.0], times=stamps).to("h")
     windows = Window(size=TimeDelta(4, "h"), anchor="start")(series)
 

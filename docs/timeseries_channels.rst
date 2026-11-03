@@ -21,7 +21,7 @@ Here channel ``a`` is sampled every 0.1 s from 0 s, and channel ``b`` every
 
 A time series can be evaluated only where all of its channels can, here from
 0.05 s, when ``b`` starts, to 0.13 s, when ``b`` ends. The figure shows both
-channels with this domain shaded. The squares are a query at ``t = 0.1``.
+channels with this domain shaded. The squares are a query at 0.1 s.
 
 .. image:: _static/timeseries_channels_light.png
    :width: 80%
@@ -73,12 +73,12 @@ holds vectors of length 2 at 0.05, 0.1, and 0.15 s, next to channel ``a``
 from above::
 
    v = TimeSeries([[1.0, 0.0], [0.0, 1.0], [-1.0, 2.0]],
-                  times=[0.05, 0.1, 0.15])
+                  times=TimeDeltaTensor([0.05, 0.1, 0.15], "s"))
    mixed = TimeSeries.from_channels([a, v])
 
 The figure shows ``a`` as a step function and ``v`` with each vector above
 its timestamp. The shared domain is shaded, and the squares are a query at
-``t = 0.125``; the vector below the line is the one the query returns.
+0.125 s; the vector below the line is the one the query returns.
 
 .. image:: _static/timeseries_vector_channel_light.png
    :width: 80%
@@ -99,12 +99,12 @@ its timestamp. The shared domain is shaded, and the squares are a query at
 
 Each entry of the result has the shape of its channel's observations::
 
-   values = mixed(0.125)
+   values = mixed(0.125, "s")
    float(values[0])  # 2.0, from a
    values[1]         # FloatTensor [0.0, 1.0], from v
 
 With several query times, the entry for ``v`` holds one vector per query
 time::
 
-   values = mixed([0.06, 0.125])
+   values = mixed([0.06, 0.125], "s")
    values[1]  # FloatTensor [[1.0, 0.0], [0.0, 1.0]], shape (2, 2)

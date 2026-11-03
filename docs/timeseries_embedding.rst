@@ -14,18 +14,20 @@ and delay :math:`\delta > 0`, the value of :math:`x` at time :math:`t` becomes
 For a sine with period 2 s, a delay of a quarter period traces a circle::
 
    import numpy as np
-   from stablebear.timeseries import TimeDelayEmbedding, TimeSeries
+   from stablebear.timeseries import (TimeDelayEmbedding, TimeDelta,
+                                      TimeDeltaTensor, TimeSeries)
 
    t = np.linspace(0.0, 6.0, 49)
-   signal = TimeSeries(np.sin(np.pi * t), times=t)
-   embedded = TimeDelayEmbedding(dimension=2, delay=0.5)(signal)
+   signal = TimeSeries(np.sin(np.pi * t), times=TimeDeltaTensor(t, "s"))
+   embedded = TimeDelayEmbedding(dimension=2,
+                                 delay=TimeDelta(0.5, "s"))(signal)
 
-   embedded.shape  # (2,)
-   embedded(1.0)   # [1.0, 0.0], the values at 0.5 s and 1 s
+   embedded.shape      # (2,)
+   embedded(1.0, "s")  # [1.0, 0.0], the values at 0.5 s and 1 s
 
 The figure shows ``signal`` on the left and the embedded points on the
 right, one per observation. The squares mark the values at 0.5 s and 1 s
-and the point they form at ``t = 1``.
+and the point they form at 1 s.
 
 .. image:: _static/timeseries_embedding_light.png
    :width: 90%
@@ -47,14 +49,15 @@ and the point they form at ``t = 1``.
 The embedding has the full history only from :math:`(m-1)\delta` after the
 time series starts, so its domain is :math:`[0.5, 6]`::
 
-   embedded(0.4)   # ValueError: Time 0.4 is outside the domain [0.5, 6]
+   embedded(0.4, "s")  # ValueError: Time 0.4 is outside the domain [0.5, 6]
 
 More generally, the observations can be arrays or elements such as point
 clouds. For a time series :math:`x \colon \mathbb{R} \to X` with observations in
 a space :math:`X`, the embedding takes values in :math:`X^m`.
 
 The embedding shares the observations of ``signal`` instead of copying
-them, and the delay is read in the unit of the time series. To study the shape
+them. The delay is a duration, converted into the unit of the time series,
+or a plain number for a time series without a unit. To study the shape
 of the embedded points over time, cut the embedding into
 :doc:`windows <timeseries_windows>`. On a time series with several
 :doc:`channels <timeseries_channels>`, each channel is embedded separately.
@@ -73,10 +76,11 @@ The components keep the same order, so the forward point at :math:`t` is the
 backward point at :math:`t + (m-1)\delta`. The domain now ends :math:`(m-1)\delta`
 before the time series does::
 
-   forward = TimeDelayEmbedding(dimension=2, delay=0.5, direction="forward")(signal)
+   forward = TimeDelayEmbedding(dimension=2, delay=TimeDelta(0.5, "s"),
+                                direction="forward")(signal)
 
-   forward(0.5)  # [1.0, 0.0], the values at 0.5 s and 1 s
-   forward(5.6)  # ValueError: Time 5.6 is outside the domain [0, 5.5]
+   forward(0.5, "s")  # [1.0, 0.0], the values at 0.5 s and 1 s
+   forward(5.6, "s")  # ValueError: Time 5.6 is outside the domain [0, 5.5]
 
 Takens's theorem
 ----------------

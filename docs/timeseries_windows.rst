@@ -11,21 +11,23 @@ second. Its observations stay at 0, rise by 1 each second to 3, and fall
 back to 0::
 
    import numpy as np
-   from stablebear.timeseries import TimeSeries, Window
+   from stablebear.timeseries import (TimeDelta, TimeDeltaTensor, TimeSeries,
+                                      Window)
 
    signal = TimeSeries([0.0, 0.0, 0.0, 1.0, 2.0, 3.0, 2.0, 1.0, 0.0],
-                       times=np.arange(9.0))
+                       times=TimeDeltaTensor(np.arange(9.0), "s"))
 
-   windows, bounds = Window(size=4.0, step=2.0, anchor="start")(
-       signal, return_bounds=True)
-   bounds  # [[0.0, 4.0], [2.0, 6.0], [4.0, 8.0]]
+   windows, bounds = Window(size=TimeDelta(4, "s"), step=TimeDelta(2, "s"),
+                            anchor="start")(signal, return_bounds=True)
+   bounds.count  # [[0.0, 4.0], [2.0, 6.0], [4.0, 8.0]]
 
-The bounds are times from the time 0 of ``signal``: numbers here, since
-``signal`` was built from numbers and has no unit, and a
-:py:class:`~stablebear.timeseries.TimeDeltaTensor` of durations for a time
-series with a unit. For a time series with an epoch, they are a
+The bounds are a :py:class:`~stablebear.timeseries.TimeDeltaTensor` of
+durations from the time 0 of ``signal``, in its unit, and ``bounds.count``
+holds the numbers.
+For a time series with an epoch, they are a
 :py:class:`~stablebear.timeseries.DateTimeTensor` of dates instead (see
-:doc:`timeseries_dates`).
+:doc:`timeseries_dates`). On a time series without a unit, the size, step,
+and bounds are plain numbers.
 
 The figure shows ``signal`` with the domains of the three windows marked
 above it, and below it each window as a time series of its own, evaluated
@@ -56,15 +58,15 @@ in the time of the window. The result is a tensor with one axis for the
 windows followed by the axes of the times, so here ``windows(t)[i, j]`` is
 window ``i`` at ``t[j]``::
 
-   windows(1.0)[1]      # 1.0, the value of signal at 3 s
-   windows([0.0, 1.0])  # [[0.0, 0.0], [0.0, 1.0], [2.0, 3.0]], shape (3, 2)
+   windows(1.0, "s")[1]      # 1.0, the value of signal at 3 s
+   windows([0.0, 1.0], "s")  # [[0.0, 0.0], [0.0, 1.0], [2.0, 3.0]], shape (3, 2)
 
 A window also keeps where it was cut from.
 :py:attr:`~stablebear.timeseries.TimeSeries.origin` is the time in
 ``signal`` that the window's time 0 stands for, so an observation at time
 ``t`` in the window was at ``origin + t`` in ``signal``::
 
-   windows[1].origin  # 2.0
+   windows[1].origin  # TimeDelta(2, 's')
 
 The origins are the starts in ``bounds``, the same for every channel of a
 window. When a start falls just short of an observation and snaps to it
@@ -82,10 +84,12 @@ starts. With ``anchor="end"``, the default, they end where it ends. The two
 differ when the windows do not fit exactly, as windows of 3 s on the 8 s of
 ``signal`` do not::
 
-   _, bounds = Window(size=3.0, anchor="start")(signal, return_bounds=True)
+   size = TimeDelta(3, "s")
+
+   _, bounds = Window(size=size, anchor="start")(signal, return_bounds=True)
    bounds.count  # [[0.0, 3.0], [3.0, 6.0]]
 
-   _, bounds = Window(size=3.0)(signal, return_bounds=True)
+   _, bounds = Window(size=size)(signal, return_bounds=True)
    bounds.count  # [[2.0, 5.0], [5.0, 8.0]]
 
 The figure shows both sets of windows below ``signal``. Filled circles
@@ -140,11 +144,11 @@ window. Of the four choices, ``"left"`` gives
 if it includes that end, and an observation where two windows meet belongs
 to each window that includes it::
 
-   windows = Window(size=3.0, anchor="start", closed="both")(signal)
-   windows(3.0)  # [1.0, 2.0], the values of signal at 3 s and 6 s
+   windows = Window(size=size, anchor="start", closed="both")(signal)
+   windows(3.0, "s")  # [1.0, 2.0], the values of signal at 3 s and 6 s
 
-   windows = Window(size=3.0, anchor="start")(signal)  # closed="left"
-   windows(3.0)  # ValueError: Time 3 is outside the domain [0, 3)
+   windows = Window(size=size, anchor="start")(signal)  # closed="left"
+   windows(3.0, "s")  # ValueError: Time 3 is outside the domain [0, 3)
 
 The figure shows the windows of 3 s from the start for each choice.
 
@@ -178,11 +182,11 @@ becomes :math:`[t_0, s_k + \text{size}]`. A window cut short includes the
 end of the time series it is cut at, whatever ``closed`` is. The rows of
 ``bounds`` hold the ends after cutting::
 
-   _, bounds = Window(size=3.0, anchor="start", partial=True)(
+   _, bounds = Window(size=size, anchor="start", partial=True)(
        signal, return_bounds=True)
    bounds.count  # [[0.0, 3.0], [3.0, 6.0], [6.0, 8.0]]
 
-   _, bounds = Window(size=3.0, partial=True)(signal, return_bounds=True)
+   _, bounds = Window(size=size, partial=True)(signal, return_bounds=True)
    bounds.count  # [[0.0, 2.0], [2.0, 5.0], [5.0, 8.0]]
 
 In the figure, the dashed windows are the ones cut short.
@@ -212,8 +216,8 @@ When the step is shorter than the size, several windows can be cut short.
 With windows of 6 s every 3 s from the start, the last two are cut
 short::
 
-   _, bounds = Window(size=6.0, step=3.0, anchor="start", partial=True)(
-       signal, return_bounds=True)
+   _, bounds = Window(size=TimeDelta(6, "s"), step=size, anchor="start",
+                      partial=True)(signal, return_bounds=True)
    bounds.count  # [[0.0, 6.0], [3.0, 8.0], [6.0, 8.0]]
 
 The figure shows each window on its own row.
@@ -252,8 +256,6 @@ own timestamps, so a window can hold a different number of observations in
 each channel. The channels ``a`` and ``b`` from :doc:`timeseries_channels`
 can both be evaluated from 0.05 s to 0.13 s, and windows of 40 ms cut this
 time in two::
-
-   from stablebear.timeseries import TimeDelta
 
    a = TimeSeries([1.0, 2.0, 3.0, 4.0],
                   times=TimeDeltaTensor([0.0, 0.1, 0.2, 0.3], "s"))

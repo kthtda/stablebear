@@ -55,13 +55,14 @@ epsilons, the default of APL. Here the larger timestamp is 0.2, so a query
 up to ``2e-15`` s below it snaps. This takes in the rounding error of
 ``0.3 - 0.1`` while an ordinary query such as ``0.19`` is far outside::
 
-   series = TimeSeries([1.0, 2.0, 3.0, 4.0], times=[0.0, 0.1, 0.2, 0.3])
-   series(0.3 - 0.1)  # 3.0
-   series(0.19)       # 2.0
+   times = TimeDeltaTensor([0.0, 0.1, 0.2, 0.3], "s")
 
-   exact = TimeSeries([1.0, 2.0, 3.0, 4.0], times=[0.0, 0.1, 0.2, 0.3],
-                      snap_tolerance=0.0)
-   exact(0.3 - 0.1)   # 2.0
+   series = TimeSeries([1.0, 2.0, 3.0, 4.0], times=times)
+   series(0.3 - 0.1, "s")  # 3.0
+   series(0.19, "s")       # 2.0
+
+   exact = TimeSeries([1.0, 2.0, 3.0, 4.0], times=times, snap_tolerance=0.0)
+   exact(0.3 - 0.1, "s")   # 2.0
 
 The figure places three queries by how far they fall below 0.2, on a log
 scale. Only queries in the shaded range return the observation at 0.2. The

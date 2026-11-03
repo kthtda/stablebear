@@ -4,19 +4,17 @@ Time series
 A time series records observations at known times. Each observation can be a
 number, an array, or an element such as a point cloud. A
 :py:class:`~stablebear.timeseries.TimeSeries` is built from the observations
-and one timestamp per observation. Plain numbers give a time series without
-a unit, and a :py:class:`~stablebear.timeseries.TimeDeltaTensor` gives the
-timestamps a unit::
+and one timestamp per observation. The timestamps are durations from the
+time 0 of the time series, here a
+:py:class:`~stablebear.timeseries.TimeDeltaTensor` of seconds::
 
-   from stablebear.timeseries import TimeDeltaTensor, TimeSeries
+   from stablebear.timeseries import TimeDelta, TimeDeltaTensor, TimeSeries
 
-   series = TimeSeries([1.0, 3.0, 2.0, 4.0], times=[0.0, 1.0, 1.5, 3.5])
+   series = TimeSeries([1.0, 3.0, 2.0, 4.0],
+                       times=TimeDeltaTensor([0.0, 1.0, 1.5, 3.5], "s"))
 
-   times_ms = TimeDeltaTensor([0.0, 1000.0, 1500.0, 3500.0], "ms")
-   series_ms = TimeSeries([1.0, 3.0, 2.0, 4.0], times=times_ms)
-
-Both time series hold the same observations; ``series_ms`` takes durations,
-so ``series_ms(1500.0, "ms")`` equals ``series(1.5)``.
+Durations can also be given in other forms, such as a ``timedelta64``
+array, and timestamps can be dates and times (see :doc:`timeseries_dates`).
 
 This page covers evaluation and units, which every other operation on a
 time series builds on. The pages listed at the end cover channels, delay
@@ -37,8 +35,8 @@ For observations :math:`x_0, \dots, x_{n-1}` at timestamps
 on the domain :math:`[t_0, t_{n-1}]`. The figure shows ``series`` from the
 example above as a step function on its domain :math:`[0, 3.5]`. The filled
 circles are the observations, and an open circle marks the right end of a
-step, which belongs to the next step. The squares are queries at ``t = 0.5``,
-``1.5``, and ``2.75``.
+step, which belongs to the next step. The squares are queries at 0.5, 1.5,
+and 2.75 s.
 
 .. image:: _static/timeseries_evaluation_light.png
    :width: 80%
@@ -57,31 +55,51 @@ step, which belongs to the next step. The squares are queries at ``t = 0.5``,
       :pyobject: plot_timeseries_evaluation
       :language: python
 
-Each query returns the value of the step it falls on. A query past the last
-timestamp is outside the domain and raises an error::
+Each query is a duration, a :py:class:`~stablebear.timeseries.TimeDelta`,
+and returns the value of the step it falls on. A unit passed as the second
+argument reads numbers as counts of it, so ``series(0.5, "s")`` is
+``series(TimeDelta(0.5, "s"))``. A query past the last timestamp is outside
+the domain and raises an error::
 
-   series(0.5)   # 1.0
-   series(1.5)   # 2.0
-   series(2.75)  # 2.0
-   series(4.0)   # ValueError: Time 4 is outside the domain [0, 3.5]
+   series(TimeDelta(0.5, "s"))  # 1.0
+   series(1.5, "s")             # 2.0
+   series(2750.0, "ms")         # 2.0
+   series(4.0, "s")             # ValueError: Time 4 is outside the domain [0, 3.5]
 
-A query at a timestamp gets the observation recorded there, as at
-``t = 1.5``.
+A query at a timestamp gets the observation recorded there, as at 1.5 s.
+A number without a unit raises a ``TypeError``, since it does not say which
+unit it counts.
 
 Units
 -----
 
-A time series holds its timestamps in one physical unit, from attoseconds
-(``"as"``) to days (``"d"``), or without a unit, as plain numbers;
-:doc:`timeseries_units` lists the units.
+A time series stores its timestamps as numbers of one unit, its
+:py:attr:`~stablebear.timeseries.TimeSeries.unit`, from attoseconds
+(``"as"``) to days (``"d"``). Durations in other units are converted into
+it, as the query in milliseconds above is.
+:py:meth:`TimeSeries.to <stablebear.timeseries.TimeSeries.to>` converts the
+stored timestamps to another unit; :doc:`timeseries_units` explains how the
+unit affects precision and lists the units::
 
-A time series with a unit is queried at durations, and
-:py:meth:`TimeSeries.to <stablebear.timeseries.TimeSeries.to>` converts its
-timestamps to another unit by an exact factor. A unit passed as the second
-argument of :py:meth:`~stablebear.timeseries.TimeSeries.evaluate` reads
-numbers as counts of it::
+   series.to("ms").times  # TimeDeltaTensor([0.0, 1000.0, 1500.0, 3500.0], 'ms')
 
-   series_ms(1500.0, "ms")  # 2.0, the same as series_ms(1.5, "s")
+Time series without a unit
+--------------------------
+
+When the times are not physical, such as sample indices or the values of a
+parameter, plain numbers give a time series without a unit, whose
+:py:attr:`~stablebear.timeseries.TimeSeries.unit` is ``None``. It is
+queried at plain numbers, and window sizes and delays for it are plain
+numbers too::
+
+   steps = TimeSeries([1.0, 3.0, 2.0, 4.0], times=[0.0, 1.0, 1.5, 3.5])
+   steps(1.5)  # 2.0
+
+A duration on a time series without a unit raises a ``TypeError``, as a
+number without a unit does on a time series with one. Calling
+:py:meth:`~stablebear.timeseries.TimeSeries.to` gives it a unit: its
+numbers become counts of that unit, so ``steps.to("s")`` equals
+``series``.
 
 Working with time series
 ------------------------
