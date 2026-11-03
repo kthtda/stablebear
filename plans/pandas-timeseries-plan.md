@@ -1,6 +1,6 @@
 # pandas input and durations for time series: implementation plan
 
-Progress: 48 of 58 items, 97 of 117 points (83%)
+Progress: 49 of 58 items, 100 of 117 points (85%)
 
 Specs: [pandas-timeseries-spec.md](pandas-timeseries-spec.md) (phases A, B,
 and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
@@ -269,7 +269,7 @@ so.
 - [x] **F3.** [2] (e5342aa45) `test_time_delay_embedding.py`, `test_plotting_timeseries.py`,
   `test_timeseries_pandas.py`, `persistence/test_timeseries_persistence.py`,
   `test_io_roundtrip.py`, and `test_integration.py` likewise.
-- [ ] **F4.** [3] The time series guide pages (`docs/timeseries*.rst`) use
+- [x] **F4.** [3] (2e5f0d1ca) The time series guide pages (`docs/timeseries*.rst`) use
   `TimeDelta` and `DateTime`; `timeseries_units.rst` explains the unit as
   storage.
   Note: depends on G, which settles series without a unit; do it after

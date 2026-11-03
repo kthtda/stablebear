@@ -434,7 +434,14 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
 
     @classmethod
     def from_pandas(cls, obj, unit: str | None = None, *, snap_tolerance: float = 1e-14) -> TimeSeries:
-        """Build a series from a pandas ``Series``, whose index gives the times.
+        """Build a series from a pandas ``Series`` or ``DataFrame``, whose index
+        gives the times.
+
+        A ``Series`` gives one channel, and a ``DataFrame`` one channel per
+        column, in column order, all at the times of the index. Each column
+        is converted as a ``Series`` is, and the columns then take one
+        common dtype, such as float64 for int and float columns. Column
+        names are not kept.
 
         A ``DatetimeIndex`` is counted from its first date and time, which
         becomes the :attr:`epoch`; one with a timezone is converted to UTC
@@ -444,7 +451,7 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
 
         Parameters
         ----------
-        obj : pandas.Series
+        obj : pandas.Series or pandas.DataFrame
             Observations of numbers or booleans. Missing values, ``NaN`` and
             ``pd.NA``, are kept as ``NaN``; call ``obj.dropna()`` first to
             drop them.
@@ -458,12 +465,15 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         Raises
         ------
         TypeError
-            If ``obj`` is not a pandas ``Series``, or its index holds
-            neither dates, durations, nor numbers.
+            If ``obj`` is not a pandas ``Series`` or ``DataFrame``, its index
+            holds neither dates, durations, nor numbers, or its values are
+            not numbers or booleans.
+        ValueError
+            If ``obj`` is a ``DataFrame`` with no columns.
         """
         pd = sys.modules.get("pandas")
-        if pd is None or not isinstance(obj, pd.Series):
-            raise TypeError(f"Expected a pandas Series; got {type(obj).__name__}")
+        if pd is None or not isinstance(obj, (pd.Series, pd.DataFrame)):
+            raise TypeError(f"Expected a pandas Series or DataFrame; got {type(obj).__name__}")
         index = obj.index
         if isinstance(index, (pd.DatetimeIndex, pd.TimedeltaIndex)):
             times = _native_times(index, unit)
@@ -471,7 +481,14 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
             times = _native_times(np.asarray(index, dtype=np.float64), unit)
         else:
             raise TypeError(f"Expected an index of dates, durations, or numbers; got {type(index).__name__}")
-        return cls._from_cpp(_native_series(np.asarray(obj), times, snap_tolerance))
+        if isinstance(obj, pd.Series):
+            return cls._from_cpp(_native_series(np.asarray(obj), times, snap_tolerance))
+        if obj.shape[1] == 0:
+            raise ValueError("A DataFrame needs at least one column to give a channel")
+        columns = [np.asarray(obj.iloc[:, i]) for i in range(obj.shape[1])]
+        dtype = np.result_type(*columns)
+        return cls.from_channels([cls._from_cpp(_native_series(column.astype(dtype), times, snap_tolerance))
+                                  for column in columns])
 
     def _single_channel(self):
         if self._data.n_channels != 1:

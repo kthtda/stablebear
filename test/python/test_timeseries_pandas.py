@@ -180,6 +180,44 @@ def test_from_pandas_keeps_the_dtype(values, dtype):
     assert series.dtype is dtype
 
 
+def _frame(columns):
+    return pd.DataFrame(columns, index=pd.to_timedelta([0, 500, 1500], unit="ms"))
+
+
+def test_from_pandas_with_a_data_frame_gives_one_channel_per_column():
+    frame = _frame({"a": [10.0, 20.0, 30.0], "b": [-1.0, -2.0, -3.0]})
+
+    series = TimeSeries.from_pandas(frame)
+
+    assert series.n_channels == 2
+    for i in range(2):
+        assert series[i].array_equal(TimeSeries.from_pandas(frame.iloc[:, i]))
+
+
+def test_from_pandas_with_int_and_float_columns_gives_float64_channels():
+    series = TimeSeries.from_pandas(_frame({"a": [10, 20, 30], "b": [-1.5, -2.5, -3.5]}))
+
+    assert series.dtype is sb.float64
+    assert series[0].values.array_equal(sb.FloatTensor([10.0, 20.0, 30.0], dtype=sb.float64))
+
+
+def test_from_pandas_with_a_data_frame_keeps_pd_na_as_nan():
+    series = TimeSeries.from_pandas(_frame({"a": pd.array([10.0, None, 30.0], dtype="Float64"),
+                                            "b": [1.0, 2.0, 3.0]}))
+
+    assert np.array_equal(np.asarray(series[0].values), [10.0, np.nan, 30.0], equal_nan=True)
+
+
+def test_from_pandas_with_a_string_column_raises():
+    with pytest.raises(TypeError):
+        TimeSeries.from_pandas(_frame({"a": [10.0, 20.0, 30.0], "b": ["x", "y", "z"]}))
+
+
+def test_from_pandas_with_a_data_frame_without_columns_raises():
+    with pytest.raises(ValueError, match="column"):
+        TimeSeries.from_pandas(_frame({}))
+
+
 def test_time_delta_keeps_nanoseconds_of_timedelta():
     time_delta = TimeDelta(pd.Timedelta(1, "ns"))
 
