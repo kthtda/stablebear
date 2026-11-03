@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 
 import stablebear as sb
-from stablebear.timeseries import DateTime, DateTimeTensor, Domain, TimeDelayEmbedding, TimeDelta, TimeDeltaTensor, TimeSeries, cut_windows
+from stablebear.timeseries import DateTime, DateTimeTensor, Domain, TimeDelta, TimeDeltaTensor, TimeSeries, cut_windows, delay_embed
 
 from _element_values import TWO_ELEMENTS_OF_EVERY_DTYPE
 from _round_trip import ROUND_TRIPS
@@ -1028,7 +1028,7 @@ def test_series_channels_at_epochs_of_different_resolutions_combine():
 def test_series_embedding_channel_of_a_later_epoch_reads_the_same_points():
     # Each observation is 10 times its hour on 2 January.
     source = TimeSeries([0.0, 10.0, 20.0], times=TimeDeltaTensor([0.0, 1.0, 2.0], "h"), epoch="2023-01-02")
-    embedding = TimeDelayEmbedding(dimension=2, delay=TimeDelta(1.0, "h"))(source)
+    embedding = delay_embed(source, dimension=2, delay=TimeDelta(1.0, "h"))
     earlier = TimeSeries([-10.0, -20.0], times=TimeDeltaTensor([0.0, 48.0], "h"), epoch="2023-01-01")
 
     series = TimeSeries.from_channels([embedding, earlier])
@@ -1164,7 +1164,7 @@ def test_to_converts_the_origin_and_the_end_after_the_last_observation():
 
 def test_to_keeps_how_an_embedding_evaluates():
     series = TimeSeries([0.0, 10.0, 25.0, 40.0], times=TimeDeltaTensor([0.0, 1.0, 2.5, 4.0], "s"))
-    embedding = TimeDelayEmbedding(dimension=3, delay=TimeDelta(1, "s"))(series)
+    embedding = delay_embed(series, dimension=3, delay=TimeDelta(1, "s"))
     queries = TimeDeltaTensor([2.0, 2.5, 3.0, 4.0], "s")
 
     assert embedding.to("ms")(queries).array_equal(embedding(queries))
@@ -1417,7 +1417,7 @@ def test_mutating_an_observation_leaves_the_series_unchanged(make_values, read):
     values = make_values()
     expected = np.asarray(values[0]).copy()
     series = TimeSeries(values, times=TimeDeltaTensor([0.0, 1.0], "s"))
-    embedding = TimeDelayEmbedding(dimension=2, delay=TimeDelta(1.0, "s"))(series)
+    embedding = delay_embed(series, dimension=2, delay=TimeDelta(1.0, "s"))
 
     observation = read(values, series, embedding)
     observation[0, 1] = 99.0

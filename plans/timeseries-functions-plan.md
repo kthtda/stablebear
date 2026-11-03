@@ -1,6 +1,6 @@
 # Time series follow-ups: implementation plan
 
-Progress: 0 of 10 items, 0 of 19 points (0%)
+Progress: 1 of 10 items, 3 of 19 points (16%)
 
 Specs: [timeseries-functions-spec.md](timeseries-functions-spec.md)
 (phase A, #265) and `timeseries-point-clouds-spec.md`, written in B1
@@ -9,7 +9,7 @@ Specs: [timeseries-functions-spec.md](timeseries-functions-spec.md)
 
 ## Phase A: functions instead of classes (#265)
 
-- [ ] **A1.** [3] `cut_windows` replaces `Window` in
+- [x] **A1.** [3] (8d4f39e35, 84dea1a58) `cut_windows` replaces `Window` in
   `stablebear/timeseries/window.py`, with its docstring, and in the
   tests, internal callers, golden generator, and figure scripts, without
   `return_bounds`; `TimeSeries.source_domain` gives where a window lies.

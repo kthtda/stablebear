@@ -331,7 +331,7 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
     a series built from observations, it runs from the first to the last
     observation, both included. A window (:func:`cut_windows`) runs from its
     start to its end, which may exclude its start and extend past its last
-    observation, and a delay embedding (:class:`TimeDelayEmbedding`) keeps
+    observation, and a delay embedding (:func:`delay_embed`) keeps
     the ends of its channel's domain. A series can be evaluated where all
     of its channels can; :attr:`domain` gives these times.
 

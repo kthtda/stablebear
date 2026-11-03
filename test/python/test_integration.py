@@ -5,7 +5,7 @@ import numpy.testing as npt
 
 import stablebear as sb
 import stablebear.persistence as pers
-from stablebear.timeseries import TimeDelayEmbedding, TimeDelta, TimeDeltaTensor, TimeSeries, cut_windows
+from stablebear.timeseries import TimeDelta, TimeDeltaTensor, TimeSeries, cut_windows, delay_embed
 
 
 def test_pcf_generation_to_distance_to_persistence():
@@ -115,7 +115,7 @@ def test_delay_embedding_to_windows_to_persistence():
                         times=TimeDeltaTensor([0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5], "s"))
 
     # The embedding has domain [0.5, 3.5], so three windows fit.
-    embedding = TimeDelayEmbedding(dimension=2, delay=TimeDelta(0.5, "s"))(series)
+    embedding = delay_embed(series, dimension=2, delay=TimeDelta(0.5, "s"))
     windows = cut_windows(embedding, size=TimeDelta(1.0, "s"), step=TimeDelta(1.0, "s"), closed="left", partial=False,
                           anchor="start")
 

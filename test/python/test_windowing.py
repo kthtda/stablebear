@@ -6,7 +6,7 @@ import pytest
 
 import stablebear as sb
 from stablebear import FloatTensor
-from stablebear.timeseries import DateTime, DateTimeTensor, Domain, TimeDelayEmbedding, TimeDelta, TimeDeltaTensor, TimeSeries, cut_windows
+from stablebear.timeseries import DateTime, DateTimeTensor, Domain, TimeDelta, TimeDeltaTensor, TimeSeries, cut_windows, delay_embed
 from stablebear.timeseries.series import TimeSeriesTensor
 
 from _element_values import TWO_ELEMENTS_OF_EVERY_DTYPE
@@ -406,7 +406,7 @@ def test_an_embedding_of_a_window_keeps_its_origin():
     window = cut_windows(_windows_source(), size=TimeDelta(2, "s"), step=TimeDelta(2, "s"), closed="left",
                          partial=False, anchor="start")[1]
 
-    embedding = TimeDelayEmbedding(dimension=2, delay=TimeDelta(0.5, "s"))(window)
+    embedding = delay_embed(window, dimension=2, delay=TimeDelta(0.5, "s"))
 
     assert embedding.origin == TimeDelta(2, "s")
 
@@ -484,7 +484,7 @@ def test_a_dated_window_domain_keeps_a_unit_finer_than_microseconds():
 
 
 def test_an_embedding_keeps_the_epoch_of_its_series():
-    embedding = TimeDelayEmbedding(dimension=2, delay=TimeDelta(0.5, "s"))(_dated_source())
+    embedding = delay_embed(_dated_source(), dimension=2, delay=TimeDelta(0.5, "s"))
 
     assert embedding.epoch == DateTime("2023-01-01")
 
@@ -513,7 +513,7 @@ def test_an_embedding_of_a_window_keeps_its_open_end():
     window = cut_windows(_windows_source(), size=TimeDelta(2, "s"), step=TimeDelta(1, "s"), closed="left",
                          partial=False, anchor="start")[1]
 
-    embedding = TimeDelayEmbedding(dimension=2, delay=TimeDelta(0.4, "s"))(window)
+    embedding = delay_embed(window, dimension=2, delay=TimeDelta(0.4, "s"))
 
     assert np.array_equal(embedding.times.count, [0.4, 0.5, 0.9, 1.5, 1.9])
     assert np.array_equal(np.asarray(embedding(TimeDelta(1.95, "s"))), [25.0, 25.0])
@@ -528,7 +528,7 @@ def test_an_embedding_of_a_window_keeps_its_open_start_and_closed_end():
     window = cut_windows(series, size=TimeDelta(2, "s"), step=TimeDelta(1, "s"), closed="right", partial=False,
                          anchor="start")[1]
 
-    embedding = TimeDelayEmbedding(dimension=2, delay=TimeDelta(1, "s"))(window)
+    embedding = delay_embed(window, dimension=2, delay=TimeDelta(1, "s"))
 
     assert np.array_equal(embedding.times.count, [1.0, 2.0])
     assert np.array_equal(np.asarray(embedding(TimeDelta(2, "s"))), [20.0, 20.0])
@@ -542,7 +542,7 @@ def test_an_embedding_of_a_window_takes_no_history_from_before_the_window():
     window = cut_windows(_windows_source(), size=TimeDelta(2, "s"), step=TimeDelta(1, "s"), closed="left",
                          partial=False, anchor="start")[1]
 
-    embedding = TimeDelayEmbedding(dimension=2, delay=TimeDelta(1, "s"))(window)
+    embedding = delay_embed(window, dimension=2, delay=TimeDelta(1, "s"))
 
     assert np.array_equal(embedding.times.count, [1.0, 1.5])
     assert np.array_equal(np.asarray(embedding.values), [[5.0, 15.0], [15.0, 25.0]])
@@ -554,7 +554,7 @@ def test_an_embedding_of_a_window_takes_no_history_from_before_the_window():
 
 def test_windows_of_an_embedding_hold_its_points():
     # The embedding has points at 1.0, 1.5, 2.5, 3.5, and 4.0.
-    embedding = TimeDelayEmbedding(dimension=2, delay=TimeDelta(1, "s"))(_windows_source())
+    embedding = delay_embed(_windows_source(), dimension=2, delay=TimeDelta(1, "s"))
 
     windows = cut_windows(embedding, size=TimeDelta(2, "s"), step=TimeDelta(1, "s"), closed="left",
                           partial=False, anchor="start")

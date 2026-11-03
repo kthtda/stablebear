@@ -7,7 +7,7 @@ import numpy as np
 from pathlib import Path
 from typing import Literal
 
-from stablebear.timeseries import TimeDelayEmbedding, TimeDelta, TimeDeltaTensor, TimeSeries, cut_windows
+from stablebear.timeseries import TimeDelta, TimeDeltaTensor, TimeSeries, cut_windows, delay_embed
 
 HERE = Path(__file__).parent
 
@@ -235,7 +235,7 @@ def plot_timeseries_snap_quarter():
 def plot_timeseries_embedding():
     t = np.linspace(0.0, 6.0, 49)
     signal = TimeSeries(np.sin(np.pi * t), times=TimeDeltaTensor(t, "s"))
-    embedded = TimeDelayEmbedding(dimension=2, delay=TimeDelta(0.5, "s"))(signal)
+    embedded = delay_embed(signal, dimension=2, delay=TimeDelta(0.5, "s"))
     query = 1.0
     color = plt.rcParams["lines.color"]
 

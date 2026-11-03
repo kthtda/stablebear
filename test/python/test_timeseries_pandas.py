@@ -7,7 +7,7 @@ import pytest
 
 import stablebear as sb
 
-from stablebear.timeseries import DateTime, DateTimeTensor, TimeDelayEmbedding, TimeDelta, TimeDeltaTensor, TimeSeries, cut_windows
+from stablebear.timeseries import DateTime, DateTimeTensor, TimeDelta, TimeDeltaTensor, TimeSeries, cut_windows, delay_embed
 
 pd = pytest.importorskip("pandas")
 
@@ -17,11 +17,11 @@ import sys
 sys.modules["pandas"] = None
 
 import numpy as np
-from stablebear.timeseries import TimeDelayEmbedding, TimeDelta, TimeDeltaTensor, TimeSeries, cut_windows
+from stablebear.timeseries import TimeDelta, TimeDeltaTensor, TimeSeries, cut_windows, delay_embed
 
 series = TimeSeries(np.array([1.0, 2.0, 3.0, 4.0]), TimeDeltaTensor([0.0, 1.0, 2.0, 3.0], "s"))
 windows = cut_windows(series, TimeDelta(1.0, "s"), TimeDelta(1.0, "s"), closed="left", partial=False, anchor="start")
-embedded = TimeDelayEmbedding(2, TimeDelta(1.0, "s"), direction="backward")(series)
+embedded = delay_embed(series, 2, TimeDelta(1.0, "s"), direction="backward")
 print(len(windows), embedded.n_observations)
 """
 
@@ -271,15 +271,11 @@ def test_windows_of_a_pandas_timedelta_size_and_step_equal_those_of_their_time_d
                                            closed="left", partial=False, anchor="start"))
 
 
-def test_embedding_delay_of_timedelta_is_a_time_delta_in_nanoseconds():
-    assert TimeDelayEmbedding(dimension=2, delay=pd.Timedelta(3, "h")).delay == TimeDelta(10_800_000_000_000, "ns")
-
-
 def test_embedding_delay_timedelta_equals_timedelta64():
     series = TimeSeries(np.array([1.0, 2.0, 3.0, 4.0]), TimeDeltaTensor([0.0, 1.0, 2.0, 3.0], "h"))
 
-    from_pandas = TimeDelayEmbedding(2, pd.Timedelta(3, "h"), direction="backward")(series)
-    from_numpy = TimeDelayEmbedding(2, np.timedelta64(3, "h"), direction="backward")(series)
+    from_pandas = delay_embed(series, 2, pd.Timedelta(3, "h"), direction="backward")
+    from_numpy = delay_embed(series, 2, np.timedelta64(3, "h"), direction="backward")
 
     assert from_pandas.array_equal(from_numpy)
 
@@ -406,6 +402,7 @@ def test_windows_of_a_pandas_series_equal_those_of_its_time_series():
 
 def test_embedding_of_a_data_frame_equals_that_of_its_time_series():
     frame = pd.DataFrame({0: np.arange(10.0), 1: -np.arange(10.0)}, index=_hours())
-    embedding = TimeDelayEmbedding(dimension=2, delay=TimeDelta(2, "h"), direction="backward")
+    embedding = delay_embed(frame, dimension=2, delay=TimeDelta(2, "h"), direction="backward")
 
-    assert embedding(frame).array_equal(embedding(TimeSeries.from_pandas(frame)))
+    assert embedding.array_equal(delay_embed(TimeSeries.from_pandas(frame), dimension=2, delay=TimeDelta(2, "h"),
+                                             direction="backward"))
