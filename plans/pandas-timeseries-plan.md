@@ -1,6 +1,6 @@
 # pandas input and durations for time series: implementation plan
 
-Progress: 34 of 53 items, 69 of 104 points (66%)
+Progress: 35 of 53 items, 70 of 104 points (67%)
 
 Specs: [pandas-timeseries-spec.md](pandas-timeseries-spec.md) (phases A, B,
 and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
@@ -160,7 +160,7 @@ and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
     date to the values of each channel there; a window channel keeps
     where it lies; channels with and without an epoch raise; the epochs
     at different resolutions combine.
-- [ ] **D7.** [1] `TimeSeries.evaluate` takes a `DateTime` and a
+- [x] **D7.** [1] (62cc4ece0) `TimeSeries.evaluate` takes a `DateTime` and a
   `DateTimeTensor` as dates, as it takes a `datetime64` array.
   Tests: a `DateTime` and a `DateTimeTensor` give the values at their
   `datetime64` dates; a `DateTimeTensor` keeps its shape.

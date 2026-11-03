@@ -563,9 +563,23 @@ def _as_boolean(equal):
     return BoolTensor(equal) if np.ndim(equal) else bool(equal)
 
 
+def _from_pair(value):
+    """A tuple ``(count, unit)`` as ``TimeDelta(count, unit)``, or as a
+    :class:`TimeDeltaTensor` for an array of counts; any other value, such
+    as a tuple of two dates, as itself."""
+    if not (isinstance(value, tuple) and len(value) == 2 and isinstance(value[1], str)):
+        return value
+    count, unit = value
+    if isinstance(count, str) or (np.ndim(count) > 0 and np.asarray(count).dtype.kind in "MOUS"):
+        return value
+    return _time_delta(count, unit)
+
+
 def _as_time_delta(value):
-    """``value`` as a :class:`TimeDelta` if it is a duration, or itself if it
-    is a :class:`TimeDeltaTensor`, else ``None``."""
+    """``value`` as a :class:`TimeDelta` if it is a duration, such as a tuple
+    ``(count, unit)``, or itself if it is a :class:`TimeDeltaTensor`, else
+    ``None``."""
+    value = _from_pair(value)
     if isinstance(value, _Duration):
         return value
     if isinstance(value, (np.timedelta64, datetime.timedelta)) or hasattr(value, "to_timedelta64"):

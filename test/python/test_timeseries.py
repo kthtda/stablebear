@@ -892,6 +892,38 @@ def test_series_at_an_array_of_durations_equals_the_series_at_their_times(durati
     assert values.array_equal(series(TimeDeltaTensor([[0.5, 1.5], [4.0, 1.0]], "h")))
 
 
+def test_series_at_a_pair_of_count_and_unit_equals_the_series_at_its_time_delta():
+    series = _hourly_series()
+
+    assert series((90, "min")) == series(TimeDelta(90, "min"))
+    assert series(([30.0, 90.0], "min")).array_equal(series(TimeDeltaTensor([30.0, 90.0], "min")))
+
+
+def test_windows_at_a_pair_of_counts_and_unit_equal_the_windows_at_their_time_deltas():
+    windows = Window(size=TimeDelta(2.0, "h"), step=TimeDelta(1.0, "h"),
+                     closed="left", partial=False, anchor="start")(_hourly_series())
+
+    assert windows(([0.0, 30.0], "min")).array_equal(windows(TimeDeltaTensor([0.0, 30.0], "min")))
+
+
+def test_series_of_times_as_a_pair_equals_the_series_of_their_time_delta_tensor():
+    series = TimeSeries([10.0, 20.0], times=([0.0, 1.5], "h"))
+
+    assert series.array_equal(TimeSeries([10.0, 20.0], times=TimeDeltaTensor([0.0, 1.5], "h")))
+
+
+def test_series_at_a_tuple_of_two_dates_is_at_both_dates():
+    series = _dated_series()
+
+    assert series(("2023-01-01T00:30", "2023-01-01T02:00")).array_equal(
+        series(DateTimeTensor(["2023-01-01T00:30", "2023-01-01T02:00"])))
+
+
+def test_series_at_a_pair_with_an_unknown_unit_raises():
+    with pytest.raises(ValueError, match="Unknown unit"):
+        _hourly_series()((90, "hours"))
+
+
 def test_series_at_a_list_of_time_deltas_equals_the_series_at_their_times():
     series = _hourly_series()
 

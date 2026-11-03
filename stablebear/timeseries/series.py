@@ -16,7 +16,7 @@ from ..functional.pcf import Pcf
 from ..nested_tensor import NestedTensor, _leaf_wrappers
 from ..point_cloud import PointCloud
 from ..symmetric_matrix import SymmetricMatrix
-from .date_time import _ATTOSECONDS, _NUMPY_TO_UNIT, _UNIT_TO_NUMPY, DateTime, DateTimeTensor, TimeDelta, TimeDeltaTensor, _as_array, _as_time_delta, _in_unit
+from .date_time import _ATTOSECONDS, _NUMPY_TO_UNIT, _UNIT_TO_NUMPY, DateTime, DateTimeTensor, TimeDelta, TimeDeltaTensor, _as_array, _as_time_delta, _from_pair, _in_unit
 from ..typing import (
     _NATIVE_SUFFIX,
     barcode32,
@@ -123,9 +123,10 @@ class Times:
     times : array_like
         One-dimensional timestamps, as numbers in ``unit``, as durations, or
         as dates and times. Durations are a :class:`TimeDeltaTensor`, a
-        ``timedelta64`` array, a sequence of ``TimeDelta`` or
-        other durations, or a pandas ``TimedeltaIndex``, converted to
-        ``unit`` by one exact factor each.
+        tuple ``(counts, unit)`` such as ``([0.0, 1.5], "h")``, a
+        ``timedelta64`` array, a sequence of ``TimeDelta`` or other
+        durations, or a pandas ``TimedeltaIndex``, converted to ``unit`` by
+        one exact factor each.
         Dates and times are a :class:`DateTimeTensor`, a ``datetime64``
         array, or a pandas ``DatetimeIndex`` or ``Series`` of dates, whose
         timezone, if any, is converted to UTC and dropped. Dates and times
@@ -154,6 +155,7 @@ class Times:
     """
 
     def __init__(self, times, unit: str | None = None, *, epoch=None):
+        times = _from_pair(times)
         if isinstance(times, TimeDeltaTensor):
             # Counts in one unit, by default theirs, converted by one exact
             # factor; the short name of unit, which may be an alias.
@@ -760,9 +762,11 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         of shape ``t_shape``. Many times are evaluated together: they are
         sorted once and merged with each channel's timestamps. Numeric times
         and durations count from the series' own time 0, which for a window
-        is its start. A duration is a :class:`TimeDelta` or a value it
-        accepts, such as ``np.timedelta64(90, "m")``. Many durations are a
-        :class:`TimeDeltaTensor`, or an array, sequence, or pandas
+        is its start. A duration is a :class:`TimeDelta`, a tuple
+        ``(count, unit)`` such as ``(90, "min")``, or a value
+        :class:`TimeDelta` accepts, such as ``np.timedelta64(90, "m")``.
+        Many durations are a :class:`TimeDeltaTensor`, a tuple
+        ``(counts, unit)``, or an array, sequence, or pandas
         ``TimedeltaIndex`` of durations. Durations are converted to the
         series' unit by an exact factor and take no ``unit``. For a series with an
         :attr:`epoch`, ``t`` may also be a date and time, a :class:`DateTime`

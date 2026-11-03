@@ -44,9 +44,10 @@ class TimeDelayEmbedding:
     ----------
     dimension : int
         The number of components ``m``, at least 1.
-    delay : float, TimeDelta, np.timedelta64, datetime.timedelta, or pd.Timedelta
+    delay : float, TimeDelta, tuple, np.timedelta64, datetime.timedelta, or pd.Timedelta
         The time between components, positive. A number is in the series'
-        unit; a duration such as ``np.timedelta64(3, "h")`` is converted to
+        unit; a duration such as ``(3, "h")``, ``TimeDelta(3, "h")``, or
+        ``np.timedelta64(3, "h")`` is converted to
         the unit of each series embedded. Months and years have no fixed
         length and are rejected.
     direction : {"backward", "forward"}, default "backward"

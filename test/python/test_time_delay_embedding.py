@@ -370,3 +370,7 @@ def test_embedding_repr_shows_its_duration():
 def test_embedding_rejects_a_delay_without_a_fixed_length():
     with pytest.raises(ValueError, match="fixed length"):
         TimeDelayEmbedding(dimension=2, delay=np.timedelta64(1, "M"))
+
+
+def test_embedding_delay_of_a_pair_of_count_and_unit_is_its_time_delta():
+    assert TimeDelayEmbedding(dimension=2, delay=(30, "min")).delay == TimeDelta(30, "min")

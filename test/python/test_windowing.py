@@ -928,3 +928,9 @@ def test_dated_window_domains_start_at_the_bounds_from_windowing():
     starts = [windows[k].domain.start.to_datetime64() for k in range(windows.shape[0])]
 
     assert np.array_equal(starts, bounds[:, 0].to_datetime64())
+
+
+def test_window_of_pairs_of_count_and_unit_equals_the_window_of_their_time_deltas():
+    window = Window(size=(2, "s"), step=(500, "ms"))
+
+    assert (window.size, window.step) == (TimeDelta(2, "s"), TimeDelta(500, "ms"))
