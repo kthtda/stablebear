@@ -498,9 +498,13 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         return cls.from_channels([cls._from_cpp(_native_series(column.astype(dtype), times, snap_tolerance))
                                   for column in columns])
 
-    def to_pandas(self, resolution: str | None = None) -> Any:  # A pandas Series; pandas is optional.
+    def to_pandas(self, resolution: str | None = None) -> Any:  # A pandas Series or DataFrame; pandas is optional.
         """The series as a pandas ``Series`` of its observations, indexed by
-        its times.
+        its times, or for several channels a ``DataFrame`` with columns ``0``
+        to ``n_channels - 1``, indexed by the union of the channels' times.
+        A column holds its channel's value in effect at each of these times,
+        as :meth:`evaluate` gives it, and ``NaN`` outside the channel's
+        domain.
 
         The index is a ``DatetimeIndex`` of ``epoch + origin + times`` for a
         series with an :attr:`epoch`, a ``TimedeltaIndex`` of :attr:`times`
@@ -521,35 +525,64 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         TypeError
             If the observations are not scalar numbers or booleans.
         ValueError
-            For several channels, an unknown ``resolution``, a unit finer
-            than nanoseconds without ``resolution``, or a ``resolution`` for
-            a series without a unit.
+            For an unknown ``resolution``, a unit finer than nanoseconds
+            without ``resolution``, or a ``resolution`` for a series without
+            a unit.
         ImportError
             If pandas is not installed.
         """
         from .._pandas import import_pandas
         pd = import_pandas()
-        if self.n_channels > 1:
-            raise ValueError("This series has several channels; select one with series[i]")
-        if self.dtype not in _SCALAR_DTYPES or self.shape != ():
+        shapes = (self.shape,) if self.n_channels == 1 else self.shape
+        if self.dtype not in _SCALAR_DTYPES or any(shape != () for shape in shapes):
             raise TypeError(f"Only series of scalar numbers or booleans convert to pandas, not of {self.dtype}")
-        values = np.asarray(self.values)
+        resolution = self._pandas_resolution(resolution)
+        # Each channel's times where they lie: placed by its origin for a
+        # series with an epoch, else from its own time 0.
+        offsets = [self._data.origin(i) if self.epoch is not None else 0.0 for i in range(self.n_channels)]
+        if self.n_channels == 1:
+            return pd.Series(np.asarray(self.values),
+                             index=self._pandas_index(pd, np.asarray(self._data.times(0)) + offsets[0], resolution))
+        placed = np.unique(np.concatenate([np.asarray(self._data.times(i)) + offset
+                                           for i, offset in enumerate(offsets)]))
+        index = self._pandas_index(pd, placed, resolution)
+        columns = {}
+        for i, offset in enumerate(offsets):
+            # The value in effect at every time of the union in the channel's
+            # domain, and NaN outside it.
+            channel = self[i]
+            t = placed - offset
+            start, end, start_closed, end_closed = channel._data.domain
+            inside = ((t > start) | (start_closed & (t == start))) & ((t < end) | (end_closed & (t == end)))
+            values = np.asarray(channel._evaluate_numbers(FloatTensor(t[inside]))) if inside.any() else []
+            columns[i] = pd.Series(values, index=index[inside], dtype=np.asarray(channel.values).dtype).reindex(index)
+        return pd.DataFrame(columns, index=index)
+
+    def _pandas_resolution(self, resolution):
+        """``resolution`` for :meth:`to_pandas`, checked, or its default."""
         if self.unit is None:
             if resolution is not None:
                 raise ValueError("A series without a unit has no resolution; pass none")
-            return pd.Series(values, index=pd.Index(np.asarray(self.times)))
+            return None
         if resolution is None:
             if _ATTOSECONDS[self.unit] < _ATTOSECONDS["ns"]:
                 raise ValueError(f"pandas holds times to nanoseconds at finest, not {self.unit!r}; "
                                  "pass resolution='ns' to round to nanoseconds")
-            resolution = self.unit if _ATTOSECONDS[self.unit] < _ATTOSECONDS["us"] else "us"
-        elif resolution not in ("s", "ms", "us", "ns"):
+            return self.unit if _ATTOSECONDS[self.unit] < _ATTOSECONDS["us"] else "us"
+        if resolution not in ("s", "ms", "us", "ns"):
             raise ValueError(f"resolution must be 's', 'ms', 'us', or 'ns', not {resolution!r}")
+        return resolution
+
+    def _pandas_index(self, pd, counts, resolution):
+        """A pandas index of ``counts``, numbers of :attr:`unit`: dates from
+        the epoch, durations, or for a series without a unit, the numbers."""
+        if self.unit is None:
+            return pd.Index(counts)
+        durations = TimeDeltaTensor(FloatTensor(np.asarray(counts, dtype=np.float64)), self.unit)
         if self.epoch is None:
-            return pd.Series(values, index=pd.TimedeltaIndex(self.times.to_timedelta64(resolution)))
-        offsets = (self.origin + self.times).to_timedelta64(resolution)
-        dates = (self.epoch.to_datetime64() + offsets).astype(f"datetime64[{_UNIT_TO_NUMPY[resolution]}]")
-        return pd.Series(values, index=pd.DatetimeIndex(dates))
+            return pd.TimedeltaIndex(durations.to_timedelta64(resolution))
+        dates = self.epoch.to_datetime64() + durations.to_timedelta64(resolution)
+        return pd.DatetimeIndex(dates.astype(f"datetime64[{_UNIT_TO_NUMPY[resolution]}]"))
 
     def _single_channel(self):
         if self._data.n_channels != 1:

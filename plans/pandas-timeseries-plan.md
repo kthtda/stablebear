@@ -1,6 +1,6 @@
 # pandas input and durations for time series: implementation plan
 
-Progress: 51 of 58 items, 103 of 117 points (88%)
+Progress: 52 of 58 items, 106 of 117 points (91%)
 
 Specs: [pandas-timeseries-spec.md](pandas-timeseries-spec.md) (phases A, B,
 and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
@@ -345,7 +345,7 @@ so.
 
 ## Phase I: back to pandas
 
-- [ ] **I2.** [3] `TimeSeries.to_pandas(resolution=None)` for one channel of
+- [x] **I2.** [3] (fe283b97f) `TimeSeries.to_pandas(resolution=None)` for one channel of
   scalar numbers or booleans gives a `Series` indexed by a `DatetimeIndex`
   of `epoch + origin + times`, else a `TimedeltaIndex` of `times`, by default at the
   finer of the unit and microseconds; a unit finer than nanoseconds needs
@@ -362,9 +362,11 @@ so.
   A series without a unit gives an `Index` of its numbers and takes no
   `resolution`.
 - [ ] **I3.** [2] Several channels give a `DataFrame` indexed by the union of
-  the channels' times, with `NaN` where a channel has no observation.
-  Tests: round trip of a `DataFrame`; channels with different times give
-  the union with `NaN`.
+  the channels' times, each column holding its channel's value in effect
+  there, and `NaN` outside the channel's domain.
+  Tests: round trip of a `DataFrame`; channels with different times hold
+  their values and give `NaN` outside their domains; integer channels in
+  their domains stay integers.
 
 ## Phase J: windows and embeddings of pandas input
 

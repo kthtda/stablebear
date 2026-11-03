@@ -353,3 +353,35 @@ def test_to_pandas_without_pandas_says_pandas_is_needed(monkeypatch):
 
     with pytest.raises(ImportError, match="needs the pandas package"):
         series.to_pandas()
+
+
+def test_to_pandas_of_several_channels_gives_back_a_data_frame():
+    index = pd.DatetimeIndex(["2023-01-01T01:00", "2023-01-01T02:30", "2023-01-02T00:00"])
+    original = pd.DataFrame({0: [1.0, 2.0, 3.0], 1: [4.0, 5.0, 6.0]}, index=index)
+
+    converted = TimeSeries.from_pandas(original).to_pandas()
+
+    pd.testing.assert_frame_equal(converted, original)
+
+
+def test_to_pandas_of_channels_with_different_times_holds_each_value_in_its_domain():
+    # Channel a can be evaluated from 0 s to 2 s, channel b from 0.5 s to 3 s.
+    a = TimeSeries([1.0, 2.0], times=TimeDeltaTensor([0.0, 2.0], "s"))
+    b = TimeSeries([10.0, 20.0, 30.0], times=TimeDeltaTensor([500.0, 1000.0, 3000.0], "ms"))
+
+    converted = TimeSeries.from_channels([a, b], unit="s").to_pandas()
+
+    expected = pd.DataFrame({0: [1.0, 1.0, 1.0, 2.0, np.nan], 1: [np.nan, 10.0, 20.0, 20.0, 30.0]},
+                            index=pd.to_timedelta([0, 500, 1000, 2000, 3000], unit="ms").as_unit("us"))
+    pd.testing.assert_frame_equal(converted, expected)
+
+
+def test_to_pandas_of_integer_channels_in_their_domains_keeps_integers():
+    # Channel b has an observation at 1 s, where channel a holds 1.
+    a = TimeSeries([1, 2], times=TimeDeltaTensor([0.0, 2.0], "s"))
+    b = TimeSeries([10, 20, 30], times=TimeDeltaTensor([0.0, 1.0, 2.0], "s"))
+
+    converted = TimeSeries.from_channels([a, b]).to_pandas()
+
+    assert converted[0].tolist() == [1, 1, 2]
+    assert converted.dtypes.tolist() == [np.int64, np.int64]

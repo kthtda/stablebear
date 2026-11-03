@@ -95,8 +95,10 @@ These settle the open questions of the issue.
   rounding to nanoseconds, which can merge times, is chosen explicitly.
 - `TimeSeries.to_pandas()` returns, for one channel, a `Series` with that
   index. For several channels it returns a `DataFrame` with columns `0` to
-  `n_channels - 1`, indexed by the union of the channels' times, with
-  `NaN` where a channel has no observation at a time.
+  `n_channels - 1`, indexed by the union of the channels' times. Each
+  column holds its channel's value in effect at each time, as `evaluate`
+  gives it, and `NaN` outside the channel's domain, so a column keeps its
+  integer or boolean dtype when every time lies in its domain.
 - Only observations of shape `()` that are numbers or booleans can be
   converted; other series raise `TypeError`.
 - If pandas is not installed, it raises `ImportError` saying that the
