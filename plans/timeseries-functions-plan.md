@@ -1,6 +1,6 @@
 # Time series follow-ups: implementation plan
 
-Progress: 3 of 10 items, 8 of 19 points (42%)
+Progress: 4 of 11 items, 9 of 21 points (43%)
 
 Specs: [timeseries-functions-spec.md](timeseries-functions-spec.md)
 (phase A, #265) and
@@ -29,29 +29,51 @@ Specs: [timeseries-functions-spec.md](timeseries-functions-spec.md)
 
 ## Phase B: point clouds from time series (#267)
 
-- [ ] **B1.** [1] Write `plans/timeseries-point-clouds-spec.md`, settling
+- [x] **B1.** [1] (fb46ea98b) Write `plans/timeseries-point-clouds-spec.md`, settling
   the open questions of #267: the name and signature, what a series of
   scalar observations gives, how channels combine, and whether "every
   observation" includes the start of the domain and the end of a window.
-- [ ] **B2.** [3] `to_point_clouds` in its "every observation" mode: a
-  series gives a `PointCloud` of one point per stored time, and a
-  `TimeSeriesTensor`, such as windows, a `PointCloudTensor` whose clouds
-  can differ in size, with `channels="join"` or `"separate"`.
+- [ ] **B2.** [2] `TimeSeries.stack_channels(axis=0)` stacks the channels of
+  a series into one, as the
+  [point cloud spec](timeseries-point-clouds-spec.md) describes. The work
+  is in C++, in `include/sbear/timeseries/stack_channels.hpp`, using the
+  C++ `stack` so that its shape check and `axis` match `sb.stack`; the
+  Python method sits next to `from_channels`. Its docstring has a
+  `.. warning::` that observations can be dropped or repeated: those
+  outside the domain, or at an end the domain leaves out, are dropped, and
+  one in effect at several of the times is repeated at each.
+  Tests: scalar channels give vectors at the times of any channel in the
+  domain and its start; vector channels with `axis` 0, 1, and -1; channels
+  of PCFs; a window keeps its open start and origin; the unit and epoch
+  stay; channels of different shapes or origins, and an `axis` out of
+  range, raise.
+- [ ] **B3.** [3] `to_point_clouds(series)` in its "every observation"
+  mode: a series of one channel gives a `PointCloud` of one point per
+  stored time, and a `TimeSeriesTensor`, such as windows, a
+  `PointCloudTensor` whose clouds can differ in size. The work is in C++,
+  in `include/sbear/timeseries/point_clouds.hpp`, with the tensor version
+  filling the clouds with `parallel_walk`; name its parameter
+  `seriesTensor`, not `series`. The bindings go in
+  `register_derived_element`, behind a check that the element type is a
+  number other than `bool`; the Python function only checks its argument
+  and calls C++.
   Tests: a delay embedding gives its points; windows give clouds of their
-  own sizes, including the value at time 0; scalars give 1-D clouds;
-  joined channels give one point per time of any channel, separate ones a
-  cloud each; `float32` gives `pcloud32`; unsupported observations raise.
-- [ ] **B3.** [2] The uniform grid mode: `n` points, or points every
+  own sizes, including the value at time 0; partial windows give smaller
+  clouds; scalars give 1-D clouds; integers give float64 clouds; a pandas
+  `Series`; a series or windows of several channels raise, naming
+  `stack_channels`; `float32` gives `pcloud32`; booleans and matrices
+  raise.
+- [ ] **B4.** [2] The uniform grid mode: `n` points, or points every
   `step`, over each series' domain from its time 0.
   Tests: `n` and `step` give the same cloud where they agree; `n` with
   closed, half-open, and open domains; windows of one size give clouds of
   one size; a step that does not divide the domain; an open start leaves
   out the start; more than one mode raises.
-- [ ] **B4.** [1] The given-times mode: durations, or numbers for a series
+- [ ] **B5.** [1] The given-times mode: durations, or numbers for a series
   without a unit, as `evaluate` takes them.
   Tests: equals evaluating at those times; times outside the domain
   raise.
-- [ ] **B5.** [2] A guide section on point clouds from time series, and
+- [ ] **B6.** [2] A guide section on point clouds from time series, and
   the tide gauge tutorial builds its window clouds with it instead of
   evaluating on a grid by hand.
 
