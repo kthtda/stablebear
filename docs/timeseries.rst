@@ -15,8 +15,8 @@ timestamps a unit::
    times_ms = TimeDeltaTensor([0.0, 1000.0, 1500.0, 3500.0], "ms")
    series_ms = TimeSeries([1.0, 3.0, 2.0, 4.0], times=times_ms)
 
-Both time series hold the same observations; ``series_ms`` reads query
-times in milliseconds, so ``series_ms(1500.0)`` equals ``series(1.5)``.
+Both time series hold the same observations; ``series_ms`` takes durations,
+so ``series_ms(1500.0, "ms")`` equals ``series(1.5)``.
 
 This page covers evaluation and units, which every other operation on a
 time series builds on. The pages listed at the end cover channels, delay
@@ -75,13 +75,13 @@ A time series holds its timestamps in one physical unit, from attoseconds
 (``"as"``) to days (``"d"``), or without a unit, as plain numbers;
 :doc:`timeseries_units` lists the units.
 
-A time series reads query times, window sizes, and delays in its unit, which
-:py:meth:`TimeSeries.to <stablebear.timeseries.TimeSeries.to>` changes
-without converting the stored timestamps. A unit passed as the second
-argument of :py:meth:`~stablebear.timeseries.TimeSeries.evaluate` applies to
-that query only::
+A time series with a unit is queried at durations, and
+:py:meth:`TimeSeries.to <stablebear.timeseries.TimeSeries.to>` changes its
+unit without converting the stored timestamps. A unit passed as the second
+argument of :py:meth:`~stablebear.timeseries.TimeSeries.evaluate` reads
+numbers as counts of it::
 
-   series(1500.0, "ms")  # 2.0, the same as series(1.5)
+   series_ms(1500.0, "ms")  # 2.0, the same as series_ms(1.5, "s")
 
 Working with time series
 ------------------------

@@ -43,22 +43,22 @@ channels with this domain shaded. The squares are a query at ``t = 0.1``.
 The query returns one value from each channel. A query outside the shaded
 domain raises an error, even where ``a`` alone has observations::
 
-   series(0.1)  # OK
-   series(0.0)  # ValueError: Time 0 is outside the domain [0.05, 0.13]
+   series(0.1, "s")  # OK
+   series(0.0, "s")  # ValueError: Time 0 is outside the domain [0.05, 0.13]
 
 Evaluating several channels gives a
 :py:class:`~stablebear.nested_tensor.NestedTensor` with one entry per
 channel, in channel order, since channels can hold observations of different
 shapes. Index it by channel to get each channel's value::
 
-   values = series(0.1)
+   values = series(0.1, "s")
    float(values[0])  # 2.0, from a
    float(values[1])  # 20.0, from b
 
 With several query times, each entry holds that channel's values at all of
 them::
 
-   values = series([0.06, 0.1])
+   values = series([0.06, 0.1], "s")
    values[0]  # FloatTensor [1.0, 2.0], from a
    values[1]  # FloatTensor [10.0, 20.0], from b
 

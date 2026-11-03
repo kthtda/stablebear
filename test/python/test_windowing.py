@@ -698,6 +698,41 @@ def test_windows_reject_an_unknown_unit():
         windows([0.0, 1.0], "fortnight")
 
 
+def test_windows_at_numbers_of_a_unit_equal_the_windows_at_their_durations():
+    windows = _overlapping_windows()
+
+    assert windows(1500.0, "ms").array_equal(windows(TimeDelta(1500.0, "ms")))
+    assert windows([0.0, 1500.0], "ms").array_equal(windows(TimeDeltaTensor([0.0, 1500.0], "ms")))
+
+
+@pytest.mark.parametrize("t", [pytest.param(1.5, id="single"), pytest.param([0.0, 1.5], id="many")])
+def test_windows_with_a_unit_reject_numbers_without_unit(t):
+    with pytest.raises(TypeError, match="have a unit"):
+        _overlapping_windows()(t)
+
+
+def _windows_without_a_unit():
+    series = TimeSeries([0.0, 5.0, 15.0, 25.0, 40.0], times=[0.0, 0.5, 1.5, 2.5, 4.0])
+    return Window(size=2.0, step=2.0, closed="left", partial=False, anchor="start")(series)
+
+
+def test_windows_without_a_unit_take_numbers():
+    windows = _windows_without_a_unit()
+
+    assert windows(0.5).array_equal(sb.FloatTensor([5.0, 25.0], dtype=sb.float64))
+    assert windows([0.0, 0.5]).array_equal(sb.FloatTensor([[0.0, 5.0], [15.0, 25.0]], dtype=sb.float64))
+
+
+@pytest.mark.parametrize("t, unit", [
+    pytest.param(TimeDelta(0.5, "s"), None, id="duration"),
+    pytest.param(TimeDeltaTensor([0.0, 0.5], "s"), None, id="durations"),
+    pytest.param(0.5, "s", id="unit"),
+])
+def test_windows_without_a_unit_reject_durations_and_units(t, unit):
+    with pytest.raises(TypeError, match="without a unit"):
+        _windows_without_a_unit()(t, unit)
+
+
 def test_windows_of_several_channels_evaluate_to_one_leaf_per_channel():
     # A's observations are 10 * t and B's are -10 * t, with t in seconds; B
     # starts 0.5 s after A. Both are observed from 0.5 to 2.5, so the windows
@@ -747,9 +782,9 @@ def test_evaluating_windows_outside_a_window_raises_naming_its_position():
     message = "TimeSeries at position (1): Time 1.5 is outside the domain [0, 1]"
     with pytest.raises(ValueError, match=re.escape(message)):
         windows(TimeDeltaTensor([0.0, 1.5], "s"))
-    message = "TimeSeries at position (0): Time nan is outside the domain [0, 2)"
+    message = "TimeSeries at position (0): Time 2.5 is outside the domain [0, 2)"
     with pytest.raises(ValueError, match=re.escape(message)):
-        windows([0.0, np.nan, 1.0])
+        windows(TimeDeltaTensor([0.0, 2.5, 1.0], "s"))
 
 
 @pytest.mark.parametrize("round_trip", ROUND_TRIPS)

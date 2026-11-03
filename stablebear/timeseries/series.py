@@ -117,6 +117,29 @@ def _times_in(counts, unit):
     return counts if unit is None else TimeDeltaTensor(counts, unit)
 
 
+def _numbers(t):
+    """``t`` as a float or a ``FloatTensor`` if it holds plain numbers, else
+    ``None``."""
+    if isinstance(t, (FloatTensor, IntTensor)):
+        return FloatTensor(np.asarray(t, dtype=np.float64))
+    if isinstance(t, (bool, np.bool_, Tensor, str)) or _as_time_delta(t) is not None:
+        return None
+    if isinstance(t, (int, float, np.integer, np.floating)):
+        return float(t)
+    array = _as_array(t)
+    if array.dtype.kind not in "iuf":
+        return None
+    return FloatTensor(np.asarray(array, dtype=np.float64))
+
+
+def _with_unit(t, unit):
+    """Numbers ``t`` read as counts of ``unit``, as durations."""
+    numbers = _numbers(t)
+    if numbers is None:
+        raise TypeError(f"Durations and dates have no unit; pass unit only with numbers, as in series(90, {unit!r})")
+    return _times_in(numbers, unit)
+
+
 def _native_times(times, unit=None, epoch=None):
     """The native times of ``times``, as the constructor of
     :class:`TimeSeries` accepts them, in ``unit`` and counted from ``epoch``;
@@ -670,28 +693,33 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         """Each channel's observation with the largest timestamp at or before ``t``.
 
         A ``t`` just below a timestamp snaps forward to it, by each
-        channel's own ``snap_tolerance``; see the constructor. ``t`` is in ``unit``, which defaults to the series'
-        unit and accepts the units of :class:`TimeDelta`, and must lie in the
-        domain of every channel; see :class:`TimeSeries`.
+        channel's own ``snap_tolerance``; see the constructor. ``t`` must lie
+        in the domain of every channel; see :class:`TimeSeries`.
 
-        ``t`` is a single time or an array-like or ``FloatTensor`` of times
-        of shape ``t_shape``. Many times are evaluated together: they are
-        sorted once and merged with each channel's timestamps. Numeric times
-        and durations count from the series' own time 0, which for a window
-        is its start. A duration is a :class:`TimeDelta`, a tuple
-        ``(count, unit)`` such as ``(90, "min")``, or a value
-        :class:`TimeDelta` accepts, such as ``np.timedelta64(90, "m")``.
-        Many durations are a :class:`TimeDeltaTensor`, a tuple
-        ``(counts, unit)``, or an array, sequence, or pandas
-        ``TimedeltaIndex`` of durations. Durations are converted to the
-        series' unit by an exact factor and take no ``unit``. For a series with an
+        ``t`` is a single time or many, of shape ``t_shape``. Many times are
+        evaluated together: they are sorted once and merged with each
+        channel's timestamps. Times count from the series' own time 0, which
+        for a window is its start.
+
+        A series with a :attr:`unit` takes durations. A duration is a
+        :class:`TimeDelta`, a tuple ``(count, unit)`` such as
+        ``(90, "min")``, or a value :class:`TimeDelta` accepts, such as
+        ``np.timedelta64(90, "m")``. Many durations are a
+        :class:`TimeDeltaTensor`, a tuple ``(counts, unit)``, or an array,
+        sequence, or pandas ``TimedeltaIndex`` of durations. Durations are
+        converted to the series' unit by an exact factor. With ``unit``,
+        ``t`` is a number or numbers of it: ``series(90, "min")`` is
+        ``series(TimeDelta(90, "min"))``. For a series with an
         :attr:`epoch`, ``t`` may also be a date and time, a :class:`DateTime`
         or anything it accepts, such as ``"2023-01-01T12:30"``, or a
         :class:`DateTimeTensor`, an array, a pandas ``DatetimeIndex``, or a
-        pandas ``Series`` of them. A
-        date names an instant, not an offset: it is placed at
-        ``t - epoch - origin`` in each channel, so a window gives the value
-        it held at that instant, as the series it was cut from does.
+        pandas ``Series`` of them. A date names an instant, not an offset:
+        it is placed at ``t - epoch - origin`` in each channel, so a window
+        gives the value it held at that instant, as the series it was cut
+        from does.
+
+        A series without a unit takes plain numbers: a number, or an
+        array-like or ``FloatTensor`` of them, and no ``unit``.
 
         For one channel and a single time, returns a scalar or element for
         observations of shape ``()``, otherwise a tensor of that shape; for
@@ -705,46 +733,57 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         ValueError
             If a time is outside the domain of any channel, or a channel has
             no observations, or if ``unit`` is unknown.
+        TypeError
+            For numbers without ``unit`` on a series with a unit, or for
+            durations, dates, or ``unit`` on a series without one.
         """
+        if unit is not None:
+            if self.unit is None:
+                raise TypeError("A series without a unit takes plain numbers; pass no unit")
+            t = _with_unit(t, unit)
+        numbers = _numbers(t)
+        if numbers is not None:
+            if self.unit is not None:
+                raise TypeError(f"This series has a unit, so its times are durations; pass the unit, "
+                                f"as in series(t, {self.unit!r}), or a TimeDelta")
+            return self._evaluate_numbers(numbers)
+        if self.unit is None:
+            raise TypeError("A series without a unit takes plain numbers, not durations or dates")
         if isinstance(t, (str, datetime.date, np.datetime64, DateTime)):
-            if unit is not None:
-                raise TypeError("A date and time has no unit; pass unit only with numeric times")
             return self._evaluate_date(DateTime(t).to_datetime64())
         if isinstance(t, DateTimeTensor):
-            if unit is not None:
-                raise TypeError("Dates and times have no unit; pass unit only with numeric times")
             return self._evaluate_date(t.to_datetime64())
         duration = _as_time_delta(t)
         if duration is not None:
-            if unit is not None:
-                raise TypeError("A duration has no unit; pass unit only with numeric times")
-            return self.evaluate(_in_unit(duration, self.unit))
-        if not isinstance(t, (Tensor, int, float, np.integer, np.floating)):
+            return self._evaluate_numbers(_in_unit(duration, self.unit))
+        if not isinstance(t, Tensor):
             # Lists, arrays, and pandas objects, such as a DatetimeIndex.
             t = _as_array(t)
             durations = _durations_in(t, self.unit)
             if durations is not None:
-                if unit is not None:
-                    raise TypeError("Durations have no unit; pass unit only with numeric times")
-                return self.evaluate(durations)
+                return self._evaluate_numbers(FloatTensor(np.asarray(durations, dtype=np.float64)))
         if isinstance(t, np.ndarray) and t.dtype.kind in "MOUS":
             # Dates and times, as datetime64, strings, or datetimes.
             try:
                 dates = np.asarray(t, dtype="datetime64")
             except (TypeError, ValueError):
-                raise TypeError("Times must be all numbers or all dates and times, not a mix") from None
-            if unit is not None:
-                raise TypeError("Dates and times have no unit; pass unit only with numeric times")
+                raise TypeError("Times must be all durations or all dates and times, not a mix") from None
             return self._evaluate_date(_checked_dates(dates))
-        if isinstance(t, (int, float, np.integer, np.floating)):
-            values = NestedTensor._from_cpp(self._data.evaluate(float(t), unit))
-            if self.n_channels > 1:
-                return values
-            leaf = values[0]
-            return leaf[()] if leaf.ndim == 0 else leaf
-        times = FloatTensor(np.asarray(t, dtype=np.float64))
-        values = NestedTensor._from_cpp(self._data.evaluate(times._data, unit))
-        return values if self.n_channels > 1 else values[0]
+        raise TypeError(f"Expected durations or dates and times, not {type(t).__name__}")
+
+    def _evaluate_numbers(self, t):
+        """Evaluate at ``t``, a float or an array or ``FloatTensor`` of times
+        in :attr:`unit`."""
+        if np.ndim(t) > 0:
+            t = FloatTensor(np.asarray(t, dtype=np.float64))
+        if isinstance(t, FloatTensor):
+            values = NestedTensor._from_cpp(self._data.evaluate(t._data, None))
+            return values if self.n_channels > 1 else values[0]
+        values = NestedTensor._from_cpp(self._data.evaluate(float(t), None))
+        if self.n_channels > 1:
+            return values
+        leaf = values[0]
+        return leaf[()] if leaf.ndim == 0 else leaf
 
     def __call__(self, t, unit: str | None = None):
         """``series(t, unit)`` is ``series.evaluate(t, unit)``."""
@@ -790,7 +829,7 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
             return float(t) if np.ndim(t) == 0 else FloatTensor(np.asarray(t, dtype=np.float64))
 
         if self.n_channels == 1:
-            return self.evaluate(query(0))
+            return self._evaluate_numbers(query(0))
         # Channels of a window can have different origins, so each is
         # queried at its own time.
         leaves = []
@@ -865,10 +904,9 @@ class TimeSeriesTensor(Tensor):
 
     def evaluate(self, t, unit: str | None = None):
         """Every series evaluated at the times ``t``, as
-        :meth:`TimeSeries.evaluate` does. Numeric ``t`` is in ``unit`` for
-        every series, or in each series' own unit if ``unit`` is omitted.
-        Durations, as :meth:`TimeSeries.evaluate` takes them, count from each
-        series' time 0 and take no ``unit``.
+        :meth:`TimeSeries.evaluate` does: durations, or numbers of ``unit``,
+        for series with a unit, and plain numbers without ``unit`` for series
+        without one. Times count from each series' time 0.
 
         ``t`` is a single time or an array-like or ``FloatTensor`` of times
         of shape ``t_shape``. For series with one channel, returns a tensor
@@ -889,21 +927,27 @@ class TimeSeriesTensor(Tensor):
             If a time is outside the domain of a series, or the tensor is
             empty or its series differ in channels or shapes, or if
             ``unit`` is unknown.
+        TypeError
+            For numbers without ``unit`` on series with a unit, or for
+            durations or ``unit`` on series without one.
         """
+        if unit is not None:
+            t = _with_unit(t, unit)
+        # Durations are queried in their own unit, to which C++ converts each
+        # series, so that they are not rounded.
         duration = _as_time_delta(t)
         if duration is not None:
-            if unit is not None:
-                raise TypeError("A duration has no unit; pass unit only with numeric times")
-            return self.evaluate(_in_unit(duration, duration.unit), duration.unit)
+            return self._evaluate(_in_unit(duration, duration.unit), duration.unit)
         if not isinstance(t, (Tensor, int, float, np.integer, np.floating)):
             t = _as_array(t)
             finest = _finest_duration_unit(t)
             if finest is not None:
-                if unit is not None:
-                    raise TypeError("Durations have no unit; pass unit only with numeric times")
-                # Queried in their own unit, to which C++ converts each
-                # series, so that the durations are not rounded.
-                return self.evaluate(_durations_in(t, finest), finest)
+                return self._evaluate(_durations_in(t, finest), finest)
+        return self._evaluate(t, None)
+
+    def _evaluate(self, t, unit):
+        """Evaluate at numbers ``t`` of ``unit``, or of no unit if ``unit``
+        is ``None``."""
         times = FloatTensor(np.asarray(t, dtype=np.float64))
         values = NestedTensor._from_cpp(
             cpp.evaluate_series(self._data, times._data, unit))

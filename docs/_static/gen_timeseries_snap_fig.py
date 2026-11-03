@@ -48,7 +48,7 @@ def plot_timeseries_channels():
                    times=TimeDeltaTensor([50.0, 90.0, 130.0], "ms"))
     series = TimeSeries.from_channels([a, b], unit="s")
     query = 0.1
-    values = series(query)
+    values = series(query, "s")
 
     fig, axes = plt.subplots(2, 1, figsize=(6, 3.5), sharex=True)
     for i, (ax, channel, top) in enumerate(zip(axes, (a, b), (5, 40))):

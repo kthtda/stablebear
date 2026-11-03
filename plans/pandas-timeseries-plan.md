@@ -1,6 +1,6 @@
 # pandas input and durations for time series: implementation plan
 
-Progress: 42 of 56 items, 84 of 111 points (76%)
+Progress: 44 of 56 items, 89 of 111 points (80%)
 
 Specs: [pandas-timeseries-spec.md](pandas-timeseries-spec.md) (phases A, B,
 and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
@@ -279,7 +279,7 @@ so.
 
 ## Phase G: numbers mean a series without a unit
 
-- [ ] **G1.** [3] Series without a unit: C++ gains a `TimeUnit` that
+- [x] **G1.** [3] (1547f1f8a) Series without a unit: C++ gains a `TimeUnit` that
   converts only to itself, saved and loaded as any unit. `TimeSeries` of
   numbers and `from_pandas` of a numeric index without `unit` give one,
   with `unit` `None`; `epoch=` and `with_epoch` on it raise
@@ -301,7 +301,7 @@ so.
   raises `TypeError` when applied.
   Tests: `Window(size=3.0)` on both kinds; `TimeDelayEmbedding(2, 1.0)`
   likewise; durations on a series without a unit raise.
-- [ ] **G4.** [2] A series without a unit gives numbers: `times` is a
+- [x] **G4.** [2] (1547f1f8a) A series without a unit gives numbers: `times` is a
   `FloatTensor`, `domain` has float ends, `origin` is a float or a
   `FloatTensor`, and `return_bounds` gives a `FloatTensor`;
   `plot_timeseries` labels its axis "time" and raises on an axis with a

@@ -23,16 +23,7 @@ namespace
   {
     m.def("evaluate_series", [](const sb::Tensor<sb::TimeSeries<T>>& series, const sb::Tensor<sb::float64_t>& t,
                                 const std::optional<std::string>& unit) {
-      if (!unit)
-      {
-        return sb::evaluate(series, t);
-      }
-      // Each series reads the queries in @p unit; the copies share their
-      // observations with @p series.
-      const auto target = sb::parse_time_unit(*unit);
-      sb::Tensor<sb::TimeSeries<T>> converted(std::vector<size_t>(series.shape().begin(), series.shape().end()));
-      sb::walk(series, [&](const std::vector<size_t>& index) { converted(index) = series(index).to(target); });
-      return sb::evaluate(converted, t);
+      return sb::evaluate(series, t, unit ? std::optional(sb::parse_time_unit(*unit)) : std::nullopt);
     }, nb::arg("series"), nb::arg("t"), nb::arg("unit") = nb::none(), nb::call_guard<nb::gil_scoped_release>());
     m.def("delay_embed", [](const sb::TimeSeries<T>& series, size_t dimension, sb::float64_t delay, bool forward) {
       return sb::delay_embed(series, dimension, delay, forward);

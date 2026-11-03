@@ -597,7 +597,7 @@ def test_series_evaluates_to_previous_value():
     assert series(TimeDelta(1.5, "s")) == 20.0
     assert series(TimeDelta(3.75, "s")) == 20.0
     assert series(TimeDelta(4.0, "s")) == 30.0
-    assert series(1) == 10.0
+    assert series(1, "s") == 10.0
 
 
 @pytest.mark.parametrize("t", [TimeDelta(-0.5, "s"), TimeDelta(4.5, "s")])
@@ -1165,6 +1165,41 @@ def test_evaluate_rejects_an_unknown_unit():
         series(0.25, "fortnight")
 
 
+def test_series_at_numbers_of_a_unit_equals_the_series_at_their_durations():
+    series = TimeSeries([10.0, 20.0, 30.0], times=TimeDeltaTensor([0.0, 1.5, 4.0], "s"))
+
+    assert series(1500.0, "ms") == series(TimeDelta(1500.0, "ms"))
+    assert series([0.0, 1500.0, 3000.0], "ms").array_equal(series(TimeDeltaTensor([0.0, 1500.0, 3000.0], "ms")))
+
+
+@pytest.mark.parametrize("t", [pytest.param(1.5, id="single"), pytest.param([0.0, 1.5], id="many")])
+def test_series_with_a_unit_rejects_numbers_without_unit(t):
+    series = TimeSeries([10.0, 20.0, 30.0], times=TimeDeltaTensor([0.0, 1.5, 4.0], "s"))
+
+    with pytest.raises(TypeError, match=re.escape("series(t, 's')")):
+        series(t)
+
+
+def test_series_without_a_unit_takes_numbers():
+    series = TimeSeries([10.0, 20.0, 30.0], times=[0.0, 1.5, 4.0])
+
+    assert series(1.5) == 20.0
+    assert series([0.0, 1.5, 4.0]).array_equal(sb.FloatTensor([10.0, 20.0, 30.0], dtype=sb.float64))
+
+
+@pytest.mark.parametrize("t, unit", [
+    pytest.param(TimeDelta(1.5, "s"), None, id="duration"),
+    pytest.param(TimeDeltaTensor([0.0, 1.5], "s"), None, id="durations"),
+    pytest.param("2023-01-01", None, id="date"),
+    pytest.param(1.5, "s", id="unit"),
+])
+def test_series_without_a_unit_rejects_durations_dates_and_units(t, unit):
+    series = TimeSeries([10.0, 20.0, 30.0], times=[0.0, 1.5, 4.0])
+
+    with pytest.raises(TypeError, match="without a unit"):
+        series(t, unit)
+
+
 def _channel_a():
     return TimeSeries([10.0, 20.0, 30.0], times=TimeDeltaTensor([0.0, 1.0, 2.5], "s"))
 
@@ -1298,7 +1333,7 @@ def test_many_times_snap_and_check_the_domain_like_single_times():
     with pytest.raises(ValueError, match="outside the domain"):
         series(TimeDeltaTensor([0.0, 4.5], "s"))
     with pytest.raises(ValueError, match="outside the domain"):
-        series([0.0, np.nan, 4.0])
+        TimeSeries([10.0, 20.0, 30.0], times=[0.0, 1.5, 4.0])([0.0, np.nan, 4.0])
 
 
 @pytest.mark.parametrize("index", [1, -1])

@@ -269,6 +269,6 @@ followed by the axes of the times. In the second window, ``a`` changes from
 1.0 to 2.0 at 0.01 s, with its observation at 0.1 s, while ``b`` keeps its
 observation 20.0 from 0.09 s::
 
-   values = windows([0.0, 0.02])
+   values = windows([0.0, 0.02], "s")
    values[0]  # [[1.0, 1.0], [1.0, 2.0]], from a
    values[1]  # [[10.0, 10.0], [20.0, 20.0]], from b

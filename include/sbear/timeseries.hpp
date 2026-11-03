@@ -3,6 +3,7 @@
 
 #include "algorithms/gallop.hpp"
 #include "config.hpp"
+#include "errors.hpp"
 #include "nested_tensor.hpp"
 #include "tensor.hpp"
 #include "walk.hpp"
@@ -178,6 +179,21 @@ namespace sb
       else if constexpr (std::ratio_equal_v<Period, std::ratio<3600>>) return TimeUnit::Hours;
       else if constexpr (std::ratio_equal_v<Period, std::ratio<86400>>) return TimeUnit::Days;
       else static_assert(sizeof(Period) == 0, "No time unit has this period");
+    }
+  }
+
+  /// Throw TypeError unless times in @p queryUnit suit a series in
+  /// @p seriesUnit: durations, which come with a unit, for a series with
+  /// one, and plain numbers for a series without one.
+  inline void check_query_unit(TimeUnit queryUnit, TimeUnit seriesUnit)
+  {
+    if (queryUnit != TimeUnit::Unitless && seriesUnit == TimeUnit::Unitless)
+    {
+      throw TypeError("A series without a unit takes plain numbers, not durations");
+    }
+    if (queryUnit == TimeUnit::Unitless && seriesUnit != TimeUnit::Unitless)
+    {
+      throw TypeError("These series have a unit, so their times are durations, not plain numbers");
     }
   }
 
@@ -659,9 +675,11 @@ namespace sb
   template <typename T>
   inline constexpr bool is_timeseries_v = is_timeseries<T>::value;
 
-  /// Every series of @p series evaluated at the times @p t, each in its own
-  /// unit, as TimeSeries::evaluate does: one leaf per channel, in channel
+  /// Every series of @p series evaluated at the times @p t, counts of
+  /// @p unit, as TimeSeries::evaluate does: one leaf per channel, in channel
   /// order, of shape (*series.shape(), *t.shape(), *shape) of that channel.
+  /// Without @p unit, @p t are plain numbers, which only series without a
+  /// unit take; times of the wrong kind throw TypeError.
   /// Requires every series to have the same number of channels and channel
   /// shapes, and @p series to be non-empty. A time outside the domain of a
   /// series throws std::domain_error naming the first such series'
@@ -669,6 +687,7 @@ namespace sb
   /// The series are evaluated in parallel on @p exec.
   template <typename T>
   [[nodiscard]] NestedTensor<T> evaluate(const Tensor<TimeSeries<T>>& series, const Tensor<float64_t>& t,
+                                         std::optional<TimeUnit> unit = std::nullopt,
                                          Executor& exec = default_executor());
 }
 

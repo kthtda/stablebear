@@ -82,7 +82,7 @@ A time series with an epoch can be evaluated at dates and times, given as
 anything :py:class:`~stablebear.timeseries.DateTime` accepts or as an array
 of them::
 
-   series("2023-01-01T07:00")  # 3.0, the same as series(1.0)
+   series("2023-01-01T07:00")  # 3.0, the same as series(1.0, "h")
    series(np.array(["2023-01-01T06:15", "2023-01-01T07:45"],
                    dtype="datetime64[m]"))  # [1.0, 3.0]
 

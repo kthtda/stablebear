@@ -56,9 +56,9 @@ def _assert_series(actual, expected):
         for evaluation in channel["evaluations"]:
             if evaluation.get("outside"):
                 with pytest.raises(ValueError, match="outside the domain"):
-                    one(evaluation["t"])
+                    one(evaluation["t"], one.unit)
             else:
-                _assert_array(one(evaluation["t"]), evaluation["value"])
+                _assert_array(one(evaluation["t"], one.unit), evaluation["value"])
 
 
 def _assert_expected(actual, expected):

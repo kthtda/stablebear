@@ -1,5 +1,6 @@
 #include "nb.hpp"
 
+#include <sbear/errors.hpp>
 #include <sbear/executor.hpp>
 #include <sbear/task.hpp>
 
@@ -107,6 +108,17 @@ namespace
 }
 
 NB_MODULE(SB_MODULE_NAME, m) {
+  nb::register_exception_translator([](const std::exception_ptr& p, void*) {
+    try
+    {
+      std::rethrow_exception(p);
+    }
+    catch (const sb::TypeError& e)
+    {
+      PyErr_SetString(PyExc_TypeError, e.what());
+    }
+  });
+
   sb_py::register_pcf(m);
 
   register_bindings_stoppable_task<void>(m, "_void");

@@ -614,8 +614,10 @@ namespace sb
   }
 
   template <typename T>
-  NestedTensor<T> evaluate(const Tensor<TimeSeries<T>>& series, const Tensor<float64_t>& t, Executor& exec)
+  NestedTensor<T> evaluate(const Tensor<TimeSeries<T>>& series, const Tensor<float64_t>& t,
+                           std::optional<TimeUnit> unit, Executor& exec)
   {
+    const auto queryUnit = unit.value_or(TimeUnit::Unitless);
     if (series.size() == 0)
     {
       throw std::invalid_argument("Cannot evaluate an empty tensor of series");
@@ -641,6 +643,7 @@ namespace sb
     // series that cannot be evaluated, whichever worker would reach it.
     walk(series, [&](const std::vector<size_t>& index) {
       const auto& one = series(index);
+      check_query_unit(queryUnit, one.unit());
       if (one.n_channels() != first.n_channels())
       {
         throw std::invalid_argument("Every series must have the same number of channels");
@@ -657,8 +660,9 @@ namespace sb
         return;
       }
       const auto domain = one.domain();
-      for (const auto x : {queries[order.front()], queries[order.back()]})
+      for (const auto query : {queries[order.front()], queries[order.back()]})
       {
+        const auto x = convert_time(query, queryUnit, one.unit());
         if (!domain.contains(x))
         {
           std::string position;
@@ -688,7 +692,7 @@ namespace sb
           const auto& channel = one.channel(c);
           for (size_t q = 0; q < order.size(); ++q)
           {
-            sorted[q] = convert_time(queries[order[q]], one.unit(), channel.unit());
+            sorted[q] = convert_time(queries[order[q]], queryUnit, channel.unit());
           }
           const auto blockSize = leaves[c].size() / series.size();
           channel.lookup_sorted(sorted, order, leaves[c].data() + static_cast<std::ptrdiff_t>(k * blockSize));
