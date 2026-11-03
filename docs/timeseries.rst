@@ -110,8 +110,9 @@ signal into points that trace its dynamics, and windows cut a time series into
 pieces that can be compared with each other.
 Snapping covers query times such as ``0.3 - 0.1`` that land a rounding error
 below the timestamp they mean. Dates and times covers series recorded with
-dates, queried at dates, and cut into windows of durations, and Plotting
-shows how to draw time series and their windows.
+dates, queried at dates, and cut into windows of durations. From pandas
+converts a pandas ``Series`` or ``DataFrame`` into a time series and back,
+and Plotting shows how to draw time series and their windows.
 The notebook :doc:`tutorial_notebooks/timeseries_tides` combines delay
 embeddings and windows to follow the tides in a tide gauge record with
 stable ranks.
@@ -125,4 +126,5 @@ stable ranks.
    timeseries_windows
    timeseries_snapping
    timeseries_dates
+   timeseries_pandas
    timeseries_plotting
