@@ -1,10 +1,6 @@
 #include "py_timeseries.hpp"
 #include "py_timeseries_bind.hpp"
 
-#include <nanobind/ndarray.h>
-
-#include <algorithm>
-#include <optional>
 #include <string>
 
 namespace nb = nanobind;
@@ -26,33 +22,6 @@ namespace sb_py
         return std::string(sb::time_unit_name(self.unit));
       })
       .def("__eq__", [](const sb::DateTime& self, const sb::DateTime& other) { return self == other; });
-
-    nb::class_<sb::Times>(m, "Times")
-      .def("__init__", [](sb::Times* self, nb::ndarray<const sb::float64_t, nb::c_contig, nb::device::cpu> values,
-                          const std::optional<std::string>& unit, const std::optional<sb::DateTime>& epoch) {
-        if (values.ndim() != 1)
-        {
-          throw std::invalid_argument(
-              "Timestamps must be one-dimensional, got " + std::to_string(values.ndim()) + " dimensions");
-        }
-        std::vector<sb::float64_t> data(values.data(), values.data() + values.size());
-        new (self) sb::Times(std::move(data), unit ? sb::parse_time_unit(*unit) : sb::TimeUnit::Unitless, epoch);
-      }, nb::arg("values"), nb::arg("unit"), nb::arg("epoch") = nb::none())
-      .def_prop_ro("values", [](const sb::Times& self) {
-        // A copy: timestamps cannot change after validation.
-        sb::Tensor<sb::float64_t> out({self.size()});
-        std::copy(self.values().begin(), self.values().end(), out.data());
-        return out;
-      })
-      .def_prop_ro("unit", [](const sb::Times& self) { return unit_name(self.unit()); })
-      .def_prop_ro("epoch", &sb::Times::epoch)
-      .def_prop_ro("origin", &sb::Times::origin)
-      .def("with_epoch", &sb::Times::with_epoch, nb::arg("epoch"))
-      .def("to", [](const sb::Times& self, const std::string& unit) {
-        return self.to(sb::parse_time_unit(unit));
-      }, nb::arg("unit"))
-      .def("__len__", &sb::Times::size)
-      .def("__eq__", [](const sb::Times& self, const sb::Times& other) { return self == other; });
 
     register_typed_timeseries<bool>(m, "Bool");
     register_timeseries_float(m);

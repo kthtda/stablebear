@@ -519,7 +519,7 @@ def plot_timeseries(series, ax=None, *, unit=None, relative=False, markers=False
         if axis_unit is not None:
             series = series.to(axis_unit)
     offset = 0.0 if relative else series._data.origin(0)
-    times = np.asarray(series._data.times(0).values) + offset
+    times = np.asarray(series._data.times(0)) + offset
     values = np.asarray(series.values)
     if values.ndim != 1:
         raise ValueError(f"Can only plot scalar observations, not observations of shape {series.shape}")

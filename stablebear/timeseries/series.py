@@ -89,15 +89,15 @@ def _durations_in(values, unit):
 
 
 def _times_from_datetimes(stamps, unit, epoch):
-    """The native times of ``datetime64`` stamps counted from ``epoch``, or
-    from the first stamp, in ``unit``."""
+    """The times of ``datetime64`` stamps counted from ``epoch``, or from the
+    first stamp, in ``unit``, as :func:`_native_times` gives them."""
     if epoch is None:
         if stamps.size == 0:
             raise ValueError("Pass an epoch for an empty array of dates and times")
         epoch = stamps.reshape(-1)[0]
     epoch = DateTime(epoch)
-    # Integer differences at the finer of the two resolutions; cpp.Times.to then
-    # converts them to unit by one exact factor.
+    # Integer differences at the finer of the two resolutions, then converted
+    # to unit by one exact factor.
     offsets = stamps - epoch.to_datetime64()
     if np.isnat(offsets).any():
         raise ValueError("Dates and times cannot be NaT")
@@ -105,7 +105,8 @@ def _times_from_datetimes(stamps, unit, epoch):
     if code not in _NUMPY_TO_UNIT:
         raise ValueError(f"Dates and times need a resolution of fixed length, not {code!r}")
     counts = offsets.astype(np.int64).astype(np.float64) * step
-    return cpp.Times(counts, _NUMPY_TO_UNIT[code], epoch._data).to(unit)
+    unit = _unit_name(unit)
+    return _in_unit(TimeDeltaTensor(FloatTensor(counts), _NUMPY_TO_UNIT[code]), unit), unit, epoch._data
 
 
 def _times_in(counts, unit):
@@ -141,9 +142,10 @@ def _with_unit(t, unit):
 
 
 def _native_times(times, unit=None, epoch=None):
-    """The native times of ``times``, as the constructor of
-    :class:`TimeSeries` accepts them, in ``unit`` and counted from ``epoch``;
-    a plain array is in ``unit``, by default none."""
+    """The times of ``times``, as the constructor of :class:`TimeSeries`
+    accepts them, in ``unit`` and counted from ``epoch``, as a tuple of the
+    timestamps, a float64 array, the unit, and the native epoch or ``None``.
+    A plain array is in ``unit``, by default none."""
     times = _from_pair(times)
     if isinstance(times, TimeDeltaTensor):
         # Counts in one unit, by default theirs, converted by one exact
@@ -163,8 +165,8 @@ def _native_times(times, unit=None, epoch=None):
         # Durations as dates after 1970-01-01, so that they are converted
         # to unit in integers, as dates are.
         origin = np.datetime64(0, code)  # pyright: ignore[reportCallIssue, reportArgumentType]
-        return _times_from_datetimes(origin + times, unit, origin).with_epoch(
-            None if epoch is None else DateTime(epoch)._data)
+        values, unit, _ = _times_from_datetimes(origin + times, unit, origin)
+        return values, unit, None if epoch is None else DateTime(epoch)._data
     finest = _finest_duration_unit(times)
     if finest is not None:
         # TimeDelta and other durations, by default in the finest of
@@ -172,9 +174,7 @@ def _native_times(times, unit=None, epoch=None):
         # of unit, which may be an alias.
         unit = unit or finest
         times = _durations_in(times, _unit_name(unit))
-    if epoch is not None:
-        epoch = DateTime(epoch)._data
-    return cpp.Times(np.asarray(times, dtype=np.float64), unit, epoch)
+    return np.asarray(times, dtype=np.float64), unit, None if epoch is None else DateTime(epoch)._data
 
 
 # Element dtype -> native series class. The tensor class wrapping the values
@@ -261,9 +261,12 @@ def _values_tensor(values):
 
 
 def _native_series(values, times, snap_tolerance):
-    """The native series of ``values`` at native ``times``."""
+    """The native series of ``values`` at ``times``, as :func:`_native_times`
+    gives them."""
+    stamps, unit, epoch = times
     tensor = _values_tensor(values)
-    return _SERIES_NATIVE[tensor.dtype](times, tensor._data, snap_tolerance)
+    return _SERIES_NATIVE[tensor.dtype](np.ascontiguousarray(stamps, dtype=np.float64), unit, epoch, tensor._data,
+                                        snap_tolerance)
 
 
 class Domain(NamedTuple):
@@ -511,7 +514,7 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         """
         if self._data.n_channels > 1:
             raise ValueError("The channels of this series have their own times; select one with series[i].times")
-        return _times_in(np.array(self._data.times(0).values), self.unit)
+        return _times_in(np.array(self._data.times(0)), self.unit)
 
     @property
     def datetimes(self) -> DateTimeTensor:

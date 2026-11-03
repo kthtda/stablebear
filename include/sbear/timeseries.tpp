@@ -199,40 +199,31 @@ namespace sb
   }
 
   template <typename T>
-  Channel<T> Channel<T>::with_epoch(std::optional<DateTime> epoch) const
+  Channel<T> Channel<T>::to(TimeUnit from, TimeUnit to) const
   {
-    auto channel = *this;
-    channel.m_times = std::make_shared<const Times>(held_times().with_epoch(epoch));
-    return channel;
-  }
-
-  template <typename T>
-  Channel<T> Channel<T>::to(TimeUnit unit) const
-  {
-    const auto from = this->unit();
-    if (unit == from)
+    if (from == to)
     {
       return *this;
     }
     auto channel = *this;
-    channel.m_times = std::make_shared<const Times>(held_times().to(unit));
+    channel.m_times = std::make_shared<const Times>(held_times().to(from, to));
     if (m_end)
     {
-      channel.m_end = convert_time(*m_end, from, unit);
+      channel.m_end = convert_time(*m_end, from, to);
     }
     for (auto& lag : channel.m_lags)
     {
-      lag = convert_time(lag, from, unit);
+      lag = convert_time(lag, from, to);
     }
     if (m_source)
     {
-      channel.m_source = std::make_shared<const Channel>(m_source->to(unit));
+      channel.m_source = std::make_shared<const Channel>(m_source->to(from, to));
     }
     return channel;
   }
 
   template <typename T>
-  Channel<T> Channel<T>::shifted(float64_t delta, std::optional<DateTime> epoch) const
+  Channel<T> Channel<T>::shifted(float64_t delta) const
   {
     auto channel = *this;
     auto values = held_times().values();
@@ -240,7 +231,7 @@ namespace sb
     {
       value += delta;
     }
-    channel.m_times = std::make_shared<const Times>(held_times().with_values(std::move(values)).with_epoch(epoch));
+    channel.m_times = std::make_shared<const Times>(held_times().with_values(std::move(values)));
     if (m_end)
     {
       channel.m_end = *m_end + delta;
@@ -248,7 +239,7 @@ namespace sb
     // A view reads its source at its own times minus its lags.
     if (m_source)
     {
-      channel.m_source = std::make_shared<const Channel>(m_source->shifted(delta, epoch));
+      channel.m_source = std::make_shared<const Channel>(m_source->shifted(delta));
     }
     return channel;
   }
@@ -270,11 +261,9 @@ namespace sb
   template <typename T>
   bool Channel<T>::same_observations(const Channel& other) const
   {
-    const auto& times = held_times();
-    const auto& otherTimes = other.held_times();
     return m_snapTolerance == other.m_snapTolerance && m_shape == other.m_shape
            && m_end == other.m_end && end_closed() == other.end_closed() && m_startClosed == other.m_startClosed
-           && times.unit() == otherTimes.unit() && times.values() == otherTimes.values() && values() == other.values();
+           && held_times().values() == other.held_times().values() && values() == other.values();
   }
 
   template <typename T>
@@ -437,20 +426,14 @@ namespace sb
   }
 
   template <typename T>
-  TimeSeries<T>::TimeSeries(std::vector<Channel<T>> channels, TimeUnit unit)
-    : m_channels(std::move(channels)), m_unit(unit)
+  TimeSeries<T>::TimeSeries(std::vector<Channel<T>> channels, TimeUnit unit, std::optional<DateTime> epoch)
+    : m_channels(std::move(channels)), m_unit(unit), m_epoch(epoch)
   {
     if (m_channels.empty())
     {
       throw std::invalid_argument("A time series needs at least one channel");
     }
-    for (const auto& channel : m_channels)
-    {
-      if (channel.unit() != m_unit)
-      {
-        throw std::invalid_argument("Every channel must be in the unit of the series");
-      }
-    }
+    check_epoch(m_unit, m_epoch);
   }
 
   template <typename T>
@@ -460,6 +443,8 @@ namespace sb
     {
       throw std::invalid_argument("A time series needs at least one channel");
     }
+    const auto& front = parts.front();
+    const auto target = unit.value_or(front.unit());
     std::vector<Channel<T>> channels;
     channels.reserve(parts.size());
     for (const auto& part : parts)
@@ -468,21 +453,21 @@ namespace sb
       {
         throw std::invalid_argument("Each channel must be a one-channel series; select channels with series[i]");
       }
-      check_same_kind_of_unit(part.unit(), parts.front().unit());
-      if (!unit && part.unit() != parts.front().unit())
+      check_same_kind_of_unit(part.unit(), front.unit());
+      if (!unit && part.unit() != front.unit())
       {
         throw std::invalid_argument("The channels differ in unit; pass unit= to choose one");
       }
-      check_same_kind_of_unit(part.unit(), unit.value_or(part.unit()));
-      channels.push_back(part.m_channels.front().to(unit.value_or(part.unit())));
+      check_same_kind_of_unit(part.unit(), target);
       // One epoch for the series: every channel has the same one, or none.
       // Python counts dated channels from one epoch before combining them.
-      if (channels.back().epoch() != parts.front().m_channels.front().epoch())
+      if (part.epoch() != front.epoch())
       {
         throw std::invalid_argument("The channels have different epochs; give every channel an epoch, or none");
       }
+      channels.push_back(part.m_channels.front().to(part.unit(), target));
     }
-    return TimeSeries(std::move(channels), unit.value_or(parts.front().unit()));
+    return TimeSeries(std::move(channels), target, front.epoch());
   }
 
   template <typename T>
@@ -500,16 +485,20 @@ namespace sb
       }
       channels.push_back(m_channels[static_cast<size_t>(i < 0 ? i + n : i)]);
     }
-    return TimeSeries(std::move(channels), m_unit);
+    return TimeSeries(std::move(channels), m_unit, m_epoch);
   }
 
   template <typename T>
   TimeSeries<T> TimeSeries<T>::to(TimeUnit unit) const
   {
+    if (unit == TimeUnit::Unitless && m_unit != TimeUnit::Unitless)
+    {
+      throw std::invalid_argument("Times in a unit cannot become plain numbers");
+    }
     auto series = *this;
     for (auto& channel : series.m_channels)
     {
-      channel = channel.to(unit);
+      channel = channel.to(m_unit, unit);
     }
     series.m_unit = unit;
     return series;
@@ -518,22 +507,22 @@ namespace sb
   template <typename T>
   TimeSeries<T> TimeSeries<T>::with_epoch(std::optional<DateTime> epoch) const
   {
+    check_epoch(m_unit, epoch);
     auto series = *this;
-    for (auto& channel : series.m_channels)
-    {
-      channel = channel.with_epoch(epoch);
-    }
+    series.m_epoch = epoch;
     return series;
   }
 
   template <typename T>
   TimeSeries<T> TimeSeries<T>::shifted(float64_t delta, std::optional<DateTime> epoch) const
   {
+    check_epoch(m_unit, epoch);
     auto series = *this;
     for (auto& channel : series.m_channels)
     {
-      channel = channel.shifted(delta, epoch);
+      channel = channel.shifted(delta);
     }
+    series.m_epoch = epoch;
     return series;
   }
 

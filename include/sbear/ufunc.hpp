@@ -225,7 +225,7 @@ namespace sb
         }
         channels.push_back(std::move(channel));
       }
-      return TimeSeries<Out>(std::move(channels), m_input.unit());
+      return TimeSeries<Out>(std::move(channels), m_input.unit(), m_input.epoch());
     }
 
   private:

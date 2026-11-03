@@ -1,6 +1,6 @@
 # pandas input and durations for time series: implementation plan
 
-Progress: 45 of 58 items, 90 of 117 points (77%)
+Progress: 47 of 58 items, 94 of 117 points (80%)
 
 Specs: [pandas-timeseries-spec.md](pandas-timeseries-spec.md) (phases A, B,
 and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
@@ -296,7 +296,7 @@ so.
   numbers without `unit`, naming `series(t, unit)`.
   Tests: both kinds of series, single and many times; tensor likewise.
   Note: keeps the `unit` argument, which this item first removed.
-- [ ] **G3.** [1] `Window` and `TimeDelayEmbedding` take numbers for a
+- [x] **G3.** [1] (364d763ae) `Window` and `TimeDelayEmbedding` take numbers for a
   series without a unit and durations for one with a unit; the other kind
   raises `TypeError` when applied.
   Tests: `Window(size=3.0)` on both kinds; `TimeDelayEmbedding(2, 1.0)`
@@ -310,7 +310,7 @@ so.
   label and the raise.
   Note: done with G1, since the docs mix, plot, and bound series of
   numbers.
-- [ ] **G5.** [3] The unit is storage: `TimeSeries.to(unit)` converts each
+- [x] **G5.** [3] (364d763ae) The unit is storage: `TimeSeries.to(unit)` converts each
   channel's times, end, origin, and view lags and source by one exact
   factor (`Channel::to`), `from_channels` converts every channel into the
   series' unit, and a series requires all channels in its unit. The

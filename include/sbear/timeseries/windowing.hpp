@@ -181,7 +181,7 @@ namespace sb
         window = window.with_start_closed(startClosed);
         channels.push_back(std::move(window));
       }
-      contents.emplace_back(std::move(channels), series.unit());
+      contents.emplace_back(std::move(channels), series.unit(), series.epoch());
     }
 
     Tensor<TimeSeries<T>> windowTensor({contents.size()});

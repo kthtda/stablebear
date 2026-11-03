@@ -186,7 +186,7 @@ namespace sb
     {
       channels.push_back(delay_embed(series.channel(c), dimension, delay, forward));
     }
-    return TimeSeries<T>(std::move(channels), series.unit());
+    return TimeSeries<T>(std::move(channels), series.unit(), series.epoch());
   }
 }
 

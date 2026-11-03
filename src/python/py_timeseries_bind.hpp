@@ -8,7 +8,9 @@
 #include <sbear/tensor.hpp>
 #include <sbear/timeseries.hpp>
 
+#include <nanobind/ndarray.h>
 
+#include <algorithm>
 #include <optional>
 #include <string>
 #include <vector>
@@ -49,7 +51,6 @@ namespace sb_py
     using Series = sb::TimeSeries<T>;
 
     nb::class_<Channel>(m, ("TimeSeriesChannel" + suffix).c_str())
-      .def_prop_ro("times", &Channel::times)
       .def_prop_ro("shape", [](const Channel& self) {
         return nb::tuple(nb::cast(self.shape()));
       })
@@ -58,8 +59,18 @@ namespace sb_py
       .def("__len__", &Channel::size);
 
     nb::class_<Series>(m, ("TimeSeries" + suffix).c_str())
-      .def(nb::init<sb::Times, const sb::Tensor<T>&, sb::float64_t>(),
-           nb::arg("times"), nb::arg("values"), nb::arg("snap_tolerance"))
+      .def("__init__", [](Series* self, nb::ndarray<const sb::float64_t, nb::c_contig, nb::device::cpu> times,
+                          const std::optional<std::string>& unit, const std::optional<sb::DateTime>& epoch,
+                          const sb::Tensor<T>& values, sb::float64_t snapTolerance) {
+        if (times.ndim() != 1)
+        {
+          throw std::invalid_argument(
+              "Timestamps must be one-dimensional, got " + std::to_string(times.ndim()) + " dimensions");
+        }
+        std::vector<sb::float64_t> data(times.data(), times.data() + times.size());
+        new (self) Series(sb::Times(std::move(data)), values, snapTolerance,
+                          unit ? sb::parse_time_unit(*unit) : sb::TimeUnit::Unitless, epoch);
+      }, nb::arg("times"), nb::arg("unit"), nb::arg("epoch"), nb::arg("values"), nb::arg("snap_tolerance"))
       .def_static("from_channels",
                   [](const std::vector<Series>& parts,
                      const std::optional<std::string>& unit) {
@@ -74,11 +85,17 @@ namespace sb_py
       .def_prop_ro("unit", [](const Series& self) { return unit_name(self.unit()); })
       .def("to", [](const Series& self, const std::string& unit) { return self.to(sb::parse_time_unit(unit)); },
            nb::arg("unit"))
-      .def("times", &Series::times, nb::arg("index"))
+      .def("times", [](const Series& self, size_t index) {
+        // A copy: timestamps cannot change after validation.
+        const auto times = self.channel(index).times();
+        sb::Tensor<sb::float64_t> out({times.size()});
+        std::copy(times.values().begin(), times.values().end(), out.data());
+        return out;
+      }, nb::arg("index"))
       .def("origin", [](const Series& self, size_t index) { return self.channel(index).origin(); }, nb::arg("index"))
       .def("channel", &Series::channel, nb::arg("index"), nb::rv_policy::reference_internal)
       .def_prop_ro("n_channels", &Series::n_channels)
-      .def_prop_ro("epoch", [](const Series& self) { return self.channel(0).epoch(); })
+      .def_prop_ro("epoch", &Series::epoch)
       .def("with_epoch", &Series::with_epoch, nb::arg("epoch"))
       .def("shifted", &Series::shifted, nb::arg("delta"), nb::arg("epoch"))
       .def_prop_ro("domain", [](const Series& self) {
