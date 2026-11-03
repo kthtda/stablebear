@@ -9,10 +9,32 @@ from .date_time import TimeDeltaTensor, _duration, _in_unit, _ScalarDuration
 from .series import TimeSeries, TimeSeriesTensor, _PandasLike, _as_series, _times_in
 
 
-class Window:
-    """Consecutive windows of a time series.
+_CLOSED = {"left": (True, False), "right": (False, True), "both": (True, True), "none": (False, False)}
 
-    ``Window(size, step, anchor="start")(series)`` returns a 1-D tensor of
+
+@overload
+def cut_windows(series: TimeSeries | _PandasLike, size: float | _ScalarDuration,
+                step: float | _ScalarDuration | None = None, *,
+                closed: Literal["left", "right", "both", "none"] | None = None, partial: bool = False,
+                anchor: Literal["start", "end"] = "end",
+                return_bounds: Literal[False] = False) -> TimeSeriesTensor: ...
+
+
+@overload
+def cut_windows(series: TimeSeries | _PandasLike, size: float | _ScalarDuration,
+                step: float | _ScalarDuration | None = None, *,
+                closed: Literal["left", "right", "both", "none"] | None = None, partial: bool = False,
+                anchor: Literal["start", "end"] = "end",
+                return_bounds: Literal[True]) -> tuple[TimeSeriesTensor, Any]: ...  # Bounds are dates if the series has an epoch.
+
+
+def cut_windows(series: TimeSeries | _PandasLike, size: float | _ScalarDuration,
+                step: float | _ScalarDuration | None = None, *,
+                closed: Literal["left", "right", "both", "none"] | None = None, partial: bool = False,
+                anchor: Literal["start", "end"] = "end", return_bounds: bool = False):
+    """Cut a time series into consecutive windows.
+
+    ``cut_windows(series, size, step, anchor="start")`` returns a 1-D tensor of
     dtype ``sb.series(series.dtype)`` with one window per start time
     ``a_k = t_0 + k * step``, while ``a_k + size`` is at most the last time
     at which every channel of ``series`` can be evaluated; ``t_0`` is the
@@ -26,7 +48,7 @@ class Window:
     ``partial=True`` they continue while ``b_k`` is in the domain, and a
     window that would start before ``t_0`` starts where ``series`` does.
     They still come in chronological order, so the last window ends at
-    ``t_1``. With ``return_bounds=True`` it returns the tensor and a tensor
+    ``t_1``. With ``return_bounds=True`` it also returns a tensor
     of shape ``(n_windows, 2)`` whose row ``k`` is ``(a_k, a_k + size)``: a
     :class:`TimeDeltaTensor` of durations from the time 0 of ``series``, in
     its unit, or for a series with an :attr:`~TimeSeries.epoch`, a
@@ -66,6 +88,8 @@ class Window:
 
     Parameters
     ----------
+    series : TimeSeries, pandas.Series, or pandas.DataFrame
+        The series to cut.
     size : float, TimeDelta, tuple, np.timedelta64, datetime.timedelta, or pd.Timedelta
         The length of each window, positive. A duration such as
         ``(25, "h")``, ``TimeDelta(25, "h")``, or ``np.timedelta64(25, "h")``
@@ -90,58 +114,41 @@ class Window:
     anchor : {"start", "end"}, default "end"
         Whether the windows are taken from the start of the series going
         forward, or from its end going back.
+    return_bounds : bool, default False
+        Whether to also return the bounds of the windows.
+
+    Returns
+    -------
+    TimeSeriesTensor, or tuple of TimeSeriesTensor and bounds
+        The windows, and with ``return_bounds=True`` their bounds.
 
     Raises
     ------
     ValueError
-        On a ``size`` or ``step`` that is not finite and positive, or an
-        unknown ``closed`` or ``anchor``. When
-        called, if a channel has no observations or ``size`` is longer
-        than the time during which every channel has observations and
-        ``partial`` is false, so that no window fits.
+        On a ``size`` or ``step`` that is not finite and positive, an
+        unknown ``closed`` or ``anchor``, or if a channel has no
+        observations or ``size`` is longer than the time during which every
+        channel has observations and ``partial`` is false, so that no
+        window fits.
     TypeError
-        When called, for numbers on a series with a unit, or durations on
-        a series without one, or on an object that is not a
-        :class:`TimeSeries` or a pandas ``Series`` or ``DataFrame``.
+        For numbers on a series with a unit, or durations on a series
+        without one, or for an object that is not a :class:`TimeSeries` or
+        a pandas ``Series`` or ``DataFrame``.
     """
-
-    _CLOSED = {"left": (True, False), "right": (False, True), "both": (True, True), "none": (False, False)}
-
-    def __init__(self, size: float | _ScalarDuration,
-                 step: float | _ScalarDuration | None = None,
-                 closed: Literal["left", "right", "both", "none"] | None = None, partial: bool = False,
-                 anchor: Literal["start", "end"] = "end"):
-        self.size = _duration(size, "The window size must be finite and positive")
-        self.step = self.size if step is None else _duration(step, "The window step must be finite and positive")
-        if anchor not in ("start", "end"):
-            raise ValueError(f"anchor must be 'start' or 'end', not {anchor!r}")
-        self.anchor = anchor
-        if closed is None:
-            closed = "left" if anchor == "start" else "right"
-        if closed not in self._CLOSED:
-            raise ValueError(f"closed must be 'left', 'right', 'both', or 'none', not {closed!r}")
-        self.closed = closed
-        self.partial = bool(partial)
-
-    @overload
-    def __call__(self, series: TimeSeries | _PandasLike,
-                 return_bounds: Literal[False] = False) -> TimeSeriesTensor: ...
-
-    @overload
-    def __call__(self, series: TimeSeries | _PandasLike,
-                 return_bounds: Literal[True]) -> tuple[TimeSeriesTensor, Any]: ...  # Bounds are dates if the series has an epoch.
-
-    def __call__(self, series: TimeSeries | _PandasLike, return_bounds: bool = False):
-        series = _as_series(series)
-        windows, bounds = cpp.windows(series._data, _in_unit(self.size, series.unit), _in_unit(self.step, series.unit),
-                                      *self._CLOSED[self.closed], self.partial, self.anchor == "end")
-        if return_bounds:
-            return TimeSeriesTensor(windows), _bounds_as_instants(series, np.asarray(bounds))
-        return TimeSeriesTensor(windows)
-
-    def __repr__(self):
-        return (f"Window(size={self.size!r}, step={self.step!r}, closed={self.closed!r}, partial={self.partial}, "
-                f"anchor={self.anchor!r})")
+    size = _duration(size, "The window size must be finite and positive")
+    step = size if step is None else _duration(step, "The window step must be finite and positive")
+    if anchor not in ("start", "end"):
+        raise ValueError(f"anchor must be 'start' or 'end', not {anchor!r}")
+    if closed is None:
+        closed = "left" if anchor == "start" else "right"
+    if closed not in _CLOSED:
+        raise ValueError(f"closed must be 'left', 'right', 'both', or 'none', not {closed!r}")
+    series = _as_series(series)
+    windows, bounds = cpp.windows(series._data, _in_unit(size, series.unit), _in_unit(step, series.unit),
+                                  *_CLOSED[closed], bool(partial), anchor == "end")
+    if return_bounds:
+        return TimeSeriesTensor(windows), _bounds_as_instants(series, np.asarray(bounds))
+    return TimeSeriesTensor(windows)
 
 
 def _bounds_as_instants(series, bounds):

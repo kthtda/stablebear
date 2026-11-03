@@ -10,7 +10,7 @@ from stablebear.persistence import (
     barcode_to_stable_rank,
     compute_persistent_homology,
 )
-from stablebear.timeseries import TimeDelta, TimeDeltaTensor, TimeSeries, Window
+from stablebear.timeseries import TimeDelta, TimeDeltaTensor, TimeSeries, cut_windows
 
 
 def _clouds(dtype, np_dtype):
@@ -215,7 +215,7 @@ def test_summary_of_a_series_keeps_channels_and_times(summary):
 def test_persistence_and_summaries_keep_the_domain_of_a_window():
     series = TimeSeries(_clouds(sb.pcloud64, np.float64), times=TimeDeltaTensor([0.0, 1.0, 3.0], "s"))
     # The window (0, 2) holds the clouds at 0 and 1.
-    window = Window(size=TimeDelta(2.0, "s"), step=TimeDelta(2.0, "s"), closed="none", anchor="start")(series)[0]
+    window = cut_windows(series, size=TimeDelta(2.0, "s"), step=TimeDelta(2.0, "s"), closed="none", anchor="start")[0]
 
     barcodes = compute_persistent_homology(window, max_dim=0)
     stable_ranks = barcode_to_stable_rank(barcodes)

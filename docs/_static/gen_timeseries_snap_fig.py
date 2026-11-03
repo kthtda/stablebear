@@ -7,7 +7,7 @@ import numpy as np
 from pathlib import Path
 from typing import Literal
 
-from stablebear.timeseries import TimeDelayEmbedding, TimeDelta, TimeDeltaTensor, TimeSeries, Window
+from stablebear.timeseries import TimeDelayEmbedding, TimeDelta, TimeDeltaTensor, TimeSeries, cut_windows
 
 HERE = Path(__file__).parent
 
@@ -267,8 +267,9 @@ def plot_timeseries_embedding():
 def plot_timeseries_windows():
     signal = TimeSeries([0.0, 0.0, 0.0, 1.0, 2.0, 3.0, 2.0, 1.0, 0.0],
                         times=TimeDeltaTensor(np.arange(9.0), "s"))
-    windows, bounds = Window(size=TimeDelta(4, "s"), step=TimeDelta(2, "s"),
-                             anchor="start")(signal, return_bounds=True)
+    windows, bounds = cut_windows(signal, size=TimeDelta(4, "s"),
+                                  step=TimeDelta(2, "s"), anchor="start",
+                                  return_bounds=True)
     bounds = np.asarray(bounds.count)
     color = plt.rcParams["lines.color"]
 
@@ -310,8 +311,9 @@ def plot_timeseries_windows():
 
 
 def _plot_window_rows(rows, stacked=False):
-    """Plot ``signal`` above one row of window bars per (label, Window), or
-    with ``stacked``, the windows of the one Window each on its own row."""
+    """Plot ``signal`` above one row of window bars per (label, arguments of
+    cut_windows), or with ``stacked``, the windows of the one set of
+    arguments each on its own row."""
     signal = TimeSeries([0.0, 0.0, 0.0, 1.0, 2.0, 3.0, 2.0, 1.0, 0.0],
                         times=TimeDeltaTensor(np.arange(9.0), "s"))
     color = plt.rcParams["lines.color"]
@@ -319,7 +321,7 @@ def _plot_window_rows(rows, stacked=False):
     t0, t1 = 0.0, 8.0
     bars = []  # (row, height offset, a, b, window)
     for row, (label, window) in enumerate(rows):
-        _, bounds = window(signal, return_bounds=True)
+        _, bounds = cut_windows(signal, **window, return_bounds=True)
         for k, (a, b) in enumerate(np.asarray(bounds.count)):
             if stacked:
                 bars.append((k, 0.0, a, b, window))
@@ -345,9 +347,11 @@ def _plot_window_rows(rows, stacked=False):
     # and closed where they are cut at the end of the series.
     for row, offset, a, b, window in bars:
         y = n_rows - 1 - row + offset
-        partial = b - a < window.size.count
-        closed_a = window.closed in ("left", "both") or (partial and a == t0)
-        closed_b = window.closed in ("right", "both") or (partial and b == t1)
+        # Windows are closed at their anchor by default.
+        closed = window.get("closed", "left" if window.get("anchor") == "start" else "right")
+        partial = b - a < window["size"].count
+        closed_a = closed in ("left", "both") or (partial and a == t0)
+        closed_b = closed in ("right", "both") or (partial and b == t1)
         ax_rows.plot([a, b], [y, y], color="tab:orange", linewidth=2,
                      linestyle="--" if partial else "-")
         for x, closed in ((a, closed_a), (b, closed_b)):
@@ -366,8 +370,8 @@ def _plot_window_rows(rows, stacked=False):
 # -- included in docs via literalinclude :pyobject: --
 def plot_timeseries_window_anchors():
     return _plot_window_rows([
-        ('anchor="start"', Window(size=TimeDelta(3, "s"), anchor="start")),
-        ('anchor="end"', Window(size=TimeDelta(3, "s"))),
+        ('anchor="start"', dict(size=TimeDelta(3, "s"), anchor="start")),
+        ('anchor="end"', dict(size=TimeDelta(3, "s"))),
     ])
 
 
@@ -380,8 +384,8 @@ def plot_timeseries_window_closed():
 
     fig, ax = plt.subplots(figsize=(7, 3.0))
     for row, closed in enumerate(choices):
-        window = Window(size=TimeDelta(3, "s"), anchor="start", closed=closed)
-        _, bounds = window(signal, return_bounds=True)
+        _, bounds = cut_windows(signal, size=TimeDelta(3, "s"), anchor="start",
+                                closed=closed, return_bounds=True)
         for k, (a, b) in enumerate(np.asarray(bounds.count)):
             # Alternate heights so that the shared end at 3 s stays visible.
             y = len(choices) - 1 - row + (0.15 if k % 2 else -0.15)
@@ -406,16 +410,16 @@ def plot_timeseries_window_closed():
 def plot_timeseries_window_partial():
     return _plot_window_rows([
         ('anchor="start"',
-         Window(size=TimeDelta(3, "s"), anchor="start", partial=True)),
-        ('anchor="end"', Window(size=TimeDelta(3, "s"), partial=True)),
+         dict(size=TimeDelta(3, "s"), anchor="start", partial=True)),
+        ('anchor="end"', dict(size=TimeDelta(3, "s"), partial=True)),
     ])
 
 
 # -- included in docs via literalinclude :pyobject: --
 def plot_timeseries_window_partial_overlap():
     return _plot_window_rows([
-        ("", Window(size=TimeDelta(6, "s"), step=TimeDelta(3, "s"), anchor="start",
-                    partial=True)),
+        ("", dict(size=TimeDelta(6, "s"), step=TimeDelta(3, "s"), anchor="start",
+                  partial=True)),
     ], stacked=True)
 
 

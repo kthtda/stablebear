@@ -3,7 +3,7 @@ __before = set(dir())
 from .embedding import TimeDelayEmbedding
 from .date_time import DateTime, DateTimeTensor, TimeDelta, TimeDeltaTensor
 from .series import Domain, TimeSeries
-from .window import Window
+from .window import cut_windows
 
 import types as _types
 __all__ = sorted(

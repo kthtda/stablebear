@@ -14,7 +14,7 @@ class TimeDelayEmbedding:
     The embedding of a channel ``x`` with ``dimension`` ``m`` and ``delay``
     ``d`` looks back by default: it evaluates at every time ``t`` from
     ``t_0 + (m - 1) * d`` to the end of the channel's domain, its last
-    observation or, for a window (:class:`Window`), the window's end, to the
+    observation or, for a window (:func:`cut_windows`), the window's end, to the
     point ``(x(t - (m - 1) * d), ..., x(t - d), x(t))``. With
     ``direction="forward"``, it evaluates at every time ``t`` from ``t_0`` to
     the end of the domain minus ``(m - 1) * d``, to the point

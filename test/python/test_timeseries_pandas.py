@@ -7,7 +7,7 @@ import pytest
 
 import stablebear as sb
 
-from stablebear.timeseries import DateTime, DateTimeTensor, TimeDelayEmbedding, TimeDelta, TimeDeltaTensor, TimeSeries, Window
+from stablebear.timeseries import DateTime, DateTimeTensor, TimeDelayEmbedding, TimeDelta, TimeDeltaTensor, TimeSeries, cut_windows
 
 pd = pytest.importorskip("pandas")
 
@@ -17,10 +17,10 @@ import sys
 sys.modules["pandas"] = None
 
 import numpy as np
-from stablebear.timeseries import TimeDelayEmbedding, TimeDelta, TimeDeltaTensor, TimeSeries, Window
+from stablebear.timeseries import TimeDelayEmbedding, TimeDelta, TimeDeltaTensor, TimeSeries, cut_windows
 
 series = TimeSeries(np.array([1.0, 2.0, 3.0, 4.0]), TimeDeltaTensor([0.0, 1.0, 2.0, 3.0], "s"))
-windows = Window(TimeDelta(1.0, "s"), TimeDelta(1.0, "s"), closed="left", partial=False, anchor="start")(series)
+windows = cut_windows(series, TimeDelta(1.0, "s"), TimeDelta(1.0, "s"), closed="left", partial=False, anchor="start")
 embedded = TimeDelayEmbedding(2, TimeDelta(1.0, "s"), direction="backward")(series)
 print(len(windows), embedded.n_observations)
 """
@@ -254,19 +254,21 @@ def test_series_at_a_timedelta_index_equals_series_at_its_array():
 def test_window_size_of_one_nanosecond_timedelta():
     series = TimeSeries(np.array([1.0, 2.0, 3.0, 4.0]), TimeDeltaTensor([0.0, 1.0, 2.0, 3.0], "ns"))
 
-    windows = Window(pd.Timedelta(1, "ns"), pd.Timedelta(1, "ns"), closed="left", partial=False,
-                     anchor="start")(series)
+    windows = cut_windows(series, pd.Timedelta(1, "ns"), pd.Timedelta(1, "ns"), closed="left", partial=False,
+                          anchor="start")
 
     # Windows [0, 1), [1, 2), [2, 3) ns
     assert len(windows) == 3
 
 
-def test_window_size_and_step_of_timedelta_are_time_deltas_in_nanoseconds():
-    window = Window(size=pd.Timedelta(2, "h"), step=pd.Timedelta(30, "min"), closed="left", partial=False,
-                    anchor="start")
+def test_windows_of_a_pandas_timedelta_size_and_step_equal_those_of_their_time_deltas():
+    series = TimeSeries(np.arange(10.0), times=TimeDeltaTensor(np.arange(10.0), "h"))
 
-    assert window.size == TimeDelta(7_200_000_000_000, "ns")
-    assert window.step == TimeDelta(1_800_000_000_000, "ns")
+    windows = cut_windows(series, size=pd.Timedelta(2, "h"), step=pd.Timedelta(30, "min"), closed="left",
+                          partial=False, anchor="start")
+
+    assert windows.array_equal(cut_windows(series, size=TimeDelta(2, "h"), step=TimeDelta(30, "min"),
+                                           closed="left", partial=False, anchor="start"))
 
 
 def test_embedding_delay_of_timedelta_is_a_time_delta_in_nanoseconds():
@@ -331,8 +333,8 @@ def test_to_pandas_rejects_a_resolution_pandas_does_not_support():
 
 def test_to_pandas_of_a_window_starts_at_its_start_date():
     series = TimeSeries([10.0, 20.0, 30.0], times=TimeDeltaTensor([0.0, 1.5, 4.0], "h"), epoch="2023-01-01")
-    window = Window(size=TimeDelta(2, "h"), step=TimeDelta(1, "h"), closed="left", partial=False,
-                    anchor="start")(series)[1]
+    window = cut_windows(series, size=TimeDelta(2, "h"), step=TimeDelta(1, "h"), closed="left", partial=False,
+                         anchor="start")[1]
 
     converted = window.to_pandas()
 
@@ -393,11 +395,11 @@ def _hours():
 
 def test_windows_of_a_pandas_series_equal_those_of_its_time_series():
     hourly = pd.Series(np.arange(10.0), index=_hours())
-    window = Window(size=TimeDelta(3, "h"), step=TimeDelta(1, "h"), closed="left", partial=False,
-                    anchor="start")
-
-    windows, bounds = window(hourly, return_bounds=True)
-    expected, expected_bounds = window(TimeSeries.from_pandas(hourly), return_bounds=True)
+    windows, bounds = cut_windows(hourly, size=TimeDelta(3, "h"), step=TimeDelta(1, "h"), closed="left",
+                                  partial=False, anchor="start", return_bounds=True)
+    expected, expected_bounds = cut_windows(TimeSeries.from_pandas(hourly), size=TimeDelta(3, "h"),
+                                            step=TimeDelta(1, "h"), closed="left", partial=False, anchor="start",
+                                            return_bounds=True)
 
     assert windows.array_equal(expected)
     assert bounds.array_equal(expected_bounds)

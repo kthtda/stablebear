@@ -3,7 +3,7 @@
 import numpy as np
 import stablebear as sb
 from stablebear.persistence import Barcode
-from stablebear.timeseries import TimeDelta, TimeDeltaTensor, TimeSeries, Window
+from stablebear.timeseries import TimeDelta, TimeDeltaTensor, TimeSeries, cut_windows
 
 from pinned_corpus import write_pinned_corpus
 
@@ -88,8 +88,8 @@ def _windows(closed, windows):
     # Each observation is 10 * t, with none at 3.0, so the window at 1.0 ends
     # after its last observation.
     series = TimeSeries([0.0, 10.0, 20.0, 40.0], times=TimeDeltaTensor([0.0, 1.0, 2.0, 4.0], "s"))
-    tensor = Window(size=TimeDelta(2, "s"), step=TimeDelta(1, "s"), closed=closed, partial=False,
-                    anchor="start")(series)
+    tensor = cut_windows(series, size=TimeDelta(2, "s"), step=TimeDelta(1, "s"), closed=closed, partial=False,
+                         anchor="start")
     expected = {
         "accepted_types": ["TimeSeriesTensor"], "comparison": "series_elements",
         "dtype": "series(float64)", "shape": [len(windows)],

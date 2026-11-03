@@ -8,7 +8,7 @@ from pathlib import Path
 
 from gen_timeseries_snap_fig import DARK, LIGHT, _save_themed
 from stablebear.plotting import plot_timeseries
-from stablebear.timeseries import DateTimeTensor, TimeDelta, TimeDeltaTensor, TimeSeries, Window
+from stablebear.timeseries import DateTimeTensor, TimeDelta, TimeDeltaTensor, TimeSeries, cut_windows
 
 HERE = Path(__file__).parent
 
@@ -28,7 +28,7 @@ def plot_timeseries_steps():
 def plot_timeseries_window_in_place():
     series = TimeSeries([0.0, 0.0, 0.0, 1.0, 2.0, 3.0, 2.0, 1.0, 0.0],
                         times=TimeDeltaTensor(np.arange(9.0), "s"))
-    window = Window(size=TimeDelta(3, "s"), anchor="start")(series)[1]
+    window = cut_windows(series, size=TimeDelta(3, "s"), anchor="start")[1]
 
     fig, ax = plt.subplots(figsize=(6, 2.5))
     plot_timeseries(series, ax=ax, color="gray", linewidth=1)
@@ -71,7 +71,7 @@ def plot_timeseries_sharex():
 def plot_timeseries_windows_relative():
     times = TimeDeltaTensor([0.0, 0.7, 1.9, 2.4, 3.6, 4.9, 5.5, 7.2], "s")
     series = TimeSeries([0.5, 2.0, 1.0, 3.5, 2.5, 0.0, 3.0, 1.5], times=times)
-    windows = Window(size=TimeDelta(2.4, "s"), anchor="start")(series)
+    windows = cut_windows(series, size=TimeDelta(2.4, "s"), anchor="start")
 
     fig, (ax_in_place, ax_relative) = plt.subplots(1, 2, figsize=(8, 2.5))
     plot_timeseries(windows, ax=ax_in_place, markers=True)
@@ -86,7 +86,7 @@ def plot_timeseries_windows_relative():
 def plot_timeseries_some_windows():
     times = TimeDeltaTensor([0.0, 0.7, 1.9, 2.4, 3.6, 4.9, 5.5, 7.2], "s")
     series = TimeSeries([0.5, 2.0, 1.0, 3.5, 2.5, 0.0, 3.0, 1.5], times=times)
-    windows = Window(size=TimeDelta(2.4, "s"), anchor="start")(series)
+    windows = cut_windows(series, size=TimeDelta(2.4, "s"), anchor="start")
 
     fig, ax = plt.subplots(figsize=(6, 2.5))
     plot_timeseries(series, ax=ax, color="gray", linewidth=1)
@@ -116,7 +116,7 @@ def plot_timeseries_dates():
                              "2023-01-01T11:00", "2023-01-01T15:45",
                              "2023-01-01T18:00"])
     series = TimeSeries([2.0, 3.5, 1.0, 2.5, 3.0], times=stamps).to("h")
-    windows = Window(size=TimeDelta(4, "h"), anchor="start")(series)
+    windows = cut_windows(series, size=TimeDelta(4, "h"), anchor="start")
 
     fig, ax = plt.subplots(figsize=(6, 2.5))
     plot_timeseries(series, ax=ax, color="gray", linewidth=1, markers=True)

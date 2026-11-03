@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 
 import stablebear as sb
-from stablebear.timeseries import DateTime, DateTimeTensor, Domain, TimeDelayEmbedding, TimeDelta, TimeDeltaTensor, TimeSeries, Window
+from stablebear.timeseries import DateTime, DateTimeTensor, Domain, TimeDelayEmbedding, TimeDelta, TimeDeltaTensor, TimeSeries, cut_windows
 
 from _element_values import TWO_ELEMENTS_OF_EVERY_DTYPE
 from _round_trip import ROUND_TRIPS
@@ -661,8 +661,8 @@ def test_series_at_a_pair_of_count_and_unit_equals_the_series_at_its_time_delta(
 
 
 def test_windows_at_a_pair_of_counts_and_unit_equal_the_windows_at_their_time_deltas():
-    windows = Window(size=TimeDelta(2.0, "h"), step=TimeDelta(1.0, "h"),
-                     closed="left", partial=False, anchor="start")(_hourly_series())
+    windows = cut_windows(_hourly_series(), size=TimeDelta(2.0, "h"), step=TimeDelta(1.0, "h"), closed="left",
+                          partial=False, anchor="start")
 
     assert windows(([0.0, 30.0], "min")).array_equal(windows(TimeDeltaTensor([0.0, 30.0], "min")))
 
@@ -752,8 +752,8 @@ def test_series_domain_of_several_channels_is_their_intersection():
 ])
 def test_series_domain_of_several_channels_excludes_an_end_any_channel_excludes(closed, expected):
     source = TimeSeries([10.0, 20.0, 30.0, 40.0], times=TimeDeltaTensor([0.0, 1.0, 2.0, 3.0], "s"))
-    window = Window(size=TimeDelta(2.0, "s"), step=TimeDelta(2.0, "s"),
-                    closed=closed, partial=False, anchor="start")(source)[0]
+    window = cut_windows(source, size=TimeDelta(2.0, "s"), step=TimeDelta(2.0, "s"), closed=closed, partial=False,
+                         anchor="start")[0]
     observed = TimeSeries([-10.0, -20.0, -30.0], times=TimeDeltaTensor([0.0, 1.0, 2.0], "s"))
 
     series = TimeSeries.from_channels([window, observed])
@@ -930,8 +930,8 @@ def test_series_at_a_date_outside_its_domain_names_the_dates():
 
 
 def test_window_at_a_date_outside_it_names_its_dates():
-    window = Window(size=TimeDelta(2.0, "h"), step=TimeDelta(1.0, "h"),
-                    closed="left", partial=False, anchor="start")(_dated_series())[1]
+    window = cut_windows(_dated_series(), size=TimeDelta(2.0, "h"), step=TimeDelta(1.0, "h"), closed="left",
+                         partial=False, anchor="start")[1]
 
     with pytest.raises(ValueError, match=re.escape("is outside the domain [2023-01-01T01:00, 2023-01-01T03:00)")):
         window("2023-01-01T03:00")
@@ -949,8 +949,8 @@ def test_window_at_a_date_equals_its_series_at_that_date():
     series = _dated_series()
     # The window covers 01:00 to 03:00; the value changes from 10 to 20 at
     # 01:30.
-    window = Window(size=TimeDelta(2.0, "h"), step=TimeDelta(1.0, "h"),
-                    closed="left", partial=False, anchor="start")(series)[1]
+    window = cut_windows(series, size=TimeDelta(2.0, "h"), step=TimeDelta(1.0, "h"), closed="left", partial=False,
+                         anchor="start")[1]
 
     assert window(np.datetime64("2023-01-01T01:15")) == 10.0
     assert window(np.datetime64("2023-01-01T02:30")) == 20.0
@@ -1042,8 +1042,8 @@ def test_series_window_channel_of_a_later_epoch_keeps_where_it_lies():
     source = TimeSeries([0.0, 10.0, 20.0, 30.0], times=TimeDeltaTensor([0.0, 1.0, 2.0, 3.0], "h"),
                         epoch="2023-01-02")
     # From 01:00 to 03:00 on 2 January
-    window = Window(size=TimeDelta(2.0, "h"), step=TimeDelta(1.0, "h"),
-                    closed="left", partial=False, anchor="start")(source)[1]
+    window = cut_windows(source, size=TimeDelta(2.0, "h"), step=TimeDelta(1.0, "h"), closed="left", partial=False,
+                         anchor="start")[1]
     earlier = TimeSeries([-10.0, -20.0], times=TimeDeltaTensor([0.0, 48.0], "h"), epoch="2023-01-01")
 
     series = TimeSeries.from_channels([window, earlier])
@@ -1153,8 +1153,8 @@ def test_to_converts_the_times():
 def test_to_converts_the_origin_and_the_end_after_the_last_observation():
     # A window starting at 1 s, with observations at 0 s and 1 s and an end at 2 s.
     series = TimeSeries([0.0, 10.0, 20.0, 30.0], times=TimeDeltaTensor([0.0, 1.0, 2.0, 3.0], "s"))
-    window = Window(size=TimeDelta(2, "s"), step=TimeDelta(1, "s"), closed="left", partial=False,
-                    anchor="start")(series)[1]
+    window = cut_windows(series, size=TimeDelta(2, "s"), step=TimeDelta(1, "s"), closed="left", partial=False,
+                         anchor="start")[1]
 
     converted = window.to("ms")
 
@@ -1535,8 +1535,8 @@ def _window_at_one(closed):
     # Each observation is 10 * t; the window at 1.0 holds 10.0 at 0 and 15.0
     # at 0.5, and 20.0 at 1 when its end is closed.
     series = TimeSeries([0.0, 5.0, 10.0, 15.0, 20.0], times=TimeDeltaTensor([0.0, 0.5, 1.0, 1.5, 2.0], "s"))
-    return Window(size=TimeDelta(1.0, "s"), step=TimeDelta(1.0, "s"),
-                  closed=closed, partial=False, anchor="start")(series)[1]
+    return cut_windows(series, size=TimeDelta(1.0, "s"), step=TimeDelta(1.0, "s"), closed=closed, partial=False,
+                       anchor="start")[1]
 
 
 def test_series_array_equal_compares_the_start():
@@ -1554,7 +1554,7 @@ def _gap_window_at_one(size, closed):
     # Each observation is 10 * t, with none at 3.0; the window at 1.0 holds
     # 10.0 at 0 and 20.0 at 1 and ends after its last observation.
     series = TimeSeries([0.0, 10.0, 20.0, 40.0], times=TimeDeltaTensor([0.0, 1.0, 2.0, 4.0], "s"))
-    return Window(size=size, step=TimeDelta(1.0, "s"), closed=closed, partial=False, anchor="start")(series)[1]
+    return cut_windows(series, size=size, step=TimeDelta(1.0, "s"), closed=closed, partial=False, anchor="start")[1]
 
 
 def test_series_array_equal_compares_where_the_end_is():
