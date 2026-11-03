@@ -1,6 +1,6 @@
 # pandas input and durations for time series: implementation plan
 
-Progress: 47 of 58 items, 94 of 117 points (80%)
+Progress: 48 of 58 items, 97 of 117 points (83%)
 
 Specs: [pandas-timeseries-spec.md](pandas-timeseries-spec.md) (phases A, B,
 and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
@@ -322,7 +322,7 @@ so.
   stores channels in its unit.
   Note: done with G3. The tests that compared windows and embeddings of
   a duration with those of a number in the series' unit are removed.
-- [ ] **G6.** [3] A series holds its unit and epoch once: `Times` keeps
+- [x] **G6.** [3] (5d26cd412) A series holds its unit and epoch once: `Times` keeps
   only values and origin, `TimeSeries` holds the unit and epoch, and
   `Channel::to` becomes a scaling by a factor `TimeSeries::to` computes.
   The native series constructor takes values, unit, and epoch instead of
