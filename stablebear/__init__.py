@@ -50,7 +50,6 @@ from .typing import (
     series,
     symmat32,
     symmat64,
-    times,
     uint32,
     uint64,
 )

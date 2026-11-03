@@ -68,9 +68,6 @@ distmat64 = dtype("distmat64", "64-bit distance matrix dtype.")
 # Boolean
 boolean = dtype("boolean", "Boolean dtype.")
 
-# Timestamps
-times = dtype("times", "Dtype of the timestamps of a time series.")
-
 
 # Each tensor element dtype and the suffix of its native class names, such
 # as cpp.TimeSeriesFloat64.

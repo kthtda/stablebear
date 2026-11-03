@@ -8,7 +8,6 @@ import pytest
 
 import stablebear as sb
 from stablebear.timeseries import DateTime, DateTimeTensor, Domain, TimeDelayEmbedding, TimeDelta, TimeDeltaTensor, TimeSeries, Window
-from stablebear.timeseries.series import Times, TimesTensor
 
 from _element_values import TWO_ELEMENTS_OF_EVERY_DTYPE
 from _round_trip import ROUND_TRIPS
@@ -504,62 +503,6 @@ def test_series_rejects_an_epoch_tensor():
     with pytest.raises(TypeError, match="DateTimeTensor"):
         TimeSeries([10.0, 20.0], times=TimeDeltaTensor([0.0, 1.5], "h"),
                    epoch=DateTimeTensor(["2023-01-01", "2023-01-02"]))
-
-
-def test_times_tensor_indexes_back_to_each_times():
-    first = Times([0.0, 1.0, 2.5], unit="s")
-    second = Times([500.0, 1500.0], unit="ms", epoch="2023-01-01")
-
-    tensor = TimesTensor([first, second])
-
-    assert tensor.dtype is sb.times
-    assert tensor.shape == (2,)
-    assert tensor[0] == first
-    assert tensor[1] == second
-
-
-def test_times_tensor_takes_an_assigned_times():
-    tensor = TimesTensor([Times([0.0, 1.0], unit="s"), Times([0.0, 2.0], unit="s")])
-    assigned = Times([3.0, 4.0, 5.0], unit="min")
-
-    tensor[1] = assigned
-
-    assert tensor[1] == assigned
-
-
-def test_times_tensor_copy_is_independent():
-    first = Times([0.0, 1.0], unit="s")
-    tensor = TimesTensor([first])
-
-    copy = tensor.copy()
-    copy[0] = Times([2.0], unit="s")
-
-    assert tensor[0] == first
-
-
-@pytest.mark.parametrize("other", [
-    Times([0.0, 1.0], unit="ms", epoch="2023-01-01"),
-    Times([0.0, 1.0], unit="s"),
-    Times([0.0, 1.0], unit="s", epoch="2023-01-02"),
-])
-def test_times_tensors_are_equal_only_with_the_same_units_and_epochs(other):
-    times = Times([0.0, 1.0], unit="s", epoch="2023-01-01")
-
-    assert TimesTensor([times]).array_equal(TimesTensor([times]))
-    assert not TimesTensor([times]).array_equal(TimesTensor([other]))
-
-
-@pytest.mark.parametrize("round_trip", ROUND_TRIPS)
-def test_times_tensor_round_trips(round_trip):
-    tensor = TimesTensor([
-        [Times([0.0, 1.0, 2.5], unit="s"), Times([500.0, 1500.0], unit="ms", epoch="2023-01-01")],
-        [Times([0.0, 1.0], unit="s"), Times([], unit="min")],
-    ])
-
-    loaded = round_trip(tensor)
-
-    assert isinstance(loaded, TimesTensor)
-    assert loaded.array_equal(tensor)
 
 
 def test_series_keeps_explicit_unit():

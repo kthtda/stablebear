@@ -55,9 +55,6 @@ namespace sb_py
       }, nb::arg("unit"))
       .def("__len__", &sb::Times::size)
       .def("__eq__", [](const sb::Times& self, const sb::Times& other) { return self == other; });
-    register_tensor_element<sb::Times>(m, "Times");
-    nb::borrow<nb::class_<sb::Tensor<sb::Times>>>(m.attr("TimesTensor"))
-      .def("_save", &save_tensor<sb::Tensor<sb::Times>>, nb::arg("file"));
 
     register_typed_timeseries<bool>(m, "Bool");
     register_timeseries_float(m);

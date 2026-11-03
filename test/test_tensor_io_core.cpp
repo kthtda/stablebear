@@ -101,11 +101,6 @@ namespace
       EXPECT_EQ(10000, fmt.baseFormat);
       EXPECT_EQ(64, fmt.subFormat);
     }
-    {
-      auto fmt = tensorFormatV3<sb::Times>();
-      EXPECT_EQ(20000, fmt.baseFormat);
-      EXPECT_EQ(64, fmt.subFormat);
-    }
   }
 
   TEST(TensorIoCore, NestedTensorFormatsPreserveLeafFormat)

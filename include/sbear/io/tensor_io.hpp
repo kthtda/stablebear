@@ -119,8 +119,6 @@ namespace sb::io::detail
       Tensor<DistanceMatrix<float32_t>, TensorProperty::Indexed>,
       Tensor<DistanceMatrix<float64_t>, TensorProperty::Indexed>,
 
-      Tensor<Times>,
-
       Tensor<TimeSeries<bool>>,
       Tensor<TimeSeries<float32_t>>,
       Tensor<TimeSeries<float64_t>>,
@@ -276,8 +274,6 @@ namespace sb::io::detail
 
     else if constexpr (std::is_same_v<T, ph::Barcode<float32_t>>) { return TensorFormat{ .baseFormat = 10000, .subFormat = 32 }; }
     else if constexpr (std::is_same_v<T, ph::Barcode<float64_t>>) { return TensorFormat{ .baseFormat = 10000, .subFormat = 64 }; }
-
-    else if constexpr (std::is_same_v<T, Times>) { return TensorFormat{ .baseFormat = 20000, .subFormat = 64 }; }
 
     throw std::runtime_error("Tensor type "s + sb::detail::unmangled_typename<T>() +  " not supported.");
   }
@@ -700,8 +696,6 @@ namespace sb::io::detail
         *elem = read_nested_tensor_element<typename is_nested_tensor<T>::leaf_type>(reader);
       else if constexpr (is_timeseries_v<T>)
         *elem = read_timeseries<typename T::value_type>(reader);
-      else if constexpr (std::is_same_v<T, Times>)
-        *elem = read_times(is);
       else
       {
         *elem = read_element<T>(is);

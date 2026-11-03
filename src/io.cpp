@@ -53,8 +53,6 @@ namespace sb
     else if (format.matches_type<ph::Barcode<float32_t>>(reader.format_version())) { return io::detail::read_tensor<ph::Barcode<float32_t>>(reader); }
     else if (format.matches_type<ph::Barcode<float64_t>>(reader.format_version())) { return io::detail::read_tensor<ph::Barcode<float64_t>>(reader); }
 
-    else if (format.matches_type<Times>(reader.format_version())) { return io::detail::read_tensor<Times>(reader); }
-
     else if (auto series = io::detail::read_any_timeseries_tensor(reader, format)) { return std::move(*series); }
 
     else

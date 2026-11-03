@@ -5,10 +5,8 @@
 #include "../timeseries.hpp"
 
 #include <cstdint>
-#include <optional>
 #include <stdexcept>
 #include <string>
-#include <vector>
 
 namespace sb::io::detail
 {
@@ -49,32 +47,6 @@ namespace sb::io::detail
   {
     const auto count = read_bytes<int64_t>(is);
     return DateTime(count, read_time_unit(is));
-  }
-
-  /// Times are written as their unit, timestamps, origin, and epoch, if set.
-  inline void write_value(std::ostream& os, const Times& times)
-  {
-    write_time_unit(os, times.unit());
-    write_elements(os, times.values().begin(), times.values().end());
-    write_bytes<float64_t>(os, times.origin());
-    write_bytes<std::optional<DateTime>>(os, times.epoch());
-  }
-
-  /// Read times written by write_value, through the validating constructor.
-  inline Times read_times(std::istream& is)
-  {
-    const auto unit = read_time_unit(is);
-    auto values = read_vector<float64_t>(is);
-    const auto origin = read_bytes<float64_t>(is);
-    const auto epoch = read_bytes<std::optional<DateTime>>(is);
-    try
-    {
-      return Times(std::move(values), unit, epoch).with_origin(origin);
-    }
-    catch (const std::invalid_argument& error)
-    {
-      throw std::runtime_error("Invalid times in saved data: " + std::string(error.what()));
-    }
   }
 }
 
