@@ -588,16 +588,42 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         return _SERIES_CPP_TO_DTYPE[type(self._data)]
 
     @property
-    def times(self) -> Times | TimesTensor:
-        """The timestamps of the recorded observations, in :attr:`unit`.
+    def times(self) -> TimeDeltaTensor:
+        """The timestamps of the recorded observations, a
+        :class:`TimeDeltaTensor` of float counts in :attr:`unit` from time
+        0, with or without an :attr:`epoch`. Their dates are
+        ``epoch + origin + times``, where :attr:`origin` places a window in
+        the series it was cut from.
 
-        A :class:`Times` for a series with one channel. For several
-        channels, a :class:`TimesTensor` of shape ``(n_channels,)`` with one
-        ``Times`` per channel, in channel order, each holding that channel's
-        timestamps converted to :attr:`unit`.
+        Raises
+        ------
+        ValueError
+            For several channels, whose times differ in length; select a
+            channel with ``series[i]`` first.
         """
-        times = [Times._from_cpp(self._data.times(i)) for i in range(self._data.n_channels)]
-        return times[0] if len(times) == 1 else TimesTensor(times)
+        if self._data.n_channels > 1:
+            raise ValueError("The channels of this series have their own times; select one with series[i].times")
+        return TimeDeltaTensor(Times._from_cpp(self._data.times(0)).to_floats(), self.unit)
+
+    @property
+    def datetimes(self) -> DateTimeTensor:
+        """The dates and times of the recorded observations, a
+        :class:`DateTimeTensor` of ``epoch + origin + times``, at the finer
+        of :attr:`unit` and microseconds. For a window, these are the
+        instants where its observations lie in the series it was cut from.
+
+        Raises
+        ------
+        ValueError
+            If the series has no :attr:`epoch`, or for several channels,
+            whose times differ in length; select a channel with
+            ``series[i]`` first.
+        """
+        if self._data.n_channels > 1:
+            raise ValueError("The channels of this series have their own times; select one with series[i].datetimes")
+        if self.epoch is None:
+            raise ValueError("This series has no epoch to give its times as dates; set one with with_epoch")
+        return self.epoch + (self.origin + self.times)
 
     @property
     def values(self) -> Tensor | NestedTensor:
@@ -982,28 +1008,6 @@ class TimeSeriesTensor(Tensor):
 
     def _get_valid_setitem_dtypes(self):
         return [TimeSeries, TimeSeriesTensor]
-
-    @property
-    def times(self) -> TimesTensor:
-        """The times of every series, as :attr:`TimeSeries.times` gives
-        them, in a :class:`TimesTensor` of the tensor's shape. For series of
-        several channels, a last axis of ``n_channels`` holds the times of
-        each channel.
-
-        Raises
-        ------
-        ValueError
-            If the series differ in their number of channels.
-        """
-        elements = [self[index] for index in np.ndindex(*self.shape)]
-        n_channels = {element.n_channels for element in elements}
-        if len(n_channels) > 1:
-            raise ValueError(f"The series differ in their number of channels: {sorted(n_channels)}")
-        n = n_channels.pop() if n_channels else 1
-        times = TimesTensor([
-            Times._from_cpp(element._data.times(i)) for element in elements for i in range(n)
-        ])
-        return times.reshape((*self.shape, n) if n > 1 else tuple(self.shape))
 
     def evaluate(self, t, unit: str | None = None):
         """Every series evaluated at the times ``t``, as

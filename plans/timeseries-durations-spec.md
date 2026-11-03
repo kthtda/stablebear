@@ -165,11 +165,17 @@ finer units narrow that range, to 1678-2262 for nanoseconds.
 - **`TimeSeries.times`** is a `TimeDeltaTensor` of shape
   `(n_observations,)`: the timestamps as float counts in the series'
   unit, from its time 0, with or without an epoch. Their dates are
-  `series.epoch + series.times`, rounded as a `DateTimeTensor` is. `count`
-  gives the floats for code that needs numbers.
+  `series.epoch + series.origin + series.times`, rounded as a
+  `DateTimeTensor` is; the origin places a window in the series it was cut
+  from. `count` gives the floats for code that needs numbers.
+- **`TimeSeries.datetimes`** is that `DateTimeTensor`, at the finer of the
+  series' unit and microseconds. It raises `ValueError` for a series
+  without an epoch, naming `with_epoch`, and for several channels, naming
+  `series[i].datetimes`.
 - **`TimeSeries.times` of several channels** raises `ValueError`, since
   the channels differ in length, naming `series[i].times`.
-- **`TimeSeriesTensor.times`** is removed, naming `windows[i].times`.
+- **`TimeSeriesTensor.times`** is removed; `windows[i].times` gives the
+  times of one window.
 - **`TimeSeries.domain`** has `DateTime` or `TimeDelta` ends. For a series
   with an epoch, these are the instants it can be evaluated at, so a
   window's domain is where it lies.
@@ -226,7 +232,7 @@ to the time series:
   and `from_channels` for channels of different epochs;
 - converting the unit: `TimeSeries.to(unit)`;
 - the timestamps as floats or dates: `series.times.count` and
-  `series.epoch + series.times`.
+  `series.datetimes`.
 
 C++ keeps `sb::Times` as the storage of a series; `Tensor<sb::Times>` is
 no longer registered.

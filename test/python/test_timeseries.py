@@ -98,7 +98,9 @@ def test_times_of_durations_reject_nat():
 def test_series_takes_durations_as_times():
     series = TimeSeries([10.0, 20.0, 30.0], times=np.array([0, 1, 2], dtype="timedelta64[m]"))
 
-    assert series.times == Times([0.0, 1.0, 2.0], unit="min")
+    assert series.times.array_equal(TimeDeltaTensor([0.0, 1.0, 2.0], "min"))
+
+    assert series.epoch is None
 
 
 @pytest.mark.parametrize("times, unit", [
@@ -624,7 +626,7 @@ def test_series_takes_a_date_time_tensor_as_times():
 
     series = TimeSeries([10.0, 20.0], times=dates)
 
-    assert series.times == Times(dates)
+    assert series.times.array_equal(TimeDeltaTensor([0.0, 90.0], "min"))
     assert series.epoch == DateTime("2023-01-01T06:00")
 
 
@@ -742,12 +744,9 @@ def test_times_tensors_are_equal_only_with_the_same_units_and_epochs(other):
 
 @pytest.mark.parametrize("round_trip", ROUND_TRIPS)
 def test_times_tensor_round_trips(round_trip):
-    series = TimeSeries([1.0, 2.0, 3.0, 4.0], times=Times([0.0, 1.0, 2.0, 3.0], unit="s"))
-    window = Window(size=TimeDelta(2.0, "s"), step=TimeDelta(1.0, "s"),
-                    closed="left", partial=False, anchor="start")(series)[1]
     tensor = TimesTensor([
         [Times([0.0, 1.0, 2.5], unit="s"), Times([500.0, 1500.0], unit="ms", epoch="2023-01-01")],
-        [window.times, Times([], unit="min")],
+        [Times([0.0, 1.0], unit="s"), Times([], unit="min")],
     ])
 
     loaded = round_trip(tensor)
@@ -1048,7 +1047,7 @@ def test_series_from_datetimes_counts_their_resolution_from_the_first():
 
     assert series.unit == "min"
     assert series.epoch == DateTime(np.datetime64("2023-01-01T06:00", "m"))
-    assert sb.FloatTensor([0.0, 1.0, 60.0], dtype=sb.float64).array_equal(series.times.to_floats())
+    assert sb.FloatTensor([0.0, 1.0, 60.0], dtype=sb.float64).array_equal(series.times.count)
 
 
 def _dated_series():
@@ -1124,6 +1123,32 @@ def test_series_of_several_channels_at_an_array_of_dates_gives_each_channel():
 
     assert values[0].array_equal(sb.FloatTensor([10.0, 10.0], dtype=sb.float64))
     assert values[1].array_equal(sb.FloatTensor([-10.0, -20.0], dtype=sb.float64))
+
+
+def test_times_of_a_dated_series_are_durations_from_its_epoch():
+    series = _dated_series()
+
+    assert series.times.array_equal(TimeDeltaTensor([0.0, 1.5, 4.0], "h"))
+
+
+def test_datetimes_of_a_dated_series_are_its_epoch_plus_its_times():
+    series = _dated_series()
+
+    assert series.datetimes.array_equal(
+        DateTimeTensor(np.array(["2023-01-01T00:00", "2023-01-01T01:30", "2023-01-01T04:00"], dtype="datetime64[us]")))
+
+
+def test_datetimes_of_a_series_without_an_epoch_raise():
+    with pytest.raises(ValueError, match="with_epoch"):
+        TimeSeries([10.0, 20.0], times=TimeDeltaTensor([0.0, 1.0], "h")).datetimes
+
+
+def test_datetimes_of_several_channels_raise_naming_the_datetimes_of_each_channel():
+    a = TimeSeries([10.0, 20.0], times=TimeDeltaTensor([0.0, 1.0], "h"), epoch="2023-01-01")
+    b = TimeSeries([-10.0, -20.0], times=TimeDeltaTensor([0.0, 60.0], "min"), epoch="2023-01-01")
+
+    with pytest.raises(ValueError, match=re.escape("series[i].datetimes")):
+        TimeSeries.from_channels([a, b], unit="h").datetimes
 
 
 def test_series_without_an_epoch_cannot_be_evaluated_at_a_date():
@@ -1371,7 +1396,7 @@ def test_to_changes_the_query_unit():
     series = TimeSeries([10.0, 20.0], times=Times([0.0, 0.5], unit="s")).to("ms")
 
     assert series.unit == "ms"
-    assert np.array_equal(series.times.to_floats(), [0.0, 500.0])
+    assert np.array_equal(series.times.count, [0.0, 500.0])
     assert series(TimeDelta(250.0, "ms")) == 10.0
     assert series(TimeDelta(500.0, "ms")) == 20.0  # the last observation, in the new unit
 
@@ -1441,9 +1466,15 @@ def test_times_of_several_channels_are_in_the_query_unit():
     # Channel A is in s and channel B in ms.
     series = TimeSeries.from_channels([_channel_a(), _channel_b()], unit="s")
 
-    expected = TimesTensor([Times([0.0, 1.0, 2.5], unit="s"), Times([0.5, 1.5, 3.0], unit="s")])
+    assert series[0].times.array_equal(TimeDeltaTensor([0.0, 1.0, 2.5], "s"))
+    assert series[1].times.array_equal(TimeDeltaTensor([0.5, 1.5, 3.0], "s"))
 
-    assert series.times.array_equal(expected)
+
+def test_times_of_several_channels_raise_naming_the_times_of_each_channel():
+    series = TimeSeries.from_channels([_channel_a(), _channel_b()], unit="s")
+
+    with pytest.raises(ValueError, match=re.escape("series[i].times")):
+        series.times
 
 
 @pytest.mark.parametrize("t, expected", [
@@ -1634,7 +1665,7 @@ def test_one_channel_survives_saving(make_values, as_shape, round_trip):
     assert isinstance(loaded, TimeSeries)
     assert loaded.dtype is series.dtype
     assert loaded.shape == series.shape
-    assert loaded.times == series.times
+    assert loaded.times.array_equal(series.times)
     assert loaded.unit == "ms"
     assert loaded.snap_tolerance == 0.25
     assert loaded.values.array_equal(values)
@@ -1648,7 +1679,8 @@ def test_several_channels_survive_saving(round_trip):
 
     assert loaded.n_channels == 2
     assert loaded.unit == "s"
-    assert loaded.times.array_equal(series.times)
+    for i in range(2):
+        assert loaded[i].times.array_equal(series[i].times)
     for t in (TimeDelta(0.5, "s"), TimeDelta(1.5, "s")):
         assert [loaded(t)[i][()] for i in range(2)] == [series(t)[i][()] for i in range(2)]
 

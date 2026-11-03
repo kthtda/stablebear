@@ -87,7 +87,7 @@ These settle the open questions of the issue.
 ### `TimeSeries.to_pandas(resolution=None)`
 
 - The index of a series with an epoch is a `DatetimeIndex` of
-  `epoch + times`, else a `TimedeltaIndex` of `times` (see the
+  `epoch + origin + times`, else a `TimedeltaIndex` of `times` (see the
   [durations spec](timeseries-durations-spec.md)). `resolution` is one of
   `"s"`, `"ms"`, `"us"`, and `"ns"`, the resolutions pandas supports. It
   defaults to the finer of the series' unit and microseconds, or

@@ -1,6 +1,6 @@
 # pandas input and durations for time series: implementation plan
 
-Progress: 36 of 55 items, 72 of 108 points (67%)
+Progress: 36 of 55 items, 72 of 109 points (66%)
 
 Specs: [pandas-timeseries-spec.md](pandas-timeseries-spec.md) (phases A, B,
 and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
@@ -228,13 +228,15 @@ and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
   Tests: a start that snaps keeps `3 * 0.3` as origin and holds the
   observation at 0.9 at time 0; channels that snap differently share an
   origin; dated bounds of windows of such a window are their dates.
-- [ ] **E8.** [2] `TimeSeries.times` is a `TimeDeltaTensor` from time 0 in
+- [ ] **E8.** [3] `TimeSeries.times` is a `TimeDeltaTensor` from time 0 in
   the series' unit, with or without an epoch. For several channels it
   raises `ValueError` naming `series[i].times`, and
-  `TimeSeriesTensor.times` raises naming `windows[i].times`. Update
+  `TimeSeriesTensor.times` is removed. `TimeSeries.datetimes` gives
+  `epoch + origin + times` as a `DateTimeTensor`. Update
   `plot_timeseries` and other internal callers.
-  Tests: undated and dated series; `epoch + times` gives the dates; a
-  window's times start at 0; several channels and a tensor raise.
+  Tests: undated and dated series; `datetimes` of a dated series and a
+  window; a window's times start at 0; several channels and a series
+  without an epoch raise.
   Note: replaces E2c and E2d.
 - [ ] **E9.** [3] Tests, docstrings, and internal code build series from
   `TimeDeltaTensor` and `DateTimeTensor` and set epochs with `epoch=`,
@@ -319,7 +321,7 @@ so.
 
 - [ ] **I2.** [3] `TimeSeries.to_pandas(resolution=None)` for one channel of
   scalar numbers or booleans gives a `Series` indexed by a `DatetimeIndex`
-  of `epoch + times`, else a `TimedeltaIndex` of `times`, by default at the
+  of `epoch + origin + times`, else a `TimedeltaIndex` of `times`, by default at the
   finer of the unit and microseconds, at most nanoseconds. Add
   `stablebear/_pandas.py` with the import that raises `ImportError` naming
   `pip install pandas`.

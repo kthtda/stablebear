@@ -23,7 +23,7 @@ from the first one, in hours::
    series = TimeSeries([1.0, 3.0, 2.0], times=Times(stamps, unit="h"))
 
    series.epoch  # DateTime('2023-01-01T06:00')
-   series.times  # Times([0.0, 0.5, 2.0], unit='h', epoch=DateTime('2023-01-01T06:00'))
+   series.times  # TimeDeltaTensor([0.0, 0.5, 2.0], 'h')
 
 The differences between the dates are taken in integers and converted to
 the unit once, so whole multiples of the unit, such as the 0.5 h here, are

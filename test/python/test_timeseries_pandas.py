@@ -6,7 +6,7 @@ import pytest
 
 import stablebear as sb
 
-from stablebear.timeseries import DateTime, DateTimeTensor, TimeDelayEmbedding, TimeDelta, Times, TimeSeries, Window
+from stablebear.timeseries import DateTime, DateTimeTensor, TimeDelayEmbedding, TimeDelta, TimeDeltaTensor, Times, TimeSeries, Window
 
 pd = pytest.importorskip("pandas")
 
@@ -125,7 +125,9 @@ def test_from_pandas_with_index_of_dates_counts_from_the_first_date():
 
     series = TimeSeries.from_pandas(pd.Series([10.0, 20.0, 30.0], index=index), unit="h")
 
-    assert series.times == Times([0.0, 1.0, 3.0], unit="h", epoch=np.datetime64("2023-01-01T01:00", "ns"))
+    assert series.times.array_equal(TimeDeltaTensor([0.0, 1.0, 3.0], "h"))
+
+    assert series.epoch == DateTime(np.datetime64("2023-01-01T01:00", "ns"))
     assert series.values.array_equal(sb.FloatTensor([10.0, 20.0, 30.0]))
 
 
@@ -134,13 +136,17 @@ def test_from_pandas_with_index_of_durations_has_no_epoch():
 
     series = TimeSeries.from_pandas(pd.Series([10.0, 20.0, 30.0], index=index), unit="ms")
 
-    assert series.times == Times([0.0, 500.0, 1500.0], unit="ms")
+    assert series.times.array_equal(TimeDeltaTensor([0.0, 500.0, 1500.0], "ms"))
+
+    assert series.epoch is None
 
 
 def test_from_pandas_with_range_index_counts_in_unit():
     series = TimeSeries.from_pandas(pd.Series([10.0, 20.0, 30.0]), unit="min")
 
-    assert series.times == Times([0.0, 1.0, 2.0], unit="min")
+    assert series.times.array_equal(TimeDeltaTensor([0.0, 1.0, 2.0], "min"))
+
+    assert series.epoch is None
 
 
 @pytest.mark.parametrize("values", [

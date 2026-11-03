@@ -28,7 +28,7 @@ def _clouds(dtype, np_dtype):
 ])
 def test_series_persistence_matches_each_snapshot(dtype, np_dtype, barcode_dtype):
     clouds = _clouds(dtype, np_dtype)
-    times = Times([0.0, 1.3, 4.0], unit="ms")
+    times = TimeDeltaTensor([0.0, 1.3, 4.0], "ms")
     series = TimeSeries(clouds, times=times)
 
     result = compute_persistent_homology(series, max_dim=1)
@@ -37,7 +37,7 @@ def test_series_persistence_matches_each_snapshot(dtype, np_dtype, barcode_dtype
     assert result.n_channels == 1
     assert result.dtype is barcode_dtype
     assert result.shape == (2,)
-    assert result.times == times
+    assert result.times.array_equal(times)
     assert result.unit == "ms"
     for i in range(3):
         expected = compute_persistent_homology(clouds[i], max_dim=1)
@@ -65,7 +65,7 @@ def test_each_channel_gets_its_own_barcodes_and_times():
     assert result.n_channels == 2
     for i, source in enumerate((cam, lidar)):
         channel = result[i]
-        assert channel.times == source.times
+        assert channel.times.array_equal(source.times)
         expected = compute_persistent_homology(source, max_dim=1)
         assert channel.values.is_isomorphic_to(expected.values, atol=0, rtol=0)
 
@@ -85,13 +85,13 @@ def test_series_of_distance_matrices(dtype, np_dtype, barcode_dtype):
         [1, 0, 3],
         [2, 3, 0],
     ], dtype=np_dtype))
-    times = Times([0.0, 2.5], unit="s")
+    times = TimeDeltaTensor([0.0, 2.5], "s")
     series = TimeSeries(matrices, times=times)
 
     result = compute_persistent_homology(series, max_dim=1)
 
     assert result.dtype is barcode_dtype
-    assert result.times == times
+    assert result.times.array_equal(times)
     for i in range(2):
         expected = compute_persistent_homology(matrices[i], max_dim=1)
         assert result.values[i].is_isomorphic_to(expected, atol=0, rtol=0)
@@ -142,7 +142,7 @@ def test_float_series_of_matrices_reads_rows_as_points(np_dtype, barcode_dtype):
     assert result.dtype is barcode_dtype
     assert result.shape == ((2,), (2,))
     for i in range(2):
-        assert result[i].times == expected[i].times
+        assert result[i].times.array_equal(expected[i].times)
         assert result[i].values.is_isomorphic_to(expected[i].values, atol=0, rtol=0)
 
 
@@ -163,7 +163,7 @@ def test_float_series_with_several_clouds_per_observation(np_dtype):
     assert result.shape == ((2, 1), (2, 1))
     for i, distances in enumerate([[(1, 2), (3, 4)], [(5, 6)]]):
         values = result[i].values
-        assert result[i].times == series[i].times
+        assert result[i].times.array_equal(series[i].times)
         assert values.shape == (len(distances), 2, 1)
         for k, pair in enumerate(distances):
             for b, d in enumerate(pair):
@@ -207,7 +207,7 @@ def test_summary_of_a_series_keeps_channels_and_times(summary):
     assert isinstance(result, TimeSeries)
     assert result.n_channels == 2
     for i in range(2):
-        assert result[i].times == series[i].times
+        assert result[i].times.array_equal(series[i].times)
         assert result[i].values.array_equal(summary(series[i].values))
 
 
@@ -221,7 +221,7 @@ def test_persistence_and_summaries_keep_the_domain_of_a_window():
     stable_ranks = barcode_to_stable_rank(barcodes)
 
     for result in (barcodes, stable_ranks):
-        assert result.times == window.times
+        assert result.times.array_equal(window.times)
         with pytest.raises(ValueError, match=r"outside the domain \(0, 2\)"):
             result(TimeDelta(0.0, "s"))
         result(TimeDelta(1.5, "s"))

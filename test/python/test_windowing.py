@@ -7,7 +7,7 @@ import pytest
 import stablebear as sb
 from stablebear import FloatTensor
 from stablebear.timeseries import DateTime, DateTimeTensor, Domain, TimeDelayEmbedding, TimeDelta, TimeDeltaTensor, Times, TimeSeries, Window
-from stablebear.timeseries.series import TimeSeriesTensor, TimesTensor
+from stablebear.timeseries.series import TimeSeriesTensor
 
 from _element_values import TWO_ELEMENTS_OF_EVERY_DTYPE
 from _round_trip import ROUND_TRIPS
@@ -30,9 +30,9 @@ def test_windows_are_a_tensor_of_series_of_the_source_dtype():
     assert windows.shape == (2,)
     assert windows[0].dtype is sb.float64
     assert windows[1].dtype is sb.float64
-    assert np.array_equal(windows[0].times.to_floats(), [0.0, 0.5, 1.5])
+    assert np.array_equal(windows[0].times.count, [0.0, 0.5, 1.5])
     assert np.array_equal(np.asarray(windows[0].values), [0.0, 5.0, 15.0])
-    assert np.array_equal(windows[1].times.to_floats(), [0.0, 0.5])
+    assert np.array_equal(windows[1].times.count, [0.0, 0.5])
     assert np.array_equal(np.asarray(windows[1].values), [15.0, 25.0])
 
 
@@ -198,7 +198,7 @@ def test_a_window_origin_places_its_observations_at_their_times_in_the_series():
     window = Window(size=TimeDelta(0.5, "s"), step=TimeDelta(0.5, "s"),
                     closed="left", partial=False, anchor="start")(series)[0]
 
-    placed = window.origin.count + window.times.to_floats()
+    placed = window.origin.count + window.times.count
     assert sb.allclose(placed, FloatTensor([0.3, 0.7], dtype=sb.float64), atol=0.0, rtol=4e-16)
 
 
@@ -224,7 +224,7 @@ def test_a_partial_window_ends_where_the_series_does():
     window = Window(size=TimeDelta(3, "s"), step=TimeDelta(3, "s"),
                     closed="left", partial=True, anchor="start")(_partial_source())[1]
 
-    assert np.array_equal(window.times.to_floats(), [0.0, 1.0])
+    assert np.array_equal(window.times.count, [0.0, 1.0])
     assert np.array_equal(np.asarray(window.values), [30.0, 40.0])
     assert window(TimeDelta(1, "s")) == 40.0
     with pytest.raises(ValueError, match=re.escape("outside the domain [0, 1]")):
@@ -237,7 +237,7 @@ def test_a_window_anchored_at_the_end_holds_the_last_observation():
     window = Window(size=TimeDelta(3, "s"), step=TimeDelta(3, "s"),
                     closed="right", partial=False, anchor="end")(_partial_source())[0]
 
-    assert np.array_equal(window.times.to_floats(), [0.0, 1.0, 2.0, 3.0])
+    assert np.array_equal(window.times.count, [0.0, 1.0, 2.0, 3.0])
     assert np.array_equal(np.asarray(window.values), [10.0, 20.0, 30.0, 40.0])
     assert window(TimeDelta(3, "s")) == 40.0
 
@@ -253,13 +253,13 @@ def test_a_partial_window_anchored_at_the_end_starts_where_the_series_does():
         [0.0, 1.0],
         [1.0, 4.0],
     ])
-    assert np.array_equal(windows[0].times.to_floats(), [0.0, 1.0])
+    assert np.array_equal(windows[0].times.count, [0.0, 1.0])
     assert np.array_equal(np.asarray(windows[0].values), [0.0, 10.0])
     assert windows[0](TimeDelta(0, "s")) == 0.0
     assert windows[0](TimeDelta(1, "s")) == 10.0
     # The full window (1.0, 4.0] holds the value at 1.0 just after its start,
     # then the observations at 2.0, 3.0, and 4.0.
-    assert np.array_equal(windows[1].times.to_floats(), [0.0, 1.0, 2.0, 3.0])
+    assert np.array_equal(windows[1].times.count, [0.0, 1.0, 2.0, 3.0])
     assert np.array_equal(np.asarray(windows[1].values), [10.0, 20.0, 30.0, 40.0])
     assert windows[1](TimeDelta(3, "s")) == 40.0
 
@@ -280,7 +280,7 @@ def test_a_left_closed_partial_window_can_start_at_the_last_observation():
 
     # The window at 4.0 holds only the last observation.
     assert np.array_equal(np.asarray(bounds.count)[:, 0], [0.0, 2.0, 4.0])
-    assert np.array_equal(windows[2].times.to_floats(), [0.0])
+    assert np.array_equal(windows[2].times.count, [0.0])
     assert windows[2](TimeDelta(0, "s")) == 40.0
 
 
@@ -301,7 +301,7 @@ def test_a_window_can_be_evaluated_from_its_start_up_to_its_end():
     window = Window(size=TimeDelta(2, "s"), step=TimeDelta(1, "s"),
                     closed="left", partial=False, anchor="start")(_windows_source())[1]
 
-    assert np.array_equal(window.times.to_floats(), [0.0, 0.5, 1.5])
+    assert np.array_equal(window.times.count, [0.0, 0.5, 1.5])
     assert np.array_equal(np.asarray(window.values), [5.0, 15.0, 25.0])
     assert window(TimeDelta(0, "s")) == 5.0
     assert window(TimeDelta(1.75, "s")) == 25.0
@@ -336,7 +336,7 @@ def test_a_window_between_observations_holds_the_value_at_its_start():
     window = Window(size=TimeDelta(0.5, "s"), step=TimeDelta(0.5, "s"),
                     closed="left", partial=False, anchor="start")(_windows_source())[6]
 
-    assert np.array_equal(window.times.to_floats(), [0.0])
+    assert np.array_equal(window.times.count, [0.0])
     assert np.array_equal(np.asarray(window.values), [25.0])
     assert window(TimeDelta(0.25, "s")) == 25.0
 
@@ -355,7 +355,7 @@ def test_window_bounds_just_below_an_observation_reach_it():
     # The observation at 0.9 is the end of window 2, so only window 3 holds
     # it, at time 0.
     assert np.array_equal(np.asarray(windows[2].values), [6.0])
-    assert np.array_equal(windows[3].times.to_floats(), [0.0])
+    assert np.array_equal(windows[3].times.count, [0.0])
     assert np.array_equal(np.asarray(windows[3].values), [9.0])
 
 
@@ -370,7 +370,7 @@ def test_a_window_start_that_snaps_to_an_observation_keeps_its_start_as_origin()
     # observation at 0.9, which it holds at time 0.
     assert windows[3].origin == bounds[3, 0]
     assert windows[3].origin == TimeDelta(3 * 0.3, "s")
-    assert np.array_equal(windows[3].times.to_floats(), [0.0])
+    assert np.array_equal(windows[3].times.count, [0.0])
     assert windows[3](TimeDelta(0, "s")) == 9.0
 
 
@@ -526,7 +526,7 @@ def test_an_embedding_of_a_window_keeps_its_open_end():
 
     embedding = TimeDelayEmbedding(dimension=2, delay=TimeDelta(0.4, "s"))(window)
 
-    assert np.array_equal(embedding.times.to_floats(), [0.4, 0.5, 0.9, 1.5, 1.9])
+    assert np.array_equal(embedding.times.count, [0.4, 0.5, 0.9, 1.5, 1.9])
     assert np.array_equal(np.asarray(embedding(TimeDelta(1.95, "s"))), [25.0, 25.0])
     with pytest.raises(ValueError, match=r"outside the domain \[0.4, 2\)"):
         embedding(TimeDelta(2, "s"))
@@ -541,7 +541,7 @@ def test_an_embedding_of_a_window_keeps_its_open_start_and_closed_end():
 
     embedding = TimeDelayEmbedding(dimension=2, delay=TimeDelta(1, "s"))(window)
 
-    assert np.array_equal(embedding.times.to_floats(), [1.0, 2.0])
+    assert np.array_equal(embedding.times.count, [1.0, 2.0])
     assert np.array_equal(np.asarray(embedding(TimeDelta(2, "s"))), [20.0, 20.0])
     with pytest.raises(ValueError, match=re.escape("outside the domain (1, 2]")):
         embedding(TimeDelta(1, "s"))
@@ -555,7 +555,7 @@ def test_an_embedding_of_a_window_takes_no_history_from_before_the_window():
 
     embedding = TimeDelayEmbedding(dimension=2, delay=TimeDelta(1, "s"))(window)
 
-    assert np.array_equal(embedding.times.to_floats(), [1.0, 1.5])
+    assert np.array_equal(embedding.times.count, [1.0, 1.5])
     assert np.array_equal(np.asarray(embedding.values), [[5.0, 15.0], [15.0, 25.0]])
     with pytest.raises(ValueError, match=r"outside the domain \[1, 2\)"):
         embedding(TimeDelta(0.75, "s"))
@@ -572,7 +572,7 @@ def test_windows_of_an_embedding_hold_its_points():
         embedding, return_bounds=True)
 
     assert np.array_equal(np.asarray(bounds.count)[:, 0], [1.0, 2.0])
-    assert np.array_equal(windows[0].times.to_floats(), [0.0, 0.5, 1.5])
+    assert np.array_equal(windows[0].times.count, [0.0, 0.5, 1.5])
     assert np.array_equal(np.asarray(windows[0].values), [[0.0, 5.0], [5.0, 15.0], [15.0, 25.0]])
 
 
@@ -590,52 +590,14 @@ def test_windows_cut_every_channel_at_the_same_bounds():
     # [0.5, 1.5) and [1.5, 2.5).
     assert np.array_equal(np.asarray(bounds.count)[:, 0], [0.5, 1.5])
     # B's observation at 1500 ms is the end of the first window.
-    assert np.array_equal(windows[0].times[0].to_floats(), [0.0, 0.5])
-    assert np.array_equal(windows[0].times[1].to_floats(), [0.0])
-    assert np.array_equal(windows[1].times[0].to_floats(), [0.0])
-    assert np.array_equal(windows[1].times[1].to_floats(), [0.0])
+    assert np.array_equal(windows[0][0].times.count, [0.0, 0.5])
+    assert np.array_equal(windows[0][1].times.count, [0.0])
+    assert np.array_equal(windows[1][0].times.count, [0.0])
+    assert np.array_equal(windows[1][1].times.count, [0.0])
     assert windows[0](TimeDelta(0.5, "s"))[0][()] == 10.0
     assert windows[0](TimeDelta(0.5, "s"))[1][()] == -5.0
     with pytest.raises(ValueError, match=r"outside the domain \[0, 1\)"):
         windows[0](TimeDelta(1, "s"))
-
-
-def test_times_of_windows_are_the_times_of_each_window():
-    windows = Window(size=TimeDelta(2, "s"), step=TimeDelta(1, "s"),
-                     closed="left", partial=False, anchor="start")(_windows_source())
-
-    times = windows.times
-
-    assert isinstance(times, TimesTensor)
-    assert times.shape == windows.shape
-    for i in range(windows.shape[0]):
-        assert times[i] == windows[i].times
-
-
-def test_times_of_windows_of_several_channels_have_an_axis_of_channels():
-    a = TimeSeries([0.0, 10.0, 25.0], times=TimeDeltaTensor([0.0, 1.0, 2.5], "s"))
-    b = TimeSeries([-5.0, -15.0, -30.0], times=TimeDeltaTensor([500.0, 1500.0, 3000.0], "ms"))
-    series = TimeSeries.from_channels([a, b], unit="s")
-    windows = Window(size=TimeDelta(1, "s"), step=TimeDelta(1, "s"),
-                     closed="left", partial=False, anchor="start")(series)
-
-    times = windows.times
-
-    assert times.shape == (windows.shape[0], 2)
-    for i in range(windows.shape[0]):
-        assert times[i].array_equal(windows[i].times)
-
-
-def test_times_of_series_of_different_numbers_of_channels_raise():
-    a = TimeSeries([0.0, 10.0, 20.0], times=TimeDeltaTensor([0.0, 1.0, 2.0], "s"))
-    b = TimeSeries([5.0, 15.0, 25.0], times=TimeDeltaTensor([0.0, 1.0, 2.0], "s"))
-    # Two windows of both channels; the first is replaced by one channel.
-    windows = Window(size=TimeDelta(1, "s"), step=TimeDelta(1, "s"), closed="left", partial=False, anchor="start")(
-        TimeSeries.from_channels([a, b], unit="s"))
-    windows[0] = a
-
-    with pytest.raises(ValueError, match=r"differ in their number of channels: \[1, 2\]"):
-        windows.times
 
 
 def _overlapping_windows():
@@ -842,7 +804,7 @@ def test_window_dates_include_their_origin():
                     closed="left", partial=False, anchor="start")(_dated_source())[2]
 
     # Window 2 starts at 2 s and holds the observation at 2.5 s.
-    dates = window.times.to_datetime64("ms")
+    dates = window.datetimes.to_datetime64()
 
     assert np.array_equal(dates, np.array(["2023-01-01T00:00:02", "2023-01-01T00:00:02.5"], dtype="datetime64[ms]"))
 
