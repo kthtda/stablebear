@@ -14,6 +14,7 @@
 * **Nested tensors of any element type** — `NestedTensor` leaves can be boolean, PCF, point-cloud, distance-matrix, symmetric-matrix, barcode, and time series tensors, not only numeric ones, and nested tensors of them can be saved, loaded, and pickled. ([#255](https://github.com/kthtda/stablebear/pull/255))
 * **`system.get_cpu_limit`** — Returns the number of CPU threads available for computations, as set by `system.limit_cpus`. ([#255](https://github.com/kthtda/stablebear/pull/255))
 * **`array_equal` accepts lists** — `array_equal` on a numeric tensor compares against nested lists as well as NumPy arrays. ([#254](https://github.com/kthtda/stablebear/pull/254))
+* **Fewer false warnings in editors** — Editors flag far less correct code that uses stablebear as an error, and autocompletion knows more precisely what each function returns.
 
 ### Bug fixes
 
