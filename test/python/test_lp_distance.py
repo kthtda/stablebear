@@ -179,7 +179,7 @@ def test_lp_distance_rejects_p_negative():
 def test_lp_distance_rejects_non_pcf():
     f = sb.Pcf(np.array([[0.0, 1.0]]))
     with pytest.raises(TypeError):
-        sb.lp_distance(f, 42)
+        sb.lp_distance(f, 42)  # pyright: ignore[reportArgumentType]
 
 
 def test_lp_distance_rejects_mismatched_dtypes():

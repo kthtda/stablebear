@@ -1,5 +1,7 @@
 """Acceptance tests for point-cloud and distance-matrix subsampling."""
 
+from typing import Any
+
 import numpy as np
 import numpy.testing as npt
 import pytest
@@ -102,7 +104,7 @@ class TestSubsample:
     @pytest.mark.parametrize("parameter", ["n_points", "n_samples"])
     def test_rejects_noninteger_count(self, parameter):
         source = sb.PointCloudTensor(np.array([[10., 1.]]))
-        counts = dict(n_points=1, n_samples=1)
+        counts: dict[str, Any] = dict(n_points=1, n_samples=1)
         counts[parameter] = 1.5
 
         with pytest.raises(TypeError, match=f"{parameter} must be an integer"):
@@ -112,7 +114,7 @@ class TestSubsample:
     @pytest.mark.parametrize("count", [0, -1])
     def test_rejects_nonpositive_count(self, parameter, count):
         source = sb.PointCloudTensor(np.array([[10., 1.]]))
-        counts = dict(n_points=1, n_samples=1)
+        counts: dict[str, Any] = dict(n_points=1, n_samples=1)
         counts[parameter] = count
 
         with pytest.raises(ValueError, match=f"{parameter} must be greater than zero"):
@@ -187,7 +189,7 @@ class TestSubsample:
         ])
 
         with pytest.raises(ValueError, match="allow_partial must be one of 'no', 'keep', 'drop'"):
-            subsample(source, n_points=1, n_samples=1, replace=False, allow_partial="maybe")
+            subsample(source, n_points=1, n_samples=1, replace=False, allow_partial="maybe")  # pyright: ignore[reportArgumentType, reportCallIssue]
 
     @pytest.mark.parametrize("allow_partial", [1, None, np.bool_(True)],
                              ids=["int", "None", "numpy-bool"])
@@ -288,7 +290,7 @@ class TestSubsample:
         assert result[1:].array_equal(before[1:])
 
     def test_separate_sampling_calls_are_independent(self, sample_data):
-        options = dict(n_points=3, n_samples=2, replace=True)
+        options: dict[str, Any] = dict(n_points=3, n_samples=2, replace=True)
         first_result = subsample(sample_data, generator=sb.random.Generator(seed=229), **options)
         second_result = subsample(sample_data, generator=sb.random.Generator(seed=229), **options)
         second_result_before = second_result.copy()

@@ -1,0 +1,46 @@
+name: Type check
+
+# Runs pyright over the package, the tests, the docs scripts, and the static
+# checks in test/typing. The tests and scripts import the installed package,
+# as users do; the stubs come from a CPU build of the extension.
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: typecheck-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pyright:
+    name: pyright
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      BUILD_WITH_CUDA: 0
+      PIP_RETRIES: 5
+      PIP_DEFAULT_TIMEOUT: 60
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: 'recursive'
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.10"
+
+      - name: Install dependencies
+        run: |
+          bash .github/scripts/ci-retry.sh python -m pip install --upgrade pip
+          bash .github/scripts/ci-retry.sh pip install --group test --group typecheck 'cmake>=3.30.3' 'numpy>=2.0' tqdm matplotlib
+
+      - name: Build extension and stubs
+        run: |
+          cmake -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --target _sb_cpu _gpu_detect -j $(nproc)
+          cmake --install build
+
+      - name: Run pyright
+        run: pyright

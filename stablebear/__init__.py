@@ -1,6 +1,6 @@
 __before = set(dir())
 
-from . import point_process, random, system, timeseries
+from . import persistence, point_process, random, system, timeseries
 from ._tensor_base import Shape
 from .comparison import allclose
 from .distance import cdist, lp_distance, pdist
@@ -62,5 +62,5 @@ __all__ = sorted(
     name for name in set(dir()) - __before - {"__before"}
     if not name.startswith("_")
     and not isinstance(globals()[name], _types.ModuleType)
-) + ["distributions", "point_process", "random", "system", "timeseries"]
+) + ["distributions", "persistence", "point_process", "random", "system", "timeseries"]
 del __before, _types

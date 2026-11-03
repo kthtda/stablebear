@@ -51,7 +51,7 @@ def plot_filter_function(*, dark=False):
                           va="center" if label == "D" else "bottom",
                           color=color, fontsize=11)
     cloud_ax.scatter(*query, marker="x", s=80, linewidths=2, color=ink, zorder=4)
-    cloud_ax.annotate("q", query, xytext=(0, -8), textcoords="offset points",
+    cloud_ax.annotate("q", (query[0], query[1]), xytext=(0, -8), textcoords="offset points",
                       ha="center", va="top", fontsize=11, color=ink)
     cloud_ax.set(xlim=(-1.55, 1.05), ylim=(-1.25, 1.3), aspect="equal")
     cloud_ax.set_axis_off()

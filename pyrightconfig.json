@@ -1,4 +1,20 @@
 {
     "pythonVersion": "3.10",
     "pythonPlatform": "All",
+    "include": ["stablebear", "test/python", "test/typing", "docs/_static"],
+    // The generated stubs are checked through their use, not on their own.
+    "exclude": ["stablebear/_sb_cpu", "stablebear/_sb_cuda*", "**/__pycache__"],
+    // Tests and docs import stablebear as users do: the installed package,
+    // not the source tree.
+    "executionEnvironments": [
+        {"root": "test"},
+        {"root": "docs/_static"}
+    ],
+    // Compiled and generated modules live in the build tree, with stubs here.
+    "reportMissingModuleSource": "none",
+    // Overloads are tried in order, so an earlier one may take a subset of
+    // a later one's arguments, such as a float before an array.
+    "reportOverlappingOverload": "none",
+    // The package __init__ files build __all__ from their imports.
+    "reportUnsupportedDunderAll": "none"
 }

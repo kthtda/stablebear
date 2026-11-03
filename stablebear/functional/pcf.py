@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 import numpy as np
 
 from .. import _sb_cpp as cpp
@@ -58,6 +60,9 @@ class Pcf(_BinaryIoMixin):
         np.int32: lambda arr: cpp.Pcf_i32_i32(arr),
         np.int64: lambda arr: cpp.Pcf_i64_i64(arr),
     }
+
+    # A native Pcf_f32_f32, Pcf_f64_f64, Pcf_i32_i32, or Pcf_i64_i64.
+    _data: Any
 
     _CPP_TYPE_INFO = {
         cpp.Pcf_f32_f32: (float32, float32),

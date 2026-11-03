@@ -18,10 +18,10 @@ class CoordinateView(FloatTensor):
             n, d = cloud.shape
             rows = np.broadcast_to(np.arange(n)[:, None], (n, d))
             columns = np.broadcast_to(np.arange(d)[None, :], (n, d))
-        self._rows, self._columns = rows, columns
+        self._rows, self._columns = np.asarray(rows), np.asarray(columns)
 
     @property
-    def shape(self):
+    def shape(self):  # pyright: ignore[reportIncompatibleMethodOverride]
         return self._rows.shape
 
     @property
@@ -44,10 +44,10 @@ class CoordinateView(FloatTensor):
         if self._readonly:
             raise ValueError("assignment destination is read-only")
 
-    def _decay_operand(self, value):
-        if isinstance(value, (np.ndarray, list, tuple)):
-            return FloatTensor(np.asarray(value), dtype=self.dtype)._data
-        return super()._decay_operand(value)
+    def _decay_operand(self, val):
+        if isinstance(val, (np.ndarray, list, tuple)):
+            return FloatTensor(np.asarray(val), dtype=self.dtype)._data
+        return super()._decay_operand(val)
 
     def _read(self, rows, columns):
         cloud = self._cloud._current_point_cloud()

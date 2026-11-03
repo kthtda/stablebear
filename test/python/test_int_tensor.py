@@ -59,7 +59,7 @@ def test_construct_2d():
 
 def test_construct_bad_type():
     with pytest.raises(TypeError):
-        IntTensor("not a tensor")
+        IntTensor("not a tensor")  # pyright: ignore[reportArgumentType]
 
 
 def test_numpy_roundtrip_large_uint64():

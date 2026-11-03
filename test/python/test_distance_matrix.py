@@ -35,7 +35,7 @@ class TestConstruction:
 
     def test_rejects_bad_dtype(self):
         with pytest.raises(TypeError, match="Unsupported dtype"):
-            DistanceMatrix(3, dtype=int)
+            DistanceMatrix(3, dtype=int)  # pyright: ignore[reportArgumentType]
 
     def test_copy_wraps_same_data(self, dtype):
         dm1 = DistanceMatrix(3, dtype=dtype)

@@ -5,6 +5,7 @@ import math
 import numbers
 import operator
 from fractions import Fraction
+from typing import Any, Generic, TypeVar, overload
 
 import numpy as np
 
@@ -25,12 +26,32 @@ _ATTOSECONDS = {
 }
 
 
-class _Counts:
+# The type of the count of a date or duration: a number, or a tensor of them.
+_CountT = TypeVar("_CountT", bound="int | float | IntTensor | FloatTensor")
+_TensorCountT = TypeVar("_TensorCountT", bound="IntTensor | FloatTensor")
+
+
+class _Counts(Generic[_CountT]):
     """A count of a unit, or a tensor of counts in one unit: the storage
     that dates and durations share."""
 
     # NumPy defers to the operators below instead of making object arrays.
     __array_ufunc__ = None
+
+    # The count (int, float, IntTensor, or FloatTensor) of ``_unit``,
+    # published with its type by ``count``.
+    _count: Any
+    _unit: str
+
+    @property
+    def _family(self) -> type:
+        """The base class of the values this one compares with."""
+        raise NotImplementedError
+
+    @classmethod
+    def _of(cls, count, unit) -> Any:
+        """A value of ``count`` of ``unit``."""
+        raise NotImplementedError
 
     @property
     def unit(self) -> str:
@@ -46,12 +67,30 @@ class _Counts:
         """The count, or an array of the counts."""
         return np.asarray(self._count) if self._array else self._count
 
-    def __eq__(self, other) -> bool | BoolTensor:
+    @overload
+    def __eq__(self, other: DateTimeTensor | TimeDeltaTensor) -> BoolTensor: ...
+
+    @overload
+    def __eq__(self: _CountsTensor[Any], other: object) -> BoolTensor: ...
+
+    @overload
+    def __eq__(self, other: object) -> bool: ...
+
+    def __eq__(self, other):  # pyright: ignore[reportIncompatibleMethodOverride]
         if not isinstance(other, self._family):
             return NotImplemented
         return _as_boolean(np.equal(self._counts(), other._counts()) & (self._unit == other._unit))
 
-    def __ne__(self, other) -> bool | BoolTensor:
+    @overload
+    def __ne__(self, other: DateTimeTensor | TimeDeltaTensor) -> BoolTensor: ...
+
+    @overload
+    def __ne__(self: _CountsTensor[Any], other: object) -> BoolTensor: ...
+
+    @overload
+    def __ne__(self, other: object) -> bool: ...
+
+    def __ne__(self, other):  # pyright: ignore[reportIncompatibleMethodOverride]
         if not isinstance(other, self._family):
             return NotImplemented
         return _as_boolean(np.not_equal(self._counts(), other._counts()) | (self._unit != other._unit))
@@ -60,10 +99,10 @@ class _Counts:
         return hash((self._count, self._unit))
 
 
-class _CountsTensor:
+class _CountsTensor(_Counts[_TensorCountT]):
     """What :class:`DateTimeTensor` and :class:`TimeDeltaTensor` share."""
 
-    __hash__ = None
+    __hash__ = None  # type: ignore[assignment]
 
     @property
     def shape(self) -> tuple[int, ...]:
@@ -91,13 +130,21 @@ class _CountsTensor:
                 and np.array_equal(np.asarray(self._count), np.asarray(other._count)))
 
 
-class _Instants(_Counts):
+class _Instants(_Counts[_CountT]):
     """The arithmetic that :class:`DateTime` and :class:`DateTimeTensor`
     share."""
 
     @property
     def _family(self):
         return _Instants
+
+    @overload
+    @classmethod
+    def _of(cls, count: IntTensor, unit: str) -> DateTimeTensor: ...
+
+    @overload
+    @classmethod
+    def _of(cls, count: int, unit: str) -> DateTime: ...
 
     @classmethod
     def _of(cls, count, unit):
@@ -107,10 +154,19 @@ class _Instants(_Counts):
         return value
 
     @property
-    def count(self) -> int | IntTensor:
+    def count(self) -> _CountT:
         """The number of :attr:`unit` after 1970-01-01T00:00, or a tensor of
         them."""
         return self._count
+
+    @overload
+    def to_datetime64(self: DateTime) -> np.datetime64: ...
+
+    @overload
+    def to_datetime64(self: DateTimeTensor) -> np.ndarray: ...
+
+    @overload
+    def to_datetime64(self) -> np.datetime64 | np.ndarray: ...
 
     def to_datetime64(self) -> np.datetime64 | np.ndarray:
         """The value as a ``np.datetime64`` at its resolution, or a
@@ -122,17 +178,47 @@ class _Instants(_Counts):
             return NotImplemented
         return _as_boolean(compare(self.to_datetime64(), other.to_datetime64()))
 
-    def __lt__(self, other) -> bool | BoolTensor:
+    @overload
+    def __lt__(self: DateTime, other: DateTime) -> bool: ...
+
+    @overload
+    def __lt__(self, other: DateTime | DateTimeTensor) -> BoolTensor: ...
+
+    def __lt__(self, other):
         return self._compare(other, operator.lt)
 
-    def __le__(self, other) -> bool | BoolTensor:
+    @overload
+    def __le__(self: DateTime, other: DateTime) -> bool: ...
+
+    @overload
+    def __le__(self, other: DateTime | DateTimeTensor) -> BoolTensor: ...
+
+    def __le__(self, other):
         return self._compare(other, operator.le)
 
-    def __gt__(self, other) -> bool | BoolTensor:
+    @overload
+    def __gt__(self: DateTime, other: DateTime) -> bool: ...
+
+    @overload
+    def __gt__(self, other: DateTime | DateTimeTensor) -> BoolTensor: ...
+
+    def __gt__(self, other):
         return self._compare(other, operator.gt)
 
-    def __ge__(self, other) -> bool | BoolTensor:
+    @overload
+    def __ge__(self: DateTime, other: DateTime) -> bool: ...
+
+    @overload
+    def __ge__(self, other: DateTime | DateTimeTensor) -> BoolTensor: ...
+
+    def __ge__(self, other):
         return self._compare(other, operator.ge)
+
+    @overload
+    def __add__(self: DateTime, other: _ScalarDuration) -> DateTime: ...
+
+    @overload
+    def __add__(self, other: Duration) -> DateTimeTensor: ...
 
     def __add__(self, other):
         other = _as_time_delta(other)
@@ -141,6 +227,18 @@ class _Instants(_Counts):
         return _date_time(self.to_datetime64() + other.to_timedelta64())
 
     __radd__ = __add__
+
+    @overload
+    def __sub__(self: DateTime, other: DateTime) -> TimeDelta: ...
+
+    @overload
+    def __sub__(self, other: DateTime | DateTimeTensor) -> TimeDeltaTensor: ...
+
+    @overload
+    def __sub__(self: DateTime, other: _ScalarDuration) -> DateTime: ...
+
+    @overload
+    def __sub__(self, other: Duration) -> DateTimeTensor: ...
 
     def __sub__(self, other):
         if isinstance(other, _Instants):
@@ -154,7 +252,7 @@ class _Instants(_Counts):
         return type(self), (self.to_datetime64(),)
 
 
-class DateTime(_Instants):
+class DateTime(_Instants[int]):
     """A calendar date and time: a count of a time unit after
     1970-01-01T00:00, as a ``np.datetime64`` stores it. The epoch of
     :class:`Times`, the instant its time 0 stands for, is one.
@@ -220,7 +318,7 @@ class DateTime(_Instants):
         return f"DateTime({str(self.to_datetime64())!r})"
 
 
-class DateTimeTensor(_CountsTensor, _Instants):
+class DateTimeTensor(_CountsTensor[IntTensor], _Instants[IntTensor]):
     """A tensor of calendar dates and times in one unit.
 
     Its :attr:`count` is an ``IntTensor`` of counts after
@@ -277,7 +375,7 @@ def _date_time(value):
     return (DateTimeTensor if np.ndim(value) else DateTime)(value)
 
 
-class _Duration(_Counts):
+class _Duration(_Counts[_CountT]):
     """The arithmetic that :class:`TimeDelta` and :class:`TimeDeltaTensor`
     share."""
 
@@ -286,13 +384,22 @@ class _Duration(_Counts):
         return _Duration
 
     @property
-    def count(self) -> int | float | IntTensor | FloatTensor:
+    def count(self) -> _CountT:
         """The number of :attr:`unit` in the duration, or a tensor of them."""
         return self._count
 
     @classmethod
     def _of(cls, count, unit):
         return _time_delta(count, unit)
+
+    @overload
+    def to_timedelta64(self: TimeDelta, resolution: str | None = None) -> np.timedelta64: ...
+
+    @overload
+    def to_timedelta64(self: TimeDeltaTensor, resolution: str | None = None) -> np.ndarray: ...
+
+    @overload
+    def to_timedelta64(self, resolution: str | None = None) -> np.timedelta64 | np.ndarray: ...
 
     def to_timedelta64(self, resolution: str | None = None) -> np.timedelta64 | np.ndarray:
         """The value as a ``np.timedelta64``, or a ``timedelta64`` array,
@@ -316,7 +423,7 @@ class _Duration(_Counts):
             # Each count rounded exactly, as a single count is.
             steps = [TimeDelta(count, self._unit).to_timedelta64(resolution) for count in np.asarray(self._count).flat]
             return np.array(steps, dtype=f"timedelta64[{_UNIT_TO_NUMPY[resolution]}]").reshape(np.shape(self._counts()))
-        steps = round(Fraction(self._count) * _ATTOSECONDS[self._unit] / _ATTOSECONDS[resolution])
+        steps = round(self._length() / _ATTOSECONDS[resolution])
         return np.timedelta64(steps, _UNIT_TO_NUMPY[resolution])
 
     def _length(self):
@@ -332,41 +439,100 @@ class _Duration(_Counts):
         unit = min(self._unit, other._unit, key=_ATTOSECONDS.__getitem__)
         return BoolTensor(compare(self._in(unit), other._in(unit)))
 
-    def __lt__(self, other) -> bool | BoolTensor:
+    @overload
+    def __lt__(self: TimeDelta, other: _ScalarDuration) -> bool: ...
+
+    @overload
+    def __lt__(self, other: Duration) -> BoolTensor: ...
+
+    def __lt__(self, other):
         return self._compare(other, operator.lt)
 
-    def __le__(self, other) -> bool | BoolTensor:
+    @overload
+    def __le__(self: TimeDelta, other: _ScalarDuration) -> bool: ...
+
+    @overload
+    def __le__(self, other: Duration) -> BoolTensor: ...
+
+    def __le__(self, other):
         return self._compare(other, operator.le)
 
-    def __gt__(self, other) -> bool | BoolTensor:
+    @overload
+    def __gt__(self: TimeDelta, other: _ScalarDuration) -> bool: ...
+
+    @overload
+    def __gt__(self, other: Duration) -> BoolTensor: ...
+
+    def __gt__(self, other):
         return self._compare(other, operator.gt)
 
-    def __ge__(self, other) -> bool | BoolTensor:
+    @overload
+    def __ge__(self: TimeDelta, other: _ScalarDuration) -> bool: ...
+
+    @overload
+    def __ge__(self, other: Duration) -> BoolTensor: ...
+
+    def __ge__(self, other):
         return self._compare(other, operator.ge)
 
     def _in(self, unit):
         """The count in ``unit``, a unit at least as fine, by an exact factor."""
         return self._counts() * (_ATTOSECONDS[self._unit] // _ATTOSECONDS[unit])
 
-    def __add__(self, other):
-        other = _as_time_delta(other)
-        if other is None:
-            return NotImplemented
+    @overload
+    def __add__(self: TimeDelta, other: _ScalarDuration) -> TimeDelta: ...
+
+    @overload
+    def __add__(self, other: Duration) -> TimeDeltaTensor: ...
+
+    def _plus(self, other):
+        """The sum with ``other``, a duration, in the finer of the two units."""
         unit = min(self._unit, other._unit, key=_ATTOSECONDS.__getitem__)
         return _time_delta(self._in(unit) + other._in(unit), unit)
 
+    def _negated(self):
+        return _time_delta(-self._counts(), self._unit)
+
+    def __add__(self, other):
+        other = _as_time_delta(other)
+        return NotImplemented if other is None else self._plus(other)
+
     __radd__ = __add__
+
+    @overload
+    def __sub__(self: TimeDelta, other: _ScalarDuration) -> TimeDelta: ...
+
+    @overload
+    def __sub__(self, other: Duration) -> TimeDeltaTensor: ...
 
     def __sub__(self, other):
         other = _as_time_delta(other)
-        return NotImplemented if other is None else self + -other
+        return NotImplemented if other is None else self._plus(other._negated())
+
+    @overload
+    def __rsub__(self: TimeDelta, other: _ScalarDuration) -> TimeDelta: ...
+
+    @overload
+    def __rsub__(self, other: Duration) -> TimeDeltaTensor: ...
 
     def __rsub__(self, other):
         other = _as_time_delta(other)
-        return NotImplemented if other is None else other + -self
+        return NotImplemented if other is None else other._plus(self._negated())
+
+    @overload
+    def __neg__(self: TimeDelta) -> TimeDelta: ...
+
+    @overload
+    def __neg__(self: TimeDeltaTensor) -> TimeDeltaTensor: ...
 
     def __neg__(self):
-        return _time_delta(-self._counts(), self._unit)
+        return self._negated()
+
+    @overload
+    def __mul__(self: TimeDelta, factor: float) -> TimeDelta: ...
+
+    @overload
+    def __mul__(self: TimeDeltaTensor, factor: float) -> TimeDeltaTensor: ...
 
     def __mul__(self, factor):
         if not isinstance(factor, numbers.Real):
@@ -379,7 +545,7 @@ class _Duration(_Counts):
         return type(self), (self._count, self._unit)
 
 
-class TimeDelta(_Duration):
+class TimeDelta(_Duration[int | float]):
     """A duration: a count of a time unit, such as 1.5 hours.
 
     The count is an integer, as a ``np.timedelta64`` stores it, or a float,
@@ -454,7 +620,7 @@ class TimeDelta(_Duration):
         return f"TimeDelta({self._count}, {self._unit!r})"
 
 
-class TimeDeltaTensor(_CountsTensor, _Duration):
+class TimeDeltaTensor(_CountsTensor[IntTensor | FloatTensor], _Duration[IntTensor | FloatTensor]):
     """A tensor of durations in one unit, such as the times at which to
     evaluate a time series.
 
@@ -509,8 +675,9 @@ class TimeDeltaTensor(_CountsTensor, _Duration):
         if array.dtype.kind == "m":
             self._count, self._unit = _numpy_counts(array)
             return
-        durations = [_as_time_delta(element) for element in array.flat] if array.dtype == object else [None]
-        if None in durations:
+        given = [_as_time_delta(element) for element in array.flat] if array.dtype == object else [None]
+        durations = [duration for duration in given if duration is not None]
+        if len(durations) < len(given):
             raise TypeError("Expected durations, or numbers with a unit")
         unit = min((duration.unit for duration in durations), key=_ATTOSECONDS.__getitem__)
         counts = np.array([duration._in(unit) for duration in durations]).reshape(array.shape)
@@ -577,12 +744,12 @@ def _from_pair(value):
     return _time_delta(count, unit)
 
 
-def _as_time_delta(value):
+def _as_time_delta(value) -> TimeDelta | TimeDeltaTensor | None:
     """``value`` as a :class:`TimeDelta` if it is a duration, such as a tuple
     ``(count, unit)``, or itself if it is a :class:`TimeDeltaTensor`, else
     ``None``."""
     value = _from_pair(value)
-    if isinstance(value, _Duration):
+    if isinstance(value, TimeDelta | TimeDeltaTensor):
         return value
     if isinstance(value, (np.timedelta64, datetime.timedelta)) or hasattr(value, "to_timedelta64"):
         return TimeDelta(value)
@@ -593,12 +760,12 @@ def _as_array(values):
     """``values`` as an array. Dates with a timezone, as pandas holds them,
     become naive UTC ``datetime64`` at their resolution."""
     dtype = getattr(values, "dtype", None)
-    if getattr(dtype, "tz", None) is not None:
+    if dtype is not None and getattr(dtype, "tz", None) is not None:
         return values.to_numpy(dtype=f"datetime64[{dtype.unit}]")
     return np.asarray(values)
 
 
-def _duration(value, message):
+def _duration(value, message) -> TimeDelta | float:
     """``value`` as a positive duration: a :class:`TimeDelta` for a duration,
     such as a ``timedelta64`` or ``pd.Timedelta``, kept at its resolution, or
     else a float. Raises ``ValueError`` with ``message`` if it is not
@@ -607,7 +774,7 @@ def _duration(value, message):
     if isinstance(value, np.timedelta64) and np.isnat(value):
         raise ValueError(message)
     duration = _as_time_delta(value)
-    if duration is not None:
+    if isinstance(duration, TimeDelta):
         if duration.count <= 0:
             raise ValueError(message)
         return duration
@@ -617,16 +784,34 @@ def _duration(value, message):
     return value
 
 
+@overload
+def _in_unit(duration: TimeDeltaTensor, unit: str) -> np.ndarray: ...
+
+
+@overload
+def _in_unit(duration: TimeDelta | float, unit: str) -> float: ...
+
+
+@overload
+def _in_unit(duration: _Duration | float, unit: str) -> float | np.ndarray: ...
+
+
 def _in_unit(duration, unit):
     """A duration from :func:`_duration` as a number of ``unit``, a Times unit;
     a :class:`TimeDelta` is converted by an exact factor and rounded once,
     and a :class:`TimeDeltaTensor` likewise to a float64 array."""
     if not isinstance(duration, _Duration):
         return duration
-    if duration._array:
+    if isinstance(duration, TimeDeltaTensor):
         # One unit is a whole multiple of the other, so one multiplication
         # or division by an integer rounds each count once.
         counts = np.asarray(duration.count, dtype=np.float64)
         source, target = _ATTOSECONDS[duration.unit], _ATTOSECONDS[unit]
         return counts * (source // target) if source >= target else counts / (target // source)
-    return float(Fraction(duration.count) * _ATTOSECONDS[duration.unit] / _ATTOSECONDS[unit])
+    return float(duration._length() / _ATTOSECONDS[unit])
+
+
+# A single duration, in any of the forms the operators of TimeDelta and
+# DateTime take, and a duration that may also be a tensor of them.
+_ScalarDuration = TimeDelta | tuple[float, str] | np.timedelta64 | datetime.timedelta
+Duration = _ScalarDuration | TimeDeltaTensor

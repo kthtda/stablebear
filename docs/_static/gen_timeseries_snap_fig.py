@@ -5,6 +5,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 from pathlib import Path
+from typing import Literal
 
 from stablebear.timeseries import TimeDelayEmbedding, Times, TimeSeries, Window
 
@@ -369,7 +370,7 @@ def plot_timeseries_window_anchors():
 def plot_timeseries_window_closed():
     signal = TimeSeries([0.0, 0.0, 0.0, 1.0, 2.0, 3.0, 2.0, 1.0, 0.0],
                         times=np.arange(9.0))
-    choices = ["left", "right", "both", "none"]
+    choices: list[Literal["left", "right", "both", "none"]] = ["left", "right", "both", "none"]
     hollow = plt.rcParams["axes.facecolor"]
 
     fig, ax = plt.subplots(figsize=(7, 3.0))

@@ -101,6 +101,13 @@ protect. These principles apply when writing, reviewing, or changing tests.
     fractions, use ones that are exact in binary floating point, such as
     0.5 and 0.25, unless it tests rounding.
 
+20. **Tests must type-check.** Tests use the public API as users do, so
+    pyright checks them too. A line that passes invalid input on purpose
+    carries `# pyright: ignore[<rule>]`, naming the rule it breaks. An
+    expression evaluated only for the error it raises is assigned to `_`,
+    as in `_ = a + b` inside `pytest.raises`. See
+    [AGENTS.md](../AGENTS.md#type-checking).
+
 The review question is: **What bug would make this test fail, and can I see
 that immediately?**
 

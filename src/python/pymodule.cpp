@@ -182,4 +182,17 @@ NB_MODULE(SB_MODULE_NAME, m) {
   sb_py::register_module_persistence(m);
   sb_py::register_distributions(m);
   sb_py::register_module_point_process(m);
+
+  // Export every binding, private ones included, so that the stablebear
+  // backend selector and type checkers reading the generated stub see the
+  // whole API through "from _sb_cpu import *".
+  nb::list all;
+  for (auto [name, value] : nb::borrow<nb::dict>(m.attr("__dict__")))
+  {
+    if (!nb::cast<std::string>(name).starts_with("__"))
+    {
+      all.append(name);
+    }
+  }
+  m.attr("__all__") = all;
 }

@@ -1,0 +1,55 @@
+"""Static type checks for the public API.
+
+pyright checks this file in CI; it is not run. Each ``assert_type`` fails
+the check if the inferred type of the expression changes.
+"""
+
+import numpy as np
+from typing_extensions import assert_type
+
+import stablebear as sb
+from stablebear.timeseries.date_time import DateTime, DateTimeTensor, TimeDelta, TimeDeltaTensor
+
+pcfs = sb.zeros((3,))
+
+assert_type(sb.max_time(pcfs), sb.FloatTensor)
+assert_type(sb.mean(pcfs), sb.PcfTensor)
+assert_type(sb.sum(pcfs), sb.PcfTensor)
+
+assert_type(DateTime("2023-01-01").count, int)
+assert_type(DateTime("2023-01-01").to_datetime64(), np.datetime64)
+assert_type(DateTimeTensor(["2023-01-01"]).count, sb.IntTensor)
+assert_type(DateTimeTensor(["2023-01-01"]).to_datetime64(), np.ndarray)
+
+assert_type(TimeDelta(1, "h").count, int | float)
+assert_type(TimeDelta(1, "h").to_timedelta64(), np.timedelta64)
+assert_type(TimeDeltaTensor([1], "h").count, sb.IntTensor | sb.FloatTensor)
+assert_type(TimeDeltaTensor([1], "h").to_timedelta64(), np.ndarray)
+
+cloud = sb.PointCloud(np.zeros((4, 2)))
+assert_type(sb.random.subsample(cloud, n_points=2), sb.PointCloudTensor)
+assert_type(sb.random.subsample(sb.DistanceMatrix(4), n_points=2), sb.DistanceMatrixTensor)
+
+assert_type(sb.distributions.Gaussian().weight(0.5), float)
+assert_type(sb.distributions.Gaussian().weight(np.zeros(3)), np.ndarray)
+
+hour = TimeDelta(1, "h")
+hours = TimeDeltaTensor([1, 2], "h")
+assert_type(hour + (30, "min"), TimeDelta)
+assert_type(hour + hours, TimeDeltaTensor)
+assert_type(hours - hour, TimeDeltaTensor)
+assert_type(-hour, TimeDelta)
+assert_type(hours * 0.5, TimeDeltaTensor)
+assert_type(hour < hour, bool)
+assert_type(hours < hour, sb.BoolTensor)
+assert_type(hour == hours, sb.BoolTensor)
+assert_type(hour == hour, bool)
+
+day = DateTime("2023-01-01")
+days = DateTimeTensor(["2023-01-01", "2023-01-02"])
+assert_type(day + hour, DateTime)
+assert_type(day + hours, DateTimeTensor)
+assert_type(day - day, TimeDelta)
+assert_type(days - day, TimeDeltaTensor)
+assert_type(days < day, sb.BoolTensor)
+assert_type(day < day, bool)

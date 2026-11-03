@@ -126,7 +126,7 @@ def plot_barcode_colors():
     for dim, lc in enumerate(ax.collections):
         n_bars = len(np.asarray(bcs[dim]))
         ax.text(1.02, y + (n_bars - 1) / 2, f"H{dim}",
-                color=lc.get_colors()[0], va="center",
+                color=np.asarray(lc.get_edgecolor())[0], va="center",
                 transform=ax.get_yaxis_transform())
         y += n_bars
     ax.set_xlabel("t")
@@ -162,7 +162,7 @@ def plot_tda_pipeline(h0_color="steelblue", h1_color="orangered"):
     ax1.set_title("Point cloud")
 
     # Middle: persistence diagram (via persim)
-    import persim
+    import persim  # pyright: ignore[reportMissingImports]
     persim.plot_diagrams(
         [np.asarray(bc_h0), np.asarray(bc_h1)],
         ax=ax2, legend=True, show=False,

@@ -298,4 +298,4 @@ def test_binary_io_mixin_requires_explicit_backend_data_hook():
         pass
 
     with pytest.raises(TypeError, match=r"abstract method.*_binary_io_data"):
-        IncompleteBinaryObject()
+        IncompleteBinaryObject()  # pyright: ignore[reportAbstractUsage]

@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import warnings
+from typing import Any
 
 import numpy as np
 
 from . import _sb_cpp as cpp
 from ._binary_io import _BinaryIoMixin
 from ._tensor_base import Tensor, _array_for_protocol
-from .typing import float32, float64, symmat32, symmat64
+from .typing import Dtype, float32, float64, symmat32, symmat64
 
 _dtype_to_cpp = {
     float32: cpp.SymmetricMatrix_f32,
@@ -50,13 +51,16 @@ class SymmetricMatrix(_BinaryIoMixin):
         existing matrix objects.
     """
 
+    # A native SymmetricMatrix_f32 or _f64.
+    _data: Any
+
     def _binary_io_data(self):
         return self._data
 
     def __init__(
         self,
         n_or_data: int | np.ndarray | SymmetricMatrix,
-        dtype: float32 | float64 | None = None,
+        dtype: Dtype | None = None,
     ):
         if isinstance(n_or_data, SymmetricMatrix):
             self._data = n_or_data._data

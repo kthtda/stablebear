@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 import numpy as np
 
 from . import _sb_cpp as cpp
@@ -32,6 +34,9 @@ class PointCloud(_BinaryIoMixin):
     Basic coordinate slices are views; advanced indexing copies coordinates.
     A write asks the owner to materialize if necessary.
     """
+
+    # A native PointCloud32 or PointCloud64, or None for an element of a tensor.
+    _value: Any
 
     def __init__(self, data, dtype=None, *, _owner=None, _outer_index=None):
         from .base_tensor import FloatTensor

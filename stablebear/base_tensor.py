@@ -1,13 +1,15 @@
 from __future__ import annotations
 
 import operator
+from collections.abc import Sequence
+from typing import Any, TypeAlias
 
 import numpy as np
 
 from . import _sb_cpp as cpp
 from ._tensor_base import (
-    ArithmeticTensorMixin,
-    FunctionTensorMixin,
+    ArithmeticTensor,
+    FunctionTensor,
     Tensor,
     _array_for_protocol,
     _tensor_from_nested,
@@ -56,10 +58,7 @@ def _single_element_bool(tensor):
     )
 
 
-class NumericTensor(Tensor, ArithmeticTensorMixin):
-    def __init__(self):
-        super().__init__()
-
+class NumericTensor(ArithmeticTensor):
     def __float__(self):
         if self.size != 1:
             raise TypeError(
@@ -88,16 +87,16 @@ class NumericTensor(Tensor, ArithmeticTensorMixin):
             return _array_for_protocol(np.asarray(self._data), dtype, copy, copied=False)
         return _array_for_protocol(np.asarray(self.copy()._data), dtype, copy, copied=True)
 
-    def __eq__(self, other):
+    def __eq__(self, other):  # pyright: ignore[reportIncompatibleMethodOverride]
         return self._compare(other, operator.eq, "==")
 
-    def __ne__(self, other):
+    def __ne__(self, other):  # pyright: ignore[reportIncompatibleMethodOverride]
         return self._compare(other, operator.ne, "!=")
 
-    def array_equal(self, other) -> bool:
-        if not isinstance(other, Tensor):
-            return np.array_equal(np.asarray(self), np.asarray(other))
-        return super().array_equal(other)
+    def array_equal(self, rhs) -> bool:
+        if not isinstance(rhs, Tensor):
+            return bool(np.array_equal(np.asarray(self), np.asarray(rhs)))
+        return super().array_equal(rhs)
 
     def __floordiv__(self, rhs):
         rhs_arr = np.asarray(rhs) if isinstance(rhs, NumericTensor) else rhs
@@ -116,22 +115,19 @@ class NumericTensor(Tensor, ArithmeticTensorMixin):
 class FloatTensor(NumericTensor):
     def __init__(self, data: cpp.Float32Tensor | cpp.Float64Tensor | FloatTensor | np.ndarray | list | tuple, dtype=None):
         super().__init__()
-        if isinstance(data, (list, tuple)):
+        if isinstance(data, list | tuple):
             data = np.asarray(data)
 
         if isinstance(data, FloatTensor):
             data = data._data
         elif isinstance(data, np.ndarray):
             if dtype is None:
-                if data.dtype == np.float32:
-                    dtype = float32
-                else:
-                    dtype = float64
+                dtype = float32 if data.dtype == np.float32 else float64
             if dtype == float32:
                 data = cpp.ndarray_to_tensor_32(np.asarray(data, dtype=np.float32))
             else:
                 data = cpp.ndarray_to_tensor_64(np.asarray(data, dtype=np.float64))
-        elif not isinstance(data, (cpp.Float32Tensor, cpp.Float64Tensor)):
+        elif not isinstance(data, cpp.Float32Tensor | cpp.Float64Tensor):
             raise TypeError(f"Cannot create FloatTensor from {type(data)}")
 
         self._data = data
@@ -158,7 +154,7 @@ _INT_CPP_TO_DTYPE = {
 class IntTensor(NumericTensor):
     def __init__(self, data: cpp.Int32Tensor | cpp.Int64Tensor | cpp.Uint32Tensor | cpp.Uint64Tensor | IntTensor | np.ndarray | list | tuple, dtype=None):
         super().__init__()
-        if isinstance(data, (list, tuple)):
+        if isinstance(data, list | tuple):
             data = np.asarray(data)
 
         if isinstance(data, IntTensor):
@@ -214,10 +210,7 @@ class IntTensor(NumericTensor):
         return np.asarray(self).__str__()
 
 
-class _PcfTensorBase(Tensor, ArithmeticTensorMixin, FunctionTensorMixin):
-    def __init__(self):
-        super().__init__()
-
+class _PcfTensorBase(ArithmeticTensor, FunctionTensor):
     def _get_valid_setitem_dtypes(self):
         return [_PcfTensorBase, Pcf]
 
@@ -233,12 +226,12 @@ class PcfTensor(_PcfTensorBase):
         super().__init__()
         if isinstance(data, PcfTensor):
             data = data._data
-        elif isinstance(data, (list, tuple)):
+        elif isinstance(data, list | tuple):
             data = _tensor_from_nested(data, {
                 cpp.Pcf_f32_f32: cpp.Pcf32Tensor,
                 cpp.Pcf_f64_f64: cpp.Pcf64Tensor,
             })
-        elif not isinstance(data, (cpp.Pcf32Tensor, cpp.Pcf64Tensor)):
+        elif not isinstance(data, cpp.Pcf32Tensor | cpp.Pcf64Tensor):
             raise TypeError(f"Cannot create PcfTensor from {type(data)}")
         self._data = data
         self.dtype = _PCF_CPP_TO_DTYPE[type(self._data)]
@@ -252,12 +245,12 @@ class IntPcfTensor(_PcfTensorBase):
         super().__init__()
         if isinstance(data, IntPcfTensor):
             data = data._data
-        elif isinstance(data, (list, tuple)):
+        elif isinstance(data, list | tuple):
             data = _tensor_from_nested(data, {
                 cpp.Pcf_i32_i32: cpp.Pcf32iTensor,
                 cpp.Pcf_i64_i64: cpp.Pcf64iTensor,
             })
-        elif not isinstance(data, (cpp.Pcf32iTensor, cpp.Pcf64iTensor)):
+        elif not isinstance(data, cpp.Pcf32iTensor | cpp.Pcf64iTensor):
             raise TypeError(f"Cannot create IntPcfTensor from {type(data)}")
         self._data = data
         self.dtype = _INTPCF_CPP_TO_DTYPE[type(self._data)]
@@ -271,7 +264,7 @@ class BoolTensor(Tensor):
 
     def __init__(self, data: cpp.BoolTensor | BoolTensor | np.ndarray | list | tuple):
         super().__init__()
-        if isinstance(data, (list, tuple)):
+        if isinstance(data, list | tuple):
             data = np.asarray(data)
 
         if isinstance(data, BoolTensor):
@@ -303,13 +296,15 @@ class BoolTensor(Tensor):
         return _array_for_protocol(np.asarray(self.copy()._data), dtype, copy, copied=True)
 
 
-PcfContainerLike = Tensor | list[Pcf] | Pcf
+# A single PCF, or PCFs nested in lists or tuples.
+_PcfNested: TypeAlias = "Pcf | Sequence[_PcfNested]"
+PcfContainerLike: TypeAlias = "PcfTensor | IntPcfTensor | _PcfNested"
 
 
 def _first_pcf(fs):
     """Return the first leaf when *fs* is a nested collection of PCFs."""
     first = fs
-    while isinstance(first, (list, tuple)):
+    while isinstance(first, list | tuple):
         if not first:
             return None
         first = first[0]
@@ -325,7 +320,7 @@ def _to_tensor_pcf(fs: PcfContainerLike):
             return IntPcfTensor([fs])
         return PcfTensor([fs])
 
-    if isinstance(fs, (list, tuple)):
+    if isinstance(fs, list | tuple):
         if not fs:
             return PcfTensor(fs)
         first = _first_pcf(fs)
@@ -337,19 +332,19 @@ def _to_tensor_pcf(fs: PcfContainerLike):
     raise TypeError("Input should be convertible to a PcfTensor.")
 
 
-def _get_backend(fs, backendMapping: dict):
+def _get_backend(fs, backendMapping: dict) -> tuple[Any, Any]:  # Any: callers pass any tensor type through.
     if isinstance(fs, Tensor):
         _validate_dtype(fs.dtype, backendMapping.keys())
 
         backend = backendMapping.get(fs.dtype)
         if backend is None:
             raise ValueError(
-                f"Operation not supported for tensors of this type ({fs._type} with dtype {fs.dtype})"
+                f"Operation not supported for tensors of this type ({type(fs).__name__} with dtype {fs.dtype})"
             )
         return backend, fs
     elif isinstance(fs, np.ndarray):
         return _get_backend(FloatTensor(fs), backendMapping)
-    elif isinstance(fs, (Pcf, list, tuple)):
+    elif isinstance(fs, Pcf | list | tuple):
         return _get_backend(_to_tensor_pcf(fs), backendMapping)
     elif hasattr(fs, "dtype"):
         _validate_dtype(fs.dtype, backendMapping.keys())
@@ -387,5 +382,5 @@ def _resolve_pcf_inputs(backend_map: dict, *inputs: PcfContainerLike):
 
 
 # Backward-compatible re-exports. Implementations live in domain modules.
-from .nested_tensor import NestedTensor  # noqa: E402
-from .point_cloud import PointCloud, PointCloudTensor  # noqa: E402
+from .nested_tensor import NestedTensor  # noqa: E402, F401
+from .point_cloud import PointCloud, PointCloudTensor  # noqa: E402, F401

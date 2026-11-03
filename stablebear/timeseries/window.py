@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-import datetime
-from typing import Literal, overload
+from typing import Any, Literal, overload
 
 import numpy as np
 
 from .. import _sb_cpp as cpp
-from .date_time import DateTimeTensor, TimeDelta, TimeDeltaTensor, _duration, _in_unit
+from .date_time import TimeDeltaTensor, _duration, _in_unit, _ScalarDuration
 from .series import TimeSeries, TimeSeriesTensor
 
 
@@ -103,8 +102,8 @@ class Window:
 
     _CLOSED = {"left": (True, False), "right": (False, True), "both": (True, True), "none": (False, False)}
 
-    def __init__(self, size: float | TimeDelta | np.timedelta64 | datetime.timedelta,
-                 step: float | TimeDelta | np.timedelta64 | datetime.timedelta | None = None,
+    def __init__(self, size: float | _ScalarDuration,
+                 step: float | _ScalarDuration | None = None,
                  closed: Literal["left", "right", "both", "none"] | None = None, partial: bool = False,
                  anchor: Literal["start", "end"] = "end"):
         self.size = _duration(size, "The window size must be finite and positive")
@@ -123,7 +122,7 @@ class Window:
     def __call__(self, series: TimeSeries, return_bounds: Literal[False] = False) -> TimeSeriesTensor: ...
 
     @overload
-    def __call__(self, series: TimeSeries, return_bounds: Literal[True]) -> tuple[TimeSeriesTensor, TimeDeltaTensor | DateTimeTensor]: ...
+    def __call__(self, series: TimeSeries, return_bounds: Literal[True]) -> tuple[TimeSeriesTensor, Any]: ...  # Bounds are dates if the series has an epoch.
 
     def __call__(self, series: TimeSeries, return_bounds: bool = False):
         windows, bounds = cpp.windows(series._data, _in_unit(self.size, series.unit), _in_unit(self.step, series.unit),

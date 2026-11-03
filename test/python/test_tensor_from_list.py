@@ -1,19 +1,20 @@
 import numpy as np
+from numpy.typing import DTypeLike
 import pytest
 
 import stablebear as sb
 from stablebear.persistence import Barcode, BarcodeTensor
 
 
-def _make_pcf(val, dtype=np.float32):
+def _make_pcf(val, dtype: DTypeLike = np.float32):
     return sb.Pcf(np.array([[0.0, val], [1.0, val + 1]], dtype=dtype))
 
 
-def _make_int_pcf(val, dtype=np.int32):
+def _make_int_pcf(val, dtype: DTypeLike = np.int32):
     return sb.Pcf(np.array([[0, val], [1, val + 1]], dtype=dtype))
 
 
-def _make_barcode(offset=0.0, dtype=np.float64):
+def _make_barcode(offset=0.0, dtype: DTypeLike = np.float64):
     return Barcode(np.array([[offset, offset + 1.0]], dtype=dtype))
 
 

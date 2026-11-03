@@ -1,3 +1,5 @@
+from typing import Any
+
 from . import _sb_cpp as cpp
 from ._tensor_base import Shape, ShapeLike, Tensor
 from .base_tensor import (
@@ -116,7 +118,7 @@ def zeros(shape: ShapeLike, dtype: Dtype = pcf32):
     return wrapper(cpp_cls(shape, *zero_fill))
 
 
-def tensor(data, dtype: Dtype = None):
+def tensor(data, dtype: Dtype | None = None) -> Any:  # Any: the type follows the data and dtype.
     """Create a tensor from existing data, dispatching on *dtype*.
 
     A NumPy-like factory that wraps the per-family constructors so any

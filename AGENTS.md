@@ -85,6 +85,31 @@ Tests marked `statistical` rerun probability checks with large inputs and draw
 counts. They are skipped unless `SB_RUN_STATISTICAL=1` is set. CI runs them in
 `.github/workflows/statistical.yaml`.
 
+### Type checking
+Working code that uses the public API must type-check cleanly in users'
+editors. pyright checks the package, the tests, the docs scripts in
+`docs/_static/`, and the static checks in `test/typing/`. The tests and
+scripts import the installed package, as users do, so build and install
+before running it, and again after changing the package. CI runs it on every
+pull request (`.github/workflows/typecheck.yaml`).
+
+```bash
+pip install --group test --group typecheck
+cmake --build cmake-build-debug -j$JOBS && cmake --install cmake-build-debug
+pyright
+```
+
+- Annotate public parameters: pyright infers an unannotated parameter's type
+  from its default, such as `str` for `allow_partial="keep"`.
+- When the return type follows from the argument types, say so with
+  `@overload`. When it depends on runtime state, such as the number of
+  channels or whether a series has an epoch, return `Any` and describe the
+  cases in the docstring.
+- A test that passes invalid input on purpose marks the line with
+  `# pyright: ignore[<rule>]`.
+- Add an `assert_type` to `test/typing/check_types.py` when narrowing the type
+  of a public API, so that the narrowing stays checked.
+
 ### C++ tests (GoogleTest)
 ```bash
 cmake --build cmake-build-debug --target sb_test -j$JOBS

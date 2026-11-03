@@ -88,7 +88,7 @@ def test_resolve_pcf_inputs_invalid():
     from stablebear.reductions import _REDUCTIONS_BACKEND_MAP
 
     with pytest.raises(ValueError, match="not supported"):
-        _resolve_pcf_inputs(_REDUCTIONS_BACKEND_MAP, "not a tensor")
+        _resolve_pcf_inputs(_REDUCTIONS_BACKEND_MAP, "not a tensor")  # pyright: ignore[reportArgumentType]
 
 
 def test_max_time_1d():

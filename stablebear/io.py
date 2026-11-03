@@ -1,3 +1,5 @@
+from typing import Any
+
 import stablebear._sb_cpp as cpp
 
 from .persistence.barcode import Barcode
@@ -111,7 +113,7 @@ _OBJECT_SAVE_DISPATCH = None
 def _init_object_save_dispatch():
     global _OBJECT_SAVE_DISPATCH
     if _OBJECT_SAVE_DISPATCH is not None:
-        return
+        return _OBJECT_SAVE_DISPATCH
     cpp_p = cpp.persistence
     _OBJECT_SAVE_DISPATCH = {
         cpp.Pcf_f32_f32: cpp.IoOps.save_pcf32_object,
@@ -129,6 +131,7 @@ def _init_object_save_dispatch():
     }
     for native in _SERIES_NATIVE.values():
         _OBJECT_SAVE_DISPATCH[native] = native._save
+    return _OBJECT_SAVE_DISPATCH
 
 
 _OBJECT_LOAD_DISPATCH = None
@@ -137,7 +140,7 @@ _OBJECT_LOAD_DISPATCH = None
 def _init_object_load_dispatch():
     global _OBJECT_LOAD_DISPATCH
     if _OBJECT_LOAD_DISPATCH is not None:
-        return
+        return _OBJECT_LOAD_DISPATCH
     cpp_p = cpp.persistence
     _OBJECT_LOAD_DISPATCH = {
         cpp.Pcf_f32_f32: Pcf,
@@ -155,21 +158,20 @@ def _init_object_load_dispatch():
     }
     for native in _SERIES_NATIVE.values():
         _OBJECT_LOAD_DISPATCH[native] = TimeSeries._from_cpp
+    return _OBJECT_LOAD_DISPATCH
 
 
 def _save_object(item, file):
-    _init_object_save_dispatch()
     data = item._binary_io_data()
-    fn = _OBJECT_SAVE_DISPATCH.get(type(data))
+    fn = _init_object_save_dispatch().get(type(data))
     if fn is None:
         raise TypeError(f"Unsupported object type {type(data)}")
     fn(data, file)
 
 
 def _load_object(file):
-    _init_object_load_dispatch()
     cpp_obj = cpp.IoOps.load_object_from_file(file)
-    ctor = _OBJECT_LOAD_DISPATCH.get(type(cpp_obj))
+    ctor = _init_object_load_dispatch().get(type(cpp_obj))
     if ctor is None:
         raise TypeError(f"File contains unsupported object of type {type(cpp_obj)}")
     return ctor(cpp_obj)
@@ -199,7 +201,7 @@ def save(item, file):
         save_fn(item, file)
 
 
-def load(file):
+def load(file) -> Any:  # Any: the type is whatever the file holds.
     """Load a tensor or object from a file in stablebear's binary format.
 
     The returned item will have the same type and dtype as what was saved.

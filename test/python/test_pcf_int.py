@@ -74,13 +74,13 @@ class TestIntPcfArithmetic:
         a = Pcf(np.array([[0, 1]], dtype=np.int32))
         b = Pcf(np.array([[0.0, 1.0]], dtype=np.float32))
         with pytest.raises(TypeError, match="Mismatched PCF types"):
-            a + b
+            _ = a + b
 
     def test_add_mismatched_i32_i64_raises(self):
         a = Pcf(np.array([[0, 1]], dtype=np.int32))
         b = Pcf(np.array([[0, 1]], dtype=np.int64))
         with pytest.raises(TypeError, match="Mismatched PCF types"):
-            a + b
+            _ = a + b
 
     def test_div_scalar_i32(self):
         f = Pcf(np.array([[0, 10], [2, 20]], dtype=np.int32))

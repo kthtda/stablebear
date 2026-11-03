@@ -1,13 +1,10 @@
 from __future__ import annotations
 
-import datetime
 import operator
 from typing import Literal
 
-import numpy as np
-
 from .. import _sb_cpp as cpp
-from .date_time import TimeDelta, _duration, _in_unit
+from .date_time import _duration, _in_unit, _ScalarDuration
 from .series import TimeSeries
 
 
@@ -60,7 +57,7 @@ class TimeDelayEmbedding:
         channel spans less than ``(m - 1) * d``.
     """
 
-    def __init__(self, dimension: int, delay: float | TimeDelta | np.timedelta64 | datetime.timedelta,
+    def __init__(self, dimension: int, delay: float | _ScalarDuration,
                  direction: Literal["backward", "forward"] = "backward"):
         self.dimension = operator.index(dimension)
         if self.dimension < 1:

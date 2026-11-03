@@ -11,6 +11,7 @@ import pkgutil
 import platform
 import re
 import sys
+from typing import TYPE_CHECKING
 
 from .gpu import has_nvidia_gpu as _has_nvidia_gpu
 
@@ -196,11 +197,10 @@ if os.environ.get("SB_FORCE_CPU", "0") == "0" and (_force_cuda or _has_nvidia_gp
 if _backend is None:
     _backend = importlib.import_module("._sb_cpu", package="stablebear")
 
-# Populate this module's namespace with everything from the backend
-_this = sys.modules[__name__]
-for _attr in dir(_backend):
-    setattr(_this, _attr, getattr(_backend, _attr))
+# Populate this module's namespace with the backend's API
+for _attr in _backend.__all__:
+    globals()[_attr] = getattr(_backend, _attr)
 
-# Make cpp.persistence work by aliasing the submodule
-if hasattr(_backend, "persistence"):
-    persistence = _backend.persistence
+if TYPE_CHECKING:
+    # Type checkers see the CPU backend; the CUDA backends have the same API.
+    from ._sb_cpu import *  # noqa: F403

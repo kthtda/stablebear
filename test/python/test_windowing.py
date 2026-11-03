@@ -96,12 +96,12 @@ def test_window_raises_on_a_size_or_step_that_is_not_positive(size, step, match)
 
 def test_window_raises_on_an_unknown_closed():
     with pytest.raises(ValueError, match="closed"):
-        Window(size=TimeDelta(1, "s"), step=TimeDelta(1, "s"), closed="middle")
+        Window(size=TimeDelta(1, "s"), step=TimeDelta(1, "s"), closed="middle")  # pyright: ignore[reportArgumentType]
 
 
 def test_window_raises_on_an_unknown_anchor():
     with pytest.raises(ValueError, match="anchor"):
-        Window(size=TimeDelta(1, "s"), step=TimeDelta(1, "s"), closed="left", anchor="middle")
+        Window(size=TimeDelta(1, "s"), step=TimeDelta(1, "s"), closed="left", anchor="middle")  # pyright: ignore[reportArgumentType]
 
 
 @pytest.mark.parametrize("anchor, closed", [

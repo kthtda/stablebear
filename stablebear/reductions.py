@@ -12,17 +12,6 @@ from .typing import pcf32, pcf64
 _REDUCTIONS_BACKEND_MAP = {pcf32: cpp.Reductions_f32_f32, pcf64: cpp.Reductions_f64_f64}
 
 
-def _to_tensor(outFs):
-    if isinstance(outFs, (cpp.Pcf32Tensor, cpp.Pcf64Tensor)):
-        return PcfTensor(outFs)
-    elif isinstance(outFs, (cpp.Float32Tensor, cpp.Float64Tensor)):
-        return FloatTensor(outFs)
-    else:
-        raise ValueError(
-            "Invalid output type (this is probably a bug -- please report it!)."
-        )
-
-
 def _resolve_dim(dim: int, ndim: int) -> int:
     """Normalize a reduction ``dim`` to a non-negative axis (NumPy semantics).
 
@@ -39,7 +28,7 @@ def _resolve_dim(dim: int, ndim: int) -> int:
     return resolved
 
 
-def sum(fs: PcfContainerLike, dim: int = 0):
+def sum(fs: PcfContainerLike, dim: int = 0) -> PcfTensor:
     r"""Compute the pointwise sum of PCFs along the given dimension.
 
     For functions :math:`f_1, \ldots, f_n` along the reduced dimension,
@@ -68,10 +57,10 @@ def sum(fs: PcfContainerLike, dim: int = 0):
         If ``dim`` is out of range for the input tensor's number of dimensions.
     """
     backend, tensor = _resolve_pcf_inputs(_REDUCTIONS_BACKEND_MAP, fs)
-    return _to_tensor(backend.sum(tensor._data, _resolve_dim(dim, tensor.ndim)))
+    return PcfTensor(backend.sum(tensor._data, _resolve_dim(dim, tensor.ndim)))
 
 
-def mean(fs: PcfContainerLike, dim: int = 0):
+def mean(fs: PcfContainerLike, dim: int = 0) -> PcfTensor:
     r"""Compute the pointwise mean of a PCF tensor along the given dimension.
 
     The mean is computed pointwise in time: for functions
@@ -106,10 +95,10 @@ def mean(fs: PcfContainerLike, dim: int = 0):
         If ``dim`` is out of range for the input tensor's number of dimensions.
     """
     backend, tensor = _resolve_pcf_inputs(_REDUCTIONS_BACKEND_MAP, fs)
-    return _to_tensor(backend.mean(tensor._data, _resolve_dim(dim, tensor.ndim)))
+    return PcfTensor(backend.mean(tensor._data, _resolve_dim(dim, tensor.ndim)))
 
 
-def max_time(fs: PcfContainerLike, dim: int = 0):
+def max_time(fs: PcfContainerLike, dim: int = 0) -> FloatTensor:
     r"""Compute the maximum breakpoint time along the given dimension.
 
     For each PCF :math:`f_i` with breakpoints
@@ -147,4 +136,4 @@ def max_time(fs: PcfContainerLike, dim: int = 0):
         over an empty range, so there is no value to return.
     """
     backend, tensor = _resolve_pcf_inputs(_REDUCTIONS_BACKEND_MAP, fs)
-    return _to_tensor(backend.max_time(tensor._data, _resolve_dim(dim, tensor.ndim)))
+    return FloatTensor(backend.max_time(tensor._data, _resolve_dim(dim, tensor.ndim)))

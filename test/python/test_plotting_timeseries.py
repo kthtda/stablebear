@@ -13,6 +13,21 @@ _show_gallery = gallery_fixture(_gallery)
 ax = ax_fixture(_gallery)
 
 
+def _axes(line):
+    """The axes of ``line``, which matplotlib types as optional."""
+    assert line.axes is not None
+    return line.axes
+
+
+def _close(line):
+    """Close the figure that ``line`` is drawn in."""
+    import matplotlib.pyplot as plt
+    from matplotlib.figure import Figure
+    figure = _axes(line).figure
+    assert isinstance(figure, Figure)
+    plt.close(figure)
+
+
 def _series():
     return TimeSeries([10.0, 20.0, 30.0], times=Times([0.0, 1.5, 4.0], unit="s"))
 
@@ -132,14 +147,14 @@ def _windows():
 def test_a_tensor_of_windows_is_drawn_one_line_each_in_place(ax):
     lines = plot_timeseries(_windows(), ax=ax)
 
-    assert [list(line.get_xdata()) for line in lines] == [[0.0, 1.0, 2.0], [2.0, 3.0, 4.0], [4.0, 5.0, 6.0]]
+    assert [np.asarray(line.get_xdata()).tolist() for line in lines] == [[0.0, 1.0, 2.0], [2.0, 3.0, 4.0], [4.0, 5.0, 6.0]]
     assert len({line.get_color() for line in lines}) == 3
 
 
 def test_relative_draws_each_window_from_zero(ax):
     lines = plot_timeseries(_windows(), ax=ax, relative=True)
 
-    assert [list(line.get_xdata()) for line in lines] == [[0.0, 1.0, 2.0]] * 3
+    assert [np.asarray(line.get_xdata()).tolist() for line in lines] == [[0.0, 1.0, 2.0]] * 3
 
 
 def test_an_empty_tensor_draws_nothing(ax):
@@ -169,30 +184,27 @@ def _channels():
 
 
 def test_several_channels_are_drawn_on_new_rows_sharing_time():
-    import matplotlib.pyplot as plt
     lines = plot_timeseries(_channels())
 
-    rows = [line.axes for line in lines]
+    rows = [_axes(line) for line in lines]
     assert len(set(rows)) == 3
-    assert [list(line.get_ydata()) for line in lines] == [[1.0, 2.0], [10.0, 20.0, 30.0], [-1.0, -2.0]]
+    assert [np.asarray(line.get_ydata()).tolist() for line in lines] == [[1.0, 2.0], [10.0, 20.0, 30.0], [-1.0, -2.0]]
     assert rows[0].get_shared_x_axes().joined(rows[0], rows[2])
-    plt.close(rows[0].figure)
+    _close(lines[0])
 
 
 def test_channels_in_other_units_are_drawn_in_the_unit_of_the_series():
-    import matplotlib.pyplot as plt
     lines = plot_timeseries(_channels())
 
-    assert list(lines[1].get_xdata()) == [0.0, 1.0, 2.0]
-    plt.close(lines[0].axes.figure)
+    assert np.asarray(lines[1].get_xdata()).tolist() == [0.0, 1.0, 2.0]
+    _close(lines[0])
 
 
 def test_only_the_last_row_is_labeled():
-    import matplotlib.pyplot as plt
     lines = plot_timeseries(_channels())
 
-    assert [line.axes.get_xlabel() for line in lines] == ["", "", "time (s)"]
-    plt.close(lines[0].axes.figure)
+    assert [_axes(line).get_xlabel() for line in lines] == ["", "", "time (s)"]
+    _close(lines[0])
 
 
 def test_several_channels_are_drawn_on_given_axes_in_order():
@@ -201,7 +213,7 @@ def test_several_channels_are_drawn_on_given_axes_in_order():
 
     lines = plot_timeseries(_channels(), ax=axes)
 
-    assert [line.axes for line in lines] == list(axes)
+    assert [_axes(line) for line in lines] == list(axes)
     plt.close(fig)
 
 
@@ -251,7 +263,7 @@ def test_dates_are_rounded_to_microseconds(ax):
 def test_relative_draws_a_series_with_an_epoch_at_its_times(ax):
     (line,) = plot_timeseries(_dated(), ax=ax, relative=True, unit="min")
 
-    assert list(line.get_xdata()) == [0.0, 90.0, 240.0]
+    assert np.asarray(line.get_xdata()).tolist() == [0.0, 90.0, 240.0]
     assert ax.get_xlabel() == "time (min)"
 
 
@@ -268,12 +280,11 @@ def test_a_series_with_an_epoch_on_a_time_axis_raises(ax):
 
 
 def test_several_channels_with_an_epoch_are_drawn_at_their_dates():
-    import matplotlib.pyplot as plt
     series = _dated()
     lines = plot_timeseries(TimeSeries.from_channels([series, series]))
 
-    assert all(line.get_xdata().dtype == np.dtype("datetime64[us]") for line in lines)
-    plt.close(lines[0].axes.figure)
+    assert all(np.asarray(line.get_xdata()).dtype == np.dtype("datetime64[us]") for line in lines)
+    _close(lines[0])
 
 
 def test_series_with_different_epochs_land_at_their_own_dates(ax):
@@ -282,7 +293,7 @@ def test_series_with_different_epochs_land_at_their_own_dates(ax):
     first, = plot_timeseries(_dated(), ax=ax)
     second, = plot_timeseries(later, ax=ax)
 
-    assert second.get_xdata()[0] - first.get_xdata()[0] == np.timedelta64(1, "D")
+    assert np.asarray(second.get_xdata())[0] - np.asarray(first.get_xdata())[0] == np.timedelta64(1, "D")
 
 
 @pytest.mark.parametrize("values, dtype_name", [

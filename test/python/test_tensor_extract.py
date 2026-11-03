@@ -17,7 +17,7 @@ _NUMERIC_TYPES = [
 
 def _populate(np_arr):
     """Fill an array with unique values based on index: 100*i + 10*j + k ..."""
-    it = np.nditer(np_arr, flags=['multi_index'], op_flags=['writeonly'])
+    it = np.nditer(np_arr, flags=['multi_index'], op_flags=[['writeonly']])
     while not it.finished:
         idx = it.multi_index
         val = sum(v * 10 ** (len(idx) - 1 - i) for i, v in enumerate(idx))

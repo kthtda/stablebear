@@ -7,7 +7,7 @@ from .typing import pcf32, pcf64
 _NORMS_BACKEND_MAP = {pcf32: cpp.Norms_f32_f32, pcf64: cpp.Norms_f64_f64}
 
 
-def lp_norm(fs: PcfContainerLike, p=1, verbose=False) -> FloatTensor:
+def lp_norm(fs: PcfContainerLike, p: float = 1, verbose: bool = False) -> FloatTensor:
     r"""Computes the :math:`L_p` norm of each PCF in `fs`. For example, if `fs` is an :math:`m \times n` array with elements indexed as :math:`f_{ij}`, :math:`0 \leq i < m, 0 \leq j < n`, we compute
 
       .. math::

@@ -96,7 +96,7 @@ def test_embedding_of_pcfs_stacks_delayed_pcfs():
     pytest.param(lambda: TimeDelayEmbedding(dimension=2, delay=TimeDelta(0.0, "s")), ValueError, id="delay-0"),
     pytest.param(lambda: TimeDelayEmbedding(dimension=2, delay=TimeDelta(-1.0, "s")), ValueError,
                  id="delay-negative"),
-    pytest.param(lambda: TimeDelayEmbedding(dimension=2, delay=TimeDelta(1.0, "s"), direction="ahead"), ValueError,
+    pytest.param(lambda: TimeDelayEmbedding(dimension=2, delay=TimeDelta(1.0, "s"), direction="ahead"), ValueError,  # pyright: ignore[reportArgumentType]
                  id="direction-unknown"),
     pytest.param(lambda: TimeDelayEmbedding(dimension=3, delay=TimeDelta(1.0, "s"))(
         TimeSeries([0.0, 10.0], times=TimeDeltaTensor([0.0, 1.0], "s"))), ValueError, id="too-short"),

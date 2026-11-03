@@ -85,11 +85,11 @@ class TestListInput:
 class TestUnsupportedInputType:
     def test_string_raises(self):
         with pytest.raises(ValueError, match="unsupported input data"):
-            Pcf("not a valid input")
+            Pcf("not a valid input")  # pyright: ignore[reportArgumentType]
 
     def test_dict_raises(self):
         with pytest.raises(ValueError, match="unsupported input data"):
-            Pcf({"a": 1})
+            Pcf({"a": 1})  # pyright: ignore[reportArgumentType]
 
 
 class TestDtypeConstructor:
@@ -221,13 +221,13 @@ class TestArithmetic:
         a = Pcf(np.array([[0.0, 1.0]], dtype=np.float32))
         b = Pcf(np.array([[0.0, 1.0]], dtype=np.float64))
         with pytest.raises(TypeError):
-            a + b
+            _ = a + b
         with pytest.raises(TypeError):
-            a - b
+            _ = a - b
         with pytest.raises(TypeError):
-            a * b
+            _ = a * b
         with pytest.raises(TypeError):
-            a / b
+            _ = a / b
 
 
 class TestStr:

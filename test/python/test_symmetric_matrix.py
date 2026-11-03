@@ -37,7 +37,7 @@ class TestConstruction:
 
     def test_construct_rejects_bad_dtype(self):
         with pytest.raises(TypeError, match="Unsupported dtype"):
-            sb.SymmetricMatrix(5, dtype=int)
+            sb.SymmetricMatrix(5, dtype=int)  # pyright: ignore[reportArgumentType]
 
     def test_construct_from_symmetric_matrix(self, dtype):
         m = sb.SymmetricMatrix(3, dtype=dtype)
@@ -48,12 +48,12 @@ class TestConstruction:
     def test_construct_from_cpp_object(self):
         from stablebear import _sb_cpp as cpp
         raw = cpp.SymmetricMatrix_f64(4)
-        m = sb.SymmetricMatrix(raw)
+        m = sb.SymmetricMatrix(raw)  # pyright: ignore[reportArgumentType]
         assert m.size == 4
 
     def test_construct_rejects_bad_type(self):
         with pytest.raises(TypeError, match="Expected int"):
-            sb.SymmetricMatrix([1, 2, 3])
+            sb.SymmetricMatrix([1, 2, 3])  # pyright: ignore[reportArgumentType]
 
 
 class TestArrayConstruction:

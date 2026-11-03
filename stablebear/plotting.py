@@ -1,3 +1,5 @@
+from typing import Any
+
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -146,7 +148,7 @@ def plot_distance_weight_heatmap(
     kwargs.setdefault("cmap", "viridis")
     kwargs.setdefault("aspect", "equal")
     kwargs.setdefault("interpolation", "nearest")
-    return ax.imshow(weights, origin="lower", extent=extent, **kwargs)
+    return ax.imshow(weights, origin="lower", extent=(xmin, xmax, ymin, ymax), **kwargs)
 
 
 def _resolve_barcode_colors(n, color=None, ax=None):
@@ -180,7 +182,7 @@ def _resolve_barcode_colors(n, color=None, ax=None):
         # Advance the axes' own cycle, as ax.plot does, so set_prop_cycle and
         # repeated calls on the same axes behave as in matplotlib.
         ax = plt.gca() if ax is None else ax
-        return [ax._get_lines.get_next_color() for _ in range(n)]
+        return [ax._get_lines.get_next_color() for _ in range(n)]  # pyright: ignore[reportAttributeAccessIssue]
     if is_color_like(color):
         cycle = [color]
     else:
@@ -344,7 +346,7 @@ def plot_barcode(bc, ax=None, y_offset=0, **kwargs):
     if segments:
         lc = LineCollection(segments, **defaults)
         ax.add_collection(lc)
-        arrow_color = tuple(lc.get_colors()[0])
+        arrow_color = tuple(np.asarray(lc.get_colors())[0])
 
     # Add arrowheads for infinite bars
     for y in inf_y_positions:
@@ -476,7 +478,7 @@ def plot_timeseries(series, ax=None, *, unit=None, relative=False, markers=False
     """
     from .timeseries.series import Times, TimeSeriesTensor
 
-    options = dict(unit=unit, relative=relative, markers=markers, **kwargs)
+    options: dict[str, Any] = dict(unit=unit, relative=relative, markers=markers, **kwargs)
     if isinstance(series, TimeSeriesTensor):
         tensor = series.squeeze() if len(series.shape) != 1 else series
         if len(tensor.shape) != 1:

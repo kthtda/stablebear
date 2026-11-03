@@ -1,12 +1,13 @@
 """Tests for Barcode.is_isomorphic_to tolerance behavior."""
 
 import numpy as np
+from numpy.typing import DTypeLike
 import pytest
 
 from stablebear.persistence import Barcode, BarcodeTensor
 
 
-def _bc(pairs, dtype=np.float64):
+def _bc(pairs, dtype: DTypeLike = np.float64):
     """Create a Barcode from a list of (birth, death) pairs."""
     if len(pairs) == 0:
         return Barcode(np.zeros((0, 2), dtype=dtype))
@@ -105,4 +106,4 @@ def test_barcode_tensor_isomorphism_rejects_incompatible_inputs():
     with pytest.raises(TypeError, match="same dtype"):
         tensor.is_isomorphic_to(wrong_dtype)
     with pytest.raises(TypeError, match="another BarcodeTensor"):
-        tensor.is_isomorphic_to(barcode)
+        tensor.is_isomorphic_to(barcode)  # pyright: ignore[reportArgumentType]

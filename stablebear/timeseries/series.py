@@ -3,7 +3,7 @@ from __future__ import annotations
 import datetime
 import operator
 import sys
-from typing import Generic, NamedTuple, TypeVar
+from typing import Any, Generic, NamedTuple, TypeVar
 
 import numpy as np
 
@@ -64,8 +64,8 @@ def _finest_duration_unit(values):
         # A resolution without a fixed length is rejected by _durations_in.
         return _NUMPY_TO_UNIT.get(np.datetime_data(values.dtype)[0], "s")
     if values.dtype == object and values.size > 0:
-        durations = [_as_time_delta(value) for value in values.flat]
-        if all(duration is not None for duration in durations):
+        durations = [duration for value in values.flat if (duration := _as_time_delta(value)) is not None]
+        if len(durations) == values.size:
             return min((duration.unit for duration in durations), key=_ATTOSECONDS.__getitem__)
     return None
 
@@ -83,8 +83,8 @@ def _durations_in(values, unit):
         # Both in integers of the finer resolution, divided once.
         return values / np.timedelta64(1, _UNIT_TO_NUMPY[unit])
     if values.dtype == object and values.size > 0:
-        durations = [_as_time_delta(value) for value in values.flat]
-        if all(duration is not None for duration in durations):
+        durations = [duration for value in values.flat if (duration := _as_time_delta(value)) is not None]
+        if len(durations) == values.size:
             return np.array([_in_unit(duration, unit) for duration in durations]).reshape(values.shape)
     return None
 
@@ -174,7 +174,7 @@ class Times:
                 return
             # Durations as dates after 1970-01-01, so that they are converted
             # to unit in integers, as dates are.
-            origin = np.datetime64(0, code)
+            origin = np.datetime64(0, code)  # pyright: ignore[reportCallIssue, reportArgumentType]
             self._data = _times_from_datetimes(origin + times, unit, origin).with_epoch(
                 None if epoch is None else DateTime(epoch)._data)
             return
@@ -202,7 +202,7 @@ class Times:
         return self._data.unit
 
     @property
-    def epoch(self) -> DateTime | None:
+    def epoch(self) -> Any:  # A DateTime, or None; see the docstring.
         """The date and time that time 0 stands for, or ``None``."""
         data = self._data.epoch
         return None if data is None else DateTime._from_cpp(data)
@@ -369,10 +369,11 @@ class Domain(NamedTuple):
     themselves are included.
     """
 
+    # A DateTime if the series has an epoch, else a TimeDelta.
     #: The first time in the domain, or its lower bound if not included.
-    start: DateTime | TimeDelta
+    start: Any
     #: The last time in the domain, or its upper bound if not included.
-    end: DateTime | TimeDelta
+    end: Any
     #: Whether ``start`` is in the domain.
     start_closed: bool
     #: Whether ``end`` is in the domain.
@@ -626,7 +627,7 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         return self.epoch + (self.origin + self.times)
 
     @property
-    def values(self) -> Tensor | NestedTensor:
+    def values(self) -> Any:  # Depends on the number of channels; see the docstring.
         """A copy of the observations, with time along axis 0.
 
         A tensor of shape ``(len(series), *shape)`` for a series with one
@@ -641,7 +642,7 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         ])
 
     @property
-    def shape(self) -> tuple[int, ...] | tuple[tuple[int, ...], ...]:
+    def shape(self) -> Any:  # Depends on the number of channels; see the docstring.
         """The shape of one observation; ``()`` for scalars.
 
         For several channels, a tuple with one shape per channel, in
@@ -651,7 +652,7 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         return shapes[0] if len(shapes) == 1 else shapes
 
     @property
-    def origin(self) -> TimeDelta | TimeDeltaTensor:
+    def origin(self) -> Any:  # Depends on the number of channels; see the docstring.
         """The time in the series a channel was cut from that its time 0
         stands for, as a duration in :attr:`unit`.
 
@@ -667,7 +668,7 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         return TimeDeltaTensor(np.array(origins, dtype=np.float64), self.unit)
 
     @property
-    def epoch(self) -> DateTime | None:
+    def epoch(self) -> Any:  # A DateTime, or None; see the docstring.
         """The date and time that time 0 stands for, or ``None``.
 
         One value even for several channels, which share their epoch.
@@ -729,7 +730,7 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         return start, end, start_closed, end_closed
 
     @property
-    def n_observations(self) -> int | IntTensor:
+    def n_observations(self) -> Any:  # Depends on the number of channels; see the docstring.
         """The number of recorded observations.
 
         An int for a series with one channel, the same as ``len(series)``;
@@ -747,7 +748,7 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         return FloatTensor(np.array(values, dtype=np.float64))
 
     @property
-    def snap_tolerance(self) -> float | FloatTensor:
+    def snap_tolerance(self) -> Any:  # Depends on the number of channels; see the docstring.
         """The snap tolerance used when evaluating; see the constructor.
 
         A float for a series with one channel; for several, a float64
@@ -863,7 +864,9 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
     def _time_of_date(self, date, channel):
         """The time of ``date`` in channel ``channel``, in :attr:`unit`:
         ``date - epoch - origin``, with the difference taken in integers."""
-        offset = date - self.epoch.to_datetime64()
+        epoch = self.epoch
+        assert epoch is not None
+        offset = date - epoch.to_datetime64()
         return offset / np.timedelta64(1, _UNIT_TO_NUMPY[self.unit]) - self._data.origin(channel)
 
     def _check_date_in_domain(self, date, t, channel):
@@ -881,7 +884,7 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         # Formatted at one precision, the coarsest that shows all three.
         dates = np.array([first, *ends], dtype=ends.dtype)
         precision = next(code for code in ("m", "s", "ms", "us") if (dates == dates.astype(f"datetime64[{code}]")).all())
-        first, start, end = np.datetime_as_string(dates, unit=precision)
+        first, start, end = np.datetime_as_string(dates, unit=precision)  # pyright: ignore[reportCallIssue, reportArgumentType]
         domain = ("[" if start_closed else "(") + f"{start}, {end}" + ("]" if end_closed else ")")
         raise ValueError(f"{first} is outside the domain {domain}")
 
@@ -903,7 +906,7 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         leaves = []
         for i in range(self.n_channels):
             t = query(i)
-            native = self._data.select([i]).evaluate(t if isinstance(t, float) else t._data, None)
+            native = self._data.select([i]).evaluate(t._data if isinstance(t, FloatTensor) else t, None)
             leaves.append(NestedTensor._from_cpp(native)[0])
         return NestedTensor(leaves)
 

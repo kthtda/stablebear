@@ -44,7 +44,7 @@ def plot_relative_subsamples(*, uniform=False, dark=False):
 
     fig, axes = plt.subplots(1, 3, figsize=(11, 4), sharex=True, sharey=True)
     for i, ax in enumerate(axes):
-        heatmap = plot_distance_weight_heatmap(
+        plot_distance_weight_heatmap(
             distribution, query=queries[i], extent=extent, ax=ax,
             cmap=cmap, vmin=0, vmax=peak, zorder=0,
         )
@@ -74,14 +74,14 @@ def plot_relative_subsamples(*, uniform=False, dark=False):
     legend = fig.legend(handles, labels, loc="lower center", ncol=3, frameon=False,
                         bbox_to_anchor=(0.47, 0.01))
     # The legend sits on the page background rather than the heatmap peak.
-    legend.legend_handles[-1].set_color("#ffffff" if dark else "#16384b")
+    plt.setp(legend.legend_handles[-1], color="#ffffff" if dark else "#16384b")
     fig.suptitle(title, y=0.98, fontsize=13)
     fig.subplots_adjust(left=0.06, right=0.87, bottom=0.22, top=0.86,
                         wspace=0.12)
     colorbar_ax = fig.add_axes((0.9, 0.22, 0.015, 0.64))
-    colorbar = fig.colorbar(heatmap, cax=colorbar_ax, label="Distance weight",
+    colorbar = fig.colorbar(axes[-1].images[0], cax=colorbar_ax, label="Distance weight",
                  ticks=[0, peak] if uniform else None)
-    colorbar.outline.set_visible(False)
+    plt.setp(colorbar.outline, visible=False)
     colorbar.ax.tick_params(length=0, labelsize=9)
     return fig
 # -- docs snippet end relative_subsamples --

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 import numpy as np
 
 from .. import _sb_cpp as cpp
@@ -37,6 +39,9 @@ class Barcode(_BinaryIoMixin):
         such as a nested list or an array. A ``float32`` array gives a
         ``barcode32``; any other real-valued input gives a ``barcode64``.
     """
+
+    # A native Barcode32 or Barcode64.
+    _data: Any
 
     def _binary_io_data(self):
         return self._data

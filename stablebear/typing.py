@@ -32,7 +32,7 @@ class dtype:
     def __hash__(self):
         return id(self)
 
-    def __reduce__(self):
+    def __reduce__(self) -> str | tuple:
         # Pickle support: reconstruct by looking up the module-level name
         return self._name
 
@@ -111,7 +111,7 @@ class _SeriesDtype(dtype):
 _SERIES_DTYPES = {}
 
 
-def series(inner: dtype) -> dtype:
+def series(inner: dtype) -> _SeriesDtype:
     """The dtype of time series whose observations have dtype ``inner``.
 
     It is the dtype of a tensor of series, such as the windows of a series

@@ -134,7 +134,7 @@ def test_times_cannot_be_assigned_to():
     times = Times([0.0, 1.0], unit="s")
 
     with pytest.raises(TypeError):
-        times[0] = 5.0
+        times[0] = 5.0  # pyright: ignore[reportIndexIssue]
 
     assert np.array_equal(times.to_floats(), [0.0, 1.0])
 
@@ -525,7 +525,7 @@ def test_time_deltas_compare_lengths():
 
 def test_time_delta_rejects_adding_a_number():
     with pytest.raises(TypeError):
-        TimeDelta(1, "h") + 1
+        _ = TimeDelta(1, "h") + 1  # pyright: ignore[reportOperatorIssue]
 
 
 def test_date_time_plus_time_delta_is_at_the_finer_resolution():
@@ -1324,7 +1324,7 @@ def test_series_origin_cannot_be_assigned_to():
     series = TimeSeries([10.0, 20.0], times=TimeDeltaTensor([0.0, 1.0], "s"))
 
     with pytest.raises(AttributeError):
-        series.origin = TimeDelta(1.0, "s")
+        series.origin = TimeDelta(1.0, "s")  # pyright: ignore[reportAttributeAccessIssue]
 
 
 def test_query_just_below_an_observation_snaps_to_it():

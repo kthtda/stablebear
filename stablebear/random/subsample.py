@@ -1,3 +1,7 @@
+from __future__ import annotations
+
+from typing import Literal, overload
+
 from .. import _sb_cpp as cpp
 from .._validation import _boolean, _positive_integer
 from ..async_task import _run_task
@@ -6,7 +10,10 @@ from ..distance_matrix import DistanceMatrix, DistanceMatrixTensor
 from ..point_cloud import PointCloud, PointCloudTensor
 from ..tensor_create import zeros
 from ..typing import distmat32, distmat64, float32, pcloud32, pcloud64
-from .generator import _unwrap
+from .generator import Generator, _unwrap
+
+# What allow_partial accepts; True and False mean "keep" and "no".
+PartialPolicy = Literal["no", "keep", "drop"] | bool
 
 
 def _partial_policy(value):
@@ -22,17 +29,45 @@ def _partial_policy(value):
     return getattr(cpp.point_process._PartialPolicy, value)
 
 
+@overload
 def subsample(
-    data,
-    n_points,
-    n_samples=1,
+    data: PointCloud | PointCloudTensor,
+    n_points: int,
+    n_samples: int = 1,
     *,
-    replace=True,
-    allow_partial="keep",
-    discard_duplicates=False,
-    generator=None,
-    verbose=False,
-):
+    replace: bool = True,
+    allow_partial: PartialPolicy = "keep",
+    discard_duplicates: bool = False,
+    generator: Generator | None = None,
+    verbose: bool = False,
+) -> PointCloudTensor: ...
+
+
+@overload
+def subsample(
+    data: DistanceMatrix | DistanceMatrixTensor,
+    n_points: int,
+    n_samples: int = 1,
+    *,
+    replace: bool = True,
+    allow_partial: PartialPolicy = "keep",
+    discard_duplicates: bool = False,
+    generator: Generator | None = None,
+    verbose: bool = False,
+) -> DistanceMatrixTensor: ...
+
+
+def subsample(
+    data: PointCloud | PointCloudTensor | DistanceMatrix | DistanceMatrixTensor,
+    n_points: int,
+    n_samples: int = 1,
+    *,
+    replace: bool = True,
+    allow_partial: PartialPolicy = "keep",
+    discard_duplicates: bool = False,
+    generator: Generator | None = None,
+    verbose: bool = False,
+) -> PointCloudTensor | DistanceMatrixTensor:
     """Draw uniform subsamples from point clouds, distance matrices, or their tensors.
 
     One sample axis is appended to the input tensor shape. Each input value is
@@ -100,7 +135,7 @@ def subsample(
     discard_duplicates = _boolean(discard_duplicates, "discard_duplicates")
     verbose = _boolean(verbose, "verbose")
 
-    backend, data = _get_backend(
+    backend, source = _get_backend(
         data,
         {
             pcloud32: cpp.point_process.subsample32,
@@ -110,7 +145,7 @@ def subsample(
         },
     )
     task = backend(
-        data._data,
+        source._data,
         n_points,
         n_samples,
         replace,

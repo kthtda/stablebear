@@ -11,13 +11,12 @@ def _wait_for_task(task, verbose=True):
         )
         return progress
 
-    if verbose:
-        progress = init_progress(task)
-        work_step = task.work_step()
+    progress = init_progress(task) if verbose else None
+    work_step = task.work_step() if verbose else None
 
     wait_time_ms = 50
     while not task.wait_for(wait_time_ms):
-        if verbose:
+        if progress is not None:
             progress.update(task.work_completed() - progress.n)
             new_work_step = task.work_step()
             if new_work_step != work_step:
@@ -25,7 +24,7 @@ def _wait_for_task(task, verbose=True):
                 print("")
                 progress = init_progress(task)
 
-    if verbose:
+    if progress is not None:
         progress.update(task.work_completed() - progress.n)
 
 

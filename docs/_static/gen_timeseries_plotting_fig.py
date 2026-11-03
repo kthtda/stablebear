@@ -98,8 +98,8 @@ def plot_timeseries_channels():
     b = TimeSeries([10.0, 20.0, 30.0], times=Times([50.0, 90.0, 130.0], unit="ms"))
     series = TimeSeries.from_channels([a, b], unit="s")
 
-    lines = plot_timeseries(series, markers=True)
-    fig = lines[0].figure
+    plot_timeseries(series, markers=True)
+    fig = plt.gcf()
     fig.set_size_inches(6, 3.5)
     fig.tight_layout()
     return fig

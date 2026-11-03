@@ -32,6 +32,7 @@ dependencies = [ "numpy>=2.0", "tqdm", "matplotlib" ]
 
 [dependency-groups]
 test = ["pytest", "scipy", "pandas>=2.2.2"]
+typecheck = ["pyright==1.1.414", "typing_extensions"]
 
 [tool.scikit-build]
 minimum-version = "build-system.requires"

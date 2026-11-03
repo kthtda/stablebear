@@ -42,5 +42,4 @@ def from_serial_content(
 
     if dtype == pcf32:
         return PcfTensor(cpp.make_from_serial_content_32(content, enumeration))
-    elif dtype == pcf64:
-        return PcfTensor(cpp.make_from_serial_content_64(content, enumeration))
+    return PcfTensor(cpp.make_from_serial_content_64(content, enumeration))
