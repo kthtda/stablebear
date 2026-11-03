@@ -1,4 +1,5 @@
 from enum import Enum
+from typing import overload
 
 import numpy as np
 
@@ -28,6 +29,28 @@ class DistanceType(Enum):
 
 class ComplexType(Enum):
     VietorisRips = 1
+
+
+@overload
+def compute_persistent_homology(
+    X: TimeSeries,
+    max_dim: int = 1,
+    distance_type: DistanceType = DistanceType.Euclidean,
+    complex_type: ComplexType = ComplexType.VietorisRips,
+    reduced: bool = False,
+    verbose: bool = False,
+) -> TimeSeries: ...
+
+
+@overload
+def compute_persistent_homology(
+    X: PointCloud | PointCloudTensor | DistanceMatrix | DistanceMatrixTensor | FloatTensor | np.ndarray,
+    max_dim: int = 1,
+    distance_type: DistanceType = DistanceType.Euclidean,
+    complex_type: ComplexType = ComplexType.VietorisRips,
+    reduced: bool = False,
+    verbose: bool = False,
+) -> BarcodeTensor: ...
 
 
 def compute_persistent_homology(

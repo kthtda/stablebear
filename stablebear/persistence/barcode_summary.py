@@ -1,6 +1,9 @@
+from typing import overload
+
 from .. import _sb_cpp as cpp
 from ..async_task import _run_task
 from ..base_tensor import PcfTensor, _get_backend
+from ..functional.pcf import Pcf
 from ..timeseries.series import TimeSeries
 from ..typing import barcode32, barcode64
 from .barcode import Barcode
@@ -39,6 +42,18 @@ def _barcode_to_pcf(bc, task_method, verbose=False, **kwargs):
     return out
 
 
+@overload
+def barcode_to_stable_rank(bc: Barcode, verbose: bool = False) -> Pcf: ...
+
+
+@overload
+def barcode_to_stable_rank(bc: BarcodeTensor, verbose: bool = False) -> PcfTensor: ...
+
+
+@overload
+def barcode_to_stable_rank(bc: TimeSeries, verbose: bool = False) -> TimeSeries: ...
+
+
 def barcode_to_stable_rank(
     bc: Barcode | BarcodeTensor | TimeSeries, verbose=False
 ):
@@ -66,6 +81,18 @@ def barcode_to_stable_rank(
     )
 
 
+@overload
+def barcode_to_betti_curve(bc: Barcode, verbose: bool = False) -> Pcf: ...
+
+
+@overload
+def barcode_to_betti_curve(bc: BarcodeTensor, verbose: bool = False) -> PcfTensor: ...
+
+
+@overload
+def barcode_to_betti_curve(bc: TimeSeries, verbose: bool = False) -> TimeSeries: ...
+
+
 def barcode_to_betti_curve(
     bc: Barcode | BarcodeTensor | TimeSeries, verbose=False
 ):
@@ -91,6 +118,18 @@ def barcode_to_betti_curve(
     return _barcode_to_pcf(
         bc, "spawn_barcode_to_betti_curve_task", verbose
     )
+
+
+@overload
+def barcode_to_accumulated_persistence(bc: Barcode, max_death: float = float("inf"), verbose: bool = False) -> Pcf: ...
+
+
+@overload
+def barcode_to_accumulated_persistence(bc: BarcodeTensor, max_death: float = float("inf"), verbose: bool = False) -> PcfTensor: ...
+
+
+@overload
+def barcode_to_accumulated_persistence(bc: TimeSeries, max_death: float = float("inf"), verbose: bool = False) -> TimeSeries: ...
 
 
 def barcode_to_accumulated_persistence(
