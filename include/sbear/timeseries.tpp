@@ -207,10 +207,27 @@ namespace sb
   }
 
   template <typename T>
-  Channel<T> Channel<T>::with_unit(TimeUnit unit) const
+  Channel<T> Channel<T>::to(TimeUnit unit) const
   {
+    const auto from = this->unit();
+    if (unit == from)
+    {
+      return *this;
+    }
     auto channel = *this;
-    channel.m_times = std::make_shared<const Times>(held_times().with_unit(unit));
+    channel.m_times = std::make_shared<const Times>(held_times().to(unit));
+    if (m_end)
+    {
+      channel.m_end = convert_time(*m_end, from, unit);
+    }
+    for (auto& lag : channel.m_lags)
+    {
+      lag = convert_time(lag, from, unit);
+    }
+    if (m_source)
+    {
+      channel.m_source = std::make_shared<const Channel>(m_source->to(unit));
+    }
     return channel;
   }
 
@@ -429,7 +446,10 @@ namespace sb
     }
     for (const auto& channel : m_channels)
     {
-      check_same_kind_of_unit(channel.unit(), m_unit);
+      if (channel.unit() != m_unit)
+      {
+        throw std::invalid_argument("Every channel must be in the unit of the series");
+      }
     }
   }
 
@@ -448,12 +468,13 @@ namespace sb
       {
         throw std::invalid_argument("Each channel must be a one-channel series; select channels with series[i]");
       }
-      channels.push_back(part.m_channels.front());
       check_same_kind_of_unit(part.unit(), parts.front().unit());
       if (!unit && part.unit() != parts.front().unit())
       {
         throw std::invalid_argument("The channels differ in unit; pass unit= to choose one");
       }
+      check_same_kind_of_unit(part.unit(), unit.value_or(part.unit()));
+      channels.push_back(part.m_channels.front().to(unit.value_or(part.unit())));
       // One epoch for the series: every channel has the same one, or none.
       // Python counts dated channels from one epoch before combining them.
       if (channels.back().epoch() != parts.front().m_channels.front().epoch())
@@ -486,17 +507,10 @@ namespace sb
   TimeSeries<T> TimeSeries<T>::to(TimeUnit unit) const
   {
     auto series = *this;
-    if (m_unit == TimeUnit::Unitless && unit != TimeUnit::Unitless)
+    for (auto& channel : series.m_channels)
     {
-      // Plain numbers become counts of unit.
-      for (auto& channel : series.m_channels)
-      {
-        channel = channel.with_unit(unit);
-      }
-      series.m_unit = unit;
-      return series;
+      channel = channel.to(unit);
     }
-    check_same_kind_of_unit(m_unit, unit);
     series.m_unit = unit;
     return series;
   }
@@ -518,7 +532,7 @@ namespace sb
     auto series = *this;
     for (auto& channel : series.m_channels)
     {
-      channel = channel.shifted(convert_time(delta, m_unit, channel.unit()), epoch);
+      channel = channel.shifted(delta, epoch);
     }
     return series;
   }
@@ -531,7 +545,7 @@ namespace sb
     for (size_t i = 0; i < m_channels.size(); ++i)
     {
       const auto& c = m_channels[i];
-      values(i) = NestedTensor<T>::from_leaf_view(c.lookup(convert_time(t, m_unit, c.unit())));
+      values(i) = NestedTensor<T>::from_leaf_view(c.lookup(t));
     }
     return NestedTensor<T>::from_outer_view(std::move(values), 1);
   }
@@ -553,7 +567,7 @@ namespace sb
       const auto& channel = m_channels[c];
       for (size_t k = 0; k < order.size(); ++k)
       {
-        sorted[k] = convert_time(queries[order[k]], m_unit, channel.unit());
+        sorted[k] = queries[order[k]];
       }
       std::vector<size_t> shape(t.shape().begin(), t.shape().end());
       shape.insert(shape.end(), channel.shape().begin(), channel.shape().end());
@@ -580,13 +594,13 @@ namespace sb
       }
       // An open end at the same time as another channel's closed one still
       // excludes that time, and likewise for starts.
-      const auto first = convert_time(c.time(0), c.unit(), m_unit);
+      const auto first = c.time(0);
       if (first > domain.first || (first == domain.first && !c.start_closed()))
       {
         domain.first = first;
         domain.closedStart = c.start_closed();
       }
-      const auto last = convert_time(c.end().value_or(c.time(c.size() - 1)), c.unit(), m_unit);
+      const auto last = c.end().value_or(c.time(c.size() - 1));
       if (last < domain.last || (last == domain.last && !c.end_closed()))
       {
         domain.last = last;
@@ -692,7 +706,7 @@ namespace sb
           const auto& channel = one.channel(c);
           for (size_t q = 0; q < order.size(); ++q)
           {
-            sorted[q] = convert_time(queries[order[q]], queryUnit, channel.unit());
+            sorted[q] = convert_time(queries[order[q]], queryUnit, one.unit());
           }
           const auto blockSize = leaves[c].size() / series.size();
           channel.lookup_sorted(sorted, order, leaves[c].data() + static_cast<std::ptrdiff_t>(k * blockSize));

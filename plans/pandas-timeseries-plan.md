@@ -1,6 +1,6 @@
 # pandas input and durations for time series: implementation plan
 
-Progress: 44 of 56 items, 89 of 111 points (80%)
+Progress: 45 of 58 items, 90 of 117 points (77%)
 
 Specs: [pandas-timeseries-spec.md](pandas-timeseries-spec.md) (phases A, B,
 and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
@@ -289,7 +289,7 @@ so.
   without `unit`; round trip of a series without a unit; `to("s")` on a
   series without a unit; the raises.
   Note: replaces rejecting numbers as times, which raised `TypeError`.
-- [ ] **G2.** [1] `evaluate` on series and tensors: a series without a
+- [x] **G2.** [1] (019db8043) `evaluate` on series and tensors: a series without a
   unit takes numbers, and raises `TypeError` for durations, dates, and
   `unit=`; a series with a unit takes `series(t, unit)` as
   `TimeDelta(t, unit)` or `TimeDeltaTensor(t, unit)`, and raises for
@@ -310,6 +310,25 @@ so.
   label and the raise.
   Note: done with G1, since the docs mix, plot, and bound series of
   numbers.
+- [ ] **G5.** [3] The unit is storage: `TimeSeries.to(unit)` converts each
+  channel's times, end, origin, and view lags and source by one exact
+  factor (`Channel::to`), `from_channels` converts every channel into the
+  series' unit, and a series requires all channels in its unit. The
+  conversions between series and channel units go, and a saved series
+  writes its unit once, not per channel. The time-series golden corpus is
+  removed, to be regenerated after G6.
+  Tests: `to` converts times, origin, and an end after the last
+  observation; a converted embedding evaluates as before; `from_channels`
+  stores channels in its unit.
+  Note: done with G3. The tests that compared windows and embeddings of
+  a duration with those of a number in the series' unit are removed.
+- [ ] **G6.** [3] A series holds its unit and epoch once: `Times` keeps
+  only values and origin, `TimeSeries` holds the unit and epoch, and
+  `Channel::to` becomes a scaling by a factor `TimeSeries::to` computes.
+  The native series constructor takes values, unit, and epoch instead of
+  a `cpp.Times`. A saved series writes its epoch once. Regenerate the
+  time-series golden corpus.
+  Tests: existing round trips and epoch tests; the regenerated corpus.
 
 ## Phase H: `TimeSeries.from_pandas` for DataFrames and bad input
 

@@ -8,7 +8,7 @@ from pathlib import Path
 
 from gen_timeseries_snap_fig import DARK, LIGHT, _save_themed
 from stablebear.plotting import plot_timeseries
-from stablebear.timeseries import TimeDeltaTensor, TimeSeries, Window
+from stablebear.timeseries import TimeDelta, TimeDeltaTensor, TimeSeries, Window
 
 HERE = Path(__file__).parent
 
@@ -110,7 +110,7 @@ def plot_timeseries_dates():
     stamps = np.array(["2023-01-01T06:00", "2023-01-01T09:30", "2023-01-01T11:00",
                        "2023-01-01T15:45", "2023-01-01T18:00"], dtype="datetime64[m]")
     series = TimeSeries([2.0, 3.5, 1.0, 2.5, 3.0], times=stamps).to("h")
-    windows = Window(size=4.0, anchor="start")(series)
+    windows = Window(size=TimeDelta(4, "h"), anchor="start")(series)
 
     fig, ax = plt.subplots(figsize=(6, 2.5))
     plot_timeseries(series, ax=ax, color="gray", linewidth=1, markers=True)

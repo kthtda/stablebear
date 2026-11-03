@@ -460,6 +460,21 @@ def test_a_window_of_a_series_without_a_unit_gives_numbers():
     assert windows[1].domain == Domain(0.0, 2.0, True, False)
 
 
+def test_windows_of_a_number_on_a_series_with_a_unit_raise():
+    window = Window(size=2.0, step=2.0, closed="left", partial=False, anchor="start")
+
+    with pytest.raises(TypeError, match="has a unit"):
+        window(_windows_source())
+
+
+def test_windows_of_a_duration_on_a_series_without_a_unit_raise():
+    series = TimeSeries([0.0, 5.0, 15.0, 25.0, 40.0], times=[0.0, 0.5, 1.5, 2.5, 4.0])
+    window = Window(size=TimeDelta(2, "s"), step=TimeDelta(2, "s"), closed="left", partial=False, anchor="start")
+
+    with pytest.raises(TypeError, match="without a unit"):
+        window(series)
+
+
 def test_bounds_of_a_dated_series_are_the_dates_of_its_windows():
     _, bounds = Window(size=TimeDelta(1, "s"), step=TimeDelta(1, "s"), closed="left", partial=False, anchor="start")(
         _dated_source(), return_bounds=True)
@@ -862,27 +877,6 @@ def test_window_dates_include_their_origin():
     dates = window.datetimes.to_datetime64()
 
     assert np.array_equal(dates, np.array(["2023-01-01T00:00:02", "2023-01-01T00:00:02.5"], dtype="datetime64[ms]"))
-
-
-@pytest.mark.parametrize("size, step", [
-    pytest.param(np.timedelta64(2, "h"), np.timedelta64(1, "h"), id="timedelta64"),
-    pytest.param(datetime.timedelta(hours=2), datetime.timedelta(hours=1), id="timedelta"),
-    pytest.param(TimeDelta(2, "h"), TimeDelta(1, "h"), id="time_delta"),
-])
-@pytest.mark.parametrize("unit, numeric_size, numeric_step", [
-    pytest.param("min", 120.0, 60.0, id="minutes"),
-    pytest.param("h", 2.0, 1.0, id="hours"),
-])
-def test_windows_of_a_duration_match_windows_of_the_same_number(size, step, unit, numeric_size, numeric_step):
-    series = TimeSeries([0.0, 1.0, 2.0, 3.0, 4.0], times=TimeDeltaTensor([0.0, 1.0, 2.0, 3.0, 4.0], "h")).to(unit)
-
-    windows, bounds = Window(size=size, step=step, closed="left", partial=False, anchor="start")(
-        series, return_bounds=True)
-    expected, expected_bounds = Window(size=numeric_size, step=numeric_step, closed="left", partial=False,
-                                       anchor="start")(series, return_bounds=True)
-
-    assert windows.array_equal(expected)
-    assert bounds.array_equal(expected_bounds)
 
 
 def test_windows_of_a_fractional_time_delta_convert_it_exactly():

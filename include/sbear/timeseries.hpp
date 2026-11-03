@@ -142,16 +142,17 @@ namespace sb
   /// Convert @p value from unit @p from to unit @p to. The factor is an
   /// integer that multiplies or divides the value, so the result is rounded
   /// once. The factor is exact unless it exceeds 2^53 (days and attoseconds).
-  /// Unitless converts only to itself.
+  /// A plain number, from Unitless, becomes a count of @p to unchanged; a
+  /// time in a unit cannot become a plain number.
   [[nodiscard]] constexpr float64_t convert_time(float64_t value, TimeUnit from, TimeUnit to)
   {
-    if (from == to)
+    if (from == to || from == TimeUnit::Unitless)
     {
       return value;
     }
-    if (from == TimeUnit::Unitless || to == TimeUnit::Unitless)
+    if (to == TimeUnit::Unitless)
     {
-      throw std::invalid_argument("A series without a unit and a series with one cannot be converted into each other");
+      throw std::invalid_argument("Times in a unit cannot become plain numbers");
     }
     const auto& src = detail::time_unit_info(from);
     const auto& dst = detail::time_unit_info(to);
@@ -272,18 +273,6 @@ namespace sb
       return times;
     }
 
-    /// The same timestamps, which have no unit, as counts of @p unit.
-    [[nodiscard]] Times with_unit(TimeUnit unit) const
-    {
-      if (m_unit != TimeUnit::Unitless)
-      {
-        throw std::invalid_argument("Only times without a unit can be given one");
-      }
-      auto times = *this;
-      times.m_unit = unit;
-      return times;
-    }
-
     /// The time, in this unit, that time 0 stands for in the series these
     /// times were cut from; 0 for recorded observations. Evaluation does not
     /// use it.
@@ -310,7 +299,8 @@ namespace sb
     }
 
     /// The same timestamps in another unit, from the same epoch, with the
-    /// origin converted alike.
+    /// origin converted alike. Timestamps without a unit become counts of
+    /// @p unit unchanged.
     [[nodiscard]] Times to(TimeUnit unit) const
     {
       std::vector<float64_t> converted(m_values.size());
@@ -421,10 +411,11 @@ namespace sb
     /// shares the observations; no time is shifted.
     [[nodiscard]] Channel with_epoch(std::optional<DateTime> epoch) const;
 
-    /// This channel, which has no unit, with its timestamps read as counts
-    /// of @p unit. It shares the observations; a view reads its source by
-    /// time values alone, so the source keeps no unit.
-    [[nodiscard]] Channel with_unit(TimeUnit unit) const;
+    /// This channel in @p unit: its timestamps, end, and origin, and for a
+    /// view its lags and source, converted as convert_time() converts them,
+    /// so that timestamps without a unit become counts of @p unit. It shares
+    /// the observations.
+    [[nodiscard]] Channel to(TimeUnit unit) const;
 
     /// This channel with @p delta, in its unit, added to every timestamp and
     /// to its end, counted from @p epoch, or from none. A view shifts its
@@ -572,10 +563,9 @@ namespace sb
     {
     }
 
-    /// Combine one-channel series into one series; channel i is @p parts[i].
-    /// Each channel keeps its own times, unit, and snap
-    /// settings. @p unit defaults to the unit the parts share and is required
-    /// when their units differ.
+    /// Combine one-channel series into one series; channel i is @p parts[i]
+    /// converted to @p unit, with its own snap settings. @p unit defaults to
+    /// the unit the parts share and is required when their units differ.
     [[nodiscard]] static TimeSeries from_channels(const std::vector<TimeSeries>& parts,
                                                   std::optional<TimeUnit> unit);
 
@@ -588,9 +578,9 @@ namespace sb
     [[nodiscard]] TimeSeries select(const std::vector<std::ptrdiff_t>& indices) const;
     [[nodiscard]] TimeUnit unit() const noexcept { return m_unit; }
 
-    /// The same series queried in @p unit; the channels are shared, not
-    /// converted. A series without a unit gets @p unit instead: its numbers
-    /// become counts of it.
+    /// The same series in @p unit, with every channel converted by
+    /// Channel::to(), sharing the observations. A series without a unit gets
+    /// @p unit: its numbers become counts of it.
     [[nodiscard]] TimeSeries to(TimeUnit unit) const;
 
     /// The same series with every channel's times counted from @p epoch, or
@@ -601,13 +591,12 @@ namespace sb
     /// every channel, counted from @p epoch, or from none.
     [[nodiscard]] TimeSeries shifted(float64_t delta, std::optional<DateTime> epoch) const;
 
-    /// The timestamps of channel @p i, converted to the query unit.
-    [[nodiscard]] Times times(size_t i) const { return channel(i).times().to(m_unit); }
+    /// The timestamps of channel @p i.
+    [[nodiscard]] Times times(size_t i) const { return channel(i).times(); }
 
-    /// The times, in the series' unit, at which every channel can be
-    /// evaluated: from the latest first timestamp to the earliest end, a
-    /// channel's last timestamp or its end, converted exactly as
-    /// check_observed() compares.
+    /// The times at which every channel can be evaluated: from the latest
+    /// first timestamp to the earliest end, a channel's last timestamp or its
+    /// end, as check_observed() compares them.
     struct Domain
     {
       float64_t first;

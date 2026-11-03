@@ -184,8 +184,7 @@ namespace sb
     channels.reserve(series.n_channels());
     for (size_t c = 0; c < series.n_channels(); ++c)
     {
-      const auto& channel = series.channel(c);
-      channels.push_back(delay_embed(channel, dimension, convert_time(delay, series.unit(), channel.unit()), forward));
+      channels.push_back(delay_embed(series.channel(c), dimension, delay, forward));
     }
     return TimeSeries<T>(std::move(channels), series.unit());
   }

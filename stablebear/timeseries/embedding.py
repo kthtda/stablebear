@@ -42,11 +42,11 @@ class TimeDelayEmbedding:
     dimension : int
         The number of components ``m``, at least 1.
     delay : float, TimeDelta, tuple, np.timedelta64, datetime.timedelta, or pd.Timedelta
-        The time between components, positive. A number is in the series'
-        unit; a duration such as ``(3, "h")``, ``TimeDelta(3, "h")``, or
-        ``np.timedelta64(3, "h")`` is converted to
-        the unit of each series embedded. Months and years have no fixed
-        length and are rejected.
+        The time between components, positive. A duration such as
+        ``(3, "h")``, ``TimeDelta(3, "h")``, or ``np.timedelta64(3, "h")`` is
+        for a series with a unit, and is converted to the unit of each
+        series embedded. A number is for a series without a unit. Months
+        and years have no fixed length and are rejected.
     direction : {"backward", "forward"}, default "backward"
         Whether the components look back from ``t`` or ahead of it.
 
@@ -55,6 +55,9 @@ class TimeDelayEmbedding:
     ValueError
         On an invalid ``dimension``, ``delay``, or ``direction``, or when a
         channel spans less than ``(m - 1) * d``.
+    TypeError
+        When applied, for a number on a series with a unit, or a duration
+        on a series without one.
     """
 
     def __init__(self, dimension: int, delay: float | _ScalarDuration,

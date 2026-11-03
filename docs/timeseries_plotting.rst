@@ -140,8 +140,7 @@ Several channels
 
 A time series with several channels (see :doc:`timeseries_channels`) is
 drawn with one row per channel, in channel order, in a new figure whose
-rows share the time axis. Every channel is drawn in the unit of the time
-series, whatever its own unit::
+rows share the time axis, in the unit of the time series::
 
    from stablebear.timeseries import TimeDeltaTensor
 
@@ -263,11 +262,12 @@ dates and times, on a date axis, and so are its windows. Here observations
 recorded through a day are drawn with the window from 10:00 to 14:00::
 
    import numpy as np
+   from stablebear.timeseries import TimeDelta
 
    stamps = np.array(["2023-01-01T06:00", "2023-01-01T09:30", "2023-01-01T11:00",
                       "2023-01-01T15:45", "2023-01-01T18:00"], dtype="datetime64[m]")
    series = TimeSeries([2.0, 3.5, 1.0, 2.5, 3.0], times=stamps).to("h")
-   windows = Window(size=4.0, anchor="start")(series)
+   windows = Window(size=TimeDelta(4, "h"), anchor="start")(series)
 
    fig, ax = plt.subplots()
    plot_timeseries(series, ax=ax, color="gray", linewidth=1, markers=True)

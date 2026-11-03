@@ -1141,13 +1141,40 @@ def test_snap_tolerance_outside_unit_interval_raises(tolerance):
         TimeSeries([1.0, 2.0], times=TimeDeltaTensor([0.0, 1.0], "s"), snap_tolerance=tolerance)
 
 
-def test_to_changes_the_query_unit():
+def test_to_converts_the_times():
     series = TimeSeries([10.0, 20.0], times=TimeDeltaTensor([0.0, 0.5], "s")).to("ms")
 
     assert series.unit == "ms"
-    assert np.array_equal(series.times.count, [0.0, 500.0])
+    assert series.times.array_equal(TimeDeltaTensor([0.0, 500.0], "ms"))
     assert series(TimeDelta(250.0, "ms")) == 10.0
-    assert series(TimeDelta(500.0, "ms")) == 20.0  # the last observation, in the new unit
+    assert series(TimeDelta(500.0, "ms")) == 20.0
+
+
+def test_to_converts_the_origin_and_the_end_after_the_last_observation():
+    # A window starting at 1 s, with observations at 0 s and 1 s and an end at 2 s.
+    series = TimeSeries([0.0, 10.0, 20.0, 30.0], times=TimeDeltaTensor([0.0, 1.0, 2.0, 3.0], "s"))
+    window = Window(size=TimeDelta(2, "s"), step=TimeDelta(1, "s"), closed="left", partial=False,
+                    anchor="start")(series)[1]
+
+    converted = window.to("ms")
+
+    assert converted.origin == TimeDelta(1000.0, "ms")
+    assert converted.domain == Domain(TimeDelta(0.0, "ms"), TimeDelta(2000.0, "ms"), True, False)
+
+
+def test_to_keeps_how_an_embedding_evaluates():
+    series = TimeSeries([0.0, 10.0, 25.0, 40.0], times=TimeDeltaTensor([0.0, 1.0, 2.5, 4.0], "s"))
+    embedding = TimeDelayEmbedding(dimension=3, delay=TimeDelta(1, "s"))(series)
+    queries = TimeDeltaTensor([2.0, 2.5, 3.0, 4.0], "s")
+
+    assert embedding.to("ms")(queries).array_equal(embedding(queries))
+
+
+def test_from_channels_stores_every_channel_in_its_unit():
+    series = TimeSeries.from_channels([_channel_a(), _channel_b()], unit="ms")
+
+    assert series[0].times.array_equal(TimeDeltaTensor([0.0, 1000.0, 2500.0], "ms"))
+    assert series[1].times.array_equal(TimeDeltaTensor([500.0, 1500.0, 3000.0], "ms"))
 
 
 def test_evaluate_reads_times_in_the_given_unit():

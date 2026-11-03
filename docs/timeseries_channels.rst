@@ -4,9 +4,9 @@ Channels
 Signals recorded by different instruments rarely share timestamps or units.
 :py:meth:`TimeSeries.from_channels
 <stablebear.timeseries.TimeSeries.from_channels>` keeps each signal as a
-channel with its own timestamps, unit, and snapping (see
-:doc:`timeseries_snapping`). Every query is converted from the time series' unit
-into each channel's unit (see :doc:`timeseries_units`).
+channel with its own timestamps and snapping (see
+:doc:`timeseries_snapping`), converted into the unit of the time series by
+an exact factor (see :doc:`timeseries_units`).
 
 Here channel ``a`` is sampled every 0.1 s from 0 s, and channel ``b`` every
 40 ms from 50 ms::

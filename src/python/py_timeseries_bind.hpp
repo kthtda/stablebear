@@ -75,10 +75,7 @@ namespace sb_py
       .def("to", [](const Series& self, const std::string& unit) { return self.to(sb::parse_time_unit(unit)); },
            nb::arg("unit"))
       .def("times", &Series::times, nb::arg("index"))
-      .def("origin", [](const Series& self, size_t index) {
-        const auto& channel = self.channel(index);
-        return sb::convert_time(channel.origin(), channel.unit(), self.unit());
-      }, nb::arg("index"))
+      .def("origin", [](const Series& self, size_t index) { return self.channel(index).origin(); }, nb::arg("index"))
       .def("channel", &Series::channel, nb::arg("index"), nb::rv_policy::reference_internal)
       .def_prop_ro("n_channels", &Series::n_channels)
       .def_prop_ro("epoch", [](const Series& self) { return self.channel(0).epoch(); })
@@ -91,13 +88,10 @@ namespace sb_py
       .def("select", &Series::select, nb::arg("indices"))
       .def("array_equal", [](const Series& self, const Series& other) { return self.same_observations(other); },
            nb::arg("other"))
-      .def("evaluate", [](const Series& self, sb::float64_t t, const std::optional<std::string>& unit) {
-        return unit ? self.to(sb::parse_time_unit(*unit)).evaluate(t) : self.evaluate(t);
-      }, nb::arg("t"), nb::arg("unit") = nb::none(), nb::call_guard<nb::gil_scoped_release>())
-      .def("evaluate", [](const Series& self, const sb::Tensor<sb::float64_t>& t,
-                          const std::optional<std::string>& unit) {
-        return unit ? self.to(sb::parse_time_unit(*unit)).evaluate(t) : self.evaluate(t);
-      }, nb::arg("t"), nb::arg("unit") = nb::none(), nb::call_guard<nb::gil_scoped_release>())
+      .def("evaluate", [](const Series& self, sb::float64_t t) { return self.evaluate(t); },
+           nb::arg("t"), nb::call_guard<nb::gil_scoped_release>())
+      .def("evaluate", [](const Series& self, const sb::Tensor<sb::float64_t>& t) { return self.evaluate(t); },
+           nb::arg("t"), nb::call_guard<nb::gil_scoped_release>())
       .def("_save", &save_object<Series>, nb::arg("file"));
   }
 

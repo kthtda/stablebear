@@ -76,8 +76,8 @@ A time series holds its timestamps in one physical unit, from attoseconds
 :doc:`timeseries_units` lists the units.
 
 A time series with a unit is queried at durations, and
-:py:meth:`TimeSeries.to <stablebear.timeseries.TimeSeries.to>` changes its
-unit without converting the stored timestamps. A unit passed as the second
+:py:meth:`TimeSeries.to <stablebear.timeseries.TimeSeries.to>` converts its
+timestamps to another unit by an exact factor. A unit passed as the second
 argument of :py:meth:`~stablebear.timeseries.TimeSeries.evaluate` reads
 numbers as counts of it::
 

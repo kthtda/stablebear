@@ -1,4 +1,3 @@
-import datetime
 from dataclasses import dataclass
 
 import numpy as np
@@ -342,20 +341,27 @@ def test_embeddings_of_every_dtype_survive_saving(make_values, round_trip):
     assert loaded.array_equal(embedding)
 
 
-@pytest.mark.parametrize("delay", [
-    pytest.param(np.timedelta64(30, "m"), id="timedelta64"),
-    pytest.param(datetime.timedelta(minutes=30), id="timedelta"),
-])
-@pytest.mark.parametrize("unit, numeric_delay", [
-    pytest.param("min", 30.0, id="minutes"),
-    pytest.param("h", 0.5, id="hours"),
-])
-def test_embedding_with_a_duration_matches_the_same_number(delay, unit, numeric_delay):
-    series = TimeSeries([0.0, 1.0, 0.0, -1.0, 0.0], times=TimeDeltaTensor([0.0, 0.5, 1.0, 1.5, 2.0], "h")).to(unit)
+def test_embedding_of_a_series_without_a_unit_takes_a_number():
+    series = TimeSeries([0.0, 10.0, 25.0, 40.0], times=[0.0, 1.0, 2.5, 4.0])
 
-    embedding = TimeDelayEmbedding(dimension=2, delay=delay)(series)
+    embedding = TimeDelayEmbedding(dimension=2, delay=1.0)(series)
 
-    assert embedding.array_equal(TimeDelayEmbedding(dimension=2, delay=numeric_delay)(series))
+    assert embedding.unit is None
+    assert np.array_equal(np.asarray(embedding(2.5)), [10.0, 25.0])
+
+
+def test_embedding_of_a_number_on_a_series_with_a_unit_raises():
+    series = TimeSeries([0.0, 10.0, 25.0, 40.0], times=TimeDeltaTensor([0.0, 1.0, 2.5, 4.0], "ms"))
+
+    with pytest.raises(TypeError, match="has a unit"):
+        TimeDelayEmbedding(dimension=2, delay=1.0)(series)
+
+
+def test_embedding_of_a_duration_on_a_series_without_a_unit_raises():
+    series = TimeSeries([0.0, 10.0, 25.0, 40.0], times=[0.0, 1.0, 2.5, 4.0])
+
+    with pytest.raises(TypeError, match="without a unit"):
+        TimeDelayEmbedding(dimension=2, delay=TimeDelta(1, "ms"))(series)
 
 
 def test_embedding_delay_of_timedelta64_is_a_time_delta():

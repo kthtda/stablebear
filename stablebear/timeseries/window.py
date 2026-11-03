@@ -39,8 +39,7 @@ class Window:
     ``closed`` includes, and is a series with the channels of ``series``.
     Each channel holds the value in effect at ``a_k``, at time 0, then its
     observations at times ``t`` with ``a_k < t < a_k + size``, and one at
-    ``a_k + size`` if the end is closed, at the times ``t - a_k`` in the
-    channel's own unit. A window can be evaluated from 0 up to ``size``,
+    ``a_k + size`` if the end is closed, at the times ``t - a_k``. A window can be evaluated from 0 up to ``size``,
     after its last observation too, at 0 if the start is closed, and at
     ``size`` if the end is. With an open start the value at time 0 stays in
     effect after it, so it is still held, though evaluating at 0 raises.
@@ -67,11 +66,11 @@ class Window:
     Parameters
     ----------
     size : float, TimeDelta, tuple, np.timedelta64, datetime.timedelta, or pd.Timedelta
-        The length of each window, positive. A number is in the series'
-        unit; a duration such as ``(25, "h")``, ``TimeDelta(25, "h")``, or
-        ``np.timedelta64(25, "h")`` is converted
-        to the unit of each series the windows are taken from. Months and
-        years have no fixed length and are rejected.
+        The length of each window, positive. A duration such as
+        ``(25, "h")``, ``TimeDelta(25, "h")``, or ``np.timedelta64(25, "h")``
+        is for a series with a unit, and is converted to the unit of each
+        series the windows are taken from. A number is for a series without
+        a unit. Months and years have no fixed length and are rejected.
     step : float, TimeDelta, tuple, np.timedelta64, datetime.timedelta, or pd.Timedelta, optional
         The time between the starts of consecutive windows, positive, as
         for ``size``. Defaults to ``size``, so windows touch without
@@ -99,6 +98,9 @@ class Window:
         called, if a channel has no observations or ``size`` is longer
         than the time during which every channel has observations and
         ``partial`` is false, so that no window fits.
+    TypeError
+        When called, for numbers on a series with a unit, or durations on
+        a series without one.
     """
 
     _CLOSED = {"left": (True, False), "right": (False, True), "both": (True, True), "none": (False, False)}

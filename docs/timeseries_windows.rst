@@ -253,13 +253,15 @@ each channel. The channels ``a`` and ``b`` from :doc:`timeseries_channels`
 can both be evaluated from 0.05 s to 0.13 s, and windows of 40 ms cut this
 time in two::
 
+   from stablebear.timeseries import TimeDelta
+
    a = TimeSeries([1.0, 2.0, 3.0, 4.0],
                   times=TimeDeltaTensor([0.0, 0.1, 0.2, 0.3], "s"))
    b = TimeSeries([10.0, 20.0, 30.0],
                   times=TimeDeltaTensor([50.0, 90.0, 130.0], "ms"))
    series = TimeSeries.from_channels([a, b], unit="s")
 
-   windows, bounds = Window(size=0.04, anchor="start")(
+   windows, bounds = Window(size=TimeDelta(40, "ms"), anchor="start")(
        series, return_bounds=True)
    bounds.count  # [[0.05, 0.09], [0.09, 0.13]]
 

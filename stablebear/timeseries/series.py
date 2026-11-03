@@ -386,9 +386,9 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
     def from_channels(cls, channels, unit: str | None = None) -> TimeSeries:
         """Combine one-channel series into one series with several channels.
 
-        Each channel keeps its own times, unit, and ``snap_tolerance``;
-        queries are converted from the series' unit into each channel's
-        unit. Channels with different epochs are counted from the earliest
+        Each channel keeps its own times and ``snap_tolerance``, converted
+        to ``unit`` as :meth:`to` converts them. Channels with different
+        epochs are counted from the earliest
         of them: each channel's times and domain end are shifted by the
         difference of its epoch, converted to its unit by an exact factor,
         so it keeps its dates up to that floating-point addition.
@@ -399,8 +399,9 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
             One-channel series of one element type; channel ``i`` of the
             result is ``channels[i]``.
         unit : str, optional
-            The unit of queries and reported times. Defaults to the unit
-            the channels share; required when their units differ.
+            The unit of the series, into which every channel is converted.
+            Defaults to the unit the channels share; required when their
+            units differ.
 
         Raises
         ------
@@ -483,8 +484,9 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
 
     @property
     def unit(self) -> str | None:
-        """The time unit of queries and reported times, or ``None`` for a
-        series without a unit, whose times are plain numbers."""
+        """The time unit in which the times of every channel are stored, or
+        ``None`` for a series without a unit, whose times are plain
+        numbers."""
         return self._data.unit
 
     @property
@@ -667,13 +669,19 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         return self._per_channel("snap_tolerance")
 
     def to(self, unit: str) -> TimeSeries:
-        """Return the same series with queries and reported times in ``unit``.
+        """Return the same series with its times in ``unit``.
 
-        The stored observations and timestamps are shared, not converted;
-        :attr:`times` are reported in the new unit, and queries are read in
-        it. Accepts the units of :class:`TimeDelta`. A series without a
-        unit gets ``unit`` instead: its numbers become counts of it, so
-        times ``[0.0, 1.5]`` become 0 s and 1.5 s with ``to("s")``.
+        Every timestamp, domain end, and :attr:`origin` is converted by one
+        exact factor and rounded once, as for :class:`TimeDelta`; the
+        observations are shared, not copied. Accepts the units of
+        :class:`TimeDelta`. A series without a unit gets ``unit`` instead:
+        its numbers become counts of it, so times ``[0.0, 1.5]`` become 0 s
+        and 1.5 s with ``to("s")``.
+
+        Raises
+        ------
+        ValueError
+            If ``unit`` is unknown.
         """
         return TimeSeries._from_cpp(self._data.to(unit))
 
@@ -777,9 +785,9 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         if np.ndim(t) > 0:
             t = FloatTensor(np.asarray(t, dtype=np.float64))
         if isinstance(t, FloatTensor):
-            values = NestedTensor._from_cpp(self._data.evaluate(t._data, None))
+            values = NestedTensor._from_cpp(self._data.evaluate(t._data))
             return values if self.n_channels > 1 else values[0]
-        values = NestedTensor._from_cpp(self._data.evaluate(float(t), None))
+        values = NestedTensor._from_cpp(self._data.evaluate(float(t)))
         if self.n_channels > 1:
             return values
         leaf = values[0]
@@ -835,7 +843,7 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         leaves = []
         for i in range(self.n_channels):
             t = query(i)
-            native = self._data.select([i]).evaluate(t._data if isinstance(t, FloatTensor) else t, None)
+            native = self._data.select([i]).evaluate(t._data if isinstance(t, FloatTensor) else t)
             leaves.append(NestedTensor._from_cpp(native)[0])
         return NestedTensor(leaves)
 
@@ -933,8 +941,8 @@ class TimeSeriesTensor(Tensor):
         """
         if unit is not None:
             t = _with_unit(t, unit)
-        # Durations are queried in their own unit, to which C++ converts each
-        # series, so that they are not rounded.
+        # Durations are queried in their own unit, and C++ converts them into
+        # the unit of each series.
         duration = _as_time_delta(t)
         if duration is not None:
             return self._evaluate(_in_unit(duration, duration.unit), duration.unit)

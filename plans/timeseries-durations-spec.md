@@ -122,16 +122,20 @@ keeps its counts as one tensor in one unit.
 
   The unit of the series is the resolution of the times, such as minutes
   for a `timedelta64[m]` array, the unit of a `TimeDeltaTensor`, or the
-  finest unit of a sequence of durations; `to(unit)` changes it. Plain
-  numbers give a series without a unit.
+  finest unit of a sequence of durations. `to(unit)` converts the stored
+  times, domain ends, origins, and lags by one exact factor each, so the
+  unit is always the unit the times are stored in. Plain numbers give a
+  series without a unit.
 - **`epoch`** is the date that time 0 stands for, a `DateTime` or a value
   it accepts. Dates keep their instants and are counted from it instead of
   from the first of them, in integers and converted to the unit once, so
   whole multiples of the unit are exact. Durations have their time 0 at
   it, as `with_epoch` sets it. `with_epoch` stays, to set, replace, or
   remove the epoch of a series without shifting its times.
-- **`TimeSeries.from_channels`** takes dated channels with different
-  epochs and counts them all from the earliest: each channel's times and
+- **`TimeSeries.from_channels`** converts every channel into the unit of
+  the series, `unit` or the unit the channels share, so all channels of a
+  series store their times in its unit. It takes dated channels with
+  different epochs and counts them all from the earliest: each channel's times and
   domain end are shifted by the difference of its epoch, converted to its
   unit by an exact factor. Whole multiples of the unit stay exact only up
   to that floating-point addition. Channels with and without an epoch

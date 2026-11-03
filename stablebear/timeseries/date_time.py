@@ -799,9 +799,13 @@ def _in_unit(duration: _Duration | float, unit: str | None) -> float | np.ndarra
 def _in_unit(duration, unit):
     """A duration from :func:`_duration` as a number of ``unit``, a time unit;
     a :class:`TimeDelta` is converted by an exact factor and rounded once,
-    and a :class:`TimeDeltaTensor` likewise to a float64 array. ``unit``
-    ``None``, of a series without a unit, takes only numbers."""
+    and a :class:`TimeDeltaTensor` likewise to a float64 array. A number
+    is taken only by ``unit`` ``None``, of a series without a unit, and is
+    kept; ``unit`` ``None`` takes only numbers."""
     if not isinstance(duration, _Duration):
+        if unit is not None:
+            raise TypeError(f"This series has a unit, so this takes a duration, such as TimeDelta(1, {unit!r}), "
+                            "not a plain number")
         return duration
     if unit is None:
         raise TypeError("A series without a unit takes numbers, not durations")

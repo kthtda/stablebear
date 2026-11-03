@@ -3,7 +3,7 @@
 import numpy as np
 import stablebear as sb
 from stablebear.persistence import Barcode
-from stablebear.timeseries import TimeSeries, Window
+from stablebear.timeseries import TimeDelta, TimeDeltaTensor, TimeSeries, Window
 
 from pinned_corpus import write_pinned_corpus
 
@@ -71,7 +71,7 @@ def _barcode_series():
 
 
 def _channels_series():
-    # Channel B is stored in milliseconds and read in seconds.
+    # Channel B is recorded in milliseconds and stored in seconds.
     a = TimeSeries([10.0, 20.0, 30.0], times=TimeDeltaTensor([0.0, 1.0, 2.5], "s"))
     b = TimeSeries([-1.0, -2.0, -3.0], times=TimeDeltaTensor([500.0, 1500.0, 3000.0], "ms"))
     series = TimeSeries.from_channels([a, b], unit="s")
@@ -87,8 +87,9 @@ def _channels_series():
 def _windows(closed, windows):
     # Each observation is 10 * t, with none at 3.0, so the window at 1.0 ends
     # after its last observation.
-    series = TimeSeries([0.0, 10.0, 20.0, 40.0], times=[0.0, 1.0, 2.0, 4.0])
-    tensor = Window(size=2.0, step=1.0, closed=closed, partial=False, anchor="start")(series)
+    series = TimeSeries([0.0, 10.0, 20.0, 40.0], times=TimeDeltaTensor([0.0, 1.0, 2.0, 4.0], "s"))
+    tensor = Window(size=TimeDelta(2, "s"), step=TimeDelta(1, "s"), closed=closed, partial=False,
+                    anchor="start")(series)
     expected = {
         "accepted_types": ["TimeSeriesTensor"], "comparison": "series_elements",
         "dtype": "series(float64)", "shape": [len(windows)],

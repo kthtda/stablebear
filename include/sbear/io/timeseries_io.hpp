@@ -15,15 +15,15 @@
 
 namespace sb::io::detail
 {
-  /// A series is written as its query unit and one record per channel: the
-  /// channel's unit, timestamps, values as a tensor with time along axis 0,
-  /// snap tolerance, whether its start and end are closed, its end, if set,
-  /// its origin, and the epoch of its timestamps, if set, as a count and its
-  /// unit. The end is always closed without one, but its flag is written
-  /// anyway so that an open end at the last timestamp needs no new format.
-  /// Each channel is written on its own, as the
-  /// values it shows, so a file holds no views or shared storage.
-  /// read_timeseries reads it back.
+  /// A series is written as its unit, which every channel's times are in,
+  /// and one record per channel: its timestamps, values as a tensor with
+  /// time along axis 0, snap tolerance, whether its start and end are
+  /// closed, its end, if set, its origin, and the epoch of its timestamps, if
+  /// set, as a count and its unit. The end is always closed without one, but
+  /// its flag is written anyway so that an open end at the last timestamp
+  /// needs no new format. Each channel is written on its own, as the values
+  /// it shows, so a file holds no views or shared storage. read_timeseries
+  /// reads it back.
   template <typename T>
   void write_value(std::ostream& os, const TimeSeries<T>& series)
   {
@@ -33,7 +33,6 @@ namespace sb::io::detail
     {
       const auto& channel = series.channel(i);
       const auto& times = channel.times();
-      write_time_unit(os, times.unit());
       write_elements(os, times.values().begin(), times.values().end());
       write_tensor(os, channel.values());
       write_bytes<float64_t>(os, channel.snap_tolerance());
@@ -58,7 +57,6 @@ namespace sb::io::detail
       std::vector<Channel<T>> channels;
       for (uint64_t i = 0; i < nChannels; ++i)
       {
-        const auto channelUnit = read_time_unit(is);
         auto times = read_vector<float64_t>(is);
         auto values = read_element<Tensor<T>>(reader);
         const auto snapTolerance = read_bytes<float64_t>(is);
@@ -68,7 +66,7 @@ namespace sb::io::detail
         const auto origin = read_bytes<float64_t>(is);
         const auto epoch = read_bytes<std::optional<DateTime>>(is);
 
-        auto channel = Channel<T>(Times(std::move(times), channelUnit, epoch).with_origin(origin), values,
+        auto channel = Channel<T>(Times(std::move(times), unit, epoch).with_origin(origin), values,
                                   snapTolerance)
                            .with_start_closed(startClosed);
         if (end)

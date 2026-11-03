@@ -136,15 +136,13 @@ namespace sb
     // hints for the next window's, which are close by.
     std::vector<size_t> atFrom(series.n_channels(), 0);
     std::vector<size_t> atTo(series.n_channels(), 0);
-    for (const auto& [start, stop, startClosed, stopClosed] : bounds)
+    for (const auto& [from, to, startClosed, stopClosed] : bounds)
     {
       std::vector<Channel<T>> channels;
       channels.reserve(series.n_channels());
       for (size_t c = 0; c < series.n_channels(); ++c)
       {
         const auto& channel = series.channel(c);
-        const auto from = convert_time(start, series.unit(), channel.unit());
-        const auto to = convert_time(stop, series.unit(), channel.unit());
         // The observations in effect at from and at to, with snapping. The
         // one at from is the window's first, at time 0, also if from snaps
         // forward onto it. An open window end excludes an observation at to,
