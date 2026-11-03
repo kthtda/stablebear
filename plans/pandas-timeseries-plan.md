@@ -1,6 +1,6 @@
 # pandas input and durations for time series: implementation plan
 
-Progress: 36 of 55 items, 72 of 109 points (66%)
+Progress: 38 of 55 items, 76 of 109 points (70%)
 
 Specs: [pandas-timeseries-spec.md](pandas-timeseries-spec.md) (phases A, B,
 and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
@@ -172,7 +172,7 @@ and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
   Tests: each of these with a tuple equals it with the `TimeDelta` or
   `TimeDeltaTensor`; a tuple of two dates is still two dates; a tuple
   with an unknown unit raises.
-- [ ] **D9.** [1] `TimeDelta` and `TimeDeltaTensor` take the unit aliases
+- [x] **D9.** [1] (c921bd4ed) `TimeDelta` and `TimeDeltaTensor` take the unit aliases
   that series take, such as `"hours"`, through one C++ lookup, and keep
   the short name.
   Tests: `TimeDelta` and `TimeDeltaTensor` in `"hours"`, `"minutes"`, and
@@ -228,7 +228,7 @@ and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
   Tests: a start that snaps keeps `3 * 0.3` as origin and holds the
   observation at 0.9 at time 0; channels that snap differently share an
   origin; dated bounds of windows of such a window are their dates.
-- [ ] **E8.** [3] `TimeSeries.times` is a `TimeDeltaTensor` from time 0 in
+- [x] **E8.** [3] (563faadce) `TimeSeries.times` is a `TimeDeltaTensor` from time 0 in
   the series' unit, with or without an epoch. For several channels it
   raises `ValueError` naming `series[i].times`, and
   `TimeSeriesTensor.times` is removed. `TimeSeries.datetimes` gives

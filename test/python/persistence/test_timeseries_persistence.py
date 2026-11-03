@@ -10,7 +10,7 @@ from stablebear.persistence import (
     barcode_to_stable_rank,
     compute_persistent_homology,
 )
-from stablebear.timeseries import TimeDelta, TimeDeltaTensor, Times, TimeSeries, Window
+from stablebear.timeseries import TimeDelta, TimeDeltaTensor, TimeSeries, Window
 
 
 def _clouds(dtype, np_dtype):
@@ -55,9 +55,9 @@ def test_series_of_one_cloud_keeps_its_time_axis():
 
 def test_each_channel_gets_its_own_barcodes_and_times():
     clouds = _clouds(sb.pcloud64, np.float64)
-    cam = TimeSeries(clouds, times=Times([0.0, 1.3, 4.0], unit="ms"))
+    cam = TimeSeries(clouds, times=TimeDeltaTensor([0.0, 1.3, 4.0], "ms"))
     # Not cam's first two clouds, so reading cam's elements for lidar shows.
-    lidar = TimeSeries(clouds[[2, 1]], times=Times([0.5, 2.0], unit="ms"))
+    lidar = TimeSeries(clouds[[2, 1]], times=TimeDeltaTensor([0.5, 2.0], "ms"))
     series = TimeSeries.from_channels([cam, lidar])
 
     result = compute_persistent_homology(series, max_dim=1)
@@ -186,11 +186,11 @@ def _barcode_series():
     x = TimeSeries(BarcodeTensor([
         Barcode(np.array([[0.0, 1.0]])),
         Barcode(np.array([[0.0, 2.0], [0.5, 1.5]])),
-    ]), times=Times([0.0, 1.0], unit="s"))
+    ]), times=TimeDeltaTensor([0.0, 1.0], "s"))
     y = TimeSeries(BarcodeTensor([
         Barcode(np.array([[0.0, 4.0], [1.0, 2.0], [1.0, 3.0]])),
         Barcode(np.array([[0.25, 0.75]])),
-    ]), times=Times([500.0, 1500.0], unit="ms"))
+    ]), times=TimeDeltaTensor([500.0, 1500.0], "ms"))
     return TimeSeries.from_channels([x, y], unit="s")
 
 

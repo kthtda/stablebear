@@ -7,92 +7,34 @@ import numpy as np
 import pytest
 
 import stablebear as sb
-from stablebear.timeseries import DateTime, DateTimeTensor, Domain, TimeDelayEmbedding, TimeDelta, TimeDeltaTensor, Times, TimeSeries, Window
-from stablebear.timeseries.series import TimesTensor
+from stablebear.timeseries import DateTime, DateTimeTensor, Domain, TimeDelayEmbedding, TimeDelta, TimeDeltaTensor, TimeSeries, Window
+from stablebear.timeseries.series import Times, TimesTensor
 
 from _element_values import TWO_ELEMENTS_OF_EVERY_DTYPE
 from _round_trip import ROUND_TRIPS
 
 
-def test_times_keeps_values_and_unit():
-    times = Times([0.0, 1.5, 4.0], unit="ms")
-
-    assert times.to_floats().dtype is sb.float64
-    assert np.array_equal(times.to_floats(), [0.0, 1.5, 4.0])
-    assert times.unit == "ms"
-
-
-def test_times_without_an_epoch_as_an_array_are_durations():
-    times = Times([0.0, 1.5], unit="h")
-
-    expected = np.array([0, 5_400_000_000], dtype="timedelta64[us]")
-    assert np.asarray(times).dtype == expected.dtype
-    assert np.array_equal(np.asarray(times), expected)
-
-
-def test_times_with_an_epoch_as_an_array_are_dates():
-    times = Times([0.0, 1.5], unit="h", epoch="2023-01-01")
-
-    expected = np.array(["2023-01-01T00:00", "2023-01-01T01:30"], dtype="datetime64[us]")
-    assert np.asarray(times).dtype == expected.dtype
-    assert np.array_equal(np.asarray(times), expected)
-
-
-def test_times_finer_than_microseconds_as_an_array_keep_their_unit():
-    times = Times([0.0, 1.0], unit="ns")
-
-    assert np.asarray(times).dtype == np.dtype("timedelta64[ns]")
-    assert np.array_equal(np.asarray(times), np.array([0, 1], dtype="timedelta64[ns]"))
-
-
-def test_times_to_floats_in_another_unit():
-    times = Times([0.0, 1.5], unit="h")
-
-    assert times.to_floats("min").array_equal(sb.FloatTensor([0.0, 90.0], dtype=sb.float64))
-
-
-def test_times_of_timedelta64_are_in_its_resolution():
-    times = Times(np.array([0, 90, 150], dtype="timedelta64[m]"))
-
-    assert times == Times([0.0, 90.0, 150.0], unit="min")
-    assert times.epoch is None
-
-
 @pytest.mark.parametrize("durations, expected", [
     pytest.param([TimeDelta(0, "s"), TimeDelta(1500, "ms"), TimeDelta(3, "s")],
-                 Times([0.0, 1500.0, 3000.0], unit="ms"), id="time_delta"),
+                 TimeDeltaTensor([0.0, 1500.0, 3000.0], "ms"), id="time_delta"),
     pytest.param([datetime.timedelta(0), datetime.timedelta(seconds=1.5), datetime.timedelta(seconds=3)],
-                 Times([0.0, 1_500_000.0, 3_000_000.0], unit="us"), id="timedelta"),
+                 TimeDeltaTensor([0.0, 1_500_000.0, 3_000_000.0], "us"), id="timedelta"),
 ])
-def test_times_of_durations_are_in_their_finest_unit(durations, expected):
-    assert Times(durations) == expected
+def test_series_times_of_durations_are_in_their_finest_unit(durations, expected):
+    series = TimeSeries([10.0, 20.0, 30.0], times=durations)
+
+    assert series.times.array_equal(expected)
 
 
-def test_times_of_a_time_delta_tensor_equal_times_of_their_timedelta64():
-    times = Times(TimeDeltaTensor(sb.IntTensor([0, 90]), "min"))
+def test_series_at_a_time_delta_tensor_equals_series_at_its_timedelta64():
+    series = TimeSeries([10.0, 20.0], times=TimeDeltaTensor(sb.IntTensor([0, 90]), "min"))
 
-    assert times == Times(np.array([0, 90], dtype="timedelta64[m]"))
-
-
-def test_times_of_durations_in_a_given_unit_are_exact():
-    times = Times(np.array([0, 1500, 3000], dtype="timedelta64[ms]"), unit="s")
-
-    assert times == Times([0.0, 1.5, 3.0], unit="s")
+    assert series.array_equal(TimeSeries([10.0, 20.0], times=np.array([0, 90], dtype="timedelta64[m]")))
 
 
-def test_times_of_durations_in_a_unit_alias():
-    assert Times([TimeDelta(1, "min"), TimeDelta(2, "min")], unit="sec") == Times([60.0, 120.0], unit="s")
-
-
-def test_times_of_durations_take_an_epoch():
-    times = Times(np.array([0, 90], dtype="timedelta64[m]"), epoch="2023-01-01")
-
-    assert times == Times([0.0, 90.0], unit="min", epoch="2023-01-01")
-
-
-def test_times_of_durations_reject_nat():
+def test_series_rejects_durations_with_nat():
     with pytest.raises(ValueError, match="NaT"):
-        Times(np.array([0, "NaT"], dtype="timedelta64[s]"), unit="s")
+        TimeSeries([10.0, 20.0], times=np.array([0, "NaT"], dtype="timedelta64[s]"))
 
 
 def test_series_takes_durations_as_times():
@@ -111,44 +53,10 @@ def test_series_takes_durations_as_times():
     ([[0.0, 1.0]], "s"),  # two-dimensional
     ([0.0, 1.0], "yr"),  # unknown unit
 ])
-def test_times_rejects_invalid_input(times, unit):
+def test_series_rejects_invalid_times(times, unit):
     with pytest.raises(ValueError):
-        Times(times, unit=unit)
+        TimeSeries([10.0, 20.0], times=(times, unit))
 
-
-
-@pytest.mark.parametrize("alias, unit", [
-    ("sec", "s"),
-    ("seconds", "s"),
-    ("hr", "h"),
-    ("msec", "ms"),
-    ("D", "d"),
-    ("\u00b5s", "us"),  # micro sign
-    ("\u03bcs", "us"),  # Greek small letter mu
-])
-def test_times_accepts_unit_aliases(alias, unit):
-    assert Times([0.0, 1.0], unit=alias).unit == unit
-
-
-def test_times_cannot_be_assigned_to():
-    times = Times([0.0, 1.0], unit="s")
-
-    with pytest.raises(TypeError):
-        times[0] = 5.0  # pyright: ignore[reportIndexIssue]
-
-    assert np.array_equal(times.to_floats(), [0.0, 1.0])
-
-
-@pytest.mark.parametrize("times, unit, target, expected", [
-    ([0.0, 1.5], "min", "s", [0.0, 90.0]),
-    ([0.0, 1.5], "fs", "as", [0.0, 1500.0]),
-    ([0.0, 2.25], "as", "fs", [0.0, 0.00225]),
-])
-def test_times_converts_units(times, unit, target, expected):
-    converted = Times(times, unit=unit).to(target)
-
-    assert np.array_equal(converted.to_floats(), expected)
-    assert converted.unit == target
 
 
 def test_series_defaults_to_seconds_and_one_channel():
@@ -264,11 +172,6 @@ def test_date_time_tensor_survives_pickling():
     instants = DateTimeTensor(["2023-01-01T00:30", "2023-01-01T01:30"])
 
     assert pickle.loads(pickle.dumps(instants)).array_equal(instants)
-
-
-def test_times_reject_an_epoch_tensor():
-    with pytest.raises(TypeError, match="DateTimeTensor"):
-        Times([0.0, 1.0], unit="h", epoch=DateTimeTensor(["2023-01-01", "2023-01-02"]))
 
 
 @pytest.mark.parametrize("value, unit, expected", [
@@ -554,71 +457,18 @@ def test_date_times_compare_instants():
     assert DateTime("2023-01-02") > DateTime("2023-01-01T23:59")
 
 
-def test_times_have_no_epoch_by_default():
-    assert Times([0.0, 1.5], unit="s").epoch is None
-
-
-def test_times_epoch_from_a_string_equals_one_from_a_date_time():
-    from_string = Times([0.0, 1.5], unit="s", epoch="2023-01-01")
-    from_date_time = Times([0.0, 1.5], unit="s", epoch=DateTime("2023-01-01"))
-
-    assert from_string.epoch == DateTime("2023-01-01")
-    assert from_string == from_date_time
-
-
-def test_times_keep_their_epoch_in_another_unit():
-    times = Times([0.0, 1.5], unit="s", epoch="2023-01-01").to("ms")
-
-    assert times.epoch == DateTime("2023-01-01")
-
-
-def test_times_with_different_epochs_are_not_equal():
-    times = Times([0.0, 1.5], unit="s", epoch="2023-01-01")
-
-    assert times != Times([0.0, 1.5], unit="s", epoch="2023-01-02")
-    assert times != Times([0.0, 1.5], unit="s")
-
-
-def test_times_with_epoch_sets_replaces_and_removes_the_epoch():
-    times = Times([0.0, 1.5], unit="s")
-
-    with_epoch = times.with_epoch("2023-01-01")
-    replaced = with_epoch.with_epoch(DateTime("2023-01-02"))
-    removed = replaced.with_epoch(None)
-
-    assert with_epoch.epoch == DateTime("2023-01-01")
-    assert replaced.epoch == DateTime("2023-01-02")
-    assert removed.epoch is None
-
-
-def test_times_with_epoch_keeps_the_timestamps_and_unit():
-    times = Times([0.0, 1.5], unit="ms").with_epoch("2023-01-01")
-
-    assert sb.FloatTensor([0.0, 1.5], dtype=sb.float64).array_equal(times.to_floats())
-    assert times.unit == "ms"
-
-
-def test_times_with_epoch_rejects_an_invalid_epoch():
+def test_series_rejects_an_invalid_epoch():
     with pytest.raises(ValueError):
-        Times([0.0, 1.5], unit="s").with_epoch(np.datetime64("2023-01", "M"))
+        TimeSeries([10.0, 20.0], times=TimeDeltaTensor([0.0, 1.5], "s"), epoch=np.datetime64("2023-01", "M"))
 
 
-def _stamps():
-    return np.array(["2023-01-01T06:00", "2023-01-01T07:30", "2023-01-02T06:00"], dtype="datetime64[m]")
-
-
-def test_times_from_datetimes_count_whole_units_from_the_first():
-    times = Times(_stamps(), unit="min")
-
-    assert times.epoch == DateTime(np.datetime64("2023-01-01T06:00", "m"))
-    assert sb.FloatTensor([0.0, 90.0, 1440.0], dtype=sb.float64).array_equal(times.to_floats())
-
-
-def test_times_of_a_date_time_tensor_equal_times_of_its_datetime64():
+def test_series_at_a_date_time_tensor_equals_series_at_its_datetime64():
     dates = DateTimeTensor(["2023-01-01T06:00", "2023-01-01T07:30"])
 
-    assert Times(dates, unit="h") == Times(dates.to_datetime64(), unit="h")
-    assert Times(dates) == Times(dates.to_datetime64())
+    series = TimeSeries([10.0, 20.0], times=dates)
+
+    assert series.array_equal(TimeSeries([10.0, 20.0], times=dates.to_datetime64()))
+    assert series.epoch == TimeSeries([10.0, 20.0], times=dates.to_datetime64()).epoch
 
 
 def test_series_takes_a_date_time_tensor_as_times():
@@ -654,49 +504,6 @@ def test_series_rejects_an_epoch_tensor():
     with pytest.raises(TypeError, match="DateTimeTensor"):
         TimeSeries([10.0, 20.0], times=TimeDeltaTensor([0.0, 1.5], "h"),
                    epoch=DateTimeTensor(["2023-01-01", "2023-01-02"]))
-
-
-def test_times_from_datetimes_are_converted_to_the_unit():
-    times = Times(_stamps(), unit="h")
-
-    assert sb.FloatTensor([0.0, 1.5, 24.0], dtype=sb.float64).array_equal(times.to_floats())
-
-
-def test_times_from_datetimes_count_from_an_explicit_epoch():
-    times = Times(_stamps(), unit="h", epoch="2023-01-01")
-
-    assert times.epoch == DateTime("2023-01-01")
-    assert sb.FloatTensor([6.0, 7.5, 30.0], dtype=sb.float64).array_equal(times.to_floats())
-
-
-def test_times_to_datetime64_defaults_to_microseconds():
-    dates = Times([0.0, 1.5], unit="h", epoch="2023-01-01").to_datetime64()
-
-    assert dates.dtype == np.dtype("datetime64[us]")
-    assert np.array_equal(dates, np.array(["2023-01-01T00:00", "2023-01-01T01:30"], dtype="datetime64[us]"))
-
-
-@pytest.mark.parametrize("resolution, expected", [
-    pytest.param("ns", np.array(["2023-01-01T00:00:00", "2023-01-01T00:00:01.5"], dtype="datetime64[ns]"), id="ns"),
-    pytest.param("s", np.array(["2023-01-01T00:00:00", "2023-01-01T00:00:02"], dtype="datetime64[s]"), id="s"),
-])
-def test_times_to_datetime64_rounds_to_the_resolution(resolution, expected):
-    # 1.5 s rounds to 2 s, the nearest even step.
-    dates = Times([0.0, 1.5], unit="s", epoch="2023-01-01").to_datetime64(resolution)
-
-    assert dates.dtype == expected.dtype
-    assert np.array_equal(dates, expected)
-
-
-def test_times_to_datetime64_needs_an_epoch():
-    with pytest.raises(ValueError, match="with_epoch"):
-        Times([0.0, 1.5], unit="s").to_datetime64()
-
-
-def test_times_repr_shows_the_epoch():
-    times = Times([0.0, 1.5], unit="s", epoch="2023-01-01")
-
-    assert repr(times) == "Times([0.0, 1.5], unit='s', epoch=DateTime('2023-01-01'))"
 
 
 def test_times_tensor_indexes_back_to_each_times():
@@ -756,7 +563,7 @@ def test_times_tensor_round_trips(round_trip):
 
 
 def test_series_keeps_explicit_unit():
-    series = TimeSeries([1.0, 2.0], times=Times([0.0, 0.5], unit="ms"))
+    series = TimeSeries([1.0, 2.0], times=TimeDeltaTensor([0.0, 0.5], "ms"))
 
     assert series.unit == "ms"
 
@@ -875,7 +682,7 @@ def test_singleton_series_evaluates_at_its_time():
 
 
 def _hourly_series():
-    return TimeSeries([10.0, 20.0, 30.0], times=Times([0.0, 1.5, 4.0], unit="h"))
+    return TimeSeries([10.0, 20.0, 30.0], times=TimeDeltaTensor([0.0, 1.5, 4.0], "h"))
 
 
 @pytest.mark.parametrize("duration", [
@@ -947,7 +754,7 @@ def test_series_at_a_list_of_time_deltas_equals_the_series_at_their_times():
 
 
 def test_dated_series_at_a_duration_counts_from_its_epoch():
-    series = TimeSeries([10.0, 20.0, 30.0], times=Times([0.0, 1.5, 4.0], unit="h", epoch="2023-01-01"))
+    series = TimeSeries([10.0, 20.0, 30.0], times=TimeDeltaTensor([0.0, 1.5, 4.0], "h"), epoch="2023-01-01")
 
     assert series(np.timedelta64(2, "h")) == series("2023-01-01T02:00")
 
@@ -989,8 +796,8 @@ def test_series_domain_fields_by_name_and_by_unpacking():
 
 
 def test_series_domain_of_several_channels_is_their_intersection():
-    a = TimeSeries([10.0, 20.0, 30.0], times=Times([0.0, 1.0, 2.5], unit="s"))
-    b = TimeSeries([-10.0, -20.0], times=Times([500.0, 3000.0], unit="ms"))
+    a = TimeSeries([10.0, 20.0, 30.0], times=TimeDeltaTensor([0.0, 1.0, 2.5], "s"))
+    b = TimeSeries([-10.0, -20.0], times=TimeDeltaTensor([500.0, 3000.0], "ms"))
 
     series = TimeSeries.from_channels([a, b], unit="s")
 
@@ -1013,7 +820,7 @@ def test_series_domain_of_several_channels_excludes_an_end_any_channel_excludes(
 
 
 def test_dated_series_domain_has_date_time_ends():
-    series = TimeSeries([10.0, 20.0, 30.0], times=Times([0.5, 1.5, 4.0], unit="h", epoch="2023-01-01"))
+    series = TimeSeries([10.0, 20.0, 30.0], times=TimeDeltaTensor([0.5, 1.5, 4.0], "h"), epoch="2023-01-01")
 
     domain = series.domain
 
@@ -1023,8 +830,8 @@ def test_dated_series_domain_has_date_time_ends():
 
 
 def test_dated_series_domain_of_several_channels_is_the_intersection_of_where_each_lies():
-    a = TimeSeries([10.0, 20.0, 30.0], times=Times([0.0, 1.0, 2.5], unit="h", epoch="2023-01-01"))
-    b = TimeSeries([-10.0, -20.0], times=Times([30.0, 180.0], unit="min", epoch="2023-01-01"))
+    a = TimeSeries([10.0, 20.0, 30.0], times=TimeDeltaTensor([0.0, 1.0, 2.5], "h"), epoch="2023-01-01")
+    b = TimeSeries([-10.0, -20.0], times=TimeDeltaTensor([30.0, 180.0], "min"), epoch="2023-01-01")
     series = TimeSeries.from_channels([a, b], unit="h")
 
     domain = series.domain
@@ -1034,7 +841,7 @@ def test_dated_series_domain_of_several_channels_is_the_intersection_of_where_ea
 
 
 def test_series_epoch_is_the_epoch_of_its_times():
-    series = TimeSeries([10.0, 20.0], times=Times([0.0, 1.0], unit="h", epoch="2023-01-01"))
+    series = TimeSeries([10.0, 20.0], times=TimeDeltaTensor([0.0, 1.0], "h"), epoch="2023-01-01")
 
     assert series.epoch == DateTime("2023-01-01")
     assert series.to("min").epoch == DateTime("2023-01-01")
@@ -1051,7 +858,7 @@ def test_series_from_datetimes_counts_their_resolution_from_the_first():
 
 
 def _dated_series():
-    return TimeSeries([10.0, 20.0, 30.0], times=Times([0.0, 1.5, 4.0], unit="h", epoch="2023-01-01"))
+    return TimeSeries([10.0, 20.0, 30.0], times=TimeDeltaTensor([0.0, 1.5, 4.0], "h"), epoch="2023-01-01")
 
 
 @pytest.mark.parametrize("date, t", [
@@ -1105,8 +912,8 @@ def test_series_at_a_date_time_tensor_equals_the_series_at_its_datetime64_array(
 
 
 def test_series_of_several_channels_at_a_date_gives_each_channel():
-    a = TimeSeries([10.0, 20.0], times=Times([0.0, 1.0], unit="h", epoch="2023-01-01"))
-    b = TimeSeries([-10.0, -20.0, -30.0], times=Times([0.0, 30.0, 60.0], unit="min", epoch="2023-01-01"))
+    a = TimeSeries([10.0, 20.0], times=TimeDeltaTensor([0.0, 1.0], "h"), epoch="2023-01-01")
+    b = TimeSeries([-10.0, -20.0, -30.0], times=TimeDeltaTensor([0.0, 30.0, 60.0], "min"), epoch="2023-01-01")
     series = TimeSeries.from_channels([a, b], unit="h")
 
     values = series(np.datetime64("2023-01-01T00:45"))
@@ -1115,8 +922,8 @@ def test_series_of_several_channels_at_a_date_gives_each_channel():
 
 
 def test_series_of_several_channels_at_an_array_of_dates_gives_each_channel():
-    a = TimeSeries([10.0, 20.0], times=Times([0.0, 1.0], unit="h", epoch="2023-01-01"))
-    b = TimeSeries([-10.0, -20.0, -30.0], times=Times([0.0, 30.0, 60.0], unit="min", epoch="2023-01-01"))
+    a = TimeSeries([10.0, 20.0], times=TimeDeltaTensor([0.0, 1.0], "h"), epoch="2023-01-01")
+    b = TimeSeries([-10.0, -20.0, -30.0], times=TimeDeltaTensor([0.0, 30.0, 60.0], "min"), epoch="2023-01-01")
     series = TimeSeries.from_channels([a, b], unit="h")
 
     values = series(np.array(["2023-01-01T00:15", "2023-01-01T00:45"], dtype="datetime64[m]"))
@@ -1191,7 +998,7 @@ def test_window_at_a_date_outside_it_names_its_dates():
 def test_a_date_just_below_a_timestamp_snaps_to_it():
     # 0.1 + 0.2 computes as 0.30000000000000004, so 300 ms after the epoch
     # converts to just below it.
-    series = TimeSeries([1.0, 2.0, 3.0], times=Times([0.0, 0.1, 0.1 + 0.2], unit="s", epoch="2023-01-01"))
+    series = TimeSeries([1.0, 2.0, 3.0], times=TimeDeltaTensor([0.0, 0.1, 0.1 + 0.2], "s"), epoch="2023-01-01")
 
     assert series(np.datetime64("2023-01-01T00:00:00.300")) == 3.0
 
@@ -1212,15 +1019,15 @@ def test_series_without_an_epoch_has_none():
 
 
 def test_series_epoch_is_one_value_for_several_channels():
-    a = TimeSeries([10.0, 20.0], times=Times([0.0, 1.0], unit="h", epoch="2023-01-01"))
-    b = TimeSeries([-10.0, -20.0], times=Times([0.0, 60.0], unit="min", epoch="2023-01-01"))
+    a = TimeSeries([10.0, 20.0], times=TimeDeltaTensor([0.0, 1.0], "h"), epoch="2023-01-01")
+    b = TimeSeries([-10.0, -20.0], times=TimeDeltaTensor([0.0, 60.0], "min"), epoch="2023-01-01")
 
     assert TimeSeries.from_channels([a, b], unit="h").epoch == DateTime("2023-01-01")
 
 
 def test_series_with_epoch_sets_the_epoch_of_every_channel():
-    a = TimeSeries([10.0, 20.0], times=Times([0.0, 1.0], unit="h"))
-    b = TimeSeries([-10.0, -20.0], times=Times([0.0, 60.0], unit="min"))
+    a = TimeSeries([10.0, 20.0], times=TimeDeltaTensor([0.0, 1.0], "h"))
+    b = TimeSeries([-10.0, -20.0], times=TimeDeltaTensor([0.0, 60.0], "min"))
 
     series = TimeSeries.from_channels([a, b], unit="h").with_epoch("2023-01-01")
 
@@ -1238,7 +1045,7 @@ def test_series_with_epoch_keeps_its_times_and_values():
 
 
 def test_series_with_epoch_none_removes_the_epoch():
-    series = TimeSeries([10.0, 20.0], times=Times([0.0, 1.5], unit="s", epoch="2023-01-01"))
+    series = TimeSeries([10.0, 20.0], times=TimeDeltaTensor([0.0, 1.5], "s"), epoch="2023-01-01")
 
     assert series.with_epoch(None).epoch is None
 
@@ -1313,7 +1120,7 @@ def test_series_origin_is_zero_for_recorded_observations():
 
 def test_series_origin_has_one_entry_per_channel():
     a = TimeSeries([10.0, 20.0], times=TimeDeltaTensor([0.0, 1.0], "s"))
-    b = TimeSeries([-10.0, -20.0], times=Times([0.0, 1000.0], unit="ms"))
+    b = TimeSeries([-10.0, -20.0], times=TimeDeltaTensor([0.0, 1000.0], "ms"))
 
     origin = TimeSeries.from_channels([a, b], unit="s").origin
 
@@ -1393,7 +1200,7 @@ def test_snap_tolerance_outside_unit_interval_raises(tolerance):
 
 
 def test_to_changes_the_query_unit():
-    series = TimeSeries([10.0, 20.0], times=Times([0.0, 0.5], unit="s")).to("ms")
+    series = TimeSeries([10.0, 20.0], times=TimeDeltaTensor([0.0, 0.5], "s")).to("ms")
 
     assert series.unit == "ms"
     assert np.array_equal(series.times.count, [0.0, 500.0])
@@ -1402,7 +1209,7 @@ def test_to_changes_the_query_unit():
 
 
 def test_evaluate_reads_times_in_the_given_unit():
-    series = TimeSeries([10.0, 20.0], times=Times([0.0, 500.0], unit="ms"))
+    series = TimeSeries([10.0, 20.0], times=TimeDeltaTensor([0.0, 500.0], "ms"))
 
     assert series(250000.0, "us") == 10.0
     assert series(500000.0, "us") == 20.0
@@ -1410,18 +1217,18 @@ def test_evaluate_reads_times_in_the_given_unit():
 
 
 def test_evaluate_rejects_an_unknown_unit():
-    series = TimeSeries([10.0, 20.0], times=Times([0.0, 0.5], unit="s"))
+    series = TimeSeries([10.0, 20.0], times=TimeDeltaTensor([0.0, 0.5], "s"))
 
     with pytest.raises(ValueError, match="Unknown time unit"):
         series(0.25, "fortnight")
 
 
 def _channel_a():
-    return TimeSeries([10.0, 20.0, 30.0], times=Times([0.0, 1.0, 2.5], unit="s"))
+    return TimeSeries([10.0, 20.0, 30.0], times=TimeDeltaTensor([0.0, 1.0, 2.5], "s"))
 
 
 def _channel_b():
-    return TimeSeries([-1.0, -2.0, -3.0], times=Times([500.0, 1500.0, 3000.0], unit="ms"))
+    return TimeSeries([-1.0, -2.0, -3.0], times=TimeDeltaTensor([500.0, 1500.0, 3000.0], "ms"))
 
 
 def test_from_channels_keeps_every_channel():
@@ -1494,7 +1301,7 @@ def test_several_channels_evaluate_to_one_leaf_per_channel(t, expected):
 
 
 def test_each_channel_snaps_by_its_own_settings():
-    a = TimeSeries([10.0, 20.0, 30.0], times=Times([0.0, 1.0, 2.5], unit="s"),
+    a = TimeSeries([10.0, 20.0, 30.0], times=TimeDeltaTensor([0.0, 1.0, 2.5], "s"),
                    snap_tolerance=0.0)
     series = TimeSeries.from_channels([a, _channel_b()], unit="s")
 
@@ -1572,7 +1379,7 @@ def test_selecting_several_channels_keeps_their_order():
 
 
 def test_selection_keeps_each_channel_snap_settings():
-    a = TimeSeries([10.0, 20.0, 30.0], times=Times([0.0, 1.0, 2.5], unit="s"),
+    a = TimeSeries([10.0, 20.0, 30.0], times=TimeDeltaTensor([0.0, 1.0, 2.5], "s"),
                    snap_tolerance=0.25)
     series = TimeSeries.from_channels([a, _channel_b()], unit="s")
 
@@ -1657,7 +1464,7 @@ def test_one_channel_survives_saving(make_values, as_shape, round_trip):
     if as_shape:
         # Two observations of shape (2,): [a, b] and [b, a].
         values = sb.concatenate([values, values[[1, 0]]]).reshape((2, 2))
-    times = Times(0.25 * np.arange(values.shape[0]), unit="ms")
+    times = TimeDeltaTensor(0.25 * np.arange(values.shape[0]), "ms")
     series = TimeSeries(values, times=times, snap_tolerance=0.25)
 
     loaded = round_trip(series)
@@ -1692,7 +1499,7 @@ def test_series_dtype_is_one_object_per_inner_dtype():
 
 
 def _array_equal_series():
-    return TimeSeries([0.0, 10.0], times=Times([0.0, 1.0], unit="ms"), snap_tolerance=0.25)
+    return TimeSeries([0.0, 10.0], times=TimeDeltaTensor([0.0, 1.0], "ms"), snap_tolerance=0.25)
 
 
 def test_series_array_equal_an_equal_series():
@@ -1700,18 +1507,18 @@ def test_series_array_equal_an_equal_series():
 
 
 @pytest.mark.parametrize("other", [
-    pytest.param(TimeSeries([0.0, 20.0], times=Times([0.0, 1.0], unit="ms"), snap_tolerance=0.25),
+    pytest.param(TimeSeries([0.0, 20.0], times=TimeDeltaTensor([0.0, 1.0], "ms"), snap_tolerance=0.25),
                  id="values"),
-    pytest.param(TimeSeries([0.0, 10.0], times=Times([0.0, 2.0], unit="ms"), snap_tolerance=0.25),
+    pytest.param(TimeSeries([0.0, 10.0], times=TimeDeltaTensor([0.0, 2.0], "ms"), snap_tolerance=0.25),
                  id="times"),
-    pytest.param(TimeSeries([0.0, 10.0], times=Times([0.0, 1.0], unit="s"), snap_tolerance=0.25),
+    pytest.param(TimeSeries([0.0, 10.0], times=TimeDeltaTensor([0.0, 1.0], "s"), snap_tolerance=0.25),
                  id="unit"),
-    pytest.param(TimeSeries([0.0, 10.0], times=Times([0.0, 1.0], unit="ms"), snap_tolerance=0.5),
+    pytest.param(TimeSeries([0.0, 10.0], times=TimeDeltaTensor([0.0, 1.0], "ms"), snap_tolerance=0.5),
                  id="snap-tolerance"),
-    pytest.param(TimeSeries([[0.0], [10.0]], times=Times([0.0, 1.0], unit="ms"), snap_tolerance=0.25),
+    pytest.param(TimeSeries([[0.0], [10.0]], times=TimeDeltaTensor([0.0, 1.0], "ms"), snap_tolerance=0.25),
                  id="shape"),
     pytest.param(TimeSeries.from_channels([_array_equal_series(), _array_equal_series()]), id="channels"),
-    pytest.param(TimeSeries(np.array([0.0, 10.0], dtype=np.float32), times=Times([0.0, 1.0], unit="ms"),
+    pytest.param(TimeSeries(np.array([0.0, 10.0], dtype=np.float32), times=TimeDeltaTensor([0.0, 1.0], "ms"),
                             snap_tolerance=0.25),
                  id="dtype"),
     pytest.param(sb.FloatTensor(np.array([0.0, 10.0])), id="tensor"),
@@ -1758,7 +1565,7 @@ def test_series_array_equal_compares_whether_the_end_is_closed():
 
 def test_series_array_equal_compares_the_channel_order():
     a = _array_equal_series()
-    b = TimeSeries([5.0, 15.0], times=Times([0.0, 1.0], unit="ms"), snap_tolerance=0.25)
+    b = TimeSeries([5.0, 15.0], times=TimeDeltaTensor([0.0, 1.0], "ms"), snap_tolerance=0.25)
 
     assert not TimeSeries.from_channels([a, b]).array_equal(TimeSeries.from_channels([b, a]))
 
@@ -1784,7 +1591,7 @@ def test_series_array_equal_compares_the_channel_order():
     pytest.param(DateTime, id="DateTime"),
 ])
 def test_series_epoch_survives_saving(value, as_epoch, round_trip):
-    series = TimeSeries([10.0, 20.0], times=Times([0.0, 1.5], unit="s", epoch=as_epoch(value)))
+    series = TimeSeries([10.0, 20.0], times=TimeDeltaTensor([0.0, 1.5], "s"), epoch=as_epoch(value))
 
     loaded = round_trip(series)
 

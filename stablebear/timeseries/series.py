@@ -71,7 +71,7 @@ def _finest_duration_unit(values):
 
 
 def _durations_in(values, unit):
-    """``values``, an array, as float64 numbers of ``unit``, a Times unit, if
+    """``values``, an array, as float64 numbers of ``unit``, a time unit, if
     it holds durations, else ``None``. Each is converted by an exact factor
     and rounded once."""
     if np.issubdtype(values.dtype, np.timedelta64):
@@ -107,6 +107,44 @@ def _times_from_datetimes(stamps, unit, epoch):
         raise ValueError(f"Dates and times need a resolution of fixed length, not {code!r}")
     counts = offsets.astype(np.int64).astype(np.float64) * step
     return cpp.Times(counts, _NUMPY_TO_UNIT[code], epoch._data).to(unit)
+
+
+def _native_times(times, unit=None, epoch=None):
+    """The native times of ``times``, as the constructor of
+    :class:`TimeSeries` accepts them, in ``unit`` and counted from ``epoch``;
+    a plain array is in ``unit``, by default seconds."""
+    times = _from_pair(times)
+    if isinstance(times, TimeDeltaTensor):
+        # Counts in one unit, by default theirs, converted by one exact
+        # factor; the short name of unit, which may be an alias.
+        unit = unit or times.unit
+        times = _in_unit(times, _unit_name(unit))
+    elif isinstance(times, DateTimeTensor):
+        times = times.to_datetime64()
+    times = _as_array(times)
+    if np.issubdtype(times.dtype, np.datetime64) or np.issubdtype(times.dtype, np.timedelta64):
+        code = np.datetime_data(times.dtype)[0]
+        # The resolution of the dates or durations; one without a fixed
+        # length is rejected when they are converted.
+        unit = unit or _NUMPY_TO_UNIT.get(code, "s")
+        if np.issubdtype(times.dtype, np.datetime64):
+            return _times_from_datetimes(times, unit, epoch)
+        # Durations as dates after 1970-01-01, so that they are converted
+        # to unit in integers, as dates are.
+        origin = np.datetime64(0, code)  # pyright: ignore[reportCallIssue, reportArgumentType]
+        return _times_from_datetimes(origin + times, unit, origin).with_epoch(
+            None if epoch is None else DateTime(epoch)._data)
+    finest = _finest_duration_unit(times)
+    if finest is not None:
+        # TimeDelta and other durations, by default in the finest of
+        # their units, each converted by an exact factor; the short name
+        # of unit, which may be an alias.
+        unit = unit or finest
+        times = _durations_in(times, _unit_name(unit))
+    unit = unit or "s"
+    if epoch is not None:
+        epoch = DateTime(epoch)._data
+    return cpp.Times(np.asarray(times, dtype=np.float64), unit, epoch)
 
 
 class Times:
@@ -155,40 +193,7 @@ class Times:
     """
 
     def __init__(self, times, unit: str | None = None, *, epoch=None):
-        times = _from_pair(times)
-        if isinstance(times, TimeDeltaTensor):
-            # Counts in one unit, by default theirs, converted by one exact
-            # factor; the short name of unit, which may be an alias.
-            unit = unit or times.unit
-            times = _in_unit(times, _unit_name(unit))
-        elif isinstance(times, DateTimeTensor):
-            times = times.to_datetime64()
-        times = _as_array(times)
-        if np.issubdtype(times.dtype, np.datetime64) or np.issubdtype(times.dtype, np.timedelta64):
-            code = np.datetime_data(times.dtype)[0]
-            # The resolution of the dates or durations; one without a fixed
-            # length is rejected when they are converted.
-            unit = unit or _NUMPY_TO_UNIT.get(code, "s")
-            if np.issubdtype(times.dtype, np.datetime64):
-                self._data = _times_from_datetimes(times, unit, epoch)
-                return
-            # Durations as dates after 1970-01-01, so that they are converted
-            # to unit in integers, as dates are.
-            origin = np.datetime64(0, code)  # pyright: ignore[reportCallIssue, reportArgumentType]
-            self._data = _times_from_datetimes(origin + times, unit, origin).with_epoch(
-                None if epoch is None else DateTime(epoch)._data)
-            return
-        finest = _finest_duration_unit(times)
-        if finest is not None:
-            # TimeDelta and other durations, by default in the finest of
-            # their units, each converted by an exact factor; the short name
-            # of unit, which may be an alias.
-            unit = unit or finest
-            times = _durations_in(times, _unit_name(unit))
-        unit = unit or "s"
-        if epoch is not None:
-            epoch = DateTime(epoch)._data
-        self._data = cpp.Times(np.asarray(times, dtype=np.float64), unit, epoch)
+        self._data = _native_times(times, unit, epoch)
 
     @classmethod
     def _from_cpp(cls, data):
@@ -362,6 +367,12 @@ def _values_tensor(values):
     return values
 
 
+def _native_series(values, times, snap_tolerance):
+    """The native series of ``values`` at native ``times``."""
+    tensor = _values_tensor(values)
+    return _SERIES_NATIVE[tensor.dtype](times, tensor._data, snap_tolerance)
+
+
 class Domain(NamedTuple):
     """The times at which a series can be evaluated, from ``start`` to ``end``.
 
@@ -419,14 +430,20 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         get the dtype ``sb.tensor`` would give them: float32, int32,
         uint32, uint64, and bool are kept, other floats become float64,
         and other integers become int64.
-    times : Times or array_like
-        One timestamp per observation, as :class:`Times` accepts them, in
-        the unit :class:`Times` gives them: a plain array is in seconds, and
-        durations and dates are at their own resolution, such as minutes
-        for a ``timedelta64[m]`` array. Dates and times, such as a
-        :class:`DateTimeTensor`, a ``datetime64`` array, or a pandas
-        ``DatetimeIndex``, are counted from ``epoch``, which defaults to the
-        first of them.
+    times : TimeDeltaTensor, DateTimeTensor, or array_like
+        One finite timestamp per observation, strictly increasing. Durations
+        are a :class:`TimeDeltaTensor`, a tuple ``(counts, unit)`` such as
+        ``([0.0, 1.5], "h")``, a ``timedelta64`` array, a sequence of
+        :class:`TimeDelta` or other durations, or a pandas
+        ``TimedeltaIndex``. Dates and times are a :class:`DateTimeTensor`, a
+        ``datetime64`` array, or a pandas ``DatetimeIndex`` or ``Series`` of
+        dates, whose timezone, if any, is converted to UTC and dropped; they
+        are counted from ``epoch``, which defaults to the first of them. A
+        plain array of numbers is in seconds. The :attr:`unit` is that of
+        the durations or dates: the unit of a ``TimeDeltaTensor``, the
+        resolution of an array or index, such as minutes for a
+        ``timedelta64[m]`` array and nanoseconds for most pandas indexes, or
+        the finest unit of a sequence of durations.
     epoch : DateTime or a value DateTime accepts, optional
         The date and time that time 0 stands for, such as ``"2023-01-01"``.
         Dates keep their instants and are counted from it, in integers and
@@ -460,15 +477,14 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
 
     def __init__(self, values, times, *, epoch=None, snap_tolerance: float = 1e-14):
         if not isinstance(times, Times):
-            times = Times(times, epoch=epoch)
+            native = _native_times(times, epoch=epoch)
         elif epoch is not None:
             if times.epoch is not None:
                 raise ValueError("These times already have an epoch; pass their dates to count them from another")
-            times = times.with_epoch(epoch)
-        tensor = _values_tensor(values)
-        self._data = _SERIES_NATIVE[tensor.dtype](
-            times._data, tensor._data, snap_tolerance
-        )
+            native = times.with_epoch(epoch)._data
+        else:
+            native = times._data
+        self._data = _native_series(values, native, snap_tolerance)
 
     @classmethod
     def _from_cpp(cls, data):
@@ -541,7 +557,7 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
             ``pd.NA``, are kept as ``NaN``; call ``obj.dropna()`` first to
             drop them.
         unit : str, optional
-            The unit of the times, as for :class:`Times`. Defaults to the
+            The unit of the times, as for :class:`TimeDelta`. Defaults to the
             resolution of a ``DatetimeIndex`` or ``TimedeltaIndex``, usually
             nanoseconds, and to seconds for a numeric index, which is in
             this unit.
@@ -559,12 +575,12 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
             raise TypeError(f"Expected a pandas Series; got {type(obj).__name__}")
         index = obj.index
         if isinstance(index, (pd.DatetimeIndex, pd.TimedeltaIndex)):
-            times = Times(index, unit)
+            times = _native_times(index, unit)
         elif index.dtype.kind in "iuf":
-            times = Times(np.asarray(index, dtype=np.float64), unit)
+            times = _native_times(np.asarray(index, dtype=np.float64), unit)
         else:
             raise TypeError(f"Expected an index of dates, durations, or numbers; got {type(index).__name__}")
-        return cls(np.asarray(obj), times, snap_tolerance=snap_tolerance)
+        return cls._from_cpp(_native_series(np.asarray(obj), times, snap_tolerance))
 
     def _single_channel(self):
         if self._data.n_channels != 1:
@@ -604,7 +620,7 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         """
         if self._data.n_channels > 1:
             raise ValueError("The channels of this series have their own times; select one with series[i].times")
-        return TimeDeltaTensor(Times._from_cpp(self._data.times(0)).to_floats(), self.unit)
+        return TimeDeltaTensor(FloatTensor(np.array(self._data.times(0).values)), self.unit)
 
     @property
     def datetimes(self) -> DateTimeTensor:
@@ -761,7 +777,7 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
 
         The stored observations and timestamps are shared, not converted;
         :attr:`times` are reported in the new unit, and queries are read in
-        it. Accepts the units of :class:`Times`.
+        it. Accepts the units of :class:`TimeDelta`.
         """
         return TimeSeries._from_cpp(self._data.to(unit))
 
@@ -782,7 +798,7 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
 
         A ``t`` just below a timestamp snaps forward to it, by each
         channel's own ``snap_tolerance``; see the constructor. ``t`` is in ``unit``, which defaults to the series'
-        unit and accepts the units of :class:`Times`, and must lie in the
+        unit and accepts the units of :class:`TimeDelta`, and must lie in the
         domain of every channel; see :class:`TimeSeries`.
 
         ``t`` is a single time or an array-like or ``FloatTensor`` of times
@@ -880,7 +896,8 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
             return
         first = np.asarray(date).reshape(-1)[np.argmin(inside.reshape(-1))]
         origin = self._data.origin(channel)
-        ends = Times([start + origin, end + origin], unit=self.unit, epoch=self.epoch).to_datetime64()
+        ends = (self.epoch.to_datetime64()
+                + TimeDeltaTensor(FloatTensor([start + origin, end + origin]), self.unit).to_timedelta64("us"))
         # Formatted at one precision, the coarsest that shows all three.
         dates = np.array([first, *ends], dtype=ends.dtype)
         precision = next(code for code in ("m", "s", "ms", "us") if (dates == dates.astype(f"datetime64[{code}]")).all())

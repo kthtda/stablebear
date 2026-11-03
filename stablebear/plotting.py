@@ -8,7 +8,7 @@ from ._validation import _positive_integer
 from .persistence.barcode import Barcode
 from .persistence.ph_tensor import BarcodeTensor
 from .reductions import max_time as max_time_reduction
-from .base_tensor import IntPcfTensor, PcfContainerLike, PcfTensor, _to_tensor_pcf
+from .base_tensor import FloatTensor, IntPcfTensor, PcfContainerLike, PcfTensor, _to_tensor_pcf
 from .typing import boolean, float32, float64, int32, int64, uint32, uint64
 
 
@@ -436,7 +436,7 @@ def plot_timeseries(series, ax=None, *, unit=None, relative=False, markers=False
         given, without making them share x.
     unit : str, optional
         The time unit of the x axis, one of the units of
-        :class:`~stablebear.timeseries.Times`. Defaults to the unit the axis
+        :class:`~stablebear.timeseries.TimeDelta`. Defaults to the unit the axis
         already has, or else the unit of ``series``.
     relative : bool, default False
         Whether to draw each time series at its own times, from 0, instead
@@ -476,7 +476,8 @@ def plot_timeseries(series, ax=None, *, unit=None, relative=False, markers=False
     different units line up. The axis is labeled ``time (<unit>)`` unless it
     already has a label.
     """
-    from .timeseries.series import Times, TimeSeriesTensor
+    from .timeseries.date_time import TimeDeltaTensor
+    from .timeseries.series import TimeSeriesTensor
 
     options: dict[str, Any] = dict(unit=unit, relative=relative, markers=markers, **kwargs)
     if isinstance(series, TimeSeriesTensor):
@@ -516,7 +517,8 @@ def plot_timeseries(series, ax=None, *, unit=None, relative=False, markers=False
         values = np.append(values, values[-1])
     if dated:
         # Dates at epoch + origin + t, at microseconds; the axis is a date axis.
-        times = Times(times, unit=series.unit, epoch=series.epoch).to_datetime64()
+        assert series.epoch is not None
+        times = series.epoch.to_datetime64() + TimeDeltaTensor(FloatTensor(times), series.unit).to_timedelta64("us")
         return ax.plot(times, values, drawstyle="steps-post", **kwargs)
     lines = ax.plot(times, values, drawstyle="steps-post", **kwargs)
     if not ax.get_xlabel():

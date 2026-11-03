@@ -6,7 +6,7 @@ from plot_helpers import FigureGallery, gallery_fixture, ax_fixture
 import stablebear as sb
 from stablebear.persistence import Barcode, BarcodeTensor
 from stablebear.plotting import plot_timeseries
-from stablebear.timeseries import TimeDelta, TimeDeltaTensor, Times, TimeSeries, Window
+from stablebear.timeseries import TimeDelta, TimeDeltaTensor, TimeSeries, Window
 
 _gallery = FigureGallery()
 _show_gallery = gallery_fixture(_gallery)
@@ -29,7 +29,7 @@ def _close(line):
 
 
 def _series():
-    return TimeSeries([10.0, 20.0, 30.0], times=Times([0.0, 1.5, 4.0], unit="s"))
+    return TimeSeries([10.0, 20.0, 30.0], times=TimeDeltaTensor([0.0, 1.5, 4.0], "s"))
 
 
 def test_a_series_is_drawn_as_steps_through_its_observations(ax):
@@ -103,7 +103,7 @@ def test_unit_sets_the_unit_of_the_time_axis(ax):
 
 def test_a_series_in_another_unit_is_drawn_in_the_unit_of_the_axis(ax):
     plot_timeseries(_series(), ax=ax)
-    milliseconds = TimeSeries([1.0, 2.0], times=Times([500.0, 2500.0], unit="ms"))
+    milliseconds = TimeSeries([1.0, 2.0], times=TimeDeltaTensor([500.0, 2500.0], "ms"))
 
     (line,) = plot_timeseries(milliseconds, ax=ax)
 
@@ -116,7 +116,7 @@ def test_axes_that_share_x_share_the_time_unit():
     fig, (top, bottom) = plt.subplots(2, 1, sharex=True)
     plot_timeseries(_series(), ax=top)
 
-    (line,) = plot_timeseries(TimeSeries([1.0, 2.0], times=Times([500.0, 2500.0], unit="ms")), ax=bottom)
+    (line,) = plot_timeseries(TimeSeries([1.0, 2.0], times=TimeDeltaTensor([500.0, 2500.0], "ms")), ax=bottom)
 
     assert np.array_equal(line.get_xdata(), [0.5, 2.5])
     plt.close(fig)
@@ -177,9 +177,9 @@ def test_vector_observations_raise(ax):
 
 
 def _channels():
-    a = TimeSeries([1.0, 2.0], times=Times([0.0, 2.0], unit="s"))
-    b = TimeSeries([10.0, 20.0, 30.0], times=Times([0.0, 1000.0, 2000.0], unit="ms"))
-    c = TimeSeries([-1.0, -2.0], times=Times([0.0, 2.0], unit="s"))
+    a = TimeSeries([1.0, 2.0], times=TimeDeltaTensor([0.0, 2.0], "s"))
+    b = TimeSeries([10.0, 20.0, 30.0], times=TimeDeltaTensor([0.0, 1000.0, 2000.0], "ms"))
+    c = TimeSeries([-1.0, -2.0], times=TimeDeltaTensor([0.0, 2.0], "s"))
     return TimeSeries.from_channels([a, b, c], unit="s")
 
 
@@ -229,7 +229,7 @@ def test_several_channels_need_one_axes_each(n_axes):
 
 
 def _dated():
-    return TimeSeries([10.0, 20.0, 30.0], times=Times([0.0, 1.5, 4.0], unit="h", epoch="2023-01-01"))
+    return TimeSeries([10.0, 20.0, 30.0], times=TimeDeltaTensor([0.0, 1.5, 4.0], "h"), epoch="2023-01-01")
 
 
 def test_a_series_with_an_epoch_is_drawn_at_its_dates(ax):
@@ -252,7 +252,7 @@ def test_windows_with_an_epoch_are_drawn_at_their_dates(ax):
 
 
 def test_dates_are_rounded_to_microseconds(ax):
-    series = TimeSeries([1.0, 2.0], times=Times([0.0, 1500.4], unit="ns", epoch="2023-01-01"))
+    series = TimeSeries([1.0, 2.0], times=TimeDeltaTensor([0.0, 1500.4], "ns"), epoch="2023-01-01")
 
     (line,) = plot_timeseries(series, ax=ax)
 

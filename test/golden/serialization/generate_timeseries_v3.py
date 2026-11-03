@@ -3,7 +3,7 @@
 import numpy as np
 import stablebear as sb
 from stablebear.persistence import Barcode
-from stablebear.timeseries import Times, TimeSeries, Window
+from stablebear.timeseries import TimeSeries, Window
 
 from pinned_corpus import write_pinned_corpus
 
@@ -58,7 +58,7 @@ def _barcode_series():
         for j, values in enumerate(observation):
             barcodes[i, j] = Barcode(np.array(values, dtype=np.float32).reshape(-1, 2))
             elements.append({"index": [i, j], "array": _array("float32", [len(values), 2], values)})
-    series = TimeSeries(barcodes, times=Times([0.0, 1.3, 4.0], unit="ms"))
+    series = TimeSeries(barcodes, times=TimeDeltaTensor([0.0, 1.3, 4.0], "ms"))
     expected = _series("barcode32", "ms", [_channel(
         [0.0, 1.3, 4.0],
         {
@@ -72,8 +72,8 @@ def _barcode_series():
 
 def _channels_series():
     # Channel B is stored in milliseconds and read in seconds.
-    a = TimeSeries([10.0, 20.0, 30.0], times=Times([0.0, 1.0, 2.5], unit="s"))
-    b = TimeSeries([-1.0, -2.0, -3.0], times=Times([500.0, 1500.0, 3000.0], unit="ms"))
+    a = TimeSeries([10.0, 20.0, 30.0], times=TimeDeltaTensor([0.0, 1.0, 2.5], "s"))
+    b = TimeSeries([-1.0, -2.0, -3.0], times=TimeDeltaTensor([500.0, 1500.0, 3000.0], "ms"))
     series = TimeSeries.from_channels([a, b], unit="s")
     expected = _series("float64", "s", [
         _channel([0.0, 1.0, 2.5], _floats([10.0, 20.0, 30.0]),

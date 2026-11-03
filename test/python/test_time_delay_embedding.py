@@ -6,7 +6,7 @@ import pytest
 
 import stablebear as sb
 from stablebear.persistence import compute_persistent_homology
-from stablebear.timeseries import TimeDelayEmbedding, TimeDelta, TimeDeltaTensor, Times, TimeSeries, Window
+from stablebear.timeseries import TimeDelayEmbedding, TimeDelta, TimeDeltaTensor, TimeSeries, Window
 
 from _element_values import TWO_ELEMENTS_OF_EVERY_DTYPE
 from _round_trip import ROUND_TRIPS
@@ -15,7 +15,7 @@ from _round_trip import ROUND_TRIPS
 def _ms_series():
     # Each observation is 10 * t, so a value carried from an earlier
     # observation stands out: x(1.5) is 10, not 15.
-    return TimeSeries([0.0, 10.0, 25.0, 40.0], times=Times([0.0, 1.0, 2.5, 4.0], unit="ms"))
+    return TimeSeries([0.0, 10.0, 25.0, 40.0], times=TimeDeltaTensor([0.0, 1.0, 2.5, 4.0], "ms"))
 
 
 @pytest.mark.parametrize("direction, times, between", [
@@ -109,8 +109,8 @@ def test_embedding_rejects_invalid_input(make_embedding, error):
 
 
 def test_embedding_of_several_channels_converts_the_delay_per_channel():
-    a = TimeSeries([10.0, 20.0, 30.0], times=Times([0.0, 1.0, 2.5], unit="s"))
-    b = TimeSeries([-1.0, -2.0, -3.0], times=Times([500.0, 1500.0, 3000.0], unit="ms"))
+    a = TimeSeries([10.0, 20.0, 30.0], times=TimeDeltaTensor([0.0, 1.0, 2.5], "s"))
+    b = TimeSeries([-1.0, -2.0, -3.0], times=TimeDeltaTensor([500.0, 1500.0, 3000.0], "ms"))
     series = TimeSeries.from_channels([a, b], unit="s")
 
     embedding = TimeDelayEmbedding(dimension=2, delay=TimeDelta(0.5, "s"))(series)
@@ -351,7 +351,7 @@ def test_embeddings_of_every_dtype_survive_saving(make_values, round_trip):
     pytest.param("h", 0.5, id="hours"),
 ])
 def test_embedding_with_a_duration_matches_the_same_number(delay, unit, numeric_delay):
-    series = TimeSeries([0.0, 1.0, 0.0, -1.0, 0.0], times=Times([0.0, 0.5, 1.0, 1.5, 2.0], unit="h")).to(unit)
+    series = TimeSeries([0.0, 1.0, 0.0, -1.0, 0.0], times=TimeDeltaTensor([0.0, 0.5, 1.0, 1.5, 2.0], "h")).to(unit)
 
     embedding = TimeDelayEmbedding(dimension=2, delay=delay)(series)
 

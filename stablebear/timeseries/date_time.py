@@ -12,14 +12,14 @@ import numpy as np
 from .. import _sb_cpp as cpp
 from ..base_tensor import BoolTensor, FloatTensor, IntTensor
 
-# NumPy datetime64 resolutions with a fixed length, and the matching Times
-# units. NumPy's "m" is minutes, which Times spells "min".
+# NumPy datetime64 resolutions with a fixed length, and the matching time
+# units. NumPy's "m" is minutes, which stablebear spells "min".
 _NUMPY_TO_UNIT = {
     "as": "as", "fs": "fs", "ps": "ps", "ns": "ns", "us": "us", "ms": "ms",
     "s": "s", "m": "min", "h": "h", "D": "d",
 }
 _UNIT_TO_NUMPY = {unit: code for code, unit in _NUMPY_TO_UNIT.items()}
-# The length of each Times unit in attoseconds, the finest of them.
+# The length of each time unit in attoseconds, the finest of them.
 _ATTOSECONDS = {
     "as": 1, "fs": 10**3, "ps": 10**6, "ns": 10**9, "us": 10**12, "ms": 10**15,
     "s": 10**18, "min": 60 * 10**18, "h": 3600 * 10**18, "d": 86400 * 10**18,
@@ -55,7 +55,7 @@ class _Counts(Generic[_CountT]):
 
     @property
     def unit(self) -> str:
-        """The resolution, as a ``Times`` unit such as ``"h"`` or ``"us"``."""
+        """The resolution, as a time unit such as ``"h"`` or ``"us"``."""
         return self._unit
 
     @property
@@ -255,7 +255,7 @@ class _Instants(_Counts[_CountT]):
 class DateTime(_Instants[int]):
     """A calendar date and time: a count of a time unit after
     1970-01-01T00:00, as a ``np.datetime64`` stores it. The epoch of
-    :class:`Times`, the instant its time 0 stands for, is one.
+    :class:`TimeSeries`, the instant its time 0 stands for, is one.
 
     Dates follow the Gregorian calendar and every day has 86400
     seconds: leap seconds are not counted. A ``DateTime`` holds one
@@ -797,7 +797,7 @@ def _in_unit(duration: _Duration | float, unit: str) -> float | np.ndarray: ...
 
 
 def _in_unit(duration, unit):
-    """A duration from :func:`_duration` as a number of ``unit``, a Times unit;
+    """A duration from :func:`_duration` as a number of ``unit``, a time unit;
     a :class:`TimeDelta` is converted by an exact factor and rounded once,
     and a :class:`TimeDeltaTensor` likewise to a float64 array."""
     if not isinstance(duration, _Duration):

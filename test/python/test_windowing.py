@@ -6,7 +6,7 @@ import pytest
 
 import stablebear as sb
 from stablebear import FloatTensor
-from stablebear.timeseries import DateTime, DateTimeTensor, Domain, TimeDelayEmbedding, TimeDelta, TimeDeltaTensor, Times, TimeSeries, Window
+from stablebear.timeseries import DateTime, DateTimeTensor, Domain, TimeDelayEmbedding, TimeDelta, TimeDeltaTensor, TimeSeries, Window
 from stablebear.timeseries.series import TimeSeriesTensor
 
 from _element_values import TWO_ELEMENTS_OF_EVERY_DTYPE
@@ -415,7 +415,7 @@ def test_an_embedding_of_a_window_keeps_its_origin():
 def _dated_source():
     # The observations of _windows_source, counted from 2023-01-01.
     source = _windows_source()
-    return TimeSeries(source.values, times=Times(source.times, unit="s", epoch="2023-01-01"))
+    return TimeSeries(source.values, times=source.times, epoch="2023-01-01")
 
 
 def test_windows_keep_the_epoch_of_their_series():
@@ -461,7 +461,7 @@ def test_bounds_of_windows_of_a_dated_window_are_where_they_lie():
 
 
 def test_dated_bounds_keep_a_unit_finer_than_microseconds():
-    series = TimeSeries([0.0, 1.0, 2.0], times=Times(TimeDeltaTensor([0.0, 1.0, 2.0], "ns"), epoch="2023-01-01"))
+    series = TimeSeries([0.0, 1.0, 2.0], times=TimeDeltaTensor([0.0, 1.0, 2.0], "ns"), epoch="2023-01-01")
 
     _, bounds = Window(size=TimeDelta(1, "ns"), step=TimeDelta(1, "ns"),
                        closed="left", partial=False, anchor="start")(series, return_bounds=True)
