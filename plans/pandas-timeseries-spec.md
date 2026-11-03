@@ -41,9 +41,6 @@ These settle the open questions of the issue.
 7. **Bare NumPy arrays.** `Window` and `TimeDelayEmbedding` accept a
    `TimeSeries` or a pandas `Series` or `DataFrame`. NumPy data goes through
    `TimeSeries(values, times)`, which is already one call.
-8. **NumPy protocols.** Tensors keep refusing NumPy ufuncs, but with an
-   error that says what to do instead. `__array_function__` and
-   `__dlpack__` are out of scope.
 
 ## Behavior
 
@@ -112,14 +109,6 @@ return what they return for that series. Other objects that are not a
 `TimeSeries` raise `TypeError`, naming `TimeSeries(values, times)` and
 `TimeSeries.from_pandas`.
 
-### NumPy ufuncs on tensors
-
-`ndarray + tensor` and the other operators with an array on the left keep
-working, as they do today because NumPy defers to the tensor's reflected
-operator. Other ufuncs, such as `np.sin(tensor)`, raise `TypeError`. For a
-numeric tensor the message suggests `np.asarray(tensor)`; for other tensors
-it says they have no NumPy equivalent.
-
 ### Dependency
 
 pandas stays optional, and stablebear declares no extra for it: users
@@ -135,5 +124,3 @@ object's module, so only `to_pandas` needs to import it.
   `TimeDelayEmbedding`.
 - Returning pandas objects from `Window`, `TimeDelayEmbedding`, or
   `evaluate`.
-- Dispatching NumPy ufuncs to stablebear operations, `__array_function__`,
-  and DLPack. These need their own issue.

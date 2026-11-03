@@ -1,9 +1,9 @@
 # pandas input and durations for time series: implementation plan
 
-Progress: 53 of 58 items, 108 of 117 points (92%)
+Progress: 54 of 57 items, 110 of 115 points (96%)
 
 Specs: [pandas-timeseries-spec.md](pandas-timeseries-spec.md) (phases A, B,
-and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
+H to J, and L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
 (phases C to G)
 
 ## Phase A: pandas values in the existing time series API
@@ -370,7 +370,7 @@ so.
 
 ## Phase J: windows and embeddings of pandas input
 
-- [ ] **J1.** [2] `Window` and `TimeDelayEmbedding` convert a pandas `Series`
+- [x] **J1.** [2] (08d122be9) `Window` and `TimeDelayEmbedding` convert a pandas `Series`
   or `DataFrame` with `TimeSeries.from_pandas`, and raise `TypeError` on
   other objects that are not a `TimeSeries`; update their docstrings and
   type hints.
@@ -378,17 +378,6 @@ so.
   `return_bounds=True`; embedding of a `DataFrame` equals that of
   `from_pandas(df)`; an ndarray raises `TypeError` naming
   `TimeSeries(values, times)`.
-
-## Phase K: a clearer error for NumPy ufuncs on tensors
-
-- [ ] **K1.** [2] Replace `__array_ufunc__ = None` in
-  `stablebear/_tensor_base.py` by a method that calls the tensor's
-  reflected operator for the binary ufuncs that have one, so
-  `ndarray + tensor` still works, and otherwise raises `TypeError`
-  suggesting `np.asarray(tensor)` for numeric tensors.
-  Tests: `ndarray + FloatTensor` is a `FloatTensor`; `ndarray < FloatTensor`
-  is a `BoolTensor`; `np.sin(FloatTensor)` raises naming `np.asarray`;
-  `np.sin` of a `PcfTensor` raises.
 
 ## Phase L: pandas in the user guide and tutorial
 
