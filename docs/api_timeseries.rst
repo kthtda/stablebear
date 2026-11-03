@@ -1,5 +1,5 @@
-timeseries
-==========
+stablebear.timeseries
+=====================
 
 Observations recorded at known times.
 
