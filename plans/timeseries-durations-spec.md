@@ -10,8 +10,10 @@ Plan: [pandas-timeseries-plan.md](pandas-timeseries-plan.md), phases C to G
 A plain number such as `series(3.5)` or `Window(size=3.0)` means
 something only together with the unit of the series, which the reader
 cannot see. The time series API should take and give times as durations
-and dates instead, so that every time says what it measures. Time series
-are in beta, so the old forms are removed rather than deprecated.
+and dates instead, so that every time says what it measures. A series
+whose times measure no physical time, such as sample indices, has no unit
+and keeps plain numbers. Time series are in beta, so the old forms are
+removed rather than deprecated.
 
 ## Principle
 
@@ -27,6 +29,9 @@ are in beta, so the old forms are removed rather than deprecated.
 - The `unit` of a series remains, but only as its storage: its times are
   floats in that unit. It sets their precision and the unit of a plot
   axis. No number in the API is read in it.
+- A series without a unit takes and gives plain numbers instead (see
+  below). Whether a series has a unit decides which of the two it takes,
+  so no number is ever read in a unit the reader cannot see.
 - There is no `Times` type: durations are `TimeDelta` and
   `TimeDeltaTensor`, and dates are `DateTime` and `DateTimeTensor`.
 
@@ -118,7 +123,7 @@ keeps its counts as one tensor in one unit.
   The unit of the series is the resolution of the times, such as minutes
   for a `timedelta64[m]` array, the unit of a `TimeDeltaTensor`, or the
   finest unit of a sequence of durations; `to(unit)` changes it. Plain
-  numbers raise `TypeError`, naming `TimeDeltaTensor(numbers, unit)`.
+  numbers give a series without a unit.
 - **`epoch`** is the date that time 0 stands for, a `DateTime` or a value
   it accepts. Dates keep their instants and are counted from it instead of
   from the first of them, in integers and converted to the unit once, so
@@ -137,13 +142,18 @@ keeps its counts as one tensor in one unit.
   `TimeSeries(values, times=([0.0, 1.5], "s"))`. Only a tuple whose second
   element is a unit is read so; any other tuple keeps its meaning.
 - **`TimeSeries.from_pandas`** takes `unit` for storage. A numeric index
-  needs it.
-- **`TimeSeries.evaluate(t)` and `TimeSeriesTensor.evaluate(t)`** take a
-  duration or an array of durations, measured from time 0. A series with an
-  epoch also takes dates, including a `DateTime` and a `DateTimeTensor`.
-  Numbers raise `TypeError`. The `unit` argument is removed.
+  with `unit` is a count of that unit, and without it gives a series
+  without a unit.
+- **`TimeSeries.evaluate(t, unit=None)` and
+  `TimeSeriesTensor.evaluate(t, unit=None)`** take a duration or an array
+  of durations, measured from time 0. With `unit`, `t` is a count or an
+  array of counts of it, as in `series(90, "min")`, the same as
+  `series(TimeDelta(90, "min"))`. A series with an epoch also takes dates,
+  including a `DateTime` and a `DateTimeTensor`. On a series with a unit,
+  numbers without `unit` raise `TypeError`, naming `series(t, unit)`.
 - **`Window(size, step)` and `TimeDelayEmbedding(delay)`** take durations
-  only. Numbers raise `TypeError`.
+  for series with a unit, and numbers for series without one; the other
+  kind raises `TypeError` when the window or embedding is applied.
 
 ## Outputs
 
@@ -179,7 +189,29 @@ finer units narrow that range, to 1678-2262 for nanoseconds.
   gives a `DateTimeTensor` of where the windows lie, at the finer of the
   series' unit and microseconds.
 - **`Window.size`, `Window.step`, and `TimeDelayEmbedding.delay`** are
-  `TimeDelta`.
+  `TimeDelta`, or floats when given as numbers for a series without a
+  unit.
+
+## Series without a unit
+
+A series built from plain numbers, as in
+`TimeSeries(values, times=[0.0, 1.0, 1.5])`, has no unit: `unit` is
+`None`. Its times are numbers, not durations, and it works as a series
+with a unit does, with numbers in place of durations:
+
+- `evaluate`, `Window`, and `TimeDelayEmbedding` take numbers, as in
+  `series(2.5)` and `Window(size=3.0)`. A duration, a date, a tuple
+  `(count, unit)`, or `unit=` on it raises `TypeError`.
+- `times` is a `FloatTensor`, `domain` has float ends, `origin` is a float
+  or a `FloatTensor`, and `return_bounds` gives a `FloatTensor`.
+- It has no epoch: `epoch=` and `with_epoch` raise `ValueError`, and so
+  does `to(unit)`, since there is nothing to convert.
+- `from_channels` combines channels without a unit, and raises for
+  channels with and without one.
+- `plot_timeseries` labels its axis "time", with no unit; it cannot share
+  an axis with a series that has a unit.
+- C++ stores it with a `TimeUnit` that converts only to itself; it is
+  saved and loaded as any unit is.
 
 ## No `Times`
 
@@ -188,7 +220,8 @@ finer units narrow that range, to 1678-2262 for nanoseconds.
 to the time series:
 
 - building times from durations or dates: `TimeSeries(values, times)`;
-- a unit for numbers: `TimeDeltaTensor(numbers, unit)`;
+- a unit for numbers: `TimeDeltaTensor(numbers, unit)`, or none for a
+  series without a unit;
 - an epoch: `TimeSeries(..., epoch=...)` for durations, `with_epoch`,
   and `from_channels` for channels of different epochs;
 - converting the unit: `TimeSeries.to(unit)`;

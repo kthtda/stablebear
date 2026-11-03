@@ -1,6 +1,6 @@
 # pandas input and durations for time series: implementation plan
 
-Progress: 35 of 53 items, 70 of 104 points (67%)
+Progress: 36 of 54 items, 72 of 107 points (67%)
 
 Specs: [pandas-timeseries-spec.md](pandas-timeseries-spec.md) (phases A, B,
 and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
@@ -164,7 +164,7 @@ and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
   `DateTimeTensor` as dates, as it takes a `datetime64` array.
   Tests: a `DateTime` and a `DateTimeTensor` give the values at their
   `datetime64` dates; a `DateTimeTensor` keeps its shape.
-- [ ] **D8.** [2] A tuple `(count, unit)` is a duration wherever one is
+- [x] **D8.** [2] (a70059601) A tuple `(count, unit)` is a duration wherever one is
   taken: `TimeDelta(count, unit)`, or `TimeDeltaTensor(count, unit)` for
   a sequence or array of counts. This covers `Window`,
   `TimeDelayEmbedding`, `evaluate` on series and tensors, and `times` of
@@ -259,20 +259,41 @@ so.
 - [ ] **F4.** [3] The time series guide pages (`docs/timeseries*.rst`) use
   `TimeDelta` and `DateTime`; `timeseries_units.rst` explains the unit as
   storage.
+  Note: depends on G, which settles series without a unit; do it after
+  G4.
 - [ ] **F5.** [1] The tide gauge tutorial uses `TimeDelta` for its window
   sizes and delays, and a `TimeDeltaTensor` for its evaluation grid.
 
-## Phase G: numbers are rejected
+## Phase G: numbers mean a series without a unit
 
-- [ ] **G1.** [2] `TimeSeries` rejects numbers as times, and `from_pandas`
-  a numeric index without a unit, naming `TimeDeltaTensor(numbers, unit)`.
-  Tests: `TimeSeries(values, [0, 1, 2])` raises `TypeError`; a numeric
-  index without `unit` raises.
-- [ ] **G2.** [1] `evaluate` on series and tensors rejects numbers; remove
-  its `unit` argument.
-  Tests: `series(1.5)` raises `TypeError`; tensor likewise.
-- [ ] **G3.** [1] `Window` and `TimeDelayEmbedding` reject numbers.
-  Tests: `Window(3.0)` and `TimeDelayEmbedding(2, 1.0)` raise `TypeError`.
+- [ ] **G1.** [3] Series without a unit: C++ gains a `TimeUnit` that
+  converts only to itself, saved and loaded as any unit. `TimeSeries` of
+  numbers and `from_pandas` of a numeric index without `unit` give one,
+  with `unit` `None`; `epoch=`, `with_epoch`, and `to(unit)` on it raise
+  `ValueError`, and `from_channels` of channels with and without a unit
+  raises.
+  Tests: `TimeSeries(values, [0, 1, 2]).unit is None`; a numeric index
+  without `unit`; round trip of a series without a unit; the raises.
+  Note: replaces rejecting numbers as times, which raised `TypeError`.
+- [ ] **G2.** [1] `evaluate` on series and tensors: a series without a
+  unit takes numbers, and raises `TypeError` for durations, dates, and
+  `unit=`; a series with a unit takes `series(t, unit)` as
+  `TimeDelta(t, unit)` or `TimeDeltaTensor(t, unit)`, and raises for
+  numbers without `unit`, naming `series(t, unit)`.
+  Tests: both kinds of series, single and many times; tensor likewise.
+  Note: keeps the `unit` argument, which this item first removed.
+- [ ] **G3.** [1] `Window` and `TimeDelayEmbedding` take numbers for a
+  series without a unit and durations for one with a unit; the other kind
+  raises `TypeError` when applied.
+  Tests: `Window(size=3.0)` on both kinds; `TimeDelayEmbedding(2, 1.0)`
+  likewise; durations on a series without a unit raise.
+- [ ] **G4.** [2] A series without a unit gives numbers: `times` is a
+  `FloatTensor`, `domain` has float ends, `origin` is a float or a
+  `FloatTensor`, and `return_bounds` gives a `FloatTensor`;
+  `plot_timeseries` labels its axis "time" and raises on an axis with a
+  unit.
+  Tests: each output; a window of a series without a unit; the plot
+  label and the raise.
 
 ## Phase H: `TimeSeries.from_pandas` for DataFrames and bad input
 

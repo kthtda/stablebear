@@ -72,8 +72,9 @@ These settle the open questions of the issue.
   - `DatetimeIndex`: counted from the first timestamp, which becomes the
     epoch, and converted to `unit`, as for `datetime64` arrays.
   - `TimedeltaIndex`: converted to `unit`, with no epoch.
-  - Numeric index, including `RangeIndex`: numbers in `unit`, with no
-    epoch.
+  - Numeric index, including `RangeIndex`: counts of `unit`, with no
+    epoch, or without `unit` a series without a unit (see the
+    [durations spec](timeseries-durations-spec.md)).
 
   There is no `epoch` keyword; `with_epoch` sets or changes the epoch.
 - Raises `TypeError` for other objects, other index types (such as
