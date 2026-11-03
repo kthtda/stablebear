@@ -155,7 +155,7 @@ class _Instants(_Counts[_CountT]):
 
     @property
     def count(self) -> _CountT:
-        """The number of ``unit`` after 1970-01-01T00:00, or a tensor of
+        """The number of ``unit`` after ``1970-01-01T00:00``, or a tensor of
         them."""
         return self._count
 
@@ -254,7 +254,7 @@ class _Instants(_Counts[_CountT]):
 
 class DateTime(_Instants[int]):
     """A calendar date and time: a count of a time unit after
-    1970-01-01T00:00, as a ``np.datetime64`` stores it. The epoch of
+    ``1970-01-01T00:00``, as a ``np.datetime64`` stores it. The epoch of
     :class:`TimeSeries`, the instant its time 0 stands for, is one.
 
     Dates follow the Gregorian calendar and every day has 86400
@@ -322,7 +322,7 @@ class DateTimeTensor(_CountsTensor[IntTensor], _Instants[IntTensor]):
     """A tensor of calendar dates and times in one unit.
 
     Its ``count`` is an ``IntTensor`` of counts after
-    1970-01-01T00:00. It has ``shape``, ``len``, iteration, and
+    ``1970-01-01T00:00``. It has ``shape``, ``len``, iteration, and
     indexing, which gives a :class:`DateTime` for one element and a
     ``DateTimeTensor`` otherwise, and ``to_datetime64()`` gives a
     ``datetime64`` array. It has no hash, and it cannot be an epoch.
