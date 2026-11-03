@@ -469,18 +469,23 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
             holds neither dates, durations, nor numbers, or its values are
             not numbers or booleans.
         ValueError
-            If ``obj`` is a ``DataFrame`` with no columns.
+            If ``obj`` is a ``DataFrame`` with no columns, or its index holds
+            ``NaT`` or ``NaN``, is not sorted, or has duplicates.
         """
         pd = sys.modules.get("pandas")
         if pd is None or not isinstance(obj, (pd.Series, pd.DataFrame)):
             raise TypeError(f"Expected a pandas Series or DataFrame; got {type(obj).__name__}")
         index = obj.index
-        if isinstance(index, (pd.DatetimeIndex, pd.TimedeltaIndex)):
-            times = _native_times(index, unit)
-        elif index.dtype.kind in "iuf":
-            times = _native_times(np.asarray(index, dtype=np.float64), unit)
-        else:
+        temporal = isinstance(index, (pd.DatetimeIndex, pd.TimedeltaIndex))
+        if not temporal and (isinstance(index, pd.MultiIndex) or index.dtype.kind not in "iuf"):
             raise TypeError(f"Expected an index of dates, durations, or numbers; got {type(index).__name__}")
+        if index.hasnans:
+            raise ValueError("The index holds missing times; drop those rows with obj[obj.index.notna()]")
+        if index.has_duplicates:
+            raise ValueError("The index holds duplicated times; find them with obj.index.duplicated()")
+        if not index.is_monotonic_increasing:
+            raise ValueError("The index is not sorted; sort it with obj.sort_index()")
+        times = _native_times(index if temporal else np.asarray(index, dtype=np.float64), unit)
         if isinstance(obj, pd.Series):
             return cls._from_cpp(_native_series(np.asarray(obj), times, snap_tolerance))
         if obj.shape[1] == 0:

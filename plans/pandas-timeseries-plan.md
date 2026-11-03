@@ -1,6 +1,6 @@
 # pandas input and durations for time series: implementation plan
 
-Progress: 49 of 58 items, 100 of 117 points (85%)
+Progress: 50 of 58 items, 102 of 117 points (87%)
 
 Specs: [pandas-timeseries-spec.md](pandas-timeseries-spec.md) (phases A, B,
 and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
@@ -332,7 +332,7 @@ so.
 
 ## Phase H: `TimeSeries.from_pandas` for DataFrames and bad input
 
-- [ ] **H1.** [2] A `DataFrame` gives one channel per column, sharing the
+- [x] **H1.** [2] (c0f0ad307) A `DataFrame` gives one channel per column, sharing the
   index's times, each column converted as a `Series` is, then in one
   common dtype.
   Tests: channel `i` equals `from_pandas(df.iloc[:, i])`; int and float

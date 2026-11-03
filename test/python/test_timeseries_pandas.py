@@ -1,3 +1,4 @@
+import re
 import subprocess
 import sys
 
@@ -216,6 +217,26 @@ def test_from_pandas_with_a_string_column_raises():
 def test_from_pandas_with_a_data_frame_without_columns_raises():
     with pytest.raises(ValueError, match="column"):
         TimeSeries.from_pandas(_frame({}))
+
+
+@pytest.mark.parametrize("index, message", [
+    pytest.param(pd.DatetimeIndex(["2023-01-01", None]), "notna()", id="NaT"),
+    pytest.param(pd.to_timedelta([5, 1], unit="s"), "sort_index()", id="unsorted"),
+    pytest.param(pd.to_timedelta([1, 1], unit="s"), "index.duplicated()", id="duplicated"),
+])
+def test_from_pandas_rejects_an_index_naming_the_fix(index, message):
+    with pytest.raises(ValueError, match=re.escape(message)):
+        TimeSeries.from_pandas(pd.Series([10.0, 20.0], index=index))
+
+
+@pytest.mark.parametrize("obj", [
+    pytest.param(pd.Series([10.0, 20.0], index=pd.period_range("2023-01", periods=2, freq="M")), id="PeriodIndex"),
+    pytest.param(pd.Series([10.0, 20.0], index=pd.MultiIndex.from_tuples([(0, 1), (1, 2)])), id="MultiIndex"),
+    pytest.param(np.array([10.0, 20.0]), id="ndarray"),
+])
+def test_from_pandas_rejects_other_indexes_and_objects(obj):
+    with pytest.raises(TypeError, match="Expected"):
+        TimeSeries.from_pandas(obj)
 
 
 def test_time_delta_keeps_nanoseconds_of_timedelta():
