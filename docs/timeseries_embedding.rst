@@ -4,7 +4,7 @@ Delay embeddings
 A delay embedding turns a signal into points built from its values at
 several delayed times. Let :math:`x \colon \mathbb{R} \to \mathbb{R}` be a time series of
 numbers, evaluated as in :doc:`timeseries`. With
-:py:class:`~stablebear.timeseries.TimeDelayEmbedding` of dimension :math:`m`
+:py:func:`~stablebear.timeseries.delay_embed` of dimension :math:`m`
 and delay :math:`\delta > 0`, the value of :math:`x` at time :math:`t` becomes
 
 .. math::
@@ -14,13 +14,12 @@ and delay :math:`\delta > 0`, the value of :math:`x` at time :math:`t` becomes
 For a sine with period 2 s, a delay of a quarter period traces a circle::
 
    import numpy as np
-   from stablebear.timeseries import (TimeDelayEmbedding, TimeDelta,
-                                      TimeDeltaTensor, TimeSeries)
+   from stablebear.timeseries import (TimeDelta, TimeDeltaTensor, TimeSeries,
+                                      delay_embed)
 
    t = np.linspace(0.0, 6.0, 49)
    signal = TimeSeries(np.sin(np.pi * t), times=TimeDeltaTensor(t, "s"))
-   embedded = TimeDelayEmbedding(dimension=2,
-                                 delay=TimeDelta(0.5, "s"))(signal)
+   embedded = delay_embed(signal, dimension=2, delay=TimeDelta(0.5, "s"))
 
    embedded.shape      # (2,)
    embedded(1.0, "s")  # [1.0, 0.0], the values at 0.5 s and 1 s
@@ -76,8 +75,8 @@ The components keep the same order, so the forward point at :math:`t` is the
 backward point at :math:`t + (m-1)\delta`. The domain now ends :math:`(m-1)\delta`
 before the time series does::
 
-   forward = TimeDelayEmbedding(dimension=2, delay=TimeDelta(0.5, "s"),
-                                direction="forward")(signal)
+   forward = delay_embed(signal, dimension=2, delay=TimeDelta(0.5, "s"),
+                         direction="forward")
 
    forward(0.5, "s")  # [1.0, 0.0], the values at 0.5 s and 1 s
    forward(5.6, "s")  # ValueError: Time 5.6 is outside the domain [0, 5.5]

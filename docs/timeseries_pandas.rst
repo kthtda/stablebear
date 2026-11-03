@@ -12,7 +12,7 @@ Here six water levels are recorded every 30 minutes from 06:00 on
 1 January 2023::
 
    import pandas as pd
-   from stablebear.timeseries import TimeDelta, TimeSeries, Window
+   from stablebear.timeseries import TimeDelta, TimeSeries, cut_windows
 
    index = pd.date_range("2023-01-01T06:00", periods=6, freq="30min")
    levels = pd.Series([1.0, 3.0, 2.0, 4.0, 3.5, 2.5], index=index)
@@ -60,15 +60,15 @@ not kept::
 Windows and delay embeddings
 ----------------------------
 
-:py:class:`~stablebear.timeseries.Window` and
-:py:class:`~stablebear.timeseries.TimeDelayEmbedding` can be applied to a
-pandas ``Series`` or ``DataFrame`` directly. They convert it with
+:py:func:`~stablebear.timeseries.cut_windows` and
+:py:func:`~stablebear.timeseries.delay_embed` take a pandas ``Series`` or
+``DataFrame`` directly. They convert it with
 ``from_pandas`` and return the same stablebear objects as for the converted
 time series, ready for
 :py:func:`~stablebear.persistence.homology.compute_persistent_homology`::
 
-   windows = Window(size=TimeDelta(1, "h"), step=TimeDelta(30, "min"),
-                    anchor="start")(levels)
+   windows = cut_windows(levels, size=TimeDelta(1, "h"),
+                         step=TimeDelta(30, "min"), anchor="start")
    windows.shape      # (4,)
    windows[1].domain  # from 2023-01-01T06:30 to 07:30, without the end
 

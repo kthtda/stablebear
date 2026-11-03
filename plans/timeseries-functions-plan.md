@@ -1,6 +1,6 @@
 # Time series follow-ups: implementation plan
 
-Progress: 1 of 10 items, 3 of 19 points (16%)
+Progress: 2 of 10 items, 6 of 19 points (32%)
 
 Specs: [timeseries-functions-spec.md](timeseries-functions-spec.md)
 (phase A, #265) and `timeseries-point-clouds-spec.md`, written in B1
@@ -19,7 +19,7 @@ Specs: [timeseries-functions-spec.md](timeseries-functions-spec.md)
   channels at different origins; the tests of `Window.size`,
   `Window.step`, and its `repr` become tests that durations of each type
   give the same windows.
-- [ ] **A2.** [3] `delay_embed` replaces `TimeDelayEmbedding` in
+- [x] **A2.** [3] (664d1cefd) `delay_embed` replaces `TimeDelayEmbedding` in
   `stablebear/timeseries/embedding.py` likewise.
   Tests: as for A1, with `delay`.
 - [ ] **A3.** [2] The guide pages and the tide gauge tutorial use

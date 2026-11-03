@@ -16,7 +16,7 @@ converts them to hours::
    import datetime
 
    from stablebear.timeseries import (DateTime, DateTimeTensor, TimeDelta,
-                                      TimeDeltaTensor, TimeSeries, Window)
+                                      TimeDeltaTensor, TimeSeries, cut_windows)
 
    stamps = DateTimeTensor(["2023-01-01T06:00", "2023-01-01T06:30",
                             "2023-01-01T08:00"])
@@ -96,13 +96,13 @@ raises an error that names the domain as dates.
 Durations
 ---------
 
-The size and step of a :py:class:`~stablebear.timeseries.Window` and the
-delay of a :py:class:`~stablebear.timeseries.TimeDelayEmbedding` are
+The size and step of :py:func:`~stablebear.timeseries.cut_windows` and the
+delay of :py:func:`~stablebear.timeseries.delay_embed` are
 durations, as on any time series with a unit. They do not need an epoch,
 and are converted to the unit of each time series they are applied to::
 
-   windows = Window(size=TimeDelta(1, "h"), step=TimeDelta(30, "min"),
-                    anchor="start")(series)
+   windows = cut_windows(series, size=TimeDelta(1, "h"),
+                         step=TimeDelta(30, "min"), anchor="start")
    windows[1].domain  # from 2023-01-01T06:30 to 07:30, without the end
 
 Durations can also be given as ``np.timedelta64``, ``datetime.timedelta``,
