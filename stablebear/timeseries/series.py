@@ -3,7 +3,7 @@ from __future__ import annotations
 import datetime
 import operator
 import sys
-from typing import Any, Generic, NamedTuple, TypeVar
+from typing import Any, Generic, NamedTuple, Protocol, TypeVar
 
 import numpy as np
 
@@ -175,6 +175,28 @@ def _native_times(times, unit=None, epoch=None):
         unit = unit or finest
         times = _durations_in(times, _unit_name(unit))
     return np.asarray(times, dtype=np.float64), unit, None if epoch is None else DateTime(epoch)._data
+
+
+class _PandasLike(Protocol):
+    """A pandas ``Series`` or ``DataFrame``, described by the members they
+    share so that type hints need no pandas, which is optional."""
+
+    @property
+    def index(self) -> Any: ...
+
+    def to_numpy(self) -> np.ndarray: ...
+
+
+def _as_series(obj: TimeSeries | _PandasLike) -> TimeSeries:
+    """``obj``, a :class:`TimeSeries`, or a pandas ``Series`` or
+    ``DataFrame`` converted with :meth:`TimeSeries.from_pandas`."""
+    if isinstance(obj, TimeSeries):
+        return obj
+    pd = sys.modules.get("pandas")
+    if pd is not None and isinstance(obj, (pd.Series, pd.DataFrame)):
+        return TimeSeries.from_pandas(obj)
+    raise TypeError(f"Expected a TimeSeries or a pandas Series or DataFrame, not {type(obj).__name__}; "
+                    "build a TimeSeries from arrays with TimeSeries(values, times)")
 
 
 # Element dtypes of observations that convert to pandas.

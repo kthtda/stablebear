@@ -385,3 +385,26 @@ def test_to_pandas_of_integer_channels_in_their_domains_keeps_integers():
 
     assert converted[0].tolist() == [1, 1, 2]
     assert converted.dtypes.tolist() == [np.int64, np.int64]
+
+
+def _hours():
+    return pd.date_range("2023-01-01", periods=10, freq="h")
+
+
+def test_windows_of_a_pandas_series_equal_those_of_its_time_series():
+    hourly = pd.Series(np.arange(10.0), index=_hours())
+    window = Window(size=TimeDelta(3, "h"), step=TimeDelta(1, "h"), closed="left", partial=False,
+                    anchor="start")
+
+    windows, bounds = window(hourly, return_bounds=True)
+    expected, expected_bounds = window(TimeSeries.from_pandas(hourly), return_bounds=True)
+
+    assert windows.array_equal(expected)
+    assert bounds.array_equal(expected_bounds)
+
+
+def test_embedding_of_a_data_frame_equals_that_of_its_time_series():
+    frame = pd.DataFrame({0: np.arange(10.0), 1: -np.arange(10.0)}, index=_hours())
+    embedding = TimeDelayEmbedding(dimension=2, delay=TimeDelta(2, "h"), direction="backward")
+
+    assert embedding(frame).array_equal(embedding(TimeSeries.from_pandas(frame)))

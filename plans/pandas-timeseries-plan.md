@@ -1,6 +1,6 @@
 # pandas input and durations for time series: implementation plan
 
-Progress: 52 of 58 items, 106 of 117 points (91%)
+Progress: 53 of 58 items, 108 of 117 points (92%)
 
 Specs: [pandas-timeseries-spec.md](pandas-timeseries-spec.md) (phases A, B,
 and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
@@ -361,7 +361,7 @@ so.
   Note: absorbed I1, `Times.to_pandas`, since `Times` is removed (E10).
   A series without a unit gives an `Index` of its numbers and takes no
   `resolution`.
-- [ ] **I3.** [2] Several channels give a `DataFrame` indexed by the union of
+- [x] **I3.** [2] (3cebd0853) Several channels give a `DataFrame` indexed by the union of
   the channels' times, each column holding its channel's value in effect
   there, and `NaN` outside the channel's domain.
   Tests: round trip of a `DataFrame`; channels with different times hold
@@ -374,10 +374,10 @@ so.
   or `DataFrame` with `TimeSeries.from_pandas`, and raise `TypeError` on
   other objects that are not a `TimeSeries`; update their docstrings and
   type hints.
-  Tests: windows of a `Series` with `size=pd.Timedelta("3h")` equal those of
-  `from_pandas(s)`, also with `return_bounds=True`; embedding of a
-  `DataFrame` equals that of `from_pandas(df)`; an ndarray raises
-  `TypeError` naming `TimeSeries(values, times)`.
+  Tests: windows of a `Series` equal those of `from_pandas(s)`, also with
+  `return_bounds=True`; embedding of a `DataFrame` equals that of
+  `from_pandas(df)`; an ndarray raises `TypeError` naming
+  `TimeSeries(values, times)`.
 
 ## Phase K: a clearer error for NumPy ufuncs on tensors
 

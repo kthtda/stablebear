@@ -5,7 +5,7 @@ from typing import Literal
 
 from .. import _sb_cpp as cpp
 from .date_time import _duration, _in_unit, _ScalarDuration
-from .series import TimeSeries
+from .series import TimeSeries, _PandasLike, _as_series
 
 
 class TimeDelayEmbedding:
@@ -21,7 +21,8 @@ class TimeDelayEmbedding:
     ``(x(t), x(t + d), ..., x(t + (m - 1) * d))``. Both are oldest first, so
     the forward point at ``t`` is the backward point at ``t + (m - 1) * d``.
     Each end is included when the channel's is, and each observation gains a
-    leading axis of length ``m``.
+    leading axis of length ``m``. A pandas ``Series`` or ``DataFrame`` is
+    converted with :meth:`TimeSeries.from_pandas` first.
 
     Its times are the start of its domain and the times in it where a
     component reaches an observation, ``t_i + k * d`` for ``k`` from 0 to
@@ -57,7 +58,8 @@ class TimeDelayEmbedding:
         channel spans less than ``(m - 1) * d``.
     TypeError
         When applied, for a number on a series with a unit, or a duration
-        on a series without one.
+        on a series without one, or to an object that is not a
+        :class:`TimeSeries` or a pandas ``Series`` or ``DataFrame``.
     """
 
     def __init__(self, dimension: int, delay: float | _ScalarDuration,
@@ -70,7 +72,8 @@ class TimeDelayEmbedding:
             raise ValueError(f"direction must be 'backward' or 'forward', not {direction!r}")
         self.direction = direction
 
-    def __call__(self, series: TimeSeries) -> TimeSeries:
+    def __call__(self, series: TimeSeries | _PandasLike) -> TimeSeries:
+        series = _as_series(series)
         return TimeSeries._from_cpp(cpp.delay_embed(series._data, self.dimension, _in_unit(self.delay, series.unit),
                                                     self.direction == "forward"))
 

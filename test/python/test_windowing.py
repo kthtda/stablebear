@@ -945,3 +945,10 @@ def test_window_of_pairs_of_count_and_unit_equals_the_window_of_their_time_delta
     window = Window(size=(2, "s"), step=(500, "ms"))
 
     assert (window.size, window.step) == (TimeDelta(2, "s"), TimeDelta(500, "ms"))
+
+
+def test_windows_of_an_array_raise_naming_the_time_series_constructor():
+    window = Window(size=TimeDelta(1, "s"), step=TimeDelta(1, "s"), closed="left", partial=False, anchor="start")
+
+    with pytest.raises(TypeError, match=re.escape("TimeSeries(values, times)")):
+        window(np.arange(3.0))  # pyright: ignore[reportArgumentType]

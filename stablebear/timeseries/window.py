@@ -6,7 +6,7 @@ import numpy as np
 
 from .. import _sb_cpp as cpp
 from .date_time import TimeDeltaTensor, _duration, _in_unit, _ScalarDuration
-from .series import TimeSeries, TimeSeriesTensor, _times_in
+from .series import TimeSeries, TimeSeriesTensor, _PandasLike, _as_series, _times_in
 
 
 class Window:
@@ -33,7 +33,8 @@ class Window:
     :class:`DateTimeTensor` of the dates where the windows lie, at the finer
     of its unit and microseconds. For a series without a unit, it is a
     ``FloatTensor`` of numbers. A partial window's row starts or ends
-    where the series does.
+    where the series does. A pandas ``Series`` or ``DataFrame`` is converted
+    with :meth:`TimeSeries.from_pandas` first.
 
     Window ``k`` covers ``a_k`` to ``a_k + size``, with the ends that
     ``closed`` includes, and is a series with the channels of ``series``.
@@ -100,7 +101,8 @@ class Window:
         ``partial`` is false, so that no window fits.
     TypeError
         When called, for numbers on a series with a unit, or durations on
-        a series without one.
+        a series without one, or on an object that is not a
+        :class:`TimeSeries` or a pandas ``Series`` or ``DataFrame``.
     """
 
     _CLOSED = {"left": (True, False), "right": (False, True), "both": (True, True), "none": (False, False)}
@@ -122,12 +124,15 @@ class Window:
         self.partial = bool(partial)
 
     @overload
-    def __call__(self, series: TimeSeries, return_bounds: Literal[False] = False) -> TimeSeriesTensor: ...
+    def __call__(self, series: TimeSeries | _PandasLike,
+                 return_bounds: Literal[False] = False) -> TimeSeriesTensor: ...
 
     @overload
-    def __call__(self, series: TimeSeries, return_bounds: Literal[True]) -> tuple[TimeSeriesTensor, Any]: ...  # Bounds are dates if the series has an epoch.
+    def __call__(self, series: TimeSeries | _PandasLike,
+                 return_bounds: Literal[True]) -> tuple[TimeSeriesTensor, Any]: ...  # Bounds are dates if the series has an epoch.
 
-    def __call__(self, series: TimeSeries, return_bounds: bool = False):
+    def __call__(self, series: TimeSeries | _PandasLike, return_bounds: bool = False):
+        series = _as_series(series)
         windows, bounds = cpp.windows(series._data, _in_unit(self.size, series.unit), _in_unit(self.step, series.unit),
                                       *self._CLOSED[self.closed], self.partial, self.anchor == "end")
         if return_bounds:

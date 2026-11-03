@@ -1,3 +1,4 @@
+import re
 from dataclasses import dataclass
 
 import numpy as np
@@ -379,3 +380,10 @@ def test_embedding_rejects_a_delay_without_a_fixed_length():
 
 def test_embedding_delay_of_a_pair_of_count_and_unit_is_its_time_delta():
     assert TimeDelayEmbedding(dimension=2, delay=(30, "min")).delay == TimeDelta(30, "min")
+
+
+def test_embedding_of_an_array_raises_naming_the_time_series_constructor():
+    embedding = TimeDelayEmbedding(dimension=2, delay=TimeDelta(1, "s"), direction="backward")
+
+    with pytest.raises(TypeError, match=re.escape("TimeSeries(values, times)")):
+        embedding(np.arange(3.0))  # pyright: ignore[reportArgumentType]
