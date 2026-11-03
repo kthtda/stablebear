@@ -11,11 +11,11 @@ into each channel's unit (see :doc:`timeseries_units`).
 Here channel ``a`` is sampled every 0.1 s from 0 s, and channel ``b`` every
 40 ms from 50 ms::
 
-   from stablebear.timeseries import TimeSeries, Times
+   from stablebear.timeseries import TimeDeltaTensor, TimeSeries
 
    a = TimeSeries([1.0, 2.0, 3.0, 4.0], times=[0.0, 0.1, 0.2, 0.3])
    b = TimeSeries([10.0, 20.0, 30.0],
-                  times=Times([50.0, 90.0, 130.0], unit="ms"))
+                  times=TimeDeltaTensor([50.0, 90.0, 130.0], "ms"))
    series = TimeSeries.from_channels([a, b], unit="s")
 
 A time series can be evaluated only where all of its channels can, here from

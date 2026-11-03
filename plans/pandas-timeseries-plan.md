@@ -1,6 +1,6 @@
 # pandas input and durations for time series: implementation plan
 
-Progress: 38 of 55 items, 76 of 109 points (70%)
+Progress: 39 of 56 items, 79 of 111 points (71%)
 
 Specs: [pandas-timeseries-spec.md](pandas-timeseries-spec.md) (phases A, B,
 and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
@@ -238,17 +238,22 @@ and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
   window; a window's times start at 0; several channels and a series
   without an epoch raise.
   Note: replaces E2c and E2d.
-- [ ] **E9.** [3] Tests, docstrings, and internal code build series from
+- [x] **E9.** [3] (aea5e201a) Tests, docstrings, and internal code build series from
   `TimeDeltaTensor` and `DateTimeTensor` and set epochs with `epoch=`,
   instead of `Times`.
   Tests: the `Times` tests move to `TimeSeries` where they test its times,
   and are removed where they test only `Times`.
-- [ ] **E10.** [2] Remove `Times`, `TimesTensor`, and `sb.times` from the
-  Python API, and the registration of `Tensor<sb::Times>` in C++, with
-  the saving and loading of a `TimesTensor`.
-  Tests: `stablebear.timeseries` has no `Times` or `TimesTensor`; the E2
-  tests are removed.
-  Note: undoes E1's `Times` conversions and E2.
+- [ ] **E10.** Remove `Times`.
+  - [ ] **E10a.** [2] The guide pages, the figure scripts in
+    `docs/_static/`, and the tide gauge tutorial build series from
+    `TimeDeltaTensor` and dates, and point to `TimeSeries.datetimes`
+    instead of `Times.to_datetime64`. F4 still rewrites the pages.
+  - [ ] **E10b.** [2] Remove `Times`, `TimesTensor`, and `sb.times` from the
+    Python API, and the registration of `Tensor<sb::Times>` in C++, with
+    the saving and loading of a `TimesTensor`.
+    Tests: `stablebear.timeseries` has no `Times` or `TimesTensor`; the E2
+    tests are removed.
+    Note: undoes E1's `Times` conversions and E2.
 
 ## Phase F: tests and docs use durations
 

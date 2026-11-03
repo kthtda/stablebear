@@ -1,37 +1,34 @@
 Dates and times
 ===============
 
-Time series are often recorded with dates and times rather than with
-numbers. A :py:class:`~stablebear.timeseries.Times` can count its timestamps
-from an *epoch*, the date and time that time 0 stands for. The timestamps
-stay numbers in the unit of the times, so evaluation, windows, and delay
-embeddings work as on any time series, and dates can be used wherever a time
-series takes times.
+Time series are often recorded with dates and times rather than with numbers. A
+:py:class:`~stablebear.timeseries.TimeSeries` can count its timestamps from an
+*epoch*, the date and time that time 0 stands for. The timestamps stay numbers
+in the unit of the times, so evaluation, windows, and delay embeddings work as
+on any time series, and dates can be used wherever a time series takes times.
 
 Here three observations are recorded at 06:00, 06:30, and 08:00 on
 1 January 2023. Passing their dates as a ``datetime64`` array counts them
-from the first one, in hours::
+from the first one, and ``to("h")`` reads them in hours::
 
    import datetime
 
    import numpy as np
    from stablebear.timeseries import (DateTime, DateTimeTensor, TimeDeltaTensor,
-                                      Times, TimeSeries, Window)
+                                      TimeSeries, Window)
 
    stamps = np.array(["2023-01-01T06:00", "2023-01-01T06:30",
                       "2023-01-01T08:00"], dtype="datetime64[m]")
-   series = TimeSeries([1.0, 3.0, 2.0], times=Times(stamps, unit="h"))
+   series = TimeSeries([1.0, 3.0, 2.0], times=stamps).to("h")
 
    series.epoch  # DateTime('2023-01-01T06:00')
    series.times  # TimeDeltaTensor([0.0, 0.5, 2.0], 'h')
 
 The differences between the dates are taken in integers and converted to
 the unit once, so whole multiples of the unit, such as the 0.5 h here, are
-exact. Pass ``epoch=`` to :py:class:`~stablebear.timeseries.Times` to count
-from another date and time instead. Without ``unit``, the times count in
-the resolution of the dates, minutes for these, as does a
-:py:class:`~stablebear.timeseries.TimeSeries` built from a ``datetime64``
-array directly.
+exact. Pass ``epoch=`` to :py:class:`~stablebear.timeseries.TimeSeries` to
+count from another date and time instead. The timestamps are stored in the
+resolution of the dates, minutes for these.
 
 Epochs
 ------
@@ -67,9 +64,7 @@ A ``DateTimeTensor`` cannot be an epoch.
 .. note::
 
    Epochs are not recommended for times much finer than microseconds, such
-   as picoseconds. Dates computed from them, by
-   :py:meth:`Times.to_datetime64 <stablebear.timeseries.Times.to_datetime64>`
-   by default and by plotting, are rounded to microseconds, so such times
+   as picoseconds. Plotting rounds dates to microseconds, so such times
    collapse onto the same dates. Keep these times as numbers instead.
 
 All channels of a time series share one epoch, so
@@ -113,13 +108,13 @@ to::
 Dates of windows
 ----------------
 
-:py:meth:`Times.to_datetime64 <stablebear.timeseries.Times.to_datetime64>`
-gives timestamps back as dates, by default at microsecond resolution. The
-:py:attr:`~stablebear.timeseries.TimeSeries.domain` of a window with an
-epoch is where it lies in the series it was cut from, as above, and the
-window is evaluated at those dates::
+:py:attr:`~stablebear.timeseries.TimeSeries.datetimes` gives timestamps back as
+dates, at microsecond resolution, or at the unit of the series if it is finer.
+The :py:attr:`~stablebear.timeseries.TimeSeries.domain` of a window with an
+epoch is where it lies in the series it was cut from, as above, and the window
+is evaluated at those dates::
 
    windows[1]("2023-01-01T07:00")  # 3.0, the same as windows[1](0.5)
 
-Microseconds reach about 290,000 years either side of 1970; nanoseconds,
-with ``resolution="ns"``, reach from 1678 to 2262.
+Microseconds reach about 290,000 years either side of 1970; nanoseconds
+reach from 1678 to 2262.

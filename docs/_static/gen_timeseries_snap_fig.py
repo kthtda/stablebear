@@ -7,7 +7,7 @@ import numpy as np
 from pathlib import Path
 from typing import Literal
 
-from stablebear.timeseries import TimeDelayEmbedding, Times, TimeSeries, Window
+from stablebear.timeseries import TimeDelayEmbedding, TimeDeltaTensor, TimeSeries, Window
 
 HERE = Path(__file__).parent
 
@@ -45,7 +45,7 @@ def plot_timeseries_evaluation():
 def plot_timeseries_channels():
     a = TimeSeries([1.0, 2.0, 3.0, 4.0], times=[0.0, 0.1, 0.2, 0.3])
     b = TimeSeries([10.0, 20.0, 30.0],
-                   times=Times([50.0, 90.0, 130.0], unit="ms"))
+                   times=TimeDeltaTensor([50.0, 90.0, 130.0], "ms"))
     series = TimeSeries.from_channels([a, b], unit="s")
     query = 0.1
     values = series(query)

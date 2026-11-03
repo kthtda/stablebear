@@ -5,13 +5,14 @@ A time series records observations at known times. Each observation can be a
 number, an array, or an element such as a point cloud. A
 :py:class:`~stablebear.timeseries.TimeSeries` is built from the observations
 and one timestamp per observation; plain timestamp arrays are in seconds, and
-:py:class:`~stablebear.timeseries.Times` gives them another unit::
+a :py:class:`~stablebear.timeseries.TimeDeltaTensor` gives them another
+unit::
 
-   from stablebear.timeseries import Times, TimeSeries
+   from stablebear.timeseries import TimeDeltaTensor, TimeSeries
 
    series = TimeSeries([1.0, 3.0, 2.0, 4.0], times=[0.0, 1.0, 1.5, 3.5])
 
-   times_ms = Times([0.0, 1000.0, 1500.0, 3500.0], unit="ms")
+   times_ms = TimeDeltaTensor([0.0, 1000.0, 1500.0, 3500.0], "ms")
    series_ms = TimeSeries([1.0, 3.0, 2.0, 4.0], times=times_ms)
 
 Both time series hold the same observations at the same times; ``series_ms``
@@ -71,14 +72,8 @@ A query at a timestamp gets the observation recorded there, as at
 Units
 -----
 
-A :py:class:`~stablebear.timeseries.Times` holds timestamps in one physical
-unit, from attoseconds (``"as"``) to days (``"d"``); :doc:`timeseries_units`
-lists them all.
-:py:meth:`Times.to <stablebear.timeseries.Times.to>` converts them by an
-exact integer factor::
-
-   times = Times([0.0, 250.0, 500.0], unit="ms")
-   times.to("s")  # Times([0.0, 0.25, 0.5], unit='s')
+A time series holds its timestamps in one physical unit, from attoseconds
+(``"as"``) to days (``"d"``); :doc:`timeseries_units` lists them all.
 
 A time series reads query times, window sizes, and delays in its unit, which
 :py:meth:`TimeSeries.to <stablebear.timeseries.TimeSeries.to>` changes

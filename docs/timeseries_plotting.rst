@@ -142,10 +142,10 @@ drawn with one row per channel, in channel order, in a new figure whose
 rows share the time axis. Every channel is drawn in the unit of the time
 series, whatever its own unit::
 
-   from stablebear.timeseries import Times
+   from stablebear.timeseries import TimeDeltaTensor
 
    a = TimeSeries([1.0, 2.0, 3.0, 4.0], times=[0.0, 0.1, 0.2, 0.3])
-   b = TimeSeries([10.0, 20.0, 30.0], times=Times([50.0, 90.0, 130.0], unit="ms"))
+   b = TimeSeries([10.0, 20.0, 30.0], times=TimeDeltaTensor([50.0, 90.0, 130.0], "ms"))
    series = TimeSeries.from_channels([a, b], unit="s")
 
    plot_timeseries(series, markers=True)
@@ -189,11 +189,11 @@ seconds and the other in milliseconds::
 
    import matplotlib.pyplot as plt
    from stablebear.plotting import plot_timeseries
-   from stablebear.timeseries import Times, TimeSeries
+   from stablebear.timeseries import TimeDeltaTensor, TimeSeries
 
    seconds = TimeSeries([1.0, 3.0, 2.0], times=[0.0, 1.0, 2.5])
    milliseconds = TimeSeries([0.5, 1.5, 2.5],
-                             times=Times([500.0, 1500.0, 3000.0], unit="ms"))
+                             times=TimeDeltaTensor([500.0, 1500.0, 3000.0], "ms"))
 
    fig, ax = plt.subplots()
    plot_timeseries(seconds, ax=ax, markers=True, label="in s")
@@ -265,7 +265,7 @@ recorded through a day are drawn with the window from 10:00 to 14:00::
 
    stamps = np.array(["2023-01-01T06:00", "2023-01-01T09:30", "2023-01-01T11:00",
                       "2023-01-01T15:45", "2023-01-01T18:00"], dtype="datetime64[m]")
-   series = TimeSeries([2.0, 3.5, 1.0, 2.5, 3.0], times=Times(stamps, unit="h"))
+   series = TimeSeries([2.0, 3.5, 1.0, 2.5, 3.0], times=stamps).to("h")
    windows = Window(size=4.0, anchor="start")(series)
 
    fig, ax = plt.subplots()
