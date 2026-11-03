@@ -177,6 +177,9 @@ def _native_times(times, unit=None, epoch=None):
     return np.asarray(times, dtype=np.float64), unit, None if epoch is None else DateTime(epoch)._data
 
 
+# Element dtypes of observations that convert to pandas.
+_SCALAR_DTYPES = (boolean, float32, float64, int32, int64, uint32, uint64)
+
 # Element dtype -> native series class. The tensor class wrapping the values
 # of each dtype comes from _leaf_wrappers, which loads persistence lazily, so
 # this module does not import stablebear.persistence and persistence can
@@ -494,6 +497,59 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         dtype = np.result_type(*columns)
         return cls.from_channels([cls._from_cpp(_native_series(column.astype(dtype), times, snap_tolerance))
                                   for column in columns])
+
+    def to_pandas(self, resolution: str | None = None) -> Any:  # A pandas Series; pandas is optional.
+        """The series as a pandas ``Series`` of its observations, indexed by
+        its times.
+
+        The index is a ``DatetimeIndex`` of ``epoch + origin + times`` for a
+        series with an :attr:`epoch`, a ``TimedeltaIndex`` of :attr:`times`
+        for one without, and an ``Index`` of the numbers for a series
+        without a unit. Dates and durations are rounded to ``resolution``.
+
+        Parameters
+        ----------
+        resolution : {"s", "ms", "us", "ns"}, optional
+            The resolution of the dates or durations, one that pandas
+            supports. Defaults to the finer of :attr:`unit` and
+            microseconds. A unit finer than nanoseconds, the finest
+            resolution pandas supports, needs ``resolution="ns"`` to round
+            to nanoseconds. A series without a unit takes none.
+
+        Raises
+        ------
+        TypeError
+            If the observations are not scalar numbers or booleans.
+        ValueError
+            For several channels, an unknown ``resolution``, a unit finer
+            than nanoseconds without ``resolution``, or a ``resolution`` for
+            a series without a unit.
+        ImportError
+            If pandas is not installed.
+        """
+        from .._pandas import import_pandas
+        pd = import_pandas()
+        if self.n_channels > 1:
+            raise ValueError("This series has several channels; select one with series[i]")
+        if self.dtype not in _SCALAR_DTYPES or self.shape != ():
+            raise TypeError(f"Only series of scalar numbers or booleans convert to pandas, not of {self.dtype}")
+        values = np.asarray(self.values)
+        if self.unit is None:
+            if resolution is not None:
+                raise ValueError("A series without a unit has no resolution; pass none")
+            return pd.Series(values, index=pd.Index(np.asarray(self.times)))
+        if resolution is None:
+            if _ATTOSECONDS[self.unit] < _ATTOSECONDS["ns"]:
+                raise ValueError(f"pandas holds times to nanoseconds at finest, not {self.unit!r}; "
+                                 "pass resolution='ns' to round to nanoseconds")
+            resolution = self.unit if _ATTOSECONDS[self.unit] < _ATTOSECONDS["us"] else "us"
+        elif resolution not in ("s", "ms", "us", "ns"):
+            raise ValueError(f"resolution must be 's', 'ms', 'us', or 'ns', not {resolution!r}")
+        if self.epoch is None:
+            return pd.Series(values, index=pd.TimedeltaIndex(self.times.to_timedelta64(resolution)))
+        offsets = (self.origin + self.times).to_timedelta64(resolution)
+        dates = (self.epoch.to_datetime64() + offsets).astype(f"datetime64[{_UNIT_TO_NUMPY[resolution]}]")
+        return pd.Series(values, index=pd.DatetimeIndex(dates))
 
     def _single_channel(self):
         if self._data.n_channels != 1:

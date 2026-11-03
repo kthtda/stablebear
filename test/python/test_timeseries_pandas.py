@@ -280,3 +280,76 @@ def test_embedding_delay_timedelta_equals_timedelta64():
     from_numpy = TimeDelayEmbedding(2, np.timedelta64(3, "h"), direction="backward")(series)
 
     assert from_pandas.array_equal(from_numpy)
+
+
+def test_to_pandas_gives_back_a_series_with_dates():
+    index = pd.DatetimeIndex(["2023-01-01T01:00", "2023-01-01T02:30", "2023-01-02T00:00"])
+    original = pd.Series([1.0, 2.0, 3.0], index=index)
+
+    converted = TimeSeries.from_pandas(original).to_pandas()
+
+    pd.testing.assert_series_equal(converted, original)
+
+
+def test_to_pandas_of_a_series_without_an_epoch_has_a_timedelta_index():
+    series = TimeSeries([10, 20], times=TimeDeltaTensor([0.0, 1.5], "s"))
+
+    converted = series.to_pandas()
+
+    assert converted.index.dtype == np.dtype("timedelta64[us]")
+    assert np.array_equal(converted.index.to_numpy(), np.array([0, 1_500_000], dtype="timedelta64[us]"))
+    assert converted.dtype == np.int64
+
+
+def test_to_pandas_of_a_series_without_a_unit_has_a_numeric_index():
+    converted = TimeSeries([10.0, 20.0], times=[0.0, 1.5]).to_pandas()
+
+    assert converted.index.equals(pd.Index([0.0, 1.5]))
+
+
+def test_to_pandas_of_picoseconds_raises_without_a_resolution():
+    series = TimeSeries([10.0, 20.0], times=TimeDeltaTensor([0.0, 1500.0], "ps"))
+
+    with pytest.raises(ValueError, match="resolution='ns'"):
+        series.to_pandas()
+
+
+def test_to_pandas_of_picoseconds_rounds_to_nanoseconds_with_a_resolution():
+    series = TimeSeries([10.0, 20.0], times=TimeDeltaTensor([0.0, 1500.0], "ps"))
+
+    converted = series.to_pandas(resolution="ns")
+
+    assert np.array_equal(converted.index.to_numpy(), np.array([0, 2], dtype="timedelta64[ns]"))
+
+
+def test_to_pandas_rejects_a_resolution_pandas_does_not_support():
+    series = TimeSeries([10.0, 20.0], times=TimeDeltaTensor([0.0, 1.5], "h"))
+
+    with pytest.raises(ValueError, match="resolution"):
+        series.to_pandas(resolution="h")
+
+
+def test_to_pandas_of_a_window_starts_at_its_start_date():
+    series = TimeSeries([10.0, 20.0, 30.0], times=TimeDeltaTensor([0.0, 1.5, 4.0], "h"), epoch="2023-01-01")
+    window = Window(size=TimeDelta(2, "h"), step=TimeDelta(1, "h"), closed="left", partial=False,
+                    anchor="start")(series)[1]
+
+    converted = window.to_pandas()
+
+    assert np.array_equal(converted.index.to_numpy(),
+                          np.array(["2023-01-01T01:00", "2023-01-01T01:30"], dtype="datetime64[us]"))
+
+
+def test_to_pandas_of_a_series_of_pcfs_raises():
+    series = TimeSeries(sb.zeros((2,), dtype=sb.pcf64), times=TimeDeltaTensor([0.0, 1.0], "s"))
+
+    with pytest.raises(TypeError, match="scalar numbers"):
+        series.to_pandas()
+
+
+def test_to_pandas_without_pandas_says_pandas_is_needed(monkeypatch):
+    monkeypatch.setitem(sys.modules, "pandas", None)
+    series = TimeSeries([10.0, 20.0], times=TimeDeltaTensor([0.0, 1.5], "s"))
+
+    with pytest.raises(ImportError, match="needs the pandas package"):
+        series.to_pandas()

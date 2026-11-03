@@ -1,6 +1,6 @@
 # pandas input and durations for time series: implementation plan
 
-Progress: 50 of 58 items, 102 of 117 points (87%)
+Progress: 51 of 58 items, 103 of 117 points (88%)
 
 Specs: [pandas-timeseries-spec.md](pandas-timeseries-spec.md) (phases A, B,
 and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
@@ -338,7 +338,7 @@ so.
   Tests: channel `i` equals `from_pandas(df.iloc[:, i])`; int and float
   columns give float64 channels; `pd.NA` in a column becomes `NaN`; a string column raises `TypeError`; no
   columns raises `ValueError`.
-- [ ] **H2.** [1] Reject bad input with errors that say what to do.
+- [x] **H2.** [1] (0d3fe8618) Reject bad input with errors that say what to do.
   Tests: `NaT` in the index; unsorted index names `sort_index()`;
   duplicates name `index.duplicated()`; `PeriodIndex` and `MultiIndex`
   raise `TypeError`; an ndarray raises `TypeError`.
@@ -348,16 +348,19 @@ so.
 - [ ] **I2.** [3] `TimeSeries.to_pandas(resolution=None)` for one channel of
   scalar numbers or booleans gives a `Series` indexed by a `DatetimeIndex`
   of `epoch + origin + times`, else a `TimedeltaIndex` of `times`, by default at the
-  finer of the unit and microseconds, at most nanoseconds. Add
-  `stablebear/_pandas.py` with the import that raises `ImportError` naming
-  `pip install pandas`.
+  finer of the unit and microseconds; a unit finer than nanoseconds needs
+  `resolution="ns"`. Add
+  `stablebear/_pandas.py` with the import that raises `ImportError` saying
+  pandas is needed.
   Tests: round trip of a `Series` with a `DatetimeIndex` (times, epoch,
   values, dtype); an undated series gives a `TimedeltaIndex`; a picosecond
-  unit gives nanoseconds; `resolution="h"` raises; a window's index starts
+  unit raises without `resolution` and rounds to nanoseconds with
+  `resolution="ns"`; `resolution="h"` raises; a window's index starts
   at its start date; a PCF series raises `TypeError`; with
-  `sys.modules["pandas"] = None` the `ImportError` names
-  `pip install pandas`.
+  `sys.modules["pandas"] = None` the `ImportError` says pandas is needed.
   Note: absorbed I1, `Times.to_pandas`, since `Times` is removed (E10).
+  A series without a unit gives an `Index` of its numbers and takes no
+  `resolution`.
 - [ ] **I3.** [2] Several channels give a `DataFrame` indexed by the union of
   the channels' times, with `NaN` where a channel has no observation.
   Tests: round trip of a `DataFrame`; channels with different times give

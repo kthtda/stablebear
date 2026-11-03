@@ -90,16 +90,17 @@ These settle the open questions of the issue.
   `epoch + origin + times`, else a `TimedeltaIndex` of `times` (see the
   [durations spec](timeseries-durations-spec.md)). `resolution` is one of
   `"s"`, `"ms"`, `"us"`, and `"ns"`, the resolutions pandas supports. It
-  defaults to the finer of the series' unit and microseconds, or
-  nanoseconds if that is finer.
+  defaults to the finer of the series' unit and microseconds. A unit finer
+  than nanoseconds raises unless `resolution="ns"` is passed, so that
+  rounding to nanoseconds, which can merge times, is chosen explicitly.
 - `TimeSeries.to_pandas()` returns, for one channel, a `Series` with that
   index. For several channels it returns a `DataFrame` with columns `0` to
   `n_channels - 1`, indexed by the union of the channels' times, with
   `NaN` where a channel has no observation at a time.
 - Only observations of shape `()` that are numbers or booleans can be
   converted; other series raise `TypeError`.
-- If pandas is not installed, it raises `ImportError` naming
-  `pip install pandas`.
+- If pandas is not installed, it raises `ImportError` saying that the
+  pandas package is needed, without naming an installer.
 
 ### `Window` and `TimeDelayEmbedding` on pandas input
 
