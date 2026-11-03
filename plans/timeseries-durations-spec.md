@@ -210,8 +210,9 @@ with a unit does, with numbers in place of durations:
   `(count, unit)`, or `unit=` on it raises `TypeError`.
 - `times` is a `FloatTensor`, `domain` has float ends, `origin` is a float
   or a `FloatTensor`, and `return_bounds` gives a `FloatTensor`.
-- It has no epoch: `epoch=` and `with_epoch` raise `ValueError`, and so
-  does `to(unit)`, since there is nothing to convert.
+- It has no epoch: `epoch=` and `with_epoch` raise `ValueError`.
+- `to(unit)` gives it a unit: its numbers become counts of `unit`, so
+  times `[0.0, 1.5]` become 0 s and 1.5 s with `to("s")`.
 - `from_channels` combines channels without a unit, and raises for
   channels with and without one.
 - `plot_timeseries` labels its axis "time", with no unit; it cannot share

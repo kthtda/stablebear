@@ -440,6 +440,26 @@ def test_a_dated_window_domain_is_where_it_lies(closed, start_closed, end_closed
     assert (domain.start_closed, domain.end_closed) == (start_closed, end_closed)
 
 
+def test_bounds_of_a_series_without_a_unit_are_numbers():
+    series = TimeSeries([0.0, 5.0, 15.0, 25.0, 40.0], times=[0.0, 0.5, 1.5, 2.5, 4.0])
+
+    _, bounds = Window(size=2.0, step=2.0, closed="left", partial=False, anchor="start")(
+        series, return_bounds=True)
+
+    assert bounds.array_equal(sb.FloatTensor([[0.0, 2.0], [2.0, 4.0]], dtype=sb.float64))
+
+
+def test_a_window_of_a_series_without_a_unit_gives_numbers():
+    series = TimeSeries([0.0, 5.0, 15.0, 25.0, 40.0], times=[0.0, 0.5, 1.5, 2.5, 4.0])
+
+    windows = Window(size=2.0, step=2.0, closed="left", partial=False, anchor="start")(series)
+
+    assert windows[1].unit is None
+    assert windows[1].origin == 2.0
+    assert windows[1].times.array_equal(sb.FloatTensor([0.0, 0.5], dtype=sb.float64))
+    assert windows[1].domain == Domain(0.0, 2.0, True, False)
+
+
 def test_bounds_of_a_dated_series_are_the_dates_of_its_windows():
     _, bounds = Window(size=TimeDelta(1, "s"), step=TimeDelta(1, "s"), closed="left", partial=False, anchor="start")(
         _dated_source(), return_bounds=True)

@@ -38,7 +38,7 @@ def plot_timeseries_window_in_place():
 
 # -- included in docs via literalinclude :pyobject: --
 def plot_timeseries_units():
-    seconds = TimeSeries([1.0, 3.0, 2.0], times=[0.0, 1.0, 2.5])
+    seconds = TimeSeries([1.0, 3.0, 2.0], times=TimeDeltaTensor([0.0, 1.0, 2.5], "s"))
     milliseconds = TimeSeries([0.5, 1.5, 2.5],
                               times=TimeDeltaTensor([500.0, 1500.0, 3000.0], "ms"))
 
@@ -52,7 +52,7 @@ def plot_timeseries_units():
 
 # -- included in docs via literalinclude :pyobject: --
 def plot_timeseries_sharex():
-    seconds = TimeSeries([1.0, 3.0, 2.0], times=[0.0, 1.0, 2.5])
+    seconds = TimeSeries([1.0, 3.0, 2.0], times=TimeDeltaTensor([0.0, 1.0, 2.5], "s"))
     milliseconds = TimeSeries([0.5, 1.5, 2.5],
                               times=TimeDeltaTensor([500.0, 1500.0, 3000.0], "ms"))
 
@@ -94,7 +94,7 @@ def plot_timeseries_some_windows():
 
 # -- included in docs via literalinclude :pyobject: --
 def plot_timeseries_channels():
-    a = TimeSeries([1.0, 2.0, 3.0, 4.0], times=[0.0, 0.1, 0.2, 0.3])
+    a = TimeSeries([1.0, 2.0, 3.0, 4.0], times=TimeDeltaTensor([0.0, 0.1, 0.2, 0.3], "s"))
     b = TimeSeries([10.0, 20.0, 30.0], times=TimeDeltaTensor([50.0, 90.0, 130.0], "ms"))
     series = TimeSeries.from_channels([a, b], unit="s")
 

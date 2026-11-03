@@ -19,6 +19,16 @@
 
 namespace sb_py
 {
+  /// The short name of @p unit, or none for times without a unit.
+  inline std::optional<std::string> unit_name(sb::TimeUnit unit)
+  {
+    if (unit == sb::TimeUnit::Unitless)
+    {
+      return std::nullopt;
+    }
+    return std::string(sb::time_unit_name(unit));
+  }
+
   void register_timeseries_float(nb::module_& m);
   void register_timeseries_int(nb::module_& m);
   void register_timeseries_uint(nb::module_& m);
@@ -61,9 +71,7 @@ namespace sb_py
                     return Series::from_channels(parts, parsed);
                   },
                   nb::arg("parts"), nb::arg("unit"))
-      .def_prop_ro("unit", [](const Series& self) {
-        return std::string(sb::time_unit_name(self.unit()));
-      })
+      .def_prop_ro("unit", [](const Series& self) { return unit_name(self.unit()); })
       .def("to", [](const Series& self, const std::string& unit) { return self.to(sb::parse_time_unit(unit)); },
            nb::arg("unit"))
       .def("times", &Series::times, nb::arg("index"))

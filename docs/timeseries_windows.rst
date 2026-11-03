@@ -18,11 +18,12 @@ back to 0::
 
    windows, bounds = Window(size=4.0, step=2.0, anchor="start")(
        signal, return_bounds=True)
-   bounds.count  # [[0.0, 4.0], [2.0, 6.0], [4.0, 8.0]]
+   bounds  # [[0.0, 4.0], [2.0, 6.0], [4.0, 8.0]]
 
-The bounds are a :py:class:`~stablebear.timeseries.TimeDeltaTensor` of
-durations from the time 0 of ``signal``, in its unit, so their counts are
-seconds here. For a time series with an epoch, they are a
+The bounds are times from the time 0 of ``signal``: numbers here, since
+``signal`` was built from numbers and has no unit, and a
+:py:class:`~stablebear.timeseries.TimeDeltaTensor` of durations for a time
+series with a unit. For a time series with an epoch, they are a
 :py:class:`~stablebear.timeseries.DateTimeTensor` of dates instead (see
 :doc:`timeseries_dates`).
 
@@ -63,7 +64,7 @@ A window also keeps where it was cut from.
 ``signal`` that the window's time 0 stands for, so an observation at time
 ``t`` in the window was at ``origin + t`` in ``signal``::
 
-   windows[1].origin  # TimeDelta(2, 's')
+   windows[1].origin  # 2.0
 
 The origins are the starts in ``bounds``, the same for every channel of a
 window. When a start falls just short of an observation and snaps to it
@@ -252,7 +253,8 @@ each channel. The channels ``a`` and ``b`` from :doc:`timeseries_channels`
 can both be evaluated from 0.05 s to 0.13 s, and windows of 40 ms cut this
 time in two::
 
-   a = TimeSeries([1.0, 2.0, 3.0, 4.0], times=[0.0, 0.1, 0.2, 0.3])
+   a = TimeSeries([1.0, 2.0, 3.0, 4.0],
+                  times=TimeDeltaTensor([0.0, 0.1, 0.2, 0.3], "s"))
    b = TimeSeries([10.0, 20.0, 30.0],
                   times=TimeDeltaTensor([50.0, 90.0, 130.0], "ms"))
    series = TimeSeries.from_channels([a, b], unit="s")

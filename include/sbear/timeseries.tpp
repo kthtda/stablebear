@@ -207,6 +207,14 @@ namespace sb
   }
 
   template <typename T>
+  Channel<T> Channel<T>::with_unit(TimeUnit unit) const
+  {
+    auto channel = *this;
+    channel.m_times = std::make_shared<const Times>(held_times().with_unit(unit));
+    return channel;
+  }
+
+  template <typename T>
   Channel<T> Channel<T>::shifted(float64_t delta, std::optional<DateTime> epoch) const
   {
     auto channel = *this;
@@ -419,6 +427,10 @@ namespace sb
     {
       throw std::invalid_argument("A time series needs at least one channel");
     }
+    for (const auto& channel : m_channels)
+    {
+      check_same_kind_of_unit(channel.unit(), m_unit);
+    }
   }
 
   template <typename T>
@@ -437,6 +449,7 @@ namespace sb
         throw std::invalid_argument("Each channel must be a one-channel series; select channels with series[i]");
       }
       channels.push_back(part.m_channels.front());
+      check_same_kind_of_unit(part.unit(), parts.front().unit());
       if (!unit && part.unit() != parts.front().unit())
       {
         throw std::invalid_argument("The channels differ in unit; pass unit= to choose one");
@@ -473,6 +486,17 @@ namespace sb
   TimeSeries<T> TimeSeries<T>::to(TimeUnit unit) const
   {
     auto series = *this;
+    if (m_unit == TimeUnit::Unitless && unit != TimeUnit::Unitless)
+    {
+      // Plain numbers become counts of unit.
+      for (auto& channel : series.m_channels)
+      {
+        channel = channel.with_unit(unit);
+      }
+      series.m_unit = unit;
+      return series;
+    }
+    check_same_kind_of_unit(m_unit, unit);
     series.m_unit = unit;
     return series;
   }

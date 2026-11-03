@@ -58,11 +58,10 @@ def test_series_rejects_invalid_times(times, unit):
 
 
 
-def test_series_defaults_to_seconds_and_one_channel():
-    # This test checks the default unit and channel name.
+def test_series_of_numbers_has_no_unit_and_one_channel():
     series = TimeSeries([10.0, 20.0, 30.0], times=[0.0, 1.5, 4.0])
 
-    assert series.unit == "s"
+    assert series.unit is None
     assert series.n_channels == 1
     assert series.shape == ()
     assert len(series) == 3
@@ -1541,6 +1540,71 @@ def test_series_epoch_survives_saving(value, as_epoch, round_trip):
     assert loaded.epoch == DateTime(value)
     assert loaded.epoch.to_datetime64() == value
     assert loaded.epoch.to_datetime64().dtype == value.dtype
+
+
+@pytest.mark.parametrize("round_trip", ROUND_TRIPS)
+def test_series_without_a_unit_survives_saving(round_trip):
+    series = TimeSeries([10.0, 20.0], times=[0.0, 1.5])
+
+    loaded = round_trip(series)
+
+    assert loaded.unit is None
+    assert loaded.array_equal(series)
+
+
+def test_series_without_a_unit_rejects_an_epoch():
+    with pytest.raises(ValueError, match="without a unit"):
+        TimeSeries([10.0, 20.0], times=[0.0, 1.5], epoch="2023-01-01")
+
+
+def test_series_without_a_unit_rejects_with_epoch():
+    series = TimeSeries([10.0, 20.0], times=[0.0, 1.5])
+
+    with pytest.raises(ValueError, match="without a unit"):
+        series.with_epoch("2023-01-01")
+
+
+def test_series_without_a_unit_gets_the_unit_of_to():
+    series = TimeSeries([10.0, 20.0], times=[0.0, 1.5]).to("s")
+
+    assert series.unit == "s"
+    assert series.times.array_equal(TimeDeltaTensor([0.0, 1.5], "s"))
+
+
+@pytest.mark.parametrize("unit", [None, "s"])
+def test_from_channels_rejects_channels_with_and_without_a_unit(unit):
+    with_unit = TimeSeries([10.0, 20.0], times=TimeDeltaTensor([0.0, 1.5], "s"))
+    without_unit = TimeSeries([10.0, 20.0], times=[0.0, 1.5])
+
+    with pytest.raises(ValueError, match="without a unit"):
+        TimeSeries.from_channels([with_unit, without_unit], unit=unit)
+
+
+def test_series_without_a_unit_gives_its_times_as_numbers():
+    series = TimeSeries([10.0, 20.0, 30.0], times=[0.0, 1.5, 4.0])
+
+    assert series.times.array_equal(sb.FloatTensor([0.0, 1.5, 4.0], dtype=sb.float64))
+
+
+def test_series_without_a_unit_gives_its_domain_as_numbers():
+    series = TimeSeries([10.0, 20.0, 30.0], times=[0.0, 1.5, 4.0])
+
+    assert series.domain == Domain(0.0, 4.0, True, True)
+
+
+def test_series_without_a_unit_gives_its_origin_as_a_number():
+    series = TimeSeries([10.0, 20.0, 30.0], times=[0.0, 1.5, 4.0])
+
+    assert series.origin == 0.0
+
+
+def test_series_without_a_unit_gives_the_origins_of_its_channels_as_numbers():
+    a = TimeSeries([10.0, 20.0], times=[0.0, 1.5])
+    b = TimeSeries([-10.0, -20.0], times=[0.5, 2.0])
+
+    series = TimeSeries.from_channels([a, b])
+
+    assert series.origin.array_equal(sb.FloatTensor([0.0, 0.0], dtype=sb.float64))
 
 
 @pytest.mark.parametrize("round_trip", ROUND_TRIPS)

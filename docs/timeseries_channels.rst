@@ -13,7 +13,8 @@ Here channel ``a`` is sampled every 0.1 s from 0 s, and channel ``b`` every
 
    from stablebear.timeseries import TimeDeltaTensor, TimeSeries
 
-   a = TimeSeries([1.0, 2.0, 3.0, 4.0], times=[0.0, 0.1, 0.2, 0.3])
+   a = TimeSeries([1.0, 2.0, 3.0, 4.0],
+                  times=TimeDeltaTensor([0.0, 0.1, 0.2, 0.3], "s"))
    b = TimeSeries([10.0, 20.0, 30.0],
                   times=TimeDeltaTensor([50.0, 90.0, 130.0], "ms"))
    series = TimeSeries.from_channels([a, b], unit="s")

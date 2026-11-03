@@ -6,7 +6,7 @@ import numpy as np
 
 from .. import _sb_cpp as cpp
 from .date_time import TimeDeltaTensor, _duration, _in_unit, _ScalarDuration
-from .series import TimeSeries, TimeSeriesTensor
+from .series import TimeSeries, TimeSeriesTensor, _times_in
 
 
 class Window:
@@ -31,7 +31,8 @@ class Window:
     :class:`TimeDeltaTensor` of durations from the time 0 of ``series``, in
     its unit, or for a series with an :attr:`~TimeSeries.epoch`, a
     :class:`DateTimeTensor` of the dates where the windows lie, at the finer
-    of its unit and microseconds. A partial window's row starts or ends
+    of its unit and microseconds. For a series without a unit, it is a
+    ``FloatTensor`` of numbers. A partial window's row starts or ends
     where the series does.
 
     Window ``k`` covers ``a_k`` to ``a_k + size``, with the ends that
@@ -141,7 +142,7 @@ def _bounds_as_instants(series, bounds):
     durations, or as dates placed by its epoch and origin. Raises
     ``ValueError`` if the origins of its channels give different dates."""
     if series.epoch is None:
-        return TimeDeltaTensor(bounds, series.unit)
+        return _times_in(bounds, series.unit)
     # Each channel's origin places the bounds; channels that snap differently
     # can differ by less than the resolution of the dates.
     first, *others = (series.epoch + TimeDeltaTensor(bounds + origin, series.unit)

@@ -785,23 +785,26 @@ def _duration(value, message) -> TimeDelta | float:
 
 
 @overload
-def _in_unit(duration: TimeDeltaTensor, unit: str) -> np.ndarray: ...
+def _in_unit(duration: TimeDeltaTensor, unit: str | None) -> np.ndarray: ...
 
 
 @overload
-def _in_unit(duration: TimeDelta | float, unit: str) -> float: ...
+def _in_unit(duration: TimeDelta | float, unit: str | None) -> float: ...
 
 
 @overload
-def _in_unit(duration: _Duration | float, unit: str) -> float | np.ndarray: ...
+def _in_unit(duration: _Duration | float, unit: str | None) -> float | np.ndarray: ...
 
 
 def _in_unit(duration, unit):
     """A duration from :func:`_duration` as a number of ``unit``, a time unit;
     a :class:`TimeDelta` is converted by an exact factor and rounded once,
-    and a :class:`TimeDeltaTensor` likewise to a float64 array."""
+    and a :class:`TimeDeltaTensor` likewise to a float64 array. ``unit``
+    ``None``, of a series without a unit, takes only numbers."""
     if not isinstance(duration, _Duration):
         return duration
+    if unit is None:
+        raise TypeError("A series without a unit takes numbers, not durations")
     if isinstance(duration, TimeDeltaTensor):
         # One unit is a whole multiple of the other, so one multiplication
         # or division by an integer rounds each count once.

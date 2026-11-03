@@ -361,20 +361,26 @@ def plot_barcode(bc, ax=None, y_offset=0, **kwargs):
     return y_offset + len(bars)
 
 
+# The unit stored on an x axis of times without a unit.
+_NO_UNIT = "none"
+
+
 def _time_axis_unit(ax, unit, requested):
     """The time unit of the x axis of ``ax``, storing ``unit`` on it first if
-    it has none. ``requested`` is the unit asked for, if any, which must
-    match a unit the axis already has."""
+    it has none; ``None`` for a series without a unit. ``requested`` is the
+    unit asked for, if any, which must match a unit the axis already has."""
     if ax.xaxis.get_converter() is not None:
         raise TypeError("The x axis holds dates or other values that are not times in a unit")
     current = ax.xaxis.get_units()
     if current is None:
         # Axes made with sharex share this unit.
-        ax.xaxis.set_units(unit)
+        ax.xaxis.set_units(_NO_UNIT if unit is None else unit)
         return unit
+    if (current == _NO_UNIT) != (unit is None):
+        raise ValueError("A time series without a unit and one with a unit cannot share a time axis")
     if requested is not None and requested != current:
         raise ValueError(f"The time axis is in {current!r}, not {requested!r}")
-    return current
+    return None if current == _NO_UNIT else current
 
 
 _NUMERIC_DTYPES = (float32, float64, int32, int64, uint32, uint64, boolean)
@@ -437,7 +443,8 @@ def plot_timeseries(series, ax=None, *, unit=None, relative=False, markers=False
     unit : str, optional
         The time unit of the x axis, one of the units of
         :class:`~stablebear.timeseries.TimeDelta`. Defaults to the unit the axis
-        already has, or else the unit of ``series``.
+        already has, or else the unit of ``series``. A series without a
+        unit takes none.
     relative : bool, default False
         Whether to draw each time series at its own times, from 0, instead
         of where it lies in the series it was cut from. Windows are then
@@ -460,7 +467,9 @@ def plot_timeseries(series, ax=None, *, unit=None, relative=False, markers=False
         If ``unit`` differs from the unit the x axis already has, the
         observations are not scalars, or a tensor has more than one
         dimension; for a time series with an epoch, if ``unit`` is given
-        or the x axis has a time unit, unless ``relative`` is true.
+        or the x axis has a time unit, unless ``relative`` is true; if a
+        time series without a unit and one with a unit share an axis, or
+        ``unit`` is given for one without a unit.
     TypeError
         If the observations are not numbers, such as point clouds or
         barcodes, or if the x axis holds dates or other values that are not
@@ -474,7 +483,9 @@ def plot_timeseries(series, ax=None, *, unit=None, relative=False, markers=False
     true. Otherwise the x axis keeps one time unit, stored on it by the first time series
     drawn, and each time series is converted into it exactly, so series in
     different units line up. The axis is labeled ``time (<unit>)`` unless it
-    already has a label.
+    already has a label. A time series without a unit is drawn at its
+    numbers, on an axis labeled ``time``, which a time series with a unit
+    cannot share.
     """
     from .timeseries.date_time import TimeDeltaTensor
     from .timeseries.series import TimeSeriesTensor
@@ -498,13 +509,17 @@ def plot_timeseries(series, ax=None, *, unit=None, relative=False, markers=False
         if unit is not None:
             raise ValueError("A time series with an epoch is drawn at dates, which have no unit; "
                              "pass unit only with relative=True")
-        if isinstance(ax.xaxis.get_units(), str):
-            raise ValueError(f"The x axis is a time axis in {ax.xaxis.get_units()!r}, not a date axis")
+        units = ax.xaxis.get_units()
+        if isinstance(units, str):
+            raise ValueError("The x axis is a time axis" + ("" if units == _NO_UNIT else f" in {units!r}")
+                             + ", not a date axis")
     else:
         requested = None if unit is None else series.to(unit).unit
-        series = series.to(_time_axis_unit(ax, requested or series.unit, requested))
-    offset = 0.0 if relative else series.origin.count
-    times = np.asarray(series.times.count) + offset
+        axis_unit = _time_axis_unit(ax, requested or series.unit, requested)
+        if axis_unit is not None:
+            series = series.to(axis_unit)
+    offset = 0.0 if relative else series._data.origin(0)
+    times = np.asarray(series._data.times(0).values) + offset
     values = np.asarray(series.values)
     if values.ndim != 1:
         raise ValueError(f"Can only plot scalar observations, not observations of shape {series.shape}")
@@ -522,5 +537,5 @@ def plot_timeseries(series, ax=None, *, unit=None, relative=False, markers=False
         return ax.plot(times, values, drawstyle="steps-post", **kwargs)
     lines = ax.plot(times, values, drawstyle="steps-post", **kwargs)
     if not ax.get_xlabel():
-        ax.set_xlabel(f"time ({series.unit})")
+        ax.set_xlabel("time" if series.unit is None else f"time ({series.unit})")
     return lines

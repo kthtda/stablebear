@@ -59,6 +59,23 @@ def test_the_time_axis_is_labeled_with_its_unit(ax):
     assert ax.get_xlabel() == "time (s)"
 
 
+def test_the_time_axis_of_a_series_without_a_unit_is_labeled_time(ax):
+    plot_timeseries(TimeSeries([10.0, 20.0], times=[0.0, 1.5]), ax=ax)
+
+    assert ax.get_xlabel() == "time"
+
+
+@pytest.mark.parametrize("first, second", [
+    pytest.param(TimeSeries([10.0, 20.0], times=[0.0, 1.5]), _series(), id="unit after none"),
+    pytest.param(_series(), TimeSeries([10.0, 20.0], times=[0.0, 1.5]), id="none after unit"),
+])
+def test_series_with_and_without_a_unit_on_one_axis_raise(ax, first, second):
+    plot_timeseries(first, ax=ax)
+
+    with pytest.raises(ValueError, match="cannot share a time axis"):
+        plot_timeseries(second, ax=ax)
+
+
 def test_a_label_set_before_drawing_is_kept(ax):
     ax.set_xlabel("elapsed")
 

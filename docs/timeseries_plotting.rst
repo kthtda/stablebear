@@ -6,9 +6,10 @@ step function it evaluates to, with matplotlib. Each value holds from its
 observation until the next one, and the last until the end of the domain.
 Only time series of numbers can be drawn; for other elements, such as point
 clouds or barcodes, evaluate the time series and plot the elements
-themselves. The time axis is labeled with the unit of the time series. With
+themselves. The time axis is labeled with the unit of the time series, or
+just "time" for a time series without a unit, such as this one. With
 ``markers=True``, each observation is marked with a dot, which also shows
-the last value, held only at the end of the domain, here 4 at 3.5 s::
+the last value, held only at the end of the domain, here 4 at 3.5::
 
    import matplotlib.pyplot as plt
    from stablebear.plotting import plot_timeseries
@@ -144,7 +145,7 @@ series, whatever its own unit::
 
    from stablebear.timeseries import TimeDeltaTensor
 
-   a = TimeSeries([1.0, 2.0, 3.0, 4.0], times=[0.0, 0.1, 0.2, 0.3])
+   a = TimeSeries([1.0, 2.0, 3.0, 4.0], times=TimeDeltaTensor([0.0, 0.1, 0.2, 0.3], "s"))
    b = TimeSeries([10.0, 20.0, 30.0], times=TimeDeltaTensor([50.0, 90.0, 130.0], "ms"))
    series = TimeSeries.from_channels([a, b], unit="s")
 
@@ -191,7 +192,7 @@ seconds and the other in milliseconds::
    from stablebear.plotting import plot_timeseries
    from stablebear.timeseries import TimeDeltaTensor, TimeSeries
 
-   seconds = TimeSeries([1.0, 3.0, 2.0], times=[0.0, 1.0, 2.5])
+   seconds = TimeSeries([1.0, 3.0, 2.0], times=TimeDeltaTensor([0.0, 1.0, 2.5], "s"))
    milliseconds = TimeSeries([0.5, 1.5, 2.5],
                              times=TimeDeltaTensor([500.0, 1500.0, 3000.0], "ms"))
 

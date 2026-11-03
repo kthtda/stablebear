@@ -4,9 +4,9 @@ Time series
 A time series records observations at known times. Each observation can be a
 number, an array, or an element such as a point cloud. A
 :py:class:`~stablebear.timeseries.TimeSeries` is built from the observations
-and one timestamp per observation; plain timestamp arrays are in seconds, and
-a :py:class:`~stablebear.timeseries.TimeDeltaTensor` gives them another
-unit::
+and one timestamp per observation. Plain numbers give a time series without
+a unit, and a :py:class:`~stablebear.timeseries.TimeDeltaTensor` gives the
+timestamps a unit::
 
    from stablebear.timeseries import TimeDeltaTensor, TimeSeries
 
@@ -15,9 +15,8 @@ unit::
    times_ms = TimeDeltaTensor([0.0, 1000.0, 1500.0, 3500.0], "ms")
    series_ms = TimeSeries([1.0, 3.0, 2.0, 4.0], times=times_ms)
 
-Both time series hold the same observations at the same times; ``series_ms``
-reads query times in milliseconds, so ``series_ms(1500.0)`` equals
-``series(1.5)``.
+Both time series hold the same observations; ``series_ms`` reads query
+times in milliseconds, so ``series_ms(1500.0)`` equals ``series(1.5)``.
 
 This page covers evaluation and units, which every other operation on a
 time series builds on. The pages listed at the end cover channels, delay
@@ -73,7 +72,8 @@ Units
 -----
 
 A time series holds its timestamps in one physical unit, from attoseconds
-(``"as"``) to days (``"d"``); :doc:`timeseries_units` lists them all.
+(``"as"``) to days (``"d"``), or without a unit, as plain numbers;
+:doc:`timeseries_units` lists the units.
 
 A time series reads query times, window sizes, and delays in its unit, which
 :py:meth:`TimeSeries.to <stablebear.timeseries.TimeSeries.to>` changes

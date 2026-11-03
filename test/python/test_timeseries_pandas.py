@@ -153,6 +153,13 @@ def test_from_pandas_with_range_index_counts_in_unit():
     assert series.epoch is None
 
 
+def test_from_pandas_with_numeric_index_without_unit_has_no_unit():
+    series = TimeSeries.from_pandas(pd.Series([10.0, 20.0, 30.0], index=[0.0, 1.5, 4.0]))
+
+    assert series.unit is None
+    assert series.times.array_equal(sb.FloatTensor([0.0, 1.5, 4.0], dtype=sb.float64))
+
+
 @pytest.mark.parametrize("values", [
     pytest.param(pd.Series([10.0, np.nan, 30.0]), id="nan"),
     pytest.param(pd.Series([10.0, None, 30.0], dtype="Float64"), id="na"),

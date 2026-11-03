@@ -1,6 +1,6 @@
 # pandas input and durations for time series: implementation plan
 
-Progress: 41 of 56 items, 83 of 111 points (75%)
+Progress: 42 of 56 items, 84 of 111 points (76%)
 
 Specs: [pandas-timeseries-spec.md](pandas-timeseries-spec.md) (phases A, B,
 and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
@@ -274,7 +274,7 @@ so.
   storage.
   Note: depends on G, which settles series without a unit; do it after
   G4.
-- [ ] **F5.** [1] The tide gauge tutorial uses `TimeDelta` for its window
+- [x] **F5.** [1] (cd6a198e7) The tide gauge tutorial uses `TimeDelta` for its window
   sizes and delays, and a `TimeDeltaTensor` for its evaluation grid.
 
 ## Phase G: numbers mean a series without a unit
@@ -282,11 +282,12 @@ so.
 - [ ] **G1.** [3] Series without a unit: C++ gains a `TimeUnit` that
   converts only to itself, saved and loaded as any unit. `TimeSeries` of
   numbers and `from_pandas` of a numeric index without `unit` give one,
-  with `unit` `None`; `epoch=`, `with_epoch`, and `to(unit)` on it raise
-  `ValueError`, and `from_channels` of channels with and without a unit
-  raises.
+  with `unit` `None`; `epoch=` and `with_epoch` on it raise
+  `ValueError`, `to(unit)` reads its numbers as counts of `unit`, and
+  `from_channels` of channels with and without a unit raises.
   Tests: `TimeSeries(values, [0, 1, 2]).unit is None`; a numeric index
-  without `unit`; round trip of a series without a unit; the raises.
+  without `unit`; round trip of a series without a unit; `to("s")` on a
+  series without a unit; the raises.
   Note: replaces rejecting numbers as times, which raised `TypeError`.
 - [ ] **G2.** [1] `evaluate` on series and tensors: a series without a
   unit takes numbers, and raises `TypeError` for durations, dates, and
@@ -307,6 +308,8 @@ so.
   unit.
   Tests: each output; a window of a series without a unit; the plot
   label and the raise.
+  Note: done with G1, since the docs mix, plot, and bound series of
+  numbers.
 
 ## Phase H: `TimeSeries.from_pandas` for DataFrames and bad input
 

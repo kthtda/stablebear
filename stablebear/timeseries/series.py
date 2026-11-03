@@ -108,10 +108,19 @@ def _times_from_datetimes(stamps, unit, epoch):
     return cpp.Times(counts, _NUMPY_TO_UNIT[code], epoch._data).to(unit)
 
 
+def _times_in(counts, unit):
+    """``counts``, a float or an array of them, as durations in ``unit``,
+    or as numbers for a series without a unit, whose ``unit`` is ``None``."""
+    if np.ndim(counts) == 0:
+        return float(counts) if unit is None else TimeDelta(float(counts), unit)
+    counts = FloatTensor(np.asarray(counts, dtype=np.float64))
+    return counts if unit is None else TimeDeltaTensor(counts, unit)
+
+
 def _native_times(times, unit=None, epoch=None):
     """The native times of ``times``, as the constructor of
     :class:`TimeSeries` accepts them, in ``unit`` and counted from ``epoch``;
-    a plain array is in ``unit``, by default seconds."""
+    a plain array is in ``unit``, by default none."""
     times = _from_pair(times)
     if isinstance(times, TimeDeltaTensor):
         # Counts in one unit, by default theirs, converted by one exact
@@ -140,7 +149,6 @@ def _native_times(times, unit=None, epoch=None):
         # of unit, which may be an alias.
         unit = unit or finest
         times = _durations_in(times, _unit_name(unit))
-    unit = unit or "s"
     if epoch is not None:
         epoch = DateTime(epoch)._data
     return cpp.Times(np.asarray(times, dtype=np.float64), unit, epoch)
@@ -242,7 +250,8 @@ class Domain(NamedTuple):
     themselves are included.
     """
 
-    # A DateTime if the series has an epoch, else a TimeDelta.
+    # A DateTime if the series has an epoch, else a TimeDelta, or a float
+    # for a series without a unit.
     #: The first time in the domain, or its lower bound if not included.
     start: Any
     #: The last time in the domain, or its upper bound if not included.
@@ -300,19 +309,20 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         ``TimedeltaIndex``. Dates and times are a :class:`DateTimeTensor`, a
         ``datetime64`` array, or a pandas ``DatetimeIndex`` or ``Series`` of
         dates, whose timezone, if any, is converted to UTC and dropped; they
-        are counted from ``epoch``, which defaults to the first of them. A
-        plain array of numbers is in seconds. The :attr:`unit` is that of
-        the durations or dates: the unit of a ``TimeDeltaTensor``, the
-        resolution of an array or index, such as minutes for a
-        ``timedelta64[m]`` array and nanoseconds for most pandas indexes, or
-        the finest unit of a sequence of durations.
+        are counted from ``epoch``, which defaults to the first of them. The
+        :attr:`unit` is that of the durations or dates: the unit of a
+        ``TimeDeltaTensor``, the resolution of an array or index, such as
+        minutes for a ``timedelta64[m]`` array and nanoseconds for most
+        pandas indexes, or the finest unit of a sequence of durations. A
+        plain array of numbers gives a series without a unit, whose
+        :attr:`unit` is ``None``.
     epoch : DateTime or a value DateTime accepts, optional
         The date and time that time 0 stands for, such as ``"2023-01-01"``.
         Dates keep their instants and are counted from it, in integers and
         converted to the unit once, so whole multiples of the unit are
         exact. Durations have their time 0 at it, as with
         :meth:`with_epoch`. Defaults to the first of the dates, or to none
-        for durations.
+        for durations. A series without a unit has no epoch.
     snap_tolerance : float, optional
         How close below an observation a query may land and still get that
         observation, relative to the magnitude of the timestamps, as in the
@@ -401,8 +411,9 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
 
         A ``DatetimeIndex`` is counted from its first date and time, which
         becomes the :attr:`epoch`; one with a timezone is converted to UTC
-        first. A ``TimedeltaIndex`` or numeric index gives times with no
-        epoch; set one with :meth:`with_epoch`.
+        first. A ``TimedeltaIndex`` gives times with no epoch; set one with
+        :meth:`with_epoch`. A numeric index counts ``unit``, or gives a
+        series without a unit if ``unit`` is omitted.
 
         Parameters
         ----------
@@ -413,8 +424,7 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         unit : str, optional
             The unit of the times, as for :class:`TimeDelta`. Defaults to the
             resolution of a ``DatetimeIndex`` or ``TimedeltaIndex``, usually
-            nanoseconds, and to seconds for a numeric index, which is in
-            this unit.
+            nanoseconds, and to none for a numeric index.
         snap_tolerance : float, optional
             As for the constructor.
 
@@ -449,8 +459,9 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         return self._data.n_channels
 
     @property
-    def unit(self) -> str:
-        """The time unit of queries and reported times."""
+    def unit(self) -> str | None:
+        """The time unit of queries and reported times, or ``None`` for a
+        series without a unit, whose times are plain numbers."""
         return self._data.unit
 
     @property
@@ -459,12 +470,13 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         return _SERIES_CPP_TO_DTYPE[type(self._data)]
 
     @property
-    def times(self) -> TimeDeltaTensor:
+    def times(self) -> Any:  # Depends on whether the series has a unit; see the docstring.
         """The timestamps of the recorded observations, a
         :class:`TimeDeltaTensor` of float counts in :attr:`unit` from time
         0, with or without an :attr:`epoch`. Their dates are
         ``epoch + origin + times``, where :attr:`origin` places a window in
-        the series it was cut from.
+        the series it was cut from. For a series without a unit, a
+        ``FloatTensor`` of the numbers.
 
         Raises
         ------
@@ -474,7 +486,7 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         """
         if self._data.n_channels > 1:
             raise ValueError("The channels of this series have their own times; select one with series[i].times")
-        return TimeDeltaTensor(FloatTensor(np.array(self._data.times(0).values)), self.unit)
+        return _times_in(np.array(self._data.times(0).values), self.unit)
 
     @property
     def datetimes(self) -> DateTimeTensor:
@@ -530,12 +542,11 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         it places a window in the series it was cut from: without an
         :attr:`epoch`, a channel lies at its :attr:`domain` moved by its
         origin. A :class:`TimeDelta` for a series with one channel; for
-        several, a :class:`TimeDeltaTensor` with one entry per channel.
+        several, a :class:`TimeDeltaTensor` with one entry per channel. For
+        a series without a unit, a float or a ``FloatTensor``.
         """
         origins = [self._data.origin(i) for i in range(self.n_channels)]
-        if len(origins) == 1:
-            return TimeDelta(origins[0], self.unit)
-        return TimeDeltaTensor(np.array(origins, dtype=np.float64), self.unit)
+        return _times_in(origins[0] if len(origins) == 1 else origins, self.unit)
 
     @property
     def epoch(self) -> Any:  # A DateTime, or None; see the docstring.
@@ -553,6 +564,11 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         to remove the epoch. No time is shifted, and the observations are
         shared, not copied. The epoch is the date of time 0 of the series a
         window was cut from, so a window keeps its :attr:`origin`.
+
+        Raises
+        ------
+        ValueError
+            If ``epoch`` is not ``None`` and the series has no unit.
         """
         if epoch is not None:
             epoch = DateTime(epoch)._data
@@ -563,7 +579,8 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         """The times at which every channel can be evaluated.
 
         Without an :attr:`epoch`, the ends are :class:`TimeDelta` durations
-        from time 0 in :attr:`unit`. For several channels, the domain is the
+        from time 0 in :attr:`unit`, or floats for a series without a unit.
+        For several channels, the domain is the
         intersection of theirs, which :meth:`evaluate` checks queries
         against.
 
@@ -579,7 +596,7 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         """
         if self.epoch is None:
             start, end, start_closed, end_closed = self._data.domain
-            return Domain(TimeDelta(start, self.unit), TimeDelta(end, self.unit), start_closed, end_closed)
+            return Domain(_times_in(start, self.unit), _times_in(end, self.unit), start_closed, end_closed)
         start, end, start_closed, end_closed = self._dated_domain()
         epoch = self.epoch
         return Domain(epoch + TimeDelta(start, self.unit), epoch + TimeDelta(end, self.unit), start_closed, end_closed)
@@ -631,7 +648,9 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
 
         The stored observations and timestamps are shared, not converted;
         :attr:`times` are reported in the new unit, and queries are read in
-        it. Accepts the units of :class:`TimeDelta`.
+        it. Accepts the units of :class:`TimeDelta`. A series without a
+        unit gets ``unit`` instead: its numbers become counts of it, so
+        times ``[0.0, 1.5]`` become 0 s and 1.5 s with ``to("s")``.
         """
         return TimeSeries._from_cpp(self._data.to(unit))
 
@@ -734,10 +753,10 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
     def _time_of_date(self, date, channel):
         """The time of ``date`` in channel ``channel``, in :attr:`unit`:
         ``date - epoch - origin``, with the difference taken in integers."""
-        epoch = self.epoch
-        assert epoch is not None
+        epoch, unit = self.epoch, self.unit
+        assert epoch is not None and unit is not None
         offset = date - epoch.to_datetime64()
-        return offset / np.timedelta64(1, _UNIT_TO_NUMPY[self.unit]) - self._data.origin(channel)
+        return offset / np.timedelta64(1, _UNIT_TO_NUMPY[unit]) - self._data.origin(channel)
 
     def _check_date_in_domain(self, date, t, channel):
         """Raise naming ``date`` and the domain of channel ``channel`` as dates

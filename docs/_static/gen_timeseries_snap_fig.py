@@ -13,7 +13,7 @@ HERE = Path(__file__).parent
 
 
 def _plot_steps(ax, series, color):
-    times = np.asarray(series.to("s").times.count)
+    times = np.asarray(series.times if series.unit is None else series.to("s").times.count)
     values = np.asarray(series.values)
     # Each step [t_i, t_{i+1}) is closed on the left and open on the right.
     for t0, t1, v in zip(times[:-1], times[1:], values[:-1]):
@@ -43,7 +43,7 @@ def plot_timeseries_evaluation():
 
 # -- included in docs via literalinclude :pyobject: --
 def plot_timeseries_channels():
-    a = TimeSeries([1.0, 2.0, 3.0, 4.0], times=[0.0, 0.1, 0.2, 0.3])
+    a = TimeSeries([1.0, 2.0, 3.0, 4.0], times=TimeDeltaTensor([0.0, 0.1, 0.2, 0.3], "s"))
     b = TimeSeries([10.0, 20.0, 30.0],
                    times=TimeDeltaTensor([50.0, 90.0, 130.0], "ms"))
     series = TimeSeries.from_channels([a, b], unit="s")
@@ -92,7 +92,7 @@ def plot_timeseries_vector_channel():
     # Channel v: the time axis as a line, with each vector above its time
     # and the queried vector below.
     ax_v.axhline(0, color=color, linewidth=1)
-    for t, x in zip(np.asarray(v.times.count), np.asarray(v.values)):
+    for t, x in zip(np.asarray(v.times), np.asarray(v.values)):
         ax_v.plot(t, 0, "o", color=color, markersize=6, zorder=5)
         ax_v.text(t, 0.25, column(x), ha="center", va="bottom", fontsize=14)
     ax_v.plot(query, 0, "s", color="tab:orange", markersize=7, zorder=6)
@@ -264,13 +264,13 @@ def plot_timeseries_windows():
                         times=np.arange(9.0))
     windows, bounds = Window(size=4.0, step=2.0, anchor="start")(
         signal, return_bounds=True)
-    bounds = np.asarray(bounds.count)
+    bounds = np.asarray(bounds)
     color = plt.rcParams["lines.color"]
 
     fig = plt.figure(figsize=(7, 4.4))
     grid = fig.add_gridspec(2, len(bounds), height_ratios=[1.4, 1])
     ax_signal = fig.add_subplot(grid[0, :])
-    ax_signal.step(np.asarray(signal.times.count), np.asarray(signal.values),
+    ax_signal.step(np.asarray(signal.times), np.asarray(signal.values),
                    where="post", color=color, linewidth=1.5)
     # One bar per window above the signal, staggered so they do not overlap.
     # Each window is [a, b): closed at the start, open at the end.
@@ -315,7 +315,7 @@ def _plot_window_rows(rows, stacked=False):
     bars = []  # (row, height offset, a, b, window)
     for row, (label, window) in enumerate(rows):
         _, bounds = window(signal, return_bounds=True)
-        for k, (a, b) in enumerate(np.asarray(bounds.count)):
+        for k, (a, b) in enumerate(np.asarray(bounds)):
             if stacked:
                 bars.append((k, 0.0, a, b, window))
             else:
@@ -330,7 +330,7 @@ def _plot_window_rows(rows, stacked=False):
     fig, (ax_signal, ax_rows) = plt.subplots(
         2, 1, figsize=(7, 1.9 + (row_height + 0.1) * n_rows), sharex=True,
         gridspec_kw={"height_ratios": [1.6, row_height * n_rows]})
-    ax_signal.step(np.asarray(signal.times.count), np.asarray(signal.values),
+    ax_signal.step(np.asarray(signal.times), np.asarray(signal.values),
                    where="post", color=color, linewidth=1.5)
     ax_signal.set_ylim(-0.3, 3.4)
     ax_signal.set_yticks([0, 1, 2, 3])
@@ -377,7 +377,7 @@ def plot_timeseries_window_closed():
     for row, closed in enumerate(choices):
         window = Window(size=3.0, anchor="start", closed=closed)
         _, bounds = window(signal, return_bounds=True)
-        for k, (a, b) in enumerate(np.asarray(bounds.count)):
+        for k, (a, b) in enumerate(np.asarray(bounds)):
             # Alternate heights so that the shared end at 3 s stays visible.
             y = len(choices) - 1 - row + (0.15 if k % 2 else -0.15)
             ax.plot([a, b], [y, y], color="tab:orange", linewidth=2)

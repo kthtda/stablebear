@@ -29,14 +29,14 @@ namespace sb_py
 
     nb::class_<sb::Times>(m, "Times")
       .def("__init__", [](sb::Times* self, nb::ndarray<const sb::float64_t, nb::c_contig, nb::device::cpu> values,
-                          const std::string& unit, const std::optional<sb::DateTime>& epoch) {
+                          const std::optional<std::string>& unit, const std::optional<sb::DateTime>& epoch) {
         if (values.ndim() != 1)
         {
           throw std::invalid_argument(
               "Timestamps must be one-dimensional, got " + std::to_string(values.ndim()) + " dimensions");
         }
         std::vector<sb::float64_t> data(values.data(), values.data() + values.size());
-        new (self) sb::Times(std::move(data), sb::parse_time_unit(unit), epoch);
+        new (self) sb::Times(std::move(data), unit ? sb::parse_time_unit(*unit) : sb::TimeUnit::Unitless, epoch);
       }, nb::arg("values"), nb::arg("unit"), nb::arg("epoch") = nb::none())
       .def_prop_ro("values", [](const sb::Times& self) {
         // A copy: timestamps cannot change after validation.
@@ -44,9 +44,7 @@ namespace sb_py
         std::copy(self.values().begin(), self.values().end(), out.data());
         return out;
       })
-      .def_prop_ro("unit", [](const sb::Times& self) {
-        return std::string(sb::time_unit_name(self.unit()));
-      })
+      .def_prop_ro("unit", [](const sb::Times& self) { return unit_name(self.unit()); })
       .def_prop_ro("epoch", &sb::Times::epoch)
       .def_prop_ro("origin", &sb::Times::origin)
       .def("with_epoch", &sb::Times::with_epoch, nb::arg("epoch"))
