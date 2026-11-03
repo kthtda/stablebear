@@ -16,7 +16,7 @@ from ..functional.pcf import Pcf
 from ..nested_tensor import NestedTensor, _leaf_wrappers
 from ..point_cloud import PointCloud
 from ..symmetric_matrix import SymmetricMatrix
-from .date_time import _ATTOSECONDS, _NUMPY_TO_UNIT, _UNIT_TO_NUMPY, DateTime, DateTimeTensor, TimeDelta, TimeDeltaTensor, _as_array, _as_time_delta, _from_pair, _in_unit
+from .date_time import _ATTOSECONDS, _NUMPY_TO_UNIT, _UNIT_TO_NUMPY, DateTime, DateTimeTensor, TimeDelta, TimeDeltaTensor, _as_array, _as_time_delta, _from_pair, _in_unit, _unit_name
 from ..typing import (
     _NATIVE_SUFFIX,
     barcode32,
@@ -160,7 +160,7 @@ class Times:
             # Counts in one unit, by default theirs, converted by one exact
             # factor; the short name of unit, which may be an alias.
             unit = unit or times.unit
-            times = _in_unit(times, cpp.Times(np.zeros(0), unit, None).unit)
+            times = _in_unit(times, _unit_name(unit))
         elif isinstance(times, DateTimeTensor):
             times = times.to_datetime64()
         times = _as_array(times)
@@ -184,7 +184,7 @@ class Times:
             # their units, each converted by an exact factor; the short name
             # of unit, which may be an alias.
             unit = unit or finest
-            times = _durations_in(times, cpp.Times(np.zeros(0), unit, None).unit)
+            times = _durations_in(times, _unit_name(unit))
         unit = unit or "s"
         if epoch is not None:
             epoch = DateTime(epoch)._data

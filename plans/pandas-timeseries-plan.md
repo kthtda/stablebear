@@ -1,6 +1,6 @@
 # pandas input and durations for time series: implementation plan
 
-Progress: 36 of 54 items, 72 of 107 points (67%)
+Progress: 36 of 55 items, 72 of 108 points (67%)
 
 Specs: [pandas-timeseries-spec.md](pandas-timeseries-spec.md) (phases A, B,
 and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
@@ -172,6 +172,13 @@ and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
   Tests: each of these with a tuple equals it with the `TimeDelta` or
   `TimeDeltaTensor`; a tuple of two dates is still two dates; a tuple
   with an unknown unit raises.
+- [ ] **D9.** [1] `TimeDelta` and `TimeDeltaTensor` take the unit aliases
+  that series take, such as `"hours"`, through one C++ lookup, and keep
+  the short name.
+  Tests: `TimeDelta` and `TimeDeltaTensor` in `"hours"`, `"minutes"`, and
+  `"\u00b5s"` are in `"h"`, `"min"`, and `"us"`; `(1.5, "hours")` equals
+  `(1.5, "h")`;
+  `"m"` and `"fortnight"` raise.
 
 ## Phase E: durations and dates as output
 

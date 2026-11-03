@@ -348,8 +348,21 @@ def test_time_delta_rejects_a_count_that_is_not_finite(count):
 
 def test_time_delta_rejects_an_unknown_unit():
     # NumPy's "m" is minutes, but it could be read as months.
-    with pytest.raises(ValueError, match="Unknown unit"):
+    with pytest.raises(ValueError, match="Unknown time unit"):
         TimeDelta(3, "m")
+
+
+@pytest.mark.parametrize("alias, unit", [
+    pytest.param("hours", "h", id="hours"),
+    pytest.param("minutes", "min", id="minutes"),
+    pytest.param("\u00b5s", "us", id="micro-sign"),
+])
+@pytest.mark.parametrize("make", [
+    pytest.param(lambda unit: TimeDelta(90, unit), id="TimeDelta"),
+    pytest.param(lambda unit: TimeDeltaTensor([30, 90], unit), id="TimeDeltaTensor"),
+])
+def test_time_deltas_in_a_unit_alias_are_in_its_short_name(make, alias, unit):
+    assert make(alias).unit == unit
 
 
 def test_time_delta_rejects_a_number_without_a_unit():
@@ -919,9 +932,13 @@ def test_series_at_a_tuple_of_two_dates_is_at_both_dates():
         series(DateTimeTensor(["2023-01-01T00:30", "2023-01-01T02:00"])))
 
 
+def test_series_at_a_pair_with_a_unit_alias_equals_the_series_at_its_short_name():
+    assert _hourly_series()((1.5, "hours")) == _hourly_series()((1.5, "h"))
+
+
 def test_series_at_a_pair_with_an_unknown_unit_raises():
-    with pytest.raises(ValueError, match="Unknown unit"):
-        _hourly_series()((90, "hours"))
+    with pytest.raises(ValueError, match="Unknown time unit"):
+        _hourly_series()((90, "fortnight"))
 
 
 def test_series_at_a_list_of_time_deltas_equals_the_series_at_their_times():

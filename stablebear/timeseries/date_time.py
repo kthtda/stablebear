@@ -399,7 +399,8 @@ class TimeDelta(_Duration):
     unit : str, optional
         The unit of a number ``value``: one of ``"as"``, ``"fs"``, ``"ps"``,
         ``"ns"``, ``"us"``, ``"ms"``, ``"s"``, ``"min"``, ``"h"``, and
-        ``"d"``.
+        ``"d"``, or an alias such as ``"hours"`` or ``"\u00b5s"``.
+        :attr:`unit` reports the short name.
 
     Raises
     ------
@@ -428,7 +429,7 @@ class TimeDelta(_Duration):
             self._count, self._unit = value._count, value._unit
             return
         if unit is not None:
-            _check_unit(unit)
+            unit = _unit_name(unit)
             if isinstance(value, numbers.Integral):
                 self._count = int(value)
             elif isinstance(value, numbers.Real):
@@ -499,7 +500,7 @@ class TimeDeltaTensor(_CountsTensor, _Duration):
             self._count, self._unit = value._count, value._unit
             return
         if unit is not None:
-            _check_unit(unit)
+            unit = _unit_name(unit)
             self._count, self._unit = _array_counts(value, unit), unit
             return
         array = _as_array(value)
@@ -526,9 +527,10 @@ def _time_delta(value, unit=None):
     return (TimeDeltaTensor if array else TimeDelta)(value, unit)
 
 
-def _check_unit(unit):
-    if unit not in _UNIT_TO_NUMPY:
-        raise ValueError(f"Unknown unit {unit!r}; expected one of {', '.join(_UNIT_TO_NUMPY)}")
+def _unit_name(unit):
+    """The short name of ``unit``, a time unit or an alias such as
+    ``"hours"``; raises ``ValueError`` for an unknown unit."""
+    return cpp.time_unit_name(unit)
 
 
 def _numpy_counts(value):

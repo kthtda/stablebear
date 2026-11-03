@@ -13,6 +13,10 @@ namespace sb_py
 {
   void register_timeseries(nb::module_& m)
   {
+    m.def("time_unit_name", [](const std::string& unit) {
+      return std::string(sb::time_unit_name(sb::parse_time_unit(unit)));
+    }, nb::arg("unit"), "The short name of a time unit given by its name or an alias.");
+
     nb::class_<sb::DateTime>(m, "DateTime")
       .def("__init__", [](sb::DateTime* self, int64_t count, const std::string& unit) {
         new (self) sb::DateTime(count, sb::parse_time_unit(unit));
