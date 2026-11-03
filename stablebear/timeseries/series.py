@@ -765,8 +765,9 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         :class:`TimeDeltaTensor`, or an array, sequence, or pandas
         ``TimedeltaIndex`` of durations. Durations are converted to the
         series' unit by an exact factor and take no ``unit``. For a series with an
-        :attr:`epoch`, ``t`` may also be a date and time, as anything :class:`DateTime` accepts, such as
-        ``"2023-01-01T12:30"``, or an array, pandas ``DatetimeIndex``, or
+        :attr:`epoch`, ``t`` may also be a date and time, a :class:`DateTime`
+        or anything it accepts, such as ``"2023-01-01T12:30"``, or a
+        :class:`DateTimeTensor`, an array, a pandas ``DatetimeIndex``, or a
         pandas ``Series`` of them. A
         date names an instant, not an offset: it is placed at
         ``t - epoch - origin`` in each channel, so a window gives the value
@@ -785,10 +786,14 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
             If a time is outside the domain of any channel, or a channel has
             no observations, or if ``unit`` is unknown.
         """
-        if isinstance(t, (str, datetime.date, np.datetime64)):
+        if isinstance(t, (str, datetime.date, np.datetime64, DateTime)):
             if unit is not None:
                 raise TypeError("A date and time has no unit; pass unit only with numeric times")
             return self._evaluate_date(DateTime(t).to_datetime64())
+        if isinstance(t, DateTimeTensor):
+            if unit is not None:
+                raise TypeError("Dates and times have no unit; pass unit only with numeric times")
+            return self._evaluate_date(t.to_datetime64())
         duration = _as_time_delta(t)
         if duration is not None:
             if unit is not None:

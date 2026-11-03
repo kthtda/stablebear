@@ -1039,6 +1039,23 @@ def test_series_at_a_list_of_dates_equals_the_series_at_their_times(dates):
     assert series(dates).array_equal(series(TimeDeltaTensor([0.5, 2.0], "h")))
 
 
+def test_series_at_a_date_time_equals_the_series_at_its_datetime64():
+    series = _dated_series()
+
+    assert series(DateTime("2023-01-01T02:00")) == series(np.datetime64("2023-01-01T02:00"))
+
+
+def test_series_at_a_date_time_tensor_equals_the_series_at_its_datetime64_array():
+    series = _dated_series()
+    dates = DateTimeTensor([["2023-01-01T00:30", "2023-01-01T02:00"],
+                            ["2023-01-01T04:00", "2023-01-01T01:30"]])
+
+    values = series(dates)
+
+    assert values.shape == (2, 2)
+    assert values.array_equal(series(dates.to_datetime64()))
+
+
 def test_series_of_several_channels_at_a_date_gives_each_channel():
     a = TimeSeries([10.0, 20.0], times=Times([0.0, 1.0], unit="h", epoch="2023-01-01"))
     b = TimeSeries([-10.0, -20.0, -30.0], times=Times([0.0, 30.0, 60.0], unit="min", epoch="2023-01-01"))

@@ -1,6 +1,6 @@
 # pandas input and durations for time series: implementation plan
 
-Progress: 33 of 51 items, 66 of 101 points (65%)
+Progress: 34 of 53 items, 69 of 104 points (66%)
 
 Specs: [pandas-timeseries-spec.md](pandas-timeseries-spec.md) (phases A, B,
 and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
@@ -147,19 +147,31 @@ and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
   `dates.to_datetime64()`; a series with a `DateTimeTensor` as times has
   its first date as epoch.
   Note: added during F4, whose examples build series from dates.
-- [ ] **D6.** An epoch without `Times`.
+- [x] **D6.** An epoch without `Times`.
   - [x] **D6a.** [1] (4fd939cd4) `TimeSeries(values, times, *, epoch=None)` counts
     dates from `epoch` and gives durations their time 0 at it.
     Tests: dates with an epoch keep their instants and count from it,
     exact in whole units; durations with an epoch equal the series
     `with_epoch` it; a `DateTimeTensor` epoch raises `TypeError`.
-  - [ ] **D6b.** [3] `TimeSeries.from_channels` counts dated channels of
+  - [x] **D6b.** [3] (e2eca5eea) `TimeSeries.from_channels` counts dated channels of
     different epochs from the earliest, shifting each channel's times and
     domain end in C++.
     Tests: channels whose first dates differ combine, and evaluate at a
     date to the values of each channel there; a window channel keeps
     where it lies; channels with and without an epoch raise; the epochs
     at different resolutions combine.
+- [ ] **D7.** [1] `TimeSeries.evaluate` takes a `DateTime` and a
+  `DateTimeTensor` as dates, as it takes a `datetime64` array.
+  Tests: a `DateTime` and a `DateTimeTensor` give the values at their
+  `datetime64` dates; a `DateTimeTensor` keeps its shape.
+- [ ] **D8.** [2] A tuple `(count, unit)` is a duration wherever one is
+  taken: `TimeDelta(count, unit)`, or `TimeDeltaTensor(count, unit)` for
+  a sequence or array of counts. This covers `Window`,
+  `TimeDelayEmbedding`, `evaluate` on series and tensors, and `times` of
+  `TimeSeries`.
+  Tests: each of these with a tuple equals it with the `TimeDelta` or
+  `TimeDeltaTensor`; a tuple of two dates is still two dates; a tuple
+  with an unknown unit raises.
 
 ## Phase E: durations and dates as output
 

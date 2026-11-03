@@ -131,12 +131,17 @@ keeps its counts as one tensor in one unit.
   unit by an exact factor. Whole multiples of the unit stay exact only up
   to that floating-point addition. Channels with and without an epoch
   still raise.
+- **A tuple `(count, unit)`** is a duration wherever one is taken:
+  `TimeDelta(count, unit)`, or `TimeDeltaTensor(count, unit)` when `count`
+  is a sequence or array, as in `Window(size=(2.0, "h"))` and
+  `TimeSeries(values, times=([0.0, 1.5], "s"))`. Only a tuple whose second
+  element is a unit is read so; any other tuple keeps its meaning.
 - **`TimeSeries.from_pandas`** takes `unit` for storage. A numeric index
   needs it.
 - **`TimeSeries.evaluate(t)` and `TimeSeriesTensor.evaluate(t)`** take a
   duration or an array of durations, measured from time 0. A series with an
-  epoch also takes dates, as today. Numbers raise `TypeError`. The `unit`
-  argument is removed.
+  epoch also takes dates, including a `DateTime` and a `DateTimeTensor`.
+  Numbers raise `TypeError`. The `unit` argument is removed.
 - **`Window(size, step)` and `TimeDelayEmbedding(delay)`** take durations
   only. Numbers raise `TypeError`.
 
