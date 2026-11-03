@@ -144,6 +144,8 @@ NB_MODULE(SB_MODULE_NAME, m) {
   m.def("set_min_block_side", [](size_t n){ sb::settings().minBlockSide = n; });
 #ifdef BUILD_WITH_CUDA
   m.def("limit_gpus", [](size_t n){ sb::default_executor().limit_cuda_workers(n); });
+#else
+  m.def("limit_gpus", [](size_t){}); // No GPUs to limit
 #endif
   m.def("get_ngpus", &getNumGpus);
 

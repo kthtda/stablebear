@@ -4,8 +4,10 @@ Uses the C++ _gpu_detect module (direct OS API calls) when available,
 falling back to a pure-Python implementation using subprocess.
 """
 
+__all__ = ["detect_nvidia_gpus", "has_nvidia_gpu", "nvidia_gpu_count"]
+
 try:
-    from _gpu_detect import detect_nvidia_gpus, has_nvidia_gpu, nvidia_gpu_count
+    from ._gpu_detect import detect_nvidia_gpus, has_nvidia_gpu, nvidia_gpu_count
 except ImportError:
     import os
     import platform

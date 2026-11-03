@@ -1,10 +1,13 @@
 #include <nanobind/nanobind.h>
+#include <nanobind/stl/string.h>
 
 #include <string>
 #include <vector>
 
 #ifdef __linux__
 #include <dirent.h>
+#include <cstdlib>
+#include <set>
 #include <fstream>
 #include <sstream>
 #elif defined(_WIN32)
@@ -32,6 +35,9 @@ struct GpuInfo
 std::vector<GpuInfo> detect_gpus()
 {
   std::vector<GpuInfo> gpus;
+  // A GPU has several DRM entries (such as card1 and renderD128), all
+  // linking to the same PCI device.
+  std::set<std::string> seen_devices;
 
   DIR* drm = opendir("/sys/class/drm");
   if (!drm)
@@ -55,6 +61,14 @@ std::vector<GpuInfo> detect_gpus()
     vendor_file.close();
 
     if (vendor_id != NVIDIA_VENDOR_ID)
+      continue;
+
+    char* device = realpath(device_path.c_str(), nullptr);
+    if (!device)
+      continue;
+    bool is_new = seen_devices.insert(device).second;
+    free(device);
+    if (!is_new)
       continue;
 
     GpuInfo gpu;
@@ -151,22 +165,20 @@ NB_MODULE(_gpu_detect, m)
 {
   m.doc() = "Detect NVIDIA GPUs without CUDA dependencies";
 
-  nb::class_<GpuInfo>(m, "GpuInfo")
-    .def_ro("name", &GpuInfo::name)
-    .def_ro("vendor_id", &GpuInfo::vendor_id)
-    .def_ro("device_id", &GpuInfo::device_id)
-    .def("__repr__", [](const GpuInfo& g) {
-      return "GpuInfo(name='" + g.name + "', device_id=0x" +
-        ([](uint32_t v) {
-          char buf[16];
-          snprintf(buf, sizeof(buf), "%04x", v);
-          return std::string(buf);
-        })(g.device_id) + ")";
-    });
-
-  m.def("detect_nvidia_gpus", &detect_gpus,
+  m.def("detect_nvidia_gpus", []() {
+    nb::list gpus;
+    for (const auto& gpu : detect_gpus())
+    {
+      nb::dict info;
+      info["name"] = gpu.name;
+      info["vendor_id"] = gpu.vendor_id;
+      info["device_id"] = gpu.device_id;
+      gpus.append(info);
+    }
+    return gpus;
+  },
     "Detect NVIDIA GPUs using OS-level APIs (no CUDA required).\n"
-    "Returns a list of GpuInfo objects.");
+    "Returns a list of dicts with \"name\", \"vendor_id\", and \"device_id\".");
 
   m.def("has_nvidia_gpu", []() { return !detect_gpus().empty(); },
     "Returns True if at least one NVIDIA GPU is detected.");
