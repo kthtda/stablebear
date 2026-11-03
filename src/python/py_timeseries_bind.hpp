@@ -75,6 +75,7 @@ namespace sb_py
       .def_prop_ro("n_channels", &Series::n_channels)
       .def_prop_ro("epoch", [](const Series& self) { return self.channel(0).epoch(); })
       .def("with_epoch", &Series::with_epoch, nb::arg("epoch"))
+      .def("shifted", &Series::shifted, nb::arg("delta"), nb::arg("epoch"))
       .def_prop_ro("domain", [](const Series& self) {
         const auto domain = self.domain();
         return nb::make_tuple(domain.first, domain.last, domain.closedStart, domain.closedEnd);

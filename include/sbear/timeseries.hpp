@@ -364,6 +364,12 @@ namespace sb
     /// shares the observations; no time is shifted.
     [[nodiscard]] Channel with_epoch(std::optional<DateTime> epoch) const;
 
+    /// This channel with @p delta, in its unit, added to every timestamp and
+    /// to its end, counted from @p epoch, or from none. A view shifts its
+    /// source alike, so it reads the same observations. It shares the
+    /// observations; only the timestamps are copied.
+    [[nodiscard]] Channel shifted(float64_t delta, std::optional<DateTime> epoch) const;
+
     /// Whether the first timestamp is in the domain.
     [[nodiscard]] bool start_closed() const noexcept { return m_startClosed; }
 
@@ -527,6 +533,10 @@ namespace sb
     /// The same series with every channel's times counted from @p epoch, or
     /// from none, sharing the observations; no time is shifted.
     [[nodiscard]] TimeSeries with_epoch(std::optional<DateTime> epoch) const;
+
+    /// The same series with @p delta, in its unit, added to the times of
+    /// every channel, counted from @p epoch, or from none.
+    [[nodiscard]] TimeSeries shifted(float64_t delta, std::optional<DateTime> epoch) const;
 
     /// The timestamps of channel @p i, converted to the query unit.
     [[nodiscard]] Times times(size_t i) const { return channel(i).times().to(m_unit); }

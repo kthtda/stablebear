@@ -317,6 +317,18 @@ def _is_stablebear_object(value):
     )
 
 
+def _on_one_epoch(parts):
+    """``parts``, one-channel series, counted from the earliest of their
+    epochs if they all have one."""
+    epochs = [part.epoch for part in parts]
+    if None in epochs or len(set(epochs)) == 1:
+        return parts
+    earliest = min(epochs)
+    return [part if part.epoch == earliest
+            else TimeSeries._from_cpp(part._data.shifted(_in_unit(part.epoch - earliest, part.unit), earliest._data))
+            for part in parts]
+
+
 def _values_tensor(values):
     """Convert values to a tensor whose axis 0 is time."""
     from ..tensor_create import tensor
@@ -470,7 +482,10 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
 
         Each channel keeps its own times, unit, and ``snap_tolerance``;
         queries are converted from the series' unit into each channel's
-        unit.
+        unit. Channels with different epochs are counted from the earliest
+        of them: each channel's times and domain end are shifted by the
+        difference of its epoch, converted to its unit by an exact factor,
+        so it keeps its dates up to that floating-point addition.
 
         Parameters
         ----------
@@ -485,10 +500,8 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         ------
         ValueError
             If there are no channels, a channel has several channels,
-            ``unit`` is omitted while the channels' units differ, or the
-            channels do not share their :attr:`epoch`: all the same, at the
-            same resolution, or none. To combine dated channels, count each
-            one's times from one shared epoch with ``Times(..., epoch=...)``.
+            ``unit`` is omitted while the channels' units differ, or some
+            channels have an :attr:`epoch` and others do not.
         TypeError
             If a channel is not a ``TimeSeries`` or the channels have
             different element types.
@@ -506,7 +519,7 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
             raise ValueError("A time series needs at least one channel")
         native = _SERIES_NATIVE[parts[0].dtype]
         return cls._from_cpp(native.from_channels(
-            [part._data for part in parts], unit
+            [part._data for part in _on_one_epoch(parts)], unit
         ))
 
     @classmethod

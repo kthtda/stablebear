@@ -621,7 +621,8 @@ def test_series_counts_its_dates_from_its_epoch():
     series = TimeSeries([10.0, 20.0], times=dates, epoch="2023-01-01")
 
     assert series.epoch == DateTime("2023-01-01")
-    assert series.times == Times([360.0, 450.0], unit="min", epoch="2023-01-01")
+    assert series(TimeDelta(360.0, "min")) == 10.0
+    assert series(TimeDelta(450.0, "min")) == 20.0
     assert series.domain == TimeSeries([10.0, 20.0], times=dates).domain
 
 
@@ -1151,18 +1152,66 @@ def test_series_with_epoch_none_removes_the_epoch():
     assert series.with_epoch(None).epoch is None
 
 
-@pytest.mark.parametrize("epoch_b", [
-    pytest.param("2023-01-02", id="different"),
-    pytest.param(None, id="missing"),
-    # The same instant in microseconds; the epoch of channel a counts days.
-    pytest.param(datetime.datetime(2023, 1, 1), id="other-resolution"),
-])
-def test_series_channels_must_share_their_epoch(epoch_b):
-    a = TimeSeries([10.0, 20.0], times=Times([0.0, 1.0], unit="h", epoch="2023-01-01"))
-    b = TimeSeries([-10.0, -20.0], times=Times([0.0, 1.0], unit="h", epoch=epoch_b))
+def test_series_channels_with_and_without_an_epoch_raise():
+    a = TimeSeries([10.0, 20.0], times=TimeDeltaTensor([0.0, 1.0], "h"), epoch="2023-01-01")
+    b = TimeSeries([-10.0, -20.0], times=TimeDeltaTensor([0.0, 1.0], "h"))
 
     with pytest.raises(ValueError, match="different epochs"):
         TimeSeries.from_channels([a, b])
+
+
+def test_series_channels_of_different_epochs_count_from_the_earliest():
+    a = TimeSeries([10.0, 20.0, 30.0], times=DateTimeTensor(["2023-01-01T06:00", "2023-01-01T07:00",
+                                                             "2023-01-01T08:00"]))
+    b = TimeSeries([-10.0, -20.0], times=DateTimeTensor(["2023-01-01T06:30", "2023-01-01T07:30"]))
+
+    series = TimeSeries.from_channels([a, b])
+
+    assert series.epoch == DateTime("2023-01-01T06:00")
+    assert series[1](TimeDelta(30.0, "min")) == -10.0
+    assert series[1](TimeDelta(90.0, "min")) == -20.0
+    values = series("2023-01-01T07:15")
+    assert (float(values[0]), float(values[1])) == (20.0, -10.0)
+
+
+def test_series_channels_at_epochs_of_different_resolutions_combine():
+    # The same instant, counted in days and in microseconds.
+    a = TimeSeries([10.0, 20.0], times=TimeDeltaTensor([0.0, 1.0], "h"), epoch="2023-01-01")
+    b = TimeSeries([-10.0, -20.0], times=TimeDeltaTensor([0.0, 1.0], "h"), epoch=datetime.datetime(2023, 1, 1))
+
+    series = TimeSeries.from_channels([a, b])
+
+    assert series.epoch == DateTime("2023-01-01")
+    assert series[1](TimeDelta(1.0, "h")) == -20.0
+
+
+def test_series_embedding_channel_of_a_later_epoch_reads_the_same_points():
+    # Each observation is 10 times its hour on 2 January.
+    source = TimeSeries([0.0, 10.0, 20.0], times=TimeDeltaTensor([0.0, 1.0, 2.0], "h"), epoch="2023-01-02")
+    embedding = TimeDelayEmbedding(dimension=2, delay=TimeDelta(1.0, "h"))(source)
+    earlier = TimeSeries([-10.0, -20.0], times=TimeDeltaTensor([0.0, 48.0], "h"), epoch="2023-01-01")
+
+    series = TimeSeries.from_channels([embedding, earlier])
+
+    # (x(01:00), x(02:00)) on 2 January
+    assert np.array_equal(np.asarray(series("2023-01-02T02:00")[0]), [10.0, 20.0])
+
+
+def test_series_window_channel_of_a_later_epoch_keeps_where_it_lies():
+    # Each observation is 10 times its hour on 2 January.
+    source = TimeSeries([0.0, 10.0, 20.0, 30.0], times=TimeDeltaTensor([0.0, 1.0, 2.0, 3.0], "h"),
+                        epoch="2023-01-02")
+    # From 01:00 to 03:00 on 2 January
+    window = Window(size=TimeDelta(2.0, "h"), step=TimeDelta(1.0, "h"),
+                    closed="left", partial=False, anchor="start")(source)[1]
+    earlier = TimeSeries([-10.0, -20.0], times=TimeDeltaTensor([0.0, 48.0], "h"), epoch="2023-01-01")
+
+    series = TimeSeries.from_channels([window, earlier])
+
+    assert series.epoch == DateTime("2023-01-01")
+    assert series[0].domain == window.domain
+    # x(02:00) on 2 January
+    assert float(series("2023-01-02T02:30")[0]) == 20.0
 
 
 def test_series_origin_is_zero_for_recorded_observations():

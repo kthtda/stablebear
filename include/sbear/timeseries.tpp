@@ -207,6 +207,28 @@ namespace sb
   }
 
   template <typename T>
+  Channel<T> Channel<T>::shifted(float64_t delta, std::optional<DateTime> epoch) const
+  {
+    auto channel = *this;
+    auto values = held_times().values();
+    for (auto& value : values)
+    {
+      value += delta;
+    }
+    channel.m_times = std::make_shared<const Times>(held_times().with_values(std::move(values)).with_epoch(epoch));
+    if (m_end)
+    {
+      channel.m_end = *m_end + delta;
+    }
+    // A view reads its source at its own times minus its lags.
+    if (m_source)
+    {
+      channel.m_source = std::make_shared<const Channel>(m_source->shifted(delta, epoch));
+    }
+    return channel;
+  }
+
+  template <typename T>
   Channel<T> Channel<T>::with_start_closed(bool closed) const
   {
     auto channel = *this;
@@ -420,9 +442,10 @@ namespace sb
         throw std::invalid_argument("The channels differ in unit; pass unit= to choose one");
       }
       // One epoch for the series: every channel has the same one, or none.
+      // Python counts dated channels from one epoch before combining them.
       if (channels.back().epoch() != parts.front().m_channels.front().epoch())
       {
-        throw std::invalid_argument("The channels have different epochs; count their times from one shared epoch");
+        throw std::invalid_argument("The channels have different epochs; give every channel an epoch, or none");
       }
     }
     return TimeSeries(std::move(channels), unit.value_or(parts.front().unit()));
@@ -461,6 +484,17 @@ namespace sb
     for (auto& channel : series.m_channels)
     {
       channel = channel.with_epoch(epoch);
+    }
+    return series;
+  }
+
+  template <typename T>
+  TimeSeries<T> TimeSeries<T>::shifted(float64_t delta, std::optional<DateTime> epoch) const
+  {
+    auto series = *this;
+    for (auto& channel : series.m_channels)
+    {
+      channel = channel.shifted(convert_time(delta, m_unit, channel.unit()), epoch);
     }
     return series;
   }

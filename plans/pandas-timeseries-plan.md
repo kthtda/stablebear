@@ -1,6 +1,6 @@
 # pandas input and durations for time series: implementation plan
 
-Progress: 32 of 51 items, 65 of 101 points (64%)
+Progress: 33 of 51 items, 66 of 101 points (65%)
 
 Specs: [pandas-timeseries-spec.md](pandas-timeseries-spec.md) (phases A, B,
 and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
@@ -148,7 +148,7 @@ and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
   its first date as epoch.
   Note: added during F4, whose examples build series from dates.
 - [ ] **D6.** An epoch without `Times`.
-  - [ ] **D6a.** [1] `TimeSeries(values, times, *, epoch=None)` counts
+  - [x] **D6a.** [1] (4fd939cd4) `TimeSeries(values, times, *, epoch=None)` counts
     dates from `epoch` and gives durations their time 0 at it.
     Tests: dates with an epoch keep their instants and count from it,
     exact in whole units; durations with an epoch equal the series
