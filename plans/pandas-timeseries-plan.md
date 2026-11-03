@@ -1,6 +1,6 @@
 # pandas input and durations for time series: implementation plan
 
-Progress: 40 of 56 items, 81 of 111 points (73%)
+Progress: 41 of 56 items, 83 of 111 points (75%)
 
 Specs: [pandas-timeseries-spec.md](pandas-timeseries-spec.md) (phases A, B,
 and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
@@ -243,12 +243,12 @@ and H to L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
   instead of `Times`.
   Tests: the `Times` tests move to `TimeSeries` where they test its times,
   and are removed where they test only `Times`.
-- [ ] **E10.** Remove `Times`.
+- [x] **E10.** Remove `Times`.
   - [x] **E10a.** [2] (e153dbb9d) The guide pages, the figure scripts in
     `docs/_static/`, and the tide gauge tutorial build series from
     `TimeDeltaTensor` and dates, and point to `TimeSeries.datetimes`
     instead of `Times.to_datetime64`. F4 still rewrites the pages.
-  - [ ] **E10b.** [2] Remove `Times`, `TimesTensor`, and `sb.times` from the
+  - [x] **E10b.** [2] (0aeb67eb9) Remove `Times`, `TimesTensor`, and `sb.times` from the
     Python API, and the registration of `Tensor<sb::Times>` in C++, with
     the saving and loading of a `TimesTensor`.
     Tests: the E2 tests are removed.
