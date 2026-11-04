@@ -1,6 +1,6 @@
 # Time series follow-ups: implementation plan
 
-Progress: 6 of 12 items, 13 of 23 points (57%)
+Progress: 7 of 12 items, 16 of 23 points (70%)
 
 Specs: [timeseries-functions-spec.md](timeseries-functions-spec.md)
 (phase A, #265) and
@@ -55,7 +55,7 @@ Specs: [timeseries-functions-spec.md](timeseries-functions-spec.md)
     for floats and PCFs; channels of different lengths along `axis`; a
     negative `axis`; scalar channels raise naming `stack_channels`; shapes
     that differ off `axis`, and an `axis` out of range, raise.
-- [ ] **B3.** [3] `to_point_clouds(series)` in its "every observation"
+- [x] **B3.** [3] (c5b0afc5b) `to_point_clouds(series)` in its "every observation"
   mode: a series of one channel gives a `PointCloud` of one point per
   stored time in its domain, and a `TimeSeriesTensor`, such as windows, a
   `PointCloudTensor` whose clouds can differ in size. The work is in C++,
