@@ -295,14 +295,14 @@ namespace sb_py
         return sb::stack(tensors, axis);
       }, nb::arg("tensors"), nb::arg("axis") = 0)
       .def_static("split_sections", [](const TTensor& tensor,
-          size_t sections, size_t axis) { return sb::split(tensor, sections, axis); },
+          size_t sections, ptrdiff_t axis) { return sb::split(tensor, sections, axis); },
           nb::arg("tensor"), nb::arg("n_sections"), nb::arg("axis") = 0)
       .def_static("split_indices", [](const TTensor& tensor,
-          const std::vector<size_t>& indices, size_t axis) {
+          const std::vector<size_t>& indices, ptrdiff_t axis) {
         return sb::split(tensor, indices, axis);
       }, nb::arg("tensor"), nb::arg("indices"), nb::arg("axis") = 0)
       .def_static("array_split", [](const TTensor& tensor,
-          size_t sections, size_t axis) { return sb::array_split(tensor, sections, axis); },
+          size_t sections, ptrdiff_t axis) { return sb::array_split(tensor, sections, axis); },
           nb::arg("tensor"), nb::arg("n_sections"), nb::arg("axis") = 0)
       .def("masked_select", [](const TTensor& self, const sb::Tensor<bool>& mask) {
         return sb::masked_select(self, mask);

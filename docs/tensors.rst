@@ -346,6 +346,9 @@ All tensors must have the same shape except along the join axis.
    sb.stack((X, Y), axis=0)    # (2, 3)
    sb.stack((X, Y), axis=1)    # (3, 2)
 
+In ``concatenate``, ``stack``, ``split``, and ``array_split``, a negative
+``axis`` counts from the end, so ``axis=-1`` is the last axis.
+
 
 Splitting tensors
 =================

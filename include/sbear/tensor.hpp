@@ -841,25 +841,25 @@ namespace sb
    * A section count produces that many equal contiguous parts. Split points
    * `{i0, i1, ...}` produce half-open axis intervals `[0, i0)`, `[i0, i1)`,
    * ..., `[ik, axis_size)`, so the element at each split point begins the next
-   * part. Returns views.
+   * part. Returns views. Supports negative axis.
    */
   template <typename T, TensorProperties Properties>
   [[nodiscard]] std::vector<Tensor<T, Properties>> split(const Tensor<T, Properties>& tensor,
-    const std::vector<size_t>& split_points, size_t axis);
+    const std::vector<size_t>& split_points, ptrdiff_t axis);
 
   template <typename T, TensorProperties Properties>
   [[nodiscard]] std::vector<Tensor<T, Properties>> split(const Tensor<T, Properties>& tensor,
-    size_t n_sections, size_t axis);
+    size_t n_sections, ptrdiff_t axis);
 
   /**
    * Split a tensor into n_sections parts, allowing uneven splits.
    * Let `axis_size = q * n_sections + r`. The first `r` parts have length
    * `q + 1`; the remaining trailing parts have length `q` and do not receive
-   * the extra element.
+   * the extra element. Supports negative axis.
    */
   template <typename T, TensorProperties Properties>
   [[nodiscard]] std::vector<Tensor<T, Properties>> array_split(const Tensor<T, Properties>& tensor,
-    size_t n_sections, size_t axis);
+    size_t n_sections, ptrdiff_t axis);
 
   // ============================================================================
   // Index-based gather/scatter operations

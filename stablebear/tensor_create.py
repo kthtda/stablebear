@@ -242,7 +242,8 @@ def split(tensor, indices_or_sections, axis=0):
         splitting an axis of length 8 at ``[3, 5]`` produces parts of lengths
         3, 2, and 3. The element at each boundary starts the following part.
     axis : int
-        The axis along which to split (default 0).
+        The axis along which to split (default 0). A negative axis counts
+        from the end.
 
     Returns
     -------
@@ -279,7 +280,8 @@ def array_split(tensor, indices_or_sections, axis=0):
         ``[ik, axis_size)``. The element at each boundary starts the following
         part.
     axis : int
-        The axis along which to split (default 0).
+        The axis along which to split (default 0). A negative axis counts
+        from the end.
 
     Returns
     -------
