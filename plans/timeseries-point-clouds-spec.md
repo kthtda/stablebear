@@ -48,8 +48,8 @@ These settle the open questions of the issue.
 - The unit and epoch stay the same. The snap tolerance is the smallest of
   the channels'.
 - Raises `ValueError` if the channels have different shapes, as `sb.stack`
-  does, or different origins, if `axis` is out of range, or if a channel has
-  no observations.
+  does, or different origins, if `axis` is out of range, if their domains do
+  not overlap, or if a channel has no observations.
 
 ### `to_point_clouds(series, times=None, *, n=None, step=None)`
 

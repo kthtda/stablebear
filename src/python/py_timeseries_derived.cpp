@@ -6,6 +6,7 @@
 #include <sbear/point_cloud.hpp>
 #include <sbear/symmetric_matrix.hpp>
 #include <sbear/timeseries.hpp>
+#include <sbear/timeseries/stack_channels.hpp>
 #include <sbear/timeseries/time_delay_embedding.hpp>
 #include <sbear/timeseries/windowing.hpp>
 
@@ -29,6 +30,9 @@ namespace
       return sb::delay_embed(series, dimension, delay, forward);
     }, nb::arg("series"), nb::arg("dimension"), nb::arg("delay"), nb::arg("forward"),
        nb::call_guard<nb::gil_scoped_release>());
+    m.def("stack_channels", [](const sb::TimeSeries<T>& series, std::ptrdiff_t axis) {
+      return sb::stack_channels(series, axis);
+    }, nb::arg("series"), nb::arg("axis"), nb::call_guard<nb::gil_scoped_release>());
     m.def("windows", [](const sb::TimeSeries<T>& series, sb::float64_t size, sb::float64_t step, bool closedStart,
                         bool closedEnd, bool partial, bool anchorEnd) {
       return sb::windows(series, size, step, closedStart, closedEnd, partial, anchorEnd);

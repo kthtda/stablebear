@@ -457,6 +457,46 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
             [part._data for part in _on_one_epoch(parts)], unit
         ))
 
+    def stack_channels(self, axis: int = 0) -> TimeSeries:
+        """Stack the channels into one channel, as ``sb.stack`` stacks
+        tensors.
+
+        The observation at each time stacks the channels' observations in
+        effect there along a new axis ``axis`` of length :attr:`n_channels`:
+        for channels of shape ``shape`` and ``axis=0``, observations of shape
+        ``(n_channels, *shape)``. The times are the start of the
+        :attr:`domain` and every time in it at which a channel stores an
+        observation. The domain, unit, epoch, and origin stay the same, and
+        the snap tolerance is the smallest of the channels'. Observations
+        are copied.
+
+        .. warning::
+
+           Observations can be dropped or repeated. A channel's observations
+           outside the domain, or at an end the domain leaves out, are
+           dropped, and an observation in effect at several of the times is
+           repeated at each.
+
+        Parameters
+        ----------
+        axis : int, default 0
+            The position of the new axis in each observation; a negative
+            ``axis`` counts from the end.
+
+        Returns
+        -------
+        TimeSeries
+            A series of one channel.
+
+        Raises
+        ------
+        ValueError
+            If the channels have different shapes or origins, their domains
+            do not overlap, a channel has no observations, or ``axis`` is
+            out of range.
+        """
+        return TimeSeries._from_cpp(cpp.stack_channels(self._data, operator.index(axis)))
+
     @classmethod
     def from_pandas(cls, obj, unit: str | None = None, *, snap_tolerance: float = 1e-14) -> TimeSeries:
         """Build a series from a pandas ``Series`` or ``DataFrame``, whose index
