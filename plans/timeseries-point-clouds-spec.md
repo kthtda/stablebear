@@ -21,7 +21,9 @@ These settle the open questions of the issue.
 2. **Scalar observations.** A series of numbers gives one-dimensional point
    clouds, one point of dimension 1 per time.
 3. **Channels.** `TimeSeries.stack_channels` combines the channels of a
-   series into one, as `sb.stack` stacks tensors, so `to_point_clouds`
+   series into one, as `sb.stack` stacks tensors, and
+   `TimeSeries.concatenate_channels` as `sb.concatenate` joins them, so
+   that channels of different lengths can share one vector. `to_point_clouds`
    takes series of one channel only. One cloud per channel is
    `to_point_clouds(series[i])`.
 4. **Ends of the domain.** "Every observation" takes the times a series
@@ -50,6 +52,17 @@ These settle the open questions of the issue.
 - Raises `ValueError` if the channels have different shapes, as `sb.stack`
   does, or different origins, if `axis` is out of range, if their domains do
   not overlap, or if a channel has no observations.
+
+### `TimeSeries.concatenate_channels(axis=0)`
+
+- As `stack_channels`, with the same times, domain, unit, epoch, origin,
+  and snap tolerance, but joining the channels' observations along their
+  existing axis `axis`, as `sb.concatenate` joins tensors: channels of
+  shapes `(2,)` and `(3,)` give observations of shape `(5,)`. A negative
+  `axis` counts from the end.
+- Raises `ValueError` as `stack_channels` does, except that the shapes may
+  differ along `axis`; also if the channels are scalars, naming
+  `stack_channels`, or have different numbers of axes.
 
 ### `to_point_clouds(series, times=None, *, n=None, step=None)`
 

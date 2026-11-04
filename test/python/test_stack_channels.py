@@ -130,3 +130,74 @@ def test_stack_channels_rejects_invalid_input(make_series, axis, message):
 
     with pytest.raises(ValueError, match=message):
         series.stack_channels(axis=axis)
+
+
+def _vector_channels_of_different_lengths():
+    a = TimeSeries([[10.0], [20.0]], times=TimeDeltaTensor([1.0, 2.0], "s"))
+    b = TimeSeries([[-10.0, -20.0], [-20.0, -40.0]], times=TimeDeltaTensor([1.0, 2.0], "s"))
+    return TimeSeries.from_channels([a, b], unit="s")
+
+
+@pytest.mark.parametrize("axis", [0, -1])
+@pytest.mark.parametrize("t", [TimeDelta(1.0, "s"), TimeDelta(2.0, "s")])
+@pytest.mark.parametrize("make_series", [
+    pytest.param(_two_vector_channels, id="floats"),
+    pytest.param(_two_pcf_vector_channels, id="pcfs"),
+    pytest.param(_vector_channels_of_different_lengths, id="lengths"),
+])
+def test_concatenated_channels_join_as_tensors_concatenate(make_series, t, axis):
+    series = make_series()
+
+    concatenated = series.concatenate_channels(axis=axis)
+
+    assert concatenated.dtype is series.dtype
+    assert concatenated(t).array_equal(sb.concatenate([series[0](t), series[1](t)], axis=axis))
+
+
+def _two_matrix_channels_of_different_widths():
+    # Columns of 10 * t for a, and of -10 * t and -20 * t for b.
+    a = TimeSeries([[[10.0], [10.0]],
+                    [[20.0], [20.0]]], times=TimeDeltaTensor([1.0, 2.0], "s"))
+    b = TimeSeries([[[-10.0, -20.0], [-10.0, -20.0]],
+                    [[-20.0, -40.0], [-20.0, -40.0]]], times=TimeDeltaTensor([1.0, 2.0], "s"))
+    return TimeSeries.from_channels([a, b], unit="s")
+
+
+@pytest.mark.parametrize("axis", [1, -1])
+@pytest.mark.parametrize("t", [TimeDelta(1.0, "s"), TimeDelta(2.0, "s")])
+def test_concatenated_matrix_channels_join_along_their_columns(t, axis):
+    series = _two_matrix_channels_of_different_widths()
+
+    concatenated = series.concatenate_channels(axis=axis)
+
+    assert concatenated(t).array_equal(sb.concatenate([series[0](t), series[1](t)], axis=axis))
+
+
+def _channels_of_different_ranks():
+    a = TimeSeries([[10.0, 20.0], [20.0, 40.0]], times=TimeDeltaTensor([1.0, 2.0], "s"))
+    b = TimeSeries([[[-10.0], [-20.0]],
+                    [[-20.0], [-40.0]]], times=TimeDeltaTensor([1.0, 2.0], "s"))
+    return TimeSeries.from_channels([a, b], unit="s")
+
+
+def _vector_channels_of_different_origins():
+    source = TimeSeries([[0.0], [10.0], [20.0], [30.0]], times=TimeDeltaTensor([0.0, 1.0, 2.0, 3.0], "s"))
+    # The window [1, 3), whose origin is 1.
+    window = cut_windows(source, size=TimeDelta(2.0, "s"), step=TimeDelta(1.0, "s"), closed="left", partial=False,
+                         anchor="start")[1]
+    return TimeSeries.from_channels([window, source], unit="s")
+
+
+@pytest.mark.parametrize("make_series, axis, message", [
+    pytest.param(_two_scalar_channels, 0, "stack_channels", id="scalars"),
+    pytest.param(_two_matrix_channels_of_different_widths, 0, "differ other than along axis", id="shapes"),
+    pytest.param(_channels_of_different_ranks, 0, "differ other than along axis", id="ranks"),
+    pytest.param(_vector_channels_of_different_origins, 0, "different origins", id="origins"),
+    pytest.param(_two_vector_channels, 1, "out of range", id="axis-1"),
+    pytest.param(_two_vector_channels, -2, "out of range", id="axis-minus-2"),
+])
+def test_concatenate_channels_rejects_invalid_input(make_series, axis, message):
+    series = make_series()
+
+    with pytest.raises(ValueError, match=message):
+        series.concatenate_channels(axis=axis)

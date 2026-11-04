@@ -33,6 +33,9 @@ namespace
     m.def("stack_channels", [](const sb::TimeSeries<T>& series, std::ptrdiff_t axis) {
       return sb::stack_channels(series, axis);
     }, nb::arg("series"), nb::arg("axis"), nb::call_guard<nb::gil_scoped_release>());
+    m.def("concatenate_channels", [](const sb::TimeSeries<T>& series, std::ptrdiff_t axis) {
+      return sb::concatenate_channels(series, axis);
+    }, nb::arg("series"), nb::arg("axis"), nb::call_guard<nb::gil_scoped_release>());
     m.def("windows", [](const sb::TimeSeries<T>& series, sb::float64_t size, sb::float64_t step, bool closedStart,
                         bool closedEnd, bool partial, bool anchorEnd) {
       return sb::windows(series, size, step, closedStart, closedEnd, partial, anchorEnd);

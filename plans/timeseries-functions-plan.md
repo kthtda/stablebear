@@ -1,6 +1,6 @@
 # Time series follow-ups: implementation plan
 
-Progress: 4 of 11 items, 9 of 21 points (43%)
+Progress: 5 of 12 items, 11 of 23 points (48%)
 
 Specs: [timeseries-functions-spec.md](timeseries-functions-spec.md)
 (phase A, #265) and
@@ -33,20 +33,28 @@ Specs: [timeseries-functions-spec.md](timeseries-functions-spec.md)
   the open questions of #267: the name and signature, what a series of
   scalar observations gives, how channels combine, and whether "every
   observation" includes the start of the domain and the end of a window.
-- [ ] **B2.** [2] `TimeSeries.stack_channels(axis=0)` stacks the channels of
-  a series into one, as the
-  [point cloud spec](timeseries-point-clouds-spec.md) describes. The work
-  is in C++, in `include/sbear/timeseries/stack_channels.hpp`, using the
-  C++ `stack` so that its shape check and `axis` match `sb.stack`; the
-  Python method sits next to `from_channels`. Its docstring has a
-  `.. warning::` that observations can be dropped or repeated: those
-  outside the domain, or at an end the domain leaves out, are dropped, and
-  one in effect at several of the times is repeated at each.
-  Tests: scalar channels give vectors at the times of any channel in the
-  domain and its start; vector channels with `axis` 0, 1, and -1; channels
-  of PCFs; a window keeps its open start and origin; the unit and epoch
-  stay; channels of different shapes or origins, and an `axis` out of
-  range, raise.
+- [ ] **B2.** Combine the channels of a series into one.
+  - [x] **B2a.** [2] (212620df5) `TimeSeries.stack_channels(axis=0)` stacks the channels of
+    a series into one, as the
+    [point cloud spec](timeseries-point-clouds-spec.md) describes. The work
+    is in C++, in `include/sbear/timeseries/stack_channels.hpp`, using the
+    C++ `stack` so that its shape check and `axis` match `sb.stack`; the
+    Python method sits next to `from_channels`. Its docstring has a
+    `.. warning::` that observations can be dropped or repeated: those
+    outside the domain, or at an end the domain leaves out, are dropped, and
+    one in effect at several of the times is repeated at each.
+    Tests: scalar channels give vectors at the times of any channel in the
+    domain and its start; vector channels with `axis` 0, 1, and -1; channels
+    of PCFs; a window keeps its open start and origin; the unit and epoch
+    stay; channels of different shapes or origins, and an `axis` out of
+    range, raise.
+  - [ ] **B2b.** [2] `TimeSeries.concatenate_channels(axis=0)` joins the
+    channels along an existing axis, as `sb.concatenate` does, sharing the
+    C++ of `stack_channels` in the same header.
+    Tests: it equals `sb.concatenate` of the channels' values at each time
+    for floats and PCFs; channels of different lengths along `axis`; a
+    negative `axis`; scalar channels raise naming `stack_channels`; shapes
+    that differ off `axis`, and an `axis` out of range, raise.
 - [ ] **B3.** [3] `to_point_clouds(series)` in its "every observation"
   mode: a series of one channel gives a `PointCloud` of one point per
   stored time, and a `TimeSeriesTensor`, such as windows, a

@@ -493,9 +493,47 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         ValueError
             If the channels have different shapes or origins, their domains
             do not overlap, a channel has no observations, or ``axis`` is
-            out of range.
+            out of range. To join channels whose shapes differ along one
+            axis, use :meth:`concatenate_channels`.
         """
         return TimeSeries._from_cpp(cpp.stack_channels(self._data, operator.index(axis)))
+
+    def concatenate_channels(self, axis: int = 0) -> TimeSeries:
+        """Join the channels into one channel along an existing axis, as
+        ``sb.concatenate`` joins tensors.
+
+        The observation at each time joins the channels' observations in
+        effect there along their axis ``axis``: channels of shapes ``(2,)``
+        and ``(3,)`` give observations of shape ``(5,)``. The times, domain,
+        unit, epoch, origin, and snap tolerance are as for
+        :meth:`stack_channels`, which adds a new axis instead. Observations
+        are copied.
+
+        .. warning::
+
+           Observations can be dropped or repeated, as in
+           :meth:`stack_channels`.
+
+        Parameters
+        ----------
+        axis : int, default 0
+            The axis of each observation to join along; a negative ``axis``
+            counts from the end.
+
+        Returns
+        -------
+        TimeSeries
+            A series of one channel.
+
+        Raises
+        ------
+        ValueError
+            If the channels hold scalars, have shapes that differ other than
+            along ``axis`` or different origins, their domains do not
+            overlap, a channel has no observations, or ``axis`` is out of
+            range.
+        """
+        return TimeSeries._from_cpp(cpp.concatenate_channels(self._data, operator.index(axis)))
 
     @classmethod
     def from_pandas(cls, obj, unit: str | None = None, *, snap_tolerance: float = 1e-14) -> TimeSeries:
