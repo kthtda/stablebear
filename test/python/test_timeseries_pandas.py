@@ -7,7 +7,7 @@ import pytest
 
 import stablebear as sb
 
-from stablebear.timeseries import DateTime, DateTimeTensor, TimeDelta, TimeDeltaTensor, TimeSeries, cut_windows, delay_embed
+from stablebear.timeseries import DateTime, DateTimeTensor, TimeDelta, TimeDeltaTensor, TimeSeries, cut_windows, delay_embed, to_point_clouds
 
 pd = pytest.importorskip("pandas")
 
@@ -406,3 +406,11 @@ def test_embedding_of_a_data_frame_equals_that_of_its_time_series():
 
     assert embedding.array_equal(delay_embed(TimeSeries.from_pandas(frame), dimension=2, delay=TimeDelta(2, "h"),
                                              direction="backward"))
+
+
+def test_point_cloud_of_a_pandas_series_equals_that_of_its_time_series():
+    hourly = pd.Series(10.0 * np.arange(10.0), index=_hours())
+
+    cloud = to_point_clouds(hourly)
+
+    assert np.array_equal(np.asarray(cloud), np.asarray(to_point_clouds(TimeSeries.from_pandas(hourly))))

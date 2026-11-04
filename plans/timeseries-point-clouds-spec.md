@@ -27,9 +27,11 @@ These settle the open questions of the issue.
    takes series of one channel only. One cloud per channel is
    `to_point_clouds(series[i])`.
 4. **Ends of the domain.** "Every observation" takes the times a series
-   stores. A window stores the value in effect at its start at time 0, so
-   that point is included. Its end adds no point: the value there is that of
-   its last observation, or is itself stored if the end is closed.
+   stores that lie in its domain. A window stores the value in effect at its
+   start at time 0; that point is included if the window includes its start,
+   and left out if the start is open, though the value holds just after it.
+   The end adds no point: the value there is that of the last observation,
+   or is itself stored if the end is closed.
 
 ## Behavior
 
@@ -82,7 +84,7 @@ In `stablebear.timeseries`.
 ### Modes
 
 - **Every observation** (no `times`, `n`, or `step`): one point per time the
-  series stores.
+  series stores in its domain.
 - **Uniform grid, `n`**: `n` evenly spaced times over each series' domain,
   in its own time from 0, including each end the domain includes. With both
   ends closed they are `length / (n - 1)` apart, with one end open

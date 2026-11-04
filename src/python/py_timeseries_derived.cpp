@@ -6,6 +6,7 @@
 #include <sbear/point_cloud.hpp>
 #include <sbear/symmetric_matrix.hpp>
 #include <sbear/timeseries.hpp>
+#include <sbear/timeseries/point_clouds.hpp>
 #include <sbear/timeseries/stack_channels.hpp>
 #include <sbear/timeseries/time_delay_embedding.hpp>
 #include <sbear/timeseries/windowing.hpp>
@@ -13,6 +14,7 @@
 
 #include <optional>
 #include <string>
+#include <type_traits>
 #include <vector>
 
 namespace nb = nanobind;
@@ -41,6 +43,14 @@ namespace
       return sb::windows(series, size, step, closedStart, closedEnd, partial, anchorEnd);
     }, nb::arg("series"), nb::arg("size"), nb::arg("step"), nb::arg("closed_start"), nb::arg("closed_end"),
        nb::arg("partial"), nb::arg("anchor_end"), nb::call_guard<nb::gil_scoped_release>());
+    if constexpr (std::is_arithmetic_v<T> && !std::is_same_v<T, bool>)
+    {
+      m.def("to_point_cloud", [](const sb::TimeSeries<T>& series) { return sb::to_point_cloud(series); },
+            nb::arg("series"), nb::call_guard<nb::gil_scoped_release>());
+      m.def("to_point_clouds", [](const sb::Tensor<sb::TimeSeries<T>>& seriesTensor) {
+        return sb::to_point_clouds(seriesTensor);
+      }, nb::arg("series_tensor"), nb::call_guard<nb::gil_scoped_release>());
+    }
   }
 }
 

@@ -8,6 +8,7 @@ import numpy as np
 from typing_extensions import assert_type
 
 import stablebear as sb
+from stablebear.timeseries import TimeSeries, cut_windows, to_point_clouds
 from stablebear.timeseries.date_time import DateTime, DateTimeTensor, TimeDelta, TimeDeltaTensor
 
 pcfs = sb.zeros((3,))
@@ -53,3 +54,7 @@ assert_type(day - day, TimeDelta)
 assert_type(days - day, TimeDeltaTensor)
 assert_type(days < day, sb.BoolTensor)
 assert_type(day < day, bool)
+
+observed = TimeSeries([10.0, 20.0], times=hours)
+assert_type(to_point_clouds(observed), sb.PointCloud)
+assert_type(to_point_clouds(cut_windows(observed, size=hour, step=hour)), sb.PointCloudTensor)

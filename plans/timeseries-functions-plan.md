@@ -1,6 +1,6 @@
 # Time series follow-ups: implementation plan
 
-Progress: 5 of 12 items, 11 of 23 points (48%)
+Progress: 6 of 12 items, 13 of 23 points (57%)
 
 Specs: [timeseries-functions-spec.md](timeseries-functions-spec.md)
 (phase A, #265) and
@@ -33,7 +33,7 @@ Specs: [timeseries-functions-spec.md](timeseries-functions-spec.md)
   the open questions of #267: the name and signature, what a series of
   scalar observations gives, how channels combine, and whether "every
   observation" includes the start of the domain and the end of a window.
-- [ ] **B2.** Combine the channels of a series into one.
+- [x] **B2.** Combine the channels of a series into one.
   - [x] **B2a.** [2] (212620df5) `TimeSeries.stack_channels(axis=0)` stacks the channels of
     a series into one, as the
     [point cloud spec](timeseries-point-clouds-spec.md) describes. The work
@@ -48,7 +48,7 @@ Specs: [timeseries-functions-spec.md](timeseries-functions-spec.md)
     of PCFs; a window keeps its open start and origin; the unit and epoch
     stay; channels of different shapes or origins, and an `axis` out of
     range, raise.
-  - [ ] **B2b.** [2] `TimeSeries.concatenate_channels(axis=0)` joins the
+  - [x] **B2b.** [2] (38231c712) `TimeSeries.concatenate_channels(axis=0)` joins the
     channels along an existing axis, as `sb.concatenate` does, sharing the
     C++ of `stack_channels` in the same header.
     Tests: it equals `sb.concatenate` of the channels' values at each time
@@ -57,7 +57,7 @@ Specs: [timeseries-functions-spec.md](timeseries-functions-spec.md)
     that differ off `axis`, and an `axis` out of range, raise.
 - [ ] **B3.** [3] `to_point_clouds(series)` in its "every observation"
   mode: a series of one channel gives a `PointCloud` of one point per
-  stored time, and a `TimeSeriesTensor`, such as windows, a
+  stored time in its domain, and a `TimeSeriesTensor`, such as windows, a
   `PointCloudTensor` whose clouds can differ in size. The work is in C++,
   in `include/sbear/timeseries/point_clouds.hpp`, with the tensor version
   filling the clouds with `parallel_walk`; name its parameter
@@ -66,7 +66,7 @@ Specs: [timeseries-functions-spec.md](timeseries-functions-spec.md)
   number other than `bool`; the Python function only checks its argument
   and calls C++.
   Tests: a delay embedding gives its points; windows give clouds of their
-  own sizes, including the value at time 0; partial windows give smaller
+  own sizes, including the value at time 0 only if the start is closed; partial windows give smaller
   clouds; scalars give 1-D clouds; integers give float64 clouds; a pandas
   `Series`; a series or windows of several channels raise, naming
   `stack_channels`; `float32` gives `pcloud32`; booleans and matrices

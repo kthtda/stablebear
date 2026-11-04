@@ -1,6 +1,7 @@
 __before = set(dir())
 
 from .embedding import delay_embed
+from .point_clouds import to_point_clouds
 from .date_time import DateTime, DateTimeTensor, TimeDelta, TimeDeltaTensor
 from .series import Domain, TimeSeries
 from .window import cut_windows
