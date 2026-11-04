@@ -258,7 +258,7 @@ namespace sb_py
         assert_valid_index(self, index);
         writable_element(self, index) = sb::detail::store_copy(value);
       })
-      .def_static("concatenate", [](const nb::iterable& values, size_t axis) {
+      .def_static("concatenate", [](const nb::iterable& values, ptrdiff_t axis) {
         std::vector<TPlain> tensors;
         for (const auto item : values)
         {

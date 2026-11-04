@@ -822,10 +822,11 @@ namespace sb
   /**
    * Concatenate tensors along an existing axis.
    * All tensors must have the same shape except along the join axis.
+   * Supports negative axis.
    */
   template <typename T, TensorProperties Properties>
   [[nodiscard]] typename Tensor<T, Properties>::source_tensor_type concatenate(
-    const std::vector<Tensor<T, Properties>>& tensors, size_t axis);
+    const std::vector<Tensor<T, Properties>>& tensors, ptrdiff_t axis);
 
   /**
    * Stack tensors along a new axis.

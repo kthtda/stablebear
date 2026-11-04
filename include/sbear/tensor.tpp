@@ -1161,16 +1161,19 @@ namespace sb
 
   template <typename T, TensorProperties Properties>
   typename Tensor<T, Properties>::source_tensor_type concatenate(
-      const std::vector<Tensor<T, Properties>>& tensors, size_t axis)
+      const std::vector<Tensor<T, Properties>>& tensors, ptrdiff_t signedAxis)
   {
     using TResult = typename Tensor<T, Properties>::source_tensor_type;
     if (tensors.empty())
       throw std::invalid_argument("concatenate: need at least one tensor");
 
     auto ndim = tensors[0].shape().size();
-    if (axis >= ndim)
-      throw std::invalid_argument("concatenate: axis " + std::to_string(axis) +
+    // Resolve negative axis; valid range is [-ndim, ndim)
+    const auto signedNdim = static_cast<ptrdiff_t>(ndim);
+    if (signedAxis < -signedNdim || signedAxis >= signedNdim)
+      throw std::invalid_argument("concatenate: axis " + std::to_string(signedAxis) +
         " out of range for " + std::to_string(ndim) + "-D tensor");
+    const auto axis = static_cast<size_t>(signedAxis < 0 ? signedAxis + signedNdim : signedAxis);
 
     // Validate shapes match on all axes except the join axis
     for (size_t t = 1; t < tensors.size(); ++t)
@@ -1236,7 +1239,7 @@ namespace sb
     for (const auto& t : tensors)
       expanded.push_back(t.expand_dims(axis));
 
-    return concatenate(expanded, static_cast<size_t>(axis));
+    return concatenate(expanded, axis);
   }
 
   template <typename T, TensorProperties Properties>

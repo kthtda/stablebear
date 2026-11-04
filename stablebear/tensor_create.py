@@ -186,7 +186,8 @@ def indices(data):
 
 
 def concatenate(tensors, axis=0):
-    """Concatenate tensors along an existing axis (outer indexing)."""
+    """Concatenate tensors along an existing axis (outer indexing). A
+    negative axis counts from the end."""
     if not tensors:
         raise ValueError("need at least one tensor to concatenate")
     _validate_nested_join(tensors)

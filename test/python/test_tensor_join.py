@@ -47,6 +47,16 @@ class TestConcatenate:
         b = np.arange(4, dtype=np_dtype).reshape(2, 2)
         _assert_concatenate((a, b), 1, TensorType, np_dtype)
 
+    def test_2d_negative_axis(self, TensorType, np_dtype):
+        a = np.arange(6, dtype=np_dtype).reshape(2, 3)
+        b = np.arange(4, dtype=np_dtype).reshape(2, 2)
+        _assert_concatenate((a, b), -1, TensorType, np_dtype)
+
+    def test_axis_out_of_range_raises(self, TensorType, np_dtype):
+        a = TensorType(np.zeros((2, 3), dtype=np_dtype))
+        with pytest.raises(ValueError, match="out of range"):
+            sb.concatenate((a, a), axis=-3)
+
     def test_three_tensors(self, TensorType, np_dtype):
         _assert_concatenate(([1, 2], [3, 4], [5, 6]), 0, TensorType, np_dtype)
 
