@@ -101,7 +101,18 @@ protect. These principles apply when writing, reviewing, or changing tests.
     fractions, use ones that are exact in binary floating point, such as
     0.5 and 0.25, unless it tests rounding.
 
-20. **Tests must type-check.** Tests use the public API as users do, so
+20. **Tie paired numbers together.** When a test pairs numbers, such as a
+    value with its time or a weight with its index, make one a fixed
+    multiple of the other throughout the test, so that each number shows
+    what it is paired with. A time series observed at 0, 1, and 2.5 holds
+    `10 * t`: 0, 10, and 25, and `-10 * t` in a second channel. An expected
+    value of 10 at time 1.5 then reads as "the observation at 1 is still in
+    effect". Shaped values scale a fixed pattern, such as
+    `[10 * t, 20 * t]`. Break the pattern where it would weaken what the
+    test shows, such as a value of 0 at time 0 that hides which channel it
+    came from.
+
+21. **Tests must type-check.** Tests use the public API as users do, so
     pyright checks them too. A line that passes invalid input on purpose
     carries `# pyright: ignore[<rule>]`, naming the rule it breaks. An
     expression evaluated only for the error it raises is assigned to `_`,
