@@ -273,3 +273,28 @@ observation 20.0 from 0.09 s::
    values = windows([0.0, 0.02], "s")
    values[0]  # [[1.0, 1.0], [1.0, 2.0]], from a
    values[1]  # [[10.0, 10.0], [20.0, 20.0]], from b
+
+Restricting a time series
+-------------------------
+
+:py:meth:`TimeSeries.restrict <stablebear.timeseries.TimeSeries.restrict>`
+gives one part of a time series, at the same times, instead of a sequence of
+windows that each start at 0. Its argument is a
+:py:class:`~stablebear.timeseries.Domain`, whose ends are durations from
+time 0, or numbers for a time series without a unit, and the choice of which
+ends to include::
+
+   from stablebear.timeseries import Domain
+
+   part = signal.restrict(Domain(TimeDelta(2.5, "s"), TimeDelta(5, "s"),
+                                 start_closed=False, end_closed=True))
+   part.times.count  # [2.5, 3.0, 4.0, 5.0]
+   part.values       # [0.0, 1.0, 2.0, 3.0]
+
+As in a window, the observation in effect at the start, here 0.0 from 2 s,
+holds from the start on, and with the start left out, the part can be
+evaluated only after it. The domain must lie within that of the time series.
+A time series with an epoch is restricted without it, and then given it
+back::
+
+   part = dated.with_epoch(None).restrict(domain).with_epoch(dated.epoch)

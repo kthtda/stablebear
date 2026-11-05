@@ -73,6 +73,30 @@ These settle the open questions of the issue.
   differ along `axis`; also if the channels are scalars, naming
   `sb.stack`, or have different numbers of axes.
 
+### `TimeSeries.restrict(domain)`
+
+Tests of point clouds need series with open ends, which only `cut_windows`
+made before, at shifted times.
+
+- Returns the series on `domain`, a `Domain` within its own, whose ends are
+  durations from time 0, or numbers for a series without a unit, with
+  `start_closed` and `end_closed`.
+- A series with an epoch raises `TypeError`, naming
+  `series.with_epoch(None).restrict(domain).with_epoch(series.epoch)`, so
+  that the ends are always in the series' own time and the same for every
+  channel, whatever its origin.
+- Times keep their place: the unit, epoch, and origin stay the same. Each
+  channel holds the observation in effect at the new start, at the start,
+  then its observations inside the domain, and one at the end if it is
+  closed, as a window does. Observations are shared, not copied.
+- Raises `ValueError` if `domain` reaches outside the series' domain,
+  including an end the series leaves out but `domain` includes.
+  Raises `TypeError` for ends of the wrong kind, as `evaluate` does.
+- `Domain` itself raises `ValueError` if it holds no time: its start comes
+  after its end, or equals it without both ends closed. It stays a named
+  tuple, through a private base class whose constructor it checks.
+- Not covered: extending a series past its last observation.
+
 ### `to_point_clouds(series, times=None, *, n=None, step=None)`
 
 In `stablebear.timeseries`.

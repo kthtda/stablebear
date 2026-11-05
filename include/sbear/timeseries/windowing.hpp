@@ -13,6 +13,57 @@
 
 namespace sb
 {
+  namespace detail
+  {
+    /// The part of @p channel from @p from to @p to, each end included when
+    /// @p startClosed or @p stopClosed says so, at its times less @p zero,
+    /// as windows() cuts each channel: the observation in effect at @p from,
+    /// at from - zero, then the observations after it up to @p to, with the
+    /// end to - zero (Channel::until). The origin moves by @p zero, so the
+    /// times keep their place in the series the channel was cut from. A
+    /// view made by Channel::take, so no values are copied. @p atFrom and
+    /// @p atTo are hints for the observations in effect at @p from and
+    /// @p to, updated to them. Requires channel.size() > 0.
+    template <typename T>
+    Channel<T> cut_channel(const Channel<T>& channel, float64_t from, float64_t to, bool startClosed, bool stopClosed,
+                           float64_t zero, size_t& atFrom, size_t& atTo)
+    {
+      // The observations in effect at from and at to, with snapping. The
+      // one at from is the first, also if from snaps forward onto it. An
+      // open end excludes an observation at to, or that to snaps onto, and
+      // a closed one keeps it.
+      atFrom = channel.index_at(from, atFrom);
+      atTo = channel.index_at(to, atTo);
+      const auto lo = atFrom;
+      const bool atEnd = channel.time(atTo) >= to;
+      const auto lastIn = (atEnd && !stopClosed && atTo > lo) ? atTo - 1 : atTo;
+
+      // Subtracting zero can round two close times together, and the
+      // observation after one that from snaps onto can lie at or before
+      // from; keep the times strictly increasing.
+      std::vector<float64_t> at{from - zero};
+      std::vector<size_t> indices{lo};
+      for (auto i = lo + 1; i <= lastIn; ++i)
+      {
+        at.push_back(std::max(channel.time(i) - zero, std::nextafter(at.back(), std::numeric_limits<float64_t>::infinity())));
+        indices.push_back(i);
+      }
+      // The part can be evaluated up to its end, and at it if closed. A
+      // closed end at or before the last time held needs no end: the part
+      // ends at that timestamp.
+      auto part = channel.take(channel.times_like(std::move(at)).with_origin(channel.origin() + zero),
+                               std::move(indices));
+      const auto end = to - zero;
+      const auto lastAt = part.time(part.size() - 1);
+      if (!(stopClosed && end <= lastAt))
+      {
+        part = part.until(std::max(end, std::nextafter(lastAt, std::numeric_limits<float64_t>::infinity())),
+                          stopClosed);
+      }
+      return part.with_start_closed(startClosed);
+    }
+  }
+
   /// The windows of @p series of length @p size, in the series' unit: a 1-D
   /// tensor with one window per start time a_k = t_0 + k * @p step, while
   /// the window ends in the series' domain, t_0 being its start, and a float
@@ -142,44 +193,8 @@ namespace sb
       channels.reserve(series.n_channels());
       for (size_t c = 0; c < series.n_channels(); ++c)
       {
-        const auto& channel = series.channel(c);
-        // The observations in effect at from and at to, with snapping. The
-        // one at from is the window's first, at time 0, also if from snaps
-        // forward onto it. An open window end excludes an observation at to,
-        // or that to snaps onto, and a closed one keeps it.
-        atFrom[c] = channel.index_at(from, atFrom[c]);
-        atTo[c] = channel.index_at(to, atTo[c]);
-        const auto lo = atFrom[c];
-        const bool atEnd = channel.time(atTo[c]) >= to;
-        const auto lastIn = (atEnd && !stopClosed && atTo[c] > lo) ? atTo[c] - 1 : atTo[c];
-
-        // Subtracting from can round two close times together, or put the
-        // observation after one that from snaps onto at or before 0; keep the
-        // times strictly increasing.
-        std::vector<float64_t> at{0.0};
-        std::vector<size_t> indices{lo};
-        for (auto i = lo + 1; i <= lastIn; ++i)
-        {
-          at.push_back(std::max(channel.time(i) - from, std::nextafter(at.back(), std::numeric_limits<float64_t>::infinity())));
-          indices.push_back(i);
-        }
-        // The window can be evaluated up to its end, and at it if closed. A
-        // closed end at or before the last time held needs no end: the
-        // window ends at that timestamp.
-        // Time 0 of the window is from in the channel, the same in every
-        // channel; the origin places it in the first series the channel was
-        // cut from.
-        auto window = channel.take(channel.times_like(std::move(at)).with_origin(channel.origin() + from),
-                                   std::move(indices));
-        const auto end = to - from;
-        const auto lastAt = window.time(window.size() - 1);
-        if (!(stopClosed && end <= lastAt))
-        {
-          window = window.until(std::max(end, std::nextafter(lastAt, std::numeric_limits<float64_t>::infinity())),
-                                stopClosed);
-        }
-        window = window.with_start_closed(startClosed);
-        channels.push_back(std::move(window));
+        channels.push_back(detail::cut_channel(series.channel(c), from, to, startClosed, stopClosed, from,
+                                               atFrom[c], atTo[c]));
       }
       contents.emplace_back(std::move(channels), series.unit(), series.epoch());
     }
@@ -193,6 +208,26 @@ namespace sb
       boundsTensor({k, 1}) = bounds[k].stop;
     }
     return {std::move(windowTensor), std::move(boundsTensor)};
+  }
+  /// @p series on the domain from @p from to @p to, each end included when
+  /// @p startClosed or @p stopClosed says so, at the same times: each
+  /// channel is cut as detail::cut_channel() cuts it, with nothing
+  /// subtracted, so the unit, epoch, and origins stay. The caller checks
+  /// that the domain lies within the series'. Requires every channel to
+  /// have observations.
+  template <typename T>
+  TimeSeries<T> restrict(const TimeSeries<T>& series, float64_t from, float64_t to, bool startClosed,
+                         bool stopClosed)
+  {
+    std::vector<Channel<T>> channels;
+    channels.reserve(series.n_channels());
+    for (size_t c = 0; c < series.n_channels(); ++c)
+    {
+      size_t atFrom = 0;
+      size_t atTo = 0;
+      channels.push_back(detail::cut_channel(series.channel(c), from, to, startClosed, stopClosed, 0.0, atFrom, atTo));
+    }
+    return TimeSeries<T>(std::move(channels), series.unit(), series.epoch());
   }
 }
 

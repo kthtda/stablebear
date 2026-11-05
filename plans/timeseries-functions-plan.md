@@ -1,6 +1,6 @@
 # Time series follow-ups: implementation plan
 
-Progress: 8 of 15 items, 18 of 29 points (62%)
+Progress: 8 of 16 items, 18 of 31 points (58%)
 
 Specs: [timeseries-functions-spec.md](timeseries-functions-spec.md)
 (phase A, #265) and
@@ -94,6 +94,21 @@ tensors of series, which `sb.stack` of series (B2c) is easily mistaken for.
 - [ ] **B6.** [2] A guide section on point clouds from time series, and
   the tide gauge tutorial builds its window clouds with it instead of
   evaluating on a grid by hand.
+- [ ] **B7.** [2] `TimeSeries.restrict(domain)`, as the
+  [point cloud spec](timeseries-point-clouds-spec.md) describes; done
+  before B4, whose tests build series with open ends with it. The C++
+  cuts each channel with the code `windows` uses, moved into a function
+  in `include/sbear/timeseries/windowing.hpp` that takes the time to
+  subtract: the window start for `windows`, 0 for `restrict`. Python
+  checks that `domain` lies within the series' own; a series with an
+  epoch raises, pointing to `with_epoch(None)`. `Domain` raises if it holds
+  no time.
+  Tests: a closed series restricted to each kind of ends; a start between
+  observations holds the value in effect there; the unit and origin
+  stay; each channel is restricted as a series of its own; a domain
+  reaching outside, ends of the wrong kind, and an epoch raise; a
+  `Domain` of one time with both ends closed is valid, and one reversed,
+  with an open end at one time, or with one time in two units raises.
 
 ## Phase C: changelog and documentation upkeep (#263, #264, #266)
 

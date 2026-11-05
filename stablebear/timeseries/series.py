@@ -118,6 +118,17 @@ def _times_in(counts, unit):
     return counts if unit is None else TimeDeltaTensor(counts, unit)
 
 
+def _end_of_domain(t):
+    """``t``, an end of a domain, as a :class:`TimeDelta` if it is a
+    duration, else as a float."""
+    duration = _as_time_delta(t)
+    if isinstance(duration, TimeDelta):
+        return duration
+    if isinstance(t, (bool, np.bool_)) or not isinstance(t, (int, float, np.integer, np.floating)):
+        raise TypeError(f"The ends of a domain are durations or numbers, not {type(t).__name__}")
+    return float(t)
+
+
 def _numbers(t):
     """``t`` as a float or a ``FloatTensor`` if it holds plain numbers, else
     ``None``."""
@@ -294,23 +305,46 @@ def _native_series(values, times, snap_tolerance):
                                         snap_tolerance)
 
 
-class Domain(NamedTuple):
+class _DomainFields(NamedTuple):
+    # A DateTime if the series has an epoch, else a TimeDelta, or a float
+    # for a series without a unit.
+    start: Any
+    end: Any
+    start_closed: bool
+    end_closed: bool
+
+
+class Domain(_DomainFields):
     """The times at which a series can be evaluated, from ``start`` to ``end``.
 
     ``start_closed`` and ``end_closed`` say whether ``start`` and ``end``
-    themselves are included.
+    themselves are included. The ends are durations, dates, or numbers, of
+    one kind.
+
+    Attributes
+    ----------
+    start : TimeDelta, DateTime, or float
+        The first time in the domain, or its lower bound if not included.
+    end : TimeDelta, DateTime, or float
+        The last time in the domain, or its upper bound if not included.
+    start_closed : bool
+        Whether ``start`` is in the domain.
+    end_closed : bool
+        Whether ``end`` is in the domain.
+
+    Raises
+    ------
+    ValueError
+        If the domain holds no time: ``start`` comes after ``end``, or
+        equals it without both ends included.
     """
 
-    # A DateTime if the series has an epoch, else a TimeDelta, or a float
-    # for a series without a unit.
-    #: The first time in the domain, or its lower bound if not included.
-    start: Any
-    #: The last time in the domain, or its upper bound if not included.
-    end: Any
-    #: Whether ``start`` is in the domain.
-    start_closed: bool
-    #: Whether ``end`` is in the domain.
-    end_closed: bool
+    __slots__ = ()
+
+    def __new__(cls, start: Any, end: Any, start_closed: bool, end_closed: bool):
+        if end < start or (not start < end and not (start_closed and end_closed)):
+            raise ValueError(f"A domain from {start} to {end} holds no time")
+        return super().__new__(cls, start, end, bool(start_closed), bool(end_closed))
 
 
 class TimeSeries(_BinaryIoMixin, Generic[T]):
@@ -798,6 +832,55 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
             if last < end or (last == end and not last_closed):
                 end, end_closed = last, last_closed
         return start, end, start_closed, end_closed
+
+    def restrict(self, domain: Domain) -> TimeSeries:
+        """The series on ``domain``, a part of its own domain.
+
+        The ends of ``domain`` are times of the series: durations from
+        time 0, or numbers for a series without a unit. Build one with
+        :class:`Domain`, as in ``Domain(TimeDelta(1, "s"), TimeDelta(3, "s"),
+        start_closed=False, end_closed=True)``. The times keep their place:
+        the unit, epoch, and origin stay the same. Each channel holds the
+        observation in effect at the new start from the start on, then its
+        observations inside the domain, as a window from :func:`cut_windows`
+        does. Observations are shared, not copied.
+
+        For a series with an :attr:`epoch`, restrict it without one, as in
+        ``series.with_epoch(None).restrict(domain).with_epoch(series.epoch)``.
+
+        Parameters
+        ----------
+        domain : Domain
+            The domain of the result, within that of the series.
+
+        Returns
+        -------
+        TimeSeries
+            The series on ``domain``.
+
+        Raises
+        ------
+        ValueError
+            If ``domain`` reaches outside the series' domain, including an
+            end the series leaves out but ``domain`` includes, or a channel
+            has no observations.
+        TypeError
+            For a series with an epoch, and for ends of the wrong kind:
+            numbers on a series with a unit, or durations on one without.
+        """
+        if self.epoch is not None:
+            raise TypeError("Restrict a series with an epoch without it: "
+                            "series.with_epoch(None).restrict(domain).with_epoch(series.epoch)")
+        start, end, start_closed, end_closed = domain
+        a = _in_unit(_end_of_domain(start), self.unit)
+        b = _in_unit(_end_of_domain(end), self.unit)
+        lo, hi, lo_closed, hi_closed = self._data.domain
+        if not (np.isfinite(a) and np.isfinite(b)):
+            raise ValueError("The ends of a domain must be finite")
+        if (a < lo or (a == lo and start_closed and not lo_closed)
+                or b > hi or (b == hi and end_closed and not hi_closed)):
+            raise ValueError(f"The domain {domain} reaches outside the series' domain {self.domain}")
+        return TimeSeries._from_cpp(cpp.restrict(self._data, a, b, start_closed, end_closed))
 
     @property
     def n_observations(self) -> Any:  # Depends on the number of channels; see the docstring.
