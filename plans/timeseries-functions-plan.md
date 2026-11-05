@@ -1,6 +1,6 @@
 # Time series follow-ups: implementation plan
 
-Progress: 7 of 15 items, 16 of 29 points (55%)
+Progress: 8 of 15 items, 18 of 29 points (62%)
 
 Specs: [timeseries-functions-spec.md](timeseries-functions-spec.md)
 (phase A, #265) and
@@ -34,7 +34,7 @@ tensors of series, which `sb.stack` of series (B2c) is easily mistaken for.
   the open questions of #267: the name and signature, what a series of
   scalar observations gives, how channels combine, and whether "every
   observation" includes the start of the domain and the end of a window.
-- [ ] **B2.** Combine the channels of a series into one.
+- [x] **B2.** Combine the channels of a series into one.
   - [x] **B2a.** [2] (212620df5) `TimeSeries.stack_channels(axis=0)` stacks the channels of
     a series into one, as the
     [point cloud spec](timeseries-point-clouds-spec.md) describes. The work
@@ -56,7 +56,7 @@ tensors of series, which `sb.stack` of series (B2c) is easily mistaken for.
     for floats and PCFs; channels of different lengths along `axis`; a
     negative `axis`; scalar channels raise naming `stack_channels`; shapes
     that differ off `axis`, and an `axis` out of range, raise.
-  - [ ] **B2c.** [2] Move B2a and B2b into `sb.stack` and `sb.concatenate`,
+  - [x] **B2c.** [2] (61313e35a) Move B2a and B2b into `sb.stack` and `sb.concatenate`,
     which take one `TimeSeries` (a list of series raises `TypeError`,
     naming `from_channels` and `sb.tensor`), and remove
     `TimeSeries.stack_channels` and `TimeSeries.concatenate_channels`. The

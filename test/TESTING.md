@@ -119,6 +119,17 @@ protect. These principles apply when writing, reviewing, or changing tests.
     as in `_ = a + b` inside `pytest.raises`. See
     [AGENTS.md](../AGENTS.md#type-checking).
 
+22. **Build inputs the most direct way.** Construct what a test needs with
+    the simplest public API that gives it, not as a by-product of a more
+    complex operation. A test that needs a tensor of two functions builds
+    it from those two, rather than taking a slice of a larger tensor; a
+    test that needs an object with some property sets that property,
+    rather than running an operation that happens to produce it. Going
+    through the larger operation makes the test depend on its behavior and
+    forces the reader to work out what it produced. If no direct way
+    exists and one would be a sensible addition to the public API, ask
+    about adding it before writing the test around its absence.
+
 The review question is: **What bug would make this test fail, and can I see
 that immediately?**
 
