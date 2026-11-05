@@ -124,10 +124,10 @@ def _two_channels():
     pytest.param(lambda: cut_windows(_two_channels(), size=TimeDelta(1.0, "s"), step=TimeDelta(1.0, "s"),
                                      closed="both", partial=False, anchor="start"), id="windows"),
 ])
-def test_point_clouds_of_several_channels_raise_naming_stack_channels(make_series):
+def test_point_clouds_of_several_channels_raise_naming_stack(make_series):
     series = make_series()
 
-    with pytest.raises(ValueError, match="stack_channels"):
+    with pytest.raises(ValueError, match="sb.stack"):
         to_point_clouds(series)
 
 

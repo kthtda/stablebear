@@ -23,7 +23,7 @@ def test_stacked_scalar_channels_give_vectors_at_every_time_in_the_domain():
     # domain        [-------------------]
     # stacked       *    *    *         *
 
-    stacked = series.stack_channels(axis=0)
+    stacked = sb.stack(series, axis=0)
 
     assert stacked.n_channels == 1
     assert stacked.domain == series.domain
@@ -65,7 +65,7 @@ def _two_pcf_vector_channels():
 def test_stacked_channels_stack_as_tensors_stack(make_series, t, axis):
     series = make_series()
 
-    stacked = series.stack_channels(axis=axis)
+    stacked = sb.stack(series, axis=axis)
 
     assert stacked.dtype is series.dtype
     assert stacked(t).array_equal(sb.stack([series[0](t), series[1](t)], axis=axis))
@@ -87,7 +87,7 @@ def test_stacked_window_keeps_its_open_start_and_origin():
     window = cut_windows(source, size=TimeDelta(2.0, "s"), step=TimeDelta(1.0, "s"), closed="right",
                          anchor="start")[1]
 
-    stacked = window.stack_channels(axis=0)
+    stacked = sb.stack(window, axis=0)
 
     assert stacked.domain == window.domain
     assert stacked.origin == TimeDelta(1.0, "s")
@@ -99,10 +99,19 @@ def test_stacked_series_keeps_its_unit_and_epoch():
     a = TimeSeries([10.0, 20.0], times=TimeDeltaTensor([1.0, 2.0], "h"), epoch="2023-01-01")
     b = TimeSeries([-10.0, -20.0], times=TimeDeltaTensor([1.0, 2.0], "h"), epoch="2023-01-01")
 
-    stacked = TimeSeries.from_channels([a, b], unit="h").stack_channels(axis=0)
+    stacked = sb.stack(TimeSeries.from_channels([a, b], unit="h"), axis=0)
 
     assert stacked.unit == "h"
     assert stacked.epoch == DateTime("2023-01-01")
+
+
+@pytest.mark.parametrize("join", [sb.stack, sb.concatenate])
+def test_list_of_series_raises_naming_from_channels_and_tensor(join):
+    a = TimeSeries([[10.0, 20.0], [20.0, 40.0]], times=TimeDeltaTensor([1.0, 2.0], "s"))
+    b = TimeSeries([[-10.0, -20.0], [-20.0, -40.0]], times=TimeDeltaTensor([1.5, 2.0], "s"))
+
+    with pytest.raises(TypeError, match=r"from_channels.*sb\.tensor"):
+        join([a, b], axis=0)
 
 
 def _channels_of_different_shapes():
@@ -125,11 +134,11 @@ def _channels_of_different_origins():
     pytest.param(_two_scalar_channels, 2, "out of range", id="axis-2"),
     pytest.param(_two_scalar_channels, -3, "out of range", id="axis-minus-3"),
 ])
-def test_stack_channels_rejects_invalid_input(make_series, axis, message):
+def test_stack_of_series_rejects_invalid_input(make_series, axis, message):
     series = make_series()
 
     with pytest.raises(ValueError, match=message):
-        series.stack_channels(axis=axis)
+        sb.stack(series, axis=axis)
 
 
 def _vector_channels_of_different_lengths():
@@ -148,7 +157,7 @@ def _vector_channels_of_different_lengths():
 def test_concatenated_channels_join_as_tensors_concatenate(make_series, t, axis):
     series = make_series()
 
-    concatenated = series.concatenate_channels(axis=axis)
+    concatenated = sb.concatenate(series, axis=axis)
 
     assert concatenated.dtype is series.dtype
     assert concatenated(t).array_equal(sb.concatenate([series[0](t), series[1](t)], axis=axis))
@@ -168,7 +177,7 @@ def _two_matrix_channels_of_different_widths():
 def test_concatenated_matrix_channels_join_along_their_columns(t, axis):
     series = _two_matrix_channels_of_different_widths()
 
-    concatenated = series.concatenate_channels(axis=axis)
+    concatenated = sb.concatenate(series, axis=axis)
 
     assert concatenated(t).array_equal(sb.concatenate([series[0](t), series[1](t)], axis=axis))
 
@@ -189,15 +198,15 @@ def _vector_channels_of_different_origins():
 
 
 @pytest.mark.parametrize("make_series, axis, message", [
-    pytest.param(_two_scalar_channels, 0, "stack_channels", id="scalars"),
+    pytest.param(_two_scalar_channels, 0, "sb.stack", id="scalars"),
     pytest.param(_two_matrix_channels_of_different_widths, 0, "differ other than along axis", id="shapes"),
     pytest.param(_channels_of_different_ranks, 0, "differ other than along axis", id="ranks"),
     pytest.param(_vector_channels_of_different_origins, 0, "different origins", id="origins"),
     pytest.param(_two_vector_channels, 1, "out of range", id="axis-1"),
     pytest.param(_two_vector_channels, -2, "out of range", id="axis-minus-2"),
 ])
-def test_concatenate_channels_rejects_invalid_input(make_series, axis, message):
+def test_concatenate_of_series_rejects_invalid_input(make_series, axis, message):
     series = make_series()
 
     with pytest.raises(ValueError, match=message):
-        series.concatenate_channels(axis=axis)
+        sb.concatenate(series, axis=axis)

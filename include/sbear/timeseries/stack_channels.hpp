@@ -125,7 +125,7 @@ namespace sb
     const auto& shape = series.channel(0).shape();
     if (shape.empty())
     {
-      throw std::invalid_argument("Cannot concatenate channels of scalars; stack them with stack_channels");
+      throw std::invalid_argument("Cannot concatenate channels of scalars; stack them with sb.stack");
     }
     const auto rank = static_cast<std::ptrdiff_t>(shape.size());
     const auto at = detail::channel_axis(axis, rank, rank);

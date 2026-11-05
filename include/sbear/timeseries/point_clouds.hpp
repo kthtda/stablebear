@@ -33,7 +33,7 @@ namespace sb
     {
       throw std::invalid_argument(
           "A point cloud comes from a series of one channel, not " + std::to_string(series.n_channels())
-          + "; combine the channels with stack_channels or concatenate_channels, or select one with series[i]");
+          + "; combine the channels with sb.stack or sb.concatenate, or select one with series[i]");
     }
     const auto& channel = series.channel(0);
     const auto& shape = channel.shape();

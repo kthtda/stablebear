@@ -36,8 +36,8 @@ def to_point_clouds(series: TimeSeries | TimeSeriesTensor | _PandasLike) -> Poin
     ----------
     series : TimeSeries, TimeSeriesTensor, pandas.Series, or pandas.DataFrame
         Series of one channel of numbers. Combine several channels with
-        :meth:`TimeSeries.stack_channels` or
-        :meth:`TimeSeries.concatenate_channels`, or select one with
+        :func:`~stablebear.tensor_create.stack` or
+        :func:`~stablebear.tensor_create.concatenate`, or select one with
         ``series[i]``.
 
     Returns

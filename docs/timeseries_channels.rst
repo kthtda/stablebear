@@ -108,3 +108,34 @@ time::
 
    values = mixed([0.06, 0.125], "s")
    values[1]  # FloatTensor [[1.0, 0.0], [0.0, 1.0]], shape (2, 2)
+
+Combining channels into one
+---------------------------
+
+:py:func:`sb.stack <stablebear.tensor_create.stack>` combines the channels of a series
+into one channel, as it stacks tensors. Its observation at each time
+stacks the observations of the channels in effect then, along a new axis.
+The times are the start of the domain and every time in the domain at which
+a channel has an observation. For ``a`` and ``b`` from above::
+
+   import stablebear as sb
+
+   stacked = sb.stack(series)
+   stacked.times.count  # [0.05, 0.09, 0.1, 0.13]
+   stacked.values       # FloatTensor [[1.0, 10.0], [1.0, 20.0],
+                        #              [2.0, 20.0], [2.0, 30.0]]
+
+Observations outside the domain are dropped, such as those of ``a`` at 0,
+0.2, and 0.3 s. One that stays in effect over several of the times, such as
+``b``'s 20.0 at 0.09 and 0.1 s, is repeated at each. To combine separate
+series, make them the channels of one with ``from_channels`` first; a list
+of series raises ``TypeError``.
+
+:py:func:`sb.concatenate <stablebear.tensor_create.concatenate>` joins observations
+along an existing axis instead, so channels of vectors of lengths 2 and 3
+give vectors of length 5. Channels of numbers have no axis to join along;
+stack them instead.
+
+Functions that take a series of one channel, such as
+:py:func:`~stablebear.timeseries.to_point_clouds`, take the combined
+series.

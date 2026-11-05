@@ -349,6 +349,9 @@ All tensors must have the same shape except along the join axis.
 In ``concatenate``, ``stack``, ``split``, and ``array_split``, a negative
 ``axis`` counts from the end, so ``axis=-1`` is the last axis.
 
+Both also combine the channels of a time series into one channel (see
+:doc:`timeseries_channels`).
+
 
 Splitting tensors
 =================

@@ -1,12 +1,13 @@
 # Time series follow-ups: implementation plan
 
-Progress: 7 of 12 items, 16 of 23 points (70%)
+Progress: 7 of 15 items, 16 of 29 points (55%)
 
 Specs: [timeseries-functions-spec.md](timeseries-functions-spec.md)
 (phase A, #265) and
 [timeseries-point-clouds-spec.md](timeseries-point-clouds-spec.md)
 (phase B, #267). Phase C finishes #263, #264, and #266, which the
-[pandas plan](pandas-timeseries-plan.md) implemented.
+[pandas plan](pandas-timeseries-plan.md) implemented. Phase D builds
+tensors of series, which `sb.stack` of series (B2c) is easily mistaken for.
 
 ## Phase A: functions instead of classes (#265)
 
@@ -33,7 +34,7 @@ Specs: [timeseries-functions-spec.md](timeseries-functions-spec.md)
   the open questions of #267: the name and signature, what a series of
   scalar observations gives, how channels combine, and whether "every
   observation" includes the start of the domain and the end of a window.
-- [x] **B2.** Combine the channels of a series into one.
+- [ ] **B2.** Combine the channels of a series into one.
   - [x] **B2a.** [2] (212620df5) `TimeSeries.stack_channels(axis=0)` stacks the channels of
     a series into one, as the
     [point cloud spec](timeseries-point-clouds-spec.md) describes. The work
@@ -55,6 +56,15 @@ Specs: [timeseries-functions-spec.md](timeseries-functions-spec.md)
     for floats and PCFs; channels of different lengths along `axis`; a
     negative `axis`; scalar channels raise naming `stack_channels`; shapes
     that differ off `axis`, and an `axis` out of range, raise.
+  - [ ] **B2c.** [2] Move B2a and B2b into `sb.stack` and `sb.concatenate`,
+    which take one `TimeSeries` (a list of series raises `TypeError`,
+    naming `from_channels` and `sb.tensor`), and remove
+    `TimeSeries.stack_channels` and `TimeSeries.concatenate_channels`. The
+    C++ stays; errors name `sb.stack` and `sb.concatenate`. Overloads type
+    a `TimeSeries` argument as giving a `TimeSeries`.
+    Docs: a section in `timeseries_channels.rst`.
+    Tests: the B2a/B2b tests, called through `sb.stack` and
+    `sb.concatenate`; a list of series raises.
 - [x] **B3.** [3] (c5b0afc5b) `to_point_clouds(series)` in its "every observation"
   mode: a series of one channel gives a `PointCloud` of one point per
   stored time in its domain, and a `TimeSeriesTensor`, such as windows, a
@@ -94,3 +104,36 @@ Specs: [timeseries-functions-spec.md](timeseries-functions-spec.md)
   classes and external classes that the API reference names, so that a
   broken link to the API reference (#266) fails the docs build.
   Tests: the docs build without warnings.
+
+## Phase D: tensors of time series
+
+Today a `TimeSeriesTensor` comes only from `cut_windows`, `delay_embed`, or
+loading a file: `sb.tensor([a, b])` fails with a NumPy error about too many
+dimensions, and `sb.zeros` rejects `sb.series(...)` dtypes. The C++ tensor
+classes already take a shape, with an optional series to fill it, and
+`TimeSeriesTensor.__setitem__` already takes a `TimeSeries`.
+
+- [ ] **D1.** [2] `sb.zeros(shape, dtype=sb.series(inner))` gives a
+  `TimeSeriesTensor` of empty series, through `_dtype_dispatch` in
+  `stablebear/tensor_create.py`. An element built from the bare shape is
+  a series of one channel with no observations and unit `"s"`; decide
+  whether it should have no unit instead, and say what it is in the
+  docstring.
+  Tests: shape and dtype for float and PCF series; elements can be
+  assigned a `TimeSeries`; an element left empty raises on evaluation.
+- [ ] **D2.** [2] `sb.tensor` takes a list, or nested lists, of
+  `TimeSeries` and gives a `TimeSeriesTensor` of that shape, as it does
+  for lists of `Pcf`. Series may differ in times, lengths, units, and
+  channels, but not in element type, and an explicit
+  `dtype=sb.series(inner)` must match it.
+  Tests: a list of two series of different lengths keeps each; nested
+  lists give a 2-D tensor; series of different element types, or a
+  `dtype` that does not match, raise `TypeError`.
+- [ ] **D3.** [1] Docs: a "Tensors of series" section in
+  `timeseries_channels.rst`, contrasting `sb.tensor([a, b])`, a tensor
+  of two series, with `sb.stack(TimeSeries.from_channels([a, b]))`, one
+  series of stacked observations; a note in `tensors.rst`, under "Joining tensors" and
+  where `zeros` and `tensor` build tensors, that series go into a
+  `TimeSeriesTensor` with `sb.tensor` or `sb.zeros`, while `sb.stack` and
+  `sb.concatenate` combine their channels; a pointer from the `stack` and
+  `concatenate` docstrings; a `CHANGELOG.md` entry.
