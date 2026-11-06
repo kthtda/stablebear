@@ -78,7 +78,12 @@ Keep them in separate files, and link the plan to its spec.
     Give every item without subitems, and every subitem, a size in points
     after its label: 1 for a small change, 2 for a typical item, 3 for a
     large one, 5 for one that is nearly too large to review, as in
-    `- [ ] **B3.** [3] ...`. Under the title, write
+    `- [ ] **B3.** [3] ...`. Points measure the effort of reviewing the
+    change, not of writing it: the number of lines and the concepts a
+    reviewer must hold in mind to check them. Tests take far longer to
+    review than the code they cover, so an item that adds many tests is
+    large even if its code is small, and a configuration change checked by
+    a build is small. Under the title, write
     `Progress: 7 of 47 items, 14 of 89 points (16%)`: the checked items
     against all items, and their points against all points, with the
     percentage of points. Update it with each tick. Re-estimate an item
