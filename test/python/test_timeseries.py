@@ -8,6 +8,7 @@ import pytest
 
 import stablebear as sb
 from stablebear.timeseries import DateTime, DateTimeTensor, Domain, TimeDelta, TimeDeltaTensor, TimeSeries, cut_windows, delay_embed
+from stablebear.timeseries.series import TimeSeriesTensor
 
 from _element_values import TWO_ELEMENTS_OF_EVERY_DTYPE
 from _round_trip import ROUND_TRIPS
@@ -1500,6 +1501,31 @@ def test_ts_dtype_is_one_object_per_value_type():
     assert sb.ts(sb.float64) is sb.ts(sb.float64)
     assert sb.ts(sb.float64) is not sb.ts(sb.float32)
     assert sb.ts(sb.float64).value_type is sb.float64
+
+
+@pytest.mark.parametrize("value_type", [sb.float32, sb.float64, sb.pcf32, sb.pcf64])
+def test_zeros_of_a_series_dtype_is_a_series_tensor_of_that_shape_and_dtype(value_type):
+    tensor = sb.zeros((2, 3), dtype=sb.ts(value_type))
+
+    assert isinstance(tensor, TimeSeriesTensor)
+    assert tensor.shape == (2, 3)
+    assert tensor.dtype is sb.ts(value_type)
+
+
+def test_zeros_of_series_takes_an_assigned_series():
+    tensor = sb.zeros((2,), dtype=sb.ts(sb.float64))
+    series = TimeSeries([10.0, 20.0], times=TimeDeltaTensor([0.0, 1.0], "s"))
+
+    tensor[1] = series
+
+    assert tensor[1].array_equal(series)
+
+
+def test_zeros_of_series_raises_on_evaluating_an_element_left_empty():
+    tensor = sb.zeros((2,), dtype=sb.ts(sb.float64))
+
+    with pytest.raises(ValueError):
+        tensor[0](TimeDelta(0.0, "s"))
 
 
 def _array_equal_series():

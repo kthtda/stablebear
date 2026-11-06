@@ -16,8 +16,10 @@ from .base_tensor import (
 from .nested_tensor import NestedTensor
 from .point_cloud import PointCloudTensor
 from .typing import (
+    _NATIVE_SUFFIX,
     Dtype,
     _assert_valid_dtype,
+    _SeriesDtype,
     barcode32,
     barcode64,
     boolean,
@@ -89,7 +91,7 @@ def _dtype_dispatch():
     return _DTYPE_DISPATCH
 
 
-def zeros(shape: ShapeLike, dtype: Dtype = pcf32):
+def zeros(shape: ShapeLike, dtype: Dtype = pcf32) -> Any:  # Any: the type follows the dtype.
     """
     Creates a new `Tensor` of the specified `shape` and `dtype` whose entries are "zero." What "zero" means depends on the `dtype`:
 
@@ -100,6 +102,9 @@ def zeros(shape: ShapeLike, dtype: Dtype = pcf32):
     `dtype=barcode32/64`: An empty barcode.
     `dtype=symmat32/64`: A 0×0 symmetric matrix.
     `dtype=distmat32/64`: A 0×0 distance matrix.
+    `dtype=ts(value_type)`: A series of one channel without observations,
+    in seconds, to be replaced by assigning a `TimeSeries` to the element.
+    Evaluating a series without observations raises `ValueError`.
 
     Parameters
     ----------
@@ -116,6 +121,10 @@ def zeros(shape: ShapeLike, dtype: Dtype = pcf32):
 
     if not isinstance(shape, Shape):
         shape = Shape(shape)  # If passed as, e.g., tuple of ints
+
+    if isinstance(dtype, _SeriesDtype):
+        from .timeseries.series import TimeSeriesTensor
+        return TimeSeriesTensor(getattr(cpp, f"TimeSeries{_NATIVE_SUFFIX[dtype.value_type]}Tensor")(shape))
 
     dispatch = _dtype_dispatch()
     _assert_valid_dtype(dtype, list(dispatch))
