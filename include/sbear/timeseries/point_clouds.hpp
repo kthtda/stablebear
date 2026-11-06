@@ -9,6 +9,7 @@
 #include "../walk.hpp"
 
 #include <cmath>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
@@ -25,18 +26,22 @@ namespace sb
   /// time a series stores an observation in its domain. With @p n > 0, @p n
   /// evenly spaced times over the domain, including each end it includes.
   /// With @p step > 0, the times start + k * step in the domain, for
-  /// k = 0, 1, ..., where @p step is a count of @p stepUnit, or a plain
-  /// number for a series without a unit.
+  /// k = 0, 1, ... With @p times, those times, in their order. @p step and
+  /// @p times are counts of @p unit, or plain numbers for a series without
+  /// a unit.
   struct PointTimes
   {
     size_t n = 0;
     float64_t step = 0;
-    TimeUnit stepUnit = TimeUnit::Unitless;
+    std::optional<std::vector<float64_t>> times;
+    TimeUnit unit = TimeUnit::Unitless;
   };
 
   namespace detail
   {
-    /// The times of @p how in @p domain of a series in @p unit, ascending.
+    /// The times of @p how in @p domain of a series in @p unit: ascending,
+    /// or in their order for given times, which throw std::domain_error if
+    /// one is outside @p domain.
     template <typename Domain>
     std::vector<float64_t> grid_times(const Domain& domain, const PointTimes& how, TimeUnit unit)
     {
@@ -58,8 +63,22 @@ namespace sb
         }
         return times;
       }
-      check_query_unit(how.stepUnit, unit);
-      const auto step = convert_time(how.step, how.stepUnit, unit);
+      check_query_unit(how.unit, unit);
+      if (how.times)
+      {
+        for (const auto query : *how.times)
+        {
+          const auto t = convert_time(query, how.unit, unit);
+          if (!domain.contains(t))
+          {
+            throw std::domain_error("Time " + detail::shortest_text(t) + " is outside the domain "
+                                    + domain.to_string());
+          }
+          times.push_back(t);
+        }
+        return times;
+      }
+      const auto step = convert_time(how.step, how.unit, unit);
       for (size_t k = domain.closedStart ? 0 : 1;; ++k)
       {
         const auto t = domain.first + static_cast<float64_t>(k) * step;
@@ -98,7 +117,7 @@ namespace sb
     }
     const size_t dim = shape.empty() ? 1 : shape[0];
     std::vector<size_t> kept;
-    if (how.n > 0 || how.step > 0)
+    if (how.n > 0 || how.step > 0 || how.times)
     {
       size_t hint = 0;
       for (const auto t : detail::grid_times(series.domain(), how, series.unit()))

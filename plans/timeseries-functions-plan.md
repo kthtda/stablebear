@@ -1,6 +1,6 @@
 # Time series follow-ups: implementation plan
 
-Progress: 10 of 16 items, 22 of 31 points (71%)
+Progress: 11 of 17 items, 24 of 34 points (71%)
 
 Specs: [timeseries-functions-spec.md](timeseries-functions-spec.md)
 (phase A, #265) and
@@ -81,7 +81,7 @@ tensors of series, which `sb.stack` of series (B2c) is easily mistaken for.
   `Series`; a series or windows of several channels raise, naming
   `stack_channels`; `float32` gives `pcloud32`; booleans and matrices
   raise.
-- [ ] **B4.** [2] The uniform grid mode: `n` points, or points every
+- [x] **B4.** [2] (c3a2f1e7d) The uniform grid mode: `n` points, or points every
   `step`, over each series' domain from its time 0.
   Tests: `n` and `step` give the same cloud where they agree; `n` with
   closed, half-open, and open domains; windows of one size give clouds of
@@ -152,3 +152,14 @@ classes already take a shape, with an optional series to fill it, and
   `TimeSeriesTensor` with `sb.tensor` or `sb.zeros`, while `sb.stack` and
   `sb.concatenate` combine their channels; a pointer from the `stack` and
   `concatenate` docstrings; a `CHANGELOG.md` entry.
+- [ ] **D4.** [3] Dates and times for a tensor of series that all have an
+  epoch, in `TimeSeriesTensor.evaluate` and `to_point_clouds`: each series
+  places a date at `date - epoch - origin` in its own time, so separate
+  series, such as one per station, are sampled at the same instants. C++
+  takes the dates as integer counts of a unit and converts them per
+  series. Today both raise `TypeError` for dates on a tensor; windows of
+  one series rarely share a date in their domains, so they keep taking
+  durations.
+  Tests: two series with different epochs give the values at the same
+  instants; a series without an epoch raises `ValueError`; a date outside
+  a series' domain raises `ValueError` naming its position.

@@ -1125,6 +1125,24 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         )
 
 
+def _queries(t, unit=None):
+    """Times ``t``, durations or numbers of ``unit``, as numbers and their
+    unit for C++, which converts them into the unit of each series; plain
+    numbers without ``unit`` get the unit ``None``. Durations are counted in
+    their own unit."""
+    if unit is not None:
+        t = _with_unit(t, unit)
+    duration = _as_time_delta(t)
+    if duration is not None:
+        return _in_unit(duration, duration.unit), duration.unit
+    if not isinstance(t, (Tensor, int, float, np.integer, np.floating)):
+        t = _as_array(t)
+        finest = _finest_duration_unit(t)
+        if finest is not None:
+            return _durations_in(t, finest), finest
+    return t, None
+
+
 class TimeSeriesTensor(Tensor):
     """Tensor whose elements are :class:`TimeSeries`, such as the windows of
     a series. Its dtype is ``sb.ts(value_type)`` for series of ``value_type``
@@ -1180,19 +1198,7 @@ class TimeSeriesTensor(Tensor):
             For numbers without ``unit`` on series with a unit, or for
             durations or ``unit`` on series without one.
         """
-        if unit is not None:
-            t = _with_unit(t, unit)
-        # Durations are queried in their own unit, and C++ converts them into
-        # the unit of each series.
-        duration = _as_time_delta(t)
-        if duration is not None:
-            return self._evaluate(_in_unit(duration, duration.unit), duration.unit)
-        if not isinstance(t, (Tensor, int, float, np.integer, np.floating)):
-            t = _as_array(t)
-            finest = _finest_duration_unit(t)
-            if finest is not None:
-                return self._evaluate(_durations_in(t, finest), finest)
-        return self._evaluate(t, None)
+        return self._evaluate(*_queries(t, unit))
 
     def _evaluate(self, t, unit):
         """Evaluate at numbers ``t`` of ``unit``, or of no unit if ``unit``

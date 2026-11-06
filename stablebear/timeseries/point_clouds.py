@@ -1,28 +1,31 @@
 from __future__ import annotations
 
 import operator
-from typing import overload
+from typing import Any, overload
+
+import numpy as np
 
 from .. import _sb_cpp as cpp
 from ..point_cloud import PointCloud, PointCloudTensor
 from ..typing import float32, float64, int32, int64, uint32, uint64
-from .date_time import TimeDelta, _duration, _in_unit, _ScalarDuration
-from .series import TimeSeries, TimeSeriesTensor, _PandasLike, _as_series
+from .date_time import DateTimeTensor, TimeDelta, _duration, _in_unit, _ScalarDuration
+from .series import TimeSeries, TimeSeriesTensor, _checked_dates, _PandasLike, _as_series, _queries
 
 _NUMBER_DTYPES = (float32, float64, int32, int64, uint32, uint64)
 
 
 @overload
-def to_point_clouds(series: TimeSeries | _PandasLike, *, n: int | None = None,
+def to_point_clouds(series: TimeSeries | _PandasLike, times: Any = None, *, n: int | None = None,
                     step: float | _ScalarDuration | None = None) -> PointCloud: ...
 
 
 @overload
-def to_point_clouds(series: TimeSeriesTensor, *, n: int | None = None,
+def to_point_clouds(series: TimeSeriesTensor, times: Any = None, *, n: int | None = None,
                     step: float | _ScalarDuration | None = None) -> PointCloudTensor: ...
 
 
-def to_point_clouds(series: TimeSeries | TimeSeriesTensor | _PandasLike, *, n: int | None = None,
+def to_point_clouds(series: TimeSeries | TimeSeriesTensor | _PandasLike, times: Any = None, *,
+                    n: int | None = None,
                     step: float | _ScalarDuration | None = None) -> PointCloud | PointCloudTensor:
     """The point clouds traced by a time series or by each series of a
     tensor of them, such as windows.
@@ -47,12 +50,14 @@ def to_point_clouds(series: TimeSeries | TimeSeriesTensor | _PandasLike, *, n: i
     on which ends are closed: ``[0, 2]`` gives times 0, 1, 2, and
     ``[0, 2)`` gives 0, 2/3, 4/3. The clouds of half-open windows that
     follow each other then form one evenly spaced grid, without a time
-    in two clouds. Windows of one size give clouds of ``n`` points each. With ``step``, the times are ``start + k * step`` in the
-    domain of each series, for ``k = 0, 1, ...``, leaving out ``start`` if
-    the domain leaves it out.
+    in two clouds. Windows of one size give clouds of ``n`` points each.
+    With ``step``, the times are ``start + k * step`` in the domain of each
+    series, for ``k = 0, 1, ...``, leaving out ``start`` if the domain
+    leaves it out. With ``times``, the times are those, in their order, the
+    same for every series, so the cloud holds the values that evaluating
+    the series at ``times`` gives.
 
-    A
-    ``float32`` series gives ``pcloud32`` clouds, and series of other
+    A ``float32`` series gives ``pcloud32`` clouds, and series of other
     numbers ``pcloud64`` clouds. A pandas ``Series`` or ``DataFrame`` is
     converted with :meth:`TimeSeries.from_pandas` first.
 
@@ -63,6 +68,13 @@ def to_point_clouds(series: TimeSeries | TimeSeriesTensor | _PandasLike, *, n: i
         :func:`~stablebear.tensor_create.stack` or
         :func:`~stablebear.tensor_create.concatenate`, or select one with
         ``series[i]``.
+    times : durations, dates and times, or numbers, optional
+        The times of the points, counted from the time 0 of each series,
+        as :meth:`TimeSeries.evaluate` takes them: durations, such as a
+        :class:`TimeDeltaTensor`, for series with a unit, or numbers for
+        series without one. A single series with an
+        :attr:`~TimeSeries.epoch` also takes dates and times, such as a
+        :class:`DateTimeTensor`.
     n : int, optional
         The number of evenly spaced points of each cloud.
     step : TimeDelta, duration, or float, optional
@@ -79,23 +91,24 @@ def to_point_clouds(series: TimeSeries | TimeSeriesTensor | _PandasLike, *, n: i
     Raises
     ------
     ValueError
-        If a series has several channels, both ``n`` and ``step`` are
-        given, ``n`` is not positive or is 1 for a domain with both ends
-        closed, or ``step`` is not finite and positive.
+        If a series has several channels, more than one of ``times``,
+        ``n``, and ``step`` is given, ``n`` is not positive or is 1 for a
+        domain with both ends closed, ``step`` is not finite and positive,
+        ``times`` is not one-dimensional, a time is outside the domain of
+        a series, or for dates and times on a series without an epoch.
     TypeError
         If the observations are not numbers, are booleans, or have more
-        than one dimension, for a ``step`` that is a number on a series
-        with a unit or a duration on one without, or for an object that is
-        not a series or a pandas ``Series`` or ``DataFrame``.
+        than one dimension, for a ``step`` or ``times`` that are numbers
+        on a series with a unit or durations on one without, for dates
+        and times with a tensor of series, or for an object that is not a
+        series or a pandas ``Series`` or ``DataFrame``.
     """
-    times = _point_times(n, step)
     if isinstance(series, TimeSeriesTensor):
-        value_type = series.dtype.value_type
-        _check_numbers(value_type)
-        return PointCloudTensor(cpp.to_point_clouds(series._data, *times))
+        _check_numbers(series.dtype.value_type)
+        return PointCloudTensor(cpp.to_point_clouds(series._data, *_point_times(times, n, step, None)))
     series = _as_series(series)
     _check_numbers(series.dtype)
-    return PointCloud(cpp.to_point_cloud(series._data, *times))
+    return PointCloud(cpp.to_point_cloud(series._data, *_point_times(times, n, step, series)))
 
 
 def _check_numbers(dtype):
@@ -103,19 +116,48 @@ def _check_numbers(dtype):
         raise TypeError(f"Point clouds come from series of numbers, not of {dtype}")
 
 
-def _point_times(n, step):
-    """The ``n``, ``step``, and ``step_unit`` arguments of the C++
-    ``to_point_clouds``, 0 for a mode not chosen."""
-    if n is not None and step is not None:
-        raise ValueError("Pass at most one of n and step")
+def _point_times(times, n, step, series):
+    """The ``n``, ``step``, ``times``, and ``unit`` arguments of the C++
+    ``to_point_clouds``, 0 or ``None`` for a mode not chosen. Dates and
+    times are placed in ``series``, or raise for a tensor of series, with
+    ``series`` ``None``."""
+    if sum(x is not None for x in (times, n, step)) > 1:
+        raise ValueError("Pass at most one of times, n, and step")
+    if times is not None:
+        numbers, unit = _queries(times)
+        if isinstance(times, DateTimeTensor):
+            numbers = times.to_datetime64()
+        if isinstance(numbers, np.ndarray) and numbers.dtype.kind in "MOUS":
+            numbers, unit = _times_of_dates(numbers, series)
+        numbers = np.asarray(numbers, dtype=np.float64)
+        if numbers.ndim != 1:
+            raise ValueError(f"The times of the points must be one-dimensional, not of shape {numbers.shape}")
+        return 0, 0.0, numbers.tolist(), unit
     if n is not None:
         n = operator.index(n)
         if n < 1:
             raise ValueError(f"n must be positive, not {n}")
-        return n, 0.0, None
+        return n, 0.0, None, None
     if step is not None:
         step = _duration(step, "The step must be finite and positive")
         if isinstance(step, TimeDelta):
-            return 0, _in_unit(step, step.unit), step.unit
-        return 0, step, None
-    return 0, 0.0, None
+            return 0, _in_unit(step, step.unit), None, step.unit
+        return 0, step, None, None
+    return 0, 0.0, None, None
+
+
+def _times_of_dates(dates, series):
+    """``dates``, an array of dates and times, as times of ``series`` and
+    its unit."""
+    if series is None:
+        raise TypeError("Dates and times place the points of one series, not of a tensor of series; "
+                        "pass durations")
+    if series.epoch is None:
+        raise ValueError("This series has no epoch to place dates and times; set one with with_epoch")
+    try:
+        dates = _checked_dates(np.asarray(dates, dtype="datetime64"))
+    except (TypeError, ValueError):
+        raise TypeError("Times must be all durations or all dates and times, not a mix") from None
+    times = series._time_of_date(dates, 0)
+    series._check_date_in_domain(dates, times, 0)
+    return times, series.unit

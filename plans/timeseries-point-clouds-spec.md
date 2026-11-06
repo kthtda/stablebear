@@ -110,7 +110,7 @@ In `stablebear.timeseries`.
   `S` a `PointCloudTensor` of shape `S`, whose clouds can differ in size.
 - A series of several channels raises `ValueError`, naming
   `sb.stack` and `series[i]`.
-- The points come in the order of their times.
+- The points come in the order of their times, or of the given times.
 
 ### Modes
 
@@ -125,17 +125,18 @@ In `stablebear.timeseries`.
   open and the open ends left out, so `[0, 2]` gives 0, 1, 2 and `[0, 2)`
   gives 0, 2/3, 4/3. The clouds of consecutive half-open windows then form
   one evenly spaced grid, without a time in two clouds. Windows of one size
-  give clouds of `n` points each. `n` is a positive integer; `n = 1` needs an open end, since one
-  point cannot include both ends; it lies at the closed end, or in the
-  middle if both are open.
+  give clouds of `n` points each. `n` is a positive integer; `n = 1` needs
+  an open end, since one point cannot include both ends; it lies at the
+  closed end, or in the middle if both are open.
 - **Uniform grid, `step`**: times `start + k * step` in each series'
   domain, for `k = 0, 1, ...`, leaving out `start` if that end is open.
   `step` is a positive duration, or a number for a series without a unit,
   as for `cut_windows`.
-- **Given times** (`times`): the same times for every series, as
-  `evaluate` takes them: durations, numbers for a series without a unit, or
-  dates for a series with an epoch. A time outside a domain raises
-  `ValueError`, as `evaluate` does.
+- **Given times** (`times`): the same times for every series, in their
+  order, as `evaluate` takes them: durations, numbers for a series without
+  a unit, or dates for a single series with an epoch, since the windows of
+  a tensor hold different instants at the same time. A time outside a
+  domain raises `ValueError`, as `evaluate` does.
 
 ### Errors
 

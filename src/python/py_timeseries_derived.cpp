@@ -22,10 +22,11 @@ namespace nb = nanobind;
 namespace
 {
   /// The times to take points at, from the arguments of to_point_clouds:
-  /// n, or step in step_unit (none for a plain number), or neither.
-  sb::PointTimes point_times(size_t n, sb::float64_t step, const std::optional<std::string>& stepUnit)
+  /// n, or step or times in unit (none for plain numbers), or none of them.
+  sb::PointTimes point_times(size_t n, sb::float64_t step, std::optional<std::vector<sb::float64_t>> times,
+                             const std::optional<std::string>& unit)
   {
-    return {n, step, stepUnit ? sb::parse_time_unit(*stepUnit) : sb::TimeUnit::Unitless};
+    return {n, step, std::move(times), unit ? sb::parse_time_unit(*unit) : sb::TimeUnit::Unitless};
   }
 
   template <typename T>
@@ -58,15 +59,17 @@ namespace
     if constexpr (std::is_arithmetic_v<T> && !std::is_same_v<T, bool>)
     {
       m.def("to_point_cloud", [](const sb::TimeSeries<T>& series, size_t n, sb::float64_t step,
-                                 const std::optional<std::string>& stepUnit) {
-        return sb::to_point_cloud(series, point_times(n, step, stepUnit));
-      }, nb::arg("series"), nb::arg("n") = 0, nb::arg("step") = 0, nb::arg("step_unit") = nb::none(),
-         nb::call_guard<nb::gil_scoped_release>());
+                                 std::optional<std::vector<sb::float64_t>> times,
+                                 const std::optional<std::string>& unit) {
+        return sb::to_point_cloud(series, point_times(n, step, std::move(times), unit));
+      }, nb::arg("series"), nb::arg("n") = 0, nb::arg("step") = 0, nb::arg("times") = nb::none(),
+         nb::arg("unit") = nb::none(), nb::call_guard<nb::gil_scoped_release>());
       m.def("to_point_clouds", [](const sb::Tensor<sb::TimeSeries<T>>& seriesTensor, size_t n, sb::float64_t step,
-                                  const std::optional<std::string>& stepUnit) {
-        return sb::to_point_clouds(seriesTensor, point_times(n, step, stepUnit));
-      }, nb::arg("series_tensor"), nb::arg("n") = 0, nb::arg("step") = 0, nb::arg("step_unit") = nb::none(),
-         nb::call_guard<nb::gil_scoped_release>());
+                                  std::optional<std::vector<sb::float64_t>> times,
+                                  const std::optional<std::string>& unit) {
+        return sb::to_point_clouds(seriesTensor, point_times(n, step, std::move(times), unit));
+      }, nb::arg("series_tensor"), nb::arg("n") = 0, nb::arg("step") = 0, nb::arg("times") = nb::none(),
+         nb::arg("unit") = nb::none(), nb::call_guard<nb::gil_scoped_release>());
     }
   }
 }
