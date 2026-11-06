@@ -8,6 +8,7 @@
 #include "../timeseries.hpp"
 #include "../walk.hpp"
 
+#include <cmath>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
@@ -20,14 +21,67 @@ namespace sb
   template <typename T>
   using point_coordinate_t = std::conditional_t<std::is_same_v<T, float32_t>, float32_t, float64_t>;
 
-  /// The point cloud of @p series, one point per observation stored at a
-  /// time in its domain, in the order of their times; a window with an open
-  /// start leaves out the value it stores at its start. An observation of shape () gives a point of
-  /// dimension 1, and one of shape (m) a point of dimension m. Requires one
+  /// The times at which to_point_cloud() takes points. By default, every
+  /// time a series stores an observation in its domain. With @p n > 0, @p n
+  /// evenly spaced times over the domain, including each end it includes.
+  /// With @p step > 0, the times start + k * step in the domain, for
+  /// k = 0, 1, ..., where @p step is a count of @p stepUnit, or a plain
+  /// number for a series without a unit.
+  struct PointTimes
+  {
+    size_t n = 0;
+    float64_t step = 0;
+    TimeUnit stepUnit = TimeUnit::Unitless;
+  };
+
+  namespace detail
+  {
+    /// The times of @p how in @p domain of a series in @p unit, ascending.
+    template <typename Domain>
+    std::vector<float64_t> grid_times(const Domain& domain, const PointTimes& how, TimeUnit unit)
+    {
+      std::vector<float64_t> times;
+      if (how.n > 0)
+      {
+        if (how.n == 1 && domain.closedStart && domain.closedEnd)
+        {
+          throw std::invalid_argument("One point cannot include both ends of the closed domain "
+                                      + domain.to_string() + "; take n of at least 2");
+        }
+        // The fractions of the domain's length at which the points lie: from
+        // 0 if the start is closed, to 1 if the end is closed, evenly apart.
+        const auto gaps = static_cast<float64_t>(how.n + 1) - (domain.closedStart ? 1 : 0) - (domain.closedEnd ? 1 : 0);
+        const float64_t offset = domain.closedStart ? 0 : 1;
+        for (size_t i = 0; i < how.n; ++i)
+        {
+          times.push_back(std::lerp(domain.first, domain.last, (static_cast<float64_t>(i) + offset) / gaps));
+        }
+        return times;
+      }
+      check_query_unit(how.stepUnit, unit);
+      const auto step = convert_time(how.step, how.stepUnit, unit);
+      for (size_t k = domain.closedStart ? 0 : 1;; ++k)
+      {
+        const auto t = domain.first + static_cast<float64_t>(k) * step;
+        if (!domain.contains(t))
+        {
+          return times;
+        }
+        times.push_back(t);
+      }
+    }
+  }
+
+  /// The point cloud of @p series at the times @p how picks, in the order of
+  /// their times: each gives the observation in effect then as one point,
+  /// an observation of shape () a point of dimension 1, and one of shape (m)
+  /// a point of dimension m. By default the times are those at which the
+  /// series stores an observation in its domain; a window with an open
+  /// start leaves out the value it stores at its start. Requires one
   /// channel, and throws TypeError for observations of other shapes.
   template <typename T>
     requires(std::is_arithmetic_v<T> && !std::is_same_v<T, bool>)
-  PointCloud<point_coordinate_t<T>> to_point_cloud(const TimeSeries<T>& series)
+  PointCloud<point_coordinate_t<T>> to_point_cloud(const TimeSeries<T>& series, const PointTimes& how = {})
   {
     if (series.n_channels() != 1)
     {
@@ -44,7 +98,16 @@ namespace sb
     }
     const size_t dim = shape.empty() ? 1 : shape[0];
     std::vector<size_t> kept;
-    if (channel.size() > 0)
+    if (how.n > 0 || how.step > 0)
+    {
+      size_t hint = 0;
+      for (const auto t : detail::grid_times(series.domain(), how, series.unit()))
+      {
+        hint = channel.index_at(t, hint);
+        kept.push_back(hint);
+      }
+    }
+    else if (channel.size() > 0)
     {
       const auto domain = series.domain();
       for (size_t k = 0; k < channel.size(); ++k)
@@ -67,17 +130,19 @@ namespace sb
   }
 
   /// The point cloud of every series of @p seriesTensor, as to_point_cloud()
-  /// gives it, in a tensor of the same shape. The clouds can differ in size.
-  /// The series are converted in parallel on @p exec.
+  /// gives it at the times @p how picks, in a tensor of the same shape. The
+  /// clouds can differ in size. The series are converted in parallel on
+  /// @p exec.
   template <typename T>
     requires(std::is_arithmetic_v<T> && !std::is_same_v<T, bool>)
   Tensor<PointCloud<point_coordinate_t<T>>> to_point_clouds(const Tensor<TimeSeries<T>>& seriesTensor,
+                                                            const PointTimes& how = {},
                                                             Executor& exec = default_executor())
   {
     Tensor<PointCloud<point_coordinate_t<T>>> clouds(
         std::vector<size_t>(seriesTensor.shape().begin(), seriesTensor.shape().end()));
     parallel_walk(seriesTensor, [&](const std::vector<size_t>& index) {
-      clouds(index) = to_point_cloud(seriesTensor(index));
+      clouds(index) = to_point_cloud(seriesTensor(index), how);
     }, exec);
     return clouds;
   }

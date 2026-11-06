@@ -1,6 +1,6 @@
 # Time series follow-ups: implementation plan
 
-Progress: 8 of 16 items, 18 of 31 points (58%)
+Progress: 10 of 16 items, 22 of 31 points (71%)
 
 Specs: [timeseries-functions-spec.md](timeseries-functions-spec.md)
 (phase A, #265) and
@@ -94,7 +94,7 @@ tensors of series, which `sb.stack` of series (B2c) is easily mistaken for.
 - [ ] **B6.** [2] A guide section on point clouds from time series, and
   the tide gauge tutorial builds its window clouds with it instead of
   evaluating on a grid by hand.
-- [ ] **B7.** [2] `TimeSeries.restrict(domain)`, as the
+- [x] **B7.** [2] (e0ca36884) `TimeSeries.restrict(domain)`, as the
   [point cloud spec](timeseries-point-clouds-spec.md) describes; done
   before B4, whose tests build series with open ends with it. The C++
   cuts each channel with the code `windows` uses, moved into a function
@@ -128,7 +128,7 @@ dimensions, and `sb.zeros` rejects `sb.ts(...)` dtypes. The C++ tensor
 classes already take a shape, with an optional series to fill it, and
 `TimeSeriesTensor.__setitem__` already takes a `TimeSeries`.
 
-- [ ] **D1.** [2] `sb.zeros(shape, dtype=sb.ts(value_type))` gives a
+- [x] **D1.** [2] (2bb836cf9) `sb.zeros(shape, dtype=sb.ts(value_type))` gives a
   `TimeSeriesTensor` of empty series, through `_dtype_dispatch` in
   `stablebear/tensor_create.py`. An element built from the bare shape is
   a series of one channel with no observations and unit `"s"`; decide

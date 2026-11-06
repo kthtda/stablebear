@@ -21,6 +21,13 @@ namespace nb = nanobind;
 
 namespace
 {
+  /// The times to take points at, from the arguments of to_point_clouds:
+  /// n, or step in step_unit (none for a plain number), or neither.
+  sb::PointTimes point_times(size_t n, sb::float64_t step, const std::optional<std::string>& stepUnit)
+  {
+    return {n, step, stepUnit ? sb::parse_time_unit(*stepUnit) : sb::TimeUnit::Unitless};
+  }
+
   template <typename T>
   void register_derived_element(nb::module_& m)
   {
@@ -50,11 +57,16 @@ namespace
        nb::arg("partial"), nb::arg("anchor_end"), nb::call_guard<nb::gil_scoped_release>());
     if constexpr (std::is_arithmetic_v<T> && !std::is_same_v<T, bool>)
     {
-      m.def("to_point_cloud", [](const sb::TimeSeries<T>& series) { return sb::to_point_cloud(series); },
-            nb::arg("series"), nb::call_guard<nb::gil_scoped_release>());
-      m.def("to_point_clouds", [](const sb::Tensor<sb::TimeSeries<T>>& seriesTensor) {
-        return sb::to_point_clouds(seriesTensor);
-      }, nb::arg("series_tensor"), nb::call_guard<nb::gil_scoped_release>());
+      m.def("to_point_cloud", [](const sb::TimeSeries<T>& series, size_t n, sb::float64_t step,
+                                 const std::optional<std::string>& stepUnit) {
+        return sb::to_point_cloud(series, point_times(n, step, stepUnit));
+      }, nb::arg("series"), nb::arg("n") = 0, nb::arg("step") = 0, nb::arg("step_unit") = nb::none(),
+         nb::call_guard<nb::gil_scoped_release>());
+      m.def("to_point_clouds", [](const sb::Tensor<sb::TimeSeries<T>>& seriesTensor, size_t n, sb::float64_t step,
+                                  const std::optional<std::string>& stepUnit) {
+        return sb::to_point_clouds(seriesTensor, point_times(n, step, stepUnit));
+      }, nb::arg("series_tensor"), nb::arg("n") = 0, nb::arg("step") = 0, nb::arg("step_unit") = nb::none(),
+         nb::call_guard<nb::gil_scoped_release>());
     }
   }
 }

@@ -120,8 +120,14 @@ In `stablebear.timeseries`.
   in its own time from 0, including each end the domain includes. With both
   ends closed they are `length / (n - 1)` apart, with one end open
   `length / n` apart starting from the closed end, and with both open
-  `length / (n + 1)` apart. Windows of one size give clouds of `n` points
-  each. `n` is a positive integer; `n = 1` needs a closed end.
+  `length / (n + 1)` apart. These are the evenly spaced times over the
+  domain with both ends closed, with `n + 1` or `n + 2` times when ends are
+  open and the open ends left out, so `[0, 2]` gives 0, 1, 2 and `[0, 2)`
+  gives 0, 2/3, 4/3. The clouds of consecutive half-open windows then form
+  one evenly spaced grid, without a time in two clouds. Windows of one size
+  give clouds of `n` points each. `n` is a positive integer; `n = 1` needs an open end, since one
+  point cannot include both ends; it lies at the closed end, or in the
+  middle if both are open.
 - **Uniform grid, `step`**: times `start + k * step` in each series'
   domain, for `k = 0, 1, ...`, leaving out `start` if that end is open.
   `step` is a positive duration, or a number for a series without a unit,
