@@ -1,6 +1,6 @@
 # Time series follow-ups: implementation plan
 
-Progress: 13 of 17 items, 27 of 34 points (79%)
+Progress: 15 of 20 items, 28 of 38 points (74%)
 
 Specs: [timeseries-functions-spec.md](timeseries-functions-spec.md)
 (phase A, #265) and
@@ -112,13 +112,31 @@ tensors of series, which `sb.stack` of series (B2c) is easily mistaken for.
 
 ## Phase C: changelog and documentation upkeep (#263, #264, #266)
 
-- [ ] **C1.** [1] `CHANGELOG.md` cites #263 and #264 in the time series
+- [x] **C1.** [1] (49ad56885) `CHANGELOG.md` cites #263 and #264 in the time series
   entries, and describes `cut_windows` and `delay_embed` (#265) and point
   clouds from time series (#267).
-- [ ] **C2.** [1] Turn on Sphinx's nitpicky mode, ignoring the private base
-  classes and external classes that the API reference names, so that a
-  broken link to the API reference (#266) fails the docs build.
-  Tests: the docs build without warnings.
+- [ ] **C2.** Turn on Sphinx's nitpicky mode, so that a broken link to the
+  API reference (#266) fails the docs build. A trial build with `-n` gives
+  405 warnings, all unresolved classes in docstring type fields.
+  - [ ] **C2a.** [1] In `docs/conf.py`: `sphinx.ext.intersphinx` for
+    Python, NumPy, pandas, and matplotlib; `napoleon_preprocess_types`,
+    which drops words such as "optional"; `napoleon_type_aliases` mapping
+    the short names of stablebear classes, such as `Tensor`,
+    `TimeSeries`, and `FloatTensor`, to their documented paths; and
+    `nitpick_ignore_regex` for private names, such as `_PcfNested`,
+    `numpy._typing` internals, and the `_Mock` of mocked imports. The
+    first two alone leave 301 warnings. Intersphinx fetches its
+    inventories when the docs build, so the build needs the network.
+    Tests: a build with `-n` warns only about the prose of C2b.
+  - [ ] **C2b.** [2] Rewrite the type fields that hold prose, such as
+    "durations", "them", "C++ tensor", "matplotlib axes", "file-like", and
+    "same kind as ``X``", as types, with the prose moved into the
+    description; document the dtype sentinels, such as `float32`, so that
+    unions like `float32 | float64 | None` resolve, or ignore them.
+    Tests: a build with `-n` gives no warnings.
+  - [ ] **C2c.** [1] `nitpicky = True` in `docs/conf.py` and
+    `fail_on_warning: true` in `.readthedocs.yaml`.
+    Tests: a broken reference fails a local build with `-W`.
 
 ## Phase D: tensors of time series
 
