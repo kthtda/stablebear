@@ -1,6 +1,6 @@
 # Time series follow-ups: implementation plan
 
-Progress: 11 of 17 items, 24 of 34 points (71%)
+Progress: 12 of 17 items, 25 of 34 points (74%)
 
 Specs: [timeseries-functions-spec.md](timeseries-functions-spec.md)
 (phase A, #265) and
@@ -87,7 +87,7 @@ tensors of series, which `sb.stack` of series (B2c) is easily mistaken for.
   closed, half-open, and open domains; windows of one size give clouds of
   one size; a step that does not divide the domain; an open start leaves
   out the start; more than one mode raises.
-- [ ] **B5.** [1] The given-times mode: durations, or numbers for a series
+- [x] **B5.** [1] (247d9e6f0) The given-times mode: durations, or numbers for a series
   without a unit, as `evaluate` takes them.
   Tests: equals evaluating at those times; times outside the domain
   raise.

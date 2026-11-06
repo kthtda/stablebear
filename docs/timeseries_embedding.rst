@@ -56,9 +56,10 @@ a space :math:`X`, the embedding takes values in :math:`X^m`.
 
 The embedding shares the observations of ``signal`` instead of copying
 them. The delay is a duration, converted into the unit of the time series,
-or a plain number for a time series without a unit. To study the shape
-of the embedded points over time, cut the embedding into
-:doc:`windows <timeseries_windows>`. On a time series with several
+or a plain number for a time series without a unit.
+:doc:`timeseries_point_clouds` turns the embedded points into a point
+cloud for persistent homology. To study the shape of the embedded points
+over time, cut the embedding into :doc:`windows <timeseries_windows>`. On a time series with several
 :doc:`channels <timeseries_channels>`, each channel is embedded separately.
 
 Looking forward

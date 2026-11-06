@@ -107,7 +107,8 @@ Working with time series
 The following pages build on evaluation. Channels combine signals with
 different timestamps and units into one time series. A delay embedding turns a
 signal into points that trace its dynamics, and windows cut a time series into
-pieces that can be compared with each other.
+pieces that can be compared with each other. Point clouds turns a time series,
+or each of its windows, into a point cloud for persistent homology.
 Snapping covers query times such as ``0.3 - 0.1`` that land a rounding error
 below the timestamp they mean. Dates and times covers series recorded with
 dates, queried at dates, and cut into windows of durations. From pandas
@@ -124,6 +125,7 @@ stable ranks.
    timeseries_channels
    timeseries_embedding
    timeseries_windows
+   timeseries_point_clouds
    timeseries_snapping
    timeseries_dates
    timeseries_pandas
