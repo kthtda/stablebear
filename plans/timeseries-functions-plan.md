@@ -1,6 +1,6 @@
 # Time series follow-ups: implementation plan
 
-Progress: 12 of 17 items, 25 of 34 points (74%)
+Progress: 13 of 17 items, 27 of 34 points (79%)
 
 Specs: [timeseries-functions-spec.md](timeseries-functions-spec.md)
 (phase A, #265) and
@@ -91,7 +91,7 @@ tensors of series, which `sb.stack` of series (B2c) is easily mistaken for.
   without a unit, as `evaluate` takes them.
   Tests: equals evaluating at those times; times outside the domain
   raise.
-- [ ] **B6.** [2] A guide section on point clouds from time series, and
+- [x] **B6.** [2] (5f2c54f56) A guide section on point clouds from time series, and
   the tide gauge tutorial builds its window clouds with it instead of
   evaluating on a grid by hand.
 - [x] **B7.** [2] (e0ca36884) `TimeSeries.restrict(domain)`, as the
