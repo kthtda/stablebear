@@ -646,7 +646,7 @@
           "TimeSeriesTensor"
         ],
         "comparison": "series_elements",
-        "dtype": "series(float64)",
+        "dtype": "ts(float64)",
         "shape": [
           3
         ],
@@ -875,7 +875,7 @@
           "TimeSeriesTensor"
         ],
         "comparison": "series_elements",
-        "dtype": "series(float64)",
+        "dtype": "ts(float64)",
         "shape": [
           3
         ],
@@ -1104,7 +1104,7 @@
           "TimeSeriesTensor"
         ],
         "comparison": "series_elements",
-        "dtype": "series(float64)",
+        "dtype": "ts(float64)",
         "shape": [
           3
         ],
@@ -1345,7 +1345,7 @@
           "TimeSeriesTensor"
         ],
         "comparison": "series_elements",
-        "dtype": "series(float64)",
+        "dtype": "ts(float64)",
         "shape": [
           3
         ],

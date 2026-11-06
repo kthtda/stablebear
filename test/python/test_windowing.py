@@ -30,7 +30,7 @@ def test_windows_are_a_tensor_of_series_of_the_source_dtype():
     # and 1.5; the second starts with the value at 2.0, observed at 1.5, and
     # holds 2.5.
     assert isinstance(windows, TimeSeriesTensor)
-    assert windows.dtype is sb.series(sb.float64)
+    assert windows.dtype is sb.ts(sb.float64)
     assert windows.shape == (2,)
     assert windows[0].dtype is sb.float64
     assert windows[1].dtype is sb.float64

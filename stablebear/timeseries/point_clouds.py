@@ -57,8 +57,8 @@ def to_point_clouds(series: TimeSeries | TimeSeriesTensor | _PandasLike) -> Poin
         pandas ``Series`` or ``DataFrame``.
     """
     if isinstance(series, TimeSeriesTensor):
-        inner = series.dtype.inner
-        _check_numbers(inner)
+        value_type = series.dtype.value_type
+        _check_numbers(value_type)
         return PointCloudTensor(cpp.to_point_clouds(series._data))
     series = _as_series(series)
     _check_numbers(series.dtype)

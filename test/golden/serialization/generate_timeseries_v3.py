@@ -92,7 +92,7 @@ def _windows(closed, windows):
                          anchor="start")
     expected = {
         "accepted_types": ["TimeSeriesTensor"], "comparison": "series_elements",
-        "dtype": "series(float64)", "shape": [len(windows)],
+        "dtype": "ts(float64)", "shape": [len(windows)],
         "elements": [
             {"index": [i], "series": _series("float64", "s", [_channel(times, _floats(values), evaluations)])}
             for i, (times, values, evaluations) in enumerate(windows)

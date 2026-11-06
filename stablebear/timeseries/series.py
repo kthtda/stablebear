@@ -34,7 +34,7 @@ from ..typing import (
     pcf64i,
     pcloud32,
     pcloud64,
-    series,
+    ts,
     symmat32,
     symmat64,
     uint32,
@@ -240,7 +240,7 @@ _SERIES_NATIVE = {
 }
 _SERIES_CPP_TO_DTYPE = {cls: dtype for dtype, cls in _SERIES_NATIVE.items()}
 _SERIES_TENSOR_TO_DTYPE = {
-    getattr(cpp, f"TimeSeries{suffix}Tensor"): series(element)
+    getattr(cpp, f"TimeSeries{suffix}Tensor"): ts(element)
     for element, suffix in _NATIVE_SUFFIX.items()
 }
 
@@ -1127,7 +1127,7 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
 
 class TimeSeriesTensor(Tensor):
     """Tensor whose elements are :class:`TimeSeries`, such as the windows of
-    a series. Its dtype is ``sb.series(inner)`` for series of ``inner``
+    a series. Its dtype is ``sb.ts(value_type)`` for series of ``value_type``
     observations."""
 
     def __init__(self, data):

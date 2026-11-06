@@ -17,7 +17,7 @@ def cut_windows(series: TimeSeries | _PandasLike, size: float | _ScalarDuration,
     """Cut a time series into consecutive windows.
 
     ``cut_windows(series, size, step, anchor="start")`` returns a 1-D tensor of
-    dtype ``sb.series(series.dtype)`` with one window per start time
+    dtype ``sb.ts(series.dtype)`` with one window per start time
     ``a_k = t_0 + k * step``, while ``a_k + size`` is at most the last time
     at which every channel of ``series`` can be evaluated; ``t_0`` is the
     first such time. With ``partial=True``, windows continue while

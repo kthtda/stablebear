@@ -24,7 +24,7 @@ from .typing import (
     pcf64i,
     pcloud32,
     pcloud64,
-    series,
+    ts,
     symmat32,
     symmat64,
     uint32,
@@ -54,7 +54,7 @@ _NESTED_CPP_TYPES = {
     barcode64: (cpp.persistence.NestedBarcode64, cpp.persistence.NestedBarcode64Tensor),
     # Leaves of time series, such as the windows of a series.
     **{
-        series(element): (
+        ts(element): (
             getattr(cpp, f"NestedTimeSeries{suffix}"),
             getattr(cpp, f"NestedTimeSeries{suffix}Tensor"),
         )
@@ -88,7 +88,7 @@ def _leaf_wrappers():
         distmat32: DistanceMatrixTensor, distmat64: DistanceMatrixTensor,
         symmat32: SymmetricMatrixTensor, symmat64: SymmetricMatrixTensor,
         barcode32: BarcodeTensor, barcode64: BarcodeTensor,
-        **{series(element): TimeSeriesTensor for element in _NATIVE_SUFFIX},
+        **{ts(element): TimeSeriesTensor for element in _NATIVE_SUFFIX},
     }
 
 

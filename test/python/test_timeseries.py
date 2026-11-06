@@ -1496,10 +1496,10 @@ def test_several_channels_survive_saving(round_trip):
         assert [loaded(t)[i][()] for i in range(2)] == [series(t)[i][()] for i in range(2)]
 
 
-def test_series_dtype_is_one_object_per_inner_dtype():
-    assert sb.series(sb.float64) is sb.series(sb.float64)
-    assert sb.series(sb.float64) is not sb.series(sb.float32)
-    assert sb.series(sb.float64).inner is sb.float64
+def test_ts_dtype_is_one_object_per_value_type():
+    assert sb.ts(sb.float64) is sb.ts(sb.float64)
+    assert sb.ts(sb.float64) is not sb.ts(sb.float32)
+    assert sb.ts(sb.float64).value_type is sb.float64
 
 
 def _array_equal_series():

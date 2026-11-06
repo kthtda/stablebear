@@ -124,11 +124,11 @@ tensors of series, which `sb.stack` of series (B2c) is easily mistaken for.
 
 Today a `TimeSeriesTensor` comes only from `cut_windows`, `delay_embed`, or
 loading a file: `sb.tensor([a, b])` fails with a NumPy error about too many
-dimensions, and `sb.zeros` rejects `sb.series(...)` dtypes. The C++ tensor
+dimensions, and `sb.zeros` rejects `sb.ts(...)` dtypes. The C++ tensor
 classes already take a shape, with an optional series to fill it, and
 `TimeSeriesTensor.__setitem__` already takes a `TimeSeries`.
 
-- [ ] **D1.** [2] `sb.zeros(shape, dtype=sb.series(inner))` gives a
+- [ ] **D1.** [2] `sb.zeros(shape, dtype=sb.ts(value_type))` gives a
   `TimeSeriesTensor` of empty series, through `_dtype_dispatch` in
   `stablebear/tensor_create.py`. An element built from the bare shape is
   a series of one channel with no observations and unit `"s"`; decide
@@ -140,7 +140,7 @@ classes already take a shape, with an optional series to fill it, and
   `TimeSeries` and gives a `TimeSeriesTensor` of that shape, as it does
   for lists of `Pcf`. Series may differ in times, lengths, units, and
   channels, but not in element type, and an explicit
-  `dtype=sb.series(inner)` must match it.
+  `dtype=sb.ts(value_type)` must match it.
   Tests: a list of two series of different lengths keeps each; nested
   lists give a 2-D tensor; series of different element types, or a
   `dtype` that does not match, raise `TypeError`.

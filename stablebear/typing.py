@@ -105,46 +105,47 @@ _NATIVE_SUFFIX = {
 
 
 class _SeriesDtype(dtype):
-    def __init__(self, inner: dtype):
+    def __init__(self, value_type: dtype):
         super().__init__(
-            f"series({inner.name})",
-            f"Dtype of time series whose observations have dtype {inner.name}.",
+            f"ts({value_type.name})",
+            f"Dtype of time series whose observations have dtype {value_type.name}.",
         )
-        self._inner = inner
+        self._value_type = value_type
 
     @property
-    def inner(self) -> dtype:
+    def value_type(self) -> dtype:
         """The dtype of the observations of each series."""
-        return self._inner
+        return self._value_type
 
     def __repr__(self):
-        return f"stablebear.series(stablebear.{self._inner.name})"
+        return f"stablebear.ts(stablebear.{self._value_type.name})"
 
     def __reduce__(self):
-        return series, (self._inner,)
+        return ts, (self._value_type,)
 
 
 _SERIES_DTYPES = {}
 
 
-def series(inner: dtype) -> _SeriesDtype:
-    """The dtype of time series whose observations have dtype ``inner``.
+def ts(value_type: dtype) -> _SeriesDtype:
+    """The dtype of time series whose observations have dtype ``value_type``.
 
     It is the dtype of a tensor of series, such as the windows of a series
-    of ``inner`` observations. The same ``inner`` always gives the same
-    object, so dtypes compare with ``is``, and ``inner`` reads it back.
+    of ``value_type`` observations. The same ``value_type`` always gives
+    the same object, so dtypes compare with ``is``, and ``value_type``
+    reads it back.
 
     Raises
     ------
     TypeError
-        If ``inner`` is not the dtype of a tensor element, such as
+        If ``value_type`` is not the dtype of a tensor element, such as
         ``float64`` or ``pcloud32``.
     """
-    if inner not in _NATIVE_SUFFIX:
-        raise TypeError(f"Series hold tensor elements, not {inner!r}")
-    if inner not in _SERIES_DTYPES:
-        _SERIES_DTYPES[inner] = _SeriesDtype(inner)
-    return _SERIES_DTYPES[inner]
+    if value_type not in _NATIVE_SUFFIX:
+        raise TypeError(f"Series hold tensor elements, not {value_type!r}")
+    if value_type not in _SERIES_DTYPES:
+        _SERIES_DTYPES[value_type] = _SeriesDtype(value_type)
+    return _SERIES_DTYPES[value_type]
 
 
 Dtype = dtype  # Alias for type annotations
