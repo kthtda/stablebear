@@ -829,6 +829,7 @@ if (BUILD_TESTER)
       test/test_union_find.cpp
       test/test_stoppable_task.cpp
       test/test_gallop.cpp
+      test/test_timeseries_channel.cpp
   )
 
   if (BUILD_CUDA_TESTER)
