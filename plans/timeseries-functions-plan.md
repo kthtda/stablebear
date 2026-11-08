@@ -1,6 +1,6 @@
 # Time series follow-ups: implementation plan
 
-Progress: 20 of 21 items, 38 of 40 points (95%)
+Progress: 21 of 21 items, 40 of 40 points (100%)
 
 Specs: [timeseries-functions-spec.md](timeseries-functions-spec.md)
 (phase A, #265) and
@@ -194,7 +194,7 @@ classes already take a shape, with an optional series to fill it, and
 `TimeSeries` and `TimeSeriesTensor` have both `evaluate` and `__call__`,
 which only forwards to it, while `Pcf` and PCF tensors are only called.
 
-- [ ] **E1.** [2] Remove `TimeSeries.evaluate` and
+- [x] **E1.** [2] (6415402d9) Remove `TimeSeries.evaluate` and
   `TimeSeriesTensor.evaluate`: their docstrings move to `__call__`, which
   `api_timeseries.rst` documents with `:special-members: __call__`. Links
   to `evaluate` in docstrings and guides, and calls in the tests, use the
