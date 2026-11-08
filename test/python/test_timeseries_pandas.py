@@ -132,7 +132,7 @@ def test_from_pandas_with_index_of_dates_counts_from_the_first_date():
 
     assert series.times.array_equal(TimeDeltaTensor([0.0, 1.0, 3.0], "h"))
 
-    assert series.epoch == DateTime(np.datetime64("2023-01-01T01:00", "ns"))
+    assert series.epoch.to_datetime64() == np.datetime64("2023-01-01T01:00")
     assert series.values.array_equal(sb.FloatTensor([10.0, 20.0, 30.0]))
 
 

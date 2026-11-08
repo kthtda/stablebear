@@ -33,7 +33,8 @@ These settle the open questions of the issue.
    or `index.duplicated()`.
 5. **Resolution.** The default `unit`, which sets only how the times are
    stored, is the resolution of a `DatetimeIndex` or `TimedeltaIndex`,
-   usually nanoseconds, as for `datetime64` and `timedelta64` arrays.
+   mostly microseconds in pandas 3 and nanoseconds in pandas 2, as for
+   `datetime64` and `timedelta64` arrays.
 6. **Return types.** `cut_windows` and `delay_embed` return the same
    stablebear types for pandas input as for a `TimeSeries`, so results feed
    straight into `compute_persistent_homology`. Calling a series at dates

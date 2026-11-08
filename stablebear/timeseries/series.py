@@ -424,10 +424,9 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         are counted from ``epoch``, which defaults to the first of them. The
         :attr:`unit` is that of the durations or dates: the unit of a
         ``TimeDeltaTensor``, the resolution of an array or index, such as
-        minutes for a ``timedelta64[m]`` array and nanoseconds for most
-        pandas indexes, or the finest unit of a sequence of durations. A
-        plain array of numbers gives a series without a unit, whose
-        :attr:`unit` is ``None``.
+        minutes for a ``timedelta64[m]`` array, or the finest unit of a
+        sequence of durations. A plain array of numbers gives a series
+        without a unit, whose :attr:`unit` is ``None``.
     epoch : DateTime, str, np.datetime64, datetime.datetime, or datetime.date, optional
         The date and time that time 0 stands for, such as ``"2023-01-01"``.
         Dates keep their instants and are counted from it, in integers and
@@ -543,8 +542,9 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
             drop them.
         unit : str, optional
             The unit of the times, as for :class:`TimeDelta`. Defaults to the
-            resolution of a ``DatetimeIndex`` or ``TimedeltaIndex``, usually
-            nanoseconds, and to none for a numeric index.
+            resolution of a ``DatetimeIndex`` or ``TimedeltaIndex``, mostly
+            microseconds in pandas 3 and nanoseconds in pandas 2, and to none
+            for a numeric index.
         snap_tolerance : float, optional
             As for the constructor.
 

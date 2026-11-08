@@ -18,8 +18,8 @@ Here six water levels are recorded every 30 minutes from 06:00 on
    levels = pd.Series([1.0, 3.0, 2.0, 4.0, 3.5, 2.5], index=index)
 
    series = TimeSeries.from_pandas(levels)
-   series.epoch  # DateTime('2023-01-01T06:00:00.000000000')
-   series.unit   # 'ns'
+   series.epoch  # DateTime('2023-01-01T06:00:00.000000')
+   series.unit   # 'us'
 
    series(TimeDelta(1, "h"))   # 2.0
    series("2023-01-01T07:15")  # 2.0
@@ -27,8 +27,9 @@ Here six water levels are recorded every 30 minutes from 06:00 on
 The index gives the times. A ``DatetimeIndex`` is counted from its first
 date, which becomes the :py:attr:`~stablebear.timeseries.TimeSeries.epoch`
 (see :doc:`timeseries_dates`). The times are stored in the resolution of the
-index, nanoseconds for most pandas indexes, or in the unit passed as
-``unit``, such as ``TimeSeries.from_pandas(levels, unit="min")``. A
+index, microseconds for most indexes in pandas 3 and nanoseconds in pandas 2,
+or in the unit passed as ``unit``, such as
+``TimeSeries.from_pandas(levels, unit="min")``. A
 ``TimedeltaIndex`` gives durations without an epoch, and a numeric index
 gives a time series without a unit, or counts of ``unit`` if it is given
 (see :doc:`timeseries_units`).

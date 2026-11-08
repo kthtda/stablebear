@@ -1,6 +1,6 @@
 # Time series general release: checklist
 
-Progress: 0 of 29 items, 0 of 46 points (0%)
+Progress: 1 of 29 items, 1 of 46 points (2%)
 
 From the release review of `issue-258-pandas` on 2026-11-08, in which each
 problem below was reproduced twice. The items correct behavior that the
@@ -17,7 +17,7 @@ Decisions for the maintainer: B4a (equality) and F2 (iterating a series).
 
 ## Phase A: CI and the docs build pass
 
-- [ ] **A1.** [1] Read the Docs builds with Sphinx 9, with the "All
+- [x] **A1.** [1] (a4c09c865) Read the Docs builds with Sphinx 9, with the "All
   members, including inherited" dropdowns: `docs/_ext/inherited_members.py`
   adds each dropdown in an `autodoc-process-docstring` handler and moves it
   after the members of its class in a `doctree-read` handler, instead of
