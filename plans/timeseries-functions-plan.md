@@ -1,6 +1,6 @@
 # Time series follow-ups: implementation plan
 
-Progress: 18 of 20 items, 32 of 38 points (84%)
+Progress: 19 of 20 items, 34 of 38 points (89%)
 
 Specs: [timeseries-functions-spec.md](timeseries-functions-spec.md)
 (phase A, #265) and
@@ -161,7 +161,7 @@ classes already take a shape, with an optional series to fill it, and
   docstring.
   Tests: shape and dtype for float and PCF series; elements can be
   assigned a `TimeSeries`; an element left empty raises on evaluation.
-- [ ] **D2.** [2] `sb.tensor` takes a list, or nested lists, of
+- [x] **D2.** [2] (52a7a550c) `sb.tensor` takes a list, or nested lists, of
   `TimeSeries` and gives a `TimeSeriesTensor` of that shape, as it does
   for lists of `Pcf`. Series may differ in times, lengths, units, and
   channels, but not in element type, and an explicit

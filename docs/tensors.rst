@@ -23,7 +23,7 @@ The most common way to create a tensor is :py:func:`~stablebear.tensor_create.ze
    # Scalar float tensor
    Z = sb.zeros((5, 5), dtype=sb.float64)
 
-For PCF dtypes, "zero" is a function that is identically zero. For numeric dtypes, it is the number 0. For point cloud dtypes, it is an empty point cloud.
+For PCF dtypes, "zero" is a function that is identically zero. For numeric dtypes, it is the number 0. For point cloud dtypes, it is an empty point cloud. For a tensor of time series, of dtype ``sb.ts(value_type)``, it is a series without observations, to be replaced by assigning a series to the element.
 
 Generating random data
 -----------------------
@@ -216,6 +216,10 @@ When passed a ``Pcf`` or a nested collection of PCFs, the factory infers a
 :py:class:`~stablebear.base_tensor.PcfTensor` or :py:class:`~stablebear.base_tensor.IntPcfTensor` from
 the PCF value dtype. A single ``Pcf`` becomes a one-element tensor.
 
+A list, or nested lists, of time series gives a
+:py:class:`~stablebear.timeseries.series.TimeSeriesTensor` with one series
+per element (see :doc:`timeseries_channels`).
+
 
 From serialized NumPy data
 ---------------------------
@@ -350,7 +354,8 @@ In ``concatenate``, ``stack``, ``split``, and ``array_split``, a negative
 ``axis`` counts from the end, so ``axis=-1`` is the last axis.
 
 Both also combine the channels of a time series into one channel (see
-:doc:`timeseries_channels`).
+:doc:`timeseries_channels`). To put separate series into a tensor, use
+``sb.tensor`` or ``sb.zeros`` instead.
 
 
 Splitting tensors

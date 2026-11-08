@@ -269,6 +269,7 @@ def concatenate(tensors, axis=0):
         ``TimeSeries`` joins its channels; make several series the
         channels of one with
         :meth:`~stablebear.timeseries.TimeSeries.from_channels` first.
+        To put separate series into a tensor, use :func:`tensor`.
     axis : int, default 0
         The axis to join along, of each tensor or of each observation; a
         negative ``axis`` counts from the end.
@@ -330,6 +331,7 @@ def stack(tensors, axis=0):
         Tensors of one type and shape. A ``TimeSeries`` stacks its
         channels; make several series the channels of one with
         :meth:`~stablebear.timeseries.TimeSeries.from_channels` first.
+        To put separate series into a tensor, use :func:`tensor`.
     axis : int, default 0
         The position of the new axis, in the result or in each
         observation; a negative ``axis`` counts from the end.

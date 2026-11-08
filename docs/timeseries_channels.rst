@@ -139,3 +139,31 @@ stack them instead.
 Functions that take a series of one channel, such as
 :py:func:`~stablebear.timeseries.to_point_clouds`, take the combined
 series.
+
+Tensors of series
+-----------------
+
+Channels are signals observed together, which a query evaluates at the
+same time. Separate series, such as recordings from different stations or
+runs of a simulation, go into a tensor instead, with one series per
+element. :py:func:`sb.tensor <stablebear.tensor_create.tensor>` makes one
+from a list, or nested lists, of series::
+
+   tensor = sb.tensor([a, b])
+   tensor.shape  # (2,)
+   tensor.dtype  # ts(float64)
+   tensor[1]     # the series b, with its own times in ms
+
+The series of a tensor keep their own times, units, and channels, but
+share the dtype of their observations. The dtype of a tensor of series of
+``float64`` observations is ``sb.ts(sb.float64)``, and
+:py:func:`sb.zeros <stablebear.tensor_create.zeros>` with that dtype makes
+a tensor of empty series, whose elements are then assigned.
+:py:meth:`~stablebear.timeseries.series.TimeSeriesTensor.evaluate` and
+:py:func:`~stablebear.timeseries.to_point_clouds` take a tensor of series
+as they take the windows of a series (see :doc:`timeseries_windows`).
+
+The tensor ``sb.tensor([a, b])`` holds two series, while
+``sb.stack(TimeSeries.from_channels([a, b]))`` is one series whose
+observations are pairs of values of ``a`` and ``b``, taken at the times
+where both are defined.
