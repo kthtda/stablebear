@@ -1,6 +1,6 @@
 # Time series general release: checklist
 
-Progress: 1 of 29 items, 1 of 46 points (2%)
+Progress: 2 of 30 items, 2 of 47 points (4%)
 
 From the release review of `issue-258-pandas` on 2026-11-08, in which each
 problem below was reproduced twice. The items correct behavior that the
@@ -8,14 +8,14 @@ problem below was reproduced twice. The items correct behavior that the
 [pandas spec](pandas-timeseries-spec.md),
 [functions spec](timeseries-functions-spec.md), and
 [point cloud spec](timeseries-point-clouds-spec.md) describe; an item that
-changes a decision in one of them updates that spec first. Phase A comes
-before the merge. The rest can land on the branch or after the merge, but
-before 0.6.0, which follows the 0.6.0 betas directly, with no further
-pre-release. Files saved by the betas need not load.
+changes a decision in one of them updates that spec first. Every item
+lands on this branch before CI runs on it and its PR opens, in phase H.
+0.6.0 follows the 0.6.0 betas directly, with no further pre-release. Files
+saved by the betas need not load.
 
 Decisions for the maintainer: B4a (equality) and F2 (iterating a series).
 
-## Phase A: CI and the docs build pass
+## Phase A: the docs and tests pass with Sphinx 9 and pandas 3
 
 - [x] **A1.** [1] (a4c09c865) Read the Docs builds with Sphinx 9, with the "All
   members, including inherited" dropdowns: `docs/_ext/inherited_members.py`
@@ -30,7 +30,7 @@ Decisions for the maintainer: B4a (equality) and F2 (iterating a series).
   Tests: `-W --keep-going` builds pass with Sphinx 9.1.1 on Python 3.12 and
   Sphinx 8.1.3 on Python 3.10, with the same 19 dropdowns in the same places
   as before.
-- [ ] **A2.** [1] Nothing assumes pandas indexes are in nanoseconds; pandas
+- [x] **A2.** [1] (40540c955) Nothing assumes pandas indexes are in nanoseconds; pandas
   3, which pip installs on Python 3.11 and newer and so in most CI jobs,
   gives microseconds. `test_timeseries_pandas.py:135` compares instants
   instead of `DateTime`s of one resolution. `docs/timeseries_pandas.rst`
@@ -40,10 +40,6 @@ Decisions for the maintainer: B4a (equality) and F2 (iterating a series).
   index, or the example passes `unit=`.
   Tests: the pandas tests pass with pandas 2.3.3 on Python 3.10 and pandas
   3.1.1 on Python 3.13.
-- [ ] **A3.** [1] The PR for this branch, closing #258 and #263 to #267,
-  passes the full CI matrix: Linux, Windows with MSVC, macOS with AppleClang,
-  Python 3.10 to 3.15, and the free-threaded builds. CI has never run on the
-  branch.
 
 ## Phase B: no silently wrong results or unreadable files
 
@@ -269,6 +265,15 @@ Decisions for the maintainer: B4a (equality) and F2 (iterating a series).
 - [ ] **G4.** [1] `docs/saving.rst` lists series and tensors of series
   among what can be saved, and the `TimeSeries` docstring
   (`series.py:380-382`) no longer says each channel keeps its unit.
+
+## Phase H: CI and the PR
+
+- [ ] **H1.** [1] The PR for this branch, closing #256, #258, and #263 to
+  #267, passes the full CI matrix: Linux, Windows with MSVC, macOS with
+  AppleClang, Python 3.10 to 3.15, and the free-threaded builds. CI has
+  never run on the branch.
+- [ ] **H2.** [1] The PR is merged, and Read the Docs builds `latest` from
+  the merge.
 
 Left out, since these can come after the release without breaking the API
 or the format:
