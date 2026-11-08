@@ -1,6 +1,6 @@
 # Time series general release: checklist
 
-Progress: 3 of 30 items, 4 of 47 points (9%)
+Progress: 4 of 30 items, 6 of 47 points (13%)
 
 From the release review of `issue-258-pandas` on 2026-11-08, in which each
 problem below was reproduced twice. The items correct behavior that the
@@ -59,7 +59,7 @@ Decisions for the maintainer: B4a (equality) and F2 (iterating a series).
   `np.timedelta64`, and `np.timedelta64(5, "ns")` with a unit raise; an
   `(array, unit)` tuple raises in `TimeSeries` and in a call; a column of
   durations raises in `from_pandas`.
-- [ ] **B2.** [2] A series that saves also loads: `Channel::to` and
+- [x] **B2.** [2] (20567acee, e4c1f2f05) A series that saves also loads: `Channel::to` and
   `Channel::shifted` (`timeseries.tpp:221`, `:246`) treat the end as
   `cut_channel` does, dropping a closed end that lands at or before the last
   time and moving an open one to `nextafter(last, +inf)`, and `shifted`
