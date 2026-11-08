@@ -41,6 +41,65 @@ extensions = [
     "sphinxcontrib.tikz",
     "sphinxcontrib.bibtex",
     "inherited_members",
+    "sphinx.ext.intersphinx",
+]
+
+# Link types in docstrings to the documentation of other projects. Sphinx
+# fetches these inventories when it builds, so the build needs the network.
+intersphinx_mapping = {
+    "python": ("https://docs.python.org/3", None),
+    "numpy": ("https://numpy.org/doc/stable", None),
+    "pandas": ("https://pandas.pydata.org/docs", None),
+    "matplotlib": ("https://matplotlib.org/stable", None),
+}
+
+# Turn the types in docstring fields into links, dropping words such as
+# "optional", and resolve the short names that docstrings use.
+napoleon_preprocess_types = True
+napoleon_type_aliases = {
+    "array_like": ":term:`numpy:array_like`",
+    "sequence": ":term:`python:sequence`",
+    "np.ndarray": "numpy.ndarray",
+    "ndarray": "numpy.ndarray",
+    "np.datetime64": "numpy.datetime64",
+    "np.timedelta64": "numpy.timedelta64",
+    "pd.Timedelta": "pandas.Timedelta",
+    "pd.TimedeltaIndex": "pandas.TimedeltaIndex",
+    "FloatTensor": "stablebear.base_tensor.FloatTensor",
+    "IntTensor": "stablebear.base_tensor.IntTensor",
+    "BoolTensor": "stablebear.base_tensor.BoolTensor",
+    "PcfTensor": "stablebear.base_tensor.PcfTensor",
+    "IntPcfTensor": "stablebear.base_tensor.IntPcfTensor",
+    "Pcf": "stablebear.functional.pcf.Pcf",
+    "PointCloud": "stablebear.point_cloud.PointCloud",
+    "PointCloudTensor": "stablebear.point_cloud.PointCloudTensor",
+    "Barcode": "stablebear.persistence.barcode.Barcode",
+    "BarcodeTensor": "stablebear.persistence.ph_tensor.BarcodeTensor",
+    "DistanceMatrix": "stablebear.distance_matrix.DistanceMatrix",
+    "DistanceMatrixTensor": "stablebear.distance_matrix.DistanceMatrixTensor",
+    "SymmetricMatrix": "stablebear.symmetric_matrix.SymmetricMatrix",
+    "SymmetricMatrixTensor": "stablebear.symmetric_matrix.SymmetricMatrixTensor",
+    "TimeSeries": "stablebear.timeseries.TimeSeries",
+    "TimeSeriesTensor": "stablebear.timeseries.series.TimeSeriesTensor",
+    "Domain": "stablebear.timeseries.Domain",
+    "DateTime": "stablebear.timeseries.DateTime",
+    "TimeDelta": "stablebear.timeseries.TimeDelta",
+    "Dtype": "stablebear.typing.dtype",
+    "Distribution": "stablebear.distributions.Distribution",
+}
+
+# Names that are not documented: the tensor base class, type aliases, private
+# classes, numpy internals, the mocks that stand in for imports while autodoc
+# runs, and torch.
+nitpick_ignore = [
+    ("py:class", "Tensor"),
+    ("py:class", "PcfContainerLike"),
+    ("py:class", "ShapeLike"),
+    ("py:class", "torch.Generator"),
+]
+nitpick_ignore_regex = [
+    ("py:class", r"(.*\.)?_[A-Za-z]\w*(\..*)?"),
+    ("py:class", r"numpy\._typing\..*"),
 ]
 
 # Build glossary previews into the HTML so they also work outside Read the Docs.

@@ -128,6 +128,11 @@ tensors of series, which `sb.stack` of series (B2c) is easily mistaken for.
     first two alone leave 301 warnings. Intersphinx fetches its
     inventories when the docs build, so the build needs the network.
     Tests: a build with `-n` warns only about the prose of C2b.
+    Note: the type aliases `PcfContainerLike` and `ShapeLike`, the
+    undocumented base `Tensor`, and `torch.Generator` are ignored too. The
+    39 warnings left include unions and generics, such as
+    `int | numpy.ndarray | DistanceMatrix` and `list[Rectangle]`, that
+    napoleon does not split; C2b rewrites them with the prose.
   - [ ] **C2b.** [2] Rewrite the type fields that hold prose, such as
     "durations", "them", "C++ tensor", "matplotlib axes", "file-like", and
     "same kind as ``X``", as types, with the prose moved into the
