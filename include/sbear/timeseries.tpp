@@ -228,7 +228,7 @@ namespace sb
     {
       channel.m_source = std::make_shared<const Channel>(m_source->to(from, to));
     }
-    return channel;
+    return channel.with_end_after_last();
   }
 
   template <typename T>
@@ -240,6 +240,7 @@ namespace sb
     {
       value += delta;
     }
+    detail::keep_increasing(values);
     channel.m_times = std::make_shared<const Times>(held_times().with_values(std::move(values)));
     if (m_end)
     {
@@ -250,6 +251,20 @@ namespace sb
     {
       channel.m_source = std::make_shared<const Channel>(m_source->shifted(delta));
     }
+    return channel.with_end_after_last();
+  }
+
+  template <typename T>
+  Channel<T> Channel<T>::with_end_after_last() const
+  {
+    if (!m_end || size() == 0 || *m_end > time(size() - 1))
+    {
+      return *this;
+    }
+    auto channel = *this;
+    channel.m_end = m_endClosed ? std::nullopt
+                                : std::optional(std::nextafter(time(size() - 1),
+                                                               std::numeric_limits<float64_t>::infinity()));
     return channel;
   }
 

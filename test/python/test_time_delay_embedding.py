@@ -331,6 +331,19 @@ def test_embedding_of_a_window_with_a_closed_end_survives_saving(direction, roun
 
 
 @pytest.mark.parametrize("round_trip", ROUND_TRIPS)
+@pytest.mark.parametrize("unit", ["min", "d"])
+def test_embeddings_of_windows_in_a_coarser_unit_survive_saving(unit, round_trip):
+    series = TimeSeries(np.arange(400.0), times=TimeDeltaTensor(np.arange(400) / 10, "s"))
+    windows = cut_windows(series, size=TimeDelta(2, "s"), step=TimeDelta(0.3, "s"), closed="left", partial=False,
+                          anchor="start")
+
+    for k in range(windows.shape[0]):
+        embedding = delay_embed(windows[k], dimension=3, delay=TimeDelta(0.1, "s")).to(unit)
+
+        assert round_trip(embedding).array_equal(embedding)
+
+
+@pytest.mark.parametrize("round_trip", ROUND_TRIPS)
 @pytest.mark.parametrize("make_values", TWO_ELEMENTS_OF_EVERY_DTYPE)
 def test_embeddings_of_every_dtype_survive_saving(make_values, round_trip):
     # The observations are a, b, b, a, so the points (a, b), (b, b), and

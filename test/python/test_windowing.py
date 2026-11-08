@@ -784,6 +784,21 @@ def test_window_ends_survive_saving(closed, round_trip):
 
 
 @pytest.mark.parametrize("round_trip", ROUND_TRIPS)
+@pytest.mark.parametrize("anchor, closed", [("start", "left"), ("end", "right")])
+def test_windows_of_series_with_different_epochs_combine_and_survive_saving(anchor, closed, round_trip):
+    times = TimeDeltaTensor(np.arange(200) / 10, "s")
+    first = cut_windows(TimeSeries(np.arange(200.0), times=times, epoch="2023-01-01"), size=TimeDelta(1.5, "s"),
+                        step=TimeDelta(0.1, "s"), closed=closed, partial=False, anchor=anchor)
+    second = cut_windows(TimeSeries(np.arange(200.0), times=times, epoch="2023-01-02"), size=TimeDelta(1.5, "s"),
+                         step=TimeDelta(0.1, "s"), closed=closed, partial=False, anchor=anchor)
+
+    for k in range(first.shape[0]):
+        series = TimeSeries.from_channels([first[k], second[k]])
+
+        assert round_trip(series).array_equal(series)
+
+
+@pytest.mark.parametrize("round_trip", ROUND_TRIPS)
 def test_window_origins_survive_saving(round_trip):
     windows = cut_windows(_windows_source(), size=TimeDelta(1, "s"), step=TimeDelta(1, "s"), closed="left",
                           partial=False, anchor="start")

@@ -1,6 +1,6 @@
 # Time series general release: checklist
 
-Progress: 2 of 30 items, 2 of 47 points (4%)
+Progress: 3 of 30 items, 4 of 47 points (9%)
 
 From the release review of `issue-258-pandas` on 2026-11-08, in which each
 problem below was reproduced twice. The items correct behavior that the
@@ -43,7 +43,7 @@ Decisions for the maintainer: B4a (equality) and F2 (iterating a series).
 
 ## Phase B: no silently wrong results or unreadable files
 
-- [ ] **B1.** [2] A `timedelta64` or `datetime64` given with a unit raises
+- [x] **B1.** [2] (1849b6bf4) A `timedelta64` or `datetime64` given with a unit raises
   `TypeError` instead of being read as counts of the unit (#256).
   `_array_counts` (`date_time.py:721`) takes only dtype kinds `i`, `u`, and
   `f`, and `TimeDelta(value, unit)` (`date_time.py:599`) rejects

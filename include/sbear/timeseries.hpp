@@ -166,6 +166,17 @@ namespace sb
 
   namespace detail
   {
+    /// Raises each of @p values that rounding put at or before the one
+    /// before it to just after that one, so that converted or shifted
+    /// timestamps stay strictly increasing.
+    inline void keep_increasing(std::vector<float64_t>& values)
+    {
+      for (size_t i = 1; i < values.size(); ++i)
+      {
+        values[i] = std::max(values[i], std::nextafter(values[i - 1], std::numeric_limits<float64_t>::infinity()));
+      }
+    }
+
     /// The time unit of a std::chrono period, at compile time.
     template <typename Period>
     constexpr TimeUnit time_unit_of()
@@ -332,6 +343,7 @@ namespace sb
       {
         converted[i] = convert_time(m_values[i], from, to);
       }
+      detail::keep_increasing(converted);
       Times times(std::move(converted));
       times.m_origin = convert_time(m_origin, from, to);
       return times;
@@ -511,6 +523,11 @@ namespace sb
     /// The timestamps, kept inside the channel so that searches go through
     /// index_at().
     [[nodiscard]] const Times& held_times() const noexcept { return m_times ? *m_times : m_storage->times; }
+
+    /// This channel with an end that rounding put at or before its last
+    /// timestamp placed as windows place it: a closed end is dropped, and an
+    /// open one moves to just after the last timestamp.
+    [[nodiscard]] Channel with_end_after_last() const;
 
     /// The number of values in one observation, prod(shape()).
     [[nodiscard]] size_t block_size() const noexcept
