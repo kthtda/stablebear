@@ -91,7 +91,7 @@ made before, at shifted times.
   closed, as a window does. Observations are shared, not copied.
 - Raises `ValueError` if `domain` reaches outside the series' domain,
   including an end the series leaves out but `domain` includes.
-  Raises `TypeError` for ends of the wrong kind, as `evaluate` does.
+  Raises `TypeError` for ends of the wrong kind, as calling a series does.
 - `Domain` itself raises `ValueError` if it holds no time: its start comes
   after its end, or equals it without both ends closed. It stays a named
   tuple, through a private base class whose constructor it checks.
@@ -133,17 +133,17 @@ In `stablebear.timeseries`.
   `step` is a positive duration, or a number for a series without a unit,
   as for `cut_windows`.
 - **Given times** (`times`): the same times for every series, in their
-  order, as `evaluate` takes them: durations, numbers for a series without
+  order, as calling a series takes them: durations, numbers for a series without
   a unit, or dates for a single series with an epoch, since the windows of
   a tensor hold different instants at the same time. A time outside a
-  domain raises `ValueError`, as `evaluate` does.
+  domain raises `ValueError`, as calling a series does.
 
 ### Errors
 
 - `ValueError` if more than one of `times`, `n`, and `step` is given, for
   an invalid `n` or `step`, or for several channels.
 - `TypeError` for unsupported observations, and for numbers on a series
-  with a unit or durations on one without, as `evaluate` raises.
+  with a unit or durations on one without, as calling a series raises.
 
 ## Out of scope
 

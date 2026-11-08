@@ -7,7 +7,7 @@ Plan: [pandas-timeseries-plan.md](pandas-timeseries-plan.md), phases C to G
 
 ## Goal
 
-A plain number such as `series(3.5)` or `Window(size=3.0)` means
+A plain number such as `series(3.5)` or `cut_windows(series, size=3.0)` means
 something only together with the unit of the series, which the reader
 cannot see. The time series API should take and give times as durations
 and dates instead, so that every time says what it measures. A series
@@ -62,9 +62,9 @@ as a time series stores its times.
   years.
 - A `TimeDelta` holds one duration; a `TimeDeltaTensor` holds an array of
   them.
-- A `TimeDelta` given to `Window`, `TimeDelayEmbedding`, or `evaluate` is
+- A `TimeDelta` given to `cut_windows`, `delay_embed`, or a call of a series is
   converted to the series' unit by an exact factor, without rounding.
-  `evaluate` and `TimeSeries` take a `TimeDeltaTensor` as an array of
+  Calling a series and `TimeSeries` take a `TimeDeltaTensor` as an array of
   durations.
 - `TimeDelta` is Python only; nothing in C++ stores a duration.
 
@@ -142,22 +142,22 @@ keeps its counts as one tensor in one unit.
   still raise.
 - **A tuple `(count, unit)`** is a duration wherever one is taken:
   `TimeDelta(count, unit)`, or `TimeDeltaTensor(count, unit)` when `count`
-  is a sequence or array, as in `Window(size=(2.0, "h"))` and
+  is a sequence or array, as in `cut_windows(series, size=(2.0, "h"))` and
   `TimeSeries(values, times=([0.0, 1.5], "s"))`. Only a tuple whose second
   element is a unit is read so; any other tuple keeps its meaning.
 - **`TimeSeries.from_pandas`** takes `unit` for storage. A numeric index
   with `unit` is a count of that unit, and without it gives a series
   without a unit.
-- **`TimeSeries.evaluate(t, unit=None)` and
-  `TimeSeriesTensor.evaluate(t, unit=None)`** take a duration or an array
+- **`series(t, unit=None)`, calling a `TimeSeries` or a
+  `TimeSeriesTensor`,** takes a duration or an array
   of durations, measured from time 0. With `unit`, `t` is a count or an
   array of counts of it, as in `series(90, "min")`, the same as
   `series(TimeDelta(90, "min"))`. A series with an epoch also takes dates,
   including a `DateTime` and a `DateTimeTensor`. On a series with a unit,
   numbers without `unit` raise `TypeError`, naming `series(t, unit)`.
-- **`Window(size, step)` and `TimeDelayEmbedding(delay)`** take durations
-  for series with a unit, and numbers for series without one; the other
-  kind raises `TypeError` when the window or embedding is applied.
+- **The `size` and `step` of `cut_windows` and the `delay` of
+  `delay_embed`** are durations for series with a unit, and numbers for
+  series without one; the other kind raises `TypeError`.
 
 ## Outputs
 
@@ -193,14 +193,9 @@ finer units narrow that range, to 1678-2262 for nanoseconds.
   `TimeSeries.from_channels` can still have different origins.
 - **`TimeSeries.bounds`** is removed. With an epoch, `domain` already gives
   where a window lies. Without one, that is `domain` shifted by `origin`.
-- **`Window(..., return_bounds=True)`** gives a `TimeDeltaTensor` of
-  shape `(n_windows, 2)` in the series' unit, holding the bounds as
-  computed, instead of a `FloatTensor`. For a series with an epoch, it
-  gives a `DateTimeTensor` of where the windows lie, at the finer of the
-  series' unit and microseconds.
-- **`Window.size`, `Window.step`, and `TimeDelayEmbedding.delay`** are
-  `TimeDelta`, or floats when given as numbers for a series without a
-  unit.
+- **`TimeSeries.source_domain`** of a window gives where it lies in the
+  series it was cut from: a `Domain` of durations in the series' unit, or
+  of dates for a series with an epoch.
 
 ## Series without a unit
 
@@ -209,11 +204,11 @@ A series built from plain numbers, as in
 `None`. Its times are numbers, not durations, and it works as a series
 with a unit does, with numbers in place of durations:
 
-- `evaluate`, `Window`, and `TimeDelayEmbedding` take numbers, as in
-  `series(2.5)` and `Window(size=3.0)`. A duration, a date, a tuple
+- Calling a series, `cut_windows`, and `delay_embed` take numbers, as in
+  `series(2.5)` and `cut_windows(series, size=3.0)`. A duration, a date, a tuple
   `(count, unit)`, or `unit=` on it raises `TypeError`.
 - `times` is a `FloatTensor`, `domain` has float ends, `origin` is a float
-  or a `FloatTensor`, and `return_bounds` gives a `FloatTensor`.
+  or a `FloatTensor`, and `source_domain` has float ends.
 - It has no epoch: `epoch=` and `with_epoch` raise `ValueError`.
 - `to(unit)` gives it a unit: its numbers become counts of `unit`, so
   times `[0.0, 1.5]` become 0 s and 1.5 s with `to("s")`.

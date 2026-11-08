@@ -11,22 +11,22 @@ tensors of series, which `sb.stack` of series (B2c) is easily mistaken for.
 
 ## Phase A: functions instead of classes (#265)
 
-- [x] **A1.** [3] (8d4f39e35, 84dea1a58) `cut_windows` replaces `Window` in
+- [x] **A1.** [3] (8d4f39e35, 84dea1a58) `cut_windows` replaces the window class in
   `stablebear/timeseries/window.py`, with its docstring, and in the
   tests, internal callers, golden generator, and figure scripts, without
-  `return_bounds`; `TimeSeries.source_domain` gives where a window lies.
+  returning bounds; `TimeSeries.source_domain` gives where a window lies.
   Tests: the existing window tests call `cut_windows`, and those of bounds
   check each window's `source_domain`; `source_domain` of a series built
   from observations, a dated window, a series without a unit, and
-  channels at different origins; the tests of `Window.size`,
-  `Window.step`, and its `repr` become tests that durations of each type
-  give the same windows.
-- [x] **A2.** [3] (664d1cefd) `delay_embed` replaces `TimeDelayEmbedding` in
+  channels at different origins; the tests of the class's `size`,
+  `step`, and `repr` become tests that durations of each type give the
+  same windows.
+- [x] **A2.** [3] (664d1cefd) `delay_embed` replaces the embedding class in
   `stablebear/timeseries/embedding.py` likewise.
   Tests: as for A1, with `delay`.
 - [x] **A3.** [2] (56c882342) The guide pages and the tide gauge tutorial use
   `cut_windows` and `delay_embed`, and show where windows lie by their
-  `source_domain` instead of `return_bounds`.
+  `source_domain` instead of the bounds the class returned.
 
 ## Phase B: point clouds from time series (#267)
 
@@ -88,7 +88,7 @@ tensors of series, which `sb.stack` of series (B2c) is easily mistaken for.
   one size; a step that does not divide the domain; an open start leaves
   out the start; more than one mode raises.
 - [x] **B5.** [1] (247d9e6f0) The given-times mode: durations, or numbers for a series
-  without a unit, as `evaluate` takes them.
+  without a unit, as calling a series takes them.
   Tests: equals evaluating at those times; times outside the domain
   raise.
 - [x] **B6.** [2] (5f2c54f56) A guide section on point clouds from time series, and
@@ -178,7 +178,7 @@ classes already take a shape, with an optional series to fill it, and
   `sb.concatenate` combine their channels; a pointer from the `stack` and
   `concatenate` docstrings; a `CHANGELOG.md` entry.
 - [x] **D4.** [3] (3fd685b68) Dates and times for a tensor of series that all have an
-  epoch, in `TimeSeriesTensor.evaluate` and `to_point_clouds`: each series
+  epoch, in calling a `TimeSeriesTensor` and in `to_point_clouds`: each series
   places a date at `date - epoch - origin` in its own time, so separate
   series, such as one per station, are sampled at the same instants. C++
   takes the dates as integer counts of a unit and converts them per
@@ -189,15 +189,16 @@ classes already take a shape, with an optional series to fill it, and
   instants; a series without an epoch raises `ValueError`; a date outside
   a series' domain raises `ValueError` naming its position.
 
-## Phase E: calling a series instead of `evaluate`
+## Phase E: calling a series
 
-`TimeSeries` and `TimeSeriesTensor` have both `evaluate` and `__call__`,
-which only forwards to it, while `Pcf` and PCF tensors are only called.
+`TimeSeries` and `TimeSeriesTensor` had a named method besides
+`__call__`, which only forwarded to it, while `Pcf` and PCF tensors are
+only called.
 
-- [x] **E1.** [2] (6415402d9) Remove `TimeSeries.evaluate` and
-  `TimeSeriesTensor.evaluate`: their docstrings move to `__call__`, which
-  `api_timeseries.rst` documents with `:special-members: __call__`. Links
-  to `evaluate` in docstrings and guides, and calls in the tests, use the
-  call form; the time series entry in `CHANGELOG.md` says series are
-  called, as PCFs are.
-  Tests: the existing tests of `.evaluate(...)` call the series instead.
+- [x] **E1.** [2] (6415402d9) Series and tensors of series are only
+  called: the named method is removed and its docstrings move to
+  `__call__`, which `api_timeseries.rst` documents with
+  `:special-members: __call__`. Links in docstrings and guides, and the
+  tests, use the call form; the time series entry in `CHANGELOG.md` says
+  series are called, as PCFs are.
+  Tests: the existing tests call the series.

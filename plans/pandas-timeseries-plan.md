@@ -17,8 +17,8 @@ H to J, and L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
   their `to_datetime64` and `to_timedelta64` methods, found by attribute so
   pandas is not imported.
   Tests: `DateTime` of a nanosecond `Timestamp` has unit `"ns"`;
-  `Window(size=pd.Timedelta("1ns"))` on a series in `"ns"`;
-  `TimeDelayEmbedding(delay=pd.Timedelta("3h"))` equals one with
+  windows of `size=pd.Timedelta("1ns")` on a series in `"ns"`; an
+  embedding with `delay=pd.Timedelta("3h")` equals one with
   `np.timedelta64(3, "h")`.
 - [x] **A3.** Timezone-aware dates become naive UTC.
   - [x] **A3a.** [1] (79218327d) `DateTime` converts an aware `datetime` or `Timestamp`
@@ -30,7 +30,7 @@ H to J, and L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
     update the `Times` and `TimeSeries` docstrings.
     Tests: aware index equals the naive UTC index; `Series` of dates equals
     its index; `NaT` raises.
-- [x] **A4.** [1] (725c6b968) `TimeSeries.evaluate` takes a `DatetimeIndex` or a `Series`
+- [x] **A4.** [1] (725c6b968) Calling a `TimeSeries` takes a `DatetimeIndex` or a `Series`
   of dates as dates, not numbers.
   Tests: equals evaluating `index.to_numpy()`; aware index equals its UTC
   equivalent; aware `Timestamp`.
@@ -60,14 +60,14 @@ H to J, and L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
   negation, `* 3`, and `* 0.5`; `DateTime + TimeDelta(1.5, "h")`; `DateTime - DateTime` and `DateTime + TimeDelta`;
   comparisons across resolutions.
 - [x] **C3.** [1] (3d7136917) `_duration` keeps a `TimeDelta` and `_in_unit` converts its
-  count to the series' unit by an exact factor, so `Window` and
-  `TimeDelayEmbedding` take it without rounding.
-  Tests: `Window(TimeDelta(2, "h"))` equals `Window(np.timedelta64(2, "h"))`
-  on a series in hours; a first window of `TimeDelta(1 / 3, "s")` on a
+  count to the series' unit by an exact factor, so `cut_windows` and
+  `delay_embed` take it without rounding.
+  Tests: windows of size `TimeDelta(2, "h")` equal those of size
+  `np.timedelta64(2, "h")` on a series in hours; a first window of `TimeDelta(1 / 3, "s")` on a
   series in nanoseconds holds an observation at 333333100 ns.
   Note: `_duration` now turns every duration into a `TimeDelta`, so
-  `Window.size`, `Window.step`, and `TimeDelayEmbedding.delay` already are
-  one for duration input, and their reprs show it; E6 is left with numbers.
+  the window size and step and the embedding delay already are one for
+  duration input, and their reprs show it; E6 is left with numbers.
 - [x] **C4.** Arrays of durations and dates in one unit, as `TimeDeltaTensor`
   and `DateTimeTensor`.
   - [x] **C4a.** [3] (5d5d0c882) `TimeDelta(counts, unit)` for a `FloatTensor`,
@@ -102,7 +102,7 @@ H to J, and L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
     a scalar `DateTime` is an array `TimeDelta`; array minus a scalar
     `TimeDelta` with a float count.
   - [x] **C4f.** [3] (1cef3c791) Move the arrays of `TimeDelta` into a new
-    `TimeDeltaTensor`, so that a `TimeDelta` holds one duration. Update `evaluate`,
+    `TimeDeltaTensor`, so that a `TimeDelta` holds one duration. Update calling a series,
     `Times`, the `DateTime` arithmetic, and the docstrings to use it.
     Tests: the C4a, C4b, C4e, and D3 tests on `TimeDeltaTensor`; a
     `TimeDeltaTensor` from a `TimeDelta` list equals one from its
@@ -127,12 +127,12 @@ H to J, and L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
   Tests: `timedelta64[m]` is in minutes; a `TimeDelta` list is in its
   finest unit; `timedelta64[ms]` in `unit="s"` gives exact seconds;
   `datetime64[m]` is in minutes; `TimedeltaIndex` equals its array.
-- [x] **D2.** [2] (432122132) `TimeSeries.evaluate` accepts durations, single or arrays,
+- [x] **D2.** [2] (432122132) Calling a `TimeSeries` accepts durations, single or arrays,
   as times from time 0, with or without an epoch.
   Tests: `TimeDelta(90, "min")` on a series in hours equals 1.5; a
   `timedelta64` array; a window evaluated at a duration from its start.
-- [x] **D3.** [3] (6c9281336) `TimeSeriesTensor.evaluate` accepts durations, and
-  `evaluate` and `Times` take an array `TimeDelta` as an array of
+- [x] **D3.** [3] (6c9281336) Calling a `TimeSeriesTensor` accepts durations, and
+  calling a series and `Times` take an array `TimeDelta` as an array of
   durations.
   Tests: windows at durations equal windows at their times in seconds;
   `TimeDelta(sb.FloatTensor([[30, 90], [240, 60]]), "min")` on a series in
@@ -160,14 +160,14 @@ H to J, and L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
     date to the values of each channel there; a window channel keeps
     where it lies; channels with and without an epoch raise; the epochs
     at different resolutions combine.
-- [x] **D7.** [1] (62cc4ece0) `TimeSeries.evaluate` takes a `DateTime` and a
+- [x] **D7.** [1] (62cc4ece0) Calling a `TimeSeries` takes a `DateTime` and a
   `DateTimeTensor` as dates, as it takes a `datetime64` array.
   Tests: a `DateTime` and a `DateTimeTensor` give the values at their
   `datetime64` dates; a `DateTimeTensor` keeps its shape.
 - [x] **D8.** [2] (a70059601) A tuple `(count, unit)` is a duration wherever one is
   taken: `TimeDelta(count, unit)`, or `TimeDeltaTensor(count, unit)` for
-  a sequence or array of counts. This covers `Window`,
-  `TimeDelayEmbedding`, `evaluate` on series and tensors, and `times` of
+  a sequence or array of counts. This covers `cut_windows`,
+  `delay_embed`, calling series and tensors, and `times` of
   `TimeSeries`.
   Tests: each of these with a tuple equals it with the `TimeDelta` or
   `TimeDeltaTensor`; a tuple of two dates is still two dates; a tuple
@@ -211,12 +211,13 @@ H to J, and L) and [timeseries-durations-spec.md](timeseries-durations-spec.md)
 - [x] **E4.** [2] (7ec48f8f9) `TimeSeries.origin` is a `TimeDelta` or a `TimeDeltaTensor`;
   remove `TimeSeries.bounds` and update its callers and docs.
   Tests: window origins, including after snapping; several channels.
-- [x] **E5.** [2] (f04d7b62f) `Window(..., return_bounds=True)` gives a
+- [x] **E5.** [2] (f04d7b62f) The bounds of windows are a
   `TimeDeltaTensor` of shape `(n_windows, 2)` in the series' unit, or a
-  `DateTimeTensor` for a series with an epoch.
+  `DateTimeTensor` for a series with an epoch. (Since replaced by
+  `TimeSeries.source_domain`.)
   Tests: dated and undated series; partial windows.
-- [x] **E6.** [1] (19485daf8) `Window.size`, `Window.step`, and
-  `TimeDelayEmbedding.delay` are `TimeDelta`; update the reprs.
+- [x] **E6.** [1] (19485daf8) The window size and step and the embedding
+  delay are `TimeDelta`; update the reprs.
   Tests: from `np.timedelta64` and `pd.Timedelta`; repr.
   Note: C3 already made durations `TimeDelta` and showed them in the
   reprs, so this item adds the tests. Numbers stay floats until G3, since
@@ -263,8 +264,8 @@ that check they are accepted, and in one place per guide page that says
 so.
 
 - [x] **F1.** [3] (d697d7a7b) `test/python/test_windowing.py` builds series from
-  `TimeDelta` durations and passes `TimeDelta` to `Window` and
-  `evaluate`.
+  `TimeDelta` durations and passes `TimeDelta` to `cut_windows` and to
+  calls of series.
 - [x] **F2.** [3] (bb8279d1c) `test/python/test_timeseries.py` likewise.
 - [x] **F3.** [2] (e5342aa45) `test_time_delay_embedding.py`, `test_plotting_timeseries.py`,
   `test_timeseries_pandas.py`, `persistence/test_timeseries_persistence.py`,
@@ -289,21 +290,21 @@ so.
   without `unit`; round trip of a series without a unit; `to("s")` on a
   series without a unit; the raises.
   Note: replaces rejecting numbers as times, which raised `TypeError`.
-- [x] **G2.** [1] (019db8043) `evaluate` on series and tensors: a series without a
+- [x] **G2.** [1] (019db8043) Calling series and tensors: a series without a
   unit takes numbers, and raises `TypeError` for durations, dates, and
   `unit=`; a series with a unit takes `series(t, unit)` as
   `TimeDelta(t, unit)` or `TimeDeltaTensor(t, unit)`, and raises for
   numbers without `unit`, naming `series(t, unit)`.
   Tests: both kinds of series, single and many times; tensor likewise.
   Note: keeps the `unit` argument, which this item first removed.
-- [x] **G3.** [1] (364d763ae) `Window` and `TimeDelayEmbedding` take numbers for a
+- [x] **G3.** [1] (364d763ae) `cut_windows` and `delay_embed` take numbers for a
   series without a unit and durations for one with a unit; the other kind
-  raises `TypeError` when applied.
-  Tests: `Window(size=3.0)` on both kinds; `TimeDelayEmbedding(2, 1.0)`
-  likewise; durations on a series without a unit raise.
+  raises `TypeError`.
+  Tests: `cut_windows(series, size=3.0)` on both kinds;
+  `delay_embed(series, 2, 1.0)` likewise; durations on a series without a unit raise.
 - [x] **G4.** [2] (1547f1f8a) A series without a unit gives numbers: `times` is a
   `FloatTensor`, `domain` has float ends, `origin` is a float or a
-  `FloatTensor`, and `return_bounds` gives a `FloatTensor`;
+  `FloatTensor`, and the bounds of windows are a `FloatTensor`;
   `plot_timeseries` labels its axis "time" and raises on an axis with a
   unit.
   Tests: each output; a window of a series without a unit; the plot
@@ -370,12 +371,12 @@ so.
 
 ## Phase J: windows and embeddings of pandas input
 
-- [x] **J1.** [2] (08d122be9) `Window` and `TimeDelayEmbedding` convert a pandas `Series`
+- [x] **J1.** [2] (08d122be9) `cut_windows` and `delay_embed` convert a pandas `Series`
   or `DataFrame` with `TimeSeries.from_pandas`, and raise `TypeError` on
   other objects that are not a `TimeSeries`; update their docstrings and
   type hints.
   Tests: windows of a `Series` equal those of `from_pandas(s)`, also with
-  `return_bounds=True`; embedding of a `DataFrame` equals that of
+  their bounds; embedding of a `DataFrame` equals that of
   `from_pandas(df)`; an ndarray raises `TypeError` naming
   `TimeSeries(values, times)`.
 

@@ -20,7 +20,7 @@ These settle the open questions of the issue.
 
 1. **Time zones.** Timezone-aware input is converted to UTC and the zone is
    dropped. This applies to `DateTime`, `DateTimeTensor`, `TimeSeries`,
-   `evaluate`, and `from_pandas`, for both `datetime` and pandas values.
+   calling a series, and `from_pandas`, for both `datetime` and pandas values.
    Nothing stores a zone, so `to_pandas` returns naive UTC dates.
 2. **Missing data.** `NaN` and `pd.NA` values are kept as observations, as
    `TimeSeries(values, times)` keeps them today. `NaT` in an index is
@@ -34,11 +34,11 @@ These settle the open questions of the issue.
 5. **Resolution.** The default `unit`, which sets only how the times are
    stored, is the resolution of a `DatetimeIndex` or `TimedeltaIndex`,
    usually nanoseconds, as for `datetime64` and `timedelta64` arrays.
-6. **Return types.** `Window` and `TimeDelayEmbedding` return the same
+6. **Return types.** `cut_windows` and `delay_embed` return the same
    stablebear types for pandas input as for a `TimeSeries`, so results feed
-   straight into `compute_persistent_homology`. `evaluate` at dates returns
-   tensors as now.
-7. **Bare NumPy arrays.** `Window` and `TimeDelayEmbedding` accept a
+   straight into `compute_persistent_homology`. Calling a series at dates
+   returns tensors as now.
+7. **Bare NumPy arrays.** `cut_windows` and `delay_embed` accept a
    `TimeSeries` or a pandas `Series` or `DataFrame`. NumPy data goes through
    `TimeSeries(values, times)`, which is already one call.
 
@@ -48,7 +48,7 @@ These settle the open questions of the issue.
 
 - `DateTime(pd.Timestamp(...))` keeps the timestamp's resolution, such as
   nanoseconds. Today `np.datetime64(timestamp)` drops it to microseconds.
-- Durations (`Window` `size` and `step`, `TimeDelayEmbedding` `delay`)
+- Durations (the `size` and `step` of `cut_windows`, the `delay` of `delay_embed`)
   accept `pd.Timedelta` at its own resolution. It is a `datetime.timedelta`
   and is accepted today, but rounded to microseconds.
 - `DateTime` converts a timezone-aware `datetime` or `pd.Timestamp` to the
@@ -56,7 +56,7 @@ These settle the open questions of the issue.
 - The `times` of `TimeSeries(...)` accept a `DatetimeIndex` or a `Series`
   of dates, naive or timezone-aware. A naive index works today; an aware
   one fails with an unclear `TypeError`.
-- `TimeSeries.evaluate` accepts a `DatetimeIndex` or a `Series` of dates as
+- Calling a `TimeSeries` accepts a `DatetimeIndex` or a `Series` of dates as
   it accepts a `datetime64` array. Today an index is taken as numbers.
 
 ### `TimeSeries.from_pandas(obj, unit=None, *, snap_tolerance=1e-14)`
@@ -93,17 +93,17 @@ These settle the open questions of the issue.
 - `TimeSeries.to_pandas()` returns, for one channel, a `Series` with that
   index. For several channels it returns a `DataFrame` with columns `0` to
   `n_channels - 1`, indexed by the union of the channels' times. Each
-  column holds its channel's value in effect at each time, as `evaluate`
-  gives it, and `NaN` outside the channel's domain, so a column keeps its
+  column holds its channel's value in effect at each time, as calling the
+  series gives it, and `NaN` outside the channel's domain, so a column keeps its
   integer or boolean dtype when every time lies in its domain.
 - Only observations of shape `()` that are numbers or booleans can be
   converted; other series raise `TypeError`.
 - If pandas is not installed, it raises `ImportError` saying that the
   pandas package is needed, without naming an installer.
 
-### `Window` and `TimeDelayEmbedding` on pandas input
+### `cut_windows` and `delay_embed` on pandas input
 
-`Window(...)(obj)` and `TimeDelayEmbedding(...)(obj)` accept a pandas
+`cut_windows(obj, ...)` and `delay_embed(obj, ...)` accept a pandas
 `Series` or `DataFrame`, convert it with `TimeSeries.from_pandas(obj)`, and
 return what they return for that series. Other objects that are not a
 `TimeSeries` raise `TypeError`, naming `TimeSeries(values, times)` and
@@ -120,7 +120,7 @@ object's module, so only `to_pandas` needs to import it.
 ## Out of scope
 
 - Storing a time zone, or channel names.
-- Accepting `(values, times)` tuples or bare arrays in `Window` and
-  `TimeDelayEmbedding`.
-- Returning pandas objects from `Window`, `TimeDelayEmbedding`, or
-  `evaluate`.
+- Accepting `(values, times)` tuples or bare arrays in `cut_windows` and
+  `delay_embed`.
+- Returning pandas objects from `cut_windows`, `delay_embed`, or calling
+  a series.
