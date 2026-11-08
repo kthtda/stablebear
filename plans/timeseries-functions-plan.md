@@ -1,6 +1,6 @@
 # Time series follow-ups: implementation plan
 
-Progress: 16 of 20 items, 29 of 38 points (76%)
+Progress: 17 of 20 items, 31 of 38 points (82%)
 
 Specs: [timeseries-functions-spec.md](timeseries-functions-spec.md)
 (phase A, #265) and
@@ -133,12 +133,14 @@ tensors of series, which `sb.stack` of series (B2c) is easily mistaken for.
     39 warnings left include unions and generics, such as
     `int | numpy.ndarray | DistanceMatrix` and `list[Rectangle]`, that
     napoleon does not split; C2b rewrites them with the prose.
-  - [ ] **C2b.** [2] Rewrite the type fields that hold prose, such as
+  - [x] **C2b.** [2] (8e467e11a) Rewrite the type fields that hold prose, such as
     "durations", "them", "C++ tensor", "matplotlib axes", "file-like", and
     "same kind as ``X``", as types, with the prose moved into the
     description; document the dtype sentinels, such as `float32`, so that
     unions like `float32 | float64 | None` resolve, or ignore them.
     Tests: a build with `-n` gives no warnings.
+    Note: the dtype sentinels resolve through napoleon aliases to
+    `:data:` targets, since they are constants, not classes.
   - [ ] **C2c.** [1] `nitpicky = True` in `docs/conf.py` and
     `fail_on_warning: true` in `.readthedocs.yaml`.
     Tests: a broken reference fails a local build with `-W`.

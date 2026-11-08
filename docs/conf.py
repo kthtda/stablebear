@@ -95,6 +95,10 @@ napoleon_type_aliases.update(
                   "symmat32", "symmat64")}
 )
 
+# Warn about every reference that does not resolve, such as a broken link to
+# the API reference.
+nitpicky = True
+
 # Names that are not documented: the tensor base class, type aliases, private
 # classes, numpy internals, the mocks that stand in for imports while autodoc
 # runs, and torch.
