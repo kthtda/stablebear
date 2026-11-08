@@ -185,7 +185,7 @@ def save(item, file):
     ----------
     item : Tensor or Pcf or PointCloud or Barcode or DistanceMatrix or SymmetricMatrix or TimeSeries
         The item to save.
-    file : str or file-like
+    file : str or typing.BinaryIO
         A file path or an open file object in binary write mode.
     """
     is_object = isinstance(
@@ -206,7 +206,7 @@ def load(file) -> Any:  # Any: the type is whatever the file holds.
 
     Parameters
     ----------
-    file : str or file-like
+    file : str or typing.BinaryIO
         A file path or an open file object in binary read mode.
 
     Returns

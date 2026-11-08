@@ -99,7 +99,7 @@ except ImportError:
 
         Returns
         -------
-        list[dict]
+        list of dict
             A list of dicts, each with a ``"name"`` key describing the GPU.
             An empty list means no NVIDIA GPUs were found.
         """

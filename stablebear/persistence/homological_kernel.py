@@ -124,8 +124,8 @@ def compute_homological_kernel(
     X : PointCloud, PointCloudTensor, DistanceMatrix, DistanceMatrixTensor, FloatTensor, or numpy.ndarray
         Input data for :math:`d`. A ``FloatTensor`` or NumPy array is
         interpreted as a single point cloud (one row per point).
-    Y : same kind as ``X``
-        Input data for :math:`d'`, with the same number of points per
+    Y : PointCloud, PointCloudTensor, DistanceMatrix, DistanceMatrixTensor, FloatTensor, or numpy.ndarray
+        Input data for :math:`d'`, of the same kind as ``X``, with the same number of points per
         element as ``X``. Point clouds stay in ambient dimension: express
         a lower-dimensional projection in the original coordinates.
     dim : int, optional

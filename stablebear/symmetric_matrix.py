@@ -36,13 +36,13 @@ class SymmetricMatrix(_BinaryIoMixin):
 
     Parameters
     ----------
-    n_or_data : int | numpy.ndarray | SymmetricMatrix
+    n_or_data : int, numpy.ndarray, or SymmetricMatrix
         If an int, creates a zero-initialized matrix of that size.
         A two-dimensional NumPy array supplies the full square matrix. A
         one-dimensional array supplies the upper triangle, including the
         diagonal, in row-major order: ``(0, 0), (0, 1), ..., (1, 1), ...``.
         If a SymmetricMatrix, wraps it directly.
-    dtype : float32 | float64 | None, optional
+    dtype : float32 or float64, optional
         Element precision. ``float32`` stores entries as 32-bit floats,
         ``float64`` as 64-bit floats. Defaults to ``float64`` when
         ``n_or_data`` is an int. For array input, ``float32`` and ``float64``
@@ -204,10 +204,11 @@ class SymmetricMatrixTensor(Tensor):
 
     Parameters
     ----------
-    data : ndarray, SymmetricMatrixTensor, or C++ tensor
+    data : numpy.ndarray or SymmetricMatrixTensor
         An ndarray of shape ``(*tensor_shape, n, n)`` whose trailing two axes
-        form each n×n symmetric matrix, or an existing tensor.
-    dtype : symmat32 | symmat64 | None, optional
+        form each n×n symmetric matrix, or an existing tensor, from Python or
+        from the C++ backend.
+    dtype : symmat32 or symmat64, optional
         Element precision. Inferred from the array dtype when ``None``.
     """
 

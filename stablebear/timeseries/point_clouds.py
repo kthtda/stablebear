@@ -68,7 +68,7 @@ def to_point_clouds(series: TimeSeries | TimeSeriesTensor | _PandasLike, times: 
         :func:`~stablebear.tensor_create.stack` or
         :func:`~stablebear.tensor_create.concatenate`, or select one with
         ``series[i]``.
-    times : durations, dates and times, or numbers, optional
+    times : TimeDeltaTensor, DateTimeTensor, or array_like, optional
         The times of the points, counted from the time 0 of each series,
         as :meth:`TimeSeries.evaluate` takes them: durations, such as a
         :class:`TimeDeltaTensor`, for series with a unit, or numbers for
@@ -77,7 +77,7 @@ def to_point_clouds(series: TimeSeries | TimeSeriesTensor | _PandasLike, times: 
         :class:`DateTimeTensor`.
     n : int, optional
         The number of evenly spaced points of each cloud.
-    step : TimeDelta, duration, or float, optional
+    step : float, TimeDelta, tuple, numpy.timedelta64, datetime.timedelta, or pandas.Timedelta, optional
         The time between points: a duration for a series with a unit, or a
         number for one without, as :func:`cut_windows` takes its ``step``.
 

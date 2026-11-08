@@ -357,7 +357,7 @@ def iterate_rectangles(f: Pcf, g: Pcf, a=0.0, b=float('inf')):
 
     Returns
     -------
-    list[Rectangle]
+    list of Rectangle
         Rectangles in chronological order.
     """
     if not isinstance(f, Pcf) or not isinstance(g, Pcf):

@@ -556,7 +556,7 @@ class TimeDelta(_Duration[int | float]):
 
     Parameters
     ----------
-    value : np.timedelta64, datetime.timedelta, pd.Timedelta, TimeDelta, or number
+    value : np.timedelta64, datetime.timedelta, pd.Timedelta, TimeDelta, int, or float
         The duration, such as ``np.timedelta64(3, "h")``. Its resolution is
         kept: a ``timedelta`` counts microseconds, and a ``pd.Timedelta``
         counts its own unit, such as nanoseconds. With ``unit``, a number of
@@ -632,7 +632,7 @@ class TimeDeltaTensor(_CountsTensor[IntTensor | FloatTensor], _Duration[IntTenso
 
     Parameters
     ----------
-    value : IntTensor, FloatTensor, array_like, timedelta64 array, pd.TimedeltaIndex, or sequence of durations
+    value : IntTensor, FloatTensor, array_like, numpy.ndarray, pd.TimedeltaIndex, or sequence
         With ``unit``, numbers of ``unit``, as in
         ``TimeDeltaTensor(sb.FloatTensor([[30, 90], [240, 60]]), "min")``,
         kept as a ``FloatTensor``, or an ``IntTensor`` for integers so that

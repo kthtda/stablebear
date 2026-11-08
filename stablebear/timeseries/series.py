@@ -401,7 +401,7 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         pandas indexes, or the finest unit of a sequence of durations. A
         plain array of numbers gives a series without a unit, whose
         :attr:`unit` is ``None``.
-    epoch : DateTime or a value DateTime accepts, optional
+    epoch : DateTime, str, np.datetime64, datetime.datetime, or datetime.date, optional
         The date and time that time 0 stands for, such as ``"2023-01-01"``.
         Dates keep their instants and are counted from it, in integers and
         converted to the unit once, so whole multiples of the unit are

@@ -86,7 +86,14 @@ napoleon_type_aliases = {
     "TimeDelta": "stablebear.timeseries.TimeDelta",
     "Dtype": "stablebear.typing.dtype",
     "Distribution": "stablebear.distributions.Distribution",
+    "Rectangle": "stablebear.functional.pcf.Rectangle",
 }
+# The dtype sentinels are module constants, not classes.
+napoleon_type_aliases.update(
+    {name: f":data:`stablebear.typing.{name}`"
+     for name in ("float32", "float64", "pcloud32", "pcloud64", "distmat32", "distmat64",
+                  "symmat32", "symmat64")}
+)
 
 # Names that are not documented: the tensor base class, type aliases, private
 # classes, numpy internals, the mocks that stand in for imports while autodoc

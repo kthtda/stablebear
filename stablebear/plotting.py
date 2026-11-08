@@ -21,7 +21,7 @@ def plot(f: PcfContainerLike, fmt="", ax=None, auto_label=False, max_time=None, 
         A single ``Pcf``, a list of ``Pcf`` objects, or a 1-D PCF tensor.
     fmt : str, optional
         A matplotlib format string (e.g. ``'r--'``), by default ``''``.
-    ax : matplotlib axes, optional
+    ax : matplotlib.axes.Axes, optional
         Axes to plot on. If ``None``, uses ``matplotlib.pyplot`` directly.
     auto_label : bool, optional
         If ``True`` and ``f`` is a tensor, label each PCF as ``f0``, ``f1``,
@@ -162,7 +162,7 @@ def _resolve_barcode_colors(n, color=None, ax=None):
         ``None`` takes the next ``n`` colors from the axes' property cycle, a
         single color is repeated for all barcodes, and a sequence of colors is
         cycled across barcodes.
-    ax : matplotlib axes, optional
+    ax : matplotlib.axes.Axes, optional
         Axes whose property cycle supplies default colors. Only used when
         ``color`` is ``None``; defaults to the current axes.
 
@@ -216,11 +216,11 @@ def plot_barcode(bc, ax=None, y_offset=0, **kwargs):
 
     Parameters
     ----------
-    bc : Barcode, BarcodeTensor or NumPy array
+    bc : Barcode, BarcodeTensor, or numpy.ndarray
         A single ``Barcode``, a 1-D ``BarcodeTensor`` or an (n, 2) NumPy array
         of ``(birth, death)`` pairs. For a tensor,
         the barcodes are stacked vertically in order.
-    ax : matplotlib axes, optional
+    ax : matplotlib.axes.Axes, optional
         Axes to plot on. If ``None``, uses the current axes.
     y_offset : int, optional
         Starting y position for the first bar. Useful when stacking
@@ -435,7 +435,7 @@ def plot_timeseries(series, ax=None, *, unit=None, relative=False, markers=False
         axes unless ``color`` is given. A time series with several channels
         is drawn with one row per channel, in channel order, on axes that
         share the time axis; only the last row is labeled.
-    ax : matplotlib axes or sequence of them, optional
+    ax : matplotlib.axes.Axes or sequence of matplotlib.axes.Axes, optional
         Axes to draw on. If ``None``, uses the current axes, or for several
         channels creates a new figure with one row per channel. For several
         channels, a sequence of one axes per channel, used in order and as

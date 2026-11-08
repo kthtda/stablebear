@@ -1,6 +1,6 @@
 # Time series follow-ups: implementation plan
 
-Progress: 15 of 20 items, 28 of 38 points (74%)
+Progress: 16 of 20 items, 29 of 38 points (76%)
 
 Specs: [timeseries-functions-spec.md](timeseries-functions-spec.md)
 (phase A, #265) and
@@ -118,7 +118,7 @@ tensors of series, which `sb.stack` of series (B2c) is easily mistaken for.
 - [ ] **C2.** Turn on Sphinx's nitpicky mode, so that a broken link to the
   API reference (#266) fails the docs build. A trial build with `-n` gives
   405 warnings, all unresolved classes in docstring type fields.
-  - [ ] **C2a.** [1] In `docs/conf.py`: `sphinx.ext.intersphinx` for
+  - [x] **C2a.** [1] (1d74d648e) In `docs/conf.py`: `sphinx.ext.intersphinx` for
     Python, NumPy, pandas, and matplotlib; `napoleon_preprocess_types`,
     which drops words such as "optional"; `napoleon_type_aliases` mapping
     the short names of stablebear classes, such as `Tensor`,

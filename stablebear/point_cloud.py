@@ -190,13 +190,14 @@ class PointCloudTensor(IndexedElementTensor):
 
     Parameters
     ----------
-    data : ndarray, list of ndarray, PointCloudTensor, or C++ tensor
+    data : numpy.ndarray, list of numpy.ndarray, or PointCloudTensor
         An ndarray whose trailing ``cloud_ndim`` axes form each point cloud and
         whose leading axes form the tensor shape; or a list of point cloud arrays
-        (possibly ragged) forming a 1-D tensor; or an existing tensor.
+        (possibly ragged) forming a 1-D tensor; or an existing tensor, from
+        Python or from the C++ backend.
     cloud_ndim : int, optional
         Must be 2. Retained as a keyword for compatibility.
-    dtype : pcloud32 | pcloud64 | None, optional
+    dtype : pcloud32 or pcloud64, optional
         Element precision. Inferred from the array dtype when ``None``.
     """
 
