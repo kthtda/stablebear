@@ -93,6 +93,26 @@ placed in it by its :py:attr:`~stablebear.timeseries.TimeSeries.origin`, so
 a window gives the value it held at that date. A date outside the domain
 raises an error that names the domain as dates.
 
+The same holds for a tensor of series, such as one series per station,
+built with :py:func:`sb.tensor <stablebear.tensor_create.tensor>` (see
+:doc:`timeseries_channels`). When every series has an epoch,
+:py:meth:`~stablebear.timeseries.series.TimeSeriesTensor.evaluate` takes
+dates, and each series places them by its own epoch, so series that start
+at different times are evaluated at the same instants::
+
+   import stablebear as sb
+
+   early = TimeSeries([10.0, 20.0, 30.0],
+                      times=TimeDeltaTensor([0.0, 1.0, 2.0], "h"),
+                      epoch="2023-01-01T00:00")
+   late = TimeSeries([40.0, 50.0, 60.0],
+                     times=TimeDeltaTensor([0.0, 1.0, 2.0], "h"),
+                     epoch="2023-01-01T01:00")
+   sb.tensor([early, late])("2023-01-01T01:30")  # [20.0, 40.0]
+
+A date outside the domain of a series raises an error that names the
+position of the series in the tensor.
+
 Durations
 ---------
 

@@ -55,6 +55,33 @@ def _checked_dates(dates):
     return dates
 
 
+def _dates_of(t):
+    """``t`` as a checked ``datetime64`` array if it is dates and times:
+    a :class:`DateTime` or a value it accepts, a :class:`DateTimeTensor`, or
+    an array, sequence, or pandas object of them; else ``None``."""
+    if isinstance(t, (str, datetime.date, np.datetime64, DateTime)):
+        return np.asarray(DateTime(t).to_datetime64())
+    if isinstance(t, DateTimeTensor):
+        return t.to_datetime64()
+    if isinstance(t, (Tensor, tuple, int, float, np.integer, np.floating)) or _as_time_delta(t) is not None:
+        return None
+    values = _as_array(t)
+    if values.dtype.kind not in "MOUS" or _finest_duration_unit(values) is not None:
+        return None
+    try:
+        dates = np.asarray(values, dtype="datetime64")
+    except (TypeError, ValueError):
+        raise TypeError("Times must be all durations or all dates and times, not a mix") from None
+    return _checked_dates(dates)
+
+
+def _date_counts(dates):
+    """``dates``, a checked ``datetime64`` array, as an ``IntTensor`` of
+    counts and their unit."""
+    code, _ = np.datetime_data(dates.dtype)
+    return IntTensor(dates.astype(np.int64)), _NUMPY_TO_UNIT[code]
+
+
 def _finest_duration_unit(values):
     """The resolution of ``values``, an array, if it holds durations: that of
     a ``timedelta64`` array, or the finest unit of other durations; else
@@ -1199,6 +1226,12 @@ class TimeSeriesTensor(Tensor):
         :meth:`~stablebear.timeseries.TimeSeries.evaluate` does: durations, or
         numbers of ``unit``, for series with a unit, and plain numbers without
         ``unit`` for series without one. Times count from each series' time 0.
+        When every series has an
+        :attr:`~stablebear.timeseries.TimeSeries.epoch`, ``t`` may also be
+        dates and times, as :meth:`~stablebear.timeseries.TimeSeries.evaluate`
+        takes them; each series places a date at ``date - epoch - origin`` in
+        each channel, so series with different epochs are evaluated at the
+        same instants.
 
         ``t`` is a single time or an array-like or ``FloatTensor`` of times
         of shape ``t_shape``. For series with one channel, returns a tensor
@@ -1216,21 +1249,31 @@ class TimeSeriesTensor(Tensor):
         Raises
         ------
         ValueError
-            If a time is outside the domain of a series, or the tensor is
-            empty or its series differ in channels or shapes, or if
-            ``unit`` is unknown.
+            If a time is outside the domain of a series, naming the
+            position of the first such series, or the tensor is empty or
+            its series differ in channels or shapes, if ``unit`` is
+            unknown, or for dates and times when a series has no epoch.
         TypeError
             For numbers without ``unit`` on series with a unit, or for
             durations or ``unit`` on series without one.
         """
+        dates = None if unit is not None else _dates_of(t)
+        if dates is not None:
+            counts, date_unit = _date_counts(dates)
+            return self._leaves(cpp.evaluate_series_dates(self._data, counts._data, date_unit))
         return self._evaluate(*_queries(t, unit))
 
     def _evaluate(self, t, unit):
         """Evaluate at numbers ``t`` of ``unit``, or of no unit if ``unit``
         is ``None``."""
         times = FloatTensor(np.asarray(t, dtype=np.float64))
-        values = NestedTensor._from_cpp(
-            cpp.evaluate_series(self._data, times._data, unit))
+        return self._leaves(cpp.evaluate_series(self._data, times._data, unit))
+
+    @staticmethod
+    def _leaves(native):
+        """The values of a C++ evaluation: the tensor of the one channel, or
+        a ``NestedTensor`` of one per channel."""
+        values = NestedTensor._from_cpp(native)
         if values.shape[0] > 1:
             return values
         leaf = values[0]

@@ -28,24 +28,47 @@ namespace sb
   /// With @p step > 0, the times start + k * step in the domain, for
   /// k = 0, 1, ... With @p times, those times, in their order. @p step and
   /// @p times are counts of @p unit, or plain numbers for a series without
-  /// a unit.
+  /// a unit. With @p dates, counts of @p dateUnit after 1970-01-01, the
+  /// times of those dates in the series, as evaluate_dates() places them.
   struct PointTimes
   {
     size_t n = 0;
     float64_t step = 0;
     std::optional<std::vector<float64_t>> times;
     TimeUnit unit = TimeUnit::Unitless;
+    std::optional<std::vector<int64_t>> dates;
+    TimeUnit dateUnit = TimeUnit::Unitless;
   };
 
   namespace detail
   {
-    /// The times of @p how in @p domain of a series in @p unit: ascending,
-    /// or in their order for given times, which throw std::domain_error if
-    /// one is outside @p domain.
-    template <typename Domain>
-    std::vector<float64_t> grid_times(const Domain& domain, const PointTimes& how, TimeUnit unit)
+    /// The times of @p how in the domain of @p series, of one channel:
+    /// ascending, or in their order for given times or dates, which throw
+    /// std::domain_error if one is outside the domain.
+    template <typename T>
+    std::vector<float64_t> grid_times(const TimeSeries<T>& series, const PointTimes& how)
     {
+      const auto domain = series.domain();
+      const auto unit = series.unit();
       std::vector<float64_t> times;
+      if (how.dates)
+      {
+        if (!series.epoch())
+        {
+          throw std::invalid_argument("Every series needs an epoch to place dates and times; set one with with_epoch");
+        }
+        for (const auto date : *how.dates)
+        {
+          const auto t = time_since(DateTime(date, how.dateUnit), *series.epoch(), unit) - series.channel(0).origin();
+          if (!domain.contains(t))
+          {
+            throw std::domain_error("Time " + detail::shortest_text(t) + " is outside the domain "
+                                    + domain.to_string());
+          }
+          times.push_back(t);
+        }
+        return times;
+      }
       if (how.n > 0)
       {
         if (how.n == 1 && domain.closedStart && domain.closedEnd)
@@ -117,10 +140,10 @@ namespace sb
     }
     const size_t dim = shape.empty() ? 1 : shape[0];
     std::vector<size_t> kept;
-    if (how.n > 0 || how.step > 0 || how.times)
+    if (how.n > 0 || how.step > 0 || how.times || how.dates)
     {
       size_t hint = 0;
-      for (const auto t : detail::grid_times(series.domain(), how, series.unit()))
+      for (const auto t : detail::grid_times(series, how))
       {
         hint = channel.index_at(t, hint);
         kept.push_back(hint);

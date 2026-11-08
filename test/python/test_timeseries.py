@@ -1582,6 +1582,52 @@ def test_tensor_of_series_with_a_dtype_that_does_not_match_raises():
         sb.tensor([doubles], dtype=sb.ts(sb.float32))
 
 
+def _hourly(values, epoch):
+    """``values`` at 0, 1, and 2 h after ``epoch``."""
+    return TimeSeries(values, times=TimeDeltaTensor([0.0, 1.0, 2.0], "h")).with_epoch(epoch)
+
+
+def test_tensor_of_series_with_different_epochs_evaluates_dates_at_the_same_instants():
+    early = _hourly([10.0, 20.0, 30.0], "2023-01-01T00:00")
+    late = _hourly([40.0, 50.0, 60.0], "2023-01-01T01:00")
+    dates = DateTimeTensor(["2023-01-01T01:30", "2023-01-01T02:00"])
+
+    values = sb.tensor([early, late])(dates)
+
+    assert np.array_equal(np.asarray(values[0]), np.asarray(early(dates)))
+    assert np.array_equal(np.asarray(values[1]), np.asarray(late(dates)))
+
+
+def test_windows_evaluate_a_date_at_its_instant_in_their_series():
+    series = TimeSeries([10.0, 20.0, 30.0, 40.0],
+                        times=TimeDeltaTensor([0.0, 1.0, 2.0, 3.0], "h")).with_epoch("2023-01-01T00:00")
+    # The windows are [0 h, 2 h) and [1 h, 3 h), both holding 1:30.
+    windows = cut_windows(series, size=TimeDelta(2, "h"), step=TimeDelta(1, "h"), closed="left", partial=False,
+                          anchor="start")
+    date = DateTime("2023-01-01T01:30")
+
+    values = windows(date)
+
+    assert np.array_equal(np.asarray(values), [series(date), series(date)])
+
+
+def test_dates_on_a_tensor_with_a_series_without_an_epoch_raise():
+    dated = _hourly([10.0, 20.0, 30.0], "2023-01-01T00:00")
+    undated = TimeSeries([40.0, 50.0, 60.0], times=TimeDeltaTensor([0.0, 1.0, 2.0], "h"))
+
+    with pytest.raises(ValueError, match="epoch"):
+        sb.tensor([dated, undated])(DateTime("2023-01-01T01:00"))
+
+
+def test_a_date_outside_a_series_of_a_tensor_raises_naming_its_position():
+    early = _hourly([10.0, 20.0, 30.0], "2023-01-01T00:00")
+    late = _hourly([40.0, 50.0, 60.0], "2023-01-01T01:00")
+
+    # 00:30 is before the domain of late, which starts at 01:00.
+    with pytest.raises(ValueError, match=re.escape("TimeSeries at position (1)")):
+        sb.tensor([early, late])(DateTime("2023-01-01T00:30"))
+
+
 def _array_equal_series():
     return TimeSeries([0.0, 10.0], times=TimeDeltaTensor([0.0, 1.0], "ms"), snap_tolerance=0.25)
 

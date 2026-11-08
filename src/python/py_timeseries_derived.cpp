@@ -22,11 +22,19 @@ namespace nb = nanobind;
 namespace
 {
   /// The times to take points at, from the arguments of to_point_clouds:
-  /// n, or step or times in unit (none for plain numbers), or none of them.
+  /// n, or step or times in unit (none for plain numbers), or dates in
+  /// unit, or none of them.
   sb::PointTimes point_times(size_t n, sb::float64_t step, std::optional<std::vector<sb::float64_t>> times,
-                             const std::optional<std::string>& unit)
+                             std::optional<std::vector<int64_t>> dates, const std::optional<std::string>& unit)
   {
-    return {n, step, std::move(times), unit ? sb::parse_time_unit(*unit) : sb::TimeUnit::Unitless};
+    const auto timeUnit = unit ? sb::parse_time_unit(*unit) : sb::TimeUnit::Unitless;
+    if (dates)
+    {
+      return {.n = n, .step = step, .times = std::nullopt, .unit = sb::TimeUnit::Unitless, .dates = std::move(dates),
+              .dateUnit = timeUnit};
+    }
+    return {.n = n, .step = step, .times = std::move(times), .unit = timeUnit, .dates = std::nullopt,
+            .dateUnit = sb::TimeUnit::Unitless};
   }
 
   template <typename T>
@@ -36,6 +44,10 @@ namespace
                                 const std::optional<std::string>& unit) {
       return sb::evaluate(series, t, unit ? std::optional(sb::parse_time_unit(*unit)) : std::nullopt);
     }, nb::arg("series"), nb::arg("t"), nb::arg("unit") = nb::none(), nb::call_guard<nb::gil_scoped_release>());
+    m.def("evaluate_series_dates", [](const sb::Tensor<sb::TimeSeries<T>>& series, const sb::Tensor<int64_t>& dates,
+                                      const std::string& unit) {
+      return sb::evaluate_dates(series, dates, sb::parse_time_unit(unit));
+    }, nb::arg("series"), nb::arg("dates"), nb::arg("unit"), nb::call_guard<nb::gil_scoped_release>());
     m.def("delay_embed", [](const sb::TimeSeries<T>& series, size_t dimension, sb::float64_t delay, bool forward) {
       return sb::delay_embed(series, dimension, delay, forward);
     }, nb::arg("series"), nb::arg("dimension"), nb::arg("delay"), nb::arg("forward"),
@@ -60,16 +72,16 @@ namespace
     {
       m.def("to_point_cloud", [](const sb::TimeSeries<T>& series, size_t n, sb::float64_t step,
                                  std::optional<std::vector<sb::float64_t>> times,
-                                 const std::optional<std::string>& unit) {
-        return sb::to_point_cloud(series, point_times(n, step, std::move(times), unit));
+                                 std::optional<std::vector<int64_t>> dates, const std::optional<std::string>& unit) {
+        return sb::to_point_cloud(series, point_times(n, step, std::move(times), std::move(dates), unit));
       }, nb::arg("series"), nb::arg("n") = 0, nb::arg("step") = 0, nb::arg("times") = nb::none(),
-         nb::arg("unit") = nb::none(), nb::call_guard<nb::gil_scoped_release>());
+         nb::arg("dates") = nb::none(), nb::arg("unit") = nb::none(), nb::call_guard<nb::gil_scoped_release>());
       m.def("to_point_clouds", [](const sb::Tensor<sb::TimeSeries<T>>& seriesTensor, size_t n, sb::float64_t step,
                                   std::optional<std::vector<sb::float64_t>> times,
-                                  const std::optional<std::string>& unit) {
-        return sb::to_point_clouds(seriesTensor, point_times(n, step, std::move(times), unit));
+                                  std::optional<std::vector<int64_t>> dates, const std::optional<std::string>& unit) {
+        return sb::to_point_clouds(seriesTensor, point_times(n, step, std::move(times), std::move(dates), unit));
       }, nb::arg("series_tensor"), nb::arg("n") = 0, nb::arg("step") = 0, nb::arg("times") = nb::none(),
-         nb::arg("unit") = nb::none(), nb::call_guard<nb::gil_scoped_release>());
+         nb::arg("dates") = nb::none(), nb::arg("unit") = nb::none(), nb::call_guard<nb::gil_scoped_release>());
     }
   }
 }

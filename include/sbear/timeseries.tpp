@@ -44,21 +44,30 @@ namespace sb
     /// The queries in @p t in row-major order, and their positions sorted by
     /// time. A NaN sorts first, so checking the first and last sorted queries
     /// against a domain rejects it.
+    template <typename Q>
     struct SortedQueries
     {
-      std::vector<float64_t> values;
+      std::vector<Q> values;
       std::vector<size_t> order;
     };
 
-    inline SortedQueries sort_queries(const Tensor<float64_t>& t)
+    template <typename Q>
+    SortedQueries<Q> sort_queries(const Tensor<Q>& t)
     {
-      SortedQueries queries;
+      SortedQueries<Q> queries;
       walk(t, [&](const std::vector<size_t>& index) { queries.values.push_back(t(index)); });
       queries.order.resize(queries.values.size());
       std::iota(queries.order.begin(), queries.order.end(), size_t{0});
       const auto& v = queries.values;
       std::sort(queries.order.begin(), queries.order.end(), [&](size_t a, size_t b) {
-        return std::isnan(v[a]) ? !std::isnan(v[b]) : v[a] < v[b];
+        if constexpr (std::is_floating_point_v<Q>)
+        {
+          return std::isnan(v[a]) ? !std::isnan(v[b]) : v[a] < v[b];
+        }
+        else
+        {
+          return v[a] < v[b];
+        }
       });
       return queries;
     }
@@ -616,99 +625,138 @@ namespace sb
            + (closedEnd ? "]" : ")");
   }
 
+  namespace detail
+  {
+    /// Every series of @p series evaluated at the queries @p t, where
+    /// time_of(one, c, q) is the time of query q in channel c of the series
+    /// one, increasing in q. check(one) throws for a series that cannot take
+    /// the queries. See evaluate() for the result and errors.
+    template <typename T, typename Q, typename TimeOf, typename Check>
+    NestedTensor<T> evaluate_each(const Tensor<TimeSeries<T>>& series, const Tensor<Q>& t, TimeOf time_of,
+                                  Check check, Executor& exec)
+    {
+      if (series.size() == 0)
+      {
+        throw std::invalid_argument("Cannot evaluate an empty tensor of series");
+      }
+
+      // The queries are sorted once for every series, as TimeSeries::evaluate
+      // sorts them for one.
+      const auto [queries, order] = sort_queries(t);
+
+      // Leaf c holds, in block k, the values of channel c of the k-th series
+      // in row-major order.
+      const auto& first = series(std::vector<size_t>(series.rank(), 0));
+      std::vector<Tensor<T>> leaves;
+      for (size_t c = 0; c < first.n_channels(); ++c)
+      {
+        std::vector<size_t> shape(series.shape().begin(), series.shape().end());
+        shape.insert(shape.end(), t.shape().begin(), t.shape().end());
+        shape.insert(shape.end(), first.channel(c).shape().begin(), first.channel(c).shape().end());
+        leaves.emplace_back(shape);
+      }
+
+      // Check every series in order first, so that an error names the first
+      // series that cannot be evaluated, whichever worker would reach it.
+      walk(series, [&](const std::vector<size_t>& index) {
+        const auto& one = series(index);
+        check(one);
+        if (one.n_channels() != first.n_channels())
+        {
+          throw std::invalid_argument("Every series must have the same number of channels");
+        }
+        for (size_t c = 0; c < one.n_channels(); ++c)
+        {
+          if (one.channel(c).shape() != first.channel(c).shape())
+          {
+            throw std::invalid_argument("Every series must have the same channel shapes");
+          }
+        }
+        if (order.empty())
+        {
+          return;
+        }
+        for (size_t c = 0; c < one.n_channels(); ++c)
+        {
+          // The domain of the series, or of channel c for queries that
+          // depend on the channel.
+          const auto domain = one.n_channels() == 1 ? one.domain() : one.select({static_cast<std::ptrdiff_t>(c)}).domain();
+          for (const auto query : {queries[order.front()], queries[order.back()]})
+          {
+            const auto x = time_of(one, c, query);
+            if (!domain.contains(x))
+            {
+              std::string position;
+              for (const auto i : index)
+              {
+                position += (position.empty() ? "" : ", ") + std::to_string(i);
+              }
+              throw std::domain_error("TimeSeries at position (" + position + "): Time " + shortest_text(x)
+                                      + " is outside the domain " + domain.to_string());
+            }
+          }
+        }
+      });
+
+      if (!order.empty())
+      {
+        parallel_walk(series, [&](const std::vector<size_t>& index) {
+          size_t k = 0;
+          for (size_t i = 0; i < index.size(); ++i)
+          {
+            k = k * series.shape(i) + index[i];
+          }
+          const auto& one = series(index);
+          thread_local std::vector<float64_t> sorted;
+          sorted.resize(order.size());
+          for (size_t c = 0; c < leaves.size(); ++c)
+          {
+            for (size_t q = 0; q < order.size(); ++q)
+            {
+              sorted[q] = time_of(one, c, queries[order[q]]);
+            }
+            const auto blockSize = leaves[c].size() / series.size();
+            one.channel(c).lookup_sorted(sorted, order, leaves[c].data() + static_cast<std::ptrdiff_t>(k * blockSize));
+          }
+        }, exec);
+      }
+
+      Tensor<NestedTensor<T>> out({leaves.size()});
+      for (size_t c = 0; c < leaves.size(); ++c)
+      {
+        out(c) = NestedTensor<T>::from_leaf_view(std::move(leaves[c]));
+      }
+      return NestedTensor<T>::from_outer_view(std::move(out), 1);
+    }
+  }
+
   template <typename T>
   NestedTensor<T> evaluate(const Tensor<TimeSeries<T>>& series, const Tensor<float64_t>& t,
                            std::optional<TimeUnit> unit, Executor& exec)
   {
     const auto queryUnit = unit.value_or(TimeUnit::Unitless);
-    if (series.size() == 0)
-    {
-      throw std::invalid_argument("Cannot evaluate an empty tensor of series");
-    }
+    return detail::evaluate_each(
+        series, t,
+        [&](const TimeSeries<T>& one, size_t, float64_t query) { return convert_time(query, queryUnit, one.unit()); },
+        [&](const TimeSeries<T>& one) { check_query_unit(queryUnit, one.unit()); }, exec);
+  }
 
-    // The queries are sorted once for every series, as TimeSeries::evaluate
-    // sorts them for one.
-    const auto [queries, order] = detail::sort_queries(t);
-
-    // Leaf c holds, in block k, the values of channel c of the k-th series
-    // in row-major order.
-    const auto& first = series(std::vector<size_t>(series.rank(), 0));
-    std::vector<Tensor<T>> leaves;
-    for (size_t c = 0; c < first.n_channels(); ++c)
-    {
-      std::vector<size_t> shape(series.shape().begin(), series.shape().end());
-      shape.insert(shape.end(), t.shape().begin(), t.shape().end());
-      shape.insert(shape.end(), first.channel(c).shape().begin(), first.channel(c).shape().end());
-      leaves.emplace_back(shape);
-    }
-
-    // Check every series in order first, so that an error names the first
-    // series that cannot be evaluated, whichever worker would reach it.
-    walk(series, [&](const std::vector<size_t>& index) {
-      const auto& one = series(index);
-      check_query_unit(queryUnit, one.unit());
-      if (one.n_channels() != first.n_channels())
-      {
-        throw std::invalid_argument("Every series must have the same number of channels");
-      }
-      for (size_t c = 0; c < one.n_channels(); ++c)
-      {
-        if (one.channel(c).shape() != first.channel(c).shape())
-        {
-          throw std::invalid_argument("Every series must have the same channel shapes");
-        }
-      }
-      if (order.empty())
-      {
-        return;
-      }
-      const auto domain = one.domain();
-      for (const auto query : {queries[order.front()], queries[order.back()]})
-      {
-        const auto x = convert_time(query, queryUnit, one.unit());
-        if (!domain.contains(x))
-        {
-          std::string position;
-          for (const auto i : index)
+  template <typename T>
+  NestedTensor<T> evaluate_dates(const Tensor<TimeSeries<T>>& series, const Tensor<int64_t>& dates,
+                                 TimeUnit dateUnit, Executor& exec)
+  {
+    return detail::evaluate_each(
+        series, dates,
+        [&](const TimeSeries<T>& one, size_t c, int64_t date) {
+          return time_since(DateTime(date, dateUnit), *one.epoch(), one.unit()) - one.channel(c).origin();
+        },
+        [&](const TimeSeries<T>& one) {
+          if (!one.epoch())
           {
-            position += (position.empty() ? "" : ", ") + std::to_string(i);
+            throw std::invalid_argument("Every series needs an epoch to place dates and times; set one with with_epoch");
           }
-          throw std::domain_error("TimeSeries at position (" + position + "): Time " + detail::shortest_text(x)
-                                  + " is outside the domain " + domain.to_string());
-        }
-      }
-    });
-
-    if (!order.empty())
-    {
-      parallel_walk(series, [&](const std::vector<size_t>& index) {
-        size_t k = 0;
-        for (size_t i = 0; i < index.size(); ++i)
-        {
-          k = k * series.shape(i) + index[i];
-        }
-        const auto& one = series(index);
-        thread_local std::vector<float64_t> sorted;
-        sorted.resize(order.size());
-        for (size_t c = 0; c < leaves.size(); ++c)
-        {
-          const auto& channel = one.channel(c);
-          for (size_t q = 0; q < order.size(); ++q)
-          {
-            sorted[q] = convert_time(queries[order[q]], queryUnit, one.unit());
-          }
-          const auto blockSize = leaves[c].size() / series.size();
-          channel.lookup_sorted(sorted, order, leaves[c].data() + static_cast<std::ptrdiff_t>(k * blockSize));
-        }
-      }, exec);
-    }
-
-    Tensor<NestedTensor<T>> out({leaves.size()});
-    for (size_t c = 0; c < leaves.size(); ++c)
-    {
-      out(c) = NestedTensor<T>::from_leaf_view(std::move(leaves[c]));
-    }
-    return NestedTensor<T>::from_outer_view(std::move(out), 1);
+        },
+        exec);
   }
 }
 

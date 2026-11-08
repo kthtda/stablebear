@@ -78,9 +78,12 @@ def test_dates_place_points_at_their_durations_from_the_epoch():
     assert _points(by_date) == _points(by_duration)
 
 
-def test_dates_for_a_tensor_of_series_raise():
-    series_tensor = sb.zeros((1,), dtype=sb.ts(sb.float64))
-    series_tensor[0] = _series().with_epoch("2023-01-01")
+def test_dates_give_every_series_of_a_tensor_a_cloud_at_those_instants():
+    early = _series().with_epoch("2023-01-01T00:00:00")
+    late = _series().with_epoch("2023-01-01T00:00:01")
+    dates = DateTimeTensor(["2023-01-01T00:00:02", "2023-01-01T00:00:01"])
 
-    with pytest.raises(TypeError, match="one series"):
-        to_point_clouds(series_tensor, DateTimeTensor(["2023-01-01T00:00:01"]))
+    clouds = to_point_clouds(sb.tensor([early, late]), dates)
+
+    assert _points(clouds[0]) == _points(to_point_clouds(early, dates))
+    assert _points(clouds[1]) == _points(to_point_clouds(late, dates))

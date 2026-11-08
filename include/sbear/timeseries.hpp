@@ -27,6 +27,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <type_traits>
 #include <string_view>
 #include <utility>
 #include <vector>
@@ -231,6 +232,48 @@ namespace sb
     /// resolution is a different DateTime.
     bool operator==(const DateTime&) const = default;
   };
+
+  /// The time from @p epoch to @p date in @p unit. The difference is taken
+  /// in integers at the finer of their resolutions, as NumPy subtracts
+  /// datetime64 values, and then converted to @p unit as convert_time()
+  /// converts it. Throws std::overflow_error if a count at the finer
+  /// resolution does not fit in 64 bits.
+  [[nodiscard]] inline float64_t time_since(const DateTime& date, const DateTime& epoch, TimeUnit unit)
+  {
+    constexpr auto max = std::numeric_limits<int64_t>::max();
+    constexpr auto min = std::numeric_limits<int64_t>::min();
+    const auto& d = detail::time_unit_info(date.unit);
+    const auto& e = detail::time_unit_info(epoch.unit);
+    const auto& fine = d.exp < e.exp || (d.exp == e.exp && d.mult <= e.mult) ? d : e;
+    const auto overflow = [&] {
+      return std::overflow_error("A date is too far from the epoch to count in " + std::string(fine.name));
+    };
+    // @p count units of @p info in fine units. The factor is a whole number,
+    // since the multipliers of coarser units are multiples of finer ones.
+    const auto in_fine = [&](int64_t count, const detail::TimeUnitInfo& info) {
+      int64_t factor = info.mult / fine.mult;
+      for (int32_t k = fine.exp; k < info.exp; ++k)
+      {
+        if (factor > max / 10)
+        {
+          throw overflow();
+        }
+        factor *= 10;
+      }
+      if (count > max / factor || count < min / factor)
+      {
+        throw overflow();
+      }
+      return count * factor;
+    };
+    const auto dateCount = in_fine(date.count, d);
+    const auto epochCount = in_fine(epoch.count, e);
+    if ((epochCount > 0 && dateCount < min + epochCount) || (epochCount < 0 && dateCount > max + epochCount))
+    {
+      throw overflow();
+    }
+    return convert_time(static_cast<float64_t>(dateCount - epochCount), fine.unit, unit);
+  }
 
   /// One-dimensional, finite, strictly increasing timestamps, placed by an
   /// origin in the series they were cut from. Their unit and epoch are those
@@ -653,6 +696,15 @@ namespace sb
   [[nodiscard]] NestedTensor<T> evaluate(const Tensor<TimeSeries<T>>& series, const Tensor<float64_t>& t,
                                          std::optional<TimeUnit> unit = std::nullopt,
                                          Executor& exec = default_executor());
+
+  /// Every series of @p series evaluated at the dates @p dates, counts of
+  /// @p dateUnit after 1970-01-01, as evaluate() evaluates at times. Each
+  /// series places a date at time_since(date, epoch, unit) - origin in each
+  /// channel, so series with different epochs are evaluated at the same
+  /// instants. Throws std::invalid_argument if a series has no epoch.
+  template <typename T>
+  [[nodiscard]] NestedTensor<T> evaluate_dates(const Tensor<TimeSeries<T>>& series, const Tensor<int64_t>& dates,
+                                               TimeUnit dateUnit, Executor& exec = default_executor());
 }
 
 #include "timeseries.tpp"

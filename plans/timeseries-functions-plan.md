@@ -1,6 +1,6 @@
 # Time series follow-ups: implementation plan
 
-Progress: 19 of 20 items, 34 of 38 points (89%)
+Progress: 19 of 21 items, 35 of 40 points (88%)
 
 Specs: [timeseries-functions-spec.md](timeseries-functions-spec.md)
 (phase A, #265) and
@@ -169,7 +169,7 @@ classes already take a shape, with an optional series to fill it, and
   Tests: a list of two series of different lengths keeps each; nested
   lists give a 2-D tensor; series of different element types, or a
   `dtype` that does not match, raise `TypeError`.
-- [ ] **D3.** [1] Docs: a "Tensors of series" section in
+- [x] **D3.** [1] (1fbcad384) Docs: a "Tensors of series" section in
   `timeseries_channels.rst`, contrasting `sb.tensor([a, b])`, a tensor
   of two series, with `sb.stack(TimeSeries.from_channels([a, b]))`, one
   series of stacked observations; a note in `tensors.rst`, under "Joining tensors" and
@@ -188,3 +188,18 @@ classes already take a shape, with an optional series to fill it, and
   Tests: two series with different epochs give the values at the same
   instants; a series without an epoch raises `ValueError`; a date outside
   a series' domain raises `ValueError` naming its position.
+
+## Phase E: calling a series instead of `evaluate`
+
+`TimeSeries` and `TimeSeriesTensor` have both `evaluate` and `__call__`,
+which only forwards to it, while `Pcf` and PCF tensors are only called.
+
+- [ ] **E1.** [2] Remove `TimeSeries.evaluate` and
+  `TimeSeriesTensor.evaluate`: their docstrings move to `__call__`, which
+  `api_timeseries.rst` documents with `:special-members: __call__`. Links
+  to `evaluate` in docstrings and guides, and calls in the tests, use the
+  call form; the time series entry in `CHANGELOG.md` says series are
+  called, as PCFs are.
+  Tests: the existing tests of `.evaluate(...)` call the series instead;
+  `hasattr(series, "evaluate")` is false for a series and a tensor of
+  series.
