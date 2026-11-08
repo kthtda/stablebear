@@ -289,8 +289,7 @@ class DistanceMatrixTensor(IndexedElementTensor):
     ----------
     data : numpy.ndarray or DistanceMatrixTensor
         An ndarray of shape ``(*tensor_shape, n, n)`` whose trailing two axes
-        form each n×n distance matrix, or an existing tensor, from Python or
-        from the C++ backend.
+        form each n×n distance matrix, or an existing tensor.
     dtype : distmat32 or distmat64, optional
         Element precision. Inferred from the array dtype when ``None``.
     """

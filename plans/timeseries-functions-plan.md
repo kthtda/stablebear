@@ -1,6 +1,6 @@
 # Time series follow-ups: implementation plan
 
-Progress: 17 of 20 items, 31 of 38 points (82%)
+Progress: 18 of 20 items, 32 of 38 points (84%)
 
 Specs: [timeseries-functions-spec.md](timeseries-functions-spec.md)
 (phase A, #265) and
@@ -115,7 +115,7 @@ tensors of series, which `sb.stack` of series (B2c) is easily mistaken for.
 - [x] **C1.** [1] (49ad56885) `CHANGELOG.md` cites #263 and #264 in the time series
   entries, and describes `cut_windows` and `delay_embed` (#265) and point
   clouds from time series (#267).
-- [ ] **C2.** Turn on Sphinx's nitpicky mode, so that a broken link to the
+- [x] **C2.** Turn on Sphinx's nitpicky mode, so that a broken link to the
   API reference (#266) fails the docs build. A trial build with `-n` gives
   405 warnings, all unresolved classes in docstring type fields.
   - [x] **C2a.** [1] (1d74d648e) In `docs/conf.py`: `sphinx.ext.intersphinx` for
@@ -141,7 +141,7 @@ tensors of series, which `sb.stack` of series (B2c) is easily mistaken for.
     Tests: a build with `-n` gives no warnings.
     Note: the dtype sentinels resolve through napoleon aliases to
     `:data:` targets, since they are constants, not classes.
-  - [ ] **C2c.** [1] `nitpicky = True` in `docs/conf.py` and
+  - [x] **C2c.** [1] (d19e28959) `nitpicky = True` in `docs/conf.py` and
     `fail_on_warning: true` in `.readthedocs.yaml`.
     Tests: a broken reference fails a local build with `-W`.
 

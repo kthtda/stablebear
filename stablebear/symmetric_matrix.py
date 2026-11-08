@@ -206,8 +206,7 @@ class SymmetricMatrixTensor(Tensor):
     ----------
     data : numpy.ndarray or SymmetricMatrixTensor
         An ndarray of shape ``(*tensor_shape, n, n)`` whose trailing two axes
-        form each n×n symmetric matrix, or an existing tensor, from Python or
-        from the C++ backend.
+        form each n×n symmetric matrix, or an existing tensor.
     dtype : symmat32 or symmat64, optional
         Element precision. Inferred from the array dtype when ``None``.
     """
