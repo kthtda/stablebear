@@ -17,17 +17,19 @@ Decisions for the maintainer: B4a (equality) and F2 (iterating a series).
 
 ## Phase A: CI and the docs build pass
 
-- [ ] **A1.** [1] Read the Docs builds with Sphinx 9: `docs/conf.py` sets
-  `autodoc_use_legacy_class_based = True`, and
-  `docs/_ext/inherited_members.py` registers `ExpandableClassDocumenter` at
-  `config-inited` with `override=True` and priority 900, instead of in
-  `setup`. The branch turns on `fail_on_warning`, and Read the Docs builds
-  with Sphinx 9.1.1 on Python 3.12, where the extension warns "directive
-  'autoclass' is already registered". Pinning `sphinx<9` alone is not
-  enough: Sphinx 8.2.3 with numpy 2.5 gives other warnings.
+- [ ] **A1.** [1] Read the Docs builds with Sphinx 9, with the "All
+  members, including inherited" dropdowns: `docs/_ext/inherited_members.py`
+  adds each dropdown in an `autodoc-process-docstring` handler and moves it
+  after the members of its class in a `doctree-read` handler, instead of
+  subclassing `ClassDocumenter`, which the new autodoc of Sphinx 9 does not
+  call. The branch turns on `fail_on_warning`, and Read the Docs builds with
+  Sphinx 9.1.1 on Python 3.12, where registering the subclass warns
+  "directive 'autoclass' is already registered".
+  `autodoc_use_legacy_class_based` would also work, but Sphinx keeps the
+  legacy autodoc only for backward compatibility.
   Tests: `-W --keep-going` builds pass with Sphinx 9.1.1 on Python 3.12 and
-  Sphinx 8.1.3 on Python 3.10, with the "All members, including inherited"
-  dropdowns.
+  Sphinx 8.1.3 on Python 3.10, with the same 19 dropdowns in the same places
+  as before.
 - [ ] **A2.** [1] Nothing assumes pandas indexes are in nanoseconds; pandas
   3, which pip installs on Python 3.11 and newer and so in most CI jobs,
   gives microseconds. `test_timeseries_pandas.py:135` compares instants
