@@ -9,7 +9,7 @@ import numpy as np
 
 from .. import _sb_cpp as cpp
 from .._binary_io import _BinaryIoMixin
-from .._tensor_base import IndexedElementTensor, Tensor
+from .._tensor_base import IndexedElementTensor, Tensor, _infer_shape_and_flatten, _tensor_from_nested
 from ..base_tensor import FloatTensor, IntTensor
 from ..distance_matrix import DistanceMatrix
 from ..functional.pcf import Pcf
@@ -1156,6 +1156,31 @@ class TimeSeriesTensor(Tensor):
             raise TypeError(f"Cannot create TimeSeriesTensor from {type(data)}")
         self._data = data
         self.dtype = _SERIES_TENSOR_TO_DTYPE[type(data)]
+
+    @staticmethod
+    def _from_series(data, dtype=None):
+        """The tensor of the series in the nested lists ``data``, of dtype
+        ``dtype`` if given."""
+        _, flat = _infer_shape_and_flatten(data)
+        if not all(isinstance(series, TimeSeries) for series in flat):
+            raise TypeError("A tensor of series takes only TimeSeries elements")
+        value_types = list(dict.fromkeys(series.dtype for series in flat))
+        if len(value_types) > 1:
+            raise TypeError(
+                "The series of a tensor must have one element type, not "
+                + ", ".join(repr(value_type) for value_type in value_types))
+        if dtype is not None and value_types and ts(value_types[0]) is not dtype:
+            raise TypeError(f"Series of {value_types[0]!r} do not have dtype {dtype!r}")
+        if value_types:
+            value_type = value_types[0]
+        elif dtype is not None:
+            value_type = dtype.value_type
+        else:
+            raise TypeError("An empty tensor of series needs a dtype")
+        suffix = _NATIVE_SUFFIX[value_type]
+        tensor_class = getattr(cpp, f"TimeSeries{suffix}Tensor")
+        return TimeSeriesTensor(_tensor_from_nested(
+            data, {getattr(cpp, f"TimeSeries{suffix}"): tensor_class}, tensor_class))
 
     def _to_py_tensor(self, data):
         return TimeSeriesTensor(data)

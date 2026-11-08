@@ -1528,6 +1528,60 @@ def test_zeros_of_series_raises_on_evaluating_an_element_left_empty():
         tensor[0](TimeDelta(0.0, "s"))
 
 
+def test_tensor_of_series_of_different_lengths_and_units_keeps_each():
+    seconds = TimeSeries([10.0, 20.0, 30.0], times=TimeDeltaTensor([0.0, 1.0, 2.0], "s"))
+    minutes = TimeSeries([40.0, 50.0], times=TimeDeltaTensor([0.0, 3.0], "min"))
+
+    tensor = sb.tensor([seconds, minutes])
+
+    assert isinstance(tensor, TimeSeriesTensor)
+    assert tensor.shape == (2,)
+    assert tensor.dtype is sb.ts(sb.float64)
+    assert tensor[0].array_equal(seconds)
+    assert tensor[1].array_equal(minutes)
+
+
+def test_tensor_of_nested_lists_of_series_is_two_dimensional():
+    a = TimeSeries([10.0, 20.0], times=TimeDeltaTensor([0.0, 1.0], "s"))
+    b = TimeSeries([30.0], times=TimeDeltaTensor([0.0], "s"))
+    c = TimeSeries([40.0, 50.0, 60.0], times=TimeDeltaTensor([0.0, 1.0, 2.0], "s"))
+
+    tensor = sb.tensor([[a, b, c],
+                        [c, b, a]])
+
+    assert tensor.shape == (2, 3)
+    assert tensor[0, 0].array_equal(a)
+    assert tensor[0, 1].array_equal(b)
+    assert tensor[0, 2].array_equal(c)
+    assert tensor[1, 0].array_equal(c)
+    assert tensor[1, 1].array_equal(b)
+    assert tensor[1, 2].array_equal(a)
+
+
+def test_tensor_of_series_takes_a_matching_dtype():
+    series = TimeSeries(np.array([10.0, 20.0], dtype=np.float32), times=TimeDeltaTensor([0.0, 1.0], "s"))
+
+    tensor = sb.tensor([series], dtype=sb.ts(sb.float32))
+
+    assert tensor.dtype is sb.ts(sb.float32)
+    assert tensor[0].array_equal(series)
+
+
+def test_tensor_of_series_of_different_element_types_raises():
+    doubles = TimeSeries(np.array([10.0, 20.0], dtype=np.float64), times=TimeDeltaTensor([0.0, 1.0], "s"))
+    floats = TimeSeries(np.array([10.0, 20.0], dtype=np.float32), times=TimeDeltaTensor([0.0, 1.0], "s"))
+
+    with pytest.raises(TypeError):
+        sb.tensor([doubles, floats])
+
+
+def test_tensor_of_series_with_a_dtype_that_does_not_match_raises():
+    doubles = TimeSeries(np.array([10.0, 20.0], dtype=np.float64), times=TimeDeltaTensor([0.0, 1.0], "s"))
+
+    with pytest.raises(TypeError):
+        sb.tensor([doubles], dtype=sb.ts(sb.float32))
+
+
 def _array_equal_series():
     return TimeSeries([0.0, 10.0], times=TimeDeltaTensor([0.0, 1.0], "ms"), snap_tolerance=0.25)
 

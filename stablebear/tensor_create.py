@@ -148,8 +148,18 @@ def tensor(data, dtype: Dtype | None = None) -> Any:  # Any: the type follows th
     dtype : Dtype, optional
         Target element dtype. When ``None``, a numeric dtype is inferred from
         the array (bool/int/float), while a collection of ``Pcf`` objects is
-        inferred as a ``PcfTensor`` or ``IntPcfTensor``. Other non-numeric
-        tensors require an explicit dtype.
+        inferred as a ``PcfTensor`` or ``IntPcfTensor``, and one of
+        :class:`~stablebear.timeseries.TimeSeries` as a
+        :class:`~stablebear.timeseries.series.TimeSeriesTensor` of dtype
+        ``ts(value_type)``. The series may differ in their times, units,
+        and channels, but not in the dtype of their observations. Other
+        non-numeric tensors require an explicit dtype.
+
+    Raises
+    ------
+    TypeError
+        If series differ in the dtype of their observations, or do not
+        match an explicit ``dtype``.
 
     Returns
     -------
@@ -164,6 +174,10 @@ def tensor(data, dtype: Dtype | None = None) -> Any:  # Any: the type follows th
 
     if isinstance(data, (list, tuple)) and contains_tensor(data):
         return NestedTensor(data, dtype=dtype)
+
+    from .timeseries.series import TimeSeries, TimeSeriesTensor
+    if isinstance(dtype, _SeriesDtype) or (dtype is None and isinstance(_first_leaf(data), TimeSeries)):
+        return TimeSeriesTensor._from_series(data, dtype)
 
     if dtype is None:
         if _first_pcf(data) is not None:
@@ -189,6 +203,15 @@ def tensor(data, dtype: Dtype | None = None) -> Any:  # Any: the type follows th
     if dtype in _DATA_DTYPE_KW:
         return wrapper(data, dtype=dtype)
     return wrapper(data)
+
+
+def _first_leaf(data):
+    """The first element of nested lists or tuples, or ``None`` if empty."""
+    while isinstance(data, (list, tuple)):
+        if not data:
+            return None
+        data = data[0]
+    return data
 
 
 def indices(data):
