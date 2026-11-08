@@ -308,6 +308,10 @@ def _values_tensor(values):
         # The same dtype inference as sb.tensor(): float32, int32, uint32,
         # uint64, and bool are kept; other numbers become float64 or int64.
         array = np.asarray(values)
+        if array.dtype.kind == "m":
+            # sb.tensor() would keep the counts of the durations without their unit.
+            raise TypeError("Durations cannot be observations; convert them to numbers of a unit first, "
+                            'such as values / np.timedelta64(1, "s")')
         try:
             values = tensor(array)
         except TypeError as error:

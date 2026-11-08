@@ -58,6 +58,11 @@ def test_series_rejects_invalid_times(times, unit):
         TimeSeries([10.0, 20.0], times=(times, unit))
 
 
+def test_series_rejects_durations_with_a_unit_as_times():
+    with pytest.raises(TypeError, match="own unit"):
+        TimeSeries([10.0, 20.0], times=(np.array([0, 1], dtype="timedelta64[h]"), "min"))
+
+
 
 def test_series_of_numbers_has_no_unit_and_one_channel():
     series = TimeSeries([10.0, 20.0, 30.0], times=[0.0, 1.5, 4.0])
@@ -274,6 +279,16 @@ def test_time_delta_rejects_a_number_without_a_unit():
         TimeDelta(3)
 
 
+def test_time_delta_rejects_a_timedelta64_with_a_unit():
+    with pytest.raises(TypeError, match="own unit"):
+        TimeDelta(np.timedelta64(5, "ns"), "s")
+
+
+def test_time_delta_rejects_a_boolean_with_a_unit():
+    with pytest.raises(TypeError):
+        TimeDelta(True, "s")
+
+
 def test_time_delta_tensor_of_integer_counts_keeps_them_as_an_int_tensor():
     time_delta = TimeDeltaTensor([[30, 90],
                             [240, 60]], "min")
@@ -347,6 +362,15 @@ def test_time_delta_tensor_rejects_counts_that_are_not_finite(value, unit):
 def test_time_delta_tensor_rejects_counts_that_are_not_numbers():
     with pytest.raises(TypeError):
         TimeDeltaTensor([True, False], "h")
+
+
+@pytest.mark.parametrize("durations", [
+    pytest.param(np.array([0, 1], dtype="timedelta64[h]"), id="timedelta64 array"),
+    pytest.param([np.timedelta64(1, "h"), np.timedelta64(30, "m")], id="list of timedelta64"),
+])
+def test_time_delta_tensor_rejects_durations_with_a_unit(durations):
+    with pytest.raises(TypeError, match="own unit"):
+        TimeDeltaTensor(durations, "min")
 
 
 def test_time_delta_tensor_plus_a_time_delta_is_in_the_finer_unit():
@@ -577,6 +601,7 @@ def test_series_of_every_element_type(make_values):
         id="list of point clouds",
     ),
     pytest.param(np.array(["a", "b"]), id="strings"),
+    pytest.param(np.array([1, 2], dtype="timedelta64[s]"), id="durations"),
     pytest.param(
         sb.NestedTensor([
             sb.FloatTensor(np.array([1.0, 2.0])),
@@ -705,6 +730,11 @@ def test_dated_series_at_a_duration_counts_from_its_epoch():
 def test_series_at_a_duration_takes_no_unit():
     with pytest.raises(TypeError, match="no unit"):
         _hourly_series()(np.timedelta64(1, "h"), "h")
+
+
+def test_series_at_a_pair_of_durations_and_a_unit_raises():
+    with pytest.raises(TypeError, match="own unit"):
+        _hourly_series()((np.array([0, 1], dtype="timedelta64[h]"), "min"))
 
 
 @pytest.mark.parametrize("durations", [

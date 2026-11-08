@@ -214,6 +214,18 @@ def test_from_pandas_with_a_string_column_raises():
         TimeSeries.from_pandas(_frame({"a": [10.0, 20.0, 30.0], "b": ["x", "y", "z"]}))
 
 
+def test_from_pandas_with_a_column_of_durations_raises():
+    index = pd.DatetimeIndex(["2023-01-01T01:00", "2023-01-01T02:00"])
+
+    with pytest.raises(TypeError, match="Durations cannot be observations"):
+        TimeSeries.from_pandas(pd.Series(pd.to_timedelta([1, 2], unit="s"), index=index))
+
+
+def test_time_delta_tensor_rejects_an_index_of_durations_with_a_unit():
+    with pytest.raises(TypeError, match="own unit"):
+        TimeDeltaTensor(pd.TimedeltaIndex(["1h", "2h"]), "s")
+
+
 def test_from_pandas_with_a_data_frame_without_columns_raises():
     with pytest.raises(ValueError, match="column"):
         TimeSeries.from_pandas(_frame({}))

@@ -571,7 +571,8 @@ class TimeDelta(_Duration[int | float]):
     Raises
     ------
     TypeError
-        If ``value`` is of another type, or is a number without ``unit``.
+        If ``value`` is of another type, is a number without ``unit``, or is
+        a duration with ``unit``.
     ValueError
         If ``value`` is ``NaT``, is not finite, or has a resolution of
         weeks, months, or years, or ``unit`` is unknown.
@@ -596,15 +597,18 @@ class TimeDelta(_Duration[int | float]):
             return
         if unit is not None:
             unit = _unit_name(unit)
+            # NumPy counts a timedelta64 among the integers.
+            if isinstance(value, np.timedelta64):
+                raise TypeError("A timedelta64 has its own unit; pass it without unit")
+            if isinstance(value, bool) or not isinstance(value, numbers.Real):
+                raise TypeError(f"Expected a number of {unit!r}; got {type(value).__name__}")
             if isinstance(value, numbers.Integral):
                 self._count = int(value)
-            elif isinstance(value, numbers.Real):
+            else:
                 value = float(value)
                 if not math.isfinite(value):
                     raise ValueError("A TimeDelta needs a finite count")
                 self._count = int(value) if value.is_integer() else value
-            else:
-                raise TypeError(f"Expected a number of {unit!r}; got {type(value).__name__}")
             self._unit = unit
             return
         if hasattr(value, "to_timedelta64"):
@@ -646,8 +650,8 @@ class TimeDeltaTensor(_CountsTensor[IntTensor | FloatTensor], _Duration[IntTenso
     Raises
     ------
     TypeError
-        If ``value`` is of another type or is not an array, or holds numbers
-        without ``unit``.
+        If ``value`` is of another type or is not an array, holds numbers
+        without ``unit``, or holds durations with ``unit``.
     ValueError
         If ``value`` holds ``NaT`` or counts that are not finite, or has a
         resolution of weeks, months, or years, or ``unit`` is unknown.
@@ -718,6 +722,9 @@ def _array_counts(value, unit):
     counts = np.asarray(value)
     if counts.ndim == 0:
         raise TypeError(f"Expected an array of numbers of {unit!r}; got {type(value).__name__}")
+    # NumPy counts timedelta64 among the integers.
+    if counts.dtype.kind == "m":
+        raise TypeError("Durations have their own unit; pass them without unit")
     if np.issubdtype(counts.dtype, np.integer):
         return IntTensor(counts.astype(np.int64))
     if np.issubdtype(counts.dtype, np.floating):
