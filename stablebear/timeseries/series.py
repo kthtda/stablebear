@@ -383,7 +383,7 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
     times, unit, and snap settings.
 
     A series cannot be changed. The constructor copies ``values``, and
-    :attr:`values` and :meth:`evaluate` return copies, so changing the
+    :attr:`values` and :meth:`__call__` return copies, so changing the
     input or a result leaves the series unchanged. Channel selection,
     :meth:`to`, windows, and delay embeddings share the observations
     instead of copying them.
@@ -586,7 +586,7 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         its times, or for several channels a ``DataFrame`` with columns ``0``
         to ``n_channels - 1``, indexed by the union of the channels' times.
         A column holds its channel's value in effect at each of these times,
-        as :meth:`evaluate` gives it, and ``NaN`` outside the channel's
+        as :meth:`__call__` gives it, and ``NaN`` outside the channel's
         domain.
 
         The index is a ``DatetimeIndex`` of ``epoch + origin + times`` for a
@@ -802,7 +802,7 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         Without an :attr:`epoch`, the ends are :class:`TimeDelta` durations
         from time 0 in :attr:`unit`, or floats for a series without a unit.
         For several channels, the domain is the
-        intersection of theirs, which :meth:`evaluate` checks queries
+        intersection of theirs, which :meth:`__call__` checks queries
         against.
 
         With an epoch, the ends are :class:`DateTime` instants: the dates
@@ -965,7 +965,7 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         return (isinstance(other, TimeSeries) and other.dtype is self.dtype
                 and self._data.array_equal(other._data))
 
-    def evaluate(self, t, unit: str | None = None):
+    def __call__(self, t, unit: str | None = None):
         """Each channel's observation with the largest timestamp at or before ``t``.
 
         A ``t`` just below a timestamp snaps forward to it, by each
@@ -1060,10 +1060,6 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
             return values
         leaf = values[0]
         return leaf[()] if leaf.ndim == 0 else leaf
-
-    def __call__(self, t, unit: str | None = None):
-        """``series(t, unit)`` is ``series.evaluate(t, unit)``."""
-        return self.evaluate(t, unit)
 
     def _time_of_date(self, date, channel):
         """The time of ``date`` in channel ``channel``, in :attr:`unit`:
@@ -1221,14 +1217,14 @@ class TimeSeriesTensor(Tensor):
     def _get_valid_setitem_dtypes(self):
         return [TimeSeries, TimeSeriesTensor]
 
-    def evaluate(self, t, unit: str | None = None):
+    def __call__(self, t, unit: str | None = None):
         """Every series evaluated at the times ``t``, as
-        :meth:`~stablebear.timeseries.TimeSeries.evaluate` does: durations, or
+        :meth:`~stablebear.timeseries.TimeSeries.__call__` does: durations, or
         numbers of ``unit``, for series with a unit, and plain numbers without
         ``unit`` for series without one. Times count from each series' time 0.
         When every series has an
         :attr:`~stablebear.timeseries.TimeSeries.epoch`, ``t`` may also be
-        dates and times, as :meth:`~stablebear.timeseries.TimeSeries.evaluate`
+        dates and times, as :meth:`~stablebear.timeseries.TimeSeries.__call__`
         takes them; each series places a date at ``date - epoch - origin`` in
         each channel, so series with different epochs are evaluated at the
         same instants.
@@ -1279,6 +1275,3 @@ class TimeSeriesTensor(Tensor):
         leaf = values[0]
         return leaf[()] if leaf.ndim == 0 else leaf
 
-    def __call__(self, t, unit: str | None = None):
-        """``windows(t, unit)`` is ``windows.evaluate(t, unit)``."""
-        return self.evaluate(t, unit)

@@ -5,6 +5,7 @@ Observations recorded at known times.
 
 .. automodule:: stablebear.timeseries
    :members:
+   :special-members: __call__
 
 .. autoclass:: stablebear.timeseries.series.TimeSeriesTensor
-   :members: evaluate
+   :special-members: __call__

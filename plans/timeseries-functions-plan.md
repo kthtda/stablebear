@@ -1,6 +1,6 @@
 # Time series follow-ups: implementation plan
 
-Progress: 19 of 21 items, 35 of 40 points (88%)
+Progress: 20 of 21 items, 38 of 40 points (95%)
 
 Specs: [timeseries-functions-spec.md](timeseries-functions-spec.md)
 (phase A, #265) and
@@ -177,7 +177,7 @@ classes already take a shape, with an optional series to fill it, and
   `TimeSeriesTensor` with `sb.tensor` or `sb.zeros`, while `sb.stack` and
   `sb.concatenate` combine their channels; a pointer from the `stack` and
   `concatenate` docstrings; a `CHANGELOG.md` entry.
-- [ ] **D4.** [3] Dates and times for a tensor of series that all have an
+- [x] **D4.** [3] (3fd685b68) Dates and times for a tensor of series that all have an
   epoch, in `TimeSeriesTensor.evaluate` and `to_point_clouds`: each series
   places a date at `date - epoch - origin` in its own time, so separate
   series, such as one per station, are sampled at the same instants. C++
@@ -200,6 +200,4 @@ which only forwards to it, while `Pcf` and PCF tensors are only called.
   to `evaluate` in docstrings and guides, and calls in the tests, use the
   call form; the time series entry in `CHANGELOG.md` says series are
   called, as PCFs are.
-  Tests: the existing tests of `.evaluate(...)` call the series instead;
-  `hasattr(series, "evaluate")` is false for a series and a tensor of
-  series.
+  Tests: the existing tests of `.evaluate(...)` call the series instead.

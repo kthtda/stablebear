@@ -25,7 +25,8 @@ Evaluation
 
 For observations :math:`x_0, \dots, x_{n-1}` at timestamps
 :math:`t_0 < \dots < t_{n-1}`,
-:py:meth:`~stablebear.timeseries.TimeSeries.evaluate` computes
+:py:meth:`calling the series <stablebear.timeseries.TimeSeries.__call__>`
+at a time :math:`t` gives
 
 .. math::
 

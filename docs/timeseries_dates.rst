@@ -96,8 +96,8 @@ raises an error that names the domain as dates.
 The same holds for a tensor of series, such as one series per station,
 built with :py:func:`sb.tensor <stablebear.tensor_create.tensor>` (see
 :doc:`timeseries_channels`). When every series has an epoch,
-:py:meth:`~stablebear.timeseries.series.TimeSeriesTensor.evaluate` takes
-dates, and each series places them by its own epoch, so series that start
+:py:meth:`calling the tensor <stablebear.timeseries.series.TimeSeriesTensor.__call__>`
+takes dates, and each series places them by its own epoch, so series that start
 at different times are evaluated at the same instants::
 
    import stablebear as sb

@@ -159,7 +159,8 @@ share the dtype of their observations. The dtype of a tensor of series of
 ``float64`` observations is ``sb.ts(sb.float64)``, and
 :py:func:`sb.zeros <stablebear.tensor_create.zeros>` with that dtype makes
 a tensor of empty series, whose elements are then assigned.
-:py:meth:`~stablebear.timeseries.series.TimeSeriesTensor.evaluate` and
+:py:meth:`Calling the tensor
+<stablebear.timeseries.series.TimeSeriesTensor.__call__>` and
 :py:func:`~stablebear.timeseries.to_point_clouds` take a tensor of series
 as they take the windows of a series (see :doc:`timeseries_windows`).
 

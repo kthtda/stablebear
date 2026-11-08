@@ -4,7 +4,8 @@ Snapping queries to timestamps
 A :py:class:`~stablebear.timeseries.TimeSeries` evaluated at a time returns
 the observation with the largest timestamp at or before that time; see
 :doc:`timeseries`. This page explains how
-:py:meth:`~stablebear.timeseries.TimeSeries.evaluate` handles queries that
+:py:meth:`calling a series <stablebear.timeseries.TimeSeries.__call__>`
+handles queries that
 miss a timestamp by a rounding error, and how the ``snap_tolerance``
 argument controls it.
 

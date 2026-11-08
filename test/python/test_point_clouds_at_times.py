@@ -43,8 +43,8 @@ def test_given_times_give_every_series_of_a_tensor_a_cloud_at_those_times():
 
     clouds = to_point_clouds(series_tensor, times)
 
-    assert _points(clouds[0]) == _points(series_tensor[0].evaluate(times))
-    assert _points(clouds[1]) == _points(series_tensor[1].evaluate(times))
+    assert _points(clouds[0]) == _points(series_tensor[0](times))
+    assert _points(clouds[1]) == _points(series_tensor[1](times))
 
 
 @pytest.mark.parametrize("times, error, message", [

@@ -70,7 +70,7 @@ def to_point_clouds(series: TimeSeries | TimeSeriesTensor | _PandasLike, times: 
         ``series[i]``.
     times : TimeDeltaTensor, DateTimeTensor, or array_like, optional
         The times of the points, counted from the time 0 of each series,
-        as :meth:`TimeSeries.evaluate` takes them: durations, such as a
+        as :meth:`TimeSeries.__call__` takes them: durations, such as a
         :class:`TimeDeltaTensor`, for series with a unit, or numbers for
         series without one. Series with an :attr:`~TimeSeries.epoch` also
         take dates and times, such as a :class:`DateTimeTensor`, which each
