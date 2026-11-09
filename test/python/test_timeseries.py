@@ -480,6 +480,40 @@ def test_date_times_compare_instants():
     assert DateTime("2023-01-02") > DateTime("2023-01-01T23:59")
 
 
+def test_date_times_before_1678_and_in_ns_compare_instants():
+    # 1659 in nanoseconds, where NumPy would compare them, is out of int64.
+    early = DateTime("1659-01-01T00:00:00")
+    late = DateTime(np.datetime64("1990-01-01T00:00:00", "ns"))
+
+    assert early < late
+    assert late > early
+    assert (DateTimeTensor(np.array(["1659-01-01T00:00:00", "2000-01-01T00:00:00"], dtype="datetime64[s]"))
+            < late).array_equal(sb.BoolTensor([True, False]))
+
+
+def test_date_time_plus_a_duration_out_of_int64_at_the_finer_resolution_raises():
+    # 1659 is before the range of nanoseconds in int64.
+    with pytest.raises(OverflowError, match="ns"):
+        _ = DateTime("1659-01-01T00:00:00") + np.timedelta64(1, "ns")
+
+
+def test_date_time_minus_a_date_time_out_of_int64_at_the_finer_resolution_raises():
+    with pytest.raises(OverflowError, match="ns"):
+        _ = DateTime(np.datetime64("1990-01-01T00:00:00", "ns")) - DateTime("1659-01-01T00:00:00")
+
+
+def test_time_delta_tensors_of_350_years_and_of_ns_compare_lengths():
+    # 350 years in nanoseconds are out of int64.
+    years = TimeDeltaTensor([350 * 365], "d")
+
+    assert (years > TimeDelta(1, "ns")).array_equal(sb.BoolTensor([True]))
+
+
+def test_time_delta_tensor_plus_a_duration_out_of_int64_at_the_finer_resolution_raises():
+    with pytest.raises(OverflowError, match="ns"):
+        _ = TimeDeltaTensor([350 * 365], "d") + TimeDelta(1, "ns")
+
+
 def test_series_rejects_an_invalid_epoch():
     with pytest.raises(ValueError):
         TimeSeries([10.0, 20.0], times=TimeDeltaTensor([0.0, 1.5], "s"), epoch=np.datetime64("2023-01", "M"))

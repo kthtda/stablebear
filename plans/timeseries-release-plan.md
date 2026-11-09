@@ -1,6 +1,6 @@
 # Time series general release: checklist
 
-Progress: 5 of 30 items, 9 of 47 points (19%)
+Progress: 6 of 30 items, 11 of 47 points (23%)
 
 From the release review of `issue-258-pandas` on 2026-11-08, in which each
 problem below was reproduced twice. The items correct behavior that the
@@ -89,15 +89,17 @@ Decisions for the maintainer: B4a (equality) and F2 (iterating a series).
     unit of the result, since a shift of centuries in ns rounds its times
     by microseconds. B3b replaced the fallback in Python integers with
     the split into days that C++ uses, so that the two agree.
-  - [ ] **B3b.** [2] C++: `time_since` (`timeseries.hpp:241-276`) computes
+  - [x] **B3b.** [2] (13f32618b) C++: `time_since` (`timeseries.hpp:241-276`) computes
     the offset without an int64 intermediate at the finer resolution, so a
     tensor of series agrees with B3a instead of raising `OverflowError`, and
     a unit with multiplier 0 throws instead of dividing by it.
     Tests: a tensor of a series with an epoch in 1659 called at ns dates;
     one series and a tensor of it agree in unit `"as"`.
-  - [ ] **B3c.** [2] Arithmetic and comparisons of `DateTime`,
-    `DateTimeTensor`, and `TimeDeltaTensor` across resolutions raise
-    `OverflowError` when a result leaves int64, instead of wrapping.
+  - [ ] **B3c.** [2] Arithmetic of `DateTime`, `DateTimeTensor`, and
+    `TimeDeltaTensor` across resolutions raises `OverflowError` when a
+    result leaves int64, instead of wrapping, and their comparisons are
+    exact, splitting the finer count into whole units of the coarser and
+    a remainder instead of converting it.
     Tests: the start of a domain in 1659 plus `pd.Timedelta(days=10)`;
     `TimeDeltaTensor([350 * 365], "d") + TimeDelta(1, "ns")`; a date in 1659
     in s against one in 1990 in ns.

@@ -58,6 +58,11 @@ as a time series stores its times.
   - `DateTime` plus or minus `TimeDelta`, and `DateTime` minus `DateTime`;
     a float count is first rounded as `to_timedelta64` rounds it;
   - comparisons of `DateTime`.
+- Comparisons are exact at any two resolutions. Arithmetic whose integer
+  counts leave int64 at the finer resolution, such as a date before 1678
+  plus a duration in nanoseconds, raises `OverflowError` instead of
+  wrapping as NumPy does. The integer count of a single `TimeDelta` is a
+  Python integer, so arithmetic of two of them does not overflow.
 - It rejects `NaT`, counts that are not finite, and weeks, months, and
   years.
 - A `TimeDelta` holds one duration; a `TimeDeltaTensor` holds an array of

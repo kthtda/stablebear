@@ -176,7 +176,7 @@ class _Instants(_Counts[_CountT]):
     def _compare(self, other, compare):
         if not isinstance(other, _Instants):
             return NotImplemented
-        return _as_boolean(compare(self.to_datetime64(), other.to_datetime64()))
+        return _as_boolean(_exact_compare(self._counts(), self._unit, other._counts(), other._unit, compare))
 
     @overload
     def __lt__(self: DateTime, other: DateTime) -> bool: ...
@@ -224,7 +224,7 @@ class _Instants(_Counts[_CountT]):
         other = _as_time_delta(other)
         if other is None:
             return NotImplemented
-        return _date_time(self.to_datetime64() + other.to_timedelta64())
+        return _date_time(_numpy_sum(self.to_datetime64(), other.to_timedelta64()))
 
     __radd__ = __add__
 
@@ -242,11 +242,11 @@ class _Instants(_Counts[_CountT]):
 
     def __sub__(self, other):
         if isinstance(other, _Instants):
-            return _time_delta(self.to_datetime64() - other.to_datetime64())
+            return _time_delta(_numpy_sum(self.to_datetime64(), other.to_datetime64(), subtract=True))
         other = _as_time_delta(other)
         if other is None:
             return NotImplemented
-        return _date_time(self.to_datetime64() - other.to_timedelta64())
+        return _date_time(_numpy_sum(self.to_datetime64(), other.to_timedelta64(), subtract=True))
 
     def __reduce__(self):
         return type(self), (self.to_datetime64(),)
@@ -282,14 +282,16 @@ class DateTime(_Instants[int]):
     Two values are equal when they have the same count of the same unit; the
     same instant at another resolution is a different value. Compare
     ``to_datetime64()`` values to compare instants. ``<``, ``<=``, ``>``,
-    and ``>=`` compare instants.
+    and ``>=`` compare instants, exactly at any two resolutions.
 
     Adding or subtracting a :class:`TimeDelta`, or a duration it accepts,
     gives a ``DateTime`` at the finer of the two resolutions; a duration with
     a float count is first rounded as ``TimeDelta.to_timedelta64()``
     rounds it. Subtracting a ``DateTime`` gives the :class:`TimeDelta`
     between them. With a :class:`TimeDeltaTensor` or a ``DateTimeTensor``,
-    the result is a ``DateTimeTensor`` or a ``TimeDeltaTensor``.
+    the result is a ``DateTimeTensor`` or a ``TimeDeltaTensor``. A count
+    that does not fit in int64 at the finer resolution, such as that of a
+    date before 1678 in nanoseconds, raises ``OverflowError``.
     """
 
     def __init__(self, value):
@@ -436,7 +438,9 @@ class _Duration(_Counts[_CountT]):
             return NotImplemented
         if not (self._array or other._array):
             return compare(self._length(), other._length())
-        unit = min(self._unit, other._unit, key=_ATTOSECONDS.__getitem__)
+        if self._integral and other._integral:
+            return BoolTensor(_exact_compare(self._counts(), self._unit, other._counts(), other._unit, compare))
+        unit = _finer(self._unit, other._unit)
         return BoolTensor(compare(self._in(unit), other._in(unit)))
 
     @overload
@@ -475,8 +479,17 @@ class _Duration(_Counts[_CountT]):
     def __ge__(self, other):
         return self._compare(other, operator.ge)
 
+    @property
+    def _integral(self):
+        """Whether the count is an integer or an ``IntTensor``."""
+        return isinstance(self._count, (int, IntTensor))
+
     def _in(self, unit):
-        """The count in ``unit``, a unit at least as fine, by an exact factor."""
+        """The count in ``unit``, a unit at least as fine, by an exact factor;
+        integer counts of a tensor raise ``OverflowError`` if one leaves
+        int64."""
+        if isinstance(self._count, IntTensor):
+            return _counts_in(self._counts(), self._unit, unit)
         return self._counts() * (_ATTOSECONDS[self._unit] // _ATTOSECONDS[unit])
 
     @overload
@@ -487,10 +500,16 @@ class _Duration(_Counts[_CountT]):
 
     def _plus(self, other):
         """The sum with ``other``, a duration, in the finer of the two units."""
-        unit = min(self._unit, other._unit, key=_ATTOSECONDS.__getitem__)
+        unit = _finer(self._unit, other._unit)
+        if (self._array or other._array) and self._integral and other._integral:
+            # In int64, which a sum can leave; two integers add exactly.
+            return _time_delta(_checked_sum(_counts_in(self._counts(), self._unit, unit),
+                                            _counts_in(other._counts(), other._unit, unit)), unit)
         return _time_delta(self._in(unit) + other._in(unit), unit)
 
     def _negated(self):
+        if isinstance(self._count, IntTensor):
+            return _time_delta(_checked_negation(self._counts()), self._unit)
         return _time_delta(-self._counts(), self._unit)
 
     def __add__(self, other):
@@ -537,6 +556,11 @@ class _Duration(_Counts[_CountT]):
     def __mul__(self, factor):
         if not isinstance(factor, numbers.Real):
             return NotImplemented
+        if isinstance(self._count, IntTensor) and isinstance(factor, numbers.Integral) and factor:
+            most = _INT64.max // abs(int(factor))
+            counts = self._counts()
+            if ((counts > most) | (counts < -most)).any():
+                raise OverflowError("The result is too large to hold in int64")
         return _time_delta(self._counts() * factor, self._unit)
 
     __rmul__ = __mul__
@@ -662,7 +686,8 @@ class TimeDeltaTensor(_CountsTensor[IntTensor | FloatTensor], _Duration[IntTenso
     broadcast against the tensor, as :class:`TimeDelta` does them. ``<``,
     ``<=``, ``>``, ``>=``, ``==``, and ``!=`` give a ``BoolTensor``, as they
     do on tensors; ``==`` compares count and unit. ``array_equal()`` tells
-    whether two are equal as a whole.
+    whether two are equal as a whole. Integer counts that do not fit in
+    int64 in the finer unit of an operation raise ``OverflowError``.
     """
 
     def __init__(self, value, unit: str | None = None):
@@ -714,6 +739,97 @@ def _numpy_counts(value):
         raise ValueError(f"Dates, times, and durations need a resolution of fixed length, not {code!r}")
     counts = value.astype(np.int64) * step
     return IntTensor(counts) if counts.ndim else int(counts), _NUMPY_TO_UNIT[code]
+
+
+_INT64 = np.iinfo(np.int64)
+
+
+def _finer(unit, other):
+    """The shorter of two time units."""
+    return min(unit, other, key=_ATTOSECONDS.__getitem__)
+
+
+def _coarser(unit, other):
+    """The longer of two time units."""
+    return max(unit, other, key=_ATTOSECONDS.__getitem__)
+
+
+def _counts_in(counts, unit, finer):
+    """``counts``, integer counts of ``unit`` or an array of them, as int64
+    counts of ``finer``, a unit at most as long; raises ``OverflowError`` if
+    one does not fit."""
+    counts = np.asarray(counts, dtype=np.int64)
+    factor = _ATTOSECONDS[unit] // _ATTOSECONDS[finer]
+    if factor == 1:
+        return counts
+    most = _INT64.max // factor
+    if ((counts > most) | (counts < -most)).any():
+        raise OverflowError(f"A count of {unit} is too large to hold in {finer}, "
+                            "the finer resolution of the operation")
+    # A factor beyond int64 leaves only counts of 0.
+    return counts * factor if most else np.zeros_like(counts)
+
+
+def _checked_sum(a, b):
+    """``a + b``, int64 counts or arrays of them; raises ``OverflowError`` if a
+    sum leaves int64. Its least value, which NumPy reads as ``NaT``, counts
+    as leaving it."""
+    with np.errstate(over="ignore"):
+        total = np.add(a, b)
+    # A sum overflows when it has the sign of neither operand.
+    if (((a ^ total) & (b ^ total)) < 0).any() or (total == _INT64.min).any():
+        raise OverflowError("The result is too large to hold in int64")
+    return total
+
+
+def _checked_negation(counts):
+    """``-counts``, int64 counts or an array of them; raises ``OverflowError``
+    for the least int64, which has no negation."""
+    if (counts == _INT64.min).any():
+        raise OverflowError("The result is too large to hold in int64")
+    return -counts
+
+
+def _numpy_sum(a, b, subtract=False):
+    """``a + b``, or ``a - b`` with ``subtract``, of ``datetime64`` or
+    ``timedelta64`` values or arrays, at the finer of their resolutions;
+    raises ``OverflowError`` if an operand or the result does not fit in
+    int64 there, where NumPy would wrap."""
+    a, b = np.asarray(a), np.asarray(b)
+    unit_a = _NUMPY_TO_UNIT[np.datetime_data(a.dtype)[0]]
+    unit_b = _NUMPY_TO_UNIT[np.datetime_data(b.dtype)[0]]
+    unit = _finer(unit_a, unit_b)
+    counts_b = _counts_in(b.astype(np.int64), unit_b, unit)
+    total = _checked_sum(_counts_in(a.astype(np.int64), unit_a, unit),
+                         _checked_negation(counts_b) if subtract else counts_b)
+    # A date plus or minus a duration is a date; anything else a duration.
+    kind = "datetime64" if a.dtype.kind == "M" and b.dtype.kind == "m" else "timedelta64"
+    return total.astype(f"{kind}[{_UNIT_TO_NUMPY[unit]}]")[()]
+
+
+def _exact_compare(counts, unit, other_counts, other_unit, compare):
+    """``compare(counts, other_counts)``, an operator such as ``operator.lt``,
+    for integer counts of two units, or arrays of them, as the lengths they
+    stand for, without converting either to the finer unit, where it can
+    overflow: the finer is split into whole units of the coarser and a
+    remainder."""
+    counts, other_counts = np.asarray(counts, dtype=np.int64), np.asarray(other_counts, dtype=np.int64)
+    if unit == other_unit:
+        return compare(counts, other_counts)
+    fine_first = _ATTOSECONDS[unit] < _ATTOSECONDS[other_unit]
+    fine, coarse = (counts, other_counts) if fine_first else (other_counts, counts)
+    # The number of the finer unit in one of the coarser.
+    ratio = _ATTOSECONDS[_coarser(unit, other_unit)] // _ATTOSECONDS[_finer(unit, other_unit)]
+    if ratio <= _INT64.max:
+        whole, rest = np.divmod(fine, ratio)
+    else:
+        # Every count is below the ratio: a negative one is -1 whole units
+        # and a positive remainder.
+        whole, rest = np.where(fine < 0, -1, 0), np.where(fine < 0, 1, fine)
+    # The sign of fine - coarse, from the whole units and then the
+    # remainder, which is never negative.
+    sign = (whole > coarse).astype(np.int64) - (whole < coarse) + ((whole == coarse) & (rest > 0))
+    return compare(sign if fine_first else -sign, 0)
 
 
 def _array_counts(value, unit):
