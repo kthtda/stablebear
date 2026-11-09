@@ -244,46 +244,99 @@ namespace sb
     bool operator==(const DateTime&) const = default;
   };
 
-  /// The time from @p epoch to @p date in @p unit. The difference is taken
-  /// in integers at the finer of their resolutions, as NumPy subtracts
-  /// datetime64 values, and then converted to @p unit as convert_time()
-  /// converts it. Throws std::overflow_error if a count at the finer
-  /// resolution does not fit in 64 bits.
+  namespace detail
+  {
+    /// Whether @p a is a unit at most as long as @p b.
+    constexpr bool not_coarser(const TimeUnitInfo& a, const TimeUnitInfo& b)
+    {
+      return a.exp < b.exp || (a.exp == b.exp && a.mult <= b.mult);
+    }
+
+    /// The number of @p fine in one @p coarse, a unit at least as long, or
+    /// nullopt if it exceeds int64. It is a whole number, since the
+    /// multipliers of coarser units are multiples of finer ones.
+    constexpr std::optional<int64_t> units_per(const TimeUnitInfo& coarse, const TimeUnitInfo& fine)
+    {
+      int64_t ratio = coarse.mult / fine.mult;
+      for (int32_t k = fine.exp; k < coarse.exp; ++k)
+      {
+        if (ratio > std::numeric_limits<int64_t>::max() / 10)
+        {
+          return std::nullopt;
+        }
+        ratio *= 10;
+      }
+      return ratio;
+    }
+
+    /// Whether @p count of a unit, @p factor of a finer one each, is below
+    /// 2^62 in the finer unit, so that a difference of two such fits in int64.
+    constexpr bool fits_in_fine(int64_t count, std::optional<int64_t> factor)
+    {
+      if (!factor)
+      {
+        return false;
+      }
+      const auto most = ((int64_t{1} << 62) - 1) / *factor;
+      return count <= most && count >= -most;
+    }
+  }
+
+  /// The time from @p epoch to @p date in @p unit. When both counts fit
+  /// below 2^62 in the finest of the three units, the difference is taken
+  /// there in integers and converted to @p unit as convert_time() converts
+  /// it. Otherwise each count is split into whole days and a remainder in
+  /// its own unit, and the difference of the days and that of the
+  /// remainders, taken in integers when a day of the finer unit fits, are
+  /// converted to @p unit separately and added, so that no resolution or
+  /// span overflows. stablebear.timeseries computes
+  /// dates the same way, so that a series and a tensor of it agree.
+  /// Throws std::invalid_argument if a unit has no length, and
+  /// std::overflow_error if the days differ by more than int64 holds.
   [[nodiscard]] inline float64_t time_since(const DateTime& date, const DateTime& epoch, TimeUnit unit)
   {
-    constexpr auto max = std::numeric_limits<int64_t>::max();
-    constexpr auto min = std::numeric_limits<int64_t>::min();
+    if (date.unit == TimeUnit::Unitless || epoch.unit == TimeUnit::Unitless || unit == TimeUnit::Unitless)
+    {
+      throw std::invalid_argument("Dates, epochs, and the times between them need a unit with a length");
+    }
     const auto& d = detail::time_unit_info(date.unit);
     const auto& e = detail::time_unit_info(epoch.unit);
-    const auto& fine = d.exp < e.exp || (d.exp == e.exp && d.mult <= e.mult) ? d : e;
-    const auto overflow = [&] {
-      return std::overflow_error("A date is too far from the epoch to count in " + std::string(fine.name));
-    };
-    // @p count units of @p info in fine units. The factor is a whole number,
-    // since the multipliers of coarser units are multiples of finer ones.
-    const auto in_fine = [&](int64_t count, const detail::TimeUnitInfo& info) {
-      int64_t factor = info.mult / fine.mult;
-      for (int32_t k = fine.exp; k < info.exp; ++k)
-      {
-        if (factor > max / 10)
-        {
-          throw overflow();
-        }
-        factor *= 10;
-      }
-      if (count > max / factor || count < min / factor)
-      {
-        throw overflow();
-      }
-      return count * factor;
-    };
-    const auto dateCount = in_fine(date.count, d);
-    const auto epochCount = in_fine(epoch.count, e);
-    if ((epochCount > 0 && dateCount < min + epochCount) || (epochCount < 0 && dateCount > max + epochCount))
+    const auto& u = detail::time_unit_info(unit);
+    const auto& fine = detail::not_coarser(d, e) ? (detail::not_coarser(d, u) ? d : u)
+                                                 : (detail::not_coarser(e, u) ? e : u);
+    const auto dateFactor = detail::units_per(d, fine);
+    const auto epochFactor = detail::units_per(e, fine);
+    if (detail::fits_in_fine(date.count, dateFactor) && detail::fits_in_fine(epoch.count, epochFactor))
     {
-      throw overflow();
+      return convert_time(static_cast<float64_t>(date.count * *dateFactor - epoch.count * *epochFactor), fine.unit,
+                          unit);
     }
-    return convert_time(static_cast<float64_t>(dateCount - epochCount), fine.unit, unit);
+    // Each count as whole days and a remainder in its own unit.
+    const auto& days = detail::time_unit_info(TimeUnit::Days);
+    const auto split = [&](int64_t count, const detail::TimeUnitInfo& info) {
+      // A ratio beyond int64 exceeds every count, which is then all remainder.
+      const auto ratio = detail::units_per(days, info);
+      return ratio ? std::pair{count / *ratio, count % *ratio} : std::pair{int64_t{0}, count};
+    };
+    const auto [dateDays, dateRest] = split(date.count, d);
+    const auto [epochDays, epochRest] = split(epoch.count, e);
+    constexpr auto max = std::numeric_limits<int64_t>::max();
+    constexpr auto min = std::numeric_limits<int64_t>::min();
+    if ((epochDays > 0 && dateDays < min + epochDays) || (epochDays < 0 && dateDays > max + epochDays))
+    {
+      throw std::overflow_error("A date is too many days from the epoch to count");
+    }
+    const auto dayDifference = convert_time(static_cast<float64_t>(dateDays - epochDays), TimeUnit::Days, unit);
+    // The remainders, below a day each, subtract in int64 in the finer of
+    // their units when a day of it is below 2^62, as down to picoseconds.
+    const auto& finer = detail::not_coarser(d, e) ? d : e;
+    if (detail::fits_in_fine(1, detail::units_per(days, finer)))
+    {
+      const auto restDifference = dateRest * *detail::units_per(d, finer) - epochRest * *detail::units_per(e, finer);
+      return dayDifference + convert_time(static_cast<float64_t>(restDifference), finer.unit, unit);
+    }
+    return dayDifference + convert_time(static_cast<float64_t>(dateRest), date.unit, unit)
+           - convert_time(static_cast<float64_t>(epochRest), epoch.unit, unit);
   }
 
   /// One-dimensional, finite, strictly increasing timestamps, placed by an

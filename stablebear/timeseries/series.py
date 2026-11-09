@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import datetime
-import math
 import operator
 import sys
 from typing import Any, Generic, NamedTuple, Protocol, TypeVar
@@ -116,28 +115,104 @@ def _durations_in(values, unit):
     return None
 
 
+# Counts below this in the finest unit of a date, its epoch, and the series
+# have a difference that fits in int64.
+_FITS_IN_FINE = 2**62 - 1
+_INT64 = np.iinfo(np.int64)
+
+
+def _units_per(coarse, fine):
+    """The number of ``fine`` in one ``coarse``, time units, or ``None`` if
+    it exceeds int64."""
+    ratio = _ATTOSECONDS[coarse] // _ATTOSECONDS[fine]
+    return ratio if ratio <= _INT64.max else None
+
+
+def _fits_in_fine(counts, factor):
+    """Whether ``counts``, of a unit with ``factor`` of a finer one each, are
+    below ``_FITS_IN_FINE`` in the finer unit."""
+    if factor is None:
+        return np.zeros(np.shape(counts), dtype=bool)
+    most = _FITS_IN_FINE // factor
+    return (counts <= most) & (counts >= -most)
+
+
+def _converted(values, source, target):
+    """``values``, float64 numbers of the time unit ``source``, in
+    ``target``, multiplied or divided by one integer factor."""
+    if source == target:
+        return values
+    source_length, target_length = _ATTOSECONDS[source], _ATTOSECONDS[target]
+    if source_length > target_length:
+        return values * float(source_length // target_length)
+    return values / float(target_length // source_length)
+
+
 def _offsets_in(dates, epoch, unit):
     """``dates - epoch`` as float64 numbers of ``unit``, a time unit, for
     ``dates`` a checked ``datetime64`` array and ``epoch`` a
-    :class:`DateTime`. The difference is taken in integers of the finest
-    unit that ``dates``, ``epoch``, and ``unit`` are whole multiples of,
-    then divided once: in int64 when it fits, else in Python integers, so
-    that no resolution or span overflows."""
+    :class:`DateTime`, as ``time_since`` in C++ computes each, so that a
+    series and a tensor of it agree. When both counts fit, the difference is
+    taken in int64 in the finest of the three units and converted to
+    ``unit``. Otherwise :func:`_split_offsets` gives it, so that no
+    resolution or span overflows."""
     code, step = np.datetime_data(dates.dtype)
-    date_length = _ATTOSECONDS[_NUMPY_TO_UNIT[code]] * step
-    epoch_length, unit_length = _ATTOSECONDS[epoch.unit], _ATTOSECONDS[unit]
-    fine = math.gcd(date_length, epoch_length, unit_length)
-    date_factor, divisor = date_length // fine, unit_length // fine
-    epoch_offset = epoch.count * (epoch_length // fine)
+    if step != 1:
+        # Counts of the unit itself, such as minutes for datetime64[15m].
+        dates = dates.astype(f"datetime64[{code}]")
+    date_unit = _NUMPY_TO_UNIT[code]
     counts = dates.astype(np.int64)
-    largest = int(np.abs(counts).max()) if counts.size else 0
-    # Both terms below 2**62, so that their difference fits in int64.
-    if largest * date_factor < 2**62 and abs(epoch_offset) < 2**62:
-        differences = counts * np.int64(date_factor) - np.int64(epoch_offset)
-    else:
-        differences = counts.astype(object) * date_factor - epoch_offset
-    # Python integers divide with one rounding, as int64 ones do below 2**53.
-    return np.asarray(np.asarray(differences) / divisor, dtype=np.float64)
+    fine = min(date_unit, epoch.unit, unit, key=_ATTOSECONDS.__getitem__)
+    date_factor, epoch_factor = _units_per(date_unit, fine), _units_per(epoch.unit, fine)
+    fast = _fits_in_fine(counts, date_factor) & _fits_in_fine(epoch.count, epoch_factor)
+    offsets = np.empty(counts.shape)
+    if fast.any():
+        assert date_factor is not None and epoch_factor is not None
+        differences = counts[fast] * date_factor - epoch.count * epoch_factor
+        offsets[fast] = _converted(differences.astype(np.float64), fine, unit)
+    if not fast.all():
+        offsets[~fast] = _split_offsets(counts[~fast], date_unit, epoch, unit)
+    return offsets
+
+
+def _whole_days(counts, unit):
+    """``counts`` of the time unit ``unit`` as whole days and a remainder in
+    ``unit``, truncated as C++ divides."""
+    ratio = _units_per("d", unit)
+    if ratio is None:
+        # Beyond int64, so more than any count, which is all remainder.
+        return np.zeros_like(counts), counts
+    rest = np.fmod(counts, ratio)
+    return (counts - rest) // ratio, rest
+
+
+def _split_offsets(counts, date_unit, epoch, unit):
+    """``dates - epoch`` as :func:`_offsets_in` gives it, for ``counts`` of
+    dates in ``date_unit`` too far from ``epoch`` to subtract in int64: each
+    count is split into whole days and a remainder in its own unit, and the
+    difference of the days and that of the remainders, taken in integers
+    when a day of the finer unit fits, are converted to ``unit`` and
+    added."""
+    date_days, date_rest = _whole_days(counts, date_unit)
+    epoch_days, epoch_rest = _whole_days(np.int64(epoch.count), epoch.unit)
+    days = date_days - epoch_days
+    # A difference overflows when its operands differ in sign and it does
+    # not have the sign of the first.
+    if (((date_days ^ epoch_days) & (date_days ^ days)) < 0).any():
+        raise OverflowError("A date is too many days from the epoch to count")
+    day_difference = _converted(days.astype(np.float64), "d", unit)
+    # The remainders, below a day each, subtract in int64 in the finer of
+    # their units when a day of it is below 2**62, as down to picoseconds.
+    finer = min(date_unit, epoch.unit, key=_ATTOSECONDS.__getitem__)
+    finer_per_day = _units_per("d", finer)
+    if finer_per_day is not None and finer_per_day <= _FITS_IN_FINE:
+        # Both factors are at most finer_per_day, so they fit too.
+        date_factor = _ATTOSECONDS[date_unit] // _ATTOSECONDS[finer]
+        epoch_factor = _ATTOSECONDS[epoch.unit] // _ATTOSECONDS[finer]
+        rest_difference = date_rest * date_factor - epoch_rest * epoch_factor
+        return day_difference + _converted(rest_difference.astype(np.float64), finer, unit)
+    return (day_difference + _converted(date_rest.astype(np.float64), date_unit, unit)
+            - _converted(np.float64(epoch_rest), epoch.unit, unit))
 
 
 def _times_from_datetimes(stamps, unit, epoch):

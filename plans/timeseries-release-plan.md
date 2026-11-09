@@ -1,6 +1,6 @@
 # Time series general release: checklist
 
-Progress: 4 of 30 items, 6 of 47 points (13%)
+Progress: 5 of 30 items, 9 of 47 points (19%)
 
 From the release review of `issue-258-pandas` on 2026-11-08, in which each
 problem below was reproduced twice. The items correct behavior that the
@@ -72,7 +72,7 @@ Decisions for the maintainer: B4a (equality) and F2 (iterating a series).
   different epochs saves and loads, with both anchors.
 - [ ] **B3.** Dates are counted from an epoch exactly, without int64
   overflow at fine resolutions.
-  - [ ] **B3a.** [3] Python: one helper computes `date - epoch` in the
+  - [x] **B3a.** [3] (04679edb3) Python: one helper computes `date - epoch` in the
     series unit exactly, in Python integers or in whole coarse units plus a
     remainder. `_time_of_date` (calls and `to_point_clouds`),
     `_times_from_datetimes` (construction and `from_pandas`), and
@@ -85,6 +85,10 @@ Decisions for the maintainer: B4a (equality) and F2 (iterating a series).
     before 1678 with ns queries; `from_pandas` of a 400-year ns index;
     `from_channels` of a channel from 1659 in s and one from 1990 in ns
     counts from 1659.
+    Note: `from_channels` also shifts a channel after converting it to the
+    unit of the result, since a shift of centuries in ns rounds its times
+    by microseconds. B3b replaced the fallback in Python integers with
+    the split into days that C++ uses, so that the two agree.
   - [ ] **B3b.** [2] C++: `time_since` (`timeseries.hpp:241-276`) computes
     the offset without an int64 intermediate at the finer resolution, so a
     tensor of series agrees with B3a instead of raising `OverflowError`, and

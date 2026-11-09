@@ -3,6 +3,7 @@
 #include <sbear/timeseries.hpp>
 
 #include <cmath>
+#include <stdexcept>
 #include <vector>
 
 namespace
@@ -51,5 +52,15 @@ namespace
     const auto shifted = channel_up_to_two_seconds(true).shifted(86400.0);
 
     EXPECT_LT(shifted.time(1), shifted.time(2));
+  }
+
+  TEST(TimeSinceTest, AUnitWithoutALengthThrows)
+  {
+    const sb::DateTime date(10, sb::TimeUnit::Seconds);
+    const sb::DateTime epoch(0, sb::TimeUnit::Seconds);
+
+    EXPECT_THROW((void)sb::time_since(date, sb::DateTime(0, sb::TimeUnit::Unitless), sb::TimeUnit::Seconds),
+                 std::invalid_argument);
+    EXPECT_THROW((void)sb::time_since(date, epoch, sb::TimeUnit::Unitless), std::invalid_argument);
   }
 }

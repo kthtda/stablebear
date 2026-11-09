@@ -1660,6 +1660,33 @@ def test_tensor_of_series_with_different_epochs_evaluates_dates_at_the_same_inst
     assert np.array_equal(np.asarray(values[1]), np.asarray(late(dates)))
 
 
+def test_tensor_of_a_series_from_1659_at_ns_dates_equals_the_series_at_those_dates():
+    # Each observation is its year; 1659 is before the range of datetime64[ns].
+    series = TimeSeries([1659.0, 1800.0, 2000.0],
+                        times=np.array(["1659-01-01", "1800-01-01", "2000-01-01"], dtype="datetime64[D]"))
+    dates = np.array(["1800-01-01", "2000-01-01"], dtype="datetime64[ns]")
+
+    values = sb.tensor([series])(dates)
+
+    assert np.array_equal(np.asarray(values[0]), np.asarray(series(dates)))
+
+
+def test_tensor_of_a_series_in_attoseconds_agrees_with_the_series_at_its_dates():
+    # Observations 10 times their seconds after an epoch with nanoseconds, in
+    # attoseconds, where its count does not fit in int64.
+    series = TimeSeries([0.0, 15.0, 30.0],
+                        times=TimeDeltaTensor(sb.IntTensor([0, 1_500_000_000_000_000_000,
+                                                            3_000_000_000_000_000_000]), "as"),
+                        epoch="2023-01-01T06:00:00.123456789")
+    dates = np.array(["2023-01-01T06:00:00.123456789", "2023-01-01T06:00:01.623456789",
+                      "2023-01-01T06:00:03.123456789"], dtype="datetime64[ns]")
+
+    values = sb.tensor([series])(dates)
+
+    assert np.array_equal(np.asarray(values[0]), np.asarray(series(dates)))
+    assert np.array_equal(np.asarray(series(dates)), [0.0, 15.0, 30.0])
+
+
 def test_windows_evaluate_a_date_at_its_instant_in_their_series():
     series = TimeSeries([10.0, 20.0, 30.0, 40.0],
                         times=TimeDeltaTensor([0.0, 1.0, 2.0, 3.0], "h")).with_epoch("2023-01-01T00:00")
