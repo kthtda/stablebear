@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime
+import math
 import operator
 import sys
 from typing import Any, Generic, NamedTuple, Protocol, TypeVar
@@ -115,25 +116,41 @@ def _durations_in(values, unit):
     return None
 
 
+def _offsets_in(dates, epoch, unit):
+    """``dates - epoch`` as float64 numbers of ``unit``, a time unit, for
+    ``dates`` a checked ``datetime64`` array and ``epoch`` a
+    :class:`DateTime`. The difference is taken in integers of the finest
+    unit that ``dates``, ``epoch``, and ``unit`` are whole multiples of,
+    then divided once: in int64 when it fits, else in Python integers, so
+    that no resolution or span overflows."""
+    code, step = np.datetime_data(dates.dtype)
+    date_length = _ATTOSECONDS[_NUMPY_TO_UNIT[code]] * step
+    epoch_length, unit_length = _ATTOSECONDS[epoch.unit], _ATTOSECONDS[unit]
+    fine = math.gcd(date_length, epoch_length, unit_length)
+    date_factor, divisor = date_length // fine, unit_length // fine
+    epoch_offset = epoch.count * (epoch_length // fine)
+    counts = dates.astype(np.int64)
+    largest = int(np.abs(counts).max()) if counts.size else 0
+    # Both terms below 2**62, so that their difference fits in int64.
+    if largest * date_factor < 2**62 and abs(epoch_offset) < 2**62:
+        differences = counts * np.int64(date_factor) - np.int64(epoch_offset)
+    else:
+        differences = counts.astype(object) * date_factor - epoch_offset
+    # Python integers divide with one rounding, as int64 ones do below 2**53.
+    return np.asarray(np.asarray(differences) / divisor, dtype=np.float64)
+
+
 def _times_from_datetimes(stamps, unit, epoch):
     """The times of ``datetime64`` stamps counted from ``epoch``, or from the
     first stamp, in ``unit``, as :func:`_native_times` gives them."""
+    stamps = _checked_dates(stamps)
     if epoch is None:
         if stamps.size == 0:
             raise ValueError("Pass an epoch for an empty array of dates and times")
         epoch = stamps.reshape(-1)[0]
     epoch = DateTime(epoch)
-    # Integer differences at the finer of the two resolutions, then converted
-    # to unit by one exact factor.
-    offsets = stamps - epoch.to_datetime64()
-    if np.isnat(offsets).any():
-        raise ValueError("Dates and times cannot be NaT")
-    code, step = np.datetime_data(offsets.dtype)
-    if code not in _NUMPY_TO_UNIT:
-        raise ValueError(f"Dates and times need a resolution of fixed length, not {code!r}")
-    counts = offsets.astype(np.int64).astype(np.float64) * step
     unit = _unit_name(unit)
-    return _in_unit(TimeDeltaTensor(FloatTensor(counts), _NUMPY_TO_UNIT[code]), unit), unit, epoch._data
+    return _offsets_in(stamps, epoch, unit), unit, epoch._data
 
 
 def _times_in(counts, unit):
@@ -280,16 +297,27 @@ def _is_stablebear_object(value):
     )
 
 
-def _on_one_epoch(parts):
+def _on_one_epoch(parts, unit):
     """``parts``, one-channel series, counted from the earliest of their
-    epochs if they all have one."""
+    epochs if they all have one. A part that moves is first converted to
+    ``unit``, if given, so that it is shifted at the resolution of the
+    result: shifting by centuries in a fine unit, such as nanoseconds,
+    would round its times."""
     epochs = [part.epoch for part in parts]
     if None in epochs or len(set(epochs)) == 1:
         return parts
-    earliest = min(epochs)
-    return [part if part.epoch == earliest
-            else TimeSeries._from_cpp(part._data.shifted(_in_unit(part.epoch - earliest, part.unit), earliest._data))
+    # Compared in attoseconds, exactly; datetime64 values of two resolutions
+    # are compared at the finer one, where an early date overflows.
+    earliest = min(epochs, key=lambda epoch: epoch.count * _ATTOSECONDS[epoch.unit])
+    return [part if part.epoch == earliest else _shifted_to(part if unit is None else part.to(unit), earliest)
             for part in parts]
+
+
+def _shifted_to(part, epoch):
+    """``part``, a one-channel series, counted from ``epoch``, an earlier
+    :class:`DateTime`."""
+    offset = float(_offsets_in(np.asarray(part.epoch.to_datetime64()), epoch, part.unit))
+    return TimeSeries._from_cpp(part._data.shifted(offset, epoch._data))
 
 
 def _values_tensor(values):
@@ -518,7 +546,7 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
             raise ValueError("A time series needs at least one channel")
         native = _SERIES_NATIVE[parts[0].dtype]
         return cls._from_cpp(native.from_channels(
-            [part._data for part in _on_one_epoch(parts)], unit
+            [part._data for part in _on_one_epoch(parts, unit)], unit
         ))
 
     @classmethod
@@ -1070,8 +1098,7 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         ``date - epoch - origin``, with the difference taken in integers."""
         epoch, unit = self.epoch, self.unit
         assert epoch is not None and unit is not None
-        offset = date - epoch.to_datetime64()
-        return offset / np.timedelta64(1, _UNIT_TO_NUMPY[unit]) - self._data.origin(channel)
+        return _offsets_in(date, epoch, unit) - self._data.origin(channel)
 
     def _check_date_in_domain(self, date, t, channel):
         """Raise naming ``date`` and the domain of channel ``channel`` as dates

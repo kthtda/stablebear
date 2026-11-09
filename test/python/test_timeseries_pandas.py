@@ -136,6 +136,17 @@ def test_from_pandas_with_index_of_dates_counts_from_the_first_date():
     assert series.values.array_equal(sb.FloatTensor([10.0, 20.0, 30.0]))
 
 
+def test_from_pandas_with_an_index_of_400_years_in_ns_equals_that_index_in_seconds():
+    # 400 years in nanoseconds exceed int64.
+    index = pd.DatetimeIndex(["1700-01-01", "1900-01-01", "2100-01-01"]).as_unit("ns")
+    observations = pd.Series([1700.0, 1900.0, 2100.0], index=index)
+
+    in_ns = TimeSeries.from_pandas(observations, unit="d")
+    in_seconds = TimeSeries.from_pandas(observations.set_axis(index.as_unit("s")), unit="d")
+
+    assert in_ns.times.array_equal(in_seconds.times)
+
+
 def test_from_pandas_with_index_of_durations_has_no_epoch():
     index = pd.to_timedelta([0, 500, 1500], unit="ms")
 

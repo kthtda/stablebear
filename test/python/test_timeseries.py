@@ -857,6 +857,25 @@ def test_series_at_an_array_of_dates_equals_the_series_at_their_times():
     assert values.array_equal(series(TimeDeltaTensor([[0.5, 2.0], [4.0, 1.5]], "h")))
 
 
+def test_series_at_ns_dates_over_292_years_after_its_epoch_equals_the_series_at_those_days():
+    # Each observation is its year; 300 years in nanoseconds exceed int64.
+    series = TimeSeries([1700.0, 1850.0, 2000.0],
+                        times=np.array(["1700-01-01", "1850-01-01", "2000-01-01"], dtype="datetime64[D]"))
+    days = np.array(["1850-01-01", "2000-01-01"], dtype="datetime64[D]")
+
+    assert series(days.astype("datetime64[ns]")).array_equal(series(days))
+
+
+def test_series_with_an_epoch_before_1678_at_ns_dates_equals_the_series_at_those_days():
+    # Each observation is its year. 1500 is before the range of
+    # datetime64[ns], and 2090 is 590 years after it.
+    series = TimeSeries([1500.0, 1800.0, 2100.0],
+                        times=np.array(["1500-01-01", "1800-01-01", "2100-01-01"], dtype="datetime64[D]"))
+    days = np.array(["1800-01-01", "2090-01-01"], dtype="datetime64[D]")
+
+    assert series(days.astype("datetime64[ns]")).array_equal(series(days))
+
+
 @pytest.mark.parametrize("dates", [
     pytest.param(["2023-01-01T00:30", "2023-01-01T02:00"], id="strings"),
     pytest.param([datetime.datetime(2023, 1, 1, 0, 30), datetime.datetime(2023, 1, 1, 2)], id="datetimes"),
@@ -1043,6 +1062,19 @@ def test_series_channels_of_different_epochs_count_from_the_earliest():
     assert series[1](TimeDelta(90.0, "min")) == -20.0
     values = series("2023-01-01T07:15")
     assert (float(values[0]), float(values[1])) == (20.0, -10.0)
+
+
+def test_series_channels_from_1659_in_seconds_and_in_ns_count_from_1659():
+    # 1659 is before the range of datetime64[ns].
+    a = TimeSeries([10.0, 20.0],
+                   times=np.array(["1659-01-01T00:00:00", "1659-01-01T00:00:10"], dtype="datetime64[s]"))
+    b = TimeSeries([-10.0, -20.0],
+                   times=np.array(["1990-01-01T00:00:00", "1990-01-01T00:00:10"], dtype="datetime64[ns]"))
+
+    series = TimeSeries.from_channels([a, b], unit="s")
+
+    assert series.epoch == DateTime("1659-01-01T00:00:00")
+    assert series[1](np.datetime64("1990-01-01T00:00:10", "s")) == -20.0
 
 
 def test_series_channels_at_epochs_of_different_resolutions_combine():
