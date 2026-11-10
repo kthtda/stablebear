@@ -43,11 +43,6 @@ class _Counts(Generic[_CountT]):
     _count: Any
     _unit: str
 
-    @property
-    def _family(self) -> type:
-        """The base class of the values this one compares with."""
-        raise NotImplementedError
-
     @classmethod
     def _of(cls, count, unit) -> Any:
         """A value of ``count`` of ``unit``."""
@@ -77,9 +72,7 @@ class _Counts(Generic[_CountT]):
     def __eq__(self, other: object) -> bool: ...
 
     def __eq__(self, other):  # pyright: ignore[reportIncompatibleMethodOverride]
-        if not isinstance(other, self._family):
-            return NotImplemented
-        return _as_boolean(np.equal(self._counts(), other._counts()) & (self._unit == other._unit))
+        return self._equal(other, operator.eq)
 
     @overload
     def __ne__(self, other: DateTimeTensor | TimeDeltaTensor) -> BoolTensor: ...
@@ -91,12 +84,30 @@ class _Counts(Generic[_CountT]):
     def __ne__(self, other: object) -> bool: ...
 
     def __ne__(self, other):  # pyright: ignore[reportIncompatibleMethodOverride]
-        if not isinstance(other, self._family):
-            return NotImplemented
-        return _as_boolean(np.not_equal(self._counts(), other._counts()) | (self._unit != other._unit))
+        return self._equal(other, operator.ne)
+
+    def _comparable(self, other) -> Any:
+        """``other`` as a value this one compares with, or ``None``."""
+        raise NotImplementedError
+
+    def _compare(self, other, compare) -> Any:
+        """``compare``, an operator such as ``operator.lt``, of this and
+        ``other`` as instants or lengths."""
+        raise NotImplementedError
+
+    def _equal(self, other, compare):
+        """``compare``, ``==`` or ``!=``, of instants or lengths. A value that
+        is not one, such as ``NaT``, is unequal instead of raising."""
+        try:
+            comparable = self._comparable(other)
+        except (TypeError, ValueError):
+            comparable = None
+        return NotImplemented if comparable is None else self._compare(comparable, compare)
 
     def __hash__(self):
-        return hash((self._count, self._unit))
+        # Equal instants or lengths hash the same: the exact length in
+        # attoseconds hashes as an int when whole.
+        return hash(Fraction(self._count) * _ATTOSECONDS[self._unit])
 
 
 class _CountsTensor(_Counts[_TensorCountT]):
@@ -125,7 +136,7 @@ class _CountsTensor(_Counts[_TensorCountT]):
 
     def array_equal(self, other) -> bool:
         """Whether ``other`` is of the same type, with the same shape,
-        counts, and unit."""
+        counts, and unit; 1 hour and 60 minutes differ, unlike for ``==``."""
         return (isinstance(other, type(self)) and self._unit == other._unit
                 and np.array_equal(np.asarray(self._count), np.asarray(other._count)))
 
@@ -134,9 +145,8 @@ class _Instants(_Counts[_CountT]):
     """The arithmetic that :class:`DateTime` and :class:`DateTimeTensor`
     share."""
 
-    @property
-    def _family(self):
-        return _Instants
+    def _comparable(self, other):
+        return other if isinstance(other, _Instants) else None
 
     @overload
     @classmethod
@@ -174,7 +184,8 @@ class _Instants(_Counts[_CountT]):
         return np.asarray(self._counts()).astype(f"datetime64[{_UNIT_TO_NUMPY[self._unit]}]")[()]
 
     def _compare(self, other, compare):
-        if not isinstance(other, _Instants):
+        other = self._comparable(other)
+        if other is None:
             return NotImplemented
         return _as_boolean(_exact_compare(self._counts(), self._unit, other._counts(), other._unit, compare))
 
@@ -279,10 +290,10 @@ class DateTime(_Instants[int]):
 
     Notes
     -----
-    Two values are equal when they have the same count of the same unit; the
-    same instant at another resolution is a different value. Compare
-    ``to_datetime64()`` values to compare instants. ``<``, ``<=``, ``>``,
-    and ``>=`` compare instants, exactly at any two resolutions.
+    ``==``, ``<``, and the other comparisons compare instants, exactly at
+    any two resolutions: ``DateTime("2023-01-01")`` equals
+    ``DateTime(datetime.datetime(2023, 1, 1))``, and the two hash the same.
+    Compare ``unit`` as well to tell them apart.
 
     Adding or subtracting a :class:`TimeDelta`, or a duration it accepts,
     gives a ``DateTime`` at the finer of the two resolutions; a duration with
@@ -350,8 +361,9 @@ class DateTimeTensor(_CountsTensor[IntTensor], _Instants[IntTensor]):
     Arithmetic and comparisons work elementwise, with a single date or
     duration broadcast against the tensor, as :class:`DateTime` does them.
     ``<``, ``<=``, ``>``, ``>=``, ``==``, and ``!=`` give a ``BoolTensor``,
-    as they do on tensors; ``==`` compares count and unit.
-    ``array_equal()`` tells whether two are equal as a whole.
+    as they do on tensors; ``==`` compares instants, as for a single date.
+    ``array_equal()`` tells whether two are equal as a whole, with the same
+    counts of the same unit.
     """
 
     def __init__(self, value):
@@ -381,9 +393,8 @@ class _Duration(_Counts[_CountT]):
     """The arithmetic that :class:`TimeDelta` and :class:`TimeDeltaTensor`
     share."""
 
-    @property
-    def _family(self):
-        return _Duration
+    def _comparable(self, other):
+        return _as_time_delta(other)
 
     @property
     def count(self) -> _CountT:
@@ -433,7 +444,7 @@ class _Duration(_Counts[_CountT]):
         return Fraction(self._count) * _ATTOSECONDS[self._unit]
 
     def _compare(self, other, compare):
-        other = _as_time_delta(other)
+        other = self._comparable(other)
         if other is None:
             return NotImplemented
         if not (self._array or other._array):
@@ -603,10 +614,11 @@ class TimeDelta(_Duration[int | float]):
 
     Notes
     -----
-    Two values are equal when they have the same count of the same unit; the
-    same length in another unit is a different value. Compare
-    ``to_timedelta64()`` values to compare lengths. ``<``, ``<=``, ``>``,
-    and ``>=`` compare lengths.
+    ``==``, ``<``, and the other comparisons compare lengths, exactly, with
+    another ``TimeDelta`` or a duration it accepts: ``TimeDelta(1, "h")``
+    equals ``TimeDelta(60, "min")`` and ``np.timedelta64(1, "h")``, and
+    equal durations hash the same. Compare ``unit`` as well to tell 1 hour
+    from 60 minutes.
 
     Adding or subtracting another duration, which may be any value
     ``TimeDelta`` accepts, gives a ``TimeDelta`` in the finer of the two
@@ -685,8 +697,9 @@ class TimeDeltaTensor(_CountsTensor[IntTensor | FloatTensor], _Duration[IntTenso
     Arithmetic and comparisons work elementwise, with a single duration
     broadcast against the tensor, as :class:`TimeDelta` does them. ``<``,
     ``<=``, ``>``, ``>=``, ``==``, and ``!=`` give a ``BoolTensor``, as they
-    do on tensors; ``==`` compares count and unit. ``array_equal()`` tells
-    whether two are equal as a whole. Integer counts that do not fit in
+    do on tensors; ``==`` compares lengths, as for a single duration.
+    ``array_equal()`` tells whether two are equal as a whole, with the same
+    counts of the same unit. Integer counts that do not fit in
     int64 in the finer unit of an operation raise ``OverflowError``.
     """
 

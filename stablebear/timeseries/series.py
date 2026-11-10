@@ -379,13 +379,15 @@ def _on_one_epoch(parts, unit):
     result: shifting by centuries in a fine unit, such as nanoseconds,
     would round its times."""
     epochs = [part.epoch for part in parts]
-    if None in epochs or len(set(epochs)) == 1:
+    # One instant at two resolutions is two epochs: the channels of a series
+    # share one.
+    stored = [None if epoch is None else (epoch.count, epoch.unit) for epoch in epochs]
+    if None in stored or len(set(stored)) == 1:
         return parts
-    # Compared in attoseconds, exactly; datetime64 values of two resolutions
-    # are compared at the finer one, where an early date overflows.
-    earliest = min(epochs, key=lambda epoch: epoch.count * _ATTOSECONDS[epoch.unit])
-    return [part if part.epoch == earliest else _shifted_to(part if unit is None else part.to(unit), earliest)
-            for part in parts]
+    earliest = min(epochs)
+    return [part if epoch == (earliest.count, earliest.unit)
+            else _shifted_to(part if unit is None else part.to(unit), earliest)
+            for part, epoch in zip(parts, stored)]
 
 
 def _shifted_to(part, epoch):

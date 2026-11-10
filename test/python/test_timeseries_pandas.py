@@ -294,6 +294,14 @@ def test_windows_of_a_pandas_timedelta_size_and_step_equal_those_of_their_time_d
                                            closed="left", partial=False, anchor="start"))
 
 
+def test_length_of_a_window_from_pandas_equals_its_size():
+    levels = pd.Series(np.arange(10.0), index=pd.date_range("2023-01-01", periods=10, freq="h", unit="ns"))
+    window = cut_windows(TimeSeries.from_pandas(levels), size=TimeDelta(2, "h"), step=TimeDelta(1, "h"),
+                         closed="left", partial=False, anchor="start")[0]
+
+    assert window.domain.end - window.domain.start == TimeDelta(2, "h")
+
+
 def test_embedding_delay_timedelta_equals_timedelta64():
     series = TimeSeries(np.array([1.0, 2.0, 3.0, 4.0]), TimeDeltaTensor([0.0, 1.0, 2.0, 3.0], "h"))
 

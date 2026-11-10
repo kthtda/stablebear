@@ -99,11 +99,26 @@ def test_date_time_converts_back_to_the_same_datetime64():
     assert result.dtype == value.dtype
 
 
-def test_date_times_are_equal_only_at_the_same_resolution():
-    # A string date and a date count days; a datetime counts microseconds.
-    assert DateTime("2023-01-01") == DateTime(datetime.date(2023, 1, 1))
+def test_date_times_at_one_instant_are_equal_at_any_resolution():
+    # A string date counts days; a datetime counts microseconds.
+    day = DateTime("2023-01-01")
+    microseconds = DateTime(datetime.datetime(2023, 1, 1))
+
+    assert day == microseconds
+    assert not day != microseconds
+    assert hash(day) == hash(microseconds)
     assert DateTime("2023-01-01") != DateTime("2023-01-02")
-    assert DateTime("2023-01-01") != DateTime(datetime.datetime(2023, 1, 1))
+
+
+def test_date_times_before_1678_and_in_ns_are_unequal():
+    # 1659 in nanoseconds, where NumPy would compare them, is out of int64.
+    assert DateTime("1659-01-01T00:00:00") != DateTime(np.datetime64("1990-01-01T00:00:00", "ns"))
+
+
+def test_dates_of_a_dated_series_start_at_its_epoch():
+    series = TimeSeries([10.0, 20.0], times=TimeDeltaTensor([0.0, 1.5], "h"), epoch="2023-01-01")
+
+    assert series.datetimes[0] == series.epoch
 
 
 def test_date_time_survives_pickling():
@@ -198,9 +213,26 @@ def test_time_delta_from_a_count_and_a_unit():
     assert time_delta == TimeDelta(np.timedelta64(3, "h"))
 
 
-def test_time_deltas_are_equal_only_at_the_same_resolution():
-    assert TimeDelta(1, "h") != TimeDelta(60, "min")
-    assert TimeDelta(1, "h").to_timedelta64() == TimeDelta(60, "min").to_timedelta64()
+def test_time_deltas_of_one_length_are_equal_in_any_unit():
+    assert TimeDelta(1, "h") == TimeDelta(60, "min")
+    assert not TimeDelta(1, "h") != TimeDelta(60, "min")
+    assert hash(TimeDelta(1, "h")) == hash(TimeDelta(60, "min"))
+    assert TimeDelta(1.5, "h") == TimeDelta(90, "min")
+    assert hash(TimeDelta(1.5, "h")) == hash(TimeDelta(90, "min"))
+    assert TimeDelta(1, "h") != TimeDelta(61, "min")
+
+
+def test_time_delta_equals_the_timedelta64_of_its_length():
+    assert TimeDelta(1, "h") == np.timedelta64(1, "h")
+    assert TimeDelta(1, "h") == np.timedelta64(60, "m")
+    assert TimeDelta(1, "h") == datetime.timedelta(hours=1)
+
+
+def test_time_delta_is_unequal_to_nat_and_to_other_values():
+    assert TimeDelta(1, "h") != np.timedelta64("NaT")
+    assert not TimeDelta(1, "h") == np.timedelta64("NaT")
+    assert TimeDelta(1, "h") != 1
+    assert DateTime("2023-01-01") != "2023-01-01"
 
 
 def test_time_delta_survives_pickling():
@@ -391,12 +423,25 @@ def test_time_delta_tensor_compares_each_length():
     assert shorter.array_equal(sb.BoolTensor([True, False]))
 
 
-def test_time_delta_tensors_are_equal_only_at_the_same_resolution():
+def test_time_delta_tensors_compare_each_length_for_equality():
     minutes = TimeDeltaTensor([30, 90], "min")
 
-    assert (minutes == TimeDeltaTensor([30, 90], "min")).array_equal(sb.BoolTensor([True, True]))
-    assert (minutes == TimeDeltaTensor([0.5, 1.5], "h")).array_equal(sb.BoolTensor([False, False]))
-    assert (minutes != TimeDeltaTensor([0.5, 1.5], "h")).array_equal(sb.BoolTensor([True, True]))
+    assert (minutes == TimeDeltaTensor([0.5, 2.0], "h")).array_equal(sb.BoolTensor([True, False]))
+    assert (minutes != TimeDeltaTensor([0.5, 2.0], "h")).array_equal(sb.BoolTensor([False, True]))
+    assert (minutes == TimeDelta(90, "min")).array_equal(sb.BoolTensor([False, True]))
+
+
+def test_array_equal_tells_lengths_in_different_units_apart():
+    assert not TimeDeltaTensor([1], "h").array_equal(TimeDeltaTensor([60], "min"))
+    assert TimeDeltaTensor([1], "h").array_equal(TimeDeltaTensor([1], "h"))
+
+
+def test_date_time_tensors_compare_each_instant_for_equality():
+    days = DateTimeTensor(np.array(["2023-01-01", "2023-01-02"], dtype="datetime64[D]"))
+    seconds = DateTimeTensor(np.array(["2023-01-01T00:00:00", "2023-01-02T00:00:01"], dtype="datetime64[s]"))
+
+    assert (days == seconds).array_equal(sb.BoolTensor([True, False]))
+    assert not days.array_equal(seconds)
 
 
 def test_date_time_plus_time_delta_tensor_gives_each_instant():

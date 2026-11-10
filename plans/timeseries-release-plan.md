@@ -1,6 +1,6 @@
 # Time series general release: checklist
 
-Progress: 7 of 30 items, 13 of 47 points (28%)
+Progress: 8 of 30 items, 14 of 47 points (30%)
 
 From the release review of `issue-258-pandas` on 2026-11-08, in which each
 problem below was reproduced twice. The items correct behavior that the
@@ -104,7 +104,7 @@ Decisions for the maintainer: F2 (iterating a series).
     `TimeDeltaTensor([350 * 365], "d") + TimeDelta(1, "ns")`; a date in 1659
     in s against one in 1990 in ns.
 - [ ] **B4.** Equality of durations and dates.
-  - [ ] **B4a.** [1] Decide how `==` and `hash` compare `TimeDelta`,
+  - [x] **B4a.** [1] (4855df0b9) Decide how `==` and `hash` compare `TimeDelta`,
     `DateTime`, and their tensors, and record it in the durations spec
     (lines 49 and 97). Recommended: by value, as `<` already does and as
     numpy, pandas, and `datetime` do, with `array_equal` comparing count and
@@ -121,6 +121,8 @@ Decisions for the maintainer: F2 (iterating a series).
     dated series equals its epoch; the length of a window from pandas
     equals `TimeDelta(2, "h")`; `array_equal` still tells 1 h from 60 min;
     the asserts at `test_timeseries.py:101`, `:197`, and `:375` change.
+    Note: `from_channels` still tells one instant at two resolutions apart,
+    since the channels of a series share one stored epoch.
 
 ## Phase C: dates and pandas at the edges
 

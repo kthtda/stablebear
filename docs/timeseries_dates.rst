@@ -39,11 +39,11 @@ a string such as ``"2023-01-01T06:00"``, a ``np.datetime64``, or a
 ``datetime.datetime`` or ``datetime.date``. A ``datetime`` with a timezone
 is converted to UTC and its timezone dropped. An epoch keeps the resolution
 of its value: a date string counts days and a ``datetime`` counts
-microseconds. Two epochs are equal only at the same resolution::
+microseconds. Dates compare as instants, at any two resolutions::
 
-   DateTime("2023-01-01") == DateTime(datetime.datetime(2023, 1, 1))  # False
+   DateTime("2023-01-01") == DateTime(datetime.datetime(2023, 1, 1))  # True
 
-Compare their ``to_datetime64()`` values to compare instants. Dates follow
+Compare their ``unit`` as well to tell the two apart. Dates follow
 the Gregorian calendar and every day has 86400 seconds: leap seconds are not
 counted. Resolutions of weeks, months, and years are rejected, since months
 and years have no fixed length.
