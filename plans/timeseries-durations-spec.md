@@ -46,8 +46,11 @@ as a time series stores its times.
   `value` is a number of `unit`, as in `TimeDelta(1.5, "h")`; a float that
   is a whole number becomes an integer.
 - It has `count`, `unit`, `to_timedelta64(resolution=None)`, `==`, `hash`,
-  `repr`, and pickling, as `DateTime` does. Equality compares count and
-  unit; compare `to_timedelta64()` values to compare lengths.
+  `repr`, and pickling, as `DateTime` does. Equality compares lengths, as
+  `<` does and as NumPy, pandas, and `datetime` do: `TimeDelta(1, "h")`
+  equals `TimeDelta(60, "min")` and `np.timedelta64(1, "h")`, and equal
+  durations hash the same. A `DateTime` equals another at the same
+  instant, at any resolution.
   `to_timedelta64` rounds to `resolution`, which defaults to the unit for
   an integer count and to the finer of the unit and microseconds for a
   float.
@@ -99,8 +102,9 @@ keeps its counts as one tensor in one unit.
     `to_timedelta64` and `to_datetime64` give `timedelta64` and
     `datetime64` arrays;
   - `<`, `<=`, `>`, `>=`, `==`, and `!=` give a `BoolTensor`, as tensors
-    do; `==` compares count and unit, as for a scalar. `array_equal` tells
-    whether two are equal as a whole;
+    do; `==` compares lengths or instants, as for a scalar. `array_equal`
+    tells whether two are equal as a whole, comparing counts and unit, so
+    that it tells 1 h from 60 min;
   - they have `repr` and pickling but no hash.
 - Arithmetic is that of the scalars, elementwise, with a scalar broadcast
   against a tensor, in the finer unit by exact factors. The result is a

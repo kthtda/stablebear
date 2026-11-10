@@ -1,6 +1,6 @@
 # Time series general release: checklist
 
-Progress: 6 of 30 items, 11 of 47 points (23%)
+Progress: 7 of 30 items, 13 of 47 points (28%)
 
 From the release review of `issue-258-pandas` on 2026-11-08, in which each
 problem below was reproduced twice. The items correct behavior that the
@@ -13,7 +13,7 @@ lands on this branch before CI runs on it and its PR opens, in phase H.
 0.6.0 follows the 0.6.0 betas directly, with no further pre-release. Files
 saved by the betas need not load.
 
-Decisions for the maintainer: B4a (equality) and F2 (iterating a series).
+Decisions for the maintainer: F2 (iterating a series).
 
 ## Phase A: the docs and tests pass with Sphinx 9 and pandas 3
 
@@ -70,7 +70,7 @@ Decisions for the maintainer: B4a (equality) and F2 (iterating a series).
   Tests: every such embedding saves, loads, and pickles after `.to("min")`
   and `.to("d")`; `from_channels` of the windows of two series with
   different epochs saves and loads, with both anchors.
-- [ ] **B3.** Dates are counted from an epoch exactly, without int64
+- [x] **B3.** Dates are counted from an epoch exactly, without int64
   overflow at fine resolutions.
   - [x] **B3a.** [3] (04679edb3) Python: one helper computes `date - epoch` in the
     series unit exactly, in Python integers or in whole coarse units plus a
@@ -95,7 +95,7 @@ Decisions for the maintainer: B4a (equality) and F2 (iterating a series).
     a unit with multiplier 0 throws instead of dividing by it.
     Tests: a tensor of a series with an epoch in 1659 called at ns dates;
     one series and a tensor of it agree in unit `"as"`.
-  - [ ] **B3c.** [2] Arithmetic of `DateTime`, `DateTimeTensor`, and
+  - [x] **B3c.** [2] (42914e946) Arithmetic of `DateTime`, `DateTimeTensor`, and
     `TimeDeltaTensor` across resolutions raises `OverflowError` when a
     result leaves int64, instead of wrapping, and their comparisons are
     exact, splitting the finer count into whole units of the coarser and
@@ -109,6 +109,7 @@ Decisions for the maintainer: B4a (equality) and F2 (iterating a series).
     (lines 49 and 97). Recommended: by value, as `<` already does and as
     numpy, pandas, and `datetime` do, with `array_equal` comparing count and
     unit. A change after the release would silently flip results.
+    Decided: by value, as recommended.
     Today: `TimeDelta(1, "h") == TimeDelta(60, "min")` is false while `<=`
     and `>=` are true, `series.datetimes[0] == series.epoch` is false, and
     an epoch from pandas equals a `DateTime` in one pandas version but not
