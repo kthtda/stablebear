@@ -7,9 +7,10 @@
 # /sys/class/drm. A session also mounts the GPUs' sysfs and /proc entries,
 # in user namespaces that the job allows first. The session takes the GPU
 # model and count from VGPU_GPU and VGPU_DEVICE_COUNT, which the action
-# sets, and exits with the command's status.
+# sets, and exits with the command's status. They are passed as --gpu and
+# --count, since `vgpu shell -y` otherwise starts its default of one H100.
 #
 # Usage:
 #   bash .github/scripts/vgpu-shell.sh <command> [args...]
 set -euo pipefail
-exec vgpu shell -y -c "$(printf '%q ' "$@")"
+exec vgpu shell -y --gpu "$VGPU_GPU" --count "$VGPU_DEVICE_COUNT" -c "$(printf '%q ' "$@")"
