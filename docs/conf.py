@@ -7,6 +7,7 @@
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
+import os
 from datetime import datetime
 
 try:
@@ -180,6 +181,10 @@ html_theme_options = {
 html_static_path = ["_static"]
 html_css_files = ["lightbox.css", "diagrams.css", "glossary.css", "notebooks.css"]
 html_js_files = ["lightbox.js"]
+# On Read the Docs, its server-side search replaces the theme's search in
+# the browser, so that searches show in its search analytics.
+if os.environ.get("READTHEDOCS") == "True":
+    html_js_files.append(("readthedocs.js", {"defer": "defer"}))
 
 # --- Create a temporary bundle of 'stablebear' with a stub C++ backend from the Python source in ../stablebear. This is only for documentation purposes (so that we don't have to keep reinstalling, including recompiling, stablebear everytime we want to update the docs). The setup has been tested on Linux and should probably work on OSX. It is unclear if it'll work on Windows.
 
