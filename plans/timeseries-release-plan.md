@@ -1,6 +1,6 @@
 # Time series general release: checklist
 
-Progress: 19 of 32 items, 39 of 53 points (74%)
+Progress: 20 of 32 items, 40 of 53 points (75%)
 
 From the release review of `issue-258-pandas` on 2026-11-08, in which each
 problem below was reproduced twice. The items correct behavior that the
@@ -255,7 +255,7 @@ Decisions for the maintainer: F2 (iterating a series).
   dated series take about 4 s per million observations, all in Python.
   Tests: random integer and float counts, including values near ties, give
   the results of the scalar `TimeDelta` path.
-- [ ] **E2.** [1] `TimeSeries.__call__` and `to_point_clouds` check for a
+- [x] **E2.** [1] (88ec13997) `TimeSeries.__call__` and `to_point_clouds` check for a
   `DateTimeTensor` before converting the query with `np.asarray`
   (`series.py:159-171`, `:1020`, `:1151-1166`), and an empty
   `DateTimeTensor` counts as dates.
