@@ -1189,10 +1189,12 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         first = np.asarray(date).reshape(-1)[np.argmin(inside.reshape(-1))]
         origin = self._data.origin(channel)
         ends = (self.epoch.to_datetime64()
-                + TimeDeltaTensor(FloatTensor([start + origin, end + origin]), self.unit).to_timedelta64("us"))
+                + TimeDeltaTensor(FloatTensor([start + origin, end + origin]), self.unit).to_timedelta64())
         # Formatted at one precision, the coarsest that shows all three.
-        dates = np.array([first, *ends], dtype=ends.dtype)
-        precision = next(code for code in ("m", "s", "ms", "us") if (dates == dates.astype(f"datetime64[{code}]")).all())
+        dates = np.array([first, *ends])
+        finest = np.datetime_data(dates.dtype)[0]
+        precision = next(code for code in ("m", "s", "ms", "us", "ns", "ps", "fs", "as")
+                         if code == finest or (dates == dates.astype(f"datetime64[{code}]")).all())
         first, start, end = np.datetime_as_string(dates, unit=precision)  # pyright: ignore[reportCallIssue, reportArgumentType]
         domain = ("[" if start_closed else "(") + f"{start}, {end}" + ("]" if end_closed else ")")
         raise ValueError(f"{first} is outside the domain {domain}")

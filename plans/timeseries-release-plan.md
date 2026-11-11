@@ -1,6 +1,6 @@
 # Time series general release: checklist
 
-Progress: 8 of 30 items, 14 of 47 points (30%)
+Progress: 9 of 30 items, 17 of 47 points (36%)
 
 From the release review of `issue-258-pandas` on 2026-11-08, in which each
 problem below was reproduced twice. The items correct behavior that the
@@ -103,7 +103,7 @@ Decisions for the maintainer: F2 (iterating a series).
     Tests: the start of a domain in 1659 plus `pd.Timedelta(days=10)`;
     `TimeDeltaTensor([350 * 365], "d") + TimeDelta(1, "ns")`; a date in 1659
     in s against one in 1990 in ns.
-- [ ] **B4.** Equality of durations and dates.
+- [x] **B4.** Equality of durations and dates.
   - [x] **B4a.** [1] (4855df0b9) Decide how `==` and `hash` compare `TimeDelta`,
     `DateTime`, and their tensors, and record it in the durations spec
     (lines 49 and 97). Recommended: by value, as `<` already does and as
@@ -114,7 +114,7 @@ Decisions for the maintainer: F2 (iterating a series).
     and `>=` are true, `series.datetimes[0] == series.epoch` is false, and
     an epoch from pandas equals a `DateTime` in one pandas version but not
     the other.
-  - [ ] **B4b.** [3] Implement B4a. Update `docs/timeseries_dates.rst:42-46`
+  - [x] **B4b.** [3] (7cf00b07a) Implement B4a. Update `docs/timeseries_dates.rst:42-46`
     and the notes of the four classes.
     Tests: 1 h equals 60 min and hashes the same;
     `TimeDelta(1, "h") == np.timedelta64(1, "h")`; `datetimes[0]` of a
@@ -132,7 +132,13 @@ Decisions for the maintainer: F2 (iterating a series).
   the dates, instead of letting `StopIteration` escape, which silently ends
   `map()`.
   Tests: such a `Timestamp` on an ns series, called and through
-  `to_point_clouds`; `list(map(series, dates))` raises.
+  `to_point_clouds`; `list(map(series, dates))` raises; an end 700 ns
+  into a microsecond shows as such.
+  Note: the ends of the domain were rounded to microseconds, so an ns
+  series could report a date as outside a domain that, as printed,
+  contained it; they now keep the resolution of the series.
+  Note: `to_point_clouds` reads a list of `Timestamp` in microseconds,
+  dropping finer digits; C5 covers the forms dates come in.
 - [ ] **C2.** [3] A date at a closed end of the domain is in the domain
   despite rounding: placing a date snaps it to a closed end within the
   channel's snap tolerance, in `_check_date_in_domain` and `_evaluate_date`

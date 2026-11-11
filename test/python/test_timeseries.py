@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 
 import stablebear as sb
-from stablebear.timeseries import DateTime, DateTimeTensor, Domain, TimeDelta, TimeDeltaTensor, TimeSeries, cut_windows, delay_embed
+from stablebear.timeseries import DateTime, DateTimeTensor, Domain, TimeDelta, TimeDeltaTensor, TimeSeries, cut_windows, delay_embed, to_point_clouds
 from stablebear.timeseries.series import TimeSeriesTensor
 
 from _element_values import TWO_ELEMENTS_OF_EVERY_DTYPE
@@ -1056,6 +1056,43 @@ def test_series_at_a_date_with_a_timezone_is_at_its_utc_instant():
 def test_series_at_a_date_outside_its_domain_names_the_dates():
     with pytest.raises(ValueError, match=re.escape("2023-01-01T05:00 is outside the domain [2023-01-01T00:00, 2023-01-01T04:00]")):
         _dated_series()(np.array(["2023-01-01T01:00", "2023-01-01T05:00"], dtype="datetime64[m]"))
+
+
+def _nanosecond_series():
+    times = np.array(["2023-01-01T00:00", "2023-01-01T01:00", "2023-01-01T02:00"], dtype="datetime64[ns]")
+    return TimeSeries([10.0, 20.0, 30.0], times=DateTimeTensor(times))
+
+
+# A nanosecond after 05:00, which no precision down to microseconds shows.
+_NANOSECOND_DATE = np.datetime64("2023-01-01T05:00:00.000000001", "ns")
+
+
+def test_series_at_a_date_outside_its_domain_in_nanoseconds_names_the_dates():
+    with pytest.raises(ValueError, match=re.escape("2023-01-01T05:00:00.000000001 is outside the domain "
+                                                   "[2023-01-01T00:00:00.000000000, 2023-01-01T02:00:00.000000000]")):
+        _nanosecond_series()(_NANOSECOND_DATE)
+
+
+def test_series_at_a_date_just_after_an_end_between_microseconds_names_the_end():
+    # The domain ends 700 ns into the first microsecond.
+    times = np.array(["2023-01-01T00:00:00.000000000", "2023-01-01T00:00:00.000000700"], dtype="datetime64[ns]")
+    series = TimeSeries([10.0, 20.0], times=DateTimeTensor(times))
+
+    with pytest.raises(ValueError, match=re.escape("2023-01-01T00:00:00.000000701 is outside the domain "
+                                                   "[2023-01-01T00:00:00.000000000, 2023-01-01T00:00:00.000000700]")):
+        series(np.datetime64("2023-01-01T00:00:00.000000701", "ns"))
+
+
+def test_point_clouds_at_a_date_outside_the_domain_in_nanoseconds_name_the_dates():
+    with pytest.raises(ValueError, match=re.escape("2023-01-01T05:00:00.000000001 is outside the domain "
+                                                   "[2023-01-01T00:00:00.000000000, 2023-01-01T02:00:00.000000000]")):
+        to_point_clouds(_nanosecond_series(), np.array([_NANOSECOND_DATE]))
+
+
+def test_mapping_a_series_over_a_date_outside_its_domain_raises():
+    # A StopIteration from the call would end map() early instead.
+    with pytest.raises(ValueError, match="outside the domain"):
+        list(map(_nanosecond_series(), [_NANOSECOND_DATE]))
 
 
 def test_window_at_a_date_outside_it_names_its_dates():
