@@ -144,9 +144,12 @@ def _point_times(times, n, step, series):
     if sum(x is not None for x in (times, n, step)) > 1:
         raise ValueError("Pass at most one of times, n, and step")
     if times is not None:
-        numbers, unit = _queries(times)
+        # A DateTimeTensor is read as dates before _queries, which would
+        # convert it one element at a time.
         if isinstance(times, DateTimeTensor):
-            numbers = times.to_datetime64()
+            numbers, unit = times.to_datetime64(), None
+        else:
+            numbers, unit = _queries(times)
         if isinstance(numbers, np.ndarray) and numbers.dtype.kind in "MOUS":
             if series is None:
                 dates = _checked_dates(_as_dates(numbers))

@@ -79,6 +79,21 @@ def test_dates_place_points_at_their_durations_from_the_epoch():
     assert _points(by_date) == _points(by_duration)
 
 
+def test_dates_as_a_date_time_tensor_give_the_points_of_their_datetime64_array():
+    series = _series().with_epoch("2023-01-01")
+    dates = DateTimeTensor(["2023-01-01T00:00:02", "2023-01-01T00:00:01"])
+
+    assert _points(to_point_clouds(series, dates)) == _points(to_point_clouds(series, dates.to_datetime64()))
+
+
+def test_an_empty_date_time_tensor_gives_a_cloud_without_points():
+    series = _series().with_epoch("2023-01-01")
+
+    cloud = to_point_clouds(series, DateTimeTensor(np.array([], dtype="datetime64[s]")))
+
+    assert _points(cloud) == []
+
+
 def test_dates_give_every_series_of_a_tensor_a_cloud_at_those_instants():
     early = _series().with_epoch("2023-01-01T00:00:00")
     late = _series().with_epoch("2023-01-01T00:00:01")

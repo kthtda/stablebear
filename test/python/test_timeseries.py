@@ -1072,6 +1072,14 @@ def test_series_at_a_date_time_tensor_equals_the_series_at_its_datetime64_array(
     assert values.array_equal(series(dates.to_datetime64()))
 
 
+def test_series_at_an_empty_date_time_tensor_gives_no_values():
+    series = _dated_series()
+
+    values = series(DateTimeTensor(np.array([], dtype="datetime64[m]")))
+
+    assert values.shape == (0,)
+
+
 def test_series_of_several_channels_at_a_date_gives_each_channel():
     a = TimeSeries([10.0, 20.0], times=TimeDeltaTensor([0.0, 1.0], "h"), epoch="2023-01-01")
     b = TimeSeries([-10.0, -20.0, -30.0], times=TimeDeltaTensor([0.0, 30.0, 60.0], "min"), epoch="2023-01-01")

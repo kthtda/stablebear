@@ -275,7 +275,9 @@ def _numbers(t):
     ``None``."""
     if isinstance(t, (FloatTensor, IntTensor)):
         return FloatTensor(np.asarray(t, dtype=np.float64))
-    if isinstance(t, (bool, np.bool_, Tensor, str)) or _as_time_delta(t) is not None:
+    # A DateTimeTensor is checked before np.asarray, which would convert it
+    # one element at a time, and read an empty one as numbers.
+    if isinstance(t, (bool, np.bool_, Tensor, str, DateTimeTensor)) or _as_time_delta(t) is not None:
         return None
     if isinstance(t, (int, float, np.integer, np.floating)):
         return float(t)
