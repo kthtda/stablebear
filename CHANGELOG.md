@@ -1,4 +1,4 @@
-## Unreleased
+## 0.6.0
 
 ### Breaking changes
 
@@ -8,21 +8,23 @@
 
 ### New features
 
-* **`allclose` accepts more types** — `allclose` compares `IntTensor` and `BoolTensor`, tensors of different dtypes, and matrices of different precisions, and accepts an array or list as one input when the other is a tensor. ([#100](https://github.com/kthtda/stablebear/issues/100))
-* **`Barcode` accepts lists and integer arrays** — `persistence.Barcode` builds a `barcode64` from any real-valued (n, 2) input, such as a nested list or an integer array, and an empty barcode from `[]`. A `float32` array still gives a `barcode32`. Other input raises `TypeError`; previously it raised `AttributeError`. ([#183](https://github.com/kthtda/stablebear/issues/183))
-* **Time series** — `timeseries.TimeSeries` holds observations of any element type, such as numbers, vectors, point clouds, or barcodes, at explicit timestamps. A series is called at a time, as a PCF is, and gives the observation in effect then. Timestamps are durations, `timeseries.TimeDelta` and `TimeDeltaTensor`, stored in one time unit from attoseconds to days, or dates and times, `timeseries.DateTime` and `DateTimeTensor`, counted from an epoch ([#263](https://github.com/kthtda/stablebear/issues/263)); plain numbers give a series without a unit ([#264](https://github.com/kthtda/stablebear/issues/264)). Query times, window sizes, and delays are durations or dates for a series with a unit, and numbers for one without. Several channels with their own timestamps combine with `TimeSeries.from_channels`. Queries that miss a timestamp by a rounding error snap to it by tolerant comparison, as in APL. `timeseries.delay_embed` and `timeseries.cut_windows` build delay embeddings and windows ([#265](https://github.com/kthtda/stablebear/issues/265)). `timeseries.to_point_clouds` turns a series of numbers or vectors, or each of its windows, into point clouds for persistent homology, with a point at every observation, at evenly spaced times, or at given times; `sb.stack` and `sb.concatenate` first combine the channels of a series into one, and `TimeSeries.restrict` restricts a series to part of its domain ([#267](https://github.com/kthtda/stablebear/issues/267)). `sb.tensor` makes a tensor of separate series from a list of them, and `sb.zeros` with `dtype=sb.ts(value_type)` one of empty series; series with different epochs in one tensor are evaluated at the same dates. Persistent homology and barcode summaries such as stable rank apply to each observation of a series. `plotting.plot_timeseries` draws series and their windows, at dates for a series with an epoch. Series and tensors of series support saving, loading, and pickling. ([#242](https://github.com/kthtda/stablebear/issues/242), [#257](https://github.com/kthtda/stablebear/pull/257))
-* **Time series from pandas** — `TimeSeries.from_pandas` builds a time series from a pandas `Series`, or from a `DataFrame` with one channel per column, and `TimeSeries.to_pandas` converts a time series back. `cut_windows`, `delay_embed`, and `to_point_clouds` apply to pandas objects directly. Dates and durations accept pandas values such as `Timestamp`, `Timedelta`, and `DatetimeIndex` at their own resolution, and dates with a time zone are converted to UTC. pandas is optional. ([#258](https://github.com/kthtda/stablebear/issues/258))
-* **Nested tensors of any element type** — `NestedTensor` leaves can be boolean, PCF, point-cloud, distance-matrix, symmetric-matrix, barcode, and time series tensors, not only numeric ones, and nested tensors of them can be saved, loaded, and pickled. ([#255](https://github.com/kthtda/stablebear/pull/255))
-* **`system.get_cpu_limit`** — Returns the number of CPU threads available for computations, as set by `system.limit_cpus`. ([#255](https://github.com/kthtda/stablebear/pull/255))
-* **`array_equal` accepts lists** — `array_equal` on a numeric tensor compares against nested lists as well as NumPy arrays. ([#254](https://github.com/kthtda/stablebear/pull/254))
-* **Fewer false warnings in editors** — Editors flag far less correct code that uses stablebear as an error, and autocompletion knows more precisely what each function returns.
+* **Time series** — `timeseries.TimeSeries` holds observations of any element type at timestamps given as numbers, durations, or dates. `cut_windows`, `delay_embed`, and `to_point_clouds` prepare series for persistent homology, and `plotting.plot_timeseries` draws them. ([#242](https://github.com/kthtda/stablebear/issues/242), [#256](https://github.com/kthtda/stablebear/issues/256), [#263](https://github.com/kthtda/stablebear/issues/263)–[#267](https://github.com/kthtda/stablebear/issues/267))
+* **pandas** — `TimeSeries.from_pandas` and `to_pandas` convert to and from a pandas `Series` or `DataFrame`. pandas is optional. ([#258](https://github.com/kthtda/stablebear/issues/258))
+* **Nested tensors of any element type** — `NestedTensor` leaves can be any tensor type. ([#255](https://github.com/kthtda/stablebear/pull/255))
+* **More inputs to `allclose`, `array_equal`, and `Barcode`** — `allclose` compares integer, boolean, and mixed-precision tensors; `array_equal` and `Barcode` accept lists. ([#100](https://github.com/kthtda/stablebear/issues/100), [#183](https://github.com/kthtda/stablebear/issues/183), [#254](https://github.com/kthtda/stablebear/pull/254))
+* **`system.get_cpu_limit`** — Returns the limit set by `limit_cpus`. ([#255](https://github.com/kthtda/stablebear/pull/255))
+* **Better editor support** — Fewer false type errors and more precise return types.
 
 ### Bug fixes
 
-* **Errors in parallel work are raised** — An exception thrown while processing one element in parallel, such as a failed allocation in `point_process.sample_poisson`, now reaches Python. Previously the element was silently left at its default value. ([#34](https://github.com/kthtda/stablebear/issues/34))
-* **Generators fill 0-d shapes** — `random.noisy_sin`, `random.noisy_cos`, and `point_process.sample_poisson` called with the shape `()` now generate its one element. Previously they returned it unfilled, as zeros. ([#35](https://github.com/kthtda/stablebear/issues/35))
-* **Evaluating at no times** — Evaluating a PCF tensor at an empty time array returns an empty result of shape `X.shape + (0,)`. Previously it crashed the interpreter. ([#192](https://github.com/kthtda/stablebear/issues/192))
-* **`allclose` and infinities** — Equal infinities are close and opposite infinities are not. Previously `allclose(x, x)` was `False` when `x` held an infinity, and `inf` was close to `-inf`. NaN in a `DistanceMatrix` or `SymmetricMatrix` is no longer close to itself. ([#51](https://github.com/kthtda/stablebear/issues/51))
+* **Improved error handling in parallel and CUDA work** — Errors raised during parallel or GPU computations now reach Python. ([#34](https://github.com/kthtda/stablebear/issues/34), [#188](https://github.com/kthtda/stablebear/issues/188))
+* **Generators fill 0-d shapes** instead of returning zeros. ([#35](https://github.com/kthtda/stablebear/issues/35))
+* **Evaluating at no times** returns an empty result instead of crashing. ([#192](https://github.com/kthtda/stablebear/issues/192))
+* **`allclose` handles infinities** correctly. ([#51](https://github.com/kthtda/stablebear/issues/51))
+* **Correct distance matrices on several GPUs**, which a data race could corrupt. ([#189](https://github.com/kthtda/stablebear/issues/189))
+* **No usable GPU falls back to the CPU** instead of crashing. ([#187](https://github.com/kthtda/stablebear/issues/187))
+* **Ctrl-C stops GPU computations.** ([#195](https://github.com/kthtda/stablebear/issues/195))
+* **`limit_gpus(0)` raises `ValueError`**, pointing to `force_cpu`.
 
 ## 0.5.1
 
