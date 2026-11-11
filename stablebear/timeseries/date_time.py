@@ -433,9 +433,19 @@ class _Duration(_Counts[_CountT]):
         if resolution not in _ATTOSECONDS:
             raise ValueError(f"Unknown resolution {resolution!r}; expected one of {', '.join(_ATTOSECONDS)}")
         if self._array:
-            # Each count rounded exactly, as a single count is.
-            steps = [TimeDelta(count, self._unit).to_timedelta64(resolution) for count in np.asarray(self._count).flat]
-            return np.array(steps, dtype=f"timedelta64[{_UNIT_TO_NUMPY[resolution]}]").reshape(np.shape(self._counts()))
+            counts = self._counts()
+            factor = Fraction(_ATTOSECONDS[self._unit], _ATTOSECONDS[resolution])
+            if self._integral:
+                steps, exact = _integer_steps(counts.astype(np.int64), factor)
+            else:
+                steps, exact = _float_steps(counts.astype(np.float64), factor)
+            # The few counts that the rounding above cannot take exactly, such
+            # as ones that do not fit in int64, round as a single count does,
+            # which raises for those that do not fit.
+            flat_counts, flat_steps = counts.reshape(-1), steps.reshape(-1)
+            for i in np.flatnonzero(~exact):
+                flat_steps[i] = TimeDelta(flat_counts[i].item(), self._unit).to_timedelta64(resolution).astype(np.int64)
+            return steps.astype(f"timedelta64[{_UNIT_TO_NUMPY[resolution]}]")
         steps = round(self._length() / _ATTOSECONDS[resolution])
         return np.timedelta64(steps, _UNIT_TO_NUMPY[resolution])
 
@@ -781,6 +791,107 @@ def _counts_in(counts, unit, finer):
                             "the finer resolution of the operation")
     # A factor beyond int64 leaves only counts of 0.
     return counts * factor if most else np.zeros_like(counts)
+
+
+def _divide_half_even(numerators, denominators):
+    """``numerators / denominators``, int64 arrays with positive
+    denominators, rounded to the nearest integer, and at ties to the even
+    one."""
+    quotients, remainders = np.divmod(numerators, denominators)
+    # The remainder is in [0, denominator), so the quotient rounds up when
+    # the remainder is more than what is left of the denominator.
+    left = denominators - remainders
+    return quotients + ((remainders > left) | ((remainders == left) & (quotients % 2 == 1)))
+
+
+def _integer_steps(counts, factor):
+    """``counts``, an int64 array, times ``factor``, rounded to the nearest
+    integer and at ties to the even one, and a mask of the counts whose
+    step is exact. ``factor`` is the ratio of two time units, and so a whole
+    number or the inverse of one."""
+    if factor.denominator == 1:
+        most = _INT64.max // factor.numerator
+        exact = (counts >= -most) & (counts <= most)
+        # A factor beyond int64 leaves only counts of 0.
+        return (np.where(exact, counts, 0) * factor.numerator if most else np.zeros_like(counts)), exact
+    divisor = factor.denominator
+    if divisor > _INT64.max:
+        # Each count of less than half the divisor rounds to 0.
+        most = min((divisor - 1) // 2, int(_INT64.max))
+        return np.zeros_like(counts), (counts >= -most) & (counts <= most)
+    return _divide_half_even(counts, np.int64(divisor)), np.ones(counts.shape, dtype=bool)
+
+
+def _split(a):
+    """``a`` as the sum of its high 26 bits and the rest (Veltkamp)."""
+    scaled = 134217729.0 * a  # 2**27 + 1
+    high = scaled - (scaled - a)
+    return high, a - high
+
+
+def _two_product(a, b):
+    """The product ``a * b`` rounded, and its rounding error, so that the two
+    sum to the product exactly (Dekker)."""
+    product = a * b
+    a_high, a_low = _split(a)
+    b_high, b_low = _split(np.float64(b))
+    error = ((a_high * b_high - product) + a_high * b_low + a_low * b_high) + a_low * b_low
+    return product, error
+
+
+def _float_steps(counts, factor):
+    """``counts``, a float64 array, times ``factor``, rounded to the nearest
+    integer and at ties to the even one, and a mask of the counts whose
+    step is exact. ``factor`` is the ratio of two time units, and so a whole
+    number or the inverse of one. ``np.rint(counts * factor)`` is not exact,
+    since the product rounds before ``rint`` does."""
+    finite = np.isfinite(counts)
+    counts = np.where(finite, counts, 0.0)
+    with np.errstate(over="ignore", invalid="ignore"):
+        if factor.denominator == 1:
+            steps, exact = _multiplied_float_steps(counts, factor.numerator)
+        else:
+            steps, exact = _divided_float_steps(counts, factor.denominator)
+    return steps, exact & finite
+
+
+def _multiplied_float_steps(counts, multiplier):
+    """The steps of :func:`_float_steps` for a whole factor."""
+    if float(multiplier) != multiplier:
+        return np.zeros(counts.shape, dtype=np.int64), np.zeros(counts.shape, dtype=bool)
+    product, error = _two_product(counts, multiplier)
+    # The exact product is product + error, and the error is at most half a
+    # step of the rounded product. Below 2**52, where the rounded product
+    # has steps of at most a half, the exact product rounds as the rounded
+    # one does, except when the rounded one is at a tie, where the error
+    # decides.
+    floor = np.floor(product)
+    tie = (product - floor == 0.5) & (error != 0)
+    steps = np.where(tie, floor + (error > 0), np.rint(product))
+    # From 2**52, a rounded product is whole, and exact without an error.
+    exact = (np.abs(product) < 2.0**52) | ((error == 0) & (np.abs(product) < 2.0**63))
+    return np.where(exact, steps, 0).astype(np.int64), exact
+
+
+def _divided_float_steps(counts, divisor):
+    """The steps of :func:`_float_steps` for the inverse of a whole factor."""
+    mantissas, exponents = np.frexp(counts)
+    # Each count is numerators / 2**shifts, with |numerators| < 2**53.
+    numerators = (mantissas * 2.0**53).astype(np.int64)
+    shifts = 53 - exponents
+    # A count with no shift is whole, and divides as an integer.
+    whole = shifts <= 0
+    fits = np.abs(counts) < 2.0**63
+    steps, exact = _integer_steps(np.where(whole & fits, counts, 0).astype(np.int64), Fraction(1, divisor))
+    exact &= fits | ~whole
+    # Another divides its numerator by divisor * 2**shifts while that fits in
+    # int64. A larger one is at least 2**62, and the quotient rounds to 0.
+    room = 62 - divisor.bit_length()
+    near = ~whole & (shifts <= room)
+    if near.any():
+        denominators = np.left_shift(np.int64(divisor), np.where(near, shifts, 0))
+        steps = np.where(near, _divide_half_even(numerators, denominators), steps)
+    return np.where(~whole & ~near, 0, steps), exact
 
 
 def _checked_sum(a, b):

@@ -368,6 +368,58 @@ def test_time_delta_tensor_of_float_counts_converts_to_microseconds():
     assert durations.dtype == np.dtype("timedelta64[us]")
 
 
+def test_time_delta_tensor_rounds_integer_counts_at_ties_to_even():
+    durations = TimeDeltaTensor([500, 1500, 2500, -1500], "ms").to_timedelta64("s")
+
+    assert np.array_equal(durations, np.array([0, 2, 2, -2], dtype="timedelta64[s]"))
+
+
+def test_time_delta_tensor_rounds_float_counts_by_their_exact_value():
+    # Each count is slightly more than a half millisecond in binary, so it
+    # rounds up, while its product with 1000 rounds to the tie.
+    durations = TimeDeltaTensor([0.0005, 0.0015, 0.0025, 0.0035], "s").to_timedelta64("ms")
+
+    assert np.array_equal(durations, np.array([1, 2, 3, 4], dtype="timedelta64[ms]"))
+
+
+# Units to finer, to coarser, and to the same resolution.
+_CONVERSIONS = [
+    pytest.param("h", "us", id="h-to-us"),
+    pytest.param("s", "ms", id="s-to-ms"),
+    pytest.param("ms", "s", id="ms-to-s"),
+    pytest.param("ns", "us", id="ns-to-us"),
+    pytest.param("us", "us", id="us-to-us"),
+]
+
+
+@pytest.mark.parametrize("unit, resolution", _CONVERSIONS)
+def test_time_delta_tensor_of_integer_counts_rounds_as_each_count_does(unit, resolution):
+    rng = np.random.default_rng(0)
+    counts = rng.integers(-10**9, 10**9, 1000)
+
+    durations = TimeDeltaTensor(counts, unit).to_timedelta64(resolution)
+
+    assert durations.tolist() == [TimeDelta(int(count), unit).to_timedelta64(resolution) for count in counts]
+
+
+@pytest.mark.parametrize("unit, resolution", _CONVERSIONS)
+def test_time_delta_tensor_of_float_counts_rounds_as_each_count_does(unit, resolution):
+    rng = np.random.default_rng(0)
+    # Halves are ties in every resolution, and their neighbors are near them.
+    halves = rng.integers(-10**6, 10**6, 300) + 0.5
+    counts = np.concatenate([rng.normal(0, 1e6, 300), halves, np.nextafter(halves, np.inf), halves / 1000,
+                             np.nextafter(halves / 1000, -np.inf)])
+
+    durations = TimeDeltaTensor(sb.FloatTensor(counts), unit).to_timedelta64(resolution)
+
+    assert durations.tolist() == [TimeDelta(float(count), unit).to_timedelta64(resolution) for count in counts]
+
+
+def test_time_delta_tensor_raises_for_a_count_beyond_its_resolution():
+    with pytest.raises(OverflowError):
+        TimeDeltaTensor([1, 2**62], "s").to_timedelta64("ns")
+
+
 def test_time_delta_tensor_is_unhashable():
     with pytest.raises(TypeError, match="unhashable"):
         hash(TimeDeltaTensor([30, 90], "min"))
