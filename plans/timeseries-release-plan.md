@@ -1,6 +1,6 @@
 # Time series general release: checklist
 
-Progress: 15 of 32 items, 30 of 53 points (57%)
+Progress: 16 of 32 items, 33 of 53 points (62%)
 
 From the release review of `issue-258-pandas` on 2026-11-08, in which each
 problem below was reproduced twice. The items correct behavior that the
@@ -201,7 +201,7 @@ Decisions for the maintainer: F2 (iterating a series).
 
 ## Phase D: windows and views
 
-- [ ] **D1.** [3] Window bounds compare tolerantly in both directions, in
+- [x] **D1.** [3] (f1224150e) Window bounds compare tolerantly in both directions, in
   `detail::cut_channel` (`windowing.hpp:35-39`) and where windows are
   checked to fit (`:132-134`, `:159-161`): an observation within the snap
   reach of an open end is at the end, one within reach of a computed start
