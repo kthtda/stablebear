@@ -1,6 +1,6 @@
 # Time series general release: checklist
 
-Progress: 14 of 31 items, 29 of 52 points (56%)
+Progress: 15 of 31 items, 30 of 52 points (58%)
 
 From the release review of `issue-258-pandas` on 2026-11-08, in which each
 problem below was reproduced twice. The items correct behavior that the
@@ -191,7 +191,7 @@ Decisions for the maintainer: F2 (iterating a series).
   Note: lists of `(count, unit)` tuples were dropped, since neither calls
   nor `TimeDeltaTensor` take them; `(counts, unit)` already gives
   durations.
-- [ ] **C5.** [1] Calls take dates in the same forms everywhere: a list of
+- [x] **C5.** [1] (da2550e8a) Calls take dates in the same forms everywhere: a list of
   `DateTime` in a call of a series, a tuple of date strings in a call of a
   `TimeSeriesTensor`, and `datetime64` with a multiple, such as
   `datetime64[15m]`, in tensor date queries (`_date_counts`,
