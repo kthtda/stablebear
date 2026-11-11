@@ -1,6 +1,6 @@
 # Time series general release: checklist
 
-Progress: 11 of 31 items, 21 of 52 points (40%)
+Progress: 12 of 31 items, 26 of 52 points (50%)
 
 From the release review of `issue-258-pandas` on 2026-11-08, in which each
 problem below was reproduced twice. The items correct behavior that the
@@ -139,7 +139,7 @@ Decisions for the maintainer: F2 (iterating a series).
   contained it; they now keep the resolution of the series.
   Note: `to_point_clouds` reads a list of `Timestamp` in microseconds,
   dropping finer digits; C5 covers the forms dates come in.
-- [ ] **C2.** Dates at the ends of the domain.
+- [x] **C2.** Dates at the ends of the domain.
   - [x] **C2a.** [3] (b7d486f38) A date at a closed end of the domain is in the domain
     despite rounding: placing a date snaps it to a closed end it misses by
     at most the channel's snap tolerance times the larger magnitude of
@@ -155,7 +155,7 @@ Decisions for the maintainer: F2 (iterating a series).
     Note: the snap of a channel's times scales with their magnitude, which
     is 0 at a window's start, so it cannot absorb an error on the scale of
     the origin.
-  - [ ] **C2b.** [5] A time outside the domain raises
+  - [x] **C2b.** [5] (e09bfceaf, 7858c873d) A time outside the domain raises
     `stablebear.timeseries.TimeSeriesDomainError`, a `ValueError` with the
     `time`, the `domain`, and the `index` of the series in a tensor, on
     every path: calls of a series and of a tensor, and `to_point_clouds`.
