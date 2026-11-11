@@ -1,3 +1,5 @@
+import pytest
+
 import stablebear as sb
 from stablebear import gpu
 
@@ -19,3 +21,8 @@ def test_has_nvidia_gpu_is_whether_any_gpu_is_detected():
 
 def test_limit_gpus_accepts_the_number_of_gpus():
     sb.system.limit_gpus(gpu.nvidia_gpu_count())
+
+
+def test_limit_gpus_to_no_gpu_raises():
+    with pytest.raises(ValueError, match="force_cpu"):
+        sb.system.limit_gpus(0)
