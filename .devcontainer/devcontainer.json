@@ -81,6 +81,9 @@
         "openai.chatgpt"
       ],
       "settings": {
+        // CMake Tools configures the project when the folder opens; configure
+        // and build manually instead (see postCreateCommand above).
+        "cmake.configureOnOpen": false,
         // Python deps live in a venv outside the workspace folder (see
         // Dockerfile: VIRTUAL_ENV=/opt/venv). The Python extension only
         // auto-discovers .venv/venv *inside* the workspace, so without this it

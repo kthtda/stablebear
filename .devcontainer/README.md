@@ -51,9 +51,11 @@ an NVIDIA GPU). Everything below is shared unless noted.
   CLI need not be installed. It needs Node.js 18 or newer, and loads nvm from
   `${NVM_DIR:-~/.nvm}` if present. Extra arguments go to `devcontainer up`.
 
-First start runs `postCreateCommand`: submodule init, then the cmake build + install
-(`debug` preset for GPU, `debug-nocuda` for CPU). The extensions are built and
-symlinked into `stablebear/` -- not pip-installed.
+First start runs `postCreateCommand`, which only initializes submodules. Neither
+config builds the extensions on creation, and CMake Tools does not configure on
+open (`cmake.configureOnOpen` is off). Build manually with the build loop below
+(`debug` preset for GPU, `debug-nocuda` for CPU); `cmake --install` symlinks the
+extensions into `stablebear/` -- they are not pip-installed.
 
 ## Verify
 
