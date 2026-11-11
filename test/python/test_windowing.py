@@ -91,10 +91,13 @@ def test_window_raises_on_a_size_or_step_that_is_not_positive(size, step, match)
         cut_windows(_windows_source(), size=size, step=step)
 
 
-def test_window_raises_on_an_unknown_closed():
-    with pytest.raises(ValueError, match="closed"):
+def test_window_raises_on_an_unknown_closed_naming_both_spellings():
+    with pytest.raises(ValueError, match="closed") as excinfo:
         cut_windows(_windows_source(), size=TimeDelta(1, "s"), step=TimeDelta(1, "s"),
                     closed="middle")  # pyright: ignore[reportArgumentType]
+
+    assert "'left'" in str(excinfo.value)
+    assert "'[)'" in str(excinfo.value)
 
 
 def test_window_raises_on_an_unknown_anchor():
@@ -180,6 +183,21 @@ def test_a_window_domain_runs_from_zero_to_its_size_with_its_closed_ends(closed,
                          partial=False, anchor="start")[0]
 
     assert window.domain == Domain(TimeDelta(0, "s"), TimeDelta(2, "s"), start_closed, end_closed)
+
+
+@pytest.mark.parametrize("notation, word", [
+    pytest.param("[)", "left", id="left"),
+    pytest.param("(]", "right", id="right"),
+    pytest.param("[]", "both", id="both"),
+    pytest.param("()", "none", id="none"),
+])
+def test_interval_notation_for_closed_gives_the_windows_of_its_word(notation, word):
+    by_notation = cut_windows(_windows_source(), size=TimeDelta(2, "s"), step=TimeDelta(1, "s"), closed=notation,
+                              partial=False, anchor="start")
+    by_word = cut_windows(_windows_source(), size=TimeDelta(2, "s"), step=TimeDelta(1, "s"), closed=word,
+                          partial=False, anchor="start")
+
+    assert by_notation.array_equal(by_word)
 
 
 def test_a_window_origin_is_its_start_in_the_series():

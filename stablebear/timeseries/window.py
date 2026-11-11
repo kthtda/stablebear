@@ -7,12 +7,15 @@ from .date_time import _duration, _in_unit, _ScalarDuration
 from .series import TimeSeries, TimeSeriesTensor, _PandasLike, _as_series
 
 
-_CLOSED = {"left": (True, False), "right": (False, True), "both": (True, True), "none": (False, False)}
+# Which ends a window includes, by name and in interval notation.
+_CLOSED = {"left": (True, False), "right": (False, True), "both": (True, True), "none": (False, False),
+           "[)": (True, False), "(]": (False, True), "[]": (True, True), "()": (False, False)}
 
 
 def cut_windows(series: TimeSeries | _PandasLike, size: float | _ScalarDuration,
                 step: float | _ScalarDuration | None = None, *,
-                closed: Literal["left", "right", "both", "none"] | None = None, partial: bool = False,
+                closed: Literal["left", "right", "both", "none", "[)", "(]", "[]", "()"] | None = None,
+                partial: bool = False,
                 anchor: Literal["start", "end"] = "end") -> TimeSeriesTensor:
     """Cut a time series into consecutive windows.
 
@@ -83,10 +86,12 @@ def cut_windows(series: TimeSeries | _PandasLike, size: float | _ScalarDuration,
         for ``size``. Defaults to ``size``, so windows touch without
         overlapping; a smaller step makes them overlap by ``size - step``,
         and a larger one leaves gaps between them.
-    closed : {"left", "right", "both", "none"}, optional
+    closed : {"left", "right", "both", "none", "[)", "(]", "[]", "()"}, optional
         Which ends of each window are included, as in Polars
         ``group_by_dynamic``: ``"left"`` is ``[a_k, a_k + size)``,
-        ``"right"`` is ``(a_k, a_k + size]``. Defaults to the end at the
+        ``"right"`` is ``(a_k, a_k + size]``. Interval notation names the
+        same choices: ``"[)"``, ``"(]"``, ``"[]"``, and ``"()"`` are
+        ``"left"``, ``"right"``, ``"both"``, and ``"none"``. Defaults to the end at the
         anchor: ``"left"`` for ``anchor="start"`` and ``"right"`` for
         ``anchor="end"``, so the observation the windows are anchored at is
         in one.
@@ -121,7 +126,8 @@ def cut_windows(series: TimeSeries | _PandasLike, size: float | _ScalarDuration,
     if closed is None:
         closed = "left" if anchor == "start" else "right"
     if closed not in _CLOSED:
-        raise ValueError(f"closed must be 'left', 'right', 'both', or 'none', not {closed!r}")
+        raise ValueError("closed must be 'left', 'right', 'both', or 'none', or in interval notation "
+                         f"'[)', '(]', '[]', or '()', not {closed!r}")
     series = _as_series(series)
     windows, _ = cpp.windows(series._data, _in_unit(size, series.unit), _in_unit(step, series.unit),
                              *_CLOSED[closed], bool(partial), anchor == "end")

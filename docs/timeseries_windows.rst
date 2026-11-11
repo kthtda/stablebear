@@ -143,9 +143,11 @@ window. Of the four choices, ``"left"`` gives
 :math:`[s_k, s_k + \text{size})`, ``"right"`` gives
 :math:`(s_k, s_k + \text{size}]`, ``"both"`` gives
 :math:`[s_k, s_k + \text{size}]`, and ``"none"`` gives
-:math:`(s_k, s_k + \text{size})`. A window can be evaluated at an end only
-if it includes that end, and an observation where two windows meet belongs
-to each window that includes it::
+:math:`(s_k, s_k + \text{size})`. Interval notation names them too:
+``closed="[)"`` is ``"left"``, and ``"(]"``, ``"[]"``, and ``"()"`` are
+``"right"``, ``"both"``, and ``"none"``. A window can be evaluated at an
+end only if it includes that end, and an observation where two windows
+meet belongs to each window that includes it::
 
    windows = cut_windows(signal, size=size, anchor="start", closed="both")
    windows(3.0, "s")  # [1.0, 2.0], the values of signal at 3 s and 6 s
