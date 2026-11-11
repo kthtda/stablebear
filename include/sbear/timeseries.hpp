@@ -474,9 +474,9 @@ namespace sb
   ///
   /// A channel either holds stored observations or is a view whose
   /// observations are those of a source channel: stacked at lagged times by
-  /// stack_at, or picked by index by take. A view keeps its times, its lags,
-  /// and for each observation a base: the source observation for the
-  /// smallest lag. The other components are found by searching back from the
+  /// stack_at, or picked by index by view_at_indices. A view keeps its
+  /// times, its lags, and for each observation a base: the source
+  /// observation for the smallest lag. The other components are found by searching back from the
   /// base when read, so a view costs two numbers per observation and copies
   /// no values. A view evaluates as any channel does, by previous value on
   /// its own times with its own snapping, so it shows exactly the
@@ -506,13 +506,19 @@ namespace sb
     /// shares this channel and its snap settings.
     [[nodiscard]] Channel stack_at(Times times, std::span<const float64_t> lags) const;
 
-    /// A view of this channel whose times are @p times and whose observation
-    /// k is this channel's observation @p indices[k], with no new axis. It
-    /// shares this channel and its snap settings, but not its start or end.
-    /// For a view with one component, as take and stack_at with one lag
-    /// make, it shares that view's source instead, at the indices the view
-    /// reads there, so chains of views stay one level deep.
-    [[nodiscard]] Channel take(Times times, std::vector<size_t> indices) const;
+    /// A view of this channel's observations @p indices, strictly
+    /// increasing, at their times, with no new axis. It shares this channel
+    /// and its snap settings, but not its start or end. For a view with one
+    /// component, as view_at_indices and stack_at with one lag make, it
+    /// shares that view's source instead, at the indices the view reads
+    /// there, so chains of views stay one level deep.
+    [[nodiscard]] Channel view_at_indices(std::vector<size_t> indices) const;
+
+    /// The same observations at @p times, one per observation, with its own
+    /// origin. It keeps whether the start is closed but not the end, which
+    /// was at the old times. Throws std::logic_error for a view with several
+    /// lags, whose components are found from its times.
+    [[nodiscard]] Channel with_times(Times times) const;
 
     /// This channel with the end @p end, in its unit: it can be evaluated
     /// after its last timestamp up to @p end, and at @p end if @p closed.

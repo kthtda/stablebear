@@ -162,22 +162,23 @@ namespace sb
   }
 
   template <typename T>
-  Channel<T> Channel<T>::take(Times times, std::vector<size_t> indices) const
+  Channel<T> Channel<T>::view_at_indices(std::vector<size_t> indices) const
   {
-    if (indices.size() != times.size())
+    std::vector<float64_t> at;
+    at.reserve(indices.size());
+    for (size_t k = 0; k < indices.size(); ++k)
     {
-      throw std::invalid_argument(
-          "Expected one index per time: got " + std::to_string(indices.size()) + " indices for "
-          + std::to_string(times.size()) + " times");
-    }
-    for (const auto i : indices)
-    {
-      if (i >= size())
+      if (indices[k] >= size())
       {
         throw std::out_of_range(
-            "Observation index " + std::to_string(i) + " is out of range for " + std::to_string(size())
+            "Observation index " + std::to_string(indices[k]) + " is out of range for " + std::to_string(size())
             + " observations");
       }
+      if (k > 0 && indices[k] <= indices[k - 1])
+      {
+        throw std::invalid_argument("Observation indices must be strictly increasing");
+      }
+      at.push_back(time(indices[k]));
     }
 
     // One component at lag 0, whose base is the given index. A view with
@@ -198,13 +199,32 @@ namespace sb
     {
       view.m_source = std::make_shared<const Channel>(*this);
     }
-    view.m_times = std::make_shared<const Times>(std::move(times));
+    view.m_times = std::make_shared<const Times>(times_like(std::move(at)));
     view.m_base = std::make_shared<const std::vector<size_t>>(std::move(indices));
     view.m_lags = {0.0};
     view.m_end = std::nullopt;
     view.m_endClosed = false;
     view.m_startClosed = true;
     return view;
+  }
+
+  template <typename T>
+  Channel<T> Channel<T>::with_times(Times times) const
+  {
+    if (m_lags.size() > 1)
+    {
+      throw std::logic_error("A view with several lags finds its observations from its times; it cannot move them");
+    }
+    if (times.size() != size())
+    {
+      throw std::invalid_argument("Expected one time per observation: got " + std::to_string(times.size())
+                                  + " times for " + std::to_string(size()) + " observations");
+    }
+    auto channel = *this;
+    channel.m_times = std::make_shared<const Times>(std::move(times));
+    channel.m_end = std::nullopt;
+    channel.m_endClosed = false;
+    return channel;
   }
 
   template <typename T>
@@ -395,7 +415,7 @@ namespace sb
   template <typename T>
   size_t Channel<T>::source_index(size_t k, size_t j) const
   {
-    // A single component is the base, given by take or found by stack_at.
+    // A single component is the base, given by view_at_indices or found by stack_at.
     if (m_lags.size() == 1)
     {
       return (*m_base)[k];

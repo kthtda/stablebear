@@ -49,9 +49,9 @@ namespace sb
     /// at from - zero, then the observations after it up to @p to, with the
     /// end to - zero (Channel::until). The origin moves by @p zero, so the
     /// times keep their place in the series the channel was cut from. A
-    /// view made by Channel::take, so no values are copied. @p atFrom and
-    /// @p atTo are hints for the observations in effect at @p from and
-    /// @p to, updated to them. @p fromScale and @p toScale are the larger
+    /// view made by Channel::view_at_indices, so no values are copied.
+    /// @p atFrom and @p atTo are hints for the observations in effect at
+    /// @p from and @p to, updated to them. @p fromScale and @p toScale are the larger
     /// magnitude of the operands that @p from and @p to were computed from,
     /// such as a start and a size; an observation within the channel's snap
     /// tolerance times them of a bound, on either side, is at it. They are 0
@@ -86,8 +86,8 @@ namespace sb
       // The part can be evaluated up to its end, and at it if closed. A
       // closed end at or before the last time held needs no end: the part
       // ends at that timestamp.
-      auto part = channel.take(channel.times_like(std::move(at)).with_origin(channel.origin() + zero),
-                               std::move(indices));
+      auto part = channel.view_at_indices(std::move(indices))
+                      .with_times(channel.times_like(std::move(at)).with_origin(channel.origin() + zero));
       const auto end = to - zero;
       const auto lastAt = part.time(part.size() - 1);
       if (!(stopClosed && end <= lastAt))
@@ -126,9 +126,8 @@ namespace sb
   /// evaluation does, is at it: a start at one holds it at time 0, and an
   /// end at one excludes it, or includes it if closed. Whether a window
   /// fits in the domain is decided alike, with the smallest snap tolerance
-  /// of the channels. Each
-  /// window channel is a view of its channel made by Channel::take, so it
-  /// copies no values. Throws std::invalid_argument if a channel has no
+  /// of the channels. Each window channel is a view of its channel made by
+  /// Channel::view_at_indices, so it copies no values. Throws std::invalid_argument if a channel has no
   /// observations or no window fits.
   template <typename T>
   std::pair<Tensor<TimeSeries<T>>, Tensor<float64_t>> windows(const TimeSeries<T>& series, float64_t size, float64_t step,

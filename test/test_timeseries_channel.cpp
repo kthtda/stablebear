@@ -62,27 +62,58 @@ namespace
     return sb::Channel<double>(sb::Times(std::move(times)), {}, std::move(values));
   }
 
-  TEST(ChannelTest, ATakeOfATakeReadsTheObservationsBothPick)
+  TEST(ChannelTest, AViewAtIndicesHoldsTheObservationsAtTheirTimes)
   {
-    const auto first = channel_of_ten().take(sb::Times(std::vector<double>{0.0, 1.0, 2.0}), {2, 5, 7});
+    const auto view = channel_of_ten().view_at_indices({2, 5, 7});
 
-    const auto second = first.take(sb::Times(std::vector<double>{0.0, 1.0}), {2, 0});
-
-    // Observation 2 of first is 7, and observation 0 is 2.
-    EXPECT_EQ(second.flat_value(0), 7.0);
-    EXPECT_EQ(second.flat_value(1), 2.0);
+    EXPECT_EQ(view.time(1), 5.0);
+    EXPECT_EQ(view.flat_value(1), 5.0);
   }
 
-  TEST(ChannelTest, ATakeOfAViewAtOneLagReadsWhatTheViewReads)
+  TEST(ChannelTest, AViewAtIndicesOfAViewReadsTheObservationsBothPick)
+  {
+    const auto first = channel_of_ten().view_at_indices({2, 5, 7});
+
+    const auto second = first.view_at_indices({0, 2});
+
+    // Observations 0 and 2 of first are 2 and 7.
+    EXPECT_EQ(second.flat_value(0), 2.0);
+    EXPECT_EQ(second.flat_value(1), 7.0);
+  }
+
+  TEST(ChannelTest, AViewAtIndicesOfAViewAtOneLagReadsWhatTheViewReads)
   {
     const std::vector<double> lags{2.0};
     const auto lagged = channel_of_ten().stack_at(sb::Times(std::vector<double>{3.0, 5.0, 8.0}), lags);
 
-    const auto taken = lagged.take(sb::Times(std::vector<double>{0.0, 1.0}), {2, 0});
+    const auto picked = lagged.view_at_indices({0, 2});
 
     // The view reads 1, 3, and 6, two seconds before 3 s, 5 s, and 8 s.
-    EXPECT_EQ(taken.flat_value(0), 6.0);
-    EXPECT_EQ(taken.flat_value(1), 1.0);
+    EXPECT_EQ(picked.flat_value(0), 1.0);
+    EXPECT_EQ(picked.flat_value(1), 6.0);
+  }
+
+  TEST(ChannelTest, AViewAtIndicesThatAreNotIncreasingThrows)
+  {
+    EXPECT_THROW((void)channel_of_ten().view_at_indices({5, 2}), std::invalid_argument);
+  }
+
+  TEST(ChannelTest, WithTimesHoldsTheSameObservationsAtTheNewTimes)
+  {
+    const auto view = channel_of_ten().view_at_indices({2, 5, 7});
+
+    const auto moved = view.with_times(sb::Times(std::vector<double>{0.0, 0.5, 1.0}));
+
+    EXPECT_EQ(moved.time(1), 0.5);
+    EXPECT_EQ(moved.flat_value(1), 5.0);
+  }
+
+  TEST(ChannelTest, WithTimesOfAViewWithSeveralLagsThrows)
+  {
+    const std::vector<double> lags{0.0, 2.0};
+    const auto embedded = channel_of_ten().stack_at(sb::Times(std::vector<double>{3.0, 5.0}), lags);
+
+    EXPECT_THROW((void)embedded.with_times(sb::Times(std::vector<double>{0.0, 1.0})), std::logic_error);
   }
 
   TEST(TimeSinceTest, AUnitWithoutALengthThrows)
