@@ -46,17 +46,24 @@ def cut_windows(series: TimeSeries | _PandasLike, size: float | _ScalarDuration,
     ``closed="right"``, the default when anchored at the end, an
     observation at ``a_k`` belongs only to the previous one. A delay
     embedding of a window keeps its ends.
-    A bound computed in floating point that falls just short of an
-    observation reaches it, with the channel's snapping, as evaluation does:
-    a window whose start reaches one holds it at time 0, and an end that
-    reaches one excludes it, or includes it if closed. Each channel snaps
+    A bound computed in floating point rounds on the scale of the terms it
+    is computed from, ``t_0`` and ``k * step`` or a bound and ``size``, so
+    it can miss an observation on either side. An observation within the
+    channel's ``snap_tolerance`` times the larger magnitude of those terms
+    of a bound, or one the bound snaps to as evaluation does, is at it: a
+    window whose start is at one holds it at time 0, and an end at one
+    excludes it, or includes it if closed. Whether a window fits in the
+    domain is decided alike, with the smallest tolerance of the channels.
+    So windows of times such as ``np.arange(n) / 10`` in seconds hold the
+    same observations as windows of the same times in milliseconds. Each
+    channel snaps
     with its own timestamps and settings, so channels of one window can
     snap differently, but all of them have their time 0 at ``a_k`` as
     computed: the :attr:`~TimeSeries.origin` of window ``k`` is its bound
     ``a_k``. For example, ``3 * 0.3`` computes just below 0.9: a window
     starting there holds an observation at 0.9 at time 0, and its origin
-    has the count ``0.8999999999999999``. A snapped observation is thus
-    placed in ``series`` off by at most the snap tolerance.
+    has the count ``0.8999999999999999``. An observation at a bound is thus
+    placed in ``series`` off by at most that reach.
     Each window shares its observations with ``series`` and copies none; it
     evaluates by previous value on its own times, so it shows only the
     observations it holds.

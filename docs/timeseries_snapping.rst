@@ -141,6 +141,13 @@ So a date that misses a closed end of the domain by at most :math:`r` times
 the larger magnitude of the two is placed at that end, and a window gives
 its value at its own start date.
 
+Window bounds are computed alike, from :math:`t_0` and :math:`k` times the
+step, or from a start and the size, and can round to either side of the
+observation they mean. :py:func:`~stablebear.timeseries.cut_windows` places
+an observation at a bound if it lies within :math:`r` times the larger
+magnitude of those terms on either side, so windows of 10 Hz data in seconds
+hold the same observations as in milliseconds.
+
 Choosing the tolerance
 ----------------------
 

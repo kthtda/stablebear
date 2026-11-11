@@ -211,9 +211,14 @@ Decisions for the maintainer: F2 (iterating a series).
   Today: windows of 1.5 s every 0.1 s on 10 Hz data give 49 windows of 16
   observations instead of 15, and the same data in milliseconds gives a
   different number of windows.
-  Tests: `np.arange(n) / 10` and `np.linspace` times give windows of equal
-  sizes; an observation on a bound between two half-open windows is in one;
-  seconds and milliseconds give the same windows.
+  Tests: `np.arange(n) / 10` times give windows of equal sizes; an
+  observation on a bound between two half-open windows is in one; seconds
+  and milliseconds give the same windows.
+  Note: `np.linspace` times were dropped from the tests, since they only
+  round differently from `np.arange(n) / 10`, which already failed, and
+  seconds against milliseconds checks that rounding does not matter.
+  `restrict` keeps comparing exactly, since its bounds are given, not
+  computed.
   Note: a delay embedding of a half-open window keeps a point at the
   window's open end when the shifted time rounds just below it: 404 of 469
   embeddings with dimension 2 and a delay of 6 minutes of the windows of

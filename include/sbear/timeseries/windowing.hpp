@@ -15,6 +15,34 @@ namespace sb
 {
   namespace detail
   {
+    /// Whether observation @p i of @p channel lies within @p reach of @p t,
+    /// a bound computed in floating point, and so is at it. The reach is
+    /// capped at a quarter of the gaps around the observation, as snapping
+    /// caps it, so that a bound nearer a neighbour stays with it.
+    template <typename T>
+    bool is_at(const Channel<T>& channel, size_t i, float64_t t, float64_t reach)
+    {
+      const auto at = channel.time(i);
+      if (i > 0)
+      {
+        reach = std::min(reach, (at - channel.time(i - 1)) / 4);
+      }
+      if (i + 1 < channel.size())
+      {
+        reach = std::min(reach, (channel.time(i + 1) - at) / 4);
+      }
+      return std::abs(at - t) <= reach;
+    }
+
+    /// The index of the observation in effect at @p t, as Channel::index_at
+    /// gives it, or of the next one if it is at @p t within @p reach.
+    template <typename T>
+    size_t index_near(const Channel<T>& channel, float64_t t, float64_t reach, size_t hint)
+    {
+      const auto i = channel.index_at(t, hint);
+      return (i + 1 < channel.size() && is_at(channel, i + 1, t, reach)) ? i + 1 : i;
+    }
+
     /// The part of @p channel from @p from to @p to, each end included when
     /// @p startClosed or @p stopClosed says so, at its times less @p zero,
     /// as windows() cuts each channel: the observation in effect at @p from,
@@ -23,19 +51,26 @@ namespace sb
     /// times keep their place in the series the channel was cut from. A
     /// view made by Channel::take, so no values are copied. @p atFrom and
     /// @p atTo are hints for the observations in effect at @p from and
-    /// @p to, updated to them. Requires channel.size() > 0.
+    /// @p to, updated to them. @p fromScale and @p toScale are the larger
+    /// magnitude of the operands that @p from and @p to were computed from,
+    /// such as a start and a size; an observation within the channel's snap
+    /// tolerance times them of a bound, on either side, is at it. They are 0
+    /// for bounds that were not computed. Requires channel.size() > 0.
     template <typename T>
     Channel<T> cut_channel(const Channel<T>& channel, float64_t from, float64_t to, bool startClosed, bool stopClosed,
-                           float64_t zero, size_t& atFrom, size_t& atTo)
+                           float64_t zero, size_t& atFrom, size_t& atTo, float64_t fromScale = 0,
+                           float64_t toScale = 0)
     {
-      // The observations in effect at from and at to, with snapping. The
-      // one at from is the first, also if from snaps forward onto it. An
-      // open end excludes an observation at to, or that to snaps onto, and
-      // a closed one keeps it.
-      atFrom = channel.index_at(from, atFrom);
-      atTo = channel.index_at(to, atTo);
+      // The observations in effect at from and at to, with snapping, and
+      // the ones just after them that the bounds' rounding may have missed.
+      // The one at from is the first. An open end excludes an observation
+      // at to, and a closed one keeps it.
+      const auto fromReach = channel.snap_tolerance() * fromScale;
+      const auto toReach = channel.snap_tolerance() * toScale;
+      atFrom = index_near(channel, from, fromReach, atFrom);
+      atTo = index_near(channel, to, toReach, atTo);
       const auto lo = atFrom;
-      const bool atEnd = channel.time(atTo) >= to;
+      const bool atEnd = channel.time(atTo) >= to || is_at(channel, atTo, to, toReach);
       const auto lastIn = (atEnd && !stopClosed && atTo > lo) ? atTo - 1 : atTo;
 
       // Subtracting zero can round two close times together, and the
@@ -85,10 +120,13 @@ namespace sb
   /// outside the domain, though the observation there stays in effect after
   /// it. With an open end, an observation at a_k + size belongs only to the
   /// next window. A bound
-  /// that falls just short of an observation reaches it, with the channel's
-  /// snapping, as evaluation does: a start that reaches one holds it at
-  /// time 0, and an end that reaches one excludes it, or includes it if
-  /// closed. Each
+  /// is computed in floating point from terms such as a_k and size, and
+  /// an observation within the channel's snap tolerance times the larger
+  /// magnitude of them of it, on either side, or one it snaps to as
+  /// evaluation does, is at it: a start at one holds it at time 0, and an
+  /// end at one excludes it, or includes it if closed. Whether a window
+  /// fits in the domain is decided alike, with the smallest snap tolerance
+  /// of the channels. Each
   /// window channel is a view of its channel made by Channel::take, so it
   /// copies no values. Throws std::invalid_argument if a channel has no
   /// observations or no window fits.
@@ -114,41 +152,64 @@ namespace sb
       }
     }
 
-    // The bounds of each window and whether they are included.
+    // The bounds of each window, whether they are included, and the larger
+    // magnitude of the operands each was computed from, which scales how
+    // far it may have rounded from the time it means.
     struct Bounds
     {
       float64_t start;
       float64_t stop;
       bool startClosed;
       bool stopClosed;
+      float64_t startScale;
+      float64_t stopScale;
     };
     std::vector<Bounds> bounds;
     const auto [first, last, seriesClosedStart, seriesClosedEnd] = series.domain();
+    // A computed bound within the smallest snap tolerance of the channels
+    // times the magnitude of its operands of an end of the domain is at it,
+    // so that whether a window fits does not depend on rounding.
+    float64_t tolerance = series.channel(0).snap_tolerance();
+    for (size_t c = 1; c < series.n_channels(); ++c)
+    {
+      tolerance = std::min(tolerance, series.channel(c).snap_tolerance());
+    }
+    const auto scale = [](float64_t a, float64_t b) { return std::max(std::abs(a), std::abs(b)); };
+    // Whether a, computed from operands of magnitude up to aScale, lies
+    // before b, or at it within that reach.
+    const auto before = [&](float64_t a, float64_t b, float64_t aScale) { return a < b - tolerance * aScale; };
+    const auto at = [&](float64_t a, float64_t b, float64_t aScale) { return std::abs(a - b) <= tolerance * aScale; };
     if (!anchorEnd)
     {
       // A window fits when a + size is at most the last time, whether that
       // is a last timestamp or an end; a closed window end must come before
       // an open one of the series.
       const auto fits = [&](float64_t start) {
-        return start + size < last || (start + size == last && (seriesClosedEnd || !closedEnd));
+        const auto stopScale = scale(start, size);
+        return before(start + size, last, stopScale) ||
+               (at(start + size, last, stopScale) && (seriesClosedEnd || !closedEnd));
       };
       // The first window starts where the series does, so it cannot be
       // evaluated at 0 if the series cannot at its start.
       const auto startClosed = [&](size_t k) { return closedStart && (k > 0 || seriesClosedStart); };
       // A partial window needs its start in the domain.
-      const auto startsIn = [&](float64_t start, size_t k) {
-        return start < last || (start == last && startClosed(k) && seriesClosedEnd);
+      const auto startsIn = [&](float64_t start, float64_t startScale, size_t k) {
+        return before(start, last, startScale) ||
+               (at(start, last, startScale) && startClosed(k) && seriesClosedEnd);
       };
       for (size_t k = 0;; ++k)
       {
-        const auto start = first + static_cast<float64_t>(k) * step;
+        const auto offset = static_cast<float64_t>(k) * step;
+        const auto start = first + offset;
+        const auto startScale = scale(first, offset);
         const bool full = fits(start);
-        if (!full && !(partial && startsIn(start, k)))
+        if (!full && !(partial && startsIn(start, startScale, k)))
         {
           break;
         }
         // A partial window ends where the series does.
-        bounds.push_back({start, full ? start + size : last, startClosed(k), full ? closedEnd : seriesClosedEnd});
+        bounds.push_back({start, full ? start + size : last, startClosed(k), full ? closedEnd : seriesClosedEnd,
+                          startScale, full ? scale(start, size) : 0.0});
       }
     }
     else
@@ -157,21 +218,27 @@ namespace sb
       // time, the last window ends where the series does, and a partial
       // window needs its end in the domain and starts where the series does.
       const auto fits = [&](float64_t stop) {
-        return stop - size > first || (stop - size == first && (seriesClosedStart || !closedStart));
+        const auto startScale = scale(stop, size);
+        return before(first, stop - size, startScale) ||
+               (at(stop - size, first, startScale) && (seriesClosedStart || !closedStart));
       };
       const auto stopClosed = [&](size_t k) { return closedEnd && (k > 0 || seriesClosedEnd); };
-      const auto stopsIn = [&](float64_t stop, size_t k) {
-        return stop > first || (stop == first && stopClosed(k) && seriesClosedStart);
+      const auto stopsIn = [&](float64_t stop, float64_t stopScale, size_t k) {
+        return before(first, stop, stopScale) ||
+               (at(stop, first, stopScale) && stopClosed(k) && seriesClosedStart);
       };
       for (size_t k = 0;; ++k)
       {
-        const auto stop = last - static_cast<float64_t>(k) * step;
+        const auto offset = static_cast<float64_t>(k) * step;
+        const auto stop = last - offset;
+        const auto stopScale = scale(last, offset);
         const bool full = fits(stop);
-        if (!full && !(partial && stopsIn(stop, k)))
+        if (!full && !(partial && stopsIn(stop, stopScale, k)))
         {
           break;
         }
-        bounds.push_back({full ? stop - size : first, stop, full ? closedStart : seriesClosedStart, stopClosed(k)});
+        bounds.push_back({full ? stop - size : first, stop, full ? closedStart : seriesClosedStart, stopClosed(k),
+                          full ? scale(stop, size) : 0.0, stopScale});
       }
       std::reverse(bounds.begin(), bounds.end());
     }
@@ -187,14 +254,14 @@ namespace sb
     // hints for the next window's, which are close by.
     std::vector<size_t> atFrom(series.n_channels(), 0);
     std::vector<size_t> atTo(series.n_channels(), 0);
-    for (const auto& [from, to, startClosed, stopClosed] : bounds)
+    for (const auto& [from, to, startClosed, stopClosed, fromScale, toScale] : bounds)
     {
       std::vector<Channel<T>> channels;
       channels.reserve(series.n_channels());
       for (size_t c = 0; c < series.n_channels(); ++c)
       {
         channels.push_back(detail::cut_channel(series.channel(c), from, to, startClosed, stopClosed, from,
-                                               atFrom[c], atTo[c]));
+                                               atFrom[c], atTo[c], fromScale, toScale));
       }
       contents.emplace_back(std::move(channels), series.unit(), series.epoch());
     }

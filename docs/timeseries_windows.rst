@@ -68,7 +68,7 @@ A window also keeps where it was cut from.
    windows[1].origin  # TimeDelta(2, 's')
 
 The origins are the starts of the source domains, the same for every
-channel of a window. When a start falls just short of an observation and snaps to it
+channel of a window. When a start rounds to just beside an observation and is placed at it
 (see :doc:`timeseries_snapping`), the window holds that observation at
 time 0, though its origin stays the computed start. Evaluation does not
 use the origin, and

@@ -816,6 +816,47 @@ def test_window_origins_survive_saving(round_trip):
     assert origins == [TimeDelta(start, "s") for start in [0, 1, 2, 3]]
 
 
+def _indexed(times, unit="s"):
+    # One observation at each time; each is its index.
+    return TimeSeries(np.arange(float(len(times))), times=TimeDeltaTensor(times, unit))
+
+
+@pytest.mark.parametrize("anchor", ["start", "end"])
+def test_windows_of_times_a_tenth_of_a_second_apart_each_hold_15_observations(anchor):
+    # Times 0.0 s, 0.1 s, ..., 29.9 s, which round in float64.
+    windows = cut_windows(_indexed(np.arange(300) / 10), size=TimeDelta(1.5, "s"), step=TimeDelta(0.1, "s"),
+                          closed="left", partial=False, anchor=anchor)
+
+    # The windows start at 0 s, 0.1 s, ..., 28.4 s, so that the last ends at
+    # 29.9 s, and each holds the 15 observations from its start up to 1.5 s
+    # later, excluding the one at its open end.
+    assert windows.shape == (285,)
+    assert [len(windows[k].values) for k in range(285)] == [15] * 285
+
+
+def test_an_observation_on_the_bound_between_two_half_open_windows_is_in_one():
+    windows = cut_windows(_indexed(np.arange(300) / 10), size=TimeDelta(0.3, "s"), step=TimeDelta(0.3, "s"),
+                          closed="left", partial=False, anchor="start")
+
+    held = np.concatenate([np.asarray(windows[k].values) for k in range(windows.shape[0])])
+
+    # 99 windows; the last 3 observations do not fill a window.
+    assert np.array_equal(held, np.arange(297.0))
+
+
+@pytest.mark.parametrize("closed", ["left", "right", "both", "none"])
+@pytest.mark.parametrize("anchor", ["start", "end"])
+def test_windows_in_seconds_and_in_milliseconds_hold_the_same_observations(closed, anchor):
+    seconds = cut_windows(_indexed(np.arange(300) / 10), size=TimeDelta(1.5, "s"), step=TimeDelta(0.1, "s"),
+                          closed=closed, partial=False, anchor=anchor)
+    milliseconds = cut_windows(_indexed(np.arange(300) * 100.0, "ms"), size=TimeDelta(1500, "ms"),
+                               step=TimeDelta(100, "ms"), closed=closed, partial=False, anchor=anchor)
+
+    assert seconds.shape == milliseconds.shape
+    for k in range(seconds.shape[0]):
+        assert seconds[k].values.array_equal(milliseconds[k].values)
+
+
 def _windows_of_pattern(start):
     # The pattern 0, 1 repeats every 2 seconds from start.
     series = TimeSeries([0.0, 1.0, 0.0, 1.0, 0.0], times=TimeDeltaTensor(start + np.arange(5.0), "s"))
