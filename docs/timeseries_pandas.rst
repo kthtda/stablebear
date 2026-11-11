@@ -65,7 +65,8 @@ Windows and delay embeddings
 :py:func:`~stablebear.timeseries.delay_embed` take a pandas ``Series`` or
 ``DataFrame`` directly. They convert it with
 ``from_pandas`` and return the same stablebear objects as for the converted
-time series, ready for
+time series. :py:func:`~stablebear.timeseries.to_point_clouds` turns windows
+or an embedding into point clouds, ready for
 :py:func:`~stablebear.persistence.homology.compute_persistent_homology`::
 
    windows = cut_windows(levels, size=TimeDelta(1, "h"),

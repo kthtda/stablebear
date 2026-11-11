@@ -68,11 +68,12 @@ A ``DateTimeTensor`` cannot be an epoch.
    collapse onto the same dates. Keep such a time series without an epoch
    instead.
 
-All channels of a time series share one epoch, so
+All channels of a time series share one epoch.
 :py:meth:`TimeSeries.from_channels
-<stablebear.timeseries.TimeSeries.from_channels>` raises if their epochs
-differ. To combine channels recorded with dates, build the times of each
-from its dates with the same ``epoch=``.
+<stablebear.timeseries.TimeSeries.from_channels>` counts channels with
+different epochs from the earliest of them, shifting the times of the
+others so that each observation keeps its date. Channels with an epoch and
+channels without one do not combine.
 :py:meth:`~stablebear.timeseries.TimeSeries.with_epoch` gives a series an
 epoch, or another one, without shifting any time.
 

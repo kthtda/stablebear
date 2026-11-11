@@ -303,4 +303,7 @@ evaluated only after it. The domain must lie within that of the time series.
 A time series with an epoch is restricted without it, and then given it
 back::
 
+   dated = signal.with_epoch("2023-01-01")
+   domain = Domain(TimeDelta(2.5, "s"), TimeDelta(5, "s"),
+                   start_closed=False, end_closed=True)
    part = dated.with_epoch(None).restrict(domain).with_epoch(dated.epoch)

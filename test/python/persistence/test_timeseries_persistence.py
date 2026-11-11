@@ -263,3 +263,11 @@ def test_series_persistence_does_not_depend_on_the_thread_count():
 
     assert sb.system.get_cpu_limit() == previous
     assert result.values.is_isomorphic_to(expected.values, atol=0, rtol=0)
+
+
+def test_persistent_homology_of_windows_raises_naming_to_point_clouds():
+    series = TimeSeries([0.0, 10.0, 20.0, 30.0], times=TimeDeltaTensor([0.0, 1.0, 2.0, 3.0], "s"))
+    windows = cut_windows(series, size=TimeDelta(2, "s"), step=TimeDelta(1, "s"), anchor="start")
+
+    with pytest.raises(TypeError, match="to_point_clouds"):
+        _ = compute_persistent_homology(windows)  # pyright: ignore[reportCallIssue, reportArgumentType]

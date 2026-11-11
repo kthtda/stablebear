@@ -165,6 +165,6 @@ a tensor of empty series, whose elements are then assigned.
 as they take the windows of a series (see :doc:`timeseries_windows`).
 
 The tensor ``sb.tensor([a, b])`` holds two series, while
-``sb.stack(TimeSeries.from_channels([a, b]))`` is one series whose
+``sb.stack(TimeSeries.from_channels([a, b], unit="s"))`` is one series whose
 observations are pairs of values of ``a`` and ``b``, taken at the times
 where both are defined.

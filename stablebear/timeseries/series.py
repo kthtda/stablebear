@@ -593,8 +593,8 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
     has no ``len``, since it could iterate over either: ``series[i]``
     selects a channel, :attr:`values` gives the observations, and
     :attr:`n_observations` counts them. Series can be saved with
-    ``sb.save``, loaded with ``sb.load``, and pickled; each channel keeps its
-    times, unit, and snap settings.
+    ``sb.save``, loaded with ``sb.load``, and pickled; the series keeps its
+    unit and epoch, and each channel its times and snap settings.
 
     A series cannot be changed. The constructor copies ``values``, and
     :attr:`values` and :meth:`__call__` return copies, so changing the
@@ -610,9 +610,12 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
     the ends of its channel's domain. A series can be evaluated where all
     of its channels can; :attr:`domain` gives these times.
 
-    Element-wise operations, such as
-    :func:`~stablebear.persistence.homology.compute_persistent_homology`, accept a
-    series wherever they accept a tensor of the same elements. They apply to
+    :func:`~stablebear.persistence.homology.compute_persistent_homology`,
+    :func:`~stablebear.persistence.barcode_summary.barcode_to_stable_rank`,
+    :func:`~stablebear.persistence.barcode_summary.barcode_to_betti_curve`,
+    and
+    :func:`~stablebear.persistence.barcode_summary.barcode_to_accumulated_persistence`
+    take a series as they take a tensor of the same elements. They apply to
     every channel's observations and return a series with the same channels,
     times, domains, unit, and snap settings. An operation that consumes
     trailing axes or adds axes to each element changes each channel's

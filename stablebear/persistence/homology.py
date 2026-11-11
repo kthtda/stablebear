@@ -11,7 +11,7 @@ from ..distance_matrix import (
 )
 from ..base_tensor import FloatTensor
 from ..point_cloud import PointCloud, PointCloudTensor
-from ..timeseries.series import TimeSeries
+from ..timeseries.series import TimeSeries, TimeSeriesTensor
 from ..typing import barcode32, barcode64, distmat32, distmat64, float32, float64, pcloud32, pcloud64
 from .ph_tensor import BarcodeTensor
 
@@ -122,6 +122,9 @@ def compute_persistent_homology(
 
     if isinstance(X, TimeSeries):
         return _series_persistent_homology(X, max_dim, distance_type, reduced, verbose)
+    if isinstance(X, TimeSeriesTensor):
+        raise TypeError("A tensor of time series, such as windows, is not a set of point clouds; "
+                        "make it one with stablebear.timeseries.to_point_clouds")
 
     if isinstance(X, (DistanceMatrix, DistanceMatrixTensor)):
         task = _compute_barcodes_distmat_ripser(X, max_dim, reduced)

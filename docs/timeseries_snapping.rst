@@ -56,6 +56,8 @@ epsilons, the default of APL. Here the larger timestamp is 0.2, so a query
 up to ``2e-15`` s below it snaps. This takes in the rounding error of
 ``0.3 - 0.1`` while an ordinary query such as ``0.19`` is far outside::
 
+   from stablebear.timeseries import TimeDeltaTensor, TimeSeries
+
    times = TimeDeltaTensor([0.0, 0.1, 0.2, 0.3], "s")
 
    series = TimeSeries([1.0, 2.0, 3.0, 4.0], times=times)

@@ -3,9 +3,10 @@ Saving and loading
 ==================
 
 stablebear provides a binary format for saving and loading numeric, PCF,
-nested, point-cloud, barcode, distance-matrix, and symmetric-matrix tensors.
-Standalone ``Pcf``, ``PointCloud``, ``Barcode``, ``DistanceMatrix``, and
-``SymmetricMatrix`` objects use the same API.
+nested, point-cloud, barcode, distance-matrix, symmetric-matrix, and time
+series tensors. Standalone ``Pcf``, ``PointCloud``, ``Barcode``,
+``DistanceMatrix``, ``SymmetricMatrix``, and ``TimeSeries`` objects use the
+same API.
 
 Saving
 ======
