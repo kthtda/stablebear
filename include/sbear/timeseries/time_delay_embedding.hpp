@@ -55,7 +55,8 @@ namespace sb
       const auto start = channel.time(0) + *highest;
       // A channel with an end, such as a window, can be evaluated past its
       // last timestamp up to its end, so the embedding can too, up to that
-      // end plus the lowest lag. It keeps an open start through stack_at.
+      // end plus the lowest lag. It keeps an open start through
+      // view_lagged_at.
       const auto end = channel.end().value_or(channel.time(n - 1)) + *lowest;
       const auto closed = channel.end_closed();
       const auto past = [&](float64_t s) { return closed ? s > end : s >= end; };
@@ -165,7 +166,7 @@ namespace sb
       }
     }
 
-    auto embedding = channel.stack_at(channel.times_like(std::move(at)), lags);
+    auto embedding = channel.view_lagged_at(channel.times_like(std::move(at)), lags);
     if (n == 0)
     {
       return embedding;

@@ -474,7 +474,7 @@ namespace sb
   ///
   /// A channel either holds stored observations or is a view whose
   /// observations are those of a source channel: stacked at lagged times by
-  /// stack_at, or picked by index by view_at_indices. A view keeps its
+  /// view_lagged_at, or picked by index by view_at_indices. A view keeps its
   /// times, its lags, and for each observation a base: the source
   /// observation for the smallest lag. The other components are found by searching back from the
   /// base when read, so a view costs two numbers per observation and copies
@@ -504,13 +504,13 @@ namespace sb
     /// channel's observations in effect at times[k] - lags[j] for each j, in
     /// order. A lagged time before the first observation gets the first. It
     /// shares this channel and its snap settings.
-    [[nodiscard]] Channel stack_at(Times times, std::span<const float64_t> lags) const;
+    [[nodiscard]] Channel view_lagged_at(Times times, std::span<const float64_t> lags) const;
 
     /// A view of this channel's observations @p indices, strictly
     /// increasing, at their times, with no new axis. It shares this channel
     /// and its snap settings, but not its start or end. For a view with one
-    /// component, as view_at_indices and stack_at with one lag make, it
-    /// shares that view's source instead, at the indices the view reads
+    /// component, as view_at_indices and view_lagged_at with one lag make,
+    /// it shares that view's source instead, at the indices the view reads
     /// there, so chains of views stay one level deep.
     [[nodiscard]] Channel view_at_indices(std::vector<size_t> indices) const;
 
@@ -523,8 +523,8 @@ namespace sb
     /// This channel with the end @p end, in its unit: it can be evaluated
     /// after its last timestamp up to @p end, and at @p end if @p closed.
     /// @p end must come after the last timestamp, or be at it if @p closed,
-    /// which is the same as setting no end. Views made by stack_at keep the
-    /// end.
+    /// which is the same as setting no end. Views made by view_lagged_at
+    /// keep the end.
     [[nodiscard]] Channel until(float64_t end, bool closed = false) const;
 
     /// The end set by until(), if any; without one, the channel can be
@@ -537,7 +537,7 @@ namespace sb
 
     /// This channel with its first timestamp in the domain if @p closed. If
     /// not, the first observation still stays in effect after it. Views made
-    /// by stack_at keep the start.
+    /// by view_lagged_at keep the start.
     [[nodiscard]] Channel with_start_closed(bool closed) const;
 
     /// This channel with its timestamps, end, and origin, and for a view its

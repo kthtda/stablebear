@@ -127,7 +127,7 @@ namespace sb
   }
 
   template <typename T>
-  Channel<T> Channel<T>::stack_at(Times times, std::span<const float64_t> lags) const
+  Channel<T> Channel<T>::view_lagged_at(Times times, std::span<const float64_t> lags) const
   {
     if (lags.empty())
     {
@@ -415,7 +415,8 @@ namespace sb
   template <typename T>
   size_t Channel<T>::source_index(size_t k, size_t j) const
   {
-    // A single component is the base, given by view_at_indices or found by stack_at.
+    // A single component is the base, given by view_at_indices or found by
+    // view_lagged_at.
     if (m_lags.size() == 1)
     {
       return (*m_base)[k];

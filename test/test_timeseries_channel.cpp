@@ -84,7 +84,7 @@ namespace
   TEST(ChannelTest, AViewAtIndicesOfAViewAtOneLagReadsWhatTheViewReads)
   {
     const std::vector<double> lags{2.0};
-    const auto lagged = channel_of_ten().stack_at(sb::Times(std::vector<double>{3.0, 5.0, 8.0}), lags);
+    const auto lagged = channel_of_ten().view_lagged_at(sb::Times(std::vector<double>{3.0, 5.0, 8.0}), lags);
 
     const auto picked = lagged.view_at_indices({0, 2});
 
@@ -111,7 +111,7 @@ namespace
   TEST(ChannelTest, WithTimesOfAViewWithSeveralLagsThrows)
   {
     const std::vector<double> lags{0.0, 2.0};
-    const auto embedded = channel_of_ten().stack_at(sb::Times(std::vector<double>{3.0, 5.0}), lags);
+    const auto embedded = channel_of_ten().view_lagged_at(sb::Times(std::vector<double>{3.0, 5.0}), lags);
 
     EXPECT_THROW((void)embedded.with_times(sb::Times(std::vector<double>{0.0, 1.0})), std::logic_error);
   }
