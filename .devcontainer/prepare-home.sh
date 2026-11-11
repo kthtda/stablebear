@@ -29,7 +29,7 @@ for directory in "$copy_root" "$stage_root"; do
         echo "Staging directory must be owned by the current user: $directory" >&2
         exit 1
     fi
-    chmod 700 -- "$directory"
+    chmod -- 700 "$directory"
 done
 
 needs_copy() {
@@ -65,12 +65,13 @@ stage() {
         if [[ -L "$destination" ]]; then
             rm -f -- "$destination"
         fi
-        # -u keeps files the container changed after the host did.
+        # --update keeps files the container changed after the host did. cp -u is
+        # GNU-only, so use rsync, which macOS also ships.
         if [[ -d "$source" ]]; then
             mkdir -p -- "$destination"
-            cp -R -p -u -- "$source/." "$destination/"
+            rsync -a --update -- "$source/" "$destination/"
         else
-            cp -p -u -- "$source" "$destination"
+            rsync -a --update -- "$source" "$destination"
         fi
         echo "Copied $source for the devcontainer (container changes stay in $destination)"
     else
