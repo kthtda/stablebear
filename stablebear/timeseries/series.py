@@ -780,18 +780,35 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         if self.n_channels == 1:
             return pd.Series(np.asarray(self.values),
                              index=self._pandas_index(pd, np.asarray(self._data.times(0)) + offsets[0], resolution))
-        placed = np.unique(np.concatenate([np.asarray(self._data.times(i)) + offset
-                                           for i, offset in enumerate(offsets)]))
-        index = self._pandas_index(pd, placed, resolution)
+        # The index is the union of the channels' times rounded to labels,
+        # so that one instant held as two floats, as shifting a channel by
+        # its epoch can leave it, gives one label.
+        times = [np.asarray(self._data.times(i)) for i in range(self.n_channels)]
+        labels = [self._pandas_index(pd, t + offset, resolution) for t, offset in zip(times, offsets)]
+        placed = pd.Series(np.concatenate([t + offset for t, offset in zip(times, offsets)]),
+                           index=labels[0].append(labels[1:]))
+        placed = placed.groupby(level=0).first()
+        index = placed.index
         columns = {}
         for i, offset in enumerate(offsets):
-            # The value in effect at every time of the union in the channel's
-            # domain, and NaN outside it.
+            # The value in effect at every label of the union in the
+            # channel's domain, and NaN outside it. The domain is checked on
+            # labels too, and a label is evaluated at the channel's own time
+            # if it has one there, else at the first time placed there,
+            # moved into the domain if it missed a closed end by rounding.
             channel = self[i]
-            t = placed - offset
+            own = pd.Series(times[i], index=labels[i]).groupby(level=0).last().reindex(index)
             start, end, start_closed, end_closed = channel._data.domain
-            inside = ((t > start) | (start_closed & (t == start))) & ((t < end) | (end_closed & (t == end)))
-            values = np.asarray(channel._evaluate_numbers(FloatTensor(t[inside]))) if inside.any() else []
+            after_start, before_end = np.full(len(index), True), np.full(len(index), True)
+            if np.isfinite(start):
+                start_label = self._pandas_index(pd, np.array([start + offset]), resolution)[0]
+                after_start = (index > start_label) | (start_closed & (index == start_label))
+            if np.isfinite(end):
+                end_label = self._pandas_index(pd, np.array([end + offset]), resolution)[0]
+                before_end = (index < end_label) | (end_closed & (index == end_label))
+            inside = own.notna().to_numpy() | (after_start & before_end)
+            t = np.clip(own.fillna(placed - offset).to_numpy()[inside], start, end)
+            values = np.asarray(channel._evaluate_numbers(FloatTensor(t))) if inside.any() else []
             columns[i] = pd.Series(values, index=index[inside], dtype=np.asarray(channel.values).dtype).reindex(index)
         return pd.DataFrame(columns, index=index)
 

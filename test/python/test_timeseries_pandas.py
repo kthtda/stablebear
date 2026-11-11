@@ -405,6 +405,22 @@ def test_to_pandas_of_channels_with_different_times_holds_each_value_in_its_doma
     pd.testing.assert_frame_equal(converted, expected)
 
 
+def test_to_pandas_of_channels_with_different_epochs_gives_one_label_per_instant():
+    # Shifting b by 10 minutes in hours places its time at 00:50 an ulp
+    # after that of a, which is the closed end of a.
+    a = TimeSeries.from_pandas(pd.Series([0.0, 10.0, 20.0, 30.0, 40.0, 50.0],
+                                         index=pd.date_range("2023-01-01T00:00", periods=6, freq="10min")))
+    b = TimeSeries.from_pandas(pd.Series([10.0, 20.0, 30.0, 40.0, 50.0, 60.0],
+                                         index=pd.date_range("2023-01-01T00:10", periods=6, freq="10min")))
+
+    converted = TimeSeries.from_channels([a.to("h"), b.to("h")]).to_pandas()
+
+    expected = pd.DataFrame({0: [0.0, 10.0, 20.0, 30.0, 40.0, 50.0, np.nan],
+                             1: [np.nan, 10.0, 20.0, 30.0, 40.0, 50.0, 60.0]},
+                            index=pd.date_range("2023-01-01T00:00", periods=7, freq="10min").as_unit("us"))
+    pd.testing.assert_frame_equal(converted, expected, check_freq=False)
+
+
 def test_to_pandas_of_integer_channels_in_their_domains_keeps_integers():
     # Channel b has an observation at 1 s, where channel a holds 1.
     a = TimeSeries([1, 2], times=TimeDeltaTensor([0.0, 2.0], "s"))
