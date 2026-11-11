@@ -258,7 +258,10 @@ namespace sb
     {
       lag = convert_time(lag, from, to);
     }
-    if (m_source)
+    // A view with several lags reads its source at its own times less its
+    // lags, so the source moves to the same unit. One with one lag reads it
+    // by index only, so it stays as it is.
+    if (m_source && m_lags.size() > 1)
     {
       channel.m_source = std::make_shared<const Channel>(m_source->to(from, to));
     }
@@ -280,8 +283,10 @@ namespace sb
     {
       channel.m_end = *m_end + delta;
     }
-    // A view reads its source at its own times minus its lags.
-    if (m_source)
+    // A view with several lags reads its source at its own times less its
+    // lags, so the source shifts alike. One with one lag reads it by index
+    // only, so it stays as it is.
+    if (m_source && m_lags.size() > 1)
     {
       channel.m_source = std::make_shared<const Channel>(m_source->shifted(delta));
     }

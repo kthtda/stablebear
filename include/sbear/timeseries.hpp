@@ -541,13 +541,16 @@ namespace sb
     [[nodiscard]] Channel with_start_closed(bool closed) const;
 
     /// This channel with its timestamps, end, and origin, and for a view its
-    /// lags and source, converted from @p from to @p to as convert_time()
-    /// converts them, so that timestamps without a unit become counts of
-    /// @p to. It shares the observations.
+    /// lags, converted from @p from to @p to as convert_time() converts
+    /// them, so that timestamps without a unit become counts of @p to. A
+    /// view with several lags, which reads its source at its times less its
+    /// lags, converts its source alike; one with one lag reads it by index
+    /// and leaves it. It shares the observations.
     [[nodiscard]] Channel to(TimeUnit from, TimeUnit to) const;
 
     /// This channel with @p delta added to every timestamp and to its end. A
-    /// view shifts its source alike, so it reads the same observations. It
+    /// view with several lags shifts its source alike, so it reads the same
+    /// observations; one with one lag reads it by index and leaves it. It
     /// shares the observations; only the timestamps are copied.
     [[nodiscard]] Channel shifted(float64_t delta) const;
 

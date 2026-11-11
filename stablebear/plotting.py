@@ -404,10 +404,11 @@ def _rows(ax, n_channels):
 
 def _plot_channels(series, axes, *, unit, **options):
     """Plot each channel of ``series`` on its own axes, in one time unit."""
+    from .timeseries.date_time import _unit_name
     # The unit is resolved once, from the first row, so that every row uses
     # it even on axes that do not share x.
     if series.epoch is None or options["relative"]:
-        requested = None if unit is None else series.to(unit).unit
+        requested = None if unit is None else _unit_name(unit)
         unit = _time_axis_unit(axes[0], requested or series.unit, requested)
     unlabeled = [not row.get_xlabel() for row in axes]
     lines = [line for i, row in enumerate(axes) for line in plot_timeseries(series[i], ax=row, unit=unit, **options)]
@@ -487,7 +488,7 @@ def plot_timeseries(series, ax=None, *, unit=None, relative=False, markers=False
     numbers, on an axis labeled ``time``, which a time series with a unit
     cannot share.
     """
-    from .timeseries.date_time import TimeDeltaTensor
+    from .timeseries.date_time import TimeDeltaTensor, _unit_name
     from .timeseries.series import TimeSeriesTensor
 
     options: dict[str, Any] = dict(unit=unit, relative=relative, markers=markers, **kwargs)
@@ -514,7 +515,7 @@ def plot_timeseries(series, ax=None, *, unit=None, relative=False, markers=False
             raise ValueError("The x axis is a time axis" + ("" if units == _NO_UNIT else f" in {units!r}")
                              + ", not a date axis")
     else:
-        requested = None if unit is None else series.to(unit).unit
+        requested = None if unit is None else _unit_name(unit)
         axis_unit = _time_axis_unit(ax, requested or series.unit, requested)
         if axis_unit is not None:
             series = series.to(axis_unit)

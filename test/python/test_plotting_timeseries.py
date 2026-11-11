@@ -176,6 +176,13 @@ def test_relative_draws_each_window_from_zero(ax):
     assert [np.asarray(line.get_xdata()).tolist() for line in lines] == [[0.0, 1.0, 2.0]] * 3
 
 
+def test_relative_with_a_unit_draws_each_window_from_zero_in_that_unit(ax):
+    lines = plot_timeseries(_windows(), ax=ax, relative=True, unit="ms")
+
+    assert [np.asarray(line.get_xdata()).tolist() for line in lines] == [[0.0, 1000.0, 2000.0]] * 3
+    assert ax.get_xlabel() == "time (ms)"
+
+
 def test_an_empty_tensor_draws_nothing(ax):
     assert plot_timeseries(_windows()[0:0], ax=ax) == []
     assert ax.get_lines() == []

@@ -565,6 +565,57 @@ def test_windows_of_an_embedding_hold_its_points():
     assert np.array_equal(np.asarray(windows[0].values), [[0.0, 5.0], [5.0, 15.0], [15.0, 25.0]])
 
 
+def _second_window():
+    # The window [1.0, 3.0) holds 5, 15, and 25 at 0.0, 0.5, and 1.5.
+    return cut_windows(_windows_source(), size=TimeDelta(2, "s"), step=TimeDelta(1, "s"), closed="left",
+                       partial=False, anchor="start")[1]
+
+
+def test_a_window_converted_to_milliseconds_holds_its_observations_at_the_converted_times():
+    converted = _second_window().to("ms")
+
+    assert np.array_equal(converted.times.count, [0.0, 500.0, 1500.0])
+    assert np.array_equal(np.asarray(converted.values), [5.0, 15.0, 25.0])
+    assert converted(TimeDelta(1200, "ms")) == 15.0
+
+
+def test_an_embedding_of_a_window_converted_to_milliseconds_holds_its_points():
+    embedding = delay_embed(_second_window(), dimension=2, delay=TimeDelta(1, "s"))
+
+    converted = embedding.to("ms")
+
+    assert np.array_equal(converted.times.count, [1000.0, 1500.0])
+    assert np.array_equal(np.asarray(converted.values), [[5.0, 15.0], [15.0, 25.0]])
+
+
+def test_a_window_of_an_embedding_converted_to_milliseconds_holds_its_points():
+    # Each point is [x(t - 1 s), x(t)], so the embedding starts at 1.0 s, the
+    # first time whose point one second earlier is in the source. It has
+    # points at 1.0, 1.5, 2.5, 3.5, and 4.0.
+    embedding = delay_embed(_windows_source(), dimension=2, delay=TimeDelta(1, "s"))
+    window = cut_windows(embedding, size=TimeDelta(2, "s"), step=TimeDelta(1, "s"), closed="left",
+                         partial=False, anchor="start")[0]
+
+    converted = window.to("ms")
+
+    assert np.array_equal(converted.times.count, [0.0, 500.0, 1500.0])
+    assert np.array_equal(np.asarray(converted.values), [[0.0, 5.0], [5.0, 15.0], [15.0, 25.0]])
+
+
+def test_a_window_shifted_to_an_earlier_epoch_holds_its_observations_at_its_dates():
+    # The later window holds 4 and 5 from 01:00, and is shifted by 1 h to
+    # count from the epoch of the earlier one.
+    early = TimeSeries([1.0, 2.0, 3.0], times=TimeDeltaTensor([0.0, 1.0, 2.0], "h"), epoch="2023-01-01")
+    late = TimeSeries([4.0, 5.0, 6.0], times=TimeDeltaTensor([0.0, 1.0, 2.0], "h"), epoch="2023-01-01T01:00")
+    windows = [cut_windows(series, size=TimeDelta(2, "h"), step=TimeDelta(1, "h"), closed="left", partial=False,
+                           anchor="start")[0] for series in (early, late)]
+
+    combined = TimeSeries.from_channels(windows)
+
+    assert np.array_equal(np.asarray(combined[1].values), [4.0, 5.0])
+    assert combined[1](DateTime("2023-01-01T02:30")) == 5.0
+
+
 def test_windows_cut_every_channel_at_the_same_bounds():
     # A's observations are 10 * t and B's are -10 * t, with t in seconds.
     a = TimeSeries([0.0, 10.0, 25.0], times=TimeDeltaTensor([0.0, 1.0, 2.5], "s"))
