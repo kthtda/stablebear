@@ -1,6 +1,6 @@
 # Time series general release: checklist
 
-Progress: 20 of 32 items, 40 of 53 points (75%)
+Progress: 21 of 32 items, 41 of 53 points (77%)
 
 From the release review of `issue-258-pandas` on 2026-11-08, in which each
 problem below was reproduced twice. The items correct behavior that the
@@ -266,7 +266,7 @@ Decisions for the maintainer: F2 (iterating a series).
 
 ## Phase F: the public API before it is frozen
 
-- [ ] **F1.** [1] `TimeSeries.__call__` and `TimeSeriesTensor.__call__`
+- [x] **F1.** [1] (5167bfe25) `TimeSeries.__call__` and `TimeSeriesTensor.__call__`
   (`series.py:968`, `:1220`) return `Any`, as `AGENTS.md` says for results
   that depend on the number of channels.
   Today: pyright types `series(t)` as `NestedTensor | Unknown` and flags
