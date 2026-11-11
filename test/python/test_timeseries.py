@@ -8,8 +8,8 @@ import pytest
 
 import stablebear as sb
 from stablebear.timeseries import (DateTime, DateTimeTensor, Domain, TimeDelta, TimeDeltaTensor, TimeSeries,
-                                   TimeSeriesDomainError, cut_windows, delay_embed, to_point_clouds)
-from stablebear.timeseries.series import TimeSeriesTensor
+                                   TimeSeriesDomainError, TimeSeriesTensor, cut_windows, delay_embed,
+                                   to_point_clouds)
 
 from _element_values import TWO_ELEMENTS_OF_EVERY_DTYPE
 from _round_trip import ROUND_TRIPS
@@ -1930,6 +1930,20 @@ def test_tensor_of_nested_lists_of_series_is_two_dimensional():
     assert tensor[1, 0].array_equal(c)
     assert tensor[1, 1].array_equal(b)
     assert tensor[1, 2].array_equal(a)
+
+
+def test_time_series_tensor_of_a_list_of_series_equals_the_tensor_of_the_list():
+    seconds = TimeSeries([10.0, 20.0, 30.0], times=TimeDeltaTensor([0.0, 1.0, 2.0], "s"))
+    minutes = TimeSeries([40.0, 50.0], times=TimeDeltaTensor([0.0, 3.0], "min"))
+
+    assert TimeSeriesTensor([seconds, minutes]).array_equal(sb.tensor([seconds, minutes]))
+
+
+def test_time_series_tensor_of_an_empty_list_takes_its_dtype():
+    tensor = TimeSeriesTensor([], dtype=sb.ts(sb.float32))
+
+    assert tensor.shape == (0,)
+    assert tensor.dtype is sb.ts(sb.float32)
 
 
 def test_tensor_of_series_takes_a_matching_dtype():

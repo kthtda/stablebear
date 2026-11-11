@@ -150,7 +150,7 @@ def tensor(data, dtype: Dtype | None = None) -> Any:  # Any: the type follows th
         the array (bool/int/float), while a collection of ``Pcf`` objects is
         inferred as a ``PcfTensor`` or ``IntPcfTensor``, and one of
         :class:`~stablebear.timeseries.TimeSeries` as a
-        :class:`~stablebear.timeseries.series.TimeSeriesTensor` of dtype
+        :class:`~stablebear.timeseries.TimeSeriesTensor` of dtype
         ``ts(value_type)``. The series may differ in their times, units,
         and channels, but not in the dtype of their observations. Other
         non-numeric tensors require an explicit dtype.

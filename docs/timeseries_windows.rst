@@ -50,7 +50,7 @@ on its domain :math:`[0, 4)`.
       :language: python
 
 The windows are returned as a
-:py:class:`~stablebear.timeseries.series.TimeSeriesTensor` of shape
+:py:class:`~stablebear.timeseries.TimeSeriesTensor` of shape
 ``(n,)``, where ``n`` is the number of windows (here ``n = 3``).
 Evaluating the tensor at some times evaluates every window at those times,
 in the time of the window. The result is a tensor with one axis for the

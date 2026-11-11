@@ -80,7 +80,7 @@ napoleon_type_aliases = {
     "SymmetricMatrix": "stablebear.symmetric_matrix.SymmetricMatrix",
     "SymmetricMatrixTensor": "stablebear.symmetric_matrix.SymmetricMatrixTensor",
     "TimeSeries": "stablebear.timeseries.TimeSeries",
-    "TimeSeriesTensor": "stablebear.timeseries.series.TimeSeriesTensor",
+    "TimeSeriesTensor": "stablebear.timeseries.TimeSeriesTensor",
     "Domain": "stablebear.timeseries.Domain",
     "TimeSeriesDomainError": "stablebear.timeseries.TimeSeriesDomainError",
     "DateTime": "stablebear.timeseries.DateTime",

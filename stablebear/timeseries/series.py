@@ -1385,10 +1385,22 @@ def _queries(t, unit=None):
 class TimeSeriesTensor(Tensor):
     """Tensor whose elements are :class:`TimeSeries`, such as the windows of
     a series. Its dtype is ``sb.ts(value_type)`` for series of ``value_type``
-    observations."""
+    observations.
 
-    def __init__(self, data):
+    Parameters
+    ----------
+    data : list of TimeSeries, or TimeSeriesTensor
+        The series, in a list or nested lists whose nesting gives the shape
+        of the tensor, as :func:`~stablebear.tensor_create.tensor` takes
+        them. The series must have one element type.
+    dtype : Dtype, optional
+        ``sb.ts(value_type)``; required for an empty list.
+    """
+
+    def __init__(self, data, dtype=None):
         super().__init__()
+        if isinstance(data, (list, tuple)):
+            data = TimeSeriesTensor._from_series(data, dtype)._data
         if isinstance(data, TimeSeriesTensor):
             data = data._data
         elif type(data) not in _SERIES_TENSOR_TO_DTYPE:

@@ -7,8 +7,7 @@ import pytest
 import stablebear as sb
 from stablebear import FloatTensor
 from stablebear.timeseries import (DateTime, DateTimeTensor, Domain, TimeDelta, TimeDeltaTensor, TimeSeries,
-                                   TimeSeriesDomainError, cut_windows, delay_embed)
-from stablebear.timeseries.series import TimeSeriesTensor
+                                   TimeSeriesDomainError, TimeSeriesTensor, cut_windows, delay_embed)
 
 from _element_values import TWO_ELEMENTS_OF_EVERY_DTYPE
 from _round_trip import ROUND_TRIPS

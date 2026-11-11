@@ -217,7 +217,7 @@ When passed a ``Pcf`` or a nested collection of PCFs, the factory infers a
 the PCF value dtype. A single ``Pcf`` becomes a one-element tensor.
 
 A list, or nested lists, of time series gives a
-:py:class:`~stablebear.timeseries.series.TimeSeriesTensor` with one series
+:py:class:`~stablebear.timeseries.TimeSeriesTensor` with one series
 per element (see :doc:`timeseries_channels`).
 
 
