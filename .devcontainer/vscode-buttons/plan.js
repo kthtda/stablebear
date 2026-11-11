@@ -82,6 +82,22 @@ function summary(text) {
   return plain(text.split(/\s(?:Tests|Note):/)[0]);
 }
 
+// The size of each item with points as a badge of its points on the right,
+// as git marks changed files, so that the icon on the left keeps showing
+// whether the item is done. Each such item has a resourceUri of this scheme
+// whose query holds its points.
+const ITEM_SCHEME = "stablebear-plan-item";
+
+class SizeDecorations {
+  provideFileDecoration(uri) {
+    const points = Number(uri.query);
+    if (uri.scheme !== ITEM_SCHEME || !points) {
+      return undefined;
+    }
+    return new vscode.FileDecoration(String(points), `${points} point${points === 1 ? "" : "s"}`);
+  }
+}
+
 function isDone(node) {
   return node.children.length ? node.children.every(isDone) : node.done;
 }
@@ -157,6 +173,13 @@ class PlanProvider {
       : done ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.Expanded;
     const item = new vscode.TreeItem(isPhase ? plain(node.label) : `${node.id}  ${summary(node.text)}`, state);
     item.iconPath = done ? DONE : TODO;
+    if (!isPhase && node.points) {
+      item.resourceUri = vscode.Uri.from({
+        scheme: ITEM_SCHEME,
+        path: `/${path.basename(this.file)}/${node.id}`,
+        query: String(node.points),
+      });
+    }
     if (isPhase) {
       const items = workItems([node]);
       item.description = `${items.filter((i) => i.done).length}/${items.length}`;
@@ -180,6 +203,7 @@ function activatePlan(context) {
   provider.refresh();
   context.subscriptions.push(provider.view);
   context.subscriptions.push(vscode.commands.registerCommand("stablebear.selectPlan", () => provider.select()));
+  context.subscriptions.push(vscode.window.registerFileDecorationProvider(new SizeDecorations()));
   const folder = vscode.workspace.workspaceFolders?.[0];
   if (folder) {
     const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(folder, PLAN_GLOB));

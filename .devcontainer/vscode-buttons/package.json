@@ -3,7 +3,7 @@
   "displayName": "Stablebear buttons",
   "description": "A Stablebear panel with actions for common development commands and the progress of a plan.",
   "publisher": "stablebear",
-  "version": "0.0.12",
+  "version": "0.0.21",
   "private": true,
   "engines": {
     "vscode": "^1.90.0"
