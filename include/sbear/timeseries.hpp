@@ -509,6 +509,9 @@ namespace sb
     /// A view of this channel whose times are @p times and whose observation
     /// k is this channel's observation @p indices[k], with no new axis. It
     /// shares this channel and its snap settings, but not its start or end.
+    /// For a view with one component, as take and stack_at with one lag
+    /// make, it shares that view's source instead, at the indices the view
+    /// reads there, so chains of views stay one level deep.
     [[nodiscard]] Channel take(Times times, std::vector<size_t> indices) const;
 
     /// This channel with the end @p end, in its unit: it can be evaluated

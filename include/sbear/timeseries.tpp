@@ -180,10 +180,24 @@ namespace sb
       }
     }
 
-    // One component at lag 0, whose base is the given index.
+    // One component at lag 0, whose base is the given index. A view with
+    // one component reads observation i of its source at its base i, so a
+    // view of it takes from that source directly: chains of views stay one
+    // level deep, and the views between are freed.
     Channel view = *this;
     view.m_storage = nullptr;
-    view.m_source = std::make_shared<const Channel>(*this);
+    if (m_source && m_lags.size() == 1)
+    {
+      for (auto& i : indices)
+      {
+        i = (*m_base)[i];
+      }
+      view.m_source = m_source;
+    }
+    else
+    {
+      view.m_source = std::make_shared<const Channel>(*this);
+    }
     view.m_times = std::make_shared<const Times>(std::move(times));
     view.m_base = std::make_shared<const std::vector<size_t>>(std::move(indices));
     view.m_lags = {0.0};

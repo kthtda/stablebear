@@ -54,6 +54,37 @@ namespace
     EXPECT_LT(shifted.time(1), shifted.time(2));
   }
 
+  // Observations 0, 1, ..., 9 at 0 s, 1 s, ..., 9 s.
+  sb::Channel<double> channel_of_ten()
+  {
+    std::vector<double> times{0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0};
+    std::vector<double> values(times);
+    return sb::Channel<double>(sb::Times(std::move(times)), {}, std::move(values));
+  }
+
+  TEST(ChannelTest, ATakeOfATakeReadsTheObservationsBothPick)
+  {
+    const auto first = channel_of_ten().take(sb::Times(std::vector<double>{0.0, 1.0, 2.0}), {2, 5, 7});
+
+    const auto second = first.take(sb::Times(std::vector<double>{0.0, 1.0}), {2, 0});
+
+    // Observation 2 of first is 7, and observation 0 is 2.
+    EXPECT_EQ(second.flat_value(0), 7.0);
+    EXPECT_EQ(second.flat_value(1), 2.0);
+  }
+
+  TEST(ChannelTest, ATakeOfAViewAtOneLagReadsWhatTheViewReads)
+  {
+    const std::vector<double> lags{2.0};
+    const auto lagged = channel_of_ten().stack_at(sb::Times(std::vector<double>{3.0, 5.0, 8.0}), lags);
+
+    const auto taken = lagged.take(sb::Times(std::vector<double>{0.0, 1.0}), {2, 0});
+
+    // The view reads 1, 3, and 6, two seconds before 3 s, 5 s, and 8 s.
+    EXPECT_EQ(taken.flat_value(0), 6.0);
+    EXPECT_EQ(taken.flat_value(1), 1.0);
+  }
+
   TEST(TimeSinceTest, AUnitWithoutALengthThrows)
   {
     const sb::DateTime date(10, sb::TimeUnit::Seconds);
