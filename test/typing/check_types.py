@@ -66,3 +66,10 @@ assert_type(to_point_clouds(observed), sb.PointCloud)
 assert_type(to_point_clouds(cut_windows(observed, size=hour, step=hour)), sb.PointCloudTensor)
 assert_type(sb.stack(observed), TimeSeries)
 assert_type(sb.concatenate(observed), TimeSeries)
+
+# A call returns a number, a tensor, or a NestedTensor, depending on the
+# number of channels, so its result takes arithmetic as each of them does.
+windows = cut_windows(observed, size=hour, step=hour)
+_ = float(observed(hour))
+_ = observed(hours) * 2.0
+_ = windows(hours) * 2.0

@@ -1164,7 +1164,7 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         return (isinstance(other, TimeSeries) and other.dtype is self.dtype
                 and self._data.array_equal(other._data))
 
-    def __call__(self, t, unit: str | None = None):
+    def __call__(self, t, unit: str | None = None) -> Any:  # Depends on the number of channels; see the docstring.
         """Each channel's observation with the largest timestamp at or before ``t``.
 
         A ``t`` just below a timestamp snaps forward to it, by each
@@ -1424,7 +1424,7 @@ class TimeSeriesTensor(Tensor):
     def _get_valid_setitem_dtypes(self):
         return [TimeSeries, TimeSeriesTensor]
 
-    def __call__(self, t, unit: str | None = None):
+    def __call__(self, t, unit: str | None = None) -> Any:  # Depends on the number of channels; see the docstring.
         """Every series evaluated at the times ``t``, as
         :meth:`~stablebear.timeseries.TimeSeries.__call__` does: durations, or
         numbers of ``unit``, for series with a unit, and plain numbers without
