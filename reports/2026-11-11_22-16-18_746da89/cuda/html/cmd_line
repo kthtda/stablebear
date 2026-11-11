@@ -1,0 +1,1 @@
+genhtml covreport/cuda/cuda.info --output-directory covreport/cuda/html --branch-coverage --flat
