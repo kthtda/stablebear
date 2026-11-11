@@ -1,6 +1,6 @@
 # Time series general release: checklist
 
-Progress: 22 of 32 items, 43 of 53 points (81%)
+Progress: 23 of 32 items, 44 of 53 points (83%)
 
 From the release review of `issue-258-pandas` on 2026-11-08, in which each
 problem below was reproduced twice. The items correct behavior that the
@@ -287,7 +287,7 @@ Decisions for the maintainer: none open.
   that does not iterate should have no length either; `n_observations`
   counts the observations. Without `__len__`, pyright flags
   `len(series)`, and `bool(series)` stays true.
-- [ ] **F3.** [1] `TimeSeriesTensor` is exported from
+- [x] **F3.** [1] (41337974b) `TimeSeriesTensor` is exported from
   `stablebear.timeseries`, and its constructor takes a list of series as
   `sb.tensor` does; `docs/conf.py:83`, `api_timeseries.rst:10`,
   `timeseries_windows.rst:53`, and `tensors.rst:220` name it there.
