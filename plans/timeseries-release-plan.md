@@ -1,6 +1,6 @@
 # Time series general release: checklist
 
-Progress: 26 of 32 items, 47 of 53 points (89%)
+Progress: 30 of 32 items, 51 of 53 points (96%)
 
 From the release review of `issue-258-pandas` on 2026-11-08, in which each
 problem below was reproduced twice. The items correct behavior that the
@@ -309,22 +309,22 @@ Decisions for the maintainer: none open.
 
 ## Phase G: guide pages
 
-- [ ] **G1.** [1] The From pandas page (`docs/timeseries_pandas.rst:63-68`)
+- [x] **G1.** [1] (b3e809e0d) The From pandas page (`docs/timeseries_pandas.rst:63-68`)
   sends windows and embeddings through `to_point_clouds` before
   `compute_persistent_homology`, which raises for them, and the dtype error
   of `compute_persistent_homology` for a tensor of series names
   `to_point_clouds`.
-- [ ] **G2.** [1] The Dates page (`docs/timeseries_dates.rst:71-75`) says
+- [x] **G2.** [1] (b3e809e0d) The Dates page (`docs/timeseries_dates.rst:71-75`) says
   that `from_channels` counts channels with different epochs from the
   earliest, and that channels with and without an epoch do not combine.
-- [ ] **G3.** [1] The examples run as written:
+- [x] **G3.** [1] (b3e809e0d) The examples run as written:
   `sb.stack(TimeSeries.from_channels([a, b], unit="s"))` in
   `timeseries_channels.rst:244-247`, the imports of the block in
   `timeseries_snapping.rst:59-66`, and `dated` and `domain` in the
   `restrict` recipe of `timeseries_windows.rst:300`. The `TimeSeries`
   docstring (`series.py:399-404`) names the operations that take a series
   instead of claiming every element-wise one.
-- [ ] **G4.** [1] `docs/saving.rst` lists series and tensors of series
+- [x] **G4.** [1] (b3e809e0d) `docs/saving.rst` lists series and tensors of series
   among what can be saved, and the `TimeSeries` docstring
   (`series.py:380-382`) no longer says each channel keeps its unit.
 
