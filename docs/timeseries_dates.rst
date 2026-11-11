@@ -27,8 +27,8 @@ converts them to hours::
 
 The differences between the dates are taken in integers and converted to
 the unit once, so whole multiples of the unit, such as the 0.5 h here, are
-exact. A ``datetime64`` array or a pandas ``DatetimeIndex`` gives the same
-times. Pass ``epoch=`` to :py:class:`~stablebear.timeseries.TimeSeries` to
+exact. A ``datetime64`` array, a pandas ``DatetimeIndex``, or a list of
+date strings or ``datetime`` objects gives the same times. Pass ``epoch=`` to :py:class:`~stablebear.timeseries.TimeSeries` to
 count from another date and time instead.
 
 Epochs

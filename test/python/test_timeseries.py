@@ -910,6 +910,29 @@ def test_series_from_datetimes_counts_their_resolution_from_the_first():
     assert sb.FloatTensor([0.0, 1.0, 60.0], dtype=sb.float64).array_equal(series.times.count)
 
 
+@pytest.mark.parametrize("dates", [
+    pytest.param([datetime.datetime(2023, 1, 1, 6), datetime.datetime(2023, 1, 1, 7, 30)], id="datetimes"),
+    pytest.param([datetime.date(2023, 1, 1), datetime.date(2023, 1, 3)], id="dates"),
+    pytest.param([DateTime("2023-01-01T06:00"), DateTime("2023-01-01T07:30")], id="date_times"),
+    pytest.param(["2023-01-01T06:00", "2023-01-01T07:30"], id="strings"),
+    pytest.param(("2023-01-01T06:00", "2023-01-01T07:30"), id="tuple_of_strings"),
+])
+def test_series_from_a_list_of_dates_equals_the_series_from_their_tensor(dates):
+    series = TimeSeries([10.0, 20.0], times=dates)
+
+    assert series.array_equal(TimeSeries([10.0, 20.0], times=DateTimeTensor(dates)))
+
+
+def test_series_from_a_list_of_dates_and_durations_raises():
+    with pytest.raises(TypeError, match="mix"):
+        TimeSeries([10.0, 20.0], times=["2023-01-01T06:00", TimeDelta(1, "h")])
+
+
+def test_series_from_dates_with_a_unit_raises():
+    with pytest.raises(TypeError, match="no unit"):
+        TimeSeries([10.0, 20.0], times=(["2023-01-01T06:00", "2023-01-01T07:30"], "h"))
+
+
 def _dated_series():
     return TimeSeries([10.0, 20.0, 30.0], times=TimeDeltaTensor([0.0, 1.5, 4.0], "h"), epoch="2023-01-01")
 

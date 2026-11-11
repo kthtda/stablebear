@@ -55,11 +55,16 @@ def _checked_dates(dates):
     return dates
 
 
+def _is_date(t):
+    """Whether ``t`` is a date and time that :class:`DateTime` accepts."""
+    return isinstance(t, (str, datetime.date, np.datetime64, DateTime))
+
+
 def _dates_of(t):
     """``t`` as a checked ``datetime64`` array if it is dates and times:
     a :class:`DateTime` or a value it accepts, a :class:`DateTimeTensor`, or
     an array, sequence, or pandas object of them; else ``None``."""
-    if isinstance(t, (str, datetime.date, np.datetime64, DateTime)):
+    if _is_date(t):
         return np.asarray(DateTime(t).to_datetime64())
     if isinstance(t, DateTimeTensor):
         return t.to_datetime64()
@@ -277,6 +282,14 @@ def _native_times(times, unit=None, epoch=None):
     timestamps, a float64 array, the unit, and the native epoch or ``None``.
     A plain array is in ``unit``, by default none."""
     times = _from_pair(times)
+    if isinstance(times, tuple) and len(times) == 2 and np.ndim(times[0]) > 0 and isinstance(times[1], str):
+        # A pair of an array and a unit that _from_pair left alone holds
+        # dates or strings.
+        raise TypeError("Dates and times have no unit; pass them alone and convert the series with .to(unit)")
+    if isinstance(times, (list, tuple)) and any(_is_date(t) for t in times):
+        if not all(_is_date(t) for t in times):
+            raise TypeError("Times must be all durations or all dates and times, not a mix")
+        times = DateTimeTensor(times)
     if isinstance(times, TimeDeltaTensor):
         # Counts in one unit, by default theirs, converted by one exact
         # factor; the short name of unit, which may be an alias.
@@ -573,11 +586,13 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         ``([0.0, 1.5], "h")``, a ``timedelta64`` array, a sequence of
         :class:`TimeDelta` or other durations, or a pandas
         ``TimedeltaIndex``. Dates and times are a :class:`DateTimeTensor`, a
-        ``datetime64`` array, or a pandas ``DatetimeIndex`` or ``Series`` of
-        dates, whose timezone, if any, is converted to UTC and dropped; they
-        are counted from ``epoch``, which defaults to the first of them. The
+        ``datetime64`` array, a list of values that :class:`DateTime`
+        accepts, such as ``datetime`` objects or date strings, or a pandas
+        ``DatetimeIndex`` or ``Series`` of dates, whose timezone, if any, is
+        converted to UTC and dropped; they take no unit and are counted from
+        ``epoch``, which defaults to the first of them. The
         :attr:`unit` is that of the durations or dates: the unit of a
-        ``TimeDeltaTensor``, the resolution of an array or index, such as
+        ``TimeDeltaTensor`` or ``DateTimeTensor``, the resolution of an array or index, such as
         minutes for a ``timedelta64[m]`` array, or the finest unit of a
         sequence of durations. A plain array of numbers gives a series
         without a unit, whose :attr:`unit` is ``None``.

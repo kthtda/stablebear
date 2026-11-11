@@ -182,13 +182,15 @@ Decisions for the maintainer: F2 (iterating a series).
   their domains.
 - [ ] **C4.** [2] `TimeSeries(values, times)` takes lists of `datetime`,
   `pd.Timestamp`, `DateTime`, or date strings as dates, through
-  `DateTimeTensor`, and lists of `(count, unit)` tuples as durations,
-  through `TimeDeltaTensor`, as calling a series does. A `(dates, unit)`
-  tuple raises `TypeError`.
+  `DateTimeTensor`, as calling a series does. A `(dates, unit)` tuple
+  raises `TypeError`.
   Today: a list of `datetime` raises "float() argument must be a string or a
   real number".
   Tests: each list equals its tensor; a list of dates and durations raises;
   a `(dates, unit)` tuple raises.
+  Note: lists of `(count, unit)` tuples were dropped, since neither calls
+  nor `TimeDeltaTensor` take them; `(counts, unit)` already gives
+  durations.
 - [ ] **C5.** [1] Calls take dates in the same forms everywhere: a list of
   `DateTime` in a call of a series, a tuple of date strings in a call of a
   `TimeSeriesTensor`, and `datetime64` with a multiple, such as

@@ -125,6 +125,14 @@ def test_series_at_index_of_durations_equals_series_at_its_values():
     assert _dated_series()(index).array_equal(_dated_series()(index.to_numpy()))
 
 
+def test_series_from_a_list_of_timestamps_equals_the_series_from_their_tensor():
+    stamps = [pd.Timestamp("2023-01-01T06:00"), pd.Timestamp("2023-01-01T07:30")]
+
+    series = TimeSeries([10.0, 20.0], times=stamps)
+
+    assert series.array_equal(TimeSeries([10.0, 20.0], times=DateTimeTensor(stamps)))
+
+
 def test_from_pandas_with_index_of_dates_counts_from_the_first_date():
     index = pd.DatetimeIndex(["2023-01-01T01:00", "2023-01-01T02:00", "2023-01-01T04:00"])
 
