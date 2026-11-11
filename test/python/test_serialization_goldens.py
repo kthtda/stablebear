@@ -51,14 +51,14 @@ def _assert_series(actual, expected):
     assert actual.n_channels == len(expected["channels"])
     for i, channel in enumerate(expected["channels"]):
         one = actual[i]
-        _assert_array(one.times, channel["times"])
+        _assert_array(one.times.count, channel["times"])
         _assert_expected(one.values, channel["values"])
         for evaluation in channel["evaluations"]:
             if evaluation.get("outside"):
                 with pytest.raises(ValueError, match="outside the domain"):
-                    one(evaluation["t"])
+                    one(evaluation["t"], one.unit)
             else:
-                _assert_array(one(evaluation["t"]), evaluation["value"])
+                _assert_array(one(evaluation["t"], one.unit), evaluation["value"])
 
 
 def _assert_expected(actual, expected):

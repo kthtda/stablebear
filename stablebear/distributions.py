@@ -8,13 +8,23 @@ finite scalar or array-like values to evaluate weights.
 
 import math
 from abc import ABC, abstractmethod
+from typing import overload
 
 import numpy as np
+from numpy.typing import ArrayLike
 
 from . import _sb_cpp as cpp
 from ._validation import _real
 
 __all__ = ["Distribution", "Gaussian", "Uniform", "Mixture"]
+
+
+@overload
+def _evaluate(native, values: float) -> float: ...
+
+
+@overload
+def _evaluate(native, values: ArrayLike) -> np.ndarray: ...
 
 
 def _evaluate(native, values):
@@ -52,7 +62,7 @@ class Distribution(ABC):
         raise AttributeError(f"{type(self).__name__} is immutable")
 
     @abstractmethod
-    def _fields(self):
+    def _fields(self) -> tuple[tuple[str, object], ...]:
         """Return ``(name, value)`` pairs of the constructor parameters."""
 
     def __repr__(self):
@@ -66,6 +76,12 @@ class Distribution(ABC):
 
     def __hash__(self):
         return hash((type(self), self._fields()))
+
+    @overload
+    def weight(self, values: float) -> float: ...
+
+    @overload
+    def weight(self, values: ArrayLike) -> np.ndarray: ...
 
     @abstractmethod
     def weight(self, values):
@@ -82,6 +98,7 @@ class Distribution(ABC):
             Scalar input returns a float; array-like input returns a float64
             array with the same shape. Values are not normalized over the array.
         """
+        raise NotImplementedError
 
     @abstractmethod
     def plot_range(self):
@@ -122,6 +139,12 @@ class Gaussian(Distribution):
 
     def _fields(self):
         return ("mean", self.mean), ("std", self.std)
+
+    @overload
+    def weight(self, values: float) -> float: ...
+
+    @overload
+    def weight(self, values: ArrayLike) -> np.ndarray: ...
 
     def weight(self, values):
         """Evaluate the normalized Gaussian density at finite real values.
@@ -174,6 +197,12 @@ class Uniform(Distribution):
 
     def _fields(self):
         return ("start", self.start), ("end", self.end)
+
+    @overload
+    def weight(self, values: float) -> float: ...
+
+    @overload
+    def weight(self, values: ArrayLike) -> np.ndarray: ...
 
     def weight(self, values):
         """Evaluate the interval density, or unit weight if unbounded, at finite real values.
@@ -254,6 +283,12 @@ class Mixture(Distribution):
 
     def _fields(self):
         return ("distributions", self.distributions), ("coefficients", self.coefficients)
+
+    @overload
+    def weight(self, values: float) -> float: ...
+
+    @overload
+    def weight(self, values: ArrayLike) -> np.ndarray: ...
 
     def weight(self, values):
         """Evaluate the coefficient-weighted sum of component weights at finite real values.

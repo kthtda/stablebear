@@ -18,10 +18,11 @@ an NVIDIA GPU). Everything below is shared unless noted.
 - **Python 3.10** in a venv at `/opt/venv` (auto on `PATH`). Deps are
   installed at image-build time straight from the repo's canonical lists, so
   there's no second copy to maintain:
-  - runtime + test deps from `pyproject.toml` (`[project].dependencies` +
-    `[tool.cibuildwheel].test-requires`), read via `tomli`;
+  - runtime deps from `pyproject.toml` (`[project].dependencies`), read via
+    `tomli`, and test deps from its `test` dependency group;
   - Sphinx docs deps from `docs/requirements.txt`.
 - **Node 20** + `@anthropic-ai/claude-code` (run `claude` in the terminal).
+- **Pyright** in the venv (run `pyright`), configured by `pyrightconfig.json`.
 - **Codex**: the CLI and VS Code extension trust `/workspaces/stablebear` and
   use `danger-full-access` inside the container, avoiding a redundant nested
   OS sandbox. State-changing Git commands still require explicit user
@@ -50,9 +51,11 @@ an NVIDIA GPU). Everything below is shared unless noted.
   CLI need not be installed. It needs Node.js 18 or newer, and loads nvm from
   `${NVM_DIR:-~/.nvm}` if present. Extra arguments go to `devcontainer up`.
 
-First start runs `postCreateCommand`: submodule init, then the cmake build + install
-(`debug` preset for GPU, `debug-nocuda` for CPU). The extensions are built and
-symlinked into `stablebear/` -- not pip-installed.
+First start runs `postCreateCommand`, which only initializes submodules. Neither
+config builds the extensions on creation, and CMake Tools does not configure on
+open (`cmake.configureOnOpen` is off). Build manually with the build loop below
+(`debug` preset for GPU, `debug-nocuda` for CPU); `cmake --install` symlinks the
+extensions into `stablebear/` -- they are not pip-installed.
 
 ## Verify
 
@@ -118,8 +121,17 @@ edit `devcontainer.json` and narrow the first mount to
 
 Both devcontainer configs bind-mount the host's `~/.codex/auth.json` to
 `/home/ubuntu/.codex/auth.json`, so a file-based Codex login is available in
-the container and survives rebuilds. The host file must exist before opening
-the devcontainer. Codex configuration and rules remain container-specific.
+the container and survives rebuilds. Codex configuration and rules remain
+container-specific.
+
+## Hosts without Claude Code or Codex
+
+`~/.claude`, `~/.claude.json`, and `~/.codex/auth.json` need not exist on the
+host. For each one missing, `.devcontainer/prepare-home.sh` stages an empty
+one (an empty directory, or `{}`) in `.devcontainer/.local/home/`, so the
+mounts still work and the tool starts logged out. A login or other state
+saved in the container stays there across rebuilds. If the host file appears
+later, the next start uses it, as described below.
 
 ## Home directories on AFS
 

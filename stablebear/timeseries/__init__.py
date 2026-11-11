@@ -1,9 +1,10 @@
 __before = set(dir())
 
-from .embedding import TimeDelayEmbedding
-from .date_time import DateTime
-from .series import Domain, Times, TimeSeries
-from .window import Window
+from .embedding import delay_embed
+from .point_clouds import to_point_clouds
+from .date_time import DateTime, DateTimeTensor, TimeDelta, TimeDeltaTensor
+from .series import Domain, TimeSeries, TimeSeriesDomainError, TimeSeriesTensor
+from .window import cut_windows
 
 import types as _types
 __all__ = sorted(

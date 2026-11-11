@@ -6,15 +6,18 @@ step function it evaluates to, with matplotlib. Each value holds from its
 observation until the next one, and the last until the end of the domain.
 Only time series of numbers can be drawn; for other elements, such as point
 clouds or barcodes, evaluate the time series and plot the elements
-themselves. The time axis is labeled with the unit of the time series. With
-``markers=True``, each observation is marked with a dot, which also shows
-the last value, held only at the end of the domain, here 4 at 3.5 s::
+themselves. The time axis is labeled with the unit of the time series, or
+just "time" for a time series without a unit. With ``markers=True``, each
+observation is marked with a dot, which also shows the last value, held
+only at the end of the domain, here 4 at 3.5 s::
 
    import matplotlib.pyplot as plt
+   import numpy as np
    from stablebear.plotting import plot_timeseries
-   from stablebear.timeseries import TimeSeries
+   from stablebear.timeseries import TimeDelta, TimeDeltaTensor, TimeSeries
 
-   series = TimeSeries([1.0, 3.0, 2.0, 4.0], times=[0.0, 1.0, 1.5, 3.5])
+   series = TimeSeries([1.0, 3.0, 2.0, 4.0],
+                       times=TimeDeltaTensor([0.0, 1.0, 1.5, 3.5], "s"))
 
    fig, ax = plt.subplots()
    plot_timeseries(series, ax=ax, markers=True)
@@ -44,11 +47,11 @@ A window is drawn where it was cut from its time series, at its
 that it lines up with the series on the same axes. Here the window of 3 s
 starting at 3 s is drawn over the series it was cut from::
 
-   from stablebear.timeseries import Window
+   from stablebear.timeseries import cut_windows
 
    series = TimeSeries([0.0, 0.0, 0.0, 1.0, 2.0, 3.0, 2.0, 1.0, 0.0],
-                       times=[0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0])
-   window = Window(size=3.0, step=3.0, anchor="start")(series)[1]
+                       times=TimeDeltaTensor(np.arange(9.0), "s"))
+   window = cut_windows(series, size=TimeDelta(3, "s"), anchor="start")[1]
 
    fig, ax = plt.subplots()
    plot_timeseries(series, ax=ax, color="gray", linewidth=1)
@@ -79,9 +82,9 @@ one line per time series. By default each window is drawn where it was cut;
 with ``relative=True``, each is drawn from 0, on top of the others, to
 compare their shapes::
 
-   series = TimeSeries([0.5, 2.0, 1.0, 3.5, 2.5, 0.0, 3.0, 1.5],
-                       times=[0.0, 0.7, 1.9, 2.4, 3.6, 4.9, 5.5, 7.2])
-   windows = Window(size=2.4, anchor="start")(series)
+   times = TimeDeltaTensor([0.0, 0.7, 1.9, 2.4, 3.6, 4.9, 5.5, 7.2], "s")
+   series = TimeSeries([0.5, 2.0, 1.0, 3.5, 2.5, 0.0, 3.0, 1.5], times=times)
+   windows = cut_windows(series, size=TimeDelta(2.4, "s"), anchor="start")
 
    fig, (ax_in_place, ax_relative) = plt.subplots(1, 2)
    plot_timeseries(windows, ax=ax_in_place, markers=True)
@@ -139,13 +142,12 @@ Several channels
 
 A time series with several channels (see :doc:`timeseries_channels`) is
 drawn with one row per channel, in channel order, in a new figure whose
-rows share the time axis. Every channel is drawn in the unit of the time
-series, whatever its own unit::
+rows share the time axis, in the unit of the time series::
 
-   from stablebear.timeseries import Times
-
-   a = TimeSeries([1.0, 2.0, 3.0, 4.0], times=[0.0, 0.1, 0.2, 0.3])
-   b = TimeSeries([10.0, 20.0, 30.0], times=Times([50.0, 90.0, 130.0], unit="ms"))
+   a = TimeSeries([1.0, 2.0, 3.0, 4.0],
+                  times=TimeDeltaTensor([0.0, 0.1, 0.2, 0.3], "s"))
+   b = TimeSeries([10.0, 20.0, 30.0],
+                  times=TimeDeltaTensor([50.0, 90.0, 130.0], "ms"))
    series = TimeSeries.from_channels([a, b], unit="s")
 
    plot_timeseries(series, markers=True)
@@ -170,8 +172,8 @@ series, whatever its own unit::
 Channel ``b``, recorded in milliseconds, is drawn in seconds, the unit of
 ``series``, and only the last row is labeled with it.
 
-To draw the channels on axes of your own, such as side by side, pass one
-axes per channel; to draw a single channel, select it with ``series[i]``::
+To draw the channels on given axes, such as side by side, pass one axes
+per channel; to draw a single channel, select it with ``series[i]``::
 
    fig, (left, right) = plt.subplots(1, 2)
    plot_timeseries(series, ax=[left, right])
@@ -187,13 +189,10 @@ The first time series drawn on an axes sets the unit of its time axis, or
 exactly, so time series recorded in different units line up. Here one is in
 seconds and the other in milliseconds::
 
-   import matplotlib.pyplot as plt
-   from stablebear.plotting import plot_timeseries
-   from stablebear.timeseries import Times, TimeSeries
-
-   seconds = TimeSeries([1.0, 3.0, 2.0], times=[0.0, 1.0, 2.5])
+   seconds = TimeSeries([1.0, 3.0, 2.0],
+                        times=TimeDeltaTensor([0.0, 1.0, 2.5], "s"))
    milliseconds = TimeSeries([0.5, 1.5, 2.5],
-                             times=Times([500.0, 1500.0, 3000.0], unit="ms"))
+                             times=TimeDeltaTensor([500.0, 1500.0, 3000.0], "ms"))
 
    fig, ax = plt.subplots()
    plot_timeseries(seconds, ax=ax, markers=True, label="in s")
@@ -261,12 +260,13 @@ A time series with an epoch (see :doc:`timeseries_dates`) is drawn at its
 dates and times, on a date axis, and so are its windows. Here observations
 recorded through a day are drawn with the window from 10:00 to 14:00::
 
-   import numpy as np
+   from stablebear.timeseries import DateTimeTensor
 
-   stamps = np.array(["2023-01-01T06:00", "2023-01-01T09:30", "2023-01-01T11:00",
-                      "2023-01-01T15:45", "2023-01-01T18:00"], dtype="datetime64[m]")
-   series = TimeSeries([2.0, 3.5, 1.0, 2.5, 3.0], times=Times(stamps, unit="h"))
-   windows = Window(size=4.0, anchor="start")(series)
+   stamps = DateTimeTensor(["2023-01-01T06:00", "2023-01-01T09:30",
+                            "2023-01-01T11:00", "2023-01-01T15:45",
+                            "2023-01-01T18:00"])
+   series = TimeSeries([2.0, 3.5, 1.0, 2.5, 3.0], times=stamps).to("h")
+   windows = cut_windows(series, size=TimeDelta(4, "h"), anchor="start")
 
    fig, ax = plt.subplots()
    plot_timeseries(series, ax=ax, color="gray", linewidth=1, markers=True)

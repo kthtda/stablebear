@@ -1,3 +1,5 @@
+from typing import Any
+
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -6,7 +8,7 @@ from ._validation import _positive_integer
 from .persistence.barcode import Barcode
 from .persistence.ph_tensor import BarcodeTensor
 from .reductions import max_time as max_time_reduction
-from .base_tensor import IntPcfTensor, PcfContainerLike, PcfTensor, _to_tensor_pcf
+from .base_tensor import FloatTensor, IntPcfTensor, PcfContainerLike, PcfTensor, _to_tensor_pcf
 from .typing import boolean, float32, float64, int32, int64, uint32, uint64
 
 
@@ -19,7 +21,7 @@ def plot(f: PcfContainerLike, fmt="", ax=None, auto_label=False, max_time=None, 
         A single ``Pcf``, a list of ``Pcf`` objects, or a 1-D PCF tensor.
     fmt : str, optional
         A matplotlib format string (e.g. ``'r--'``), by default ``''``.
-    ax : matplotlib axes, optional
+    ax : matplotlib.axes.Axes, optional
         Axes to plot on. If ``None``, uses ``matplotlib.pyplot`` directly.
     auto_label : bool, optional
         If ``True`` and ``f`` is a tensor, label each PCF as ``f0``, ``f1``,
@@ -146,7 +148,7 @@ def plot_distance_weight_heatmap(
     kwargs.setdefault("cmap", "viridis")
     kwargs.setdefault("aspect", "equal")
     kwargs.setdefault("interpolation", "nearest")
-    return ax.imshow(weights, origin="lower", extent=extent, **kwargs)
+    return ax.imshow(weights, origin="lower", extent=(xmin, xmax, ymin, ymax), **kwargs)
 
 
 def _resolve_barcode_colors(n, color=None, ax=None):
@@ -160,7 +162,7 @@ def _resolve_barcode_colors(n, color=None, ax=None):
         ``None`` takes the next ``n`` colors from the axes' property cycle, a
         single color is repeated for all barcodes, and a sequence of colors is
         cycled across barcodes.
-    ax : matplotlib axes, optional
+    ax : matplotlib.axes.Axes, optional
         Axes whose property cycle supplies default colors. Only used when
         ``color`` is ``None``; defaults to the current axes.
 
@@ -180,7 +182,7 @@ def _resolve_barcode_colors(n, color=None, ax=None):
         # Advance the axes' own cycle, as ax.plot does, so set_prop_cycle and
         # repeated calls on the same axes behave as in matplotlib.
         ax = plt.gca() if ax is None else ax
-        return [ax._get_lines.get_next_color() for _ in range(n)]
+        return [ax._get_lines.get_next_color() for _ in range(n)]  # pyright: ignore[reportAttributeAccessIssue]
     if is_color_like(color):
         cycle = [color]
     else:
@@ -214,11 +216,11 @@ def plot_barcode(bc, ax=None, y_offset=0, **kwargs):
 
     Parameters
     ----------
-    bc : Barcode, BarcodeTensor or NumPy array
+    bc : Barcode, BarcodeTensor, or numpy.ndarray
         A single ``Barcode``, a 1-D ``BarcodeTensor`` or an (n, 2) NumPy array
         of ``(birth, death)`` pairs. For a tensor,
         the barcodes are stacked vertically in order.
-    ax : matplotlib axes, optional
+    ax : matplotlib.axes.Axes, optional
         Axes to plot on. If ``None``, uses the current axes.
     y_offset : int, optional
         Starting y position for the first bar. Useful when stacking
@@ -344,7 +346,7 @@ def plot_barcode(bc, ax=None, y_offset=0, **kwargs):
     if segments:
         lc = LineCollection(segments, **defaults)
         ax.add_collection(lc)
-        arrow_color = tuple(lc.get_colors()[0])
+        arrow_color = tuple(np.asarray(lc.get_colors())[0])
 
     # Add arrowheads for infinite bars
     for y in inf_y_positions:
@@ -359,20 +361,26 @@ def plot_barcode(bc, ax=None, y_offset=0, **kwargs):
     return y_offset + len(bars)
 
 
+# The unit stored on an x axis of times without a unit.
+_NO_UNIT = "none"
+
+
 def _time_axis_unit(ax, unit, requested):
     """The time unit of the x axis of ``ax``, storing ``unit`` on it first if
-    it has none. ``requested`` is the unit asked for, if any, which must
-    match a unit the axis already has."""
+    it has none; ``None`` for a series without a unit. ``requested`` is the
+    unit asked for, if any, which must match a unit the axis already has."""
     if ax.xaxis.get_converter() is not None:
         raise TypeError("The x axis holds dates or other values that are not times in a unit")
     current = ax.xaxis.get_units()
     if current is None:
         # Axes made with sharex share this unit.
-        ax.xaxis.set_units(unit)
+        ax.xaxis.set_units(_NO_UNIT if unit is None else unit)
         return unit
+    if (current == _NO_UNIT) != (unit is None):
+        raise ValueError("A time series without a unit and one with a unit cannot share a time axis")
     if requested is not None and requested != current:
         raise ValueError(f"The time axis is in {current!r}, not {requested!r}")
-    return current
+    return None if current == _NO_UNIT else current
 
 
 _NUMERIC_DTYPES = (float32, float64, int32, int64, uint32, uint64, boolean)
@@ -396,10 +404,11 @@ def _rows(ax, n_channels):
 
 def _plot_channels(series, axes, *, unit, **options):
     """Plot each channel of ``series`` on its own axes, in one time unit."""
+    from .timeseries.date_time import _unit_name
     # The unit is resolved once, from the first row, so that every row uses
     # it even on axes that do not share x.
     if series.epoch is None or options["relative"]:
-        requested = None if unit is None else series.to(unit).unit
+        requested = None if unit is None else _unit_name(unit)
         unit = _time_axis_unit(axes[0], requested or series.unit, requested)
     unlabeled = [not row.get_xlabel() for row in axes]
     lines = [line for i, row in enumerate(axes) for line in plot_timeseries(series[i], ax=row, unit=unit, **options)]
@@ -427,15 +436,16 @@ def plot_timeseries(series, ax=None, *, unit=None, relative=False, markers=False
         axes unless ``color`` is given. A time series with several channels
         is drawn with one row per channel, in channel order, on axes that
         share the time axis; only the last row is labeled.
-    ax : matplotlib axes or sequence of them, optional
+    ax : matplotlib.axes.Axes or sequence of matplotlib.axes.Axes, optional
         Axes to draw on. If ``None``, uses the current axes, or for several
         channels creates a new figure with one row per channel. For several
         channels, a sequence of one axes per channel, used in order and as
         given, without making them share x.
     unit : str, optional
         The time unit of the x axis, one of the units of
-        :class:`~stablebear.timeseries.Times`. Defaults to the unit the axis
-        already has, or else the unit of ``series``.
+        :class:`~stablebear.timeseries.TimeDelta`. Defaults to the unit the axis
+        already has, or else the unit of ``series``. A series without a
+        unit takes none.
     relative : bool, default False
         Whether to draw each time series at its own times, from 0, instead
         of where it lies in the series it was cut from. Windows are then
@@ -458,7 +468,9 @@ def plot_timeseries(series, ax=None, *, unit=None, relative=False, markers=False
         If ``unit`` differs from the unit the x axis already has, the
         observations are not scalars, or a tensor has more than one
         dimension; for a time series with an epoch, if ``unit`` is given
-        or the x axis has a time unit, unless ``relative`` is true.
+        or the x axis has a time unit, unless ``relative`` is true; if a
+        time series without a unit and one with a unit share an axis, or
+        ``unit`` is given for one without a unit.
     TypeError
         If the observations are not numbers, such as point clouds or
         barcodes, or if the x axis holds dates or other values that are not
@@ -472,11 +484,14 @@ def plot_timeseries(series, ax=None, *, unit=None, relative=False, markers=False
     true. Otherwise the x axis keeps one time unit, stored on it by the first time series
     drawn, and each time series is converted into it exactly, so series in
     different units line up. The axis is labeled ``time (<unit>)`` unless it
-    already has a label.
+    already has a label. A time series without a unit is drawn at its
+    numbers, on an axis labeled ``time``, which a time series with a unit
+    cannot share.
     """
-    from .timeseries.series import Times, TimeSeriesTensor
+    from .timeseries.date_time import TimeDeltaTensor, _unit_name
+    from .timeseries.series import TimeSeriesTensor
 
-    options = dict(unit=unit, relative=relative, markers=markers, **kwargs)
+    options: dict[str, Any] = dict(unit=unit, relative=relative, markers=markers, **kwargs)
     if isinstance(series, TimeSeriesTensor):
         tensor = series.squeeze() if len(series.shape) != 1 else series
         if len(tensor.shape) != 1:
@@ -495,28 +510,33 @@ def plot_timeseries(series, ax=None, *, unit=None, relative=False, markers=False
         if unit is not None:
             raise ValueError("A time series with an epoch is drawn at dates, which have no unit; "
                              "pass unit only with relative=True")
-        if isinstance(ax.xaxis.get_units(), str):
-            raise ValueError(f"The x axis is a time axis in {ax.xaxis.get_units()!r}, not a date axis")
+        units = ax.xaxis.get_units()
+        if isinstance(units, str):
+            raise ValueError("The x axis is a time axis" + ("" if units == _NO_UNIT else f" in {units!r}")
+                             + ", not a date axis")
     else:
-        requested = None if unit is None else series.to(unit).unit
-        series = series.to(_time_axis_unit(ax, requested or series.unit, requested))
-    offset = 0.0 if relative else series.origin
-    times = np.asarray(series.times) + offset
+        requested = None if unit is None else _unit_name(unit)
+        axis_unit = _time_axis_unit(ax, requested or series.unit, requested)
+        if axis_unit is not None:
+            series = series.to(axis_unit)
+    offset = 0.0 if relative else series._data.origin(0)
+    times = np.asarray(series._data.times(0)) + offset
     values = np.asarray(series.values)
     if values.ndim != 1:
         raise ValueError(f"Can only plot scalar observations, not observations of shape {series.shape}")
     if markers:
         kwargs = {"marker": "o", "markevery": list(range(len(times))), **kwargs}
-    end = series.domain.end + offset
+    end = series._data.domain[1] + offset
     if end > times[-1]:
         # The last value holds until the end of the domain.
         times = np.append(times, end)
         values = np.append(values, values[-1])
     if dated:
         # Dates at epoch + origin + t, at microseconds; the axis is a date axis.
-        times = Times(times, unit=series.unit, epoch=series.epoch).to_datetime64()
+        assert series.epoch is not None
+        times = series.epoch.to_datetime64() + TimeDeltaTensor(FloatTensor(times), series.unit).to_timedelta64("us")
         return ax.plot(times, values, drawstyle="steps-post", **kwargs)
     lines = ax.plot(times, values, drawstyle="steps-post", **kwargs)
     if not ax.get_xlabel():
-        ax.set_xlabel(f"time ({series.unit})")
+        ax.set_xlabel("time" if series.unit is None else f"time ({series.unit})")
     return lines

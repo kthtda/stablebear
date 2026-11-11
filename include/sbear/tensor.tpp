@@ -1159,18 +1159,31 @@ namespace sb
   // Joining operations
   // ============================================================================
 
+  namespace detail
+  {
+    /// @p axis of a tensor of @p ndim dimensions, counted from the start; a
+    /// negative axis counts from the end. Throws, naming @p fn, unless it is
+    /// in [-ndim, ndim).
+    inline size_t resolve_axis(ptrdiff_t axis, size_t ndim, const char* fn)
+    {
+      const auto signedNdim = static_cast<ptrdiff_t>(ndim);
+      if (axis < -signedNdim || axis >= signedNdim)
+        throw std::invalid_argument(std::string(fn) + ": axis " + std::to_string(axis) +
+          " out of range for " + std::to_string(ndim) + "-D tensor");
+      return static_cast<size_t>(axis < 0 ? axis + signedNdim : axis);
+    }
+  }
+
   template <typename T, TensorProperties Properties>
   typename Tensor<T, Properties>::source_tensor_type concatenate(
-      const std::vector<Tensor<T, Properties>>& tensors, size_t axis)
+      const std::vector<Tensor<T, Properties>>& tensors, ptrdiff_t signedAxis)
   {
     using TResult = typename Tensor<T, Properties>::source_tensor_type;
     if (tensors.empty())
       throw std::invalid_argument("concatenate: need at least one tensor");
 
     auto ndim = tensors[0].shape().size();
-    if (axis >= ndim)
-      throw std::invalid_argument("concatenate: axis " + std::to_string(axis) +
-        " out of range for " + std::to_string(ndim) + "-D tensor");
+    const auto axis = detail::resolve_axis(signedAxis, ndim, "concatenate");
 
     // Validate shapes match on all axes except the join axis
     for (size_t t = 1; t < tensors.size(); ++t)
@@ -1236,17 +1249,15 @@ namespace sb
     for (const auto& t : tensors)
       expanded.push_back(t.expand_dims(axis));
 
-    return concatenate(expanded, static_cast<size_t>(axis));
+    return concatenate(expanded, axis);
   }
 
   template <typename T, TensorProperties Properties>
   std::vector<Tensor<T, Properties>> split(const Tensor<T, Properties>& tensor,
-    const std::vector<size_t>& split_points, size_t axis)
+    const std::vector<size_t>& split_points, ptrdiff_t signedAxis)
   {
     auto ndim = tensor.shape().size();
-    if (axis >= ndim)
-      throw std::invalid_argument("split: axis " + std::to_string(axis) +
-        " out of range for " + std::to_string(ndim) + "-D tensor");
+    const auto axis = detail::resolve_axis(signedAxis, ndim, "split");
 
     auto axis_size = tensor.shape()[axis];
 
@@ -1278,12 +1289,10 @@ namespace sb
 
   template <typename T, TensorProperties Properties>
   std::vector<Tensor<T, Properties>> split(const Tensor<T, Properties>& tensor,
-    size_t n_sections, size_t axis)
+    size_t n_sections, ptrdiff_t signedAxis)
   {
     auto ndim = tensor.shape().size();
-    if (axis >= ndim)
-      throw std::invalid_argument("split: axis " + std::to_string(axis) +
-        " out of range for " + std::to_string(ndim) + "-D tensor");
+    const auto axis = detail::resolve_axis(signedAxis, ndim, "split");
 
     if (n_sections == 0)
       throw std::invalid_argument("split: number of sections must be > 0");
@@ -1300,17 +1309,15 @@ namespace sb
     for (size_t i = 1; i < n_sections; ++i)
       split_points.push_back(i * section_size);
 
-    return split(tensor, split_points, axis);
+    return split(tensor, split_points, static_cast<ptrdiff_t>(axis));
   }
 
   template <typename T, TensorProperties Properties>
   std::vector<Tensor<T, Properties>> array_split(const Tensor<T, Properties>& tensor,
-    size_t n_sections, size_t axis)
+    size_t n_sections, ptrdiff_t signedAxis)
   {
     auto ndim = tensor.shape().size();
-    if (axis >= ndim)
-      throw std::invalid_argument("array_split: axis " + std::to_string(axis) +
-        " out of range for " + std::to_string(ndim) + "-D tensor");
+    const auto axis = detail::resolve_axis(signedAxis, ndim, "array_split");
     if (n_sections == 0)
       throw std::invalid_argument("array_split: number of sections must be > 0");
 
@@ -1327,7 +1334,7 @@ namespace sb
       split_points.push_back(pos);
     }
 
-    return split(tensor, split_points, axis);
+    return split(tensor, split_points, static_cast<ptrdiff_t>(axis));
   }
 
   namespace detail

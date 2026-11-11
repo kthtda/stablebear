@@ -52,12 +52,20 @@ def limit_gpus(n: int):
     """Sets the number of GPUs that can be used by stablebear. By default, all available GPUs are used.
 
     This option only has an effect if stablebear is compiled with GPU support.
+    To use no GPU, call :func:`force_cpu` instead.
 
     Parameters
     ----------
     n : int
-      Number of GPUs to use
+      Number of GPUs to use, at least 1
+
+    Raises
+    ------
+    ValueError
+      If ``n`` is less than 1.
     """
+    if n < 1:
+        raise ValueError(f"limit_gpus needs at least 1 GPU, not {n}; use force_cpu(True) to use none")
     cpp.limit_gpus(n)
 
 

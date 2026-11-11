@@ -1,6 +1,7 @@
 // A Stablebear panel in the activity bar whose actions run development
-// commands as tasks or open built files in the browser. The bear above the
-// editor opens the panel.
+// commands as tasks or open built files in the browser, and whose Plan view
+// (plan.js) shows the progress of a plan. The bear above the editor opens the
+// panel.
 // To add an action, add an entry to ACTIONS and its command to "commands" in
 // package.json.
 // The devcontainers install it on attach with install.sh. After a change,
@@ -10,6 +11,7 @@ const fs = require("fs");
 const http = require("http");
 const path = require("path");
 const vscode = require("vscode");
+const { activatePlan } = require("./plan");
 
 const ACTIONS = [
   {
@@ -218,6 +220,7 @@ function activate(context) {
   context.subscriptions.push(vscode.window.registerWebviewViewProvider("stablebear.actions", actionsView));
   context.subscriptions.push(vscode.commands.registerCommand("stablebear.openPanel", () =>
     vscode.commands.executeCommand("workbench.view.extension.stablebear")));
+  activatePlan(context);
 }
 
 module.exports = { activate };

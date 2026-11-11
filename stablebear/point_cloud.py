@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 import numpy as np
 
 from . import _sb_cpp as cpp
@@ -32,6 +34,9 @@ class PointCloud(_BinaryIoMixin):
     Basic coordinate slices are views; advanced indexing copies coordinates.
     A write asks the owner to materialize if necessary.
     """
+
+    # A native PointCloud32 or PointCloud64, or None for an element of a tensor.
+    _value: Any
 
     def __init__(self, data, dtype=None, *, _owner=None, _outer_index=None):
         from .base_tensor import FloatTensor
@@ -185,13 +190,13 @@ class PointCloudTensor(IndexedElementTensor):
 
     Parameters
     ----------
-    data : ndarray, list of ndarray, PointCloudTensor, or C++ tensor
+    data : numpy.ndarray, list of numpy.ndarray, or PointCloudTensor
         An ndarray whose trailing ``cloud_ndim`` axes form each point cloud and
         whose leading axes form the tensor shape; or a list of point cloud arrays
         (possibly ragged) forming a 1-D tensor; or an existing tensor.
     cloud_ndim : int, optional
         Must be 2. Retained as a keyword for compatibility.
-    dtype : pcloud32 | pcloud64 | None, optional
+    dtype : pcloud32 or pcloud64, optional
         Element precision. Inferred from the array dtype when ``None``.
     """
 

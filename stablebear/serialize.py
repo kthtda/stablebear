@@ -16,7 +16,7 @@ def from_serial_content(
         ``(m, 2)`` array of points, where `m` is the sum of lengths of the individual PCFs
     enumeration : np.ndarray
         ``(n_1, n_2, ..., n_k, 2)`` array of `(start, end)` pointers into the content array.
-    dtype : datatype
+    dtype : Dtype, optional
         Sets the ``dtype`` of the resulting PCF ``Array``. If ``None``, uses the ``dtype`` of the supplied ``content`` array. By default, ``None``.
 
     Returns
@@ -42,5 +42,4 @@ def from_serial_content(
 
     if dtype == pcf32:
         return PcfTensor(cpp.make_from_serial_content_32(content, enumeration))
-    elif dtype == pcf64:
-        return PcfTensor(cpp.make_from_serial_content_64(content, enumeration))
+    return PcfTensor(cpp.make_from_serial_content_64(content, enumeration))

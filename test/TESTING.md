@@ -8,6 +8,13 @@ protect. These principles apply when writing, reviewing, or changing tests.
 
 2. **Test one behavior at a time.** Multiple assertions are fine when they
    establish that behavior. Independent guarantees belong in separate tests.
+   The expected value should depend only on the behavior under test, not on
+   behavior that other tests cover. When a test checks a new way to express
+   an input, compare against an equivalent form that is already tested. For
+   example, a test that a window takes a duration checks
+   `window(np.timedelta64(1750, "ms")) == window(1.75)`, not that the window
+   holds a particular value at 1750 ms, which the tests of evaluating a
+   window cover.
 
 3. **Make expectations obvious.** Prefer small, explicit inputs and expected
    values. Avoid clever expressions, unexplained indices, and reference
@@ -93,6 +100,43 @@ protect. These principles apply when writing, reviewing, or changing tests.
     follow than `[[0, 0], [1.5, 0.2], [2.5, 4.1]]`. When a test needs
     fractions, use ones that are exact in binary floating point, such as
     0.5 and 0.25, unless it tests rounding.
+
+20. **Tie paired numbers together.** When a test pairs numbers, such as a
+    value with its time or a weight with its index, make one a fixed
+    multiple of the other throughout the test, so that each number shows
+    what it is paired with. A time series observed at 0, 1, and 2.5 holds
+    `10 * t`: 0, 10, and 25, and `-10 * t` in a second channel. An expected
+    value of 10 at time 1.5 then reads as "the observation at 1 is still in
+    effect". Shaped values scale a fixed pattern, such as
+    `[10 * t, 20 * t]`. Break the pattern where it would weaken what the
+    test shows, such as a value of 0 at time 0 that hides which channel it
+    came from.
+
+21. **Tests must type-check.** Tests use the public API as users do, so
+    pyright checks them too. A line that passes invalid input on purpose
+    carries `# pyright: ignore[<rule>]`, naming the rule it breaks. An
+    expression evaluated only for the error it raises is assigned to `_`,
+    as in `_ = a + b` inside `pytest.raises`. See
+    [AGENTS.md](../AGENTS.md#type-checking).
+
+22. **Build inputs the most direct way.** Construct what a test needs with
+    the simplest public API that gives it, not as a by-product of a more
+    complex operation. A test that needs a tensor of two functions builds
+    it from those two, rather than taking a slice of a larger tensor; a
+    test that needs an object with some property sets that property,
+    rather than running an operation that happens to produce it. Going
+    through the larger operation makes the test depend on its behavior and
+    forces the reader to work out what it produced. If no direct way
+    exists and one would be a sensible addition to the public API, ask
+    about adding it before writing the test around its absence.
+
+23. **Test what an error carries, not its wording.** Check the error
+    type, and match a short phrase only to tell the error from others the
+    call could raise. When the error holds values as attributes, check
+    those: `excinfo.value.time == DateTime("2023-01-01T05:00")`. When only
+    the message can name something, check that it contains that value:
+    `assert "2023-01-01T05:00" in message`. Do not match a whole
+    sentence; rewording a message should not break tests.
 
 The review question is: **What bug would make this test fail, and can I see
 that immediately?**

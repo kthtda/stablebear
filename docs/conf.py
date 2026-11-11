@@ -7,6 +7,7 @@
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
+import os
 from datetime import datetime
 
 try:
@@ -41,6 +42,77 @@ extensions = [
     "sphinxcontrib.tikz",
     "sphinxcontrib.bibtex",
     "inherited_members",
+    "sphinx.ext.intersphinx",
+]
+
+# Link types in docstrings to the documentation of other projects. Sphinx
+# fetches these inventories when it builds, so the build needs the network.
+intersphinx_mapping = {
+    "python": ("https://docs.python.org/3", None),
+    "numpy": ("https://numpy.org/doc/stable", None),
+    "pandas": ("https://pandas.pydata.org/docs", None),
+    "matplotlib": ("https://matplotlib.org/stable", None),
+}
+
+# Turn the types in docstring fields into links, dropping words such as
+# "optional", and resolve the short names that docstrings use.
+napoleon_preprocess_types = True
+napoleon_type_aliases = {
+    "array_like": ":term:`numpy:array_like`",
+    "sequence": ":term:`python:sequence`",
+    "np.ndarray": "numpy.ndarray",
+    "ndarray": "numpy.ndarray",
+    "np.datetime64": "numpy.datetime64",
+    "np.timedelta64": "numpy.timedelta64",
+    "pd.Timedelta": "pandas.Timedelta",
+    "pd.TimedeltaIndex": "pandas.TimedeltaIndex",
+    "FloatTensor": "stablebear.base_tensor.FloatTensor",
+    "IntTensor": "stablebear.base_tensor.IntTensor",
+    "BoolTensor": "stablebear.base_tensor.BoolTensor",
+    "PcfTensor": "stablebear.base_tensor.PcfTensor",
+    "IntPcfTensor": "stablebear.base_tensor.IntPcfTensor",
+    "Pcf": "stablebear.functional.pcf.Pcf",
+    "PointCloud": "stablebear.point_cloud.PointCloud",
+    "PointCloudTensor": "stablebear.point_cloud.PointCloudTensor",
+    "Barcode": "stablebear.persistence.barcode.Barcode",
+    "BarcodeTensor": "stablebear.persistence.ph_tensor.BarcodeTensor",
+    "DistanceMatrix": "stablebear.distance_matrix.DistanceMatrix",
+    "DistanceMatrixTensor": "stablebear.distance_matrix.DistanceMatrixTensor",
+    "SymmetricMatrix": "stablebear.symmetric_matrix.SymmetricMatrix",
+    "SymmetricMatrixTensor": "stablebear.symmetric_matrix.SymmetricMatrixTensor",
+    "TimeSeries": "stablebear.timeseries.TimeSeries",
+    "TimeSeriesTensor": "stablebear.timeseries.TimeSeriesTensor",
+    "Domain": "stablebear.timeseries.Domain",
+    "TimeSeriesDomainError": "stablebear.timeseries.TimeSeriesDomainError",
+    "DateTime": "stablebear.timeseries.DateTime",
+    "TimeDelta": "stablebear.timeseries.TimeDelta",
+    "Dtype": "stablebear.typing.dtype",
+    "Distribution": "stablebear.distributions.Distribution",
+    "Rectangle": "stablebear.functional.pcf.Rectangle",
+}
+# The dtype sentinels are module constants, not classes.
+napoleon_type_aliases.update(
+    {name: f":data:`stablebear.typing.{name}`"
+     for name in ("float32", "float64", "pcloud32", "pcloud64", "distmat32", "distmat64",
+                  "symmat32", "symmat64")}
+)
+
+# Warn about every reference that does not resolve, such as a broken link to
+# the API reference.
+nitpicky = True
+
+# Names that are not documented: the tensor base class, type aliases, private
+# classes, numpy internals, the mocks that stand in for imports while autodoc
+# runs, and torch.
+nitpick_ignore = [
+    ("py:class", "Tensor"),
+    ("py:class", "PcfContainerLike"),
+    ("py:class", "ShapeLike"),
+    ("py:class", "torch.Generator"),
+]
+nitpick_ignore_regex = [
+    ("py:class", r"(.*\.)?_[A-Za-z]\w*(\..*)?"),
+    ("py:class", r"numpy\._typing\..*"),
 ]
 
 # Build glossary previews into the HTML so they also work outside Read the Docs.
@@ -109,6 +181,10 @@ html_theme_options = {
 html_static_path = ["_static"]
 html_css_files = ["lightbox.css", "diagrams.css", "glossary.css", "notebooks.css"]
 html_js_files = ["lightbox.js"]
+# On Read the Docs, its server-side search replaces the theme's search in
+# the browser, so that searches show in its search analytics.
+if os.environ.get("READTHEDOCS") == "True":
+    html_js_files.append(("readthedocs.js", {"defer": "defer"}))
 
 # --- Create a temporary bundle of 'stablebear' with a stub C++ backend from the Python source in ../stablebear. This is only for documentation purposes (so that we don't have to keep reinstalling, including recompiling, stablebear everytime we want to update the docs). The setup has been tested on Linux and should probably work on OSX. It is unclear if it'll work on Windows.
 

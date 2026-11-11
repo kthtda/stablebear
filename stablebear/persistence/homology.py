@@ -1,4 +1,5 @@
 from enum import Enum
+from typing import overload
 
 import numpy as np
 
@@ -10,7 +11,7 @@ from ..distance_matrix import (
 )
 from ..base_tensor import FloatTensor
 from ..point_cloud import PointCloud, PointCloudTensor
-from ..timeseries.series import TimeSeries
+from ..timeseries.series import TimeSeries, TimeSeriesTensor
 from ..typing import barcode32, barcode64, distmat32, distmat64, float32, float64, pcloud32, pcloud64
 from .ph_tensor import BarcodeTensor
 
@@ -28,6 +29,28 @@ class DistanceType(Enum):
 
 class ComplexType(Enum):
     VietorisRips = 1
+
+
+@overload
+def compute_persistent_homology(
+    X: TimeSeries,
+    max_dim: int = 1,
+    distance_type: DistanceType = DistanceType.Euclidean,
+    complex_type: ComplexType = ComplexType.VietorisRips,
+    reduced: bool = False,
+    verbose: bool = False,
+) -> TimeSeries: ...
+
+
+@overload
+def compute_persistent_homology(
+    X: PointCloud | PointCloudTensor | DistanceMatrix | DistanceMatrixTensor | FloatTensor | np.ndarray,
+    max_dim: int = 1,
+    distance_type: DistanceType = DistanceType.Euclidean,
+    complex_type: ComplexType = ComplexType.VietorisRips,
+    reduced: bool = False,
+    verbose: bool = False,
+) -> BarcodeTensor: ...
 
 
 def compute_persistent_homology(
@@ -99,6 +122,9 @@ def compute_persistent_homology(
 
     if isinstance(X, TimeSeries):
         return _series_persistent_homology(X, max_dim, distance_type, reduced, verbose)
+    if isinstance(X, TimeSeriesTensor):
+        raise TypeError("A tensor of time series, such as windows, is not a set of point clouds; "
+                        "make it one with stablebear.timeseries.to_point_clouds")
 
     if isinstance(X, (DistanceMatrix, DistanceMatrixTensor)):
         task = _compute_barcodes_distmat_ripser(X, max_dim, reduced)

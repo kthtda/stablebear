@@ -5,6 +5,7 @@
 #include "barcode_io.hpp"
 #include "compressed_matrix_io.hpp"
 #include "fixed_rank_tensor_io.hpp"
+#include "times_io.hpp"
 #include "../tensor.hpp"
 #include "../nested_tensor.hpp"
 #include "../timeseries.hpp"

@@ -1,30 +1,29 @@
 from __future__ import annotations
 
-import datetime
 import operator
 from typing import Literal
 
-import numpy as np
-
 from .. import _sb_cpp as cpp
-from .date_time import _duration, _in_unit
-from .series import TimeSeries
+from .date_time import _duration, _in_unit, _ScalarDuration
+from .series import TimeSeries, _PandasLike, _as_series
 
 
-class TimeDelayEmbedding:
-    """Delay embedding of a time series.
+def delay_embed(series: TimeSeries | _PandasLike, dimension: int, delay: float | _ScalarDuration, *,
+                direction: Literal["backward", "forward"] = "backward") -> TimeSeries:
+    """Embed a time series in delay coordinates.
 
     The embedding of a channel ``x`` with ``dimension`` ``m`` and ``delay``
     ``d`` looks back by default: it evaluates at every time ``t`` from
     ``t_0 + (m - 1) * d`` to the end of the channel's domain, its last
-    observation or, for a window (:class:`Window`), the window's end, to the
+    observation or, for a window (:func:`cut_windows`), the window's end, to the
     point ``(x(t - (m - 1) * d), ..., x(t - d), x(t))``. With
     ``direction="forward"``, it evaluates at every time ``t`` from ``t_0`` to
     the end of the domain minus ``(m - 1) * d``, to the point
     ``(x(t), x(t + d), ..., x(t + (m - 1) * d))``. Both are oldest first, so
     the forward point at ``t`` is the backward point at ``t + (m - 1) * d``.
     Each end is included when the channel's is, and each observation gains a
-    leading axis of length ``m``.
+    leading axis of length ``m``. A pandas ``Series`` or ``DataFrame`` is
+    converted with :meth:`TimeSeries.from_pandas` first.
 
     Its times are the start of its domain and the times in it where a
     component reaches an observation, ``t_i + k * d`` for ``k`` from 0 to
@@ -42,37 +41,40 @@ class TimeDelayEmbedding:
 
     Parameters
     ----------
+    series : TimeSeries, pandas.Series, or pandas.DataFrame
+        The series to embed.
     dimension : int
         The number of components ``m``, at least 1.
-    delay : float, np.timedelta64, or datetime.timedelta
-        The time between components, positive. A number is in the series'
-        unit; a duration such as ``np.timedelta64(3, "h")`` is converted to
-        the unit of each series embedded. Months and years have no fixed
-        length and are rejected.
+    delay : float, TimeDelta, tuple, np.timedelta64, datetime.timedelta, or pd.Timedelta
+        The time between components, positive. A duration such as
+        ``(3, "h")``, ``TimeDelta(3, "h")``, or ``np.timedelta64(3, "h")`` is
+        for a series with a unit, and is converted to the unit of each
+        series embedded. A number is for a series without a unit. Months
+        and years have no fixed length and are rejected.
     direction : {"backward", "forward"}, default "backward"
         Whether the components look back from ``t`` or ahead of it.
+
+    Returns
+    -------
+    TimeSeries
+        The embedding.
 
     Raises
     ------
     ValueError
         On an invalid ``dimension``, ``delay``, or ``direction``, or when a
         channel spans less than ``(m - 1) * d``.
+    TypeError
+        For a number on a series with a unit, or a duration on a series
+        without one, or for an object that is not a
+        :class:`TimeSeries` or a pandas ``Series`` or ``DataFrame``.
     """
-
-    def __init__(self, dimension: int, delay: float | np.timedelta64 | datetime.timedelta,
-                 direction: Literal["backward", "forward"] = "backward"):
-        self.dimension = operator.index(dimension)
-        if self.dimension < 1:
-            raise ValueError("The embedding dimension must be at least 1")
-        self.delay = _duration(delay, "The embedding delay must be finite and positive")
-        if direction not in ("backward", "forward"):
-            raise ValueError(f"direction must be 'backward' or 'forward', not {direction!r}")
-        self.direction = direction
-
-    def __call__(self, series: TimeSeries) -> TimeSeries:
-        return TimeSeries._from_cpp(cpp.delay_embed(series._data, self.dimension, _in_unit(self.delay, series.unit),
-                                                    self.direction == "forward"))
-
-    def __repr__(self):
-        return (f"TimeDelayEmbedding(dimension={self.dimension}, delay={self.delay!r}, "
-                f"direction={self.direction!r})")
+    dimension = operator.index(dimension)
+    if dimension < 1:
+        raise ValueError("The embedding dimension must be at least 1")
+    delay = _duration(delay, "The embedding delay must be finite and positive")
+    if direction not in ("backward", "forward"):
+        raise ValueError(f"direction must be 'backward' or 'forward', not {direction!r}")
+    series = _as_series(series)
+    return TimeSeries._from_cpp(cpp.delay_embed(series._data, dimension, _in_unit(delay, series.unit),
+                                                direction == "forward"))

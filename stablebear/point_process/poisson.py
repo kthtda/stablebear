@@ -10,10 +10,7 @@ cpp_pp = cpp.point_process
 def _get_backend(dtype):
     dtype = _validate_dtype(dtype, [pcloud32, pcloud64])
 
-    if dtype == pcloud32:
-        return cpp_pp.Poisson32
-    elif dtype == pcloud64:
-        return cpp_pp.Poisson64
+    return cpp_pp.Poisson32 if dtype == pcloud32 else cpp_pp.Poisson64
 
 
 def sample_poisson(shape, dim=2, rate=1.0, lo=None, hi=None, generator=None, dtype=pcloud64):
@@ -68,7 +65,7 @@ def sample_poisson(shape, dim=2, rate=1.0, lo=None, hi=None, generator=None, dty
 
     A = zeros(shape, dtype=dtype)
     backend.sample_poisson(
-        A._data, dim, float_dtype(rate), lo.tolist(), hi.tolist(),
+        A._data, dim, float(float_dtype(rate)), lo.tolist(), hi.tolist(),
         _unwrap(generator))
 
     return A

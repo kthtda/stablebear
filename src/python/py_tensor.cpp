@@ -3,6 +3,8 @@
 #include <sbear/tensor.hpp>
 #include <sbear/functional/pcf.hpp>
 
+#include <nanobind/make_iterator.h>
+
 #include <sstream>
 
 
@@ -57,6 +59,9 @@ namespace
 
       .def("__getitem__", &sb_py::Shape::dunder_getitem)
       .def("__len__", &sb_py::Shape::dunder_len)
+      .def("__iter__", [](const sb_py::Shape& self) {
+        return nb::make_iterator(nb::type<sb_py::Shape>(), "ShapeIterator", self.data.begin(), self.data.end());
+      }, nb::keep_alive<0, 1>())
       .def("__repr__", &sb_py::Shape::dunder_repr)
       .def("__str__", &sb_py::Shape::dunder_str)
     ;

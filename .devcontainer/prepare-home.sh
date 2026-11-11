@@ -5,7 +5,9 @@
 # directory on AFS therefore mounts without error, but every file in it reads as
 # "Permission denied" inside the container. For sources on AFS, this script
 # stages a copy that Docker can read. For other sources, it stages a symlink,
-# so the mount still shows the live host files.
+# so the mount still shows the live host files. For a source missing on the
+# host, it stages an empty one, so the mount works and the tool starts logged
+# out; what the container saves there stays in the staging directory.
 #
 # Set SB_DEVCONTAINER_COPY_HOME=1 to copy regardless of filesystem.
 set -euo pipefail
@@ -27,7 +29,7 @@ for directory in "$copy_root" "$stage_root"; do
         echo "Staging directory must be owned by the current user: $directory" >&2
         exit 1
     fi
-    chmod 700 -- "$directory"
+    chmod -- 700 "$directory"
 done
 
 needs_copy() {
@@ -40,10 +42,22 @@ needs_copy() {
 stage() {
     local source=$HOME/$1
     local destination=$stage_root/$2
+    local kind=$3
 
     if [[ ! -e "$source" ]]; then
-        echo "Missing $source; create it on the host before starting the devcontainer" >&2
-        exit 1
+        # A symlink left from a run when the host had the source.
+        if [[ -L "$destination" ]]; then
+            rm -f -- "$destination"
+        fi
+        if [[ ! -e "$destination" ]]; then
+            if [[ $kind == directory ]]; then
+                mkdir -- "$destination"
+            else
+                printf '{}\n' > "$destination"
+            fi
+            echo "No $source on the host; the devcontainer keeps its own in $destination"
+        fi
+        return
     fi
 
     if needs_copy "$source"; then
@@ -51,12 +65,13 @@ stage() {
         if [[ -L "$destination" ]]; then
             rm -f -- "$destination"
         fi
-        # -u keeps files the container changed after the host did.
+        # --update keeps files the container changed after the host did. cp -u is
+        # GNU-only, so use rsync, which macOS also ships.
         if [[ -d "$source" ]]; then
             mkdir -p -- "$destination"
-            cp -R -p -u -- "$source/." "$destination/"
+            rsync -a --update -- "$source/" "$destination/"
         else
-            cp -p -u -- "$source" "$destination"
+            rsync -a --update -- "$source" "$destination"
         fi
         echo "Copied $source for the devcontainer (container changes stay in $destination)"
     else
@@ -71,6 +86,6 @@ stage() {
     fi
 }
 
-stage .claude claude
-stage .claude.json claude.json
-stage .codex/auth.json codex-auth.json
+stage .claude claude directory
+stage .claude.json claude.json json
+stage .codex/auth.json codex-auth.json json

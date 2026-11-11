@@ -196,6 +196,8 @@ cython_debug/
 
 stablebear/py.typed
 stablebear/*.pyi
+!stablebear/_gpu_detect.pyi
+!stablebear/_build_info.pyi
 stablebear/_sb_cpp
 stablebear/_sb_cpu
 stablebear/_sb_cuda*

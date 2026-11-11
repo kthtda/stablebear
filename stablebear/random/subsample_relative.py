@@ -1,5 +1,10 @@
 """Relative subsampling of one reference dataset."""
 
+from __future__ import annotations
+
+from collections.abc import Sequence
+from typing import overload
+
 import numpy as np
 
 from .. import _sb_cpp as cpp
@@ -10,8 +15,8 @@ from ..distance_matrix import DistanceMatrix, DistanceMatrixTensor
 from ..distributions import Distribution, Gaussian
 from ..point_cloud import PointCloud, PointCloudTensor
 from ..typing import float32, uint64
-from .generator import _unwrap
-from .subsample import _partial_policy
+from .generator import Generator, _unwrap
+from .subsample import PartialPolicy, _partial_policy
 
 
 def _query_input(query, reference):
@@ -41,19 +46,51 @@ def _query_input(query, reference):
     return query._cpp_point_cloud()
 
 
+@overload
 def subsample_relative(
-    reference,
+    reference: PointCloud | PointCloudTensor,
     query=None,
     *,
-    n_points,
-    n_samples=1,
-    distribution=None,
-    replace=True,
-    allow_partial="keep",
-    discard_duplicates=False,
-    generator=None,
-    verbose=False,
-):
+    n_points: int,
+    n_samples: int = 1,
+    distribution: Distribution | Sequence[Distribution] | None = None,
+    replace: bool = True,
+    allow_partial: PartialPolicy = "keep",
+    discard_duplicates: bool = False,
+    generator: Generator | None = None,
+    verbose: bool = False,
+) -> PointCloudTensor: ...
+
+
+@overload
+def subsample_relative(
+    reference: DistanceMatrix | DistanceMatrixTensor,
+    query=None,
+    *,
+    n_points: int,
+    n_samples: int = 1,
+    distribution: Distribution | Sequence[Distribution] | None = None,
+    replace: bool = True,
+    allow_partial: PartialPolicy = "keep",
+    discard_duplicates: bool = False,
+    generator: Generator | None = None,
+    verbose: bool = False,
+) -> DistanceMatrixTensor: ...
+
+
+def subsample_relative(
+    reference: PointCloud | PointCloudTensor | DistanceMatrix | DistanceMatrixTensor,
+    query=None,
+    *,
+    n_points: int,
+    n_samples: int = 1,
+    distribution: Distribution | Sequence[Distribution] | None = None,
+    replace: bool = True,
+    allow_partial: PartialPolicy = "keep",
+    discard_duplicates: bool = False,
+    generator: Generator | None = None,
+    verbose: bool = False,
+) -> PointCloudTensor | DistanceMatrixTensor:
     """Draw distance-weighted subsamples relative to each query point.
 
     Implements the relative construction of Agerberg, Chachólski, and
@@ -78,8 +115,8 @@ def subsample_relative(
         Positive number of draws requested per sample.
     n_samples : int, optional
         Positive number of samples per query and distribution, by default 1.
-    distribution : Distribution or list of Distribution, optional
-        Distribution applied to distances, or a nonempty list of distributions.
+    distribution : Distribution or list or tuple of Distribution, optional
+        Distribution applied to distances, or a nonempty list or tuple of them.
         Defaults to ``Gaussian(0, 1)``. A list adds a distribution axis in
         list order.
     replace : bool, optional
@@ -127,8 +164,12 @@ def subsample_relative(
     verbose = _boolean(verbose, "verbose")
     if distribution is None:
         distribution = Gaussian()
-    distribution_axis = isinstance(distribution, list)
-    distributions = distribution if distribution_axis else [distribution]
+    if isinstance(distribution, Distribution):
+        distributions, distribution_axis = [distribution], False
+    elif isinstance(distribution, list | tuple):
+        distributions, distribution_axis = list(distribution), True
+    else:
+        raise TypeError("distribution must be a Distribution or a list of them")
     if not distributions:
         raise ValueError("distribution list must not be empty")
     if not all(isinstance(d, Distribution) for d in distributions):

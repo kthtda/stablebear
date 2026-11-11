@@ -47,7 +47,7 @@ class TestPlot:
             _make_pcf([[0, 3], [2, 4]], dtype=np_dtype),
         ]
         converted = []
-        convert = plotting_module._to_tensor_pcf
+        convert = plotting_module._to_tensor_pcf  # pyright: ignore[reportPrivateImportUsage]
 
         def capture_conversion(value):
             tensor = convert(value)

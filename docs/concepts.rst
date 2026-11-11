@@ -45,7 +45,7 @@ By representing these invariants as PCFs, stablebear enables efficient statistic
 The Pcf class
 --------------
 
-An individual PCF is represented by :py:class:`~stablebear.Pcf`. You create one from a NumPy array or a list::
+An individual PCF is represented by :py:class:`~stablebear.functional.pcf.Pcf`. You create one from a NumPy array or a list::
 
    import numpy as np
    import stablebear as sb
@@ -59,7 +59,7 @@ An individual PCF is represented by :py:class:`~stablebear.Pcf`. You create one 
    # From a list (defaults to float32)
    g = sb.Pcf([[0, 1], [2, 3], [5, 0]])
 
-You can convert a ``Pcf`` back to a NumPy array with :py:meth:`~stablebear.Pcf.to_numpy`::
+You can convert a ``Pcf`` back to a NumPy array with :py:meth:`~stablebear.functional.pcf.Pcf.to_numpy`::
 
    arr = f.to_numpy()  # shape (3, 2), dtype float32
 
@@ -75,7 +75,7 @@ See :doc:`arithmetic` for the full arithmetic reference, including broadcasting.
 Iterating over rectangles
 --------------------------
 
-Given two PCFs :math:`f` and :math:`g`, :py:func:`~stablebear.iterate_rectangles` produces the list of intervals on which both functions are constant. Each interval is returned as a :py:class:`~stablebear.functional.pcf.Rectangle` with four properties: ``left`` and ``right`` (the time boundaries) and ``f_value`` and ``g_value`` (the values of each function on that interval).
+Given two PCFs :math:`f` and :math:`g`, :py:func:`~stablebear.functional.pcf.iterate_rectangles` produces the list of intervals on which both functions are constant. Each interval is returned as a :py:class:`~stablebear.functional.pcf.Rectangle` with four properties: ``left`` and ``right`` (the time boundaries) and ``f_value`` and ``g_value`` (the values of each function on that interval).
 
 This corresponds to the rectangle decomposition described in :footcite:`Wehlin2024` and is useful for inspecting how two PCFs interact or for implementing custom integration-like operations::
 
@@ -100,8 +100,8 @@ Optional ``a`` and ``b`` parameters restrict the iteration to a sub-interval::
 
    ``iterate_rectangles`` is intended for exploration and prototyping. For
    performance-critical workloads such as computing distances or norms over
-   large collections, use the dedicated functions (:py:func:`~stablebear.pdist`,
-   :py:func:`~stablebear.lp_norm`, etc.) which are implemented in optimized
+   large collections, use the dedicated functions (:py:func:`~stablebear.distance.pdist`,
+   :py:func:`~stablebear.norms.lp_norm`, etc.) which are implemented in optimized
    C++/CUDA.
 
 .. _point-clouds-and-distance-matrices:
@@ -175,7 +175,7 @@ A tensor can have any number of dimensions. For example:
 Creating tensors
 ----------------
 
-The primary way to create a tensor is with :py:func:`~stablebear.zeros`::
+The primary way to create a tensor is with :py:func:`~stablebear.tensor_create.zeros`::
 
    import stablebear as sb
 
@@ -288,7 +288,7 @@ You can construct tensor types directly from Python lists::
    g = sb.Pcf([[0, 3.0], [2, 4.0]])
    T = sb.PcfTensor([f, g])
 
-You can also use :py:func:`~stablebear.zeros` or functions like :py:func:`~stablebear.random.noisy_sin` that return the appropriate tensor type automatically. See :doc:`tensors` for all construction methods.
+You can also use :py:func:`~stablebear.tensor_create.zeros` or functions like :py:func:`~stablebear.random.noisy_sin` that return the appropriate tensor type automatically. See :doc:`tensors` for all construction methods.
 
 
 Evaluation
@@ -352,10 +352,10 @@ The ``dtype`` parameter controls the element type of a tensor, analogous to NumP
 PCF types
 ---------
 
-- :py:class:`~stablebear.pcf32` -- 32-bit floating-point piecewise constant functions (the default dtype)
-- :py:class:`~stablebear.pcf64` -- 64-bit floating-point piecewise constant functions
-- :py:class:`~stablebear.pcf32i` -- 32-bit integer piecewise constant functions
-- :py:class:`~stablebear.pcf64i` -- 64-bit integer piecewise constant functions
+- :py:class:`~stablebear.typing.pcf32` -- 32-bit floating-point piecewise constant functions (the default dtype)
+- :py:class:`~stablebear.typing.pcf64` -- 64-bit floating-point piecewise constant functions
+- :py:class:`~stablebear.typing.pcf32i` -- 32-bit integer piecewise constant functions
+- :py:class:`~stablebear.typing.pcf64i` -- 64-bit integer piecewise constant functions
 
 Use ``pcf32`` for most work. Use ``pcf64`` when you need higher numerical precision.
 ``pcf32i`` and ``pcf64i`` provide integer-valued PCFs. They support construction,
@@ -364,47 +364,47 @@ evaluation, arithmetic, and serialization, but not norms or distances.
 Numeric types
 -------------
 
-- :py:class:`~stablebear.float32` -- 32-bit floating-point scalars
-- :py:class:`~stablebear.float64` -- 64-bit floating-point scalars
+- :py:class:`~stablebear.typing.float32` -- 32-bit floating-point scalars
+- :py:class:`~stablebear.typing.float64` -- 64-bit floating-point scalars
 
 These are used for tensors that hold scalar values, such as the results of norm or distance computations.
 
-- :py:class:`~stablebear.int32` -- 32-bit signed integer scalars
-- :py:class:`~stablebear.int64` -- 64-bit signed integer scalars
-- :py:class:`~stablebear.uint32` -- 32-bit unsigned integer scalars
-- :py:class:`~stablebear.uint64` -- 64-bit unsigned integer scalars
+- :py:class:`~stablebear.typing.int32` -- 32-bit signed integer scalars
+- :py:class:`~stablebear.typing.int64` -- 64-bit signed integer scalars
+- :py:class:`~stablebear.typing.uint32` -- 32-bit unsigned integer scalars
+- :py:class:`~stablebear.typing.uint64` -- 64-bit unsigned integer scalars
 
 These are used for tensors that hold integer values.
 
 Point cloud types
 -----------------
 
-- :py:class:`~stablebear.pcloud32` -- 32-bit point clouds
-- :py:class:`~stablebear.pcloud64` -- 64-bit point clouds
+- :py:class:`~stablebear.typing.pcloud32` -- 32-bit point clouds
+- :py:class:`~stablebear.typing.pcloud64` -- 64-bit point clouds
 
 Used when working with point cloud data, e.g., as input to persistent homology computations.
 
 Barcode types
 -------------
 
-- :py:class:`~stablebear.barcode32` -- 32-bit persistence barcodes
-- :py:class:`~stablebear.barcode64` -- 64-bit persistence barcodes
+- :py:class:`~stablebear.typing.barcode32` -- 32-bit persistence barcodes
+- :py:class:`~stablebear.typing.barcode64` -- 64-bit persistence barcodes
 
 Used to store persistence barcodes produced by homology computations.
 
 Symmetric matrix types
 -----------------------
 
-- :py:class:`~stablebear.symmat32` -- 32-bit symmetric matrices
-- :py:class:`~stablebear.symmat64` -- 64-bit symmetric matrices
+- :py:class:`~stablebear.typing.symmat32` -- 32-bit symmetric matrices
+- :py:class:`~stablebear.typing.symmat64` -- 64-bit symmetric matrices
 
 Compressed symmetric matrices using lower-triangular storage (n*(n+1)/2 elements for an n×n matrix).
 
 Distance matrix types
 -----------------------
 
-- :py:class:`~stablebear.distmat32` -- 32-bit distance matrices
-- :py:class:`~stablebear.distmat64` -- 64-bit distance matrices
+- :py:class:`~stablebear.typing.distmat32` -- 32-bit distance matrices
+- :py:class:`~stablebear.typing.distmat64` -- 64-bit distance matrices
 
 Compressed distance matrices with implicit zero diagonal and nonnegative entries (n*(n-1)/2 elements for an n×n matrix).
 

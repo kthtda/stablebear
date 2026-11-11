@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import operator
 from abc import ABC, abstractmethod
-from typing import Union
+from typing import Any
 
 import numpy as np
 
@@ -31,35 +31,6 @@ def _array_for_protocol(array: np.ndarray, dtype, copy, copied: bool) -> np.ndar
         raise ValueError("Unable to avoid copy while creating an array as requested.")
     return converted.copy() if copy and not copied else converted
 
-CppTensor = Union[
-    cpp.Float32Tensor,
-    cpp.Float64Tensor,
-    cpp.Int32Tensor,
-    cpp.Int64Tensor,
-    cpp.Uint32Tensor,
-    cpp.Uint64Tensor,
-    cpp.NestedFloat32Tensor,
-    cpp.NestedFloat64Tensor,
-    cpp.NestedInt32Tensor,
-    cpp.NestedInt64Tensor,
-    cpp.NestedUint32Tensor,
-    cpp.NestedUint64Tensor,
-    cpp.Pcf32Tensor,
-    cpp.Pcf64Tensor,
-    cpp.Pcf32iTensor,
-    cpp.Pcf64iTensor,
-    cpp.PointCloud32Tensor,
-    cpp.PointCloud64Tensor,
-    cpp._IndexedPointCloud32Tensor,
-    cpp._IndexedPointCloud64Tensor,
-    cpp.DistanceMatrix32Tensor,
-    cpp.DistanceMatrix64Tensor,
-    cpp._IndexedDistanceMatrix32Tensor,
-    cpp._IndexedDistanceMatrix64Tensor,
-    cpp.BoolTensor,
-]
-
-
 def _infer_shape_and_flatten(data):
     """Walk a nested list/tuple structure and return (shape, flat_elements).
 
@@ -69,7 +40,7 @@ def _infer_shape_and_flatten(data):
     # Infer the expected shape from the first branch at each depth.
     shape: list[int] = []
     node = data
-    while isinstance(node, (list, tuple)):
+    while isinstance(node, list | tuple):
         shape.append(len(node))
         node = node[0] if node else None
 
@@ -83,7 +54,7 @@ def _infer_shape_and_flatten(data):
         # Otherwise every sibling branch must be a sequence of the expected
         # length -- validate each one (not just the first), so ragged input is
         # rejected instead of being silently flattened into a wrong shape.
-        if not isinstance(obj, (list, tuple)):
+        if not isinstance(obj, list | tuple):
             raise ValueError(
                 f"Ragged nested list: expected a sequence of length {shape[depth]} "
                 f"at depth {depth}, got a non-sequence element"
@@ -130,7 +101,7 @@ def _slice_to_cpp(s):
 def _is_bool_scalar(obj):
     """True for Python ``bool`` and 0-d numpy booleans (treated as scalar-bool indices)."""
     import numpy as np
-    return isinstance(obj, (bool, np.bool_))
+    return isinstance(obj, bool | np.bool_)
 
 
 def _as_int_index(obj):
@@ -155,6 +126,7 @@ def _is_full_slice(s):
 def _resolve_negative_indices(index_tensor, axis_size):
     """Resolve negative indices and bounds-check."""
     import numpy as np
+
     from .base_tensor import IntTensor
     arr = np.asarray(index_tensor).astype(np.int64).copy()
     neg = arr < 0
@@ -175,14 +147,21 @@ def _resolve_axis(axis: int, ndim: int) -> int:
 
 
 class Tensor(_BinaryIoMixin, ABC):
-    _data: CppTensor
+    # One of the many C++ tensor classes, chosen by the subclass and dtype.
+    _data: Any
+    # A dtype sentinel from stablebear.typing, set by each subclass.
+    dtype: Any
+
+    @abstractmethod
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        """Each concrete tensor defines its own constructor."""
 
     __array_ufunc__ = None
 
     def _binary_io_data(self):
         return self._data
 
-    def __array__(self, dtype=None, copy=None):
+    def __array__(self, dtype=None, copy=None) -> np.ndarray:
         raise TypeError(
             f"np.asarray() is not supported for {type(self).__name__}. "
             f"Only numeric tensors (FloatTensor, IntTensor, BoolTensor) "
@@ -198,6 +177,7 @@ class Tensor(_BinaryIoMixin, ABC):
         ``IndexError`` (matching NumPy) for non-integer/boolean arrays.
         """
         import numpy as np
+
         from .base_tensor import BoolTensor, IntTensor
         if arr.dtype == np.bool_:
             return ('adv', BoolTensor(arr))
@@ -221,6 +201,7 @@ class Tensor(_BinaryIoMixin, ABC):
           ``True``, 0 for ``False``) axes to insert after the core indexing.
         """
         import numpy as np
+
         from .base_tensor import BoolTensor, IntTensor
 
         ndim = self.ndim
@@ -240,7 +221,7 @@ class Tensor(_BinaryIoMixin, ABC):
                 coerced.append(('newaxis', 1 if bool(s) else 0))
             elif isinstance(s, slice):
                 coerced.append(('slice', s))
-            elif isinstance(s, (BoolTensor, IntTensor)):
+            elif isinstance(s, BoolTensor | IntTensor):
                 coerced.append(('adv', s))
             elif isinstance(s, np.ndarray):
                 coerced.append(self._coerce_ndarray_index(s))
@@ -375,7 +356,7 @@ class Tensor(_BinaryIoMixin, ABC):
         from .base_tensor import BoolTensor, IntTensor
 
         advanced = [(i, s) for i, s in enumerate(entries)
-                    if isinstance(s, (BoolTensor, IntTensor))]
+                    if isinstance(s, BoolTensor | IntTensor)]
 
         # A single boolean mask spanning the leading axes (or the full shape),
         # with no other non-trivial index, collapses those axes (NumPy parity).
@@ -389,14 +370,14 @@ class Tensor(_BinaryIoMixin, ABC):
 
         # Mixed/multiple advanced indices: apply slices first, then each advanced
         # index sequentially (outer / np.ix_-style semantics).
-        basic = [slice(None) if isinstance(s, (BoolTensor, IntTensor)) else s
+        basic = [slice(None) if isinstance(s, BoolTensor | IntTensor) else s
                  for s in entries]
         result = self._basic_getitem(basic, allow_scalar=False)
         for orig_pos, idx in advanced:
             dims_dropped = sum(1 for j in range(orig_pos) if isinstance(entries[j], int))
             axis = orig_pos - dims_dropped
             if isinstance(idx, BoolTensor):
-                result = self._to_py_tensor(result._data.axis_select(axis, idx._data))  # type: ignore[arg-type]
+                result = self._to_py_tensor(result._data.axis_select(axis, idx._data))
             else:
                 result = self._index_select_nd(result, axis, idx)
         return result
@@ -419,13 +400,14 @@ class Tensor(_BinaryIoMixin, ABC):
     def _bool_mask_getitem(self, mask):
         """Select with a boolean mask matching the full shape or leading axes."""
         import numpy as np
+
         from .base_tensor import IntTensor
 
         tshape = tuple(self.shape[i] for i in range(self.ndim))
         mshape = tuple(mask.shape[i] for i in range(mask.ndim))
 
         if mshape == tshape:
-            return self._to_py_tensor(self._data.masked_select(mask._data))  # type: ignore[arg-type]
+            return self._to_py_tensor(self._data.masked_select(mask._data))
 
         if mask.ndim <= self.ndim and mshape == tshape[:mask.ndim]:
             trailing = list(tshape[mask.ndim:])
@@ -440,6 +422,7 @@ class Tensor(_BinaryIoMixin, ABC):
     def _index_select_nd(self, result, axis, idx):
         """Gather along ``axis`` using an integer index array of any rank."""
         import numpy as np
+
         from .base_tensor import IntTensor
 
         axis_size = result.shape[axis]
@@ -500,7 +483,7 @@ class Tensor(_BinaryIoMixin, ABC):
         views read-only for exactly this reason; mirror that by refusing the
         write. Call ``.copy()`` first to obtain a writeable tensor.
         """
-        for length, stride in zip(self.shape, self.strides):
+        for length, stride in zip(self.shape, self.strides, strict=True):
             if stride == 0 and length > 1:
                 raise ValueError(
                     "assignment destination is read-only: cannot write through "
@@ -553,19 +536,19 @@ class Tensor(_BinaryIoMixin, ABC):
         # Single full-shape boolean mask: flat masked assign/fill.
         if len(entries) == 1 and isinstance(entries[0], BoolTensor):
             if self._is_tensor_rhs(val):
-                self._data.masked_assign(entries[0]._data, self._coerce_rhs(val)._data)  # type: ignore[arg-type]
+                self._data.masked_assign(entries[0]._data, self._coerce_rhs(val)._data)
             else:
-                self._data.masked_fill(entries[0]._data, self._decay_value(val))  # type: ignore[arg-type]
+                self._data.masked_fill(entries[0]._data, self._decay_value(val))
             return
 
         advanced = [(i, s) for i, s in enumerate(entries)
-                    if isinstance(s, (BoolTensor, IntTensor))]
+                    if isinstance(s, BoolTensor | IntTensor)]
 
         if not advanced:
             self._basic_setitem(entries, val)
             return
 
-        basic = [slice(None) if isinstance(s, (BoolTensor, IntTensor)) else s
+        basic = [slice(None) if isinstance(s, BoolTensor | IntTensor) else s
                  for s in entries]
         view = self._basic_getitem(basic, allow_scalar=False)
 
@@ -583,24 +566,25 @@ class Tensor(_BinaryIoMixin, ABC):
             axis, sel_data, is_bool = selectors[0]
             if is_bool:
                 if self._is_tensor_rhs(val):
-                    view._data.axis_assign(axis, sel_data, self._coerce_rhs(val)._data)  # type: ignore[arg-type]
+                    view._data.axis_assign(axis, sel_data, self._coerce_rhs(val)._data)
                 else:
-                    view._data.axis_fill(axis, sel_data, self._decay_value(val))  # type: ignore[arg-type]
+                    view._data.axis_fill(axis, sel_data, self._decay_value(val))
             else:
                 if self._is_tensor_rhs(val):
-                    view._data.index_assign(axis, sel_data, self._coerce_rhs(val)._data)  # type: ignore[arg-type]
+                    view._data.index_assign(axis, sel_data, self._coerce_rhs(val)._data)
                 else:
-                    view._data.index_fill(axis, sel_data, self._decay_value(val))  # type: ignore[arg-type]
+                    view._data.index_fill(axis, sel_data, self._decay_value(val))
         else:
             sel_pairs = [(axis, data) for axis, data, _ in selectors]
             if self._is_tensor_rhs(val):
-                view._data.outer_assign(sel_pairs, self._coerce_rhs(val)._data)  # type: ignore[arg-type]
+                view._data.outer_assign(sel_pairs, self._coerce_rhs(val)._data)
             else:
-                view._data.outer_fill(sel_pairs, self._decay_value(val))  # type: ignore[arg-type]
+                view._data.outer_fill(sel_pairs, self._decay_value(val))
 
     def _basic_setitem(self, entries, val):
         """Assign using only ints and slices (negatives resolved, bounds checked)."""
         import numpy as np
+
         from .base_tensor import FloatTensor, NumericTensor
         from .point_cloud import PointCloudTensor
 
@@ -617,7 +601,7 @@ class Tensor(_BinaryIoMixin, ABC):
             else:
                 cpp_slices.append(_slice_to_cpp(s))
 
-        if isinstance(self, PointCloudTensor) and isinstance(val, (np.ndarray, FloatTensor)):
+        if isinstance(self, PointCloudTensor) and isinstance(val, np.ndarray | FloatTensor):
             # Distribute the RHS across the selected cells: a PointCloudTensor
             # reads its trailing axes as each cloud and the leading axes as the
             # tensor shape, so one cloud lands per cell. Without this the scalar
@@ -651,13 +635,13 @@ class Tensor(_BinaryIoMixin, ABC):
         if not isinstance(rhs, Tensor):
             return NotImplemented
         from .base_tensor import BoolTensor
-        return BoolTensor(self._data == rhs._data)  # type: ignore[arg-type]
+        return BoolTensor(self._data == rhs._data)
 
     def __ne__(self, rhs):
         if not isinstance(rhs, Tensor):
             return NotImplemented
         from .base_tensor import BoolTensor
-        return BoolTensor(self._data != rhs._data)  # type: ignore[arg-type]
+        return BoolTensor(self._data != rhs._data)
 
     def _compare(self, rhs, op, symbol):
         """Elementwise ordering comparison returning a ``BoolTensor``.
@@ -870,7 +854,7 @@ class IndexedElementTensor(Tensor):
     _indexed_element_name = "Element"
 
     @property
-    def indices(self):
+    def indices(self) -> Any:  # Any, not Optional: a subsample is always indexed.
         """Independent uint64 NestedTensor of selections, or None if not indexed.
 
         The outer shape and order follow this tensor's views. Mutating the
@@ -941,8 +925,8 @@ class IndexedElementTensor(Tensor):
         return isinstance(self._data, self._indexed_cpp_types)
 
 
-class FunctionTensorMixin:
-    """Mixin for tensors whose elements can be evaluated at domain points.
+class FunctionTensor(Tensor):
+    """Base class for tensors whose elements can be evaluated at domain points.
 
     Delegates to C++ ``__call__`` overloads which handle scalar, numpy array,
     and Tensor inputs. Tensor inputs are unwrapped, evaluated in C++,
@@ -973,13 +957,13 @@ class FunctionTensorMixin:
             return t._to_py_tensor(self._data(t._data))
         if isinstance(t, list):
             t = np.asarray(t)
-        if isinstance(t, (int, float, np.generic, np.ndarray)):
+        if isinstance(t, int | float | np.generic | np.ndarray):
             return np.asarray(self._data(t))
         raise TypeError(f"Cannot evaluate tensor at argument of type {type(t)}")
 
 
-class ArithmeticTensorMixin:
-    """Mixin providing elementwise arithmetic operators for tensors.
+class ArithmeticTensor(Tensor):
+    """Base class for tensors with elementwise arithmetic operators.
 
     Operators accept either a scalar or another tensor of the same type.
     When both operands are tensors, NumPy-style broadcasting is applied:
@@ -995,7 +979,7 @@ class ArithmeticTensorMixin:
         if hasattr(val, "_data"):
             return val._data
         import numpy as np
-        if isinstance(val, (np.ndarray, list, tuple)):
+        if isinstance(val, np.ndarray | list | tuple):
             # Wrap an array-like RHS as a same-type tensor (cast to this
             # tensor's dtype where applicable) so that ``tensor + array``
             # mirrors ``array + tensor``. See issue #62.

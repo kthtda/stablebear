@@ -28,11 +28,14 @@ Keep them in separate files, and link the plan to its spec.
    indent subitems under their item as `- [ ] **B2a.** ...`. Check an item
    once all its subitems are checked.
 
-5. **Check an item in the commit after it, with its hash.** Once an item's
-   commit exists, check the item and add the commit's short hash as
-   evidence, as in `- [x] **B2b.** [3] (9629137bd, d37757337) ...`. The tick and
-   hash go into the next item's commit. A commit cannot record its own
-   hash, because amending it to add the hash changes the hash.
+5. **Check an item in a companion commit, with its hash.** Right after an
+   item's commit, check the item, add the commit's short hash as evidence,
+   as in `- [x] **B2b.** [3] (9629137bd, d37757337) ...`, update the
+   progress line, and commit only that change to the plan, with a subject
+   such as "Check B2b in the time series epochs plan". The plan then
+   shows progress as soon as the work lands. A commit cannot record its
+   own hash, because amending it to add the hash changes the hash, so the
+   tick needs a commit of its own.
 
 ## Item size
 
@@ -78,7 +81,12 @@ Keep them in separate files, and link the plan to its spec.
     Give every item without subitems, and every subitem, a size in points
     after its label: 1 for a small change, 2 for a typical item, 3 for a
     large one, 5 for one that is nearly too large to review, as in
-    `- [ ] **B3.** [3] ...`. Under the title, write
+    `- [ ] **B3.** [3] ...`. Points measure the effort of reviewing the
+    change, not of writing it: the number of lines and the concepts a
+    reviewer must hold in mind to check them. Tests take far longer to
+    review than the code they cover, so an item that adds many tests is
+    large even if its code is small, and a configuration change checked by
+    a build is small. Under the title, write
     `Progress: 7 of 47 items, 14 of 89 points (16%)`: the checked items
     against all items, and their points against all points, with the
     percentage of points. Update it with each tick. Re-estimate an item

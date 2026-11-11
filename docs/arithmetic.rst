@@ -134,7 +134,7 @@ Broadcasting also works with PCF tensors::
 broadcast_to
 ------------
 
-For advanced use, :py:meth:`~stablebear._tensor_base.Tensor.broadcast_to` returns
+For advanced use, ``broadcast_to()`` returns
 a view of a tensor as if it had the given shape. Size-1 dimensions are
 virtually repeated without copying data::
 
@@ -146,7 +146,7 @@ Because the view shares one copy of the data, it is **read-only**. A single
 source value shows up in many places in the view, so writing to it (item
 assignment or in-place arithmetic such as ``view += 1``) would change all of
 them at once — to avoid that surprise, writing raises ``ValueError``. Call
-:py:meth:`~stablebear._tensor_base.Tensor.copy` first if you need a writeable
+``copy()`` first if you need a writeable
 tensor::
 
    writeable = X.broadcast_to((4, 3)).copy()
@@ -157,7 +157,7 @@ Comparisons
 ===========
 
 Tensors support the comparison operators ``==``, ``!=``, ``<``, ``<=``, ``>``,
-and ``>=``. Each returns a :py:class:`~stablebear.BoolTensor` containing the
+and ``>=``. Each returns a :py:class:`~stablebear.base_tensor.BoolTensor` containing the
 element-wise result, just like NumPy::
 
    import numpy as np
@@ -220,7 +220,7 @@ array_equal
 -----------
 
 To check whether two tensors are entirely equal (as a single ``bool``), use
-:py:meth:`~stablebear._tensor_base.Tensor.array_equal`::
+``array_equal()``::
 
    A = sb.FloatTensor(np.array([1.0, 2.0, 3.0]))
    B = A.copy()

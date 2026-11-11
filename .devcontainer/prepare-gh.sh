@@ -19,7 +19,7 @@ for directory in "$copy_root" "$copy_root/gh"; do
         echo "Staging directory must be owned by the current user: $directory" >&2
         exit 1
     fi
-    chmod 700 -- "$directory"
+    chmod -- 700 "$directory"
 done
 
 temporary_file=
@@ -29,7 +29,7 @@ for name in hosts.yml config.yml; do
     if [[ -f "$source_dir/$name" ]]; then
         temporary_file=$(mktemp "$copy_root/gh/.copy.XXXXXX")
         cat -- "$source_dir/$name" > "$temporary_file"
-        chmod 600 -- "$temporary_file"
+        chmod -- 600 "$temporary_file"
         # Replace files rather than following any destination symlinks.
         if [[ -d "$destination" ]]; then
             echo "Expected a file at $destination" >&2

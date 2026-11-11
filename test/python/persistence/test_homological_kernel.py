@@ -6,6 +6,7 @@ a point (x, y) maps to (m, m) with m = (x + y) / 2.
 """
 
 import numpy as np
+from numpy.typing import DTypeLike
 import pytest
 
 import stablebear as sb
@@ -16,7 +17,7 @@ S2 = np.sqrt(2.0)
 S10 = np.sqrt(10.0)
 
 
-def _bc(pairs, dtype=np.float64):
+def _bc(pairs, dtype: DTypeLike = np.float64):
     """Create a Barcode from a list of (birth, death) pairs."""
     if len(pairs) == 0:
         return Barcode(np.zeros((0, 2), dtype=dtype))
@@ -505,7 +506,7 @@ def test_multi_element_tensor_computes_per_element():
 
 def test_missing_y_raises():
     with pytest.raises(TypeError):
-        pers.compute_homological_kernel(np.array(DIAGONAL_POINTS))
+        pers.compute_homological_kernel(np.array(DIAGONAL_POINTS))  # pyright: ignore[reportCallIssue]
 
 
 def test_positive_dim_raises_not_implemented():
@@ -529,7 +530,7 @@ def test_mixed_input_kinds_raise():
 
 def test_unsupported_input_types_raise():
     with pytest.raises(TypeError):
-        pers.compute_homological_kernel(1, 2)
+        pers.compute_homological_kernel(1, 2)  # pyright: ignore[reportArgumentType]
 
 
 def test_dtype_mismatch_raises():

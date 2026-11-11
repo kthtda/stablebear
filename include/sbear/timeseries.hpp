@@ -3,6 +3,7 @@
 
 #include "algorithms/gallop.hpp"
 #include "config.hpp"
+#include "errors.hpp"
 #include "nested_tensor.hpp"
 #include "tensor.hpp"
 #include "walk.hpp"
@@ -26,13 +27,15 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <type_traits>
 #include <string_view>
 #include <utility>
 #include <vector>
 
 namespace sb
 {
-  /// Physical time units, from attoseconds to days.
+  /// Physical time units, from attoseconds to days, and Unitless for times
+  /// that are plain numbers, which convert only to themselves.
   enum class TimeUnit : uint8_t
   {
     Attoseconds,
@@ -44,7 +47,8 @@ namespace sb
     Seconds,
     Minutes,
     Hours,
-    Days
+    Days,
+    Unitless
   };
 
   namespace detail
@@ -71,6 +75,8 @@ namespace sb
       {TimeUnit::Minutes, "min", 0, 60},
       {TimeUnit::Hours, "h", 0, 3600},
       {TimeUnit::Days, "d", 0, 86400},
+      // No length; saved as 0 * 10^0 seconds.
+      {TimeUnit::Unitless, "", 0, 0},
     });
 
     /// Accepted spellings besides the canonical names.
@@ -116,7 +122,7 @@ namespace sb
   {
     for (const auto& info : detail::TimeUnitTable)
     {
-      if (info.name == name)
+      if (info.unit != TimeUnit::Unitless && info.name == name)
       {
         return info.unit;
       }
@@ -137,8 +143,18 @@ namespace sb
   /// Convert @p value from unit @p from to unit @p to. The factor is an
   /// integer that multiplies or divides the value, so the result is rounded
   /// once. The factor is exact unless it exceeds 2^53 (days and attoseconds).
+  /// A plain number, from Unitless, becomes a count of @p to unchanged; a
+  /// time in a unit cannot become a plain number.
   [[nodiscard]] constexpr float64_t convert_time(float64_t value, TimeUnit from, TimeUnit to)
   {
+    if (from == to || from == TimeUnit::Unitless)
+    {
+      return value;
+    }
+    if (to == TimeUnit::Unitless)
+    {
+      throw std::invalid_argument("Times in a unit cannot become plain numbers");
+    }
     const auto& src = detail::time_unit_info(from);
     const auto& dst = detail::time_unit_info(to);
     const auto g = std::gcd(src.mult, dst.mult);
@@ -150,6 +166,17 @@ namespace sb
 
   namespace detail
   {
+    /// Raises each of @p values that rounding put at or before the one
+    /// before it to just after that one, so that converted or shifted
+    /// timestamps stay strictly increasing.
+    inline void keep_increasing(std::vector<float64_t>& values)
+    {
+      for (size_t i = 1; i < values.size(); ++i)
+      {
+        values[i] = std::max(values[i], std::nextafter(values[i - 1], std::numeric_limits<float64_t>::infinity()));
+      }
+    }
+
     /// The time unit of a std::chrono period, at compile time.
     template <typename Period>
     constexpr TimeUnit time_unit_of()
@@ -165,6 +192,30 @@ namespace sb
       else if constexpr (std::ratio_equal_v<Period, std::ratio<3600>>) return TimeUnit::Hours;
       else if constexpr (std::ratio_equal_v<Period, std::ratio<86400>>) return TimeUnit::Days;
       else static_assert(sizeof(Period) == 0, "No time unit has this period");
+    }
+  }
+
+  /// Throw TypeError unless times in @p queryUnit suit a series in
+  /// @p seriesUnit: durations, which come with a unit, for a series with
+  /// one, and plain numbers for a series without one.
+  inline void check_query_unit(TimeUnit queryUnit, TimeUnit seriesUnit)
+  {
+    if (queryUnit != TimeUnit::Unitless && seriesUnit == TimeUnit::Unitless)
+    {
+      throw TypeError("A series without a unit takes plain numbers, not durations");
+    }
+    if (queryUnit == TimeUnit::Unitless && seriesUnit != TimeUnit::Unitless)
+    {
+      throw TypeError("These series have a unit, so their times are durations, not plain numbers");
+    }
+  }
+
+  /// Throw unless both @p a and @p b are units, or neither is.
+  inline void check_same_kind_of_unit(TimeUnit a, TimeUnit b)
+  {
+    if ((a == TimeUnit::Unitless) != (b == TimeUnit::Unitless))
+    {
+      throw std::invalid_argument("A series without a unit and a series with one cannot be combined or converted");
     }
   }
 
@@ -193,15 +244,108 @@ namespace sb
     bool operator==(const DateTime&) const = default;
   };
 
-  /// One-dimensional, finite, strictly increasing timestamps in one unit,
-  /// optionally counted from an epoch, and placed by an origin in the series
-  /// they were cut from.
+  namespace detail
+  {
+    /// Whether @p a is a unit at most as long as @p b.
+    constexpr bool not_coarser(const TimeUnitInfo& a, const TimeUnitInfo& b)
+    {
+      return a.exp < b.exp || (a.exp == b.exp && a.mult <= b.mult);
+    }
+
+    /// The number of @p fine in one @p coarse, a unit at least as long, or
+    /// nullopt if it exceeds int64. It is a whole number, since the
+    /// multipliers of coarser units are multiples of finer ones.
+    constexpr std::optional<int64_t> units_per(const TimeUnitInfo& coarse, const TimeUnitInfo& fine)
+    {
+      int64_t ratio = coarse.mult / fine.mult;
+      for (int32_t k = fine.exp; k < coarse.exp; ++k)
+      {
+        if (ratio > std::numeric_limits<int64_t>::max() / 10)
+        {
+          return std::nullopt;
+        }
+        ratio *= 10;
+      }
+      return ratio;
+    }
+
+    /// Whether @p count of a unit, @p factor of a finer one each, is below
+    /// 2^62 in the finer unit, so that a difference of two such fits in int64.
+    constexpr bool fits_in_fine(int64_t count, std::optional<int64_t> factor)
+    {
+      if (!factor)
+      {
+        return false;
+      }
+      const auto most = ((int64_t{1} << 62) - 1) / *factor;
+      return count <= most && count >= -most;
+    }
+  }
+
+  /// The time from @p epoch to @p date in @p unit. When both counts fit
+  /// below 2^62 in the finest of the three units, the difference is taken
+  /// there in integers and converted to @p unit as convert_time() converts
+  /// it. Otherwise each count is split into whole days and a remainder in
+  /// its own unit, and the difference of the days and that of the
+  /// remainders, taken in integers when a day of the finer unit fits, are
+  /// converted to @p unit separately and added, so that no resolution or
+  /// span overflows. stablebear.timeseries computes
+  /// dates the same way, so that a series and a tensor of it agree.
+  /// Throws std::invalid_argument if a unit has no length, and
+  /// std::overflow_error if the days differ by more than int64 holds.
+  [[nodiscard]] inline float64_t time_since(const DateTime& date, const DateTime& epoch, TimeUnit unit)
+  {
+    if (date.unit == TimeUnit::Unitless || epoch.unit == TimeUnit::Unitless || unit == TimeUnit::Unitless)
+    {
+      throw std::invalid_argument("Dates, epochs, and the times between them need a unit with a length");
+    }
+    const auto& d = detail::time_unit_info(date.unit);
+    const auto& e = detail::time_unit_info(epoch.unit);
+    const auto& u = detail::time_unit_info(unit);
+    const auto& fine = detail::not_coarser(d, e) ? (detail::not_coarser(d, u) ? d : u)
+                                                 : (detail::not_coarser(e, u) ? e : u);
+    const auto dateFactor = detail::units_per(d, fine);
+    const auto epochFactor = detail::units_per(e, fine);
+    if (detail::fits_in_fine(date.count, dateFactor) && detail::fits_in_fine(epoch.count, epochFactor))
+    {
+      return convert_time(static_cast<float64_t>(date.count * *dateFactor - epoch.count * *epochFactor), fine.unit,
+                          unit);
+    }
+    // Each count as whole days and a remainder in its own unit.
+    const auto& days = detail::time_unit_info(TimeUnit::Days);
+    const auto split = [&](int64_t count, const detail::TimeUnitInfo& info) {
+      // A ratio beyond int64 exceeds every count, which is then all remainder.
+      const auto ratio = detail::units_per(days, info);
+      return ratio ? std::pair{count / *ratio, count % *ratio} : std::pair{int64_t{0}, count};
+    };
+    const auto [dateDays, dateRest] = split(date.count, d);
+    const auto [epochDays, epochRest] = split(epoch.count, e);
+    constexpr auto max = std::numeric_limits<int64_t>::max();
+    constexpr auto min = std::numeric_limits<int64_t>::min();
+    if ((epochDays > 0 && dateDays < min + epochDays) || (epochDays < 0 && dateDays > max + epochDays))
+    {
+      throw std::overflow_error("A date is too many days from the epoch to count");
+    }
+    const auto dayDifference = convert_time(static_cast<float64_t>(dateDays - epochDays), TimeUnit::Days, unit);
+    // The remainders, below a day each, subtract in int64 in the finer of
+    // their units when a day of it is below 2^62, as down to picoseconds.
+    const auto& finer = detail::not_coarser(d, e) ? d : e;
+    if (detail::fits_in_fine(1, detail::units_per(days, finer)))
+    {
+      const auto restDifference = dateRest * *detail::units_per(d, finer) - epochRest * *detail::units_per(e, finer);
+      return dayDifference + convert_time(static_cast<float64_t>(restDifference), finer.unit, unit);
+    }
+    return dayDifference + convert_time(static_cast<float64_t>(dateRest), date.unit, unit)
+           - convert_time(static_cast<float64_t>(epochRest), epoch.unit, unit);
+  }
+
+  /// One-dimensional, finite, strictly increasing timestamps, placed by an
+  /// origin in the series they were cut from. Their unit and epoch are those
+  /// of the series that holds them.
   class Times
   {
   public:
-    explicit Times(std::vector<float64_t> values, TimeUnit unit = TimeUnit::Seconds,
-                   std::optional<DateTime> epoch = std::nullopt)
-      : m_values(std::move(values)), m_unit(unit), m_epoch(epoch)
+    explicit Times(std::vector<float64_t> values) : m_values(std::move(values))
     {
       for (size_t i = 0; i < m_values.size(); ++i)
       {
@@ -217,24 +361,10 @@ namespace sb
     }
 
     [[nodiscard]] const std::vector<float64_t>& values() const noexcept { return m_values; }
-    [[nodiscard]] TimeUnit unit() const noexcept { return m_unit; }
     [[nodiscard]] size_t size() const noexcept { return m_values.size(); }
 
-    /// The instant time 0 stands for, if any.
-    [[nodiscard]] const std::optional<DateTime>& epoch() const noexcept { return m_epoch; }
-
-    /// The same timestamps counted from @p epoch, or from none; no time is
-    /// shifted.
-    [[nodiscard]] Times with_epoch(std::optional<DateTime> epoch) const
-    {
-      auto times = *this;
-      times.m_epoch = epoch;
-      return times;
-    }
-
-    /// The time, in this unit, that time 0 stands for in the series these
-    /// times were cut from; 0 for recorded observations. Evaluation does not
-    /// use it.
+    /// The time that time 0 stands for in the series these times were cut
+    /// from; 0 for recorded observations. Evaluation does not use it.
     [[nodiscard]] float64_t origin() const noexcept { return m_origin; }
 
     /// The same timestamps with the origin @p origin, which must be finite.
@@ -249,25 +379,26 @@ namespace sb
       return times;
     }
 
-    /// The timestamps @p values in this unit, from this epoch and origin.
+    /// The timestamps @p values with this origin.
     [[nodiscard]] Times with_values(std::vector<float64_t> values) const
     {
-      Times times(std::move(values), m_unit, m_epoch);
+      Times times(std::move(values));
       times.m_origin = m_origin;
       return times;
     }
 
-    /// The same timestamps in another unit, from the same epoch, with the
-    /// origin converted alike.
-    [[nodiscard]] Times to(TimeUnit unit) const
+    /// The same timestamps and origin converted from @p from to @p to, as
+    /// convert_time() converts them.
+    [[nodiscard]] Times to(TimeUnit from, TimeUnit to) const
     {
       std::vector<float64_t> converted(m_values.size());
       for (size_t i = 0; i < m_values.size(); ++i)
       {
-        converted[i] = convert_time(m_values[i], m_unit, unit);
+        converted[i] = convert_time(m_values[i], from, to);
       }
-      Times times(std::move(converted), unit, m_epoch);
-      times.m_origin = convert_time(m_origin, m_unit, unit);
+      detail::keep_increasing(converted);
+      Times times(std::move(converted));
+      times.m_origin = convert_time(m_origin, from, to);
       return times;
     }
 
@@ -275,8 +406,6 @@ namespace sb
 
   private:
     std::vector<float64_t> m_values;
-    TimeUnit m_unit;
-    std::optional<DateTime> m_epoch;
     float64_t m_origin = 0.0;
   };
 
@@ -290,6 +419,51 @@ namespace sb
     std::vector<T> values;
   };
 
+  /// The times from @p first to @p last, including each end that is closed.
+  struct TimeDomain
+  {
+    float64_t first;
+    float64_t last;
+    bool closedStart;  // first itself is in the domain
+    bool closedEnd;    // last itself is in the domain
+
+    /// Whether @p t is in the domain; NaN is not.
+    [[nodiscard]] bool contains(float64_t t) const noexcept
+    {
+      return (t > first || (closedStart && t == first)) && (t < last || (closedEnd && t == last));
+    }
+
+    /// The domain as text, such as "[0, 2)".
+    [[nodiscard]] std::string to_string() const;
+  };
+
+  /// A time outside the domain of a series: time() and domain() in the unit
+  /// of the series, counted from time 0 of the channel channel(), and the
+  /// index of the series in a tensor of them, empty for one series. Python
+  /// raises it as stablebear.timeseries.TimeSeriesDomainError, naming the time
+  /// as a date for a date.
+  class TimeSeriesDomainError : public std::domain_error
+  {
+  public:
+    TimeSeriesDomainError(const std::string& message, float64_t time, const TimeDomain& domain,
+                          std::vector<size_t> index = {}, size_t channel = 0)
+      : std::domain_error(message), m_time(time), m_domain(domain), m_index(std::move(index)),
+        m_channel(channel)
+    {
+    }
+
+    [[nodiscard]] float64_t time() const noexcept { return m_time; }
+    [[nodiscard]] const TimeDomain& domain() const noexcept { return m_domain; }
+    [[nodiscard]] const std::vector<size_t>& index() const noexcept { return m_index; }
+    [[nodiscard]] size_t channel() const noexcept { return m_channel; }
+
+  private:
+    float64_t m_time;
+    TimeDomain m_domain;
+    std::vector<size_t> m_index;
+    size_t m_channel;
+  };
+
   /// Default snap tolerance, relative to the magnitude of the timestamps:
   /// the default comparison tolerance of APL.
   inline constexpr float64_t DefaultSnapTolerance = 1e-14;
@@ -300,9 +474,9 @@ namespace sb
   ///
   /// A channel either holds stored observations or is a view whose
   /// observations are those of a source channel: stacked at lagged times by
-  /// stack_at, or picked by index by take. A view keeps its times, its lags,
-  /// and for each observation a base: the source observation for the
-  /// smallest lag. The other components are found by searching back from the
+  /// view_lagged_at, or picked by index by view_at_indices. A view keeps its
+  /// times, its lags, and for each observation a base: the source
+  /// observation for the smallest lag. The other components are found by searching back from the
   /// base when read, so a view costs two numbers per observation and copies
   /// no values. A view evaluates as any channel does, by previous value on
   /// its own times with its own snapping, so it shows exactly the
@@ -330,18 +504,27 @@ namespace sb
     /// channel's observations in effect at times[k] - lags[j] for each j, in
     /// order. A lagged time before the first observation gets the first. It
     /// shares this channel and its snap settings.
-    [[nodiscard]] Channel stack_at(Times times, std::span<const float64_t> lags) const;
+    [[nodiscard]] Channel view_lagged_at(Times times, std::span<const float64_t> lags) const;
 
-    /// A view of this channel whose times are @p times and whose observation
-    /// k is this channel's observation @p indices[k], with no new axis. It
-    /// shares this channel and its snap settings, but not its start or end.
-    [[nodiscard]] Channel take(Times times, std::vector<size_t> indices) const;
+    /// A view of this channel's observations @p indices, strictly
+    /// increasing, at their times, with no new axis. It shares this channel
+    /// and its snap settings, but not its start or end. For a view with one
+    /// component, as view_at_indices and view_lagged_at with one lag make,
+    /// it shares that view's source instead, at the indices the view reads
+    /// there, so chains of views stay one level deep.
+    [[nodiscard]] Channel view_at_indices(std::vector<size_t> indices) const;
+
+    /// The same observations at @p times, one per observation, with its own
+    /// origin. It keeps whether the start is closed but not the end, which
+    /// was at the old times. Throws std::logic_error for a view with several
+    /// lags, whose components are found from its times.
+    [[nodiscard]] Channel with_times(Times times) const;
 
     /// This channel with the end @p end, in its unit: it can be evaluated
     /// after its last timestamp up to @p end, and at @p end if @p closed.
     /// @p end must come after the last timestamp, or be at it if @p closed,
-    /// which is the same as setting no end. Views made by stack_at keep the
-    /// end.
+    /// which is the same as setting no end. Views made by view_lagged_at
+    /// keep the end.
     [[nodiscard]] Channel until(float64_t end, bool closed = false) const;
 
     /// The end set by until(), if any; without one, the channel can be
@@ -354,21 +537,28 @@ namespace sb
 
     /// This channel with its first timestamp in the domain if @p closed. If
     /// not, the first observation still stays in effect after it. Views made
-    /// by stack_at keep the start.
+    /// by view_lagged_at keep the start.
     [[nodiscard]] Channel with_start_closed(bool closed) const;
 
-    /// This channel with its times counted from @p epoch, or from none. It
-    /// shares the observations; no time is shifted.
-    [[nodiscard]] Channel with_epoch(std::optional<DateTime> epoch) const;
+    /// This channel with its timestamps, end, and origin, and for a view its
+    /// lags, converted from @p from to @p to as convert_time() converts
+    /// them, so that timestamps without a unit become counts of @p to. A
+    /// view with several lags, which reads its source at its times less its
+    /// lags, converts its source alike; one with one lag reads it by index
+    /// and leaves it. It shares the observations.
+    [[nodiscard]] Channel to(TimeUnit from, TimeUnit to) const;
+
+    /// This channel with @p delta added to every timestamp and to its end. A
+    /// view with several lags shifts its source alike, so it reads the same
+    /// observations; one with one lag reads it by index and leaves it. It
+    /// shares the observations; only the timestamps are copied.
+    [[nodiscard]] Channel shifted(float64_t delta) const;
 
     /// Whether the first timestamp is in the domain.
     [[nodiscard]] bool start_closed() const noexcept { return m_startClosed; }
 
-    /// The origin of the channel's times, in its unit.
+    /// The origin of the channel's times.
     [[nodiscard]] float64_t origin() const noexcept { return held_times().origin(); }
-
-    /// The epoch of the channel's times, if any.
-    [[nodiscard]] const std::optional<DateTime>& epoch() const noexcept { return held_times().epoch(); }
 
     /// The observation with the largest timestamp at or before @p t, in the
     /// channel's own unit, a tensor of shape shape(). As in the tolerant
@@ -407,8 +597,8 @@ namespace sb
     /// with index_at().
     [[nodiscard]] Times times() const { return held_times(); }
 
-    /// The timestamps @p values on this channel's time axis: its unit,
-    /// epoch, and origin, without copying its own timestamps.
+    /// The timestamps @p values with this channel's origin, without copying
+    /// its own timestamps.
     [[nodiscard]] Times times_like(std::vector<float64_t> values) const
     {
       return held_times().with_values(std::move(values));
@@ -417,7 +607,6 @@ namespace sb
     /// Timestamp @p k, in the channel's unit, to build new times from.
     [[nodiscard]] float64_t time(size_t k) const { return held_times().values()[k]; }
 
-    [[nodiscard]] TimeUnit unit() const noexcept { return held_times().unit(); }
     [[nodiscard]] const std::vector<size_t>& shape() const noexcept { return m_shape; }
     [[nodiscard]] size_t size() const noexcept { return held_times().size(); }
 
@@ -425,8 +614,8 @@ namespace sb
     /// the timestamps include their epoch and origin.
     [[nodiscard]] bool operator==(const Channel& other) const;
 
-    /// operator== without the epoch and origin of the timestamps, which
-    /// place a channel but do not change how it evaluates.
+    /// operator== without the origin of the timestamps, which places a
+    /// channel but does not change how it evaluates.
     [[nodiscard]] bool same_observations(const Channel& other) const;
 
     /// Element @p i of the observations at times(), flattened in row-major
@@ -444,6 +633,11 @@ namespace sb
     /// The timestamps, kept inside the channel so that searches go through
     /// index_at().
     [[nodiscard]] const Times& held_times() const noexcept { return m_times ? *m_times : m_storage->times; }
+
+    /// This channel with an end that rounding put at or before its last
+    /// timestamp placed as windows place it: a closed end is dropped, and an
+    /// open one moves to just after the last timestamp.
+    [[nodiscard]] Channel with_end_after_last() const;
 
     /// The number of values in one observation, prod(shape()).
     [[nodiscard]] size_t block_size() const noexcept
@@ -493,18 +687,20 @@ namespace sb
     {
     }
 
-    TimeSeries(std::vector<Channel<T>> channels, TimeUnit unit);
+    /// A series of @p channels, whose times are in @p unit, counted from
+    /// @p epoch, or from none. A series without a unit has no epoch.
+    TimeSeries(std::vector<Channel<T>> channels, TimeUnit unit, std::optional<DateTime> epoch = std::nullopt);
 
-    /// A series with one channel, queried in the unit of its times.
-    TimeSeries(Times times, const Tensor<T>& values, float64_t snapTolerance)
-      : TimeSeries({Channel<T>(times, values, snapTolerance)}, times.unit())
+    /// A series with one channel.
+    TimeSeries(Times times, const Tensor<T>& values, float64_t snapTolerance, TimeUnit unit = TimeUnit::Seconds,
+               std::optional<DateTime> epoch = std::nullopt)
+      : TimeSeries({Channel<T>(std::move(times), values, snapTolerance)}, unit, epoch)
     {
     }
 
-    /// Combine one-channel series into one series; channel i is @p parts[i].
-    /// Each channel keeps its own times, unit, and snap
-    /// settings. @p unit defaults to the unit the parts share and is required
-    /// when their units differ.
+    /// Combine one-channel series into one series; channel i is @p parts[i]
+    /// converted to @p unit, with its own snap settings. @p unit defaults to
+    /// the unit the parts share and is required when their units differ.
     [[nodiscard]] static TimeSeries from_channels(const std::vector<TimeSeries>& parts,
                                                   std::optional<TimeUnit> unit);
 
@@ -517,47 +713,36 @@ namespace sb
     [[nodiscard]] TimeSeries select(const std::vector<std::ptrdiff_t>& indices) const;
     [[nodiscard]] TimeUnit unit() const noexcept { return m_unit; }
 
-    /// The same series queried in @p unit; the channels are shared, not
-    /// converted.
+    /// The instant time 0 stands for, if any.
+    [[nodiscard]] const std::optional<DateTime>& epoch() const noexcept { return m_epoch; }
+
+    /// The same series in @p unit, with every channel converted by
+    /// Channel::to(), sharing the observations. A series without a unit gets
+    /// @p unit: its numbers become counts of it.
     [[nodiscard]] TimeSeries to(TimeUnit unit) const;
 
-    /// The same series with every channel's times counted from @p epoch, or
-    /// from none, sharing the observations; no time is shifted.
+    /// The same series counted from @p epoch, or from none, sharing the
+    /// observations; no time is shifted.
     [[nodiscard]] TimeSeries with_epoch(std::optional<DateTime> epoch) const;
 
-    /// The timestamps of channel @p i, converted to the query unit.
-    [[nodiscard]] Times times(size_t i) const { return channel(i).times().to(m_unit); }
+    /// The same series with @p delta, in its unit, added to the times of
+    /// every channel, counted from @p epoch, or from none.
+    [[nodiscard]] TimeSeries shifted(float64_t delta, std::optional<DateTime> epoch) const;
 
-    /// The times, in the series' unit, at which every channel can be
-    /// evaluated: from the latest first timestamp to the earliest end, a
-    /// channel's last timestamp or its end, converted exactly as
-    /// check_observed() compares.
-    struct Domain
-    {
-      float64_t first;
-      float64_t last;
-      bool closedStart;  // first itself is in the domain
-      bool closedEnd;    // last itself is in the domain
-
-      /// Whether @p t is in the domain; NaN is not.
-      [[nodiscard]] bool contains(float64_t t) const noexcept
-      {
-        return (t > first || (closedStart && t == first)) && (t < last || (closedEnd && t == last));
-      }
-
-      /// The domain as text, such as "[0, 2)".
-      [[nodiscard]] std::string to_string() const;
-    };
+    /// The times at which every channel can be evaluated: from the latest
+    /// first timestamp to the earliest end, a channel's last timestamp or its
+    /// end, as check_observed() compares them.
+    using Domain = TimeDomain;
 
     /// The domain of the series. Requires every channel to have
     /// observations.
     [[nodiscard]] Domain domain() const;
 
-    /// The same unit and channels.
+    /// The same unit, epoch, and channels.
     [[nodiscard]] bool operator==(const TimeSeries& other) const = default;
 
     /// The same unit, and channels with the same observations; see
-    /// Channel::same_observations().
+    /// Channel::same_observations(). The epoch is not compared.
     [[nodiscard]] bool same_observations(const TimeSeries& other) const
     {
       return m_unit == other.m_unit && std::ranges::equal(m_channels, other.m_channels, [](const auto& a, const auto& b) {
@@ -580,14 +765,24 @@ namespace sb
     [[nodiscard]] NestedTensor<T> evaluate(const Tensor<float64_t>& t) const;
 
   private:
-    /// Throw std::domain_error, naming the domain, unless @p t, in the
+    /// Throw TimeSeriesDomainError, naming the domain, unless @p t, in the
     /// series' unit, lies in the domain. The check is exact: it compares
     /// against the timestamps converted to the series' unit, not the query
     /// converted to each channel's unit.
     void check_observed(float64_t t) const;
 
+    /// Throw unless a series in @p unit can have @p epoch.
+    static void check_epoch(TimeUnit unit, const std::optional<DateTime>& epoch)
+    {
+      if (epoch && unit == TimeUnit::Unitless)
+      {
+        throw std::invalid_argument("A series without a unit cannot have an epoch; give its times as durations or dates");
+      }
+    }
+
     std::vector<Channel<T>> m_channels;
     TimeUnit m_unit;
+    std::optional<DateTime> m_epoch;
   };
 
   template <typename T>
@@ -599,17 +794,39 @@ namespace sb
   template <typename T>
   inline constexpr bool is_timeseries_v = is_timeseries<T>::value;
 
-  /// Every series of @p series evaluated at the times @p t, each in its own
-  /// unit, as TimeSeries::evaluate does: one leaf per channel, in channel
+  /// Every series of @p series evaluated at the times @p t, counts of
+  /// @p unit, as TimeSeries::evaluate does: one leaf per channel, in channel
   /// order, of shape (*series.shape(), *t.shape(), *shape) of that channel.
+  /// Without @p unit, @p t are plain numbers, which only series without a
+  /// unit take; times of the wrong kind throw TypeError.
   /// Requires every series to have the same number of channels and channel
   /// shapes, and @p series to be non-empty. A time outside the domain of a
-  /// series throws std::domain_error naming the first such series'
+  /// series throws TimeSeriesDomainError naming the first such series'
   /// position, as in "TimeSeries at position (1, 2)".
   /// The series are evaluated in parallel on @p exec.
   template <typename T>
   [[nodiscard]] NestedTensor<T> evaluate(const Tensor<TimeSeries<T>>& series, const Tensor<float64_t>& t,
+                                         std::optional<TimeUnit> unit = std::nullopt,
                                          Executor& exec = default_executor());
+
+  /// The time of @p date in channel @p c of @p series, which has an epoch:
+  /// time_since(date, epoch, unit) - origin. The difference rounds on the
+  /// scale of the time since the epoch and the origin, not of the result,
+  /// so a date that misses a closed end of the channel's domain by at most
+  /// snap_tolerance() times the larger magnitude of the two is placed at
+  /// that end. A window's own start date, its origin, then lies in its
+  /// domain although the two round differently.
+  template <typename T>
+  [[nodiscard]] float64_t time_of_date(const TimeSeries<T>& series, size_t c, const DateTime& date);
+
+  /// Every series of @p series evaluated at the dates @p dates, counts of
+  /// @p dateUnit after 1970-01-01, as evaluate() evaluates at times. Each
+  /// series places a date in each channel by time_of_date(), so series with
+  /// different epochs are evaluated at the same instants. Throws
+  /// std::invalid_argument if a series has no epoch.
+  template <typename T>
+  [[nodiscard]] NestedTensor<T> evaluate_dates(const Tensor<TimeSeries<T>>& series, const Tensor<int64_t>& dates,
+                                               TimeUnit dateUnit, Executor& exec = default_executor());
 }
 
 #include "timeseries.tpp"

@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import warnings
+from typing import Any
 
 import numpy as np
 
 from . import _sb_cpp as cpp
 from ._binary_io import _BinaryIoMixin
 from ._tensor_base import Tensor, _array_for_protocol
-from .typing import float32, float64, symmat32, symmat64
+from .typing import Dtype, float32, float64, symmat32, symmat64
 
 _dtype_to_cpp = {
     float32: cpp.SymmetricMatrix_f32,
@@ -35,13 +36,13 @@ class SymmetricMatrix(_BinaryIoMixin):
 
     Parameters
     ----------
-    n_or_data : int | numpy.ndarray | SymmetricMatrix
+    n_or_data : int, numpy.ndarray, or SymmetricMatrix
         If an int, creates a zero-initialized matrix of that size.
         A two-dimensional NumPy array supplies the full square matrix. A
         one-dimensional array supplies the upper triangle, including the
         diagonal, in row-major order: ``(0, 0), (0, 1), ..., (1, 1), ...``.
         If a SymmetricMatrix, wraps it directly.
-    dtype : float32 | float64 | None, optional
+    dtype : float32 or float64, optional
         Element precision. ``float32`` stores entries as 32-bit floats,
         ``float64`` as 64-bit floats. Defaults to ``float64`` when
         ``n_or_data`` is an int. For array input, ``float32`` and ``float64``
@@ -50,13 +51,16 @@ class SymmetricMatrix(_BinaryIoMixin):
         existing matrix objects.
     """
 
+    # A native SymmetricMatrix_f32 or _f64.
+    _data: Any
+
     def _binary_io_data(self):
         return self._data
 
     def __init__(
         self,
         n_or_data: int | np.ndarray | SymmetricMatrix,
-        dtype: float32 | float64 | None = None,
+        dtype: Dtype | None = None,
     ):
         if isinstance(n_or_data, SymmetricMatrix):
             self._data = n_or_data._data
@@ -200,10 +204,10 @@ class SymmetricMatrixTensor(Tensor):
 
     Parameters
     ----------
-    data : ndarray, SymmetricMatrixTensor, or C++ tensor
+    data : numpy.ndarray or SymmetricMatrixTensor
         An ndarray of shape ``(*tensor_shape, n, n)`` whose trailing two axes
         form each n×n symmetric matrix, or an existing tensor.
-    dtype : symmat32 | symmat64 | None, optional
+    dtype : symmat32 or symmat64, optional
         Element precision. Inferred from the array dtype when ``None``.
     """
 

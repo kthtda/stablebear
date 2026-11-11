@@ -829,6 +829,7 @@ if (BUILD_TESTER)
       test/test_union_find.cpp
       test/test_stoppable_task.cpp
       test/test_gallop.cpp
+      test/test_timeseries_channel.cpp
   )
 
   if (BUILD_CUDA_TESTER)
@@ -978,7 +979,7 @@ if ((LINUX OR (NOT SKBUILD)) AND (NOT SKIP_STUBGEN)) # Stubgen does not seem hap
     add_custom_command(
         TARGET ${MOD_NAME}
         POST_BUILD
-        COMMAND ${Python_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/3rd/nanobind/src/stubgen.py" -m ${MOD_NAME} -r -q
+        COMMAND ${Python_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/3rd/nanobind/src/stubgen.py" -m ${MOD_NAME} -r -P -q
         -i "$<TARGET_FILE_DIR:${MOD_NAME}>"
         -O "${CMAKE_CURRENT_BINARY_DIR}/stubs"
         COMMENT "Generating Python stubs for ${MOD_NAME}..."

@@ -2,6 +2,9 @@
 #define STABLEBEAR_PY_IO_H
 
 #include "nb.hpp"
+
+#include <sbear/io.hpp>
+
 #include <iostream>
 #include <streambuf>
 #include <string>
@@ -45,6 +48,24 @@ namespace sb_py
   private:
     nb::object file_;
   };
+
+  /// Write @p tensor to the Python binary file @p file, as sb.save does.
+  template <typename TensorT>
+  void save_tensor(const TensorT& tensor, nb::object file)
+  {
+    PythonOStreamBuf buf(file);
+    std::ostream os(&buf);
+    sb::write(tensor, os);
+  }
+
+  /// Write the standalone @p object to the Python binary file @p file.
+  template <typename T>
+  void save_object(const T& object, nb::object file)
+  {
+    PythonOStreamBuf buf(file);
+    std::ostream os(&buf);
+    sb::write_object(object, os);
+  }
 
   void register_io(nb::module_& m);
 }

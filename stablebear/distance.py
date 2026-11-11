@@ -14,7 +14,7 @@ _VTYPE_TO_DISTANCE_BACKEND = {
 }
 
 
-def lp_distance(f: Pcf, g: Pcf, p=1) -> float:
+def lp_distance(f: Pcf, g: Pcf, p: float = 1) -> float:
     r"""Compute the :math:`L_p` distance between two PCFs.
 
     .. math::
@@ -64,7 +64,7 @@ def lp_distance(f: Pcf, g: Pcf, p=1) -> float:
         return float(backend.lp_distance_lp(f._data, g._data, float(p)))
 
 
-def pdist(fs: PcfContainerLike, p=1, verbose=False) -> DistanceMatrix:
+def pdist(fs: PcfContainerLike, p: float = 1, verbose: bool = False) -> DistanceMatrix:
     r"""Compute the pairwise :math:`L_p` distance matrix for a 1-D tensor of PCFs.
 
     For a tensor :math:`(f_0, f_1, \ldots, f_{n-1})`, returns an
@@ -111,7 +111,7 @@ def pdist(fs: PcfContainerLike, p=1, verbose=False) -> DistanceMatrix:
     return DistanceMatrix(dm_or_dense)
 
 
-def cdist(X: PcfContainerLike, Y: PcfContainerLike, p=1, verbose=False) -> FloatTensor:
+def cdist(X: PcfContainerLike, Y: PcfContainerLike, p: float = 1, verbose: bool = False) -> FloatTensor:
     r"""Compute the pairwise :math:`L_p` distances between two tensors of PCFs.
 
     For tensors :math:`X` of shape :math:`(m_1, \ldots, m_n)` and :math:`Y` of

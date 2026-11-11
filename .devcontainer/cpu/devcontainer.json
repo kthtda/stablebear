@@ -42,11 +42,13 @@
     "source=stablebear-cpu-build,target=${containerWorkspaceFolder}/cmake-build-debug,type=volume"
   ],
 
-  // Init submodules, then build + install the CPU extension (_sb_cpu) via cmake.
-  // `cmake --install` symlinks it into stablebear/. Python deps are already installed
-  // at image-build time (see Dockerfile). The chown gives the ubuntu user ownership
-  // of the freshly-created (root-owned) build volume.
-  "postCreateCommand": "sudo chown ubuntu:ubuntu cmake-build-debug && git submodule update --init --recursive && cmake --preset debug-nocuda && JOBS=$(awk -v c=$(nproc --ignore=2) '/MemAvailable/{m=int($2/5242880); print (m<c?(m<1?1:m):c)}' /proc/meminfo) && cmake --build --preset debug-nocuda -j$JOBS && cmake --install cmake-build-debug",
+  // One-time environment setup only: give the ubuntu user ownership of the
+  // freshly-created (root-owned) build volume, then init submodules. Python deps
+  // are already installed at image-build time (see Dockerfile). Building the
+  // extensions is intentionally NOT done here; build manually with the commands
+  // in AGENTS.md (which defines JOBS):
+  //   cmake --preset debug-nocuda && cmake --build --preset debug-nocuda -j$JOBS && cmake --install cmake-build-debug
+  "postCreateCommand": "sudo chown ubuntu:ubuntu cmake-build-debug && git submodule update --init --recursive",
 
   // Rebuilding the container discards installed extensions, so reinstall the
   // Stablebear panel from .devcontainer/vscode-buttons on each attach.
@@ -61,7 +63,12 @@
         "llvm-vs-code-extensions.vscode-clangd",
         "anthropic.claude-code",
         "openai.chatgpt"
-      ]
+      ],
+      "settings": {
+        // CMake Tools configures the project when the folder opens; configure
+        // and build manually instead (see postCreateCommand above).
+        "cmake.configureOnOpen": false
+      }
     }
   }
 }

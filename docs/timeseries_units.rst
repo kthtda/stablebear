@@ -1,11 +1,28 @@
 Time units
 ==========
 
-:py:class:`~stablebear.timeseries.Times` and
-:py:class:`~stablebear.timeseries.TimeSeries` accept the following units; see
-:doc:`timeseries` for how a time series uses its unit. Names are case-sensitive.
-:py:attr:`Times.unit <stablebear.timeseries.Times.unit>` reports the short
-name, whichever spelling was passed.
+A :py:class:`~stablebear.timeseries.TimeSeries` stores its timestamps as
+float64 numbers of its unit, counted from its time 0. The unit therefore
+sets which times are exact: whole multiples of the unit, and fractions such
+as 0.5 whose binary representation is exact, are stored exactly, while a
+time such as 0.1 s is the nearest float64 number to 0.1. Every channel of a
+time series and every window cut from it store their times in the same unit.
+
+Durations are converted into the unit of a time series when they are used,
+and :py:meth:`TimeSeries.to <stablebear.timeseries.TimeSeries.to>` converts
+the stored timestamps into another unit. Each conversion multiplies or
+divides by an exact integer factor, such as 1000 between seconds and
+milliseconds, so it rounds each time once. Choose a unit in which the
+times of interest are whole numbers, such as milliseconds for times
+recorded to the millisecond, to keep them exact.
+
+:py:class:`~stablebear.timeseries.TimeDelta`,
+:py:class:`~stablebear.timeseries.TimeDeltaTensor`, and
+:py:class:`~stablebear.timeseries.TimeSeries` accept the following units.
+Names are case-sensitive.
+:py:attr:`TimeSeries.unit <stablebear.timeseries.TimeSeries.unit>` reports
+the short name, whichever spelling was passed. A time series built from
+plain numbers has no unit (see :doc:`timeseries`).
 
 .. list-table::
    :header-rows: 1

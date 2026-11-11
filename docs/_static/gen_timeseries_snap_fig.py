@@ -5,14 +5,15 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 from pathlib import Path
+from typing import Literal
 
-from stablebear.timeseries import TimeDelayEmbedding, Times, TimeSeries, Window
+from stablebear.timeseries import TimeDelta, TimeDeltaTensor, TimeSeries, cut_windows, delay_embed
 
 HERE = Path(__file__).parent
 
 
 def _plot_steps(ax, series, color):
-    times = np.asarray(series.times.to("s"))
+    times = np.asarray(series.to("s").times.count)
     values = np.asarray(series.values)
     # Each step [t_i, t_{i+1}) is closed on the left and open on the right.
     for t0, t1, v in zip(times[:-1], times[1:], values[:-1]):
@@ -26,14 +27,15 @@ def _plot_steps(ax, series, color):
 
 # -- included in docs via literalinclude :pyobject: --
 def plot_timeseries_evaluation():
-    series = TimeSeries([1.0, 3.0, 2.0, 4.0], times=[0.0, 1.0, 1.5, 3.5])
+    series = TimeSeries([1.0, 3.0, 2.0, 4.0],
+                        times=TimeDeltaTensor([0.0, 1.0, 1.5, 3.5], "s"))
     queries = [0.5, 1.5, 2.75]
 
     fig, ax = plt.subplots(figsize=(6, 2.5))
     _plot_steps(ax, series, plt.rcParams["lines.color"])
     for t in queries:
         ax.axvline(t, color="gray", linestyle="--", linewidth=1)
-        ax.plot(t, series(t), "s", color="tab:orange", markersize=7,
+        ax.plot(t, series(t, "s"), "s", color="tab:orange", markersize=7,
                 zorder=6)
     ax.set_ylim(0, 5)
     fig.tight_layout()
@@ -42,12 +44,13 @@ def plot_timeseries_evaluation():
 
 # -- included in docs via literalinclude :pyobject: --
 def plot_timeseries_channels():
-    a = TimeSeries([1.0, 2.0, 3.0, 4.0], times=[0.0, 0.1, 0.2, 0.3])
+    a = TimeSeries([1.0, 2.0, 3.0, 4.0],
+                   times=TimeDeltaTensor([0.0, 0.1, 0.2, 0.3], "s"))
     b = TimeSeries([10.0, 20.0, 30.0],
-                   times=Times([50.0, 90.0, 130.0], unit="ms"))
+                   times=TimeDeltaTensor([50.0, 90.0, 130.0], "ms"))
     series = TimeSeries.from_channels([a, b], unit="s")
     query = 0.1
-    values = series(query)
+    values = series(query, "s")
 
     fig, axes = plt.subplots(2, 1, figsize=(6, 3.5), sharex=True)
     for i, (ax, channel, top) in enumerate(zip(axes, (a, b), (5, 40))):
@@ -65,12 +68,13 @@ def plot_timeseries_channels():
 
 # -- included in docs via literalinclude :pyobject: --
 def plot_timeseries_vector_channel():
-    a = TimeSeries([1.0, 2.0, 3.0, 4.0], times=[0.0, 0.1, 0.2, 0.3])
+    a = TimeSeries([1.0, 2.0, 3.0, 4.0],
+                   times=TimeDeltaTensor([0.0, 0.1, 0.2, 0.3], "s"))
     v = TimeSeries([[1.0, 0.0], [0.0, 1.0], [-1.0, 2.0]],
-                   times=[0.05, 0.1, 0.15])
+                   times=TimeDeltaTensor([0.05, 0.1, 0.15], "s"))
     series = TimeSeries.from_channels([a, v])
     query = 0.125
-    values = series(query)
+    values = series(query, "s")
     color = plt.rcParams["lines.color"]
 
     def column(x):
@@ -91,7 +95,7 @@ def plot_timeseries_vector_channel():
     # Channel v: the time axis as a line, with each vector above its time
     # and the queried vector below.
     ax_v.axhline(0, color=color, linewidth=1)
-    for t, x in zip(np.asarray(v.times), np.asarray(v.values)):
+    for t, x in zip(np.asarray(v.times.count), np.asarray(v.values)):
         ax_v.plot(t, 0, "o", color=color, markersize=6, zorder=5)
         ax_v.text(t, 0.25, column(x), ha="center", va="bottom", fontsize=14)
     ax_v.plot(query, 0, "s", color="tab:orange", markersize=7, zorder=6)
@@ -107,7 +111,8 @@ def plot_timeseries_vector_channel():
 
 # -- included in docs via literalinclude :pyobject: --
 def plot_timeseries_rounding():
-    exact = TimeSeries([1.0, 2.0, 3.0, 4.0], times=[0.0, 0.1, 0.2, 0.3],
+    exact = TimeSeries([1.0, 2.0, 3.0, 4.0],
+                       times=TimeDeltaTensor([0.0, 0.1, 0.2, 0.3], "s"),
                        snap_tolerance=0.0)
     query = 0.3 - 0.1
     color = plt.rcParams["lines.color"]
@@ -117,7 +122,7 @@ def plot_timeseries_rounding():
 
     # Whole series: the query looks like it sits exactly on 0.2.
     grid = np.linspace(0.0, 0.3, 1001)
-    ax_full.plot(grid, [exact(t) for t in grid], color=color, linewidth=2)
+    ax_full.plot(grid, [exact(t, "s") for t in grid], color=color, linewidth=2)
     ax_full.plot([0.0, 0.1, 0.2, 0.3], [1.0, 2.0, 3.0, 4.0], "o",
                  color=color, markersize=6, zorder=5)
     ax_full.axvline(query, color="tab:orange", linestyle="--", linewidth=1)
@@ -143,9 +148,9 @@ def plot_timeseries_rounding():
                  markersize=10, clip_on=False)
     q = (query - 0.2) / scale
     ax_zoom.axvline(q, color="tab:orange", linestyle="--", linewidth=1)
-    ax_zoom.plot(q, exact(query), "s", color="tab:orange", markersize=7,
+    ax_zoom.plot(q, exact(query, "s"), "s", color="tab:orange", markersize=7,
                  zorder=6)
-    ax_zoom.annotate("0.3 - 0.1", (q, exact(query)), xytext=(q - 2.2, 2.6),
+    ax_zoom.annotate("0.3 - 0.1", (q, exact(query, "s")), xytext=(q - 2.2, 2.6),
                      fontsize=8, arrowprops={"arrowstyle": "->",
                                              "color": "gray"})
     ax_zoom.annotate("observation\nat 0.2", (0.0, 3.0),
@@ -160,7 +165,8 @@ def plot_timeseries_rounding():
 
 # -- included in docs via literalinclude :pyobject: --
 def plot_timeseries_snap_distances():
-    series = TimeSeries([1.0, 2.0, 3.0, 4.0], times=[0.0, 0.1, 0.2, 0.3])
+    series = TimeSeries([1.0, 2.0, 3.0, 4.0],
+                        times=TimeDeltaTensor([0.0, 0.1, 0.2, 0.3], "s"))
     by_tolerance = series.snap_tolerance * 0.2
     by_gap = (0.2 - 0.1) / 4
     reach = min(by_tolerance, by_gap)
@@ -194,7 +200,7 @@ def plot_timeseries_snap_distances():
 # -- included in docs via literalinclude :pyobject: --
 def plot_timeseries_snap_quarter():
     times = [1.7e9, 1.7e9 + 1e-6, 1.7e9 + 2e-6]
-    series = TimeSeries([1.0, 2.0, 3.0], times=times)
+    series = TimeSeries([1.0, 2.0, 3.0], times=TimeDeltaTensor(times, "s"))
     t, gap = times[1], times[1] - times[0]
     reach = min(series.snap_tolerance * t, gap / 4)
     spacing = np.spacing(t)
@@ -216,7 +222,7 @@ def plot_timeseries_snap_quarter():
     for k in (1, 2):
         query = t - k * spacing
         ax.plot((t - query) * us, 0.4, "s", color=color, markersize=7)
-        ax.annotate(f"returns {series(query):g}", ((t - query) * us, 0.4),
+        ax.annotate(f"returns {series(query, 's'):g}", ((t - query) * us, 0.4),
                     xytext=(0, 8), textcoords="offset points", ha="center",
                     fontsize=8)
     ax.set_yticks([])
@@ -228,8 +234,8 @@ def plot_timeseries_snap_quarter():
 # -- included in docs via literalinclude :pyobject: --
 def plot_timeseries_embedding():
     t = np.linspace(0.0, 6.0, 49)
-    signal = TimeSeries(np.sin(np.pi * t), times=t)
-    embedded = TimeDelayEmbedding(dimension=2, delay=0.5)(signal)
+    signal = TimeSeries(np.sin(np.pi * t), times=TimeDeltaTensor(t, "s"))
+    embedded = delay_embed(signal, dimension=2, delay=TimeDelta(0.5, "s"))
     query = 1.0
     color = plt.rcParams["lines.color"]
 
@@ -240,15 +246,15 @@ def plot_timeseries_embedding():
                    linewidth=1.5)
     for s in (query - 0.5, query):
         ax_signal.axvline(s, color="gray", linestyle="--", linewidth=1)
-        ax_signal.plot(s, signal(s), "s", color="tab:orange", markersize=7,
+        ax_signal.plot(s, signal(s, "s"), "s", color="tab:orange", markersize=7,
                        zorder=6)
     ax_signal.set_xlabel("time (s)")
     ax_signal.set_ylabel("x(t)")
 
-    points = np.array([np.asarray(embedded(s)) for s in t[t >= 0.5]])
+    points = np.array([np.asarray(embedded(s, "s")) for s in t[t >= 0.5]])
     ax_points.plot(points[:, 0], points[:, 1], "o", color=color,
                    markersize=4)
-    ax_points.plot(*np.asarray(embedded(query)), "s", color="tab:orange",
+    ax_points.plot(*np.asarray(embedded(query, "s")), "s", color="tab:orange",
                    markersize=7, zorder=6)
     ax_points.set_aspect("equal")
     ax_points.set_xlabel("x(t - 0.5)")
@@ -260,16 +266,18 @@ def plot_timeseries_embedding():
 # -- included in docs via literalinclude :pyobject: --
 def plot_timeseries_windows():
     signal = TimeSeries([0.0, 0.0, 0.0, 1.0, 2.0, 3.0, 2.0, 1.0, 0.0],
-                        times=np.arange(9.0))
-    windows, bounds = Window(size=4.0, step=2.0, anchor="start")(
-        signal, return_bounds=True)
-    bounds = np.asarray(bounds)
+                        times=TimeDeltaTensor(np.arange(9.0), "s"))
+    windows = cut_windows(signal, size=TimeDelta(4, "s"),
+                          step=TimeDelta(2, "s"), anchor="start")
+    # Where each window lies in signal.
+    bounds = [(w.source_domain.start.count, w.source_domain.end.count)
+              for w in windows]
     color = plt.rcParams["lines.color"]
 
     fig = plt.figure(figsize=(7, 4.4))
     grid = fig.add_gridspec(2, len(bounds), height_ratios=[1.4, 1])
     ax_signal = fig.add_subplot(grid[0, :])
-    ax_signal.step(np.asarray(signal.times.to("s")), np.asarray(signal.values),
+    ax_signal.step(np.asarray(signal.times.count), np.asarray(signal.values),
                    where="post", color=color, linewidth=1.5)
     # One bar per window above the signal, staggered so they do not overlap.
     # Each window is [a, b): closed at the start, open at the end.
@@ -292,7 +300,7 @@ def plot_timeseries_windows():
     times = np.linspace(0.0, 4.0, 400, endpoint=False)
     for i in range(len(bounds)):
         ax = fig.add_subplot(grid[1, i])
-        ax.plot(times, np.asarray(windows[i](times)), color=color,
+        ax.plot(times, np.asarray(windows[i](times, "s")), color=color,
                 linewidth=1.5, drawstyle="steps-post")
         ax.set_xlim(0.0, 4.0)
         ax.set_ylim(-0.3, 3.3)
@@ -304,17 +312,18 @@ def plot_timeseries_windows():
 
 
 def _plot_window_rows(rows, stacked=False):
-    """Plot ``signal`` above one row of window bars per (label, Window), or
-    with ``stacked``, the windows of the one Window each on its own row."""
+    """Plot ``signal`` above one row of window bars per (label, arguments of
+    cut_windows), or with ``stacked``, the windows of the one set of
+    arguments each on its own row."""
     signal = TimeSeries([0.0, 0.0, 0.0, 1.0, 2.0, 3.0, 2.0, 1.0, 0.0],
-                        times=np.arange(9.0))
+                        times=TimeDeltaTensor(np.arange(9.0), "s"))
     color = plt.rcParams["lines.color"]
     hollow = plt.rcParams["axes.facecolor"]
     t0, t1 = 0.0, 8.0
     bars = []  # (row, height offset, a, b, window)
     for row, (label, window) in enumerate(rows):
-        _, bounds = window(signal, return_bounds=True)
-        for k, (a, b) in enumerate(np.asarray(bounds)):
+        for k, w in enumerate(cut_windows(signal, **window)):
+            a, b = w.source_domain.start.count, w.source_domain.end.count
             if stacked:
                 bars.append((k, 0.0, a, b, window))
             else:
@@ -329,7 +338,7 @@ def _plot_window_rows(rows, stacked=False):
     fig, (ax_signal, ax_rows) = plt.subplots(
         2, 1, figsize=(7, 1.9 + (row_height + 0.1) * n_rows), sharex=True,
         gridspec_kw={"height_ratios": [1.6, row_height * n_rows]})
-    ax_signal.step(np.asarray(signal.times.to("s")), np.asarray(signal.values),
+    ax_signal.step(np.asarray(signal.times.count), np.asarray(signal.values),
                    where="post", color=color, linewidth=1.5)
     ax_signal.set_ylim(-0.3, 3.4)
     ax_signal.set_yticks([0, 1, 2, 3])
@@ -339,9 +348,11 @@ def _plot_window_rows(rows, stacked=False):
     # and closed where they are cut at the end of the series.
     for row, offset, a, b, window in bars:
         y = n_rows - 1 - row + offset
-        partial = b - a < window.size
-        closed_a = window.closed in ("left", "both") or (partial and a == t0)
-        closed_b = window.closed in ("right", "both") or (partial and b == t1)
+        # Windows are closed at their anchor by default.
+        closed = window.get("closed", "left" if window.get("anchor") == "start" else "right")
+        partial = b - a < window["size"].count
+        closed_a = closed in ("left", "both") or (partial and a == t0)
+        closed_b = closed in ("right", "both") or (partial and b == t1)
         ax_rows.plot([a, b], [y, y], color="tab:orange", linewidth=2,
                      linestyle="--" if partial else "-")
         for x, closed in ((a, closed_a), (b, closed_b)):
@@ -360,23 +371,24 @@ def _plot_window_rows(rows, stacked=False):
 # -- included in docs via literalinclude :pyobject: --
 def plot_timeseries_window_anchors():
     return _plot_window_rows([
-        ('anchor="start"', Window(size=3.0, anchor="start")),
-        ('anchor="end"', Window(size=3.0)),
+        ('anchor="start"', dict(size=TimeDelta(3, "s"), anchor="start")),
+        ('anchor="end"', dict(size=TimeDelta(3, "s"))),
     ])
 
 
 # -- included in docs via literalinclude :pyobject: --
 def plot_timeseries_window_closed():
     signal = TimeSeries([0.0, 0.0, 0.0, 1.0, 2.0, 3.0, 2.0, 1.0, 0.0],
-                        times=np.arange(9.0))
-    choices = ["left", "right", "both", "none"]
+                        times=TimeDeltaTensor(np.arange(9.0), "s"))
+    choices: list[Literal["left", "right", "both", "none"]] = ["left", "right", "both", "none"]
     hollow = plt.rcParams["axes.facecolor"]
 
     fig, ax = plt.subplots(figsize=(7, 3.0))
     for row, closed in enumerate(choices):
-        window = Window(size=3.0, anchor="start", closed=closed)
-        _, bounds = window(signal, return_bounds=True)
-        for k, (a, b) in enumerate(np.asarray(bounds)):
+        windows = cut_windows(signal, size=TimeDelta(3, "s"), anchor="start",
+                              closed=closed)
+        for k, w in enumerate(windows):
+            a, b = w.source_domain.start.count, w.source_domain.end.count
             # Alternate heights so that the shared end at 3 s stays visible.
             y = len(choices) - 1 - row + (0.15 if k % 2 else -0.15)
             ax.plot([a, b], [y, y], color="tab:orange", linewidth=2)
@@ -399,15 +411,17 @@ def plot_timeseries_window_closed():
 # -- included in docs via literalinclude :pyobject: --
 def plot_timeseries_window_partial():
     return _plot_window_rows([
-        ('anchor="start"', Window(size=3.0, anchor="start", partial=True)),
-        ('anchor="end"', Window(size=3.0, partial=True)),
+        ('anchor="start"',
+         dict(size=TimeDelta(3, "s"), anchor="start", partial=True)),
+        ('anchor="end"', dict(size=TimeDelta(3, "s"), partial=True)),
     ])
 
 
 # -- included in docs via literalinclude :pyobject: --
 def plot_timeseries_window_partial_overlap():
     return _plot_window_rows([
-        ("", Window(size=6.0, step=3.0, anchor="start", partial=True)),
+        ("", dict(size=TimeDelta(6, "s"), step=TimeDelta(3, "s"), anchor="start",
+                  partial=True)),
     ], stacked=True)
 
 

@@ -2,12 +2,12 @@
   "schema_version": 1,
   "producer": {
     "package": "stablebear",
-    "version": "0.6.0b1",
-    "commit": "9629137bd56c37599f47695a43c445ce5fa1ce96",
+    "version": "0.6.0b3",
+    "commit": "5d26cd4127e1cdb5c8913a0f765a06006d1f5353",
     "format_version": 3,
     "python": "3.10.12",
     "numpy": "2.2.6",
-    "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.35",
+    "platform": "Linux-7.0.0-42-generic-x86_64-with-glibc2.35",
     "pickle_protocol": 4,
     "backend": "stablebear._sb_cuda12"
   },
@@ -17,8 +17,8 @@
       "description": "Series of barcodes of three point clouds",
       "serialization": "binary",
       "file": "series_barcode32.sb",
-      "bytes": 351,
-      "sha256": "53ef63e2b331f27d472a7f3fc073207fdafb2d51d329108bad784aa9a8584722",
+      "bytes": 339,
+      "sha256": "3799e3bca85e96809c53aa28493f55322bf13190a9b3bd28512798058723e550",
       "expected": {
         "accepted_types": [
           "TimeSeries"
@@ -190,8 +190,8 @@
       "description": "Series of barcodes of three point clouds",
       "serialization": "pickle",
       "file": "series_barcode32.pkl",
-      "bytes": 403,
-      "sha256": "92750af95668ca0275fc5d6d876aac81dcd4c229d91c7a017af2c512e9d44b0a",
+      "bytes": 391,
+      "sha256": "f9dc6e040914f09233a1b6a0f0b00e607336f28c99d71846e1c11ebd2ed95c36",
       "expected": {
         "accepted_types": [
           "TimeSeries"
@@ -363,8 +363,8 @@
       "description": "Series of two channels in different units",
       "serialization": "binary",
       "file": "series_channels_float64.sb",
-      "bytes": 359,
-      "sha256": "03755dcb6c4a0a0bf7b7c336f5f0935bf65c3b0a8882b24d6add656d046a1af4",
+      "bytes": 334,
+      "sha256": "4228eaeb67c3eebd85c046b062cdb5395d5bfcb4bc4e2c02f97b53cddfe00585",
       "expected": {
         "accepted_types": [
           "TimeSeries"
@@ -501,8 +501,8 @@
       "description": "Series of two channels in different units",
       "serialization": "pickle",
       "file": "series_channels_float64.pkl",
-      "bytes": 411,
-      "sha256": "f96841126b1a497347e5abdb646bdd02535ab14e174b3b458851f0ff24796b94",
+      "bytes": 386,
+      "sha256": "e5dc6add2dfa495949e53b0269895fe8047aa9252dceff5cea77c7ab0065362a",
       "expected": {
         "accepted_types": [
           "TimeSeries"
@@ -639,14 +639,14 @@
       "description": "Windows with open starts and ends",
       "serialization": "binary",
       "file": "windows_open_float64.sb",
-      "bytes": 511,
-      "sha256": "1ee3731af96e73422207a5e7e43c1e8b29ef740e62c1c025b7625e48a297f05e",
+      "bytes": 475,
+      "sha256": "a062b0db3e08d22fbd368722a8c5a402c90c3243685391f3377ddf95943dbefc",
       "expected": {
         "accepted_types": [
           "TimeSeriesTensor"
         ],
         "comparison": "series_elements",
-        "dtype": "series(float64)",
+        "dtype": "ts(float64)",
         "shape": [
           3
         ],
@@ -868,14 +868,14 @@
       "description": "Windows with open starts and ends",
       "serialization": "pickle",
       "file": "windows_open_float64.pkl",
-      "bytes": 563,
-      "sha256": "dd9a8177d50cb70d9112c72201c6b26e9c6558a3baae02d7c8e3fa8fff7895e3",
+      "bytes": 527,
+      "sha256": "f6b0a142a341768fc409f807231050c8e2c48dd88c27ce6530b1e362cce7864d",
       "expected": {
         "accepted_types": [
           "TimeSeriesTensor"
         ],
         "comparison": "series_elements",
-        "dtype": "series(float64)",
+        "dtype": "ts(float64)",
         "shape": [
           3
         ],
@@ -1097,14 +1097,14 @@
       "description": "Windows with closed starts and ends",
       "serialization": "binary",
       "file": "windows_closed_float64.sb",
-      "bytes": 527,
-      "sha256": "24e8c2817ebae56489a5b9860a4c5cd39a1357e8b95f518de4ee6ad34c7b9337",
+      "bytes": 491,
+      "sha256": "5b43626e7e848b5bcd4dceaf0a2653f9563c17f8a4d0248cecc1bf11b1b6ed7c",
       "expected": {
         "accepted_types": [
           "TimeSeriesTensor"
         ],
         "comparison": "series_elements",
-        "dtype": "series(float64)",
+        "dtype": "ts(float64)",
         "shape": [
           3
         ],
@@ -1338,14 +1338,14 @@
       "description": "Windows with closed starts and ends",
       "serialization": "pickle",
       "file": "windows_closed_float64.pkl",
-      "bytes": 579,
-      "sha256": "a6651fc34bcf943b5511d5567041c04e3f3c097e11fb17b752209fb46d915a50",
+      "bytes": 543,
+      "sha256": "c2c0de1a2b00cea44bc0112ba5c06fcf8cc2e37b9373b40f397b888e4c7bba1b",
       "expected": {
         "accepted_types": [
           "TimeSeriesTensor"
         ],
         "comparison": "series_elements",
-        "dtype": "series(float64)",
+        "dtype": "ts(float64)",
         "shape": [
           3
         ],

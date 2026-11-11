@@ -341,7 +341,8 @@ def gaussian(x, mean, std):
 def test_draws_with_replacement_follow_the_weights(
     distribution, density, reference_range, n_reference, n_draws,
 ):
-    x = np.linspace(*reference_range, n_reference)
+    start, stop = reference_range
+    x = np.linspace(start, stop, n_reference)
     reference = sb.PointCloud(x[:, None])
 
     samples = sb.random.subsample_relative(
@@ -395,7 +396,8 @@ def numpy_inclusion_frequencies(p, n_points, n_samples, generator):
 def test_draws_without_replacement_follow_the_weights(
     distribution, density, reference_range, n_points, n_reference, n_samples,
 ):
-    x = np.linspace(*reference_range, n_reference)
+    start, stop = reference_range
+    x = np.linspace(start, stop, n_reference)
     reference = sb.PointCloud(x[:, None])
 
     samples = sb.random.subsample_relative(
@@ -737,8 +739,8 @@ def test_non_distribution_argument_raises():
     ])
 
     with pytest.raises(TypeError, match="distribution must be a Distribution or a list of them"):
-        sb.random.subsample_relative(
-            reference, [0], n_points=1, n_samples=1, replace=True, distribution="gaussian",
+        sb.random.subsample_relative(  # pyright: ignore[reportCallIssue]
+            reference, [0], n_points=1, n_samples=1, replace=True, distribution="gaussian",  # pyright: ignore[reportArgumentType]
         )
 
 
@@ -878,10 +880,10 @@ def test_numpy_generator_raises():
     ])
 
     with pytest.raises(TypeError, match="generator must be a stablebear.random.Generator or None"):
-        sb.random.subsample_relative(
+        sb.random.subsample_relative(  # pyright: ignore[reportCallIssue]
             reference, [0], n_points=1, n_samples=1, replace=True,
             distribution=sb.distributions.Uniform(0, 0.5),
-            generator=np.random.default_rng(0),
+            generator=np.random.default_rng(0),  # pyright: ignore[reportArgumentType]
         )
 
 

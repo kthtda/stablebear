@@ -66,7 +66,7 @@ def allclose(a, b, atol=1e-8, rtol=1e-5) -> bool:
             if dense_a.shape != dense_b.shape:
                 return False
             return bool(np.allclose(dense_a, dense_b, atol=atol, rtol=rtol))
-        if isinstance(a, DistanceMatrix):
+        if isinstance(a, DistanceMatrix) and isinstance(b, DistanceMatrix):
             return a._current_matrix().allclose(b._current_matrix(), atol=atol, rtol=rtol)
         return a._data.allclose(b._data, atol=atol, rtol=rtol)
 

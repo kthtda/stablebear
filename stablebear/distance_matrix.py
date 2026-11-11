@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import warnings
+from typing import Any
 
 import numpy as np
 
 from . import _sb_cpp as cpp
 from ._binary_io import _BinaryIoMixin
 from ._tensor_base import IndexedElementTensor, _array_for_protocol
-from .typing import float32, float64, distmat32, distmat64
+from .typing import Dtype, float32, float64, distmat32, distmat64
 
 _dtype_to_cpp = {
     float32: cpp.DistanceMatrix_f32,
@@ -42,13 +43,13 @@ class DistanceMatrix(_BinaryIoMixin):
 
     Parameters
     ----------
-    n_or_data : int | numpy.ndarray | DistanceMatrix
+    n_or_data : int, numpy.ndarray, or DistanceMatrix
         If an int, creates a zero-initialized matrix of that size.
         A two-dimensional NumPy array supplies the full square matrix. A
         one-dimensional array supplies the strict upper triangle in SciPy
         condensed order: ``(0, 1), (0, 2), ..., (n-2, n-1)``.
         If a DistanceMatrix, wraps it directly.
-    dtype : float32 | float64 | None, optional
+    dtype : float32 or float64, optional
         Element precision. ``float32`` stores entries as 32-bit floats,
         ``float64`` as 64-bit floats. Defaults to ``float64`` when
         ``n_or_data`` is an int. For array input, ``float32`` and ``float64``
@@ -57,13 +58,16 @@ class DistanceMatrix(_BinaryIoMixin):
         existing matrix objects.
     """
 
+    # A native DistanceMatrix_f32 or _f64.
+    _data: Any
+
     def _binary_io_data(self):
         return self._current_matrix()
 
     def __init__(
         self,
         n_or_data: int | np.ndarray | DistanceMatrix,
-        dtype: float32 | float64 | None = None,
+        dtype: Dtype | None = None,
         *,
         _owner=None,
         _outer_index=None,
@@ -283,10 +287,10 @@ class DistanceMatrixTensor(IndexedElementTensor):
 
     Parameters
     ----------
-    data : ndarray, DistanceMatrixTensor, or C++ tensor
+    data : numpy.ndarray or DistanceMatrixTensor
         An ndarray of shape ``(*tensor_shape, n, n)`` whose trailing two axes
         form each n×n distance matrix, or an existing tensor.
-    dtype : distmat32 | distmat64 | None, optional
+    dtype : distmat32 or distmat64, optional
         Element precision. Inferred from the array dtype when ``None``.
     """
 

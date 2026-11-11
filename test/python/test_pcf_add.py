@@ -34,7 +34,7 @@ def test_add_mismatched_types_raises():
     b = sb.Pcf(np.array([[0.0, 1.0]], dtype=np.float64))
 
     with pytest.raises(TypeError, match="Mismatched PCF types"):
-        a + b
+        _ = a + b
 
 
 def test_add_does_not_modify_operands():

@@ -6,15 +6,30 @@ from plot_helpers import FigureGallery, gallery_fixture, ax_fixture
 import stablebear as sb
 from stablebear.persistence import Barcode, BarcodeTensor
 from stablebear.plotting import plot_timeseries
-from stablebear.timeseries import Times, TimeSeries, Window
+from stablebear.timeseries import TimeDelta, TimeDeltaTensor, TimeSeries, cut_windows
 
 _gallery = FigureGallery()
 _show_gallery = gallery_fixture(_gallery)
 ax = ax_fixture(_gallery)
 
 
+def _axes(line):
+    """The axes of ``line``, which matplotlib types as optional."""
+    assert line.axes is not None
+    return line.axes
+
+
+def _close(line):
+    """Close the figure that ``line`` is drawn in."""
+    import matplotlib.pyplot as plt
+    from matplotlib.figure import Figure
+    figure = _axes(line).figure
+    assert isinstance(figure, Figure)
+    plt.close(figure)
+
+
 def _series():
-    return TimeSeries([10.0, 20.0, 30.0], times=Times([0.0, 1.5, 4.0], unit="s"))
+    return TimeSeries([10.0, 20.0, 30.0], times=TimeDeltaTensor([0.0, 1.5, 4.0], "s"))
 
 
 def test_a_series_is_drawn_as_steps_through_its_observations(ax):
@@ -28,8 +43,9 @@ def test_a_series_is_drawn_as_steps_through_its_observations(ax):
 def test_a_window_holds_its_last_value_to_its_end(ax):
     # The window [2, 5) holds 20, observed at 1.5, then 30 at 4; it ends at
     # 5, after its last observation.
-    window = Window(size=3.0, step=2.0, closed="left", partial=False, anchor="start")(
-        TimeSeries([10.0, 20.0, 30.0, 40.0], times=[0.0, 1.5, 4.0, 6.0]))[1]
+    window = cut_windows(TimeSeries([10.0, 20.0, 30.0, 40.0], times=TimeDeltaTensor([0.0, 1.5, 4.0, 6.0], "s")),
+                         size=TimeDelta(3.0, "s"), step=TimeDelta(2.0, "s"), closed="left", partial=False,
+                         anchor="start")[1]
 
     (line,) = plot_timeseries(window, ax=ax)
 
@@ -42,6 +58,23 @@ def test_the_time_axis_is_labeled_with_its_unit(ax):
 
     assert ax.xaxis.get_units() == "s"
     assert ax.get_xlabel() == "time (s)"
+
+
+def test_the_time_axis_of_a_series_without_a_unit_is_labeled_time(ax):
+    plot_timeseries(TimeSeries([10.0, 20.0], times=[0.0, 1.5]), ax=ax)
+
+    assert ax.get_xlabel() == "time"
+
+
+@pytest.mark.parametrize("first, second", [
+    pytest.param(TimeSeries([10.0, 20.0], times=[0.0, 1.5]), _series(), id="unit after none"),
+    pytest.param(_series(), TimeSeries([10.0, 20.0], times=[0.0, 1.5]), id="none after unit"),
+])
+def test_series_with_and_without_a_unit_on_one_axis_raise(ax, first, second):
+    plot_timeseries(first, ax=ax)
+
+    with pytest.raises(ValueError, match="cannot share a time axis"):
+        plot_timeseries(second, ax=ax)
 
 
 def test_a_label_set_before_drawing_is_kept(ax):
@@ -62,8 +95,9 @@ def test_no_axes_draws_on_the_current_axes(ax):
 
 
 def test_markers_mark_each_observation(ax):
-    window = Window(size=3.0, step=2.0, closed="left", partial=False, anchor="start")(
-        TimeSeries([10.0, 20.0, 30.0, 40.0], times=[0.0, 1.5, 4.0, 6.0]))[1]
+    window = cut_windows(TimeSeries([10.0, 20.0, 30.0, 40.0], times=TimeDeltaTensor([0.0, 1.5, 4.0, 6.0], "s")),
+                         size=TimeDelta(3.0, "s"), step=TimeDelta(2.0, "s"), closed="left", partial=False,
+                         anchor="start")[1]
 
     (line,) = plot_timeseries(window, ax=ax, markers=True)
 
@@ -88,7 +122,7 @@ def test_unit_sets_the_unit_of_the_time_axis(ax):
 
 def test_a_series_in_another_unit_is_drawn_in_the_unit_of_the_axis(ax):
     plot_timeseries(_series(), ax=ax)
-    milliseconds = TimeSeries([1.0, 2.0], times=Times([500.0, 2500.0], unit="ms"))
+    milliseconds = TimeSeries([1.0, 2.0], times=TimeDeltaTensor([500.0, 2500.0], "ms"))
 
     (line,) = plot_timeseries(milliseconds, ax=ax)
 
@@ -101,7 +135,7 @@ def test_axes_that_share_x_share_the_time_unit():
     fig, (top, bottom) = plt.subplots(2, 1, sharex=True)
     plot_timeseries(_series(), ax=top)
 
-    (line,) = plot_timeseries(TimeSeries([1.0, 2.0], times=Times([500.0, 2500.0], unit="ms")), ax=bottom)
+    (line,) = plot_timeseries(TimeSeries([1.0, 2.0], times=TimeDeltaTensor([500.0, 2500.0], "ms")), ax=bottom)
 
     assert np.array_equal(line.get_xdata(), [0.5, 2.5])
     plt.close(fig)
@@ -123,21 +157,30 @@ def test_an_axis_of_dates_raises(ax):
 
 def _windows():
     # Windows of 2 s at 0, 2, and 4 s.
-    series = TimeSeries([0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0], times=[0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0])
-    return Window(size=2.0, step=2.0, closed="left", partial=False, anchor="start")(series)
+    series = TimeSeries([0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0],
+                        times=TimeDeltaTensor([0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0], "s"))
+    return cut_windows(series, size=TimeDelta(2.0, "s"), step=TimeDelta(2.0, "s"), closed="left", partial=False,
+                       anchor="start")
 
 
 def test_a_tensor_of_windows_is_drawn_one_line_each_in_place(ax):
     lines = plot_timeseries(_windows(), ax=ax)
 
-    assert [list(line.get_xdata()) for line in lines] == [[0.0, 1.0, 2.0], [2.0, 3.0, 4.0], [4.0, 5.0, 6.0]]
+    assert [np.asarray(line.get_xdata()).tolist() for line in lines] == [[0.0, 1.0, 2.0], [2.0, 3.0, 4.0], [4.0, 5.0, 6.0]]
     assert len({line.get_color() for line in lines}) == 3
 
 
 def test_relative_draws_each_window_from_zero(ax):
     lines = plot_timeseries(_windows(), ax=ax, relative=True)
 
-    assert [list(line.get_xdata()) for line in lines] == [[0.0, 1.0, 2.0]] * 3
+    assert [np.asarray(line.get_xdata()).tolist() for line in lines] == [[0.0, 1.0, 2.0]] * 3
+
+
+def test_relative_with_a_unit_draws_each_window_from_zero_in_that_unit(ax):
+    lines = plot_timeseries(_windows(), ax=ax, relative=True, unit="ms")
+
+    assert [np.asarray(line.get_xdata()).tolist() for line in lines] == [[0.0, 1000.0, 2000.0]] * 3
+    assert ax.get_xlabel() == "time (ms)"
 
 
 def test_an_empty_tensor_draws_nothing(ax):
@@ -146,8 +189,9 @@ def test_an_empty_tensor_draws_nothing(ax):
 
 
 def test_a_tensor_with_two_dimensions_raises(ax):
-    series = TimeSeries([0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0], times=np.arange(9.0))
-    windows = Window(size=2.0, step=2.0, closed="left", partial=False, anchor="start")(series).reshape((2, 2))
+    series = TimeSeries([0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0], times=TimeDeltaTensor(np.arange(9.0), "s"))
+    windows = cut_windows(series, size=TimeDelta(2.0, "s"), step=TimeDelta(2.0, "s"), closed="left", partial=False,
+                          anchor="start").reshape((2, 2))
 
     with pytest.raises(ValueError, match="1-D"):
         plot_timeseries(windows, ax=ax)
@@ -155,41 +199,38 @@ def test_a_tensor_with_two_dimensions_raises(ax):
 
 def test_vector_observations_raise(ax):
     with pytest.raises(ValueError, match="scalar"):
-        plot_timeseries(TimeSeries([[1.0, 2.0], [3.0, 4.0]], times=[0.0, 1.0]), ax=ax)
+        plot_timeseries(TimeSeries([[1.0, 2.0], [3.0, 4.0]], times=TimeDeltaTensor([0.0, 1.0], "s")), ax=ax)
 
 
 def _channels():
-    a = TimeSeries([1.0, 2.0], times=Times([0.0, 2.0], unit="s"))
-    b = TimeSeries([10.0, 20.0, 30.0], times=Times([0.0, 1000.0, 2000.0], unit="ms"))
-    c = TimeSeries([-1.0, -2.0], times=Times([0.0, 2.0], unit="s"))
+    a = TimeSeries([1.0, 2.0], times=TimeDeltaTensor([0.0, 2.0], "s"))
+    b = TimeSeries([10.0, 20.0, 30.0], times=TimeDeltaTensor([0.0, 1000.0, 2000.0], "ms"))
+    c = TimeSeries([-1.0, -2.0], times=TimeDeltaTensor([0.0, 2.0], "s"))
     return TimeSeries.from_channels([a, b, c], unit="s")
 
 
 def test_several_channels_are_drawn_on_new_rows_sharing_time():
-    import matplotlib.pyplot as plt
     lines = plot_timeseries(_channels())
 
-    rows = [line.axes for line in lines]
+    rows = [_axes(line) for line in lines]
     assert len(set(rows)) == 3
-    assert [list(line.get_ydata()) for line in lines] == [[1.0, 2.0], [10.0, 20.0, 30.0], [-1.0, -2.0]]
+    assert [np.asarray(line.get_ydata()).tolist() for line in lines] == [[1.0, 2.0], [10.0, 20.0, 30.0], [-1.0, -2.0]]
     assert rows[0].get_shared_x_axes().joined(rows[0], rows[2])
-    plt.close(rows[0].figure)
+    _close(lines[0])
 
 
 def test_channels_in_other_units_are_drawn_in_the_unit_of_the_series():
-    import matplotlib.pyplot as plt
     lines = plot_timeseries(_channels())
 
-    assert list(lines[1].get_xdata()) == [0.0, 1.0, 2.0]
-    plt.close(lines[0].axes.figure)
+    assert np.asarray(lines[1].get_xdata()).tolist() == [0.0, 1.0, 2.0]
+    _close(lines[0])
 
 
 def test_only_the_last_row_is_labeled():
-    import matplotlib.pyplot as plt
     lines = plot_timeseries(_channels())
 
-    assert [line.axes.get_xlabel() for line in lines] == ["", "", "time (s)"]
-    plt.close(lines[0].axes.figure)
+    assert [_axes(line).get_xlabel() for line in lines] == ["", "", "time (s)"]
+    _close(lines[0])
 
 
 def test_several_channels_are_drawn_on_given_axes_in_order():
@@ -198,7 +239,7 @@ def test_several_channels_are_drawn_on_given_axes_in_order():
 
     lines = plot_timeseries(_channels(), ax=axes)
 
-    assert [line.axes for line in lines] == list(axes)
+    assert [_axes(line) for line in lines] == list(axes)
     plt.close(fig)
 
 
@@ -214,7 +255,7 @@ def test_several_channels_need_one_axes_each(n_axes):
 
 
 def _dated():
-    return TimeSeries([10.0, 20.0, 30.0], times=Times([0.0, 1.5, 4.0], unit="h", epoch="2023-01-01"))
+    return TimeSeries([10.0, 20.0, 30.0], times=TimeDeltaTensor([0.0, 1.5, 4.0], "h"), epoch="2023-01-01")
 
 
 def test_a_series_with_an_epoch_is_drawn_at_its_dates(ax):
@@ -226,7 +267,8 @@ def test_a_series_with_an_epoch_is_drawn_at_its_dates(ax):
 
 
 def test_windows_with_an_epoch_are_drawn_at_their_dates(ax):
-    windows = Window(size=2.0, step=2.0, closed="left", partial=False, anchor="start")(_dated())
+    windows = cut_windows(_dated(), size=TimeDelta(2.0, "h"), step=TimeDelta(2.0, "h"), closed="left", partial=False,
+                          anchor="start")
 
     lines = plot_timeseries(windows, ax=ax)
 
@@ -236,7 +278,7 @@ def test_windows_with_an_epoch_are_drawn_at_their_dates(ax):
 
 
 def test_dates_are_rounded_to_microseconds(ax):
-    series = TimeSeries([1.0, 2.0], times=Times([0.0, 1500.4], unit="ns", epoch="2023-01-01"))
+    series = TimeSeries([1.0, 2.0], times=TimeDeltaTensor([0.0, 1500.4], "ns"), epoch="2023-01-01")
 
     (line,) = plot_timeseries(series, ax=ax)
 
@@ -247,7 +289,7 @@ def test_dates_are_rounded_to_microseconds(ax):
 def test_relative_draws_a_series_with_an_epoch_at_its_times(ax):
     (line,) = plot_timeseries(_dated(), ax=ax, relative=True, unit="min")
 
-    assert list(line.get_xdata()) == [0.0, 90.0, 240.0]
+    assert np.asarray(line.get_xdata()).tolist() == [0.0, 90.0, 240.0]
     assert ax.get_xlabel() == "time (min)"
 
 
@@ -264,12 +306,11 @@ def test_a_series_with_an_epoch_on_a_time_axis_raises(ax):
 
 
 def test_several_channels_with_an_epoch_are_drawn_at_their_dates():
-    import matplotlib.pyplot as plt
     series = _dated()
     lines = plot_timeseries(TimeSeries.from_channels([series, series]))
 
-    assert all(line.get_xdata().dtype == np.dtype("datetime64[us]") for line in lines)
-    plt.close(lines[0].axes.figure)
+    assert all(np.asarray(line.get_xdata()).dtype == np.dtype("datetime64[us]") for line in lines)
+    _close(lines[0])
 
 
 def test_series_with_different_epochs_land_at_their_own_dates(ax):
@@ -278,7 +319,7 @@ def test_series_with_different_epochs_land_at_their_own_dates(ax):
     first, = plot_timeseries(_dated(), ax=ax)
     second, = plot_timeseries(later, ax=ax)
 
-    assert second.get_xdata()[0] - first.get_xdata()[0] == np.timedelta64(1, "D")
+    assert np.asarray(second.get_xdata())[0] - np.asarray(first.get_xdata())[0] == np.timedelta64(1, "D")
 
 
 @pytest.mark.parametrize("values, dtype_name", [
@@ -288,7 +329,7 @@ def test_series_with_different_epochs_land_at_their_own_dates(ax):
                  "barcode64", id="barcodes"),
 ])
 def test_time_series_of_non_numbers_raise(values, dtype_name, ax):
-    series = TimeSeries(values(), times=[0.0, 1.0])
+    series = TimeSeries(values(), times=TimeDeltaTensor([0.0, 1.0], "s"))
 
     with pytest.raises(TypeError, match=dtype_name):
         plot_timeseries(series, ax=ax)

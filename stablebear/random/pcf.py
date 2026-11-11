@@ -7,10 +7,7 @@ from .generator import _unwrap
 def _get_backend(dtype):
     dtype = _validate_dtype(dtype, [pcf32, pcf64])
 
-    if dtype == pcf32:
-        return cpp.Random_f32_f32
-    elif dtype == pcf64:
-        return cpp.Random_f64_f64
+    return cpp.Random_f32_f32 if dtype == pcf32 else cpp.Random_f64_f64
 
 
 def noisy_sin(shape, n_points=20, dtype=pcf32, generator=None):

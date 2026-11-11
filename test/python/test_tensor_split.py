@@ -37,6 +37,14 @@ class TestSplitEqual:
     def test_3d(self, TensorType, np_dtype):
         _assert_split(np.arange(24, dtype=np_dtype).reshape(2, 6, 2), 3, 1, TensorType)
 
+    def test_2d_negative_axis(self, TensorType, np_dtype):
+        _assert_split(np.arange(12, dtype=np_dtype).reshape(3, 4), 2, -1, TensorType)
+
+    def test_axis_out_of_range_raises(self, TensorType, np_dtype):
+        t = TensorType(np.arange(12, dtype=np_dtype).reshape(3, 4))
+        with pytest.raises(ValueError, match="out of range"):
+            sb.split(t, 2, axis=-3)
+
     def test_uneven_raises(self, TensorType, np_dtype):
         t = TensorType(np.arange(7, dtype=np_dtype))
         with pytest.raises((ValueError, RuntimeError)):
@@ -53,6 +61,9 @@ class TestSplitIndices:
 
     def test_2d_axis1(self, TensorType, np_dtype):
         _assert_split(np.arange(12, dtype=np_dtype).reshape(3, 4), [1, 3], 1, TensorType)
+
+    def test_2d_negative_axis(self, TensorType, np_dtype):
+        _assert_split(np.arange(12, dtype=np_dtype).reshape(3, 4), [1, 3], -1, TensorType)
 
     def test_empty_indices(self, TensorType, np_dtype):
         """Empty indices list returns the whole tensor as a single part."""
@@ -93,6 +104,14 @@ class TestArraySplit:
 
     def test_2d_axis1(self, TensorType, np_dtype):
         _assert_array_split(np.arange(15, dtype=np_dtype).reshape(3, 5), 3, 1, TensorType)
+
+    def test_2d_negative_axis(self, TensorType, np_dtype):
+        _assert_array_split(np.arange(15, dtype=np_dtype).reshape(3, 5), 3, -1, TensorType)
+
+    def test_axis_out_of_range_raises(self, TensorType, np_dtype):
+        t = TensorType(np.arange(15, dtype=np_dtype).reshape(3, 5))
+        with pytest.raises(ValueError, match="out of range"):
+            sb.array_split(t, 3, axis=2)
 
     def test_single_section(self, TensorType, np_dtype):
         _assert_array_split(np.arange(7, dtype=np_dtype), 1, 0, TensorType)

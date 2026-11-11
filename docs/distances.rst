@@ -26,7 +26,7 @@ For piecewise constant functions, these integrals reduce to finite sums over the
 Distance between two PCFs
 =========================
 
-:py:func:`~stablebear.lp_distance` computes the :math:`L_p` distance between two individual PCFs, returning a scalar.
+:py:func:`~stablebear.distance.lp_distance` computes the :math:`L_p` distance between two individual PCFs, returning a scalar.
 
 ::
 
@@ -38,13 +38,13 @@ Distance between two PCFs
    d = sb.lp_distance(f, g)        # L1 distance (default)
    d2 = sb.lp_distance(f, g, p=2)  # L2 distance
 
-This is the simplest distance API and is useful for quick comparisons or unit testing. For computing distances between all pairs in a collection, use :py:func:`~stablebear.pdist` or :py:func:`~stablebear.cdist` instead.
+This is the simplest distance API and is useful for quick comparisons or unit testing. For computing distances between all pairs in a collection, use :py:func:`~stablebear.distance.pdist` or :py:func:`~stablebear.distance.cdist` instead.
 
 
 Pairwise distances
 ==================
 
-:py:func:`~stablebear.pdist` computes the full pairwise :math:`L_p` distance matrix for a 1-D tensor of PCFs. The result is a :py:class:`~stablebear.DistanceMatrix` — a compressed symmetric matrix where entry :math:`(i, j)` is the :math:`L_p` distance between the :math:`i`-th and :math:`j`-th PCF.
+:py:func:`~stablebear.distance.pdist` computes the full pairwise :math:`L_p` distance matrix for a 1-D tensor of PCFs. The result is a :py:class:`~stablebear.distance_matrix.DistanceMatrix` — a compressed symmetric matrix where entry :math:`(i, j)` is the :math:`L_p` distance between the :math:`i`-th and :math:`j`-th PCF.
 
 Basic usage
 -----------
@@ -92,7 +92,7 @@ For large collections of PCFs, ``pdist`` automatically offloads the computation 
 Cross-distances
 ================
 
-:py:func:`~stablebear.cdist` computes the pairwise :math:`L_p` distances between two tensors of PCFs. Unlike ``pdist``, the two input tensors can differ in shape and size. The result is a :py:class:`~stablebear.FloatTensor` whose shape is the concatenation of the two input shapes.
+:py:func:`~stablebear.distance.cdist` computes the pairwise :math:`L_p` distances between two tensors of PCFs. Unlike ``pdist``, the two input tensors can differ in shape and size. The result is a :py:class:`~stablebear.base_tensor.FloatTensor` whose shape is the concatenation of the two input shapes.
 
 ::
 
@@ -116,7 +116,7 @@ Higher-dimensional tensors are supported -- the output shape is ``(*X.shape, *Y.
 L2 kernel matrices
 ===================
 
-:py:func:`~stablebear.l2_kernel` computes the pairwise :math:`L_2` inner-product (kernel) matrix for a 1-D tensor of PCFs. The result is a :py:class:`~stablebear.SymmetricMatrix` where entry :math:`(i, j)` is
+:py:func:`~stablebear.inner_product.l2_kernel` computes the pairwise :math:`L_2` inner-product (kernel) matrix for a 1-D tensor of PCFs. The result is a :py:class:`~stablebear.symmetric_matrix.SymmetricMatrix` where entry :math:`(i, j)` is
 
 .. math::
 
@@ -136,7 +136,7 @@ The kernel matrix is symmetric and includes diagonal entries (self inner product
 Distance matrices
 ==================
 
-:py:class:`~stablebear.DistanceMatrix` provides a compressed storage format for distance matrices. Since a distance matrix is symmetric with zeros on the diagonal, it stores only the strict lower triangle — :math:`n(n-1)/2` elements instead of :math:`n^2`. Entries are enforced to be nonnegative, and writes to the diagonal are rejected unless the value is zero.
+:py:class:`~stablebear.distance_matrix.DistanceMatrix` provides a compressed storage format for distance matrices. Since a distance matrix is symmetric with zeros on the diagonal, it stores only the strict lower triangle — :math:`n(n-1)/2` elements instead of :math:`n^2`. Entries are enforced to be nonnegative, and writes to the diagonal are rejected unless the value is zero.
 
 Construct a matrix from either a full square NumPy array or a one-dimensional
 compact array::
@@ -221,7 +221,7 @@ tensor types::
 Symmetric matrices
 ===================
 
-:py:class:`~stablebear.SymmetricMatrix` provides a more general compressed storage format for symmetric matrices without the distance matrix constraints. It stores the lower triangle including the diagonal — :math:`n(n+1)/2` elements instead of :math:`n^2`.
+:py:class:`~stablebear.symmetric_matrix.SymmetricMatrix` provides a more general compressed storage format for symmetric matrices without the distance matrix constraints. It stores the lower triangle including the diagonal — :math:`n(n+1)/2` elements instead of :math:`n^2`.
 
 Construct a matrix from either a full square NumPy array or a one-dimensional
 compact array::
@@ -277,7 +277,7 @@ Tensors of symmetric matrices use the ``symmat32`` or ``symmat64`` dtypes::
 Norms
 =====
 
-:py:func:`~stablebear.lp_norm` computes the :math:`L_p` norm of every PCF in a tensor, returning a NumPy array of the same shape.
+:py:func:`~stablebear.norms.lp_norm` computes the :math:`L_p` norm of every PCF in a tensor, returning a NumPy array of the same shape.
 
 ::
 
@@ -302,7 +302,7 @@ For higher-dimensional tensors, the output shape matches the input::
 Using distances in machine learning
 =====================================
 
-``pdist`` returns a :py:class:`~stablebear.DistanceMatrix`. Call :py:meth:`~stablebear.DistanceMatrix.to_dense` to obtain a standard NumPy array for use with scikit-learn and other libraries.
+``pdist`` returns a :py:class:`~stablebear.distance_matrix.DistanceMatrix`. Call :py:meth:`~stablebear.distance_matrix.DistanceMatrix.to_dense` to obtain a standard NumPy array for use with scikit-learn and other libraries.
 
 Clustering
 ----------

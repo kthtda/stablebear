@@ -47,10 +47,7 @@ def test_mean_count_close_to_expected():
     gen = sb.random.Generator(seed=7)
     X = sample_poisson((200,), dim=2, rate=rate, generator=gen)
 
-    counts = [None] * 200
-    for i in range(200):
-        pc = np.asarray(X[i])
-        counts[i] = pc.shape[0]
+    counts = [np.asarray(X[i]).shape[0] for i in range(200)]
 
     mean_count = np.mean(counts)
     # Expected count = rate * volume = 50 * 1 = 50

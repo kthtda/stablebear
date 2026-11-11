@@ -1,5 +1,6 @@
 #include "nb.hpp"
 
+#include <sbear/errors.hpp>
 #include <sbear/executor.hpp>
 #include <sbear/task.hpp>
 
@@ -107,6 +108,17 @@ namespace
 }
 
 NB_MODULE(SB_MODULE_NAME, m) {
+  nb::register_exception_translator([](const std::exception_ptr& p, void*) {
+    try
+    {
+      std::rethrow_exception(p);
+    }
+    catch (const sb::TypeError& e)
+    {
+      PyErr_SetString(PyExc_TypeError, e.what());
+    }
+  });
+
   sb_py::register_pcf(m);
 
   register_bindings_stoppable_task<void>(m, "_void");
@@ -144,6 +156,8 @@ NB_MODULE(SB_MODULE_NAME, m) {
   m.def("set_min_block_side", [](size_t n){ sb::settings().minBlockSide = n; });
 #ifdef BUILD_WITH_CUDA
   m.def("limit_gpus", [](size_t n){ sb::default_executor().limit_cuda_workers(n); });
+#else
+  m.def("limit_gpus", [](size_t){}); // No GPUs to limit
 #endif
   m.def("get_ngpus", &getNumGpus);
 
@@ -180,4 +194,17 @@ NB_MODULE(SB_MODULE_NAME, m) {
   sb_py::register_module_persistence(m);
   sb_py::register_distributions(m);
   sb_py::register_module_point_process(m);
+
+  // Export every binding, private ones included, so that the stablebear
+  // backend selector and type checkers reading the generated stub see the
+  // whole API through "from _sb_cpu import *".
+  nb::list all;
+  for (auto [name, value] : nb::borrow<nb::dict>(m.attr("__dict__")))
+  {
+    if (!nb::cast<std::string>(name).starts_with("__"))
+    {
+      all.append(name);
+    }
+  }
+  m.attr("__all__") = all;
 }

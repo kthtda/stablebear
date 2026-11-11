@@ -44,21 +44,30 @@ namespace sb
     /// The queries in @p t in row-major order, and their positions sorted by
     /// time. A NaN sorts first, so checking the first and last sorted queries
     /// against a domain rejects it.
+    template <typename Q>
     struct SortedQueries
     {
-      std::vector<float64_t> values;
+      std::vector<Q> values;
       std::vector<size_t> order;
     };
 
-    inline SortedQueries sort_queries(const Tensor<float64_t>& t)
+    template <typename Q>
+    SortedQueries<Q> sort_queries(const Tensor<Q>& t)
     {
-      SortedQueries queries;
+      SortedQueries<Q> queries;
       walk(t, [&](const std::vector<size_t>& index) { queries.values.push_back(t(index)); });
       queries.order.resize(queries.values.size());
       std::iota(queries.order.begin(), queries.order.end(), size_t{0});
       const auto& v = queries.values;
       std::sort(queries.order.begin(), queries.order.end(), [&](size_t a, size_t b) {
-        return std::isnan(v[a]) ? !std::isnan(v[b]) : v[a] < v[b];
+        if constexpr (std::is_floating_point_v<Q>)
+        {
+          return std::isnan(v[a]) ? !std::isnan(v[b]) : v[a] < v[b];
+        }
+        else
+        {
+          return v[a] < v[b];
+        }
       });
       return queries;
     }
@@ -118,7 +127,7 @@ namespace sb
   }
 
   template <typename T>
-  Channel<T> Channel<T>::stack_at(Times times, std::span<const float64_t> lags) const
+  Channel<T> Channel<T>::view_lagged_at(Times times, std::span<const float64_t> lags) const
   {
     if (lags.empty())
     {
@@ -153,35 +162,69 @@ namespace sb
   }
 
   template <typename T>
-  Channel<T> Channel<T>::take(Times times, std::vector<size_t> indices) const
+  Channel<T> Channel<T>::view_at_indices(std::vector<size_t> indices) const
   {
-    if (indices.size() != times.size())
+    std::vector<float64_t> at;
+    at.reserve(indices.size());
+    for (size_t k = 0; k < indices.size(); ++k)
     {
-      throw std::invalid_argument(
-          "Expected one index per time: got " + std::to_string(indices.size()) + " indices for "
-          + std::to_string(times.size()) + " times");
-    }
-    for (const auto i : indices)
-    {
-      if (i >= size())
+      if (indices[k] >= size())
       {
         throw std::out_of_range(
-            "Observation index " + std::to_string(i) + " is out of range for " + std::to_string(size())
+            "Observation index " + std::to_string(indices[k]) + " is out of range for " + std::to_string(size())
             + " observations");
       }
+      if (k > 0 && indices[k] <= indices[k - 1])
+      {
+        throw std::invalid_argument("Observation indices must be strictly increasing");
+      }
+      at.push_back(time(indices[k]));
     }
 
-    // One component at lag 0, whose base is the given index.
+    // One component at lag 0, whose base is the given index. A view with
+    // one component reads observation i of its source at its base i, so a
+    // view of it takes from that source directly: chains of views stay one
+    // level deep, and the views between are freed.
     Channel view = *this;
     view.m_storage = nullptr;
-    view.m_source = std::make_shared<const Channel>(*this);
-    view.m_times = std::make_shared<const Times>(std::move(times));
+    if (m_source && m_lags.size() == 1)
+    {
+      for (auto& i : indices)
+      {
+        i = (*m_base)[i];
+      }
+      view.m_source = m_source;
+    }
+    else
+    {
+      view.m_source = std::make_shared<const Channel>(*this);
+    }
+    view.m_times = std::make_shared<const Times>(times_like(std::move(at)));
     view.m_base = std::make_shared<const std::vector<size_t>>(std::move(indices));
     view.m_lags = {0.0};
     view.m_end = std::nullopt;
     view.m_endClosed = false;
     view.m_startClosed = true;
     return view;
+  }
+
+  template <typename T>
+  Channel<T> Channel<T>::with_times(Times times) const
+  {
+    if (m_lags.size() > 1)
+    {
+      throw std::logic_error("A view with several lags finds its observations from its times; it cannot move them");
+    }
+    if (times.size() != size())
+    {
+      throw std::invalid_argument("Expected one time per observation: got " + std::to_string(times.size())
+                                  + " times for " + std::to_string(size()) + " observations");
+    }
+    auto channel = *this;
+    channel.m_times = std::make_shared<const Times>(std::move(times));
+    channel.m_end = std::nullopt;
+    channel.m_endClosed = false;
+    return channel;
   }
 
   template <typename T>
@@ -199,10 +242,68 @@ namespace sb
   }
 
   template <typename T>
-  Channel<T> Channel<T>::with_epoch(std::optional<DateTime> epoch) const
+  Channel<T> Channel<T>::to(TimeUnit from, TimeUnit to) const
+  {
+    if (from == to)
+    {
+      return *this;
+    }
+    auto channel = *this;
+    channel.m_times = std::make_shared<const Times>(held_times().to(from, to));
+    if (m_end)
+    {
+      channel.m_end = convert_time(*m_end, from, to);
+    }
+    for (auto& lag : channel.m_lags)
+    {
+      lag = convert_time(lag, from, to);
+    }
+    // A view with several lags reads its source at its own times less its
+    // lags, so the source moves to the same unit. One with one lag reads it
+    // by index only, so it stays as it is.
+    if (m_source && m_lags.size() > 1)
+    {
+      channel.m_source = std::make_shared<const Channel>(m_source->to(from, to));
+    }
+    return channel.with_end_after_last();
+  }
+
+  template <typename T>
+  Channel<T> Channel<T>::shifted(float64_t delta) const
   {
     auto channel = *this;
-    channel.m_times = std::make_shared<const Times>(held_times().with_epoch(epoch));
+    auto values = held_times().values();
+    for (auto& value : values)
+    {
+      value += delta;
+    }
+    detail::keep_increasing(values);
+    channel.m_times = std::make_shared<const Times>(held_times().with_values(std::move(values)));
+    if (m_end)
+    {
+      channel.m_end = *m_end + delta;
+    }
+    // A view with several lags reads its source at its own times less its
+    // lags, so the source shifts alike. One with one lag reads it by index
+    // only, so it stays as it is.
+    if (m_source && m_lags.size() > 1)
+    {
+      channel.m_source = std::make_shared<const Channel>(m_source->shifted(delta));
+    }
+    return channel.with_end_after_last();
+  }
+
+  template <typename T>
+  Channel<T> Channel<T>::with_end_after_last() const
+  {
+    if (!m_end || size() == 0 || *m_end > time(size() - 1))
+    {
+      return *this;
+    }
+    auto channel = *this;
+    channel.m_end = m_endClosed ? std::nullopt
+                                : std::optional(std::nextafter(time(size() - 1),
+                                                               std::numeric_limits<float64_t>::infinity()));
     return channel;
   }
 
@@ -223,11 +324,9 @@ namespace sb
   template <typename T>
   bool Channel<T>::same_observations(const Channel& other) const
   {
-    const auto& times = held_times();
-    const auto& otherTimes = other.held_times();
     return m_snapTolerance == other.m_snapTolerance && m_shape == other.m_shape
            && m_end == other.m_end && end_closed() == other.end_closed() && m_startClosed == other.m_startClosed
-           && times.unit() == otherTimes.unit() && times.values() == otherTimes.values() && values() == other.values();
+           && held_times().values() == other.held_times().values() && values() == other.values();
   }
 
   template <typename T>
@@ -321,7 +420,8 @@ namespace sb
   template <typename T>
   size_t Channel<T>::source_index(size_t k, size_t j) const
   {
-    // A single component is the base, given by take or found by stack_at.
+    // A single component is the base, given by view_at_indices or found by
+    // view_lagged_at.
     if (m_lags.size() == 1)
     {
       return (*m_base)[k];
@@ -390,13 +490,14 @@ namespace sb
   }
 
   template <typename T>
-  TimeSeries<T>::TimeSeries(std::vector<Channel<T>> channels, TimeUnit unit)
-    : m_channels(std::move(channels)), m_unit(unit)
+  TimeSeries<T>::TimeSeries(std::vector<Channel<T>> channels, TimeUnit unit, std::optional<DateTime> epoch)
+    : m_channels(std::move(channels)), m_unit(unit), m_epoch(epoch)
   {
     if (m_channels.empty())
     {
       throw std::invalid_argument("A time series needs at least one channel");
     }
+    check_epoch(m_unit, m_epoch);
   }
 
   template <typename T>
@@ -406,6 +507,8 @@ namespace sb
     {
       throw std::invalid_argument("A time series needs at least one channel");
     }
+    const auto& front = parts.front();
+    const auto target = unit.value_or(front.unit());
     std::vector<Channel<T>> channels;
     channels.reserve(parts.size());
     for (const auto& part : parts)
@@ -414,18 +517,21 @@ namespace sb
       {
         throw std::invalid_argument("Each channel must be a one-channel series; select channels with series[i]");
       }
-      channels.push_back(part.m_channels.front());
-      if (!unit && part.unit() != parts.front().unit())
+      check_same_kind_of_unit(part.unit(), front.unit());
+      if (!unit && part.unit() != front.unit())
       {
         throw std::invalid_argument("The channels differ in unit; pass unit= to choose one");
       }
+      check_same_kind_of_unit(part.unit(), target);
       // One epoch for the series: every channel has the same one, or none.
-      if (channels.back().epoch() != parts.front().m_channels.front().epoch())
+      // Python counts dated channels from one epoch before combining them.
+      if (part.epoch() != front.epoch())
       {
-        throw std::invalid_argument("The channels have different epochs; count their times from one shared epoch");
+        throw std::invalid_argument("The channels have different epochs; give every channel an epoch, or none");
       }
+      channels.push_back(part.m_channels.front().to(part.unit(), target));
     }
-    return TimeSeries(std::move(channels), unit.value_or(parts.front().unit()));
+    return TimeSeries(std::move(channels), target, front.epoch());
   }
 
   template <typename T>
@@ -443,13 +549,21 @@ namespace sb
       }
       channels.push_back(m_channels[static_cast<size_t>(i < 0 ? i + n : i)]);
     }
-    return TimeSeries(std::move(channels), m_unit);
+    return TimeSeries(std::move(channels), m_unit, m_epoch);
   }
 
   template <typename T>
   TimeSeries<T> TimeSeries<T>::to(TimeUnit unit) const
   {
+    if (unit == TimeUnit::Unitless && m_unit != TimeUnit::Unitless)
+    {
+      throw std::invalid_argument("Times in a unit cannot become plain numbers");
+    }
     auto series = *this;
+    for (auto& channel : series.m_channels)
+    {
+      channel = channel.to(m_unit, unit);
+    }
     series.m_unit = unit;
     return series;
   }
@@ -457,11 +571,22 @@ namespace sb
   template <typename T>
   TimeSeries<T> TimeSeries<T>::with_epoch(std::optional<DateTime> epoch) const
   {
+    check_epoch(m_unit, epoch);
+    auto series = *this;
+    series.m_epoch = epoch;
+    return series;
+  }
+
+  template <typename T>
+  TimeSeries<T> TimeSeries<T>::shifted(float64_t delta, std::optional<DateTime> epoch) const
+  {
+    check_epoch(m_unit, epoch);
     auto series = *this;
     for (auto& channel : series.m_channels)
     {
-      channel = channel.with_epoch(epoch);
+      channel = channel.shifted(delta);
     }
+    series.m_epoch = epoch;
     return series;
   }
 
@@ -473,7 +598,7 @@ namespace sb
     for (size_t i = 0; i < m_channels.size(); ++i)
     {
       const auto& c = m_channels[i];
-      values(i) = NestedTensor<T>::from_leaf_view(c.lookup(convert_time(t, m_unit, c.unit())));
+      values(i) = NestedTensor<T>::from_leaf_view(c.lookup(t));
     }
     return NestedTensor<T>::from_outer_view(std::move(values), 1);
   }
@@ -495,7 +620,7 @@ namespace sb
       const auto& channel = m_channels[c];
       for (size_t k = 0; k < order.size(); ++k)
       {
-        sorted[k] = convert_time(queries[order[k]], m_unit, channel.unit());
+        sorted[k] = queries[order[k]];
       }
       std::vector<size_t> shape(t.shape().begin(), t.shape().end());
       shape.insert(shape.end(), channel.shape().begin(), channel.shape().end());
@@ -522,13 +647,13 @@ namespace sb
       }
       // An open end at the same time as another channel's closed one still
       // excludes that time, and likewise for starts.
-      const auto first = convert_time(c.time(0), c.unit(), m_unit);
+      const auto first = c.time(0);
       if (first > domain.first || (first == domain.first && !c.start_closed()))
       {
         domain.first = first;
         domain.closedStart = c.start_closed();
       }
-      const auto last = convert_time(c.end().value_or(c.time(c.size() - 1)), c.unit(), m_unit);
+      const auto last = c.end().value_or(c.time(c.size() - 1));
       if (last < domain.last || (last == domain.last && !c.end_closed()))
       {
         domain.last = last;
@@ -544,106 +669,181 @@ namespace sb
     const auto domain = this->domain();
     if (!domain.contains(t))
     {
-      throw std::domain_error("Time " + detail::shortest_text(t) + " is outside the domain " + domain.to_string());
+      throw TimeSeriesDomainError("Time " + detail::shortest_text(t) + " is outside the domain " + domain.to_string(),
+                                  t, domain);
     }
   }
 
-  template <typename T>
-  std::string TimeSeries<T>::Domain::to_string() const
+  inline std::string TimeDomain::to_string() const
   {
     return (closedStart ? "[" : "(") + detail::shortest_text(first) + ", " + detail::shortest_text(last)
            + (closedEnd ? "]" : ")");
   }
 
-  template <typename T>
-  NestedTensor<T> evaluate(const Tensor<TimeSeries<T>>& series, const Tensor<float64_t>& t, Executor& exec)
+  namespace detail
   {
-    if (series.size() == 0)
+    /// The position of a series in a tensor, as "TimeSeries at position
+    /// (1, 2)".
+    inline std::string position_text(const std::vector<size_t>& index)
     {
-      throw std::invalid_argument("Cannot evaluate an empty tensor of series");
+      std::string position;
+      for (const auto i : index)
+      {
+        position += (position.empty() ? "" : ", ") + std::to_string(i);
+      }
+      return "TimeSeries at position (" + position + ")";
     }
 
-    // The queries are sorted once for every series, as TimeSeries::evaluate
-    // sorts them for one.
-    const auto [queries, order] = detail::sort_queries(t);
-
-    // Leaf c holds, in block k, the values of channel c of the k-th series
-    // in row-major order.
-    const auto& first = series(std::vector<size_t>(series.rank(), 0));
-    std::vector<Tensor<T>> leaves;
-    for (size_t c = 0; c < first.n_channels(); ++c)
+    /// Every series of @p series evaluated at the queries @p t, where
+    /// time_of(one, c, q) is the time of query q in channel c of the series
+    /// one, increasing in q. check(one) throws for a series that cannot take
+    /// the queries. See evaluate() for the result and errors.
+    template <typename T, typename Q, typename TimeOf, typename Check>
+    NestedTensor<T> evaluate_each(const Tensor<TimeSeries<T>>& series, const Tensor<Q>& t, TimeOf time_of,
+                                  Check check, Executor& exec)
     {
-      std::vector<size_t> shape(series.shape().begin(), series.shape().end());
-      shape.insert(shape.end(), t.shape().begin(), t.shape().end());
-      shape.insert(shape.end(), first.channel(c).shape().begin(), first.channel(c).shape().end());
-      leaves.emplace_back(shape);
-    }
+      if (series.size() == 0)
+      {
+        throw std::invalid_argument("Cannot evaluate an empty tensor of series");
+      }
 
-    // Check every series in order first, so that an error names the first
-    // series that cannot be evaluated, whichever worker would reach it.
-    walk(series, [&](const std::vector<size_t>& index) {
-      const auto& one = series(index);
-      if (one.n_channels() != first.n_channels())
-      {
-        throw std::invalid_argument("Every series must have the same number of channels");
-      }
-      for (size_t c = 0; c < one.n_channels(); ++c)
-      {
-        if (one.channel(c).shape() != first.channel(c).shape())
-        {
-          throw std::invalid_argument("Every series must have the same channel shapes");
-        }
-      }
-      if (order.empty())
-      {
-        return;
-      }
-      const auto domain = one.domain();
-      for (const auto x : {queries[order.front()], queries[order.back()]})
-      {
-        if (!domain.contains(x))
-        {
-          std::string position;
-          for (const auto i : index)
-          {
-            position += (position.empty() ? "" : ", ") + std::to_string(i);
-          }
-          throw std::domain_error("TimeSeries at position (" + position + "): Time " + detail::shortest_text(x)
-                                  + " is outside the domain " + domain.to_string());
-        }
-      }
-    });
+      // The queries are sorted once for every series, as TimeSeries::evaluate
+      // sorts them for one.
+      const auto [queries, order] = sort_queries(t);
 
-    if (!order.empty())
-    {
-      parallel_walk(series, [&](const std::vector<size_t>& index) {
-        size_t k = 0;
-        for (size_t i = 0; i < index.size(); ++i)
-        {
-          k = k * series.shape(i) + index[i];
-        }
+      // Leaf c holds, in block k, the values of channel c of the k-th series
+      // in row-major order.
+      const auto& first = series(std::vector<size_t>(series.rank(), 0));
+      std::vector<Tensor<T>> leaves;
+      for (size_t c = 0; c < first.n_channels(); ++c)
+      {
+        std::vector<size_t> shape(series.shape().begin(), series.shape().end());
+        shape.insert(shape.end(), t.shape().begin(), t.shape().end());
+        shape.insert(shape.end(), first.channel(c).shape().begin(), first.channel(c).shape().end());
+        leaves.emplace_back(shape);
+      }
+
+      // Check every series in order first, so that an error names the first
+      // series that cannot be evaluated, whichever worker would reach it.
+      walk(series, [&](const std::vector<size_t>& index) {
         const auto& one = series(index);
-        thread_local std::vector<float64_t> sorted;
-        sorted.resize(order.size());
-        for (size_t c = 0; c < leaves.size(); ++c)
+        check(one);
+        if (one.n_channels() != first.n_channels())
         {
-          const auto& channel = one.channel(c);
-          for (size_t q = 0; q < order.size(); ++q)
-          {
-            sorted[q] = convert_time(queries[order[q]], one.unit(), channel.unit());
-          }
-          const auto blockSize = leaves[c].size() / series.size();
-          channel.lookup_sorted(sorted, order, leaves[c].data() + static_cast<std::ptrdiff_t>(k * blockSize));
+          throw std::invalid_argument("Every series must have the same number of channels");
         }
-      }, exec);
-    }
+        for (size_t c = 0; c < one.n_channels(); ++c)
+        {
+          if (one.channel(c).shape() != first.channel(c).shape())
+          {
+            throw std::invalid_argument("Every series must have the same channel shapes");
+          }
+        }
+        if (order.empty())
+        {
+          return;
+        }
+        for (size_t c = 0; c < one.n_channels(); ++c)
+        {
+          // The domain of the series, or of channel c for queries that
+          // depend on the channel.
+          const auto domain = one.n_channels() == 1 ? one.domain() : one.select({static_cast<std::ptrdiff_t>(c)}).domain();
+          for (const auto query : {queries[order.front()], queries[order.back()]})
+          {
+            const auto x = time_of(one, c, query);
+            if (!domain.contains(x))
+            {
+              throw TimeSeriesDomainError(position_text(index) + ": Time " + shortest_text(x)
+                                          + " is outside the domain " + domain.to_string(), x, domain, index, c);
+            }
+          }
+        }
+      });
 
-    Tensor<NestedTensor<T>> out({leaves.size()});
-    for (size_t c = 0; c < leaves.size(); ++c)
-    {
-      out(c) = NestedTensor<T>::from_leaf_view(std::move(leaves[c]));
+      if (!order.empty())
+      {
+        parallel_walk(series, [&](const std::vector<size_t>& index) {
+          size_t k = 0;
+          for (size_t i = 0; i < index.size(); ++i)
+          {
+            k = k * series.shape(i) + index[i];
+          }
+          const auto& one = series(index);
+          thread_local std::vector<float64_t> sorted;
+          sorted.resize(order.size());
+          for (size_t c = 0; c < leaves.size(); ++c)
+          {
+            for (size_t q = 0; q < order.size(); ++q)
+            {
+              sorted[q] = time_of(one, c, queries[order[q]]);
+            }
+            const auto blockSize = leaves[c].size() / series.size();
+            one.channel(c).lookup_sorted(sorted, order, leaves[c].data() + static_cast<std::ptrdiff_t>(k * blockSize));
+          }
+        }, exec);
+      }
+
+      Tensor<NestedTensor<T>> out({leaves.size()});
+      for (size_t c = 0; c < leaves.size(); ++c)
+      {
+        out(c) = NestedTensor<T>::from_leaf_view(std::move(leaves[c]));
+      }
+      return NestedTensor<T>::from_outer_view(std::move(out), 1);
     }
-    return NestedTensor<T>::from_outer_view(std::move(out), 1);
+  }
+
+  template <typename T>
+  NestedTensor<T> evaluate(const Tensor<TimeSeries<T>>& series, const Tensor<float64_t>& t,
+                           std::optional<TimeUnit> unit, Executor& exec)
+  {
+    const auto queryUnit = unit.value_or(TimeUnit::Unitless);
+    return detail::evaluate_each(
+        series, t,
+        [&](const TimeSeries<T>& one, size_t, float64_t query) { return convert_time(query, queryUnit, one.unit()); },
+        [&](const TimeSeries<T>& one) { check_query_unit(queryUnit, one.unit()); }, exec);
+  }
+
+  template <typename T>
+  float64_t time_of_date(const TimeSeries<T>& series, size_t c, const DateTime& date)
+  {
+    const auto& channel = series.channel(c);
+    const auto offset = time_since(date, *series.epoch(), series.unit());
+    const auto origin = channel.origin();
+    const auto t = offset - origin;
+    if (channel.size() == 0)
+    {
+      return t;
+    }
+    const auto reach = channel.snap_tolerance() * std::max(std::abs(offset), std::abs(origin));
+    const auto start = channel.time(0);
+    if (channel.start_closed() && t < start && start - t <= reach)
+    {
+      return start;
+    }
+    const auto end = channel.end().value_or(channel.time(channel.size() - 1));
+    if (channel.end_closed() && t > end && t - end <= reach)
+    {
+      return end;
+    }
+    return t;
+  }
+
+  template <typename T>
+  NestedTensor<T> evaluate_dates(const Tensor<TimeSeries<T>>& series, const Tensor<int64_t>& dates,
+                                 TimeUnit dateUnit, Executor& exec)
+  {
+    return detail::evaluate_each(
+        series, dates,
+        [&](const TimeSeries<T>& one, size_t c, int64_t date) {
+          return time_of_date(one, c, DateTime(date, dateUnit));
+        },
+        [&](const TimeSeries<T>& one) {
+          if (!one.epoch())
+          {
+            throw std::invalid_argument("Every series needs an epoch to place dates and times; set one with with_epoch");
+          }
+        },
+        exec);
   }
 }
 

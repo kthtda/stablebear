@@ -9,7 +9,7 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "stablebear"
-version = "0.6.0b3"
+version = "0.6.0"
 authors = [ { name="Bjorn H. Wehlin and the stablebear contributors", email="bwehlin@kth.se" } ]
 description = "Massively parallel computations for piecewise constant functions"
 readme = "README.md"
@@ -31,7 +31,8 @@ classifiers = [
 dependencies = [ "numpy>=2.0", "tqdm", "matplotlib" ]
 
 [dependency-groups]
-test = ["pytest", "scipy"]
+test = ["pytest", "scipy", "pandas>=2.2.2"]
+typecheck = ["pyright==1.1.414", "typing_extensions"]
 
 [tool.scikit-build]
 minimum-version = "build-system.requires"

@@ -32,40 +32,59 @@ class dtype:
     def __hash__(self):
         return id(self)
 
-    def __reduce__(self):
+    def __reduce__(self) -> str | tuple:
         # Pickle support: reconstruct by looking up the module-level name
         return self._name
 
 
 # Scalar dtypes
+#: 32-bit floating-point scalar dtype.
 float32 = dtype("float32", "32-bit floating-point scalar dtype.")
+#: 64-bit floating-point scalar dtype.
 float64 = dtype("float64", "64-bit floating-point scalar dtype.")
+#: 32-bit integer scalar dtype.
 int32 = dtype("int32", "32-bit integer scalar dtype.")
+#: 64-bit integer scalar dtype.
 int64 = dtype("int64", "64-bit integer scalar dtype.")
+#: 32-bit unsigned integer scalar dtype.
 uint32 = dtype("uint32", "32-bit unsigned integer scalar dtype.")
+#: 64-bit unsigned integer scalar dtype.
 uint64 = dtype("uint64", "64-bit unsigned integer scalar dtype.")
 
 # PCF dtypes
+#: 32-bit piecewise constant function dtype.
 pcf32 = dtype("pcf32", "32-bit piecewise constant function dtype.")
+#: 64-bit piecewise constant function dtype.
 pcf64 = dtype("pcf64", "64-bit piecewise constant function dtype.")
+#: 32-bit integer piecewise constant function dtype.
 pcf32i = dtype("pcf32i", "32-bit integer piecewise constant function dtype.")
+#: 64-bit integer piecewise constant function dtype.
 pcf64i = dtype("pcf64i", "64-bit integer piecewise constant function dtype.")
 
 # Point cloud dtypes
+#: 32-bit point cloud dtype.
 pcloud32 = dtype("pcloud32", "32-bit point cloud dtype.")
+#: 64-bit point cloud dtype.
 pcloud64 = dtype("pcloud64", "64-bit point cloud dtype.")
 
 # Barcode dtypes
+#: 32-bit persistence barcode dtype.
 barcode32 = dtype("barcode32", "32-bit persistence barcode dtype.")
+#: 64-bit persistence barcode dtype.
 barcode64 = dtype("barcode64", "64-bit persistence barcode dtype.")
 
 # Matrix dtypes
+#: 32-bit symmetric matrix dtype.
 symmat32 = dtype("symmat32", "32-bit symmetric matrix dtype.")
+#: 64-bit symmetric matrix dtype.
 symmat64 = dtype("symmat64", "64-bit symmetric matrix dtype.")
+#: 32-bit distance matrix dtype.
 distmat32 = dtype("distmat32", "32-bit distance matrix dtype.")
+#: 64-bit distance matrix dtype.
 distmat64 = dtype("distmat64", "64-bit distance matrix dtype.")
 
 # Boolean
+#: Boolean dtype.
 boolean = dtype("boolean", "Boolean dtype.")
 
 
@@ -86,46 +105,47 @@ _NATIVE_SUFFIX = {
 
 
 class _SeriesDtype(dtype):
-    def __init__(self, inner: dtype):
+    def __init__(self, value_type: dtype):
         super().__init__(
-            f"series({inner.name})",
-            f"Dtype of time series whose observations have dtype {inner.name}.",
+            f"ts({value_type.name})",
+            f"Dtype of time series whose observations have dtype {value_type.name}.",
         )
-        self._inner = inner
+        self._value_type = value_type
 
     @property
-    def inner(self) -> dtype:
+    def value_type(self) -> dtype:
         """The dtype of the observations of each series."""
-        return self._inner
+        return self._value_type
 
     def __repr__(self):
-        return f"stablebear.series(stablebear.{self._inner.name})"
+        return f"stablebear.ts(stablebear.{self._value_type.name})"
 
     def __reduce__(self):
-        return series, (self._inner,)
+        return ts, (self._value_type,)
 
 
 _SERIES_DTYPES = {}
 
 
-def series(inner: dtype) -> dtype:
-    """The dtype of time series whose observations have dtype ``inner``.
+def ts(value_type: dtype) -> _SeriesDtype:
+    """The dtype of time series whose observations have dtype ``value_type``.
 
     It is the dtype of a tensor of series, such as the windows of a series
-    of ``inner`` observations. The same ``inner`` always gives the same
-    object, so dtypes compare with ``is``, and :attr:`inner` reads it back.
+    of ``value_type`` observations. The same ``value_type`` always gives
+    the same object, so dtypes compare with ``is``, and ``value_type``
+    reads it back.
 
     Raises
     ------
     TypeError
-        If ``inner`` is not the dtype of a tensor element, such as
+        If ``value_type`` is not the dtype of a tensor element, such as
         ``float64`` or ``pcloud32``.
     """
-    if inner not in _NATIVE_SUFFIX:
-        raise TypeError(f"Series hold tensor elements, not {inner!r}")
-    if inner not in _SERIES_DTYPES:
-        _SERIES_DTYPES[inner] = _SeriesDtype(inner)
-    return _SERIES_DTYPES[inner]
+    if value_type not in _NATIVE_SUFFIX:
+        raise TypeError(f"Series hold tensor elements, not {value_type!r}")
+    if value_type not in _SERIES_DTYPES:
+        _SERIES_DTYPES[value_type] = _SeriesDtype(value_type)
+    return _SERIES_DTYPES[value_type]
 
 
 Dtype = dtype  # Alias for type annotations

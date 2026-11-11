@@ -4,8 +4,10 @@ Uses the C++ _gpu_detect module (direct OS API calls) when available,
 falling back to a pure-Python implementation using subprocess.
 """
 
+__all__ = ["detect_nvidia_gpus", "has_nvidia_gpu", "nvidia_gpu_count"]
+
 try:
-    from _gpu_detect import detect_nvidia_gpus, has_nvidia_gpu, nvidia_gpu_count
+    from ._gpu_detect import detect_nvidia_gpus, has_nvidia_gpu, nvidia_gpu_count
 except ImportError:
     import os
     import platform
@@ -97,7 +99,7 @@ except ImportError:
 
         Returns
         -------
-        list[dict]
+        list of dict
             A list of dicts, each with a ``"name"`` key describing the GPU.
             An empty list means no NVIDIA GPUs were found.
         """

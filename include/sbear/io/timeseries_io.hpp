@@ -15,64 +15,25 @@
 
 namespace sb::io::detail
 {
-  /// Units are stored as their length in seconds, mult * 10^exp, so neither
-  /// renaming nor reordering units changes what a saved file means.
-  inline void write_time_unit(std::ostream& os, TimeUnit unit)
-  {
-    const auto& info = sb::detail::time_unit_info(unit);
-    write_bytes<int32_t>(os, info.exp);
-    write_bytes<int64_t>(os, info.mult);
-  }
-
-  inline TimeUnit read_time_unit(std::istream& is)
-  {
-    const auto exp = read_bytes<int32_t>(is);
-    const auto mult = read_bytes<int64_t>(is);
-    for (const auto& info : sb::detail::TimeUnitTable)
-    {
-      if (info.exp == exp && info.mult == mult)
-      {
-        return info.unit;
-      }
-    }
-    throw std::runtime_error(
-        "Unknown time unit of " + std::to_string(mult) + " * 10^" + std::to_string(exp) + " seconds in saved time series");
-  }
-
-  /// A date and time is written as its count and its unit.
-  template <>
-  inline void write_bytes<DateTime>(std::ostream& os, const DateTime& v)
-  {
-    write_bytes<int64_t>(os, v.count);
-    write_time_unit(os, v.unit);
-  }
-
-  template <>
-  inline DateTime read_bytes<DateTime>(std::istream& is)
-  {
-    const auto count = read_bytes<int64_t>(is);
-    return DateTime(count, read_time_unit(is));
-  }
-
-  /// A series is written as its query unit and one record per channel: the
-  /// channel's unit, timestamps, values as a tensor with time along axis 0,
-  /// snap tolerance, whether its start and end are closed, its end, if set,
-  /// its origin, and the epoch of its timestamps, if set, as a count and its
-  /// unit. The end is always closed without one, but its flag is written
-  /// anyway so that an open end at the last timestamp needs no new format.
-  /// Each channel is written on its own, as the
-  /// values it shows, so a file holds no views or shared storage.
-  /// read_timeseries reads it back.
+  /// A series is written as its unit, which every channel's times are in,
+  /// its epoch, if set, as a count and its unit, and one record per channel:
+  /// its timestamps, values as a tensor with time along axis 0, snap
+  /// tolerance, whether its start and end are closed, its end, if set, and
+  /// its origin. The end is always closed without one, but
+  /// its flag is written anyway so that an open end at the last timestamp
+  /// needs no new format. Each channel is written on its own, as the values
+  /// it shows, so a file holds no views or shared storage. read_timeseries
+  /// reads it back.
   template <typename T>
   void write_value(std::ostream& os, const TimeSeries<T>& series)
   {
     write_time_unit(os, series.unit());
+    write_bytes<std::optional<DateTime>>(os, series.epoch());
     write_bytes<uint64_t>(os, series.n_channels());
     for (size_t i = 0; i < series.n_channels(); ++i)
     {
       const auto& channel = series.channel(i);
       const auto& times = channel.times();
-      write_time_unit(os, times.unit());
       write_elements(os, times.values().begin(), times.values().end());
       write_tensor(os, channel.values());
       write_bytes<float64_t>(os, channel.snap_tolerance());
@@ -80,7 +41,6 @@ namespace sb::io::detail
       write_bytes<bool>(os, channel.end_closed());
       write_bytes<std::optional<float64_t>>(os, channel.end());
       write_bytes<float64_t>(os, channel.origin());
-      write_bytes<std::optional<DateTime>>(os, times.epoch());
     }
   }
 
@@ -93,11 +53,11 @@ namespace sb::io::detail
     try
     {
       const auto unit = read_time_unit(is);
+      const auto epoch = read_bytes<std::optional<DateTime>>(is);
       const auto nChannels = read_bytes<uint64_t>(is);
       std::vector<Channel<T>> channels;
       for (uint64_t i = 0; i < nChannels; ++i)
       {
-        const auto channelUnit = read_time_unit(is);
         auto times = read_vector<float64_t>(is);
         auto values = read_element<Tensor<T>>(reader);
         const auto snapTolerance = read_bytes<float64_t>(is);
@@ -105,9 +65,8 @@ namespace sb::io::detail
         const auto endClosed = read_bytes<bool>(is);
         const auto end = read_bytes<std::optional<float64_t>>(is);
         const auto origin = read_bytes<float64_t>(is);
-        const auto epoch = read_bytes<std::optional<DateTime>>(is);
 
-        auto channel = Channel<T>(Times(std::move(times), channelUnit, epoch).with_origin(origin), values,
+        auto channel = Channel<T>(Times(std::move(times)).with_origin(origin), values,
                                   snapTolerance)
                            .with_start_closed(startClosed);
         if (end)
@@ -120,7 +79,7 @@ namespace sb::io::detail
         }
         channels.push_back(std::move(channel));
       }
-      return TimeSeries<T>(std::move(channels), unit);
+      return TimeSeries<T>(std::move(channels), unit, epoch);
     }
     catch (const std::invalid_argument& error)
     {

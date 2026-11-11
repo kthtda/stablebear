@@ -10,7 +10,7 @@ from stablebear.persistence import (
     barcode_to_stable_rank,
     compute_persistent_homology,
 )
-from stablebear.timeseries import Times, TimeSeries, Window
+from stablebear.timeseries import TimeDelta, TimeDeltaTensor, TimeSeries, cut_windows
 
 
 def _clouds(dtype, np_dtype):
@@ -28,7 +28,7 @@ def _clouds(dtype, np_dtype):
 ])
 def test_series_persistence_matches_each_snapshot(dtype, np_dtype, barcode_dtype):
     clouds = _clouds(dtype, np_dtype)
-    times = Times([0.0, 1.3, 4.0], unit="ms")
+    times = TimeDeltaTensor([0.0, 1.3, 4.0], "ms")
     series = TimeSeries(clouds, times=times)
 
     result = compute_persistent_homology(series, max_dim=1)
@@ -37,7 +37,7 @@ def test_series_persistence_matches_each_snapshot(dtype, np_dtype, barcode_dtype
     assert result.n_channels == 1
     assert result.dtype is barcode_dtype
     assert result.shape == (2,)
-    assert result.times == times
+    assert result.times.array_equal(times)
     assert result.unit == "ms"
     for i in range(3):
         expected = compute_persistent_homology(clouds[i], max_dim=1)
@@ -45,19 +45,19 @@ def test_series_persistence_matches_each_snapshot(dtype, np_dtype, barcode_dtype
 
 
 def test_series_of_one_cloud_keeps_its_time_axis():
-    series = TimeSeries(_clouds(sb.pcloud64, np.float64)[:1], times=[0.0])
+    series = TimeSeries(_clouds(sb.pcloud64, np.float64)[:1], times=TimeDeltaTensor([0.0], "s"))
 
     result = compute_persistent_homology(series, max_dim=1)
 
-    assert len(result) == 1
+    assert result.n_observations == 1
     assert result.shape == (2,)
 
 
 def test_each_channel_gets_its_own_barcodes_and_times():
     clouds = _clouds(sb.pcloud64, np.float64)
-    cam = TimeSeries(clouds, times=Times([0.0, 1.3, 4.0], unit="ms"))
+    cam = TimeSeries(clouds, times=TimeDeltaTensor([0.0, 1.3, 4.0], "ms"))
     # Not cam's first two clouds, so reading cam's elements for lidar shows.
-    lidar = TimeSeries(clouds[[2, 1]], times=Times([0.5, 2.0], unit="ms"))
+    lidar = TimeSeries(clouds[[2, 1]], times=TimeDeltaTensor([0.5, 2.0], "ms"))
     series = TimeSeries.from_channels([cam, lidar])
 
     result = compute_persistent_homology(series, max_dim=1)
@@ -65,7 +65,7 @@ def test_each_channel_gets_its_own_barcodes_and_times():
     assert result.n_channels == 2
     for i, source in enumerate((cam, lidar)):
         channel = result[i]
-        assert channel.times == source.times
+        assert channel.times.array_equal(source.times)
         expected = compute_persistent_homology(source, max_dim=1)
         assert channel.values.is_isomorphic_to(expected.values, atol=0, rtol=0)
 
@@ -85,32 +85,32 @@ def test_series_of_distance_matrices(dtype, np_dtype, barcode_dtype):
         [1, 0, 3],
         [2, 3, 0],
     ], dtype=np_dtype))
-    times = Times([0.0, 2.5], unit="s")
+    times = TimeDeltaTensor([0.0, 2.5], "s")
     series = TimeSeries(matrices, times=times)
 
     result = compute_persistent_homology(series, max_dim=1)
 
     assert result.dtype is barcode_dtype
-    assert result.times == times
+    assert result.times.array_equal(times)
     for i in range(2):
         expected = compute_persistent_homology(matrices[i], max_dim=1)
         assert result.values[i].is_isomorphic_to(expected, atol=0, rtol=0)
 
 
 def test_empty_series_gives_a_typed_empty_result():
-    series = TimeSeries(sb.zeros((0,), dtype=sb.pcloud32), times=[])
+    series = TimeSeries(sb.zeros((0,), dtype=sb.pcloud32), times=TimeDeltaTensor([], "s"))
 
     result = compute_persistent_homology(series, max_dim=1)
 
     assert result.dtype is sb.barcode32
-    assert len(result) == 0
+    assert result.n_observations == 0
     assert result.shape == (2,)
     assert result.unit == "s"
 
 
 def test_keyword_input_and_parameters_reach_the_series_path():
     clouds = _clouds(sb.pcloud64, np.float64)
-    series = TimeSeries(clouds, times=[0.0, 1.0, 2.0])
+    series = TimeSeries(clouds, times=TimeDeltaTensor([0.0, 1.0, 2.0], "s"))
 
     result = compute_persistent_homology(X=series, max_dim=0, reduced=True)
 
@@ -128,12 +128,12 @@ def test_float_series_of_matrices_reads_rows_as_points(np_dtype, barcode_dtype):
     flat = np.array([[[0, 0], [1, 0]], [[0, 0], [3, 0]]], dtype=np_dtype)
     line = np.array([[[0], [2], [5]]], dtype=np_dtype)
     numeric = TimeSeries.from_channels([
-        TimeSeries(flat, times=[0.0, 1.0]),
-        TimeSeries(line, times=[0.5]),
+        TimeSeries(flat, times=TimeDeltaTensor([0.0, 1.0], "s")),
+        TimeSeries(line, times=TimeDeltaTensor([0.5], "s")),
     ])
     clouds = TimeSeries.from_channels([
-        TimeSeries(sb.PointCloudTensor(flat), times=[0.0, 1.0]),
-        TimeSeries(sb.PointCloudTensor(line), times=[0.5]),
+        TimeSeries(sb.PointCloudTensor(flat), times=TimeDeltaTensor([0.0, 1.0], "s")),
+        TimeSeries(sb.PointCloudTensor(line), times=TimeDeltaTensor([0.5], "s")),
     ])
 
     result = compute_persistent_homology(numeric, max_dim=1)
@@ -142,7 +142,7 @@ def test_float_series_of_matrices_reads_rows_as_points(np_dtype, barcode_dtype):
     assert result.dtype is barcode_dtype
     assert result.shape == ((2,), (2,))
     for i in range(2):
-        assert result[i].times == expected[i].times
+        assert result[i].times.array_equal(expected[i].times)
         assert result[i].values.is_isomorphic_to(expected[i].values, atol=0, rtol=0)
 
 
@@ -154,8 +154,8 @@ def test_float_series_with_several_clouds_per_observation(np_dtype):
         return np.array([[[[0], [d]] for d in pair] for pair in distances], dtype=np_dtype)
 
     series = TimeSeries.from_channels([
-        TimeSeries(clouds([(1, 2), (3, 4)]), times=[0.0, 1.0]),
-        TimeSeries(clouds([(5, 6)]), times=[0.5]),
+        TimeSeries(clouds([(1, 2), (3, 4)]), times=TimeDeltaTensor([0.0, 1.0], "s")),
+        TimeSeries(clouds([(5, 6)]), times=TimeDeltaTensor([0.5], "s")),
     ])
 
     result = compute_persistent_homology(series, max_dim=0, reduced=True)
@@ -163,7 +163,7 @@ def test_float_series_with_several_clouds_per_observation(np_dtype):
     assert result.shape == ((2, 1), (2, 1))
     for i, distances in enumerate([[(1, 2), (3, 4)], [(5, 6)]]):
         values = result[i].values
-        assert result[i].times == series[i].times
+        assert result[i].times.array_equal(series[i].times)
         assert values.shape == (len(distances), 2, 1)
         for k, pair in enumerate(distances):
             for b, d in enumerate(pair):
@@ -172,8 +172,8 @@ def test_float_series_with_several_clouds_per_observation(np_dtype):
 
 
 @pytest.mark.parametrize("make_series", [
-    pytest.param(lambda: TimeSeries([1.0, 2.0], times=[0.0, 1.0]), id="float-scalar"),
-    pytest.param(lambda: TimeSeries(sb.zeros((2,), dtype=sb.barcode64), times=[0.0, 1.0]),
+    pytest.param(lambda: TimeSeries([1.0, 2.0], times=TimeDeltaTensor([0.0, 1.0], "s")), id="float-scalar"),
+    pytest.param(lambda: TimeSeries(sb.zeros((2,), dtype=sb.barcode64), times=TimeDeltaTensor([0.0, 1.0], "s")),
                  id="barcode"),
 ])
 def test_series_that_holds_no_point_clouds_raises(make_series):
@@ -186,11 +186,11 @@ def _barcode_series():
     x = TimeSeries(BarcodeTensor([
         Barcode(np.array([[0.0, 1.0]])),
         Barcode(np.array([[0.0, 2.0], [0.5, 1.5]])),
-    ]), times=Times([0.0, 1.0], unit="s"))
+    ]), times=TimeDeltaTensor([0.0, 1.0], "s"))
     y = TimeSeries(BarcodeTensor([
         Barcode(np.array([[0.0, 4.0], [1.0, 2.0], [1.0, 3.0]])),
         Barcode(np.array([[0.25, 0.75]])),
-    ]), times=Times([500.0, 1500.0], unit="ms"))
+    ]), times=TimeDeltaTensor([500.0, 1500.0], "ms"))
     return TimeSeries.from_channels([x, y], unit="s")
 
 
@@ -207,26 +207,26 @@ def test_summary_of_a_series_keeps_channels_and_times(summary):
     assert isinstance(result, TimeSeries)
     assert result.n_channels == 2
     for i in range(2):
-        assert result[i].times == series[i].times
+        assert result[i].times.array_equal(series[i].times)
         assert result[i].values.array_equal(summary(series[i].values))
 
 
 
 def test_persistence_and_summaries_keep_the_domain_of_a_window():
-    series = TimeSeries(_clouds(sb.pcloud64, np.float64), times=[0.0, 1.0, 3.0])
+    series = TimeSeries(_clouds(sb.pcloud64, np.float64), times=TimeDeltaTensor([0.0, 1.0, 3.0], "s"))
     # The window (0, 2) holds the clouds at 0 and 1.
-    window = Window(size=2.0, step=2.0, closed="none", anchor="start")(series)[0]
+    window = cut_windows(series, size=TimeDelta(2.0, "s"), step=TimeDelta(2.0, "s"), closed="none", anchor="start")[0]
 
     barcodes = compute_persistent_homology(window, max_dim=0)
     stable_ranks = barcode_to_stable_rank(barcodes)
 
     for result in (barcodes, stable_ranks):
-        assert result.times == window.times
+        assert result.times.array_equal(window.times)
         with pytest.raises(ValueError, match=r"outside the domain \(0, 2\)"):
-            result(0.0)
-        result(1.5)
+            result(TimeDelta(0.0, "s"))
+        result(TimeDelta(1.5, "s"))
         with pytest.raises(ValueError, match=r"outside the domain \(0, 2\)"):
-            result(2.0)
+            result(TimeDelta(2.0, "s"))
 
 def test_accumulated_persistence_of_a_series_forwards_max_death():
     series = _barcode_series()
@@ -243,14 +243,14 @@ def test_accumulated_persistence_of_a_series_forwards_max_death():
 
 
 def test_stable_rank_of_a_point_cloud_series_raises():
-    series = TimeSeries(_clouds(sb.pcloud64, np.float64), times=[0.0, 1.0, 2.0])
+    series = TimeSeries(_clouds(sb.pcloud64, np.float64), times=TimeDeltaTensor([0.0, 1.0, 2.0], "s"))
 
     with pytest.raises(TypeError):
         barcode_to_stable_rank(series)
 
 
 def test_series_persistence_does_not_depend_on_the_thread_count():
-    series = TimeSeries(_clouds(sb.pcloud64, np.float64), times=[0.0, 1.0, 2.0])
+    series = TimeSeries(_clouds(sb.pcloud64, np.float64), times=TimeDeltaTensor([0.0, 1.0, 2.0], "s"))
     expected = compute_persistent_homology(series, max_dim=1)
 
     previous = sb.system.get_cpu_limit()
@@ -263,3 +263,11 @@ def test_series_persistence_does_not_depend_on_the_thread_count():
 
     assert sb.system.get_cpu_limit() == previous
     assert result.values.is_isomorphic_to(expected.values, atol=0, rtol=0)
+
+
+def test_persistent_homology_of_windows_raises_naming_to_point_clouds():
+    series = TimeSeries([0.0, 10.0, 20.0, 30.0], times=TimeDeltaTensor([0.0, 1.0, 2.0, 3.0], "s"))
+    windows = cut_windows(series, size=TimeDelta(2, "s"), step=TimeDelta(1, "s"), anchor="start")
+
+    with pytest.raises(TypeError, match="to_point_clouds"):
+        _ = compute_persistent_homology(windows)  # pyright: ignore[reportCallIssue, reportArgumentType]

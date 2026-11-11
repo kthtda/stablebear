@@ -1,3 +1,7 @@
+import operator
+from collections.abc import Sequence
+from typing import TYPE_CHECKING, Any, overload
+
 from . import _sb_cpp as cpp
 from ._tensor_base import Shape, ShapeLike, Tensor
 from .base_tensor import (
@@ -12,8 +16,10 @@ from .base_tensor import (
 from .nested_tensor import NestedTensor
 from .point_cloud import PointCloudTensor
 from .typing import (
+    _NATIVE_SUFFIX,
     Dtype,
     _assert_valid_dtype,
+    _SeriesDtype,
     barcode32,
     barcode64,
     boolean,
@@ -34,6 +40,9 @@ from .typing import (
     uint32,
     uint64,
 )
+
+if TYPE_CHECKING:
+    from .timeseries.series import TimeSeries
 
 cpp_p = cpp.persistence
 
@@ -82,7 +91,7 @@ def _dtype_dispatch():
     return _DTYPE_DISPATCH
 
 
-def zeros(shape: ShapeLike, dtype: Dtype = pcf32):
+def zeros(shape: ShapeLike, dtype: Dtype = pcf32) -> Any:  # Any: the type follows the dtype.
     """
     Creates a new `Tensor` of the specified `shape` and `dtype` whose entries are "zero." What "zero" means depends on the `dtype`:
 
@@ -93,6 +102,9 @@ def zeros(shape: ShapeLike, dtype: Dtype = pcf32):
     `dtype=barcode32/64`: An empty barcode.
     `dtype=symmat32/64`: A 0×0 symmetric matrix.
     `dtype=distmat32/64`: A 0×0 distance matrix.
+    `dtype=ts(value_type)`: A series of one channel without observations,
+    in seconds, to be replaced by assigning a `TimeSeries` to the element.
+    Evaluating a series without observations raises `ValueError`.
 
     Parameters
     ----------
@@ -110,13 +122,17 @@ def zeros(shape: ShapeLike, dtype: Dtype = pcf32):
     if not isinstance(shape, Shape):
         shape = Shape(shape)  # If passed as, e.g., tuple of ints
 
+    if isinstance(dtype, _SeriesDtype):
+        from .timeseries.series import TimeSeriesTensor
+        return TimeSeriesTensor(getattr(cpp, f"TimeSeries{_NATIVE_SUFFIX[dtype.value_type]}Tensor")(shape))
+
     dispatch = _dtype_dispatch()
     _assert_valid_dtype(dtype, list(dispatch))
     wrapper, cpp_cls, zero_fill = dispatch[dtype]
     return wrapper(cpp_cls(shape, *zero_fill))
 
 
-def tensor(data, dtype: Dtype = None):
+def tensor(data, dtype: Dtype | None = None) -> Any:  # Any: the type follows the data and dtype.
     """Create a tensor from existing data, dispatching on *dtype*.
 
     A NumPy-like factory that wraps the per-family constructors so any
@@ -132,8 +148,18 @@ def tensor(data, dtype: Dtype = None):
     dtype : Dtype, optional
         Target element dtype. When ``None``, a numeric dtype is inferred from
         the array (bool/int/float), while a collection of ``Pcf`` objects is
-        inferred as a ``PcfTensor`` or ``IntPcfTensor``. Other non-numeric
-        tensors require an explicit dtype.
+        inferred as a ``PcfTensor`` or ``IntPcfTensor``, and one of
+        :class:`~stablebear.timeseries.TimeSeries` as a
+        :class:`~stablebear.timeseries.TimeSeriesTensor` of dtype
+        ``ts(value_type)``. The series may differ in their times, units,
+        and channels, but not in the dtype of their observations. Other
+        non-numeric tensors require an explicit dtype.
+
+    Raises
+    ------
+    TypeError
+        If series differ in the dtype of their observations, or do not
+        match an explicit ``dtype``.
 
     Returns
     -------
@@ -148,6 +174,10 @@ def tensor(data, dtype: Dtype = None):
 
     if isinstance(data, (list, tuple)) and contains_tensor(data):
         return NestedTensor(data, dtype=dtype)
+
+    from .timeseries.series import TimeSeries, TimeSeriesTensor
+    if isinstance(dtype, _SeriesDtype) or (dtype is None and isinstance(_first_leaf(data), TimeSeries)):
+        return TimeSeriesTensor._from_series(data, dtype)
 
     if dtype is None:
         if _first_pcf(data) is not None:
@@ -175,6 +205,15 @@ def tensor(data, dtype: Dtype = None):
     return wrapper(data)
 
 
+def _first_leaf(data):
+    """The first element of nested lists or tuples, or ``None`` if empty."""
+    while isinstance(data, (list, tuple)):
+        if not data:
+            return None
+        data = data[0]
+    return data
+
+
 def indices(data):
     """Create a ``uint64`` tensor for use as indices.
 
@@ -183,8 +222,76 @@ def indices(data):
     return tensor(data, dtype=uint64)
 
 
+def _series_channels(tensors):
+    """The series whose channels a join combines, or ``None`` for tensors."""
+    from .timeseries.series import TimeSeries
+    if isinstance(tensors, TimeSeries):
+        return tensors
+    if any(isinstance(t, TimeSeries) for t in tensors):
+        raise TypeError(
+            "Pass one TimeSeries to combine its channels; build it from several "
+            "with TimeSeries.from_channels, or make a tensor of series with sb.tensor"
+        )
+    return None
+
+
+@overload
+def concatenate(tensors: "TimeSeries", axis: int = 0) -> "TimeSeries": ...
+@overload
+def concatenate(tensors: Sequence[Any], axis: int = 0) -> Any: ...
 def concatenate(tensors, axis=0):
-    """Concatenate tensors along an existing axis (outer indexing)."""
+    """Concatenate tensors, or the observations of time series, along an
+    existing axis.
+
+    Tensors are joined along their axis ``axis`` (outer indexing): tensors
+    of shapes ``(2, 4)`` and ``(3, 4)`` give one of shape ``(5, 4)``.
+
+    For time series, the result is a series of one channel whose
+    observation at each time joins the channels' observations in effect
+    there along their axis ``axis``: channels of shapes ``(2,)`` and
+    ``(3,)`` give observations of shape ``(5,)``.
+    Its times are the start of the domain and every time in the domain at
+    which a channel stores an observation. The domain, unit, epoch, and
+    origin stay the same, and the snap tolerance is the smallest of the
+    channels'. Observations are copied.
+
+    .. warning::
+
+       Observations can be dropped or repeated. A channel's observations
+       outside the domain, or at an end the domain leaves out, are
+       dropped, and an observation in effect at several of the times is
+       repeated at each.
+
+    Parameters
+    ----------
+    tensors : sequence of Tensor, or TimeSeries
+        Tensors of one type, whose shapes match except along ``axis``. A
+        ``TimeSeries`` joins its channels; make several series the
+        channels of one with
+        :meth:`~stablebear.timeseries.TimeSeries.from_channels` first.
+        To put separate series into a tensor, use :func:`tensor`.
+    axis : int, default 0
+        The axis to join along, of each tensor or of each observation; a
+        negative ``axis`` counts from the end.
+
+    Returns
+    -------
+    Tensor or TimeSeries
+        A tensor of the type of the inputs, or a series of one channel.
+
+    Raises
+    ------
+    ValueError
+        If there is nothing to join, the shapes differ other than along
+        ``axis``, or ``axis`` is out of range. For series, also if the
+        observations are scalars, the channels have different origins,
+        their domains do not overlap, or a channel has no observations.
+    TypeError
+        If a sequence holds a ``TimeSeries``.
+    """
+    series = _series_channels(tensors)
+    if series is not None:
+        return series._from_cpp(cpp.concatenate_channels(series._data, operator.index(axis)))
     if not tensors:
         raise ValueError("need at least one tensor to concatenate")
     _validate_nested_join(tensors)
@@ -193,8 +300,60 @@ def concatenate(tensors, axis=0):
     return tensors[0]._to_py_tensor(result)
 
 
+@overload
+def stack(tensors: "TimeSeries", axis: int = 0) -> "TimeSeries": ...
+@overload
+def stack(tensors: Sequence[Any], axis: int = 0) -> Any: ...
 def stack(tensors, axis=0):
-    """Stack tensors along a new axis. All tensors must have the same shape."""
+    """Stack tensors, or the observations of time series, along a new axis.
+
+    ``n`` tensors of shape ``shape`` give one of shape ``(n, *shape)`` for
+    ``axis=0``.
+
+    For time series, the result is a series of one channel whose
+    observation at each time stacks the channels' observations in effect
+    there along a new axis ``axis`` of length ``n_channels``.
+    Its times are the start of the domain and every time in the domain at
+    which a channel stores an observation. The domain, unit, epoch, and
+    origin stay the same, and the snap tolerance is the smallest of the
+    channels'. Observations are copied.
+
+    .. warning::
+
+       Observations can be dropped or repeated. A channel's observations
+       outside the domain, or at an end the domain leaves out, are
+       dropped, and an observation in effect at several of the times is
+       repeated at each.
+
+    Parameters
+    ----------
+    tensors : sequence of Tensor, or TimeSeries
+        Tensors of one type and shape. A ``TimeSeries`` stacks its
+        channels; make several series the channels of one with
+        :meth:`~stablebear.timeseries.TimeSeries.from_channels` first.
+        To put separate series into a tensor, use :func:`tensor`.
+    axis : int, default 0
+        The position of the new axis, in the result or in each
+        observation; a negative ``axis`` counts from the end.
+
+    Returns
+    -------
+    Tensor or TimeSeries
+        A tensor of the type of the inputs, or a series of one channel.
+
+    Raises
+    ------
+    ValueError
+        If there is nothing to stack, the shapes differ, or ``axis`` is
+        out of range. For series, also if the channels have different
+        origins, their domains do not overlap, or a channel has no
+        observations.
+    TypeError
+        If a sequence holds a ``TimeSeries``.
+    """
+    series = _series_channels(tensors)
+    if series is not None:
+        return series._from_cpp(cpp.stack_channels(series._data, operator.index(axis)))
     if not tensors:
         raise ValueError("need at least one tensor to stack")
     _validate_nested_join(tensors)
@@ -239,7 +398,8 @@ def split(tensor, indices_or_sections, axis=0):
         splitting an axis of length 8 at ``[3, 5]`` produces parts of lengths
         3, 2, and 3. The element at each boundary starts the following part.
     axis : int
-        The axis along which to split (default 0).
+        The axis along which to split (default 0). A negative axis counts
+        from the end.
 
     Returns
     -------
@@ -276,7 +436,8 @@ def array_split(tensor, indices_or_sections, axis=0):
         ``[ik, axis_size)``. The element at each boundary starts the following
         part.
     axis : int
-        The axis along which to split (default 0).
+        The axis along which to split (default 0). A negative axis counts
+        from the end.
 
     Returns
     -------

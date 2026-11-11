@@ -4,7 +4,8 @@ Snapping queries to timestamps
 A :py:class:`~stablebear.timeseries.TimeSeries` evaluated at a time returns
 the observation with the largest timestamp at or before that time; see
 :doc:`timeseries`. This page explains how
-:py:meth:`~stablebear.timeseries.TimeSeries.evaluate` handles queries that
+:py:meth:`calling a series <stablebear.timeseries.TimeSeries.__call__>`
+handles queries that
 miss a timestamp by a rounding error, and how the ``snap_tolerance``
 argument controls it.
 
@@ -55,13 +56,16 @@ epsilons, the default of APL. Here the larger timestamp is 0.2, so a query
 up to ``2e-15`` s below it snaps. This takes in the rounding error of
 ``0.3 - 0.1`` while an ordinary query such as ``0.19`` is far outside::
 
-   series = TimeSeries([1.0, 2.0, 3.0, 4.0], times=[0.0, 0.1, 0.2, 0.3])
-   series(0.3 - 0.1)  # 3.0
-   series(0.19)       # 2.0
+   from stablebear.timeseries import TimeDeltaTensor, TimeSeries
 
-   exact = TimeSeries([1.0, 2.0, 3.0, 4.0], times=[0.0, 0.1, 0.2, 0.3],
-                      snap_tolerance=0.0)
-   exact(0.3 - 0.1)   # 2.0
+   times = TimeDeltaTensor([0.0, 0.1, 0.2, 0.3], "s")
+
+   series = TimeSeries([1.0, 2.0, 3.0, 4.0], times=times)
+   series(0.3 - 0.1, "s")  # 3.0
+   series(0.19, "s")       # 2.0
+
+   exact = TimeSeries([1.0, 2.0, 3.0, 4.0], times=times, snap_tolerance=0.0)
+   exact(0.3 - 0.1, "s")   # 2.0
 
 The figure places three queries by how far they fall below 0.2, on a log
 scale. Only queries in the shaded range return the observation at 0.2. The
@@ -132,7 +136,19 @@ such that :math:`i = 0` or
 
 With :math:`r = 0`, this is the last observation at or before :math:`t`. The
 domain check is exact: a query just below the first timestamp raises an
-error rather than snapping.
+error rather than snapping. Dates are the exception. A date is placed at its
+time since the epoch minus the :py:attr:`~stablebear.timeseries.TimeSeries.origin`,
+and that difference rounds on the scale of the two terms, not of the result.
+So a date that misses a closed end of the domain by at most :math:`r` times
+the larger magnitude of the two is placed at that end, and a window gives
+its value at its own start date.
+
+Window bounds are computed alike, from :math:`t_0` and :math:`k` times the
+step, or from a start and the size, and can round to either side of the
+observation they mean. :py:func:`~stablebear.timeseries.cut_windows` places
+an observation at a bound if it lies within :math:`r` times the larger
+magnitude of those terms on either side, so windows of 10 Hz data in seconds
+hold the same observations as in milliseconds.
 
 Choosing the tolerance
 ----------------------
