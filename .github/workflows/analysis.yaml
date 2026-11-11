@@ -394,9 +394,9 @@ jobs:
       SKIP_BACK_COPY: 1
       ENABLE_CUDA_COVERAGE: 1
       GPUCOV_OUTPUT: ${{ github.workspace }}/covreport/cuda/cuda_%p.bin
-      # Runs the tests on the simulated GPUs, which stablebear's GPU detection
-      # cannot see
-      RUN: ${{ inputs.use_github_runners && 'vgpu run --' || '' }}
+      # Runs the tests in a session of the simulated GPUs, where
+      # stablebear's GPU detection sees them as it sees real ones
+      RUN: ${{ inputs.use_github_runners && format('bash {0}/.github/scripts/vgpu-shell.sh', github.workspace) || '' }}
       SB_FORCE_CUDA: ${{ inputs.use_github_runners && '1' || '0' }}
       # Make pip more tolerant of transient PyPI/network hiccups.
       PIP_RETRIES: 5
@@ -432,6 +432,12 @@ jobs:
           bash .github/scripts/ci-retry.sh pip install ./gpucov
           bash .github/scripts/ci-retry.sh bash -c "sudo apt-get update && sudo apt-get install -y lcov"
 
+      # A vgpu shell session runs in user namespaces, which Ubuntu 24.04
+      # restricts unless this is turned off.
+      - name: Allow user namespaces for vgpu shell (GitHub runner)
+        if: inputs.use_github_runners
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+
       # Installs nvcc, builds the simulator and puts its CUDA libraries on
       # LD_LIBRARY_PATH.
       - name: Set up PantheonSim (GitHub runner)
@@ -461,6 +467,14 @@ jobs:
         run: |
           cd test
           $RUN python3 -c "import stablebear as sb; print('Backend:', sb.system.build_type())"
+
+      # Fails here, rather than in the tests, if the session runs without the
+      # GPUs' sysfs entries, as it does where user namespaces are refused.
+      - name: Verify GPU detection sees the simulated GPUs (GitHub runner)
+        if: inputs.use_github_runners
+        run: |
+          cd test
+          $RUN python3 -c "from stablebear import gpu; n = gpu.nvidia_gpu_count(); print('Detected GPUs:', n); assert n == $VGPU_DEVICE_COUNT"
 
       - name: Clear previous CUDA coverage data
         run: gpucov zerocounters --dump "covreport/cuda/cuda_*.bin"
