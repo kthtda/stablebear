@@ -75,7 +75,7 @@ namespace sb
         if (how.n == 1 && domain.closedStart && domain.closedEnd)
         {
           throw std::invalid_argument("One point cannot include both ends of the closed domain "
-                                      + domain.to_string() + "; take n of at least 2");
+                                      + domain.to_string() + "; take n_points of at least 2");
         }
         // The fractions of the domain's length at which the points lie: from
         // 0 if the start is closed, to 1 if the end is closed, evenly apart.

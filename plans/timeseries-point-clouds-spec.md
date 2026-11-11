@@ -16,8 +16,8 @@ give a `PointCloud` or `PointCloudTensor` in a few standard modes.
 These settle the open questions of the issue.
 
 1. **Signature.** One function, `to_point_clouds`, whose arguments choose
-   the mode: none for every observation, `n` or `step` for a uniform grid,
-   `times` for given times.
+   the mode: none for every observation, `n_points` or `step` for a uniform
+   grid, `times` for given times.
 2. **Scalar observations.** A series of numbers gives one-dimensional point
    clouds, one point of dimension 1 per time.
 3. **Channels.** `sb.stack` combines the channels of a series into one, as
@@ -97,7 +97,7 @@ made before, at shifted times.
   tuple, through a private base class whose constructor it checks.
 - Not covered: extending a series past its last observation.
 
-### `to_point_clouds(series, times=None, *, n=None, step=None)`
+### `to_point_clouds(series, times=None, *, n_points=None, step=None)`
 
 In `stablebear.timeseries`.
 
@@ -114,20 +114,21 @@ In `stablebear.timeseries`.
 
 ### Modes
 
-- **Every observation** (no `times`, `n`, or `step`): one point per time the
-  series stores in its domain.
-- **Uniform grid, `n`**: `n` evenly spaced times over each series' domain,
-  in its own time from 0, including each end the domain includes. With both
-  ends closed they are `length / (n - 1)` apart, with one end open
-  `length / n` apart starting from the closed end, and with both open
-  `length / (n + 1)` apart. These are the evenly spaced times over the
-  domain with both ends closed, with `n + 1` or `n + 2` times when ends are
-  open and the open ends left out, so `[0, 2]` gives 0, 1, 2 and `[0, 2)`
-  gives 0, 2/3, 4/3. The clouds of consecutive half-open windows then form
-  one evenly spaced grid, without a time in two clouds. Windows of one size
-  give clouds of `n` points each. `n` is a positive integer; `n = 1` needs
-  an open end, since one point cannot include both ends; it lies at the
-  closed end, or in the middle if both are open.
+- **Every observation** (no `times`, `n_points`, or `step`): one point per
+  time the series stores in its domain.
+- **Uniform grid, `n_points`**: `n_points` evenly spaced times over each
+  series' domain, in its own time from 0, including each end the domain
+  includes. With both ends closed they are `length / (n_points - 1)` apart,
+  with one end open `length / n_points` apart starting from the closed end,
+  and with both open `length / (n_points + 1)` apart. These are the evenly
+  spaced times over the domain with both ends closed, with `n_points + 1` or
+  `n_points + 2` times when ends are open and the open ends left out, so
+  `[0, 2]` gives 0, 1, 2 and `[0, 2)` gives 0, 2/3, 4/3. The clouds of
+  consecutive half-open windows then form one evenly spaced grid, without a
+  time in two clouds. Windows of one size give clouds of `n_points` points
+  each. `n_points` is a positive integer; `n_points = 1` needs an open end,
+  since one point cannot include both ends; it lies at the closed end, or in
+  the middle if both are open.
 - **Uniform grid, `step`**: times `start + k * step` in each series'
   domain, for `k = 0, 1, ...`, leaving out `start` if that end is open.
   `step` is a positive duration, or a number for a series without a unit,
@@ -140,8 +141,8 @@ In `stablebear.timeseries`.
 
 ### Errors
 
-- `ValueError` if more than one of `times`, `n`, and `step` is given, for
-  an invalid `n` or `step`, or for several channels.
+- `ValueError` if more than one of `times`, `n_points`, and `step` is
+  given, for an invalid `n_points` or `step`, or for several channels.
 - `TypeError` for unsupported observations, and for numbers on a series
   with a unit or durations on one without, as calling a series raises.
 

@@ -16,17 +16,17 @@ _NUMBER_DTYPES = (float32, float64, int32, int64, uint32, uint64)
 
 
 @overload
-def to_point_clouds(series: TimeSeries | _PandasLike, times: Any = None, *, n: int | None = None,
+def to_point_clouds(series: TimeSeries | _PandasLike, times: Any = None, *, n_points: int | None = None,
                     step: float | _ScalarDuration | None = None) -> PointCloud: ...
 
 
 @overload
-def to_point_clouds(series: TimeSeriesTensor, times: Any = None, *, n: int | None = None,
+def to_point_clouds(series: TimeSeriesTensor, times: Any = None, *, n_points: int | None = None,
                     step: float | _ScalarDuration | None = None) -> PointCloudTensor: ...
 
 
 def to_point_clouds(series: TimeSeries | TimeSeriesTensor | _PandasLike, times: Any = None, *,
-                    n: int | None = None,
+                    n_points: int | None = None,
                     step: float | _ScalarDuration | None = None) -> PointCloud | PointCloudTensor:
     """The point clouds traced by a time series or by each series of a
     tensor of them, such as windows.
@@ -40,18 +40,20 @@ def to_point_clouds(series: TimeSeries | TimeSeriesTensor | _PandasLike, times: 
     0, so that value is a point if the window includes its start, and is
     left out if the start is open.
 
-    With ``n``, the times are ``n`` evenly spaced times over the domain of
-    each series, including each end the domain includes: with both ends
-    closed they are ``length / (n - 1)`` apart, with one end open
-    ``length / n`` apart from the closed end, and with both open
-    ``length / (n + 1)`` apart; one point lies at the closed end, or in
-    the middle if both are open. These are the evenly spaced times over
-    the domain with both ends closed, with ``n + 1`` or ``n + 2`` times
-    when ends are open and the open ends left out. The times thus depend
+    With ``n_points``, the times are ``n_points`` evenly spaced times over
+    the domain of each series, including each end the domain includes:
+    with both ends closed they are ``length / (n_points - 1)`` apart, with
+    one end open ``length / n_points`` apart from the closed end, and with
+    both open ``length / (n_points + 1)`` apart; one point lies at the
+    closed end, or in the middle if both are open. These are the evenly
+    spaced times over the domain with both ends closed, with
+    ``n_points + 1`` or ``n_points + 2`` times when ends are open and the
+    open ends left out. The times thus depend
     on which ends are closed: ``[0, 2]`` gives times 0, 1, 2, and
     ``[0, 2)`` gives 0, 2/3, 4/3. The clouds of half-open windows that
     follow each other then form one evenly spaced grid, without a time
-    in two clouds. Windows of one size give clouds of ``n`` points each.
+    in two clouds. Windows of one size give clouds of ``n_points`` points
+    each.
     With ``step``, the times are ``start + k * step`` in the domain of each
     series, for ``k = 0, 1, ...``, leaving out ``start`` if the domain
     leaves it out. With ``times``, the times are those, in their order, the
@@ -76,7 +78,7 @@ def to_point_clouds(series: TimeSeries | TimeSeriesTensor | _PandasLike, times: 
         series without one. Series with an :attr:`~TimeSeries.epoch` also
         take dates and times, such as a :class:`DateTimeTensor`, which each
         series places at ``date - epoch - origin`` in its own time.
-    n : int, optional
+    n_points : int, optional
         The number of evenly spaced points of each cloud.
     step : float, TimeDelta, tuple, numpy.timedelta64, datetime.timedelta, or pandas.Timedelta, optional
         The time between points: a duration for a series with a unit, or a
@@ -96,8 +98,8 @@ def to_point_clouds(series: TimeSeries | TimeSeriesTensor | _PandasLike, times: 
         of the first such series of a tensor.
     ValueError
         If a series has several channels, more than one of ``times``,
-        ``n``, and ``step`` is given, ``n`` is not positive or is 1 for a
-        domain with both ends closed, ``step`` is not finite and positive,
+        ``n_points``, and ``step`` is given, ``n_points`` is not positive or
+        is 1 for a domain with both ends closed, ``step`` is not finite and positive,
         ``times`` is not one-dimensional, or for dates and times on a
         series without an epoch.
     TypeError
@@ -109,13 +111,13 @@ def to_point_clouds(series: TimeSeries | TimeSeriesTensor | _PandasLike, times: 
     """
     if isinstance(series, TimeSeriesTensor):
         _check_numbers(series.dtype.value_type)
-        n, step, times, dates, unit = _point_times(times, n, step, None)
+        n_points, step, times, dates, unit = _point_times(times, n_points, step, None)
         counts = None
         if dates is not None:
             counts, unit = _date_counts(dates)
             counts = np.asarray(counts).tolist()
         try:
-            return PointCloudTensor(cpp.to_point_clouds(series._data, n, step, times, counts, unit))
+            return PointCloudTensor(cpp.to_point_clouds(series._data, n_points, step, times, counts, unit))
         except cpp.TimeSeriesDomainError as error:
             if dates is None:
                 raise series._domain_error(error) from None
@@ -123,9 +125,9 @@ def to_point_clouds(series: TimeSeries | TimeSeriesTensor | _PandasLike, times: 
     series = _as_series(series)
     _check_numbers(series.dtype)
     # Dates are placed in the series here, so C++ gets times.
-    n, step, times, _, unit = _point_times(times, n, step, series)
+    n_points, step, times, _, unit = _point_times(times, n_points, step, series)
     try:
-        return PointCloud(cpp.to_point_cloud(series._data, n, step, times, None, unit))
+        return PointCloud(cpp.to_point_cloud(series._data, n_points, step, times, None, unit))
     except cpp.TimeSeriesDomainError as error:
         raise _domain_error(error, series.unit, None) from None
 
@@ -135,14 +137,14 @@ def _check_numbers(dtype):
         raise TypeError(f"Point clouds come from series of numbers, not of {dtype}")
 
 
-def _point_times(times, n, step, series):
-    """The ``n``, ``step``, ``times``, ``dates``, and ``unit`` arguments of
-    the C++ ``to_point_clouds``, 0 or ``None`` for a mode not chosen. Dates
+def _point_times(times, n_points, step, series):
+    """The ``n_points``, ``step``, ``times``, ``dates``, and ``unit``
+    arguments of the C++ ``to_point_clouds``, 0 or ``None`` for a mode not chosen. Dates
     and times are placed in ``series`` here, or for a tensor of series, with
     ``series`` ``None``, returned as a ``datetime64`` array, which the caller
     passes as counts for C++ to place in each series."""
-    if sum(x is not None for x in (times, n, step)) > 1:
-        raise ValueError("Pass at most one of times, n, and step")
+    if sum(x is not None for x in (times, n_points, step)) > 1:
+        raise ValueError("Pass at most one of times, n_points, and step")
     if times is not None:
         # A DateTimeTensor is read as dates before _queries, which would
         # convert it one element at a time.
@@ -161,11 +163,11 @@ def _point_times(times, n, step, series):
         if numbers.ndim != 1:
             raise ValueError(f"The times of the points must be one-dimensional, not of shape {numbers.shape}")
         return 0, 0.0, numbers.tolist(), None, unit
-    if n is not None:
-        n = operator.index(n)
-        if n < 1:
-            raise ValueError(f"n must be positive, not {n}")
-        return n, 0.0, None, None, None
+    if n_points is not None:
+        n_points = operator.index(n_points)
+        if n_points < 1:
+            raise ValueError(f"n_points must be positive, not {n_points}")
+        return n_points, 0.0, None, None, None
     if step is not None:
         step = _duration(step, "The step must be finite and positive")
         if isinstance(step, TimeDelta):

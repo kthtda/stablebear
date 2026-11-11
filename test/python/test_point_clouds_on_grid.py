@@ -24,7 +24,7 @@ def test_n_points_are_evenly_spaced_over_the_domain_including_its_closed_ends(st
     series = _series().restrict(Domain(TimeDelta(0.0, "s"), TimeDelta(2.0, "s"), start_closed=start_closed,
                                        end_closed=end_closed))
 
-    cloud = to_point_clouds(series, n=3)
+    cloud = to_point_clouds(series, n_points=3)
 
     assert _points(cloud) == expected
 
@@ -38,16 +38,16 @@ def test_one_point_lies_at_the_closed_end_or_in_the_middle(start_closed, end_clo
     series = _series().restrict(Domain(TimeDelta(0.0, "s"), TimeDelta(2.0, "s"), start_closed=start_closed,
                                        end_closed=end_closed))
 
-    cloud = to_point_clouds(series, n=1)
+    cloud = to_point_clouds(series, n_points=1)
 
     assert _points(cloud) == expected
 
 
-def test_n_and_step_give_the_same_cloud_where_they_agree():
-    by_n = to_point_clouds(_series(), n=5)
+def test_n_points_and_step_give_the_same_cloud_where_they_agree():
+    by_n_points = to_point_clouds(_series(), n_points=5)
     by_step = to_point_clouds(_series(), step=TimeDelta(0.5, "s"))
 
-    assert _points(by_n) == _points(by_step) == [0.0, 0.0, 10.0, 10.0, 20.0]
+    assert _points(by_n_points) == _points(by_step) == [0.0, 0.0, 10.0, 10.0, 20.0]
 
 
 def test_each_series_of_a_tensor_gives_a_cloud_of_n_points_over_its_own_domain():
@@ -57,7 +57,7 @@ def test_each_series_of_a_tensor_gives_a_cloud_of_n_points_over_its_own_domain()
     series_tensor[1] = TimeSeries([0.0, 50.0, 100.0, 250.0, 300.0, 400.0],
                                   times=TimeDeltaTensor([0.0, 0.5, 1.0, 2.5, 3.0, 4.0], "s"))
 
-    clouds = to_point_clouds(series_tensor, n=3)
+    clouds = to_point_clouds(series_tensor, n_points=3)
 
     assert _points(clouds[0]) == [0.0, 5.0, 20.0]     # times 0, 1, 2
     assert _points(clouds[1]) == [0.0, 100.0, 400.0]  # times 0, 2, 4
@@ -87,9 +87,9 @@ def test_step_of_a_series_without_a_unit_is_a_number():
 
 
 @pytest.mark.parametrize("kwargs, error, message", [
-    pytest.param({"n": 2, "step": TimeDelta(1.0, "s")}, ValueError, "at most one", id="both"),
-    pytest.param({"n": 0}, ValueError, "positive", id="n-zero"),
-    pytest.param({"n": 1}, ValueError, "both ends", id="n-one-closed"),
+    pytest.param({"n_points": 2, "step": TimeDelta(1.0, "s")}, ValueError, "at most one", id="both"),
+    pytest.param({"n_points": 0}, ValueError, "positive", id="n-points-zero"),
+    pytest.param({"n_points": 1}, ValueError, "both ends", id="n-points-one-closed"),
     pytest.param({"step": TimeDelta(0.0, "s")}, ValueError, "finite and positive", id="step-zero"),
     pytest.param({"step": 1.0}, TypeError, "durations", id="step-number-with-unit"),
 ])

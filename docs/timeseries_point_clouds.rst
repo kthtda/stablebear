@@ -50,21 +50,22 @@ Evenly spaced times
 -------------------
 
 Point clouds of different sizes give barcodes that differ partly because
-of the sampling, not the shape. To compare windows by their shape, ``n``
-takes the points at ``n`` evenly spaced times
-over the domain of each time series, so windows of one size give point
-clouds of ``n`` points each, wherever the observations fall. Each point is
+of the sampling, not the shape. To compare windows by their shape,
+``n_points`` takes the points at ``n_points`` evenly spaced times over the
+domain of each time series, so windows of one size give point clouds of
+``n_points`` points each, wherever the observations fall. Each point is
 the observation in effect at its time::
 
    windows = cut_windows(embedded, size=TimeDelta(2, "s"),
                          step=TimeDelta(2, "s"), anchor="start")
-   clouds = to_point_clouds(windows, n=8)
+   clouds = to_point_clouds(windows, n_points=8)
    clouds[0].shape  # (8, 2)
 
 The times include each end that the domain includes. They are the evenly
-spaced times over the domain with both ends closed, with ``n + 1`` times
-when one end is open and ``n + 2`` when both are, the open ends left out.
-On a domain from 0 to 2 s and with ``n = 3``:
+spaced times over the domain with both ends closed, with ``n_points + 1``
+times when one end is open and ``n_points + 2`` when both are, the open
+ends left out.
+On a domain from 0 to 2 s and with ``n_points = 3``:
 
 ======================= ========================
 Domain                  Times (s)
@@ -80,8 +81,8 @@ length of the domain. For windows anchored at the start, which are
 half-open as :math:`[s, s + \text{size})`, this makes the point clouds of
 windows that follow each other form one evenly spaced grid, without a time
 in two point clouds. A single point lies at the closed end, or in the middle
-if both ends are open; a domain with both ends closed needs ``n`` of at
-least 2.
+if both ends are open; a domain with both ends closed needs ``n_points``
+of at least 2.
 
 Instead of a number of points, ``step`` gives the time between them. The
 times are the start of the domain and every ``step`` after it that lies in

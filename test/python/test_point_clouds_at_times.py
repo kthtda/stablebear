@@ -65,9 +65,9 @@ def test_duration_times_on_a_series_without_a_unit_raise():
         to_point_clouds(series, TimeDeltaTensor([0.0, 1.0], "s"))
 
 
-def test_given_times_and_n_raise():
+def test_given_times_and_n_points_raise():
     with pytest.raises(ValueError, match="at most one"):
-        to_point_clouds(_series(), TimeDeltaTensor([0.0], "s"), n=2)
+        to_point_clouds(_series(), TimeDeltaTensor([0.0], "s"), n_points=2)
 
 
 def test_dates_place_points_at_their_durations_from_the_epoch():
