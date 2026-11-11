@@ -1172,10 +1172,20 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
 
     def _time_of_date(self, date, channel):
         """The time of ``date`` in channel ``channel``, in :attr:`unit`:
-        ``date - epoch - origin``, with the difference taken in integers."""
+        ``date - epoch - origin``, with the difference taken in integers, and
+        placed at a closed end of the channel's domain that it misses by at
+        most the snap tolerance times the larger magnitude of
+        ``date - epoch`` and the origin, as ``time_of_date`` in C++ places
+        it."""
         epoch, unit = self.epoch, self.unit
         assert epoch is not None and unit is not None
-        return _offsets_in(date, epoch, unit) - self._data.origin(channel)
+        offsets = _offsets_in(date, epoch, unit)
+        origin = self._data.origin(channel)
+        t = offsets - origin
+        start, end, start_closed, end_closed = self._data.select([channel]).domain
+        reach = self._data.channel(channel).snap_tolerance * np.maximum(np.abs(offsets), abs(origin))
+        t = np.where(start_closed & (t < start) & (start - t <= reach), start, t)
+        return np.where(end_closed & (t > end) & (t - end <= reach), end, t)
 
     def _check_date_in_domain(self, date, t, channel):
         """Raise naming ``date`` and the domain of channel ``channel`` as dates

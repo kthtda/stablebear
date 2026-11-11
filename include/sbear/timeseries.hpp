@@ -767,11 +767,21 @@ namespace sb
                                          std::optional<TimeUnit> unit = std::nullopt,
                                          Executor& exec = default_executor());
 
+  /// The time of @p date in channel @p c of @p series, which has an epoch:
+  /// time_since(date, epoch, unit) - origin. The difference rounds on the
+  /// scale of the time since the epoch and the origin, not of the result,
+  /// so a date that misses a closed end of the channel's domain by at most
+  /// snap_tolerance() times the larger magnitude of the two is placed at
+  /// that end. A window's own start date, its origin, then lies in its
+  /// domain although the two round differently.
+  template <typename T>
+  [[nodiscard]] float64_t time_of_date(const TimeSeries<T>& series, size_t c, const DateTime& date);
+
   /// Every series of @p series evaluated at the dates @p dates, counts of
   /// @p dateUnit after 1970-01-01, as evaluate() evaluates at times. Each
-  /// series places a date at time_since(date, epoch, unit) - origin in each
-  /// channel, so series with different epochs are evaluated at the same
-  /// instants. Throws std::invalid_argument if a series has no epoch.
+  /// series places a date in each channel by time_of_date(), so series with
+  /// different epochs are evaluated at the same instants. Throws
+  /// std::invalid_argument if a series has no epoch.
   template <typename T>
   [[nodiscard]] NestedTensor<T> evaluate_dates(const Tensor<TimeSeries<T>>& series, const Tensor<int64_t>& dates,
                                                TimeUnit dateUnit, Executor& exec = default_executor());

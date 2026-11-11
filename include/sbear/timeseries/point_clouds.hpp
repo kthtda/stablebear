@@ -59,7 +59,7 @@ namespace sb
         }
         for (const auto date : *how.dates)
         {
-          const auto t = time_since(DateTime(date, how.dateUnit), *series.epoch(), unit) - series.channel(0).origin();
+          const auto t = time_of_date(series, 0, DateTime(date, how.dateUnit));
           if (!domain.contains(t))
           {
             throw std::domain_error("Time " + detail::shortest_text(t) + " is outside the domain "

@@ -1,6 +1,6 @@
 # Time series general release: checklist
 
-Progress: 9 of 30 items, 17 of 47 points (36%)
+Progress: 10 of 31 items, 18 of 49 points (37%)
 
 From the release review of `issue-258-pandas` on 2026-11-08, in which each
 problem below was reproduced twice. The items correct behavior that the
@@ -126,7 +126,7 @@ Decisions for the maintainer: F2 (iterating a series).
 
 ## Phase C: dates and pandas at the edges
 
-- [ ] **C1.** [1] A date outside the domain with digits finer than a
+- [x] **C1.** [1] (6542c8f45) A date outside the domain with digits finer than a
   microsecond raises `ValueError`: the precision search in
   `_check_date_in_domain` (`series.py:1087`) falls back to the resolution of
   the dates, instead of letting `StopIteration` escape, which silently ends
@@ -139,18 +139,24 @@ Decisions for the maintainer: F2 (iterating a series).
   contained it; they now keep the resolution of the series.
   Note: `to_point_clouds` reads a list of `Timestamp` in microseconds,
   dropping finer digits; C5 covers the forms dates come in.
-- [ ] **C2.** [3] A date at a closed end of the domain is in the domain
-  despite rounding: placing a date snaps it to a closed end within the
-  channel's snap tolerance, in `_check_date_in_domain` and `_evaluate_date`
-  and in the C++ placement of dates for tensors and `to_point_clouds`.
-  Errors on the tensor path name dates instead of times in the unit.
-  Today: 761 of 2150 windows of 6-minute data stored in hours, stepping by
-  6 minutes, reject their own start date, as in "2023-01-01T00:00:00.300 is
-  outside the domain [2023-01-01T00:00:00.300, ...)".
-  Tests: every window and delay embedding evaluates at its `domain.start`
-  and its `datetimes`, with a step that is inexact in hours; the closed end
-  of a channel that `from_channels` shifted; the same through `sb.tensor`
-  and `to_point_clouds(times=...)`.
+- [ ] **C2.** Dates at the ends of the domain.
+  - [ ] **C2a.** [3] A date at a closed end of the domain is in the domain
+    despite rounding: placing a date snaps it to a closed end it misses by
+    at most the channel's snap tolerance times the larger magnitude of
+    `date - epoch` and the origin, in `time_of_date` in C++ (tensor calls
+    and `to_point_clouds` of tensors) and in `_time_of_date` in Python.
+    Today: 761 of 2150 windows of 6-minute data stored in hours, stepping
+    by 6 minutes, reject their own start date, as in "2023-01-01T00:18 is
+    outside the domain [2023-01-01T00:18, 2023-01-01T01:18)".
+    Tests: a window from 00:18 at its start date, called, through
+    `sb.tensor`, and through `to_point_clouds` of a tensor; a delay
+    embedding of it at its start date; the closed end of a channel that
+    `from_channels` shifted.
+    Note: the snap of a channel's times scales with their magnitude, which
+    is 0 at a window's start, so it cannot absorb an error on the scale of
+    the origin.
+  - [ ] **C2b.** [2] Errors on the tensor path name dates instead of times
+    in the unit, as `_check_date_in_domain` does for one series.
 - [ ] **C3.** [1] `to_pandas` builds its index from times rounded to the
   output resolution instead of from raw floats, so one instant held as two
   floats one ulp apart, as `from_channels` can shift it, gives one label.
@@ -190,6 +196,10 @@ Decisions for the maintainer: F2 (iterating a series).
   Tests: `np.arange(n) / 10` and `np.linspace` times give windows of equal
   sizes; an observation on a bound between two half-open windows is in one;
   seconds and milliseconds give the same windows.
+  Note: a delay embedding of a half-open window keeps a point at the
+  window's open end when the shifted time rounds just below it: 404 of 469
+  embeddings with dimension 2 and a delay of 6 minutes of the windows of
+  C2a do, and 252 of them reject their own `datetimes`.
 - [ ] **D2.** [2] A view of a view takes from the original channel:
   `Channel::take` (`timeseries.tpp:186`) composes the indices of a view
   with one lag through its base, so chains stay one level deep and earlier

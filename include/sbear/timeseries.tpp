@@ -757,13 +757,38 @@ namespace sb
   }
 
   template <typename T>
+  float64_t time_of_date(const TimeSeries<T>& series, size_t c, const DateTime& date)
+  {
+    const auto& channel = series.channel(c);
+    const auto offset = time_since(date, *series.epoch(), series.unit());
+    const auto origin = channel.origin();
+    const auto t = offset - origin;
+    if (channel.size() == 0)
+    {
+      return t;
+    }
+    const auto reach = channel.snap_tolerance() * std::max(std::abs(offset), std::abs(origin));
+    const auto start = channel.time(0);
+    if (channel.start_closed() && t < start && start - t <= reach)
+    {
+      return start;
+    }
+    const auto end = channel.end().value_or(channel.time(channel.size() - 1));
+    if (channel.end_closed() && t > end && t - end <= reach)
+    {
+      return end;
+    }
+    return t;
+  }
+
+  template <typename T>
   NestedTensor<T> evaluate_dates(const Tensor<TimeSeries<T>>& series, const Tensor<int64_t>& dates,
                                  TimeUnit dateUnit, Executor& exec)
   {
     return detail::evaluate_each(
         series, dates,
         [&](const TimeSeries<T>& one, size_t c, int64_t date) {
-          return time_since(DateTime(date, dateUnit), *one.epoch(), one.unit()) - one.channel(c).origin();
+          return time_of_date(one, c, DateTime(date, dateUnit));
         },
         [&](const TimeSeries<T>& one) {
           if (!one.epoch())

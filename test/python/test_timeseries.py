@@ -1122,6 +1122,52 @@ def test_window_at_a_date_equals_its_series_at_that_date():
     assert window(np.datetime64("2023-01-01T02:30")) == 20.0
 
 
+def _window_from_00_18():
+    """The window from 00:18 to 01:18 of a series observed every 6 minutes
+    and stored in hours, holding 10 * t at t hours. Its origin, three steps
+    of 0.1 h, is 0.30000000000000004, while 00:18 counts as 0.3 h from the
+    epoch, so its start date lands just before its start time."""
+    times = np.arange("2023-01-01T00:00", "2023-01-01T02:06", np.timedelta64(6, "m"), dtype="datetime64[m]")
+    # 6 minutes is 0.1 h, which is inexact, so the window's origin rounds.
+    series = TimeSeries(np.arange(21.0), times=DateTimeTensor(times)).to("h")
+    return cut_windows(series, size=TimeDelta(1.0, "h"), step=TimeDelta(6.0, "min"), closed="left", partial=False,
+                       anchor="start")[3]
+
+
+def test_window_at_its_start_date_is_its_first_value():
+    window = _window_from_00_18()
+
+    assert window(window.domain.start) == 3.0
+
+
+def test_tensor_of_a_window_at_its_start_date_is_its_first_value():
+    window = _window_from_00_18()
+
+    values = sb.tensor([window])(window.domain.start)
+
+    assert values[0] == 3.0
+
+
+def test_delay_embedding_of_a_window_at_its_start_date_is_its_first_point():
+    # The embedding starts a step after the window, at 00:24.
+    embedding = delay_embed(_window_from_00_18(), dimension=2, delay=TimeDelta(6.0, "min"))
+
+    point = embedding(embedding.domain.start)
+
+    assert np.array_equal(np.asarray(point), [3.0, 4.0])  # the window at 00:18 and 00:24
+
+
+def test_channel_at_the_date_of_its_closed_end_after_from_channels_shifts_it_is_its_last_value():
+    early = TimeSeries([0.0, 60.0], times=DateTimeTensor(["2023-01-01T00:00", "2023-01-01T00:06"])).to("h")
+    late = TimeSeries([-10.0, -30.0, -60.0],
+                      times=DateTimeTensor(["2023-01-01T00:01", "2023-01-01T00:03", "2023-01-01T00:06"])).to("h")
+    # Shifted by 1/60 h, the end of late, 5/60 h, lands at
+    # 0.09999999999999999, while 00:06 counts as 0.1 h from the epoch.
+    series = TimeSeries.from_channels([early, late])
+
+    assert series[1](np.datetime64("2023-01-01T00:06")) == -60.0
+
+
 def test_series_without_an_epoch_has_none():
     assert TimeSeries([10.0, 20.0], times=TimeDeltaTensor([0.0, 1.0], "s")).epoch is None
 

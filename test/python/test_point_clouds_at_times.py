@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 
 import stablebear as sb
-from stablebear.timeseries import DateTimeTensor, TimeDeltaTensor, TimeSeries, to_point_clouds
+from stablebear.timeseries import DateTimeTensor, TimeDelta, TimeDeltaTensor, TimeSeries, cut_windows, to_point_clouds
 
 
 def _series():
@@ -87,3 +87,17 @@ def test_dates_give_every_series_of_a_tensor_a_cloud_at_those_instants():
 
     assert _points(clouds[0]) == _points(to_point_clouds(early, dates))
     assert _points(clouds[1]) == _points(to_point_clouds(late, dates))
+
+
+def test_a_tensor_of_a_window_gives_a_point_at_its_start_date():
+    # Observed every 6 minutes and stored in hours, the window from 00:18
+    # has its origin, three steps of 0.1 h, at 0.30000000000000004, while
+    # 00:18 counts as 0.3 h from the epoch.
+    times = np.arange("2023-01-01T00:00", "2023-01-01T02:06", np.timedelta64(6, "m"), dtype="datetime64[m]")
+    series = TimeSeries(np.arange(21.0), times=DateTimeTensor(times)).to("h")
+    window = cut_windows(series, size=TimeDelta(1.0, "h"), step=TimeDelta(6.0, "min"), closed="left", partial=False,
+                         anchor="start")[3]
+
+    clouds = to_point_clouds(sb.tensor([window]), DateTimeTensor(["2023-01-01T00:18"]))
+
+    assert _points(clouds[0]) == [3.0]
