@@ -629,12 +629,12 @@ namespace sb
     const auto domain = this->domain();
     if (!domain.contains(t))
     {
-      throw std::domain_error("Time " + detail::shortest_text(t) + " is outside the domain " + domain.to_string());
+      throw OutsideDomainError("Time " + detail::shortest_text(t) + " is outside the domain " + domain.to_string(), t,
+                               domain);
     }
   }
 
-  template <typename T>
-  std::string TimeSeries<T>::Domain::to_string() const
+  inline std::string TimeDomain::to_string() const
   {
     return (closedStart ? "[" : "(") + detail::shortest_text(first) + ", " + detail::shortest_text(last)
            + (closedEnd ? "]" : ")");
@@ -642,6 +642,18 @@ namespace sb
 
   namespace detail
   {
+    /// The position of a series in a tensor, as "TimeSeries at position
+    /// (1, 2)".
+    inline std::string position_text(const std::vector<size_t>& index)
+    {
+      std::string position;
+      for (const auto i : index)
+      {
+        position += (position.empty() ? "" : ", ") + std::to_string(i);
+      }
+      return "TimeSeries at position (" + position + ")";
+    }
+
     /// Every series of @p series evaluated at the queries @p t, where
     /// time_of(one, c, q) is the time of query q in channel c of the series
     /// one, increasing in q. check(one) throws for a series that cannot take
@@ -701,13 +713,8 @@ namespace sb
             const auto x = time_of(one, c, query);
             if (!domain.contains(x))
             {
-              std::string position;
-              for (const auto i : index)
-              {
-                position += (position.empty() ? "" : ", ") + std::to_string(i);
-              }
-              throw std::domain_error("TimeSeries at position (" + position + "): Time " + shortest_text(x)
-                                      + " is outside the domain " + domain.to_string());
+              throw OutsideDomainError(position_text(index) + ": Time " + shortest_text(x)
+                                       + " is outside the domain " + domain.to_string(), x, domain, index, c);
             }
           }
         }

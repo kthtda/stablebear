@@ -134,7 +134,12 @@ such that :math:`i = 0` or
 
 With :math:`r = 0`, this is the last observation at or before :math:`t`. The
 domain check is exact: a query just below the first timestamp raises an
-error rather than snapping.
+error rather than snapping. Dates are the exception. A date is placed at its
+time since the epoch minus the :py:attr:`~stablebear.timeseries.TimeSeries.origin`,
+and that difference rounds on the scale of the two terms, not of the result.
+So a date that misses a closed end of the domain by at most :math:`r` times
+the larger magnitude of the two is placed at that end, and a window gives
+its value at its own start date.
 
 Choosing the tolerance
 ----------------------

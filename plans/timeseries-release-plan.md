@@ -1,6 +1,6 @@
 # Time series general release: checklist
 
-Progress: 10 of 31 items, 18 of 49 points (37%)
+Progress: 11 of 31 items, 21 of 52 points (40%)
 
 From the release review of `issue-258-pandas` on 2026-11-08, in which each
 problem below was reproduced twice. The items correct behavior that the
@@ -140,7 +140,7 @@ Decisions for the maintainer: F2 (iterating a series).
   Note: `to_point_clouds` reads a list of `Timestamp` in microseconds,
   dropping finer digits; C5 covers the forms dates come in.
 - [ ] **C2.** Dates at the ends of the domain.
-  - [ ] **C2a.** [3] A date at a closed end of the domain is in the domain
+  - [x] **C2a.** [3] (b7d486f38) A date at a closed end of the domain is in the domain
     despite rounding: placing a date snaps it to a closed end it misses by
     at most the channel's snap tolerance times the larger magnitude of
     `date - epoch` and the origin, in `time_of_date` in C++ (tensor calls
@@ -155,8 +155,24 @@ Decisions for the maintainer: F2 (iterating a series).
     Note: the snap of a channel's times scales with their magnitude, which
     is 0 at a window's start, so it cannot absorb an error on the scale of
     the origin.
-  - [ ] **C2b.** [2] Errors on the tensor path name dates instead of times
-    in the unit, as `_check_date_in_domain` does for one series.
+  - [ ] **C2b.** [5] A time outside the domain raises
+    `stablebear.timeseries.OutsideDomainError`, a `ValueError` with the
+    `time`, the `domain`, and the `index` of the series in a tensor, on
+    every path: calls of a series and of a tensor, and `to_point_clouds`.
+    For dates, the time and the ends of the domain are `DateTime`s, on the
+    tensor paths too; otherwise durations in the unit, or numbers for a
+    series without one. C++ throws `sb::OutsideDomainError` with the time,
+    the domain (`TimeDomain`, formerly `TimeSeries::Domain`), the index,
+    and the channel, and Python builds the public error from it, or from
+    its own date check. `to_point_clouds` of a tensor names the index,
+    and the first series in order, as tensor calls do. The guides name the
+    error and say how dates snap to a closed end (C2a).
+    Today: "TimeSeries at position (1, 1): Time 3 is outside the domain
+    [0, 1]", and `to_point_clouds` of a tensor gives no position.
+    Tests: the time and domain as dates for a series and a window and as
+    durations for a series; the index and domain for a date and a duration
+    on a tensor, the domain of the channel for a date on a series of a
+    tensor, and for `to_point_clouds` of a tensor; the error pickles.
 - [ ] **C3.** [1] `to_pandas` builds its index from times rounded to the
   output resolution instead of from raw floats, so one instant held as two
   floats one ulp apart, as `from_channels` can shift it, gives one label.

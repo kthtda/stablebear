@@ -9,6 +9,7 @@
 #include "../walk.hpp"
 
 #include <cmath>
+#include <mutex>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -44,7 +45,7 @@ namespace sb
   {
     /// The times of @p how in the domain of @p series, of one channel:
     /// ascending, or in their order for given times or dates, which throw
-    /// std::domain_error if one is outside the domain.
+    /// OutsideDomainError if one is outside the domain.
     template <typename T>
     std::vector<float64_t> grid_times(const TimeSeries<T>& series, const PointTimes& how)
     {
@@ -62,8 +63,8 @@ namespace sb
           const auto t = time_of_date(series, 0, DateTime(date, how.dateUnit));
           if (!domain.contains(t))
           {
-            throw std::domain_error("Time " + detail::shortest_text(t) + " is outside the domain "
-                                    + domain.to_string());
+            throw OutsideDomainError("Time " + detail::shortest_text(t) + " is outside the domain "
+                                     + domain.to_string(), t, domain);
           }
           times.push_back(t);
         }
@@ -94,8 +95,8 @@ namespace sb
           const auto t = convert_time(query, how.unit, unit);
           if (!domain.contains(t))
           {
-            throw std::domain_error("Time " + detail::shortest_text(t) + " is outside the domain "
-                                    + domain.to_string());
+            throw OutsideDomainError("Time " + detail::shortest_text(t) + " is outside the domain "
+                                     + domain.to_string(), t, domain);
           }
           times.push_back(t);
         }
@@ -183,9 +184,28 @@ namespace sb
   {
     Tensor<PointCloud<point_coordinate_t<T>>> clouds(
         std::vector<size_t>(seriesTensor.shape().begin(), seriesTensor.shape().end()));
+    // A time outside the domain names the first such series, whichever
+    // worker reaches it, as evaluate() does.
+    std::mutex mutex;
+    std::optional<OutsideDomainError> outside;
     parallel_walk(seriesTensor, [&](const std::vector<size_t>& index) {
-      clouds(index) = to_point_cloud(seriesTensor(index), how);
+      try
+      {
+        clouds(index) = to_point_cloud(seriesTensor(index), how);
+      }
+      catch (const OutsideDomainError& e)
+      {
+        const std::scoped_lock lock(mutex);
+        if (!outside || index < outside->index())
+        {
+          outside.emplace(detail::position_text(index) + ": " + e.what(), e.time(), e.domain(), index, e.channel());
+        }
+      }
     }, exec);
+    if (outside)
+    {
+      throw *outside;
+    }
     return clouds;
   }
 }

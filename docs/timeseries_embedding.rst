@@ -48,7 +48,7 @@ and the point they form at 1 s.
 The embedding has the full history only from :math:`(m-1)\delta` after the
 time series starts, so its domain is :math:`[0.5, 6]`::
 
-   embedded(0.4, "s")  # ValueError: Time 0.4 is outside the domain [0.5, 6]
+   embedded(0.4, "s")  # OutsideDomainError: Time 0.4 is outside the domain [0.5, 6]
 
 More generally, the observations can be arrays or elements such as point
 clouds. For a time series :math:`x \colon \mathbb{R} \to X` with observations in
@@ -80,7 +80,7 @@ before the time series does::
                          direction="forward")
 
    forward(0.5, "s")  # [1.0, 0.0], the values at 0.5 s and 1 s
-   forward(5.6, "s")  # ValueError: Time 5.6 is outside the domain [0, 5.5]
+   forward(5.6, "s")  # OutsideDomainError: Time 5.6 is outside the domain [0, 5.5]
 
 Takens's theorem
 ----------------

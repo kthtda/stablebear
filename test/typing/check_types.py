@@ -8,7 +8,7 @@ import numpy as np
 from typing_extensions import assert_type
 
 import stablebear as sb
-from stablebear.timeseries import TimeSeries, cut_windows, to_point_clouds
+from stablebear.timeseries import Domain, OutsideDomainError, TimeSeries, cut_windows, to_point_clouds
 from stablebear.timeseries.date_time import DateTime, DateTimeTensor, TimeDelta, TimeDeltaTensor
 
 pcfs = sb.zeros((3,))
@@ -26,6 +26,12 @@ assert_type(TimeDelta(1, "h").count, int | float)
 assert_type(TimeDelta(1, "h").to_timedelta64(), np.timedelta64)
 assert_type(TimeDeltaTensor([1], "h").count, sb.IntTensor | sb.FloatTensor)
 assert_type(TimeDeltaTensor([1], "h").to_timedelta64(), np.ndarray)
+
+outside = OutsideDomainError("Time 3 is outside the domain [0, 1]", 3.0, Domain(0.0, 1.0, True, True))
+
+assert_type(outside.time, DateTime | TimeDelta | float)
+assert_type(outside.domain, Domain)
+assert_type(outside.index, tuple[int, ...] | None)
 
 cloud = sb.PointCloud(np.zeros((4, 2)))
 assert_type(sb.random.subsample(cloud, n_points=2), sb.PointCloudTensor)

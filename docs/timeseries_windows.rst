@@ -147,7 +147,7 @@ to each window that includes it::
    windows(3.0, "s")  # [1.0, 2.0], the values of signal at 3 s and 6 s
 
    windows = cut_windows(signal, size=size, anchor="start")  # closed="left"
-   windows(3.0, "s")  # ValueError: Time 3 is outside the domain [0, 3)
+   windows(3.0, "s")  # OutsideDomainError: Time 3 is outside the domain [0, 3)
 
 The figure shows the windows of 3 s from the start for each choice.
 

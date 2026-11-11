@@ -419,6 +419,51 @@ namespace sb
     std::vector<T> values;
   };
 
+  /// The times from @p first to @p last, including each end that is closed.
+  struct TimeDomain
+  {
+    float64_t first;
+    float64_t last;
+    bool closedStart;  // first itself is in the domain
+    bool closedEnd;    // last itself is in the domain
+
+    /// Whether @p t is in the domain; NaN is not.
+    [[nodiscard]] bool contains(float64_t t) const noexcept
+    {
+      return (t > first || (closedStart && t == first)) && (t < last || (closedEnd && t == last));
+    }
+
+    /// The domain as text, such as "[0, 2)".
+    [[nodiscard]] std::string to_string() const;
+  };
+
+  /// A time outside the domain of a series: time() and domain() in the unit
+  /// of the series, counted from time 0 of the channel channel(), and the
+  /// index of the series in a tensor of them, empty for one series. Python
+  /// raises it as stablebear.timeseries.OutsideDomainError, naming the time
+  /// as a date for a date.
+  class OutsideDomainError : public std::domain_error
+  {
+  public:
+    OutsideDomainError(const std::string& message, float64_t time, const TimeDomain& domain,
+                       std::vector<size_t> index = {}, size_t channel = 0)
+      : std::domain_error(message), m_time(time), m_domain(domain), m_index(std::move(index)),
+        m_channel(channel)
+    {
+    }
+
+    [[nodiscard]] float64_t time() const noexcept { return m_time; }
+    [[nodiscard]] const TimeDomain& domain() const noexcept { return m_domain; }
+    [[nodiscard]] const std::vector<size_t>& index() const noexcept { return m_index; }
+    [[nodiscard]] size_t channel() const noexcept { return m_channel; }
+
+  private:
+    float64_t m_time;
+    TimeDomain m_domain;
+    std::vector<size_t> m_index;
+    size_t m_channel;
+  };
+
   /// Default snap tolerance, relative to the magnitude of the timestamps:
   /// the default comparison tolerance of APL.
   inline constexpr float64_t DefaultSnapTolerance = 1e-14;
@@ -675,22 +720,7 @@ namespace sb
     /// The times at which every channel can be evaluated: from the latest
     /// first timestamp to the earliest end, a channel's last timestamp or its
     /// end, as check_observed() compares them.
-    struct Domain
-    {
-      float64_t first;
-      float64_t last;
-      bool closedStart;  // first itself is in the domain
-      bool closedEnd;    // last itself is in the domain
-
-      /// Whether @p t is in the domain; NaN is not.
-      [[nodiscard]] bool contains(float64_t t) const noexcept
-      {
-        return (t > first || (closedStart && t == first)) && (t < last || (closedEnd && t == last));
-      }
-
-      /// The domain as text, such as "[0, 2)".
-      [[nodiscard]] std::string to_string() const;
-    };
+    using Domain = TimeDomain;
 
     /// The domain of the series. Requires every channel to have
     /// observations.
@@ -723,7 +753,7 @@ namespace sb
     [[nodiscard]] NestedTensor<T> evaluate(const Tensor<float64_t>& t) const;
 
   private:
-    /// Throw std::domain_error, naming the domain, unless @p t, in the
+    /// Throw OutsideDomainError, naming the domain, unless @p t, in the
     /// series' unit, lies in the domain. The check is exact: it compares
     /// against the timestamps converted to the series' unit, not the query
     /// converted to each channel's unit.
@@ -759,7 +789,7 @@ namespace sb
   /// unit take; times of the wrong kind throw TypeError.
   /// Requires every series to have the same number of channels and channel
   /// shapes, and @p series to be non-empty. A time outside the domain of a
-  /// series throws std::domain_error naming the first such series'
+  /// series throws OutsideDomainError naming the first such series'
   /// position, as in "TimeSeries at position (1, 2)".
   /// The series are evaluated in parallel on @p exec.
   template <typename T>

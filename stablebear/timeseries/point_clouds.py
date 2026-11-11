@@ -9,7 +9,8 @@ from .. import _sb_cpp as cpp
 from ..point_cloud import PointCloud, PointCloudTensor
 from ..typing import float32, float64, int32, int64, uint32, uint64
 from .date_time import DateTimeTensor, TimeDelta, _duration, _in_unit, _ScalarDuration
-from .series import TimeSeries, TimeSeriesTensor, _checked_dates, _date_counts, _PandasLike, _as_series, _queries
+from .series import (TimeSeries, TimeSeriesTensor, _checked_dates, _date_counts, _outside_domain, _PandasLike, _as_series,
+                     _queries)
 
 _NUMBER_DTYPES = (float32, float64, int32, int64, uint32, uint64)
 
@@ -90,12 +91,15 @@ def to_point_clouds(series: TimeSeries | TimeSeriesTensor | _PandasLike, times: 
 
     Raises
     ------
+    OutsideDomainError
+        If a time is outside the domain of a series, with the ``index``
+        of the first such series of a tensor.
     ValueError
         If a series has several channels, more than one of ``times``,
         ``n``, and ``step`` is given, ``n`` is not positive or is 1 for a
         domain with both ends closed, ``step`` is not finite and positive,
-        ``times`` is not one-dimensional, a time is outside the domain of
-        a series, or for dates and times on a series without an epoch.
+        ``times`` is not one-dimensional, or for dates and times on a
+        series without an epoch.
     TypeError
         If the observations are not numbers, are booleans, or have more
         than one dimension, for a ``step`` or ``times`` that are numbers
@@ -105,10 +109,25 @@ def to_point_clouds(series: TimeSeries | TimeSeriesTensor | _PandasLike, times: 
     """
     if isinstance(series, TimeSeriesTensor):
         _check_numbers(series.dtype.value_type)
-        return PointCloudTensor(cpp.to_point_clouds(series._data, *_point_times(times, n, step, None)))
+        n, step, times, dates, unit = _point_times(times, n, step, None)
+        counts = None
+        if dates is not None:
+            counts, unit = _date_counts(dates)
+            counts = np.asarray(counts).tolist()
+        try:
+            return PointCloudTensor(cpp.to_point_clouds(series._data, n, step, times, counts, unit))
+        except cpp.OutsideDomainError as error:
+            if dates is None:
+                raise series._outside_domain(error) from None
+            raise series._naming_dates(error, dates) from None
     series = _as_series(series)
     _check_numbers(series.dtype)
-    return PointCloud(cpp.to_point_cloud(series._data, *_point_times(times, n, step, series)))
+    # Dates are placed in the series here, so C++ gets times.
+    n, step, times, _, unit = _point_times(times, n, step, series)
+    try:
+        return PointCloud(cpp.to_point_cloud(series._data, n, step, times, None, unit))
+    except cpp.OutsideDomainError as error:
+        raise _outside_domain(error, series.unit, None) from None
 
 
 def _check_numbers(dtype):
@@ -120,8 +139,8 @@ def _point_times(times, n, step, series):
     """The ``n``, ``step``, ``times``, ``dates``, and ``unit`` arguments of
     the C++ ``to_point_clouds``, 0 or ``None`` for a mode not chosen. Dates
     and times are placed in ``series`` here, or for a tensor of series, with
-    ``series`` ``None``, passed as counts of ``unit`` for C++ to place in
-    each series."""
+    ``series`` ``None``, returned as a ``datetime64`` array, which the caller
+    passes as counts for C++ to place in each series."""
     if sum(x is not None for x in (times, n, step)) > 1:
         raise ValueError("Pass at most one of times, n, and step")
     if times is not None:
@@ -130,10 +149,10 @@ def _point_times(times, n, step, series):
             numbers = times.to_datetime64()
         if isinstance(numbers, np.ndarray) and numbers.dtype.kind in "MOUS":
             if series is None:
-                counts, unit = _date_counts(_checked_dates(_as_dates(numbers)))
-                if counts.ndim != 1:
-                    raise ValueError(f"The times of the points must be one-dimensional, not of shape {counts.shape}")
-                return 0, 0.0, None, np.asarray(counts).tolist(), unit
+                dates = _checked_dates(_as_dates(numbers))
+                if dates.ndim != 1:
+                    raise ValueError(f"The times of the points must be one-dimensional, not of shape {dates.shape}")
+                return 0, 0.0, None, dates, None
             numbers, unit = _times_of_dates(numbers, series)
         numbers = np.asarray(numbers, dtype=np.float64)
         if numbers.ndim != 1:

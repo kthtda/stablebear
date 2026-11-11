@@ -483,6 +483,51 @@ class Domain(_DomainFields):
         return super().__new__(cls, start, end, bool(start_closed), bool(end_closed))
 
 
+class OutsideDomainError(ValueError):
+    """A time outside the domain of a series, raised by calling a series or
+    a tensor of them and by :func:`~stablebear.timeseries.to_point_clouds`.
+
+    Attributes
+    ----------
+    time : DateTime, TimeDelta, or float
+        The first time outside the domain: a :class:`DateTime` for a date,
+        else a duration from time 0 of the series in its unit, or a number
+        for a series without a unit.
+    domain : Domain
+        The domain that ``time`` is outside, with ends of the same kind as
+        ``time``: that of the series, or of a channel where dates or a
+        tensor of series place a time in each channel.
+    index : tuple of int or None
+        The index of the series in a tensor of them, or ``None`` for one
+        series.
+    """
+
+    time: DateTime | TimeDelta | float
+    domain: Domain
+    index: tuple[int, ...] | None
+
+    def __init__(self, message: str, time: DateTime | TimeDelta | float, domain: Domain,
+                 index: tuple[int, ...] | None = None):
+        super().__init__(message)
+        self.time = time
+        self.domain = domain
+        self.index = index
+
+    def __reduce__(self):
+        return type(self), (str(self), self.time, self.domain, self.index)
+
+
+def _outside_domain(error, unit, index):
+    """``error``, a C++ ``OutsideDomainError`` for a time in ``unit``, as an
+    :class:`OutsideDomainError` at ``index`` with the time and the
+    domain as durations, or as numbers for a series without a unit."""
+    def in_unit(count) -> TimeDelta | float:
+        return float(count) if unit is None else TimeDelta(float(count), unit)
+
+    domain = Domain(in_unit(error.start), in_unit(error.end), error.start_closed, error.end_closed)
+    return OutsideDomainError(str(error), in_unit(error.time), domain, index)
+
+
 class TimeSeries(_BinaryIoMixin, Generic[T]):
     """Observations recorded at known times, in one or more channels.
 
@@ -1115,9 +1160,10 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
 
         Raises
         ------
+        OutsideDomainError
+            If a time is outside the domain of any channel.
         ValueError
-            If a time is outside the domain of any channel, or a channel has
-            no observations, or if ``unit`` is unknown.
+            If a channel has no observations, or if ``unit`` is unknown.
         TypeError
             For numbers without ``unit`` on a series with a unit, or for
             durations, dates, or ``unit`` on a series without one.
@@ -1161,10 +1207,13 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         in :attr:`unit`."""
         if np.ndim(t) > 0:
             t = FloatTensor(np.asarray(t, dtype=np.float64))
+        try:
+            native = self._data.evaluate(t._data if isinstance(t, FloatTensor) else float(t))
+        except cpp.OutsideDomainError as error:
+            raise _outside_domain(error, self.unit, None) from None
+        values = NestedTensor._from_cpp(native)
         if isinstance(t, FloatTensor):
-            values = NestedTensor._from_cpp(self._data.evaluate(t._data))
             return values if self.n_channels > 1 else values[0]
-        values = NestedTensor._from_cpp(self._data.evaluate(float(t)))
         if self.n_channels > 1:
             return values
         leaf = values[0]
@@ -1205,9 +1254,10 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         finest = np.datetime_data(dates.dtype)[0]
         precision = next(code for code in ("m", "s", "ms", "us", "ns", "ps", "fs", "as")
                          if code == finest or (dates == dates.astype(f"datetime64[{code}]")).all())
-        first, start, end = np.datetime_as_string(dates, unit=precision)  # pyright: ignore[reportCallIssue, reportArgumentType]
-        domain = ("[" if start_closed else "(") + f"{start}, {end}" + ("]" if end_closed else ")")
-        raise ValueError(f"{first} is outside the domain {domain}")
+        first_text, start_text, end_text = np.datetime_as_string(dates, unit=precision)  # pyright: ignore[reportCallIssue, reportArgumentType]
+        domain_text = ("[" if start_closed else "(") + f"{start_text}, {end_text}" + ("]" if end_closed else ")")
+        domain = Domain(DateTime(ends[0]), DateTime(ends[1]), start_closed, end_closed)
+        raise OutsideDomainError(f"{first_text} is outside the domain {domain_text}", DateTime(first), domain)
 
     def _evaluate_date(self, date):
         """Evaluate at ``date``, one date or an array of them, placing it in
@@ -1364,11 +1414,13 @@ class TimeSeriesTensor(Tensor):
 
         Raises
         ------
+        OutsideDomainError
+            If a time is outside the domain of a series, with the
+            ``index`` of the first such series.
         ValueError
-            If a time is outside the domain of a series, naming the
-            position of the first such series, or the tensor is empty or
-            its series differ in channels or shapes, if ``unit`` is
-            unknown, or for dates and times when a series has no epoch.
+            If the tensor is empty or its series differ in channels or
+            shapes, if ``unit`` is unknown, or for dates and times when a
+            series has no epoch.
         TypeError
             For numbers without ``unit`` on series with a unit, or for
             durations or ``unit`` on series without one.
@@ -1376,14 +1428,45 @@ class TimeSeriesTensor(Tensor):
         dates = None if unit is not None else _dates_of(t)
         if dates is not None:
             counts, date_unit = _date_counts(dates)
-            return self._leaves(cpp.evaluate_series_dates(self._data, counts._data, date_unit))
+            try:
+                native = cpp.evaluate_series_dates(self._data, counts._data, date_unit)
+            except cpp.OutsideDomainError as error:
+                raise self._naming_dates(error, dates) from None
+            return self._leaves(native)
         return self._evaluate(*_queries(t, unit))
+
+    def _naming_dates(self, error, dates):
+        """``error``, a C++ ``OutsideDomainError`` for ``dates``, a
+        ``datetime64`` array, as an :class:`OutsideDomainError` with the
+        date and the domain of the series and channel it gives as dates, as
+        a call of that series gives them."""
+        index = tuple(error.index)
+        series = self[index]
+        try:
+            series._check_date_in_domain(dates, series._time_of_date(dates, error.channel), error.channel)
+        except OutsideDomainError as named:
+            return OutsideDomainError(f"TimeSeries at position ({', '.join(map(str, index))}): {named}",
+                                      named.time, named.domain, index)
+        # The series takes the dates in Python but not in C++; keep the
+        # times of C++.
+        return self._outside_domain(error)
+
+    def _outside_domain(self, error):
+        """``error``, a C++ ``OutsideDomainError`` for a time of a series of
+        the tensor, as an :class:`OutsideDomainError` in the unit of that
+        series."""
+        index = tuple(error.index)
+        return _outside_domain(error, self[index].unit, index)
 
     def _evaluate(self, t, unit):
         """Evaluate at numbers ``t`` of ``unit``, or of no unit if ``unit``
         is ``None``."""
         times = FloatTensor(np.asarray(t, dtype=np.float64))
-        return self._leaves(cpp.evaluate_series(self._data, times._data, unit))
+        try:
+            native = cpp.evaluate_series(self._data, times._data, unit)
+        except cpp.OutsideDomainError as error:
+            raise self._outside_domain(error) from None
+        return self._leaves(native)
 
     @staticmethod
     def _leaves(native):

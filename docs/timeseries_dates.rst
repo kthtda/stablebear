@@ -91,7 +91,8 @@ Durations count from the series' own time 0, and a date names an instant.
 This matters for windows: a window's times start at 0, while a date is
 placed in it by its :py:attr:`~stablebear.timeseries.TimeSeries.origin`, so
 a window gives the value it held at that date. A date outside the domain
-raises an error that names the domain as dates.
+raises an :py:class:`~stablebear.timeseries.OutsideDomainError` whose
+``time`` and ``domain`` are dates.
 
 The same holds for a tensor of series, such as one series per station,
 built with :py:func:`sb.tensor <stablebear.tensor_create.tensor>` (see
@@ -110,8 +111,9 @@ at different times are evaluated at the same instants::
                      epoch="2023-01-01T01:00")
    sb.tensor([early, late])("2023-01-01T01:30")  # [20.0, 40.0]
 
-A date outside the domain of a series raises an error that names the
-position of the series in the tensor.
+A date outside the domain of a series raises an
+:py:class:`~stablebear.timeseries.OutsideDomainError` whose ``index``
+locates the series in the tensor.
 
 Durations
 ---------

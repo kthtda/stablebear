@@ -6,7 +6,8 @@ import pytest
 
 import stablebear as sb
 from stablebear import FloatTensor
-from stablebear.timeseries import DateTime, DateTimeTensor, Domain, TimeDelta, TimeDeltaTensor, TimeSeries, cut_windows, delay_embed
+from stablebear.timeseries import (DateTime, DateTimeTensor, Domain, OutsideDomainError, TimeDelta, TimeDeltaTensor, TimeSeries,
+                                   cut_windows, delay_embed)
 from stablebear.timeseries.series import TimeSeriesTensor
 
 from _element_values import TWO_ELEMENTS_OF_EVERY_DTYPE
@@ -740,19 +741,25 @@ def test_windows_of_channels_of_different_shapes_evaluate_to_leaves_of_each_shap
     ])
 
 
-def test_evaluating_windows_outside_a_window_raises_naming_its_position():
+def test_evaluating_windows_outside_a_window_raises_with_its_index():
     # The windows are [0.0, 2.0) and the partial window [2.0, 3.0], which can
     # be evaluated from 0 to 1.
     series = TimeSeries([0.0, 10.0, 20.0, 30.0], times=TimeDeltaTensor([0.0, 1.0, 2.0, 3.0], "s"))
     windows = cut_windows(series, size=TimeDelta(2, "s"), step=TimeDelta(2, "s"), closed="left", partial=True,
                           anchor="start")
 
-    message = "TimeSeries at position (1): Time 1.5 is outside the domain [0, 1]"
-    with pytest.raises(ValueError, match=re.escape(message)):
+    with pytest.raises(OutsideDomainError) as excinfo:
         windows(TimeDeltaTensor([0.0, 1.5], "s"))
-    message = "TimeSeries at position (0): Time 2.5 is outside the domain [0, 2)"
-    with pytest.raises(ValueError, match=re.escape(message)):
+
+    assert excinfo.value.index == (1,)
+    assert excinfo.value.time == TimeDelta(1.5, "s")
+    assert excinfo.value.domain == Domain(TimeDelta(0.0, "s"), TimeDelta(1.0, "s"), True, True)
+
+    # 2.5 s is outside both windows; the error names the first.
+    with pytest.raises(OutsideDomainError) as excinfo:
         windows(TimeDeltaTensor([0.0, 2.5, 1.0], "s"))
+
+    assert excinfo.value.index == (0,)
 
 
 @pytest.mark.parametrize("round_trip", ROUND_TRIPS)

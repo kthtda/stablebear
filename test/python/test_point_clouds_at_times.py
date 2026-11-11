@@ -2,7 +2,8 @@ import numpy as np
 import pytest
 
 import stablebear as sb
-from stablebear.timeseries import DateTimeTensor, TimeDelta, TimeDeltaTensor, TimeSeries, cut_windows, to_point_clouds
+from stablebear.timeseries import (DateTimeTensor, OutsideDomainError, TimeDelta, TimeDeltaTensor, TimeSeries, cut_windows,
+                                   to_point_clouds)
 
 
 def _series():
@@ -87,6 +88,18 @@ def test_dates_give_every_series_of_a_tensor_a_cloud_at_those_instants():
 
     assert _points(clouds[0]) == _points(to_point_clouds(early, dates))
     assert _points(clouds[1]) == _points(to_point_clouds(late, dates))
+
+
+def test_a_date_outside_a_series_of_a_tensor_raises_with_its_index_and_domain():
+    early = _series().with_epoch("2023-01-01T00:00:00")
+    late = _series().with_epoch("2023-01-01T00:00:01")
+
+    # 00:00:00 is before the domain of late, which starts at 00:00:01.
+    with pytest.raises(OutsideDomainError) as excinfo:
+        to_point_clouds(sb.tensor([early, late]), DateTimeTensor(["2023-01-01T00:00:00"]))
+
+    assert excinfo.value.index == (1,)
+    assert excinfo.value.domain == late.domain
 
 
 def test_a_tensor_of_a_window_gives_a_point_at_its_start_date():

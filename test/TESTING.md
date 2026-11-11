@@ -130,6 +130,14 @@ protect. These principles apply when writing, reviewing, or changing tests.
     exists and one would be a sensible addition to the public API, ask
     about adding it before writing the test around its absence.
 
+23. **Test what an error carries, not its wording.** Check the error
+    type, and match a short phrase only to tell the error from others the
+    call could raise. When the error holds values as attributes, check
+    those: `excinfo.value.time == DateTime("2023-01-01T05:00")`. When only
+    the message can name something, check that it contains that value:
+    `assert "2023-01-01T05:00" in message`. Do not match a whole
+    sentence; rewording a message should not break tests.
+
 The review question is: **What bug would make this test fail, and can I see
 that immediately?**
 
