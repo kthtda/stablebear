@@ -1,6 +1,6 @@
 # Time series general release: checklist
 
-Progress: 18 of 32 items, 37 of 53 points (70%)
+Progress: 19 of 32 items, 39 of 53 points (74%)
 
 From the release review of `issue-258-pandas` on 2026-11-08, in which each
 problem below was reproduced twice. The items correct behavior that the
@@ -246,7 +246,7 @@ Decisions for the maintainer: F2 (iterating a series).
 
 ## Phase E: dates without Python loops
 
-- [ ] **E1.** [2] `TimeDeltaTensor.to_timedelta64` (`date_time.py:422-425`)
+- [x] **E1.** [2] (2ce94c36d) `TimeDeltaTensor.to_timedelta64` (`date_time.py:422-425`)
   rounds exactly in NumPy instead of with one `Fraction` per element:
   integer counts by a checked multiply or a half-even integer division,
   and float counts by `rint` of a TwoProduct with a correction at ties,
