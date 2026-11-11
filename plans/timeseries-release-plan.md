@@ -1,6 +1,6 @@
 # Time series general release: checklist
 
-Progress: 12 of 31 items, 26 of 52 points (50%)
+Progress: 14 of 31 items, 29 of 52 points (56%)
 
 From the release review of `issue-258-pandas` on 2026-11-08, in which each
 problem below was reproduced twice. The items correct behavior that the
@@ -173,14 +173,14 @@ Decisions for the maintainer: F2 (iterating a series).
     durations for a series; the index and domain for a date and a duration
     on a tensor, the domain of the channel for a date on a series of a
     tensor, and for `to_point_clouds` of a tensor; the error pickles.
-- [ ] **C3.** [1] `to_pandas` builds its index from times rounded to the
+- [x] **C3.** [1] (8cb45745f) `to_pandas` builds its index from times rounded to the
   output resolution instead of from raw floats, so one instant held as two
   floats one ulp apart, as `from_channels` can shift it, gives one label.
   Today: two 10-minute channels with different epochs in unit `"h"` raise
   "cannot reindex on an axis with duplicate labels".
   Tests: that series; channels with different times keep `NaN` outside
   their domains.
-- [ ] **C4.** [2] `TimeSeries(values, times)` takes lists of `datetime`,
+- [x] **C4.** [2] (95454ae21) `TimeSeries(values, times)` takes lists of `datetime`,
   `pd.Timestamp`, `DateTime`, or date strings as dates, through
   `DateTimeTensor`, as calling a series does. A `(dates, unit)` tuple
   raises `TypeError`.
