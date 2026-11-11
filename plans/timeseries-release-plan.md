@@ -1,6 +1,6 @@
 # Time series general release: checklist
 
-Progress: 16 of 32 items, 33 of 53 points (62%)
+Progress: 17 of 32 items, 35 of 53 points (66%)
 
 From the release review of `issue-258-pandas` on 2026-11-08, in which each
 problem below was reproduced twice. The items correct behavior that the
@@ -223,13 +223,17 @@ Decisions for the maintainer: F2 (iterating a series).
   window's open end when the shifted time rounds just below it: 404 of 469
   embeddings with dimension 2 and a delay of 6 minutes of the windows of
   C2a do, and 252 of them reject their own `datetimes`.
-- [ ] **D2.** [2] A view of a view takes from the original channel:
+- [x] **D2.** [2] (adfdc7638, fd5861a3c) A view of a view takes from the original channel:
   `Channel::take` (`timeseries.tpp:186`) composes the indices of a view
   with one lag through its base, so chains stay one level deep and earlier
   levels are freed.
   Today: about 25,000 chained `restrict` calls segfault when freed in the
   Debug build, and the memory of such chains grows quadratically.
   Tests: 100,000 chained `restrict` calls evaluate and are freed.
+  Note: the tests check the composed indices instead, which no Python test
+  exercised; whether a deep chain overflows the stack depends on the build
+  and the stack size, so its depth is not tested. `take` was then split
+  into `view_at_indices` and `with_times`.
 - [ ] **D3.** [2] Converting or shifting a view with one lag leaves its
   source alone (`Channel::to` and `Channel::shifted`,
   `timeseries.tpp:211-254`), since it reads the source by index only, and
