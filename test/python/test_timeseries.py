@@ -979,14 +979,28 @@ def test_series_with_an_epoch_before_1678_at_ns_dates_equals_the_series_at_those
     assert series(days.astype("datetime64[ns]")).array_equal(series(days))
 
 
-@pytest.mark.parametrize("dates", [
+# 00:30 and 02:00 on 2023-01-01, times 0.5 h and 2 h of _dated_series.
+_DATES_IN_EVERY_FORM = [
     pytest.param(["2023-01-01T00:30", "2023-01-01T02:00"], id="strings"),
+    pytest.param(("2023-01-01T00:30", "2023-01-01T02:00"), id="tuple_of_strings"),
     pytest.param([datetime.datetime(2023, 1, 1, 0, 30), datetime.datetime(2023, 1, 1, 2)], id="datetimes"),
-])
-def test_series_at_a_list_of_dates_equals_the_series_at_their_times(dates):
+    pytest.param([DateTime("2023-01-01T00:30"), DateTime("2023-01-01T02:00")], id="date_times"),
+    pytest.param(np.array(["2023-01-01T00:30", "2023-01-01T02:00"], dtype="datetime64[15m]"), id="datetime64_15m"),
+]
+
+
+@pytest.mark.parametrize("dates", _DATES_IN_EVERY_FORM)
+def test_series_at_dates_in_any_form_equals_the_series_at_their_times(dates):
     series = _dated_series()
 
     assert series(dates).array_equal(series(TimeDeltaTensor([0.5, 2.0], "h")))
+
+
+@pytest.mark.parametrize("dates", _DATES_IN_EVERY_FORM)
+def test_tensor_at_dates_in_any_form_equals_the_tensor_at_their_times(dates):
+    tensor = sb.tensor([_dated_series(), _dated_series()])
+
+    assert tensor(dates).array_equal(tensor(TimeDeltaTensor([0.5, 2.0], "h")))
 
 
 def test_series_at_a_date_time_equals_the_series_at_its_datetime64():

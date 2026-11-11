@@ -60,6 +60,20 @@ def _is_date(t):
     return isinstance(t, (str, datetime.date, np.datetime64, DateTime))
 
 
+def _dates_in_sequence(t):
+    """``t``, a list or tuple, as a :class:`DateTimeTensor` if it holds
+    values that :class:`DateTime` accepts, else ``None``. Raises
+    ``TypeError`` if it mixes them with other values, or pairs dates with a
+    unit."""
+    if isinstance(t, tuple) and len(t) == 2 and np.ndim(t[0]) > 0 and isinstance(t[1], str):
+        raise TypeError("Dates and times have no unit; pass them alone")
+    if not any(_is_date(element) for element in t):
+        return None
+    if not all(_is_date(element) for element in t):
+        raise TypeError("Times must be all durations or all dates and times, not a mix")
+    return DateTimeTensor(t)
+
+
 def _dates_of(t):
     """``t`` as a checked ``datetime64`` array if it is dates and times:
     a :class:`DateTime` or a value it accepts, a :class:`DateTimeTensor`, or
@@ -68,8 +82,10 @@ def _dates_of(t):
         return np.asarray(DateTime(t).to_datetime64())
     if isinstance(t, DateTimeTensor):
         return t.to_datetime64()
-    if isinstance(t, (Tensor, tuple, int, float, np.integer, np.floating)) or _as_time_delta(t) is not None:
+    if isinstance(t, (Tensor, int, float, np.integer, np.floating)) or _as_time_delta(t) is not None:
         return None
+    if isinstance(t, (list, tuple)) and (dates := _dates_in_sequence(t)) is not None:
+        return dates.to_datetime64()
     values = _as_array(t)
     if values.dtype.kind not in "MOUS" or _finest_duration_unit(values) is not None:
         return None
@@ -84,7 +100,8 @@ def _date_counts(dates):
     """``dates``, a checked ``datetime64`` array, as an ``IntTensor`` of
     counts and their unit."""
     code, _ = np.datetime_data(dates.dtype)
-    return IntTensor(dates.astype(np.int64)), _NUMPY_TO_UNIT[code]
+    # Counts of the unit itself, such as minutes for datetime64[15m].
+    return IntTensor(dates.astype(f"datetime64[{code}]").astype(np.int64)), _NUMPY_TO_UNIT[code]
 
 
 def _finest_duration_unit(values):
@@ -282,14 +299,8 @@ def _native_times(times, unit=None, epoch=None):
     timestamps, a float64 array, the unit, and the native epoch or ``None``.
     A plain array is in ``unit``, by default none."""
     times = _from_pair(times)
-    if isinstance(times, tuple) and len(times) == 2 and np.ndim(times[0]) > 0 and isinstance(times[1], str):
-        # A pair of an array and a unit that _from_pair left alone holds
-        # dates or strings.
-        raise TypeError("Dates and times have no unit; pass them alone and convert the series with .to(unit)")
-    if isinstance(times, (list, tuple)) and any(_is_date(t) for t in times):
-        if not all(_is_date(t) for t in times):
-            raise TypeError("Times must be all durations or all dates and times, not a mix")
-        times = DateTimeTensor(times)
+    if isinstance(times, (list, tuple)) and (dates := _dates_in_sequence(times)) is not None:
+        times = dates
     if isinstance(times, TimeDeltaTensor):
         # Counts in one unit, by default theirs, converted by one exact
         # factor; the short name of unit, which may be an alias.
@@ -1174,8 +1185,9 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
         ``series(TimeDelta(90, "min"))``. For a series with an
         :attr:`epoch`, ``t`` may also be a date and time, a :class:`DateTime`
         or anything it accepts, such as ``"2023-01-01T12:30"``, or a
-        :class:`DateTimeTensor`, an array, a pandas ``DatetimeIndex``, or a
-        pandas ``Series`` of them. A date names an instant, not an offset:
+        :class:`DateTimeTensor`, a list, tuple, or array, such as a
+        ``datetime64[15m]`` array, or a pandas ``DatetimeIndex`` or
+        ``Series`` of them. A date names an instant, not an offset:
         it is placed at ``t - epoch - origin`` in each channel, so a window
         gives the value it held at that instant, as the series it was cut
         from does.
@@ -1212,26 +1224,17 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
             return self._evaluate_numbers(numbers)
         if self.unit is None:
             raise TypeError("A series without a unit takes plain numbers, not durations or dates")
-        if isinstance(t, (str, datetime.date, np.datetime64, DateTime)):
-            return self._evaluate_date(DateTime(t).to_datetime64())
-        if isinstance(t, DateTimeTensor):
-            return self._evaluate_date(t.to_datetime64())
+        dates = _dates_of(t)
+        if dates is not None:
+            return self._evaluate_date(dates)
         duration = _as_time_delta(t)
         if duration is not None:
             return self._evaluate_numbers(_in_unit(duration, self.unit))
         if not isinstance(t, Tensor):
-            # Lists, arrays, and pandas objects, such as a DatetimeIndex.
-            t = _as_array(t)
-            durations = _durations_in(t, self.unit)
+            # Lists, arrays, and pandas objects, such as a TimedeltaIndex.
+            durations = _durations_in(_as_array(t), self.unit)
             if durations is not None:
                 return self._evaluate_numbers(FloatTensor(np.asarray(durations, dtype=np.float64)))
-        if isinstance(t, np.ndarray) and t.dtype.kind in "MOUS":
-            # Dates and times, as datetime64, strings, or datetimes.
-            try:
-                dates = np.asarray(t, dtype="datetime64")
-            except (TypeError, ValueError):
-                raise TypeError("Times must be all durations or all dates and times, not a mix") from None
-            return self._evaluate_date(_checked_dates(dates))
         raise TypeError(f"Expected durations or dates and times, not {type(t).__name__}")
 
     def _evaluate_numbers(self, t):
