@@ -1,6 +1,6 @@
 # Time series general release: checklist
 
-Progress: 23 of 32 items, 44 of 53 points (83%)
+Progress: 24 of 32 items, 45 of 53 points (85%)
 
 From the release review of `issue-258-pandas` on 2026-11-08, in which each
 problem below was reproduced twice. The items correct behavior that the
@@ -292,7 +292,7 @@ Decisions for the maintainer: none open.
   `sb.tensor` does; `docs/conf.py:83`, `api_timeseries.rst:10`,
   `timeseries_windows.rst:53`, and `tensors.rst:220` name it there.
   Tests: `TimeSeriesTensor([a, b])` equals `sb.tensor([a, b])`.
-- [ ] **F4.** [1] `to_point_clouds` takes `n_points` instead of `n`, as
+- [x] **F4.** [1] (ce479c9cd) `to_point_clouds` takes `n_points` instead of `n`, as
   `noisy_sin` and `PointCloud.n_points` say.
   Tests: the grid tests pass `n_points`.
 - [ ] **F5.** [1] `t in domain` tells whether a time lies in a `Domain`,
