@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime
+import numbers
 import operator
 import sys
 from typing import Any, Generic, NamedTuple, NoReturn, Protocol, TypeVar
@@ -476,12 +477,25 @@ class _DomainFields(NamedTuple):
     end_closed: bool
 
 
+def _end_kind(end):
+    """What an end of a domain is: dates, durations, or numbers, or ``None``
+    for anything else."""
+    if isinstance(end, DateTime):
+        return "dates"
+    if isinstance(end, TimeDelta):
+        return "durations"
+    if isinstance(end, numbers.Real) and not isinstance(end, bool):
+        return "numbers"
+    return None
+
+
 class Domain(_DomainFields):
     """The times at which a series can be evaluated, from ``start`` to ``end``.
 
     ``start_closed`` and ``end_closed`` say whether ``start`` and ``end``
     themselves are included. The ends are durations, dates, or numbers, of
-    one kind.
+    one kind. ``t in domain`` tells whether a time ``t`` of that kind lies
+    in the domain.
 
     Attributes
     ----------
@@ -496,6 +510,8 @@ class Domain(_DomainFields):
 
     Raises
     ------
+    TypeError
+        If the ends are not both durations, both dates, or both numbers.
     ValueError
         If the domain holds no time: ``start`` comes after ``end``, or
         equals it without both ends included.
@@ -504,9 +520,20 @@ class Domain(_DomainFields):
     __slots__ = ()
 
     def __new__(cls, start: Any, end: Any, start_closed: bool, end_closed: bool):
+        kind = _end_kind(start)
+        if kind is None or _end_kind(end) != kind:
+            raise TypeError("The ends of a domain must be both durations, both dates, or both numbers, "
+                            f"not {type(start).__name__} and {type(end).__name__}")
         if end < start or (not start < end and not (start_closed and end_closed)):
             raise ValueError(f"A domain from {start} to {end} holds no time")
         return super().__new__(cls, start, end, bool(start_closed), bool(end_closed))
+
+    def __contains__(self, t: object) -> bool:
+        """Whether the time ``t``, of the kind of the ends, lies in the
+        domain. A time of another kind raises ``TypeError``, as comparing
+        it with the ends does."""
+        after_start = self.start < t or (self.start_closed and t == self.start)
+        return bool(after_start and (t < self.end or (self.end_closed and t == self.end)))
 
 
 class TimeSeriesDomainError(ValueError):

@@ -26,7 +26,11 @@ window lies in the time series it was cut from, a
 :py:class:`~stablebear.timeseries.Domain` whose ends are durations from the
 time 0 of ``signal``, in its unit. For a time series with an epoch, they are
 dates instead (see :doc:`timeseries_dates`). On a time series without a
-unit, the size, step, and ends are plain numbers.
+unit, the size, step, and ends are plain numbers. ``t in w.source_domain``
+tells whether a time ``t`` of ``signal`` lies in window ``w``::
+
+   TimeDelta(3, "s") in windows[0].source_domain  # True
+   TimeDelta(4, "s") in windows[0].source_domain  # False: the end is open
 
 The figure shows ``signal`` with the domains of the three windows marked
 above it, and below it each window as a time series of its own, evaluated
