@@ -1,6 +1,6 @@
 # Time series general release: checklist
 
-Progress: 24 of 32 items, 45 of 53 points (85%)
+Progress: 25 of 32 items, 46 of 53 points (87%)
 
 From the release review of `issue-258-pandas` on 2026-11-08, in which each
 problem below was reproduced twice. The items correct behavior that the
@@ -295,7 +295,7 @@ Decisions for the maintainer: none open.
 - [x] **F4.** [1] (ce479c9cd) `to_point_clouds` takes `n_points` instead of `n`, as
   `noisy_sin` and `PointCloud.n_points` say.
   Tests: the grid tests pass `n_points`.
-- [ ] **F5.** [1] `t in domain` tells whether a time lies in a `Domain`,
+- [x] **F5.** [1] (2730f9f24) `t in domain` tells whether a time lies in a `Domain`,
   instead of whether it equals one of the tuple's fields, and a `Domain`
   checks that its ends are of one kind.
   Tests: times inside, outside, and at open and closed ends; ends of two
