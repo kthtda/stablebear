@@ -1,6 +1,6 @@
 # Time series general release: checklist
 
-Progress: 21 of 32 items, 41 of 53 points (77%)
+Progress: 22 of 32 items, 43 of 53 points (81%)
 
 From the release review of `issue-258-pandas` on 2026-11-08, in which each
 problem below was reproduced twice. The items correct behavior that the
@@ -273,7 +273,7 @@ Decisions for the maintainer: none open.
   `float(series(t))` and `series(t) + 1.0`.
   Tests: `test/typing/check_types.py` uses `float(series(t))`,
   `series(times) * 2.0`, and `windows(times) * 2.0`.
-- [ ] **F2.** [2] Iterating a `TimeSeries` is defined and documented.
+- [x] **F2.** [2] (d2969246d) Iterating a `TimeSeries` is defined and documented.
   Recommended: `__iter__` raises `TypeError` naming `series[i]` for channels
   and `series.values` for observations, `__array__` raises the same way, and
   `len` keeps counting observations, raising `TypeError` for several
