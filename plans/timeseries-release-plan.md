@@ -1,6 +1,6 @@
 # Time series general release: checklist
 
-Progress: 17 of 32 items, 35 of 53 points (66%)
+Progress: 18 of 32 items, 37 of 53 points (70%)
 
 From the release review of `issue-258-pandas` on 2026-11-08, in which each
 problem below was reproduced twice. The items correct behavior that the
@@ -234,7 +234,7 @@ Decisions for the maintainer: F2 (iterating a series).
   exercised; whether a deep chain overflows the stack depends on the build
   and the stack size, so its depth is not tested. `take` was then split
   into `view_at_indices` and `with_times`.
-- [ ] **D3.** [2] Converting or shifting a view with one lag leaves its
+- [x] **D3.** [2] (69d20edd5) Converting or shifting a view with one lag leaves its
   source alone (`Channel::to` and `Channel::shifted`,
   `timeseries.tpp:211-254`), since it reads the source by index only, and
   `plot_timeseries` (`plotting.py:410`, `:517-520`) reads the unit name
