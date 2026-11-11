@@ -28,11 +28,14 @@ Keep them in separate files, and link the plan to its spec.
    indent subitems under their item as `- [ ] **B2a.** ...`. Check an item
    once all its subitems are checked.
 
-5. **Check an item in the commit after it, with its hash.** Once an item's
-   commit exists, check the item and add the commit's short hash as
-   evidence, as in `- [x] **B2b.** [3] (9629137bd, d37757337) ...`. The tick and
-   hash go into the next item's commit. A commit cannot record its own
-   hash, because amending it to add the hash changes the hash.
+5. **Check an item in a companion commit, with its hash.** Right after an
+   item's commit, check the item, add the commit's short hash as evidence,
+   as in `- [x] **B2b.** [3] (9629137bd, d37757337) ...`, update the
+   progress line, and commit only that change to the plan, with a subject
+   such as "Check B2b in the time series epochs plan". The plan then
+   shows progress as soon as the work lands. A commit cannot record its
+   own hash, because amending it to add the hash changes the hash, so the
+   tick needs a commit of its own.
 
 ## Item size
 
