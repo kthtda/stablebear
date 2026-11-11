@@ -3,7 +3,7 @@ from __future__ import annotations
 import datetime
 import operator
 import sys
-from typing import Any, Generic, NamedTuple, Protocol, TypeVar
+from typing import Any, Generic, NamedTuple, NoReturn, Protocol, TypeVar
 
 import numpy as np
 
@@ -554,11 +554,18 @@ def _domain_error(error, unit, index):
     return TimeSeriesDomainError(str(error), in_unit(error.time), domain, index)
 
 
+_NOT_ITERABLE = ("A TimeSeries is not iterable; use series[i] for a channel, "
+                 "or series.values for the observations")
+
+
 class TimeSeries(_BinaryIoMixin, Generic[T]):
     """Observations recorded at known times, in one or more channels.
 
     A series built from ``values`` and ``times`` has one channel;
-    :meth:`from_channels` combines several. Series can be saved with
+    :meth:`from_channels` combines several. A series is not iterable and
+    has no ``len``, since it could iterate over either: ``series[i]``
+    selects a channel, :attr:`values` gives the observations, and
+    :attr:`n_observations` counts them. Series can be saved with
     ``sb.save``, loaded with ``sb.load``, and pickled; each channel keeps its
     times, unit, and snap settings.
 
@@ -933,7 +940,7 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
     def values(self) -> Any:  # Depends on the number of channels; see the docstring.
         """A copy of the observations, with time along axis 0.
 
-        A tensor of shape ``(len(series), *shape)`` for a series with one
+        A tensor of shape ``(n_observations, *shape)`` for a series with one
         channel. For several channels, a ``NestedTensor`` with one such
         leaf per channel, in channel order.
         """
@@ -1112,7 +1119,7 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
     def n_observations(self) -> Any:  # Depends on the number of channels; see the docstring.
         """The number of recorded observations.
 
-        An int for a series with one channel, the same as ``len(series)``;
+        An int for a series with one channel;
         for several, an int64 ``IntTensor`` with one entry per channel.
         """
         counts = [len(self._data.channel(i)) for i in range(self.n_channels)]
@@ -1318,15 +1325,17 @@ class TimeSeries(_BinaryIoMixin, Generic[T]):
             leaves.append(NestedTensor._from_cpp(native)[0])
         return NestedTensor(leaves)
 
-    def __len__(self) -> int:
-        """The number of recorded observations of a one-channel series.
+    def __iter__(self) -> NoReturn:
+        """Raises ``TypeError``: a series is not iterable, since it could
+        iterate over its channels or its observations. Use ``series[i]`` for
+        a channel, :attr:`values` for the observations, and
+        :attr:`n_observations` to count them."""
+        raise TypeError(_NOT_ITERABLE)
 
-        Raises
-        ------
-        ValueError
-            On several channels; use :attr:`n_observations`.
-        """
-        return len(self._single_channel())
+    def __array__(self, dtype=None, copy=None) -> NoReturn:
+        """Raises ``TypeError``, as :meth:`__iter__` does, instead of letting
+        NumPy build an array of the series."""
+        raise TypeError(_NOT_ITERABLE)
 
     def __getitem__(self, index) -> TimeSeries:
         """Select channels by index: ``series[i]`` or ``series[[i, j, ...]]``.

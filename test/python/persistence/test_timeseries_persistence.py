@@ -49,7 +49,7 @@ def test_series_of_one_cloud_keeps_its_time_axis():
 
     result = compute_persistent_homology(series, max_dim=1)
 
-    assert len(result) == 1
+    assert result.n_observations == 1
     assert result.shape == (2,)
 
 
@@ -103,7 +103,7 @@ def test_empty_series_gives_a_typed_empty_result():
     result = compute_persistent_homology(series, max_dim=1)
 
     assert result.dtype is sb.barcode32
-    assert len(result) == 0
+    assert result.n_observations == 0
     assert result.shape == (2,)
     assert result.unit == "s"
 

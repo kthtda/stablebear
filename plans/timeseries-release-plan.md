@@ -13,7 +13,7 @@ lands on this branch before CI runs on it and its PR opens, in phase H.
 0.6.0 follows the 0.6.0 betas directly, with no further pre-release. Files
 saved by the betas need not load.
 
-Decisions for the maintainer: F2 (iterating a series).
+Decisions for the maintainer: none open.
 
 ## Phase A: the docs and tests pass with Sphinx 9 and pandas 3
 
@@ -283,6 +283,10 @@ Decisions for the maintainer: F2 (iterating a series).
   `np.asarray(series)` fails with "exceed the maximum number of dimension".
   Tests: iterating, `list()`, and `np.asarray` raise `TypeError` for one
   channel and for several; `len` of one channel.
+  Decided: raise, as recommended, and drop `len` too, since a series
+  that does not iterate should have no length either; `n_observations`
+  counts the observations. Without `__len__`, pyright flags
+  `len(series)`, and `bool(series)` stays true.
 - [ ] **F3.** [1] `TimeSeriesTensor` is exported from
   `stablebear.timeseries`, and its constructor takes a list of series as
   `sb.tensor` does; `docs/conf.py:83`, `api_timeseries.rst:10`,

@@ -71,7 +71,7 @@ def test_series_of_numbers_has_no_unit_and_one_channel():
     assert series.unit is None
     assert series.n_channels == 1
     assert series.shape == ()
-    assert len(series) == 3
+    assert series.n_observations == 3
     assert np.array_equal(np.asarray(series.values), [10.0, 20.0, 30.0])
 
 
@@ -698,7 +698,7 @@ def test_series_of_points():
     series = TimeSeries(values, times=TimeDeltaTensor([0.0, 1.0, 2.0], "s"))
 
     assert series.shape == (2,)
-    assert len(series) == 3
+    assert series.n_observations == 3
     assert np.array_equal(np.asarray(series.values), values)
 
 
@@ -723,7 +723,7 @@ def test_series_of_every_element_type(make_values):
     series = TimeSeries(values, times=TimeDeltaTensor([0.0, 1.0], "s"))
 
     assert series.dtype is values.dtype
-    assert len(series) == 2
+    assert series.n_observations == 2
     assert series.values.array_equal(values)
 
 
@@ -769,7 +769,7 @@ def test_series_rejects_times_outside_observations(t):
 def test_empty_series_cannot_be_evaluated():
     series = TimeSeries(sb.zeros((0,), dtype=sb.pcloud64), times=TimeDeltaTensor([], "s"))
 
-    assert len(series) == 0
+    assert series.n_observations == 0
     assert series.dtype is sb.pcloud64
     with pytest.raises(ValueError, match="without observations"):
         series(TimeDelta(0.0, "s"))
@@ -1802,11 +1802,30 @@ def test_shapes_and_counts_of_several_channels():
     assert series[1].n_observations == 2
 
 
-def test_len_of_several_channels_raises():
-    series = TimeSeries.from_channels([_channel_a(), _channel_b()], unit="s")
+# A series could iterate over its channels or its observations, so it does
+# neither, with one channel or several.
+_ONE_AND_SEVERAL_CHANNELS = [
+    pytest.param(_channel_a, id="one-channel"),
+    pytest.param(lambda: TimeSeries.from_channels([_channel_a(), _channel_b()], unit="s"), id="several-channels"),
+]
 
-    with pytest.raises(ValueError, match="several channels"):
-        len(series)
+
+@pytest.mark.parametrize("make_series", _ONE_AND_SEVERAL_CHANNELS)
+def test_iterating_a_series_raises(make_series):
+    series = make_series()
+
+    with pytest.raises(TypeError, match="not iterable"):
+        iter(series)
+    with pytest.raises(TypeError, match="not iterable"):
+        list(series)
+
+
+@pytest.mark.parametrize("make_series", _ONE_AND_SEVERAL_CHANNELS)
+def test_a_series_as_an_array_raises(make_series):
+    series = make_series()
+
+    with pytest.raises(TypeError, match="not iterable"):
+        np.asarray(series)
 
 
 def test_channel_index_out_of_range_raises():
