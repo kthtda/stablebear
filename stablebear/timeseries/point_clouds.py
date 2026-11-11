@@ -9,7 +9,7 @@ from .. import _sb_cpp as cpp
 from ..point_cloud import PointCloud, PointCloudTensor
 from ..typing import float32, float64, int32, int64, uint32, uint64
 from .date_time import DateTimeTensor, TimeDelta, _duration, _in_unit, _ScalarDuration
-from .series import (TimeSeries, TimeSeriesTensor, _checked_dates, _date_counts, _outside_domain, _PandasLike, _as_series,
+from .series import (TimeSeries, TimeSeriesTensor, _checked_dates, _date_counts, _domain_error, _PandasLike, _as_series,
                      _queries)
 
 _NUMBER_DTYPES = (float32, float64, int32, int64, uint32, uint64)
@@ -91,7 +91,7 @@ def to_point_clouds(series: TimeSeries | TimeSeriesTensor | _PandasLike, times: 
 
     Raises
     ------
-    OutsideDomainError
+    TimeSeriesDomainError
         If a time is outside the domain of a series, with the ``index``
         of the first such series of a tensor.
     ValueError
@@ -116,9 +116,9 @@ def to_point_clouds(series: TimeSeries | TimeSeriesTensor | _PandasLike, times: 
             counts = np.asarray(counts).tolist()
         try:
             return PointCloudTensor(cpp.to_point_clouds(series._data, n, step, times, counts, unit))
-        except cpp.OutsideDomainError as error:
+        except cpp.TimeSeriesDomainError as error:
             if dates is None:
-                raise series._outside_domain(error) from None
+                raise series._domain_error(error) from None
             raise series._naming_dates(error, dates) from None
     series = _as_series(series)
     _check_numbers(series.dtype)
@@ -126,8 +126,8 @@ def to_point_clouds(series: TimeSeries | TimeSeriesTensor | _PandasLike, times: 
     n, step, times, _, unit = _point_times(times, n, step, series)
     try:
         return PointCloud(cpp.to_point_cloud(series._data, n, step, times, None, unit))
-    except cpp.OutsideDomainError as error:
-        raise _outside_domain(error, series.unit, None) from None
+    except cpp.TimeSeriesDomainError as error:
+        raise _domain_error(error, series.unit, None) from None
 
 
 def _check_numbers(dtype):

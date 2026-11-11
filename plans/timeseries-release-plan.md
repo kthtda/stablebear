@@ -156,12 +156,12 @@ Decisions for the maintainer: F2 (iterating a series).
     is 0 at a window's start, so it cannot absorb an error on the scale of
     the origin.
   - [ ] **C2b.** [5] A time outside the domain raises
-    `stablebear.timeseries.OutsideDomainError`, a `ValueError` with the
+    `stablebear.timeseries.TimeSeriesDomainError`, a `ValueError` with the
     `time`, the `domain`, and the `index` of the series in a tensor, on
     every path: calls of a series and of a tensor, and `to_point_clouds`.
     For dates, the time and the ends of the domain are `DateTime`s, on the
     tensor paths too; otherwise durations in the unit, or numbers for a
-    series without one. C++ throws `sb::OutsideDomainError` with the time,
+    series without one. C++ throws `sb::TimeSeriesDomainError` with the time,
     the domain (`TimeDomain`, formerly `TimeSeries::Domain`), the index,
     and the channel, and Python builds the public error from it, or from
     its own date check. `to_point_clouds` of a tensor names the index,

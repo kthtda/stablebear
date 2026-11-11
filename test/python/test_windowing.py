@@ -6,8 +6,8 @@ import pytest
 
 import stablebear as sb
 from stablebear import FloatTensor
-from stablebear.timeseries import (DateTime, DateTimeTensor, Domain, OutsideDomainError, TimeDelta, TimeDeltaTensor, TimeSeries,
-                                   cut_windows, delay_embed)
+from stablebear.timeseries import (DateTime, DateTimeTensor, Domain, TimeDelta, TimeDeltaTensor, TimeSeries,
+                                   TimeSeriesDomainError, cut_windows, delay_embed)
 from stablebear.timeseries.series import TimeSeriesTensor
 
 from _element_values import TWO_ELEMENTS_OF_EVERY_DTYPE
@@ -748,7 +748,7 @@ def test_evaluating_windows_outside_a_window_raises_with_its_index():
     windows = cut_windows(series, size=TimeDelta(2, "s"), step=TimeDelta(2, "s"), closed="left", partial=True,
                           anchor="start")
 
-    with pytest.raises(OutsideDomainError) as excinfo:
+    with pytest.raises(TimeSeriesDomainError) as excinfo:
         windows(TimeDeltaTensor([0.0, 1.5], "s"))
 
     assert excinfo.value.index == (1,)
@@ -756,7 +756,7 @@ def test_evaluating_windows_outside_a_window_raises_with_its_index():
     assert excinfo.value.domain == Domain(TimeDelta(0.0, "s"), TimeDelta(1.0, "s"), True, True)
 
     # 2.5 s is outside both windows; the error names the first.
-    with pytest.raises(OutsideDomainError) as excinfo:
+    with pytest.raises(TimeSeriesDomainError) as excinfo:
         windows(TimeDeltaTensor([0.0, 2.5, 1.0], "s"))
 
     assert excinfo.value.index == (0,)

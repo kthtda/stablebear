@@ -45,7 +45,7 @@ namespace sb
   {
     /// The times of @p how in the domain of @p series, of one channel:
     /// ascending, or in their order for given times or dates, which throw
-    /// OutsideDomainError if one is outside the domain.
+    /// TimeSeriesDomainError if one is outside the domain.
     template <typename T>
     std::vector<float64_t> grid_times(const TimeSeries<T>& series, const PointTimes& how)
     {
@@ -63,8 +63,8 @@ namespace sb
           const auto t = time_of_date(series, 0, DateTime(date, how.dateUnit));
           if (!domain.contains(t))
           {
-            throw OutsideDomainError("Time " + detail::shortest_text(t) + " is outside the domain "
-                                     + domain.to_string(), t, domain);
+            throw TimeSeriesDomainError("Time " + detail::shortest_text(t) + " is outside the domain "
+                                        + domain.to_string(), t, domain);
           }
           times.push_back(t);
         }
@@ -95,8 +95,8 @@ namespace sb
           const auto t = convert_time(query, how.unit, unit);
           if (!domain.contains(t))
           {
-            throw OutsideDomainError("Time " + detail::shortest_text(t) + " is outside the domain "
-                                     + domain.to_string(), t, domain);
+            throw TimeSeriesDomainError("Time " + detail::shortest_text(t) + " is outside the domain "
+                                        + domain.to_string(), t, domain);
           }
           times.push_back(t);
         }
@@ -187,13 +187,13 @@ namespace sb
     // A time outside the domain names the first such series, whichever
     // worker reaches it, as evaluate() does.
     std::mutex mutex;
-    std::optional<OutsideDomainError> outside;
+    std::optional<TimeSeriesDomainError> outside;
     parallel_walk(seriesTensor, [&](const std::vector<size_t>& index) {
       try
       {
         clouds(index) = to_point_cloud(seriesTensor(index), how);
       }
-      catch (const OutsideDomainError& e)
+      catch (const TimeSeriesDomainError& e)
       {
         const std::scoped_lock lock(mutex);
         if (!outside || index < outside->index())

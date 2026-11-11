@@ -60,13 +60,13 @@ Each query is a duration, a :py:class:`~stablebear.timeseries.TimeDelta`,
 and returns the value of the step it falls on. A unit passed as the second
 argument reads numbers as counts of it, so ``series(0.5, "s")`` is
 ``series(TimeDelta(0.5, "s"))``. A query past the last timestamp is outside
-the domain and raises an :py:class:`~stablebear.timeseries.OutsideDomainError`,
+the domain and raises an :py:class:`~stablebear.timeseries.TimeSeriesDomainError`,
 a ``ValueError`` that holds the time and the domain::
 
    series(TimeDelta(0.5, "s"))  # 1.0
    series(1.5, "s")             # 2.0
    series(2750.0, "ms")         # 2.0
-   series(4.0, "s")             # OutsideDomainError: Time 4 is outside the domain [0, 3.5]
+   series(4.0, "s")             # TimeSeriesDomainError: Time 4 is outside the domain [0, 3.5]
 
 A query at a timestamp gets the observation recorded there, as at 1.5 s.
 A number without a unit raises a ``TypeError``, since it does not say which

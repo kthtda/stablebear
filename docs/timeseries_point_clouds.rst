@@ -103,6 +103,6 @@ the time series at ``times`` gives, as in :doc:`timeseries`::
    # [[0, 1], [1, 0], [0, -1]]
 
 A time outside the domain raises an
-:py:class:`~stablebear.timeseries.OutsideDomainError`. A time series with an
+:py:class:`~stablebear.timeseries.TimeSeriesDomainError`. A time series with an
 epoch, or a tensor of them, also takes dates and times (see
 :doc:`timeseries_dates`).

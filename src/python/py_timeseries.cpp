@@ -9,9 +9,9 @@ namespace nb = nanobind;
 namespace
 {
   /// The fields from which stablebear.timeseries raises its
-  /// OutsideDomainError: the time and the domain in the unit of the series,
+  /// TimeSeriesDomainError: the time and the domain in the unit of the series,
   /// the index of the series, and the channel.
-  void set_outside_domain_attributes(nb::object& error, const sb::OutsideDomainError& e)
+  void set_domain_error_attributes(nb::object& error, const sb::TimeSeriesDomainError& e)
   {
     nb::list index;
     for (const auto i : e.index())
@@ -32,8 +32,8 @@ namespace sb_py
 {
   void register_timeseries(nb::module_& m)
   {
-    register_exception<sb::OutsideDomainError, set_outside_domain_attributes>(
-        m, "OutsideDomainError", "A time outside the domain of a series, with the domain, index, and channel.",
+    register_exception<sb::TimeSeriesDomainError, set_domain_error_attributes>(
+        m, "TimeSeriesDomainError", "A time outside the domain of a series, with the domain, index, and channel.",
         PyExc_ValueError);
 
     m.def("time_unit_name", [](const std::string& unit) {

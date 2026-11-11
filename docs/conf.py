@@ -82,7 +82,7 @@ napoleon_type_aliases = {
     "TimeSeries": "stablebear.timeseries.TimeSeries",
     "TimeSeriesTensor": "stablebear.timeseries.series.TimeSeriesTensor",
     "Domain": "stablebear.timeseries.Domain",
-    "OutsideDomainError": "stablebear.timeseries.OutsideDomainError",
+    "TimeSeriesDomainError": "stablebear.timeseries.TimeSeriesDomainError",
     "DateTime": "stablebear.timeseries.DateTime",
     "TimeDelta": "stablebear.timeseries.TimeDelta",
     "Dtype": "stablebear.typing.dtype",

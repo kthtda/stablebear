@@ -629,8 +629,8 @@ namespace sb
     const auto domain = this->domain();
     if (!domain.contains(t))
     {
-      throw OutsideDomainError("Time " + detail::shortest_text(t) + " is outside the domain " + domain.to_string(), t,
-                               domain);
+      throw TimeSeriesDomainError("Time " + detail::shortest_text(t) + " is outside the domain " + domain.to_string(),
+                                  t, domain);
     }
   }
 
@@ -713,8 +713,8 @@ namespace sb
             const auto x = time_of(one, c, query);
             if (!domain.contains(x))
             {
-              throw OutsideDomainError(position_text(index) + ": Time " + shortest_text(x)
-                                       + " is outside the domain " + domain.to_string(), x, domain, index, c);
+              throw TimeSeriesDomainError(position_text(index) + ": Time " + shortest_text(x)
+                                          + " is outside the domain " + domain.to_string(), x, domain, index, c);
             }
           }
         }

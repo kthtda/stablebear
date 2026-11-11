@@ -2,8 +2,8 @@ import numpy as np
 import pytest
 
 import stablebear as sb
-from stablebear.timeseries import (DateTimeTensor, OutsideDomainError, TimeDelta, TimeDeltaTensor, TimeSeries, cut_windows,
-                                   to_point_clouds)
+from stablebear.timeseries import (DateTimeTensor, TimeDelta, TimeDeltaTensor, TimeSeries, TimeSeriesDomainError,
+                                   cut_windows, to_point_clouds)
 
 
 def _series():
@@ -95,7 +95,7 @@ def test_a_date_outside_a_series_of_a_tensor_raises_with_its_index_and_domain():
     late = _series().with_epoch("2023-01-01T00:00:01")
 
     # 00:00:00 is before the domain of late, which starts at 00:00:01.
-    with pytest.raises(OutsideDomainError) as excinfo:
+    with pytest.raises(TimeSeriesDomainError) as excinfo:
         to_point_clouds(sb.tensor([early, late]), DateTimeTensor(["2023-01-01T00:00:00"]))
 
     assert excinfo.value.index == (1,)

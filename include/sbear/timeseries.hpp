@@ -440,13 +440,13 @@ namespace sb
   /// A time outside the domain of a series: time() and domain() in the unit
   /// of the series, counted from time 0 of the channel channel(), and the
   /// index of the series in a tensor of them, empty for one series. Python
-  /// raises it as stablebear.timeseries.OutsideDomainError, naming the time
+  /// raises it as stablebear.timeseries.TimeSeriesDomainError, naming the time
   /// as a date for a date.
-  class OutsideDomainError : public std::domain_error
+  class TimeSeriesDomainError : public std::domain_error
   {
   public:
-    OutsideDomainError(const std::string& message, float64_t time, const TimeDomain& domain,
-                       std::vector<size_t> index = {}, size_t channel = 0)
+    TimeSeriesDomainError(const std::string& message, float64_t time, const TimeDomain& domain,
+                          std::vector<size_t> index = {}, size_t channel = 0)
       : std::domain_error(message), m_time(time), m_domain(domain), m_index(std::move(index)),
         m_channel(channel)
     {
@@ -753,7 +753,7 @@ namespace sb
     [[nodiscard]] NestedTensor<T> evaluate(const Tensor<float64_t>& t) const;
 
   private:
-    /// Throw OutsideDomainError, naming the domain, unless @p t, in the
+    /// Throw TimeSeriesDomainError, naming the domain, unless @p t, in the
     /// series' unit, lies in the domain. The check is exact: it compares
     /// against the timestamps converted to the series' unit, not the query
     /// converted to each channel's unit.
@@ -789,7 +789,7 @@ namespace sb
   /// unit take; times of the wrong kind throw TypeError.
   /// Requires every series to have the same number of channels and channel
   /// shapes, and @p series to be non-empty. A time outside the domain of a
-  /// series throws OutsideDomainError naming the first such series'
+  /// series throws TimeSeriesDomainError naming the first such series'
   /// position, as in "TimeSeries at position (1, 2)".
   /// The series are evaluated in parallel on @p exec.
   template <typename T>

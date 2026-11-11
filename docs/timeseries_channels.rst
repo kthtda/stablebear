@@ -44,7 +44,7 @@ The query returns one value from each channel. A query outside the shaded
 domain raises an error, even where ``a`` alone has observations::
 
    series(0.1, "s")  # OK
-   series(0.0, "s")  # OutsideDomainError: Time 0 is outside the domain [0.05, 0.13]
+   series(0.0, "s")  # TimeSeriesDomainError: Time 0 is outside the domain [0.05, 0.13]
 
 Evaluating several channels gives a
 :py:class:`~stablebear.nested_tensor.NestedTensor` with one entry per

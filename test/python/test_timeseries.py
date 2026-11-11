@@ -7,8 +7,8 @@ import numpy as np
 import pytest
 
 import stablebear as sb
-from stablebear.timeseries import (DateTime, DateTimeTensor, Domain, OutsideDomainError, TimeDelta, TimeDeltaTensor, TimeSeries,
-                                   cut_windows, delay_embed, to_point_clouds)
+from stablebear.timeseries import (DateTime, DateTimeTensor, Domain, TimeDelta, TimeDeltaTensor, TimeSeries,
+                                   TimeSeriesDomainError, cut_windows, delay_embed, to_point_clouds)
 from stablebear.timeseries.series import TimeSeriesTensor
 
 from _element_values import TWO_ELEMENTS_OF_EVERY_DTYPE
@@ -1057,7 +1057,7 @@ def test_series_at_a_date_with_a_timezone_is_at_its_utc_instant():
 def test_series_at_a_date_outside_its_domain_raises_with_the_date_and_the_domain_as_dates():
     dates = np.array(["2023-01-01T01:00", "2023-01-01T05:00"], dtype="datetime64[m]")
 
-    with pytest.raises(OutsideDomainError) as excinfo:
+    with pytest.raises(TimeSeriesDomainError) as excinfo:
         _dated_series()(dates)
 
     assert excinfo.value.time == DateTime("2023-01-01T05:00")
@@ -1068,15 +1068,15 @@ def test_series_at_a_date_outside_its_domain_raises_with_the_date_and_the_domain
 def test_series_at_a_duration_outside_its_domain_raises_with_the_time_and_the_domain_as_durations():
     series = TimeSeries([10.0, 20.0], times=TimeDeltaTensor([0.0, 1.0], "s"))
 
-    with pytest.raises(OutsideDomainError) as excinfo:
+    with pytest.raises(TimeSeriesDomainError) as excinfo:
         series(TimeDelta(3.0, "s"))
 
     assert excinfo.value.time == TimeDelta(3.0, "s")
     assert excinfo.value.domain == Domain(TimeDelta(0.0, "s"), TimeDelta(1.0, "s"), True, True)
 
 
-def test_outside_domain_error_survives_pickling():
-    error = OutsideDomainError("Time 3 is outside the domain [0, 1]", 3.0, Domain(0.0, 1.0, True, True), (1,))
+def test_time_series_domain_error_survives_pickling():
+    error = TimeSeriesDomainError("Time 3 is outside the domain [0, 1]", 3.0, Domain(0.0, 1.0, True, True), (1,))
 
     copy = pickle.loads(pickle.dumps(error))
 
@@ -1093,7 +1093,7 @@ _NANOSECOND_DATE = np.datetime64("2023-01-01T05:00:00.000000001", "ns")
 
 
 def test_series_at_a_date_outside_its_domain_in_nanoseconds_names_the_date():
-    with pytest.raises(OutsideDomainError) as excinfo:
+    with pytest.raises(TimeSeriesDomainError) as excinfo:
         _nanosecond_series()(_NANOSECOND_DATE)
     message = str(excinfo.value)
 
@@ -1105,16 +1105,16 @@ def test_series_at_a_date_just_after_an_end_between_microseconds_names_the_end()
     times = np.array(["2023-01-01T00:00:00.000000000", "2023-01-01T00:00:00.000000700"], dtype="datetime64[ns]")
     series = TimeSeries([10.0, 20.0], times=DateTimeTensor(times))
 
-    with pytest.raises(OutsideDomainError) as excinfo:
+    with pytest.raises(TimeSeriesDomainError) as excinfo:
         series(np.datetime64("2023-01-01T00:00:00.000000701", "ns"))
 
     assert excinfo.value.domain.end == DateTime("2023-01-01T00:00:00.000000700")  # not rounded to a microsecond
 
 
 def test_point_clouds_at_a_date_outside_the_domain_in_nanoseconds_raise_as_the_series_does():
-    with pytest.raises(OutsideDomainError) as points_excinfo:
+    with pytest.raises(TimeSeriesDomainError) as points_excinfo:
         to_point_clouds(_nanosecond_series(), np.array([_NANOSECOND_DATE]))
-    with pytest.raises(OutsideDomainError) as series_excinfo:
+    with pytest.raises(TimeSeriesDomainError) as series_excinfo:
         _nanosecond_series()(_NANOSECOND_DATE)
 
     assert points_excinfo.value.time == series_excinfo.value.time
@@ -1123,7 +1123,7 @@ def test_point_clouds_at_a_date_outside_the_domain_in_nanoseconds_raise_as_the_s
 
 def test_mapping_a_series_over_a_date_outside_its_domain_raises():
     # A StopIteration from the call would end map() early instead.
-    with pytest.raises(OutsideDomainError):
+    with pytest.raises(TimeSeriesDomainError):
         list(map(_nanosecond_series(), [_NANOSECOND_DATE]))
 
 
@@ -1131,7 +1131,7 @@ def test_window_at_a_date_outside_it_raises_with_its_domain_as_dates():
     window = cut_windows(_dated_series(), size=TimeDelta(2.0, "h"), step=TimeDelta(1.0, "h"), closed="left",
                          partial=False, anchor="start")[1]
 
-    with pytest.raises(OutsideDomainError) as excinfo:
+    with pytest.raises(TimeSeriesDomainError) as excinfo:
         window("2023-01-01T03:00")
 
     assert excinfo.value.domain == Domain(DateTime("2023-01-01T01:00"), DateTime("2023-01-01T03:00"), True, False)
@@ -1909,7 +1909,7 @@ def test_a_date_outside_a_series_of_a_tensor_raises_with_its_index_and_domain():
     late = _hourly([40.0, 50.0, 60.0], "2023-01-01T01:00")
 
     # 00:30 is before the domain of late, which starts at 01:00.
-    with pytest.raises(OutsideDomainError) as excinfo:
+    with pytest.raises(TimeSeriesDomainError) as excinfo:
         sb.tensor([early, late])(DateTime("2023-01-01T00:30"))
 
     assert excinfo.value.index == (1,)
@@ -1921,7 +1921,7 @@ def test_a_duration_outside_a_series_of_a_tensor_raises_with_its_index():
     long = TimeSeries([10.0, 20.0, 30.0], times=TimeDeltaTensor([0.0, 1.0, 2.0], "h"))
     short = TimeSeries([40.0, 50.0], times=TimeDeltaTensor([0.0, 1.0], "h"))
 
-    with pytest.raises(OutsideDomainError) as excinfo:
+    with pytest.raises(TimeSeriesDomainError) as excinfo:
         sb.tensor([long, short])(TimeDelta(2.0, "h"))
 
     assert excinfo.value.index == (1,)
@@ -1934,7 +1934,7 @@ def test_a_date_outside_a_channel_of_a_series_of_a_tensor_raises_with_the_domain
     series = TimeSeries.from_channels([long, short])
 
     # 01:30 is in the domain of long, which ends at 02:00, but after short.
-    with pytest.raises(OutsideDomainError) as excinfo:
+    with pytest.raises(TimeSeriesDomainError) as excinfo:
         sb.tensor([series])(DateTime("2023-01-01T01:30"))
 
     assert excinfo.value.domain == short.domain
