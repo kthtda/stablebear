@@ -1,6 +1,6 @@
 # Time series general release: checklist
 
-Progress: 25 of 32 items, 46 of 53 points (87%)
+Progress: 26 of 32 items, 47 of 53 points (89%)
 
 From the release review of `issue-258-pandas` on 2026-11-08, in which each
 problem below was reproduced twice. The items correct behavior that the
@@ -300,7 +300,7 @@ Decisions for the maintainer: none open.
   checks that its ends are of one kind.
   Tests: times inside, outside, and at open and closed ends; ends of two
   kinds raise.
-- [ ] **F6.** [1] `cut_windows` takes interval notation for `closed`:
+- [x] **F6.** [1] (2c00bd475) `cut_windows` takes interval notation for `closed`:
   `"[)"`, `"(]"`, `"[]"`, and `"()"` mean `"left"`, `"right"`, `"both"`,
   and `"none"` (`_CLOSED`, `window.py:10`). The `Literal` type, the
   docstring, and the error for an unknown value name both spellings.
