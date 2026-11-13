@@ -1,13 +1,13 @@
 # Piecewise linear functions with evaluation: implementation plan
 
-Progress: 0 of 11 items, 0 of 22 points (0%)
+Progress: 1 of 11 items, 2 of 22 points (9%)
 
 Spec: [plf-spec.md](plf-spec.md) (#253)
 
 ## Phase A: C++ `Plf` and integration
 
 - [ ] **A1.** Add `Plf<Tt, Tv>`.
-  - [ ] **A1a.** [2] Make `Pcf`'s sorted-times `evaluate` take
+  - [x] **A1a.** [2] (1b161138e) Make `Pcf`'s sorted-times `evaluate` take
     `std::span<const time_type>` and `std::span<value_type>` instead of
     two indexable objects and a count, and pass vectors to it from
     `tensor_eval` and `py_pcf.cpp`. The existing Python evaluation tests
