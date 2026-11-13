@@ -1,20 +1,26 @@
 # Piecewise linear functions with evaluation: implementation plan
 
-Progress: 0 of 10 items, 0 of 20 points (0%)
+Progress: 0 of 11 items, 0 of 22 points (0%)
 
 Spec: [plf-spec.md](plf-spec.md) (#253)
 
 ## Phase A: C++ `Plf` and integration
 
-- [ ] **A1.** [3] Add `Plf<Tt, Tv>` in `include/sbear/functional/plf.hpp`:
-  validating constructor, zero default, both `evaluate` overloads, `==`.
-  Add it to `SB_HEADER_FILES`.
-  Tests: no breakpoints, nonzero first time, repeated time, decreasing
-  time, and infinite time throw; value at each breakpoint; value halfway
-  between; after the last breakpoint it continues the last segment; a
-  final flat segment keeps it constant; a single breakpoint is constant;
-  negative time throws; sorted-times `evaluate` matches scalar
-  `evaluate`.
+- [ ] **A1.** Add `Plf<Tt, Tv>`.
+  - [ ] **A1a.** [2] Make `Pcf`'s sorted-times `evaluate` take
+    `std::span<const time_type>` and `std::span<value_type>` instead of
+    two indexable objects and a count, and pass vectors to it from
+    `tensor_eval` and `py_pcf.cpp`. The existing Python evaluation tests
+    cover it.
+  - [ ] **A1b.** [3] Add `Plf<Tt, Tv>` in
+    `include/sbear/functional/plf.hpp`: validating constructor, zero
+    default, both `evaluate` overloads, `==`. Add it to `SB_HEADER_FILES`.
+    Tests: no breakpoints, nonzero first time, repeated time, decreasing
+    time, and infinite time throw; value at each breakpoint; value halfway
+    between; after the last breakpoint it continues the last segment; a
+    final flat segment keeps it constant; a single breakpoint is constant;
+    negative time throws; sorted-times `evaluate` matches scalar
+    `evaluate`.
 - [ ] **A2.** [2] Add `integrate(const Pcf&)` returning a `Plf`.
   Tests: breakpoints hold the running integral; a last value different
   from the one before adds a breakpoint at `t_n + max(1, t_n)`, both

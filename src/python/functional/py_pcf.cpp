@@ -168,23 +168,21 @@ namespace
           });
 
           // Build sorted times and evaluate
-          auto sorted_times = sb_py::new_array<Tt>({n});
-          NumpyTensor<Tt> sorted_in(sorted_times);
+          std::vector<Tt> sorted_in(n);
           for (size_t i = 0; i < n; ++i)
           {
-            sorted_in(i) = in[order[i]];
+            sorted_in[i] = in[order[i]];
           }
 
-          auto sorted_result = sb_py::new_array<Tv>({n});
-          NumpyTensor<Tv> sorted_out(sorted_result);
-          self.evaluate(sorted_in, sorted_out, n);
+          std::vector<Tv> sorted_out(n);
+          self.evaluate(sorted_in, sorted_out);
 
           // Unsort results back to original order
           auto result = sb_py::new_array<Tv>(shape);
           Tv* out = result.data();
           for (size_t i = 0; i < n; ++i)
           {
-            out[order[i]] = sorted_out(i);
+            out[order[i]] = sorted_out[i];
           }
 
           return result;

@@ -9,6 +9,7 @@
 #include <iostream>
 #include <ostream>
 #include <cmath>
+#include <span>
 
 namespace sb
 {
@@ -202,15 +203,16 @@ namespace sb
       return it->v;
     }
 
-    template <typename TIn, typename TOut>
-    void evaluate(const TIn& sorted_times, TOut& out, size_t n) const
+    /// Evaluate at sorted times in one pass, writing out[i] for each
+    /// sorted_times[i]. out must be at least as long as sorted_times.
+    void evaluate(std::span<const time_type> sorted_times, std::span<value_type> out) const
     {
       auto it = m_points.begin();
       auto end = m_points.end();
 
-      for (size_t i = 0; i < n; ++i)
+      for (size_t i = 0; i < sorted_times.size(); ++i)
       {
-        auto t = sorted_times(i);
+        auto t = sorted_times[i];
 
         // PCFs are defined on [0, inf); guard against 0, not the first
         // breakpoint's time (which the t=0 construction invariant pins to 0).
@@ -224,7 +226,7 @@ namespace sb
           ++it;
         }
 
-        out(i) = it->v;
+        out[i] = it->v;
       }
     }
 
