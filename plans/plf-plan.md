@@ -1,10 +1,10 @@
 # Piecewise linear functions with evaluation: implementation plan
 
-Progress: 2 of 11 items, 5 of 22 points (23%)
+Progress: 2 of 13 items, 5 of 29 points (17%)
 
 Spec: [plf-spec.md](plf-spec.md) (#253)
 
-## Phase A: C++ `Plf` and integration
+## Phase A: C++ `Plf`
 
 - [x] **A1.** Add `Plf<Tt, Tv>`.
   - [x] **A1a.** [2] (1b161138e) Make `Pcf`'s sorted-times `evaluate` take
@@ -21,20 +21,13 @@ Spec: [plf-spec.md](plf-spec.md) (#253)
     final flat segment keeps it constant; a single breakpoint is constant;
     negative time throws; sorted-times `evaluate` matches scalar
     `evaluate`.
-- [ ] **A2.** [2] Add `integrate(const Pcf&)` returning a `Plf`.
-  Tests: breakpoints hold the running integral; a last value different
-  from the one before adds a breakpoint at `t_n + max(1, t_n)`, both
-  below and above `t_n = 1`; an equal one adds none; a single-breakpoint
-  `Pcf` gives a line through 0; a repeated `Pcf` time gives one
-  breakpoint.
 
 ## Phase B: Python `Plf`
 
 - [ ] **B1.** [2] Bind `Plf_f32_f32` and `Plf_f64_f64` in
   `src/python/functional/py_plf.cpp` (constructor from an array, `size`,
-  array view, `get_time_type`), and add `plf32`/`plf64` and
-  `stablebear/functional/plf.py` with the `Plf` class and its docstring,
-  without `__call__`.
+  array view), and add `stablebear/functional/plf.py` with the `Plf`
+  class and its docstring, without `__call__`.
   Tests: array and list give the expected breakpoints; `to_numpy` round
   trip; dtype inference from `float32`, `float64`, and an integer array;
   `dtype=` overrides; copy; invalid breakpoints raise `ValueError`;
@@ -44,14 +37,21 @@ Spec: [plf-spec.md](plf-spec.md) (#253)
   Tests: values at and between breakpoints, and after the last with a
   sloped and a flat last segment; 2-d and unsorted arrays keep their
   shape and order; list; `FloatTensor` of each precision; negative time raises.
-- [ ] **B3.** [1] `Pcf.integrate()`, binding A2.
-  Tests: result equals the `Plf` built from the expected breakpoints;
-  `pcf32` gives `plf32`; an integer `Pcf` raises `TypeError`.
+- [ ] **B3.** [3] Add `integrate(const Pcf&)` returning a `Plf` in
+  `include/sbear/functional/plf.hpp`, and bind it as `Pcf.integrate()`.
+  It is tested from Python, where the breakpoints are easier to read.
+  Tests: breakpoints hold the running integral; a last value different
+  from the one before adds a breakpoint at `t_n + max(1, t_n)`, both
+  below and above `t_n = 1`; an equal one adds none; a single-breakpoint
+  `Pcf` gives a line through 0; a repeated `Pcf` time gives one
+  breakpoint; `pcf32` gives a `float32` `Plf`; an integer `Pcf` raises
+  `TypeError`.
 
 ## Phase C: `PlfTensor`
 
 - [ ] **C1.** [3] Bind `Plf32Tensor` and `Plf64Tensor` in
-  `src/python/py_tensor_plf.cpp`; add `PlfTensor` and the `zeros` and
+  `src/python/py_tensor_plf.cpp`; add the `plf32` and `plf64` dtypes,
+  `PlfTensor`, and the `zeros` and
   `tensor` dispatch. Constrain the scalar operators in
   `include/sbear/functional/piecewise_function.hpp` to types with the
   compound operator each one calls: `CanAddTo` and its siblings only check
@@ -81,3 +81,26 @@ Spec: [plf-spec.md](plf-spec.md) (#253)
   covering how a PLF continues its last segment and integrating a `Pcf`,
   the dtype tables there and in `docs/tensors.rst`, PLF evaluation in
   `docs/evaluation.rst`, and a changelog entry.
+
+## Phase E: Saving, loading, and pickling
+
+- [ ] **E1.** [3] Save, load, and pickle a `Plf`: `write_element` and
+  `read_element` in `include/sbear/io/plf_io.hpp`, base format 110 in
+  `tensorFormatV3`, `Plf_f32` and `Plf_f64` in `StreamableObject`,
+  `save_plf32_object` and `save_plf64_object` in `py_io.cpp`, the maps in
+  `stablebear/io.py`, and `_BinaryIoMixin` on `Plf`. Add `Plf` to the
+  types listed in `docs/saving.rst`.
+  Tests: `save` and `load` give back an equal `Plf` of each precision;
+  pickle gives back an equal `Plf`.
+- [ ] **E2.** [2] Save, load, and pickle a `PlfTensor`: `Tensor<Plf_f32>`
+  and `Tensor<Plf_f64>` in `StreamableTensor`, `save_plf32_tensor` and
+  `save_plf64_tensor`, the maps in `stablebear/io.py`, and
+  `_BinaryIoMixin` on `PlfTensor`. Add `PlfTensor` to `docs/saving.rst`.
+  Tests: `save` and `load` give back an equal 2-d tensor of each
+  precision; an empty tensor; pickle.
+- [ ] **E3.** [2] Pin a V3 PLF corpus with
+  `test/golden/serialization/generate_plf_v3.py`, through
+  `pinned_corpus.py`: a `Plf` and a 2-d `PlfTensor` at each precision,
+  binary and pickle, with explicit expected breakpoints. Describe it in
+  the serialization golden README.
+  Tests: every file loads to its expected breakpoints.

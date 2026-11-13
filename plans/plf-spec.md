@@ -79,11 +79,14 @@ A PLF is continuous: times are strictly increasing, so it cannot jump.
 
 - `arr` is an `(n, 2)` ndarray or a list of `(time, value)` pairs, or a
   `Plf` to copy. `Plf(f.to_numpy())` gives back `f`.
-- `dtype` is `plf32` or `plf64`. Without it, a `float32` array gives
-  `plf32`, any other real array gives `plf64`, and a list gives `plf64`.
+- `dtype` is `float32` or `float64`, the type of the times and values.
+  Without it, a `float32` array gives `float32`, any other real array
+  gives `float64`, a list gives `float64`, and a `Plf` keeps its dtype.
 - Invalid breakpoints raise `ValueError`, as above.
 - `size`, `to_numpy()`, `__array__`, `__eq__`, `astype(dtype)`, and `str`
-  behave as for `Pcf`.
+  behave as for `Pcf`. The `dtype` property gives `float32` or
+  `float64`, in place of `Pcf`'s `ttype` and `vtype`. `plf32` and
+  `plf64` are the dtypes of tensors of PLFs, not of a single PLF.
 - `f(t)` follows `Pcf.__call__`: a scalar gives a Python float, a list or
   ndarray gives an ndarray of the same shape, and a `FloatTensor` gives a
   `FloatTensor` of the same type and shape. A negative time raises
@@ -104,7 +107,8 @@ g(5.0)          # 1.0, after a final flat segment
 ## Integration: `Pcf.integrate()` and `PcfTensor.integrate()`
 
 - `Pcf.integrate()` returns the `Plf` $t \mapsto \int_0^t f(u)\,du$, of
-  the same precision: `pcf32` gives `plf32`, and `pcf64` gives `plf64`.
+  the same precision: `pcf32` gives a `float32` `Plf`, and `pcf64` a
+  `float64` one.
   An integer `Pcf` raises `TypeError`.
 
   ```python
@@ -132,6 +136,17 @@ g(5.0)          # 1.0, after a final flat segment
 - Evaluation follows `PcfTensor`: `T(t)` has shape `T.shape + t.shape`,
   for a scalar, an ndarray, a list, or a `FloatTensor`.
 
+## Saving, loading, and pickling
+
+- `sb.save` and `sb.load` accept a `Plf` and a `PlfTensor`, and both
+  pickle, as their PCF counterparts do.
+- Format V3 stores a PLF element as its breakpoints, as for a `Pcf`, with
+  base format 110 and subformat 32 or 64. Earlier versions of Stablebear
+  reject files that hold PLFs as an unknown format.
+- Reading builds each PLF through the validating constructor, so a file
+  with invalid breakpoints raises `ValueError` instead of giving an
+  invalid PLF.
+
 ## Out of scope
 
 Tracked in follow-up issues:
@@ -140,6 +155,6 @@ Tracked in follow-up issues:
 - strictly increasing PLFs: monotonicity and inverses;
 - reductions, Lp distances, and L2 kernels;
 - CUDA support (PLFs work on the CPU in both backends' modules);
-- saving and loading, pickling, casting tensors between `plf32` and
-  `plf64`, and time series of PLFs;
+- casting tensors between `plf32` and `plf64`, nested tensors of PLFs,
+  and time series of PLFs;
 - integrating integer `Pcf`s, and integrating from a time other than 0.
