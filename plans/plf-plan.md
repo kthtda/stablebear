@@ -1,6 +1,6 @@
 # Piecewise linear functions with evaluation: implementation plan
 
-Progress: 2 of 13 items, 5 of 29 points (17%)
+Progress: 3 of 13 items, 7 of 29 points (24%)
 
 Spec: [plf-spec.md](plf-spec.md) (#253)
 
@@ -24,7 +24,7 @@ Spec: [plf-spec.md](plf-spec.md) (#253)
 
 ## Phase B: Python `Plf`
 
-- [ ] **B1.** [2] Bind `Plf_f32_f32` and `Plf_f64_f64` in
+- [x] **B1.** [2] (2089e44fc) Bind `Plf_f32_f32` and `Plf_f64_f64` in
   `src/python/functional/py_plf.cpp` (constructor from an array, `size`,
   array view), and add `stablebear/functional/plf.py` with the `Plf`
   class and its docstring, without `__call__`.
