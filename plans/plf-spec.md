@@ -46,13 +46,16 @@ A PLF is continuous: times are strictly increasing, so it cannot jump.
   if the first time is not 0, if the times are not strictly increasing, or
   if a time is not finite. Values are not checked.
 - `evaluate(t)` returns the value at `t`, and throws `std::domain_error`
-  for a negative `t`. `evaluate(sorted_times, out, n)` evaluates at sorted
-  times in one pass, with the same signature as for `Pcf`, so that
-  `tensor_eval` works for both.
+  for a negative `t`. `evaluate(sorted_times, out)` evaluates at sorted
+  times in one pass, taking `std::span`s, with the same signature as for
+  `Pcf`, so that `tensor_eval` works for both.
 - Between breakpoints it computes
   $v_i + (v_{i+1} - v_i) \cdot \frac{t - t_i}{t_{i+1} - t_i}$,
-  which gives exactly $v_i$ at $t = t_i$. After $t_n$ it uses the same
-  formula with $i = n - 1$.
+  which gives exactly $v_i$ at $t = t_i$. From $t_n$ on, it continues the
+  last segment from its end,
+  $v_n + (v_n - v_{n-1}) \cdot \frac{t - t_n}{t_n - t_{n-1}}$,
+  which gives exactly $v_n$ at $t = t_n$; interpolating from $t_{n-1}$
+  could round away from it.
 - `integrate(const Pcf<Tt, Tv>&)` returns the `Plf<Tt, Tv>`
   $F(t) = \int_0^t f(u)\,du$, for float `Pcf`s. Its breakpoints are those of
   the `Pcf`, with $F(t_0) = 0$ and

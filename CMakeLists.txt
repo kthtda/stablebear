@@ -487,6 +487,7 @@ SET(SB_HEADER_FILES
     distances.hpp
     version.hpp
     functional/pcf.hpp
+    functional/plf.hpp
     functional/piecewise_function.hpp
     functional/time_point.hpp
     functional/rectangle.hpp
@@ -816,6 +817,7 @@ if (BUILD_TESTER)
       test/test_io_stream.cpp
       test/test_io_readwrite.cpp
       test/test_pcf_algebra_and_norms.cpp
+      test/test_plf.cpp
       test/test_tensor_io_core.cpp
       test/test_barcode_and_stable_rank.cpp
       test/test_linkage_to_barcode.cpp
