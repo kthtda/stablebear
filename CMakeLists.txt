@@ -569,6 +569,7 @@ SET(SB_PY_SOURCES
     py_np_support.hpp
     py_future.hpp
     functional/py_pcf.hpp functional/py_pcf.cpp
+    functional/py_plf.hpp functional/py_plf.cpp
     py_np_tensor_convert.hpp py_np_tensor_convert.cpp
     functional/py_make_from_serial_content.hpp functional/py_make_from_serial_content.cpp
     functional/py_distance.hpp functional/py_distance.cpp
