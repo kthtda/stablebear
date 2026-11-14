@@ -110,18 +110,11 @@ namespace
       using point_type = typename TPcf::point_type;
 
       nb::class_<sb::Pcf<Tt, Tv>> cls(m, ("Pcf" + suffix).c_str());
-      sb_py::bind_array_view(cls, [](const TPcf& self, nb::handle owner) {
-        return sb::detail::to_numpy(self, owner);
-      });
+      sb::detail::bind_piecewise_function(cls, &sb::detail::construct_pcf<Tt, Tv>);
       cls
-        .def(nb::init<>())
-        .def("__init__", [](TPcf* self, sb_py::NpIn<Tt> arr) {
-          new (self) TPcf(sb::detail::construct_pcf<Tt, Tv>(arr));
-        })
         .def("get_time_type", [](TPcf& /* self */) -> std::string { return STRINGIFY(Tt); })
         .def("get_value_type", [](TPcf& /* self */) -> std::string { return STRINGIFY(Tv); })
         .def("debug_print", &TPcf::debug_print) \
-        .def("size", [](const TPcf& self){ return self.points().size(); })
         .def("copy", [](const TPcf& self){ return TPcf(self); })
         .def("__add__", [](const TPcf& self, const TPcf& rhs) -> TPcf { return self + rhs; })
         .def("__add__", [](const TPcf& self, Tv c) -> TPcf { return self + c; })
@@ -148,10 +141,6 @@ namespace
             }
           }
           return result;
-        })
-        .def("__call__", [](const TPcf& self, Tt t) -> Tv { return self.evaluate(t); })
-        .def("__call__", [](const TPcf& self, nb::ndarray<const Tt, nb::c_contig, nb::device::cpu> times) {
-          return sb::detail::evaluate_at(self, times);
         })
 
         ;

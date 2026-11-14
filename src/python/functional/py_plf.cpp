@@ -42,16 +42,7 @@ namespace
     using TPlf = sb::Plf<Tt, Tv>;
 
     nb::class_<TPlf> cls(m, ("Plf" + suffix).c_str());
-    sb_py::bind_array_view(cls, [](const TPlf& self, nb::handle owner) {
-      return sb::detail::to_numpy(self, owner);
-    });
-    cls
-      .def(nb::init<>())
-      .def("__init__", [](TPlf* self, sb_py::NpIn<Tt> arr) {
-        new (self) TPlf(construct_plf<Tt, Tv>(arr));
-      })
-      .def("size", [](const TPlf& self) { return self.size(); })
-      ;
+    sb::detail::bind_piecewise_function(cls, &construct_plf<Tt, Tv>);
   }
 
 }

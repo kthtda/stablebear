@@ -6,11 +6,11 @@ from typing import Any
 import numpy as np
 
 from .. import _sb_cpp as cpp
-from .._tensor_base import _array_for_protocol
+from ._piecewise import _PiecewiseFunction
 from ..typing import Dtype, _assert_valid_dtype, float32, float64
 
 
-class Plf:
+class Plf(_PiecewiseFunction):
     r"""A piecewise linear function (PLF).
 
     A PLF is defined by breakpoints
@@ -53,6 +53,10 @@ class Plf:
     >>> f = sb.Plf([[0.0, 0.0], [1.0, 2.0], [3.0, 1.0]])
     >>> f.size
     3
+    >>> f(0.5)
+    1.0
+    >>> f([0.5, 2.0])
+    array([1. , 1.5])
     """
 
     _DTYPE_TO_NP = {float32: np.float32, float64: np.float64}
@@ -108,9 +112,3 @@ class Plf:
 
     def __str__(self):
         return f"<PLF size={self.size}, dtype={self._dtype}>"
-
-    def __array__(self, dtype=None, copy=None):
-        return _array_for_protocol(np.asarray(self._data), dtype, copy, copied=False)
-
-    def __eq__(self, other):
-        return np.array_equal(self.__array__(), np.asarray(other))

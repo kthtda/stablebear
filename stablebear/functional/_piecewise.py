@@ -7,8 +7,8 @@ import numpy as np
 from .._tensor_base import _array_for_protocol
 
 
-class _PiecewiseFunctionMixin:
-    """Provide the evaluation and array protocol shared by ``Pcf`` and ``Plf``."""
+class _PiecewiseFunction:
+    """A piecewise function on [0, inf), the base of ``Pcf`` and ``Plf``."""
 
     # A native piecewise function with an (n, 2) array view of its
     # breakpoints and __call__ overloads for a scalar and an array.

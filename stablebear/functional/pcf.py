@@ -6,11 +6,11 @@ import numpy as np
 
 from .. import _sb_cpp as cpp
 from .._binary_io import _BinaryIoMixin
-from ._piecewise import _PiecewiseFunctionMixin
+from ._piecewise import _PiecewiseFunction
 from ..typing import _assert_valid_dtype, _NP_TO_SB, float32, float64, int32, int64, pcf32, pcf32i, pcf64, pcf64i
 
 
-class Pcf(_PiecewiseFunctionMixin, _BinaryIoMixin):
+class Pcf(_PiecewiseFunction, _BinaryIoMixin):
     r"""A piecewise constant function (PCF).
 
     A PCF is defined by a sequence of (time, value) pairs

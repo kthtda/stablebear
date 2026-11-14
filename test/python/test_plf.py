@@ -152,3 +152,103 @@ class TestEquality:
                     [1, 3]])
 
         assert f != g
+
+
+class TestCall:
+    # Breakpoints (0, 0), (1, 2), (3, 1): slope 2, then -0.5.
+    def make(self, dtype=sb.float64):
+        return sb.Plf([[0, 0],
+                       [1, 2],
+                       [3, 1]], dtype=dtype)
+
+    def test_at_breakpoints(self):
+        f = self.make()
+
+        assert [f(0.0), f(1.0), f(3.0)] == [0.0, 2.0, 1.0]
+
+    def test_between_breakpoints(self):
+        f = self.make()
+
+        assert [f(0.5), f(2.0)] == [1.0, 1.5]
+
+    def test_after_last_continues_sloped_segment(self):
+        f = self.make()
+
+        assert f(5.0) == 0.0
+
+    def test_after_last_flat_segment_is_constant(self):
+        f = sb.Plf([[0, 0],
+                    [1, 2],
+                    [3, 2]])
+
+        assert f(10.0) == 2.0
+
+    def test_int_scalar(self):
+        f = self.make()
+
+        assert f(2) == 1.5
+
+    def test_2d_array_keeps_shape(self):
+        f = self.make()
+
+        result = f(np.array([[0.0, 0.5],
+                             [2.0, 5.0]]))
+
+        npt.assert_array_equal(result, [[0.0, 1.0],
+                                        [1.5, 0.0]])
+
+    def test_unsorted_array_keeps_order(self):
+        f = self.make()
+
+        result = f(np.array([5.0, 0.5, 2.0, 0.0]))
+
+        npt.assert_array_equal(result, [0.0, 1.0, 1.5, 0.0])
+
+    def test_transposed_array(self):
+        f = self.make()
+        t = np.array([[0.0, 0.5],
+                      [2.0, 5.0]])
+
+        result = f(t.T)
+
+        npt.assert_array_equal(result, [[0.0, 1.5],
+                                        [1.0, 0.0]])
+
+    def test_reversed_array(self):
+        f = self.make()
+        t = np.array([0.0, 0.5, 2.0, 5.0])
+
+        result = f(t[::-1])
+
+        npt.assert_array_equal(result, [0.0, 1.5, 1.0, 0.0])
+
+    def test_list(self):
+        f = self.make()
+
+        result = f([0.5, 2.0])
+
+        assert isinstance(result, np.ndarray)
+        npt.assert_array_equal(result, [1.0, 1.5])
+
+    @pytest.mark.parametrize("dtype", [sb.float32, sb.float64])
+    def test_float_tensor(self, dtype):
+        f = self.make(dtype=dtype)
+        t = sb.FloatTensor(np.array([0.5, 2.0, 5.0]), dtype=dtype)
+
+        result = f(t)
+
+        assert isinstance(result, sb.FloatTensor)
+        assert result.dtype == dtype
+        npt.assert_array_equal(np.asarray(result), [1.0, 1.5, 0.0])
+
+    def test_negative_scalar_raises(self):
+        f = self.make()
+
+        with pytest.raises(ValueError):
+            f(-1.0)
+
+    def test_negative_in_array_raises(self):
+        f = self.make()
+
+        with pytest.raises(ValueError):
+            f(np.array([1.0, -1.0]))
