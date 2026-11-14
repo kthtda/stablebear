@@ -1,6 +1,6 @@
 # Piecewise linear functions with evaluation: implementation plan
 
-Progress: 3 of 14 items, 7 of 31 points (23%)
+Progress: 4 of 14 items, 9 of 31 points (29%)
 
 Spec: [plf-spec.md](plf-spec.md) (#253)
 
@@ -33,7 +33,7 @@ Spec: [plf-spec.md](plf-spec.md) (#253)
   `dtype=` overrides; copy; invalid breakpoints raise `ValueError`;
   `astype`; `==`.
 - [ ] **B2.** Evaluate a `Plf`.
-  - [ ] **B2a.** [2] Move `__call__`, `__array__`, and `__eq__` from
+  - [x] **B2a.** [2] (3d3cbdd90) Move `__call__`, `__array__`, and `__eq__` from
     `Pcf` into `_PiecewiseFunctionMixin` in
     `stablebear/functional/_piecewise.py`, and the array evaluation in
     `py_pcf.cpp` into a template in `pypcf_support.hpp`. `__call__`
