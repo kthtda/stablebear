@@ -6,11 +6,11 @@ import numpy as np
 
 from .. import _sb_cpp as cpp
 from .._binary_io import _BinaryIoMixin
-from .._tensor_base import _array_for_protocol
-from ..typing import _assert_valid_dtype, _SB_TO_NP, _NP_TO_SB, float32, float64, int32, int64, pcf32, pcf32i, pcf64, pcf64i
+from ._piecewise import _PiecewiseFunctionMixin
+from ..typing import _assert_valid_dtype, _NP_TO_SB, float32, float64, int32, int64, pcf32, pcf32i, pcf64, pcf64i
 
 
-class Pcf(_BinaryIoMixin):
+class Pcf(_PiecewiseFunctionMixin, _BinaryIoMixin):
     r"""A piecewise constant function (PCF).
 
     A PCF is defined by a sequence of (time, value) pairs
@@ -217,56 +217,6 @@ class Pcf(_BinaryIoMixin):
         self._data = self._data.__pow__(exponent)
         return self
 
-    def __call__(self, t):
-        """Evaluate the PCF at the given time(s).
-
-        Parameters
-        ----------
-        t : float, int, list, numpy.ndarray, or FloatTensor
-            The time(s) at which to evaluate the PCF. Can be a single scalar
-            or an array-like of times with arbitrary shape.
-
-        Returns
-        -------
-        float, numpy.ndarray, or FloatTensor
-            The PCF value(s) at the given time(s). A scalar input returns a
-            Python float. A list or ndarray input returns an ndarray of the
-            same shape. A ``FloatTensor`` input returns a tensor of the same
-            type and shape.
-
-        Raises
-        ------
-        ValueError
-            If any time is negative (PCFs are defined on :math:`[0, \\infty)`).
-
-        Examples
-        --------
-        >>> import numpy as np
-        >>> import stablebear as sb
-        >>> f = sb.Pcf(np.array([[0.0, 1.0], [1.0, 2.0], [3.0, 0.5]], dtype=np.float32))
-        >>> f(0.5)
-        1.0
-        >>> f(np.array([0.5, 1.5, 4.0]))
-        array([1. , 2. , 0.5], dtype=float32)
-        """
-        from ..base_tensor import FloatTensor
-
-        if isinstance(t, int | float):
-            return self._data(t)
-
-        return_tensor = None
-        if isinstance(t, FloatTensor):
-            return_tensor = type(t)
-            t = np.asarray(t)
-        elif isinstance(t, list):
-            t = np.asarray(t, dtype=_SB_TO_NP[self.ttype])
-
-        result = self._data(t)
-
-        if return_tensor is not None:
-            return return_tensor(result)
-        return result
-
     @property
     def size(self):
         """Number of breakpoints (time-value pairs) in this PCF."""
@@ -282,12 +232,6 @@ class Pcf(_BinaryIoMixin):
     def __str__(self):
         dtname = self._VTYPE_NAMES.get(self.vtype, str(self.vtype))
         return f"<PCF size={self._data.size()}, dtype={dtname}>"
-
-    def __array__(self, dtype=None, copy=None):
-        return _array_for_protocol(np.asarray(self._data), dtype, copy, copied=False)
-
-    def __eq__(self, other):
-        return np.array_equal(self.__array__(), np.asarray(other))
 
 
 _BACKEND_MAP = {

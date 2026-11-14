@@ -151,41 +151,7 @@ namespace
         })
         .def("__call__", [](const TPcf& self, Tt t) -> Tv { return self.evaluate(t); })
         .def("__call__", [](const TPcf& self, nb::ndarray<const Tt, nb::c_contig, nb::device::cpu> times) {
-          // Evaluate in flat order and give the result the shape of times
-          std::vector<size_t> shape(times.ndim());
-          for (size_t i = 0; i < times.ndim(); ++i)
-          {
-            shape[i] = times.shape(i);
-          }
-          const Tt* in = times.data();
-          auto n = static_cast<size_t>(times.size());
-
-          // Argsort
-          std::vector<size_t> order(n);
-          std::iota(order.begin(), order.end(), 0);
-          std::sort(order.begin(), order.end(), [in](size_t a, size_t b) {
-            return in[a] < in[b];
-          });
-
-          // Build sorted times and evaluate
-          std::vector<Tt> sorted_in(n);
-          for (size_t i = 0; i < n; ++i)
-          {
-            sorted_in[i] = in[order[i]];
-          }
-
-          std::vector<Tv> sorted_out(n);
-          self.evaluate(sorted_in, sorted_out);
-
-          // Unsort results back to original order
-          auto result = sb_py::new_array<Tv>(shape);
-          Tv* out = result.data();
-          for (size_t i = 0; i < n; ++i)
-          {
-            out[order[i]] = sorted_out[i];
-          }
-
-          return result;
+          return sb::detail::evaluate_at(self, times);
         })
 
         ;

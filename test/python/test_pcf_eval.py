@@ -109,3 +109,19 @@ class TestTensorEval:
         assert isinstance(result, sb.FloatTensor)
         assert result.dtype == sb.float64
         npt.assert_array_almost_equal(np.asarray(result), [1.0, 2.0, 0.5])
+
+    def test_int_tensor_on_float_pcf(self):
+        f = make_f64()
+        t = sb.IntTensor(np.array([0, 2, 5], dtype=np.int32))
+        result = f(t)
+        assert isinstance(result, sb.FloatTensor)
+        assert result.dtype == sb.float64
+        npt.assert_array_equal(np.asarray(result), [1.0, 2.0, 0.5])
+
+    def test_float_tensor_on_int_pcf(self):
+        f = sb.Pcf(np.array([[0, 1], [1, 2], [3, 5]], dtype=np.int32))
+        t = sb.FloatTensor(np.array([0.0, 2.0, 5.0], dtype=np.float64))
+        result = f(t)
+        assert isinstance(result, sb.IntTensor)
+        assert result.dtype == sb.int32
+        npt.assert_array_equal(np.asarray(result), [1, 2, 5])

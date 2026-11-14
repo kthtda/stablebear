@@ -3,7 +3,10 @@
 
 #include <sbear/functional/pcf.hpp>
 
+#include <algorithm>
+#include <numeric>
 #include <sstream>
+#include <vector>
 
 #include "nb.hpp"
 #include "py_np_support.hpp"
@@ -88,6 +91,51 @@ namespace sb
       }
 
       return sb::Pcf<Tt, Tv>(std::move(points));
+    }
+
+    /// Evaluate `f` at each of `times`, giving an array of the same shape.
+    template <typename TFunction>
+    auto evaluate_at(const TFunction& f,
+                     nb::ndarray<const typename TFunction::time_type, nb::c_contig, nb::device::cpu> times)
+    {
+      using Tt = typename TFunction::time_type;
+      using Tv = typename TFunction::value_type;
+
+      // Evaluate in flat order and give the result the shape of times
+      std::vector<size_t> shape(times.ndim());
+      for (size_t i = 0; i < times.ndim(); ++i)
+      {
+        shape[i] = times.shape(i);
+      }
+      const Tt* in = times.data();
+      auto n = static_cast<size_t>(times.size());
+
+      // Argsort
+      std::vector<size_t> order(n);
+      std::iota(order.begin(), order.end(), 0);
+      std::sort(order.begin(), order.end(), [in](size_t a, size_t b) {
+        return in[a] < in[b];
+      });
+
+      // Build sorted times and evaluate
+      std::vector<Tt> sorted_in(n);
+      for (size_t i = 0; i < n; ++i)
+      {
+        sorted_in[i] = in[order[i]];
+      }
+
+      std::vector<Tv> sorted_out(n);
+      f.evaluate(sorted_in, sorted_out);
+
+      // Unsort results back to original order
+      auto result = sb_py::new_array<Tv>(shape);
+      Tv* out = result.data();
+      for (size_t i = 0; i < n; ++i)
+      {
+        out[order[i]] = sorted_out[i];
+      }
+
+      return result;
     }
 
     /// A read-only (n, 2) view of the breakpoints of `pcf`, kept alive by
