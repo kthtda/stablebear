@@ -1,6 +1,6 @@
 # Piecewise linear functions with evaluation: implementation plan
 
-Progress: 3 of 13 items, 7 of 29 points (24%)
+Progress: 3 of 14 items, 7 of 31 points (23%)
 
 Spec: [plf-spec.md](plf-spec.md) (#253)
 
@@ -32,11 +32,24 @@ Spec: [plf-spec.md](plf-spec.md) (#253)
   trip; dtype inference from `float32`, `float64`, and an integer array;
   `dtype=` overrides; copy; invalid breakpoints raise `ValueError`;
   `astype`; `==`.
-- [ ] **B2.** [2] `Plf.__call__` at scalars, arrays, lists, and
-  `FloatTensor`s, with the scalar and sorted-array bindings.
-  Tests: values at and between breakpoints, and after the last with a
-  sloped and a flat last segment; 2-d and unsorted arrays keep their
-  shape and order; list; `FloatTensor` of each precision; negative time raises.
+- [ ] **B2.** Evaluate a `Plf`.
+  - [ ] **B2a.** [2] Move `__call__`, `__array__`, and `__eq__` from
+    `Pcf` into `_PiecewiseFunctionMixin` in
+    `stablebear/functional/_piecewise.py`, and the array evaluation in
+    `py_pcf.cpp` into a template in `pypcf_support.hpp`. `__call__`
+    accepts any `NumericTensor`, and returns a tensor of the function's
+    value type.
+    Tests: `IntTensor` times on a float `Pcf` give a `FloatTensor`;
+    `FloatTensor` times on an integer `Pcf` give an `IntTensor`.
+    Note: `size` and `to_numpy` stay in each class, since the docs list
+    inherited public methods only in a dropdown.
+  - [ ] **B2b.** [2] `Plf.__call__` at scalars, arrays, lists, and
+    `FloatTensor`s: derive `Plf` from the mixin, and bind the scalar and
+    array evaluation.
+    Tests: values at and between breakpoints, and after the last with a
+    sloped and a flat last segment; 2-d and unsorted arrays keep their
+    shape and order; list; `FloatTensor` of each precision; negative time
+    raises.
 - [ ] **B3.** [3] Add `integrate(const Pcf&)` returning a `Plf` in
   `include/sbear/functional/plf.hpp`, and bind it as `Pcf.integrate()`.
   It is tested from Python, where the breakpoints are easier to read.
