@@ -1,6 +1,6 @@
 # Piecewise linear functions with evaluation: implementation plan
 
-Progress: 4 of 14 items, 9 of 32 points (28%)
+Progress: 5 of 14 items, 12 of 32 points (38%)
 
 Spec: [plf-spec.md](plf-spec.md) (#253)
 
@@ -32,7 +32,7 @@ Spec: [plf-spec.md](plf-spec.md) (#253)
   trip; dtype inference from `float32`, `float64`, and an integer array;
   `dtype=` overrides; copy; invalid breakpoints raise `ValueError`;
   `astype`; `==`.
-- [ ] **B2.** Evaluate a `Plf`.
+- [x] **B2.** Evaluate a `Plf`.
   - [x] **B2a.** [2] (3d3cbdd90) Move `__call__`, `__array__`, and `__eq__` from
     `Pcf` into `_PiecewiseFunctionMixin` in
     `stablebear/functional/_piecewise.py`, and the array evaluation in
@@ -43,7 +43,7 @@ Spec: [plf-spec.md](plf-spec.md) (#253)
     `FloatTensor` times on an integer `Pcf` give an `IntTensor`.
     Note: `size` and `to_numpy` stay in each class, since the docs list
     inherited public methods only in a dropdown.
-  - [ ] **B2b.** [3] `Plf.__call__` at scalars, arrays, lists, and
+  - [x] **B2b.** [3] (b91cb9888) `Plf.__call__` at scalars, arrays, lists, and
     `FloatTensor`s: rename the mixin to the base class
     `_PiecewiseFunction` and derive `Plf` from it, and bind what `Pcf`
     and `Plf` share, evaluation among it, in `bind_piecewise_function`.
