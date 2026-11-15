@@ -1,6 +1,6 @@
 # Piecewise linear functions with evaluation: implementation plan
 
-Progress: 10 of 15 items, 24 of 34 points (71%)
+Progress: 11 of 15 items, 25 of 34 points (74%)
 
 Spec: [plf-spec.md](plf-spec.md) (#253)
 
@@ -94,7 +94,7 @@ Spec: [plf-spec.md](plf-spec.md) (#253)
 
 ## Phase D: Documentation
 
-- [ ] **D1.** [1] API reference: `stablebear.functional.plf` in
+- [x] **D1.** [1] (e856f4a17) API reference: `stablebear.functional.plf` in
   `docs/api_base.rst`, `Plf` and `PlfTensor` aliases in `docs/conf.py`,
   and `assert_type`s for `Plf.__call__` and `Pcf.integrate` in
   `test/typing/check_types.py`.
