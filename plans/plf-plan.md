@@ -1,6 +1,6 @@
 # Piecewise linear functions with evaluation: implementation plan
 
-Progress: 15 of 17 items, 34 of 38 points (89%)
+Progress: 16 of 17 items, 36 of 38 points (95%)
 
 Spec: [plf-spec.md](plf-spec.md) (#253)
 
@@ -128,7 +128,7 @@ Spec: [plf-spec.md](plf-spec.md) (#253)
 
 ## Phase F: Plotting
 
-- [ ] **F1.** [2] `plotting.plot` draws a `Plf`, a list or tuple of
+- [x] **F1.** [2] (5af067795) `plotting.plot` draws a `Plf`, a list or tuple of
   `Plf`s, and a 1-d `PlfTensor` as lines through their breakpoints, and
   `max_time` extends them along their last segment; update its docstring.
   Tests: a single `Plf` draws its breakpoints; `max_time` adds the point
