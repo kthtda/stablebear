@@ -1,6 +1,6 @@
 # Piecewise linear functions with evaluation: implementation plan
 
-Progress: 8 of 15 items, 20 of 34 points (59%)
+Progress: 9 of 15 items, 22 of 34 points (65%)
 
 Spec: [plf-spec.md](plf-spec.md) (#253)
 
@@ -81,7 +81,7 @@ Spec: [plf-spec.md](plf-spec.md) (#253)
   Tests: `zeros` holds zero functions; set and get an element; `tensor`
   of `Plf`s infers the dtype; `PlfTensor` from a nested list; `copy` keeps
   the dtype.
-- [ ] **C2.** [2] Evaluate `PlfTensor`s: bind `__call__` for every
+- [x] **C2.** [2] (702027839) Evaluate `PlfTensor`s: bind `__call__` for every
   evaluable element type instead of only `PcfLike` ones in
   `src/python/py_tensor.hpp`.
   Tests: scalar on 1-d and 2-d tensors; array of times on a 1-d and 2-d
