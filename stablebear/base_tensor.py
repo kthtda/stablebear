@@ -267,12 +267,13 @@ class IntPcfTensor(_PcfTensorBase):
         return IntPcfTensor(data)
 
 
-class PlfTensor(Tensor):
+class PlfTensor(FunctionTensor):
     """A tensor of piecewise linear functions (:class:`Plf`), of dtype
     ``plf32`` or ``plf64``.
 
-    It supports indexing, assignment, views, copying, stacking, and
-    equality, but no arithmetic.
+    It supports evaluation, indexing, assignment, views, copying, stacking,
+    and equality, but no arithmetic. Evaluating at times of shape
+    ``t_shape`` gives values of shape ``shape + t_shape``.
 
     Parameters
     ----------

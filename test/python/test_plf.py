@@ -395,3 +395,99 @@ class TestPlfTensor:
         C[1] = f
 
         assert Z[1] == sb.Plf([[0.0, 0.0]])
+
+
+class TestPlfTensorCall:
+    @staticmethod
+    def make(dtype=sb.float64):
+        f = sb.Plf([[0.0, 0.0],
+                    [1.0, 2.0],
+                    [3.0, 1.0]], dtype=dtype)
+        g = sb.Plf([[0.0, 1.0],
+                    [2.0, 2.0]], dtype=dtype)
+        return f, g
+
+    def test_scalar_on_1d_tensor(self):
+        f, g = self.make()
+        T = sb.PlfTensor([f, g])
+
+        result = T(0.5)
+
+        assert isinstance(result, np.ndarray)
+        assert result.shape == (2,)
+        npt.assert_array_equal(result, [f(0.5), g(0.5)])
+
+    def test_scalar_on_2d_tensor(self):
+        f, g = self.make()
+        T = sb.PlfTensor([[f, g],
+                          [g, f]])
+
+        result = T(2.0)
+
+        assert result.shape == (2, 2)
+        npt.assert_array_equal(result, [[f(2.0), g(2.0)],
+                                        [g(2.0), f(2.0)]])
+
+    def test_array_on_1d_tensor(self):
+        f, g = self.make()
+        T = sb.PlfTensor([f, g])
+        t = np.array([0.5, 2.0, 5.0])
+
+        result = T(t)
+
+        assert result.shape == (2, 3)
+        npt.assert_array_equal(result, [f(t), g(t)])
+
+    def test_array_on_2d_tensor_has_tensor_then_time_shape(self):
+        f, g = self.make()
+        T = sb.PlfTensor([[f, g],
+                          [g, f]])
+        t = np.array([[0.5, 2.0, 5.0],
+                      [5.0, 2.0, 0.5]])
+
+        result = T(t)
+
+        assert result.shape == (2, 2, 2, 3)
+        npt.assert_array_equal(result, [[f(t), g(t)],
+                                        [g(t), f(t)]])
+
+    def test_list(self):
+        f, g = self.make()
+        T = sb.PlfTensor([f, g])
+
+        result = T([0.5, 2.0])
+
+        assert isinstance(result, np.ndarray)
+        assert result.shape == (2, 2)
+        npt.assert_array_equal(result, [f([0.5, 2.0]), g([0.5, 2.0])])
+
+    @pytest.mark.parametrize("dtype", [sb.float32, sb.float64])
+    def test_float_tensor(self, dtype):
+        f, g = self.make(dtype=dtype)
+        T = sb.PlfTensor([f, g])
+        t = sb.FloatTensor(np.array([0.5, 2.0]), dtype=dtype)
+
+        result = T(t)
+
+        assert isinstance(result, sb.FloatTensor)
+        assert result.dtype is dtype
+        assert result.shape == (2, 2)
+        npt.assert_array_equal(np.asarray(result), [np.asarray(f(t)), np.asarray(g(t))])
+
+    def test_parallel_matches_serial(self):
+        T = sb.zeros((20,), dtype=sb.plf64)
+        for i in range(20):
+            T[i] = sb.Plf([[0.0, float(i)],
+                           [1.0, float(i + 1)],
+                           [2.0, 0.0]])
+        t = np.array([0.0, 0.5, 1.0, 1.5, 2.5])
+        old = sb.system.get_parallel_eval_threshold()
+        try:
+            sb.system.set_parallel_eval_threshold(4)
+            parallel = T(t)
+            sb.system.set_parallel_eval_threshold(1000)
+            serial = T(t)
+        finally:
+            sb.system.set_parallel_eval_threshold(old)
+
+        npt.assert_array_equal(parallel, serial)
