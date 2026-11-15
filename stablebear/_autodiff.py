@@ -29,9 +29,17 @@ import numpy as np
 F = TypeVar("F", bound=Callable[..., Any])
 
 
+def _unwrap(x: Any) -> Any:
+    """A Keras 3 variable as the variable or tensor of its backend: a
+    tf.Variable, a torch parameter, or a JAX array. Anything else unchanged."""
+    if type(x).__module__.split(".")[0] == "keras" and hasattr(x, "value"):
+        return x.value
+    return x
+
+
 def _framework(x: Any) -> Any:
     """Return the adapter module for the framework that owns `x`, or None."""
-    root = type(x).__module__.split(".")[0]
+    root = type(_unwrap(x)).__module__.split(".")[0]
     if root == "torch":
         from . import _autodiff_torch
 
@@ -59,6 +67,7 @@ def _tracked(x: Any):
     values = getattr(x, "_tvalues", None)
     if values is not None:
         return values, x._with_values
+    x = _unwrap(x)
     if _framework(x) is not None:
         return x, _plain
     return None
@@ -99,7 +108,7 @@ def pcf_op(primal_op: Callable[..., Any], combine: Callable[..., Any], *operands
 
     def values(i, op):
         if i not in pcf_positions:
-            return op
+            return _unwrap(op)
         j = pcf_positions.index(i)
         v = op._tvalues
         if v is None:

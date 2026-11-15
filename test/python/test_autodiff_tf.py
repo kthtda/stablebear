@@ -62,3 +62,19 @@ def test_gradient_in_tf_function():
         return tape.gradient(loss, a)
 
     np.testing.assert_allclose(tf.function(loss_and_grad)().numpy(), loss_and_grad().numpy())
+
+
+def test_gradient_wrt_keras_variable():
+    keras = pytest.importorskip("keras")
+    if keras.backend.backend() != "tensorflow":
+        pytest.skip("Keras runs on another backend")
+    F, G = _tensors()
+    v = keras.Variable(0.3, dtype="float64")
+    a = tf.Variable(0.3, dtype=tf.float64)
+    grads = []
+    for param in (v, a):
+        with tf.GradientTape() as tape:
+            # A Keras variable on the left would convert G itself and fail.
+            loss = tf.reduce_sum(sb.lp_norm(F - G * param, p=2.0))
+        grads.append(tape.gradient(loss, param).numpy())
+    np.testing.assert_allclose(grads[0], grads[1])
