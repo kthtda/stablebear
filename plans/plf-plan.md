@@ -134,7 +134,8 @@ Spec: [plf-spec.md](plf-spec.md) (#253)
   Tests: a single `Plf` draws its breakpoints; `max_time` adds the point
   at `max_time` for a sloped and a flat last segment; a tensor extends
   every PLF to the latest breakpoint; a list gives the same lines as the
-  `PlfTensor`; a list mixing `Pcf`s and `Plf`s raises `TypeError`.
+  `PlfTensor`; a list mixing `Pcf`s and `Plf`s draws each as steps or
+  lines, extended to the latest breakpoint or to `max_time`.
 - [ ] **F2.** [2] Plotting guide: a PLF section in `docs/plotting.rst`
   with a figure of a `Pcf` and its integral, from
   `docs/_static/gen_plotting_gallery.py` with a code dropdown, and the

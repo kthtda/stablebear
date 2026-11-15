@@ -160,7 +160,9 @@ g(5.0)          # 1.0, after a final flat segment
   point $(t, f(t))$ at `max_time`. Without it, a single PLF ends at its
   last breakpoint, and the PLFs of a tensor extend to the latest
   breakpoint among them, as PCFs do.
-- A list or tuple that mixes `Pcf`s and `Plf`s raises `TypeError`.
+- A list or tuple may mix `Pcf`s and `Plf`s, to compare them in one
+  plot. Each is drawn in its own way, and all extend to the latest
+  breakpoint among them, or to `max_time`.
 - The plotting guide shows a PLF, drawn with a figure of a `Pcf` and its
   integral.
 
