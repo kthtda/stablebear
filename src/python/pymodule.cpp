@@ -6,6 +6,7 @@
 
 #include "py_future.hpp"
 #include "functional/py_pcf.hpp"
+#include "functional/py_plf.hpp"
 #include "py_io.hpp"
 #include "functional/py_make_from_serial_content.hpp"
 #include "functional/py_norms.hpp"
@@ -120,6 +121,7 @@ NB_MODULE(SB_MODULE_NAME, m) {
   });
 
   sb_py::register_pcf(m);
+  sb_py::register_plf(m);
 
   register_bindings_stoppable_task<void>(m, "_void");
 

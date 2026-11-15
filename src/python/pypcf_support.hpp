@@ -2,8 +2,12 @@
 #define SB_PYPCF_SUPPORT_H
 
 #include <sbear/functional/pcf.hpp>
+#include <sbear/walk.hpp>
 
+#include <algorithm>
+#include <numeric>
 #include <sstream>
+#include <vector>
 
 #include "nb.hpp"
 #include "py_np_support.hpp"
@@ -65,17 +69,16 @@ namespace sb
         throw std::runtime_error("Input array should be Nx2 (supplied shape is " + ::shape_to_string(arr) + ").");
       }
 
-      auto sortByTime = [](const point_type& a, const point_type & b){
-        return a.t < b.t;
+      // Breakpoint times must be strictly increasing. Rather than silently
+      // sorting (which can reorder rows in a way that hides a misplaced or
+      // negative time), reject input that is not already ordered.
+      auto notIncreasing = [](const point_type& a, const point_type& b) {
+        return a.t >= b.t;
       };
-
-      // Breakpoints must be supplied in non-decreasing time order. Rather than
-      // silently sorting (which can reorder rows in a way that hides a
-      // misplaced/negative time), reject input that is not already ordered.
-      if (!std::is_sorted(points.begin(), points.end(), sortByTime))
+      if (std::adjacent_find(points.begin(), points.end(), notIncreasing) != points.end())
       {
         throw std::invalid_argument(
-          "Breakpoints must be given in non-decreasing time order.");
+          "Breakpoint times must be strictly increasing.");
       }
 
       // PCFs are defined on [0, inf), so the first (smallest) breakpoint time
@@ -90,6 +93,49 @@ namespace sb
       return sb::Pcf<Tt, Tv>(std::move(points));
     }
 
+    /// Evaluate `f` at each of `times`, giving a C-ordered array of the same
+    /// shape.
+    template <typename TFunction>
+    auto evaluate_at(const TFunction& f, sb_py::NpIn<typename TFunction::time_type> times)
+    {
+      using Tt = typename TFunction::time_type;
+      using Tv = typename TFunction::value_type;
+
+      // Read the times in row-major order, whatever their strides
+      NumpyTensor<const Tt> in(times);
+      std::vector<Tt> flat_in;
+      flat_in.reserve(in.size());
+      sb::walk(in, [&](const std::vector<size_t>& idx) { flat_in.push_back(in(idx)); });
+      auto n = flat_in.size();
+
+      // Argsort
+      std::vector<size_t> order(n);
+      std::iota(order.begin(), order.end(), 0);
+      std::sort(order.begin(), order.end(), [&flat_in](size_t a, size_t b) {
+        return flat_in[a] < flat_in[b];
+      });
+
+      // Build sorted times and evaluate
+      std::vector<Tt> sorted_in(n);
+      for (size_t i = 0; i < n; ++i)
+      {
+        sorted_in[i] = flat_in[order[i]];
+      }
+
+      std::vector<Tv> sorted_out(n);
+      f.evaluate(sorted_in, sorted_out);
+
+      // Unsort results back to original order
+      auto result = sb_py::new_array<Tv>(in.shape());
+      Tv* out = result.data();
+      for (size_t i = 0; i < n; ++i)
+      {
+        out[order[i]] = sorted_out[i];
+      }
+
+      return result;
+    }
+
     /// A read-only (n, 2) view of the breakpoints of `pcf`, kept alive by
     /// the Python object `owner`.
     template <typename TPcf>
@@ -102,6 +148,31 @@ namespace sb
       return nb::ndarray<nb::numpy, const TVal>(
         reinterpret_cast<const TVal*>(pcf.points().data()),
         { pcf.points().size(), size_t{2} }, owner);
+    }
+
+    /// Bind what Pcf and Plf share: construction with no breakpoints or from
+    /// an (n, 2) array, which `construct` turns into a function, the array
+    /// view, size, and evaluation at a scalar or an array.
+    template <typename Cls, typename Construct>
+    void bind_piecewise_function(Cls& cls, Construct construct)
+    {
+      using TFunction = typename Cls::Type;
+      using Tt = typename TFunction::time_type;
+      using Tv = typename TFunction::value_type;
+
+      sb_py::bind_array_view(cls, [](const TFunction& self, nb::handle owner) {
+        return to_numpy(self, owner);
+      });
+      cls
+        .def(nb::init<>())
+        .def("__init__", [construct](TFunction* self, sb_py::NpIn<Tt> arr) {
+          new (self) TFunction(construct(arr));
+        })
+        .def("size", [](const TFunction& self) { return self.points().size(); })
+        .def("__call__", [](const TFunction& self, Tt t) -> Tv { return self.evaluate(t); })
+        .def("__call__", [](const TFunction& self, sb_py::NpIn<Tt> times) {
+          return evaluate_at(self, times);
+        });
     }
   }
 }

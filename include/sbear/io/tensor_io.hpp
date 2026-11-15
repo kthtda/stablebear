@@ -11,6 +11,7 @@
 #include "../timeseries.hpp"
 #include "../point_cloud.hpp"
 #include "../functional/pcf.hpp"
+#include "../functional/plf.hpp"
 #include "../persistence/barcode.hpp"
 
 #include <unordered_map>
@@ -103,6 +104,9 @@ namespace sb::io::detail
       Tensor<Pcf<int32_t, int32_t>>,
       Tensor<Pcf<int64_t, int64_t>>,
 
+      Tensor<Plf<float32_t, float32_t>>,
+      Tensor<Plf<float64_t, float64_t>>,
+
       Tensor<PointCloud<float32_t>>,
       Tensor<PointCloud<float64_t>>,
       Tensor<PointCloud<float32_t>, TensorProperty::Indexed>,
@@ -146,6 +150,9 @@ namespace sb::io::detail
 
       Pcf<int32_t, int32_t>,
       Pcf<int64_t, int64_t>,
+
+      Plf<float32_t, float32_t>,
+      Plf<float64_t, float64_t>,
 
       PointCloud<float32_t>,
       PointCloud<float64_t>,
@@ -262,6 +269,9 @@ namespace sb::io::detail
 
     else if constexpr (std::is_same_v<T, Pcf<int32_t, int32_t>>) { return TensorFormat{ .baseFormat = 101, .subFormat = 32 }; }
     else if constexpr (std::is_same_v<T, Pcf<int64_t, int64_t>>) { return TensorFormat{ .baseFormat = 101, .subFormat = 64 }; }
+
+    else if constexpr (std::is_same_v<T, Plf<float32_t, float32_t>>) { return TensorFormat{ .baseFormat = 110, .subFormat = 32 }; }
+    else if constexpr (std::is_same_v<T, Plf<float64_t, float64_t>>) { return TensorFormat{ .baseFormat = 110, .subFormat = 64 }; }
 
     else if constexpr (std::is_same_v<T, PointCloud<float32_t>>) { return TensorFormat{ .baseFormat = 1000, .subFormat = 32 }; }
     else if constexpr (std::is_same_v<T, PointCloud<float64_t>>) { return TensorFormat{ .baseFormat = 1000, .subFormat = 64 }; }

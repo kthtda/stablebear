@@ -39,6 +39,29 @@ def plot_overlaid():
 # -- docs snippet end overlaid --
 
 
+# -- docs snippet start plf --
+def plot_plf(pcf_color="steelblue", plf_color="orangered"):
+    from stablebear.plotting import plot
+
+    f = sb.Pcf([[0.0, 2.0], [1.0, -1.0], [3.0, 0.5]])
+    F = f.integrate()
+
+    fig, ax = plt.subplots(figsize=(5, 2.5))
+    plot([f, F], ax=ax, max_time=7)
+    f_line, F_line = ax.lines
+    f_line.set(color=pcf_color, linestyle="--", linewidth=1.5, label="f")
+    F_line.set(color=plf_color, linewidth=2, label="F, the integral of f")
+    breakpoints = F.to_numpy()
+    ax.plot(breakpoints[:, 0], breakpoints[:, 1], "o", color=plf_color,
+            label="breakpoints of F")
+    ax.axhline(0, color="gray", linewidth=0.5)
+    ax.set_xlabel("t")
+    ax.legend(fontsize="small")
+    fig.tight_layout()
+    return fig
+# -- docs snippet end plf --
+
+
 # -- docs snippet start arithmetic --
 def plot_arithmetic():
     f = sb.Pcf(np.array([[0, 1], [1, 3], [3, 1]], dtype=np.float32))
@@ -368,6 +391,7 @@ if __name__ == "__main__":
         ("gallery_single_pcf", lambda: plot_single_pcf()),
         ("gallery_overlaid", lambda: plot_overlaid()),
         ("gallery_arithmetic", lambda: plot_arithmetic()),
+        ("gallery_plf", lambda: plot_plf("steelblue", "orangered")),
         ("gallery_mean_highlight", lambda: plot_mean_highlight("b", "r")),
         ("gallery_barcode", lambda: plot_barcode_example("steelblue", "orangered")),
         ("gallery_barcode_colors", lambda: plot_barcode_colors()),
@@ -381,6 +405,7 @@ if __name__ == "__main__":
         ("gallery_single_pcf", lambda: plot_single_pcf()),
         ("gallery_overlaid", lambda: plot_overlaid()),
         ("gallery_arithmetic", lambda: plot_arithmetic()),
+        ("gallery_plf", lambda: plot_plf("#5dade2", "#ff6b6b")),
         ("gallery_mean_highlight", lambda: plot_mean_highlight("#5dade2", "#ff6b6b")),
         ("gallery_barcode", lambda: plot_barcode_example("#5dade2", "#ff6b6b")),
         ("gallery_barcode_colors", lambda: plot_barcode_colors()),

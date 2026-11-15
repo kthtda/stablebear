@@ -18,14 +18,24 @@ Pcf = sb.Pcf
 def test_unsorted_input_rejected():
     # Breakpoints out of time order are no longer silently sorted; they are
     # rejected so a misplaced/negative time can never slip in unnoticed.
-    with pytest.raises(ValueError, match="non-decreasing time order"):
+    with pytest.raises(ValueError, match="strictly increasing"):
         Pcf(np.array([[2.0, 2.0], [0.0, 1.0]], dtype=np.float64))
 
 
 def test_unsorted_negative_time_rejected():
     # A negative time on a later row makes the input unsorted -> rejected.
-    with pytest.raises(ValueError, match="non-decreasing time order"):
+    with pytest.raises(ValueError, match="strictly increasing"):
         Pcf(np.array([[0.0, 1.0], [2.0, 2.0], [-1.0, 99.0]], dtype=np.float64))
+
+
+def test_repeated_time_rejected():
+    with pytest.raises(ValueError, match="strictly increasing"):
+        Pcf(np.array([[0.0, 1.0], [2.0, 2.0], [2.0, 3.0]], dtype=np.float64))
+
+
+def test_intpcf_repeated_time_rejected():
+    with pytest.raises(ValueError, match="strictly increasing"):
+        Pcf(np.array([[0, 1], [2, 2], [2, 3]], dtype=np.int64))
 
 
 def test_negative_first_time_rejected():

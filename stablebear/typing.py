@@ -61,6 +61,12 @@ pcf32i = dtype("pcf32i", "32-bit integer piecewise constant function dtype.")
 #: 64-bit integer piecewise constant function dtype.
 pcf64i = dtype("pcf64i", "64-bit integer piecewise constant function dtype.")
 
+# PLF dtypes
+#: 32-bit piecewise linear function dtype.
+plf32 = dtype("plf32", "32-bit piecewise linear function dtype.")
+#: 64-bit piecewise linear function dtype.
+plf64 = dtype("plf64", "64-bit piecewise linear function dtype.")
+
 # Point cloud dtypes
 #: 32-bit point cloud dtype.
 pcloud32 = dtype("pcloud32", "32-bit point cloud dtype.")

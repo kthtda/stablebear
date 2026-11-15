@@ -2,7 +2,7 @@
 Plotting
 ========
 
-The :py:func:`~stablebear.plotting.plot` function provides a quick way to visualize PCFs using matplotlib.
+The :py:func:`~stablebear.plotting.plot` function provides a quick way to visualize PCFs and PLFs using matplotlib.
 
 A single PCF
 ============
@@ -44,6 +44,47 @@ Pass a list, tuple, or 1-D PCF tensor to plot all elements at once. Use
       :language: python
       :start-after: docs snippet start overlaid --
       :end-before: docs snippet end overlaid --
+
+Piecewise linear functions
+==========================
+
+:py:func:`~stablebear.plotting.plot` draws a PLF as straight lines through
+its breakpoints. With ``max_time``, the line continues along the last
+segment to that time, as the PLF itself does (see :doc:`concepts`). A list
+may mix PCFs and PLFs, so a PCF can be compared with its integral from
+:py:meth:`~stablebear.functional.pcf.Pcf.integrate`. Each function extends
+to ``max_time``::
+
+   from stablebear.plotting import plot
+
+   f = sb.Pcf([[0.0, 2.0], [1.0, -1.0], [3.0, 0.5]])
+   F = f.integrate()
+
+   fig, ax = plt.subplots()
+   plot([f, F], ax=ax, max_time=7)
+
+.. image:: _static/gallery_plf_light.png
+   :width: 60%
+   :class: only-light
+   :alt: A PCF drawn as steps and its integral drawn as a polygonal line
+
+.. image:: _static/gallery_plf_dark.png
+   :width: 60%
+   :class: only-dark
+   :alt: A PCF drawn as steps and its integral drawn as a polygonal line
+
+.. dropdown:: Show code
+   :color: secondary
+
+   .. literalinclude:: _static/gen_plotting_gallery.py
+      :language: python
+      :start-after: docs snippet start plf --
+      :end-before: docs snippet end plf --
+
+The integral rises with slope 2 while the PCF is 2, falls with slope
+:math:`-1`, and then rises with slope 0.5, the last value of the PCF. Its
+last breakpoint, at time 6, has no counterpart in the PCF: it gives the
+last segment that slope, which the line continues to time 7.
 
 PCF arithmetic
 ==============

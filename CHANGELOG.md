@@ -1,3 +1,13 @@
+## Unreleased
+
+### Breaking changes
+
+* **`Pcf` rejects repeated times** — Constructing a `Pcf` raises `ValueError` when two breakpoints have the same time. Previously the times only had to be non-decreasing. ([#253](https://github.com/kthtda/stablebear/issues/253))
+
+### New features
+
+* **Piecewise linear functions** — `Plf` represents a continuous piecewise linear function, which continues its last segment after its last breakpoint. `Pcf.integrate` and `PcfTensor.integrate` return integrals of PCFs as PLFs, and `PlfTensor`, of dtype `plf32` or `plf64`, holds tensors of them. PLFs and PLF tensors can be evaluated, as PCFs can, and `plotting.plot` draws PLFs, alone or together with PCFs. ([#253](https://github.com/kthtda/stablebear/issues/253))
+
 ## 0.6.0
 
 ### Breaking changes

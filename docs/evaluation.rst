@@ -5,8 +5,8 @@ Evaluation & Reductions
 Evaluation
 ==========
 
-PCF tensors are callable — every element can be evaluated at one or more times
-in a single call.
+PCF and PLF tensors are callable — every element can be evaluated at one or
+more times in a single call.
 
 Consider a small example with two PCFs::
 
@@ -120,6 +120,21 @@ returns a tensor of the same type::
 
    t = sb.FloatTensor(np.array([1, 2, 4], dtype=np.float32))
    result = X(t)  # returns a FloatTensor of shape (2, 2, 3)
+
+PLF tensors
+-----------
+
+A :py:class:`~stablebear.base_tensor.PlfTensor` is evaluated in the same way,
+with the same result shapes. Each PLF interpolates between its breakpoints
+and continues its last segment after the last one
+(see :doc:`concepts`)::
+
+   f = sb.Plf([[0, 0], [1, 2], [3, 1]])     # continues with slope -1/2
+   g = sb.Plf([[0, 0], [1, 2], [3, 1], [4, 1]])  # flat after time 4
+
+   P = sb.PlfTensor([f, g])
+   P(5.0)
+   # array([0., 1.])
 
 Time complexity
 ---------------

@@ -2,9 +2,9 @@
 Saving and loading
 ==================
 
-stablebear provides a binary format for saving and loading numeric, PCF,
+stablebear provides a binary format for saving and loading numeric, PCF, PLF,
 nested, point-cloud, barcode, distance-matrix, symmetric-matrix, and time
-series tensors. Standalone ``Pcf``, ``PointCloud``, ``Barcode``,
+series tensors. Standalone ``Pcf``, ``Plf``, ``PointCloud``, ``Barcode``,
 ``DistanceMatrix``, ``SymmetricMatrix``, and ``TimeSeries`` objects use the
 same API.
 
@@ -39,8 +39,9 @@ Standalone objects can be saved and loaded directly::
 Pickle support
 ==============
 
-All tensor types and standalone data objects (``Pcf``, ``PointCloud``,
-``Barcode``, ``DistanceMatrix``, and ``SymmetricMatrix``) support Python's
+All tensor types and standalone data objects (``Pcf``, ``Plf``,
+``PointCloud``, ``Barcode``, ``DistanceMatrix``, and ``SymmetricMatrix``)
+support Python's
 ``pickle`` protocol. This means they work with ``pickle.dumps``/``pickle.loads``,
 ``copy.deepcopy``, and multiprocessing::
 

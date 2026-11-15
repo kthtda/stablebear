@@ -487,6 +487,7 @@ SET(SB_HEADER_FILES
     distances.hpp
     version.hpp
     functional/pcf.hpp
+    functional/plf.hpp
     functional/piecewise_function.hpp
     functional/time_point.hpp
     functional/rectangle.hpp
@@ -504,6 +505,7 @@ SET(SB_HEADER_FILES
     io/io_stream_base.hpp
     io/barcode_io.hpp
     io/pcf_io.hpp
+    io/plf_io.hpp
     io/point_io.hpp
     io/point_cloud_io.hpp
     io/tensor_io.hpp
@@ -512,6 +514,7 @@ SET(SB_HEADER_FILES
     algorithms/functional/reduce.hpp
     algorithms/functional/matrix_integrate.hpp
     algorithms/functional/matrix_reduce.hpp
+    algorithms/functional/tensor_integrate.hpp
     algorithms/minimum_spanning_tree.hpp
     algorithms/subdivide.hpp
     algorithms/union_find.hpp
@@ -568,13 +571,14 @@ SET(SB_PY_SOURCES
     py_np_support.hpp
     py_future.hpp
     functional/py_pcf.hpp functional/py_pcf.cpp
+    functional/py_plf.hpp functional/py_plf.cpp
     py_np_tensor_convert.hpp py_np_tensor_convert.cpp
     functional/py_make_from_serial_content.hpp functional/py_make_from_serial_content.cpp
     functional/py_distance.hpp functional/py_distance.cpp
     functional/py_inner_product.hpp functional/py_inner_product.cpp
     functional/py_norms.hpp functional/py_norms.cpp
     functional/py_reductions.hpp functional/py_reductions.cpp
-    py_tensor.hpp py_tensor.cpp py_tensor_int.cpp py_tensor_pcf.cpp
+    py_tensor.hpp py_tensor.cpp py_tensor_int.cpp py_tensor_pcf.cpp py_tensor_plf.cpp
     py_point_cloud.hpp py_point_cloud.cpp
     py_io.hpp py_io.cpp
     py_symmetric_matrix.hpp py_symmetric_matrix.cpp
@@ -816,6 +820,7 @@ if (BUILD_TESTER)
       test/test_io_stream.cpp
       test/test_io_readwrite.cpp
       test/test_pcf_algebra_and_norms.cpp
+      test/test_plf.cpp
       test/test_tensor_io_core.cpp
       test/test_barcode_and_stable_rank.cpp
       test/test_linkage_to_barcode.cpp

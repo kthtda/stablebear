@@ -49,6 +49,7 @@ namespace sb_py
   // compile in parallel.
   void register_tensor_int_bindings(nb::module_& m);
   void register_tensor_pcf_bindings(nb::module_& m);
+  void register_tensor_plf_bindings(nb::module_& m);
 
   template <typename T>
   struct scalar_of
@@ -630,7 +631,7 @@ namespace sb_py
       });
     }
 
-    if constexpr (sb::PcfLike<T>)
+    if constexpr (sb::Evaluable<T, Tt, Tv>)
     {
       cls.def("__call__", [](const TTensor& self, Tt t) {
         return sb_py::pcf_tensor_eval_scalar<Tt, Tv>(self, t);

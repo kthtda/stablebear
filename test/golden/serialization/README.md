@@ -40,7 +40,14 @@ channel's times, values, and values at listed times (or that a time is outside
 its domain) are explicit in `generate_timeseries_v3.py`. Generate a new corpus
 from `test/` with `python golden/serialization/generate_timeseries_v3.py`.
 
-Both of these generators write through `pinned_corpus.py`, which records the
+`0.6.1-pre-plf` pins 8 V3 PLF artifacts, binary and protocol-4 pickle, to the
+producer implementation commit recorded in its manifest: a standalone PLF and
+a 2x3 tensor of PLFs at both precisions. The PLFs have a sloped last segment,
+a flat last segment with a value that is not exact in binary, and a single
+breakpoint. Their breakpoints are explicit in `generate_plf_v3.py`. Generate a
+new corpus from `test/` with `python golden/serialization/generate_plf_v3.py`.
+
+These generators write through `pinned_corpus.py`, which records the
 producing commit in the manifest, writes every case as binary and pickle, and
 refuses to overwrite a corpus or run with uncommitted implementation changes.
 

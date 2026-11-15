@@ -3,8 +3,8 @@ Core Concepts
 ==============
 
 This page introduces the foundational ideas behind stablebear: piecewise
-constant functions, point clouds and distance matrices, collections stored in
-tensors, and the type system.
+constant and piecewise linear functions, point clouds and distance matrices,
+collections stored in tensors, and the type system.
 
 Piecewise constant functions
 ============================
@@ -29,7 +29,7 @@ In stablebear, a PCF is represented as an :math:`n \times 2` array of ``(time, v
 
 The value at each breakpoint is the value on the interval starting at that time and continuing until the next breakpoint (or until the end of the function's domain).
 
-The breakpoints must be listed in non-decreasing order of time, and the first time must be ``0`` (PCFs are defined on :math:`[0, \infty)`). Breakpoints given out of order, a first time other than ``0``, or any negative time raise a ``ValueError``.
+The breakpoint times must be strictly increasing, and the first time must be ``0`` (PCFs are defined on :math:`[0, \infty)`). Breakpoints given out of order, a repeated time, a first time other than ``0``, or any negative time raise a ``ValueError``.
 
 Why PCFs?
 ---------
@@ -103,6 +103,76 @@ Optional ``a`` and ``b`` parameters restrict the iteration to a sub-interval::
    large collections, use the dedicated functions (:py:func:`~stablebear.distance.pdist`,
    :py:func:`~stablebear.norms.lp_norm`, etc.) which are implemented in optimized
    C++/CUDA.
+
+Piecewise linear functions
+==========================
+
+A **piecewise linear function** (PLF) is continuous and linear between
+finitely many breakpoints. A PCF can only approximate a continuous quantity by
+steps, while a PLF represents a polygonal one exactly. The integral of a PCF
+is one example.
+
+A PLF is given by breakpoints :math:`(t_0, v_0), \ldots, (t_n, v_n)` with
+:math:`t_0 = 0` and strictly increasing times, stored as an :math:`n \times 2`
+array as for a PCF. Between consecutive breakpoints, the PLF interpolates
+linearly between their values. :py:class:`~stablebear.functional.plf.Plf`
+represents one::
+
+   f = sb.Plf([[0, 0], [1, 2], [3, 1]])
+
+   f(0.5)    # 1.0, halfway from 0 to 2
+   f(2.0)    # 1.5, halfway from 2 to 1
+
+Invalid breakpoints raise a ``ValueError``, as for a PCF.
+
+After its last breakpoint, a PLF continues its last segment. Here the segment
+from :math:`(1, 2)` to :math:`(3, 1)` has slope :math:`-1/2`, so the function
+keeps decreasing::
+
+   f(5.0)    # 0.0
+
+A PCF instead keeps its last value. To keep a PLF constant after its data
+ends, end it with a flat segment by repeating the last value at a later time::
+
+   g = sb.Plf([[0, 0], [1, 2], [3, 1], [4, 1]])
+   g(5.0)    # 1.0
+
+A PLF with a single breakpoint :math:`(0, v_0)` is the constant function
+:math:`v_0`.
+
+The times and values of a ``Plf`` are ``float32`` or ``float64``, given by
+its :py:attr:`~stablebear.functional.plf.Plf.dtype`. PLFs are more limited
+in their support than PCFs. They can be evaluated, stored in tensors, and
+obtained by integrating PCFs, but they have no arithmetic, reductions, or
+distances.
+
+Integrating a PCF
+-----------------
+
+:py:meth:`~stablebear.functional.pcf.Pcf.integrate` returns the integral
+:math:`F(t) = \int_0^t f(u)\,du` of a PCF :math:`f` as a PLF. On each interval
+where :math:`f` is constant, :math:`F` is linear with slope equal to the value
+of :math:`f`, so :math:`F` has the breakpoints of :math:`f`::
+
+   f = sb.Pcf([[0.0, 2.0], [1.0, -1.0], [3.0, 0.5]])
+   F = f.integrate()
+   F.to_numpy()
+   # array([[0. , 0. ],
+   #        [1. , 2. ],
+   #        [3. , 0. ],
+   #        [6. , 1.5]])
+
+The breakpoint at time 6 has no counterpart in :math:`f`. After time 3,
+:math:`F` grows with slope 0.5, the last value of :math:`f`, while the segment
+from 1 to 3 has slope :math:`-1`. Since a PLF continues its last segment, the
+extra breakpoint gives that segment slope 0.5. It is placed at
+:math:`t_n + \max(1, t_n)` after the last time :math:`t_n` of :math:`f`; any
+later time would give the same function. When the last value of :math:`f`
+already equals the slope of the segment before :math:`t_n`, no breakpoint is
+added.
+
+:py:meth:`~stablebear.base_tensor.PcfTensor.integrate` integrates every PCF of
+a tensor in parallel and returns a ``PlfTensor`` of the same shape.
 
 .. _point-clouds-and-distance-matrices:
 
@@ -252,6 +322,9 @@ There are several concrete tensor types, each corresponding to a dtype:
    * - ``IntPcfTensor``
      - ``pcf32i`` / ``pcf64i``
      - Integer-valued piecewise constant functions
+   * - ``PlfTensor``
+     - ``plf32`` / ``plf64``
+     - Piecewise linear functions
    * - ``FloatTensor``
      - ``float32`` / ``float64``
      - Floating-point scalars
@@ -330,6 +403,9 @@ The ``dtype`` parameter controls the element type of a tensor, analogous to NumP
    * - ``pcf32i`` / ``pcf64i``
      - int
      - Integer-valued piecewise constant functions
+   * - ``plf32`` / ``plf64``
+     - float
+     - Piecewise linear functions
    * - ``float32`` / ``float64``
      - float
      - Scalar floating-point values
@@ -360,6 +436,15 @@ PCF types
 Use ``pcf32`` for most work. Use ``pcf64`` when you need higher numerical precision.
 ``pcf32i`` and ``pcf64i`` provide integer-valued PCFs. They support construction,
 evaluation, arithmetic, and serialization, but not norms or distances.
+
+PLF types
+---------
+
+- :py:class:`~stablebear.typing.plf32` -- 32-bit floating-point piecewise linear functions
+- :py:class:`~stablebear.typing.plf64` -- 64-bit floating-point piecewise linear functions
+
+Tensors of PLFs support evaluation, indexing, assignment, copying, and
+stacking, but not arithmetic.
 
 Numeric types
 -------------

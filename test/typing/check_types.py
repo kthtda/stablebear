@@ -12,6 +12,15 @@ from stablebear.timeseries import Domain, TimeSeries, TimeSeriesDomainError, cut
 from stablebear.timeseries.date_time import DateTime, DateTimeTensor, TimeDelta, TimeDeltaTensor
 
 pcfs = sb.zeros((3,))
+pcf = sb.Pcf([[0.0, 1.0]])
+plf = sb.Plf([[0.0, 1.0]])
+
+assert_type(pcf.integrate(), sb.Plf)
+assert_type(sb.PcfTensor([pcf]).integrate(), sb.PlfTensor)
+assert_type(plf(0.5), float)
+assert_type(plf([0.5]), np.ndarray)
+assert_type(plf(np.zeros(3)), np.ndarray)
+assert_type(plf(sb.FloatTensor(np.zeros(3))), sb.FloatTensor)
 
 assert_type(sb.max_time(pcfs), sb.FloatTensor)
 assert_type(sb.mean(pcfs), sb.PcfTensor)

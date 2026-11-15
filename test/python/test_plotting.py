@@ -142,6 +142,84 @@ class TestPlot:
             plot(t, ax=ax)
 
 
+class TestPlotPlf:
+    def test_single_plf_draws_lines_through_breakpoints(self, ax):
+        f = sb.Plf([[0.0, 0.0],
+                    [1.0, 2.0],
+                    [3.0, 1.0]])
+
+        plot(f, ax=ax)
+
+        assert len(ax.lines) == 1
+        np.testing.assert_array_equal(ax.lines[0].get_xydata(), f.to_numpy())
+
+    @pytest.mark.parametrize("breakpoints", [
+        pytest.param([[0.0, 0.0], [1.0, 2.0], [3.0, 1.0]], id="sloped"),
+        pytest.param([[0.0, 0.0], [1.0, 2.0], [3.0, 2.0]], id="flat"),
+    ])
+    def test_max_time_adds_point_on_last_segment(self, ax, breakpoints):
+        f = sb.Plf(breakpoints)
+
+        plot(f, ax=ax, max_time=5.0)
+
+        np.testing.assert_array_equal(ax.lines[0].get_xydata(),
+                                      breakpoints + [[5.0, f(5.0)]])
+
+    def test_tensor_extends_every_plf_to_latest_breakpoint(self, ax):
+        f = sb.Plf([[0.0, 0.0],
+                    [1.0, 2.0]])
+        g = sb.Plf([[0.0, 1.0],
+                    [4.0, 3.0]])
+
+        plot(sb.PlfTensor([f, g]), ax=ax)
+
+        np.testing.assert_array_equal(ax.lines[0].get_xydata(),
+                                      [[0.0, 0.0], [1.0, 2.0], [4.0, f(4.0)]])
+        np.testing.assert_array_equal(ax.lines[1].get_xydata(), g.to_numpy())
+
+    @pytest.mark.parametrize("container_type", [list, tuple])
+    def test_list_draws_same_lines_as_tensor(self, ax, container_type):
+        f = sb.Plf([[0.0, 0.0],
+                    [1.0, 2.0]])
+        g = sb.Plf([[0.0, 1.0],
+                    [4.0, 3.0]])
+
+        plot(container_type([f, g]), ax=ax)
+        plot(sb.PlfTensor([f, g]), ax=ax)
+
+        assert len(ax.lines) == 4
+        for i in range(2):
+            np.testing.assert_array_equal(ax.lines[i].get_xydata(),
+                                          ax.lines[i + 2].get_xydata())
+
+    def test_mixed_list_draws_each_extended_to_latest_breakpoint(self, ax):
+        pcf = _make_pcf([[0, 1], [1, 2]])
+        plf = sb.Plf([[0.0, 0.0],
+                      [3.0, 1.5]])
+
+        plot([pcf, plf], ax=ax, auto_label=True)
+
+        assert len(ax.lines) == 2
+        np.testing.assert_array_equal(ax.lines[0].get_xydata(),
+                                      [[0, 1], [1, 2], [3, 2]])
+        assert ax.lines[0].get_drawstyle() == "steps-post"
+        np.testing.assert_array_equal(ax.lines[1].get_xydata(), plf.to_numpy())
+        assert ax.lines[1].get_drawstyle() == "default"
+        assert [line.get_label() for line in ax.lines] == ["f0", "f1"]
+
+    def test_mixed_list_with_max_time(self, ax):
+        pcf = _make_pcf([[0, 1], [1, 2]])
+        plf = sb.Plf([[0.0, 0.0],
+                      [3.0, 1.5]])
+
+        plot([plf, pcf], ax=ax, max_time=4.0)
+
+        np.testing.assert_array_equal(ax.lines[0].get_xydata(),
+                                      [[0.0, 0.0], [3.0, 1.5], [4.0, plf(4.0)]])
+        np.testing.assert_array_equal(ax.lines[1].get_xydata(),
+                                      [[0, 1], [1, 2], [4, 2]])
+
+
 # ---------- plot_barcode() tests ----------
 
 def _make_barcode(pairs, dtype=np.float64):

@@ -6,11 +6,12 @@ import numpy as np
 
 from .. import _sb_cpp as cpp
 from .._binary_io import _BinaryIoMixin
-from .._tensor_base import _array_for_protocol
-from ..typing import _assert_valid_dtype, _SB_TO_NP, _NP_TO_SB, float32, float64, int32, int64, pcf32, pcf32i, pcf64, pcf64i
+from ._piecewise import _PiecewiseFunction
+from .plf import Plf
+from ..typing import _assert_valid_dtype, _NP_TO_SB, float32, float64, int32, int64, pcf32, pcf32i, pcf64, pcf64i
 
 
-class Pcf(_BinaryIoMixin):
+class Pcf(_PiecewiseFunction, _BinaryIoMixin):
     r"""A piecewise constant function (PCF).
 
     A PCF is defined by a sequence of (time, value) pairs
@@ -19,8 +20,8 @@ class Pcf(_BinaryIoMixin):
     takes the value :math:`v_i` on the interval :math:`[t_i, t_{i+1})` for
     :math:`0 \leq i < n-1`, and :math:`v_{n-1}` on :math:`[t_{n-1}, \infty)`.
 
-    The breakpoints must be given in non-decreasing time order; a ``ValueError``
-    is raised otherwise. The first time must be :math:`t_0 = 0` (PCFs are
+    The breakpoint times must be strictly increasing; a ``ValueError`` is
+    raised otherwise. The first time must be :math:`t_0 = 0` (PCFs are
     defined on :math:`[0, \infty)`): a ``ValueError`` is raised if the first
     time is not zero — in particular if any time is negative.
 
@@ -138,6 +139,50 @@ class Pcf(_BinaryIoMixin):
         np_dtype = self._DTYPE_TO_NP.get(dtype, dtype)
         return Pcf(self.to_numpy().astype(np_dtype))
 
+    def integrate(self) -> Plf:
+        r"""The integral :math:`F(t) = \int_0^t f(u)\,du`, as a PLF.
+
+        The PLF has the PCF's breakpoints. After the last one,
+        :math:`t_n`, it grows with the PCF's last value :math:`v_n`. When
+        that differs from the slope of the segment before :math:`t_n`, the
+        PLF gets one more breakpoint, at :math:`t_n + \max(1, t_n)`, so
+        that its last segment has slope :math:`v_n`.
+
+        .. note::
+
+           Any time after :math:`t_n` would give the same function. The step
+           is :math:`\max(1, t_n)` rather than 1 because at large times, such
+           as from :math:`2^{24}` in ``float32``, :math:`t_n + 1` rounds to
+           :math:`t_n`.
+
+        Returns
+        -------
+        Plf
+            The integral, with the PCF's ``vtype`` as its dtype.
+
+        Raises
+        ------
+        TypeError
+            If the PCF's ``vtype`` is ``int32`` or ``int64``.
+        ValueError
+            If the PCF's times are not strictly increasing, which can happen
+            for a PCF from
+            :func:`~stablebear.serialize.from_serial_content`.
+
+        Examples
+        --------
+        >>> import stablebear as sb
+        >>> f = sb.Pcf([[0.0, 2.0], [1.0, -1.0], [3.0, 0.5]])
+        >>> f.integrate().to_numpy()
+        array([[0. , 0. ],
+               [1. , 2. ],
+               [3. , 0. ],
+               [6. , 1.5]])
+        """
+        if self.vtype not in (float32, float64):
+            raise TypeError("Only PCFs with vtype float32 or float64 can be integrated.")
+        return Plf._from_cpp(self._data.integrate(), self.vtype)
+
     def _binop(self, rhs, op):
         if isinstance(rhs, Pcf):
             if not _has_matching_types(self, rhs):
@@ -217,56 +262,6 @@ class Pcf(_BinaryIoMixin):
         self._data = self._data.__pow__(exponent)
         return self
 
-    def __call__(self, t):
-        """Evaluate the PCF at the given time(s).
-
-        Parameters
-        ----------
-        t : float, int, list, numpy.ndarray, or FloatTensor
-            The time(s) at which to evaluate the PCF. Can be a single scalar
-            or an array-like of times with arbitrary shape.
-
-        Returns
-        -------
-        float, numpy.ndarray, or FloatTensor
-            The PCF value(s) at the given time(s). A scalar input returns a
-            Python float. A list or ndarray input returns an ndarray of the
-            same shape. A ``FloatTensor`` input returns a tensor of the same
-            type and shape.
-
-        Raises
-        ------
-        ValueError
-            If any time is negative (PCFs are defined on :math:`[0, \\infty)`).
-
-        Examples
-        --------
-        >>> import numpy as np
-        >>> import stablebear as sb
-        >>> f = sb.Pcf(np.array([[0.0, 1.0], [1.0, 2.0], [3.0, 0.5]], dtype=np.float32))
-        >>> f(0.5)
-        1.0
-        >>> f(np.array([0.5, 1.5, 4.0]))
-        array([1. , 2. , 0.5], dtype=float32)
-        """
-        from ..base_tensor import FloatTensor
-
-        if isinstance(t, int | float):
-            return self._data(t)
-
-        return_tensor = None
-        if isinstance(t, FloatTensor):
-            return_tensor = type(t)
-            t = np.asarray(t)
-        elif isinstance(t, list):
-            t = np.asarray(t, dtype=_SB_TO_NP[self.ttype])
-
-        result = self._data(t)
-
-        if return_tensor is not None:
-            return return_tensor(result)
-        return result
-
     @property
     def size(self):
         """Number of breakpoints (time-value pairs) in this PCF."""
@@ -282,12 +277,6 @@ class Pcf(_BinaryIoMixin):
     def __str__(self):
         dtname = self._VTYPE_NAMES.get(self.vtype, str(self.vtype))
         return f"<PCF size={self._data.size()}, dtype={dtname}>"
-
-    def __array__(self, dtype=None, copy=None):
-        return _array_for_protocol(np.asarray(self._data), dtype, copy, copied=False)
-
-    def __eq__(self, other):
-        return np.array_equal(self.__array__(), np.asarray(other))
 
 
 _BACKEND_MAP = {

@@ -4,6 +4,8 @@
 #include <nanobind/ndarray.h>
 
 #include <sbear/functional/pcf.hpp>
+#include <sbear/functional/plf.hpp>
+#include <sbear/algorithms/functional/tensor_integrate.hpp>
 #include "../pypcf_support.hpp"
 #include <sbear/algorithm.hpp>
 #include <sbear/algorithms/functional/iterate_rectangles.hpp>
@@ -110,18 +112,11 @@ namespace
       using point_type = typename TPcf::point_type;
 
       nb::class_<sb::Pcf<Tt, Tv>> cls(m, ("Pcf" + suffix).c_str());
-      sb_py::bind_array_view(cls, [](const TPcf& self, nb::handle owner) {
-        return sb::detail::to_numpy(self, owner);
-      });
+      sb::detail::bind_piecewise_function(cls, &sb::detail::construct_pcf<Tt, Tv>);
       cls
-        .def(nb::init<>())
-        .def("__init__", [](TPcf* self, sb_py::NpIn<Tt> arr) {
-          new (self) TPcf(sb::detail::construct_pcf<Tt, Tv>(arr));
-        })
         .def("get_time_type", [](TPcf& /* self */) -> std::string { return STRINGIFY(Tt); })
         .def("get_value_type", [](TPcf& /* self */) -> std::string { return STRINGIFY(Tv); })
         .def("debug_print", &TPcf::debug_print) \
-        .def("size", [](const TPcf& self){ return self.points().size(); })
         .def("copy", [](const TPcf& self){ return TPcf(self); })
         .def("__add__", [](const TPcf& self, const TPcf& rhs) -> TPcf { return self + rhs; })
         .def("__add__", [](const TPcf& self, Tv c) -> TPcf { return self + c; })
@@ -149,48 +144,13 @@ namespace
           }
           return result;
         })
-        .def("__call__", [](const TPcf& self, Tt t) -> Tv { return self.evaluate(t); })
-        .def("__call__", [](const TPcf& self, nb::ndarray<const Tt, nb::c_contig, nb::device::cpu> times) {
-          // Evaluate in flat order and give the result the shape of times
-          std::vector<size_t> shape(times.ndim());
-          for (size_t i = 0; i < times.ndim(); ++i)
-          {
-            shape[i] = times.shape(i);
-          }
-          const Tt* in = times.data();
-          auto n = static_cast<size_t>(times.size());
-
-          // Argsort
-          std::vector<size_t> order(n);
-          std::iota(order.begin(), order.end(), 0);
-          std::sort(order.begin(), order.end(), [in](size_t a, size_t b) {
-            return in[a] < in[b];
-          });
-
-          // Build sorted times and evaluate
-          auto sorted_times = sb_py::new_array<Tt>({n});
-          NumpyTensor<Tt> sorted_in(sorted_times);
-          for (size_t i = 0; i < n; ++i)
-          {
-            sorted_in(i) = in[order[i]];
-          }
-
-          auto sorted_result = sb_py::new_array<Tv>({n});
-          NumpyTensor<Tv> sorted_out(sorted_result);
-          self.evaluate(sorted_in, sorted_out, n);
-
-          // Unsort results back to original order
-          auto result = sb_py::new_array<Tv>(shape);
-          Tv* out = result.data();
-          for (size_t i = 0; i < n; ++i)
-          {
-            out[order[i]] = sorted_out(i);
-          }
-
-          return result;
-        })
 
         ;
+
+      if constexpr (sb::FloatType<Tt> && sb::FloatType<Tv>)
+      {
+        cls.def("integrate", [](const TPcf& self) { return sb::integrate(self); });
+      }
 
       using RectT = sb::Rectangle<Tt, Tv>;
       nb::class_<RectT>(m, ("Rectangle" + suffix).c_str())
@@ -227,6 +187,13 @@ namespace
           nb::arg("a") = point_type::zero_time(),
           nb::arg("b") = point_type::infinite_time())
         ;
+
+      if constexpr (sb::FloatType<Tt> && sb::FloatType<Tv>)
+      {
+        backend.def_static("integrate_tensor", [](const sb::Tensor<TPcf>& pcfs) {
+          return sb::integrate(pcfs);
+        }, nb::call_guard<nb::gil_scoped_release>());
+      }
 
       sb_py::register_bindings_future<TPcf>(m, suffix);
     }

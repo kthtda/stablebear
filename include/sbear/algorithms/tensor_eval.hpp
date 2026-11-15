@@ -60,15 +60,15 @@ namespace sb
       return domain_values[a] < domain_values[b];
     });
 
-    Tensor<DomainT> sorted_domain(std::vector<size_t>{n});
+    std::vector<DomainT> sorted_domain(n);
     for (size_t i = 0; i < n; ++i)
-      sorted_domain(std::vector<size_t>{i}) = domain_values[order[i]];
+      sorted_domain[i] = domain_values[order[i]];
 
     // Evaluate each element with the linear-scan overload, then unsort.
     // Each element gets its own sorted_result buffer for thread safety.
     auto eval_elem = [&](const std::vector<size_t>& elem_idx) {
-      Tensor<CodomainT> sorted_result(std::vector<size_t>{n});
-      elems(elem_idx).evaluate(sorted_domain, sorted_result, n);
+      std::vector<CodomainT> sorted_result(n);
+      elems(elem_idx).evaluate(sorted_domain, sorted_result);
 
       auto combined_idx = elem_idx;
       combined_idx.resize(elem_idx.size() + domain_indices[0].size());
@@ -76,7 +76,7 @@ namespace sb
       for (size_t i = 0; i < n; ++i) {
         const auto& d_idx = domain_indices[order[i]];
         std::copy(d_idx.begin(), d_idx.end(), combined_idx.begin() + elem_idx.size());
-        out(combined_idx) = sorted_result(std::vector<size_t>{i});
+        out(combined_idx) = sorted_result[i];
       }
     };
 
