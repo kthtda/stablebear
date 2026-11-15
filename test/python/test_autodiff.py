@@ -85,3 +85,46 @@ def test_lp_norm_gradient_through_pcf_tensor_arithmetic(p, expr):
     weights = torch.tensor([0.3, -1.0, 2.0], dtype=torch.float64)
     a = torch.tensor(0.3, dtype=torch.float64, requires_grad=True)
     assert torch.autograd.gradcheck(lambda a: (weights * sb.lp_norm(expr(F, G, a), p=p)).sum(), a)
+
+
+def test_values_with_times_match_breakpoints():
+    times = np.array([0.0, 1.0, 3.0])
+    g = sb.Pcf(np.array([2.0, -1.0, 0.0]), times=times)
+    np.testing.assert_array_equal(g.to_numpy(), [[0.0, 2.0], [1.0, -1.0], [3.0, 0.0]])
+
+
+def test_values_and_times_from_float_tensors():
+    times = sb.FloatTensor(np.array([0.0, 1.0, 3.0], dtype=np.float32))
+    values = sb.FloatTensor(np.array([2.0, -1.0, 0.0], dtype=np.float32))
+    g = sb.Pcf(values, times=times)
+    assert g.vtype == sb.float32
+    np.testing.assert_array_equal(g.to_numpy(), [[0.0, 2.0], [1.0, -1.0], [3.0, 0.0]])
+
+
+@pytest.mark.parametrize("values, times", [
+    (np.zeros((3, 2)), np.array([0.0, 1.0, 2.0])),
+    (np.zeros(2), np.array([0.0, 1.0, 2.0])),
+    (torch.zeros(2), np.array([0.0, 1.0, 2.0])),
+])
+def test_values_and_times_of_different_shapes_raise(values, times):
+    with pytest.raises(ValueError, match="same length"):
+        sb.Pcf(values, times=times)
+
+
+def test_breakpoints_as_torch_tensor_raise():
+    with pytest.raises(TypeError, match="times="):
+        sb.Pcf(torch.tensor([[0.0, 1.0], [1.0, 0.0]]))
+
+
+@pytest.mark.parametrize("p", [1.0, 2.5])
+def test_lp_norm_gradient_wrt_pcf_values(p):
+    f, _ = _f_and_g()
+    times = np.array([0.0, 0.5, 2.0, 4.5, 8.0])
+    c = torch.tensor([0.7, -1.3, 0.4, 2.0], dtype=torch.float64, requires_grad=True)
+
+    def loss(c):
+        g = sb.Pcf(torch.cat([c, c.new_zeros(1)]), times=times)
+        # Tracked through g, which the static types cannot express.
+        return sb.lp_norm(f * g, p=p).sum() + sb.lp_norm(g, p=2).sum()  # pyright: ignore[reportAttributeAccessIssue]
+
+    assert torch.autograd.gradcheck(loss, c)

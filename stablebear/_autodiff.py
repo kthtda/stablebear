@@ -73,6 +73,31 @@ def _tracked(x: Any):
     return None
 
 
+def _content(times: np.ndarray, values: Any, adapter: Any, dtype: Any) -> np.ndarray:
+    """(n, 2) breakpoints with the framework `values`, or NaN while they are abstract."""
+    concrete = adapter.concrete(values)
+    if concrete is None:
+        concrete = np.full(len(times), np.nan)
+    return np.column_stack([times, concrete]).astype(dtype)
+
+
+def content_from_values(times: Any, values: Any) -> tuple[np.ndarray, Any]:
+    """(n, 2) breakpoints from separate times and values, and the framework
+    values if `values` is tracked, otherwise None."""
+    times = np.asarray(times)
+    tracked = _tracked(values)
+    tensor = tracked[0] if tracked is not None else np.asarray(values)
+    if times.ndim != 1 or tuple(tensor.shape) != times.shape:
+        raise ValueError(
+            "values and times must be 1-D of the same length "
+            f"(got shapes {tuple(tensor.shape)} and {times.shape})."
+        )
+    if tracked is None:
+        return np.column_stack([times, tensor]), None
+    dtype = np.float32 if times.dtype == np.float32 else np.float64
+    return _content(times, tensor, _framework(tensor), dtype), tensor
+
+
 def pcf_op(primal_op: Callable[..., Any], combine: Callable[..., Any], *operands: Any) -> Any:
     """An elementwise operation on PCFs, tensors of PCFs, and scalars.
 
@@ -120,11 +145,7 @@ def pcf_op(primal_op: Callable[..., Any], combine: Callable[..., Any], *operands
     sizes = np.array([len(t) for t in times])
     ends = np.cumsum(sizes)
     enumeration = np.stack([ends - sizes, ends], axis=-1).reshape(*shape, 2)
-    concrete = adapter.concrete(result_values)
-    content = np.column_stack([
-        np.concatenate(times),
-        concrete if concrete is not None else np.full(ends[-1], np.nan),
-    ]).astype(serials[0][0].dtype)
+    content = _content(np.concatenate(times), result_values, adapter, serials[0][0].dtype)
 
     if shape == ():
         from .functional.pcf import Pcf

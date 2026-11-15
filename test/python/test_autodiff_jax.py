@@ -60,3 +60,18 @@ def test_gradient_under_jit():
 
     a = jnp.asarray(0.3)
     np.testing.assert_allclose(jax.jit(jax.grad(loss))(a), jax.grad(loss)(a))
+
+
+def test_lp_norm_gradient_wrt_pcf_values_under_jit():
+    F, _ = _tensors()
+    f = F[0]
+    times = np.array([0.0, 0.5, 2.0, 4.5, 8.0])
+
+    def loss(c):
+        g = sb.Pcf(jnp.concatenate([c, jnp.zeros(1)]), times=times)
+        # Tracked through g, which the static types cannot express.
+        return (sb.lp_norm(f * g, p=1.0) + sb.lp_norm(g, p=2.0)).sum()  # pyright: ignore[reportAttributeAccessIssue]
+
+    c = jnp.asarray([0.7, -1.3, 0.4, 2.0])
+    check_grads(lambda c: loss(jnp.asarray(c)), (c,), order=1, modes=["rev"])
+    np.testing.assert_allclose(jax.jit(jax.grad(loss))(c), jax.grad(loss)(c))

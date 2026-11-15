@@ -33,11 +33,17 @@ class Pcf(_PiecewiseFunction, _BinaryIoMixin):
     arr : numpy.ndarray or Pcf or list
         Input data. If an ndarray or list, should have shape (n, 2) where each
         row is a (time, value) pair. Can also be an existing ``Pcf`` to copy.
+        If `times` is given, the values :math:`v_i` instead, with shape (n,);
+        these may be a PyTorch, JAX, or TensorFlow array, and the PCF then
+        carries gradients with respect to them through arithmetic and norms.
     dtype : type, optional
         Data type for the PCF (``pcf32``, ``pcf64``, ``pcf32i``, or ``pcf64i``).
         If ``None``, the dtype is inferred from the input array (e.g. a
         ``numpy.float32`` array produces a 32-bit PCF, a ``numpy.int32`` array
         produces a 32-bit integer PCF).
+    times : array_like, optional
+        The breakpoint times :math:`t_i`, with shape (n,), when `arr` holds
+        only the values. The times are constants for gradients.
 
     Examples
     --------
@@ -75,7 +81,22 @@ class Pcf(_PiecewiseFunction, _BinaryIoMixin):
         cpp.Pcf_i64_i64: (int64, int64),
     }
 
-    def __init__(self, arr: np.ndarray | Pcf | list[list[float | int] | tuple[float | int, ...]], dtype=None):
+    def __init__(
+        self,
+        arr: np.ndarray | Pcf | list[list[float | int] | tuple[float | int, ...]] | Any,
+        dtype=None,
+        *,
+        times: Any = None,
+    ):
+        tvalues = None
+        if times is not None:
+            arr, tvalues = _autodiff.content_from_values(times, arr)
+        elif _autodiff._framework(arr) is not None:
+            raise TypeError(
+                "To build a PCF from a PyTorch, JAX, or TensorFlow array, pass the values "
+                "and the times separately: Pcf(values, times=times)."
+            )
+
         if isinstance(arr, Pcf):
             self._data = arr._data
             self.ttype = arr.ttype
@@ -116,6 +137,9 @@ class Pcf(_PiecewiseFunction, _BinaryIoMixin):
             raise ValueError(
                 f"Tried to create PCF from unsupported input data of type {type(arr)}."
             )
+
+        if tvalues is not None:
+            self._tvalues = tvalues
 
     def _get_time_type(self):
         return self._data.get_time_type()
