@@ -1,6 +1,6 @@
 # Piecewise linear functions with evaluation: implementation plan
 
-Progress: 13 of 15 items, 30 of 34 points (88%)
+Progress: 14 of 15 items, 32 of 34 points (94%)
 
 Spec: [plf-spec.md](plf-spec.md) (#253)
 
@@ -113,7 +113,7 @@ Spec: [plf-spec.md](plf-spec.md) (#253)
   types listed in `docs/saving.rst`.
   Tests: `save` and `load` give back an equal `Plf` of each precision;
   pickle gives back an equal `Plf`.
-- [ ] **E2.** [2] Save, load, and pickle a `PlfTensor`: `Tensor<Plf_f32>`
+- [x] **E2.** [2] (f9faaeb9f) Save, load, and pickle a `PlfTensor`: `Tensor<Plf_f32>`
   and `Tensor<Plf_f64>` in `StreamableTensor`, `save_plf32_tensor` and
   `save_plf64_tensor`, the maps in `stablebear/io.py`, and
   `_BinaryIoMixin` on `PlfTensor`. Add `PlfTensor` to `docs/saving.rst`.
