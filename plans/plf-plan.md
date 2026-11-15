@@ -1,6 +1,6 @@
 # Piecewise linear functions with evaluation: implementation plan
 
-Progress: 11 of 15 items, 25 of 34 points (74%)
+Progress: 12 of 15 items, 27 of 34 points (79%)
 
 Spec: [plf-spec.md](plf-spec.md) (#253)
 
@@ -98,7 +98,7 @@ Spec: [plf-spec.md](plf-spec.md) (#253)
   `docs/api_base.rst`, `Plf` and `PlfTensor` aliases in `docs/conf.py`,
   and `assert_type`s for `Plf.__call__` and `Pcf.integrate` in
   `test/typing/check_types.py`.
-- [ ] **D2.** [2] User guide: a PLF section in `docs/concepts.rst`
+- [x] **D2.** [2] (985baf176) User guide: a PLF section in `docs/concepts.rst`
   covering how a PLF continues its last segment and integrating a `Pcf`,
   the dtype tables there and in `docs/tensors.rst`, PLF evaluation in
   `docs/evaluation.rst`, and a changelog entry.
