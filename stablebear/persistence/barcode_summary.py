@@ -1,5 +1,8 @@
 from typing import overload
 
+import numpy as np
+
+from .. import _autodiff
 from .. import _sb_cpp as cpp
 from ..async_task import _run_task
 from ..base_tensor import PcfTensor, _get_backend
@@ -42,6 +45,28 @@ def _barcode_to_pcf(bc, task_method, verbose=False, **kwargs):
     return out
 
 
+def _tracked_stable_rank(bc: BarcodeTensor) -> PcfTensor:
+    """The stable rank of a BarcodeTensor whose bars are a framework tensor.
+
+    With n bars, the stable rank is n on [0, l_1), then n - 1 on [l_1, l_2), and
+    so on down to 0 after l_n, for the sorted lifetimes l_1 <= ... <= l_n. So its
+    times are framework operations on the bars, which the framework
+    differentiates (sort included), and its values are constant. Equal
+    lifetimes give repeated times, which describe the same function.
+    """
+    bars = bc._tvalues
+    adapter = _autodiff._framework(bars)
+    n = int(bars.shape[0])
+    lifetimes = bars[:, 1] - bars[:, 0]
+    times = adapter.concat([adapter.as_tensor(np.zeros(1), like=bars), adapter.sort(lifetimes)])
+    content = np.column_stack([
+        _autodiff._concrete_column(times, n + 1, adapter), np.arange(n, -1, -1)
+    ]).astype(np.float32 if str(bars.dtype).endswith("float32") else np.float64)
+    out = _autodiff._pcfs_from_content(content, np.array([[0, n + 1]]))
+    out._ttimes = times
+    return out
+
+
 @overload
 def barcode_to_stable_rank(bc: Barcode, verbose: bool = False) -> Pcf: ...
 
@@ -76,6 +101,8 @@ def barcode_to_stable_rank(
         A single ``Pcf`` if the input is a single ``Barcode``, otherwise the
         same kind of container as the input, with the same shape.
     """
+    if isinstance(bc, BarcodeTensor) and bc._tvalues is not None:
+        return _tracked_stable_rank(bc)
     return _barcode_to_pcf(
         bc, "spawn_barcode_to_stable_rank_task", verbose
     )

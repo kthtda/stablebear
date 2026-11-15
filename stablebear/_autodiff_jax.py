@@ -39,6 +39,10 @@ def concat(xs: list) -> jax.Array:
     return jnp.concatenate(xs)
 
 
+def sort(x: Any) -> jax.Array:
+    return jnp.sort(x)
+
+
 def apply(primal: Callable[..., Any], vjp: Callable[..., Any], *params: Any, out: Any = None) -> jax.Array:
     if out is None:
         raise TypeError("This operation does not support JAX: it does not declare the shape of its result.")

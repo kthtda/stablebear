@@ -288,6 +288,39 @@ def test_homological_kernel_gradient(fw, wrt):
     _assert_gradient_matches_finite_differences(fw, loss, X if wrt == "X" else Y)
 
 
+def test_stable_rank_of_framework_kernel_matches_numpy(fw):
+    X, Y = _kernel_points()
+    out = sb.persistence.barcode_to_stable_rank(sb.persistence.compute_homological_kernel(fw.tensor(X), fw.tensor(Y)))
+    expected = sb.persistence.barcode_to_stable_rank(sb.persistence.compute_homological_kernel(X, Y))
+    t = np.linspace(0.0, 4.0, 81)
+    np.testing.assert_allclose(out[0](t), expected[0](t))
+
+
+@pytest.mark.parametrize("p", [1.0, 2.5])
+def test_stable_rank_norm_gradient_wrt_points(fw, p):
+    X, Y = _kernel_points()
+
+    def loss(P):
+        barcodes = sb.persistence.compute_homological_kernel(P, P * fw.tensor([1.0, 0.25]))
+        return fw.sum(sb.lp_norm(sb.persistence.barcode_to_stable_rank(barcodes), p=p))
+
+    _assert_gradient_matches_finite_differences(fw, loss, X)
+
+
+def test_stable_rank_distance_gradient_wrt_points(fw):
+    if fw.traces_abstractly:
+        pytest.skip("Arithmetic needs concrete times")
+    X, _ = _kernel_points()
+    target = sb.persistence.barcode_to_stable_rank(
+        sb.persistence.compute_homological_kernel(1.5 * X, 1.5 * X * np.array([1.0, 0.25])))
+
+    def loss(P):
+        barcodes = sb.persistence.compute_homological_kernel(P, P * fw.tensor([1.0, 0.25]))
+        return fw.sum(sb.lp_norm(sb.persistence.barcode_to_stable_rank(barcodes) - target, p=2.0))
+
+    _assert_gradient_matches_finite_differences(fw, loss, X)
+
+
 def test_breakpoints_as_framework_array_raise(fw):
     with pytest.raises(TypeError, match="times="):
         sb.Pcf(fw.tensor([[0.0, 1.0], [1.0, 0.0]]))

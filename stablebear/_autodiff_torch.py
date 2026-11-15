@@ -50,6 +50,10 @@ def concat(xs: list) -> torch.Tensor:
     return torch.cat(xs)
 
 
+def sort(x: torch.Tensor) -> torch.Tensor:
+    return torch.sort(x).values
+
+
 def apply(primal: Callable[..., Any], vjp: Callable[..., Any], *params: Any, out: Any = None) -> torch.Tensor:
     params = tuple(p if isinstance(p, torch.Tensor) else torch.as_tensor(p) for p in params)
     return _Op.apply(primal, vjp, *params)
