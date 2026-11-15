@@ -1,6 +1,6 @@
 # Piecewise linear functions with evaluation: implementation plan
 
-Progress: 5 of 15 items, 12 of 34 points (35%)
+Progress: 6 of 15 items, 14 of 34 points (41%)
 
 Spec: [plf-spec.md](plf-spec.md) (#253)
 
@@ -53,7 +53,7 @@ Spec: [plf-spec.md](plf-spec.md) (#253)
     shape and order; transposed and reversed arrays; list; `FloatTensor`
     of each precision; negative time raises.
 - [ ] **B3.** Integrate a `Pcf` into a `Plf`.
-  - [ ] **B3a.** [2] Constructing a `Pcf` requires strictly increasing
+  - [x] **B3a.** [2] (5f0f7b9b6) Constructing a `Pcf` requires strictly increasing
     times, in `construct_pcf` in `pypcf_support.hpp`, with the `Pcf`
     docstring, `docs/concepts.rst`, and a changelog entry.
     Tests: a repeated time raises `ValueError` for a float and an integer
