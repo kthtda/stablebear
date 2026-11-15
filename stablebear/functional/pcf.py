@@ -7,6 +7,7 @@ import numpy as np
 from .. import _sb_cpp as cpp
 from .._binary_io import _BinaryIoMixin
 from ._piecewise import _PiecewiseFunction
+from .plf import Plf
 from ..typing import _assert_valid_dtype, _NP_TO_SB, float32, float64, int32, int64, pcf32, pcf32i, pcf64, pcf64i
 
 
@@ -137,6 +138,50 @@ class Pcf(_PiecewiseFunction, _BinaryIoMixin):
         )
         np_dtype = self._DTYPE_TO_NP.get(dtype, dtype)
         return Pcf(self.to_numpy().astype(np_dtype))
+
+    def integrate(self) -> Plf:
+        r"""The integral :math:`F(t) = \int_0^t f(u)\,du`, as a PLF.
+
+        The PLF has the PCF's breakpoints. After the last one,
+        :math:`t_n`, it grows with the PCF's last value :math:`v_n`. When
+        that differs from the slope of the segment before :math:`t_n`, the
+        PLF gets one more breakpoint, at :math:`t_n + \max(1, t_n)`, so
+        that its last segment has slope :math:`v_n`.
+
+        .. note::
+
+           Any time after :math:`t_n` would give the same function. The step
+           is :math:`\max(1, t_n)` rather than 1 because at large times, such
+           as from :math:`2^{24}` in ``float32``, :math:`t_n + 1` rounds to
+           :math:`t_n`.
+
+        Returns
+        -------
+        Plf
+            The integral, with the PCF's ``vtype`` as its dtype.
+
+        Raises
+        ------
+        TypeError
+            If the PCF's ``vtype`` is ``int32`` or ``int64``.
+        ValueError
+            If the PCF's times are not strictly increasing, which can happen
+            for a PCF from
+            :func:`~stablebear.serialize.from_serial_content`.
+
+        Examples
+        --------
+        >>> import stablebear as sb
+        >>> f = sb.Pcf([[0.0, 2.0], [1.0, -1.0], [3.0, 0.5]])
+        >>> f.integrate().to_numpy()
+        array([[0. , 0. ],
+               [1. , 2. ],
+               [3. , 0. ],
+               [6. , 1.5]])
+        """
+        if self.vtype not in (float32, float64):
+            raise TypeError("Only PCFs with vtype float32 or float64 can be integrated.")
+        return Plf._from_cpp(self._data.integrate(), self.vtype)
 
     def _binop(self, rhs, op):
         if isinstance(rhs, Pcf):

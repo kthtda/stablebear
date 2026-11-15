@@ -1,6 +1,8 @@
 #ifndef SB_PLF_H
 #define SB_PLF_H
 
+#include "pcf.hpp"
+#include "../algorithms/functional/iterate_rectangles.hpp"
 #include "piecewise_function.hpp"
 
 #include <algorithm>
@@ -151,6 +153,51 @@ namespace sb
 
     std::vector<point_type> m_points;
   };
+
+  /**
+   * The integral F(t) = int_0^t f(u) du of a PCF, as a PLF with the PCF's
+   * breakpoints. When the PCF's last value differs from the slope of F's
+   * last segment, F gets one more breakpoint, max(1, t_n) after the last
+   * one, so that it continues with that value as its slope. Throws
+   * std::invalid_argument unless the PCF's times are strictly increasing.
+   */
+  template <FloatType Tt, FloatType Tv>
+  Plf<Tt, Tv> integrate(const Pcf<Tt, Tv>& f)
+  {
+    const auto& pts = f.points();
+    if (std::adjacent_find(pts.begin(), pts.end(),
+          [](const auto& a, const auto& b) { return a.t >= b.t; }) != pts.end())
+    {
+      throw std::invalid_argument("PCF breakpoint times must be strictly increasing to integrate.");
+    }
+
+    std::vector<TimePoint<Tt, Tv>> out;
+    out.reserve(pts.size() + 1);
+    out.emplace_back(static_cast<Tt>(0), static_cast<Tv>(0));
+
+    // The slope of F's last segment: the PCF's value on its last segment.
+    // For a single breakpoint, iterate_segments gives one segment of length
+    // zero, which adds nothing.
+    Tv slope = 0;
+    iterate_segments(pts.cbegin(), pts.cend(), static_cast<Tt>(0), pts.back().t,
+      [&out, &slope](const Segment<Tt, Tv>& seg) {
+        if (seg.right > seg.left)
+        {
+          slope = seg.value;
+          out.emplace_back(seg.right, out.back().v + seg.value * static_cast<Tv>(seg.right - seg.left));
+        }
+      });
+
+    if (pts.back().v != slope)
+    {
+      // Any time after t_n gives the same function. Step by max(1, t_n), not
+      // 1: at large times t_n + 1 rounds to t_n (from 2^24 in float32).
+      auto step = std::max(static_cast<Tt>(1), out.back().t);
+      out.emplace_back(out.back().t + step, out.back().v + pts.back().v * static_cast<Tv>(step));
+    }
+
+    return Plf<Tt, Tv>(std::move(out));
+  }
 
   using Plf_f32 = Plf<float32_t, float32_t>;
   using Plf_f64 = Plf<float64_t, float64_t>;

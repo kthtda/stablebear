@@ -252,3 +252,66 @@ class TestCall:
 
         with pytest.raises(ValueError):
             f(np.array([1.0, -1.0]))
+
+
+class TestIntegrate:
+    def test_breakpoints_hold_running_integral(self):
+        f = sb.Pcf([[0.0, 2.0],
+                    [1.0, -1.0],
+                    [3.0, -1.0]])
+
+        F = f.integrate()
+
+        npt.assert_array_equal(F.to_numpy(), [[0.0, 0.0],
+                                              [1.0, 2.0],
+                                              [3.0, 0.0]])
+
+    def test_different_last_value_adds_breakpoint_one_after_small_last_time(self):
+        f = sb.Pcf([[0.0, 2.0],
+                    [0.5, 4.0]])
+
+        F = f.integrate()
+
+        npt.assert_array_equal(F.to_numpy(), [[0.0, 0.0],
+                                              [0.5, 1.0],
+                                              [1.5, 5.0]])
+
+    def test_different_last_value_adds_breakpoint_last_time_after_large_last_time(self):
+        f = sb.Pcf([[0.0, 2.0],
+                    [1.0, -1.0],
+                    [3.0, 0.5]])
+
+        F = f.integrate()
+
+        npt.assert_array_equal(F.to_numpy(), [[0.0, 0.0],
+                                              [1.0, 2.0],
+                                              [3.0, 0.0],
+                                              [6.0, 1.5]])
+
+    def test_single_breakpoint_gives_line_through_zero(self):
+        f = sb.Pcf([[0.0, 3.0]])
+
+        F = f.integrate()
+
+        npt.assert_array_equal(F.to_numpy(), [[0.0, 0.0],
+                                              [1.0, 3.0]])
+
+    @pytest.mark.parametrize("pcf_dtype, expected", [
+        (sb.pcf32, sb.float32),
+        (sb.pcf64, sb.float64),
+    ])
+    def test_keeps_precision(self, pcf_dtype, expected):
+        f = sb.Pcf([[0.0, 2.0],
+                    [1.0, 2.0]], dtype=pcf_dtype)
+
+        F = f.integrate()
+
+        assert F.dtype is expected
+        assert F.to_numpy().dtype == f.to_numpy().dtype
+
+    def test_integer_pcf_raises(self):
+        f = sb.Pcf([[0, 2],
+                    [1, 3]], dtype=sb.pcf64i)
+
+        with pytest.raises(TypeError):
+            f.integrate()

@@ -91,6 +91,14 @@ class Plf(_PiecewiseFunction):
         self._data = self._DTYPE_TO_CPP[dtype](data)
         self._dtype = dtype
 
+    @classmethod
+    def _from_cpp(cls, data: Any, dtype: Dtype) -> Plf:
+        """Wrap a native Plf_f32_f32 or Plf_f64_f64 of the given dtype."""
+        plf = cls.__new__(cls)
+        plf._data = data
+        plf._dtype = dtype
+        return plf
+
     @property
     def dtype(self) -> Dtype:
         """The type of the times and values, ``float32`` or ``float64``."""

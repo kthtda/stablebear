@@ -4,6 +4,7 @@
 #include <nanobind/ndarray.h>
 
 #include <sbear/functional/pcf.hpp>
+#include <sbear/functional/plf.hpp>
 #include "../pypcf_support.hpp"
 #include <sbear/algorithm.hpp>
 #include <sbear/algorithms/functional/iterate_rectangles.hpp>
@@ -144,6 +145,11 @@ namespace
         })
 
         ;
+
+      if constexpr (sb::FloatType<Tt> && sb::FloatType<Tv>)
+      {
+        cls.def("integrate", [](const TPcf& self) { return sb::integrate(self); });
+      }
 
       using RectT = sb::Rectangle<Tt, Tv>;
       nb::class_<RectT>(m, ("Rectangle" + suffix).c_str())
