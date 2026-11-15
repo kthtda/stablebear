@@ -1,6 +1,6 @@
 # Piecewise linear functions with evaluation: implementation plan
 
-Progress: 14 of 15 items, 32 of 34 points (94%)
+Progress: 15 of 15 items, 34 of 34 points (100%)
 
 Spec: [plf-spec.md](plf-spec.md) (#253)
 
@@ -119,7 +119,7 @@ Spec: [plf-spec.md](plf-spec.md) (#253)
   `_BinaryIoMixin` on `PlfTensor`. Add `PlfTensor` to `docs/saving.rst`.
   Tests: `save` and `load` give back an equal 2-d tensor of each
   precision; an empty tensor; pickle.
-- [ ] **E3.** [2] Pin a V3 PLF corpus with
+- [x] **E3.** [2] (42dcb86ec) Pin a V3 PLF corpus with
   `test/golden/serialization/generate_plf_v3.py`, through
   `pinned_corpus.py`: a `Plf` and a 2-d `PlfTensor` at each precision,
   binary and pickle, with explicit expected breakpoints. Describe it in
