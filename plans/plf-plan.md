@@ -1,6 +1,6 @@
 # Piecewise linear functions with evaluation: implementation plan
 
-Progress: 7 of 15 items, 17 of 34 points (50%)
+Progress: 8 of 15 items, 20 of 34 points (59%)
 
 Spec: [plf-spec.md](plf-spec.md) (#253)
 
@@ -70,7 +70,7 @@ Spec: [plf-spec.md](plf-spec.md) (#253)
 
 ## Phase C: `PlfTensor`
 
-- [ ] **C1.** [3] Bind `Plf32Tensor` and `Plf64Tensor` in
+- [x] **C1.** [3] (dc0022579) Bind `Plf32Tensor` and `Plf64Tensor` in
   `src/python/py_tensor_plf.cpp`; add the `plf32` and `plf64` dtypes,
   `PlfTensor`, and the `zeros` and
   `tensor` dispatch. Constrain the scalar operators in
