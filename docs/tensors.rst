@@ -23,7 +23,7 @@ The most common way to create a tensor is :py:func:`~stablebear.tensor_create.ze
    # Scalar float tensor
    Z = sb.zeros((5, 5), dtype=sb.float64)
 
-For PCF dtypes, "zero" is a function that is identically zero. For numeric dtypes, it is the number 0. For point cloud dtypes, it is an empty point cloud. For a tensor of time series, of dtype ``sb.ts(value_type)``, it is a series without observations, to be replaced by assigning a series to the element.
+For PCF and PLF dtypes, "zero" is a function that is identically zero. For numeric dtypes, it is the number 0. For point cloud dtypes, it is an empty point cloud. For a tensor of time series, of dtype ``sb.ts(value_type)``, it is a series without observations, to be replaced by assigning a series to the element.
 
 Generating random data
 -----------------------
@@ -63,7 +63,7 @@ For non-numeric tensors, nested lists define the shape::
    # 2-D tensor from nested lists
    t2 = sb.PcfTensor([[f, g], [g, f]])  # shape (2, 2)
 
-This works the same way for ``IntPcfTensor`` and ``BarcodeTensor``.
+This works the same way for ``IntPcfTensor``, ``PlfTensor``, and ``BarcodeTensor``.
 The precision (32- or 64-bit) is inferred from the elements.
 An empty list produces a shape ``(0,)`` tensor.
 
@@ -214,7 +214,9 @@ dispatches to the right constructor based on ``dtype``::
 
 When passed a ``Pcf`` or a nested collection of PCFs, the factory infers a
 :py:class:`~stablebear.base_tensor.PcfTensor` or :py:class:`~stablebear.base_tensor.IntPcfTensor` from
-the PCF value dtype. A single ``Pcf`` becomes a one-element tensor.
+the PCF value dtype. A single ``Pcf`` becomes a one-element tensor. A nested
+collection of ``Plf`` objects gives a
+:py:class:`~stablebear.base_tensor.PlfTensor`.
 
 A list, or nested lists, of time series gives a
 :py:class:`~stablebear.timeseries.TimeSeriesTensor` with one series
