@@ -65,9 +65,8 @@ Spec: [plf-spec.md](plf-spec.md) (#253)
     Tests: breakpoints hold the running integral; a last value different
     from the one before adds a breakpoint at `t_n + max(1, t_n)`, both
     below and above `t_n = 1`; an equal one adds none; a
-    single-breakpoint `Pcf` gives a line through 0; a repeated time from
-    `from_serial_content` raises `ValueError`; `pcf32` gives a `float32`
-    `Plf`; an integer `Pcf` raises `TypeError`.
+    single-breakpoint `Pcf` gives a line through 0; `pcf32` gives a
+    `float32` `Plf`; an integer `Pcf` raises `TypeError`.
 
 ## Phase C: `PlfTensor`
 
