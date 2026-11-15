@@ -1,6 +1,6 @@
 # Piecewise linear functions with evaluation: implementation plan
 
-Progress: 5 of 14 items, 12 of 32 points (38%)
+Progress: 5 of 15 items, 12 of 34 points (35%)
 
 Spec: [plf-spec.md](plf-spec.md) (#253)
 
@@ -52,15 +52,22 @@ Spec: [plf-spec.md](plf-spec.md) (#253)
     sloped and a flat last segment; 2-d and unsorted arrays keep their
     shape and order; transposed and reversed arrays; list; `FloatTensor`
     of each precision; negative time raises.
-- [ ] **B3.** [3] Add `integrate(const Pcf&)` returning a `Plf` in
-  `include/sbear/functional/plf.hpp`, and bind it as `Pcf.integrate()`.
-  It is tested from Python, where the breakpoints are easier to read.
-  Tests: breakpoints hold the running integral; a last value different
-  from the one before adds a breakpoint at `t_n + max(1, t_n)`, both
-  below and above `t_n = 1`; an equal one adds none; a single-breakpoint
-  `Pcf` gives a line through 0; a repeated `Pcf` time gives one
-  breakpoint; `pcf32` gives a `float32` `Plf`; an integer `Pcf` raises
-  `TypeError`.
+- [ ] **B3.** Integrate a `Pcf` into a `Plf`.
+  - [ ] **B3a.** [2] Constructing a `Pcf` requires strictly increasing
+    times, in `construct_pcf` in `pypcf_support.hpp`, with the `Pcf`
+    docstring, `docs/concepts.rst`, and a changelog entry.
+    Tests: a repeated time raises `ValueError` for a float and an integer
+    `Pcf`; existing tests that built `Pcf`s with repeated times use
+    distinct ones.
+  - [ ] **B3b.** [3] Add `integrate(const Pcf&)` returning a `Plf` in
+    `include/sbear/functional/plf.hpp`, and bind it as `Pcf.integrate()`.
+    It is tested from Python, where the breakpoints are easier to read.
+    Tests: breakpoints hold the running integral; a last value different
+    from the one before adds a breakpoint at `t_n + max(1, t_n)`, both
+    below and above `t_n = 1`; an equal one adds none; a
+    single-breakpoint `Pcf` gives a line through 0; a repeated time from
+    `from_serial_content` raises `ValueError`; `pcf32` gives a `float32`
+    `Plf`; an integer `Pcf` raises `TypeError`.
 
 ## Phase C: `PlfTensor`
 

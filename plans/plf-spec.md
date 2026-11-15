@@ -65,9 +65,8 @@ A PLF is continuous: times are strictly increasing, so it cannot jump.
   gets one more breakpoint, at time $t_n + \max(1, t_n)$ with value
   $F(t_n) + v_n \cdot \max(1, t_n)$, so that its last segment has slope
   $v_n$. Stepping by $\max(1, t_n)$ rather than 1 keeps the new time
-  distinct from $t_n$ in float32 at large times. A `Pcf` may repeat a
-  time, which gives an interval of length zero; the `Plf` keeps one
-  breakpoint for it.
+  distinct from $t_n$ in float32 at large times. A `Pcf` whose times
+  are not strictly increasing throws `std::invalid_argument`.
 - `Plf` has no arithmetic. The scalar operators in
   `piecewise_function.hpp` are constrained to types that have the compound
   operator they call, so that a `Plf` does not appear to support them.
@@ -106,10 +105,15 @@ g(5.0)          # 1.0, after a final flat segment
 
 ## Integration: `Pcf.integrate()` and `PcfTensor.integrate()`
 
+- Constructing a `Pcf` raises `ValueError` for a repeated time, as it
+  does for decreasing times, so a `Pcf` has the strictly increasing times
+  that a `Plf` needs. `from_serial_content` builds `Pcf`s without this
+  check, so `integrate` checks the times again.
 - `Pcf.integrate()` returns the `Plf` $t \mapsto \int_0^t f(u)\,du$, of
   the same precision: `pcf32` gives a `float32` `Plf`, and `pcf64` a
   `float64` one.
-  An integer `Pcf` raises `TypeError`.
+  An integer `Pcf` raises `TypeError`, and one whose times are not
+  strictly increasing raises `ValueError`.
 
   ```python
   f = sb.Pcf([[0.0, 2.0], [1.0, -1.0], [3.0, 0.5]])
