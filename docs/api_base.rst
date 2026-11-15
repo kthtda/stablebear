@@ -11,6 +11,14 @@ pcf
    :undoc-members:
    :show-inheritance:
 
+plf
+---
+
+.. automodule:: stablebear.functional.plf
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 base_tensor
 -----------
 

@@ -1,13 +1,16 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Any
+from typing import TYPE_CHECKING, Any, overload
 
 import numpy as np
 
 from .. import _sb_cpp as cpp
 from ._piecewise import _PiecewiseFunction
 from ..typing import Dtype, _assert_valid_dtype, float32, float64
+
+if TYPE_CHECKING:
+    from ..base_tensor import FloatTensor, NumericTensor
 
 
 class Plf(_PiecewiseFunction):
@@ -23,9 +26,9 @@ class Plf(_PiecewiseFunction):
 
        After its last breakpoint, a PLF continues its last segment, with
        slope :math:`(v_n - v_{n-1}) / (t_n - t_{n-1})`. It does not stay at
-       :math:`v_n`, as a :class:`Pcf` does. To keep a PLF constant after its
-       data ends, end it with a flat segment by repeating the last value at
-       a later time.
+       :math:`v_n`, as a :class:`~stablebear.functional.pcf.Pcf` does. To
+       keep a PLF constant after its data ends, end it with a flat segment
+       by repeating the last value at a later time.
 
     Parameters
     ----------
@@ -90,6 +93,15 @@ class Plf(_PiecewiseFunction):
         data = np.asarray(arr, dtype=self._DTYPE_TO_NP[dtype])
         self._data = self._DTYPE_TO_CPP[dtype](data)
         self._dtype = dtype
+
+    @overload
+    def __call__(self, t: float) -> float: ...
+    @overload
+    def __call__(self, t: NumericTensor) -> FloatTensor: ...
+    @overload
+    def __call__(self, t: np.ndarray | Sequence[Any]) -> np.ndarray: ...
+    def __call__(self, t):
+        return super().__call__(t)
 
     @classmethod
     def _from_cpp(cls, data: Any, dtype: Dtype) -> Plf:
