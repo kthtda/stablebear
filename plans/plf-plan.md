@@ -1,6 +1,6 @@
 # Piecewise linear functions with evaluation: implementation plan
 
-Progress: 9 of 15 items, 22 of 34 points (65%)
+Progress: 10 of 15 items, 24 of 34 points (71%)
 
 Spec: [plf-spec.md](plf-spec.md) (#253)
 
@@ -87,7 +87,7 @@ Spec: [plf-spec.md](plf-spec.md) (#253)
   Tests: scalar on 1-d and 2-d tensors; array of times on a 1-d and 2-d
   tensor gives shape `T.shape + t.shape`; list; `FloatTensor`; the
   parallel path agrees with the serial one.
-- [ ] **C3.** [2] `PcfTensor.integrate()`, elementwise and parallel,
+- [x] **C3.** [2] (4ae017c99) `PcfTensor.integrate()`, elementwise and parallel,
   returning a `PlfTensor`.
   Tests: each element equals that `Pcf`'s `integrate()`; shape and
   precision are kept; an empty tensor gives an empty `PlfTensor`.
