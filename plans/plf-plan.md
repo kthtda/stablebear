@@ -1,6 +1,6 @@
 # Piecewise linear functions with evaluation: implementation plan
 
-Progress: 12 of 15 items, 27 of 34 points (79%)
+Progress: 13 of 15 items, 30 of 34 points (88%)
 
 Spec: [plf-spec.md](plf-spec.md) (#253)
 
@@ -105,7 +105,7 @@ Spec: [plf-spec.md](plf-spec.md) (#253)
 
 ## Phase E: Saving, loading, and pickling
 
-- [ ] **E1.** [3] Save, load, and pickle a `Plf`: `write_element` and
+- [x] **E1.** [3] (3554ddfc1) Save, load, and pickle a `Plf`: `write_element` and
   `read_element` in `include/sbear/io/plf_io.hpp`, base format 110 in
   `tensorFormatV3`, `Plf_f32` and `Plf_f64` in `StreamableObject`,
   `save_plf32_object` and `save_plf64_object` in `py_io.cpp`, the maps in
