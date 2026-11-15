@@ -244,6 +244,26 @@ class PcfTensor(_PcfTensorBase):
         self._data = data
         self.dtype = _PCF_CPP_TO_DTYPE[type(self._data)]
 
+    def integrate(self) -> PlfTensor:
+        """Integrate every PCF, as
+        :meth:`~stablebear.functional.pcf.Pcf.integrate` does.
+
+        The PCFs are integrated in parallel on the CPU.
+
+        Returns
+        -------
+        PlfTensor
+            A tensor of the same shape, of dtype ``plf32`` for a ``pcf32``
+            tensor and ``plf64`` for a ``pcf64`` one.
+
+        Raises
+        ------
+        ValueError
+            If the times of a PCF are not strictly increasing.
+        """
+        backend = cpp.Backend_f32_f32 if self.dtype is pcf32 else cpp.Backend_f64_f64
+        return PlfTensor(backend.integrate_tensor(self._data))
+
     def _to_py_tensor(self, data):
         return PcfTensor(data)
 

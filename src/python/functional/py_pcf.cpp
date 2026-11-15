@@ -5,6 +5,7 @@
 
 #include <sbear/functional/pcf.hpp>
 #include <sbear/functional/plf.hpp>
+#include <sbear/algorithms/functional/tensor_integrate.hpp>
 #include "../pypcf_support.hpp"
 #include <sbear/algorithm.hpp>
 #include <sbear/algorithms/functional/iterate_rectangles.hpp>
@@ -186,6 +187,13 @@ namespace
           nb::arg("a") = point_type::zero_time(),
           nb::arg("b") = point_type::infinite_time())
         ;
+
+      if constexpr (sb::FloatType<Tt> && sb::FloatType<Tv>)
+      {
+        backend.def_static("integrate_tensor", [](const sb::Tensor<TPcf>& pcfs) {
+          return sb::integrate(pcfs);
+        }, nb::call_guard<nb::gil_scoped_release>());
+      }
 
       sb_py::register_bindings_future<TPcf>(m, suffix);
     }

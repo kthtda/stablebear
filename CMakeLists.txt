@@ -513,6 +513,7 @@ SET(SB_HEADER_FILES
     algorithms/functional/reduce.hpp
     algorithms/functional/matrix_integrate.hpp
     algorithms/functional/matrix_reduce.hpp
+    algorithms/functional/tensor_integrate.hpp
     algorithms/minimum_spanning_tree.hpp
     algorithms/subdivide.hpp
     algorithms/union_find.hpp

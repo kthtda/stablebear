@@ -491,3 +491,49 @@ class TestPlfTensorCall:
             sb.system.set_parallel_eval_threshold(old)
 
         npt.assert_array_equal(parallel, serial)
+
+
+class TestPcfTensorIntegrate:
+    @staticmethod
+    def make(dtype=sb.pcf64):
+        f = sb.Pcf([[0.0, 2.0],
+                    [1.0, -1.0],
+                    [3.0, 0.5]], dtype=dtype)
+        g = sb.Pcf([[0.0, 1.0],
+                    [2.0, 1.0]], dtype=dtype)
+        h = sb.Pcf([[0.0, 3.0]], dtype=dtype)
+        return f, g, h
+
+    def test_each_element_is_integral_of_that_pcf(self):
+        f, g, h = self.make()
+        T = sb.PcfTensor([[f, g, h],
+                          [h, g, f]])
+
+        F = T.integrate()
+
+        assert isinstance(F, sb.PlfTensor)
+        assert F.shape == (2, 3)
+        for i in range(2):
+            for j in range(3):
+                assert F[i, j] == T[i, j].integrate()
+
+    @pytest.mark.parametrize("dtype, expected", [
+        (sb.pcf32, sb.plf32),
+        (sb.pcf64, sb.plf64),
+    ])
+    def test_keeps_precision(self, dtype, expected):
+        f, g, h = self.make(dtype=dtype)
+        T = sb.PcfTensor([f, g, h])
+
+        F = T.integrate()
+
+        assert F.dtype is expected
+
+    def test_empty_tensor_gives_empty_plf_tensor(self):
+        T = sb.zeros((0, 3), dtype=sb.pcf64)
+
+        F = T.integrate()
+
+        assert isinstance(F, sb.PlfTensor)
+        assert F.dtype is sb.plf64
+        assert F.shape == (0, 3)
