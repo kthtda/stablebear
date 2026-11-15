@@ -1,6 +1,6 @@
 # Piecewise linear functions with evaluation: implementation plan
 
-Progress: 15 of 15 items, 34 of 34 points (100%)
+Progress: 15 of 17 items, 34 of 38 points (89%)
 
 Spec: [plf-spec.md](plf-spec.md) (#253)
 
@@ -125,3 +125,17 @@ Spec: [plf-spec.md](plf-spec.md) (#253)
   binary and pickle, with explicit expected breakpoints. Describe it in
   the serialization golden README.
   Tests: every file loads to its expected breakpoints.
+
+## Phase F: Plotting
+
+- [ ] **F1.** [2] `plotting.plot` draws a `Plf`, a list or tuple of
+  `Plf`s, and a 1-d `PlfTensor` as lines through their breakpoints, and
+  `max_time` extends them along their last segment; update its docstring.
+  Tests: a single `Plf` draws its breakpoints; `max_time` adds the point
+  at `max_time` for a sloped and a flat last segment; a tensor extends
+  every PLF to the latest breakpoint; a list gives the same lines as the
+  `PlfTensor`; a list mixing `Pcf`s and `Plf`s raises `TypeError`.
+- [ ] **F2.** [2] Plotting guide: a PLF section in `docs/plotting.rst`
+  with a figure of a `Pcf` and its integral, from
+  `docs/_static/gen_plotting_gallery.py` with a code dropdown, and the
+  changelog entry mentions plotting.

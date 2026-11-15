@@ -151,6 +151,19 @@ g(5.0)          # 1.0, after a final flat segment
   with invalid breakpoints raises `ValueError` instead of giving an
   invalid PLF.
 
+## Plotting
+
+- `plotting.plot` also accepts a `Plf`, a list or tuple of `Plf`s, or a
+  1-d `PlfTensor`, and draws each PLF as straight lines through its
+  breakpoints, where it draws a `Pcf` as steps.
+- `max_time` extends the drawing along the continued last segment, to the
+  point $(t, f(t))$ at `max_time`. Without it, a single PLF ends at its
+  last breakpoint, and the PLFs of a tensor extend to the latest
+  breakpoint among them, as PCFs do.
+- A list or tuple that mixes `Pcf`s and `Plf`s raises `TypeError`.
+- The plotting guide shows a PLF, drawn with a figure of a `Pcf` and its
+  integral.
+
 ## Out of scope
 
 Tracked in follow-up issues:
