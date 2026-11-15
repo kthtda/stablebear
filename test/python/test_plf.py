@@ -4,6 +4,8 @@ import pytest
 
 import stablebear as sb
 
+from _round_trip import ROUND_TRIPS
+
 
 class TestConstruction:
     def test_array_gives_breakpoints(self):
@@ -537,3 +539,27 @@ class TestPcfTensorIntegrate:
         assert isinstance(F, sb.PlfTensor)
         assert F.dtype is sb.plf64
         assert F.shape == (0, 3)
+
+
+class TestSaveLoad:
+    @pytest.mark.parametrize("round_trip", ROUND_TRIPS)
+    @pytest.mark.parametrize("dtype", [sb.float32, sb.float64])
+    @pytest.mark.parametrize("breakpoints", [
+        pytest.param([[0.0, 0.0]], id="zero"),
+        pytest.param([[0.0, -1.5]], id="constant"),
+        pytest.param([[0.0, 0.0],
+                      [1.0, 2.0],
+                      [3.0, 1.0]], id="sloped-tail"),
+        pytest.param([[0.0, 0.1],
+                      [0.25, -3.0],
+                      [1e6, 7.0],
+                      [2e6, 7.0]], id="flat-tail"),
+    ])
+    def test_round_trip_gives_equal_plf(self, breakpoints, dtype, round_trip):
+        f = sb.Plf(breakpoints, dtype=dtype)
+
+        g = round_trip(f)
+
+        assert isinstance(g, sb.Plf)
+        assert g.dtype is dtype
+        assert g == f

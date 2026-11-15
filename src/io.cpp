@@ -81,6 +81,9 @@ namespace sb
     else if (format.matches_type<Pcf<int32_t, int32_t>>(reader.format_version())) { return io::detail::read_element<Pcf<int32_t, int32_t>>(is); }
     else if (format.matches_type<Pcf<int64_t, int64_t>>(reader.format_version())) { return io::detail::read_element<Pcf<int64_t, int64_t>>(is); }
 
+    else if (format.matches_type<Plf<float32_t, float32_t>>(reader.format_version())) { return io::detail::read_element<Plf<float32_t, float32_t>>(is); }
+    else if (format.matches_type<Plf<float64_t, float64_t>>(reader.format_version())) { return io::detail::read_element<Plf<float64_t, float64_t>>(is); }
+
     else if (format.matches_type<PointCloud<float32_t>>(reader.format_version())) { return io::detail::read_point_cloud<float32_t>(reader); }
     else if (format.matches_type<PointCloud<float64_t>>(reader.format_version())) { return io::detail::read_point_cloud<float64_t>(reader); }
 

@@ -6,6 +6,7 @@
 #include "io_stream_base.hpp"
 #include "barcode_io.hpp"
 #include "pcf_io.hpp"
+#include "plf_io.hpp"
 #include "point_io.hpp"
 #include "point_cloud_io.hpp"
 #include "compressed_matrix_io.hpp"

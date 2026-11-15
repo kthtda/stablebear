@@ -7,6 +7,7 @@ from .persistence.ph_tensor import BarcodeTensor
 from .distance_matrix import DistanceMatrix, DistanceMatrixTensor
 from .symmetric_matrix import SymmetricMatrix, SymmetricMatrixTensor
 from .functional.pcf import Pcf
+from .functional.plf import Plf
 from .base_tensor import (
     BoolTensor,
     FloatTensor,
@@ -17,6 +18,7 @@ from .base_tensor import (
 )
 from .nested_tensor import NestedTensor
 from .point_cloud import PointCloud, PointCloudTensor
+from .typing import float32, float64
 from .timeseries.series import _SERIES_NATIVE, _SERIES_TENSOR_TO_DTYPE, TimeSeries, TimeSeriesTensor
 
 
@@ -118,6 +120,8 @@ def _init_object_save_dispatch():
         cpp.Pcf_f64_f64: cpp.IoOps.save_pcf64_object,
         cpp.Pcf_i32_i32: cpp.IoOps.save_pcf32i_object,
         cpp.Pcf_i64_i64: cpp.IoOps.save_pcf64i_object,
+        cpp.Plf_f32_f32: cpp.IoOps.save_plf32_object,
+        cpp.Plf_f64_f64: cpp.IoOps.save_plf64_object,
         cpp.PointCloud32: cpp.IoOps.save_point_cloud32_object,
         cpp.PointCloud64: cpp.IoOps.save_point_cloud64_object,
         cpp_p.Barcode32: cpp.IoOps.save_barcode32_object,
@@ -145,6 +149,8 @@ def _init_object_load_dispatch():
         cpp.Pcf_f64_f64: Pcf,
         cpp.Pcf_i32_i32: Pcf,
         cpp.Pcf_i64_i64: Pcf,
+        cpp.Plf_f32_f32: lambda data: Plf._from_cpp(data, float32),
+        cpp.Plf_f64_f64: lambda data: Plf._from_cpp(data, float64),
         cpp.PointCloud32: PointCloud,
         cpp.PointCloud64: PointCloud,
         cpp_p.Barcode32: Barcode,
@@ -178,18 +184,18 @@ def _load_object(file):
 def save(item, file):
     """Save a tensor or object to a file in stablebear's binary format.
 
-    All tensor types, standalone objects (Pcf, PointCloud, Barcode,
+    All tensor types, standalone objects (Pcf, Plf, PointCloud, Barcode,
     DistanceMatrix, SymmetricMatrix), and time series are supported.
 
     Parameters
     ----------
-    item : Tensor or Pcf or PointCloud or Barcode or DistanceMatrix or SymmetricMatrix or TimeSeries
+    item : Tensor or Pcf or Plf or PointCloud or Barcode or DistanceMatrix or SymmetricMatrix or TimeSeries
         The item to save.
     file : str or typing.BinaryIO
         A file path or an open file object in binary write mode.
     """
     is_object = isinstance(
-        item, (Pcf, PointCloud, Barcode, DistanceMatrix, SymmetricMatrix, TimeSeries)
+        item, (Pcf, Plf, PointCloud, Barcode, DistanceMatrix, SymmetricMatrix, TimeSeries)
     )
     save_fn = _save_object if is_object else _save
     if isinstance(file, str):
@@ -211,7 +217,7 @@ def load(file) -> Any:  # Any: the type is whatever the file holds.
 
     Returns
     -------
-    Tensor or Pcf or PointCloud or Barcode or DistanceMatrix or SymmetricMatrix or TimeSeries
+    Tensor or Pcf or Plf or PointCloud or Barcode or DistanceMatrix or SymmetricMatrix or TimeSeries
         The loaded item.
     """
     if isinstance(file, str):

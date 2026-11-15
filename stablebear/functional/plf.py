@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any, overload
 import numpy as np
 
 from .. import _sb_cpp as cpp
+from .._binary_io import _BinaryIoMixin
 from ._piecewise import _PiecewiseFunction
 from ..typing import Dtype, _assert_valid_dtype, float32, float64
 
@@ -13,7 +14,7 @@ if TYPE_CHECKING:
     from ..base_tensor import FloatTensor, NumericTensor
 
 
-class Plf(_PiecewiseFunction):
+class Plf(_PiecewiseFunction, _BinaryIoMixin):
     r"""A piecewise linear function (PLF).
 
     A PLF is defined by breakpoints
@@ -93,6 +94,9 @@ class Plf(_PiecewiseFunction):
         data = np.asarray(arr, dtype=self._DTYPE_TO_NP[dtype])
         self._data = self._DTYPE_TO_CPP[dtype](data)
         self._dtype = dtype
+
+    def _binary_io_data(self):
+        return self._data
 
     @overload
     def __call__(self, t: float) -> float: ...

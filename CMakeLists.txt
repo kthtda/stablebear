@@ -505,6 +505,7 @@ SET(SB_HEADER_FILES
     io/io_stream_base.hpp
     io/barcode_io.hpp
     io/pcf_io.hpp
+    io/plf_io.hpp
     io/point_io.hpp
     io/point_cloud_io.hpp
     io/tensor_io.hpp
