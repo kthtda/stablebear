@@ -375,6 +375,10 @@ class BoolTensor(Tensor):
 _PcfNested: TypeAlias = "Pcf | Sequence[_PcfNested]"
 PcfContainerLike: TypeAlias = "PcfTensor | IntPcfTensor | _PcfNested"
 
+# A single PLF, or PLFs nested in lists or tuples.
+_PlfNested: TypeAlias = "Plf | Sequence[_PlfNested]"
+PlfContainerLike: TypeAlias = "PlfTensor | _PlfNested"
+
 
 def _first_pcf(fs):
     """Return the first leaf when *fs* is a nested collection of PCFs."""

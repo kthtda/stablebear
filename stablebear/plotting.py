@@ -1,4 +1,7 @@
-from typing import Any
+from __future__ import annotations
+
+from collections.abc import Sequence
+from typing import Any, cast
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -8,17 +11,28 @@ from ._validation import _positive_integer
 from .persistence.barcode import Barcode
 from .persistence.ph_tensor import BarcodeTensor
 from .reductions import max_time as max_time_reduction
-from .base_tensor import FloatTensor, IntPcfTensor, PcfContainerLike, PcfTensor, _to_tensor_pcf
+from .base_tensor import (
+    FloatTensor, IntPcfTensor, PcfContainerLike, PcfTensor, PlfContainerLike, PlfTensor, _to_tensor_pcf,
+)
+from .functional.pcf import Pcf
+from .functional.plf import Plf
 from .typing import boolean, float32, float64, int32, int64, uint32, uint64
 
 
-def plot(f: PcfContainerLike, fmt="", ax=None, auto_label=False, max_time=None, **kwargs):
-    """Plot one or more PCFs using matplotlib's step function.
+def plot(
+    f: PcfContainerLike | PlfContainerLike | Sequence[Pcf | Plf],
+    fmt="", ax=None, auto_label=False, max_time=None, **kwargs,
+):
+    """Plot one or more PCFs or PLFs.
+
+    A PCF is drawn as steps, and a PLF as straight lines through its
+    breakpoints.
 
     Parameters
     ----------
-    f : PcfContainerLike
-        A single ``Pcf``, a list of ``Pcf`` objects, or a 1-D PCF tensor.
+    f : PcfContainerLike, PlfContainerLike, or list of Pcf and Plf
+        A single ``Pcf`` or ``Plf``, a list or tuple of them, which may mix
+        the two, or a 1-D tensor of either.
     fmt : str, optional
         A matplotlib format string (e.g. ``'r--'``), by default ``''``.
     ax : matplotlib.axes.Axes, optional
@@ -27,12 +41,14 @@ def plot(f: PcfContainerLike, fmt="", ax=None, auto_label=False, max_time=None, 
         If ``True`` and ``f`` is a tensor, label each PCF as ``f0``, ``f1``,
         etc. By default ``False``.
     max_time : float, optional
-        Extend the plot so the final constant segment reaches this time.
-        If ``None``, single PCFs are not extended and tensors extend to
-        the latest breakpoint across all elements.
+        Extend the plot to this time: a PCF along its last constant
+        segment, and a PLF along its last segment, which it continues.
+        If ``None``, single functions are not extended and tensors extend
+        to the latest breakpoint across all elements.
     **kwargs
         Additional keyword arguments passed to ``matplotlib.pyplot.step``
-        (e.g. ``color``, ``linewidth``, ``alpha``, ``label``).
+        for PCFs and ``matplotlib.pyplot.plot`` for PLFs (e.g. ``color``,
+        ``linewidth``, ``alpha``, ``label``).
 
     Raises
     ------
@@ -41,16 +57,31 @@ def plot(f: PcfContainerLike, fmt="", ax=None, auto_label=False, max_time=None, 
     """
     ax = plt if ax is None else ax
 
+    def plot_each_(fs, maxtime):
+        for i, g in enumerate(fs):
+            kw = {"label": f"f{i}"} if auto_label else {}
+            plot_single_(g, maxtime, **kw)
+
     def plot_single_(f, maxtime, **kwargs1):
         X = np.array(f)
+        if isinstance(f, Plf):
+            if maxtime is not None and maxtime > X[-1, 0]:
+                X = np.vstack((X, [maxtime, f(maxtime)]))
+            ax.plot(X[:, 0], X[:, 1], fmt, **kwargs, **kwargs1)
+            return
         if maxtime is not None and X[-1, 0] != maxtime:
             X = np.vstack((X, [maxtime, X[-1, 1]]))
         ax.step(X[:, 0], X[:, 1], fmt, where="post", **kwargs, **kwargs1)
 
     if isinstance(f, (list, tuple)):
-        f = _to_tensor_pcf(f)
+        n_plfs = sum(isinstance(g, Plf) for g in f)
+        if 0 < n_plfs < len(f):
+            # PCFs and PLFs share no tensor, so draw them one by one.
+            mt = max_time if max_time is not None else max(float(np.asarray(g)[-1, 0]) for g in f)
+            return plot_each_(f, mt)
+        f = PlfTensor(f) if n_plfs else _to_tensor_pcf(cast(PcfContainerLike, f))
 
-    if isinstance(f, (PcfTensor, IntPcfTensor)):
+    if isinstance(f, (PcfTensor, IntPcfTensor, PlfTensor)):
         if len(f.shape) != 1:
             squeezed = f.squeeze()
             if len(squeezed.shape) != 1:
@@ -67,9 +98,7 @@ def plot(f: PcfContainerLike, fmt="", ax=None, auto_label=False, max_time=None, 
             mt = float(max_time_reduction(f))
         else:
             mt = max(float(np.asarray(f[i])[-1, 0]) for i in range(f.shape[0]))
-        for i in range(f.shape[0]):
-            kw = {"label": f"f{i}"} if auto_label else {}
-            plot_single_(f[i], mt, **kw)
+        plot_each_([f[i] for i in range(f.shape[0])], mt)
     else:
         plot_single_(f, max_time)
 

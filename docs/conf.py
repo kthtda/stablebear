@@ -109,6 +109,7 @@ nitpicky = True
 nitpick_ignore = [
     ("py:class", "Tensor"),
     ("py:class", "PcfContainerLike"),
+    ("py:class", "PlfContainerLike"),
     ("py:class", "ShapeLike"),
     ("py:class", "torch.Generator"),
 ]
