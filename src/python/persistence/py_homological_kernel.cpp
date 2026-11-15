@@ -1,6 +1,7 @@
 #include "py_homological_kernel.hpp"
 #include "../py_async_support.hpp"
 #include "../py_tensor_property_variants.hpp"
+#include "../py_np_support.hpp"
 
 #include <sbear/distance_matrix.hpp>
 #include <sbear/persistence/barcode.hpp>
@@ -53,6 +54,32 @@ namespace
           dmats, dmatsPrime, out);
     }
 
+    /// (bars, critical_edges) of one pair of point clouds: bars as an (m, 2)
+    /// array and, per bar, the point indices {a, b, c, e} of the edges whose
+    /// lengths in Y and X are its birth and death.
+    static nb::tuple homological_kernel_critical_edges(
+        const sb::PointCloud<T> &pointCloud, const sb::PointCloud<T> &pointCloudPrime)
+    {
+      sb::ph::Barcode<T> barcode;
+      std::vector<std::array<size_t, 4>> edges;
+      {
+        nb::gil_scoped_release release;
+        sb::ph::homological_kernel_with_critical_edges(pointCloud, pointCloudPrime, barcode, edges);
+      }
+      auto bars = sb_py::new_array<T>({barcode.bars().size(), 2});
+      auto critical = sb_py::new_array<int64_t>({edges.size(), 4});
+      for (size_t i = 0; i < edges.size(); ++i)
+      {
+        bars.data()[2 * i] = barcode.bars()[i].birth;
+        bars.data()[2 * i + 1] = barcode.bars()[i].death;
+        for (size_t j = 0; j < 4; ++j)
+        {
+          critical.data()[4 * i + j] = static_cast<int64_t>(edges[i][j]);
+        }
+      }
+      return nb::make_tuple(bars, critical);
+    }
+
     static void register_bindings(nb::module_ &m, const std::string &suffix)
     {
       nb::class_<PyHomologicalKernelBindings> cls(
@@ -72,6 +99,8 @@ namespace
       cls.def_static(
         "spawn_homological_kernel_pcloud_task",
         &PyHomologicalKernelBindings::spawn_homological_kernel_single_pcloud_task);
+      cls.def_static(
+        "homological_kernel_critical_edges", &PyHomologicalKernelBindings::homological_kernel_critical_edges);
     }
   };
 

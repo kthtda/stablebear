@@ -1,5 +1,8 @@
+from typing import Any
+
 import numpy as np
 
+from .. import _autodiff
 from .. import _sb_cpp as cpp
 from ..async_task import _run_task
 from ..distance_matrix import (
@@ -15,6 +18,7 @@ from .homology import (
     _FLOAT_TO_PCLOUD_DTYPE,
     _PCLOUD_TO_BARCODE_DTYPE,
 )
+from .barcode import Barcode
 from .ph_tensor import BarcodeTensor
 
 cpp_p = cpp.persistence
@@ -78,6 +82,61 @@ def _normalize_kernel_input(X, name: str):
         return X
 
     raise TypeError(f"compute_homological_kernel does not support {name} of type {type(X)}")
+
+
+def _critical_edges(X: np.ndarray, Y: np.ndarray):
+    """(bars, critical edges) of the kernel of one pair of (n, d) point clouds."""
+    X, Y = np.asarray(X), np.asarray(Y)
+    dtype = np.result_type(X.dtype, Y.dtype, np.float32)
+    backend = cpp_p.HomologicalKernel32 if dtype == np.float32 else cpp_p.HomologicalKernel64
+    return backend.homological_kernel_critical_edges(
+        PointCloud(X.astype(dtype))._cpp_point_cloud(), PointCloud(Y.astype(dtype))._cpp_point_cloud())
+
+
+def _kernel_bars_vjp(grad_out, X, Y):
+    """Gradients of sum(grad_out * bars) with respect to the points of X and Y.
+
+    Each birth is the distance between two points of Y, and each death the
+    distance between two points of X; the gradient of |p_i - p_j| is the unit
+    vector from p_j to p_i at p_i and its negative at p_j.
+    """
+    X, Y = np.asarray(X, dtype=np.float64), np.asarray(Y, dtype=np.float64)
+    _, edges = _critical_edges(X, Y)
+    grads = []
+    for points, (i, j), weights in ((X, edges[:, 2:].T, grad_out[:, 1]), (Y, edges[:, :2].T, grad_out[:, 0])):
+        diff = points[i] - points[j]
+        length = np.linalg.norm(diff, axis=1, keepdims=True)
+        step = weights[:, None] * np.divide(diff, length, out=np.zeros_like(diff), where=length > 0)
+        grad = np.zeros_like(points)
+        np.add.at(grad, i, step)
+        np.add.at(grad, j, -step)
+        grads.append(grad)
+    return tuple(grads)
+
+
+def _kernel_bars_out(X, Y):
+    n = X.shape[0]
+    # The bars are float32 only if both point clouds are.
+    both_float32 = all(str(P.dtype).endswith("float32") for P in (X, Y))
+    return (max(n - 1, 0), 2), np.float32 if both_float32 else np.float64
+
+
+@_autodiff.differentiable("X", "Y", vjp=_kernel_bars_vjp, out=_kernel_bars_out)
+def _kernel_bars(X: Any, Y: Any) -> np.ndarray:
+    """The (n - 1, 2) bars of the kernel of one pair of (n, d) point clouds."""
+    return _critical_edges(X, Y)[0]
+
+
+def _tracked_kernel(X: Any, Y: Any) -> BarcodeTensor:
+    """The kernel of one pair of point clouds given as framework arrays, as a
+    BarcodeTensor of shape (1,) that carries the bars as a framework tensor."""
+    bars = _kernel_bars(X, Y)
+    concrete = _autodiff._framework(bars).concrete(bars)
+    if concrete is None:
+        concrete = np.full(tuple(bars.shape), np.nan)
+    out = BarcodeTensor([Barcode(np.asarray(concrete))])
+    out._tvalues = bars
+    return out
 
 
 def _validate_kernel_pair(X, Y):
@@ -164,6 +223,9 @@ def compute_homological_kernel(
         raise ValueError(f"dim must be non-negative (got {dim})")
     if dim > 0:
         raise NotImplementedError(f"only dim=0 is currently supported (got dim={dim})")
+
+    if _autodiff._tracked(X) is not None or _autodiff._tracked(Y) is not None:
+        return _tracked_kernel(X, Y)
 
     X = _normalize_kernel_input(X, "X")
     Y = _normalize_kernel_input(Y, "Y")

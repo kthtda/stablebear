@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 import numpy as np
 
 from .. import _sb_cpp as cpp
@@ -29,6 +31,10 @@ class BarcodeTensor(Tensor):
             raise TypeError(f"Cannot create BarcodeTensor from {type(data)}")
         self._data = data
         self.dtype = _BARCODE_CPP_TO_DTYPE[type(self._data)]
+
+    # Set when the bars depend on a PyTorch, JAX, or TensorFlow array: all
+    # bars, barcode after barcode in C order, as an (m, 2) framework tensor.
+    _tvalues: Any = None
 
     def _to_py_tensor(self, data):
         return BarcodeTensor(data)

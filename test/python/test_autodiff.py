@@ -201,13 +201,41 @@ def test_lp_norm_gradient_wrt_pcf_values(fw, p):
     lambda fw, x: fw.sum(sb.lp_norm(_tensors()[0] - x * _tensors()[1], p=2.0)),
     lambda fw, x: fw.sum(sb.lp_norm(sb.Pcf(fw.concat([x * fw.tensor([1.0, -2.0]), fw.tensor([0.0])]),
                                            times=np.array([0.0, 1.0, 3.0])), p=1.5)),
-], ids=["arithmetic", "values_and_times"])
+    lambda fw, x: fw.sum(sb.persistence.compute_homological_kernel(
+        fw.tensor(_kernel_points()[0]), x * fw.tensor(_kernel_points()[1]))._tvalues),
+], ids=["arithmetic", "values_and_times", "homological_kernel"])
 def test_compiled_gradient_matches_eager(fw, loss):
     if fw.compiled_value_and_grad is None:
         pytest.skip("No compiled mode to test")
     eager = fw.value_and_grad(lambda x: loss(fw, x), 0.3)
     compiled = fw.compiled_value_and_grad(lambda x: loss(fw, x), 0.3)
     np.testing.assert_allclose(compiled, eager)
+
+
+def _kernel_points():
+    X = np.array([[0.0, 0.0], [1.0, 2.0], [3.0, -1.0], [4.5, 0.5], [7.0, 3.0], [8.0, -2.5]])
+    Y = X * np.array([1.0, 0.25])  # dominated by X: a contraction of each pairwise distance
+    return X, Y
+
+
+def test_homological_kernel_of_framework_points_matches_numpy(fw):
+    X, Y = _kernel_points()
+    out = sb.persistence.compute_homological_kernel(fw.tensor(X), fw.tensor(Y))
+    expected = sb.persistence.compute_homological_kernel(X, Y)[0].to_numpy()
+    np.testing.assert_allclose(out[0].to_numpy(), expected)
+    np.testing.assert_allclose(fw.to_numpy(out._tvalues), expected)
+
+
+@pytest.mark.parametrize("wrt", ["X", "Y"])
+def test_homological_kernel_gradient(fw, wrt):
+    X, Y = _kernel_points()
+    weights = fw.tensor([[0.5, 1.0], [-1.0, 2.0], [1.5, -0.5], [2.0, 0.25], [-0.75, 1.25]])
+
+    def loss(P):
+        Xp, Yp = (P, Y) if wrt == "X" else (X, P)
+        return fw.sum(weights * sb.persistence.compute_homological_kernel(Xp, Yp)._tvalues)
+
+    _assert_gradient_matches_finite_differences(fw, loss, X if wrt == "X" else Y)
 
 
 def test_breakpoints_as_framework_array_raise(fw):

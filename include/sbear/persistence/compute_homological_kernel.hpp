@@ -15,6 +15,7 @@
 #include "taskflow/core/taskflow.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstddef>
 #include <functional>
@@ -50,12 +51,19 @@ namespace sb::ph
     // exactly n(n-1)/2 bounded union-find operations plus an O(n) seed copy per
     // merge: O(n^2 alpha(n)) time, O(n) memory. Throws if some death lands
     // below its birth (beyond roundoff), which means d does not dominate d'.
+    //
+    // If deathEdges is given, it receives for each bar the index into dMerges
+    // of the edge whose weight is the death.
     template <typename T>
     void compute_cross_filtration(
         const std::vector<MergeEdge<T>> &primeMerges, const std::vector<MergeEdge<T>> &dMerges,
-        std::vector<PersistencePair<T>> &bars)
+        std::vector<PersistencePair<T>> &bars, std::vector<size_t> *deathEdges = nullptr)
     {
       bars.clear();
+      if (deathEdges)
+      {
+        deathEdges->clear();
+      }
       if (primeMerges.empty())
       {
         return;
@@ -125,6 +133,10 @@ namespace sb::ph
           throw std::runtime_error("homological kernel: d does not dominate d' (death below birth)");
         }
         bars.emplace_back(merge.mergeDist, std::max(death, merge.mergeDist));
+        if (deathEdges)
+        {
+          deathEdges->push_back(edgeIdx - 1);
+        }
 
         // Only now does the contraction enter primeComponents: merge i must
         // see the quotient by merges 1..i-1, not by itself or later ones.
@@ -141,10 +153,16 @@ namespace sb::ph
     // DistT functor computes in to the scale of the output bars (sqrt for the
     // squared-Euclidean oracle, identity for oracles already in bar scale); it
     // must be monotone so the merge order is unchanged.
+    //
+    // If criticalEdges is given, it receives for each bar the points (a, b)
+    // whose d'-distance is the birth and the points (c, e) whose d-distance is
+    // the death, as {a, b, c, e}. Gradients of the bars with respect to the
+    // distances follow from these.
     template <typename DistT, typename T, typename PostF = std::identity>
     requires DistanceOracle<DistT, T>
     void homological_kernel_single_impl(
-        const DistT &dDist, const DistT &dPrimeDist, Barcode<T> &ret, PostF mergeDistTransform = {})
+        const DistT &dDist, const DistT &dPrimeDist, Barcode<T> &ret, PostF mergeDistTransform = {},
+        std::vector<std::array<size_t, 4>> *criticalEdges = nullptr)
     {
       std::vector<MergeEdge<T>> primeMerges; // d' merge order: the births
       std::vector<MergeEdge<T>> dMerges;     // d-MST edges: the sweep timeline that answers the deaths
@@ -160,7 +178,17 @@ namespace sb::ph
       }
 
       std::vector<PersistencePair<T>> bars;
-      compute_cross_filtration(primeMerges, dMerges, bars);
+      std::vector<size_t> deathEdges;
+      compute_cross_filtration(primeMerges, dMerges, bars, criticalEdges ? &deathEdges : nullptr);
+      if (criticalEdges)
+      {
+        criticalEdges->clear();
+        for (size_t i = 0; i < bars.size(); ++i)
+        {
+          auto const &death = dMerges[deathEdges[i]];
+          criticalEdges->push_back({primeMerges[i].a, primeMerges[i].b, death.a, death.b});
+        }
+      }
       ret = std::move(bars);
     }
 
@@ -211,6 +239,27 @@ namespace sb::ph
     }
 
   } // namespace detail
+
+  /// The homological kernel barcode of one pair of point clouds, and for each
+  /// bar the points {a, b, c, e} with birth = |y_a - y_b| and death = |x_c - x_e|,
+  /// where x are the points of pc (d) and y those of pcPrime (d').
+  template <typename T>
+  void homological_kernel_with_critical_edges(
+      const PointCloud<T> &pc, const PointCloud<T> &pcPrime, Barcode<T> &bars,
+      std::vector<std::array<size_t, 4>> &criticalEdges)
+  {
+    if (pc.n_points() != pcPrime.n_points() || pc.dim() != pcPrime.dim())
+    {
+      throw std::runtime_error(
+          "homological kernel: point clouds have mismatched shapes " +
+          shape_to_string(std::vector<size_t>{pc.n_points(), pc.dim()}) + " and " +
+          shape_to_string(std::vector<size_t>{pcPrime.n_points(), pcPrime.dim()}));
+    }
+    SquaredEuclideanDistance<T> dDist(pc);
+    SquaredEuclideanDistance<T> dPrimeDist(pcPrime);
+    detail::homological_kernel_single_impl(
+        dDist, dPrimeDist, bars, [](T v) { return std::sqrt(v); }, &criticalEdges);
+  }
 
   template <
       typename ElemT, typename T, TensorProperties Properties = TensorProperty::None,
