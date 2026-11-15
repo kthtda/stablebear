@@ -1990,5 +1990,15 @@
     "py": 90.0,
     "cuda": 100.0,
     "release_tag": "v0.6.0"
+  },
+  {
+    "utc_iso": "2026-11-15T19:24:40Z",
+    "sha": "6b4ba92",
+    "branch": "271/merge",
+    "detail_path": "reports/2026-11-15_19-24-40_6b4ba92/report.html",
+    "cpp": 90.2,
+    "py": 90.0,
+    "cuda": 100.0,
+    "release_tag": null
   }
 ]

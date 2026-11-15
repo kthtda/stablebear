@@ -1,0 +1,1055 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>/home/runner/work/stablebear/stablebear/src/../include/sbear/io/../timeseries.hpp</title>
+    <link href='valgrind.css' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+    <script src="https://code.jquery.com/jquery-3.4.1.js"></script>
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.0.0/styles/default.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.0.0/highlight.min.js"></script>
+    <script src="valgrind.js"></script>
+</head>
+
+<body>
+    <div class="global">
+        <div class="header">
+            <h1>/home/runner/work/stablebear/stablebear/src/../include/sbear/io/../timeseries.hpp</h1>
+            <p><b>1</b> errors</p>
+            <button class="next_error">Goto First Error</button>
+        </div>
+        <div class="listing">
+            <pre class="code">
+<code class="c++"><span class="line_number">1</span>#ifndef STABLEBEAR_TIMESERIES_H
+<span class="line_number">2</span>#define STABLEBEAR_TIMESERIES_H
+<span class="line_number">3</span>
+<span class="line_number">4</span>#include &#34;algorithms/gallop.hpp&#34;
+<span class="line_number">5</span>#include &#34;config.hpp&#34;
+<span class="line_number">6</span>#include &#34;errors.hpp&#34;
+<span class="line_number">7</span>#include &#34;nested_tensor.hpp&#34;
+<span class="line_number">8</span>#include &#34;tensor.hpp&#34;
+<span class="line_number">9</span>#include &#34;walk.hpp&#34;
+<span class="line_number">10</span>
+<span class="line_number">11</span>#include &lt;algorithm&gt;
+<span class="line_number">12</span>#include &lt;array&gt;
+<span class="line_number">13</span>#include &lt;chrono&gt;
+<span class="line_number">14</span>#include &lt;cmath&gt;
+<span class="line_number">15</span>#include &lt;concepts&gt;
+<span class="line_number">16</span>#include &lt;cstdint&gt;
+<span class="line_number">17</span>#include &lt;cstdio&gt;
+<span class="line_number">18</span>#include &lt;cstdlib&gt;
+<span class="line_number">19</span>#include &lt;functional&gt;
+<span class="line_number">20</span>#include &lt;iterator&gt;
+<span class="line_number">21</span>#include &lt;limits&gt;
+<span class="line_number">22</span>#include &lt;memory&gt;
+<span class="line_number">23</span>#include &lt;numeric&gt;
+<span class="line_number">24</span>#include &lt;span&gt;
+<span class="line_number">25</span>#include &lt;optional&gt;
+<span class="line_number">26</span>#include &lt;ratio&gt;
+<span class="line_number">27</span>#include &lt;sstream&gt;
+<span class="line_number">28</span>#include &lt;stdexcept&gt;
+<span class="line_number">29</span>#include &lt;string&gt;
+<span class="line_number">30</span>#include &lt;type_traits&gt;
+<span class="line_number">31</span>#include &lt;string_view&gt;
+<span class="line_number">32</span>#include &lt;utility&gt;
+<span class="line_number">33</span>#include &lt;vector&gt;
+<span class="line_number">34</span>
+<span class="line_number">35</span>namespace sb
+<span class="line_number">36</span>{
+<span class="line_number">37</span>  /// Physical time units, from attoseconds to days, and Unitless for times
+<span class="line_number">38</span>  /// that are plain numbers, which convert only to themselves.
+<span class="line_number">39</span>  enum class TimeUnit : uint8_t
+<span class="line_number">40</span>  {
+<span class="line_number">41</span>    Attoseconds,
+<span class="line_number">42</span>    Femtoseconds,
+<span class="line_number">43</span>    Picoseconds,
+<span class="line_number">44</span>    Nanoseconds,
+<span class="line_number">45</span>    Microseconds,
+<span class="line_number">46</span>    Milliseconds,
+<span class="line_number">47</span>    Seconds,
+<span class="line_number">48</span>    Minutes,
+<span class="line_number">49</span>    Hours,
+<span class="line_number">50</span>    Days,
+<span class="line_number">51</span>    Unitless
+<span class="line_number">52</span>  };
+<span class="line_number">53</span>
+<span class="line_number">54</span>  namespace detail
+<span class="line_number">55</span>  {
+<span class="line_number">56</span>    /// A unit is mult * 10^exp seconds. The multipliers 1, 60, 3600, and
+<span class="line_number">57</span>    /// 86400 divide each other, so a conversion factor reduces to one
+<span class="line_number">58</span>    /// integer multiplying or dividing the value.
+<span class="line_number">59</span>    struct TimeUnitInfo
+<span class="line_number">60</span>    {
+<span class="line_number">61</span>      TimeUnit unit;
+<span class="line_number">62</span>      std::string_view name;
+<span class="line_number">63</span>      int32_t exp;
+<span class="line_number">64</span>      int64_t mult;
+<span class="line_number">65</span>    };
+<span class="line_number">66</span>
+<span class="line_number">67</span>    inline constexpr auto TimeUnitTable = std::to_array&lt;TimeUnitInfo&gt;({
+<span class="line_number">68</span>      {TimeUnit::Attoseconds, &#34;as&#34;, -18, 1},
+<span class="line_number">69</span>      {TimeUnit::Femtoseconds, &#34;fs&#34;, -15, 1},
+<span class="line_number">70</span>      {TimeUnit::Picoseconds, &#34;ps&#34;, -12, 1},
+<span class="line_number">71</span>      {TimeUnit::Nanoseconds, &#34;ns&#34;, -9, 1},
+<span class="line_number">72</span>      {TimeUnit::Microseconds, &#34;us&#34;, -6, 1},
+<span class="line_number">73</span>      {TimeUnit::Milliseconds, &#34;ms&#34;, -3, 1},
+<span class="line_number">74</span>      {TimeUnit::Seconds, &#34;s&#34;, 0, 1},
+<span class="line_number">75</span>      {TimeUnit::Minutes, &#34;min&#34;, 0, 60},
+<span class="line_number">76</span>      {TimeUnit::Hours, &#34;h&#34;, 0, 3600},
+<span class="line_number">77</span>      {TimeUnit::Days, &#34;d&#34;, 0, 86400},
+<span class="line_number">78</span>      // No length; saved as 0 * 10^0 seconds.
+<span class="line_number">79</span>      {TimeUnit::Unitless, &#34;&#34;, 0, 0},
+<span class="line_number">80</span>    });
+<span class="line_number">81</span>
+<span class="line_number">82</span>    /// Accepted spellings besides the canonical names.
+<span class="line_number">83</span>    inline constexpr auto TimeUnitAliases = std::to_array&lt;std::pair&lt;std::string_view, TimeUnit&gt;&gt;({
+<span class="line_number">84</span>      {&#34;attosecond&#34;, TimeUnit::Attoseconds}, {&#34;attoseconds&#34;, TimeUnit::Attoseconds},
+<span class="line_number">85</span>      {&#34;femtosecond&#34;, TimeUnit::Femtoseconds}, {&#34;femtoseconds&#34;, TimeUnit::Femtoseconds},
+<span class="line_number">86</span>      {&#34;picosecond&#34;, TimeUnit::Picoseconds}, {&#34;picoseconds&#34;, TimeUnit::Picoseconds},
+<span class="line_number">87</span>      {&#34;nanosecond&#34;, TimeUnit::Nanoseconds}, {&#34;nanoseconds&#34;, TimeUnit::Nanoseconds},
+<span class="line_number">88</span>      {&#34;microsecond&#34;, TimeUnit::Microseconds}, {&#34;microseconds&#34;, TimeUnit::Microseconds},
+<span class="line_number">89</span>      {&#34;\xc2\xb5s&#34;, TimeUnit::Microseconds},  // micro sign
+<span class="line_number">90</span>      {&#34;\xce\xbcs&#34;, TimeUnit::Microseconds},  // Greek small letter mu
+<span class="line_number">91</span>      {&#34;millisecond&#34;, TimeUnit::Milliseconds}, {&#34;milliseconds&#34;, TimeUnit::Milliseconds},
+<span class="line_number">92</span>      {&#34;sec&#34;, TimeUnit::Seconds}, {&#34;second&#34;, TimeUnit::Seconds}, {&#34;seconds&#34;, TimeUnit::Seconds},
+<span class="line_number">93</span>      {&#34;minute&#34;, TimeUnit::Minutes}, {&#34;minutes&#34;, TimeUnit::Minutes},
+<span class="line_number">94</span>      {&#34;hr&#34;, TimeUnit::Hours}, {&#34;hour&#34;, TimeUnit::Hours}, {&#34;hours&#34;, TimeUnit::Hours},
+<span class="line_number">95</span>      {&#34;day&#34;, TimeUnit::Days}, {&#34;days&#34;, TimeUnit::Days}, {&#34;D&#34;, TimeUnit::Days},  // NumPy&#39;s spelling
+<span class="line_number">96</span>      {&#34;msec&#34;, TimeUnit::Milliseconds}, {&#34;usec&#34;, TimeUnit::Microseconds},
+<span class="line_number">97</span>    });
+<span class="line_number">98</span>
+<span class="line_number">99</span>    constexpr const TimeUnitInfo&amp; time_unit_info(TimeUnit unit)
+<span class="line_number">100</span>    {
+<span class="line_number">101</span>      return TimeUnitTable[static_cast&lt;size_t&gt;(unit)];
+<span class="line_number">102</span>    }
+<span class="line_number">103</span>
+<span class="line_number">104</span>    /// 10^k, exact in double for k &lt;= 22.
+<span class="line_number">105</span>    constexpr float64_t exact_power_of_ten(int32_t k)
+<span class="line_number">106</span>    {
+<span class="line_number">107</span>      float64_t result = 1;
+<span class="line_number">108</span>      for (int32_t i = 0; i &lt; k; ++i)
+<span class="line_number">109</span>      {
+<span class="line_number">110</span>        result *= 10;
+<span class="line_number">111</span>      }
+<span class="line_number">112</span>      return result;
+<span class="line_number">113</span>    }
+<span class="line_number">114</span>  }
+<span class="line_number">115</span>
+<span class="line_number">116</span>  [[nodiscard]] constexpr std::string_view time_unit_name(TimeUnit unit)
+<span class="line_number">117</span>  {
+<span class="line_number">118</span>    return detail::time_unit_info(unit).name;
+<span class="line_number">119</span>  }
+<span class="line_number">120</span>
+<span class="line_number">121</span>  [[nodiscard]] inline TimeUnit parse_time_unit(std::string_view name)
+<span class="line_number">122</span>  {
+<span class="line_number">123</span>    for (const auto&amp; info : detail::TimeUnitTable)
+<span class="line_number">124</span>    {
+<span class="line_number">125</span>      if (info.unit != TimeUnit::Unitless &amp;&amp; info.name == name)
+<span class="line_number">126</span>      {
+<span class="line_number">127</span>        return info.unit;
+<span class="line_number">128</span>      }
+<span class="line_number">129</span>    }
+<span class="line_number">130</span>    for (const auto&amp; [alias, unit] : detail::TimeUnitAliases)
+<span class="line_number">131</span>    {
+<span class="line_number">132</span>      if (alias == name)
+<span class="line_number">133</span>      {
+<span class="line_number">134</span>        return unit;
+<span class="line_number">135</span>      }
+<span class="line_number">136</span>    }
+<span class="line_number">137</span>    throw std::invalid_argument(
+<span class="line_number">138</span>        &#34;Unknown time unit &#39;&#34; + std::string(name)
+<span class="line_number">139</span>        + &#34;&#39;; expected one of as, fs, ps, ns, us, ms, s, min, h, d, or a spelled-out&#34;
+<span class="line_number">140</span>          &#34; name such as seconds&#34;);
+<span class="line_number">141</span>  }
+<span class="line_number">142</span>
+<span class="line_number">143</span>  /// Convert @p value from unit @p from to unit @p to. The factor is an
+<span class="line_number">144</span>  /// integer that multiplies or divides the value, so the result is rounded
+<span class="line_number">145</span>  /// once. The factor is exact unless it exceeds 2^53 (days and attoseconds).
+<span class="line_number">146</span>  /// A plain number, from Unitless, becomes a count of @p to unchanged; a
+<span class="line_number">147</span>  /// time in a unit cannot become a plain number.
+<span class="line_number">148</span>  [[nodiscard]] constexpr float64_t convert_time(float64_t value, TimeUnit from, TimeUnit to)
+<span class="line_number">149</span>  {
+<span class="line_number">150</span>    if (from == to || from == TimeUnit::Unitless)
+<span class="line_number">151</span>    {
+<span class="line_number">152</span>      return value;
+<span class="line_number">153</span>    }
+<span class="line_number">154</span>    if (to == TimeUnit::Unitless)
+<span class="line_number">155</span>    {
+<span class="line_number">156</span>      throw std::invalid_argument(&#34;Times in a unit cannot become plain numbers&#34;);
+<span class="line_number">157</span>    }
+<span class="line_number">158</span>    const auto&amp; src = detail::time_unit_info(from);
+<span class="line_number">159</span>    const auto&amp; dst = detail::time_unit_info(to);
+<span class="line_number">160</span>    const auto g = std::gcd(src.mult, dst.mult);
+<span class="line_number">161</span>    const int32_t diff = src.exp - dst.exp;
+<span class="line_number">162</span>    const float64_t num = static_cast&lt;float64_t&gt;(src.mult / g) * detail::exact_power_of_ten(std::max(diff, 0));
+<span class="line_number">163</span>    const float64_t den = static_cast&lt;float64_t&gt;(dst.mult / g) * detail::exact_power_of_ten(std::max(-diff, 0));
+<span class="line_number">164</span>    return den == 1 ? value * num : value / den;
+<span class="line_number">165</span>  }
+<span class="line_number">166</span>
+<span class="line_number">167</span>  namespace detail
+<span class="line_number">168</span>  {
+<span class="line_number">169</span>    /// Raises each of @p values that rounding put at or before the one
+<span class="line_number">170</span>    /// before it to just after that one, so that converted or shifted
+<span class="line_number">171</span>    /// timestamps stay strictly increasing.
+<span class="line_number">172</span>    inline void keep_increasing(std::vector&lt;float64_t&gt;&amp; values)
+<span class="line_number">173</span>    {
+<span class="line_number">174</span>      for (size_t i = 1; i &lt; values.size(); ++i)
+<span class="line_number">175</span>      {
+<span class="line_number">176</span>        values[i] = std::max(values[i], std::nextafter(values[i - 1], std::numeric_limits&lt;float64_t&gt;::infinity()));
+<span class="line_number">177</span>      }
+<span class="line_number">178</span>    }
+<span class="line_number">179</span>
+<span class="line_number">180</span>    /// The time unit of a std::chrono period, at compile time.
+<span class="line_number">181</span>    template &lt;typename Period&gt;
+<span class="line_number">182</span>    constexpr TimeUnit time_unit_of()
+<span class="line_number">183</span>    {
+<span class="line_number">184</span>      if constexpr (std::ratio_equal_v&lt;Period, std::atto&gt;) return TimeUnit::Attoseconds;
+<span class="line_number">185</span>      else if constexpr (std::ratio_equal_v&lt;Period, std::femto&gt;) return TimeUnit::Femtoseconds;
+<span class="line_number">186</span>      else if constexpr (std::ratio_equal_v&lt;Period, std::pico&gt;) return TimeUnit::Picoseconds;
+<span class="line_number">187</span>      else if constexpr (std::ratio_equal_v&lt;Period, std::nano&gt;) return TimeUnit::Nanoseconds;
+<span class="line_number">188</span>      else if constexpr (std::ratio_equal_v&lt;Period, std::micro&gt;) return TimeUnit::Microseconds;
+<span class="line_number">189</span>      else if constexpr (std::ratio_equal_v&lt;Period, std::milli&gt;) return TimeUnit::Milliseconds;
+<span class="line_number">190</span>      else if constexpr (std::ratio_equal_v&lt;Period, std::ratio&lt;1&gt;&gt;) return TimeUnit::Seconds;
+<span class="line_number">191</span>      else if constexpr (std::ratio_equal_v&lt;Period, std::ratio&lt;60&gt;&gt;) return TimeUnit::Minutes;
+<span class="line_number">192</span>      else if constexpr (std::ratio_equal_v&lt;Period, std::ratio&lt;3600&gt;&gt;) return TimeUnit::Hours;
+<span class="line_number">193</span>      else if constexpr (std::ratio_equal_v&lt;Period, std::ratio&lt;86400&gt;&gt;) return TimeUnit::Days;
+<span class="line_number">194</span>      else static_assert(sizeof(Period) == 0, &#34;No time unit has this period&#34;);
+<span class="line_number">195</span>    }
+<span class="line_number">196</span>  }
+<span class="line_number">197</span>
+<span class="line_number">198</span>  /// Throw TypeError unless times in @p queryUnit suit a series in
+<span class="line_number">199</span>  /// @p seriesUnit: durations, which come with a unit, for a series with
+<span class="line_number">200</span>  /// one, and plain numbers for a series without one.
+<span class="line_number">201</span>  inline void check_query_unit(TimeUnit queryUnit, TimeUnit seriesUnit)
+<span class="line_number">202</span>  {
+<span class="line_number">203</span>    if (queryUnit != TimeUnit::Unitless &amp;&amp; seriesUnit == TimeUnit::Unitless)
+<span class="line_number">204</span>    {
+<span class="line_number">205</span>      throw TypeError(&#34;A series without a unit takes plain numbers, not durations&#34;);
+<span class="line_number">206</span>    }
+<span class="line_number">207</span>    if (queryUnit == TimeUnit::Unitless &amp;&amp; seriesUnit != TimeUnit::Unitless)
+<span class="line_number">208</span>    {
+<span class="line_number">209</span>      throw TypeError(&#34;These series have a unit, so their times are durations, not plain numbers&#34;);
+<span class="line_number">210</span>    }
+<span class="line_number">211</span>  }
+<span class="line_number">212</span>
+<span class="line_number">213</span>  /// Throw unless both @p a and @p b are units, or neither is.
+<span class="line_number">214</span>  inline void check_same_kind_of_unit(TimeUnit a, TimeUnit b)
+<span class="line_number">215</span>  {
+<span class="line_number">216</span>    if ((a == TimeUnit::Unitless) != (b == TimeUnit::Unitless))
+<span class="line_number">217</span>    {
+<span class="line_number">218</span>      throw std::invalid_argument(&#34;A series without a unit and a series with one cannot be combined or converted&#34;);
+<span class="line_number">219</span>    }
+<span class="line_number">220</span>  }
+<span class="line_number">221</span>
+<span class="line_number">222</span>  /// A calendar instant: @p count units after 1970-01-01T00:00, the value of
+<span class="line_number">223</span>  /// a NumPy datetime64 at its own resolution. As in NumPy and
+<span class="line_number">224</span>  /// std::chrono::sys_time, dates follow the Gregorian calendar and every day
+<span class="line_number">225</span>  /// has 86400 seconds: leap seconds are not counted.
+<span class="line_number">226</span>  struct DateTime
+<span class="line_number">227</span>  {
+<span class="line_number">228</span>    int64_t count;
+<span class="line_number">229</span>    TimeUnit unit;
+<span class="line_number">230</span>
+<span class="line_number">231</span>    constexpr DateTime(int64_t count, TimeUnit unit) noexcept : count(count), unit(unit) {}
+<span class="line_number">232</span>
+<span class="line_number">233</span>    /// The instant @p time, at its resolution, such as
+<span class="line_number">234</span>    /// DateTime(std::chrono::sys_days{2023y / January / 1}).
+<span class="line_number">235</span>    template &lt;typename Duration&gt;
+<span class="line_number">236</span>      requires std::integral&lt;typename Duration::rep&gt;
+<span class="line_number">237</span>    constexpr explicit DateTime(std::chrono::sys_time&lt;Duration&gt; time) noexcept
+<span class="line_number">238</span>      : DateTime(static_cast&lt;int64_t&gt;(time.time_since_epoch().count()), detail::time_unit_of&lt;typename Duration::period&gt;())
+<span class="line_number">239</span>    {
+<span class="line_number">240</span>    }
+<span class="line_number">241</span>
+<span class="line_number">242</span>    /// The same count at the same resolution; the same instant at another
+<span class="line_number">243</span>    /// resolution is a different DateTime.
+<span class="line_number">244</span>    bool operator==(const DateTime&amp;) const = default;
+<span class="line_number">245</span>  };
+<span class="line_number">246</span>
+<span class="line_number">247</span>  namespace detail
+<span class="line_number">248</span>  {
+<span class="line_number">249</span>    /// Whether @p a is a unit at most as long as @p b.
+<span class="line_number">250</span>    constexpr bool not_coarser(const TimeUnitInfo&amp; a, const TimeUnitInfo&amp; b)
+<span class="line_number">251</span>    {
+<span class="line_number">252</span>      return a.exp &lt; b.exp || (a.exp == b.exp &amp;&amp; a.mult &lt;= b.mult);
+<span class="line_number">253</span>    }
+<span class="line_number">254</span>
+<span class="line_number">255</span>    /// The number of @p fine in one @p coarse, a unit at least as long, or
+<span class="line_number">256</span>    /// nullopt if it exceeds int64. It is a whole number, since the
+<span class="line_number">257</span>    /// multipliers of coarser units are multiples of finer ones.
+<span class="line_number">258</span>    constexpr std::optional&lt;int64_t&gt; units_per(const TimeUnitInfo&amp; coarse, const TimeUnitInfo&amp; fine)
+<span class="line_number">259</span>    {
+<span class="line_number">260</span>      int64_t ratio = coarse.mult / fine.mult;
+<span class="line_number">261</span>      for (int32_t k = fine.exp; k &lt; coarse.exp; ++k)
+<span class="line_number">262</span>      {
+<span class="line_number">263</span>        if (ratio &gt; std::numeric_limits&lt;int64_t&gt;::max() / 10)
+<span class="line_number">264</span>        {
+<span class="line_number">265</span>          return std::nullopt;
+<span class="line_number">266</span>        }
+<span class="line_number">267</span>        ratio *= 10;
+<span class="line_number">268</span>      }
+<span class="line_number">269</span>      return ratio;
+<span class="line_number">270</span>    }
+<span class="line_number">271</span>
+<span class="line_number">272</span>    /// Whether @p count of a unit, @p factor of a finer one each, is below
+<span class="line_number">273</span>    /// 2^62 in the finer unit, so that a difference of two such fits in int64.
+<span class="line_number">274</span>    constexpr bool fits_in_fine(int64_t count, std::optional&lt;int64_t&gt; factor)
+<span class="line_number">275</span>    {
+<span class="line_number">276</span>      if (!factor)
+<span class="line_number">277</span>      {
+<span class="line_number">278</span>        return false;
+<span class="line_number">279</span>      }
+<span class="line_number">280</span>      const auto most = ((int64_t{1} &lt;&lt; 62) - 1) / *factor;
+<span class="line_number">281</span>      return count &lt;= most &amp;&amp; count &gt;= -most;
+<span class="line_number">282</span>    }
+<span class="line_number">283</span>  }
+<span class="line_number">284</span>
+<span class="line_number">285</span>  /// The time from @p epoch to @p date in @p unit. When both counts fit
+<span class="line_number">286</span>  /// below 2^62 in the finest of the three units, the difference is taken
+<span class="line_number">287</span>  /// there in integers and converted to @p unit as convert_time() converts
+<span class="line_number">288</span>  /// it. Otherwise each count is split into whole days and a remainder in
+<span class="line_number">289</span>  /// its own unit, and the difference of the days and that of the
+<span class="line_number">290</span>  /// remainders, taken in integers when a day of the finer unit fits, are
+<span class="line_number">291</span>  /// converted to @p unit separately and added, so that no resolution or
+<span class="line_number">292</span>  /// span overflows. stablebear.timeseries computes
+<span class="line_number">293</span>  /// dates the same way, so that a series and a tensor of it agree.
+<span class="line_number">294</span>  /// Throws std::invalid_argument if a unit has no length, and
+<span class="line_number">295</span>  /// std::overflow_error if the days differ by more than int64 holds.
+<span class="line_number">296</span>  [[nodiscard]] inline float64_t time_since(const DateTime&amp; date, const DateTime&amp; epoch, TimeUnit unit)
+<span class="line_number">297</span>  {
+<span class="line_number">298</span>    if (date.unit == TimeUnit::Unitless || epoch.unit == TimeUnit::Unitless || unit == TimeUnit::Unitless)
+<span class="line_number">299</span>    {
+<span class="line_number">300</span>      throw std::invalid_argument(&#34;Dates, epochs, and the times between them need a unit with a length&#34;);
+<span class="line_number">301</span>    }
+<span class="line_number">302</span>    const auto&amp; d = detail::time_unit_info(date.unit);
+<span class="line_number">303</span>    const auto&amp; e = detail::time_unit_info(epoch.unit);
+<span class="line_number">304</span>    const auto&amp; u = detail::time_unit_info(unit);
+<span class="line_number">305</span>    const auto&amp; fine = detail::not_coarser(d, e) ? (detail::not_coarser(d, u) ? d : u)
+<span class="line_number">306</span>                                                 : (detail::not_coarser(e, u) ? e : u);
+<span class="line_number">307</span>    const auto dateFactor = detail::units_per(d, fine);
+<span class="line_number">308</span>    const auto epochFactor = detail::units_per(e, fine);
+<span class="line_number">309</span>    if (detail::fits_in_fine(date.count, dateFactor) &amp;&amp; detail::fits_in_fine(epoch.count, epochFactor))
+<span class="line_number">310</span>    {
+<span class="line_number">311</span>      return convert_time(static_cast&lt;float64_t&gt;(date.count * *dateFactor - epoch.count * *epochFactor), fine.unit,
+<span class="line_number">312</span>                          unit);
+<span class="line_number">313</span>    }
+<span class="line_number">314</span>    // Each count as whole days and a remainder in its own unit.
+<span class="line_number">315</span>    const auto&amp; days = detail::time_unit_info(TimeUnit::Days);
+<span class="line_number">316</span>    const auto split = [&amp;](int64_t count, const detail::TimeUnitInfo&amp; info) {
+<span class="line_number">317</span>      // A ratio beyond int64 exceeds every count, which is then all remainder.
+<span class="line_number">318</span>      const auto ratio = detail::units_per(days, info);
+<span class="line_number">319</span>      return ratio ? std::pair{count / *ratio, count % *ratio} : std::pair{int64_t{0}, count};
+<span class="line_number">320</span>    };
+<span class="line_number">321</span>    const auto [dateDays, dateRest] = split(date.count, d);
+<span class="line_number">322</span>    const auto [epochDays, epochRest] = split(epoch.count, e);
+<span class="line_number">323</span>    constexpr auto max = std::numeric_limits&lt;int64_t&gt;::max();
+<span class="line_number">324</span>    constexpr auto min = std::numeric_limits&lt;int64_t&gt;::min();
+<span class="line_number">325</span>    if ((epochDays &gt; 0 &amp;&amp; dateDays &lt; min + epochDays) || (epochDays &lt; 0 &amp;&amp; dateDays &gt; max + epochDays))
+<span class="line_number">326</span>    {
+<span class="line_number">327</span>      throw std::overflow_error(&#34;A date is too many days from the epoch to count&#34;);
+<span class="line_number">328</span>    }
+<span class="line_number">329</span>    const auto dayDifference = convert_time(static_cast&lt;float64_t&gt;(dateDays - epochDays), TimeUnit::Days, unit);
+<span class="line_number">330</span>    // The remainders, below a day each, subtract in int64 in the finer of
+<span class="line_number">331</span>    // their units when a day of it is below 2^62, as down to picoseconds.
+<span class="line_number">332</span>    const auto&amp; finer = detail::not_coarser(d, e) ? d : e;
+<span class="line_number">333</span>    if (detail::fits_in_fine(1, detail::units_per(days, finer)))
+<span class="line_number">334</span>    {
+<span class="line_number">335</span>      const auto restDifference = dateRest * *detail::units_per(d, finer) - epochRest * *detail::units_per(e, finer);
+<span class="line_number">336</span>      return dayDifference + convert_time(static_cast&lt;float64_t&gt;(restDifference), finer.unit, unit);
+<span class="line_number">337</span>    }
+<span class="line_number">338</span>    return dayDifference + convert_time(static_cast&lt;float64_t&gt;(dateRest), date.unit, unit)
+<span class="line_number">339</span>           - convert_time(static_cast&lt;float64_t&gt;(epochRest), epoch.unit, unit);
+<span class="line_number">340</span>  }
+<span class="line_number">341</span>
+<span class="line_number">342</span>  /// One-dimensional, finite, strictly increasing timestamps, placed by an
+<span class="line_number">343</span>  /// origin in the series they were cut from. Their unit and epoch are those
+<span class="line_number">344</span>  /// of the series that holds them.
+<span class="line_number">345</span>  class Times
+<span class="line_number">346</span>  {
+<span class="line_number">347</span>  public:
+<span class="line_number">348</span>    explicit Times(std::vector&lt;float64_t&gt; values) : m_values(std::move(values))
+<span class="line_number">349</span>    {
+<span class="line_number">350</span>      for (size_t i = 0; i &lt; m_values.size(); ++i)
+<span class="line_number">351</span>      {
+<span class="line_number">352</span>        if (!std::isfinite(m_values[i]))
+<span class="line_number">353</span>        {
+<span class="line_number">354</span>          throw std::invalid_argument(&#34;Timestamps must be finite&#34;);
+<span class="line_number">355</span>        }
+<span class="line_number">356</span>        if (i &gt; 0 &amp;&amp; m_values[i - 1] &gt;= m_values[i])
+<span class="line_number">357</span>        {
+<span class="line_number">358</span>          throw std::invalid_argument(&#34;Timestamps must be strictly increasing&#34;);
+<span class="line_number">359</span>        }
+<span class="line_number">360</span>      }
+<span class="line_number">361</span>    }
+<span class="line_number">362</span>
+<span class="line_number">363</span>    [[nodiscard]] const std::vector&lt;float64_t&gt;&amp; values() const noexcept { return m_values; }
+<span class="line_number">364</span>    [[nodiscard]] size_t size() const noexcept { return m_values.size(); }
+<span class="line_number">365</span>
+<span class="line_number">366</span>    /// The time that time 0 stands for in the series these times were cut
+<span class="line_number">367</span>    /// from; 0 for recorded observations. Evaluation does not use it.
+<span class="line_number">368</span>    [[nodiscard]] float64_t origin() const noexcept { return m_origin; }
+<span class="line_number">369</span>
+<span class="line_number">370</span>    /// The same timestamps with the origin @p origin, which must be finite.
+<span class="line_number">371</span>    [[nodiscard]] Times with_origin(float64_t origin) const
+<span class="line_number">372</span>    {
+<span class="line_number">373</span>      if (!std::isfinite(origin))
+<span class="line_number">374</span>      {
+<span class="line_number">375</span>        throw std::invalid_argument(&#34;The origin of times must be finite&#34;);
+<span class="line_number">376</span>      }
+<span class="line_number">377</span>      auto times = *this;
+<span class="line_number">378</span>      times.m_origin = origin;
+<span class="line_number">379</span>      return times;
+<span class="line_number">380</span>    }
+<span class="line_number">381</span>
+<span class="line_number">382</span>    /// The timestamps @p values with this origin.
+<span class="line_number">383</span>    [[nodiscard]] Times with_values(std::vector&lt;float64_t&gt; values) const
+<span class="line_number">384</span>    {
+<span class="line_number">385</span>      Times times(std::move(values));
+<span class="line_number">386</span>      times.m_origin = m_origin;
+<span class="line_number">387</span>      return times;
+<span class="line_number">388</span>    }
+<span class="line_number">389</span>
+<span class="line_number">390</span>    /// The same timestamps and origin converted from @p from to @p to, as
+<span class="line_number">391</span>    /// convert_time() converts them.
+<span class="line_number">392</span>    [[nodiscard]] Times to(TimeUnit from, TimeUnit to) const
+<span class="line_number">393</span>    {
+<span class="line_number">394</span>      std::vector&lt;float64_t&gt; converted(m_values.size());
+<span class="line_number">395</span>      for (size_t i = 0; i &lt; m_values.size(); ++i)
+<span class="line_number">396</span>      {
+<span class="line_number">397</span>        converted[i] = convert_time(m_values[i], from, to);
+<span class="line_number">398</span>      }
+<span class="line_number">399</span>      detail::keep_increasing(converted);
+<span class="line_number">400</span>      Times times(std::move(converted));
+<span class="line_number">401</span>      times.m_origin = convert_time(m_origin, from, to);
+<span class="line_number">402</span>      return times;
+<span class="line_number">403</span>    }
+<span class="line_number">404</span>
+<span class="line_number">405</span>    bool operator==(const Times&amp;) const = default;
+<span class="line_number">406</span>
+<span class="line_number">407</span>  private:
+<span class="line_number">408</span>    std::vector&lt;float64_t&gt; m_values;
+<span class="line_number">409</span>    float64_t m_origin = 0.0;
+<span class="line_number">410</span>  };
+<span class="line_number">411</span>
+<span class="line_number">412</span>  /// Recorded observations of one channel: one observation per timestamp,
+<span class="line_number">413</span>  /// each a tensor of shape `shape`, stored flat in row-major order.
+<span class="line_number">414</span>  template &lt;typename T&gt;
+<span class="line_number">415</span>  struct ChannelStorage
+<span class="line_number">416</span>  {
+<span class="line_number">417</span>    Times times;
+<span class="line_number">418</span>    std::vector&lt;size_t&gt; shape;
+<span class="line_number">419</span>    std::vector&lt;T&gt; values;
+<span class="line_number">420</span>  };
+<span class="line_number">421</span>
+<span class="line_number">422</span>  /// The times from @p first to @p last, including each end that is closed.
+<span class="line_number">423</span>  struct TimeDomain
+<span class="line_number">424</span>  {
+<span class="line_number">425</span>    float64_t first;
+<span class="line_number">426</span>    float64_t last;
+<span class="line_number">427</span>    bool closedStart;  // first itself is in the domain
+<span class="line_number">428</span>    bool closedEnd;    // last itself is in the domain
+<span class="line_number">429</span>
+<span class="line_number">430</span>    /// Whether @p t is in the domain; NaN is not.
+<span class="line_number">431</span>    [[nodiscard]] bool contains(float64_t t) const noexcept
+<span class="line_number">432</span>    {
+<span class="line_number">433</span>      return (t &gt; first || (closedStart &amp;&amp; t == first)) &amp;&amp; (t &lt; last || (closedEnd &amp;&amp; t == last));
+<span class="line_number">434</span>    }
+<span class="line_number">435</span>
+<span class="line_number">436</span>    /// The domain as text, such as &#34;[0, 2)&#34;.
+<span class="line_number">437</span>    [[nodiscard]] std::string to_string() const;
+<span class="line_number">438</span>  };
+<span class="line_number">439</span>
+<span class="line_number">440</span>  /// A time outside the domain of a series: time() and domain() in the unit
+<span class="line_number">441</span>  /// of the series, counted from time 0 of the channel channel(), and the
+<span class="line_number">442</span>  /// index of the series in a tensor of them, empty for one series. Python
+<span class="line_number">443</span>  /// raises it as stablebear.timeseries.TimeSeriesDomainError, naming the time
+<span class="line_number">444</span>  /// as a date for a date.
+<span class="line_number">445</span>  class TimeSeriesDomainError : public std::domain_error
+<span class="line_number">446</span>  {
+<span class="line_number">447</span>  public:
+<span class="line_number">448</span>    TimeSeriesDomainError(const std::string&amp; message, float64_t time, const TimeDomain&amp; domain,
+<span class="line_number">449</span>                          std::vector&lt;size_t&gt; index = {}, size_t channel = 0)
+<span class="line_number">450</span>      : std::domain_error(message), m_time(time), m_domain(domain), m_index(std::move(index)),
+<span class="line_number">451</span>        m_channel(channel)
+<span class="line_number">452</span>    {
+<span class="line_number">453</span>    }
+<span class="line_number">454</span>
+<span class="line_number">455</span>    [[nodiscard]] float64_t time() const noexcept { return m_time; }
+<span class="line_number">456</span>    [[nodiscard]] const TimeDomain&amp; domain() const noexcept { return m_domain; }
+<span class="line_number">457</span>    [[nodiscard]] const std::vector&lt;size_t&gt;&amp; index() const noexcept { return m_index; }
+<span class="line_number">458</span>    [[nodiscard]] size_t channel() const noexcept { return m_channel; }
+<span class="line_number">459</span>
+<span class="line_number">460</span>  private:
+<span class="line_number">461</span>    float64_t m_time;
+<span class="line_number">462</span>    TimeDomain m_domain;
+<span class="line_number">463</span>    std::vector&lt;size_t&gt; m_index;
+<span class="line_number">464</span>    size_t m_channel;
+<span class="line_number">465</span>  };
+<span class="line_number">466</span>
+<span class="line_number">467</span>  /// Default snap tolerance, relative to the magnitude of the timestamps:
+<span class="line_number">468</span>  /// the default comparison tolerance of APL.
+<span class="line_number">469</span>  inline constexpr float64_t DefaultSnapTolerance = 1e-14;
+<span class="line_number">470</span>
+<span class="line_number">471</span>  /// One channel of a time series: an immutable view of storage that other
+<span class="line_number">472</span>  /// views may share. Observations leave the channel as deep copies, so
+<span class="line_number">473</span>  /// mutating them never changes the channel or its views.
+<span class="line_number">474</span>  ///
+<span class="line_number">475</span>  /// A channel either holds stored observations or is a view whose
+<span class="line_number">476</span>  /// observations are those of a source channel: stacked at lagged times by
+<span class="line_number">477</span>  /// view_lagged_at, or picked by index by view_at_indices. A view keeps its
+<span class="line_number">478</span>  /// times, its lags, and for each observation a base: the source
+<span class="line_number">479</span>  /// observation for the smallest lag. The other components are found by searching back from the
+<span class="line_number">480</span>  /// base when read, so a view costs two numbers per observation and copies
+<span class="line_number">481</span>  /// no values. A view evaluates as any channel does, by previous value on
+<span class="line_number">482</span>  /// its own times with its own snapping, so it shows exactly the
+<span class="line_number">483</span>  /// observations it holds and nothing else of its source.
+<span class="line_number">484</span>  template &lt;typename T&gt;
+<span class="line_number">485</span>  class Channel
+<span class="line_number">486</span>  {
+<span class="line_number">487</span>  public:
+<span class="line_number">488</span>    /// Copy @p values, whose axis 0 is time, into new storage.
+<span class="line_number">489</span>    Channel(Times times, const Tensor&lt;T&gt;&amp; values, float64_t snapTolerance = DefaultSnapTolerance);
+<span class="line_number">490</span>
+<span class="line_number">491</span>    /// Adopt @p values, the observations stored flat in row-major order with
+<span class="line_number">492</span>    /// prod(@p shape) values each.
+<span class="line_number">493</span>    Channel(Times times, std::vector&lt;size_t&gt; shape, std::vector&lt;T&gt; values,
+<span class="line_number">494</span>            float64_t snapTolerance = DefaultSnapTolerance);
+<span class="line_number">495</span>
+<span class="line_number">496</span>    /// The snap tolerance used when evaluating, relative to the magnitude
+<span class="line_number">497</span>    /// of the timestamps; 0 disables snapping.
+<span class="line_number">498</span>    [[nodiscard]] float64_t snap_tolerance() const noexcept { return m_snapTolerance; }
+<span class="line_number">499</span>
+<span class="line_number">500</span>    void set_snap_tolerance(float64_t tolerance);
+<span class="line_number">501</span>
+<span class="line_number">502</span>    /// A view of this channel whose times are @p times, in the channel&#39;s
+<span class="line_number">503</span>    /// unit, and whose observation k stacks, along a new leading axis, this
+<span class="line_number">504</span>    /// channel&#39;s observations in effect at times[k] - lags[j] for each j, in
+<span class="line_number">505</span>    /// order. A lagged time before the first observation gets the first. It
+<span class="line_number">506</span>    /// shares this channel and its snap settings.
+<span class="line_number">507</span>    [[nodiscard]] Channel view_lagged_at(Times times, std::span&lt;const float64_t&gt; lags) const;
+<span class="line_number">508</span>
+<span class="line_number">509</span>    /// A view of this channel&#39;s observations @p indices, strictly
+<span class="line_number">510</span>    /// increasing, at their times, with no new axis. It shares this channel
+<span class="line_number">511</span>    /// and its snap settings, but not its start or end. For a view with one
+<span class="line_number">512</span>    /// component, as view_at_indices and view_lagged_at with one lag make,
+<span class="line_number">513</span>    /// it shares that view&#39;s source instead, at the indices the view reads
+<span class="line_number">514</span>    /// there, so chains of views stay one level deep.
+<span class="line_number">515</span>    [[nodiscard]] Channel view_at_indices(std::vector&lt;size_t&gt; indices) const;
+<span class="line_number">516</span>
+<span class="line_number">517</span>    /// The same observations at @p times, one per observation, with its own
+<span class="line_number">518</span>    /// origin. It keeps whether the start is closed but not the end, which
+<span class="line_number">519</span>    /// was at the old times. Throws std::logic_error for a view with several
+<span class="line_number">520</span>    /// lags, whose components are found from its times.
+<span class="line_number">521</span>    [[nodiscard]] Channel with_times(Times times) const;
+<span class="line_number">522</span>
+<span class="line_number">523</span>    /// This channel with the end @p end, in its unit: it can be evaluated
+<span class="line_number">524</span>    /// after its last timestamp up to @p end, and at @p end if @p closed.
+<span class="line_number">525</span>    /// @p end must come after the last timestamp, or be at it if @p closed,
+<span class="line_number">526</span>    /// which is the same as setting no end. Views made by view_lagged_at
+<span class="line_number">527</span>    /// keep the end.
+<span class="line_number">528</span>    [[nodiscard]] Channel until(float64_t end, bool closed = false) const;
+<span class="line_number">529</span>
+<span class="line_number">530</span>    /// The end set by until(), if any; without one, the channel can be
+<span class="line_number">531</span>    /// evaluated up to and at its last timestamp.
+<span class="line_number">532</span>    [[nodiscard]] std::optional&lt;float64_t&gt; end() const noexcept { return m_end; }
+<span class="line_number">533</span>
+<span class="line_number">534</span>    /// Whether the end, end() if set and else the last timestamp, is in the
+<span class="line_number">535</span>    /// domain.
+<span class="line_number">536</span>    [[nodiscard]] bool end_closed() const noexcept { return !m_end || m_endClosed; }
+<span class="line_number">537</span>
+<span class="line_number">538</span>    /// This channel with its first timestamp in the domain if @p closed. If
+<span class="line_number">539</span>    /// not, the first observation still stays in effect after it. Views made
+<span class="line_number">540</span>    /// by view_lagged_at keep the start.
+<span class="line_number">541</span>    [[nodiscard]] Channel with_start_closed(bool closed) const;
+<span class="line_number">542</span>
+<span class="line_number">543</span>    /// This channel with its timestamps, end, and origin, and for a view its
+<span class="line_number">544</span>    /// lags, converted from @p from to @p to as convert_time() converts
+<span class="line_number">545</span>    /// them, so that timestamps without a unit become counts of @p to. A
+<span class="line_number">546</span>    /// view with several lags, which reads its source at its times less its
+<span class="line_number">547</span>    /// lags, converts its source alike; one with one lag reads it by index
+<span class="line_number">548</span>    /// and leaves it. It shares the observations.
+<span class="line_number">549</span>    [[nodiscard]] Channel to(TimeUnit from, TimeUnit to) const;
+<span class="line_number">550</span>
+<span class="line_number">551</span>    /// This channel with @p delta added to every timestamp and to its end. A
+<span class="line_number">552</span>    /// view with several lags shifts its source alike, so it reads the same
+<span class="line_number">553</span>    /// observations; one with one lag reads it by index and leaves it. It
+<span class="line_number">554</span>    /// shares the observations; only the timestamps are copied.
+<span class="line_number">555</span>    [[nodiscard]] Channel shifted(float64_t delta) const;
+<span class="line_number">556</span>
+<span class="line_number">557</span>    /// Whether the first timestamp is in the domain.
+<span class="line_number">558</span>    [[nodiscard]] bool start_closed() const noexcept { return m_startClosed; }
+<span class="line_number">559</span>
+<span class="line_number">560</span>    /// The origin of the channel&#39;s times.
+<span class="line_number">561</span>    [[nodiscard]] float64_t origin() const noexcept { return held_times().origin(); }
+<span class="line_number">562</span>
+<span class="line_number">563</span>    /// The observation with the largest timestamp at or before @p t, in the
+<span class="line_number">564</span>    /// channel&#39;s own unit, a tensor of shape shape(). As in the tolerant
+<span class="line_number">565</span>    /// comparison of APL, a query below an observation by at most
+<span class="line_number">566</span>    /// snap_tolerance() times the larger magnitude of it and the previous
+<span class="line_number">567</span>    /// timestamp counts as reaching it, as long as it is also within a
+<span class="line_number">568</span>    /// quarter of the gap to the previous timestamp, so that a query at the
+<span class="line_number">569</span>    /// previous timestamp still gets the observation recorded there.
+<span class="line_number">570</span>    ///
+<span class="line_number">571</span>    /// The caller checks that @p t lies between the first and last
+<span class="line_number">572</span>    /// observations, in its own unit: a time converted into the channel&#39;s
+<span class="line_number">573</span>    /// unit may round just outside them. A time below the first observation
+<span class="line_number">574</span>    /// gets the first. Requires size() &gt; 0.
+<span class="line_number">575</span>    [[nodiscard]] Tensor&lt;T&gt; lookup(float64_t t) const;
+<span class="line_number">576</span>
+<span class="line_number">577</span>    /// The index of the observation in effect at @p t, in the channel&#39;s unit,
+<span class="line_number">578</span>    /// with the snapping of lookup(); a time below the first observation gets
+<span class="line_number">579</span>    /// the first. This is the only way from a time to an observation, so
+<span class="line_number">580</span>    /// every lookup snaps: the timestamps are not handed out to search.
+<span class="line_number">581</span>    /// The search gallops from @p hint, any index, so a hint d timestamps
+<span class="line_number">582</span>    /// from the answer costs O(log d) comparisons; the answer does not depend
+<span class="line_number">583</span>    /// on it. Passing the previous answer makes a run of nearby queries
+<span class="line_number">584</span>    /// cheap. Requires size() &gt; 0.
+<span class="line_number">585</span>    [[nodiscard]] size_t index_at(float64_t t, size_t hint = 0) const;
+<span class="line_number">586</span>
+<span class="line_number">587</span>    /// Write the observations at @p sortedTimes, ascending and in the
+<span class="line_number">588</span>    /// channel&#39;s own unit, to @p out: the one at sortedTimes[k] goes to block
+<span class="line_number">589</span>    /// order[k], each block prod(shape()) values long. @p out is a
+<span class="line_number">590</span>    /// random-access iterator, such as a tensor&#39;s data() or a vector&#39;s
+<span class="line_number">591</span>    /// begin(). One merged pass over the timestamps, as in lookup(). Requires
+<span class="line_number">592</span>    /// size() &gt; 0.
+<span class="line_number">593</span>    template &lt;std::random_access_iterator Out&gt;
+<span class="line_number">594</span>    void lookup_sorted(std::span&lt;const float64_t&gt; sortedTimes, std::span&lt;const size_t&gt; order, Out out) const;
+<span class="line_number">595</span>
+<span class="line_number">596</span>    /// A copy of the timestamps, to save or report them; find observations
+<span class="line_number">597</span>    /// with index_at().
+<span class="line_number">598</span>    [[nodiscard]] Times times() const { return held_times(); }
+<span class="line_number">599</span>
+<span class="line_number">600</span>    /// The timestamps @p values with this channel&#39;s origin, without copying
+<span class="line_number">601</span>    /// its own timestamps.
+<span class="line_number">602</span>    [[nodiscard]] Times times_like(std::vector&lt;float64_t&gt; values) const
+<span class="line_number">603</span>    {
+<span class="line_number">604</span>      return held_times().with_values(std::move(values));
+<span class="line_number">605</span>    }
+<span class="line_number">606</span>
+<span class="line_number">607</span>    /// Timestamp @p k, in the channel&#39;s unit, to build new times from.
+</code></pre>
+            <div class="issue">
+                <div>
+                    <span class="what">Possible data race during read of size 8 at 0x35D90790 by thread #14</span>
+                    <div class="navigation">
+                        <button class="next_error">Next</button>
+                        <button class="prev_error">Previous</button>
+                    </div>
+                </div>
+                <div>
+                    <table class="call_stack">
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/timeseries.tpp:432<br>
+                                    <code class="cpp">sb::Channel&lt;double&gt;::source_index(unsigned long, unsigned long) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">429</span>    // The first timestamp after the lagged time is at or before the one
+<span class="line_number">430</span>    // after the base, usually a few observations back.
+<span class="line_number">431</span>    const auto&amp; times = m_source-&gt;held_times().values();
+<span class="line_number">432</span><span class="error">    const auto t = time(k) - m_lags[j];
+</span><span class="line_number">433</span>    const auto afterBase = times.begin() + static_cast&lt;std::ptrdiff_t&gt;((*m_base)[k] + 1);
+<span class="line_number">434</span>    const auto next = gallop_upper_bound(times.begin(), times.end(), afterBase, t);
+<span class="line_number">435</span>    return m_source-&gt;snap(static_cast&lt;size_t&gt;(next - times.begin()), t);
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/io/../timeseries.tpp:416<br>
+                                    <code class="cpp">void sb::Channel&lt;double&gt;::copy_observation&lt;double*&gt;(unsigned long, double*) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">413</span>    const auto sourceBlock = m_source-&gt;block_size();
+<span class="line_number">414</span>    for (size_t j = 0; j &lt; m_lags.size(); ++j)
+<span class="line_number">415</span>    {
+<span class="line_number">416</span><span class="error">      m_source-&gt;copy_observation(source_index(k, j), out + static_cast&lt;std::ptrdiff_t&gt;(j * sourceBlock));
+</span><span class="line_number">417</span>    }
+<span class="line_number">418</span>  }
+<span class="line_number">419</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/io/../timeseries.tpp:416<br>
+                                    <code class="cpp">void sb::Channel&lt;double&gt;::copy_observation&lt;double*&gt;(unsigned long, double*) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">413</span>    const auto sourceBlock = m_source-&gt;block_size();
+<span class="line_number">414</span>    for (size_t j = 0; j &lt; m_lags.size(); ++j)
+<span class="line_number">415</span>    {
+<span class="line_number">416</span><span class="error">      m_source-&gt;copy_observation(source_index(k, j), out + static_cast&lt;std::ptrdiff_t&gt;(j * sourceBlock));
+</span><span class="line_number">417</span>    }
+<span class="line_number">418</span>  }
+<span class="line_number">419</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/io/../timeseries.tpp:350<br>
+                                    <code class="cpp">void sb::Channel&lt;double&gt;::lookup_sorted&lt;double*&gt;(std::span&lt;double const, 18446744073709551615ul&gt;, std::span&lt;unsigned long const, 18446744073709551615ul&gt;, double*) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">347</span>    const auto indices = indices_sorted(sortedTimes);
+<span class="line_number">348</span>    for (size_t k = 0; k &lt; sortedTimes.size(); ++k)
+<span class="line_number">349</span>    {
+<span class="line_number">350</span><span class="error">      copy_observation(indices[k], out + static_cast&lt;std::ptrdiff_t&gt;(order[k] * blockSize));
+</span><span class="line_number">351</span>    }
+<span class="line_number">352</span>  }
+<span class="line_number">353</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/timeseries.tpp:781<br>
+                                    <code class="cpp">sb::detail::evaluate_each&lt;double, double, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;, unsigned long, double)#1}, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;, unsigned long, double)#1}, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;)#1}, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}::operator()(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">778</span>              sorted[q] = time_of(one, c, queries[order[q]]);
+<span class="line_number">779</span>            }
+<span class="line_number">780</span>            const auto blockSize = leaves[c].size() / series.size();
+<span class="line_number">781</span><span class="error">            one.channel(c).lookup_sorted(sorted, order, leaves[c].data() + static_cast&lt;std::ptrdiff_t&gt;(k * blockSize));
+</span><span class="line_number">782</span>          }
+<span class="line_number">783</span>        }, exec);
+<span class="line_number">784</span>      }
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/walk.hpp:155<br>
+                                    <code class="cpp">sb::parallel_walk_async&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::detail::evaluate_each&lt;double, double, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;, unsigned long, double)#1}, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;, unsigned long, double)#1}, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;)#1}, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::detail::evaluate_each&lt;double, double, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;, unsigned long, double)#1}, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;, unsigned long, double)#1}, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;)#1}, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}::operator()(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">152</span>  tf::Future&lt;void&gt; parallel_walk_async(const TTensor&amp; tensor, UnaryFunc&amp;&amp; f, Executor&amp; exec)
+<span class="line_number">153</span>  {
+<span class="line_number">154</span>    return detail::parallel_walk_impl(tensor, [f = std::forward&lt;UnaryFunc&gt;(f)](const std::vector&lt;size_t&gt;&amp; idx, size_t) {
+<span class="line_number">155</span><span class="error">      f(idx);
+</span><span class="line_number">156</span>    }, exec);
+<span class="line_number">157</span>  }
+<span class="line_number">158</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/walk.hpp:118<br>
+                                    <code class="cpp">sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::detail::evaluate_each&lt;double, double, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;, unsigned long, double)#1}, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;, unsigned long, double)#1}, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;)#1}, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::detail::evaluate_each&lt;double, double, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;, unsigned long, double)#1}, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;, unsigned long, double)#1}, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;)#1}, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::detail::evaluate_each&lt;double, double, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;, unsigned long, double)#1}, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;, unsigned long, double)#1}, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;)#1}, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}::operator()(unsigned long) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">115</span>          rem /= shape[i];
+<span class="line_number">116</span>        }
+<span class="line_number">117</span>
+<span class="line_number">118</span><span class="error">        f(idx, flat);
+</span><span class="line_number">119</span>      });
+<span class="line_number">120</span>
+<span class="line_number">121</span>      return exec.cpu()-&gt;run(std::move(flow));
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/algorithm/for_each.hpp:134<br>
+                                    <code class="cpp">tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::detail::evaluate_each&lt;double, double, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;, unsigned long, double)#1}, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;, unsigned long, double)#1}, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;)#1}, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::detail::evaluate_each&lt;double, double, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;, unsigned long, double)#1}, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;, unsigned long, double)#1}, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;)#1}, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::detail::evaluate_each&lt;double, double, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;, unsigned long, double)#1}, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;, unsigned long, double)#1}, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;)#1}, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::detail::evaluate_each&lt;double, double, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;, unsigned long, double)#1}, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;, unsigned long, double)#1}, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;)#1}, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::detail::evaluate_each&lt;double, double, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;, unsigned long, double)#1}, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;, unsigned long, double)#1}, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;)#1}, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::detail::evaluate_each&lt;double, double, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;, unsigned long, double)#1}, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;, unsigned long, double)#1}, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;)#1}, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}::operator()()::{lambda(unsigned long, unsigned long)#1}::operator()(unsigned long, unsigned long)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">131</span>          part.loop(N, W, *next, [=] (size_t part_b, size_t part_e) mutable {
+<span class="line_number">132</span>            auto idx = static_cast&lt;B_t&gt;(part_b) * inc + beg;
+<span class="line_number">133</span>            for(size_t x=part_b; x&lt;part_e; x++, idx += inc) {
+<span class="line_number">134</span><span class="error">              c(idx);
+</span><span class="line_number">135</span>            }
+<span class="line_number">136</span>          });
+<span class="line_number">137</span>        });
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/../algorithm/partitioner.hpp:316<br>
+                                    <code class="cpp">void tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;::loop&lt;tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::detail::evaluate_each&lt;double, double, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;, unsigned long, double)#1}, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;, unsigned long, double)#1}, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;)#1}, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::detail::evaluate_each&lt;double, double, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;, unsigned long, double)#1}, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;, unsigned long, double)#1}, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;)#1}, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::detail::evaluate_each&lt;double, double, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;, unsigned long, double)#1}, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;, unsigned long, double)#1}, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;)#1}, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::detail::evaluate_each&lt;double, double, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;, unsigned long, double)#1}, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;, unsigned long, double)#1}, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;)#1}, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::detail::evaluate_each&lt;double, double, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;, unsigned long, double)#1}, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;, unsigned long, double)#1}, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;)#1}, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::detail::evaluate_each&lt;double, double, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;, unsigned long, double)#1}, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;, unsigned long, double)#1}, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;)#1}, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}::operator()()::{lambda(unsigned long, unsigned long)#1}, (void*)0&gt;(unsigned long, unsigned long, std::atomic&lt;unsigned long&gt;&amp;, tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::detail::evaluate_each&lt;double, double, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;, unsigned long, double)#1}, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;, unsigned long, double)#1}, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;)#1}, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::detail::evaluate_each&lt;double, double, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;, unsigned long, double)#1}, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;, unsigned long, double)#1}, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;)#1}, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::detail::evaluate_each&lt;double, double, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;, unsigned long, double)#1}, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;, unsigned long, double)#1}, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;)#1}, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::detail::evaluate_each&lt;double, double, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;, unsigned long, double)#1}, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;, unsigned long, double)#1}, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;)#1}, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::detail::evaluate_each&lt;double, double, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;, unsigned long, double)#1}, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;, unsigned long, double)#1}, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;)#1}, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::detail::evaluate_each&lt;double, double, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;, unsigned long, double)#1}, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;, unsigned long, double)#1}, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;)#1}, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}::operator()()::{lambda(unsigned long, unsigned long)#1}&amp;&amp;) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">313</span>          if(curr_b &gt;= N) {
+<span class="line_number">314</span>            return;
+<span class="line_number">315</span>          }
+<span class="line_number">316</span><span class="error">          func(curr_b, (std::min)(curr_b + chunk_size, N));
+</span><span class="line_number">317</span>        }
+<span class="line_number">318</span>        break;
+<span class="line_number">319</span>      }
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/algorithm/for_each.hpp:131<br>
+                                    <code class="cpp">tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::detail::evaluate_each&lt;double, double, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;, unsigned long, double)#1}, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;, unsigned long, double)#1}, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;)#1}, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::detail::evaluate_each&lt;double, double, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;, unsigned long, double)#1}, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;, unsigned long, double)#1}, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;)#1}, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::detail::evaluate_each&lt;double, double, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;, unsigned long, double)#1}, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;, unsigned long, double)#1}, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;)#1}, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::detail::evaluate_each&lt;double, double, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;, unsigned long, double)#1}, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;, unsigned long, double)#1}, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;)#1}, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::detail::evaluate_each&lt;double, double, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;, unsigned long, double)#1}, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;, unsigned long, double)#1}, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;)#1}, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::detail::evaluate_each&lt;double, double, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;, unsigned long, double)#1}, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;, unsigned long, double)#1}, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;)#1}, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}::operator()()</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">128</span>      auto next = std::make_shared&lt;std::atomic&lt;size_t&gt;&gt;(0);
+<span class="line_number">129</span>      for(size_t w=0; w&lt;W;) {
+<span class="line_number">130</span>        auto task = part([=] () mutable {
+<span class="line_number">131</span><span class="error">          part.loop(N, W, *next, [=] (size_t part_b, size_t part_e) mutable {
+</span><span class="line_number">132</span>            auto idx = static_cast&lt;B_t&gt;(part_b) * inc + beg;
+<span class="line_number">133</span>            for(size_t x=part_b; x&lt;part_e; x++, idx += inc) {
+<span class="line_number">134</span>              c(idx);
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/algorithm/for_each.hpp:138<br>
+                                    <code class="cpp">tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::detail::evaluate_each&lt;double, double, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;, unsigned long, double)#1}, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;, unsigned long, double)#1}, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;)#1}, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::detail::evaluate_each&lt;double, double, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;, unsigned long, double)#1}, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;, unsigned long, double)#1}, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;)#1}, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::detail::evaluate_each&lt;double, double, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;, unsigned long, double)#1}, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;, unsigned long, double)#1}, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;)#1}, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::detail::parallel_walk_impl&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::parallel_walk_async&lt;sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt;, sb::detail::evaluate_each&lt;double, double, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;, unsigned long, double)#1}, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;, unsigned long, double)#1}, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;)#1}, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::detail::evaluate_each&lt;double, double, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;, unsigned long, double)#1}, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;, unsigned long, double)#1}, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;)#1}, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;, unsigned long)#1}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::detail::evaluate_each&lt;double, double, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;, unsigned long, double)#1}, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;)#1}&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;, unsigned long, double)#1}, sb::evaluate&lt;double&gt;(sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; const&amp;, sb::Tensor&lt;double, 0&gt; const&amp;, std::optional&lt;sb::TimeUnit&gt;, sb::Executor&amp;)::{lambda(sb::TimeSeries&lt;double&gt; const&amp;)#1}, sb::Executor&amp;)::{lambda(std::vector&lt;unsigned long, std::allocator&lt;unsigned long&gt; &gt; const&amp;)#2}&amp;&amp;, sb::Executor&amp;)::{lambda(unsigned long)#2}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">135</span>            }
+<span class="line_number">136</span>          });
+<span class="line_number">137</span>        });
+<span class="line_number">138</span><span class="error">        (++w == W) ? task() : rt.silent_async(task);
+</span><span class="line_number">139</span>      }
+<span class="line_number">140</span>    }
+<span class="line_number">141</span>  };
+</code></pre>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            <pre class="code">
+<code class="c++"><span class="line_number">608</span><span class="error">    [[nodiscard]] float64_t time(size_t k) const { return held_times().values()[k]; }</span>
+<span class="line_number">609</span>
+<span class="line_number">610</span>    [[nodiscard]] const std::vector&lt;size_t&gt;&amp; shape() const noexcept { return m_shape; }
+<span class="line_number">611</span>    [[nodiscard]] size_t size() const noexcept { return held_times().size(); }
+<span class="line_number">612</span>
+<span class="line_number">613</span>    /// The same timestamps, start, end, shape, values, and snap settings;
+<span class="line_number">614</span>    /// the timestamps include their epoch and origin.
+<span class="line_number">615</span>    [[nodiscard]] bool operator==(const Channel&amp; other) const;
+<span class="line_number">616</span>
+<span class="line_number">617</span>    /// operator== without the origin of the timestamps, which places a
+<span class="line_number">618</span>    /// channel but does not change how it evaluates.
+<span class="line_number">619</span>    [[nodiscard]] bool same_observations(const Channel&amp; other) const;
+<span class="line_number">620</span>
+<span class="line_number">621</span>    /// Element @p i of the observations at times(), flattened in row-major
+<span class="line_number">622</span>    /// order: observation i / prod(shape()), element i % prod(shape()).
+<span class="line_number">623</span>    [[nodiscard]] typename std::vector&lt;T&gt;::const_reference flat_value(size_t i) const;
+<span class="line_number">624</span>
+<span class="line_number">625</span>    /// A copy of the values as a tensor of shape (size(), *shape()).
+<span class="line_number">626</span>    [[nodiscard]] Tensor&lt;T&gt; values() const;
+<span class="line_number">627</span>
+<span class="line_number">628</span>    /// A copy of observation @p i as a tensor of shape shape(). Negative
+<span class="line_number">629</span>    /// indices count from the end.
+<span class="line_number">630</span>    [[nodiscard]] Tensor&lt;T&gt; observation(std::ptrdiff_t i) const;
+<span class="line_number">631</span>
+<span class="line_number">632</span>  private:
+<span class="line_number">633</span>    /// The timestamps, kept inside the channel so that searches go through
+<span class="line_number">634</span>    /// index_at().
+<span class="line_number">635</span>    [[nodiscard]] const Times&amp; held_times() const noexcept { return m_times ? *m_times : m_storage-&gt;times; }
+<span class="line_number">636</span>
+<span class="line_number">637</span>    /// This channel with an end that rounding put at or before its last
+<span class="line_number">638</span>    /// timestamp placed as windows place it: a closed end is dropped, and an
+<span class="line_number">639</span>    /// open one moves to just after the last timestamp.
+<span class="line_number">640</span>    [[nodiscard]] Channel with_end_after_last() const;
+<span class="line_number">641</span>
+<span class="line_number">642</span>    /// The number of values in one observation, prod(shape()).
+<span class="line_number">643</span>    [[nodiscard]] size_t block_size() const noexcept
+<span class="line_number">644</span>    {
+<span class="line_number">645</span>      return std::accumulate(m_shape.begin(), m_shape.end(), size_t{1}, std::multiplies&lt;&gt;());
+<span class="line_number">646</span>    }
+<span class="line_number">647</span>
+<span class="line_number">648</span>    /// Write observation @p k, prod(shape()) values, to @p out.
+<span class="line_number">649</span>    template &lt;std::random_access_iterator Out&gt;
+<span class="line_number">650</span>    void copy_observation(size_t k, Out out) const;
+<span class="line_number">651</span>
+<span class="line_number">652</span>    /// The observation indices for @p sortedTimes, ascending and in the
+<span class="line_number">653</span>    /// channel&#39;s unit, found in one merged pass. Requires size() &gt; 0.
+<span class="line_number">654</span>    [[nodiscard]] std::vector&lt;size_t&gt; indices_sorted(std::span&lt;const float64_t&gt; sortedTimes) const;
+<span class="line_number">655</span>
+<span class="line_number">656</span>    /// The index of the observation for @p t, given @p next, the index of the
+<span class="line_number">657</span>    /// first timestamp after t.
+<span class="line_number">658</span>    [[nodiscard]] size_t snap(size_t next, float64_t t) const;
+<span class="line_number">659</span>
+<span class="line_number">660</span>    /// For a view, the source observation that component @p j of observation
+<span class="line_number">661</span>    /// @p k reads.
+<span class="line_number">662</span>    [[nodiscard]] size_t source_index(size_t k, size_t j) const;
+<span class="line_number">663</span>
+<span class="line_number">664</span>    std::shared_ptr&lt;ChannelStorage&lt;T&gt;&gt; m_storage;  // null for a view
+<span class="line_number">665</span>    std::shared_ptr&lt;const Channel&gt; m_source;       // null for stored observations
+<span class="line_number">666</span>    std::shared_ptr&lt;const Times&gt; m_times;  // set for a view, or to relabel stored times
+<span class="line_number">667</span>    std::shared_ptr&lt;const std::vector&lt;size_t&gt;&gt; m_base;
+<span class="line_number">668</span>    std::vector&lt;float64_t&gt; m_lags;
+<span class="line_number">669</span>    std::vector&lt;size_t&gt; m_shape;
+<span class="line_number">670</span>    std::optional&lt;float64_t&gt; m_end;
+<span class="line_number">671</span>    bool m_endClosed = false;
+<span class="line_number">672</span>    bool m_startClosed = true;
+<span class="line_number">673</span>    float64_t m_snapTolerance = DefaultSnapTolerance;
+<span class="line_number">674</span>  };
+<span class="line_number">675</span>
+<span class="line_number">676</span>  /// Named channels of one element type, queried in one time unit.
+<span class="line_number">677</span>  template &lt;typename T&gt;
+<span class="line_number">678</span>  class TimeSeries
+<span class="line_number">679</span>  {
+<span class="line_number">680</span>  public:
+<span class="line_number">681</span>    using value_type = T;
+<span class="line_number">682</span>
+<span class="line_number">683</span>    /// An empty one-channel series in seconds, so that series can be tensor
+<span class="line_number">684</span>    /// elements.
+<span class="line_number">685</span>    TimeSeries()
+<span class="line_number">686</span>      : TimeSeries(Times(std::vector&lt;float64_t&gt;{}), Tensor&lt;T&gt;(std::vector&lt;size_t&gt;{0}), DefaultSnapTolerance)
+<span class="line_number">687</span>    {
+<span class="line_number">688</span>    }
+<span class="line_number">689</span>
+<span class="line_number">690</span>    /// A series of @p channels, whose times are in @p unit, counted from
+<span class="line_number">691</span>    /// @p epoch, or from none. A series without a unit has no epoch.
+<span class="line_number">692</span>    TimeSeries(std::vector&lt;Channel&lt;T&gt;&gt; channels, TimeUnit unit, std::optional&lt;DateTime&gt; epoch = std::nullopt);
+<span class="line_number">693</span>
+<span class="line_number">694</span>    /// A series with one channel.
+<span class="line_number">695</span>    TimeSeries(Times times, const Tensor&lt;T&gt;&amp; values, float64_t snapTolerance, TimeUnit unit = TimeUnit::Seconds,
+<span class="line_number">696</span>               std::optional&lt;DateTime&gt; epoch = std::nullopt)
+<span class="line_number">697</span>      : TimeSeries({Channel&lt;T&gt;(std::move(times), values, snapTolerance)}, unit, epoch)
+<span class="line_number">698</span>    {
+<span class="line_number">699</span>    }
+<span class="line_number">700</span>
+<span class="line_number">701</span>    /// Combine one-channel series into one series; channel i is @p parts[i]
+<span class="line_number">702</span>    /// converted to @p unit, with its own snap settings. @p unit defaults to
+<span class="line_number">703</span>    /// the unit the parts share and is required when their units differ.
+<span class="line_number">704</span>    [[nodiscard]] static TimeSeries from_channels(const std::vector&lt;TimeSeries&gt;&amp; parts,
+<span class="line_number">705</span>                                                  std::optional&lt;TimeUnit&gt; unit);
+<span class="line_number">706</span>
+<span class="line_number">707</span>    [[nodiscard]] const Channel&lt;T&gt;&amp; channel(size_t i) const { return m_channels.at(i); }
+<span class="line_number">708</span>    [[nodiscard]] size_t n_channels() const noexcept { return m_channels.size(); }
+<span class="line_number">709</span>
+<span class="line_number">710</span>    /// The channels at @p indices, in that order, sharing their storage with
+<span class="line_number">711</span>    /// this series and queried in the same unit. Negative indices count from
+<span class="line_number">712</span>    /// the end.
+<span class="line_number">713</span>    [[nodiscard]] TimeSeries select(const std::vector&lt;std::ptrdiff_t&gt;&amp; indices) const;
+<span class="line_number">714</span>    [[nodiscard]] TimeUnit unit() const noexcept { return m_unit; }
+<span class="line_number">715</span>
+<span class="line_number">716</span>    /// The instant time 0 stands for, if any.
+<span class="line_number">717</span>    [[nodiscard]] const std::optional&lt;DateTime&gt;&amp; epoch() const noexcept { return m_epoch; }
+<span class="line_number">718</span>
+<span class="line_number">719</span>    /// The same series in @p unit, with every channel converted by
+<span class="line_number">720</span>    /// Channel::to(), sharing the observations. A series without a unit gets
+<span class="line_number">721</span>    /// @p unit: its numbers become counts of it.
+<span class="line_number">722</span>    [[nodiscard]] TimeSeries to(TimeUnit unit) const;
+<span class="line_number">723</span>
+<span class="line_number">724</span>    /// The same series counted from @p epoch, or from none, sharing the
+<span class="line_number">725</span>    /// observations; no time is shifted.
+<span class="line_number">726</span>    [[nodiscard]] TimeSeries with_epoch(std::optional&lt;DateTime&gt; epoch) const;
+<span class="line_number">727</span>
+<span class="line_number">728</span>    /// The same series with @p delta, in its unit, added to the times of
+<span class="line_number">729</span>    /// every channel, counted from @p epoch, or from none.
+<span class="line_number">730</span>    [[nodiscard]] TimeSeries shifted(float64_t delta, std::optional&lt;DateTime&gt; epoch) const;
+<span class="line_number">731</span>
+<span class="line_number">732</span>    /// The times at which every channel can be evaluated: from the latest
+<span class="line_number">733</span>    /// first timestamp to the earliest end, a channel&#39;s last timestamp or its
+<span class="line_number">734</span>    /// end, as check_observed() compares them.
+<span class="line_number">735</span>    using Domain = TimeDomain;
+<span class="line_number">736</span>
+<span class="line_number">737</span>    /// The domain of the series. Requires every channel to have
+<span class="line_number">738</span>    /// observations.
+<span class="line_number">739</span>    [[nodiscard]] Domain domain() const;
+<span class="line_number">740</span>
+<span class="line_number">741</span>    /// The same unit, epoch, and channels.
+<span class="line_number">742</span>    [[nodiscard]] bool operator==(const TimeSeries&amp; other) const = default;
+<span class="line_number">743</span>
+<span class="line_number">744</span>    /// The same unit, and channels with the same observations; see
+<span class="line_number">745</span>    /// Channel::same_observations(). The epoch is not compared.
+<span class="line_number">746</span>    [[nodiscard]] bool same_observations(const TimeSeries&amp; other) const
+<span class="line_number">747</span>    {
+<span class="line_number">748</span>      return m_unit == other.m_unit &amp;&amp; std::ranges::equal(m_channels, other.m_channels, [](const auto&amp; a, const auto&amp; b) {
+<span class="line_number">749</span>               return a.same_observations(b);
+<span class="line_number">750</span>             });
+<span class="line_number">751</span>    }
+<span class="line_number">752</span>
+<span class="line_number">753</span>    /// Every channel&#39;s value at @p t, given in the series&#39; unit: one leaf per
+<span class="line_number">754</span>    /// channel, in channel order, each a tensor of that channel&#39;s shape.
+<span class="line_number">755</span>    /// @p t must lie between the first and last observations of every
+<span class="line_number">756</span>    /// channel, both included.
+<span class="line_number">757</span>    [[nodiscard]] NestedTensor&lt;T&gt; evaluate(float64_t t) const;
+<span class="line_number">758</span>
+<span class="line_number">759</span>    /// Every channel&#39;s values at the times @p t, given in the series&#39; unit:
+<span class="line_number">760</span>    /// one leaf per channel, in channel order, each a tensor of shape
+<span class="line_number">761</span>    /// (*t.shape(), *shape). The queries are sorted once, in O(m log m) for m
+<span class="line_number">762</span>    /// queries, and merged against each channel&#39;s timestamps, galloping
+<span class="line_number">763</span>    /// between queries: at most O(m log n) and O(m + n) for n observations.
+<span class="line_number">764</span>    /// Every time must lie in the domain.
+<span class="line_number">765</span>    [[nodiscard]] NestedTensor&lt;T&gt; evaluate(const Tensor&lt;float64_t&gt;&amp; t) const;
+<span class="line_number">766</span>
+<span class="line_number">767</span>  private:
+<span class="line_number">768</span>    /// Throw TimeSeriesDomainError, naming the domain, unless @p t, in the
+<span class="line_number">769</span>    /// series&#39; unit, lies in the domain. The check is exact: it compares
+<span class="line_number">770</span>    /// against the timestamps converted to the series&#39; unit, not the query
+<span class="line_number">771</span>    /// converted to each channel&#39;s unit.
+<span class="line_number">772</span>    void check_observed(float64_t t) const;
+<span class="line_number">773</span>
+<span class="line_number">774</span>    /// Throw unless a series in @p unit can have @p epoch.
+<span class="line_number">775</span>    static void check_epoch(TimeUnit unit, const std::optional&lt;DateTime&gt;&amp; epoch)
+<span class="line_number">776</span>    {
+<span class="line_number">777</span>      if (epoch &amp;&amp; unit == TimeUnit::Unitless)
+<span class="line_number">778</span>      {
+<span class="line_number">779</span>        throw std::invalid_argument(&#34;A series without a unit cannot have an epoch; give its times as durations or dates&#34;);
+<span class="line_number">780</span>      }
+<span class="line_number">781</span>    }
+<span class="line_number">782</span>
+<span class="line_number">783</span>    std::vector&lt;Channel&lt;T&gt;&gt; m_channels;
+<span class="line_number">784</span>    TimeUnit m_unit;
+<span class="line_number">785</span>    std::optional&lt;DateTime&gt; m_epoch;
+<span class="line_number">786</span>  };
+<span class="line_number">787</span>
+<span class="line_number">788</span>  template &lt;typename T&gt;
+<span class="line_number">789</span>  struct is_timeseries : std::false_type {};
+<span class="line_number">790</span>
+<span class="line_number">791</span>  template &lt;typename T&gt;
+<span class="line_number">792</span>  struct is_timeseries&lt;TimeSeries&lt;T&gt;&gt; : std::true_type { using value_type = T; };
+<span class="line_number">793</span>
+<span class="line_number">794</span>  template &lt;typename T&gt;
+<span class="line_number">795</span>  inline constexpr bool is_timeseries_v = is_timeseries&lt;T&gt;::value;
+<span class="line_number">796</span>
+<span class="line_number">797</span>  /// Every series of @p series evaluated at the times @p t, counts of
+<span class="line_number">798</span>  /// @p unit, as TimeSeries::evaluate does: one leaf per channel, in channel
+<span class="line_number">799</span>  /// order, of shape (*series.shape(), *t.shape(), *shape) of that channel.
+<span class="line_number">800</span>  /// Without @p unit, @p t are plain numbers, which only series without a
+<span class="line_number">801</span>  /// unit take; times of the wrong kind throw TypeError.
+<span class="line_number">802</span>  /// Requires every series to have the same number of channels and channel
+<span class="line_number">803</span>  /// shapes, and @p series to be non-empty. A time outside the domain of a
+<span class="line_number">804</span>  /// series throws TimeSeriesDomainError naming the first such series&#39;
+<span class="line_number">805</span>  /// position, as in &#34;TimeSeries at position (1, 2)&#34;.
+<span class="line_number">806</span>  /// The series are evaluated in parallel on @p exec.
+<span class="line_number">807</span>  template &lt;typename T&gt;
+<span class="line_number">808</span>  [[nodiscard]] NestedTensor&lt;T&gt; evaluate(const Tensor&lt;TimeSeries&lt;T&gt;&gt;&amp; series, const Tensor&lt;float64_t&gt;&amp; t,
+<span class="line_number">809</span>                                         std::optional&lt;TimeUnit&gt; unit = std::nullopt,
+<span class="line_number">810</span>                                         Executor&amp; exec = default_executor());
+<span class="line_number">811</span>
+<span class="line_number">812</span>  /// The time of @p date in channel @p c of @p series, which has an epoch:
+<span class="line_number">813</span>  /// time_since(date, epoch, unit) - origin. The difference rounds on the
+<span class="line_number">814</span>  /// scale of the time since the epoch and the origin, not of the result,
+<span class="line_number">815</span>  /// so a date that misses a closed end of the channel&#39;s domain by at most
+<span class="line_number">816</span>  /// snap_tolerance() times the larger magnitude of the two is placed at
+<span class="line_number">817</span>  /// that end. A window&#39;s own start date, its origin, then lies in its
+<span class="line_number">818</span>  /// domain although the two round differently.
+<span class="line_number">819</span>  template &lt;typename T&gt;
+<span class="line_number">820</span>  [[nodiscard]] float64_t time_of_date(const TimeSeries&lt;T&gt;&amp; series, size_t c, const DateTime&amp; date);
+<span class="line_number">821</span>
+<span class="line_number">822</span>  /// Every series of @p series evaluated at the dates @p dates, counts of
+<span class="line_number">823</span>  /// @p dateUnit after 1970-01-01, as evaluate() evaluates at times. Each
+<span class="line_number">824</span>  /// series places a date in each channel by time_of_date(), so series with
+<span class="line_number">825</span>  /// different epochs are evaluated at the same instants. Throws
+<span class="line_number">826</span>  /// std::invalid_argument if a series has no epoch.
+<span class="line_number">827</span>  template &lt;typename T&gt;
+<span class="line_number">828</span>  [[nodiscard]] NestedTensor&lt;T&gt; evaluate_dates(const Tensor&lt;TimeSeries&lt;T&gt;&gt;&amp; series, const Tensor&lt;int64_t&gt;&amp; dates,
+<span class="line_number">829</span>                                               TimeUnit dateUnit, Executor&amp; exec = default_executor());
+<span class="line_number">830</span>}
+<span class="line_number">831</span>
+<span class="line_number">832</span>#include &#34;timeseries.tpp&#34;
+<span class="line_number">833</span>
+<span class="line_number">834</span>#endif // STABLEBEAR_TIMESERIES_H
+</code>
+            </pre>
+        </div>
+    </div>
+</body>
+
+</html>
