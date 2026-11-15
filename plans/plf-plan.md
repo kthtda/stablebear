@@ -1,6 +1,6 @@
 # Piecewise linear functions with evaluation: implementation plan
 
-Progress: 16 of 17 items, 36 of 38 points (95%)
+Progress: 17 of 17 items, 38 of 38 points (100%)
 
 Spec: [plf-spec.md](plf-spec.md) (#253)
 
@@ -136,7 +136,7 @@ Spec: [plf-spec.md](plf-spec.md) (#253)
   every PLF to the latest breakpoint; a list gives the same lines as the
   `PlfTensor`; a list mixing `Pcf`s and `Plf`s draws each as steps or
   lines, extended to the latest breakpoint or to `max_time`.
-- [ ] **F2.** [2] Plotting guide: a PLF section in `docs/plotting.rst`
+- [x] **F2.** [2] (3cc5a8866) Plotting guide: a PLF section in `docs/plotting.rst`
   with a figure of a `Pcf` and its integral, from
   `docs/_static/gen_plotting_gallery.py` with a code dropdown, and the
   changelog entry mentions plotting.
