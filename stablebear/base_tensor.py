@@ -6,6 +6,7 @@ from typing import Any, TypeAlias
 
 import numpy as np
 
+from . import _autodiff
 from . import _sb_cpp as cpp
 from ._tensor_base import (
     ArithmeticTensor,
@@ -267,6 +268,49 @@ class PcfTensor(_PcfTensorBase):
 
     def _to_py_tensor(self, data):
         return PcfTensor(data)
+
+    # Set by arithmetic with a tracked framework scalar or PCF tensor: the
+    # values at all breakpoints, in the order of _serial, as a framework tensor.
+    _tvalues: Any = None
+
+    def _serial(self):
+        """(content, enumeration) as from_serial_content takes."""
+        return cpp.to_serial_content(self._data)
+
+    def _with_values(self, values):
+        """A PcfTensor with this tensor's breakpoint times and the given values."""
+        from .serialize import from_serial_content
+
+        content, enumeration = self._serial()
+        content[:, 1] = values
+        return from_serial_content(content, enumeration)
+
+    def __add__(self, rhs):
+        return _autodiff.pcf_op(ArithmeticTensor.__add__, operator.add, self, rhs)
+
+    def __radd__(self, lhs):
+        return _autodiff.pcf_op(lambda l, s: ArithmeticTensor.__radd__(s, l), operator.add, lhs, self)
+
+    def __sub__(self, rhs):
+        return _autodiff.pcf_op(ArithmeticTensor.__sub__, operator.sub, self, rhs)
+
+    def __rsub__(self, lhs):
+        return _autodiff.pcf_op(lambda l, s: ArithmeticTensor.__rsub__(s, l), operator.sub, lhs, self)
+
+    def __mul__(self, rhs):
+        return _autodiff.pcf_op(ArithmeticTensor.__mul__, operator.mul, self, rhs)
+
+    def __rmul__(self, lhs):
+        return _autodiff.pcf_op(lambda l, s: ArithmeticTensor.__rmul__(s, l), operator.mul, lhs, self)
+
+    def __truediv__(self, rhs):
+        return _autodiff.pcf_op(ArithmeticTensor.__truediv__, operator.truediv, self, rhs)
+
+    def __rtruediv__(self, lhs):
+        return _autodiff.pcf_op(lambda l, s: ArithmeticTensor.__rtruediv__(s, l), operator.truediv, lhs, self)
+
+    def __neg__(self):
+        return _autodiff.pcf_op(ArithmeticTensor.__neg__, operator.neg, self)
 
 
 class IntPcfTensor(_PcfTensorBase):

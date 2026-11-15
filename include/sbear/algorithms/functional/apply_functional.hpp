@@ -5,6 +5,7 @@
 #include "../../executor.hpp"
 #include "../../tensor.hpp"
 #include "../../task.hpp"
+#include "../../dual.hpp"
 
 #include <vector>
 #include <functional>
@@ -80,16 +81,48 @@ namespace sb
     return std::sqrt(out);
   }
 
-  template <PcfLike F>
-  typename F::value_type lp_norm(const F& f, typename F::value_type p)
+  /// p is the value type, or a Dual of it to also get the derivative with
+  /// respect to p.
+  template <PcfLike F, typename P>
+  P lp_norm(const F& f, P p)
   {
-    typename F::value_type out{ 0 };
+    using std::pow;
+    using Tv = typename F::value_type;
+    P out{ 0 };
 
     iterate_segments(f.points().cbegin(), f.points().cend(), typename F::time_type{ 0 }, infinite_time<F>(), [&out, p](const typename F::segment_type& seg) {
-      out += (seg.right - seg.left) * std::pow(std::abs(seg.value), p);
+      out += static_cast<Tv>(seg.right - seg.left) * pow(static_cast<Tv>(std::abs(seg.value)), p);
       });
 
-    return std::pow(out, typename F::value_type{1} / p);
+    return pow(out, P{ 1 } / p);
+  }
+
+  /// Gradient of lp_norm(f, p) with respect to the value at each breakpoint
+  /// of f: (|v_k| / ||f||_p)^(p-1) sign(v_k) dt_k. The last breakpoint, whose
+  /// segment is infinite, gets 0.
+  template <PcfLike F>
+  std::vector<typename F::value_type> lp_norm_grad_values(const F& f, typename F::value_type p)
+  {
+    using Tv = typename F::value_type;
+    const auto& pts = f.points();
+    std::vector<Tv> grad(pts.size(), Tv{ 0 });
+
+    Tv norm = lp_norm(f, p);
+    if (norm == 0)
+    {
+      return grad;
+    }
+    for (std::size_t k = 0; k + 1 < pts.size(); ++k)
+    {
+      if (pts[k].v == 0)
+      {
+        continue;
+      }
+      Tv dt = static_cast<Tv>(pts[k + 1].t - pts[k].t);
+      Tv sign = pts[k].v > 0 ? Tv{ 1 } : Tv{ -1 };
+      grad[k] = static_cast<Tv>(dt * std::pow(std::abs(pts[k].v) / norm, p - 1) * sign);
+    }
+    return grad;
   }
 
   template <PiecewiseFunctionLike F>

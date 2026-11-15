@@ -84,8 +84,60 @@ namespace sb_py
     return target;
   }
 
+  /// The inverse of make_from_serial_content: (content, enumeration) with the
+  /// PCFs' points concatenated in C order of the tensor's elements.
+  template <typename Tt, typename Tv>
+  nb::tuple to_serial_content(const sb::Tensor<sb::Pcf<Tt, Tv>>& tensor)
+  {
+    const auto& shape = tensor.shape();
+    std::vector<size_t> strides(shape.size(), 1);
+    for (size_t i = shape.size(); i-- > 1;)
+    {
+      strides[i - 1] = strides[i] * shape[i];
+    }
+    auto flat = [&strides](const std::vector<size_t>& idx) {
+      size_t k = 0;
+      for (size_t i = 0; i < idx.size(); ++i)
+      {
+        k += idx[i] * strides[i];
+      }
+      return k;
+    };
+
+    std::vector<size_t> sizes(tensor.size());
+    sb::walk(tensor, [&](const std::vector<size_t>& idx) { sizes[flat(idx)] = tensor(idx).points().size(); });
+
+    std::vector<size_t> enumerationShape(shape.begin(), shape.end());
+    enumerationShape.push_back(2);
+    auto enumeration = new_array<detail::EnumerationDt>(enumerationShape);
+    auto* e = enumeration.data();
+    size_t total = 0;
+    for (size_t k = 0; k < sizes.size(); ++k)
+    {
+      e[2 * k] = static_cast<detail::EnumerationDt>(total);
+      total += sizes[k];
+      e[2 * k + 1] = static_cast<detail::EnumerationDt>(total);
+    }
+
+    auto content = new_array<Tt>({ total, 2 });
+    auto* c = content.data();
+    sb::walk(tensor, [&](const std::vector<size_t>& idx) {
+      auto row = static_cast<size_t>(e[2 * flat(idx)]);
+      for (const auto& pt : tensor(idx).points())
+      {
+        c[2 * row] = pt.t;
+        c[2 * row + 1] = static_cast<Tt>(pt.v);
+        ++row;
+      }
+    });
+
+    return nb::make_tuple(content, enumeration);
+  }
+
   void register_make_from_serial_content(nb::module_& m)
   {
+    m.def("to_serial_content", &to_serial_content<sb::float32_t, sb::float32_t>);
+    m.def("to_serial_content", &to_serial_content<sb::float64_t, sb::float64_t>);
     m.def("make_from_serial_content_32", &make_from_serial_content<sb::float32_t, sb::float32_t>);
     m.def("make_from_serial_content_64", &make_from_serial_content<sb::float64_t, sb::float64_t>);
   }

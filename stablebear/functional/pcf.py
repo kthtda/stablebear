@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import operator
 from typing import Any
 
 import numpy as np
 
+from .. import _autodiff
 from .. import _sb_cpp as cpp
 from .._binary_io import _BinaryIoMixin
 from ._piecewise import _PiecewiseFunction
@@ -184,39 +186,59 @@ class Pcf(_PiecewiseFunction, _BinaryIoMixin):
             raise TypeError("Only PCFs with vtype float32 or float64 can be integrated.")
         return Plf._from_cpp(self._data.integrate(), self.vtype)
 
-    def _binop(self, rhs, op):
-        if isinstance(rhs, Pcf):
-            if not _has_matching_types(self, rhs):
-                raise TypeError("Mismatched PCF types")
-            return Pcf(op(self._data, rhs._data))
-        return Pcf(op(self._data, rhs))
+    # Set by arithmetic with a tracked framework scalar or PCF: the values at
+    # each breakpoint as a framework tensor, so gradients flow through them.
+    _tvalues: Any = None
+
+    def _serial(self):
+        """(content, enumeration) as from_serial_content takes, for this one PCF."""
+        pts = self.to_numpy()
+        return pts, np.array([0, len(pts)])
+
+    def _with_values(self, values):
+        """A PCF with this PCF's breakpoint times and the given values."""
+        pts = self.to_numpy().copy()
+        pts[:, 1] = values
+        return Pcf(pts)
+
+    def _binop(self, rhs, op, combine):
+        if isinstance(rhs, Pcf) and not _has_matching_types(self, rhs):
+            raise TypeError("Mismatched PCF types")
+
+        def primal_op(f, g):
+            return Pcf(op(f._data, g._data if isinstance(g, Pcf) else g))
+
+        return _autodiff.pcf_op(primal_op, combine, self, rhs)
+
+    def _rbinop(self, lhs, op, combine):
+        return _autodiff.pcf_op(lambda l, f: Pcf(op(f._data, l)), combine, lhs, self)
 
     def __add__(self, rhs):
-        return self._binop(rhs, type(self._data).__add__)
+        return self._binop(rhs, type(self._data).__add__, operator.add)
 
     def __sub__(self, rhs):
-        return self._binop(rhs, type(self._data).__sub__)
+        return self._binop(rhs, type(self._data).__sub__, operator.sub)
 
     def __mul__(self, rhs):
-        return self._binop(rhs, type(self._data).__mul__)
+        return self._binop(rhs, type(self._data).__mul__, operator.mul)
 
     def __radd__(self, lhs):
-        return Pcf(self._data.__radd__(lhs))
+        return self._rbinop(lhs, type(self._data).__radd__, operator.add)
 
     def __rsub__(self, lhs):
-        return Pcf(self._data.__rsub__(lhs))
+        return self._rbinop(lhs, type(self._data).__rsub__, operator.sub)
 
     def __rmul__(self, lhs):
-        return Pcf(self._data.__rmul__(lhs))
+        return self._rbinop(lhs, type(self._data).__rmul__, operator.mul)
 
     def __truediv__(self, rhs):
-        return self._binop(rhs, type(self._data).__truediv__)
+        return self._binop(rhs, type(self._data).__truediv__, operator.truediv)
 
     def __rtruediv__(self, lhs):
-        return Pcf(self._data.__rtruediv__(lhs))
+        return self._rbinop(lhs, type(self._data).__rtruediv__, operator.truediv)
 
     def __neg__(self):
-        return Pcf(-self._data)
+        return _autodiff.pcf_op(lambda f: Pcf(-f._data), operator.neg, self)
 
     def __pow__(self, exponent):
         """Raise every value of the PCF to a power.
