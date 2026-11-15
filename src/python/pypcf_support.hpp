@@ -69,17 +69,16 @@ namespace sb
         throw std::runtime_error("Input array should be Nx2 (supplied shape is " + ::shape_to_string(arr) + ").");
       }
 
-      auto sortByTime = [](const point_type& a, const point_type & b){
-        return a.t < b.t;
+      // Breakpoint times must be strictly increasing. Rather than silently
+      // sorting (which can reorder rows in a way that hides a misplaced or
+      // negative time), reject input that is not already ordered.
+      auto notIncreasing = [](const point_type& a, const point_type& b) {
+        return a.t >= b.t;
       };
-
-      // Breakpoints must be supplied in non-decreasing time order. Rather than
-      // silently sorting (which can reorder rows in a way that hides a
-      // misplaced/negative time), reject input that is not already ordered.
-      if (!std::is_sorted(points.begin(), points.end(), sortByTime))
+      if (std::adjacent_find(points.begin(), points.end(), notIncreasing) != points.end())
       {
         throw std::invalid_argument(
-          "Breakpoints must be given in non-decreasing time order.");
+          "Breakpoint times must be strictly increasing.");
       }
 
       // PCFs are defined on [0, inf), so the first (smallest) breakpoint time

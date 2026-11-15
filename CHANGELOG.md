@@ -1,3 +1,9 @@
+## Unreleased
+
+### Breaking changes
+
+* **`Pcf` rejects repeated times** — Constructing a `Pcf` raises `ValueError` when two breakpoints have the same time. Previously the times only had to be non-decreasing. ([#253](https://github.com/kthtda/stablebear/issues/253))
+
 ## 0.6.0
 
 ### Breaking changes

@@ -19,8 +19,8 @@ class Pcf(_PiecewiseFunction, _BinaryIoMixin):
     takes the value :math:`v_i` on the interval :math:`[t_i, t_{i+1})` for
     :math:`0 \leq i < n-1`, and :math:`v_{n-1}` on :math:`[t_{n-1}, \infty)`.
 
-    The breakpoints must be given in non-decreasing time order; a ``ValueError``
-    is raised otherwise. The first time must be :math:`t_0 = 0` (PCFs are
+    The breakpoint times must be strictly increasing; a ``ValueError`` is
+    raised otherwise. The first time must be :math:`t_0 = 0` (PCFs are
     defined on :math:`[0, \infty)`): a ``ValueError`` is raised if the first
     time is not zero — in particular if any time is negative.
 
