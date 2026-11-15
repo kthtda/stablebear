@@ -34,20 +34,12 @@ namespace
       return apply(inTensor, [](const PcfT& v) { return sb::l1_norm(v); });
     }
 
-    /// The gradient of each PCF's lp norm with respect to its breakpoint values,
-    /// as PCFs with the same times that hold the gradients as values.
-    static nb::tuple lpnorm_lp_grad_values(TensorT inTensor, Tv p)
+    /// The gradient of each PCF's lp norm with respect to its breakpoints, as
+    /// "PCFs" whose points hold (d/dt_k, d/dv_k) instead of (t_k, v_k).
+    static nb::tuple lpnorm_lp_grad(TensorT inTensor, Tv p)
     {
       auto outTensor = TensorT(inTensor.shape());
-      auto f = [p](const PcfT& v) {
-        auto pts = v.points();
-        auto grad = sb::lp_norm_grad_values(v, p);
-        for (size_t k = 0; k < pts.size(); ++k)
-        {
-          pts[k].v = grad[k];
-        }
-        return PcfT(std::move(pts));
-      };
+      auto f = [p](const PcfT& v) { return PcfT(sb::lp_norm_grad(v, p)); };
       std::unique_ptr<sb::StoppableTask<void>> task = sb_py::execute_stoppable_task<sb::ApplyFunctional<TensorT, TensorT, decltype(f)>>(inTensor, outTensor, f);
       return nb::make_tuple(std::move(task), outTensor);
     }
@@ -72,7 +64,7 @@ namespace
       nb::class_<PyNormsBindings> cls(m, ("Norms" + suffix).c_str());
 
       cls.def_static("lpnorm_l1", &PyNormsBindings::lpnorm_l1);
-      cls.def_static("lpnorm_lp_grad_values", &PyNormsBindings::lpnorm_lp_grad_values);
+      cls.def_static("lpnorm_lp_grad", &PyNormsBindings::lpnorm_lp_grad);
       def_static_wrt(cls, "lpnorm_lp", [](const PcfT& v, auto q) { return sb::lp_norm(v, q); });
     }
   };

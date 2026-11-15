@@ -33,9 +33,10 @@ class Pcf(_PiecewiseFunction, _BinaryIoMixin):
     arr : numpy.ndarray or Pcf or list
         Input data. If an ndarray or list, should have shape (n, 2) where each
         row is a (time, value) pair. Can also be an existing ``Pcf`` to copy.
-        If `times` is given, the values :math:`v_i` instead, with shape (n,);
-        these may be a PyTorch, JAX, or TensorFlow array, and the PCF then
-        carries gradients with respect to them through arithmetic and norms.
+        If `times` is given, the values :math:`v_i` instead, with shape (n,).
+        The values and the times may be PyTorch, JAX, or TensorFlow arrays,
+        and the PCF then carries gradients with respect to them through
+        arithmetic and norms.
     dtype : type, optional
         Data type for the PCF (``pcf32``, ``pcf64``, ``pcf32i``, or ``pcf64i``).
         If ``None``, the dtype is inferred from the input array (e.g. a
@@ -43,7 +44,9 @@ class Pcf(_PiecewiseFunction, _BinaryIoMixin):
         produces a 32-bit integer PCF).
     times : array_like, optional
         The breakpoint times :math:`t_i`, with shape (n,), when `arr` holds
-        only the values. The times are constants for gradients.
+        only the values. Times traced abstractly, as by ``jax.grad`` or
+        ``tf.function``, cannot be checked for order, and the PCF then
+        supports norms but not arithmetic.
 
     Examples
     --------
@@ -88,9 +91,12 @@ class Pcf(_PiecewiseFunction, _BinaryIoMixin):
         *,
         times: Any = None,
     ):
-        tvalues = None
+        ttimes = tvalues = None
         if times is not None:
-            arr, tvalues = _autodiff.content_from_values(times, arr)
+            arr, ttimes, tvalues = _autodiff.content_from_values(times, arr)
+            if np.isnan(arr[:, 0]).any():
+                # Times traced abstractly: their order cannot be checked.
+                arr = _autodiff._pcfs_from_content(arr, np.array([0, len(arr)]))
         elif _autodiff._framework(arr) is not None:
             raise TypeError(
                 "To build a PCF from a PyTorch, JAX, or TensorFlow array, pass the values "
@@ -138,8 +144,8 @@ class Pcf(_PiecewiseFunction, _BinaryIoMixin):
                 f"Tried to create PCF from unsupported input data of type {type(arr)}."
             )
 
-        if tvalues is not None:
-            self._tvalues = tvalues
+        self._ttimes = ttimes
+        self._tvalues = tvalues
 
     def _get_time_type(self):
         return self._data.get_time_type()
@@ -210,20 +216,19 @@ class Pcf(_PiecewiseFunction, _BinaryIoMixin):
             raise TypeError("Only PCFs with vtype float32 or float64 can be integrated.")
         return Plf._from_cpp(self._data.integrate(), self.vtype)
 
-    # Set by arithmetic with a tracked framework scalar or PCF: the values at
-    # each breakpoint as a framework tensor, so gradients flow through them.
+    # Framework tensors of the times and values of the breakpoints, set when
+    # they depend on a PyTorch, JAX, or TensorFlow array, so gradients flow
+    # through them. None where they are constants.
+    _ttimes: Any = None
     _tvalues: Any = None
+
+    def _tracked_parts(self):
+        return _autodiff.pcf_parts(self)
 
     def _serial(self):
         """(content, enumeration) as from_serial_content takes, for this one PCF."""
         pts = self.to_numpy()
         return pts, np.array([0, len(pts)])
-
-    def _with_values(self, values):
-        """A PCF with this PCF's breakpoint times and the given values."""
-        pts = self.to_numpy().copy()
-        pts[:, 1] = values
-        return Pcf(pts)
 
     def _binop(self, rhs, op, combine):
         if isinstance(rhs, Pcf) and not _has_matching_types(self, rhs):

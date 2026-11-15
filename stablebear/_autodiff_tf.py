@@ -48,6 +48,10 @@ def gather(values: Any, idx: np.ndarray) -> tf.Tensor:
     return tf.gather(values, idx)
 
 
+def concat(xs: list) -> tf.Tensor:
+    return tf.concat(xs, axis=0)
+
+
 def apply(primal: Callable[..., Any], vjp: Callable[..., Any], *params: Any, out: Any = None) -> tf.Tensor:
     if out is None:
         raise TypeError("This operation does not support TensorFlow: it does not declare the shape of its result.")

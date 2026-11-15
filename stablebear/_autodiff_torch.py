@@ -46,6 +46,10 @@ def gather(values: torch.Tensor, idx: np.ndarray) -> torch.Tensor:
     return values[torch.as_tensor(idx, device=values.device)]
 
 
+def concat(xs: list) -> torch.Tensor:
+    return torch.cat(xs)
+
+
 def apply(primal: Callable[..., Any], vjp: Callable[..., Any], *params: Any, out: Any = None) -> torch.Tensor:
     params = tuple(p if isinstance(p, torch.Tensor) else torch.as_tensor(p) for p in params)
     return _Op.apply(primal, vjp, *params)

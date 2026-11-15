@@ -5,6 +5,8 @@ import stablebear as sb
 
 
 class _Torch:
+    traces_abstractly = False
+
     def __init__(self):
         import torch
 
@@ -34,6 +36,8 @@ class _Torch:
 
 
 class _Jax:
+    traces_abstractly = True
+
     def __init__(self):
         import jax
         import jax.numpy as jnp
@@ -65,6 +69,8 @@ class _Jax:
 
 
 class _TensorFlow:
+    traces_abstractly = False
+
     def __init__(self):
         import tensorflow as tf
 
@@ -94,12 +100,12 @@ class _TensorFlow:
 
     def value_and_grad(self, f, x0):
         y, g = self._value_and_grad(f, self.tf.Variable(x0, dtype=self.tf.float64))
-        return float(y.numpy()), g.numpy()
+        return float(y.numpy()), self.tf.convert_to_tensor(g).numpy()
 
     def compiled_value_and_grad(self, f, x0):
         x = self.tf.Variable(x0, dtype=self.tf.float64)
         y, g = self.tf.function(lambda: self._value_and_grad(f, x))()
-        return float(y.numpy()), g.numpy()
+        return float(y.numpy()), self.tf.convert_to_tensor(g).numpy()
 
 
 _FRAMEWORKS = {"torch": _Torch, "jax": _Jax, "tensorflow": _TensorFlow}
@@ -195,6 +201,50 @@ def test_lp_norm_gradient_wrt_pcf_values(fw, p):
         return fw.sum(sb.lp_norm(f * g, p=p)) + fw.sum(sb.lp_norm(g, p=2.0))
 
     _assert_gradient_matches_finite_differences(fw, loss, [0.7, -1.3, 0.4, 2.0])
+
+
+_TIMES = [0.75, 1.75, 3.5, 5.25]  # shared with no breakpoint of f or F
+_VALUES = np.array([0.7, -1.3, 0.4, 2.0, 0.0])
+
+
+@pytest.mark.parametrize("p", [1.0, 2.5])
+def test_lp_norm_gradient_wrt_pcf_times(fw, p):
+    def loss(t):
+        g = sb.Pcf(_VALUES, times=fw.concat([fw.tensor([0.0]), t]))
+        return fw.sum(sb.lp_norm(g, p=p))
+
+    _assert_gradient_matches_finite_differences(fw, loss, _TIMES)
+
+
+@pytest.mark.parametrize("p", [1.0, 2.5])
+@pytest.mark.parametrize("expr", [
+    lambda f, F, g: f * g,
+    lambda f, F, g: F - g,
+    lambda f, F, g: g * 2.0 + f,
+])
+def test_lp_norm_gradient_wrt_pcf_times_through_arithmetic(fw, p, expr):
+    if fw.traces_abstractly:
+        pytest.skip("Arithmetic needs concrete times")
+    f, _ = _f_and_g()
+    F, _ = _tensors()
+
+    def loss(t):
+        g = sb.Pcf(_VALUES, times=fw.concat([fw.tensor([0.0]), t]))
+        return fw.sum(sb.lp_norm(expr(f, F, g), p=p))
+
+    _assert_gradient_matches_finite_differences(fw, loss, _TIMES)
+
+
+def test_arithmetic_with_abstract_times_raises():
+    jax = pytest.importorskip("jax")
+    f, _ = _f_and_g()
+
+    def loss(t):
+        g = sb.Pcf(_VALUES, times=jax.numpy.concatenate([jax.numpy.zeros(1), t]))
+        return (sb.lp_norm(f * g, p=1.0)).sum()  # pyright: ignore[reportAttributeAccessIssue]
+
+    with pytest.raises(NotImplementedError, match="order of the breakpoints"):
+        jax.grad(loss)(jax.numpy.asarray(_TIMES))
 
 
 @pytest.mark.parametrize("loss", [

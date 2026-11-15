@@ -36,6 +36,17 @@ class BarcodeTensor(Tensor):
     # bars, barcode after barcode in C order, as an (m, 2) framework tensor.
     _tvalues: Any = None
 
+    def _tracked_parts(self):
+        from .. import _autodiff
+        from .barcode import Barcode
+
+        if self._tvalues is None:
+            return None
+        # ponytail: only the (1,) tensors that the tracked kernel returns; serialize bars for more
+        assert self.shape == (1,)
+        return _autodiff._Tracked(
+            [self._tvalues], lambda arrays: BarcodeTensor([Barcode(arrays[0])]), lambda grad: [grad])
+
     def _to_py_tensor(self, data):
         return BarcodeTensor(data)
 

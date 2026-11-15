@@ -97,30 +97,42 @@ namespace sb
     return pow(out, P{ 1 } / p);
   }
 
-  /// Gradient of lp_norm(f, p) with respect to the value at each breakpoint
-  /// of f: (|v_k| / ||f||_p)^(p-1) sign(v_k) dt_k. The last breakpoint, whose
-  /// segment is infinite, gets 0.
+  /// Gradient of lp_norm(f, p) with respect to each breakpoint of f, as
+  /// points whose t holds the derivative with respect to the time t_k and
+  /// whose v holds the derivative with respect to the value v_k:
+  ///
+  ///   d/dv_k = (|v_k| / ||f||_p)^(p-1) sign(v_k) (t_{k+1} - t_k)
+  ///   d/dt_k = ||f||_p^(1-p) (|v_{k-1}|^p - |v_k|^p) / p
+  ///
+  /// The first time, which is always 0, and the value of the last, infinite
+  /// segment get 0.
   template <PcfLike F>
-  std::vector<typename F::value_type> lp_norm_grad_values(const F& f, typename F::value_type p)
+  std::vector<typename F::point_type> lp_norm_grad(const F& f, typename F::value_type p)
   {
     using Tv = typename F::value_type;
+    using Tt = typename F::time_type;
     const auto& pts = f.points();
-    std::vector<Tv> grad(pts.size(), Tv{ 0 });
+    std::vector<typename F::point_type> grad(pts.size(), typename F::point_type(Tt{ 0 }, Tv{ 0 }));
 
     Tv norm = lp_norm(f, p);
     if (norm == 0)
     {
       return grad;
     }
-    for (std::size_t k = 0; k + 1 < pts.size(); ++k)
+    const Tv timeScale = std::pow(norm, Tv{ 1 } - p) / p;
+    for (std::size_t k = 0; k < pts.size(); ++k)
     {
-      if (pts[k].v == 0)
+      if (k > 0)
       {
-        continue;
+        grad[k].t = static_cast<Tt>(
+            timeScale * (std::pow(std::abs(pts[k - 1].v), p) - std::pow(std::abs(pts[k].v), p)));
       }
-      Tv dt = static_cast<Tv>(pts[k + 1].t - pts[k].t);
-      Tv sign = pts[k].v > 0 ? Tv{ 1 } : Tv{ -1 };
-      grad[k] = static_cast<Tv>(dt * std::pow(std::abs(pts[k].v) / norm, p - 1) * sign);
+      if (k + 1 < pts.size() && pts[k].v != 0)
+      {
+        Tv dt = static_cast<Tv>(pts[k + 1].t - pts[k].t);
+        Tv sign = pts[k].v > 0 ? Tv{ 1 } : Tv{ -1 };
+        grad[k].v = static_cast<Tv>(dt * std::pow(std::abs(pts[k].v) / norm, p - 1) * sign);
+      }
     }
     return grad;
   }
