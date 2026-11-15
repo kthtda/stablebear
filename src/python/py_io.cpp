@@ -86,6 +86,9 @@ namespace sb_py
         .def_static("save_pcf32i_tensor",        &IoOps::save_tensor_to_file<sb::Pcf<sb::int32_t, sb::int32_t>>)
         .def_static("save_pcf64i_tensor",        &IoOps::save_tensor_to_file<sb::Pcf<sb::int64_t, sb::int64_t>>)
 
+        .def_static("save_plf32_tensor",         &IoOps::save_tensor_to_file<sb::Plf<sb::float32_t, sb::float32_t>>)
+        .def_static("save_plf64_tensor",         &IoOps::save_tensor_to_file<sb::Plf<sb::float64_t, sb::float64_t>>)
+
         .def_static("save_point_cloud32_tensor", &IoOps::save_tensor_to_file<sb::PointCloud<sb::float32_t>>)
         .def_static("save_point_cloud64_tensor", &IoOps::save_tensor_to_file<sb::PointCloud<sb::float64_t>>)
         .def_static("save_indexed_point_cloud32_tensor", &IoOps::save_tensor_to_file<sb::PointCloud<sb::float32_t>, sb::TensorProperty::Indexed>)

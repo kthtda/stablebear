@@ -37,6 +37,9 @@ namespace sb
     else if (format.matches_type<Pcf<int32_t, int32_t>>(reader.format_version())) { return io::detail::read_tensor<Pcf<int32_t, int32_t>>(reader); }
     else if (format.matches_type<Pcf<int64_t, int64_t>>(reader.format_version())) { return io::detail::read_tensor<Pcf<int64_t, int64_t>>(reader); }
 
+    else if (format.matches_type<Plf<float32_t, float32_t>>(reader.format_version())) { return io::detail::read_tensor<Plf<float32_t, float32_t>>(reader); }
+    else if (format.matches_type<Plf<float64_t, float64_t>>(reader.format_version())) { return io::detail::read_tensor<Plf<float64_t, float64_t>>(reader); }
+
     else if (io::detail::is_tensor_format<Tensor<PointCloud<float32_t>>>(reader, format)) { return io::detail::read_tensor_for_format<Tensor<PointCloud<float32_t>>>(reader, format); }
     else if (io::detail::is_tensor_format<Tensor<PointCloud<float64_t>>>(reader, format)) { return io::detail::read_tensor_for_format<Tensor<PointCloud<float64_t>>>(reader, format); }
     else if (io::detail::is_tensor_format<Tensor<PointCloud<float32_t>, TensorProperty::Indexed>>(reader, format)) { return io::detail::read_tensor_for_format<Tensor<PointCloud<float32_t>, TensorProperty::Indexed>>(reader, format); }

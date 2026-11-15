@@ -104,6 +104,9 @@ namespace sb::io::detail
       Tensor<Pcf<int32_t, int32_t>>,
       Tensor<Pcf<int64_t, int64_t>>,
 
+      Tensor<Plf<float32_t, float32_t>>,
+      Tensor<Plf<float64_t, float64_t>>,
+
       Tensor<PointCloud<float32_t>>,
       Tensor<PointCloud<float64_t>>,
       Tensor<PointCloud<float32_t>, TensorProperty::Indexed>,

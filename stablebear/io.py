@@ -15,6 +15,7 @@ from .base_tensor import (
     IntPcfTensor,
     IntTensor,
     PcfTensor,
+    PlfTensor,
     Tensor,
 )
 from .nested_tensor import NestedTensor
@@ -43,6 +44,8 @@ def _tensor_io():
         cpp.Pcf64Tensor: (ops.save_pcf64_tensor, PcfTensor),
         cpp.Pcf32iTensor: (ops.save_pcf32i_tensor, IntPcfTensor),
         cpp.Pcf64iTensor: (ops.save_pcf64i_tensor, IntPcfTensor),
+        cpp.Plf32Tensor: (ops.save_plf32_tensor, PlfTensor),
+        cpp.Plf64Tensor: (ops.save_plf64_tensor, PlfTensor),
         cpp.PointCloud32Tensor: (ops.save_point_cloud32_tensor, PointCloudTensor),
         cpp.PointCloud64Tensor: (ops.save_point_cloud64_tensor, PointCloudTensor),
         cpp._IndexedPointCloud32Tensor: (ops.save_indexed_point_cloud32_tensor, PointCloudTensor),

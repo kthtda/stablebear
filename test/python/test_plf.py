@@ -563,3 +563,51 @@ class TestSaveLoad:
         assert isinstance(g, sb.Plf)
         assert g.dtype is dtype
         assert g == f
+
+
+class TestPlfTensorSaveLoad:
+    @staticmethod
+    def make(dtype):
+        f = sb.Plf([[0.0, 0.0],
+                    [1.0, 2.0],
+                    [3.0, 1.0]], dtype=dtype)
+        g = sb.Plf([[0.0, 0.1],
+                    [0.25, -3.0]], dtype=dtype)
+        h = sb.Plf([[0.0, -1.5]], dtype=dtype)
+        return sb.PlfTensor([[f, g, h],
+                             [h, f, g]])
+
+    @pytest.mark.parametrize("round_trip", ROUND_TRIPS)
+    @pytest.mark.parametrize("dtype, expected", [
+        (sb.float32, sb.plf32),
+        (sb.float64, sb.plf64),
+    ])
+    def test_round_trip_gives_equal_2d_tensor(self, dtype, expected, round_trip):
+        T = self.make(dtype)
+
+        R = round_trip(T)
+
+        assert isinstance(R, sb.PlfTensor)
+        assert R.dtype is expected
+        assert R.shape == (2, 3)
+        assert R.array_equal(T)
+
+    @pytest.mark.parametrize("round_trip", ROUND_TRIPS)
+    def test_round_trip_of_transposed_view(self, round_trip):
+        T = self.make(sb.float64).transpose()
+
+        R = round_trip(T)
+
+        assert R.shape == (3, 2)
+        assert R.array_equal(T)
+
+    @pytest.mark.parametrize("round_trip", ROUND_TRIPS)
+    @pytest.mark.parametrize("dtype", [sb.plf32, sb.plf64])
+    def test_round_trip_of_empty_tensor(self, dtype, round_trip):
+        T = sb.zeros((0, 3), dtype=dtype)
+
+        R = round_trip(T)
+
+        assert isinstance(R, sb.PlfTensor)
+        assert R.dtype is dtype
+        assert R.shape == (0, 3)

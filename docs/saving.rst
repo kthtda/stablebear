@@ -2,7 +2,7 @@
 Saving and loading
 ==================
 
-stablebear provides a binary format for saving and loading numeric, PCF,
+stablebear provides a binary format for saving and loading numeric, PCF, PLF,
 nested, point-cloud, barcode, distance-matrix, symmetric-matrix, and time
 series tensors. Standalone ``Pcf``, ``Plf``, ``PointCloud``, ``Barcode``,
 ``DistanceMatrix``, ``SymmetricMatrix``, and ``TimeSeries`` objects use the
