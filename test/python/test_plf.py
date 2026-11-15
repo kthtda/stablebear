@@ -315,3 +315,83 @@ class TestIntegrate:
 
         with pytest.raises(TypeError):
             f.integrate()
+
+
+class TestPlfTensor:
+    @pytest.mark.parametrize("dtype, element_dtype", [
+        (sb.plf32, sb.float32),
+        (sb.plf64, sb.float64),
+    ])
+    def test_zeros_holds_zero_functions(self, dtype, element_dtype):
+        Z = sb.zeros((2, 3), dtype=dtype)
+
+        assert isinstance(Z, sb.PlfTensor)
+        assert Z.dtype is dtype
+        assert Z.shape == (2, 3)
+        assert Z[1, 2] == sb.Plf([[0.0, 0.0]], dtype=element_dtype)
+        assert Z[1, 2].dtype is element_dtype
+
+    def test_set_and_get_element(self):
+        f = sb.Plf([[0.0, 0.0],
+                    [1.0, 2.0]])
+        Z = sb.zeros((2, 3), dtype=sb.plf64)
+
+        Z[1, 2] = f
+
+        assert Z[1, 2] == f
+        assert Z[0, 0] == sb.Plf([[0.0, 0.0]])
+
+    @pytest.mark.parametrize("element_dtype, expected", [
+        (sb.float32, sb.plf32),
+        (sb.float64, sb.plf64),
+    ])
+    def test_tensor_infers_dtype(self, element_dtype, expected):
+        f = sb.Plf([[0.0, 0.0],
+                    [1.0, 2.0]], dtype=element_dtype)
+
+        T = sb.tensor([f, f])
+
+        assert isinstance(T, sb.PlfTensor)
+        assert T.dtype is expected
+
+    def test_from_nested_list(self):
+        f = sb.Plf([[0.0, 0.0],
+                    [1.0, 2.0]])
+        g = sb.Plf([[0.0, 1.0],
+                    [2.0, 1.0]])
+
+        T = sb.PlfTensor([[f, g],
+                          [g, f]])
+
+        assert T.shape == (2, 2)
+        assert T[0, 0] == f
+        assert T[0, 1] == g
+        assert T[1, 0] == g
+        assert T[1, 1] == f
+
+    @pytest.mark.parametrize("dtype, element_dtype", [
+        (sb.plf32, sb.float32),
+        (sb.plf64, sb.float64),
+    ])
+    def test_copy_keeps_dtype_and_elements(self, dtype, element_dtype):
+        f = sb.Plf([[0.0, 0.0],
+                    [1.0, 2.0]], dtype=element_dtype)
+        Z = sb.zeros((2,), dtype=dtype)
+        Z[1] = f
+
+        C = Z.copy()
+
+        assert isinstance(C, sb.PlfTensor)
+        assert C.dtype is dtype
+        assert C[0] == sb.Plf([[0.0, 0.0]], dtype=element_dtype)
+        assert C[1] == f
+
+    def test_copy_is_independent(self):
+        f = sb.Plf([[0.0, 0.0],
+                    [1.0, 2.0]])
+        Z = sb.zeros((2,), dtype=sb.plf64)
+
+        C = Z.copy()
+        C[1] = f
+
+        assert Z[1] == sb.Plf([[0.0, 0.0]])

@@ -36,9 +36,14 @@ namespace sb
   };
 
   // --- Scalar free operators for any PiecewiseFunctionLike type ---
+  //
+  // Each operator requires the compound operator it calls (/= for dividing a
+  // scalar by a function), so that a type without arithmetic, such as Plf,
+  // does not appear to support it.
 
   template <PiecewiseFunctionLike F, Arithmetic Ts>
   [[nodiscard]] F operator+(const F& f, Ts val)
+    requires requires(F& g, Ts v) { g += v; }
   {
     F ret = f;
     ret += val;
@@ -47,6 +52,7 @@ namespace sb
 
   template <PiecewiseFunctionLike F, Arithmetic Ts>
   [[nodiscard]] F operator+(Ts val, const F& f)
+    requires requires(F& g, Ts v) { g += v; }
   {
     F ret = f;
     ret += val;
@@ -55,6 +61,7 @@ namespace sb
 
   template <PiecewiseFunctionLike F, Arithmetic Ts>
   [[nodiscard]] F operator-(const F& f, Ts val)
+    requires requires(F& g, Ts v) { g -= v; }
   {
     F ret = f;
     ret -= val;
@@ -63,6 +70,7 @@ namespace sb
 
   template <PiecewiseFunctionLike F, Arithmetic Ts>
   [[nodiscard]] F operator-(Ts val, const F& f)
+    requires requires(F& g, Ts v) { -g; g += v; }
   {
     F ret = -f;
     ret += val;
@@ -71,6 +79,7 @@ namespace sb
 
   template <PiecewiseFunctionLike F, Arithmetic Ts>
   [[nodiscard]] F operator*(const F& f, Ts val)
+    requires requires(F& g, Ts v) { g *= v; }
   {
     F ret = f;
     ret *= val;
@@ -79,6 +88,7 @@ namespace sb
 
   template <PiecewiseFunctionLike F, Arithmetic Ts>
   [[nodiscard]] F operator*(Ts val, const F& f)
+    requires requires(F& g, Ts v) { g *= v; }
   {
     F ret = f;
     ret *= val;
@@ -87,6 +97,7 @@ namespace sb
 
   template <PiecewiseFunctionLike F, Arithmetic Ts>
   [[nodiscard]] F operator/(const F& f, Ts val)
+    requires requires(F& g, Ts v) { g /= v; }
   {
     F ret = f;
     ret /= val;
@@ -95,6 +106,7 @@ namespace sb
 
   template <PiecewiseFunctionLike F, Arithmetic Ts>
   [[nodiscard]] F operator/(Ts val, const F& f)
+    requires requires(F& g, Ts v) { g /= v; }
   {
     auto pts = f.points();
     for (auto& pt : pts)

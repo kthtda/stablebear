@@ -576,7 +576,7 @@ SET(SB_PY_SOURCES
     functional/py_inner_product.hpp functional/py_inner_product.cpp
     functional/py_norms.hpp functional/py_norms.cpp
     functional/py_reductions.hpp functional/py_reductions.cpp
-    py_tensor.hpp py_tensor.cpp py_tensor_int.cpp py_tensor_pcf.cpp
+    py_tensor.hpp py_tensor.cpp py_tensor_int.cpp py_tensor_pcf.cpp py_tensor_plf.cpp
     py_point_cloud.hpp py_point_cloud.cpp
     py_io.hpp py_io.cpp
     py_symmetric_matrix.hpp py_symmetric_matrix.cpp

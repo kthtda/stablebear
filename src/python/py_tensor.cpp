@@ -128,5 +128,6 @@ namespace sb_py
 
     register_tensor_int_bindings(m);
     register_tensor_pcf_bindings(m);
+    register_tensor_plf_bindings(m);
   }
 }

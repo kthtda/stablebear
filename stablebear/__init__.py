@@ -18,6 +18,7 @@ from .base_tensor import (
     IntPcfTensor,
     IntTensor,
     PcfTensor,
+    PlfTensor,
 )
 from .nested_tensor import NestedTensor
 from .point_cloud import PointCloud, PointCloudTensor
@@ -47,6 +48,8 @@ from .typing import (
     pcf64i,
     pcloud32,
     pcloud64,
+    plf32,
+    plf64,
     ts,
     symmat32,
     symmat64,

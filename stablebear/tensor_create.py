@@ -10,9 +10,11 @@ from .base_tensor import (
     IntPcfTensor,
     IntTensor,
     PcfTensor,
+    PlfTensor,
     _first_pcf,
     _to_tensor_pcf,
 )
+from .functional.plf import Plf
 from .nested_tensor import NestedTensor
 from .point_cloud import PointCloudTensor
 from .typing import (
@@ -33,6 +35,8 @@ from .typing import (
     pcf32i,
     pcf64,
     pcf64i,
+    plf32,
+    plf64,
     pcloud32,
     pcloud64,
     symmat32,
@@ -72,6 +76,8 @@ def _dtype_dispatch():
             pcf64: (PcfTensor, cpp.Pcf64Tensor, ()),
             pcf32i: (IntPcfTensor, cpp.Pcf32iTensor, ()),
             pcf64i: (IntPcfTensor, cpp.Pcf64iTensor, ()),
+            plf32: (PlfTensor, cpp.Plf32Tensor, ()),
+            plf64: (PlfTensor, cpp.Plf64Tensor, ()),
             float32: (FloatTensor, cpp.Float32Tensor, (0.0,)),
             float64: (FloatTensor, cpp.Float64Tensor, (0.0,)),
             int32: (IntTensor, cpp.Int32Tensor, (0,)),
@@ -97,6 +103,7 @@ def zeros(shape: ShapeLike, dtype: Dtype = pcf32) -> Any:  # Any: the type follo
 
     `dtype=pcf32/64`: A PCF that takes the value 0 for all times.
     `dtype=pcf32i/64i`: An integer PCF that takes the value 0 for all times.
+    `dtype=plf32/64`: A PLF that takes the value 0 for all times.
     `dtype=float32/float64`: The number 0.
     `dtype=pcloud32/64`: An empty point cloud.
     `dtype=barcode32/64`: An empty barcode.
@@ -148,7 +155,8 @@ def tensor(data, dtype: Dtype | None = None) -> Any:  # Any: the type follows th
     dtype : Dtype, optional
         Target element dtype. When ``None``, a numeric dtype is inferred from
         the array (bool/int/float), while a collection of ``Pcf`` objects is
-        inferred as a ``PcfTensor`` or ``IntPcfTensor``, and one of
+        inferred as a ``PcfTensor`` or ``IntPcfTensor``, one of ``Plf``
+        objects as a ``PlfTensor``, and one of
         :class:`~stablebear.timeseries.TimeSeries` as a
         :class:`~stablebear.timeseries.TimeSeriesTensor` of dtype
         ``ts(value_type)``. The series may differ in their times, units,
@@ -182,6 +190,8 @@ def tensor(data, dtype: Dtype | None = None) -> Any:  # Any: the type follows th
     if dtype is None:
         if _first_pcf(data) is not None:
             return _to_tensor_pcf(data)
+        if isinstance(_first_leaf(data), Plf):
+            return PlfTensor(data)
 
         import numpy as np
         arr = np.asarray(data)

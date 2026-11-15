@@ -49,6 +49,7 @@ namespace sb_py
   // compile in parallel.
   void register_tensor_int_bindings(nb::module_& m);
   void register_tensor_pcf_bindings(nb::module_& m);
+  void register_tensor_plf_bindings(nb::module_& m);
 
   template <typename T>
   struct scalar_of

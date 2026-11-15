@@ -15,6 +15,7 @@ from ._tensor_base import (
     _tensor_from_nested,
 )
 from .functional.pcf import Pcf
+from .functional.plf import Plf
 from .typing import (
     _NP_TO_SB,
     _validate_dtype,
@@ -27,6 +28,8 @@ from .typing import (
     pcf32i,
     pcf64,
     pcf64i,
+    plf32,
+    plf64,
     uint32,
     uint64,
 )
@@ -39,6 +42,11 @@ _FLOAT_CPP_TO_DTYPE = {
 _PCF_CPP_TO_DTYPE = {
     cpp.Pcf32Tensor: pcf32,
     cpp.Pcf64Tensor: pcf64,
+}
+
+_PLF_CPP_TO_DTYPE = {
+    cpp.Plf32Tensor: plf32,
+    cpp.Plf64Tensor: plf64,
 }
 
 _INTPCF_CPP_TO_DTYPE = {
@@ -257,6 +265,51 @@ class IntPcfTensor(_PcfTensorBase):
 
     def _to_py_tensor(self, data):
         return IntPcfTensor(data)
+
+
+class PlfTensor(Tensor):
+    """A tensor of piecewise linear functions (:class:`Plf`), of dtype
+    ``plf32`` or ``plf64``.
+
+    It supports indexing, assignment, views, copying, stacking, and
+    equality, but no arithmetic.
+
+    Parameters
+    ----------
+    data : list, tuple, or PlfTensor
+        A nested list or tuple of ``Plf`` objects of one precision, or a
+        ``PlfTensor`` to share data with. The precision of the ``Plf``
+        objects gives the dtype: ``float32`` gives ``plf32``, and
+        ``float64`` gives ``plf64``.
+    """
+
+    _ELEMENT_DTYPE = {cpp.Plf_f32_f32: float32, cpp.Plf_f64_f64: float64}
+
+    def __init__(self, data):
+        super().__init__()
+        if isinstance(data, PlfTensor):
+            data = data._data
+        elif isinstance(data, list | tuple):
+            data = _tensor_from_nested(data, {
+                cpp.Plf_f32_f32: cpp.Plf32Tensor,
+                cpp.Plf_f64_f64: cpp.Plf64Tensor,
+            })
+        elif not isinstance(data, cpp.Plf32Tensor | cpp.Plf64Tensor):
+            raise TypeError(f"Cannot create PlfTensor from {type(data)}")
+        self._data = data
+        self.dtype = _PLF_CPP_TO_DTYPE[type(self._data)]
+
+    def _get_valid_setitem_dtypes(self):
+        return [PlfTensor, Plf]
+
+    def _decay_value(self, val):
+        return val._data
+
+    def _represent_element(self, element):
+        return Plf._from_cpp(element, self._ELEMENT_DTYPE[type(element)])
+
+    def _to_py_tensor(self, data):
+        return PlfTensor(data)
 
 
 class BoolTensor(Tensor):
