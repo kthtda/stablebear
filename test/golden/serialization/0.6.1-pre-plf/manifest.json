@@ -1,0 +1,861 @@
+{
+  "schema_version": 1,
+  "producer": {
+    "package": "stablebear",
+    "version": "0.6.0",
+    "commit": "4702f9c394db3cb7570dadd789c63f56aba55b50",
+    "format_version": 3,
+    "python": "3.10.12",
+    "numpy": "2.2.6",
+    "platform": "Linux-7.0.0-43-generic-x86_64-with-glibc2.35",
+    "pickle_protocol": 4,
+    "backend": "stablebear._sb_cuda12"
+  },
+  "artifacts": [
+    {
+      "name": "plf_float32",
+      "description": "V3 standalone PLF",
+      "serialization": "binary",
+      "file": "plf_float32.sb",
+      "bytes": 113,
+      "sha256": "c98fb479a1711ce2d2f73a9a3a42db58aa8e75a4ccb121aba64a4e70976f7c5d",
+      "expected": {
+        "accepted_types": [
+          "Plf"
+        ],
+        "comparison": "array",
+        "dtype": "float32",
+        "array": {
+          "dtype": "float32",
+          "shape": [
+            3,
+            2
+          ],
+          "values": [
+            [
+              0.0,
+              0.0
+            ],
+            [
+              1.0,
+              2.0
+            ],
+            [
+              3.0,
+              1.0
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "name": "plf_float32",
+      "description": "V3 standalone PLF",
+      "serialization": "pickle",
+      "file": "plf_float32.pkl",
+      "bytes": 162,
+      "sha256": "5deaad0a9833a1da1b24295d62c7a3a759091cadf1ea6f4c7d1a776661259685",
+      "expected": {
+        "accepted_types": [
+          "Plf"
+        ],
+        "comparison": "array",
+        "dtype": "float32",
+        "array": {
+          "dtype": "float32",
+          "shape": [
+            3,
+            2
+          ],
+          "values": [
+            [
+              0.0,
+              0.0
+            ],
+            [
+              1.0,
+              2.0
+            ],
+            [
+              3.0,
+              1.0
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "name": "plf_tensor_float32",
+      "description": "V3 2-d tensor of PLFs",
+      "serialization": "binary",
+      "file": "plf_tensor_float32.sb",
+      "bytes": 297,
+      "sha256": "0212abc96e24c3a1963f66d4d05f6d79dcd2a8d78b1dbc2fc6a8e201c7bf5888",
+      "expected": {
+        "accepted_types": [
+          "PlfTensor"
+        ],
+        "comparison": "elements",
+        "dtype": "plf32",
+        "shape": [
+          2,
+          3
+        ],
+        "elements": [
+          {
+            "index": [
+              0,
+              0
+            ],
+            "array": {
+              "dtype": "float32",
+              "shape": [
+                3,
+                2
+              ],
+              "values": [
+                [
+                  0.0,
+                  0.0
+                ],
+                [
+                  1.0,
+                  2.0
+                ],
+                [
+                  3.0,
+                  1.0
+                ]
+              ]
+            }
+          },
+          {
+            "index": [
+              0,
+              1
+            ],
+            "array": {
+              "dtype": "float32",
+              "shape": [
+                4,
+                2
+              ],
+              "values": [
+                [
+                  0.0,
+                  0.1
+                ],
+                [
+                  0.25,
+                  -3.0
+                ],
+                [
+                  1000000.0,
+                  7.0
+                ],
+                [
+                  2000000.0,
+                  7.0
+                ]
+              ]
+            }
+          },
+          {
+            "index": [
+              0,
+              2
+            ],
+            "array": {
+              "dtype": "float32",
+              "shape": [
+                1,
+                2
+              ],
+              "values": [
+                [
+                  0.0,
+                  -1.5
+                ]
+              ]
+            }
+          },
+          {
+            "index": [
+              1,
+              0
+            ],
+            "array": {
+              "dtype": "float32",
+              "shape": [
+                1,
+                2
+              ],
+              "values": [
+                [
+                  0.0,
+                  -1.5
+                ]
+              ]
+            }
+          },
+          {
+            "index": [
+              1,
+              1
+            ],
+            "array": {
+              "dtype": "float32",
+              "shape": [
+                3,
+                2
+              ],
+              "values": [
+                [
+                  0.0,
+                  0.0
+                ],
+                [
+                  1.0,
+                  2.0
+                ],
+                [
+                  3.0,
+                  1.0
+                ]
+              ]
+            }
+          },
+          {
+            "index": [
+              1,
+              2
+            ],
+            "array": {
+              "dtype": "float32",
+              "shape": [
+                4,
+                2
+              ],
+              "values": [
+                [
+                  0.0,
+                  0.1
+                ],
+                [
+                  0.25,
+                  -3.0
+                ],
+                [
+                  1000000.0,
+                  7.0
+                ],
+                [
+                  2000000.0,
+                  7.0
+                ]
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "plf_tensor_float32",
+      "description": "V3 2-d tensor of PLFs",
+      "serialization": "pickle",
+      "file": "plf_tensor_float32.pkl",
+      "bytes": 349,
+      "sha256": "4ceaac9306abc3f23124626e0b6a4a028512070778a81caeac8e43871e607002",
+      "expected": {
+        "accepted_types": [
+          "PlfTensor"
+        ],
+        "comparison": "elements",
+        "dtype": "plf32",
+        "shape": [
+          2,
+          3
+        ],
+        "elements": [
+          {
+            "index": [
+              0,
+              0
+            ],
+            "array": {
+              "dtype": "float32",
+              "shape": [
+                3,
+                2
+              ],
+              "values": [
+                [
+                  0.0,
+                  0.0
+                ],
+                [
+                  1.0,
+                  2.0
+                ],
+                [
+                  3.0,
+                  1.0
+                ]
+              ]
+            }
+          },
+          {
+            "index": [
+              0,
+              1
+            ],
+            "array": {
+              "dtype": "float32",
+              "shape": [
+                4,
+                2
+              ],
+              "values": [
+                [
+                  0.0,
+                  0.1
+                ],
+                [
+                  0.25,
+                  -3.0
+                ],
+                [
+                  1000000.0,
+                  7.0
+                ],
+                [
+                  2000000.0,
+                  7.0
+                ]
+              ]
+            }
+          },
+          {
+            "index": [
+              0,
+              2
+            ],
+            "array": {
+              "dtype": "float32",
+              "shape": [
+                1,
+                2
+              ],
+              "values": [
+                [
+                  0.0,
+                  -1.5
+                ]
+              ]
+            }
+          },
+          {
+            "index": [
+              1,
+              0
+            ],
+            "array": {
+              "dtype": "float32",
+              "shape": [
+                1,
+                2
+              ],
+              "values": [
+                [
+                  0.0,
+                  -1.5
+                ]
+              ]
+            }
+          },
+          {
+            "index": [
+              1,
+              1
+            ],
+            "array": {
+              "dtype": "float32",
+              "shape": [
+                3,
+                2
+              ],
+              "values": [
+                [
+                  0.0,
+                  0.0
+                ],
+                [
+                  1.0,
+                  2.0
+                ],
+                [
+                  3.0,
+                  1.0
+                ]
+              ]
+            }
+          },
+          {
+            "index": [
+              1,
+              2
+            ],
+            "array": {
+              "dtype": "float32",
+              "shape": [
+                4,
+                2
+              ],
+              "values": [
+                [
+                  0.0,
+                  0.1
+                ],
+                [
+                  0.25,
+                  -3.0
+                ],
+                [
+                  1000000.0,
+                  7.0
+                ],
+                [
+                  2000000.0,
+                  7.0
+                ]
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "plf_float64",
+      "description": "V3 standalone PLF",
+      "serialization": "binary",
+      "file": "plf_float64.sb",
+      "bytes": 137,
+      "sha256": "86145472cb0526c4bb220a026ea4789ae81d7fefdc820b10ae1c22273435e5bc",
+      "expected": {
+        "accepted_types": [
+          "Plf"
+        ],
+        "comparison": "array",
+        "dtype": "float64",
+        "array": {
+          "dtype": "float64",
+          "shape": [
+            3,
+            2
+          ],
+          "values": [
+            [
+              0.0,
+              0.0
+            ],
+            [
+              1.0,
+              2.0
+            ],
+            [
+              3.0,
+              1.0
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "name": "plf_float64",
+      "description": "V3 standalone PLF",
+      "serialization": "pickle",
+      "file": "plf_float64.pkl",
+      "bytes": 186,
+      "sha256": "5a1ce8d12de1dd0d1526e99f6b9c5402e099982c966eeec896d3b7565de5d74b",
+      "expected": {
+        "accepted_types": [
+          "Plf"
+        ],
+        "comparison": "array",
+        "dtype": "float64",
+        "array": {
+          "dtype": "float64",
+          "shape": [
+            3,
+            2
+          ],
+          "values": [
+            [
+              0.0,
+              0.0
+            ],
+            [
+              1.0,
+              2.0
+            ],
+            [
+              3.0,
+              1.0
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "name": "plf_tensor_float64",
+      "description": "V3 2-d tensor of PLFs",
+      "serialization": "binary",
+      "file": "plf_tensor_float64.sb",
+      "bytes": 425,
+      "sha256": "a7fadd89ebc9100c18f08677d9a6c9b6e8e65efb2c465e2089e79d1d105a8666",
+      "expected": {
+        "accepted_types": [
+          "PlfTensor"
+        ],
+        "comparison": "elements",
+        "dtype": "plf64",
+        "shape": [
+          2,
+          3
+        ],
+        "elements": [
+          {
+            "index": [
+              0,
+              0
+            ],
+            "array": {
+              "dtype": "float64",
+              "shape": [
+                3,
+                2
+              ],
+              "values": [
+                [
+                  0.0,
+                  0.0
+                ],
+                [
+                  1.0,
+                  2.0
+                ],
+                [
+                  3.0,
+                  1.0
+                ]
+              ]
+            }
+          },
+          {
+            "index": [
+              0,
+              1
+            ],
+            "array": {
+              "dtype": "float64",
+              "shape": [
+                4,
+                2
+              ],
+              "values": [
+                [
+                  0.0,
+                  0.1
+                ],
+                [
+                  0.25,
+                  -3.0
+                ],
+                [
+                  1000000.0,
+                  7.0
+                ],
+                [
+                  2000000.0,
+                  7.0
+                ]
+              ]
+            }
+          },
+          {
+            "index": [
+              0,
+              2
+            ],
+            "array": {
+              "dtype": "float64",
+              "shape": [
+                1,
+                2
+              ],
+              "values": [
+                [
+                  0.0,
+                  -1.5
+                ]
+              ]
+            }
+          },
+          {
+            "index": [
+              1,
+              0
+            ],
+            "array": {
+              "dtype": "float64",
+              "shape": [
+                1,
+                2
+              ],
+              "values": [
+                [
+                  0.0,
+                  -1.5
+                ]
+              ]
+            }
+          },
+          {
+            "index": [
+              1,
+              1
+            ],
+            "array": {
+              "dtype": "float64",
+              "shape": [
+                3,
+                2
+              ],
+              "values": [
+                [
+                  0.0,
+                  0.0
+                ],
+                [
+                  1.0,
+                  2.0
+                ],
+                [
+                  3.0,
+                  1.0
+                ]
+              ]
+            }
+          },
+          {
+            "index": [
+              1,
+              2
+            ],
+            "array": {
+              "dtype": "float64",
+              "shape": [
+                4,
+                2
+              ],
+              "values": [
+                [
+                  0.0,
+                  0.1
+                ],
+                [
+                  0.25,
+                  -3.0
+                ],
+                [
+                  1000000.0,
+                  7.0
+                ],
+                [
+                  2000000.0,
+                  7.0
+                ]
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "plf_tensor_float64",
+      "description": "V3 2-d tensor of PLFs",
+      "serialization": "pickle",
+      "file": "plf_tensor_float64.pkl",
+      "bytes": 477,
+      "sha256": "aeb4fcf93c0f15a3917b3157d056ed087cc47471cc867e728fc152e8b68caefb",
+      "expected": {
+        "accepted_types": [
+          "PlfTensor"
+        ],
+        "comparison": "elements",
+        "dtype": "plf64",
+        "shape": [
+          2,
+          3
+        ],
+        "elements": [
+          {
+            "index": [
+              0,
+              0
+            ],
+            "array": {
+              "dtype": "float64",
+              "shape": [
+                3,
+                2
+              ],
+              "values": [
+                [
+                  0.0,
+                  0.0
+                ],
+                [
+                  1.0,
+                  2.0
+                ],
+                [
+                  3.0,
+                  1.0
+                ]
+              ]
+            }
+          },
+          {
+            "index": [
+              0,
+              1
+            ],
+            "array": {
+              "dtype": "float64",
+              "shape": [
+                4,
+                2
+              ],
+              "values": [
+                [
+                  0.0,
+                  0.1
+                ],
+                [
+                  0.25,
+                  -3.0
+                ],
+                [
+                  1000000.0,
+                  7.0
+                ],
+                [
+                  2000000.0,
+                  7.0
+                ]
+              ]
+            }
+          },
+          {
+            "index": [
+              0,
+              2
+            ],
+            "array": {
+              "dtype": "float64",
+              "shape": [
+                1,
+                2
+              ],
+              "values": [
+                [
+                  0.0,
+                  -1.5
+                ]
+              ]
+            }
+          },
+          {
+            "index": [
+              1,
+              0
+            ],
+            "array": {
+              "dtype": "float64",
+              "shape": [
+                1,
+                2
+              ],
+              "values": [
+                [
+                  0.0,
+                  -1.5
+                ]
+              ]
+            }
+          },
+          {
+            "index": [
+              1,
+              1
+            ],
+            "array": {
+              "dtype": "float64",
+              "shape": [
+                3,
+                2
+              ],
+              "values": [
+                [
+                  0.0,
+                  0.0
+                ],
+                [
+                  1.0,
+                  2.0
+                ],
+                [
+                  3.0,
+                  1.0
+                ]
+              ]
+            }
+          },
+          {
+            "index": [
+              1,
+              2
+            ],
+            "array": {
+              "dtype": "float64",
+              "shape": [
+                4,
+                2
+              ],
+              "values": [
+                [
+                  0.0,
+                  0.1
+                ],
+                [
+                  0.25,
+                  -3.0
+                ],
+                [
+                  1000000.0,
+                  7.0
+                ],
+                [
+                  2000000.0,
+                  7.0
+                ]
+              ]
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "unsupported": []
+}
