@@ -1,4 +1,5 @@
 #include <sbear/algorithms/argsort_segments.hpp>
+#include <sbear/algorithms/multiply_points.hpp>
 #include <sbear/algorithms/pairwise_distances.hpp>
 #include <sbear/executor.hpp>
 #include <sbear/tensor.hpp>
@@ -635,6 +636,19 @@ namespace sb_py
     return sb::pairwise_lp_distances(clouds, p, sb::default_executor());
   }
 
+  /// The points of each cloud of a tensor multiplied, as rows, by a
+  /// matrix; see sb::multiply_points.
+  template <typename T>
+  sb::Tensor<sb::PointCloud<T>> multiply_points(
+      const sb::Tensor<sb::PointCloud<T>>& clouds,
+      nb::ndarray<const T, nb::ndim<2>, nb::c_contig, nb::device::cpu> matrix)
+  {
+    nb::gil_scoped_release release;
+    return sb::multiply_points(
+        clouds, std::span<const T>(matrix.data(), matrix.shape(0) * matrix.shape(1)), matrix.shape(0),
+        matrix.shape(1), sb::default_executor());
+  }
+
   /// The order that sorts the values of each element of serial content:
   /// element k has the values in rows enumeration[k, 0] to enumeration[k, 1]
   /// of @p values. Returns, for all elements concatenated, the rows of each
@@ -691,6 +705,8 @@ namespace sb_py
     m.def("argsort_segments", &argsort_segments<sb::float64_t>);
     m.def("merge_breakpoints", &merge_breakpoints<sb::float32_t, sb::float32_t>);
     m.def("merge_breakpoints", &merge_breakpoints<sb::float64_t, sb::float64_t>);
+    m.def("multiply_points", &multiply_points<sb::float32_t>);
+    m.def("multiply_points", &multiply_points<sb::float64_t>);
     m.def("pairwise_lp_distances", &pairwise_lp_distances<sb::float32_t>);
     m.def("pairwise_lp_distances", &pairwise_lp_distances<sb::float64_t>);
     m.def("pdist_grad", &pdist_grad<sb::float32_t, sb::float32_t>);
