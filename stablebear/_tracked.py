@@ -350,17 +350,9 @@ class _TrackedMixin(_TrackedObject):
         rows = np.arange(int(counts.sum()), dtype=np.int64) + np.repeat(
             offsets[source_of] + starts - (ends - counts), counts)
 
-        new_parts = []
-        for group in range(len(self._tracking.groups)):
-            arrays = [parts[group] for parts in sources]
-            like = next((array for array in arrays if _is_framework(array)), None)
-            if like is None:
-                new_parts.append(np.concatenate(arrays)[rows])
-                continue
-            adapter = _autodiff._framework(like)
-            combined = adapter.concat([
-                array if _is_framework(array) else adapter.as_tensor(array, like=like) for array in arrays])
-            new_parts.append(adapter.gather(combined, rows))
+        new_parts = [
+            _autodiff._framework(part).gather(part, rows) if _is_framework(part) else part[rows]
+            for part in _concatenated(sources)]
         self._set_state(new_parts, np.stack([ends - counts, ends], axis=-1).reshape(self._e.shape))
         self._plain = None
 
@@ -496,6 +488,63 @@ def tracked_class(base: type) -> Any:
 
 def is_tracked(x: Any) -> bool:
     return isinstance(x, _TrackedObject)
+
+
+def _concatenated(sources: list) -> list:
+    """The parts of several sources, each a list of one array per group of
+    columns, as one array per group: a framework array if a source has one
+    for the group."""
+    from . import _autodiff
+
+    combined = []
+    for arrays in zip(*sources):
+        like = next((array for array in arrays if _is_framework(array)), None)
+        if like is None:
+            combined.append(np.concatenate(arrays))
+            continue
+        adapter = _autodiff._framework(like)
+        combined.append(adapter.concat([
+            array if _is_framework(array) else adapter.as_tensor(array, like=like) for array in arrays]))
+    return combined
+
+
+def joined(tensors: Any, join: Any) -> Any:
+    """Tensors of one type, of which at least one carries gradients, joined
+    into one that carries them.
+
+    ``join`` joins IntTensors of the shapes of the tensors, as it would the
+    tensors: concatenation or stacking along an axis. It is called on the
+    indices of the elements, numbered through the tensors, and the result
+    takes the rows of the elements at those indices: one concatenation and
+    one gather per group of columns.
+    """
+    from .base_tensor import IntTensor
+
+    base = next(tensor for tensor in tensors if is_tracked(tensor))._base
+    groups = base._tracking.groups
+    sources, enumerations, sizes, ids = [], [], [], []
+    n_rows = n_elements = 0
+    for tensor in tensors:
+        if not isinstance(tensor, base) or tensor.dtype != tensors[0].dtype:
+            raise TypeError(
+                f"All tensors must have one type and dtype to be joined (got {type(tensors[0]).__name__} of "
+                f"{tensors[0].dtype.__name__} and {type(tensor).__name__} of {tensor.dtype.__name__}).")
+        if is_tracked(tensor):
+            parts, enumeration, size = tensor._parts, tensor._enumeration, tensor._sizes
+        else:
+            content, enumeration, *rest = tensor._serial()
+            parts, size = _split_columns(content, groups), rest[0] if rest else None
+        flat = enumeration.reshape(-1, 2)
+        ids.append(IntTensor(np.arange(len(flat), dtype=np.int64).reshape(enumeration.shape[:-1]) + n_elements))
+        sources.append(parts)
+        enumerations.append(flat + n_rows)
+        sizes.append(None if size is None else size.reshape(-1))
+        n_rows += int(parts[0].shape[0])
+        n_elements += len(flat)
+    every = tracked_class(base)(
+        _concatenated(sources), np.concatenate(enumerations),
+        sizes=None if sizes[0] is None else np.concatenate(sizes))
+    return every._select(join(ids))
 
 
 def from_elements(base: type, data: Any) -> Any:

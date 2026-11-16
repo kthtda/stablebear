@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Any, overload
 from . import _autodiff
 from . import _sb_cpp as cpp
 from ._tensor_base import Shape, ShapeLike, Tensor
+from ._tracked import is_tracked, joined
 from .base_tensor import (
     BoolTensor,
     FloatTensor,
@@ -289,7 +290,8 @@ def concatenate(tensors, axis=0):
     Returns
     -------
     Tensor or TimeSeries
-        A tensor of the type of the inputs, or a series of one channel.
+        A tensor of the type of the inputs, or a series of one channel. If
+        a tensor carries gradients, so does the result.
 
     Raises
     ------
@@ -307,6 +309,8 @@ def concatenate(tensors, axis=0):
     if not tensors:
         raise ValueError("need at least one tensor to concatenate")
     _validate_nested_join(tensors)
+    if any(is_tracked(t) for t in tensors):
+        return joined(tensors, lambda ids: concatenate(ids, axis))
     cpp_tensors = [t._data for t in tensors]
     result = type(cpp_tensors[0]).concatenate(cpp_tensors, axis)
     return tensors[0]._to_py_tensor(result)
@@ -351,7 +355,8 @@ def stack(tensors, axis=0):
     Returns
     -------
     Tensor or TimeSeries
-        A tensor of the type of the inputs, or a series of one channel.
+        A tensor of the type of the inputs, or a series of one channel. If
+        a tensor carries gradients, so does the result.
 
     Raises
     ------
@@ -369,6 +374,8 @@ def stack(tensors, axis=0):
     if not tensors:
         raise ValueError("need at least one tensor to stack")
     _validate_nested_join(tensors)
+    if any(is_tracked(t) for t in tensors):
+        return joined(tensors, lambda ids: stack(ids, axis))
     cpp_tensors = [t._data for t in tensors]
     result = type(cpp_tensors[0]).stack(cpp_tensors, axis)
     return tensors[0]._to_py_tensor(result)
@@ -422,6 +429,8 @@ def split(tensor, indices_or_sections, axis=0):
     --------
     array_split : Split allowing uneven divisions.
     """
+    if is_tracked(tensor):
+        return [tensor._select(part) for part in split(tensor._ids(), indices_or_sections, axis)]
     cpp_data = tensor._data
     if isinstance(indices_or_sections, int):
         parts = type(cpp_data).split_sections(cpp_data, indices_or_sections, axis)
@@ -460,6 +469,8 @@ def array_split(tensor, indices_or_sections, axis=0):
     --------
     split : Split requiring equal divisions.
     """
+    if is_tracked(tensor):
+        return [tensor._select(part) for part in array_split(tensor._ids(), indices_or_sections, axis)]
     cpp_data = tensor._data
     if isinstance(indices_or_sections, int):
         parts = type(cpp_data).array_split(cpp_data, indices_or_sections, axis)

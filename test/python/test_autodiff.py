@@ -1701,3 +1701,70 @@ def test_lp_distance_with_framework_p_below_one_raises(fw):
     f, g = _f_and_g()
     with pytest.raises(ValueError, match=">= 1"):
         sb.lp_distance(f, g, p=fw.tensor(0.5))
+
+
+_JOINABLE = pytest.mark.parametrize("make_tensor", [
+    pytest.param(lambda: _pcf_grid(), id="pcfs"),
+    pytest.param(lambda: _barcode_batch(), id="barcodes"),
+    pytest.param(lambda: _point_clouds(), id="point_clouds"),
+    pytest.param(lambda: _distance_matrices(), id="distance_matrices"),
+])
+
+
+def _assert_tracked_copy_of(fw, out, expected):
+    assert isinstance(out, type(expected))
+    assert isinstance(out.to_serial_content()[0], fw.tensor_type)
+    assert out.shape == expected.shape
+    assert out.array_equal(expected)
+
+
+@_JOINABLE
+@pytest.mark.parametrize("join", [
+    pytest.param(lambda a, b: sb.concatenate([a, b], axis=0), id="concatenate"),
+    pytest.param(lambda a, b: sb.concatenate([a, b[:, :1], a], axis=1), id="concatenate_three"),
+    pytest.param(lambda a, b: sb.stack([a, b], axis=0), id="stack"),
+    pytest.param(lambda a, b: sb.stack([a, b], axis=-1), id="stack_last"),
+])
+@pytest.mark.parametrize("which", ["first", "second", "both"])
+def test_join_of_tracked_tensors_matches_untracked(fw, make_tensor, join, which):
+    a, b = make_tensor(), make_tensor()[::-1]
+
+    out = join(tracked(fw, a) if which != "second" else a, tracked(fw, b) if which != "first" else b)
+
+    _assert_tracked_copy_of(fw, out, join(a, b))
+
+
+@_JOINABLE
+@pytest.mark.parametrize("divide", [
+    pytest.param(lambda t: sb.split(t, 2, axis=1), id="split_sections"),
+    pytest.param(lambda t: sb.split(t, [1], axis=0), id="split_indices"),
+    pytest.param(lambda t: sb.array_split(t.flatten(), 3, axis=0), id="array_split"),
+])
+def test_split_of_tracked_tensor_matches_untracked(fw, make_tensor, divide):
+    out = divide(tracked(fw, make_tensor()))
+
+    expected = divide(make_tensor())
+    assert len(out) == len(expected)
+    for part, expected_part in zip(out, expected):
+        _assert_tracked_copy_of(fw, part, expected_part)
+
+
+def test_concatenation_of_tracked_tensors_of_different_types_raises(fw):
+    with pytest.raises(TypeError, match="one type"):
+        sb.concatenate([tracked(fw, _pcf_grid()), _barcode_batch()], axis=0)
+
+
+def test_concatenation_of_tracked_tensors_of_different_shapes_raises(fw):
+    with pytest.raises(ValueError):
+        sb.concatenate([tracked(fw, _pcf_grid()), _pcf_grid().flatten()], axis=0)
+
+
+def test_gradient_through_concatenation_and_split(fw):
+    F, G = _tensors()
+
+    def loss(x):
+        both = sb.concatenate([F * x, G, G * x * x], axis=0)
+        first, second = sb.split(sb.stack([both, both * x], axis=0), [2], axis=1)
+        return fw.sum(sb.lp_norm(first, p=2.0)) + fw.sum(sb.lp_norm(second - G, p=1.0))
+
+    _assert_gradient_matches_finite_differences(fw, loss, 1.5)
