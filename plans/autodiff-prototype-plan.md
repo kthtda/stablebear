@@ -1,6 +1,6 @@
 # Autodiff prototype: implementation plan
 
-Progress: 14 of 27 items, 30 of 64 points (47%)
+Progress: 15 of 27 items, 33 of 64 points (52%)
 
 Spec: [autodiff-prototype-spec.md](autodiff-prototype-spec.md)
 
@@ -53,14 +53,18 @@ Spec: [autodiff-prototype-spec.md](autodiff-prototype-spec.md)
   critical edges of its forward pass.
   Tests: the kernel gradient tests pass; the kernel runs once per
   forward and backward.
-- [ ] **C4.** [3] PCF arithmetic with a tracked operand without a Python
-  loop over elements: the union of the operands' times comes from
+- [x] **C4.** [3] (0e517a1a9) PCF arithmetic with a tracked operand
+  without a Python loop over elements: the union of the operands' times comes from
   `iterate_rectangles_with_rows` in C++, which reports the breakpoints of
   each rectangle, in parallel over the elements.
   Tests: C++ tests of `iterate_rectangles_with_rows` (rows of each
   rectangle; one function ending first; same rectangles as
   `iterate_rectangles`); arithmetic on a stable rank with equal
   lifetimes; the arithmetic gradient tests pass; note the timings.
+  Note: in a Release build, `x * F - G` on 10^5 PCFs of 20 points takes
+  116 ms tracked, against 21 ms for `F - G` untracked; the merge is no
+  longer the main cost. `pdist` on 1500 PCFs of 50 points is unchanged: 29
+  ms for p=1 and 95 ms for p=2.
 - [ ] **C5.** [2] The sorting order of the tracked stable rank computed in
   C++, per barcode in parallel, in place of one `lexsort` over all bars.
   Tests: the stable rank tests pass; equal lifetimes and an empty barcode
