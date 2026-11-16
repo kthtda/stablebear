@@ -1,6 +1,6 @@
 # Linear subspaces, inner products, and distances: implementation plan
 
-Progress: 15 of 15 items, 33 of 33 points (100%)
+Progress: 15 of 19 items, 33 of 43 points (77%)
 
 Spec: [linear-subspaces-spec.md](linear-subspaces-spec.md)
 
@@ -120,3 +120,31 @@ Spec: [linear-subspaces-spec.md](linear-subspaces-spec.md)
   distances: what a projection under an inner product is, the kernel of a
   cloud and its projection, the distance of an Lp norm, and optimizing a
   subspace with a framework, with one figure.
+
+## Phase E: Batches with gradients
+
+- [ ] **E1.** [2] C++: the bars and critical edges of persistent homology
+  and of the homological kernel for every element of a tensor of point
+  clouds or of distance matrices, in parallel over the elements, with their
+  bindings.
+  Tests: the bars of a batch equal those of each element alone, for both
+  operations and both kinds of element; the edges of each element are
+  pairs of its own points; an empty cloud gives no bars.
+- [ ] **E2.** [2] A batch of point clouds that carries gradients from
+  framework arrays: `PointCloudTensor` of a list with framework arrays, and
+  framework arrays of shape (..., n, d) where a point cloud is taken.
+  Tests: the batch holds each array as a cloud, of different sizes;
+  gradients flow through its projection; a framework array of shape
+  (b, n, d) is a batch of b clouds.
+- [ ] **E3.** [3] `compute_persistent_homology` with gradients of a batch,
+  plain or in a `DistanceSpace` of either kind of distance (D8).
+  Tests: the bars of a batch match the untracked ones; gradients with
+  respect to the points, to the vectors of a subspace, and to a Gram
+  matrix against finite differences; under `LpDistance(1)`; points that
+  JAX traces raise.
+- [ ] **E4.** [3] `compute_homological_kernel` with gradients of two batches,
+  plain or in `DistanceSpace`s of either kind of distance.
+  Tests: the bars of a batch match the untracked ones; gradient of the
+  kernels of a batch and its projection with respect to the vectors of
+  the subspace against finite differences; under `LpDistance(1)`; batches
+  of different shapes raise.

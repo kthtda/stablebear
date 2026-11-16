@@ -215,10 +215,25 @@ projection (P) and the distances (L^T). A tracked `PointCloudTensor` holds
 the points of all its clouds as one (m, d) framework array, so its
 projection is one framework product with the same enumeration.
 
-Persistent homology and the kernel with gradients take a single cloud only
-(autodiff D16), and that does not change: a tracked batch, in a
-`DistanceSpace` or not, raises there. The pairwise distances of an
-untracked batch are computed in C++, in parallel over the clouds.
+**D8a. Persistent homology and the kernel differentiate a batch through
+its critical edges.** A batch that carries gradients is a tracked
+`PointCloudTensor`: the result of a projection or a product, a
+`PointCloudTensor` built from a list that holds framework arrays, or a
+framework array of shape (..., n, d), which is a batch of clouds of n
+points as a NumPy array of that shape is. C++ computes the bars and the
+critical edges of every element, in parallel over the elements, from the
+point clouds or, for a distance computed through matrices, from the
+distance matrices (D6a). The bars are then the distances of those pairs
+of points as framework operations on the one array that holds the points
+of all clouds: one gather and one product for the whole batch. The result
+is a tracked `BarcodeTensor` of the shape of the untracked result.
+
+This needs concrete points, so a batch raises while JAX or `tf.function`
+traces it. The kernel of a single pair of clouds with Euclidean or inner
+product distances keeps its vjp, and still works while they trace.
+
+Rejected: a Python loop over the clouds of a batch, which costs a
+framework operation per cloud (autodiff D13).
 
 **D9. Checks need concrete values.** That the Gram matrix is symmetric
 positive definite and that the vectors are independent is checked when the
@@ -241,7 +256,6 @@ PCFs, and is unrelated.
   points, for use as lower-dimensional coordinates?
 - Should affine subspaces (a subspace through a point other than the
   origin) be supported?
-- Should persistent homology and the kernel take batches of tracked clouds?
 - Should users be able to define a distance of their own, by a function
   of two points or by subclassing `Distance`?
 - Should norms be objects of their own, between inner products and
