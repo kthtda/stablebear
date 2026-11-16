@@ -1,6 +1,6 @@
 # Linear subspaces, inner products, and distances: implementation plan
 
-Progress: 15 of 19 items, 33 of 43 points (77%)
+Progress: 16 of 19 items, 35 of 43 points (81%)
 
 Spec: [linear-subspaces-spec.md](linear-subspaces-spec.md)
 
@@ -123,7 +123,7 @@ Spec: [linear-subspaces-spec.md](linear-subspaces-spec.md)
 
 ## Phase E: Batches with gradients
 
-- [ ] **E1.** [2] C++: the bars and critical edges of persistent homology
+- [x] **E1.** [2] (5471c39c5) C++: the bars and critical edges of persistent homology
   and of the homological kernel for every element of a tensor of point
   clouds or of distance matrices, in parallel over the elements, with their
   bindings.
