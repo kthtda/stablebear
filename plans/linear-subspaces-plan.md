@@ -1,12 +1,12 @@
 # Linear subspaces and inner products: implementation plan
 
-Progress: 0 of 10 items, 0 of 23 points (0%)
+Progress: 1 of 10 items, 2 of 23 points (9%)
 
 Spec: [linear-subspaces-spec.md](linear-subspaces-spec.md)
 
 ## Phase A: Projecting a single cloud
 
-- [ ] **A1.** [2] `InnerProduct(gram)` in `stablebear/linear.py`, exported
+- [x] **A1.** [2] (120c476f7) `InnerProduct(gram)` in `stablebear/linear.py`, exported
   from `stablebear`: `gram`, equality, and `ip(vectors)` returning an
   `InnerProductSpace` with `vectors`, `inner_product`, and `dtype`; NumPy
   only.
