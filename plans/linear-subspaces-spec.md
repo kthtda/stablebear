@@ -6,8 +6,7 @@ Point clouds can be projected onto a linear subspace, orthogonally with
 respect to a chosen inner product, and persistent homology and the
 homological kernel can use a chosen distance: the one an inner product
 induces, or that of an Lp norm. All of it carries gradients of PyTorch,
-JAX, and TensorFlow, so that a subspace or an inner product can be
-optimized. This file records the design and the decisions behind it, with
+so that a subspace or an inner product can be optimized. This file records the design and the decisions behind it, with
 the alternatives that were rejected. Update it when a decision changes.
 
 It builds on the autodiff prototype
@@ -176,9 +175,7 @@ edges.** Each endpoint of a bar is the distance between two points
 matrix, persistent homology and the kernel report the critical edges of
 the bars computed from that matrix, and the bars are the distances of those
 pairs of points again, as framework operations with the formula of the
-distance. This needs concrete points, so it raises while JAX or
-`tf.function` traces them, for the kernel as well, which with Euclidean
-and inner product distances keeps its vjp and works while they trace.
+distance.
 
 **D6b. `distance_type` is deprecated.** `compute_persistent_homology` has a
 `distance_type` argument with the single value `DistanceType.Euclidean`.
@@ -242,10 +239,6 @@ of points as framework operations on the one array that holds the points
 of all clouds: one gather and one product for the whole batch. The result
 is a tracked `BarcodeTensor` of the shape of the untracked result.
 
-This needs concrete points, so a batch raises while JAX or `tf.function`
-traces it. The kernel of a single pair of clouds with Euclidean or inner
-product distances keeps its vjp, and still works while they trace.
-
 Rejected: a Python loop over the clouds of a batch, which costs a
 framework operation per cloud (autodiff D13).
 
@@ -262,9 +255,7 @@ serial content for a whole tensor.
 
 In Python, a single cloud that carries gradients is a batch of one, so each
 operation has one path for gradients, and one shared function turns critical
-edges into bars. The exception is the kernel of a single pair with Euclidean
-or inner product distances, which keeps its vjp because that works while a
-framework traces (D8a).
+edges into bars.
 
 A later operation therefore needs its C++ operation on one element and, for
 gradients, its function from rows of points to values, and nothing for
@@ -274,11 +265,12 @@ Rejected: a tensor overload and a batch branch per operation, which the
 first version had, with the code that numbers the elements of a tensor
 copied in each.
 
-**D9. Checks need concrete values.** That the Gram matrix is symmetric
-positive definite and that the vectors are independent is checked when the
-values are concrete, and raises `ValueError`. While a framework traces the
-matrix or the vectors abstractly, they are not checked, and invalid values
-give NaN.
+**D9. Invalid matrices and vectors raise.** That the Gram matrix is
+symmetric positive definite and that the vectors are independent is checked
+when the object is made, also for PyTorch tensors, and raises `ValueError`.
+
+Timings of projection, persistent homology, and the kernel with and
+without gradients are in D13 of the autodiff spec.
 
 ## Names and modules
 

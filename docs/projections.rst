@@ -156,18 +156,20 @@ way, and give a time series with its times::
    projected = line.project(clouds)                       # a PointCloudTensor
    barcodes = persistence.compute_persistent_homology(taxicab(clouds))
 
-A batch carries gradients when it is made from PyTorch, JAX, or TensorFlow
-arrays, as ``sb.PointCloudTensor`` of a list that holds such arrays or of one
-such array of shape ``(..., n, d)``, and when it is the projection of a batch
-onto a subspace whose vectors are such an array.
+A batch carries gradients when it is made from PyTorch tensors, as
+``sb.PointCloudTensor`` of a list that holds such tensors, and when it is
+the projection of a batch onto a subspace whose vectors are a PyTorch
+tensor. A PyTorch tensor of shape ``(..., n, d)`` is itself a batch of point
+clouds of ``n`` points, and its projection is a PyTorch tensor of that
+shape.
 
 
 Optimizing a subspace
 =====================
 
 The points, the vectors of a subspace, and the Gram matrix of an inner
-product can each be a PyTorch, JAX, or TensorFlow array. The results then
-carry gradients with respect to each of them that is one. The example looks
+product can each be a PyTorch tensor. The results then carry gradients with
+respect to each of them that is one. The example looks
 for the plane that keeps the distances of a point cloud in three dimensions
 best: it minimizes the area under the stable rank of the kernel of the point
 cloud and its projection, which is the total length of the bars of the
@@ -208,13 +210,13 @@ third. The plane starts as the one spanned by the second and third
 coordinates, and the loss falls from about 18.8 to about 1.3 as the plane
 turns toward the first two coordinates.
 
-Some restrictions apply to gradients:
+Results with gradients come in two kinds. A result that is one array of
+numbers is a PyTorch tensor: a norm, or the projection of a point cloud
+given as a PyTorch tensor. A result whose elements differ in size, such as a
+tensor of barcodes or the projection of a ``PointCloudTensor``, is a
+stablebear tensor that carries the gradients, and its ``to_serial_content``
+gives its rows as a PyTorch tensor. An operation that cannot carry the
+gradients of its input raises instead of dropping them; ``detach`` gives the
+values without gradients.
 
-- Projection works while JAX or ``tf.function`` traces its inputs. Persistent
-  homology does not, because the number of bars depends on the points.
-  The homological kernel works for a single pair of point clouds with the
-  Euclidean distance or that of an inner product, and not for a batch or
-  with an ``LpDistance`` other than ``LpDistance(2)``.
-- That a Gram matrix is symmetric positive definite and that the vectors of a
-  subspace are linearly independent is checked only for values that are not
-  being traced.
+Gradients are supported for PyTorch only.

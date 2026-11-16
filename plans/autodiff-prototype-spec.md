@@ -2,19 +2,19 @@
 
 Plan: [autodiff-prototype-plan.md](autodiff-prototype-plan.md)
 
-The `autodiff-prototype` branch lets gradients from PyTorch, JAX, and
-TensorFlow flow through stablebear operations, so that a loss built from
-PCFs, PLFs, and barcodes can be optimized with respect to point clouds,
-breakpoints, or the parameters of a transformation. This file records the
+The `autodiff-prototype` branch lets gradients of PyTorch flow through
+stablebear operations, so that a loss built from PCFs, PLFs, and barcodes
+can be optimized with respect to point clouds, breakpoints, or the
+parameters of a transformation. This file records the
 design and the decisions behind it, with the alternatives that were
 rejected. Update it when a decision changes.
 
 ## Goals
 
-- A user writes ordinary stablebear code with framework arrays as inputs
-  and gets a framework result that carries gradients.
-- Code that does not use a framework runs exactly as before, with no extra
-  cost.
+- A user writes ordinary stablebear code with PyTorch tensors as inputs and
+  gets a result that carries gradients.
+- Code that does not use PyTorch runs exactly as before, with no extra
+  cost, and does not import it.
 - Values and gradients are never silently wrong: an operation either
   handles gradients correctly or raises.
 - Most of the library can be differentiated, with a bounded overhead over
@@ -22,14 +22,25 @@ rejected. Update it when a decision changes.
 
 ## Architecture
 
-**D1. The core stays framework-free.** An operation opts in with the
+**D1. The core stays free of PyTorch.** An operation opts in with the
 `_autodiff.differentiable` decorator, naming the parameters that can carry
-gradients and a vector-Jacobian product (vjp) written in NumPy. A small
-adapter per framework runs the operation as a custom op of that framework:
-`torch.autograd.Function` for PyTorch, `custom_vjp` with `pure_callback`
-for JAX (which also works under `jax.jit`), and `custom_gradient` with
-`numpy_function` for TensorFlow. Keras 3 variables are unwrapped to the
-variable or array of their backend.
+gradients and a vector-Jacobian product (vjp) written in NumPy. One adapter
+module, `_autodiff_torch`, runs the operation as a
+`torch.autograd.Function`, and holds every other use of PyTorch. The rest
+of the package reaches it through `_autodiff._framework`, which imports it
+only for a PyTorch tensor. This spec and the code call such tensors
+"framework arrays", to tell them from stablebear tensors.
+
+**D1a. PyTorch is the only framework, for now.** The first version also had
+adapters for JAX and TensorFlow. They were removed: every operation whose
+result depends on values (which bars exist, in which order breakpoints
+fall) needs concrete values, and `jax.grad` and `tf.function` trace with
+abstract ones, so persistent homology, the barcode summaries,
+`transform_bars`, and all batches raised there. Supporting them cost a
+declared shape for every result, a branch for abstract values in every
+operation, and a second path for the kernel that existed only for
+`jax.jit`. The seam of D1 stays, so that an adapter can come back for the
+operations that it can support.
 
 An operation whose result is a tensor declares its type (`returns=`) and
 returns the untracked C++ tensor; the decorator makes the framework array
@@ -69,9 +80,8 @@ batch and gives no vectorized gradients.
 **D5. One source of truth.** The state of a tracked object is its
 framework arrays and its enumeration. Its C++ object (`_data`) is derived
 from them, so the two cannot disagree. The derived C++ object is cached:
-a tracked object is immutable, JAX and TensorFlow arrays cannot change, and
-PyTorch's version counter of the array tells when it was changed in place,
-in which case the cache is rebuilt. An operation that already has the C++
+a tracked object is immutable, and PyTorch's version counter of the array
+tells when it was changed in place, in which case the cache is rebuilt. An operation that already has the C++
 result hands it to the tracked object as the initial cache. Indexing,
 reshaping, and copying keep the gradients; any other operation that would
 build a new object without them raises, instead of dropping them silently.
@@ -97,8 +107,7 @@ checks whether the object is tracked, which adds a Python call to every
 
 An operation's forward and backward passes get the cached C++ tensor of a
 tracked argument when the values the framework passes them equal the
-argument's current ones, which one comparison pass tells. They differ while
-a framework traces abstractly, and the argument is then converted.
+argument's current ones, which one comparison pass tells.
 
 A single `Pcf` or `Plf` that carries gradients follows the same rule:
 reading its `_data` raises, so evaluating, integrating, or copying it
@@ -142,9 +151,6 @@ Rejected: storing the zero diagonal of a distance matrix, which makes the
 number of entries tell the size but adds n entries per matrix whose
 gradients must be ignored.
 
-A distance matrix rejects NaN, so the C++ tensor of a tracked one cannot be
-derived while a framework traces it abstractly.
-
 **D5b. Writes are deferred.** `x[i] = v` on a tracked tensor records the
 replacement in a table of pending writes, at no cost per write, and the next
 operation that needs the framework arrays applies all of them in one pass.
@@ -158,9 +164,9 @@ a tracked tensor when an element carries gradients: every element is written
 to an empty tensor, which one pass then fills. A list without such an element
 is scanned once more than before to tell.
 
-Rejected: applying each write at once, which copies the whole array per
-write in JAX and TensorFlow, and one framework array per element, which
-makes writes cheap but needs a Python loop for every batch operation.
+Rejected: applying each write at once, which rebuilds the array per write,
+and one framework array per element, which makes writes cheap but needs a
+Python loop for every batch operation.
 
 **D6. Indexing reuses the tensor indexing rules.** A tracked tensor indexes,
 reshapes, or broadcasts an `IntTensor` of its elements' flat indices with
@@ -177,30 +183,19 @@ vector per element, would make the serial conversion free and let a framework
 array share memory with the C++ tensor through DLPack. It would not remove
 the need for D5: gradients still live on the framework array, and C++
 indexing does not record framework operations. Sharing memory would help
-mainly PyTorch on CPU: JAX has no buffers while it traces, `pure_callback`
-and `numpy_function` pass copies, and the barcode code is CPU only. It is a
+on the CPU only, where the barcode code runs. It is a
 storage refactor of several days, to revisit if profiling shows the copies
 or the per-element allocations matter. The `_serial` interface would stay.
 
 ## Operations
 
-**D8. Data-dependent shapes raise under abstract tracing.** JAX traces with
-abstract values even without `jax.jit` (in `jax.grad`), and so does
-`tf.function`. Where the shape of a result depends on values, the operation
-raises `NotImplementedError` while tracing:
-
-- PCF arithmetic with tracked times, since the union of times depends on
-  their order.
-- `transform_bars`, since which bars it removes depends on their values.
-  (Chosen over keeping removed bars as zero-length bars, which would give
-  the same stable ranks and Betti curves but different barcodes.)
-- The stable rank of several tracked barcodes, which sorts with a concrete
-  `lexsort`. A single barcode sorts with the framework, so the kernel's
-  stable rank works in JAX.
-- Betti curves, since the order of the births and deaths depends on their
-  values, and accumulated persistence functions, since which bars they
-  include does.
-- Persistent homology, since the number of bars depends on the points.
+**D8. Results may depend on values.** Which bars `transform_bars`
+removes, the order of the breakpoints of a sum of PCFs, and the number of
+bars of persistent homology depend on the values of their inputs. PyTorch
+runs eagerly, so the operations read the values and build the result for
+them. (`transform_bars` removes bars rather than keeping them with zero
+length, which would give the same stable ranks and Betti curves but
+different barcodes.)
 
 **D9. Derivatives at kinks are one-sided.** At a breakpoint of a PLF, the
 derivatives are those of the segment after it. A bar with an infinite
@@ -222,10 +217,6 @@ its typing overload promises a `Barcode` result. Wrap a single barcode as
 **D11. The first time of a PLF gets a gradient.** A PLF's first breakpoint
 time must be 0, but its gradient is reported anyway; a user optimizing the
 times masks it.
-
-**D12. TensorFlow gradients are made dense.** A gather after a custom op
-gives `IndexedSlices` gradients, which the TensorFlow adapter converts to a
-dense tensor before calling the vjp.
 
 **D16. Persistent homology differentiates the critical edges.** In a
 Vietoris-Rips complex a simplex appears at the length of its longest edge,
@@ -273,14 +264,29 @@ under 1 ms; and `x * F - G` on 10^5 PCFs of 20 points takes 116 ms tracked
 against 21 ms for `F - G` untracked. Take timings in a Release build
 (`cmake-build-release`).
 
+After the cleanup for PyTorch only, in a Release build on the CPU with the
+default number of threads (8 performance and 8 efficiency cores), best of
+three runs:
+
+| Pipeline | Untracked | Tracked forward | Forward and backward |
+| --- | --- | --- | --- |
+| `transform_bars`, stable rank, `lp_norm`; 2000 barcodes of 500 bars, a PLF of 50 breakpoints | 15 ms | 45 ms | 239 ms |
+| Persistent homology, dimensions 0 and 1; 200 clouds of 100 points | 12 ms | 20 ms | 22 ms |
+| Kernel of a batch and its projection; 200 clouds of 200 points | 8 ms | 15 ms | 18 ms |
+| Projection; 2000 clouds of 500 points | 1.5 ms | 5.4 ms | 13.5 ms |
+
+A tracked forward pass costs 2 to 4 times the untracked one. The backward
+pass of the first pipeline stands out: the vjp of `transform_bars` and the
+sort of the stable rank handle 10^6 bars in NumPy and PyTorch on one thread.
+
 Known limits: every operation passes through host memory, since the C++
 code takes host arrays, which costs a transfer per operation for arrays on
 a GPU.
 
 **D14. Numeric results with gradients are framework arrays.** `lp_norm` of
-tracked PCFs returns a framework array, so `loss.backward()` and
-`jax.grad` work directly, and operations that take a `FloatTensor` also
-take a framework array. A dense framework array already is the tracked form
+tracked PCFs returns a framework array, so `loss.backward()` works
+directly, and operations that take a `FloatTensor` also take a framework
+array. A dense framework array already is the tracked form
 of a `FloatTensor`; wrapping it would add a step for the user without
 adding information. This is an exception to returning stablebear tensors
 from public functions.
@@ -301,8 +307,7 @@ Rejected: keeping all values in the C++ tensors, recording our own list of
 operations, and giving the framework one operation for a whole pipeline.
 It removes every conversion and makes writes cheap, but a tracked tensor
 that feeds many separate results (a loop of 1000 norms) is differentiated
-once per result, JAX needs a deferred-execution layer because it has no
-values while tracing, and all operations so far would be rewritten.
+once per result, and all operations so far would be rewritten.
 
 ## Open questions
 
