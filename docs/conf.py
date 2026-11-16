@@ -119,6 +119,7 @@ nitpick_ignore = [
     ("py:class", "PlfContainerLike"),
     ("py:class", "ShapeLike"),
     ("py:class", "torch.Generator"),
+    ("py:class", "torch.Tensor"),
 ]
 nitpick_ignore_regex = [
     ("py:class", r"(.*\.)?_[A-Za-z]\w*(\..*)?"),

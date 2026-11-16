@@ -188,25 +188,39 @@ A `DistanceSpace` replaces it. Passing `distance_type` gives a
 
 ## Inputs and gradients
 
-**D7. One implementation over NumPy and the frameworks.** `project` and
-the distances take, as points:
+**D7. One implementation over NumPy and PyTorch.** `project` and the
+distances take, as points:
 
 - a single cloud of shape (n, d): a NumPy array, `FloatTensor`,
-  `PointCloud`, or a PyTorch, JAX, or TensorFlow array;
-- a batch: a `PointCloudTensor`, with or without gradients (autodiff D5a).
+  `PointCloud`, or a PyTorch tensor;
+- a batch: a `PointCloudTensor`, with or without gradients (autodiff D5a),
+  a time series of point clouds, or a PyTorch tensor of shape (..., n, d),
+  whose clouds have the same size.
 
-The vectors and the Gram matrix are NumPy arrays or framework arrays. If
-any of the points, the vectors, and the matrix is a framework array, the
-computation runs in that framework and the result carries gradients with
-respect to all that are: a framework array for a single cloud (as in
-autodiff D14), and a tracked `PointCloudTensor` for a batch. Otherwise a
-single cloud gives a `PointCloud` and a batch a `PointCloudTensor`.
+The vectors and the Gram matrix are NumPy arrays or PyTorch tensors. If any
+of the points, the vectors, and the matrix is a PyTorch tensor, the
+computation runs in PyTorch and the result carries gradients with respect
+to all that are.
+
+**D7a. A dense result is a PyTorch tensor, and a ragged one a tracked
+tensor.** With gradients, a result that is one dense array of numbers is a
+PyTorch tensor: norms, the matrices of `pdist` and `l2_kernel`, and the
+projection of a single cloud or of a PyTorch tensor of shape (..., n, d),
+which has the shape of its input. A result whose elements differ in size is
+a tracked stablebear tensor of the type that the operation returns without
+gradients: barcodes, PCFs, and the projection of a `PointCloudTensor`.
+`to_serial_content` (autodiff D5c) gives its rows as a PyTorch tensor. An
+`InnerProductSpace` or `DistanceSpace` keeps the points it was given, so
+the rule applies to what it holds.
+
+Rejected: a tracked stablebear object for every result, which would wrap
+dense arrays that PyTorch already tracks (autodiff D14), and converting a
+PyTorch tensor of several clouds to a `PointCloudTensor`, which made
+`project` return another type for a batch than for one cloud.
 
 The linear algebra of D5 and D6 is written once against a small set of
 array operations (product, transpose, solving a linear system, Cholesky
-factor) that NumPy and each framework adapter provide. No operation has a shape
-that depends on values, so projection works while JAX or `tf.function`
-traces, unlike persistent homology.
+factor) that NumPy and the PyTorch adapter provide.
 
 **D8. A batch is multiplied in C++, or as one framework product.** An
 untracked `PointCloudTensor` is multiplied by a (d, d) matrix in C++, in

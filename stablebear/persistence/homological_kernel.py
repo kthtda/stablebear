@@ -105,6 +105,9 @@ def _tracked_kernel_of_batches(X: Any, Y: Any, distance: Any = None) -> BarcodeT
     bars, and the bars are their distances again as framework operations
     on the points (see _critical_edges).
     """
+    # A framework array of more than two dimensions is a batch of clouds.
+    X, Y = (PointCloudTensor(points) if _autodiff._framework(points) is not None and len(points.shape) > 2
+            else points for points in (X, Y))
     if isinstance(X, PointCloudTensor) != isinstance(Y, PointCloudTensor):
         raise TypeError(
             "X and Y must both be batches of point clouds, or both single point clouds "
@@ -255,10 +258,7 @@ def compute_homological_kernel(
 
     if _autodiff._tracked(X) is not None or _autodiff._tracked(Y) is not None:
         # A framework array of more than two dimensions is a batch of clouds.
-        inputs: list[Any] = [X, Y]
-        return _tracked_kernel_of_batches(*(
-            PointCloudTensor(points) if _autodiff._framework(points) is not None and len(points.shape) > 2
-            else points for points in inputs))
+        return _tracked_kernel_of_batches(X, Y)
 
     X = _normalize_kernel_input(X, "X")
     Y = _normalize_kernel_input(Y, "Y")

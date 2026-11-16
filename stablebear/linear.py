@@ -69,10 +69,9 @@ def _is_float32(array: Any) -> bool:
 
 def _as_point_cloud(points: Any) -> Any:
     """A single point cloud from an (n, d) array, FloatTensor, or
-    PointCloud, as a PointCloud; a PyTorch tensor of
-    shape (n, d), or a batch of clouds as a PointCloudTensor, as it is; and
-    such an array of shape (..., n, d) as a PointCloudTensor that carries
-    gradients."""
+    PointCloud, as a PointCloud. A batch of clouds as a PointCloudTensor or a
+    time series, and a framework array of shape (..., n, d), a single cloud
+    or a batch of clouds of the same size, as they are."""
     if isinstance(points, PointCloudTensor):
         return points
     if isinstance(points, TimeSeries):
@@ -83,8 +82,8 @@ def _as_point_cloud(points: Any) -> Any:
         if len(points.shape) < 2:
             raise ValueError(
                 f"A point cloud must have shape (n, d), one point per row (got shape {tuple(points.shape)}).")
-        # More dimensions are a batch of clouds, as for a NumPy array.
-        return points if len(points.shape) == 2 else PointCloudTensor(points)
+        # More dimensions are a batch of clouds of the same size.
+        return points
     if isinstance(points, PointCloud):
         return points
     if isinstance(points, FloatTensor):
@@ -564,10 +563,12 @@ class LinearSubspace:
             time series, and an ``InnerProductSpace`` with the same inner
             product for an ``InnerProductSpace``. If the points, the
             vectors of the subspace, or the Gram matrix of the inner
-            product are PyTorch tensors, the projected
-            points carry gradients with respect to each of them that is
-            one: a PyTorch tensor for a single point cloud, and
-            a ``PointCloudTensor`` that carries gradients for a batch.
+            product are PyTorch tensors, the projected points carry
+            gradients with respect to each of them that is one. They are
+            then a PyTorch tensor, of the shape of the points, for a single
+            point cloud and for points given as a PyTorch tensor of shape
+            ``(..., n, d)``, and a ``PointCloudTensor`` that carries
+            gradients for a ``PointCloudTensor``.
 
         Raises
         ------
@@ -622,7 +623,7 @@ def _dim(cloud: Any) -> int | None:
         return int(cloud._tvalues.shape[1]) if is_tracked(cloud) else None
     if isinstance(cloud, TimeSeries):
         return None
-    return int(cloud.shape[1])
+    return int(cloud.shape[-1])
 
 
 def _multiply(points: Any, matrix: Any) -> Any:

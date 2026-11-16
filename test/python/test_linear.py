@@ -809,14 +809,59 @@ def test_framework_array_of_three_dimensions_is_a_batch_of_point_clouds(fw):
     assert clouds.array_equal(sb.PointCloudTensor(array))
 
 
-def test_inner_product_space_of_framework_batch_holds_a_point_cloud_tensor(fw):
-    array = np.arange(12.0).reshape(2, 3, 2)
+def _stacked_clouds():
+    # Two clouds of six points in the plane, as one array.
+    return np.stack([_lp_points(), _loop_points()])
 
-    space = sb.InnerProduct(_gram())(fw.tensor(array))
 
-    assert isinstance(space.points, sb.PointCloudTensor)
-    assert isinstance(space.points.to_serial_content()[0], fw.tensor_type)
-    assert space.points.shape == (2,)
+def test_projection_of_framework_array_of_several_clouds_has_its_shape(fw):
+    clouds = np.stack([_cloud3(), _cloud3()[::-1] + 0.5])
+    subspace = sb.LinearSubspace(_vectors())
+
+    projected = subspace.project(fw.tensor(clouds))
+
+    assert isinstance(projected, fw.tensor_type)
+    assert tuple(projected.shape) == (2, 6, 3)
+    for i in range(2):
+        np.testing.assert_allclose(fw.to_numpy(projected)[i], np.asarray(subspace.project(clouds[i])), atol=1e-12)
+
+
+def test_space_keeps_framework_array_of_several_clouds(fw):
+    points = fw.tensor(_stacked_clouds())
+
+    space = sb.InnerProduct(_gram())(points)
+
+    assert space.points is points
+    assert space.dtype == sb.pcloud64
+
+
+@pytest.mark.parametrize("make_distance", _BATCH_DISTANCES)
+def test_persistent_homology_of_framework_array_of_several_clouds_in_space(fw, make_distance):
+    distance = make_distance()
+
+    out = _homology(distance(fw.tensor(_stacked_clouds())))
+
+    assert isinstance(out, sb.persistence.BarcodeTensor)
+    assert isinstance(out.to_serial_content()[0], fw.tensor_type)
+    assert out.shape == (2, 2)
+    for i, cloud in enumerate(_stacked_clouds()):
+        alone = _homology(distance(cloud))
+        for dim in range(2):
+            assert out[i, dim].is_isomorphic_to(alone[dim], atol=1e-12, rtol=1e-12)
+
+
+@pytest.mark.parametrize("make_distance", _BATCH_DISTANCES)
+def test_kernel_of_framework_arrays_of_several_clouds_in_spaces(fw, make_distance):
+    distance = make_distance()
+    X, Y = _stacked_clouds(), np.stack([_contracted(cloud) for cloud in _stacked_clouds()])
+
+    out = _kernel(distance(fw.tensor(X)), distance(fw.tensor(Y)))
+
+    assert isinstance(out.to_serial_content()[0], fw.tensor_type)
+    assert out.shape == (2,)
+    for i in range(2):
+        alone = _kernel(distance(X[i]), distance(Y[i]))
+        assert out[i].is_isomorphic_to(alone[0], atol=1e-12, rtol=1e-12)
 
 
 def test_list_of_framework_point_clouds_of_different_dimensions_raises(fw):
