@@ -154,6 +154,11 @@ of a batch may have different numbers of points::
    projected = line.project(clouds)                       # a PointCloudTensor
    barcodes = persistence.compute_persistent_homology(taxicab(clouds))
 
+A batch carries gradients when it is made from PyTorch, JAX, or TensorFlow
+arrays, as ``sb.PointCloudTensor`` of a list that holds such arrays or of one
+such array of shape ``(..., n, d)``, and when it is the projection of a batch
+onto a subspace whose vectors are such an array.
+
 
 Optimizing a subspace
 =====================
@@ -196,11 +201,10 @@ turns toward the first two coordinates.
 Some restrictions apply to gradients:
 
 - Projection works while JAX or ``tf.function`` traces its inputs. Persistent
-  homology does not, because the number of bars depends on the points, and
-  neither does the homological kernel with an ``LpDistance`` other than
-  ``LpDistance(2)``.
-- Persistent homology and the homological kernel with gradients take a single
-  point cloud. Projection also takes a batch.
+  homology does not, because the number of bars depends on the points.
+  The homological kernel works for a single pair of point clouds with the
+  Euclidean distance or that of an inner product, and not for a batch or
+  with an ``LpDistance`` other than ``LpDistance(2)``.
 - That a Gram matrix is symmetric positive definite and that the vectors of a
   subspace are linearly independent is checked only for values that are not
   being traced.

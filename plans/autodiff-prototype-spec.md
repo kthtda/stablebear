@@ -226,8 +226,9 @@ so each endpoint of a bar is the distance between two points. Ripser
 records, on request, the longest edges of the birth and death simplices of
 each bar; the barcodes of a framework array of shape (n, d) are computed
 with them, and the bars are the lengths of those edges again as framework
-operations on the points. Only a single point cloud is supported, like the
-kernel. Without the request, Ripser runs as before.
+operations on the points. Without the request, Ripser runs as before.
+Batches of point clouds, for persistent homology and for the kernel, are
+described in D8a of [linear-subspaces-spec.md](linear-subspaces-spec.md).
 
 Rejected: finding the pair of points of each endpoint by searching for its
 value among the pairwise distances, which needs no change to Ripser but

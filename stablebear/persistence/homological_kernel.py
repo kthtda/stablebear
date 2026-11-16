@@ -4,6 +4,7 @@ import numpy as np
 
 from .. import _autodiff
 from .. import _sb_cpp as cpp
+from .._tracked import is_tracked
 from ..async_task import _run_task
 from ..distance_matrix import (
     DistanceMatrix,
@@ -146,6 +147,69 @@ def _validate_kernel_pair(X, Y):
         raise ValueError(f"X and Y must have the same shape (got {X.shape} and {Y.shape})")
 
 
+_ABSTRACT_BATCH = (
+    "compute_homological_kernel of batches, or in a distance that is computed from pairs of points, is not "
+    "supported for points that JAX or tf.function traces abstractly: the gradients follow pairs of points "
+    "that depend on their values.")
+
+
+def _tracked_kernel_of_batches(X: Any, Y: Any, distance: Any = None) -> BarcodeTensor:
+    """The kernels of the aligned clouds of two PointCloudTensors, of which
+    at least one carries gradients, as a BarcodeTensor of their shape whose
+    bars carry gradients. The distance is Euclidean, or the given Distance,
+    which is computed from pairs of points.
+
+    C++ computes the bars and critical edges of all pairs of clouds, in
+    parallel over the pairs. The points of all clouds of a tensor are one
+    framework array, so the births and the deaths of the whole batch each
+    come from one gather of the points of their edges (see
+    _tracked_endpoints). This needs concrete points.
+    """
+    if not (isinstance(X, PointCloudTensor) and isinstance(Y, PointCloudTensor)):
+        raise TypeError(
+            "X and Y must both be batches of point clouds, or both single point clouds "
+            f"(got {type(X).__name__} and {type(Y).__name__}).")
+    _validate_kernel_pair(X, Y)
+
+    points, enumerations, plain = [], [], []
+    for clouds in (X, Y):
+        if is_tracked(clouds):
+            tracked: Any = clouds
+            points.append(tracked._tvalues)
+            enumerations.append(tracked._enumeration)
+            plain.append(tracked.detach())
+        else:
+            content, enumeration = clouds._serial()
+            points.append(content)
+            enumerations.append(enumeration)
+            plain.append(clouds)
+    adapter, points = _in_one_framework(*points)
+    if any(adapter.concrete(array) is None for array in points):
+        raise NotImplementedError(_ABSTRACT_BATCH)
+
+    if distance is None:
+        elements, lengths = plain, adapter.row_norms
+    else:
+        elements = [distance._distance_matrices(clouds) for clouds in plain]
+
+        def lengths(differences):
+            return distance._lengths(adapter, differences)
+
+    backend = cpp_p.HomologicalKernel32 if X.dtype is pcloud32 else cpp_p.HomologicalKernel64
+    bars, enumeration, edges = backend.homological_kernel_critical_edges(
+        *(tensor._data.materialize() if tensor._has_indexed_storage() else tensor._data for tensor in elements))
+
+    # The critical edges count the points of each cloud from 0: shift them
+    # to the rows of the cloud among the points of all clouds of its tensor.
+    pairs = enumeration.reshape(-1, 2)
+    counts = pairs[:, 1] - pairs[:, 0]
+    shift_x, shift_y = (np.repeat(e.reshape(-1, 2)[:, 0], counts) for e in enumerations)
+    tracked_bars = adapter.stack_columns(
+        _tracked_endpoints(adapter, points[1], bars[:, 0], edges[:, 0] + shift_y, edges[:, 1] + shift_y, lengths),
+        _tracked_endpoints(adapter, points[0], bars[:, 1], edges[:, 2] + shift_x, edges[:, 3] + shift_x, lengths))
+    return _TrackedBarcodeTensor([tracked_bars], enumeration)
+
+
 def _tracked_kernel_in_distance(X: Any, Y: Any, distance: Any) -> BarcodeTensor:
     """The kernel of one pair of (n, d) point clouds, of which at least one
     is a framework array, in a distance that is computed from pairs of
@@ -157,12 +221,12 @@ def _tracked_kernel_in_distance(X: Any, Y: Any, distance: Any) -> BarcodeTensor:
     as framework operations on the points (see _tracked_endpoints). This
     needs concrete points, unlike the kernel with Euclidean distances.
     """
+    if isinstance(X, PointCloudTensor) or isinstance(Y, PointCloudTensor):
+        return _tracked_kernel_of_batches(X, Y, distance)
     adapter, (X, Y) = _in_one_framework(X, Y)
     concrete = [adapter.concrete(points) for points in (X, Y)]
     if concrete[0] is None or concrete[1] is None:
-        raise NotImplementedError(
-            f"compute_homological_kernel with {distance!r} of points that JAX or tf.function traces abstractly "
-            "is not supported: the gradients follow pairs of points that depend on their values.")
+        raise NotImplementedError(_ABSTRACT_BATCH)
     dtype = np.float32 if all(points.dtype == np.float32 for points in concrete) else np.float64
     backend = cpp_p.HomologicalKernel32 if dtype == np.float32 else cpp_p.HomologicalKernel64
     bars, edges = backend.homological_kernel_critical_edges(
@@ -186,7 +250,7 @@ def _kernel_in_spaces(X: Any, Y: Any, dim: int, verbose: bool) -> BarcodeTensor:
     if X.distance != Y.distance:
         raise TypeError(f"X and Y must have equal distances (got {X.distance!r} and {Y.distance!r}).")
     transformed = [space.distance._euclidean_points(_points_array(space)) for space in (X, Y)]
-    if transformed[0] is None and any(_autodiff._framework(space.points) is not None for space in (X, Y)):
+    if transformed[0] is None and any(_autodiff._tracked(space.points) is not None for space in (X, Y)):
         return _tracked_kernel_in_distance(_points_array(X), _points_array(Y), X.distance)
     if transformed[0] is None:
         return compute_homological_kernel(_distance_matrices(X), _distance_matrices(Y), dim=dim, verbose=verbose)
@@ -285,8 +349,13 @@ def compute_homological_kernel(
     also carry gradients with respect to its Gram matrix when that is such
     an array. With an :class:`~stablebear.linear.LpDistance` other than
     ``LpDistance(2)``, points that JAX or ``tf.function`` traces raise
-    ``NotImplementedError``. A batch of point clouds that carries gradients
-    raises ``NotImplementedError`` as well.
+    ``NotImplementedError``.
+
+    Batches carry gradients as well: ``PointCloudTensor`` objects of which
+    at least one carries gradients, such as one made from a list of
+    PyTorch, JAX, or TensorFlow arrays or by a projection, or such arrays
+    of shape ``(..., n, d)``. Batches that JAX or ``tf.function`` traces
+    raise ``NotImplementedError``.
 
     """
     from ..tensor_create import zeros
@@ -300,10 +369,11 @@ def compute_homological_kernel(
         return _kernel_in_spaces(X, Y, dim, verbose)
 
     if _autodiff._tracked(X) is not None or _autodiff._tracked(Y) is not None:
-        if any(isinstance(points, PointCloudTensor) for points in (X, Y)):
-            raise NotImplementedError(
-                "compute_homological_kernel with gradients supports a single pair of point clouds of shape "
-                "(n, d) only.")
+        # A framework array of more than two dimensions is a batch of clouds.
+        X, Y = (PointCloudTensor(points) if _autodiff._framework(_autodiff._unwrap(points)) is not None
+                and len(_autodiff._unwrap(points).shape) > 2 else points for points in (X, Y))
+        if isinstance(X, PointCloudTensor) or isinstance(Y, PointCloudTensor):
+            return _tracked_kernel_of_batches(X, Y)
         return _tracked_kernel(X, Y)
 
     X = _normalize_kernel_input(X, "X")

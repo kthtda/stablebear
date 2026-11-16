@@ -775,12 +775,6 @@ def test_projection_of_tracked_batch_gradient_wrt_points(fw):
     assert_gradient_matches_finite_differences(fw, loss, content)
 
 
-def test_kernel_of_tracked_batch_in_distance_space_raises(fw):
-    space = sb.InnerProduct(_gram())(tracked(fw, sb.PointCloudTensor(_batch2())))
-    with pytest.raises(NotImplementedError, match="single"):
-        _kernel(space, space)
-
-
 def _l1_matrices(clouds):
     return sb.LpDistance(1)._distance_matrices(sb.PointCloudTensor(clouds))
 
@@ -962,3 +956,77 @@ def test_persistent_homology_of_abstract_batch_raises():
     clouds = np.stack([_loop_points(), 2.0 * _loop_points()])
     with pytest.raises(NotImplementedError, match="abstractly"):
         jax.grad(lambda P: _homology(P)._tvalues.sum())(jax.numpy.asarray(clouds))
+
+
+_TRACKED_KERNEL_DISTANCES = [
+    pytest.param(None, id="plain"),
+    # A diagonal Gram matrix, under which _contracted still shrinks every
+    # distance.
+    pytest.param(lambda: sb.InnerProduct(np.diag([4.0, 1.0])).distance, id="inner_product"),
+    pytest.param(lambda: sb.LpDistance(1), id="taxicab"),
+]
+
+
+@pytest.mark.parametrize("make_distance", _TRACKED_KERNEL_DISTANCES)
+@pytest.mark.parametrize("which", ["X", "Y"])
+def test_kernel_of_tracked_batches_matches_untracked(fw, make_distance, which):
+    X = sb.PointCloudTensor(_batch2())
+    Y = sb.PointCloudTensor([_contracted(cloud) for cloud in _batch2()])
+
+    out = _kernel(_in_distance(make_distance, tracked(fw, X) if which == "X" else X),
+                  _in_distance(make_distance, tracked(fw, Y) if which == "Y" else Y))
+
+    expected = _kernel(_in_distance(make_distance, X), _in_distance(make_distance, Y))
+    assert isinstance(out, sb.persistence.BarcodeTensor)
+    assert out._tvalues is not None
+    assert out.shape == (3,)
+    for i in range(3):
+        assert out[i].is_isomorphic_to(expected[i], atol=1e-12, rtol=1e-12)
+
+
+def test_kernel_of_batch_and_its_projection_gradient_wrt_subspace(fw):
+    if fw.traces_abstractly:
+        pytest.skip("The critical edges of a batch need concrete points")
+    space = sb.InnerProduct(_gram3())(sb.PointCloudTensor(_batch3()))
+
+    def loss(V):
+        bars = _kernel(space, sb.LinearSubspace(V).project(space))._tvalues
+        return fw.sum(bars[:, 0] * bars[:, 0])
+
+    assert_gradient_matches_finite_differences(fw, loss, _vectors())
+
+
+@pytest.mark.parametrize("make_distance", _TRACKED_KERNEL_DISTANCES)
+def test_kernel_of_batches_gradient_wrt_points(fw, make_distance):
+    if fw.traces_abstractly:
+        pytest.skip("The critical edges of a batch need concrete points")
+    other = _lp_points()[[0, 2, 3, 5]] * 1.5
+    Y = sb.PointCloudTensor([_contracted(other), _contracted(_lp_points())])
+
+    def loss(P):
+        X = sb.PointCloudTensor([other, P])
+        bars = _kernel(_in_distance(make_distance, X), _in_distance(make_distance, Y))._tvalues
+        return fw.sum(bars[:, 0] * bars[:, 1]) + fw.sum(bars[:, 1] * bars[:, 1])
+
+    assert_gradient_matches_finite_differences(fw, loss, _lp_points())
+
+
+def test_kernel_of_tracked_batches_of_different_shapes_raises(fw):
+    X = tracked(fw, sb.PointCloudTensor(_batch2()))
+    Y = sb.PointCloudTensor([_contracted(cloud) for cloud in _batch2()[:2]])
+    with pytest.raises(ValueError, match="same shape"):
+        _kernel(X, Y)
+
+
+def test_kernel_of_tracked_batch_and_single_point_cloud_raises(fw):
+    X = tracked(fw, sb.PointCloudTensor(_batch2()))
+    with pytest.raises(TypeError, match="both"):
+        _kernel(X, _contracted(_loop_points()))
+
+
+def test_kernel_of_abstract_batches_raises():
+    jax = pytest.importorskip("jax")
+    clouds = np.stack([_loop_points(), 2.0 * _loop_points()])
+    Y = sb.PointCloudTensor([_contracted(cloud) for cloud in clouds])
+    with pytest.raises(NotImplementedError, match="abstractly"):
+        jax.grad(lambda P: _kernel(P, Y)._tvalues.sum())(jax.numpy.asarray(clouds))
