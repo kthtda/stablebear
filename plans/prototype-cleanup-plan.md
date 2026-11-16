@@ -1,6 +1,6 @@
 # Prototype cleanup: implementation plan
 
-Progress: 3 of 8 items, 7 of 17 points (41%)
+Progress: 4 of 8 items, 10 of 17 points (59%)
 
 Specs: [autodiff-prototype-spec.md](autodiff-prototype-spec.md) and
 [linear-subspaces-spec.md](linear-subspaces-spec.md), which each item
@@ -35,7 +35,7 @@ Gradients are supported for PyTorch only, for now. The APIs released on
   Tests: evaluating, integrating, and copying a tracked `Pcf` raise;
   `to_numpy` and `==` give values; arithmetic and norms still carry
   gradients.
-- [ ] **B2.** [3] `to_serial_content()` on `PcfTensor`, `BarcodeTensor`,
+- [x] **B2.** [3] (575d19ee2) `to_serial_content()` on `PcfTensor`, `BarcodeTensor`,
   `PointCloudTensor`, `DistanceMatrixTensor`, and `SymmetricMatrixTensor`:
   the public way to the rows of a tensor, as NumPy arrays, or with the
   content as a PyTorch tensor that carries gradients for a tracked tensor.
