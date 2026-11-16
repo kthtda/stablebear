@@ -1,6 +1,6 @@
 # Prototype cleanup: implementation plan
 
-Progress: 0 of 8 items, 0 of 17 points (0%)
+Progress: 1 of 8 items, 3 of 17 points (18%)
 
 Specs: [autodiff-prototype-spec.md](autodiff-prototype-spec.md) and
 [linear-subspaces-spec.md](linear-subspaces-spec.md), which each item
@@ -11,12 +11,16 @@ Gradients are supported for PyTorch only, for now. The APIs released on
 
 ## Phase A: PyTorch only
 
-- [ ] **A1.** [3] Remove the JAX and TensorFlow adapters, the Keras
+- [x] **A1.** [3] (d6fba7c74) Remove the JAX and TensorFlow adapters, the Keras
   unwrapping, the declared shapes of results (`out=`, and `residuals=` with
   its shapes), and every branch for values that a framework traces
   abstractly. The tests run on PyTorch.
   Tests: the gradient tests pass on PyTorch; the tests of compiled
   gradients and of abstract values go.
+  Note: one commit holds A1 and A2. The one adapter module stays behind
+  `_framework`, so that the package does not import PyTorch. The test of
+  a kernel handing over its C++ barcodes goes: its bars now come from
+  framework operations.
 - [ ] **A2.** [2] The homological kernel has one path for gradients, through
   its critical edges: the vjp of a single pair, which existed for
   `jax.jit`, goes, with its binding.
