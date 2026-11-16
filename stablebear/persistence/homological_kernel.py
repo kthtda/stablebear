@@ -18,7 +18,7 @@ from .homology import (
     _FLOAT_TO_PCLOUD_DTYPE,
     _PCLOUD_TO_BARCODE_DTYPE,
 )
-from .ph_tensor import BarcodeTensor, _TrackedBarcodeTensor
+from .ph_tensor import BarcodeTensor
 
 cpp_p = cpp.persistence
 
@@ -117,7 +117,7 @@ def _kernel_bars_out(X, Y):
     n = X.shape[0]
     # The bars are float32 only if both point clouds are.
     both_float32 = all(str(P.dtype).endswith("float32") for P in (X, Y))
-    return (max(n - 1, 0), 2), np.float32 if both_float32 else np.float64
+    return np.array([[0, max(n - 1, 0)]]), np.float32 if both_float32 else np.float64
 
 
 def _kernel_bars_residuals(X, Y):
@@ -125,19 +125,15 @@ def _kernel_bars_residuals(X, Y):
 
 
 @_autodiff.differentiable(
-    "X", "Y", vjp=_kernel_bars_vjp, out=_kernel_bars_out, residuals=_kernel_bars_residuals)
-def _kernel_bars(X: Any, Y: Any) -> Any:
-    """The (n - 1, 2) bars of the kernel of one pair of (n, d) point clouds,
-    and as residuals the critical edges, which the vjp reuses."""
+    "X", "Y", vjp=_kernel_bars_vjp, out=_kernel_bars_out, residuals=_kernel_bars_residuals,
+    returns=BarcodeTensor)
+def _tracked_kernel(X: Any, Y: Any) -> Any:
+    """The kernel of one pair of (n, d) point clouds given as framework
+    arrays, as a BarcodeTensor of shape (1,) that carries its n - 1 bars as a
+    framework array, and as residuals the critical edges, which the vjp
+    reuses."""
     bars, edges = _critical_edges(X, Y)
-    return bars, (edges,)
-
-
-def _tracked_kernel(X: Any, Y: Any) -> BarcodeTensor:
-    """The kernel of one pair of point clouds given as framework arrays, as a
-    BarcodeTensor of shape (1,) that carries the bars as a framework tensor."""
-    bars = _kernel_bars(X, Y)
-    return _TrackedBarcodeTensor([bars], np.array([[0, bars.shape[0]]]))
+    return BarcodeTensor._from_serial(bars, np.array([[0, len(bars)]])), (edges,)
 
 
 def _validate_kernel_pair(X, Y):

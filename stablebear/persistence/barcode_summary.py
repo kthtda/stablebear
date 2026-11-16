@@ -277,30 +277,27 @@ def _transformed_bars_vjp(grad_out, bc, f):
 
 
 def _transformed_bars_out(bc, f):
-    n_bars = len(bc._serial()[0])
-    return (n_bars, 2), np.float32 if bc.dtype == barcode32 else np.float64
+    return bc._serial()[1], np.float32 if bc.dtype == barcode32 else np.float64
 
 
-@_autodiff.differentiable("bc", "f", vjp=_transformed_bars_vjp, out=_transformed_bars_out)
-def _transformed_bars(bc: BarcodeTensor, f: Plf) -> np.ndarray:
-    """The (m, 2) transformed bars of a BarcodeTensor in the order of
-    _serial, empty ones included."""
-    out = _transform_bars(bc, f, verbose=False, keep_empty=True)
-    assert isinstance(out, BarcodeTensor)
-    return out._serial()[0]
+@_autodiff.differentiable(
+    "bc", "f", vjp=_transformed_bars_vjp, out=_transformed_bars_out, returns=BarcodeTensor)
+def _transformed_bars(bc: BarcodeTensor, f: Plf) -> Any:
+    """The transformed barcodes of a BarcodeTensor, empty bars included."""
+    return _transform_bars(bc, f, verbose=False, keep_empty=True)
 
 
 def _tracked_transform_bars(bc: BarcodeTensor, f: Plf) -> BarcodeTensor:
     """transform_bars of a BarcodeTensor where the bars, f, or both depend
     on framework tensors."""
-    bars = _transformed_bars(bc, f)
+    transformed = _transformed_bars(bc, f)
+    bars, enumeration = transformed._tvalues, transformed._enumeration
     adapter = _autodiff._framework(bars)
     concrete = adapter.concrete(bars)
     if concrete is None:
         raise NotImplementedError(
             "transform_bars of bars or a PLF that JAX or tf.function traces abstractly is not supported: "
             "which bars it removes depends on their values.")
-    _, enumeration = bc._serial()
     counts, owners = _owners(enumeration)
     keep = concrete[:, 0] < concrete[:, 1]
     kept_counts = np.bincount(owners[keep], minlength=len(counts))

@@ -610,6 +610,23 @@ def test_saved_tracked_barcodes_load_as_untracked_ones(fw, round_trip):
     assert loaded.array_equal(_expected_batch([0.0, 1.0, 1.5, 3.0]))
 
 
+def test_operation_on_kernel_of_framework_points_does_not_convert_it(fw, monkeypatch):
+    from stablebear import _sb_cpp as cpp
+
+    X, Y = _kernel_points()
+    barcodes = sb.persistence.compute_homological_kernel(fw.tensor(X), fw.tensor(Y))
+    calls = []
+    from_serial_content = cpp.barcodes_from_serial_content_64
+
+    def counting(content, enumeration):
+        calls.append(1)
+        return from_serial_content(content, enumeration)
+
+    monkeypatch.setattr(cpp, "barcodes_from_serial_content_64", counting)
+    sb.persistence.transform_bars(barcodes, _bar_plf())
+    assert len(calls) == 0
+
+
 def test_operations_on_tracked_barcodes_convert_them_once(fw, monkeypatch):
     if fw.traces_abstractly:
         pytest.skip("Removing bars needs concrete bars")

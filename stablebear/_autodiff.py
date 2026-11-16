@@ -237,9 +237,18 @@ def differentiable(
     vjp: Callable[..., tuple],
     out: Callable[..., tuple] | None = None,
     residuals: Callable[..., list] | None = None,
+    returns: Any = None,
 ) -> Callable[[F], F]:
     """``out``, given the function's arguments, returns the (shape, NumPy dtype)
     of its result. Frameworks that trace abstract values, such as JAX, need it.
+
+    With ``returns``, a tensor type that can be tracked, the function returns
+    an untracked tensor of that type, and the decorated function returns its
+    tracked form when an argument is tracked. The vjp then receives the
+    gradient with respect to the serial content of the result, and ``out``
+    returns the (enumeration, NumPy dtype) of the result. The tracked result
+    keeps the function's tensor when the framework has run the function by
+    then, so that the next operation need not convert it.
 
     With ``residuals``, the function returns ``(result, residuals)``, where
     the residuals are a tuple of arrays from its computation that the vjp
@@ -272,11 +281,16 @@ def differentiable(
                     arguments[name] = tracked[name].rebuild(list(values[start:end]))
                 return arguments
 
+            returned = []
+
             def primal(*values):
-                result = fn(**with_values(values))
-                if residuals is None:
-                    return np.asarray(result), ()
-                return np.asarray(result[0]), tuple(result[1])
+                result, saved = fn(**with_values(values)), ()
+                if residuals is not None:
+                    result, saved = result[0], tuple(result[1])
+                if returns is not None:
+                    returned.append(result)
+                    result = result._serial()[0]
+                return np.asarray(result), saved
 
             def backward(grad_out, saved, *values):
                 extra = {"residuals": saved} if residuals is not None else {}
@@ -285,8 +299,24 @@ def differentiable(
 
             out_spec = out(**bound.arguments) if out is not None else None
             residual_specs = residuals(**bound.arguments) if residuals is not None else []
-            return _framework(tensors[0]).apply(
-                primal, backward, *tensors, out=out_spec, residuals=residual_specs)
+            if returns is None:
+                return _framework(tensors[0]).apply(
+                    primal, backward, *tensors, out=out_spec, residuals=residual_specs)
+
+            from ._tracked import tracked_class
+
+            assert out_spec is not None
+            enumeration, dtype = out_spec
+            flat = np.asarray(enumeration).reshape(-1, 2)
+            widths = [width for _, width in returns._tracking.groups]
+            content = _framework(tensors[0]).apply(
+                primal, backward, *tensors,
+                out=((int(flat[-1, 1]) if len(flat) else 0, sum(widths)), dtype), residuals=residual_specs)
+            starts = np.cumsum([0] + widths)
+            parts = [content] if len(widths) == 1 else [
+                content[:, start] if width == 1 else content[:, start:start + width]
+                for start, width in zip(starts, widths)]
+            return tracked_class(returns)(parts, enumeration, plain=returned[-1] if returned else None)
 
         return wrapper  # type: ignore[return-value]
 
