@@ -1,6 +1,6 @@
 # Autodiff coverage: implementation plan
 
-Progress: 5 of 11 items, 12 of 25 points (48%)
+Progress: 6 of 11 items, 15 of 25 points (60%)
 
 Spec: [autodiff-prototype-spec.md](autodiff-prototype-spec.md), which each
 item updates where it changes a decision.
@@ -48,7 +48,7 @@ that did not say why, and common operations without gradients.
   Tests: both cases for each; `allclose` of a tracked and a plain tensor.
   Note: `allclose` does not take PCF tensors, tracked or not, so the
   tracked case of the audit was not about gradients.
-- [ ] **B3.** [3] Distance matrices with gradients: `DistanceMatrixTensor`
+- [x] **B3.** [3] (e0c76c443) Distance matrices with gradients: `DistanceMatrixTensor`
   of a PyTorch tensor of shape (..., n, n) is tracked, and
   `compute_persistent_homology` and `compute_homological_kernel` of
   tracked distance matrices give bars that carry gradients with respect to
