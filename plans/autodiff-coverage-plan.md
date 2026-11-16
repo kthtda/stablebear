@@ -1,6 +1,6 @@
 # Autodiff coverage: implementation plan
 
-Progress: 1 of 11 items, 2 of 25 points (8%)
+Progress: 2 of 11 items, 5 of 25 points (20%)
 
 Spec: [autodiff-prototype-spec.md](autodiff-prototype-spec.md), which each
 item updates where it changes a decision.
@@ -16,7 +16,7 @@ that did not say why, and common operations without gradients.
   and `cdist`, `LpDistance(p)`, `max_death` of
   `barcode_to_accumulated_persistence`, and `delay` of `delay_embed`.
   Tests: each raises for a PyTorch scalar and still takes a number.
-- [ ] **A2.** [3] Evaluating a `Pcf`, `Plf`, or `PcfTensor` gives a PyTorch
+- [x] **A2.** [3] (0711696af) Evaluating a `Pcf`, `Plf`, or `PcfTensor` gives a PyTorch
   tensor when the times or the function are PyTorch tensors or carry
   gradients, with gradients with respect to the values of the function
   and, for a `Plf`, to the times and to where it is evaluated.
