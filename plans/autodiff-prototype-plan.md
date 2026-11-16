@@ -1,6 +1,6 @@
 # Autodiff prototype: implementation plan
 
-Progress: 22 of 29 items, 52 of 70 points (74%)
+Progress: 23 of 29 items, 55 of 70 points (79%)
 
 Spec: [autodiff-prototype-spec.md](autodiff-prototype-spec.md)
 
@@ -103,11 +103,14 @@ Spec: [autodiff-prototype-spec.md](autodiff-prototype-spec.md)
   throughout. There is no tracked `Barcode`, which no operation gives.
   The vjp's rebuild must not read the framework arrays: TensorFlow forbids
   reading a variable inside its operations.
-- [ ] **D5.** [3] Deferred writes (D5b) and building a tracked tensor from
+- [x] **D5.** [3] (1c9cf6528) Deferred writes (D5b) and building a tracked tensor from
   a list of elements in one pass.
   Tests: a write is seen by reads and by the next operation; gradients
   flow to a written element and not to the one it replaced; n writes
   make one pass.
+  Note: a written value's dtype is not checked against the tensor's: the
+  tensor's dtype follows its arrays after the pass. Only `PcfTensor` builds
+  from a list, since there is no tracked `Barcode` (D4).
 - [ ] **D6.** [2] `differentiable` wraps a declared output type: the
   operation returns a C++ tensor and the decorator returns its tracked
   form.
