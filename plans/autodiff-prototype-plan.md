@@ -1,6 +1,6 @@
 # Autodiff prototype: implementation plan
 
-Progress: 13 of 26 items, 28 of 62 points (45%)
+Progress: 13 of 27 items, 28 of 64 points (44%)
 
 Spec: [autodiff-prototype-spec.md](autodiff-prototype-spec.md)
 
@@ -55,6 +55,10 @@ Spec: [autodiff-prototype-spec.md](autodiff-prototype-spec.md)
 - [ ] **C4.** [3] PCF arithmetic with a tracked operand without a Python
   loop over elements.
   Tests: the arithmetic gradient tests pass; note the timings.
+- [ ] **C5.** [2] The sorting order of the tracked stable rank computed in
+  C++, per barcode in parallel, in place of one `lexsort` over all bars.
+  Tests: the stable rank tests pass; equal lifetimes and an empty barcode
+  keep their order; note the timings.
 
 ## Phase D: One generic tracked tensor
 
