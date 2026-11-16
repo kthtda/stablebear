@@ -1,6 +1,6 @@
 # Autodiff prototype: implementation plan
 
-Progress: 25 of 30 items, 59 of 72 points (82%)
+Progress: 26 of 30 items, 61 of 72 points (85%)
 
 Spec: [autodiff-prototype-spec.md](autodiff-prototype-spec.md)
 
@@ -120,17 +120,21 @@ Spec: [autodiff-prototype-spec.md](autodiff-prototype-spec.md)
   eager JAX and TensorFlow do. The kernel gets its bars as an array, so it
   builds a C++ tensor to return: one conversion, in place of one in the
   next operation.
-- [ ] **D7.** Type descriptions for `PointCloudTensor`,
+- [x] **D7.** Type descriptions for `PointCloudTensor`,
   `DistanceMatrixTensor`, and `SymmetricMatrixTensor`.
   - [x] **D7a.** [2] (bd364ef48) `PointCloudTensor`: C++ conversions to and from
     serial content, with the points as rows of as many columns as the
     clouds have dimensions; a group of columns may leave its width open.
     Tests: serial round trip; clouds of different dimensions raise;
     indexing a tracked tensor.
-  - [ ] **D7b.** [2] `DistanceMatrixTensor` and `SymmetricMatrixTensor`.
-    Tests: serial round trip; indexing a tracked tensor of each type.
-    Note: waits for the layout of matrices in serial content, an open
-    question of the spec.
+  - [x] **D7b.** [2] (054196cfc) `DistanceMatrixTensor` and `SymmetricMatrixTensor`: C++
+    conversions with the entries as rows of one column, and the size of
+    each matrix kept beside the enumeration (D5a).
+    Tests: serial round trip, with matrices of no points and of one;
+    sizes that do not match raise; a negative distance raises; indexing a
+    tracked tensor of each type.
+    Note: writes to a tracked tensor of matrices raise: a write would
+    need the size of the value written.
 - [x] **D8.** [3] (b70327319) Reading `_data` of a tracked tensor raises (D5), so an
   operation without gradients cannot drop them; `detach()` gives the
   untracked tensor; comparisons, saving, and pickling use the values. Done
