@@ -18,7 +18,6 @@ from .homology import (
     _FLOAT_TO_PCLOUD_DTYPE,
     _PCLOUD_TO_BARCODE_DTYPE,
 )
-from .barcode import Barcode
 from .ph_tensor import BarcodeTensor
 
 cpp_p = cpp.persistence
@@ -130,13 +129,7 @@ def _kernel_bars(X: Any, Y: Any) -> np.ndarray:
 def _tracked_kernel(X: Any, Y: Any) -> BarcodeTensor:
     """The kernel of one pair of point clouds given as framework arrays, as a
     BarcodeTensor of shape (1,) that carries the bars as a framework tensor."""
-    bars = _kernel_bars(X, Y)
-    concrete = _autodiff._framework(bars).concrete(bars)
-    if concrete is None:
-        concrete = np.full(tuple(bars.shape), np.nan)
-    out = BarcodeTensor([Barcode(np.asarray(concrete))])
-    out._tvalues = bars
-    return out
+    return BarcodeTensor._from_tracked_bars(_kernel_bars(X, Y))
 
 
 def _validate_kernel_pair(X, Y):

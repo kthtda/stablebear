@@ -9,6 +9,8 @@
 #include <sbear/persistence/accumulated_persistence.hpp>
 #include <sbear/persistence/stable_rank.hpp>
 #include <sbear/persistence/betti_curve.hpp>
+#include <sbear/persistence/transform_bars.hpp>
+#include <sbear/functional/plf.hpp>
 
 #include <limits>
 #include <utility>
@@ -24,6 +26,7 @@ namespace
   public:
     using PcfT = sb::Pcf<T, T>;
     using BarcodeT = sb::ph::Barcode<T>;
+    using PlfT = sb::Plf<T, T>;
 
     static sb::Tensor<BarcodeT> as_tensor(const BarcodeT& barcode)
     {
@@ -52,6 +55,13 @@ namespace
         sb_py::register_result_task<BettiCurveTask>(m, "_BettiCurveTask" + suffix + variant);
         sb_py::register_result_task<AccumulatedPersistenceTask>(
             m, "_AccumulatedPersistenceTask" + suffix + variant);
+        using TransformBarsTask =
+            typename decltype(sb::ph::make_transform_bars_task(std::declval<Container>(), PlfT{}))::element_type;
+        sb_py::register_result_task<TransformBarsTask>(m, "_TransformBarsTask" + suffix + variant);
+
+        cls.def_static("spawn_transform_bars_task", [](const Container& bcs, const PlfT& f, bool keep_empty) {
+          return start(sb::ph::make_transform_bars_task(bcs, f, keep_empty));
+        }, nb::arg("barcodes"), nb::arg("f"), nb::arg("keep_empty") = false);
 
         cls.def_static("spawn_barcode_to_stable_rank_task", [](const Container& bcs) {
           return start(sb::ph::make_stable_rank_task(bcs));
@@ -70,6 +80,9 @@ namespace
       cls.def_static("spawn_barcode_to_betti_curve_task", [](const BarcodeT& bc) {
         return start(sb::ph::make_betti_curve_task(as_tensor(bc)));
       });
+      cls.def_static("spawn_transform_bars_task", [](const BarcodeT& bc, const PlfT& f, bool keep_empty) {
+        return start(sb::ph::make_transform_bars_task(as_tensor(bc), f, keep_empty));
+      }, nb::arg("barcode"), nb::arg("f"), nb::arg("keep_empty") = false);
       cls.def_static("spawn_barcode_to_accumulated_persistence_task", [](const BarcodeT& bc, T max_death) {
         return start(sb::ph::make_accumulated_persistence_task(as_tensor(bc), max_death));
       }, nb::arg("barcode"), nb::arg("max_death") = std::numeric_limits<T>::infinity());

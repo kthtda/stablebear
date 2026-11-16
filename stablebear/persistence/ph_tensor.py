@@ -47,6 +47,19 @@ class BarcodeTensor(Tensor):
         return _autodiff._Tracked(
             [self._tvalues], lambda arrays: BarcodeTensor([Barcode(arrays[0])]), lambda grad: [grad])
 
+    @classmethod
+    def _from_tracked_bars(cls, bars: Any) -> BarcodeTensor:
+        """A (1,) BarcodeTensor that carries (m, 2) framework bars. The barcode
+        holds the bars when they are concrete and NaN while they are abstract."""
+        from .. import _autodiff
+
+        concrete = _autodiff._framework(bars).concrete(bars)
+        if concrete is None:
+            concrete = np.full(tuple(bars.shape), np.nan)
+        out = cls([Barcode(np.asarray(concrete))])
+        out._tvalues = bars
+        return out
+
     def _to_py_tensor(self, data):
         return BarcodeTensor(data)
 

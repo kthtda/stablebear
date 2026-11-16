@@ -5,6 +5,7 @@ from .barcode_summary import (
     barcode_to_accumulated_persistence,
     barcode_to_betti_curve,
     barcode_to_stable_rank,
+    transform_bars,
 )
 from .homological_kernel import compute_homological_kernel
 from .homology import ComplexType, DistanceType, compute_persistent_homology

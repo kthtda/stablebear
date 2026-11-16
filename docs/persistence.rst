@@ -334,6 +334,26 @@ You can also convert a single barcode to a stable rank::
    sr = barcode_to_stable_rank(bc)
    # sr is a Pcf
 
+Transforming bars
+-----------------
+
+:py:func:`~stablebear.persistence.barcode_summary.transform_bars` replaces each
+bar :math:`(b, d)` by :math:`(f(b), f(d))` for a
+:py:class:`~stablebear.functional.plf.Plf` :math:`f`. An infinite death becomes
+the limit of :math:`f` at infinity. Bars with :math:`f(b) \geq f(d)` are
+removed, as happens where :math:`f` is flat or falls::
+
+   from stablebear.persistence import transform_bars
+
+   f = sb.Plf([[0.0, 0.0], [1.0, 2.0], [3.0, 3.0]])
+   transform_bars(bc, f).to_numpy()
+   # array([[0.  , 2.25],
+   #        [0.4 , 3.  ],
+   #        [1.  , 1.6 ]])
+
+It takes a barcode, a tensor of barcodes, or a time series of barcodes, and
+returns the same kind of object.
+
 
 Comparing barcode tensors
 =========================

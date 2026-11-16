@@ -75,6 +75,8 @@ def apply(primal: Callable[..., Any], vjp: Callable[..., Any], *params: Any, out
         y.set_shape(shape)
 
         def grad(grad_out):
+            # A gather downstream, as in transform_bars, gives IndexedSlices.
+            grad_out = tf.convert_to_tensor(grad_out)
             grads = tf.numpy_function(run_vjp, [grad_out, *ps], [p.dtype for p in tensors])
             if not isinstance(grads, (list, tuple)):  # a single output comes back unwrapped
                 grads = [grads]

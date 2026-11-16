@@ -8,6 +8,7 @@
 #include <memory>
 #include <span>
 #include <string>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -18,19 +19,20 @@ namespace sb::ph
    * each barcode maps to one PCF.
    *
    * @tparam T       Scalar type (e.g. float32_t, float64_t)
-   * @tparam Func    A callable with signature Pcf<T,T>(const Barcode<T>&)
+   * @tparam Func    A callable taking a const Barcode<T>&, such as one
+   *                 returning Pcf<T,T>
    */
   template <typename T, typename Func>
   struct BarcodeSummaryOperation
   {
     using input_type = Barcode<T>;
-    using output_type = Pcf<T, T>;
+    using output_type = std::invoke_result_t<const Func&, const Barcode<T>&>;
 
     Func func;
 
     [[nodiscard]] std::vector<size_t> extra_dims() const { return {}; }
 
-    void operator()(const Barcode<T>& barcode, std::span<Pcf<T, T>> out) const
+    void operator()(const Barcode<T>& barcode, std::span<output_type> out) const
     {
       out[0] = func(barcode);
     }

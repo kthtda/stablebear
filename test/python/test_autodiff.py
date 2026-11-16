@@ -321,6 +321,88 @@ def test_stable_rank_distance_gradient_wrt_points(fw):
     _assert_gradient_matches_finite_differences(fw, loss, X)
 
 
+def _bar_plf():
+    return sb.Plf([[0.0, 0.0], [1.3, 0.5], [2.7, 3.0], [4.1, 3.5]])
+
+
+def test_transform_bars_of_framework_kernel_matches_numpy(fw):
+    if fw.traces_abstractly:
+        pytest.skip("Removing bars needs concrete bars")
+    X, Y = _kernel_points()
+    out = sb.persistence.transform_bars(sb.persistence.compute_homological_kernel(fw.tensor(X), fw.tensor(Y)), _bar_plf())
+    expected = sb.persistence.transform_bars(sb.persistence.compute_homological_kernel(X, Y), _bar_plf())[0].to_numpy()
+    np.testing.assert_allclose(out[0].to_numpy(), expected)
+    np.testing.assert_allclose(fw.to_numpy(out._tvalues), expected)
+
+
+def test_transform_bars_removes_empty_bars_of_framework_kernel(fw):
+    if fw.traces_abstractly:
+        pytest.skip("Removing bars needs concrete bars")
+    X, Y = _kernel_points()
+    f = sb.Plf([[0.0, 0.0], [1.0, 1.0], [2.3, 1.0], [5.0, 2.0]])
+    out = sb.persistence.transform_bars(sb.persistence.compute_homological_kernel(fw.tensor(X), fw.tensor(Y)), f)
+    expected = sb.persistence.transform_bars(sb.persistence.compute_homological_kernel(X, Y), f)[0].to_numpy()
+    assert len(expected) == 3
+    np.testing.assert_allclose(fw.to_numpy(out._tvalues), expected)
+
+
+def test_transform_bars_gradient_with_removed_bars(fw):
+    if fw.traces_abstractly:
+        pytest.skip("Removing bars needs concrete bars")
+    X, Y = _kernel_points()
+    f = sb.Plf([[0.0, 0.0], [1.0, 1.0], [2.3, 1.0], [5.0, 2.0]])
+    weights = fw.tensor([[0.5, 1.0], [-1.0, 2.0], [1.5, -0.5]])
+
+    def loss(P):
+        barcodes = sb.persistence.compute_homological_kernel(X, P)
+        return fw.sum(weights * sb.persistence.transform_bars(barcodes, f)._tvalues)
+
+    _assert_gradient_matches_finite_differences(fw, loss, Y)
+
+
+@pytest.mark.parametrize("compiled", [False, True], ids=["eager", "compiled"])
+def test_transform_bars_of_abstract_bars_raises(fw, compiled):
+    value_and_grad = fw.compiled_value_and_grad if compiled else fw.value_and_grad
+    if value_and_grad is None or not (compiled or fw.traces_abstractly):
+        pytest.skip("Bars are concrete")
+    X, Y = _kernel_points()
+
+    def loss(x):
+        barcodes = sb.persistence.compute_homological_kernel(fw.tensor(X), x * fw.tensor(Y))
+        return fw.sum(sb.persistence.transform_bars(barcodes, _bar_plf())._tvalues)
+
+    with pytest.raises(NotImplementedError, match="abstractly"):
+        value_and_grad(loss, 0.3)
+
+
+@pytest.mark.parametrize("wrt", ["X", "Y"])
+def test_transform_bars_gradient(fw, wrt):
+    if fw.traces_abstractly:
+        pytest.skip("Removing bars needs concrete bars")
+    X, Y = _kernel_points()
+    weights = fw.tensor([[0.5, 1.0], [-1.0, 2.0], [1.5, -0.5], [2.0, 0.25], [-0.75, 1.25]])
+
+    def loss(P):
+        Xp, Yp = (P, Y) if wrt == "X" else (X, P)
+        barcodes = sb.persistence.compute_homological_kernel(Xp, Yp)
+        return fw.sum(weights * sb.persistence.transform_bars(barcodes, _bar_plf())._tvalues)
+
+    _assert_gradient_matches_finite_differences(fw, loss, X if wrt == "X" else Y)
+
+
+def test_stable_rank_norm_of_transformed_bars_gradient(fw):
+    if fw.traces_abstractly:
+        pytest.skip("Removing bars needs concrete bars")
+    X, _ = _kernel_points()
+
+    def loss(P):
+        barcodes = sb.persistence.compute_homological_kernel(P, P * fw.tensor([1.0, 0.25]))
+        return fw.sum(sb.lp_norm(sb.persistence.barcode_to_stable_rank(
+            sb.persistence.transform_bars(barcodes, _bar_plf())), p=2.0))
+
+    _assert_gradient_matches_finite_differences(fw, loss, X)
+
+
 def test_breakpoints_as_framework_array_raise(fw):
     with pytest.raises(TypeError, match="times="):
         sb.Pcf(fw.tensor([[0.0, 1.0], [1.0, 0.0]]))
