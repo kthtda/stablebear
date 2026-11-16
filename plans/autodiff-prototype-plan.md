@@ -1,6 +1,6 @@
 # Autodiff prototype: implementation plan
 
-Progress: 21 of 29 items, 49 of 70 points (70%)
+Progress: 22 of 29 items, 52 of 70 points (74%)
 
 Spec: [autodiff-prototype-spec.md](autodiff-prototype-spec.md)
 
@@ -95,9 +95,14 @@ Spec: [autodiff-prototype-spec.md](autodiff-prototype-spec.md)
   `test_autodiff.py` checks tracked arithmetic. `pdist` of tracked PCFs
   raises until E4. A tracked element is built from serial content, since
   `Pcf(rows)` rejects the repeated times of a stable rank.
-- [ ] **D4.** [3] `Pcf`, `Plf`, and `Barcode` as the 0-d case.
+- [x] **D4.** [3] (1a25847da) `Pcf`, `Plf`, and `Barcode` as the 0-d case.
   Tests: `Pcf(values, times=times)` and `Plf(values, times=times)` derive
   their C++ objects; the existing autodiff tests pass unchanged.
+  Note: `_data` of a tracked `Pcf` or `Plf` gives the derived C++ object
+  and does not raise as for a tensor (D8): their methods read it
+  throughout. There is no tracked `Barcode`, which no operation gives.
+  The vjp's rebuild must not read the framework arrays: TensorFlow forbids
+  reading a variable inside its operations.
 - [ ] **D5.** [3] Deferred writes (D5b) and building a tracked tensor from
   a list of elements in one pass.
   Tests: a write is seen by reads and by the next operation; gradients
