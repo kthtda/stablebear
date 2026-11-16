@@ -1,6 +1,6 @@
 # Autodiff prototype: implementation plan
 
-Progress: 11 of 26 items, 25 of 62 points (40%)
+Progress: 12 of 26 items, 26 of 62 points (42%)
 
 Spec: [autodiff-prototype-spec.md](autodiff-prototype-spec.md)
 
@@ -35,9 +35,11 @@ Spec: [autodiff-prototype-spec.md](autodiff-prototype-spec.md)
 
 ## Phase C: The cost rule for what exists
 
-- [ ] **C1.** [1] PLF vjp of `transform_bars` without a dense Jacobian:
-  scatter the gradients of the breakpoint times and values.
+- [x] **C1.** [1] (0e6eefcb6) PLF vjp of `transform_bars` without a
+  dense Jacobian: scatter the gradients of the breakpoint times and values.
   Tests: the existing gradient tests pass; backward on 10^6 bars runs.
+  Note: the backward pass on 10^6 bars takes 0.42 s, checked by hand; the
+  suite has no test of that size.
 - [ ] **C2.** [2] Parallel C++ conversions to and from serial content for
   PCF and barcode tensors, without temporaries per element.
   Tests: the round-trip tests pass; note the timings under this item.
