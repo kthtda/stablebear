@@ -1,6 +1,6 @@
 # Prototype cleanup: implementation plan
 
-Progress: 7 of 8 items, 16 of 17 points (94%)
+Progress: 8 of 8 items, 17 of 17 points (100%)
 
 Specs: [autodiff-prototype-spec.md](autodiff-prototype-spec.md) and
 [linear-subspaces-spec.md](linear-subspaces-spec.md), which each item
@@ -62,5 +62,5 @@ Gradients are supported for PyTorch only, for now. The APIs released on
 - [x] **C2.** [2] (285256e36) Timings in a Release build of the tracked and untracked
   pipelines (summaries, persistent homology of a batch, the kernel of a
   batch and its projection), recorded in the specs.
-- [ ] **C3.** [1] The specs, the guide, and the changelog say PyTorch only
+- [x] **C3.** [1] (285256e36) The specs, the guide, and the changelog say PyTorch only
   and describe the rules of B1 to B3.
