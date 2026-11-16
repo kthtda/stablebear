@@ -2000,5 +2000,15 @@
     "py": 90.0,
     "cuda": 100.0,
     "release_tag": null
+  },
+  {
+    "utc_iso": "2026-11-16T17:02:29Z",
+    "sha": "6b6656e",
+    "branch": "275/merge",
+    "detail_path": "reports/2026-11-16_17-02-29_6b6656e/report.html",
+    "cpp": 90.3,
+    "py": 90.0,
+    "cuda": 100.0,
+    "release_tag": null
   }
 ]
