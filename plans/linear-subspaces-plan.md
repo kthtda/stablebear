@@ -1,6 +1,6 @@
 # Linear subspaces, inner products, and distances: implementation plan
 
-Progress: 10 of 15 items, 23 of 33 points (70%)
+Progress: 11 of 15 items, 25 of 33 points (76%)
 
 Spec: [linear-subspaces-spec.md](linear-subspaces-spec.md)
 
@@ -89,7 +89,7 @@ Spec: [linear-subspaces-spec.md](linear-subspaces-spec.md)
 
 ## Phase C: Batches
 
-- [ ] **C1.** [2] C++: multiply every point of every cloud of a tensor of
+- [x] **C1.** [2] (27022cae2) C++: multiply every point of every cloud of a tensor of
   point clouds by a (d, d) matrix, in parallel over the clouds (D8), with
   its binding.
   Tests (C++): one cloud; clouds of different sizes; an empty cloud; an
