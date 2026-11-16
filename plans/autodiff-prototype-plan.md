@@ -1,6 +1,6 @@
 # Autodiff prototype: implementation plan
 
-Progress: 27 of 30 items, 64 of 72 points (89%)
+Progress: 28 of 30 items, 66 of 72 points (92%)
 
 Spec: [autodiff-prototype-spec.md](autodiff-prototype-spec.md)
 
@@ -160,7 +160,7 @@ Spec: [autodiff-prototype-spec.md](autodiff-prototype-spec.md)
   differences; a batch.
   Note: one commit holds E1 and E2, which share their helpers. A tracked
   curve has one breakpoint per birth and death, so equal times repeat.
-- [ ] **E2.** [2] Accumulated persistence functions of tracked barcodes.
+- [x] **E2.** [2] (0720fbe24) Accumulated persistence functions of tracked barcodes.
   Tests: matches the untracked function; norm gradient against finite
   differences.
 - [ ] **E3.** [3] Persistent homology of tracked point clouds, through the
