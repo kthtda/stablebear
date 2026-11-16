@@ -403,6 +403,93 @@ def test_stable_rank_norm_of_transformed_bars_gradient(fw):
     _assert_gradient_matches_finite_differences(fw, loss, X)
 
 
+def _plf_bars():
+    return sb.persistence.BarcodeTensor([sb.persistence.Barcode([[0.2, 1.5], [0.5, 3.7], [2.5, 4.0], [1.2, 2.1]])])
+
+
+def _plf_bar_weights(fw):
+    return fw.tensor([[1.0, 2.0], [-1.0, 0.5], [0.3, 0.7], [0.2, 0.9]])
+
+
+def test_plf_from_framework_values_and_times_matches_numpy(fw):
+    f = sb.Plf(fw.tensor([0.0, 1.0, 1.5, 3.0]), times=fw.tensor([0.0, 1.0, 2.0, 3.0]))
+    np.testing.assert_array_equal(f.to_numpy(), [[0.0, 0.0], [1.0, 1.0], [2.0, 1.5], [3.0, 3.0]])
+
+
+def test_plf_from_framework_breakpoints_raises(fw):
+    with pytest.raises(TypeError, match="times="):
+        sb.Plf(fw.tensor([[0.0, 0.0], [1.0, 1.0]]))
+
+
+def test_transform_bars_gradient_wrt_plf_values(fw):
+    if fw.traces_abstractly:
+        pytest.skip("Removing bars needs concrete bars")
+
+    def loss(v):
+        f = sb.Plf(v, times=np.array([0.0, 1.0, 2.0, 3.0]))
+        return fw.sum(_plf_bar_weights(fw) * sb.persistence.transform_bars(_plf_bars(), f)._tvalues)
+
+    _assert_gradient_matches_finite_differences(fw, loss, [0.0, 1.0, 1.5, 3.0])
+
+
+def test_transform_bars_gradient_wrt_plf_times(fw):
+    if fw.traces_abstractly:
+        pytest.skip("Removing bars needs concrete bars")
+
+    def loss(t):
+        f = sb.Plf(np.array([0.0, 1.0, 1.5, 3.0]), times=fw.concat([fw.tensor([0.0]), t]))
+        return fw.sum(_plf_bar_weights(fw) * sb.persistence.transform_bars(_plf_bars(), f)._tvalues)
+
+    _assert_gradient_matches_finite_differences(fw, loss, [1.0, 2.0, 3.0])
+
+
+def test_transform_bars_gradient_wrt_plf_and_points(fw):
+    if fw.traces_abstractly:
+        pytest.skip("Removing bars needs concrete bars")
+    X, Y = _kernel_points()
+
+    def loss(x):
+        barcodes = sb.persistence.compute_homological_kernel(fw.tensor(X), x * fw.tensor(Y))
+        f = sb.Plf(x * fw.tensor([0.0, 0.5, 3.0, 3.5]), times=np.array([0.0, 1.3, 2.7, 4.1]))
+        return fw.sum(sb.persistence.transform_bars(barcodes, f)._tvalues)
+
+    _assert_gradient_matches_finite_differences(fw, loss, 0.9)
+
+
+def test_transform_bars_gradient_wrt_plf_at_infinite_death(fw):
+    if fw.traces_abstractly:
+        pytest.skip("Removing bars needs concrete bars")
+    bc = sb.persistence.BarcodeTensor([sb.persistence.Barcode([[0.5, np.inf]])])
+    # f ends flat, so f(inf) is its last value.
+    _, grad = fw.value_and_grad(
+        lambda v: fw.sum(sb.persistence.transform_bars(bc, sb.Plf(v, times=np.array([0.0, 1.0, 2.0])))._tvalues),
+        np.array([0.0, 2.0, 2.0]))
+    np.testing.assert_allclose(grad, [0.5, 0.5, 1.0])
+
+
+def test_transform_bars_with_abstract_plf_raises():
+    jax = pytest.importorskip("jax")
+
+    def loss(v):
+        f = sb.Plf(v, times=np.array([0.0, 1.0]))
+        return sb.persistence.transform_bars(_plf_bars(), f)._tvalues.sum()
+
+    with pytest.raises(NotImplementedError, match="abstractly"):
+        jax.grad(loss)(jax.numpy.array([0.0, 1.0]))
+
+
+def test_tracked_plf_with_several_barcodes_raises(fw):
+    f = sb.Plf(fw.tensor([0.0, 1.0]), times=np.array([0.0, 1.0]))
+    with pytest.raises(NotImplementedError, match="shape \\(1,\\)"):
+        sb.persistence.transform_bars(sb.persistence.BarcodeTensor([_plf_bars()[0], _plf_bars()[0]]), f)
+
+
+def test_tracked_plf_with_single_barcode_raises(fw):
+    f = sb.Plf(fw.tensor([0.0, 1.0]), times=np.array([0.0, 1.0]))
+    with pytest.raises(NotImplementedError, match="BarcodeTensor\\(\\[bc\\]\\)"):
+        sb.persistence.transform_bars(_plf_bars()[0], f)
+
+
 def test_breakpoints_as_framework_array_raise(fw):
     with pytest.raises(TypeError, match="times="):
         sb.Pcf(fw.tensor([[0.0, 1.0], [1.0, 0.0]]))

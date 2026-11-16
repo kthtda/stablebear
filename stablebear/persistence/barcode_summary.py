@@ -202,41 +202,61 @@ def barcode_to_accumulated_persistence(
     )
 
 
-def _plf_slopes(f: Plf, t: np.ndarray) -> np.ndarray:
-    """The slope of f at each time in t: that of the segment starting at or
-    before it, the last segment continued after the last breakpoint, and 0 at
-    infinite times, where f takes its limit."""
+def _plf_jacobians(f: Plf, x: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """For f evaluated at each of the times x, its derivatives with respect to
+    x, (len(x),) like x, and to the breakpoint times and values of f, each
+    (len(x), n). At a breakpoint, the derivatives are those of the segment
+    after it. At an infinite x, f takes its limit: the derivatives are 0,
+    except 1 with respect to the last value where the limit is that value.
+    """
     pts = f.to_numpy().astype(np.float64)
-    if len(pts) == 1:
-        return np.zeros(t.shape)
-    segment = np.diff(pts[:, 1]) / np.diff(pts[:, 0])
-    segment = np.append(segment, segment[-1])
-    slopes = segment[np.searchsorted(pts[:, 0], t, side="right") - 1]
-    return np.where(np.isinf(t), 0.0, slopes)
+    n = len(pts)
+    rows = np.arange(len(x))
+    dx, dt, dv = np.zeros(len(x)), np.zeros((len(x), n)), np.zeros((len(x), n))
+    if n == 1:
+        dv[:, 0] = 1.0
+        return dx, dt, dv
+    finite = ~np.isinf(x)
+    # Segment k from breakpoint k to k + 1; after the last breakpoint, the
+    # last segment continues.
+    k = np.minimum(np.searchsorted(pts[:, 0], np.where(finite, x, 0.0), side="right") - 1, n - 2)
+    h = pts[k + 1, 0] - pts[k, 0]
+    slope = (pts[k + 1, 1] - pts[k, 1]) / h
+    w = (np.where(finite, x, 0.0) - pts[k, 0]) / h
+    dx[finite] = slope[finite]
+    for column, (d_left, d_right) in ((dt, (-slope * (1 - w), -slope * w)), (dv, (1 - w, w))):
+        np.add.at(column, (rows[finite], k[finite]), d_left[finite])
+        np.add.at(column, (rows[finite], k[finite] + 1), d_right[finite])
+    dv[~finite & (pts[-1, 1] == pts[-2, 1]), n - 1] = 1.0
+    return dx, dt, dv
 
 
 def _transformed_bars_vjp(grad_out, bc, f):
-    return (grad_out * _plf_slopes(f, np.asarray(bc[0], dtype=np.float64)),)
+    bars = np.asarray(bc[0], dtype=np.float64).reshape(-1)
+    grad = np.asarray(grad_out, dtype=np.float64).reshape(-1)
+    dx, dt, dv = _plf_jacobians(f, bars)
+    return (grad * dx).reshape(-1, 2), np.column_stack([grad @ dt, grad @ dv])
 
 
 def _transformed_bars_out(bc, f):
-    return tuple(bc._tvalues.shape), np.float32 if bc.dtype == barcode32 else np.float64
+    return (len(bc[0]), 2), np.float32 if bc.dtype == barcode32 else np.float64
 
 
-@_autodiff.differentiable("bc", vjp=_transformed_bars_vjp, out=_transformed_bars_out)
+@_autodiff.differentiable("bc", "f", vjp=_transformed_bars_vjp, out=_transformed_bars_out)
 def _transformed_bars(bc: BarcodeTensor, f: Plf) -> np.ndarray:
     """The (m, 2) transformed bars of a (1,) BarcodeTensor, empty ones included."""
     return np.asarray(_transform_bars(bc, f, verbose=False, keep_empty=True)[0])
 
 
 def _tracked_transform_bars(bc: BarcodeTensor, f: Plf) -> BarcodeTensor:
-    """transform_bars of a BarcodeTensor whose bars are a framework tensor."""
+    """transform_bars of a (1,) BarcodeTensor where the bars, f, or both
+    depend on framework tensors."""
     bars = _transformed_bars(bc, f)
     adapter = _autodiff._framework(bars)
     concrete = adapter.concrete(bars)
     if concrete is None:
         raise NotImplementedError(
-            "transform_bars of bars that JAX or tf.function traces abstractly is not supported: "
+            "transform_bars of bars or a PLF that JAX or tf.function traces abstractly is not supported: "
             "which bars it removes depends on their values.")
     keep = np.flatnonzero(concrete[:, 0] < concrete[:, 1])
     return BarcodeTensor._from_tracked_bars(adapter.gather(bars, keep))
@@ -263,12 +283,15 @@ def transform_bars(bc: Barcode | BarcodeTensor | TimeSeries, f: Plf, verbose: bo
     last value if the segment is flat. Bars with :math:`f(b) \geq f(d)`,
     which :math:`f` can give where it is flat or falls, are removed.
 
-    If the bars carry gradients, as those of
-    :func:`~stablebear.persistence.homological_kernel.compute_homological_kernel` of PyTorch, JAX, or TensorFlow
-    arrays do, so do the transformed bars. At a breakpoint of :math:`f`,
-    the derivative is the slope of the segment after it. Which bars are
-    removed depends on their values, which JAX and ``tf.function`` do not
-    provide while they trace, so there this raises ``NotImplementedError``.
+    The bars and :math:`f` can carry gradients: the bars when they come
+    from :func:`~stablebear.persistence.homological_kernel.compute_homological_kernel`
+    of PyTorch, JAX, or TensorFlow arrays, and :math:`f` when its times or
+    values are such arrays (see :class:`~stablebear.functional.plf.Plf`).
+    Then `bc` must be a ``BarcodeTensor`` of shape (1,), and so is the
+    result, whose bars carry gradients with respect to both. At a breakpoint of :math:`f`, the derivatives are those of the
+    segment after it. Which bars are removed depends on their values, which
+    JAX and ``tf.function`` do not provide while they trace, so there this
+    raises ``NotImplementedError``.
 
     Parameters
     ----------
@@ -292,7 +315,9 @@ def transform_bars(bc: Barcode | BarcodeTensor | TimeSeries, f: Plf, verbose: bo
         If an endpoint is negative (a PLF is defined on
         :math:`[0, \infty)`).
     NotImplementedError
-        If the bars carry gradients that JAX or ``tf.function`` traces.
+        If the bars or `f` carry gradients that JAX or ``tf.function``
+        traces, or `bc` is not a ``BarcodeTensor`` of shape (1,) while
+        they carry gradients.
 
     Examples
     --------
@@ -305,7 +330,12 @@ def transform_bars(bc: Barcode | BarcodeTensor | TimeSeries, f: Plf, verbose: bo
     """
     if not isinstance(f, Plf):
         raise TypeError(f"Expected a Plf, got {type(f).__name__}.")
-    if isinstance(bc, BarcodeTensor) and bc._tvalues is not None:
+    if f._tracked_parts() is not None or (isinstance(bc, BarcodeTensor) and bc._tvalues is not None):
+        if not isinstance(bc, BarcodeTensor) or bc.shape != (1,):
+            # ponytail: one barcode only, like the tracked kernel; batch the vjp for more
+            raise NotImplementedError(
+                "transform_bars with gradients supports a BarcodeTensor of shape (1,) only; "
+                "wrap a single Barcode as BarcodeTensor([bc]).")
         return _tracked_transform_bars(bc, f)
     return _transform_bars(bc, f, verbose=verbose, keep_empty=False)
 

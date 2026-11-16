@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Any, overload
 
 import numpy as np
 
+from .. import _autodiff
 from .. import _sb_cpp as cpp
 from .._binary_io import _BinaryIoMixin
 from ._piecewise import _PiecewiseFunction
@@ -41,12 +42,21 @@ class Plf(_PiecewiseFunction, _BinaryIoMixin):
         Without it, a ``numpy.float32`` array gives ``float32``, any other
         real array gives ``float64``, a list gives ``float64``, and a
         ``Plf`` keeps its dtype.
+    times : array_like, optional
+        The breakpoint times, with shape ``(n,)``, when ``arr`` holds only
+        the values, also with shape ``(n,)``. The values and the times may
+        be PyTorch, JAX, or TensorFlow arrays, and the PLF then carries
+        gradients with respect to them through
+        :func:`~stablebear.persistence.barcode_summary.transform_bars`.
 
     Raises
     ------
     ValueError
         If there are no breakpoints, the first time is not 0, the times are
         not strictly increasing, or a time is not finite.
+    NotImplementedError
+        If the times are traced abstractly, as by ``jax.grad`` or
+        ``tf.function``, so that their order cannot be checked.
     TypeError
         If ``dtype`` is not ``float32`` or ``float64``, or an array does not
         hold real numbers.
@@ -72,9 +82,24 @@ class Plf(_PiecewiseFunction, _BinaryIoMixin):
 
     def __init__(
         self,
-        arr: np.ndarray | Plf | Sequence[Sequence[float]],
+        arr: np.ndarray | Plf | Sequence[Sequence[float]] | Any,
         dtype: Dtype | None = None,
+        *,
+        times: Any = None,
     ):
+        ttimes = tvalues = None
+        if times is not None:
+            arr, ttimes, tvalues = _autodiff.content_from_values(times, arr)
+            if np.isnan(arr[:, 0]).any():
+                raise NotImplementedError(
+                    "PLF breakpoint times that JAX or tf.function traces abstractly are not supported: "
+                    "their order cannot be checked.")
+        elif _autodiff._framework(arr) is not None:
+            raise TypeError(
+                "To build a PLF from a PyTorch, JAX, or TensorFlow array, pass the values "
+                "and the times separately: Plf(values, times=times)."
+            )
+
         if dtype is not None:
             _assert_valid_dtype(dtype, [float32, float64])
 
@@ -94,6 +119,22 @@ class Plf(_PiecewiseFunction, _BinaryIoMixin):
         data = np.asarray(arr, dtype=self._DTYPE_TO_NP[dtype])
         self._data = self._DTYPE_TO_CPP[dtype](data)
         self._dtype = dtype
+        self._ttimes = ttimes
+        self._tvalues = tvalues
+
+    # Framework tensors of the times and values of the breakpoints, set when
+    # they depend on a PyTorch, JAX, or TensorFlow array, so gradients flow
+    # through them. None where they are constants.
+    _ttimes: Any = None
+    _tvalues: Any = None
+
+    def _tracked_parts(self):
+        return _autodiff.pcf_parts(self, build=lambda content, _: Plf(content))
+
+    def _serial(self):
+        """(content, enumeration) of the breakpoints, as for a Pcf."""
+        pts = self.to_numpy()
+        return pts, np.array([0, len(pts)])
 
     def _binary_io_data(self):
         return self._data

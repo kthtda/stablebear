@@ -94,8 +94,10 @@ def _pcfs_from_content(content: np.ndarray, enumeration: np.ndarray) -> Any:
     return from_serial_content(content, enumeration)
 
 
-def pcf_parts(pcfs: Any) -> _Tracked | None:
-    """The tracked parts of a Pcf or PcfTensor: its framework times and values."""
+def pcf_parts(pcfs: Any, build: Callable[[np.ndarray, np.ndarray], Any] | None = None) -> _Tracked | None:
+    """The tracked parts of a Pcf, PcfTensor, or Plf: its framework times and
+    values. ``build`` makes the object from serial content and enumeration,
+    by default a Pcf or PcfTensor."""
     columns = [(col, t) for col, t in ((0, pcfs._ttimes), (1, pcfs._tvalues)) if t is not None]
     if not columns:
         return None
@@ -105,7 +107,7 @@ def pcf_parts(pcfs: Any) -> _Tracked | None:
         c = content.copy()
         for (col, _), array in zip(columns, arrays):
             c[:, col] = array
-        return _pcfs_from_content(c, enumeration)
+        return (build or _pcfs_from_content)(c, enumeration)
 
     def split(grad):
         return [np.asarray(grad)[:, col] for col, _ in columns]
