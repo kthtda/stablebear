@@ -179,7 +179,8 @@ def compute_homological_kernel(
     ----------
     X : PointCloud, PointCloudTensor, DistanceMatrix, DistanceMatrixTensor, FloatTensor, or numpy.ndarray
         Input data for :math:`d`. A ``FloatTensor`` or NumPy array is
-        interpreted as a single point cloud (one row per point).
+        interpreted as a single point cloud (one row per point), and so is
+        a PyTorch, JAX, or TensorFlow array (see Notes).
     Y : PointCloud, PointCloudTensor, DistanceMatrix, DistanceMatrixTensor, FloatTensor, or numpy.ndarray
         Input data for :math:`d'`, of the same kind as ``X``, with the same number of points per
         element as ``X``. Point clouds stay in ambient dimension: express
@@ -212,6 +213,15 @@ def compute_homological_kernel(
         paired elements mismatch (for example, two point clouds with
         different point counts, or a point cloud that is not an
         ``(n, dim)`` array).
+
+    Notes
+    -----
+    If ``X``, ``Y``, or both are PyTorch, JAX, or TensorFlow arrays of shape
+    ``(n, d)``, each a single point cloud, the bars of the result carry
+    gradients with respect to the points. The other input may then be a
+    NumPy array. Each birth is the distance between two points of ``Y`` and
+    each death the distance between two points of ``X``, and the gradient
+    of a distance of 0 is 0.
 
     """
     from ..tensor_create import zeros
