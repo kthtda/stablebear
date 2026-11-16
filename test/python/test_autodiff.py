@@ -1417,6 +1417,56 @@ def test_pcf_arithmetic_with_numbers_of_another_shape_raises(fw):
         _ = F * fw.tensor([1.0, 2.0])
 
 
+def _square():
+    # A symmetric matrix with a zero diagonal: distances between three points.
+    return np.array([[0.0, 3.0, 4.0],
+                     [3.0, 0.0, 5.0],
+                     [4.0, 5.0, 0.0]])
+
+
+def _write(make, index):
+    def write(array):
+        tensor = make()
+        tensor[index] = array
+        return np.asarray(tensor)
+    return write
+
+
+# What takes a dense array, with an input for it and what it gives for that
+# input as a NumPy array.
+_DENSE_INPUTS = [
+    pytest.param(lambda a: np.asarray(sb.FloatTensor(a)), _square(), id="float_tensor"),
+    pytest.param(lambda a: np.asarray(sb.tensor(a)), _square(), id="tensor"),
+    pytest.param(lambda a: np.asarray(sb.PointCloud(a)), _square(), id="point_cloud"),
+    pytest.param(lambda a: sb.DistanceMatrix(a).to_dense(), _square(), id="distance_matrix"),
+    pytest.param(lambda a: sb.SymmetricMatrix(a).to_dense(), _square(), id="symmetric_matrix"),
+    pytest.param(lambda a: sb.persistence.Barcode(a).to_numpy(), np.array([[0.0, 1.0], [0.5, 2.0]]), id="barcode"),
+    pytest.param(lambda a: sb.from_serial_content(a, np.array([[0, 2]]))[0].to_numpy(),
+                 np.array([[0.0, 10.0], [1.0, 20.0]]), id="from_serial_content"),
+    pytest.param(lambda a: sb.persistence.linkage_to_barcode(a, reduced=True).to_numpy(),
+                 np.array([[0.0, 1.0, 1.5, 2.0], [2.0, 3.0, 4.5, 3.0]]), id="linkage"),
+    pytest.param(_write(lambda: sb.FloatTensor(np.zeros((2, 3))), 1), np.array([1.0, 2.0, 3.0]), id="write"),
+]
+
+
+@pytest.mark.parametrize("operation, array", _DENSE_INPUTS)
+def test_framework_array_without_gradients_is_read_as_a_dense_array(fw, operation, array):
+    np.testing.assert_array_equal(operation(fw.tensor(array)), operation(array))
+
+
+@pytest.mark.parametrize("operation, array", _DENSE_INPUTS)
+def test_framework_array_with_gradients_as_a_dense_array_raises(fw, operation, array):
+    with pytest.raises(TypeError, match="cannot carry the gradients"):
+        operation(fw.tensor(array).requires_grad_())
+
+
+def test_allclose_with_framework_array_compares_values(fw):
+    array = fw.tensor(_square()).requires_grad_()
+
+    assert sb.allclose(sb.FloatTensor(_square()), array, atol=0.0, rtol=0.0)
+    assert not sb.allclose(sb.FloatTensor(_square() + 1.0), array, atol=0.0, rtol=0.0)
+
+
 def test_values_with_times_match_breakpoints():
     g = sb.Pcf(np.array([2.0, -1.0, 0.0]), times=np.array([0.0, 1.0, 3.0]))
     np.testing.assert_array_equal(g.to_numpy(), [[0.0, 2.0], [1.0, -1.0], [3.0, 0.0]])

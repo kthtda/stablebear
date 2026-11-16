@@ -539,6 +539,7 @@ class Tensor(_BinaryIoMixin, ABC):
         TypeError
             If ``val`` has a type that cannot be assigned to this tensor.
         """
+        val = _autodiff.dense(val, f"A {type(self).__name__}")
         entries, inserts = self._normalize_index(slices)
         self._validate_setitem_dtype(val)
         self._validate_setitem_value(entries, val)

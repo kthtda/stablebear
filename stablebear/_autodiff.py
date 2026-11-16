@@ -55,6 +55,21 @@ def require_number(value: Any, name: str) -> None:
             f"Pass float({name}) to use its value.")
 
 
+def dense(value: Any, what: str) -> Any:
+    """``value`` as what takes plain arrays can read it: a framework array
+    without gradients as a NumPy array, and anything else as it is. A
+    framework array that carries gradients raises TypeError: ``what``, such
+    as "A FloatTensor", could not carry them."""
+    adapter = _framework(value)
+    if adapter is None:
+        return value
+    if adapter.requires_grad(value):
+        raise TypeError(
+            f"{what} cannot carry the gradients of a PyTorch tensor. Pass the tensor itself where an "
+            "operation takes one, or tensor.detach() to use its values.")
+    return adapter.to_numpy(value)
+
+
 def _plain(v: np.ndarray) -> Any:
     return v.item() if v.ndim == 0 else v
 

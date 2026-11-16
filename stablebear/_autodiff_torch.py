@@ -32,6 +32,10 @@ def to_numpy(x: torch.Tensor) -> np.ndarray:
     return x.detach().cpu().numpy()
 
 
+def requires_grad(x: torch.Tensor) -> bool:
+    return bool(x.requires_grad)
+
+
 def version(x: torch.Tensor) -> int:
     """Changes when `x` is changed in place."""
     return x._version

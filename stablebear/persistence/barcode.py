@@ -4,6 +4,7 @@ from typing import Any
 
 import numpy as np
 
+from .. import _autodiff
 from .. import _sb_cpp as cpp
 from .._binary_io import _BinaryIoMixin
 from .._tracked import Tracking, tracked_class
@@ -48,6 +49,7 @@ class Barcode(_BinaryIoMixin):
         return self._data
 
     def __init__(self, bc):
+        bc = _autodiff.dense(bc, "A Barcode")
         if isinstance(bc, Barcode):
             self._data = bc._data
         elif isinstance(bc, cpp_p.Barcode32 | cpp_p.Barcode64):

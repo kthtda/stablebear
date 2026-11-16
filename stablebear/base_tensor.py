@@ -137,6 +137,7 @@ class NumericTensor(ArithmeticTensor):
 class FloatTensor(NumericTensor):
     def __init__(self, data: cpp.Float32Tensor | cpp.Float64Tensor | FloatTensor | np.ndarray | list | tuple, dtype=None):
         super().__init__()
+        data = _autodiff.dense(data, "A FloatTensor")
         if isinstance(data, list | tuple):
             data = np.asarray(data)
 
@@ -176,6 +177,7 @@ _INT_CPP_TO_DTYPE = {
 class IntTensor(NumericTensor):
     def __init__(self, data: cpp.Int32Tensor | cpp.Int64Tensor | cpp.Uint32Tensor | cpp.Uint64Tensor | IntTensor | np.ndarray | list | tuple, dtype=None):
         super().__init__()
+        data = _autodiff.dense(data, "An IntTensor")
         if isinstance(data, list | tuple):
             data = np.asarray(data)
 

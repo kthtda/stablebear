@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import numpy as np
 
+from . import _autodiff
+from ._tracked import is_tracked
+
 from .base_tensor import BoolTensor, FloatTensor, NumericTensor
 from .distance_matrix import DistanceMatrix
 from .symmetric_matrix import SymmetricMatrix
@@ -12,6 +15,13 @@ def _as_float64_tensor(x) -> FloatTensor:
     if isinstance(x, FloatTensor) and x.dtype == float64:
         return x
     return FloatTensor(np.asarray(x, dtype=np.float64))
+
+
+def _values(x):
+    """A PyTorch tensor as a NumPy array of its values; anything else as it
+    is."""
+    adapter = _autodiff._framework(x)
+    return x if adapter is None else adapter.to_numpy(x)
 
 
 def allclose(a, b, atol=1e-8, rtol=1e-5) -> bool:
@@ -53,6 +63,9 @@ def allclose(a, b, atol=1e-8, rtol=1e-5) -> bool:
     ValueError
         If the shapes of two tensors cannot be broadcast together.
     """
+    # The result is a bool, which cannot carry gradients: compare values.
+    a, b = (x.detach() if is_tracked(x) else _values(x) for x in (a, b))
+
     matrix_types = (DistanceMatrix, SymmetricMatrix)
     if isinstance(a, matrix_types) or isinstance(b, matrix_types):
         if type(a) is not type(b):

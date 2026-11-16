@@ -5,6 +5,7 @@ from typing import Any
 
 import numpy as np
 
+from . import _autodiff
 from . import _sb_cpp as cpp
 from ._binary_io import _BinaryIoMixin
 from ._tensor_base import IndexedElementTensor, _array_for_protocol
@@ -73,6 +74,7 @@ class DistanceMatrix(_BinaryIoMixin):
         _owner=None,
         _outer_index=None,
     ):
+        n_or_data = _autodiff.dense(n_or_data, "A DistanceMatrix")
         self._owner = _owner
         self._outer_index = _outer_index
         if _owner is not None:
@@ -300,6 +302,7 @@ class DistanceMatrixTensor(IndexedElementTensor):
 
     def __init__(self, data, dtype=None):
         super().__init__()
+        data = _autodiff.dense(data, "A DistanceMatrixTensor")
         if isinstance(data, DistanceMatrixTensor):
             data = data._data
         elif isinstance(data, np.ndarray):

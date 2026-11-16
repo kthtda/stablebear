@@ -2,6 +2,7 @@ import operator
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, overload
 
+from . import _autodiff
 from . import _sb_cpp as cpp
 from ._tensor_base import Shape, ShapeLike, Tensor
 from .base_tensor import (
@@ -173,6 +174,7 @@ def tensor(data, dtype: Dtype | None = None) -> Any:  # Any: the type follows th
     -------
     Tensor
     """
+    data = _autodiff.dense(data, "A tensor made by tensor()")
     def contains_tensor(value):
         if isinstance(value, Tensor):
             return True

@@ -1,5 +1,6 @@
 import numpy as np
 
+from . import _autodiff
 from . import _sb_cpp as cpp
 from .base_tensor import PcfTensor
 from .typing import _assert_valid_dtype, pcf32, pcf64
@@ -24,6 +25,7 @@ def from_serial_content(
     PcfTensor
         `PcfTensor` of shape ``(n_1, n_2, ..., n_k)``, where element ``(i_1, i_2, ..., i_k)`` is a `Pcf` with points ``content[start, stop]`` with ``start=enumeration[i_1,...,i_k, 0]`` and ``stop=enumeration[i_1,...,i_k, 1]``.
     """
+    content = _autodiff.dense(content, "A PcfTensor made by from_serial_content")
 
     if dtype is None:
         if content.dtype == np.float32:

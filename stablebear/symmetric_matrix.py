@@ -5,6 +5,7 @@ from typing import Any
 
 import numpy as np
 
+from . import _autodiff
 from . import _sb_cpp as cpp
 from ._binary_io import _BinaryIoMixin
 from ._tensor_base import Tensor, _array_for_protocol
@@ -63,6 +64,7 @@ class SymmetricMatrix(_BinaryIoMixin):
         n_or_data: int | np.ndarray | SymmetricMatrix,
         dtype: Dtype | None = None,
     ):
+        n_or_data = _autodiff.dense(n_or_data, "A SymmetricMatrix")
         if isinstance(n_or_data, SymmetricMatrix):
             self._data = n_or_data._data
         elif isinstance(n_or_data, _cpp_types):
@@ -214,6 +216,7 @@ class SymmetricMatrixTensor(Tensor):
 
     def __init__(self, data, dtype=None):
         super().__init__()
+        data = _autodiff.dense(data, "A SymmetricMatrixTensor")
         if isinstance(data, SymmetricMatrixTensor):
             data = data._data
         elif isinstance(data, np.ndarray):

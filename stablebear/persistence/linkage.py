@@ -4,6 +4,7 @@ import warnings
 
 import numpy as np
 
+from .. import _autodiff
 from .. import _sb_cpp as cpp
 from ..typing import _validate_dtype
 from .barcode import Barcode
@@ -66,6 +67,7 @@ def linkage_to_barcode(Z: np.ndarray, *, reduced: bool = False) -> Barcode:
            [0. , 4.5],
            [0. , inf]])
     """
+    Z = _autodiff.dense(Z, "A linkage matrix")
     if not isinstance(Z, np.ndarray):
         raise TypeError("Z must be a float32 or float64 NumPy array")
     dtype = _validate_dtype(Z.dtype.type, _BACKEND_MAP)
