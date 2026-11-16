@@ -194,7 +194,10 @@ class PointCloudTensor(IndexedElementTensor):
     data : numpy.ndarray, list of numpy.ndarray, or PointCloudTensor
         An ndarray whose trailing ``cloud_ndim`` axes form each point cloud and
         whose leading axes form the tensor shape; or a list of point cloud arrays
-        (possibly ragged) forming a 1-D tensor; or an existing tensor.
+        (possibly ragged) forming a 1-D tensor; or an existing tensor. A
+        PyTorch, JAX, or TensorFlow array in place of the ndarray, or a list
+        that holds one, gives a tensor whose points carry gradients with
+        respect to those arrays.
     cloud_ndim : int, optional
         Must be 2. Retained as a keyword for compatibility.
     dtype : pcloud32 or pcloud64, optional
@@ -203,6 +206,15 @@ class PointCloudTensor(IndexedElementTensor):
 
     _indexed_cpp_types = _INDEXED_PCLOUD_CPP_TYPES
     _indexed_element_name = "Point-cloud"
+
+    def __new__(cls, data: Any = None, cloud_ndim: Any = 2, dtype: Any = None) -> PointCloudTensor:
+        if cls is PointCloudTensor:
+            # A PyTorch, JAX, or TensorFlow array, or a list that holds one,
+            # gives a tensor that carries gradients; see _tracked.
+            tracked = _tracked_point_clouds(data)
+            if tracked is not None:
+                return tracked
+        return super().__new__(cls)
 
     def __init__(self, data, cloud_ndim=2, dtype=None):
         super().__init__()
@@ -234,13 +246,19 @@ class PointCloudTensor(IndexedElementTensor):
 
     @staticmethod
     def _from_serial(content: np.ndarray, enumeration: np.ndarray) -> PointCloudTensor:
-        """The inverse of _serial."""
+        """The inverse of _serial. An enumeration of shape (2,) gives a
+        tensor of shape (), of one cloud."""
         content = np.asarray(content)
         enumeration = np.ascontiguousarray(enumeration, dtype=np.int64)
+        single = enumeration.ndim == 1
+        if single:
+            enumeration = enumeration[None]
         if content.dtype == np.float32:
-            return PointCloudTensor(cpp.point_clouds_from_serial_content_32(np.ascontiguousarray(content), enumeration))
-        return PointCloudTensor(cpp.point_clouds_from_serial_content_64(
-            np.ascontiguousarray(content, dtype=np.float64), enumeration))
+            data = cpp.point_clouds_from_serial_content_32(np.ascontiguousarray(content), enumeration)
+        else:
+            data = cpp.point_clouds_from_serial_content_64(
+                np.ascontiguousarray(content, dtype=np.float64), enumeration)
+        return PointCloudTensor(data.reshape([]) if single else data)
 
     def _represent_element(self, element):
         return PointCloud(element)
@@ -285,3 +303,40 @@ PointCloudTensor._tracking = Tracking(  # pyright: ignore[reportAttributeAccessI
 # A PointCloudTensor whose coordinates depend on PyTorch, JAX, or TensorFlow
 # arrays, built from [points] and the enumeration of _serial; see _tracked.
 _TrackedPointCloudTensor = tracked_class(PointCloudTensor)
+
+
+def _tracked_point_clouds(data: Any) -> Any:
+    """The PointCloudTensor that carries gradients for a framework array of
+    shape (..., n, d), a batch of clouds of n points, or for a list of
+    (n, d) arrays of which at least one is a framework array, a batch of
+    clouds of any sizes. None for anything else."""
+    from . import _autodiff
+
+    data = _autodiff._unwrap(data)
+    adapter = _autodiff._framework(data)
+    if adapter is not None:
+        shape = tuple(int(size) for size in data.shape)
+        if len(shape) < 2:
+            raise ValueError(f"Point clouds must have shape (..., n, d), one point per row (got shape {shape}).")
+        batch, (n_points, dim) = shape[:-2], shape[-2:]
+        starts = np.arange(int(np.prod(batch)), dtype=np.int64) * n_points
+        enumeration = np.stack([starts, starts + n_points], axis=-1).reshape(*batch, 2)
+        return _TrackedPointCloudTensor([adapter.reshape(data, (-1, dim))], enumeration)
+
+    if not isinstance(data, (list, tuple)):
+        return None
+    clouds = [_autodiff._unwrap(cloud) for cloud in data]
+    like = next((cloud for cloud in clouds if _autodiff._framework(cloud) is not None), None)
+    if like is None:
+        return None
+    adapter = _autodiff._framework(like)
+    arrays = [cloud if _autodiff._framework(cloud) is not None else adapter.as_tensor(np.asarray(cloud), like=like)
+              for cloud in clouds]
+    for array in arrays:
+        if len(array.shape) != 2 or array.shape[1] != arrays[0].shape[1]:
+            raise ValueError(
+                "The point clouds of a list with PyTorch, JAX, or TensorFlow arrays must have shape (n, d) "
+                f"with the same d (got shapes {[tuple(a.shape) for a in arrays]}).")
+    ends = np.cumsum([int(array.shape[0]) for array in arrays])
+    enumeration = np.stack([np.concatenate([[0], ends[:-1]]), ends], axis=-1)
+    return _TrackedPointCloudTensor([adapter.concat(arrays)], enumeration)

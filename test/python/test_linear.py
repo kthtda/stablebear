@@ -843,3 +843,52 @@ def test_critical_edges_of_kernel_of_batch(make_elements):
         np.testing.assert_array_equal(bars[start:stop], alone_bars)
         np.testing.assert_array_equal(edges[start:stop], alone_edges)
         assert edges[start:stop].max() < len(cloud)
+
+
+def test_point_cloud_tensor_of_list_with_framework_arrays_carries_gradients(fw):
+    first, second, third = _batch3()
+
+    clouds = sb.PointCloudTensor([fw.tensor(first), second, fw.tensor(third)])
+
+    assert isinstance(clouds, sb.PointCloudTensor)
+    assert clouds._tvalues is not None
+    assert clouds.shape == (3,)
+    assert clouds.array_equal(sb.PointCloudTensor(_batch3()))
+
+
+def test_framework_array_of_three_dimensions_is_a_batch_of_point_clouds(fw):
+    # Two clouds of three points in the plane.
+    array = np.arange(12.0).reshape(2, 3, 2)
+
+    clouds = sb.PointCloudTensor(fw.tensor(array))
+
+    assert clouds._tvalues is not None
+    assert clouds.shape == (2,)
+    assert clouds.array_equal(sb.PointCloudTensor(array))
+
+
+def test_inner_product_space_of_framework_batch_holds_a_point_cloud_tensor(fw):
+    array = np.arange(12.0).reshape(2, 3, 2)
+
+    space = sb.InnerProduct(_gram())(fw.tensor(array))
+
+    assert isinstance(space.points, sb.PointCloudTensor)
+    assert space.points._tvalues is not None
+    assert space.points.shape == (2,)
+
+
+def test_list_of_framework_point_clouds_of_different_dimensions_raises(fw):
+    with pytest.raises(ValueError, match="same d"):
+        sb.PointCloudTensor([fw.tensor(_points()), fw.tensor(_loop_points())])
+
+
+def test_projection_gradient_wrt_one_point_cloud_of_a_batch(fw):
+    _, second, third = _batch3()
+    # One weight per coordinate of the 11 points of the batch.
+    weights = _batch_weights()
+
+    def loss(P):
+        clouds = sb.PointCloudTensor([P, second, third])
+        return fw.sum(fw.tensor(weights) * sb.LinearSubspace(_vectors()).project(clouds)._tvalues)
+
+    assert_gradient_matches_finite_differences(fw, loss, _batch3()[0])

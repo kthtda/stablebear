@@ -96,6 +96,10 @@ def row_lp_norms(x: Any, p: float) -> tf.Tensor:
     return tf.reduce_sum(tf.abs(x) ** p, axis=1) ** (1 / p)
 
 
+def reshape(x: Any, shape: tuple) -> tf.Tensor:
+    return tf.reshape(x, shape)
+
+
 def apply(
     primal: Callable[..., Any], vjp: Callable[..., Any], *params: Any, out: Any = None, residuals: Any = ()
 ) -> tf.Tensor:

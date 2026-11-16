@@ -93,6 +93,10 @@ def row_lp_norms(x: torch.Tensor, p: float) -> torch.Tensor:
     return (x.abs() ** p).sum(dim=1) ** (1 / p)
 
 
+def reshape(x: torch.Tensor, shape: tuple) -> torch.Tensor:
+    return x.reshape(shape)
+
+
 def apply(
     primal: Callable[..., Any], vjp: Callable[..., Any], *params: Any, out: Any = None, residuals: Any = ()
 ) -> torch.Tensor:

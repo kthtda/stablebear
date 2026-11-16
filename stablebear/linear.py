@@ -73,15 +73,18 @@ def _is_float32(array: Any) -> bool:
 def _as_point_cloud(points: Any) -> Any:
     """A single point cloud from an (n, d) array, FloatTensor, or
     PointCloud, as a PointCloud; a PyTorch, JAX, or TensorFlow array of
-    shape (n, d), or a batch of clouds as a PointCloudTensor, as it is."""
+    shape (n, d), or a batch of clouds as a PointCloudTensor, as it is; and
+    such an array of shape (..., n, d) as a PointCloudTensor that carries
+    gradients."""
     points = _autodiff._unwrap(points)
     if isinstance(points, PointCloudTensor):
         return points
     if _autodiff._framework(points) is not None:
-        if len(points.shape) != 2:
+        if len(points.shape) < 2:
             raise ValueError(
                 f"A point cloud must have shape (n, d), one point per row (got shape {tuple(points.shape)}).")
-        return points
+        # More dimensions are a batch of clouds, as for a NumPy array.
+        return points if len(points.shape) == 2 else PointCloudTensor(points)
     if isinstance(points, PointCloud):
         return points
     if isinstance(points, FloatTensor):

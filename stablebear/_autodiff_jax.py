@@ -82,6 +82,10 @@ def row_lp_norms(x: Any, p: float) -> jax.Array:
     return (jnp.abs(x) ** p).sum(axis=1) ** (1 / p)
 
 
+def reshape(x: Any, shape: tuple) -> jax.Array:
+    return jnp.reshape(x, shape)
+
+
 def apply(
     primal: Callable[..., Any], vjp: Callable[..., Any], *params: Any, out: Any = None, residuals: Any = ()
 ) -> jax.Array:
