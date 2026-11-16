@@ -94,27 +94,6 @@ def _pcfs_from_content(content: np.ndarray, enumeration: np.ndarray) -> Any:
     return from_serial_content(content, enumeration)
 
 
-def pcf_parts(pcfs: Any, build: Callable[[np.ndarray, np.ndarray], Any] | None = None) -> _Tracked | None:
-    """The tracked parts of a Pcf, PcfTensor, or Plf: its framework times and
-    values. ``build`` makes the object from serial content and enumeration,
-    by default a Pcf or PcfTensor."""
-    columns = [(col, t) for col, t in ((0, pcfs._ttimes), (1, pcfs._tvalues)) if t is not None]
-    if not columns:
-        return None
-    content, enumeration = pcfs._serial()
-
-    def rebuild(arrays):
-        c = content.copy()
-        for (col, _), array in zip(columns, arrays):
-            c[:, col] = array
-        return (build or _pcfs_from_content)(c, enumeration)
-
-    def split(grad):
-        return [np.asarray(grad)[:, col] for col, _ in columns]
-
-    return _Tracked([t for _, t in columns], rebuild, split)
-
-
 def _concrete_column(values: Any, n: int, adapter: Any) -> np.ndarray:
     concrete = adapter.concrete(values) if values is not None else None
     return concrete if concrete is not None else np.full(n, np.nan)
@@ -245,17 +224,12 @@ def pcf_op(primal_op: Callable[..., Any], combine: Callable[..., Any], *operands
 
     ends = np.cumsum(sizes)
     enumeration = np.stack([ends - sizes, ends], axis=-1).reshape(*shape, 2)
-    dtype = serials[0][0].dtype
-    if enumeration.ndim > 1:
-        from .base_tensor import _TrackedPcfTensor
+    from .base_tensor import _TrackedPcfTensor
+    from .functional.pcf import _TrackedPcf
 
-        return _TrackedPcfTensor(
-            [result_times if result_times is not None else times.astype(dtype), result_values], enumeration)
-    content = np.column_stack([times, _concrete_column(result_values, len(times), adapter)])
-    result = _pcfs_from_content(content.astype(dtype), enumeration)
-    result._tvalues = result_values
-    result._ttimes = result_times
-    return result
+    tracked_type = _TrackedPcfTensor if enumeration.ndim > 1 else _TrackedPcf
+    return tracked_type(
+        [result_times if result_times is not None else times.astype(serials[0][0].dtype), result_values], enumeration)
 
 
 def differentiable(

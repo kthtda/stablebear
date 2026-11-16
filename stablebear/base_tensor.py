@@ -324,9 +324,9 @@ class PcfTensor(_PcfTensorBase):
 PcfTensor._tracking = Tracking(  # pyright: ignore[reportAttributeAccessIssue]
     groups=(("_ttimes", 1), ("_tvalues", 1)),
     from_serial=PcfTensor._from_serial,
+    attributes=lambda np_dtype: {"dtype": pcf32 if np_dtype == np.float32 else pcf64},
     # Not Pcf(rows), which requires strictly increasing times.
     element=lambda rows: PcfTensor._from_serial(rows, np.array([[0, len(rows)]]))[0],
-    dtype=lambda np_dtype: pcf32 if np_dtype == np.float32 else pcf64,
 )
 
 # A PcfTensor whose breakpoint times, values, or both depend on PyTorch, JAX,

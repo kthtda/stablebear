@@ -125,8 +125,8 @@ class BarcodeTensor(Tensor):
 BarcodeTensor._tracking = Tracking(  # pyright: ignore[reportAttributeAccessIssue]
     groups=(("_tvalues", 2),),
     from_serial=BarcodeTensor._from_serial,
+    attributes=lambda np_dtype: {"dtype": barcode32 if np_dtype == np.float32 else barcode64},
     element=Barcode,
-    dtype=lambda np_dtype: barcode32 if np_dtype == np.float32 else barcode64,
 )
 
 # A BarcodeTensor whose bars depend on PyTorch, JAX, or TensorFlow arrays,

@@ -726,6 +726,33 @@ def test_values_with_times_match_breakpoints():
     np.testing.assert_array_equal(g.to_numpy(), [[0.0, 2.0], [1.0, -1.0], [3.0, 0.0]])
 
 
+@pytest.mark.parametrize("function", [sb.Pcf, sb.Plf], ids=["pcf", "plf"])
+def test_function_of_framework_values_detaches_to_a_plain_one(fw, function):
+    f = function(fw.tensor([10.0, 20.0]), times=np.array([0.0, 1.0]))
+    assert isinstance(f, function)
+
+    detached = f.detach()
+
+    assert type(detached) is function
+    assert detached == function(np.array([[0.0, 10.0],
+                                          [1.0, 20.0]]))
+
+
+@pytest.mark.parametrize("function", [sb.Pcf, sb.Plf], ids=["pcf", "plf"])
+def test_function_follows_in_place_change_of_torch_values(function):
+    torch = pytest.importorskip("torch")
+    values = torch.tensor([10.0, 20.0], dtype=torch.float64)
+    f = function(values, times=np.array([0.0, 1.0]))
+    np.testing.assert_array_equal(f.to_numpy(), [[0.0, 10.0],
+                                                 [1.0, 20.0]])
+
+    with torch.no_grad():
+        values.mul_(2)
+
+    np.testing.assert_array_equal(f.to_numpy(), [[0.0, 20.0],
+                                                 [1.0, 40.0]])
+
+
 def test_values_and_times_from_float_tensors():
     times = sb.FloatTensor(np.array([0.0, 1.0, 3.0], dtype=np.float32))
     values = sb.FloatTensor(np.array([2.0, -1.0, 0.0], dtype=np.float32))

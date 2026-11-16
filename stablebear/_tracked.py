@@ -1,21 +1,25 @@
-"""Tensors that carry gradients of PyTorch, JAX, or TensorFlow.
+"""Tensors and single objects that carry gradients of PyTorch, JAX, or
+TensorFlow.
 
 A tensor type whose elements are blocks of rows of a fixed width, such as a
 BarcodeTensor with its (birth, death) bars, opts in by setting a ``_tracking``
 description on its class. ``tracked_class(T)`` is then the private subclass
-of ``T`` for tensors that carry gradients.
+of ``T`` for tensors that carry gradients. A single object, such as a Pcf
+with its (time, value) breakpoints, opts in the same way, as the case of one
+element without a shape.
 
-The only state of such a tensor is its serial content, given as groups of
+The only state of a tracked object is its serial content, given as groups of
 columns that are each a framework array or a constant NumPy array, and its
-enumeration. Its C++ tensor is derived from them, so the two cannot disagree,
-and kept until a framework array is changed in place. The tensor itself
-cannot be changed in place. Indexing, reshaping, and copying
-keep the gradients. Reading ``_data`` raises, so any operation that was not
-written for gradients raises instead of dropping them; code that handles
-them takes the C++ tensor from ``_cpp()``. ``detach()`` gives the untracked
-tensor of the current values, which comparisons, saving, and pickling use.
-A single element, as from an integer index, is an untracked element object
-of the current values.
+enumeration. Its C++ object is derived from them, so the two cannot disagree,
+and kept until a framework array is changed in place. ``detach()`` gives the
+untracked object of the current values.
+
+A tracked tensor cannot be changed in place. Indexing, reshaping, and
+copying keep the gradients. Reading ``_data`` raises, so any operation that
+was not written for gradients raises instead of dropping them; code that
+handles them takes the C++ tensor from ``_cpp()``. Comparisons, saving, and
+pickling use the values. A single element, as from an integer index, is an
+untracked element object of the current values.
 """
 
 from __future__ import annotations
@@ -29,21 +33,23 @@ from ._tensor_base import Tensor
 
 
 class Tracking(NamedTuple):
-    """How a tensor type is tracked.
+    """How a type is tracked.
 
     ``groups`` lists, in column order, the groups of columns of the serial
     content that are tracked together: for each the name of the attribute
     that gives its framework array (None while it is a constant) and its
     number of columns. A group of one column is an (m,) array, a wider one
     (m, columns). ``from_serial(content, enumeration)`` builds an untracked
-    tensor, ``element(rows)`` an element from its rows, and ``dtype`` gives
-    the tensor's dtype from the NumPy dtype of its content.
+    object, and ``attributes`` gives the attributes that the type's
+    constructor sets, such as ``dtype``, from the NumPy dtype of the
+    content. For a tensor type, ``element(rows)`` builds an element from its
+    rows.
     """
 
     groups: tuple[tuple[str, int], ...]
     from_serial: Callable[[np.ndarray, np.ndarray], Any]
-    element: Callable[[np.ndarray], Any]
-    dtype: Callable[[Any], Any]
+    attributes: Callable[[Any], dict[str, Any]]
+    element: Callable[[np.ndarray], Any] | None = None
 
 
 def _is_framework(x: Any) -> bool:
@@ -52,23 +58,37 @@ def _is_framework(x: Any) -> bool:
     return _autodiff._framework(x) is not None
 
 
-class _TrackedMixin:
-    """The behavior of ``tracked_class(T)``; see the module docstring."""
+class _TrackedObject:
+    """The state of ``tracked_class(T)`` and what derives from it; see the
+    module docstring."""
 
     _tracking: Tracking
     _base: type
+    _parts: list
+    _enumeration: np.ndarray
+    _np_dtype: Any
+    _plain: Any
+    _plain_versions: Any
 
-    def __init__(self, parts: list, enumeration: np.ndarray, data: Any = None):
-        """``data`` is the C++ tensor of these parts and enumeration, from an
-        operation that already has it; otherwise the first use derives it."""
-        # Not the constructor of the tensor type: _data is derived, not stored.
+    def __new__(cls, parts: list, enumeration: np.ndarray, plain: Any = None):
+        """``plain`` is the untracked object of these parts and enumeration,
+        from an operation that already has it; otherwise the first use
+        derives it."""
+        # The state is set here and __init__ does nothing, so that the
+        # constructor of the base type can return a tracked object.
+        self = object.__new__(cls)
         self._parts = list(parts)
         self._enumeration = np.asarray(enumeration, dtype=np.int64)
         all_float32 = all("float32" in str(part.dtype) for part in self._parts)
         self._np_dtype = np.float32 if all_float32 else np.float64
-        self.dtype = self._tracking.dtype(self._np_dtype)
-        self._cache = data
-        self._cache_versions = self._versions() if data is not None else None
+        for name, value in self._tracking.attributes(self._np_dtype).items():
+            setattr(self, name, value)
+        self._plain = plain
+        self._plain_versions = self._versions() if plain is not None else None
+        return self
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        pass
 
     def _versions(self) -> list:
         """What tells, per part, whether its values changed in place."""
@@ -91,13 +111,77 @@ class _TrackedMixin:
             columns.append(values.reshape(len(values), width))
         return columns[0] if len(columns) == 1 else np.concatenate(columns, axis=1)
 
-    def _cpp(self) -> Any:
-        """The C++ tensor of the current values."""
+    def _untracked(self) -> Any:
+        """The untracked object of the current values, shared between calls."""
         versions = self._versions()
-        if self._cache is None or versions != self._cache_versions:
-            self._cache = self._tracking.from_serial(self._concrete(), self._enumeration)._data
-            self._cache_versions = versions
-        return self._cache
+        if self._plain is None or versions != self._plain_versions:
+            self._plain = self._tracking.from_serial(self._concrete(), self._enumeration)
+            self._plain_versions = versions
+        return self._plain
+
+    def _cpp(self) -> Any:
+        """The C++ object of the current values."""
+        return self._untracked()._data
+
+    @property
+    def _data(self):
+        return self._cpp()
+
+    def detach(self) -> Any:
+        """The untracked object of the current values, without gradients."""
+        return self._tracking.from_serial(self._concrete(), self._enumeration)
+
+    def _binary_io_data(self):
+        return self._cpp()
+
+    def _serial(self) -> tuple[np.ndarray, np.ndarray]:
+        return self._concrete(), self._enumeration
+
+    def _tracked_parts(self):
+        from . import _autodiff
+
+        tracked = [i for i, part in enumerate(self._parts) if _is_framework(part)]
+        starts = np.cumsum([0] + [columns for _, columns in self._tracking.groups])
+        content, enumeration = self._serial()
+        versions = self._versions()
+
+        def rebuild(arrays):
+            arrays = [np.asarray(array).reshape(len(content), starts[i + 1] - starts[i]) for i, array in zip(tracked, arrays)]
+            # Whether these are the values the content was read from, as
+            # when the framework is not tracing. The parts are not read
+            # here: TensorFlow forbids reading a variable inside its
+            # operations.
+            current = all(np.array_equal(array, content[:, starts[i]:starts[i + 1]]) for i, array in zip(tracked, arrays))
+            if current and self._plain is not None and self._plain_versions == versions:
+                return self._plain
+            c = content.copy()
+            for i, array in zip(tracked, arrays):
+                c[:, starts[i]:starts[i + 1]] = array
+            plain = self._tracking.from_serial(c, enumeration)
+            if current:
+                self._plain, self._plain_versions = plain, versions
+            return plain
+
+        def split(grad):
+            grad = np.asarray(grad)
+            return [grad[:, starts[i]:starts[i + 1]].reshape(tuple(self._parts[i].shape)) for i in tracked]
+
+        return _autodiff._Tracked([self._parts[i] for i in tracked], rebuild, split)
+
+    def copy(self):
+        # The state cannot change, so the copy can share it.
+        return type(self)(self._parts, self._enumeration, plain=self._untracked() if self._plain is not None else None)
+
+    def __copy__(self):
+        return self.copy()
+
+    def __deepcopy__(self, memodict=None):
+        return self.copy()
+
+
+class _TrackedMixin(_TrackedObject):
+    """The behavior of ``tracked_class(T)`` for a tensor type; see the
+    module docstring."""
 
     def _drops_gradients(self) -> NotImplementedError:
         name = self._base.__name__
@@ -112,36 +196,6 @@ class _TrackedMixin:
     def detach(self) -> Any:
         """The untracked tensor of the current values, without gradients."""
         return self._base(self._cpp())
-
-    def _binary_io_data(self):
-        return self._cpp()
-
-    def _serial(self) -> tuple[np.ndarray, np.ndarray]:
-        return self._concrete(), self._enumeration
-
-    def _tracked_parts(self):
-        from . import _autodiff
-
-        tracked = [i for i, part in enumerate(self._parts) if _is_framework(part)]
-        starts = np.cumsum([0] + [columns for _, columns in self._tracking.groups])
-        content, enumeration = self._serial()
-
-        def rebuild(arrays):
-            arrays = [np.asarray(array).reshape(len(content), starts[i + 1] - starts[i]) for i, array in zip(tracked, arrays)]
-            if all(np.array_equal(array, content[:, starts[i]:starts[i + 1]]) for i, array in zip(tracked, arrays)):
-                # The current values, as when the framework is not tracing:
-                # an untracked tensor of the same C++ tensor.
-                return self.detach()
-            c = content.copy()
-            for i, array in zip(tracked, arrays):
-                c[:, starts[i]:starts[i + 1]] = array
-            return self._tracking.from_serial(c, enumeration)
-
-        def split(grad):
-            grad = np.asarray(grad)
-            return [grad[:, starts[i]:starts[i + 1]].reshape(tuple(self._parts[i].shape)) for i in tracked]
-
-        return _autodiff._Tracked([self._parts[i] for i in tracked], rebuild, split)
 
     @property
     def shape(self):
@@ -176,6 +230,7 @@ class _TrackedMixin:
         flat = self._enumeration.reshape(-1, 2)
         if not isinstance(ids, Tensor):
             start, stop = flat[ids]
+            assert self._tracking.element is not None
             return self._tracking.element(self._concrete()[start:stop])
         ids = np.asarray(ids, dtype=np.int64)
         starts = flat[ids.ravel(), 0]
@@ -190,13 +245,6 @@ class _TrackedMixin:
 
     def __getitem__(self, slices):
         return self._select(self._ids()[slices])
-
-    def copy(self):
-        # Immutable, so the copy can share the parts and the C++ tensor.
-        return type(self)(self._parts, self._enumeration, data=self._cpp() if self._cache is not None else None)
-
-    def __deepcopy__(self, memodict=None):
-        return self.copy()
 
     def __setitem__(self, slices, val):
         raise TypeError(f"A {self._base.__name__} that carries gradients cannot be changed in place.")
@@ -242,17 +290,18 @@ _TRACKED_CLASSES: dict[type, Any] = {}
 
 
 def tracked_class(base: type) -> Any:
-    """The subclass of the tensor type ``base`` for tensors that carry
-    gradients. Its constructor takes the parts, one framework or NumPy array
-    per group of ``base._tracking``, and the enumeration."""
+    """The subclass of the type ``base`` for objects that carry gradients.
+    Its constructor takes the parts, one framework or NumPy array per group
+    of ``base._tracking``, and the enumeration."""
     if base not in _TRACKED_CLASSES:
         tracking = base._tracking  # pyright: ignore[reportAttributeAccessIssue]
-        namespace: dict[str, Any] = {"_base": base, "__doc__": _TrackedMixin.__doc__}
+        mixin = _TrackedMixin if issubclass(base, Tensor) else _TrackedObject
+        namespace: dict[str, Any] = {"_base": base, "__doc__": mixin.__doc__}
         for index, (name, _) in enumerate(tracking.groups):
             namespace[name] = _part_property(index)
-        _TRACKED_CLASSES[base] = type(f"_Tracked{base.__name__}", (_TrackedMixin, base), namespace)
+        _TRACKED_CLASSES[base] = type(f"_Tracked{base.__name__}", (mixin, base), namespace)
     return _TRACKED_CLASSES[base]
 
 
 def is_tracked(x: Any) -> bool:
-    return isinstance(x, _TrackedMixin)
+    return isinstance(x, _TrackedObject)

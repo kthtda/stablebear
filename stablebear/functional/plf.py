@@ -8,6 +8,7 @@ import numpy as np
 from .. import _autodiff
 from .. import _sb_cpp as cpp
 from .._binary_io import _BinaryIoMixin
+from .._tracked import Tracking, tracked_class
 from ._piecewise import _PiecewiseFunction
 from ..typing import Dtype, _assert_valid_dtype, float32, float64
 
@@ -80,6 +81,21 @@ class Plf(_PiecewiseFunction, _BinaryIoMixin):
     # A native Plf_f32_f32 or Plf_f64_f64.
     _data: Any
 
+    def __new__(cls, arr: Any = None, dtype: Any = None, *, times: Any = None) -> Plf:
+        if cls is Plf and times is not None:
+            content, ttimes, tvalues = _autodiff.content_from_values(times, arr)
+            if ttimes is not None or tvalues is not None:
+                if np.isnan(content[:, 0]).any():
+                    raise NotImplementedError(
+                        "PLF breakpoint times that JAX or tf.function traces abstractly are not supported: "
+                        "their order cannot be checked.")
+                # A PLF that carries gradients; see _tracked.
+                return _TrackedPlf(
+                    [ttimes if ttimes is not None else content[:, 0],
+                     tvalues if tvalues is not None else content[:, 1]],
+                    np.array([0, len(content)]), plain=Plf(content))
+        return super().__new__(cls)
+
     def __init__(
         self,
         arr: np.ndarray | Plf | Sequence[Sequence[float]] | Any,
@@ -87,13 +103,8 @@ class Plf(_PiecewiseFunction, _BinaryIoMixin):
         *,
         times: Any = None,
     ):
-        ttimes = tvalues = None
         if times is not None:
-            arr, ttimes, tvalues = _autodiff.content_from_values(times, arr)
-            if np.isnan(arr[:, 0]).any():
-                raise NotImplementedError(
-                    "PLF breakpoint times that JAX or tf.function traces abstractly are not supported: "
-                    "their order cannot be checked.")
+            arr = _autodiff.content_from_values(times, arr)[0]
         elif _autodiff._framework(arr) is not None:
             raise TypeError(
                 "To build a PLF from a PyTorch, JAX, or TensorFlow array, pass the values "
@@ -119,17 +130,12 @@ class Plf(_PiecewiseFunction, _BinaryIoMixin):
         data = np.asarray(arr, dtype=self._DTYPE_TO_NP[dtype])
         self._data = self._DTYPE_TO_CPP[dtype](data)
         self._dtype = dtype
-        self._ttimes = ttimes
-        self._tvalues = tvalues
 
-    # Framework tensors of the times and values of the breakpoints, set when
-    # they depend on a PyTorch, JAX, or TensorFlow array, so gradients flow
-    # through them. None where they are constants.
+    # The framework times and values of the breakpoints of a PLF that
+    # carries gradients (see _tracked). None where they are constants, as
+    # for any other PLF.
     _ttimes: Any = None
     _tvalues: Any = None
-
-    def _tracked_parts(self):
-        return _autodiff.pcf_parts(self, build=lambda content, _: Plf(content))
 
     def _serial(self):
         """(content, enumeration) of the breakpoints, as for a Pcf."""
@@ -177,3 +183,15 @@ class Plf(_PiecewiseFunction, _BinaryIoMixin):
 
     def __str__(self):
         return f"<PLF size={self.size}, dtype={self._dtype}>"
+
+
+Plf._tracking = Tracking(  # pyright: ignore[reportAttributeAccessIssue]
+    groups=(("_ttimes", 1), ("_tvalues", 1)),
+    from_serial=lambda content, enumeration: Plf(content),
+    attributes=lambda np_dtype: {"_dtype": float32 if np_dtype == np.float32 else float64},
+)
+
+# A Plf whose breakpoint times, values, or both depend on PyTorch, JAX, or
+# TensorFlow arrays, built from [times, values] and the enumeration of
+# _serial; see _tracked.
+_TrackedPlf = tracked_class(Plf)

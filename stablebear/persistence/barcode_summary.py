@@ -4,6 +4,7 @@ import numpy as np
 
 from .. import _autodiff
 from .. import _sb_cpp as cpp
+from .._tracked import is_tracked
 from ..async_task import _run_task
 from ..base_tensor import PcfTensor, _get_backend, _TrackedPcfTensor
 from ..functional.pcf import Pcf
@@ -375,7 +376,7 @@ def transform_bars(bc: Barcode | BarcodeTensor | TimeSeries, f: Plf, verbose: bo
     """
     if not isinstance(f, Plf):
         raise TypeError(f"Expected a Plf, got {type(f).__name__}.")
-    if f._tracked_parts() is not None or isinstance(bc, _TrackedBarcodeTensor):
+    if is_tracked(f) or isinstance(bc, _TrackedBarcodeTensor):
         if not isinstance(bc, BarcodeTensor):
             raise NotImplementedError(
                 "transform_bars with gradients supports a BarcodeTensor only; "

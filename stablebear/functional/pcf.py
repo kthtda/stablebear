@@ -8,6 +8,7 @@ import numpy as np
 from .. import _autodiff
 from .. import _sb_cpp as cpp
 from .._binary_io import _BinaryIoMixin
+from .._tracked import Tracking, tracked_class
 from ._piecewise import _PiecewiseFunction
 from .plf import Plf
 from ..typing import (_assert_valid_dtype, _NP_TO_SB, _sized_type, float32, float64, int32, int64, pcf32, pcf32i, pcf64,
@@ -84,6 +85,19 @@ class Pcf(_PiecewiseFunction, _BinaryIoMixin):
         cpp.Pcf_i64_i64: (int64, int64),
     }
 
+    def __new__(cls, arr: Any = None, dtype: Any = None, *, times: Any = None) -> Pcf:
+        if cls is Pcf and times is not None:
+            content, ttimes, tvalues = _autodiff.content_from_values(times, arr)
+            if ttimes is not None or tvalues is not None:
+                # A PCF that carries gradients; see _tracked. Times traced
+                # abstractly are NaN here, and their order cannot be checked.
+                checked = None if np.isnan(content[:, 0]).any() else Pcf(content)
+                return _TrackedPcf(
+                    [ttimes if ttimes is not None else content[:, 0],
+                     tvalues if tvalues is not None else content[:, 1]],
+                    np.array([0, len(content)]), plain=checked)
+        return super().__new__(cls)
+
     def __init__(
         self,
         arr: np.ndarray | Pcf | list[list[float | int] | tuple[float | int, ...]] | Any,
@@ -91,12 +105,8 @@ class Pcf(_PiecewiseFunction, _BinaryIoMixin):
         *,
         times: Any = None,
     ):
-        ttimes = tvalues = None
         if times is not None:
-            arr, ttimes, tvalues = _autodiff.content_from_values(times, arr)
-            if np.isnan(arr[:, 0]).any():
-                # Times traced abstractly: their order cannot be checked.
-                arr = _autodiff._pcfs_from_content(arr, np.array([0, len(arr)]))
+            arr = _autodiff.content_from_values(times, arr)[0]
         elif _autodiff._framework(arr) is not None:
             raise TypeError(
                 "To build a PCF from a PyTorch, JAX, or TensorFlow array, pass the values "
@@ -143,9 +153,6 @@ class Pcf(_PiecewiseFunction, _BinaryIoMixin):
             raise ValueError(
                 f"Tried to create PCF from unsupported input data of type {type(arr)}."
             )
-
-        self._ttimes = ttimes
-        self._tvalues = tvalues
 
     def _get_time_type(self):
         return self._data.get_time_type()
@@ -216,14 +223,11 @@ class Pcf(_PiecewiseFunction, _BinaryIoMixin):
             raise TypeError("Only PCFs with vtype float32 or float64 can be integrated.")
         return Plf._from_cpp(self._data.integrate(), self.vtype)
 
-    # Framework tensors of the times and values of the breakpoints, set when
-    # they depend on a PyTorch, JAX, or TensorFlow array, so gradients flow
-    # through them. None where they are constants.
+    # The framework times and values of the breakpoints of a PCF that
+    # carries gradients (see _tracked). None where they are constants, as
+    # for any other PCF.
     _ttimes: Any = None
     _tvalues: Any = None
-
-    def _tracked_parts(self):
-        return _autodiff.pcf_parts(self)
 
     def _serial(self):
         """(content, enumeration) as from_serial_content takes, for this one PCF."""
@@ -412,3 +416,20 @@ def iterate_rectangles(f: Pcf, g: Pcf, a=0.0, b=float('inf')):
         )
     cpp_rects = backend.iterate_rectangles(f._data, g._data, a, b)
     return [Rectangle(r) for r in cpp_rects]
+
+
+def _float_types(np_dtype: Any) -> dict[str, Any]:
+    sb_type = _NP_TO_SB[np_dtype]
+    return {"ttype": sb_type, "vtype": sb_type}
+
+
+Pcf._tracking = Tracking(  # pyright: ignore[reportAttributeAccessIssue]
+    groups=(("_ttimes", 1), ("_tvalues", 1)),
+    from_serial=_autodiff._pcfs_from_content,
+    attributes=_float_types,
+)
+
+# A Pcf whose breakpoint times, values, or both depend on PyTorch, JAX, or
+# TensorFlow arrays, built from [times, values] and the enumeration of
+# _serial; see _tracked.
+_TrackedPcf = tracked_class(Pcf)

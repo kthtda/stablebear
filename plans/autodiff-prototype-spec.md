@@ -93,9 +93,10 @@ tracked argument when the values the framework passes them equal the
 argument's current ones, which one comparison pass tells. They differ while
 a framework traces abstractly, and the argument is then converted.
 
-Status: tracked tensors of barcodes and of PCFs work this way, but no
-operation hands them its C++ result yet. Single PCFs and PLFs still store a
-C++ object and framework arrays (see the plan).
+Status: tracked tensors of barcodes and of PCFs, and single PCFs and PLFs,
+work this way. A single PCF or PLF still gives its C++ object as `_data`,
+so an operation that was not written for gradients drops theirs without
+raising. There is no tracked `Barcode`: no operation gives one (D10).
 
 **D5a. One generic tracked tensor.** The tracking logic is a mixin shared by
 all tensor types, not a class written per type. Every type is a tensor
@@ -107,7 +108,8 @@ PCF), and its element class. The mixin provides the state, the derived
 `_data`, `shape`, indexing, reshaping, copying, writes (D5b), and
 `_tracked_parts`. `tracked_class(T)` builds and caches the private subclass
 of a tensor type `T`, so a tracked object is still an instance of `T`.
-Single objects (`Pcf`, `Plf`, `Barcode`) are the 0-d case. A dense numeric
+Single objects (`Pcf`, `Plf`) are the 0-d case: `Pcf(values, times=times)`
+returns the tracked subclass when an argument is a framework array. A dense numeric
 tensor needs no enumeration: see D14.
 
 **D5b. Writes are deferred.** `x[i] = v` on a tracked tensor records the
