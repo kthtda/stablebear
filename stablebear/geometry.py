@@ -332,6 +332,7 @@ class LpDistance(Distance):
     """
 
     def __init__(self, p: float):
+        _autodiff.require_number(p, "p")
         p = float(p)
         if not p >= 1:
             raise ValueError(f"p must be >= 1 (got {p}).")

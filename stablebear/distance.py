@@ -130,6 +130,7 @@ def pdist(fs: PcfContainerLike, p: float = 1, verbose: bool = False) -> Distance
     that time is that of moving both breakpoints. The gradient of the
     distance between two equal PCFs is 0.
     """
+    _autodiff.require_number(p, "p")
     if p < 1:
         raise ValueError("p must be >= 1.")
 
@@ -182,6 +183,7 @@ def cdist(X: PcfContainerLike, Y: PcfContainerLike, p: float = 1, verbose: bool 
     FloatTensor
         A tensor of shape ``(*X.shape, *Y.shape)`` containing pairwise distances.
     """
+    _autodiff.require_number(p, "p")
     if p < 1:
         raise ValueError("p must be >= 1.")
 

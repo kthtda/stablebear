@@ -1143,6 +1143,32 @@ def test_power_of_pcf_tensor_with_framework_exponent_raises(fw):
         _ = F ** fw.tensor(2.0)
 
 
+def _delay_embed(delay):
+    series = sb.timeseries.TimeSeries([0.0, 10.0, 25.0, 40.0], times=[0.0, 1.0, 2.5, 4.0])
+    return sb.timeseries.delay_embed(series, dimension=2, delay=delay, direction="backward")
+
+
+_NUMBER_ARGUMENTS = [
+    pytest.param(lambda p: sb.pdist(_tensors()[0], p=p, verbose=False), id="pdist"),
+    pytest.param(lambda p: sb.cdist(_tensors()[0], _tensors()[1], p=p, verbose=False), id="cdist"),
+    pytest.param(lambda p: sb.LpDistance(p), id="lp_distance_object"),
+    pytest.param(lambda max_death: sb.persistence.barcode_to_accumulated_persistence(
+        _barcode_batch(), max_death=max_death, verbose=False), id="max_death"),
+    pytest.param(_delay_embed, id="delay"),
+]
+
+
+@pytest.mark.parametrize("operation", _NUMBER_ARGUMENTS)
+def test_framework_scalar_where_a_number_is_required_raises(fw, operation):
+    with pytest.raises(TypeError, match="must be a number"):
+        operation(fw.tensor(2.0))
+
+
+@pytest.mark.parametrize("operation", _NUMBER_ARGUMENTS)
+def test_number_where_a_number_is_required_is_accepted(operation):
+    operation(2.0)
+
+
 def test_values_with_times_match_breakpoints():
     g = sb.Pcf(np.array([2.0, -1.0, 0.0]), times=np.array([0.0, 1.0, 3.0]))
     np.testing.assert_array_equal(g.to_numpy(), [[0.0, 2.0], [1.0, -1.0], [3.0, 0.0]])

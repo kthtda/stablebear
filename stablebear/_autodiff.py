@@ -45,6 +45,16 @@ def _framework(x: Any) -> Any:
     return None
 
 
+def require_number(value: Any, name: str) -> None:
+    """Raise TypeError if ``value``, the argument ``name`` of an operation
+    that needs a plain number, is a framework array: reading it as a number
+    would lose its gradient without a word."""
+    if _framework(value) is not None:
+        raise TypeError(
+            f"{name} must be a number, not a PyTorch tensor: the result would not carry its gradient. "
+            f"Pass float({name}) to use its value.")
+
+
 def _plain(v: np.ndarray) -> Any:
     return v.item() if v.ndim == 0 else v
 

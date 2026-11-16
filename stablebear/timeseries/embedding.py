@@ -3,6 +3,7 @@ from __future__ import annotations
 import operator
 from typing import Literal, overload
 
+from .. import _autodiff
 from .. import _sb_cpp as cpp
 from ..async_task import _run_task
 from .date_time import TimeDelta, _duration, _in_unit, _ScalarDuration
@@ -89,6 +90,7 @@ def delay_embed(series: TimeSeries | TimeSeriesTensor | _PandasLike, dimension: 
         without one, or for an object that is not a :class:`TimeSeries`, a
         :class:`TimeSeriesTensor`, or a pandas ``Series`` or ``DataFrame``.
     """
+    _autodiff.require_number(delay, "delay")
     dimension = operator.index(dimension)
     if dimension < 1:
         raise ValueError("The embedding dimension must be at least 1")

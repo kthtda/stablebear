@@ -328,6 +328,7 @@ def barcode_to_accumulated_persistence(
     Besides its breakpoint at time 0, it has one per included bar, so bars
     with equal midpoints give breakpoints with equal times.
     """
+    _autodiff.require_number(max_death, "max_death")
     if isinstance(bc, _TrackedBarcodeTensor):
         return _tracked_accumulated_persistence(bc, max_death)
     return _barcode_to_pcf(
