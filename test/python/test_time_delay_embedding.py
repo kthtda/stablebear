@@ -7,7 +7,7 @@ import pytest
 
 import stablebear as sb
 from stablebear.persistence import compute_persistent_homology
-from stablebear.timeseries import TimeDelta, TimeDeltaTensor, TimeSeries, cut_windows, delay_embed
+from stablebear.timeseries import TimeDelta, TimeDeltaTensor, TimeSeries, TimeSeriesTensor, cut_windows, delay_embed
 
 from _element_values import TWO_ELEMENTS_OF_EVERY_DTYPE
 from _round_trip import ROUND_TRIPS
@@ -100,8 +100,9 @@ def _two_seconds():
     pytest.param(lambda: delay_embed(_two_seconds(), dimension=0, delay=TimeDelta(1.0, "s")), id="dimension-0"),
     pytest.param(lambda: delay_embed(_two_seconds(), dimension=2, delay=TimeDelta(0.0, "s")), id="delay-0"),
     pytest.param(lambda: delay_embed(_two_seconds(), dimension=2, delay=TimeDelta(-1.0, "s")), id="delay-negative"),
-    pytest.param(lambda: delay_embed(_two_seconds(), dimension=2, delay=TimeDelta(1.0, "s"),
-                                     direction="ahead"),  # pyright: ignore[reportArgumentType]
+    pytest.param(lambda: delay_embed(  # pyright: ignore[reportCallIssue]
+                     _two_seconds(), dimension=2, delay=TimeDelta(1.0, "s"),
+                     direction="ahead"),  # pyright: ignore[reportArgumentType]
                  id="direction-unknown"),
     pytest.param(lambda: delay_embed(_two_seconds(), dimension=3, delay=TimeDelta(1.0, "s")), id="too-short"),
     pytest.param(lambda: delay_embed(_two_seconds(), dimension=3, delay=TimeDelta(1.0, "s"), direction="forward"),
@@ -132,6 +133,83 @@ def test_embedding_of_several_channels_converts_the_delay_per_channel():
     embedding(TimeDelta(2.5, "s"))
     with pytest.raises(ValueError, match="outside the domain"):
         embedding(TimeDelta(0.75, "s"))
+
+
+def test_embedding_of_a_tensor_embeds_each_series_converting_the_delay_to_its_unit():
+    seconds = TimeSeries([0.0, 10.0, 25.0, 40.0], times=TimeDeltaTensor([0.0, 1.0, 2.5, 4.0], "s"))
+    milliseconds = TimeSeries([0.0, -10.0, -25.0, -40.0], times=TimeDeltaTensor([0.0, 1000.0, 2500.0, 4000.0], "ms"))
+
+    embeddings = delay_embed(TimeSeriesTensor([seconds, milliseconds]), dimension=3, delay=TimeDelta(1.0, "s"),
+                             direction="backward")
+
+    assert isinstance(embeddings, TimeSeriesTensor)
+    assert embeddings.shape == (2,)
+    # A delay of 1 s is 1000 ms in the second series.
+    assert embeddings[0].array_equal(delay_embed(seconds, dimension=3, delay=TimeDelta(1.0, "s"),
+                                                 direction="backward"))
+    assert embeddings[1].array_equal(delay_embed(milliseconds, dimension=3, delay=TimeDelta(1000.0, "ms"),
+                                                 direction="backward"))
+
+
+def test_embedding_of_a_tensor_keeps_its_shape():
+    a = TimeSeries([0.0, 10.0, 20.0], times=[0.0, 1.0, 2.0])
+    b = TimeSeries([0.0, 20.0, 40.0], times=[0.0, 1.0, 2.0])
+    c = TimeSeries([0.0, 30.0, 60.0], times=[0.0, 1.0, 2.0])
+    d = TimeSeries([0.0, 40.0, 80.0], times=[0.0, 1.0, 2.0])
+
+    embeddings = delay_embed(TimeSeriesTensor([[a, b],
+                                               [c, d]]), dimension=2, delay=1.0, direction="forward")
+
+    assert embeddings.shape == (2, 2)
+    assert embeddings[0, 0].array_equal(delay_embed(a, dimension=2, delay=1.0, direction="forward"))
+    assert embeddings[0, 1].array_equal(delay_embed(b, dimension=2, delay=1.0, direction="forward"))
+    assert embeddings[1, 0].array_equal(delay_embed(c, dimension=2, delay=1.0, direction="forward"))
+    assert embeddings[1, 1].array_equal(delay_embed(d, dimension=2, delay=1.0, direction="forward"))
+
+
+def test_embedding_of_windows_embeds_each_window_on_its_own():
+    series = TimeSeries([0.0, 10.0, 20.0, 30.0, 40.0, 50.0, 60.0], times=TimeDeltaTensor([0, 1, 2, 3, 4, 5, 6], "s"))
+    windows = cut_windows(series, size=TimeDelta(3, "s"), step=TimeDelta(3, "s"), closed="left", anchor="start")
+
+    embeddings = delay_embed(windows, dimension=2, delay=TimeDelta(1, "s"), direction="backward")
+
+    assert embeddings.shape == (2,)
+    assert embeddings[0].array_equal(delay_embed(windows[0], dimension=2, delay=TimeDelta(1, "s"),
+                                                 direction="backward"))
+    assert embeddings[1].array_equal(delay_embed(windows[1], dimension=2, delay=TimeDelta(1, "s"),
+                                                 direction="backward"))
+
+
+def test_embedding_of_a_tensor_with_a_short_series_raises_naming_its_position():
+    long = TimeSeries([0.0, 10.0, 20.0], times=[0.0, 1.0, 2.0])
+    short = TimeSeries([0.0, 10.0], times=[0.0, 1.0])
+
+    with pytest.raises(ValueError, match="too short") as excinfo:
+        delay_embed(TimeSeriesTensor([long, short]), dimension=3, delay=1.0, direction="backward")
+
+    assert "(1)" in str(excinfo.value)
+
+
+def test_embedding_of_a_number_on_a_tensor_of_series_with_a_unit_raises():
+    series = TimeSeries([0.0, 10.0, 25.0, 40.0], times=TimeDeltaTensor([0.0, 1.0, 2.5, 4.0], "ms"))
+
+    with pytest.raises(TypeError, match="have a unit"):
+        delay_embed(TimeSeriesTensor([series]), dimension=2, delay=1.0, direction="backward")
+
+
+def test_embedding_of_a_duration_on_a_tensor_of_series_without_a_unit_raises():
+    series = TimeSeries([0.0, 10.0, 25.0, 40.0], times=[0.0, 1.0, 2.5, 4.0])
+
+    with pytest.raises(TypeError, match="without a unit"):
+        delay_embed(TimeSeriesTensor([series]), dimension=2, delay=TimeDelta(1, "ms"), direction="backward")
+
+
+def test_embedding_of_an_empty_tensor_is_empty():
+    empty = TimeSeriesTensor([], dtype=sb.ts(sb.float64))
+
+    embeddings = delay_embed(empty, dimension=2, delay=1.0, direction="backward")
+
+    assert embeddings.shape == (0,)
 
 
 @dataclass(frozen=True)
@@ -399,5 +477,5 @@ def test_embedding_rejects_a_delay_without_a_fixed_length():
 
 def test_embedding_of_an_array_raises_naming_the_time_series_constructor():
     with pytest.raises(TypeError, match=re.escape("TimeSeries(values, times)")):
-        delay_embed(np.arange(3.0), dimension=2, delay=TimeDelta(1, "s"),  # pyright: ignore[reportArgumentType]
-                    direction="backward")
+        delay_embed(np.arange(3.0),  # pyright: ignore[reportCallIssue, reportArgumentType]
+                    dimension=2, delay=TimeDelta(1, "s"), direction="backward")

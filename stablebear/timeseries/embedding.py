@@ -1,16 +1,29 @@
 from __future__ import annotations
 
 import operator
-from typing import Literal
+from typing import Literal, overload
 
 from .. import _sb_cpp as cpp
-from .date_time import _duration, _in_unit, _ScalarDuration
-from .series import TimeSeries, _PandasLike, _as_series
+from ..async_task import _run_task
+from .date_time import TimeDelta, _duration, _in_unit, _ScalarDuration
+from .series import TimeSeries, TimeSeriesTensor, _PandasLike, _as_series
 
 
+@overload
 def delay_embed(series: TimeSeries | _PandasLike, dimension: int, delay: float | _ScalarDuration, *,
-                direction: Literal["backward", "forward"] = "backward") -> TimeSeries:
-    """Embed a time series in delay coordinates.
+                direction: Literal["backward", "forward"] = "backward") -> TimeSeries: ...
+
+
+@overload
+def delay_embed(series: TimeSeriesTensor, dimension: int, delay: float | _ScalarDuration, *,
+                direction: Literal["backward", "forward"] = "backward") -> TimeSeriesTensor: ...
+
+
+def delay_embed(series: TimeSeries | TimeSeriesTensor | _PandasLike, dimension: int,
+                delay: float | _ScalarDuration, *,
+                direction: Literal["backward", "forward"] = "backward") -> TimeSeries | TimeSeriesTensor:
+    """Embed a time series, or each series of a tensor of them such as
+    windows, in delay coordinates.
 
     The embedding of a channel ``x`` with ``dimension`` ``m`` and ``delay``
     ``d`` looks back by default: it evaluates at every time ``t`` from
@@ -39,9 +52,14 @@ def delay_embed(series: TimeSeries | _PandasLike, dimension: int, delay: float |
     by previous value, as any series does, with its own snapping. It is a
     view: it shares the series' observations and copies none.
 
+    A :class:`TimeSeriesTensor`, such as the windows :func:`cut_windows`
+    gives, is embedded series by series into a tensor of the same shape.
+    Each window is embedded on its own, so its embedding never reaches back
+    before the window's start, unlike windows cut from an embedding.
+
     Parameters
     ----------
-    series : TimeSeries, pandas.Series, or pandas.DataFrame
+    series : TimeSeries, TimeSeriesTensor, pandas.Series, or pandas.DataFrame
         The series to embed.
     dimension : int
         The number of components ``m``, at least 1.
@@ -56,18 +74,20 @@ def delay_embed(series: TimeSeries | _PandasLike, dimension: int, delay: float |
 
     Returns
     -------
-    TimeSeries
-        The embedding.
+    TimeSeries or TimeSeriesTensor
+        The embedding, or for a tensor of series a tensor of the same shape
+        holding the embedding of each.
 
     Raises
     ------
     ValueError
         On an invalid ``dimension``, ``delay``, or ``direction``, or when a
-        channel spans less than ``(m - 1) * d``.
+        channel spans less than ``(m - 1) * d``. For a tensor, the message
+        names the position of the first series that fails.
     TypeError
         For a number on a series with a unit, or a duration on a series
-        without one, or for an object that is not a
-        :class:`TimeSeries` or a pandas ``Series`` or ``DataFrame``.
+        without one, or for an object that is not a :class:`TimeSeries`, a
+        :class:`TimeSeriesTensor`, or a pandas ``Series`` or ``DataFrame``.
     """
     dimension = operator.index(dimension)
     if dimension < 1:
@@ -75,6 +95,13 @@ def delay_embed(series: TimeSeries | _PandasLike, dimension: int, delay: float |
     delay = _duration(delay, "The embedding delay must be finite and positive")
     if direction not in ("backward", "forward"):
         raise ValueError(f"direction must be 'backward' or 'forward', not {direction!r}")
+    if isinstance(series, TimeSeriesTensor):
+        # C++ converts the delay into the unit of each series.
+        unit = delay.unit if isinstance(delay, TimeDelta) else None
+        task = cpp.spawn_delay_embed_task(series._data, dimension, _in_unit(delay, unit), unit,
+                                          direction == "forward")
+        _run_task(lambda: task, verbose=False)
+        return TimeSeriesTensor(task.result())
     series = _as_series(series)
     return TimeSeries._from_cpp(cpp.delay_embed(series._data, dimension, _in_unit(delay, series.unit),
                                                 direction == "forward"))

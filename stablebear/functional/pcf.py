@@ -8,7 +8,8 @@ from .. import _sb_cpp as cpp
 from .._binary_io import _BinaryIoMixin
 from ._piecewise import _PiecewiseFunction
 from .plf import Plf
-from ..typing import _assert_valid_dtype, _NP_TO_SB, float32, float64, int32, int64, pcf32, pcf32i, pcf64, pcf64i
+from ..typing import (_assert_valid_dtype, _NP_TO_SB, _sized_type, float32, float64, int32, int64, pcf32, pcf32i, pcf64,
+                      pcf64i)
 
 
 class Pcf(_PiecewiseFunction, _BinaryIoMixin):
@@ -84,14 +85,14 @@ class Pcf(_PiecewiseFunction, _BinaryIoMixin):
                 if arr.dtype != np_dtype:
                     arr = arr.astype(np_dtype)
 
-            constructor = self._NP_TO_CPP.get(arr.dtype.type)
+            constructor = self._NP_TO_CPP.get(_sized_type(arr.dtype))
             if constructor is None:
                 raise ValueError(
                     "Unsupported array type (must be np.float32/64 or np.int32/64)"
                 )
             self._data = constructor(arr)
-            self.ttype = _NP_TO_SB[arr.dtype.type]
-            self.vtype = _NP_TO_SB[arr.dtype.type]
+            self.ttype = _NP_TO_SB[_sized_type(arr.dtype)]
+            self.vtype = _NP_TO_SB[_sized_type(arr.dtype)]
 
         elif isinstance(arr, tuple(self._CPP_TYPE_INFO.keys())):
             self._data = arr

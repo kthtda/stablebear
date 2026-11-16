@@ -9,6 +9,7 @@ from ._tensor_base import Tensor, _infer_shape_and_flatten
 from .typing import (
     _NATIVE_SUFFIX,
     _NP_TO_SB,
+    _sized_type,
     barcode32,
     barcode64,
     boolean,
@@ -110,7 +111,7 @@ def _leaf_tensor(data, dtype=None):
             leaf = leaf.to_dense()
     elif isinstance(data, np.ndarray):
         if dtype is None:
-            dtype = boolean if data.dtype == np.bool_ else _NP_TO_SB.get(data.dtype.type)
+            dtype = boolean if data.dtype == np.bool_ else _NP_TO_SB.get(_sized_type(data.dtype))
             if dtype is None:
                 if np.issubdtype(data.dtype, np.floating):
                     dtype = float64

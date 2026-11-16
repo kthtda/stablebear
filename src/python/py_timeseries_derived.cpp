@@ -1,5 +1,7 @@
 #include "py_timeseries_derived.hpp"
 
+#include "py_async_support.hpp"
+
 #include <sbear/distance_matrix.hpp>
 #include <sbear/functional/pcf.hpp>
 #include <sbear/persistence/barcode.hpp>
@@ -38,7 +40,7 @@ namespace
   }
 
   template <typename T>
-  void register_derived_element(nb::module_& m)
+  void register_derived_element(nb::module_& m, const std::string& suffix)
   {
     m.def("evaluate_series", [](const sb::Tensor<sb::TimeSeries<T>>& series, const sb::Tensor<sb::float64_t>& t,
                                 const std::optional<std::string>& unit) {
@@ -52,6 +54,14 @@ namespace
       return sb::delay_embed(series, dimension, delay, forward);
     }, nb::arg("series"), nb::arg("dimension"), nb::arg("delay"), nb::arg("forward"),
        nb::call_guard<nb::gil_scoped_release>());
+    sb_py::register_result_task<sb::DelayEmbedTask<T>>(m, "_DelayEmbedTask" + suffix);
+    m.def("spawn_delay_embed_task", [](const sb::Tensor<sb::TimeSeries<T>>& seriesTensor, size_t dimension,
+                                       sb::float64_t delay, const std::optional<std::string>& unit, bool forward) {
+      auto task = sb::make_delay_embed_task(seriesTensor, dimension, delay,
+                                            unit ? sb::parse_time_unit(*unit) : sb::TimeUnit::Unitless, forward);
+      task->start_async(sb::default_executor());
+      return task;
+    }, nb::arg("series_tensor"), nb::arg("dimension"), nb::arg("delay"), nb::arg("unit"), nb::arg("forward"));
     m.def("stack_channels", [](const sb::TimeSeries<T>& series, std::ptrdiff_t axis) {
       return sb::stack_channels(series, axis);
     }, nb::arg("series"), nb::arg("axis"), nb::call_guard<nb::gil_scoped_release>());
@@ -90,24 +100,24 @@ namespace sb_py
 {
   void register_timeseries_derived(nb::module_& m)
   {
-    register_derived_element<bool>(m);
-    register_derived_element<sb::float32_t>(m);
-    register_derived_element<sb::float64_t>(m);
-    register_derived_element<sb::int32_t>(m);
-    register_derived_element<sb::int64_t>(m);
-    register_derived_element<uint32_t>(m);
-    register_derived_element<uint64_t>(m);
-    register_derived_element<sb::Pcf_f32>(m);
-    register_derived_element<sb::Pcf_f64>(m);
-    register_derived_element<sb::Pcf_i32>(m);
-    register_derived_element<sb::Pcf_i64>(m);
-    register_derived_element<sb::PointCloud<sb::float32_t>>(m);
-    register_derived_element<sb::PointCloud<sb::float64_t>>(m);
-    register_derived_element<sb::DistanceMatrix<sb::float32_t>>(m);
-    register_derived_element<sb::DistanceMatrix<sb::float64_t>>(m);
-    register_derived_element<sb::SymmetricMatrix<sb::float32_t>>(m);
-    register_derived_element<sb::SymmetricMatrix<sb::float64_t>>(m);
-    register_derived_element<sb::ph::Barcode<sb::float32_t>>(m);
-    register_derived_element<sb::ph::Barcode<sb::float64_t>>(m);
+    register_derived_element<bool>(m, "Bool");
+    register_derived_element<sb::float32_t>(m, "Float32");
+    register_derived_element<sb::float64_t>(m, "Float64");
+    register_derived_element<sb::int32_t>(m, "Int32");
+    register_derived_element<sb::int64_t>(m, "Int64");
+    register_derived_element<uint32_t>(m, "Uint32");
+    register_derived_element<uint64_t>(m, "Uint64");
+    register_derived_element<sb::Pcf_f32>(m, "Pcf32");
+    register_derived_element<sb::Pcf_f64>(m, "Pcf64");
+    register_derived_element<sb::Pcf_i32>(m, "Pcf32i");
+    register_derived_element<sb::Pcf_i64>(m, "Pcf64i");
+    register_derived_element<sb::PointCloud<sb::float32_t>>(m, "PointCloud32");
+    register_derived_element<sb::PointCloud<sb::float64_t>>(m, "PointCloud64");
+    register_derived_element<sb::DistanceMatrix<sb::float32_t>>(m, "DistanceMatrix32");
+    register_derived_element<sb::DistanceMatrix<sb::float64_t>>(m, "DistanceMatrix64");
+    register_derived_element<sb::SymmetricMatrix<sb::float32_t>>(m, "SymmetricMatrix32");
+    register_derived_element<sb::SymmetricMatrix<sb::float64_t>>(m, "SymmetricMatrix64");
+    register_derived_element<sb::ph::Barcode<sb::float32_t>>(m, "Barcode32");
+    register_derived_element<sb::ph::Barcode<sb::float64_t>>(m, "Barcode64");
   }
 }
