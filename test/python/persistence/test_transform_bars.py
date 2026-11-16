@@ -21,38 +21,41 @@ def test_endpoints_map_through_plf():
     ([[0.0, 0.0], [1.0, 2.0]], np.inf),
     ([[0.0, 0.0], [1.0, 2.0], [2.0, 2.0]], 2.0),
 ])
-def test_infinite_death_maps_to_limit(points, expected):
-    out = transform_bars(Barcode([[0.0, np.inf]]), sb.Plf(points))
-    assert out.to_numpy()[0, 1] == expected
+def test_infinite_death_maps_to_limit(points, expected, track):
+    out = transform_bars(track(BarcodeTensor([Barcode([[0.0, np.inf]])])), sb.Plf(points))
+    assert out[0].to_numpy()[0, 1] == expected
 
 
-def test_bars_with_birth_at_or_after_death_are_removed():
+def test_bars_with_birth_at_or_after_death_are_removed(track):
     f = sb.Plf([[0.0, 0.0], [1.0, 2.0], [2.0, 2.0], [3.0, 1.0]])
     bc = Barcode([[0.0, 1.0], [1.0, 2.0], [1.5, 2.5], [2.0, 3.0], [0.5, 2.5]])
-    np.testing.assert_allclose(transform_bars(bc, f).to_numpy(), [[0.0, 2.0], [1.0, 1.5]])
+    out = transform_bars(track(BarcodeTensor([bc])), f)
+    np.testing.assert_allclose(out[0].to_numpy(), [[0.0, 2.0], [1.0, 1.5]])
 
 
-def test_empty_barcode():
-    assert len(transform_bars(Barcode(np.zeros((0, 2))), _f())) == 0
+def test_empty_barcode(track):
+    out = transform_bars(track(BarcodeTensor([Barcode(np.zeros((0, 2)))])), _f())
+    assert len(out[0]) == 0
 
 
-def test_tensor_keeps_shape_and_transforms_each_barcode():
+def test_tensor_keeps_shape_and_transforms_each_barcode(track):
     bcs = [Barcode([[0.0, 1.0]]), Barcode([[0.5, 2.0], [1.0, 3.0]]), Barcode([[2.0, 3.0]])]
-    out = transform_bars(BarcodeTensor(bcs).reshape((1, 3)), _f())
+    out = transform_bars(track(BarcodeTensor(bcs).reshape((1, 3))), _f())
     assert out.shape == (1, 3)
     for i, bc in enumerate(bcs):
         np.testing.assert_allclose(out[0, i].to_numpy(), _f()(bc.to_numpy()))
 
 
 @pytest.mark.parametrize("points", [[[0.0, 3.0], [1.0, 2.0]], [[0.0, 3.0]]])
-def test_infinite_bar_removed_when_limit_is_not_above_birth(points):
-    assert len(transform_bars(Barcode([[0.0, np.inf]]), sb.Plf(points))) == 0
+def test_infinite_bar_removed_when_limit_is_not_above_birth(points, track):
+    out = transform_bars(track(BarcodeTensor([Barcode([[0.0, np.inf]])])), sb.Plf(points))
+    assert len(out[0]) == 0
 
 
-def test_float32_barcode_stays_float32():
-    out = transform_bars(Barcode(np.array([[0.0, 1.0]], dtype=np.float32)), _f())
+def test_float32_barcode_stays_float32(track):
+    out = transform_bars(track(BarcodeTensor([Barcode(np.array([[0.0, 1.0]], dtype=np.float32))])), _f())
     assert out.dtype == sb.barcode32
-    np.testing.assert_allclose(out.to_numpy(), [[0.0, 2.0]])
+    np.testing.assert_allclose(out[0].to_numpy(), [[0.0, 2.0]])
 
 
 def test_series_of_barcodes():

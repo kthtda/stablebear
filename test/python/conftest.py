@@ -8,6 +8,8 @@ import pytest
 import stablebear as sb
 from stablebear import _sb_cpp as cpp
 
+from _frameworks import FRAMEWORKS, tracked
+
 _has_cuda = cpp._build_type() == "CUDA" and cpp.get_ngpus() > 0
 _require_cuda = os.environ.get("SB_REQUIRE_CUDA", "0") == "1"
 
@@ -58,6 +60,25 @@ def device(request):
 
     cpp.force_cpu(False)
     cpp.set_cuda_threshold(500)
+
+
+@pytest.fixture(params=list(FRAMEWORKS))
+def fw(request):
+    """Parametrize a test over the autodiff frameworks that are installed."""
+    pytest.importorskip(request.param)
+    return FRAMEWORKS[request.param]()
+
+
+@pytest.fixture(params=["untracked", *FRAMEWORKS])
+def track(request):
+    """Parametrize a test over a tensor as it is and as one that carries
+    gradients of each installed framework: ``track(tensor)`` gives the
+    tensor the operation under test takes."""
+    if request.param == "untracked":
+        return lambda tensor: tensor
+    pytest.importorskip(request.param)
+    framework = FRAMEWORKS[request.param]()
+    return lambda tensor: tracked(framework, tensor)
 
 
 @pytest.fixture(params=[sb.pcf32, sb.pcf64], ids=["pcf32", "pcf64"])
