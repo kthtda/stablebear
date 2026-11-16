@@ -1,6 +1,6 @@
 # Prototype cleanup: implementation plan
 
-Progress: 5 of 8 items, 12 of 17 points (71%)
+Progress: 6 of 8 items, 14 of 17 points (82%)
 
 Specs: [autodiff-prototype-spec.md](autodiff-prototype-spec.md) and
 [linear-subspaces-spec.md](linear-subspaces-spec.md), which each item
@@ -56,7 +56,7 @@ Gradients are supported for PyTorch only, for now. The APIs released on
 
 ## Phase C: Names, measurements, and documents
 
-- [ ] **C1.** [2] `stablebear.linear` becomes `stablebear.geometry`, and
+- [x] **C1.** [2] (f547bf122) `stablebear.linear` becomes `stablebear.geometry`, and
   `InnerProductDistance` is exported from `stablebear`.
   Tests: the tests import from the new module; the docs build.
 - [ ] **C2.** [2] Timings in a Release build of the tracked and untracked
