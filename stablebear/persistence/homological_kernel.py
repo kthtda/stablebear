@@ -137,7 +137,7 @@ def _tracked_kernel(X: Any, Y: Any) -> BarcodeTensor:
     """The kernel of one pair of point clouds given as framework arrays, as a
     BarcodeTensor of shape (1,) that carries the bars as a framework tensor."""
     bars = _kernel_bars(X, Y)
-    return _TrackedBarcodeTensor(bars, np.array([[0, bars.shape[0]]]))
+    return _TrackedBarcodeTensor([bars], np.array([[0, bars.shape[0]]]))
 
 
 def _validate_kernel_pair(X, Y):

@@ -1,4 +1,4 @@
-from typing import overload
+from typing import Any, overload
 
 import numpy as np
 
@@ -61,7 +61,7 @@ def _enumeration(counts: np.ndarray, shape: tuple) -> np.ndarray:
     return np.stack([ends - counts, ends], axis=-1).reshape(*shape, 2)
 
 
-def _tracked_stable_rank(bc: _TrackedBarcodeTensor) -> PcfTensor:
+def _tracked_stable_rank(bc: Any) -> PcfTensor:
     """The stable ranks of a BarcodeTensor whose bars are a framework tensor.
 
     With n bars, the stable rank is n on [0, l_1), then n - 1 on [l_1, l_2), and
@@ -308,7 +308,7 @@ def _tracked_transform_bars(bc: BarcodeTensor, f: Plf) -> BarcodeTensor:
     keep = concrete[:, 0] < concrete[:, 1]
     kept_counts = np.bincount(owners[keep], minlength=len(counts))
     return _TrackedBarcodeTensor(
-        adapter.gather(bars, np.flatnonzero(keep)), _enumeration(kept_counts, tuple(enumeration.shape[:-1])))
+        [adapter.gather(bars, np.flatnonzero(keep))], _enumeration(kept_counts, tuple(enumeration.shape[:-1])))
 
 
 @overload
