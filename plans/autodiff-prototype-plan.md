@@ -1,6 +1,6 @@
 # Autodiff prototype: implementation plan
 
-Progress: 29 of 30 items, 69 of 72 points (96%)
+Progress: 30 of 30 items, 72 of 72 points (100%)
 
 Spec: [autodiff-prototype-spec.md](autodiff-prototype-spec.md)
 
@@ -163,10 +163,12 @@ Spec: [autodiff-prototype-spec.md](autodiff-prototype-spec.md)
 - [x] **E2.** [2] (0720fbe24) Accumulated persistence functions of tracked barcodes.
   Tests: matches the untracked function; norm gradient against finite
   differences.
-- [ ] **E3.** [3] Persistent homology of tracked point clouds, through the
+- [x] **E3.** [3] (c8a64d76e) Persistent homology of tracked point clouds, through the
   critical simplices of each bar.
   Tests: bars match the untracked ones; gradient against finite
   differences in dimensions 0 and 1.
+  Note: Ripser reports the critical edges, behind a flag that is off
+  otherwise. A single point cloud only, like the kernel.
 - [x] **E4.** [3] (61e38be10) `pdist` and the L2 kernel of tracked PCFs, with the
   distances and their gradients accumulated by rectangle iteration in C++,
   without building the difference of each pair.
