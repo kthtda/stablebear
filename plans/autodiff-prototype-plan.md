@@ -1,6 +1,6 @@
 # Autodiff prototype: implementation plan
 
-Progress: 11 of 15 items, 25 of 34 points (74%)
+Progress: 11 of 26 items, 25 of 62 points (40%)
 
 Spec: [autodiff-prototype-spec.md](autodiff-prototype-spec.md)
 
@@ -33,20 +33,64 @@ Spec: [autodiff-prototype-spec.md](autodiff-prototype-spec.md)
   source of truth, batched `transform_bars` and stable rank.
 - [x] **B4.** [2] (386e324b2) This plan and its spec.
 
-## Phase C: One source of truth for PCFs and PLFs
+## Phase C: The cost rule for what exists
 
-- [ ] **C1.** [3] `_TrackedPcfTensor`: framework times and values plus the
-  enumeration as its only state; `_data` derived; no in-place changes;
-  indexing, reshaping, and copying keep gradients; arithmetic, norms, and
-  stable ranks return it.
+- [ ] **C1.** [1] PLF vjp of `transform_bars` without a dense Jacobian:
+  scatter the gradients of the breakpoint times and values.
+  Tests: the existing gradient tests pass; backward on 10^6 bars runs.
+- [ ] **C2.** [2] Parallel C++ conversions to and from serial content for
+  PCF and barcode tensors, without temporaries per element.
+  Tests: the round-trip tests pass; note the timings under this item.
+- [ ] **C3.** [2] The kernel's backward pass reuses the critical edges of
+  its forward pass.
+  Tests: the kernel gradient tests pass; the kernel runs once per
+  forward and backward.
+- [ ] **C4.** [3] PCF arithmetic with a tracked operand without a Python
+  loop over elements.
+  Tests: the arithmetic gradient tests pass; note the timings.
+
+## Phase D: One generic tracked tensor
+
+- [ ] **D1.** [3] The tracked mixin and type descriptions (D5a), with
+  `tracked_class(BarcodeTensor)` replacing `_TrackedBarcodeTensor`; no
+  change in behavior.
+  Tests: the tracked barcode tests pass unchanged.
+- [ ] **D2.** [2] Cache the derived C++ tensor (D5); operations hand their
+  C++ result to the tracked object.
+  Tests: a tracked operation converts once; an in-place PyTorch change
+  of the framework array is seen by the next read.
+- [ ] **D3.** [3] `PcfTensor` on the mixin, with times and values as
+  separate column groups; arithmetic, norms, and stable ranks return it.
   Tests: indexing matches untracked tensors; gradient through indexing;
-  `__setitem__` and in-place arithmetic raise; copying into a `PcfTensor`
-  raises.
-- [ ] **C2.** [3] `_TrackedPcf`: the same for a single PCF, built by
-  `Pcf(values, times=times)` and by arithmetic on PCFs.
-  Tests: arithmetic results are tracked; in-place arithmetic raises; the
-  existing autodiff tests pass unchanged.
-- [ ] **C3.** [2] `_TrackedPlf`: the same for `Plf(values, times=times)`.
-  Tests: values derived from the framework arrays; `transform_bars`
-  gradients unchanged.
-- [ ] **C4.** [1] Mark D5 as done for PCFs and PLFs in the spec.
+  copying into a `PcfTensor` raises.
+- [ ] **D4.** [3] `Pcf`, `Plf`, and `Barcode` as the 0-d case.
+  Tests: `Pcf(values, times=times)` and `Plf(values, times=times)` derive
+  their C++ objects; the existing autodiff tests pass unchanged.
+- [ ] **D5.** [3] Deferred writes (D5b) and building a tracked tensor from
+  a list of elements in one pass.
+  Tests: a write is seen by reads and by the next operation; gradients
+  flow to a written element and not to the one it replaced; n writes
+  make one pass.
+- [ ] **D6.** [2] `differentiable` wraps a declared output type: the
+  operation returns a C++ tensor and the decorator returns its tracked
+  form.
+  Tests: the kernel and `transform_bars` use it and pass their tests.
+- [ ] **D7.** [2] Type descriptions for `PointCloudTensor`,
+  `DistanceMatrixTensor`, and `SymmetricMatrixTensor`.
+  Tests: serial round trip; indexing a tracked tensor of each type.
+
+## Phase E: Operation coverage
+
+- [ ] **E1.** [3] Betti curves of tracked barcodes.
+  Tests: matches the untracked curve; norm gradient against finite
+  differences; a batch.
+- [ ] **E2.** [2] Accumulated persistence functions of tracked barcodes.
+  Tests: matches the untracked function; norm gradient against finite
+  differences.
+- [ ] **E3.** [3] Persistent homology of tracked point clouds, through the
+  critical simplices of each bar.
+  Tests: bars match the untracked ones; gradient against finite
+  differences in dimensions 0 and 1.
+- [ ] **E4.** [3] `pdist` and the L2 kernel of tracked PCFs.
+  Tests: match the untracked matrices; gradient with respect to values
+  and times against finite differences.
