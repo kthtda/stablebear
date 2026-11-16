@@ -1,6 +1,6 @@
 # Linear subspaces, inner products, and distances: implementation plan
 
-Progress: 7 of 15 items, 16 of 33 points (48%)
+Progress: 8 of 15 items, 18 of 33 points (55%)
 
 Spec: [linear-subspaces-spec.md](linear-subspaces-spec.md)
 
@@ -65,7 +65,7 @@ Spec: [linear-subspaces-spec.md](linear-subspaces-spec.md)
   `DistanceSpace` and one plain cloud raise, and so do different distances;
   gradient of the kernel of a cloud and its projection with respect to the
   vectors of the subspace against finite differences.
-- [ ] **B5.** [2] C++: the pairwise Lp distances of every cloud of a tensor
+- [x] **B5.** [2] (795a53ab4) C++: the pairwise Lp distances of every cloud of a tensor
   of point clouds as a tensor of distance matrices, for p >= 1 and
   infinity, in parallel over the clouds, with its binding.
   Tests (C++): p = 1, 2, 3, and infinity on one cloud; clouds of different
