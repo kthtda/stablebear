@@ -593,3 +593,67 @@ def test_kernel_under_lp_distance_is_that_of_the_distance_matrices():
 
     assert out.shape == (1,)
     assert out[0].is_isomorphic_to(_kernel(distances(X), distances(Y))[0], atol=1e-12, rtol=1e-12)
+
+
+def _lp_points():
+    # Six points around a loop whose pairwise distances all differ for
+    # p = 1, 2, 3, and infinity, and still do after _contracted.
+    return np.array([[0.15, 0.19], [2.01, 0.1], [2.97, 1.9], [2.47, 3.64], [0.38, 2.86], [-1.17, 1.21]])
+
+
+@pytest.mark.parametrize("p", [1.0, 3.0, float("inf")])
+def test_persistent_homology_under_lp_distance_of_framework_points_matches_numpy(fw, p):
+    distance = sb.LpDistance(p)
+
+    out = _homology(distance(fw.tensor(_lp_points())))
+
+    assert out._tvalues is not None
+    _assert_same_barcodes(out, _homology(distance(_lp_points())))
+
+
+@pytest.mark.parametrize("p", [1.0, 3.0])
+def test_persistent_homology_under_lp_distance_gradient(fw, p):
+    if fw.traces_abstractly:
+        pytest.skip("The number of bars needs concrete points")
+
+    def loss(P):
+        return _bars_loss(fw, _homology(sb.LpDistance(p)(P)))
+
+    assert_gradient_matches_finite_differences(fw, loss, _lp_points())
+
+
+@pytest.mark.parametrize("p", [1.0, 3.0, float("inf")])
+def test_kernel_under_lp_distance_of_framework_points_matches_numpy(fw, p):
+    distance = sb.LpDistance(p)
+    X, Y = _lp_points(), _contracted(_lp_points())
+
+    out = _kernel(distance(fw.tensor(X)), distance(Y))
+
+    assert out._tvalues is not None
+    assert out.shape == (1,)
+    assert out[0].is_isomorphic_to(_kernel(distance(X), distance(Y))[0], atol=1e-12, rtol=1e-12)
+
+
+@pytest.mark.parametrize("p", [1.0, 3.0])
+@pytest.mark.parametrize("wrt", ["X", "Y"])
+def test_kernel_under_lp_distance_gradient(fw, p, wrt):
+    if fw.traces_abstractly:
+        pytest.skip("The critical edges need concrete points")
+    distance = sb.LpDistance(p)
+    X, Y = _lp_points(), _contracted(_lp_points())
+
+    def loss(P):
+        bars = _kernel(distance(P if wrt == "X" else X), distance(P if wrt == "Y" else Y))._tvalues
+        return fw.sum(bars[:, 0] * bars[:, 0]) + fw.sum(bars[:, 1] * bars[:, 1])
+
+    assert_gradient_matches_finite_differences(fw, loss, X if wrt == "X" else Y)
+
+
+@pytest.mark.parametrize("operation", [
+    pytest.param(lambda P: _homology(sb.LpDistance(1)(P)), id="persistent_homology"),
+    pytest.param(lambda P: _kernel(sb.LpDistance(1)(P), sb.LpDistance(1)(_contracted(_lp_points()))), id="kernel"),
+])
+def test_lp_distance_of_abstract_points_raises(operation):
+    jax = pytest.importorskip("jax")
+    with pytest.raises(NotImplementedError, match="abstractly"):
+        jax.grad(lambda P: operation(P)._tvalues.sum())(jax.numpy.asarray(_lp_points()))

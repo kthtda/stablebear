@@ -76,6 +76,12 @@ def cholesky(a: Any) -> jax.Array:
     return jnp.linalg.cholesky(a)
 
 
+def row_lp_norms(x: Any, p: float) -> jax.Array:
+    if p == float("inf"):
+        return jnp.abs(x).max(axis=1)
+    return (jnp.abs(x) ** p).sum(axis=1) ** (1 / p)
+
+
 def apply(
     primal: Callable[..., Any], vjp: Callable[..., Any], *params: Any, out: Any = None, residuals: Any = ()
 ) -> jax.Array:

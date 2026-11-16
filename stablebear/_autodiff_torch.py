@@ -87,6 +87,12 @@ def cholesky(a: torch.Tensor) -> torch.Tensor:
     return torch.linalg.cholesky(a)
 
 
+def row_lp_norms(x: torch.Tensor, p: float) -> torch.Tensor:
+    if p == float("inf"):
+        return x.abs().max(dim=1).values
+    return (x.abs() ** p).sum(dim=1) ** (1 / p)
+
+
 def apply(
     primal: Callable[..., Any], vjp: Callable[..., Any], *params: Any, out: Any = None, residuals: Any = ()
 ) -> torch.Tensor:

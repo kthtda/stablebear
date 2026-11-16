@@ -90,6 +90,12 @@ def cholesky(a: Any) -> tf.Tensor:
     return tf.linalg.cholesky(a)
 
 
+def row_lp_norms(x: Any, p: float) -> tf.Tensor:
+    if p == float("inf"):
+        return tf.reduce_max(tf.abs(x), axis=1)
+    return tf.reduce_sum(tf.abs(x) ** p, axis=1) ** (1 / p)
+
+
 def apply(
     primal: Callable[..., Any], vjp: Callable[..., Any], *params: Any, out: Any = None, residuals: Any = ()
 ) -> tf.Tensor:

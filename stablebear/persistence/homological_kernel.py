@@ -10,16 +10,17 @@ from ..distance_matrix import (
     DistanceMatrixTensor,
 )
 from ..base_tensor import FloatTensor, _get_backend
-from ..linear import DistanceSpace, _distance_matrices, _points_array
+from ..linear import DistanceSpace, _distance_matrices, _distance_matrix, _in_one_framework, _points_array
 from ..point_cloud import PointCloud, PointCloudTensor
 from ..typing import distmat32, distmat64, float32, float64, pcloud32, pcloud64
 from .homology import (
+    _tracked_endpoints,
     _DISTMAT_TO_BARCODE_DTYPE,
     _FLOAT_TO_BARCODE_DTYPE,
     _FLOAT_TO_PCLOUD_DTYPE,
     _PCLOUD_TO_BARCODE_DTYPE,
 )
-from .ph_tensor import BarcodeTensor
+from .ph_tensor import BarcodeTensor, _TrackedBarcodeTensor
 
 cpp_p = cpp.persistence
 
@@ -145,6 +146,37 @@ def _validate_kernel_pair(X, Y):
         raise ValueError(f"X and Y must have the same shape (got {X.shape} and {Y.shape})")
 
 
+def _tracked_kernel_in_distance(X: Any, Y: Any, distance: Any) -> BarcodeTensor:
+    """The kernel of one pair of (n, d) point clouds, of which at least one
+    is a framework array, in a distance that is computed from pairs of
+    points, as a BarcodeTensor of shape (1,) whose bars carry gradients.
+
+    Each birth is the distance between two points of Y and each death the
+    distance between two points of X. The kernel of the two matrices of
+    distances reports these pairs, and the bars are their distances again
+    as framework operations on the points (see _tracked_endpoints). This
+    needs concrete points, unlike the kernel with Euclidean distances.
+    """
+    adapter, (X, Y) = _in_one_framework(X, Y)
+    concrete = [adapter.concrete(points) for points in (X, Y)]
+    if concrete[0] is None or concrete[1] is None:
+        raise NotImplementedError(
+            f"compute_homological_kernel with {distance!r} of points that JAX or tf.function traces abstractly "
+            "is not supported: the gradients follow pairs of points that depend on their values.")
+    dtype = np.float32 if all(points.dtype == np.float32 for points in concrete) else np.float64
+    backend = cpp_p.HomologicalKernel32 if dtype == np.float32 else cpp_p.HomologicalKernel64
+    bars, edges = backend.homological_kernel_critical_edges(
+        *(_distance_matrix(distance, points.astype(dtype)) for points in concrete))
+
+    def lengths(differences):
+        return distance._lengths(adapter, differences)
+
+    tracked_bars = adapter.stack_columns(
+        _tracked_endpoints(adapter, Y, bars[:, 0], edges[:, 0], edges[:, 1], lengths),
+        _tracked_endpoints(adapter, X, bars[:, 1], edges[:, 2], edges[:, 3], lengths))
+    return _TrackedBarcodeTensor([tracked_bars], np.array([[0, len(bars)]]))
+
+
 def _kernel_in_spaces(X: Any, Y: Any, dim: int, verbose: bool) -> BarcodeTensor:
     """The kernel of the points of two DistanceSpaces in their distance."""
     if not (isinstance(X, DistanceSpace) and isinstance(Y, DistanceSpace)):
@@ -154,6 +186,8 @@ def _kernel_in_spaces(X: Any, Y: Any, dim: int, verbose: bool) -> BarcodeTensor:
     if X.distance != Y.distance:
         raise TypeError(f"X and Y must have equal distances (got {X.distance!r} and {Y.distance!r}).")
     transformed = [space.distance._euclidean_points(_points_array(space)) for space in (X, Y)]
+    if transformed[0] is None and any(_autodiff._tracked(space.points) is not None for space in (X, Y)):
+        return _tracked_kernel_in_distance(_points_array(X), _points_array(Y), X.distance)
     if transformed[0] is None:
         return compute_homological_kernel(_distance_matrices(X), _distance_matrices(Y), dim=dim, verbose=verbose)
     # The Euclidean distances of the transformed points are the distances

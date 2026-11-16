@@ -175,6 +175,23 @@ namespace sb::ph
                                  std::span<std::vector<detail::CriticalEdges>>(criticalEdges));
   }
 
+  /// persistence_with_critical_edges for the distances of a distance
+  /// matrix: the critical edges are pairs of its rows.
+  template <typename T>
+  void persistence_with_critical_edges(const DistanceMatrix<T>& distances, size_t maxDim, bool reducedHomology,
+                                       std::vector<Barcode<T>>& barcodes,
+                                       std::vector<std::vector<detail::CriticalEdges>>& criticalEdges)
+  {
+    barcodes.assign(maxDim + 1, Barcode<T>());
+    criticalEdges.assign(maxDim + 1, {});
+    if (distances.size() == 0)
+    {
+      return;
+    }
+    detail::run_ripser(distances, distances.size(), std::span<Barcode<T>>(barcodes), maxDim, reducedHomology,
+                       std::span<std::vector<detail::CriticalEdges>>(criticalEdges));
+  }
+
   /// Vietoris-Rips persistence of one point cloud (Euclidean distances) or one
   /// distance matrix, as an operation with extra dimensions (maxDim + 1,): out[i] is
   /// the barcode of dimension i.

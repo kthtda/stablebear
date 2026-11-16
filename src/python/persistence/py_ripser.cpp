@@ -60,12 +60,14 @@ namespace
       }
     }
 
-    /// (bars, enumeration, critical_edges) of one point cloud: the bars of
+    /// (bars, enumeration, critical_edges) of one point cloud or distance
+    /// matrix: the bars of
     /// all dimensions as an (m, 2) array, the [start, stop) rows of each
     /// dimension as a (maxDim + 1, 2) array, and per bar the points {a, b,
     /// c, d} whose distances are its birth, between a and b, and its death,
     /// between c and d, with -1 where an endpoint has no edge.
-    static nb::tuple persistence_critical_edges(const sb::PointCloud<T>& points, size_t maxDim, bool reducedHomology)
+    template <typename ElemT>
+    static nb::tuple persistence_critical_edges(const ElemT& points, size_t maxDim, bool reducedHomology)
     {
       std::vector<sb::ph::Barcode<T>> barcodes;
       std::vector<std::vector<sb::ph::detail::CriticalEdges>> edges;
@@ -104,7 +106,12 @@ namespace
     {
       nb::class_<PyRipserBindings> cls(
         m, ("PersistenceRipser" + suffix).c_str());
-      cls.def_static("persistence_critical_edges", &PyRipserBindings::persistence_critical_edges);
+      // For a point cloud, with Euclidean distances, or a distance matrix,
+      // whose critical edges are pairs of its rows.
+      cls.def_static("persistence_critical_edges",
+                     &PyRipserBindings::template persistence_critical_edges<sb::PointCloud<T>>);
+      cls.def_static("persistence_critical_edges",
+                     &PyRipserBindings::template persistence_critical_edges<sb::DistanceMatrix<T>>);
       register_spawn<sb::PointCloud<T>>(
           m, cls, "spawn_ripser_pcloud_euclidean_task", "_PersistenceTaskPointCloud" + suffix);
       register_spawn<sb::DistanceMatrix<T>>(

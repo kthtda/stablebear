@@ -245,6 +245,12 @@ class Distance:
         without _euclidean_points."""
         raise NotImplementedError
 
+    def _lengths(self, adapter: Any, differences: Any) -> Any:
+        """The distance from x to y for each row x - y of a framework
+        array, as an operation of the framework of the given adapter, for a
+        distance without _euclidean_points."""
+        raise NotImplementedError
+
     __hash__ = None  # type: ignore[assignment]
 
 
@@ -338,6 +344,9 @@ class LpDistance(Distance):
     def _distance_matrices(self, clouds: PointCloudTensor) -> DistanceMatrixTensor:
         data = clouds._data.materialize() if clouds._has_indexed_storage() else clouds._data
         return DistanceMatrixTensor(cpp.pairwise_lp_distances(data, self._p))
+
+    def _lengths(self, adapter: Any, differences: Any) -> Any:
+        return adapter.row_lp_norms(differences, self._p)
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, Distance):
@@ -579,13 +588,16 @@ def _projected(xp: Any, X: Any, V: Any, G: Any = None) -> Any:
     return xp.matmul(X, xp.matmul(GVt, xp.solve(xp.matmul(V, GVt), V)))
 
 
+def _distance_matrix(distance: Distance, points: np.ndarray) -> Any:
+    """The C++ matrix of the distances between the points of one (n, d)
+    cloud, for a distance without _euclidean_points."""
+    return distance._distance_matrices(PointCloudTensor([points]))[0]._current_matrix()
+
+
 def _distance_matrices(space: DistanceSpace) -> DistanceMatrixTensor:
     """The distances between the points of an untracked space, for a
     distance without _euclidean_points: one matrix for a single cloud."""
-    points = space.points
-    if _autodiff._framework(points) is not None:
-        raise NotImplementedError(f"Gradients are not supported with {space.distance!r} yet.")
-    return space.distance._distance_matrices(PointCloudTensor([np.asarray(points)]))
+    return space.distance._distance_matrices(PointCloudTensor([np.asarray(space.points)]))
 
 
 def _points_array(space: DistanceSpace) -> Any:

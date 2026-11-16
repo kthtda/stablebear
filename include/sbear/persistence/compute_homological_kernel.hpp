@@ -261,6 +261,23 @@ namespace sb::ph
         dDist, dPrimeDist, bars, [](T v) { return std::sqrt(v); }, &criticalEdges);
   }
 
+  /// The homological kernel barcode of one pair of distance matrices, and
+  /// for each bar the rows {a, b, c, e} with birth = d'(a, b) and death =
+  /// d(c, e), where d is the distance of dm and d' that of dmPrime.
+  template <typename T>
+  void homological_kernel_with_critical_edges(
+      const DistanceMatrix<T> &dm, const DistanceMatrix<T> &dmPrime, Barcode<T> &bars,
+      std::vector<std::array<size_t, 4>> &criticalEdges)
+  {
+    if (dm.size() != dmPrime.size())
+    {
+      throw std::runtime_error(
+          "homological kernel: distance matrices have mismatched sizes (" + std::to_string(dm.size()) + " and " +
+          std::to_string(dmPrime.size()) + ")");
+    }
+    detail::homological_kernel_single_impl(dm, dmPrime, bars, [](T v) { return v; }, &criticalEdges);
+  }
+
   template <
       typename ElemT, typename T, TensorProperties Properties = TensorProperty::None,
       TensorProperties PrimeProperties = Properties>

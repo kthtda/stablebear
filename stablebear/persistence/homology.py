@@ -12,7 +12,7 @@ from ..distance_matrix import (
     DistanceMatrixTensor,
 )
 from ..base_tensor import FloatTensor
-from ..linear import DistanceSpace, _distance_matrices, _points_array
+from ..linear import DistanceSpace, _distance_matrices, _distance_matrix, _points_array
 from ..point_cloud import PointCloud, PointCloudTensor
 from ..timeseries.series import TimeSeries, TimeSeriesTensor
 from ..typing import barcode32, barcode64, distmat32, distmat64, float32, float64, pcloud32, pcloud64
@@ -56,7 +56,30 @@ def compute_persistent_homology(
 ) -> BarcodeTensor: ...
 
 
-def _tracked_persistent_homology(X: Any, max_dim: int, reduced: bool) -> BarcodeTensor:
+def _tracked_endpoints(
+    adapter: Any, points: Any, endpoints: np.ndarray, first: np.ndarray, second: np.ndarray, lengths: Any
+) -> Any:
+    """The endpoints of bars as a framework array that carries gradients
+    with respect to the points, a framework array of shape (n, d).
+
+    Endpoint k is the distance between the points first[k] and second[k],
+    its critical edge, and is computed again as lengths(differences), a
+    framework operation on the rows of differences of those points. An
+    endpoint without an edge (first[k] is -1), such as a birth at 0 in
+    dimension 0 or an infinite death, is a constant, and so is an endpoint
+    at 0, where a distance has no derivative.
+    """
+    has_edge = (first >= 0) & (endpoints > 0)
+    edges = adapter.gather(points, first[has_edge]) - adapter.gather(points, second[has_edge])
+    # The endpoints as constants, followed by the lengths of the critical
+    # edges, from which each endpoint takes its own.
+    values = adapter.concat([adapter.as_tensor(endpoints, like=points), lengths(edges)])
+    source = np.arange(len(endpoints))
+    source[has_edge] = len(endpoints) + np.arange(int(has_edge.sum()))
+    return adapter.gather(values, source)
+
+
+def _tracked_persistent_homology(X: Any, max_dim: int, reduced: bool, distance: Any = None) -> BarcodeTensor:
     """The barcodes of one (n, d) point cloud given as a framework array,
     with bars that carry gradients with respect to its points.
 
@@ -65,9 +88,10 @@ def _tracked_persistent_homology(X: Any, max_dim: int, reduced: bool) -> Barcode
     points: the critical edge of the simplex that creates or destroys the
     class. Ripser reports these edges with the bars, and the bars are their
     lengths again as framework operations on the points, which the
-    framework differentiates. An endpoint without an edge, a birth at 0 in
-    dimension 0 or an infinite death, is a constant, and so is an endpoint
-    at 0, where a distance has no derivative.
+    framework differentiates (see _tracked_endpoints).
+
+    The distance is Euclidean, or the given Distance, which Ripser then
+    takes as the matrix of the distances between the points.
     """
     X = _autodiff._unwrap(X)
     adapter = _autodiff._framework(X)
@@ -82,27 +106,27 @@ def _tracked_persistent_homology(X: Any, max_dim: int, reduced: bool) -> Barcode
 
     dtype = np.float32 if points.dtype == np.float32 else np.float64
     backend = cpp_p.PersistenceRipser32 if dtype == np.float32 else cpp_p.PersistenceRipser64
-    content, enumeration, critical_edges = backend.persistence_critical_edges(
-        PointCloud(points.astype(dtype))._cpp_point_cloud(), max_dim, reduced)
+    points = points.astype(dtype)
+    if distance is None:
+        element, lengths = PointCloud(points)._cpp_point_cloud(), adapter.row_norms
+    else:
+        element = _distance_matrix(distance, points)
 
-    # The endpoints in the order birth, death of each bar, with the two
-    # points of the edge of each.
-    endpoints = content.reshape(-1)
-    first, second = critical_edges.reshape(-1, 2).T
-    has_edge = (first >= 0) & (endpoints > 0)
-    edges = adapter.gather(X, first[has_edge]) - adapter.gather(X, second[has_edge])
-    # The endpoints as constants, followed by the lengths of the critical
-    # edges, from which each endpoint takes its own.
-    values = adapter.concat([adapter.as_tensor(endpoints, like=X), adapter.row_norms(edges)])
-    source = np.arange(len(endpoints))
-    source[has_edge] = len(endpoints) + np.arange(int(has_edge.sum()))
-    bars = adapter.stack_columns(adapter.gather(values, source[0::2]), adapter.gather(values, source[1::2]))
+        def lengths(differences):
+            return distance._lengths(adapter, differences)
+
+    content, enumeration, critical_edges = backend.persistence_critical_edges(element, max_dim, reduced)
+    bars = adapter.stack_columns(
+        _tracked_endpoints(adapter, X, content[:, 0], critical_edges[:, 0], critical_edges[:, 1], lengths),
+        _tracked_endpoints(adapter, X, content[:, 1], critical_edges[:, 2], critical_edges[:, 3], lengths))
     return _TrackedBarcodeTensor([bars], enumeration)
 
 
 def _persistent_homology_in_space(space: DistanceSpace, max_dim: int, reduced: bool, verbose: bool) -> Any:
     """The barcodes of the points of a DistanceSpace in its distance."""
     transformed = space.distance._euclidean_points(_points_array(space))
+    if transformed is None and _autodiff._tracked(space.points) is not None:
+        return _tracked_persistent_homology(space.points, max_dim, reduced, distance=space.distance)
     if transformed is None:
         return compute_persistent_homology(
             _distance_matrices(space), max_dim=max_dim, reduced=reduced, verbose=verbose)

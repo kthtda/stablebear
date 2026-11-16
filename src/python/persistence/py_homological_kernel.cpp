@@ -57,14 +57,14 @@ namespace
     /// (bars, critical_edges) of one pair of point clouds: bars as an (m, 2)
     /// array and, per bar, the point indices {a, b, c, e} of the edges whose
     /// lengths in Y and X are its birth and death.
-    static nb::tuple homological_kernel_critical_edges(
-        const sb::PointCloud<T> &pointCloud, const sb::PointCloud<T> &pointCloudPrime)
+    template <typename ElemT>
+    static nb::tuple homological_kernel_critical_edges(const ElemT &element, const ElemT &elementPrime)
     {
       sb::ph::Barcode<T> barcode;
       std::vector<std::array<size_t, 4>> edges;
       {
         nb::gil_scoped_release release;
-        sb::ph::homological_kernel_with_critical_edges(pointCloud, pointCloudPrime, barcode, edges);
+        sb::ph::homological_kernel_with_critical_edges(element, elementPrime, barcode, edges);
       }
       auto bars = sb_py::new_array<T>({barcode.bars().size(), 2});
       auto critical = sb_py::new_array<int64_t>({edges.size(), 4});
@@ -99,8 +99,14 @@ namespace
       cls.def_static(
         "spawn_homological_kernel_pcloud_task",
         &PyHomologicalKernelBindings::spawn_homological_kernel_single_pcloud_task);
+      // For two point clouds, with Euclidean distances, or two distance
+      // matrices, whose critical edges are pairs of their rows.
       cls.def_static(
-        "homological_kernel_critical_edges", &PyHomologicalKernelBindings::homological_kernel_critical_edges);
+        "homological_kernel_critical_edges",
+        &PyHomologicalKernelBindings::template homological_kernel_critical_edges<sb::PointCloud<T>>);
+      cls.def_static(
+        "homological_kernel_critical_edges",
+        &PyHomologicalKernelBindings::template homological_kernel_critical_edges<sb::DistanceMatrix<T>>);
     }
   };
 
