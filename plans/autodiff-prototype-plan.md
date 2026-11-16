@@ -1,6 +1,6 @@
 # Autodiff prototype: implementation plan
 
-Progress: 17 of 27 items, 38 of 64 points (59%)
+Progress: 18 of 27 items, 40 of 64 points (63%)
 
 Spec: [autodiff-prototype-spec.md](autodiff-prototype-spec.md)
 
@@ -79,10 +79,12 @@ Spec: [autodiff-prototype-spec.md](autodiff-prototype-spec.md)
   `tracked_class(BarcodeTensor)` replacing `_TrackedBarcodeTensor`; no
   change in behavior.
   Tests: the tracked barcode tests pass unchanged.
-- [ ] **D2.** [2] Cache the derived C++ tensor (D5); operations hand their
+- [x] **D2.** [2] (706c2fd3a) Cache the derived C++ tensor (D5); operations hand their
   C++ result to the tracked object.
   Tests: a tracked operation converts once; an in-place PyTorch change
   of the framework array is seen by the next read.
+  Note: only `copy` hands over a C++ tensor so far; D3 and D6 are the first
+  operations that have one.
 - [ ] **D3.** [3] `PcfTensor` on the mixin, with times and values as
   separate column groups; arithmetic, norms, and stable ranks return it.
   Tests: indexing matches untracked tensors; gradient through indexing;
