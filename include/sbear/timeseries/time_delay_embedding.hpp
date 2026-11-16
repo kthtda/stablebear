@@ -1,14 +1,21 @@
 #ifndef STABLEBEAR_TIMESERIES_TIME_DELAY_EMBEDDING_H
 #define STABLEBEAR_TIMESERIES_TIME_DELAY_EMBEDDING_H
 
+#include "../errors.hpp"
+#include "../executor.hpp"
+#include "../tensor.hpp"
 #include "../timeseries.hpp"
+#include "../walk.hpp"
 
 #include <algorithm>
 #include <cmath>
 #include <functional>
 #include <limits>
+#include <mutex>
+#include <optional>
 #include <queue>
 #include <stdexcept>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -188,6 +195,63 @@ namespace sb
       channels.push_back(delay_embed(series.channel(c), dimension, delay, forward));
     }
     return TimeSeries<T>(std::move(channels), series.unit(), series.epoch());
+  }
+
+  /// The delay embedding of every series of @p seriesTensor, as
+  /// delay_embed() gives it, in a tensor of the same shape. @p delay is a
+  /// count of @p delayUnit, converted into the unit of each series, or a
+  /// plain number for series without a unit. The series are embedded in
+  /// parallel on @p exec. A series that cannot be embedded throws, for the
+  /// first such series, an error of the same type whose message names its
+  /// position.
+  template <typename T>
+  Tensor<TimeSeries<T>> delay_embed(const Tensor<TimeSeries<T>>& seriesTensor, size_t dimension, float64_t delay,
+                                    TimeUnit delayUnit, bool forward = false, Executor& exec = default_executor())
+  {
+    Tensor<TimeSeries<T>> embeddings(std::vector<size_t>(seriesTensor.shape().begin(), seriesTensor.shape().end()));
+    // The first series that fails, whichever worker reaches it, with its
+    // message and whether the error is a TypeError.
+    struct Failure
+    {
+      std::vector<size_t> index;
+      std::string message;
+      bool typeError;
+    };
+    std::mutex mutex;
+    std::optional<Failure> failure;
+    parallel_walk(seriesTensor, [&](const std::vector<size_t>& index) {
+      const auto record = [&](const std::exception& e, bool typeError) {
+        const std::scoped_lock lock(mutex);
+        if (!failure || index < failure->index)
+        {
+          failure = Failure{index, e.what(), typeError};
+        }
+      };
+      try
+      {
+        const auto& series = seriesTensor(index);
+        check_query_unit(delayUnit, series.unit());
+        embeddings(index) = delay_embed(series, dimension, convert_time(delay, delayUnit, series.unit()), forward);
+      }
+      catch (const TypeError& e)
+      {
+        record(e, true);
+      }
+      catch (const std::invalid_argument& e)
+      {
+        record(e, false);
+      }
+    }, exec);
+    if (failure)
+    {
+      const auto message = detail::position_text(failure->index) + ": " + failure->message;
+      if (failure->typeError)
+      {
+        throw TypeError(message);
+      }
+      throw std::invalid_argument(message);
+    }
+    return embeddings;
   }
 }
 

@@ -15,7 +15,7 @@ For a sine with period 2 s, a delay of a quarter period traces a circle::
 
    import numpy as np
    from stablebear.timeseries import (TimeDelta, TimeDeltaTensor, TimeSeries,
-                                      delay_embed)
+                                      cut_windows, delay_embed)
 
    t = np.linspace(0.0, 6.0, 49)
    signal = TimeSeries(np.sin(np.pi * t), times=TimeDeltaTensor(t, "s"))
@@ -61,6 +61,26 @@ or a plain number for a time series without a unit.
 cloud for persistent homology. To study the shape of the embedded points
 over time, cut the embedding into :doc:`windows <timeseries_windows>`. On a time series with several
 :doc:`channels <timeseries_channels>`, each channel is embedded separately.
+
+Embedding windows
+-----------------
+
+Cutting the embedding into windows lets each window's first points reach
+back before the window starts. When windows are independent samples, such
+as labelled chunks or separate recordings, embed each window instead:
+``delay_embed`` takes a tensor of time series, such as the windows from
+:py:func:`~stablebear.timeseries.cut_windows`, and embeds each series on
+its own into a tensor of the same shape. A window's embedding then starts
+:math:`(m-1)\delta` after the window does::
+
+   windows = cut_windows(signal, size=TimeDelta(2, "s"),
+                         step=TimeDelta(2, "s"), anchor="start")
+   embedded_windows = delay_embed(windows, dimension=2,
+                                  delay=TimeDelta(0.5, "s"))
+   embedded_windows.shape  # (3,), as windows.shape
+
+:py:func:`~stablebear.timeseries.to_point_clouds` turns such a tensor into
+a tensor of point clouds.
 
 Looking forward
 ---------------

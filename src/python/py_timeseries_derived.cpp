@@ -52,6 +52,12 @@ namespace
       return sb::delay_embed(series, dimension, delay, forward);
     }, nb::arg("series"), nb::arg("dimension"), nb::arg("delay"), nb::arg("forward"),
        nb::call_guard<nb::gil_scoped_release>());
+    m.def("delay_embed_tensor", [](const sb::Tensor<sb::TimeSeries<T>>& seriesTensor, size_t dimension,
+                                   sb::float64_t delay, const std::optional<std::string>& unit, bool forward) {
+      return sb::delay_embed(seriesTensor, dimension, delay,
+                             unit ? sb::parse_time_unit(*unit) : sb::TimeUnit::Unitless, forward);
+    }, nb::arg("series_tensor"), nb::arg("dimension"), nb::arg("delay"), nb::arg("unit"), nb::arg("forward"),
+       nb::call_guard<nb::gil_scoped_release>());
     m.def("stack_channels", [](const sb::TimeSeries<T>& series, std::ptrdiff_t axis) {
       return sb::stack_channels(series, axis);
     }, nb::arg("series"), nb::arg("axis"), nb::call_guard<nb::gil_scoped_release>());
