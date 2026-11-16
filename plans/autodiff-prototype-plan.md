@@ -1,6 +1,6 @@
 # Autodiff prototype: implementation plan
 
-Progress: 16 of 27 items, 35 of 64 points (55%)
+Progress: 17 of 27 items, 38 of 64 points (59%)
 
 Spec: [autodiff-prototype-spec.md](autodiff-prototype-spec.md)
 
@@ -75,7 +75,7 @@ Spec: [autodiff-prototype-spec.md](autodiff-prototype-spec.md)
 
 ## Phase D: One generic tracked tensor
 
-- [ ] **D1.** [3] The tracked mixin and type descriptions (D5a), with
+- [x] **D1.** [3] (06f36d271) The tracked mixin and type descriptions (D5a), with
   `tracked_class(BarcodeTensor)` replacing `_TrackedBarcodeTensor`; no
   change in behavior.
   Tests: the tracked barcode tests pass unchanged.
