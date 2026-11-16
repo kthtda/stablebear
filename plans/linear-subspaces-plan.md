@@ -1,6 +1,6 @@
-# Linear subspaces and inner products: implementation plan
+# Linear subspaces, inner products, and distances: implementation plan
 
-Progress: 3 of 10 items, 8 of 23 points (35%)
+Progress: 3 of 15 items, 8 of 33 points (24%)
 
 Spec: [linear-subspaces-spec.md](linear-subspaces-spec.md)
 
@@ -37,21 +37,52 @@ Spec: [linear-subspaces-spec.md](linear-subspaces-spec.md)
   adapters. Two inner products of matrices that a framework traces are
   equal only if the matrices are the same object.
 
-## Phase B: Distances under an inner product
+## Phase B: Distance spaces
 
-- [ ] **B1.** [2] `compute_persistent_homology` of an `InnerProductSpace` of
-  a single cloud, by the transformed points X L^T (D6), with and without gradients.
+- [ ] **B1.** [2] `Distance` and `DistanceSpace(points, distance)` with
+  `points`, `distance`, and `dtype`; `InnerProductSpace` becomes its
+  subclass, with `points` in place of `vectors` (D2, D2a); `ip.distance`,
+  and calling a distance on points.
+  Tests: a distance space gives its points and distance back; an
+  `InnerProductSpace` is a `DistanceSpace` with the distance of its inner
+  product; distances of equal inner products are equal; projecting a
+  `DistanceSpace` that is not an `InnerProductSpace` raises.
+- [ ] **B2.** [2] `compute_persistent_homology` of a `DistanceSpace` of a
+  single cloud with the distance of an inner product, by the transformed
+  points X L^T (D6), with and without gradients; the Cholesky factor in
+  each adapter.
   Tests: equals the barcodes of the transformed points; the identity matrix
   gives the barcodes of the plain cloud; gradient with respect to the Gram
   matrix against finite differences.
-- [ ] **B2.** [3] `compute_homological_kernel` of two `InnerProductSpace`s of
-  single clouds with equal inner products, with and without gradients.
+- [ ] **B3.** [1] Deprecate `distance_type` (D6b).
+  Tests: passing it warns; passing it with a `DistanceSpace` raises; the
+  default does not warn.
+- [ ] **B4.** [3] `compute_homological_kernel` of two `DistanceSpace`s of
+  single clouds with equal distances of inner products, with and without
+  gradients.
   Tests: equals the kernel of the transformed points; the kernel of a cloud
   and its projection under the same inner product is valid; one
-  `InnerProductSpace` and one plain cloud raise, and so do different inner
-  products; gradient
-  of the kernel of a cloud and its projection with respect to the vectors
-  of the subspace against finite differences.
+  `DistanceSpace` and one plain cloud raise, and so do different distances;
+  gradient of the kernel of a cloud and its projection with respect to the
+  vectors of the subspace against finite differences.
+- [ ] **B5.** [2] C++: the pairwise Lp distances of every cloud of a tensor
+  of point clouds as a tensor of distance matrices, for p >= 1 and
+  infinity, in parallel over the clouds, with its binding.
+  Tests (C++): p = 1, 2, 3, and infinity on one cloud; clouds of different
+  sizes; an empty cloud; p < 1 raises.
+- [ ] **B6.** [2] `LpDistance(p)`, and persistent homology and the kernel of
+  an untracked single cloud in its `DistanceSpace`, through the distance
+  matrix (D6).
+  Tests: p = 2 gives the Euclidean barcodes; barcodes for p = 1 and
+  infinity of a small cloud with known distances; equal p give equal
+  distances; p < 1 raises; the kernel under p = 1 equals the kernel of the
+  two distance matrices.
+- [ ] **B7.** [3] Gradients under `LpDistance(p)` (D6a): the critical edges
+  of persistent homology and of the kernel from distance matrices, and the
+  bars as the distances of those pairs in framework operations.
+  Tests: the bars of framework points match NumPy for p = 1 and 3;
+  gradients of persistent homology and of the kernel against finite
+  differences for p = 1 and 3; points that JAX traces raise.
 
 ## Phase C: Batches
 
@@ -62,24 +93,24 @@ Spec: [linear-subspaces-spec.md](linear-subspaces-spec.md)
   indexed cloud; a matrix of another dimension raises.
 - [ ] **C2.** [2] `project` of an untracked `PointCloudTensor`, plain or in
   an `InnerProductSpace`, and persistent homology and the kernel of
-  untracked batches in one.
+  untracked batches in a `DistanceSpace`, for both kinds of distance.
   Tests: each projected cloud equals the projection of that cloud alone;
-  the barcodes and kernels of a batch in an `InnerProductSpace` equal those
-  of each of its clouds alone.
+  the barcodes and kernels of a batch in a `DistanceSpace` equal those of
+  each of its clouds alone.
 - [ ] **C3.** [2] `project` of a tracked `PointCloudTensor` as one
   framework product (D8).
   Tests: matches the untracked projection; gradient with respect to the
   vectors against finite differences; persistent homology of a tracked
-  batch in an `InnerProductSpace` raises.
+  batch in a `DistanceSpace` raises.
 
 ## Phase D: Documentation
 
-- [ ] **D1.** [2] API reference entries for `InnerProduct`,
-  `InnerProductSpace`, and `LinearSubspace`, and the `InnerProductSpace`
-  inputs in
-  the docstrings of `compute_persistent_homology` and
-  `compute_homological_kernel`. (Each class gets its docstring in the item
-  that adds it.)
-- [ ] **D2.** [2] A user guide page on projecting point clouds: what a
-  projection under an inner product is, the kernel of a cloud and its
-  projection, and optimizing a subspace with a framework, with one figure.
+- [ ] **D1.** [2] API reference entries for the new classes, and the
+  `DistanceSpace` inputs in the docstrings of `compute_persistent_homology`
+  and `compute_homological_kernel`; `docs/persistence.rst` without
+  `distance_type`. (Each class gets its docstring in the item that adds
+  it.)
+- [ ] **D2.** [2] A user guide page on projecting point clouds and choosing
+  distances: what a projection under an inner product is, the kernel of a
+  cloud and its projection, the distance of an Lp norm, and optimizing a
+  subspace with a framework, with one figure.
