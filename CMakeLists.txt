@@ -617,7 +617,7 @@ source_group("Core Sources"           REGULAR_EXPRESSION "src/[^/]+\\.cpp")
 source_group("IO" FILES src/io_stream.cpp)
 
 # Standalone GPU detection module (no CUDA dependency)
-nanobind_add_module(_gpu_detect STABLE_ABI src/gpu_detect/gpu_detect.cpp)
+nanobind_add_module(_gpu_detect STABLE_ABI NB_SUPPRESS_WARNINGS src/gpu_detect/gpu_detect.cpp)
 if (APPLE)
   target_link_libraries(_gpu_detect PRIVATE "-framework IOKit" "-framework CoreFoundation")
 elseif (WIN32)
@@ -695,12 +695,15 @@ endif ()
 # optimization level instead of nanobind's default of optimizing for size.
 # STABLE_ABI targets the stable ABI on Python 3.12 and newer, so that one wheel
 # serves all of them; it has no effect on older or free-threaded Python.
-nanobind_add_module(${CPP_MODULE_NAME_CPU} NOMINSIZE STABLE_ABI ${SB_LIB_SOURCES} ${SB_PY_SOURCES} ${SB_VERSION_SOURCE})
+# NB_SUPPRESS_WARNINGS includes the Python and nanobind headers as system
+# headers. pyconfig.h of some Python builds redefines _POSIX_C_SOURCE and
+# _XOPEN_SOURCE after newer glibc headers, which warns in every source file.
+nanobind_add_module(${CPP_MODULE_NAME_CPU} NOMINSIZE STABLE_ABI NB_SUPPRESS_WARNINGS ${SB_LIB_SOURCES} ${SB_PY_SOURCES} ${SB_VERSION_SOURCE})
 # Do NOT define BUILD_WITH_CUDA for the CPU module: code uses #ifdef BUILD_WITH_CUDA,
 # so a value of 0 would still enable CUDA code paths.
 
 if (BUILD_WITH_CUDA)
-  nanobind_add_module(${CPP_MODULE_NAME_CUDA} NOMINSIZE STABLE_ABI ${SB_LIB_SOURCES} ${SB_LIB_SOURCES_CUDA} ${SB_PY_SOURCES} ${SB_VERSION_SOURCE})
+  nanobind_add_module(${CPP_MODULE_NAME_CUDA} NOMINSIZE STABLE_ABI NB_SUPPRESS_WARNINGS ${SB_LIB_SOURCES} ${SB_LIB_SOURCES_CUDA} ${SB_PY_SOURCES} ${SB_VERSION_SOURCE})
   target_compile_definitions(${CPP_MODULE_NAME_CUDA} PRIVATE BUILD_WITH_CUDA=1)
   target_include_directories(${CPP_MODULE_NAME_CUDA} PRIVATE ${SB_CUDA_INCLUDE_DIRS})
   if (CUDAToolkit_ROOT AND EXISTS "${CUDAToolkit_ROOT}/include/cuda_runtime.h")
