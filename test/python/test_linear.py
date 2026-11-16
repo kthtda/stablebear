@@ -3,7 +3,7 @@ import pytest
 
 import stablebear as sb
 
-from _frameworks import assert_gradient_matches_finite_differences
+from _frameworks import assert_gradient_matches_finite_differences, tracked
 
 
 def _gram():
@@ -657,3 +657,129 @@ def test_lp_distance_of_abstract_points_raises(operation):
     jax = pytest.importorskip("jax")
     with pytest.raises(NotImplementedError, match="abstractly"):
         jax.grad(lambda P: operation(P)._tvalues.sum())(jax.numpy.asarray(_lp_points()))
+
+
+def _batch3():
+    # Clouds of 6, 2, and 3 points in 3 dimensions.
+    return [_cloud3(), _points(), _cloud3()[[5, 1, 3]] + 0.5]
+
+
+def _batch2():
+    # Clouds of 6, 6, and 4 points in the plane.
+    return [_lp_points(), _loop_points(), _lp_points()[[0, 2, 3, 5]] * 1.5]
+
+
+@pytest.mark.parametrize("gram", [None, _gram3()], ids=["euclidean", "inner_product"])
+def test_projection_of_batch_projects_each_cloud(gram):
+    subspace = sb.LinearSubspace(_vectors())
+    clouds = _batch3()
+
+    def in_space(points):
+        return points if gram is None else sb.InnerProduct(gram)(points)
+
+    projected = subspace.project(in_space(sb.PointCloudTensor(clouds)))
+
+    if gram is not None:
+        assert isinstance(projected, sb.InnerProductSpace)
+        assert projected.dtype == sb.pcloud64
+        projected = projected.points
+    assert isinstance(projected, sb.PointCloudTensor)
+    assert projected.shape == (3,)
+    for i, cloud in enumerate(clouds):
+        alone = subspace.project(in_space(cloud))
+        alone = alone if gram is None else alone.points
+        np.testing.assert_allclose(np.asarray(projected[i]), np.asarray(alone), atol=1e-12)
+
+
+def test_projection_of_batch_of_another_dimension_raises():
+    line = sb.LinearSubspace(np.array([[3.0, 4.0]]))
+    with pytest.raises(ValueError, match="dimension 3"):
+        line.project(sb.PointCloudTensor(_batch3()))
+
+
+_BATCH_DISTANCES = [
+    # A diagonal Gram matrix, under which _contracted still shrinks every
+    # distance.
+    pytest.param(lambda: sb.InnerProduct(np.diag([4.0, 1.0])).distance, id="inner_product"),
+    pytest.param(lambda: sb.LpDistance(1), id="taxicab"),
+    pytest.param(lambda: sb.LpDistance(2), id="euclidean"),
+]
+
+
+@pytest.mark.parametrize("make_distance", _BATCH_DISTANCES)
+def test_persistent_homology_of_batch_in_distance_space_is_that_of_each_cloud(make_distance):
+    distance = make_distance()
+    clouds = _batch2()
+
+    out = _homology(distance(sb.PointCloudTensor(clouds)))
+
+    assert out.shape == (3, 2)
+    for i, cloud in enumerate(clouds):
+        alone = _homology(distance(cloud))
+        for dim in range(2):
+            assert out[i, dim].is_isomorphic_to(alone[dim], atol=1e-12, rtol=1e-12)
+
+
+@pytest.mark.parametrize("make_distance", _BATCH_DISTANCES)
+def test_kernel_of_batches_in_distance_spaces_is_that_of_each_pair(make_distance):
+    distance = make_distance()
+    clouds = _batch2()
+    contracted = [_contracted(cloud) for cloud in clouds]
+
+    out = _kernel(distance(sb.PointCloudTensor(clouds)), distance(sb.PointCloudTensor(contracted)))
+
+    assert out.shape == (3,)
+    for i in range(3):
+        alone = _kernel(distance(clouds[i]), distance(contracted[i]))
+        assert out[i].is_isomorphic_to(alone[0], atol=1e-12, rtol=1e-12)
+
+
+@pytest.mark.parametrize("which", ["points", "vectors"])
+def test_projection_of_batch_with_framework_arrays_matches_untracked(fw, which):
+    clouds = sb.PointCloudTensor(_batch3())
+    points = tracked(fw, clouds) if which == "points" else clouds
+    vectors = fw.tensor(_vectors()) if which == "vectors" else _vectors()
+
+    projected = sb.LinearSubspace(vectors).project(points)
+
+    assert isinstance(projected, sb.PointCloudTensor)
+    assert projected._tvalues is not None
+    assert projected.shape == (3,)
+    expected = sb.LinearSubspace(_vectors()).project(clouds)
+    for i in range(3):
+        np.testing.assert_allclose(np.asarray(projected[i]), np.asarray(expected[i]), atol=1e-12)
+
+
+def _batch_weights():
+    # One weight per coordinate of the 11 points of _batch3.
+    return np.arange(33.0).reshape(11, 3) % 7.0 - 3.0
+
+
+def test_projection_of_batch_gradient_wrt_vectors(fw):
+    def loss(V):
+        projected = sb.LinearSubspace(V).project(sb.InnerProduct(_gram3())(sb.PointCloudTensor(_batch3())))
+        return fw.sum(fw.tensor(_batch_weights()) * projected.points._tvalues)
+
+    assert_gradient_matches_finite_differences(fw, loss, _vectors())
+
+
+def test_projection_of_tracked_batch_gradient_wrt_points(fw):
+    plain = sb.PointCloudTensor(_batch3())
+    content, enumeration = plain._serial()
+
+    def loss(P):
+        clouds = type(tracked(fw, plain))([P], enumeration)
+        projected = sb.LinearSubspace(_vectors()).project(clouds)
+        return fw.sum(fw.tensor(_batch_weights()) * projected._tvalues)
+
+    assert_gradient_matches_finite_differences(fw, loss, content)
+
+
+def test_persistent_homology_and_kernel_of_tracked_batch_in_distance_space_raise(fw):
+    space = sb.InnerProduct(_gram())(tracked(fw, sb.PointCloudTensor(_batch2())))
+    with pytest.raises(NotImplementedError, match="single"):
+        _homology(space)
+    with pytest.raises(NotImplementedError, match="single"):
+        _kernel(space, space)
+    with pytest.raises(NotImplementedError, match="single"):
+        _homology(sb.LpDistance(1)(tracked(fw, sb.PointCloudTensor(_batch2()))))

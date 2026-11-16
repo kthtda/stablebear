@@ -95,7 +95,7 @@ def _tracked_persistent_homology(X: Any, max_dim: int, reduced: bool, distance: 
     """
     X = _autodiff._unwrap(X)
     adapter = _autodiff._framework(X)
-    if len(X.shape) != 2:
+    if adapter is None or len(X.shape) != 2:
         raise NotImplementedError(
             "compute_persistent_homology with gradients supports a single point cloud of shape (n, d) only.")
     points = adapter.concrete(X)
@@ -125,7 +125,7 @@ def _tracked_persistent_homology(X: Any, max_dim: int, reduced: bool, distance: 
 def _persistent_homology_in_space(space: DistanceSpace, max_dim: int, reduced: bool, verbose: bool) -> Any:
     """The barcodes of the points of a DistanceSpace in its distance."""
     transformed = space.distance._euclidean_points(_points_array(space))
-    if transformed is None and _autodiff._tracked(space.points) is not None:
+    if transformed is None and _autodiff._framework(space.points) is not None:
         return _tracked_persistent_homology(space.points, max_dim, reduced, distance=space.distance)
     if transformed is None:
         return compute_persistent_homology(

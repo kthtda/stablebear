@@ -186,7 +186,7 @@ def _kernel_in_spaces(X: Any, Y: Any, dim: int, verbose: bool) -> BarcodeTensor:
     if X.distance != Y.distance:
         raise TypeError(f"X and Y must have equal distances (got {X.distance!r} and {Y.distance!r}).")
     transformed = [space.distance._euclidean_points(_points_array(space)) for space in (X, Y)]
-    if transformed[0] is None and any(_autodiff._tracked(space.points) is not None for space in (X, Y)):
+    if transformed[0] is None and any(_autodiff._framework(space.points) is not None for space in (X, Y)):
         return _tracked_kernel_in_distance(_points_array(X), _points_array(Y), X.distance)
     if transformed[0] is None:
         return compute_homological_kernel(_distance_matrices(X), _distance_matrices(Y), dim=dim, verbose=verbose)
@@ -290,6 +290,10 @@ def compute_homological_kernel(
         return _kernel_in_spaces(X, Y, dim, verbose)
 
     if _autodiff._tracked(X) is not None or _autodiff._tracked(Y) is not None:
+        if any(isinstance(points, PointCloudTensor) for points in (X, Y)):
+            raise NotImplementedError(
+                "compute_homological_kernel with gradients supports a single pair of point clouds of shape "
+                "(n, d) only.")
         return _tracked_kernel(X, Y)
 
     X = _normalize_kernel_input(X, "X")

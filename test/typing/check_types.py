@@ -30,6 +30,8 @@ assert_type(space, sb.InnerProductSpace)
 assert_type(subspace.project(np.zeros((3, 2))), sb.PointCloud)
 assert_type(subspace.project(sb.PointCloud(np.zeros((3, 2)))), sb.PointCloud)
 assert_type(subspace.project(space), sb.InnerProductSpace)
+assert_type(subspace.project(sb.PointCloudTensor([np.zeros((3, 2))])), sb.PointCloudTensor)
+assert_type(sb.LpDistance(1)(np.zeros((3, 2))), sb.DistanceSpace)
 
 assert_type(sb.max_time(pcfs), sb.FloatTensor)
 assert_type(sb.mean(pcfs), sb.PcfTensor)
