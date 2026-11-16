@@ -1,6 +1,6 @@
 # Autodiff prototype: implementation plan
 
-Progress: 18 of 29 items, 40 of 70 points (57%)
+Progress: 19 of 29 items, 43 of 70 points (61%)
 
 Spec: [autodiff-prototype-spec.md](autodiff-prototype-spec.md)
 
@@ -105,7 +105,7 @@ Spec: [autodiff-prototype-spec.md](autodiff-prototype-spec.md)
 - [ ] **D7.** [2] Type descriptions for `PointCloudTensor`,
   `DistanceMatrixTensor`, and `SymmetricMatrixTensor`.
   Tests: serial round trip; indexing a tracked tensor of each type.
-- [ ] **D8.** [3] Reading `_data` of a tracked tensor raises (D5), so an
+- [x] **D8.** [3] (b70327319) Reading `_data` of a tracked tensor raises (D5), so an
   operation without gradients cannot drop them; `detach()` gives the
   untracked tensor; comparisons, saving, and pickling use the values. Done
   before D3, as is D9: they guard the tensors that D3 to D5 rework.
