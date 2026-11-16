@@ -1,6 +1,6 @@
 # Autodiff coverage: implementation plan
 
-Progress: 8 of 11 items, 20 of 25 points (80%)
+Progress: 9 of 11 items, 22 of 25 points (88%)
 
 Spec: [autodiff-prototype-spec.md](autodiff-prototype-spec.md), which each
 item updates where it changes a decision.
@@ -68,10 +68,11 @@ The last value of each sum is taken directly, not from the running sum, so that 
   PyTorch exponent), and `lp_distance` of tracked PCFs or with a PyTorch
   `p`.
   Tests: values match; gradients against finite differences.
-- [ ] **C3.** [2] `concatenate`, `stack`, `split`, and `array_split` of
+- [x] **C3.** [2] (6e84cd0ca) `concatenate`, `stack`, `split`, and `array_split` of
   tracked tensors, in one pass of the pending writes.
   Tests: match the untracked results for PCFs, barcodes, and point
   clouds; gradient through a concatenation.
+Joins take one concatenation and one gather of the rows, without pending writes, which would take a step per element.
 - [ ] **C4.** [2] `cdist` of tracked PCFs.
   Tests: matches the untracked distances; gradient against finite
   differences with respect to each side.
