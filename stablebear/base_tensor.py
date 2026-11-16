@@ -8,7 +8,7 @@ import numpy as np
 
 from . import _autodiff
 from . import _sb_cpp as cpp
-from ._tracked import Tracking, is_tracked, tracked_class
+from ._tracked import Tracking, from_elements, is_tracked, tracked_class
 from ._tensor_base import (
     ArithmeticTensor,
     FunctionTensor,
@@ -233,7 +233,16 @@ class _PcfTensorBase(ArithmeticTensor, FunctionTensor):
 
 
 class PcfTensor(_PcfTensorBase):
-    def __init__(self, data):
+    def __new__(cls, data: Any = None) -> PcfTensor:
+        if cls is PcfTensor and isinstance(data, list | tuple):
+            # A list with a PCF that carries gradients gives a tensor that
+            # carries them; see _tracked.
+            tracked = from_elements(PcfTensor, data)
+            if tracked is not None:
+                return tracked
+        return super().__new__(cls)
+
+    def __init__(self, data: Any):
         super().__init__()
         if is_tracked(data):
             raise TypeError(

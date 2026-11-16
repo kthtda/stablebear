@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 
 import stablebear as sb
+from stablebear import _autodiff
 
 from _frameworks import tracked
 from _round_trip import ROUND_TRIPS
@@ -545,12 +546,10 @@ def test_gradient_through_indexing_tracked_barcodes(fw):
     _assert_gradient_matches_finite_differences(fw, loss, [0.0, 1.0, 1.5, 3.0])
 
 
-def test_tracked_barcodes_cannot_be_changed_or_lose_gradients(fw):
+def test_tracked_barcodes_cannot_lose_gradients(fw):
     if fw.traces_abstractly:
         pytest.skip("Removing bars needs concrete bars")
     out = _tracked_batch(fw, fw.tensor([0.0, 1.0, 1.5, 3.0]))
-    with pytest.raises(TypeError, match="in place"):
-        out[0, 0] = sb.persistence.Barcode([[0.0, 1.0]])
     with pytest.raises(TypeError, match="copy"):
         sb.persistence.BarcodeTensor(out)
     with pytest.raises(NotImplementedError, match="astype"):
@@ -693,6 +692,115 @@ def test_tracked_pcfs_cannot_lose_gradients(fw):
     with pytest.raises(NotImplementedError, match="detach"):
         sb.pdist(out.flatten(), p=1, verbose=False)
     assert out.detach().array_equal(_pcf_grid())
+
+
+def _written_pcf():
+    return sb.Pcf(np.array([[0.0, 7.0], [5.0, 57.0]]))
+
+
+@pytest.mark.parametrize("write", [
+    pytest.param(lambda t: t.__setitem__((0, 1), _written_pcf()), id="element"),
+    pytest.param(lambda t: t.__setitem__(1, _written_pcf()), id="element_to_row"),
+    pytest.param(lambda t: t.__setitem__(0, sb.PcfTensor([_written_pcf(), _written_pcf() * 2.0])), id="tensor"),
+    pytest.param(lambda t: t.__setitem__(sb.tensor(np.array([[False, True], [True, False]])), _written_pcf()),
+                 id="mask"),
+])
+def test_write_to_tracked_pcfs_matches_write_to_plain_ones(fw, write):
+    out, expected = tracked(fw, _pcf_grid()), _pcf_grid()
+
+    write(out)
+    write(expected)
+
+    # Each element read sees the write, before and after it is applied.
+    for i in np.ndindex(2, 2):
+        assert out[i] == expected[i]
+    assert out.array_equal(expected)
+    for i in np.ndindex(2, 2):
+        assert out[i] == expected[i]
+    np.testing.assert_allclose(fw.to_numpy(sb.lp_norm(out, p=1.0)), np.asarray(sb.lp_norm(expected, p=1.0)))
+
+
+def test_later_write_to_tracked_pcfs_replaces_earlier_one(fw):
+    out = tracked(fw, _pcf_grid())
+
+    out[0, 0] = _written_pcf()
+    out[0, 0] = _written_pcf() * 2.0
+
+    assert out[0, 0] == _written_pcf() * 2.0
+    assert out.detach()[0, 0] == _written_pcf() * 2.0
+
+
+def test_write_to_copy_of_tracked_pcfs_leaves_them_unchanged(fw):
+    out = tracked(fw, _pcf_grid())
+    row = out[0]
+
+    row[1] = _written_pcf()
+
+    assert row[1] == _written_pcf()
+    assert out.array_equal(_pcf_grid())
+
+
+def test_gradient_flows_to_written_element_and_not_to_replaced_one(fw):
+    F, _ = _tensors()
+    g = sb.Pcf(np.array([[0.0, 2.0], [1.0, 4.0], [3.0, 0.0]]))
+
+    def loss(x):
+        out = x * F
+        out[1] = (x * x) * g
+        return fw.sum(sb.lp_norm(out, p=2.0))
+
+    _assert_gradient_matches_finite_differences(fw, loss, 1.5)
+
+
+def test_writes_to_tracked_barcodes_are_applied_in_one_pass(fw, monkeypatch):
+    Barcode = sb.persistence.Barcode
+    out = tracked(fw, _barcode_batch())
+    adapter = _autodiff._framework(out._tvalues)
+    calls = []
+    concat = adapter.concat
+
+    def counting(arrays):
+        calls.append(1)
+        return concat(arrays)
+
+    monkeypatch.setattr(adapter, "concat", counting)
+
+    out[0, 0] = Barcode([[0.0, 10.0]])
+    out[0, 1] = Barcode([[0.0, 20.0], [1.0, 21.0]])
+    out[1, 1] = Barcode([[0.0, 30.0]])
+    assert len(calls) == 0
+
+    np.testing.assert_array_equal(fw.to_numpy(out._tvalues), [[0.0, 10.0],
+                                                              [0.0, 20.0],
+                                                              [1.0, 21.0],
+                                                              [2.5, 4.0],
+                                                              [1.2, 2.1],
+                                                              [0.1, 0.4],
+                                                              [0.0, 30.0]])
+    assert len(calls) == 1
+
+
+def test_list_with_tracked_pcf_gives_tracked_tensor(fw):
+    f = sb.Pcf(np.array([[0.0, 1.0], [1.0, 11.0]]))
+    g = sb.Pcf(np.array([[0.0, 2.0], [3.0, 32.0], [4.0, 42.0]]))
+    tracked_g = sb.Pcf(fw.tensor([2.0, 32.0, 42.0]), times=np.array([0.0, 3.0, 4.0]))
+
+    out = sb.PcfTensor([[f, tracked_g],
+                        [tracked_g, f]])
+
+    assert out.shape == (2, 2)
+    assert out._tvalues is not None
+    assert out.array_equal(sb.PcfTensor([[f, g],
+                                         [g, f]]))
+
+
+def test_gradient_through_list_of_tracked_pcfs(fw):
+    f, g = _f_and_g()
+
+    def loss(x):
+        return fw.sum(sb.lp_norm(sb.PcfTensor([x * f, g, (x * x) * g]), p=2.0))
+
+    _assert_gradient_matches_finite_differences(fw, loss, 1.5)
 
 
 def test_arithmetic_on_stable_rank_with_equal_lifetimes_matches_numpy(fw):

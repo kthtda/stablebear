@@ -120,6 +120,11 @@ costs one pass, not n. Basic indexing of a tracked tensor gives a copy, not
 a view as for untracked tensors: writing to the result does not change the
 tensor it came from.
 
+A constructor given a list of elements, such as `PcfTensor([f, g])`, returns
+a tracked tensor when an element carries gradients: every element is written
+to an empty tensor, which one pass then fills. A list without such an element
+is scanned once more than before to tell.
+
 Rejected: applying each write at once, which copies the whole array per
 write in JAX and TensorFlow, and one framework array per element, which
 makes writes cheap but needs a Python loop for every batch operation.

@@ -14,22 +14,28 @@ enumeration. Its C++ object is derived from them, so the two cannot disagree,
 and kept until a framework array is changed in place. ``detach()`` gives the
 untracked object of the current values.
 
-A tracked tensor cannot be changed in place. Indexing, reshaping, and
-copying keep the gradients. Reading ``_data`` raises, so any operation that
+Indexing, reshaping, and copying a tracked tensor keep the gradients, and
+give a copy, not a view. Reading ``_data`` raises, so any operation that
 was not written for gradients raises instead of dropping them; code that
 handles them takes the C++ tensor from ``_cpp()``. Comparisons, saving, and
 pickling use the values. A single element, as from an integer index, is an
 untracked element object of the current values.
+
+A write to a tracked tensor is recorded in a table of pending writes, and
+the next use of the framework arrays applies all of them in one pass, so a
+loop of n writes costs one pass and not n. Reading an element looks in the
+table first.
 """
 
 from __future__ import annotations
 
+import itertools
 from typing import Any, Callable, NamedTuple
 
 import numpy as np
 
 from . import _sb_cpp as cpp
-from ._tensor_base import Tensor
+from ._tensor_base import Tensor, _infer_shape_and_flatten
 
 
 class Tracking(NamedTuple):
@@ -58,6 +64,32 @@ def _is_framework(x: Any) -> bool:
     return _autodiff._framework(x) is not None
 
 
+def _split_columns(content: np.ndarray, groups: tuple) -> list:
+    """The serial content as one array per group of columns."""
+    parts, start = [], 0
+    for _, width in groups:
+        parts.append(content[:, start] if width == 1 else content[:, start:start + width])
+        start += width
+    return parts
+
+
+def _concrete_content(parts: list, groups: tuple, np_dtype: Any) -> np.ndarray:
+    """The (m, k) serial content of the parts, with NaN where a framework
+    traces it abstractly."""
+    from . import _autodiff
+
+    columns = []
+    for part, (_, width) in zip(parts, groups):
+        values = part
+        if _is_framework(part):
+            values = _autodiff._framework(part).concrete(part)
+            if values is None:
+                values = np.full(tuple(part.shape), np.nan)
+        values = np.asarray(values, dtype=np_dtype)
+        columns.append(values.reshape(len(values), width))
+    return columns[0] if len(columns) == 1 else np.concatenate(columns, axis=1)
+
+
 class _TrackedObject:
     """The state of ``tracked_class(T)`` and what derives from it; see the
     module docstring."""
@@ -77,15 +109,18 @@ class _TrackedObject:
         # The state is set here and __init__ does nothing, so that the
         # constructor of the base type can return a tracked object.
         self = object.__new__(cls)
-        self._parts = list(parts)
-        self._enumeration = np.asarray(enumeration, dtype=np.int64)
-        all_float32 = all("float32" in str(part.dtype) for part in self._parts)
-        self._np_dtype = np.float32 if all_float32 else np.float64
-        for name, value in self._tracking.attributes(self._np_dtype).items():
-            setattr(self, name, value)
+        self._set_state(parts, enumeration)
         self._plain = plain
         self._plain_versions = self._versions() if plain is not None else None
         return self
+
+    def _set_state(self, parts: list, enumeration: np.ndarray) -> None:
+        self._parts = list(parts)
+        self._enumeration = np.asarray(enumeration, dtype=np.int64)
+        all_float32 = all("float32" in str(part.dtype) for part in parts)
+        self._np_dtype = np.float32 if all_float32 else np.float64
+        for name, value in self._tracking.attributes(self._np_dtype).items():
+            setattr(self, name, value)
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         pass
@@ -98,18 +133,7 @@ class _TrackedObject:
 
     def _concrete(self) -> np.ndarray:
         """The (m, k) serial content, with NaN where a framework traces it abstractly."""
-        from . import _autodiff
-
-        columns = []
-        for part, (_, width) in zip(self._parts, self._tracking.groups):
-            values = part
-            if _is_framework(part):
-                values = _autodiff._framework(part).concrete(part)
-                if values is None:
-                    values = np.full(tuple(part.shape), np.nan)
-            values = np.asarray(values, dtype=self._np_dtype)
-            columns.append(values.reshape(len(values), width))
-        return columns[0] if len(columns) == 1 else np.concatenate(columns, axis=1)
+        return _concrete_content(self._parts, self._tracking.groups, self._np_dtype)
 
     def _untracked(self) -> Any:
         """The untracked object of the current values, shared between calls."""
@@ -197,29 +221,124 @@ class _TrackedMixin(_TrackedObject):
         """The untracked tensor of the current values, without gradients."""
         return self._base(self._cpp())
 
+    # The state, stored as _p and _e, is read through _parts and
+    # _enumeration, which first apply the pending writes: for the flat index
+    # of each written element, the (parts, flat enumeration) of the value
+    # written and the index of its element there.
+    _p: list
+    _e: np.ndarray
+    _pending: dict[int, tuple[tuple[list, np.ndarray], int]] = {}
+
+    @property
+    def _parts(self) -> list:  # pyright: ignore[reportIncompatibleVariableOverride]
+        self._flush()
+        return self._p
+
+    @_parts.setter
+    def _parts(self, parts: list) -> None:  # pyright: ignore[reportIncompatibleVariableOverride]
+        self._p = parts
+
+    @property
+    def _enumeration(self) -> np.ndarray:  # pyright: ignore[reportIncompatibleVariableOverride]
+        self._flush()
+        return self._e
+
+    @_enumeration.setter
+    def _enumeration(self, enumeration: np.ndarray) -> None:  # pyright: ignore[reportIncompatibleVariableOverride]
+        self._e = enumeration
+
+    def _source(self, val: Any) -> tuple[list, np.ndarray]:
+        """The (parts, flat enumeration) of a value to write: a tensor or an
+        element, with or without gradients, or the rows of an element."""
+        if is_tracked(val):
+            return val._parts, val._enumeration.reshape(-1, 2)
+        if isinstance(val, Tensor):
+            content, enumeration = val._serial()  # pyright: ignore[reportAttributeAccessIssue]
+        else:
+            content = np.asarray(val if isinstance(val, np.ndarray) else val.to_numpy())
+            enumeration = np.array([0, len(content)])
+        return _split_columns(content, self._tracking.groups), np.asarray(enumeration).reshape(-1, 2)
+
+    def __setitem__(self, slices, val):
+        self._validate_setitem_dtype(val)  # pyright: ignore[reportAttributeAccessIssue]
+        ids = self._ids()[slices]
+        source = self._source(val)
+        if isinstance(val, Tensor):
+            if not isinstance(ids, Tensor):
+                raise ValueError("Cannot write a tensor to a single element.")
+            elements = np.arange(len(source[1])).reshape(tuple(val.shape))
+            elements = np.broadcast_to(elements, np.asarray(ids).shape).ravel()
+        else:
+            elements = itertools.repeat(0)
+        if not self._pending:
+            self._pending = {}
+        for target, element in zip(np.asarray(ids).ravel() if isinstance(ids, Tensor) else [ids], elements):
+            self._pending[int(target)] = (source, int(element))
+
+    def _flush(self) -> None:
+        """Apply the pending writes: per group of columns, one concatenation
+        of this tensor's rows with those of the written values, and one
+        gather of the rows of each element from where it now lives."""
+        from . import _autodiff
+
+        if not self._pending:
+            return
+        pending, self._pending = self._pending, {}
+        flat = self._e.reshape(-1, 2)
+        sources = [self._p]
+        number = {}
+        source_of = np.zeros(len(flat), dtype=np.int64)
+        starts, stops = flat[:, 0].copy(), flat[:, 1].copy()
+        for target, ((parts, enumeration), element) in pending.items():
+            if id(parts) not in number:
+                number[id(parts)] = len(sources)
+                sources.append(parts)
+            source_of[target] = number[id(parts)]
+            starts[target], stops[target] = enumeration[element]
+        lengths = [int(parts[0].shape[0]) for parts in sources]
+        offsets = np.cumsum([0] + lengths)
+        counts = stops - starts
+        ends = np.cumsum(counts)
+        rows = np.arange(int(counts.sum()), dtype=np.int64) + np.repeat(
+            offsets[source_of] + starts - (ends - counts), counts)
+
+        new_parts = []
+        for group in range(len(self._tracking.groups)):
+            arrays = [parts[group] for parts in sources]
+            like = next((array for array in arrays if _is_framework(array)), None)
+            if like is None:
+                new_parts.append(np.concatenate(arrays)[rows])
+                continue
+            adapter = _autodiff._framework(like)
+            combined = adapter.concat([
+                array if _is_framework(array) else adapter.as_tensor(array, like=like) for array in arrays])
+            new_parts.append(adapter.gather(combined, rows))
+        self._set_state(new_parts, np.stack([ends - counts, ends], axis=-1).reshape(self._e.shape))
+        self._plain = None
+
     @property
     def shape(self):
-        return cpp.Shape(list(self._enumeration.shape[:-1]))
+        return cpp.Shape(list(self._e.shape[:-1]))
 
     @property
     def ndim(self) -> int:
-        return self._enumeration.ndim - 1
+        return self._e.ndim - 1
 
     @property
     def size(self) -> int:
-        return int(np.prod(self._enumeration.shape[:-1]))
+        return int(np.prod(self._e.shape[:-1]))
 
     def __len__(self) -> int:
         if self.ndim == 0:
             raise TypeError("len() of a 0-d tensor")
-        return int(self._enumeration.shape[0])
+        return int(self._e.shape[0])
 
     def _ids(self):
         """An IntTensor of the flat indices of the elements, in this shape.
         Indexing and reshaping it as this tensor selects the elements."""
         from .base_tensor import IntTensor
 
-        return IntTensor(np.arange(self.size, dtype=np.int64).reshape(self._enumeration.shape[:-1]))
+        return IntTensor(np.arange(self.size, dtype=np.int64).reshape(self._e.shape[:-1]))
 
     def _select(self, ids: Any) -> Any:
         """The elements with flat indices ids: for an IntTensor, a tracked
@@ -227,11 +346,15 @@ class _TrackedMixin(_TrackedObject):
         untracked element of its current rows."""
         from . import _autodiff
 
-        flat = self._enumeration.reshape(-1, 2)
         if not isinstance(ids, Tensor):
-            start, stop = flat[ids]
+            # Without applying the pending writes: a written element is read
+            # from the value written.
+            (parts, enumeration), element = self._pending.get(int(ids), ((self._p, self._e.reshape(-1, 2)), int(ids)))
+            start, stop = enumeration[element]
             assert self._tracking.element is not None
-            return self._tracking.element(self._concrete()[start:stop])
+            return self._tracking.element(
+                _concrete_content(parts, self._tracking.groups, self._np_dtype)[start:stop])
+        flat = self._enumeration.reshape(-1, 2)
         ids = np.asarray(ids, dtype=np.int64)
         starts = flat[ids.ravel(), 0]
         counts = flat[ids.ravel(), 1] - starts
@@ -245,9 +368,6 @@ class _TrackedMixin(_TrackedObject):
 
     def __getitem__(self, slices):
         return self._select(self._ids()[slices])
-
-    def __setitem__(self, slices, val):
-        raise TypeError(f"A {self._base.__name__} that carries gradients cannot be changed in place.")
 
     def astype(self, dtype):
         raise NotImplementedError(f"astype of a {self._base.__name__} that carries gradients is not supported.")
@@ -305,3 +425,18 @@ def tracked_class(base: type) -> Any:
 
 def is_tracked(x: Any) -> bool:
     return isinstance(x, _TrackedObject)
+
+
+def from_elements(base: type, data: Any) -> Any:
+    """The tracked tensor of type ``base`` of a nested list of elements, if
+    an element carries gradients, and None otherwise. Every element is
+    written to an empty tensor, so the tensor is built in one pass."""
+    shape, flat = _infer_shape_and_flatten(data)
+    if not any(is_tracked(element) for element in flat):
+        return None
+    groups = base._tracking.groups  # pyright: ignore[reportAttributeAccessIssue]
+    tensor = tracked_class(base)(
+        [np.zeros(0) if width == 1 else np.zeros((0, width)) for _, width in groups], np.zeros(shape + (2,)))
+    tensor._pending = {index: (tensor._source(element), 0) for index, element in enumerate(flat)}
+    tensor._flush()
+    return tensor
