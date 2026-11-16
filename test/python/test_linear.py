@@ -78,3 +78,133 @@ def test_points_that_are_not_a_cloud_raise():
     ip = sb.InnerProduct(_gram())
     with pytest.raises(ValueError, match="shape"):
         ip(np.array([1.0, 10.0]))
+
+
+def _points():
+    return np.array([[1.0, 2.0, 3.0],
+                     [-4.0, 5.0, 6.0]])
+
+
+def test_subspace_gives_its_vectors_and_dimensions_back():
+    vectors = np.array([[1.0, 0.0, 0.0],
+                        [1.0, 1.0, 0.0]])
+
+    subspace = sb.LinearSubspace(vectors)
+
+    assert isinstance(subspace.vectors, sb.FloatTensor)
+    np.testing.assert_array_equal(np.asarray(subspace.vectors), vectors)
+    assert subspace.dim == 2
+    assert subspace.ambient_dim == 3
+
+
+@pytest.mark.parametrize("vectors, problem", [
+    pytest.param(np.array([1.0, 0.0]), "shape", id="not_a_matrix"),
+    pytest.param(np.zeros((0, 2)), "shape", id="no_vectors"),
+    pytest.param(np.array([[1.0, 2.0], [2.0, 4.0]]), "independent", id="parallel"),
+    pytest.param(np.array([[1.0, 0.0], [0.0, 1.0], [1.0, 1.0]]), "independent", id="more_than_the_dimension"),
+])
+def test_invalid_vectors_raise(vectors, problem):
+    with pytest.raises(ValueError, match=problem):
+        sb.LinearSubspace(vectors)
+
+
+def test_projection_onto_coordinate_plane_drops_the_other_coordinate():
+    plane = sb.LinearSubspace(np.array([[1.0, 0.0, 0.0],
+                                        [0.0, 1.0, 0.0]]))
+
+    projected = plane.project(_points())
+
+    assert isinstance(projected, sb.PointCloud)
+    np.testing.assert_allclose(np.asarray(projected), [[1.0, 2.0, 0.0],
+                                                       [-4.0, 5.0, 0.0]])
+
+
+def test_projection_onto_a_line():
+    # The line through (3, 4): the points (5, 0) and (0, 5) have the
+    # components 3 and 4 along its unit vector (0.6, 0.8).
+    line = sb.LinearSubspace(np.array([[3.0, 4.0]]))
+
+    projected = line.project(np.array([[5.0, 0.0],
+                                       [0.0, 5.0]]))
+
+    np.testing.assert_allclose(np.asarray(projected), [[1.8, 2.4],
+                                                       [2.4, 3.2]])
+
+
+@pytest.mark.parametrize("make_points", [
+    pytest.param(lambda points: points, id="array"),
+    pytest.param(lambda points: sb.FloatTensor(points), id="float_tensor"),
+    pytest.param(lambda points: sb.PointCloud(points), id="point_cloud"),
+])
+def test_projection_takes_every_kind_of_single_cloud(make_points):
+    plane = sb.LinearSubspace(np.array([[1.0, 0.0, 0.0],
+                                        [0.0, 1.0, 0.0]]))
+
+    projected = plane.project(make_points(_points()))
+
+    assert isinstance(projected, sb.PointCloud)
+    np.testing.assert_allclose(np.asarray(projected), [[1.0, 2.0, 0.0],
+                                                       [-4.0, 5.0, 0.0]])
+
+
+def test_projecting_twice_equals_projecting_once():
+    subspace = sb.LinearSubspace(np.array([[1.0, 2.0, 0.0],
+                                           [0.0, 1.0, 3.0]]))
+
+    once = subspace.project(_points())
+    twice = subspace.project(once)
+
+    np.testing.assert_allclose(np.asarray(twice), np.asarray(once))
+
+
+def test_projection_depends_only_on_the_span_of_the_vectors():
+    # Both pairs span the plane of the first two coordinates.
+    skewed = sb.LinearSubspace(np.array([[2.0, 0.0, 0.0],
+                                         [3.0, 5.0, 0.0]]))
+    orthonormal = sb.LinearSubspace(np.array([[1.0, 0.0, 0.0],
+                                              [0.0, 1.0, 0.0]]))
+
+    np.testing.assert_allclose(np.asarray(skewed.project(_points())), np.asarray(orthonormal.project(_points())))
+
+
+def test_projection_in_inner_product_space_is_orthogonal_in_its_inner_product():
+    gram = np.array([[2.0, 1.0, 0.0],
+                     [1.0, 2.0, 0.0],
+                     [0.0, 0.0, 3.0]])
+    vectors = np.array([[1.0, 2.0, 0.0],
+                        [0.0, 1.0, 3.0]])
+    ip = sb.InnerProduct(gram)
+
+    projected = sb.LinearSubspace(vectors).project(ip(_points()))
+
+    assert isinstance(projected, sb.InnerProductSpace)
+    assert projected.inner_product == ip
+    residual = _points() - np.asarray(projected.vectors)
+    # The inner product of each residual with each vector of the subspace.
+    np.testing.assert_allclose(residual @ gram @ vectors.T, np.zeros((2, 2)), atol=1e-12)
+    # The residuals are not orthogonal to the vectors in the Euclidean sense.
+    assert np.abs(residual @ vectors.T).max() > 0.1
+
+
+def test_projection_with_identity_inner_product_equals_euclidean_projection():
+    subspace = sb.LinearSubspace(np.array([[1.0, 2.0, 0.0],
+                                           [0.0, 1.0, 3.0]]))
+
+    in_space = subspace.project(sb.InnerProduct(np.eye(3))(_points()))
+
+    np.testing.assert_allclose(np.asarray(in_space.vectors), np.asarray(subspace.project(_points())))
+
+
+def test_projection_of_float32_points_onto_float32_subspace_is_float32():
+    plane = sb.LinearSubspace(np.array([[1.0, 0.0, 0.0],
+                                        [0.0, 1.0, 0.0]], dtype=np.float32))
+
+    projected = plane.project(_points().astype(np.float32))
+
+    assert projected.dtype == sb.float32
+
+
+def test_projection_of_points_of_another_dimension_raises():
+    line = sb.LinearSubspace(np.array([[3.0, 4.0]]))
+    with pytest.raises(ValueError, match="dimension 3"):
+        line.project(_points())

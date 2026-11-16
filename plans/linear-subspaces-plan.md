@@ -25,8 +25,8 @@ Spec: [linear-subspaces-spec.md](linear-subspaces-spec.md)
   inner product; an `InnerProductSpace` gives one back and a plain cloud a
   `PointCloud`; dependent vectors raise; points of another dimension raise.
 - [ ] **A3.** [3] Framework arrays for the points, the vectors, and the Gram
-  matrix (D7): the array operations (product, transpose, Cholesky factor,
-  triangular solve) in NumPy and in each adapter, and the linear algebra
+  matrix (D7): the array operations (product, transpose, solving a
+  linear system) in NumPy and in each adapter, and the linear algebra
   written against them.
   Tests: the projection of framework points matches NumPy; gradients with
   respect to the points, to the vectors, and to the Gram matrix against

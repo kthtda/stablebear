@@ -23,6 +23,14 @@ assert_type(plf([0.5]), np.ndarray)
 assert_type(plf(np.zeros(3)), np.ndarray)
 assert_type(plf(sb.FloatTensor(np.zeros(3))), sb.FloatTensor)
 
+subspace = sb.LinearSubspace([[1.0, 0.0]])
+space = sb.InnerProduct(np.eye(2))(np.zeros((3, 2)))
+
+assert_type(space, sb.InnerProductSpace)
+assert_type(subspace.project(np.zeros((3, 2))), sb.PointCloud)
+assert_type(subspace.project(sb.PointCloud(np.zeros((3, 2)))), sb.PointCloud)
+assert_type(subspace.project(space), sb.InnerProductSpace)
+
 assert_type(sb.max_time(pcfs), sb.FloatTensor)
 assert_type(sb.mean(pcfs), sb.PcfTensor)
 assert_type(sb.sum(pcfs), sb.PcfTensor)

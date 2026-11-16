@@ -112,7 +112,8 @@ in the kernel.
 
 **D5. The small linear algebra runs once, the points take one product.**
 The (d, d) matrix P = G V^T (V G V^T)^{-1} V is computed once per call,
-from the Cholesky factor of V G V^T, and the points are multiplied by it.
+by solving a system with the (k, k) matrix V G V^T, and the points are
+multiplied by it.
 The cost for the points is one matrix product, for a batch as well (D7).
 
 ## Distances
@@ -151,8 +152,8 @@ autodiff D14), and a tracked `PointCloudTensor` for a batch. Otherwise a
 single cloud gives a `PointCloud` and a batch a `PointCloudTensor`.
 
 The linear algebra of D5 and D6 is written once against a small set of
-array operations (product, transpose, Cholesky factor, triangular solve)
-that NumPy and each framework adapter provide. No operation has a shape
+array operations (product, transpose, solving a linear system, Cholesky
+factor) that NumPy and each framework adapter provide. No operation has a shape
 that depends on values, so projection works while JAX or `tf.function`
 traces, unlike persistent homology.
 
