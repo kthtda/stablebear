@@ -2,6 +2,7 @@
 #include <sbear/tensor.hpp>
 #include <sbear/walk.hpp>
 #include <sbear/functional/pcf.hpp>
+#include <sbear/algorithms/functional/iterate_rectangles.hpp>
 #include <sbear/persistence/barcode.hpp>
 
 #include "py_make_from_serial_content.hpp"
@@ -9,6 +10,8 @@
 #include "../py_np_support.hpp"
 
 #include <nanobind/ndarray.h>
+
+#include <vector>
 
 #include <iostream>
 
@@ -201,12 +204,97 @@ namespace sb_py
       });
   }
 
+  /// The union of the breakpoint times of two tensors of PCFs of the same
+  /// shape, per element, from the rectangles of each pair, in parallel.
+  /// Returns (times, sizes, fRows, gRows, fromG): the times of all elements,
+  /// concatenated in C order; the number of times of each element; and for
+  /// each time the positions, within their PCFs, of the breakpoints of f and
+  /// of g that hold at it, and whether the time is that of g's breakpoint
+  /// and not of f's.
+  template <typename Tt, typename Tv>
+  nb::tuple merge_breakpoints(const sb::Tensor<sb::Pcf<Tt, Tv>>& f, const sb::Tensor<sb::Pcf<Tt, Tv>>& g)
+  {
+    using RectangleT = sb::Rectangle<Tt, Tv>;
+
+    if (f.shape() != g.shape())
+    {
+      throw std::invalid_argument("merge_breakpoints: the tensors must have the same shape");
+    }
+
+    const auto& shape = f.shape();
+    std::vector<size_t> strides(shape.size(), 1);
+    for (size_t i = shape.size(); i-- > 1;)
+    {
+      strides[i - 1] = strides[i] * shape[i];
+    }
+    auto flat = [&strides](const std::vector<size_t>& idx) {
+      size_t k = 0;
+      for (size_t i = 0; i < idx.size(); ++i)
+      {
+        k += idx[i] * strides[i];
+      }
+      return k;
+    };
+    // Calls emit(rect, fRow, gRow) for each rectangle of nonzero width.
+    // Equal times within one PCF, as in a stable rank with equal lifetimes,
+    // give a rectangle of zero width, which is not a time of the union.
+    auto for_each_time = [&](const std::vector<size_t>& idx, auto&& emit) {
+      sb::iterate_rectangles_with_rows(f(idx).points(), g(idx).points(),
+        [&emit](const RectangleT& rect, size_t fRow, size_t gRow) {
+          if (rect.right > rect.left)
+          {
+            emit(rect, fRow, gRow);
+          }
+        });
+    };
+
+    const size_t n = f.size();
+    auto sizes = new_array<int64_t>({n});
+    {
+      nb::gil_scoped_release release;
+      sb::parallel_walk(f, [&](const std::vector<size_t>& idx) {
+        int64_t count = 0;
+        for_each_time(idx, [&count](const RectangleT&, size_t, size_t) { ++count; });
+        sizes.data()[flat(idx)] = count;
+      }, sb::default_executor());
+    }
+
+    std::vector<size_t> offsets(n + 1, 0);
+    for (size_t k = 0; k < n; ++k)
+    {
+      offsets[k + 1] = offsets[k] + static_cast<size_t>(sizes.data()[k]);
+    }
+
+    auto times = new_array<Tt>({offsets[n]});
+    auto fRows = new_array<int64_t>({offsets[n]});
+    auto gRows = new_array<int64_t>({offsets[n]});
+    auto fromG = new_array<bool>({offsets[n]});
+    {
+      nb::gil_scoped_release release;
+      sb::parallel_walk(f, [&](const std::vector<size_t>& idx) {
+        const auto& fpts = f(idx).points();
+        size_t out = offsets[flat(idx)];
+        for_each_time(idx, [&](const RectangleT& rect, size_t fRow, size_t gRow) {
+          times.data()[out] = rect.left;
+          fRows.data()[out] = static_cast<int64_t>(fRow);
+          gRows.data()[out] = static_cast<int64_t>(gRow);
+          fromG.data()[out] = fpts[fRow].t != rect.left;
+          ++out;
+        });
+      }, sb::default_executor());
+    }
+
+    return nb::make_tuple(times, sizes, fRows, gRows, fromG);
+  }
+
   void register_make_from_serial_content(nb::module_& m)
   {
     m.def("to_serial_content", &to_serial_content<sb::float32_t, sb::float32_t>);
     m.def("to_serial_content", &to_serial_content<sb::float64_t, sb::float64_t>);
     m.def("make_from_serial_content_32", &make_from_serial_content<sb::float32_t, sb::float32_t>);
     m.def("make_from_serial_content_64", &make_from_serial_content<sb::float64_t, sb::float64_t>);
+    m.def("merge_breakpoints", &merge_breakpoints<sb::float32_t, sb::float32_t>);
+    m.def("merge_breakpoints", &merge_breakpoints<sb::float64_t, sb::float64_t>);
     m.def("barcodes_to_serial_content", &barcodes_to_serial_content<sb::float32_t>);
     m.def("barcodes_to_serial_content", &barcodes_to_serial_content<sb::float64_t>);
     m.def("barcodes_from_serial_content_32", &barcodes_from_serial_content<sb::float32_t>);

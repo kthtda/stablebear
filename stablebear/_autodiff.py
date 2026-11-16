@@ -149,6 +149,47 @@ _ABSTRACT_TIMES = (
 )
 
 
+def _union_of_times(
+    pcfs: list, serials: list, enumerations: list, owners: list, offsets: np.ndarray, shape: tuple
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, list]:
+    """The union of the breakpoint times of one or two operands, per result element.
+
+    Operand j, ``pcfs[j]``, has serial content ``serials[j][0]`` and flat
+    enumeration ``enumerations[j]``, and result element k, of a result of the
+    given shape, takes its element ``owners[j][k]``. Returns the times of all
+    result elements, concatenated; the number of times of each; for each
+    time, the row of the breakpoint that gives it, of the first operand that
+    has one there, counted over the contents of all operands with operand j
+    starting at ``offsets[j]``; and per operand, for each time, the row of
+    its breakpoint that holds at it.
+    """
+    from . import _sb_cpp as cpp
+
+    if len(pcfs) == 1:
+        content, enumeration = serials[0][0], enumerations[0]
+        rows = np.arange(len(content), dtype=np.int64)
+        return content[:, 0], enumeration[:, 1] - enumeration[:, 0], rows, [rows]
+
+    def tensor(op, content, enumeration):
+        # A single Pcf as a 0-d tensor.
+        data = op._data if enumeration.ndim > 1 else _pcfs_tensor(content, enumeration)
+        return data.broadcast_to(list(shape))
+
+    times, sizes, f_local, g_local, from_g = cpp.merge_breakpoints(
+        *(tensor(op, content, enumeration) for op, (content, enumeration) in zip(pcfs, serials)))
+    element = np.repeat(np.arange(len(sizes)), sizes)
+    f_rows = enumerations[0][owners[0][element], 0] + f_local
+    g_rows = enumerations[1][owners[1][element], 0] + g_local
+    return times, sizes, np.where(from_g, offsets[1] + g_rows, f_rows), [f_rows, g_rows]
+
+
+def _pcfs_tensor(content: np.ndarray, enumeration: np.ndarray) -> Any:
+    """The C++ 0-d tensor holding the one PCF with the given serial content."""
+    from .serialize import from_serial_content
+
+    return from_serial_content(content, enumeration[None])._data.reshape([])
+
+
 def pcf_op(primal_op: Callable[..., Any], combine: Callable[..., Any], *operands: Any) -> Any:
     """An elementwise operation on PCFs, tensors of PCFs, and scalars.
 
@@ -179,17 +220,7 @@ def pcf_op(primal_op: Callable[..., Any], combine: Callable[..., Any], *operands
     owners = [np.broadcast_to(np.arange(int(np.prod(s))).reshape(s), shape).ravel() for s in shapes]
     enumerations = [enumeration.reshape(-1, 2) for _, enumeration in serials]
 
-    # ponytail: per-element loop in Python; move to C++ if it shows up in profiles
-    times, sources, gathers = [], [], [[] for _ in serials]
-    for k in range(int(np.prod(shape))):
-        ranges = [enumeration[owner[k]] for enumeration, owner in zip(enumerations, owners)]
-        candidates = np.concatenate([c[a:b, 0] for (c, _), (a, b) in zip(serials, ranges)])
-        global_index = np.concatenate([offset + np.arange(a, b) for offset, (a, b) in zip(offsets, ranges)])
-        t, first = np.unique(candidates, return_index=True)
-        times.append(t)
-        sources.append(global_index[first])
-        for gather, (c, _), (a, b) in zip(gathers, serials, ranges):
-            gather.append(a + np.searchsorted(c[a:b, 0], t, side="right") - 1)
+    times, sizes, sources, gathers = _union_of_times(pcfs, serials, enumerations, owners, offsets, shape)
 
     def values(i, op):
         if i not in pcf_positions:
@@ -198,7 +229,7 @@ def pcf_op(primal_op: Callable[..., Any], combine: Callable[..., Any], *operands
         v = op._tvalues
         if v is None:
             v = adapter.as_tensor(serials[j][0][:, 1], like=like)
-        return adapter.gather(v, np.concatenate(gathers[j]))
+        return adapter.gather(v, gathers[j])
 
     result_values = combine(*(values(i, op) for i, op in enumerate(operands)))
     result_times = None
@@ -207,13 +238,11 @@ def pcf_op(primal_op: Callable[..., Any], combine: Callable[..., Any], *operands
             op._ttimes if op._ttimes is not None else adapter.as_tensor(c[:, 0], like=like)
             for op, (c, _) in zip(pcfs, serials)
         ])
-        result_times = adapter.gather(all_times, np.concatenate(sources))
+        result_times = adapter.gather(all_times, sources)
 
-    sizes = np.array([len(t) for t in times])
     ends = np.cumsum(sizes)
     enumeration = np.stack([ends - sizes, ends], axis=-1).reshape(*shape, 2)
-    concat_times = np.concatenate(times)
-    content = np.column_stack([concat_times, _concrete_column(result_values, len(concat_times), adapter)])
+    content = np.column_stack([times, _concrete_column(result_values, len(times), adapter)])
     result = _pcfs_from_content(content.astype(serials[0][0].dtype), enumeration)
     result._tvalues = result_values
     result._ttimes = result_times

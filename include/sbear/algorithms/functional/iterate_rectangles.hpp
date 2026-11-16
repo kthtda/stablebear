@@ -2,6 +2,7 @@
 #define SB_ALGORITHM_ITERATE_RECTANGLES_H
 
 #include <algorithm>
+#include <cstddef>
 #include <limits>
 #include <vector>
 #include "../../functional/rectangle.hpp"
@@ -34,8 +35,14 @@ namespace sb
     return std::prev(it);
   }
 
+  /**
+   * Like iterate_rectangles, but calls cb(rect, fRow, gRow), where fRow and
+   * gRow are the positions in @p fpts and @p gpts of the breakpoints that
+   * give the rectangle its values. Breakpoints with equal times within one
+   * function give a rectangle of zero width.
+   */
   template <typename TimePointT, typename FCb>
-  void iterate_rectangles(const std::vector<TimePointT>& fpts, const std::vector<TimePointT>& gpts, FCb cb,
+  void iterate_rectangles_with_rows(const std::vector<TimePointT>& fpts, const std::vector<TimePointT>& gpts, FCb cb,
     typename TimePointT::time_type a = TimePointT::zero_time(), typename TimePointT::time_type b = TimePointT::infinite_time())
   {
     using TTime = typename TimePointT::time_type;
@@ -56,6 +63,8 @@ namespace sb
       tprev = t;
       fv = fi->v;
       gv = gi->v;
+      const auto fRow = static_cast<size_t>(fi - fpts.begin());
+      const auto gRow = static_cast<size_t>(gi - gpts.begin());
 
       auto fi_next = std::next(fi);
       auto gi_next = std::next(gi);
@@ -87,7 +96,7 @@ namespace sb
         rect.f_value = fv;
         rect.g_value = gv;
 
-        cb(rect);
+        cb(rect, fRow, gRow);
 
         return;
       }
@@ -99,8 +108,16 @@ namespace sb
       rect.f_value = fv;
       rect.g_value = gv;
 
-      cb(rect);
+      cb(rect, fRow, gRow);
     }
+  }
+
+  template <typename TimePointT, typename FCb>
+  void iterate_rectangles(const std::vector<TimePointT>& fpts, const std::vector<TimePointT>& gpts, FCb cb,
+    typename TimePointT::time_type a = TimePointT::zero_time(), typename TimePointT::time_type b = TimePointT::infinite_time())
+  {
+    using RectangleT = Rectangle<typename TimePointT::time_type, typename TimePointT::value_type>;
+    iterate_rectangles_with_rows(fpts, gpts, [&cb](const RectangleT& rect, size_t, size_t) { cb(rect); }, a, b);
   }
 
   template <typename PointBiDirIterator, typename FCb>

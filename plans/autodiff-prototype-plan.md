@@ -53,8 +53,13 @@ Spec: [autodiff-prototype-spec.md](autodiff-prototype-spec.md)
   Tests: the kernel gradient tests pass; the kernel runs once per
   forward and backward.
 - [ ] **C4.** [3] PCF arithmetic with a tracked operand without a Python
-  loop over elements.
-  Tests: the arithmetic gradient tests pass; note the timings.
+  loop over elements: the union of the operands' times comes from
+  `iterate_rectangles_with_rows` in C++, which reports the breakpoints of
+  each rectangle, in parallel over the elements.
+  Tests: C++ tests of `iterate_rectangles_with_rows` (rows of each
+  rectangle; one function ending first; same rectangles as
+  `iterate_rectangles`); arithmetic on a stable rank with equal
+  lifetimes; the arithmetic gradient tests pass; note the timings.
 - [ ] **C5.** [2] The sorting order of the tracked stable rank computed in
   C++, per barcode in parallel, in place of one `lexsort` over all bars.
   Tests: the stable rank tests pass; equal lifetimes and an empty barcode
@@ -102,6 +107,8 @@ Spec: [autodiff-prototype-spec.md](autodiff-prototype-spec.md)
   critical simplices of each bar.
   Tests: bars match the untracked ones; gradient against finite
   differences in dimensions 0 and 1.
-- [ ] **E4.** [3] `pdist` and the L2 kernel of tracked PCFs.
+- [ ] **E4.** [3] `pdist` and the L2 kernel of tracked PCFs, with the
+  distances and their gradients accumulated by rectangle iteration in C++,
+  without building the difference of each pair.
   Tests: match the untracked matrices; gradient with respect to values
   and times against finite differences.

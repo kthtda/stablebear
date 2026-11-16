@@ -657,6 +657,22 @@ def test_tracked_barcodes_cannot_be_changed_or_lose_gradients(fw):
         out.astype(sb.barcode32)
 
 
+def test_arithmetic_on_stable_rank_with_equal_lifetimes_matches_numpy(fw):
+    if fw.traces_abstractly:
+        pytest.skip("Removing bars needs concrete bars")
+    # The bars (0.2, 1.2) and (0.5, 1.5) have the same lifetime, so the
+    # tracked stable rank has a repeated time.
+    barcodes = sb.persistence.BarcodeTensor([sb.persistence.Barcode([[0.2, 1.2], [0.5, 1.5], [1.0, 3.0]])])
+    target = sb.PcfTensor([sb.Pcf(np.array([[0.0, 2.0], [0.7, 1.0], [2.5, 0.0]]))])
+    times = np.array([0.0, 4.0])
+    tracked = sb.persistence.barcode_to_stable_rank(
+        sb.persistence.transform_bars(barcodes, sb.Plf(fw.tensor([0.0, 4.0]), times=times)))
+    plain = sb.persistence.barcode_to_stable_rank(
+        sb.persistence.transform_bars(barcodes, sb.Plf(np.array([0.0, 4.0]), times=times)))
+    t = np.linspace(0.0, 3.0, 61)
+    np.testing.assert_allclose((tracked - target)[0](t), (plain - target)[0](t))
+
+
 def test_barcode_serial_content_round_trip():
     bc = _barcode_batch()
     content, enumeration = bc._serial()
