@@ -1059,3 +1059,58 @@ def test_persistent_homology_under_lp_distance_of_indexed_batch_is_that_of_its_d
     assert out.shape == (3, 2)
     for i in np.ndindex(3, 2):
         assert out[i].is_isomorphic_to(expected[i], atol=1e-12, rtol=1e-12)
+
+
+def _series3():
+    # The clouds of _batch3 at the times 0, 1, and 2.5.
+    return sb.timeseries.TimeSeries(sb.PointCloudTensor(_batch3()), times=[0.0, 1.0, 2.5])
+
+
+def _series2():
+    # The clouds of _batch2 at the times 0, 1, and 2.5.
+    return sb.timeseries.TimeSeries(sb.PointCloudTensor(_batch2()), times=[0.0, 1.0, 2.5])
+
+
+@pytest.mark.parametrize("gram", [None, _gram3()], ids=["euclidean", "inner_product"])
+def test_projection_of_series_is_the_series_of_the_projections(gram):
+    subspace = sb.LinearSubspace(_vectors())
+
+    def in_space(points):
+        return points if gram is None else sb.InnerProduct(gram)(points)
+
+    projected = subspace.project(in_space(_series3()))
+
+    if gram is not None:
+        assert isinstance(projected, sb.InnerProductSpace)
+        projected = projected.points
+    assert isinstance(projected, sb.timeseries.TimeSeries)
+    assert projected.times.array_equal(_series3().times)
+    for i, cloud in enumerate(_batch3()):
+        alone = subspace.project(in_space(cloud))
+        alone = alone if gram is None else alone.points
+        np.testing.assert_allclose(np.asarray(projected.values[i]), np.asarray(alone), atol=1e-12)
+
+
+@pytest.mark.parametrize("make_distance", _BATCH_DISTANCES)
+def test_persistent_homology_of_series_in_distance_space_is_the_series_of_the_barcodes(make_distance):
+    distance = make_distance()
+
+    out = _homology(distance(_series2()))
+
+    assert isinstance(out, sb.timeseries.TimeSeries)
+    assert out.times.array_equal(_series2().times)
+    for i, cloud in enumerate(_batch2()):
+        alone = _homology(distance(cloud))
+        for dim in range(2):
+            assert out.values[i, dim].is_isomorphic_to(alone[dim], atol=1e-12, rtol=1e-12)
+
+
+def test_distance_space_of_series_that_does_not_hold_point_clouds_raises():
+    series = sb.timeseries.TimeSeries([10.0, 20.0], times=[0.0, 1.0])
+    with pytest.raises(TypeError, match="point clouds"):
+        sb.LpDistance(1)(series)
+
+
+def test_projection_of_series_onto_framework_subspace_raises(fw):
+    with pytest.raises(NotImplementedError, match="gradients"):
+        sb.LinearSubspace(fw.tensor(_vectors())).project(_series3())

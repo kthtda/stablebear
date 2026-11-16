@@ -12,6 +12,7 @@ from . import _sb_cpp as cpp
 from .distance_matrix import DistanceMatrixTensor
 from ._tracked import is_tracked, tracked_class
 from .point_cloud import PointCloud, PointCloudTensor
+from .timeseries.series import TimeSeries
 from .typing import Dtype, pcloud32, pcloud64
 
 
@@ -78,6 +79,10 @@ def _as_point_cloud(points: Any) -> Any:
     gradients."""
     points = _autodiff._unwrap(points)
     if isinstance(points, PointCloudTensor):
+        return points
+    if isinstance(points, TimeSeries):
+        if points.dtype not in (pcloud32, pcloud64):
+            raise TypeError(f"Expected a time series of point clouds, got one of dtype {points.dtype}.")
         return points
     if _autodiff._framework(points) is not None:
         if len(points.shape) < 2:
@@ -179,7 +184,8 @@ class InnerProduct:
         points : PointCloud, FloatTensor, or numpy.ndarray
             A point cloud of shape ``(n, d)``, one point per row, which may
             be a PyTorch, JAX, or TensorFlow array, or a batch of point
-            clouds as a ``PointCloudTensor``.
+            clouds as a ``PointCloudTensor`` or a time series of point
+            clouds.
 
         Returns
         -------
@@ -229,7 +235,8 @@ class Distance:
         points : PointCloud, FloatTensor, or numpy.ndarray
             A point cloud of shape ``(n, d)``, one point per row, which may
             be a PyTorch, JAX, or TensorFlow array, or a batch of point
-            clouds as a ``PointCloudTensor``.
+            clouds as a ``PointCloudTensor`` or a time series of point
+            clouds.
 
         Returns
         -------
@@ -248,9 +255,11 @@ class Distance:
         distance has none, and is computed from pairs of points."""
         return None
 
-    def _distance_matrices(self, clouds: PointCloudTensor) -> DistanceMatrixTensor:
-        """The distances between the points of each cloud, for a distance
-        without _euclidean_points."""
+    def _distance_matrices(self, clouds: Any) -> Any:
+        """The distances between the points of each cloud of a
+        PointCloudTensor or of a time series of point clouds, as a
+        DistanceMatrixTensor or a time series of distance matrices, for a
+        distance without _euclidean_points."""
         raise NotImplementedError
 
     def _lengths(self, adapter: Any, differences: Any) -> Any:
@@ -349,8 +358,11 @@ class LpDistance(Distance):
     def _euclidean_points(self, X: Any) -> Any:
         return X if self._p == 2 else None
 
-    def _distance_matrices(self, clouds: PointCloudTensor) -> DistanceMatrixTensor:
-        return DistanceMatrixTensor(cpp.pairwise_lp_distances(clouds._data, self._p))
+    def _distance_matrices(self, clouds: Any) -> Any:
+        distances: Any = cpp.pairwise_lp_distances  # overloaded on the container
+        if isinstance(clouds, TimeSeries):
+            return TimeSeries._from_cpp(distances(clouds._data, self._p))
+        return DistanceMatrixTensor(distances(clouds._data, self._p))
 
     def _lengths(self, adapter: Any, differences: Any) -> Any:
         return adapter.row_lp_norms(differences, self._p)
@@ -376,7 +388,7 @@ class DistanceSpace:
     points : PointCloud, FloatTensor, or numpy.ndarray
         A point cloud of shape ``(n, d)``, one point per row, which may be a
         PyTorch, JAX, or TensorFlow array, or a batch of point clouds as a
-        ``PointCloudTensor``.
+        ``PointCloudTensor`` or a time series of point clouds.
     distance : Distance
         The distance between the points.
 
@@ -400,7 +412,7 @@ class DistanceSpace:
     def points(self) -> Any:
         """The points, as a ``PointCloud``, as the PyTorch, JAX, or
         TensorFlow array that they were given as, or as the
-        ``PointCloudTensor`` of a batch."""
+        ``PointCloudTensor`` or time series of a batch."""
         return self._points
 
     @property
@@ -411,7 +423,7 @@ class DistanceSpace:
     @property
     def dtype(self) -> Dtype:
         """The dtype of what holds the points, such as ``pcloud64``."""
-        if isinstance(self._points, PointCloudTensor):
+        if isinstance(self._points, (PointCloudTensor, TimeSeries)):
             return self._points.dtype
         return pcloud32 if _is_float32(self._points) else pcloud64
 
@@ -434,7 +446,7 @@ class InnerProductSpace(DistanceSpace):
     points : PointCloud, FloatTensor, or numpy.ndarray
         A point cloud of shape ``(n, d)``, one point per row, which may be a
         PyTorch, JAX, or TensorFlow array, or a batch of point clouds as a
-        ``PointCloudTensor``.
+        ``PointCloudTensor`` or a time series of point clouds.
     inner_product : InnerProduct
         The inner product, on vectors of dimension ``d``.
 
@@ -525,6 +537,8 @@ class LinearSubspace:
     @overload
     def project(self, points: PointCloudTensor) -> PointCloudTensor: ...
     @overload
+    def project(self, points: TimeSeries) -> TimeSeries: ...
+    @overload
     def project(self, points: PointCloud | FloatTensor | np.ndarray | list) -> PointCloud: ...
     @overload
     def project(self, points: Any) -> Any: ...
@@ -549,18 +563,20 @@ class LinearSubspace:
 
         Parameters
         ----------
-        points : PointCloud, PointCloudTensor, FloatTensor, numpy.ndarray, or InnerProductSpace
+        points : PointCloud, PointCloudTensor, TimeSeries, FloatTensor, numpy.ndarray, or InnerProductSpace
             A point cloud of shape ``(n, d)``, one point per row, which may
             be a PyTorch, JAX, or TensorFlow array; a batch of point clouds
-            as a ``PointCloudTensor``, each of which is projected; or
-            either with its inner product.
+            as a ``PointCloudTensor`` or a time series of point clouds,
+            each of which is projected; or any of these with its inner
+            product.
 
         Returns
         -------
-        PointCloud, PointCloudTensor, or InnerProductSpace
+        PointCloud, PointCloudTensor, TimeSeries, or InnerProductSpace
             The projected points, of the shape of the input: a
             ``PointCloud`` for a plain point cloud, a ``PointCloudTensor``
-            for a batch, and an ``InnerProductSpace`` with the same inner
+            for a batch, a time series with the times of the input for a
+            time series, and an ``InnerProductSpace`` with the same inner
             product for an ``InnerProductSpace``. If the points, the
             vectors of the subspace, or the Gram matrix of the inner
             product are PyTorch, JAX, or TensorFlow arrays, the projected
@@ -619,6 +635,8 @@ def _dim(cloud: Any) -> int | None:
     untracked batch, whose clouds would each have to be read to tell."""
     if isinstance(cloud, PointCloudTensor):
         return int(cloud._tvalues.shape[1]) if is_tracked(cloud) else None
+    if isinstance(cloud, TimeSeries):
+        return None
     return int(cloud.shape[1])
 
 
@@ -633,6 +651,13 @@ def _multiply(points: Any, matrix: Any) -> Any:
     multiplied in one product. An untracked batch times a NumPy matrix is
     multiplied in C++, in parallel over its clouds.
     """
+    if isinstance(points, TimeSeries):
+        if _autodiff._framework(matrix) is not None:
+            raise NotImplementedError("A time series of point clouds does not carry gradients.")
+        np_dtype = np.float32 if points.dtype is pcloud32 else np.float64
+        multiply_series: Any = cpp.multiply_points  # overloaded on the container
+        return TimeSeries._from_cpp(multiply_series(points._data, np.ascontiguousarray(matrix, dtype=np_dtype)))
+
     if not isinstance(points, PointCloudTensor):
         xp, (points, matrix) = _in_one_framework(points, matrix)
         product = xp.matmul(points, matrix)
@@ -655,12 +680,12 @@ def _multiply(points: Any, matrix: Any) -> Any:
     return tracked_class(PointCloudTensor)([xp.matmul(content, matrix)], enumeration)
 
 
-def _distance_matrices(space: DistanceSpace) -> DistanceMatrixTensor:
+def _distance_matrices(space: DistanceSpace) -> Any:
     """The distances between the points of each cloud of an untracked
     space, for a distance without _euclidean_points: one matrix for a single
     cloud."""
     points = space.points
-    if not isinstance(points, PointCloudTensor):
+    if not isinstance(points, (PointCloudTensor, TimeSeries)):
         points = PointCloudTensor([np.asarray(points)])
     return space.distance._distance_matrices(points)
 

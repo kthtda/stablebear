@@ -147,7 +147,9 @@ Batches
 Every operation on this page also takes a batch of point clouds as a
 :py:class:`~stablebear.point_cloud.PointCloudTensor`, alone or in a
 ``DistanceSpace``, and treats each point cloud separately. The point clouds
-of a batch may have different numbers of points::
+of a batch may have different numbers of points. Projection and persistent
+homology take a :doc:`time series <timeseries>` of point clouds in the same
+way, and give a time series with its times::
 
    clouds = sb.PointCloudTensor([points, points[:3]])
 
