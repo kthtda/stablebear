@@ -197,13 +197,25 @@ def cdist(X: PcfContainerLike, Y: PcfContainerLike, p: float = 1, verbose: bool 
     Returns
     -------
     FloatTensor
-        A tensor of shape ``(*X.shape, *Y.shape)`` containing pairwise distances.
+        A tensor of shape ``(*X.shape, *Y.shape)`` containing pairwise
+        distances. If the PCFs of `X` or of `Y` carry gradients, the
+        distances instead as a PyTorch tensor of that shape, which carries
+        gradients as those of :func:`pdist` do.
     """
     _autodiff.require_number(p, "p")
     if p < 1:
         raise ValueError("p must be >= 1.")
 
     backend, Xt, Yt = _resolve_pcf_inputs(_DISTANCE_BACKEND_MAP, X, Y)
+
+    if is_tracked(Xt) or is_tracked(Yt):
+        from .tensor_create import concatenate
+
+        # ponytail: all pairs of X and Y together, of which the pairs across
+        # are kept; a gradient of cdist in C++ if the pairs within cost too much.
+        distances = _tracked_pdist(concatenate([Xt.flatten(), Yt.flatten()]), p, verbose)
+        adapter = _autodiff._framework(distances)
+        return adapter.reshape(distances[:Xt.size, Xt.size:], (*Xt.shape, *Yt.shape))
 
     if p == 1:
         task, out = backend.cdist_l1(Xt._data, Yt._data)

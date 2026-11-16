@@ -557,7 +557,7 @@ def test_tracked_pcfs_cannot_lose_gradients(fw):
     with pytest.raises(TypeError, match="copy"):
         sb.PcfTensor(out)
     with pytest.raises(NotImplementedError, match="detach"):
-        sb.cdist(out.flatten(), out.flatten(), p=1, verbose=False)
+        sb.max_time(out)
     assert out.detach().array_equal(_pcf_grid())
 
 
@@ -1768,3 +1768,46 @@ def test_gradient_through_concatenation_and_split(fw):
         return fw.sum(sb.lp_norm(first, p=2.0)) + fw.sum(sb.lp_norm(second - G, p=1.0))
 
     _assert_gradient_matches_finite_differences(fw, loss, 1.5)
+
+
+@pytest.mark.parametrize("p", [1, 2.5])
+@pytest.mark.parametrize("which", ["X", "Y", "both"])
+def test_cdist_of_tracked_pcfs_matches_untracked(fw, p, which):
+    X, (F, _) = _pcf_grid(), _tensors()
+
+    out = sb.cdist(tracked(fw, X) if which != "Y" else X, tracked(fw, F) if which != "X" else F, p=p, verbose=False)
+
+    assert isinstance(out, fw.tensor_type)
+    assert tuple(out.shape) == (2, 2, 3)
+    np.testing.assert_allclose(fw.to_numpy(out), np.asarray(sb.cdist(X, F, p=p, verbose=False)))
+
+
+def _cdist_weights():
+    return np.array([[1.0, 2.0, -1.0],
+                     [0.5, 3.0, 4.0]])
+
+
+@pytest.mark.parametrize("p", [1.0, 2.5])
+@pytest.mark.parametrize("side", ["X", "Y"])
+def test_cdist_gradient_wrt_pcf_values(fw, p, side):
+    f, g = _f_and_g()
+    F, _ = _tensors()
+    times = np.array([0.0, 0.5, 2.0, 4.5, 8.0])
+
+    def loss(c):
+        h = sb.PcfTensor([f, sb.Pcf(fw.concat([c, fw.tensor([0.0])]), times=times)])
+        distances = sb.cdist(h, F, p=p, verbose=False) if side == "X" else sb.cdist(F, h, p=p, verbose=False).T
+        return fw.sum(fw.tensor(_cdist_weights()) * distances)
+
+    _assert_gradient_matches_finite_differences(fw, loss, [0.7, -1.3, 0.4, 2.0])
+
+
+def test_cdist_gradient_wrt_pcf_times(fw):
+    f, g = _f_and_g()
+    F, _ = _tensors()
+
+    def loss(t):
+        h = sb.PcfTensor([f, sb.Pcf(_VALUES, times=fw.concat([fw.tensor([0.0]), t]))])
+        return fw.sum(fw.tensor(_cdist_weights()) * sb.cdist(h, F, p=2.0, verbose=False))
+
+    _assert_gradient_matches_finite_differences(fw, loss, _TIMES)
