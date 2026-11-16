@@ -1,6 +1,6 @@
 # Autodiff coverage: implementation plan
 
-Progress: 3 of 11 items, 8 of 25 points (32%)
+Progress: 4 of 11 items, 10 of 25 points (40%)
 
 Spec: [autodiff-prototype-spec.md](autodiff-prototype-spec.md), which each
 item updates where it changes a decision.
@@ -34,7 +34,7 @@ that did not say why, and common operations without gradients.
 
 ## Phase B: Errors that say why, and missing inputs
 
-- [ ] **B1.** [2] PCF arithmetic with one number per PCF: a PyTorch tensor,
+- [x] **B1.** [2] (addadb8dc) PCF arithmetic with one number per PCF: a PyTorch tensor,
   NumPy array, or `FloatTensor` of the shape of the PCF tensor scales each
   PCF, where it now combines with each breakpoint and fails.
   Tests: `F * w` for a PyTorch vector `w` matches scaling each PCF;
