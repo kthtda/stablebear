@@ -1,6 +1,6 @@
 # Prototype cleanup: implementation plan
 
-Progress: 4 of 8 items, 10 of 17 points (59%)
+Progress: 5 of 8 items, 12 of 17 points (71%)
 
 Specs: [autodiff-prototype-spec.md](autodiff-prototype-spec.md) and
 [linear-subspaces-spec.md](linear-subspaces-spec.md), which each item
@@ -43,7 +43,7 @@ Gradients are supported for PyTorch only, for now. The APIs released on
   Tests: round trip with `from_serial_content` for PCFs; the content of a
   tracked tensor is a PyTorch tensor with the values of the untracked
   content; a loss on it gives gradients.
-- [ ] **B3.** [2] One rule for results with gradients: a dense numeric
+- [x] **B3.** [2] (d1878df5b) One rule for results with gradients: a dense numeric
   result is a PyTorch tensor, and a tensor of elements of different sizes
   is a tracked stablebear tensor. `project` of a PyTorch tensor of any
   shape (..., n, d) gives a PyTorch tensor of that shape, and a space keeps
@@ -51,6 +51,8 @@ Gradients are supported for PyTorch only, for now. The APIs released on
   Tests: `project` of a PyTorch tensor of shape (b, n, d) gives one of
   that shape; persistent homology of it in a space gives a tracked
   `BarcodeTensor`.
+  Note: `torch.Tensor` in docstrings is now on the docs' list of names
+  without a target, which also quiets the warnings of `lp_norm`.
 
 ## Phase C: Names, measurements, and documents
 
