@@ -1,6 +1,6 @@
 # Autodiff coverage: implementation plan
 
-Progress: 2 of 11 items, 5 of 25 points (20%)
+Progress: 3 of 11 items, 8 of 25 points (32%)
 
 Spec: [autodiff-prototype-spec.md](autodiff-prototype-spec.md), which each
 item updates where it changes a decision.
@@ -23,7 +23,7 @@ that did not say why, and common operations without gradients.
   Tests: values match the untracked evaluation; gradients against finite
   differences with respect to PCF values, PLF values, PLF times, and the
   times of evaluation of a PLF; a tracked `PcfTensor`.
-- [ ] **A3.** [3] An integer index into a tracked tensor gives an element
+- [x] **A3.** [3] (95458978d) An integer index into a tracked tensor gives an element
   that carries gradients: a tracked `Pcf` or `Barcode`, and for a point
   cloud the PyTorch tensor of its points. The barcode summaries and
   `transform_bars` take a tracked `Barcode`, and `BarcodeTensor` of a list
