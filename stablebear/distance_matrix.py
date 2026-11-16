@@ -292,7 +292,11 @@ class DistanceMatrixTensor(IndexedElementTensor):
     ----------
     data : numpy.ndarray or DistanceMatrixTensor
         An ndarray of shape ``(*tensor_shape, n, n)`` whose trailing two axes
-        form each n×n distance matrix, or an existing tensor.
+        form each n×n distance matrix, or an existing tensor. A PyTorch
+        tensor of that shape that carries gradients gives a tensor that
+        carries them with respect to the entries below the diagonal of each
+        matrix, the only ones it reads; a single matrix of shape ``(n, n)``
+        then gives a tensor of shape ``(1,)``.
     dtype : distmat32 or distmat64, optional
         Element precision. Inferred from the array dtype when ``None``.
     """
@@ -300,7 +304,15 @@ class DistanceMatrixTensor(IndexedElementTensor):
     _indexed_cpp_types = _INDEXED_DISTMAT_CPP_TYPES
     _indexed_element_name = "Distance-matrix"
 
-    def __init__(self, data, dtype=None):
+    def __new__(cls, data: Any = None, dtype: Any = None) -> DistanceMatrixTensor:
+        if cls is DistanceMatrixTensor:
+            adapter = _autodiff._framework(data)
+            if adapter is not None and adapter.requires_grad(data):
+                # A tensor that carries the gradients; see _tracked.
+                return _tracked_distance_matrices(data)
+        return super().__new__(cls)
+
+    def __init__(self, data: Any, dtype=None):
         super().__init__()
         data = _autodiff.dense(data, "A DistanceMatrixTensor")
         if isinstance(data, DistanceMatrixTensor):
@@ -413,3 +425,25 @@ DistanceMatrixTensor._tracking = Tracking(  # pyright: ignore[reportAttributeAcc
 # arrays, built from [entries], the enumeration, and the sizes of _serial;
 # see _tracked.
 _TrackedDistanceMatrixTensor = tracked_class(DistanceMatrixTensor)
+
+
+def _tracked_distance_matrices(data: Any) -> Any:
+    """The DistanceMatrixTensor that carries gradients for a framework array
+    of shape (..., n, n): its entries below the diagonal, by rows, as one
+    framework array for all matrices. An array of shape (n, n) is a batch
+    of one matrix."""
+    adapter = _autodiff._framework(data)
+    shape = tuple(int(size) for size in data.shape)
+    if len(shape) < 2 or shape[-1] != shape[-2]:
+        raise ValueError(f"Distance matrices must have shape (..., n, n) (got shape {shape}).")
+    n = shape[-1]
+    batch = shape[:-2] or (1,)
+    count = int(np.prod(batch))
+    rows, columns = np.tril_indices(n, -1)
+    per_matrix = len(rows)
+    # The positions of the entries below the diagonal in the flattened array.
+    positions = (np.arange(count)[:, None] * n * n + rows * n + columns).reshape(-1)
+    entries = adapter.gather(adapter.reshape(data, (-1,)), positions)
+    starts = np.arange(count, dtype=np.int64) * per_matrix
+    enumeration = np.stack([starts, starts + per_matrix], axis=-1).reshape(*batch, 2)
+    return _TrackedDistanceMatrixTensor([entries], enumeration, sizes=np.full(batch, n, dtype=np.int64))

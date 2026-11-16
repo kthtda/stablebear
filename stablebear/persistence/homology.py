@@ -11,12 +11,13 @@ from ..distance_matrix import (
     DistanceMatrix,
     DistanceMatrixTensor,
 )
+from .._tracked import is_tracked
 from ..base_tensor import FloatTensor
 from ..geometry import DistanceSpace, _distance_matrices, _points_array
 from ..point_cloud import PointCloud, PointCloudTensor
 from ..timeseries.series import TimeSeries, TimeSeriesTensor
 from ..typing import barcode32, barcode64, distmat32, distmat64, float32, float64, pcloud32, pcloud64
-from ._critical_edges import as_batch, batch_parts, tracked_bars
+from ._critical_edges import as_batch, batch_parts, matrix_entries, point_distances, tracked_bars
 from .ph_tensor import BarcodeTensor
 
 cpp_p = cpp.persistence
@@ -89,7 +90,25 @@ def _tracked_persistent_homology(X: Any, max_dim: int, reduced: bool, distance: 
 
     backend = cpp_p.PersistenceRipser32 if plain.dtype is pcloud32 else cpp_p.PersistenceRipser64
     bars, enumeration, edges = backend.persistence_critical_edges(elements._data, max_dim, reduced)
-    out = tracked_bars(adapter, (points, starts), (points, starts), bars, enumeration, edges, lengths)
+    out = tracked_bars(
+        adapter, (points, starts), (points, starts), bars, enumeration, edges, point_distances(lengths))
+    # A tensor with one element loses its leading axis, as without gradients.
+    if len(out.shape) == 2 and out.shape[0] == 1:
+        out = out[0, :]
+    return out
+
+
+def _tracked_persistent_homology_of_distances(distances: Any, max_dim: int, reduced: bool) -> Any:
+    """The barcodes of a DistanceMatrixTensor that carries gradients, with
+    bars that carry gradients with respect to its entries: each endpoint of
+    a bar is the entry of its critical edge (see _critical_edges)."""
+    entries = distances._tvalues
+    adapter = _autodiff._framework(entries)
+    starts = distances._enumeration.reshape(-1, 2)[:, 0]
+    plain = distances.detach()
+    backend = cpp_p.PersistenceRipser32 if plain.dtype is distmat32 else cpp_p.PersistenceRipser64
+    bars, enumeration, edges = backend.persistence_critical_edges(plain._data, max_dim, reduced)
+    out = tracked_bars(adapter, (entries, starts), (entries, starts), bars, enumeration, edges, matrix_entries)
     # A tensor with one element loses its leading axis, as without gradients.
     if len(out.shape) == 2 and out.shape[0] == 1:
         out = out[0, :]
@@ -189,6 +208,10 @@ def compute_persistent_homology(
     and with the distance of an inner product the bars also carry
     gradients with respect to its Gram matrix when that is a PyTorch tensor.
 
+    A ``DistanceMatrixTensor`` made from a PyTorch tensor of shape
+    ``(..., n, n)`` that carries gradients gives bars that carry them with
+    respect to the distances: each such endpoint is an entry of its matrix.
+
     """
 
     from .ripser import (
@@ -211,6 +234,9 @@ def compute_persistent_homology(
 
     if isinstance(X, DistanceSpace):
         return _persistent_homology_in_space(X, max_dim, reduced, verbose)
+
+    if is_tracked(X) and isinstance(X, DistanceMatrixTensor):
+        return _tracked_persistent_homology_of_distances(X, max_dim, reduced)
 
     if _autodiff._tracked(X) is not None:
         if distance_type != DistanceType.Euclidean:

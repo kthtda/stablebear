@@ -1089,3 +1089,130 @@ def test_distance_space_of_series_that_does_not_hold_point_clouds_raises():
 def test_projection_of_series_onto_framework_subspace_raises(fw):
     with pytest.raises(NotImplementedError, match="gradients"):
         sb.LinearSubspace(fw.tensor(_vectors())).project(_series3())
+
+
+def _distances_between(points):
+    return np.linalg.norm(points[:, None, :] - points[None, :, :], axis=-1)
+
+
+def _distance_batch():
+    # The distances of two clouds of 6 points; those of the second are
+    # smaller, entry by entry, and all distances of a matrix differ.
+    return np.stack([_distances_between(_lp_points()), _distances_between(_contracted(_lp_points()))])
+
+
+def _with_gradients(fw, array):
+    return fw.tensor(array).requires_grad_()
+
+
+def _assert_gradient_wrt_distances_matches_finite_differences(fw, loss, distances, eps=1e-6):
+    # loss takes the distances as a framework array that carries gradients
+    # or as a NumPy array. A step changes an entry below the diagonal and
+    # its mirror image; the other entries have gradient 0.
+    _, grad = fw.value_and_grad(loss, distances)
+    numerical = np.zeros_like(distances)
+    for index in np.ndindex(distances.shape):
+        *batch, row, column = index
+        if row <= column:
+            continue
+        step = np.zeros_like(distances)
+        step[index] = step[(*batch, column, row)] = eps
+        numerical[index] = (float(loss(distances + step)) - float(loss(distances - step))) / (2 * eps)
+    np.testing.assert_allclose(grad, numerical, rtol=1e-6, atol=1e-8)
+
+
+def test_distance_matrix_tensor_of_framework_array_with_gradients_holds_its_matrices(fw):
+    out = sb.DistanceMatrixTensor(_with_gradients(fw, _distance_batch()))
+
+    assert isinstance(out, sb.DistanceMatrixTensor)
+    assert isinstance(out.to_serial_content()[0], fw.tensor_type)
+    assert out.shape == (2,)
+    content, enumeration, sizes = out.to_serial_content()
+    expected = sb.DistanceMatrixTensor(_distance_batch()).to_serial_content()
+    np.testing.assert_array_equal(fw.to_numpy(content), expected[0])
+    np.testing.assert_array_equal(enumeration, expected[1])
+    np.testing.assert_array_equal(sizes, expected[2])
+
+
+def test_distance_matrix_tensor_of_one_framework_matrix_with_gradients_has_one_element(fw):
+    out = sb.DistanceMatrixTensor(_with_gradients(fw, _distance_batch()[0]))
+
+    assert out.shape == (1,)
+
+
+def test_distance_matrix_tensor_of_framework_array_without_gradients_is_untracked(fw):
+    out = sb.DistanceMatrixTensor(fw.tensor(_distance_batch()))
+
+    assert isinstance(out.to_serial_content()[0], np.ndarray)
+    assert out.shape == (2,)
+
+
+def test_distance_matrix_tensor_of_framework_array_that_is_not_square_raises(fw):
+    with pytest.raises(ValueError, match=r"\(\.\.\., n, n\)"):
+        sb.DistanceMatrixTensor(_with_gradients(fw, np.ones((2, 3, 4))))
+
+
+def test_persistent_homology_of_tracked_distance_matrices_matches_untracked(fw):
+    out = _homology(sb.DistanceMatrixTensor(_with_gradients(fw, _distance_batch())))
+
+    expected = _homology(sb.DistanceMatrixTensor(_distance_batch()))
+    assert isinstance(out, sb.persistence.BarcodeTensor)
+    assert isinstance(out.to_serial_content()[0], fw.tensor_type)
+    assert out.shape == (2, 2)
+    for i in np.ndindex(2, 2):
+        assert out[i].is_isomorphic_to(expected[i], atol=1e-12, rtol=1e-12)
+
+
+def test_persistent_homology_of_one_tracked_distance_matrix_has_no_batch_axis(fw):
+    out = _homology(sb.DistanceMatrixTensor(_with_gradients(fw, _distance_batch()[0])))
+
+    _assert_same_barcodes(out, _homology(_lp_points()))
+
+
+@pytest.mark.parametrize("distances", [
+    pytest.param(_distance_batch()[0], id="one_matrix"),
+    pytest.param(_distance_batch(), id="batch"),
+])
+def test_persistent_homology_gradient_wrt_distances(fw, distances):
+    def loss(D):
+        bars = _homology(sb.DistanceMatrixTensor(D)).to_serial_content()[0]
+        return (bars[:, 1] * bars[:, 1]).sum() + bars[:, 0].sum()
+
+    _assert_gradient_wrt_distances_matches_finite_differences(fw, loss, distances)
+
+
+@pytest.mark.parametrize("which", ["X", "Y", "both"])
+def test_kernel_of_tracked_distance_matrices_matches_untracked(fw, which):
+    larger = np.stack([_distance_batch()[0], 2.0 * _distance_batch()[0]])
+    smaller = np.stack([_distance_batch()[1], _distance_batch()[1]])
+
+    out = _kernel(
+        sb.DistanceMatrixTensor(_with_gradients(fw, larger) if which in ("X", "both") else larger),
+        sb.DistanceMatrixTensor(_with_gradients(fw, smaller) if which in ("Y", "both") else smaller))
+
+    expected = _kernel(sb.DistanceMatrixTensor(larger), sb.DistanceMatrixTensor(smaller))
+    assert isinstance(out, sb.persistence.BarcodeTensor)
+    assert isinstance(out.to_serial_content()[0], fw.tensor_type)
+    assert out.shape == (2,)
+    for i in range(2):
+        assert out[i].is_isomorphic_to(expected[i], atol=1e-12, rtol=1e-12)
+
+
+@pytest.mark.parametrize("wrt", ["X", "Y"])
+def test_kernel_gradient_wrt_distances(fw, wrt):
+    larger = np.stack([_distance_batch()[0], 2.0 * _distance_batch()[0]])
+    smaller = np.stack([_distance_batch()[1], _distance_batch()[1]])
+
+    def loss(D):
+        X = sb.DistanceMatrixTensor(D if wrt == "X" else larger)
+        Y = sb.DistanceMatrixTensor(D if wrt == "Y" else smaller)
+        bars = _kernel(X, Y).to_serial_content()[0]
+        return (bars[:, 0] * bars[:, 1]).sum() + (bars[:, 1] * bars[:, 1]).sum()
+
+    _assert_gradient_wrt_distances_matches_finite_differences(fw, loss, larger if wrt == "X" else smaller)
+
+
+def test_kernel_of_tracked_distance_matrices_and_point_clouds_raises(fw):
+    X = sb.DistanceMatrixTensor(_with_gradients(fw, _distance_batch()))
+    with pytest.raises(TypeError, match="DistanceMatrixTensors"):
+        _kernel(X, sb.PointCloudTensor([_lp_points(), _lp_points()]))

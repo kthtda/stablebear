@@ -4,9 +4,10 @@ Each endpoint of a bar of persistent homology or of the homological kernel
 is the distance between two points: its critical edge. C++ computes the bars
 and their critical edges for every element of a batch, in parallel, and the
 functions here compute the bars again as framework operations on the points
-of those edges, which the framework differentiates. The points of all clouds
-of a batch are one framework array, so a whole batch takes one gather per
-column of endpoints. A single point cloud is a batch of one.
+of those edges, or on the entries of a distance matrix, which the framework
+differentiates. The points of all clouds of a batch are one framework array,
+so a whole batch takes one gather per column of endpoints. A single point
+cloud is a batch of one.
 """
 
 from __future__ import annotations
@@ -43,27 +44,47 @@ def batch_parts(clouds: PointCloudTensor) -> tuple[Any, np.ndarray, PointCloudTe
     return content, enumeration.reshape(-1, 2)[:, 0], clouds
 
 
+def point_distances(lengths: Callable) -> Callable:
+    """How tracked_bars measures an edge between points: ``lengths`` of the
+    difference of its two points, rows of the (m, d) array of all points."""
+    def measure(adapter, points, first, second, shift):
+        return lengths(adapter.gather(points, first + shift) - adapter.gather(points, second + shift))
+
+    return measure
+
+
+def matrix_entries(adapter: Any, entries: Any, first: np.ndarray, second: np.ndarray, shift: np.ndarray) -> Any:
+    """How tracked_bars measures an edge of a distance matrix: its entry,
+    among the entries below the diagonal of all matrices by rows, as
+    DistanceMatrixTensor.to_serial_content gives them."""
+    high, low = np.maximum(first, second), np.minimum(first, second)
+    return adapter.gather(entries, shift + high * (high - 1) // 2 + low)
+
+
 def _endpoints(
-    adapter: Any, points: Any, endpoints: np.ndarray, first: np.ndarray, second: np.ndarray, lengths: Callable
+    adapter: Any, source: Any, endpoints: np.ndarray, first: np.ndarray, second: np.ndarray, shift: np.ndarray,
+    measure: Callable,
 ) -> Any:
     """The endpoints of bars as a framework array that carries gradients
-    with respect to the points, a framework array of shape (m, d).
+    with respect to ``source``, a framework array of the points of all
+    clouds or of the entries of all matrices.
 
-    Endpoint k is the distance between the points first[k] and second[k],
-    its critical edge, and is computed again as lengths(differences), a
-    framework operation on the rows of differences of those points. An
-    endpoint without an edge (first[k] is negative), such as a birth at 0
-    in dimension 0 or an infinite death, is a constant, and so is an
-    endpoint at 0, where a distance has no derivative.
+    Endpoint k is the distance between the points first[k] and second[k] of
+    its element, its critical edge, and is computed again as
+    ``measure(adapter, source, first, second, shift)``, a framework
+    operation, where shift[k] is the first row of the element in the
+    source. An endpoint without an edge (first[k] is negative), such as a
+    birth at 0 in dimension 0 or an infinite death, is a constant, and so is
+    an endpoint at 0, where a distance has no derivative.
     """
     has_edge = (first >= 0) & (endpoints > 0)
-    edges = adapter.gather(points, first[has_edge]) - adapter.gather(points, second[has_edge])
-    # The endpoints as constants, followed by the lengths of the critical
-    # edges, from which each endpoint takes its own.
-    values = adapter.concat([adapter.as_tensor(endpoints, like=points), lengths(edges)])
-    source = np.arange(len(endpoints))
-    source[has_edge] = len(endpoints) + np.arange(int(has_edge.sum()))
-    return adapter.gather(values, source)
+    measured = measure(adapter, source, first[has_edge], second[has_edge], shift[has_edge])
+    # The endpoints as constants, followed by the measured edges, from which
+    # each endpoint takes its own.
+    values = adapter.concat([adapter.as_tensor(endpoints, like=source), measured])
+    index = np.arange(len(endpoints))
+    index[has_edge] = len(endpoints) + np.arange(int(has_edge.sum()))
+    return adapter.gather(values, index)
 
 
 def tracked_bars(
@@ -73,7 +94,7 @@ def tracked_bars(
     bars: np.ndarray,
     enumeration: np.ndarray,
     edges: np.ndarray,
-    lengths: Callable,
+    measure: Callable,
 ) -> BarcodeTensor:
     """The BarcodeTensor that carries gradients for the bars and critical
     edges that C++ reports for a batch.
@@ -82,22 +103,22 @@ def tracked_bars(
     their rows per barcode, and ``edges`` the (m, 4) array of the points
     {a, b, c, d} of each bar: its birth is the distance between a and b, and
     its death that between c and d, with -1 where an endpoint has no edge.
-    ``births`` and ``deaths`` give, for each, the (points, starts) of the
-    batch whose points those are, from batch_parts. The edges count the
-    points of each cloud from 0, and the barcodes of a cloud follow each
-    other, the same number for every cloud.
+    ``births`` and ``deaths`` give, for each, the (source, starts) of the
+    batch whose distances those are: the points of all its clouds with the
+    first row of each, from batch_parts, or the entries of all its distance
+    matrices with the first entry of each. ``measure`` computes the
+    distances from the source: point_distances(lengths) or matrix_entries.
+    The edges count the points of each element from 0, and the barcodes of
+    an element follow each other, the same number for every element.
     """
     rows = enumeration.reshape(-1, 2)
-    n_clouds = len(births[1])
-    per_cloud = rows.reshape(n_clouds, -1, 2) if n_clouds else rows.reshape(0, 1, 2)
-    bars_of_cloud = per_cloud[:, -1, 1] - per_cloud[:, 0, 0]
+    n_elements = len(births[1])
+    per_element = rows.reshape(n_elements, -1, 2) if n_elements else rows.reshape(0, 1, 2)
+    bars_of_element = per_element[:, -1, 1] - per_element[:, 0, 0]
 
     columns = []
-    for (points, starts), column, (first, second) in ((births, 0, (0, 1)), (deaths, 1, (2, 3))):
-        # Shift the points of each cloud to its rows among all points.
-        shift = np.repeat(starts, bars_of_cloud)
+    for (source, starts), column, (first, second) in ((births, 0, (0, 1)), (deaths, 1, (2, 3))):
         columns.append(_endpoints(
-            adapter, points, bars[:, column],
-            np.where(edges[:, first] >= 0, edges[:, first] + shift, -1),
-            np.where(edges[:, second] >= 0, edges[:, second] + shift, -1), lengths))
+            adapter, source, bars[:, column], edges[:, first], edges[:, second],
+            np.repeat(starts, bars_of_element), measure))
     return _TrackedBarcodeTensor([adapter.stack_columns(*columns)], enumeration)

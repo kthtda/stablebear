@@ -4,6 +4,7 @@ import numpy as np
 
 from .. import _autodiff
 from .. import _sb_cpp as cpp
+from .._tracked import is_tracked
 from ..async_task import _run_task
 from ..distance_matrix import (
     DistanceMatrix,
@@ -19,7 +20,7 @@ from .homology import (
     _FLOAT_TO_PCLOUD_DTYPE,
     _PCLOUD_TO_BARCODE_DTYPE,
 )
-from ._critical_edges import as_batch, batch_parts, tracked_bars
+from ._critical_edges import as_batch, batch_parts, matrix_entries, point_distances, tracked_bars
 from .ph_tensor import BarcodeTensor
 
 cpp_p = cpp.persistence
@@ -129,7 +130,39 @@ def _tracked_kernel_of_batches(X: Any, Y: Any, distance: Any = None) -> BarcodeT
     # The operation over a pair of tensors takes dense tensors.
     bars, enumeration, edges = backend.homological_kernel_critical_edges(
         *(tensor._data.materialize() if tensor._has_indexed_storage() else tensor._data for tensor in elements))
-    return tracked_bars(adapter, (y_points, y_starts), (x_points, x_starts), bars, enumeration, edges, lengths)
+    return tracked_bars(
+        adapter, (y_points, y_starts), (x_points, x_starts), bars, enumeration, edges, point_distances(lengths))
+
+
+def _tracked_kernel_of_distances(X: Any, Y: Any) -> BarcodeTensor:
+    """The kernels of the aligned matrices of two DistanceMatrixTensors, of
+    which at least one carries gradients, as a BarcodeTensor whose bars carry
+    gradients with respect to the entries: each birth is an entry of Y and
+    each death an entry of X, those of their critical edges (see
+    _critical_edges)."""
+    if not (isinstance(X, DistanceMatrixTensor) and isinstance(Y, DistanceMatrixTensor)):
+        raise TypeError(
+            "X and Y must both be DistanceMatrixTensors when one carries gradients "
+            f"(got {type(X).__name__} and {type(Y).__name__}).")
+    _validate_kernel_pair(X, Y)
+    entries, starts, plain = [], [], []
+    for matrices in (X, Y):
+        if is_tracked(matrices):
+            tracked: Any = matrices
+            entries.append(tracked._tvalues)
+            starts.append(tracked._enumeration.reshape(-1, 2)[:, 0])
+            plain.append(tracked.detach())
+        else:
+            content, enumeration, _ = matrices.to_serial_content()
+            entries.append(content[:, 0])
+            starts.append(enumeration.reshape(-1, 2)[:, 0])
+            plain.append(matrices)
+    adapter, entries = _in_one_framework(*entries)
+    backend = cpp_p.HomologicalKernel32 if X.dtype is distmat32 else cpp_p.HomologicalKernel64
+    bars, enumeration, edges = backend.homological_kernel_critical_edges(
+        *(tensor._data.materialize() if tensor._has_indexed_storage() else tensor._data for tensor in plain))
+    return tracked_bars(
+        adapter, (entries[1], starts[1]), (entries[0], starts[0]), bars, enumeration, edges, matrix_entries)
 
 
 def _kernel_in_spaces(X: Any, Y: Any, dim: int, verbose: bool) -> BarcodeTensor:
@@ -245,6 +278,11 @@ def compute_homological_kernel(
     PyTorch tensors or by a projection, or PyTorch tensors of shape
     ``(..., n, d)``.
 
+    Two ``DistanceMatrixTensor`` objects, of which at least one is made from
+    a PyTorch tensor of shape ``(..., n, n)`` that carries gradients, give
+    bars that carry them with respect to the distances: each birth is an
+    entry of a matrix of ``Y`` and each death one of ``X``.
+
     """
     from ..tensor_create import zeros
 
@@ -255,6 +293,9 @@ def compute_homological_kernel(
 
     if isinstance(X, DistanceSpace) or isinstance(Y, DistanceSpace):
         return _kernel_in_spaces(X, Y, dim, verbose)
+
+    if any(is_tracked(Z) and isinstance(Z, DistanceMatrixTensor) for Z in (X, Y)):
+        return _tracked_kernel_of_distances(X, Y)
 
     if _autodiff._tracked(X) is not None or _autodiff._tracked(Y) is not None:
         # A framework array of more than two dimensions is a batch of clouds.

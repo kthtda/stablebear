@@ -246,6 +246,15 @@ operations on the points. Without the request, Ripser runs as before.
 Batches of point clouds, for persistent homology and for the kernel, are
 described in D8a of [linear-subspaces-spec.md](linear-subspaces-spec.md).
 
+A `DistanceMatrixTensor` of a PyTorch tensor of shape (..., n, n) that
+carries gradients is tracked: its content is the entries below the diagonal
+of every matrix, gathered from the tensor, so the entries on and above the
+diagonal get gradient 0. Persistent homology and the kernel of such tensors
+take each endpoint of a bar from the entry of its critical edge. A matrix
+of shape (n, n) is a tensor of one matrix, as a tracked tensor has at least
+one axis. A PyTorch tensor without gradients is read as an array, as
+before.
+
 Rejected: finding the pair of points of each endpoint by searching for its
 value among the pairwise distances, which needs no change to Ripser but
 takes the first pair at that distance when distances are equal, which need
