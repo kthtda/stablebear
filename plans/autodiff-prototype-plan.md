@@ -1,6 +1,6 @@
 # Autodiff prototype: implementation plan
 
-Progress: 15 of 27 items, 33 of 64 points (52%)
+Progress: 16 of 27 items, 35 of 64 points (55%)
 
 Spec: [autodiff-prototype-spec.md](autodiff-prototype-spec.md)
 
@@ -65,10 +65,13 @@ Spec: [autodiff-prototype-spec.md](autodiff-prototype-spec.md)
   116 ms tracked, against 21 ms for `F - G` untracked; the merge is no
   longer the main cost. `pdist` on 1500 PCFs of 50 points is unchanged: 29
   ms for p=1 and 95 ms for p=2.
-- [ ] **C5.** [2] The sorting order of the tracked stable rank computed in
-  C++, per barcode in parallel, in place of one `lexsort` over all bars.
+- [x] **C5.** [2] (cf5ad84f1) The sorting order of the tracked stable
+  rank computed in C++, per barcode in parallel, in place of one `lexsort` over all bars.
   Tests: the stable rank tests pass; equal lifetimes and an empty barcode
   keep their order; note the timings.
+  Note: in a Release build on 10^6 bars in 2000 barcodes, the tracked
+  pipeline of D13 runs forward in 50 ms, down from 190 ms, against 14 ms
+  untracked; forward and backward take 233 ms, down from 370 ms.
 
 ## Phase D: One generic tracked tensor
 
