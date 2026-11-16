@@ -1,6 +1,6 @@
 # Linear subspaces, inner products, and distances: implementation plan
 
-Progress: 12 of 15 items, 27 of 33 points (82%)
+Progress: 13 of 15 items, 29 of 33 points (88%)
 
 Spec: [linear-subspaces-spec.md](linear-subspaces-spec.md)
 
@@ -103,7 +103,7 @@ Spec: [linear-subspaces-spec.md](linear-subspaces-spec.md)
   Note: one commit holds C2 and C3, which share the product of a batch
   with a matrix. The dimension of an untracked batch is checked when it
   is multiplied, not when it is put in a space.
-- [ ] **C3.** [2] `project` of a tracked `PointCloudTensor` as one
+- [x] **C3.** [2] (3d182707a) `project` of a tracked `PointCloudTensor` as one
   framework product (D8).
   Tests: matches the untracked projection; gradient with respect to the
   vectors against finite differences; persistent homology of a tracked
