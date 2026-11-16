@@ -655,12 +655,6 @@ def _multiply(points: Any, matrix: Any) -> Any:
     return tracked_class(PointCloudTensor)([xp.matmul(content, matrix)], enumeration)
 
 
-def _distance_matrix(distance: Distance, points: np.ndarray) -> Any:
-    """The C++ matrix of the distances between the points of one (n, d)
-    cloud, for a distance without _euclidean_points."""
-    return distance._distance_matrices(PointCloudTensor([points]))[0]._current_matrix()
-
-
 def _distance_matrices(space: DistanceSpace) -> DistanceMatrixTensor:
     """The distances between the points of each cloud of an untracked
     space, for a distance without _euclidean_points: one matrix for a single

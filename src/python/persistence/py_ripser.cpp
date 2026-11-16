@@ -64,48 +64,6 @@ namespace
       }
     }
 
-    /// (bars, enumeration, critical_edges) of one point cloud or distance
-    /// matrix: the bars of
-    /// all dimensions as an (m, 2) array, the [start, stop) rows of each
-    /// dimension as a (maxDim + 1, 2) array, and per bar the points {a, b,
-    /// c, d} whose distances are its birth, between a and b, and its death,
-    /// between c and d, with -1 where an endpoint has no edge.
-    template <typename ElemT>
-    static nb::tuple persistence_critical_edges(const ElemT& points, size_t maxDim, bool reducedHomology)
-    {
-      std::vector<sb::ph::Barcode<T>> barcodes;
-      std::vector<std::vector<sb::ph::detail::CriticalEdges>> edges;
-      {
-        nb::gil_scoped_release release;
-        sb::ph::persistence_with_critical_edges(points, maxDim, reducedHomology, barcodes, edges);
-      }
-      size_t total = 0;
-      for (const auto& barcode : barcodes)
-      {
-        total += barcode.bars().size();
-      }
-      auto bars = sb_py::new_array<T>({total, 2});
-      auto enumeration = sb_py::new_array<int64_t>({barcodes.size(), 2});
-      auto critical = sb_py::new_array<int64_t>({total, 4});
-      size_t row = 0;
-      for (size_t dim = 0; dim < barcodes.size(); ++dim)
-      {
-        enumeration.data()[2 * dim] = static_cast<int64_t>(row);
-        const auto& dimBars = barcodes[dim].bars();
-        for (size_t k = 0; k < dimBars.size(); ++k, ++row)
-        {
-          bars.data()[2 * row] = dimBars[k].birth;
-          bars.data()[2 * row + 1] = dimBars[k].death;
-          for (size_t j = 0; j < 4; ++j)
-          {
-            critical.data()[4 * row + j] = static_cast<int64_t>(edges[dim][k][j]);
-          }
-        }
-        enumeration.data()[2 * dim + 1] = static_cast<int64_t>(row);
-      }
-      return nb::make_tuple(bars, enumeration, critical);
-    }
-
     /// persistence_critical_edges of every element of a tensor of point
     /// clouds or of distance matrices, computed in parallel over the
     /// elements by the ufunc layer: the bars of all elements and dimensions
@@ -139,12 +97,6 @@ namespace
       cls.def_static(
           "persistence_critical_edges",
           &PyRipserBindings::template batch_persistence_critical_edges<sb::Tensor<sb::DistanceMatrix<T>>>);
-      // For a point cloud, with Euclidean distances, or a distance matrix,
-      // whose critical edges are pairs of its rows.
-      cls.def_static("persistence_critical_edges",
-                     &PyRipserBindings::template persistence_critical_edges<sb::PointCloud<T>>);
-      cls.def_static("persistence_critical_edges",
-                     &PyRipserBindings::template persistence_critical_edges<sb::DistanceMatrix<T>>);
       register_spawn<sb::PointCloud<T>>(
           m, cls, "spawn_ripser_pcloud_euclidean_task", "_PersistenceTaskPointCloud" + suffix);
       register_spawn<sb::DistanceMatrix<T>>(

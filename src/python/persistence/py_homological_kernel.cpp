@@ -128,14 +128,10 @@ namespace
       cls.def_static(
         "homological_kernel_critical_edges",
         &PyHomologicalKernelBindings::template batch_homological_kernel_critical_edges<sb::DistanceMatrix<T>>);
-      // For two point clouds, with Euclidean distances, or two distance
-      // matrices, whose critical edges are pairs of their rows.
+      // For one pair of point clouds, which the kernel's vjp uses.
       cls.def_static(
         "homological_kernel_critical_edges",
         &PyHomologicalKernelBindings::template homological_kernel_critical_edges<sb::PointCloud<T>>);
-      cls.def_static(
-        "homological_kernel_critical_edges",
-        &PyHomologicalKernelBindings::template homological_kernel_critical_edges<sb::DistanceMatrix<T>>);
     }
   };
 

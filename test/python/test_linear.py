@@ -788,9 +788,8 @@ def test_critical_edges_of_persistent_homology_of_batch(make_elements):
 
     ripser = cpp.persistence.PersistenceRipser64
     clouds = _batch2() + [np.zeros((0, 2))]
-    elements = make_elements(clouds)
 
-    bars, enumeration, edges = ripser.persistence_critical_edges(elements._data, 1, True)
+    bars, enumeration, edges = ripser.persistence_critical_edges(make_elements(clouds)._data, 1, True)
 
     assert enumeration.shape == (4, 2, 2)
     # The empty cloud has no bars.
@@ -798,11 +797,10 @@ def test_critical_edges_of_persistent_homology_of_batch(make_elements):
                                                    [len(bars), len(bars)]])
     for i, cloud in enumerate(clouds[:3]):
         alone_bars, alone_enumeration, alone_edges = ripser.persistence_critical_edges(
-            elements[i]._cpp_point_cloud() if isinstance(elements, sb.PointCloudTensor)
-            else elements[i]._current_matrix(), 1, True)
+            make_elements([cloud])._data, 1, True)
         start, stop = enumeration[i, 0, 0], enumeration[i, 1, 1]
         np.testing.assert_array_equal(bars[start:stop], alone_bars)
-        np.testing.assert_array_equal(enumeration[i] - start, alone_enumeration)
+        np.testing.assert_array_equal(enumeration[i] - start, alone_enumeration[0])
         # The edges are pairs of points of the element itself.
         np.testing.assert_array_equal(edges[start:stop], alone_edges)
         assert edges[start:stop].max() < len(cloud)
@@ -817,16 +815,15 @@ def test_critical_edges_of_kernel_of_batch(make_elements):
 
     kernel = cpp.persistence.HomologicalKernel64
     clouds = _batch2()
-    X, Y = make_elements(clouds), make_elements([_contracted(cloud) for cloud in clouds])
+    contracted = [_contracted(cloud) for cloud in clouds]
 
-    bars, enumeration, edges = kernel.homological_kernel_critical_edges(X._data, Y._data)
-
-    def element(tensor, i):
-        return tensor[i]._cpp_point_cloud() if isinstance(tensor, sb.PointCloudTensor) else tensor[i]._current_matrix()
+    bars, enumeration, edges = kernel.homological_kernel_critical_edges(
+        make_elements(clouds)._data, make_elements(contracted)._data)
 
     assert enumeration.shape == (3, 2)
     for i, cloud in enumerate(clouds):
-        alone_bars, alone_edges = kernel.homological_kernel_critical_edges(element(X, i), element(Y, i))
+        alone_bars, _, alone_edges = kernel.homological_kernel_critical_edges(
+            make_elements([cloud])._data, make_elements([contracted[i]])._data)
         start, stop = enumeration[i]
         # One bar per point but one.
         assert stop - start == len(cloud) - 1

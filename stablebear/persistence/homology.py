@@ -12,11 +12,12 @@ from ..distance_matrix import (
     DistanceMatrixTensor,
 )
 from ..base_tensor import FloatTensor
-from ..linear import DistanceSpace, _distance_matrices, _distance_matrix, _points_array
+from ..linear import DistanceSpace, _distance_matrices, _points_array
 from ..point_cloud import PointCloud, PointCloudTensor
 from ..timeseries.series import TimeSeries, TimeSeriesTensor
 from ..typing import barcode32, barcode64, distmat32, distmat64, float32, float64, pcloud32, pcloud64
-from .ph_tensor import BarcodeTensor, _TrackedBarcodeTensor
+from ._critical_edges import as_batch, batch_parts, tracked_bars
+from .ph_tensor import BarcodeTensor
 
 cpp_p = cpp.persistence
 
@@ -56,48 +57,35 @@ def compute_persistent_homology(
 ) -> BarcodeTensor: ...
 
 
-def _tracked_endpoints(
-    adapter: Any, points: Any, endpoints: np.ndarray, first: np.ndarray, second: np.ndarray, lengths: Any
-) -> Any:
-    """The endpoints of bars as a framework array that carries gradients
-    with respect to the points, a framework array of shape (n, d).
-
-    Endpoint k is the distance between the points first[k] and second[k],
-    its critical edge, and is computed again as lengths(differences), a
-    framework operation on the rows of differences of those points. An
-    endpoint without an edge (first[k] is -1), such as a birth at 0 in
-    dimension 0 or an infinite death, is a constant, and so is an endpoint
-    at 0, where a distance has no derivative.
-    """
-    has_edge = (first >= 0) & (endpoints > 0)
-    edges = adapter.gather(points, first[has_edge]) - adapter.gather(points, second[has_edge])
-    # The endpoints as constants, followed by the lengths of the critical
-    # edges, from which each endpoint takes its own.
-    values = adapter.concat([adapter.as_tensor(endpoints, like=points), lengths(edges)])
-    source = np.arange(len(endpoints))
-    source[has_edge] = len(endpoints) + np.arange(int(has_edge.sum()))
-    return adapter.gather(values, source)
-
-
 _ABSTRACT_POINTS = (
     "compute_persistent_homology of points that JAX or tf.function traces abstractly is not supported: "
     "the number of bars depends on their values.")
 
 
-def _tracked_persistent_homology_of_batch(clouds: Any, max_dim: int, reduced: bool, distance: Any) -> Any:
-    """_tracked_persistent_homology for a PointCloudTensor that carries
-    gradients, with the shape of the untracked result.
+def _tracked_persistent_homology(X: Any, max_dim: int, reduced: bool, distance: Any = None) -> Any:
+    """The barcodes of point clouds that carry gradients, with bars that
+    carry gradients with respect to the points, in the shape of the
+    untracked result. X is a PointCloudTensor that carries gradients or a
+    framework array of shape (..., n, d).
 
-    C++ computes the bars and critical edges of all clouds, in parallel
-    over the clouds. The points of all clouds are one framework array, so
-    the bars of the whole batch come from one gather of the points of
-    their edges.
+    In a Vietoris-Rips complex, a simplex appears at the length of its
+    longest edge, so each endpoint of a bar is the distance between two
+    points: the critical edge of the simplex that creates or destroys the
+    class. Ripser reports these edges with the bars, and the bars are their
+    lengths again as framework operations on the points (see
+    _critical_edges).
+
+    The distance is Euclidean, or the given Distance, which Ripser then
+    takes as the matrices of the distances between the points.
     """
-    points = clouds._tvalues
+    points, starts, plain = batch_parts(as_batch(X))
     adapter = _autodiff._framework(points)
+    if adapter is None:
+        raise NotImplementedError(
+            "compute_persistent_homology with gradients supports point clouds of shape (..., n, d) and "
+            "PointCloudTensors only.")
     if adapter.concrete(points) is None:
         raise NotImplementedError(_ABSTRACT_POINTS)
-    plain = clouds.detach()
     if distance is None:
         elements, lengths = plain, adapter.row_norms
     else:
@@ -107,70 +95,12 @@ def _tracked_persistent_homology_of_batch(clouds: Any, max_dim: int, reduced: bo
             return distance._lengths(adapter, differences)
 
     backend = cpp_p.PersistenceRipser32 if plain.dtype is pcloud32 else cpp_p.PersistenceRipser64
-    content, enumeration, critical_edges = backend.persistence_critical_edges(elements._data, max_dim, reduced)
-
-    # The critical edges count the points of each cloud from 0: shift them
-    # to the rows of the cloud among the points of all clouds.
-    starts = clouds._enumeration.reshape(-1, 2)[:, 0]
-    rows_of_cloud = enumeration.reshape(len(starts), 2 * (max_dim + 1))
-    shift = np.repeat(starts, rows_of_cloud[:, -1] - rows_of_cloud[:, 0])[:, None]
-    critical_edges = np.where(critical_edges >= 0, critical_edges + shift, -1)
-
-    bars = adapter.stack_columns(
-        _tracked_endpoints(adapter, points, content[:, 0], critical_edges[:, 0], critical_edges[:, 1], lengths),
-        _tracked_endpoints(adapter, points, content[:, 1], critical_edges[:, 2], critical_edges[:, 3], lengths))
-    out = _TrackedBarcodeTensor([bars], enumeration)
+    bars, enumeration, edges = backend.persistence_critical_edges(elements._data, max_dim, reduced)
+    out = tracked_bars(adapter, (points, starts), (points, starts), bars, enumeration, edges, lengths)
     # A tensor with one element loses its leading axis, as without gradients.
     if len(out.shape) == 2 and out.shape[0] == 1:
         out = out[0, :]
     return out
-
-
-def _tracked_persistent_homology(X: Any, max_dim: int, reduced: bool, distance: Any = None) -> BarcodeTensor:
-    """The barcodes of one (n, d) point cloud given as a framework array,
-    with bars that carry gradients with respect to its points.
-
-    In a Vietoris-Rips complex, a simplex appears at the length of its
-    longest edge, so each endpoint of a bar is the distance between two
-    points: the critical edge of the simplex that creates or destroys the
-    class. Ripser reports these edges with the bars, and the bars are their
-    lengths again as framework operations on the points, which the
-    framework differentiates (see _tracked_endpoints).
-
-    The distance is Euclidean, or the given Distance, which Ripser then
-    takes as the matrix of the distances between the points.
-    """
-    X = _autodiff._unwrap(X)
-    adapter = _autodiff._framework(X)
-    if adapter is not None and len(X.shape) > 2:
-        # A batch of clouds, as a NumPy array of this shape is.
-        X = PointCloudTensor(X)
-    if isinstance(X, PointCloudTensor):
-        return _tracked_persistent_homology_of_batch(X, max_dim, reduced, distance)
-    if adapter is None or len(X.shape) != 2:
-        raise NotImplementedError(
-            "compute_persistent_homology with gradients supports point clouds of shape (..., n, d) and "
-            "PointCloudTensors only.")
-    points = adapter.concrete(X)
-    if points is None:
-        raise NotImplementedError(_ABSTRACT_POINTS)
-
-    dtype = np.float32 if points.dtype == np.float32 else np.float64
-    backend = cpp_p.PersistenceRipser32 if dtype == np.float32 else cpp_p.PersistenceRipser64
-    points = points.astype(dtype)
-    if distance is None:
-        element, lengths = PointCloud(points)._cpp_point_cloud(), adapter.row_norms
-    else:
-        element = _distance_matrix(distance, points)
-
-        def lengths(differences):
-            return distance._lengths(adapter, differences)
-
-    content, enumeration, critical_edges = backend.persistence_critical_edges(element, max_dim, reduced)
-    bars = adapter.stack_columns(
-        _tracked_endpoints(adapter, X, content[:, 0], critical_edges[:, 0], critical_edges[:, 1], lengths),
-        _tracked_endpoints(adapter, X, content[:, 1], critical_edges[:, 2], critical_edges[:, 3], lengths))
-    return _TrackedBarcodeTensor([bars], enumeration)
 
 
 def _persistent_homology_in_space(space: DistanceSpace, max_dim: int, reduced: bool, verbose: bool) -> Any:
