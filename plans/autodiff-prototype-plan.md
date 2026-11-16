@@ -1,6 +1,6 @@
 # Autodiff prototype: implementation plan
 
-Progress: 10 of 15 items, 23 of 34 points (68%)
+Progress: 11 of 15 items, 25 of 34 points (74%)
 
 Spec: [autodiff-prototype-spec.md](autodiff-prototype-spec.md)
 
@@ -31,7 +31,7 @@ Spec: [autodiff-prototype-spec.md](autodiff-prototype-spec.md)
 - [x] **B3.** [3] (afa4adba9) Batches of tracked barcodes: C++ serial
   conversion for barcode tensors, `_TrackedBarcodeTensor` as the single
   source of truth, batched `transform_bars` and stable rank.
-- [ ] **B4.** [2] This plan and its spec.
+- [x] **B4.** [2] (386e324b2) This plan and its spec.
 
 ## Phase C: One source of truth for PCFs and PLFs
 
