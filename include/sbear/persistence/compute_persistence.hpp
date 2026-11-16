@@ -7,6 +7,7 @@
 #include "../ufunc.hpp"
 
 #include "barcode.hpp"
+#include "bars_with_edges.hpp"
 #include "persistence_pair.hpp"
 
 #include "ripser/ripser.hpp"
@@ -23,12 +24,6 @@ namespace sb::ph
 {
   namespace detail
   {
-    /// The points {a, b, c, d} of the critical edges of a bar: its birth is
-    /// the distance between points a and b, and its death that between c
-    /// and d. -1 where an endpoint has no edge: a birth at 0 in dimension
-    /// 0, and an infinite death.
-    using CriticalEdges = std::array<std::ptrdiff_t, 4>;
-
     /// Run Ripser on any distance-matrix-like object (must have .size() and operator()(i,j)).
     /// Computes the enclosing radius threshold, builds the compressed lower-triangular
     /// matrix, runs Ripser, and writes the barcode of dimension i into out[i].

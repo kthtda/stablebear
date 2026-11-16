@@ -2,10 +2,13 @@
 #include "../py_async_support.hpp"
 #include "../py_tensor_property_variants.hpp"
 #include "../py_np_support.hpp"
+#include "py_critical_edges.hpp"
 
 #include <sbear/distance_matrix.hpp>
 #include <sbear/persistence/barcode.hpp>
 #include <sbear/persistence/compute_homological_kernel.hpp>
+#include <sbear/persistence/kernel_critical_edges.hpp>
+#include <sbear/ufunc.hpp>
 #include <sbear/tensor.hpp>
 #include <sbear/walk.hpp>
 
@@ -83,67 +86,21 @@ namespace
 
     /// homological_kernel_critical_edges of every pair of aligned elements
     /// of two tensors of point clouds or of distance matrices, computed in
-    /// parallel over the elements: the bars of all pairs as an (m, 2)
-    /// array, in C order of the elements; the [start, stop) rows of each
-    /// pair as an array of shape tensor.shape + (2,); and the critical
-    /// edges of each bar, as points of its own pair.
+    /// parallel over the elements by the ufunc layer: the bars of all pairs
+    /// as an (m, 2) array, in C order of the elements; the [start, stop)
+    /// rows of each pair as an array of shape tensor.shape + (2,); and the
+    /// critical edges of each bar, as points of its own pair.
     template <typename ElemT>
     static nb::tuple batch_homological_kernel_critical_edges(
         const sb::Tensor<ElemT> &elements, const sb::Tensor<ElemT> &elementsPrime)
     {
-      if (elements.shape() != elementsPrime.shape())
-      {
-        throw std::invalid_argument("homological kernel: input tensors must have the same shape");
-      }
-      const auto &shape = elements.shape();
-      std::vector<size_t> strides(shape.size(), 1);
-      for (size_t i = shape.size(); i-- > 1;)
-      {
-        strides[i - 1] = strides[i] * shape[i];
-      }
-      const size_t count = elements.size();
-      std::vector<sb::ph::Barcode<T>> barcodes(count);
-      std::vector<std::vector<std::array<size_t, 4>>> edges(count);
-      {
+      auto compute = [&] {
         nb::gil_scoped_release release;
-        sb::parallel_walk(elements, [&](const std::vector<size_t> &idx) {
-          size_t k = 0;
-          for (size_t i = 0; i < idx.size(); ++i)
-          {
-            k += idx[i] * strides[i];
-          }
-          sb::ph::homological_kernel_with_critical_edges(
-              elements(idx), elementsPrime(idx), barcodes[k], edges[k]);
-        }, sb::default_executor());
-      }
-
-      size_t total = 0;
-      for (const auto &barcode : barcodes)
-      {
-        total += barcode.bars().size();
-      }
-      std::vector<size_t> enumerationShape(shape.begin(), shape.end());
-      enumerationShape.push_back(2);
-      auto bars = sb_py::new_array<T>({total, 2});
-      auto enumeration = sb_py::new_array<int64_t>(enumerationShape);
-      auto critical = sb_py::new_array<int64_t>({total, 4});
-      size_t row = 0;
-      for (size_t k = 0; k < count; ++k)
-      {
-        enumeration.data()[2 * k] = static_cast<int64_t>(row);
-        const auto &pairBars = barcodes[k].bars();
-        for (size_t b = 0; b < pairBars.size(); ++b, ++row)
-        {
-          bars.data()[2 * row] = pairBars[b].birth;
-          bars.data()[2 * row + 1] = pairBars[b].death;
-          for (size_t j = 0; j < 4; ++j)
-          {
-            critical.data()[4 * row + j] = static_cast<int64_t>(edges[k][b][j]);
-          }
-        }
-        enumeration.data()[2 * k + 1] = static_cast<int64_t>(row);
-      }
-      return nb::make_tuple(bars, enumeration, critical);
+        return sb::apply_ufunc(
+            sb::Zipped<sb::Tensor<ElemT>, sb::Tensor<ElemT>>{elements, elementsPrime},
+            sb::ph::KernelCriticalEdgesOperation<ElemT, T>{}, sb::default_executor());
+      };
+      return sb_py::bars_with_edges_to_arrays(compute());
     }
 
     static void register_bindings(nb::module_ &m, const std::string &suffix)
