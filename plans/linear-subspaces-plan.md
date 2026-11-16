@@ -1,6 +1,6 @@
 # Linear subspaces and inner products: implementation plan
 
-Progress: 2 of 10 items, 5 of 23 points (22%)
+Progress: 3 of 10 items, 8 of 23 points (35%)
 
 Spec: [linear-subspaces-spec.md](linear-subspaces-spec.md)
 
@@ -26,13 +26,16 @@ Spec: [linear-subspaces-spec.md](linear-subspaces-spec.md)
   `PointCloud`; dependent vectors raise; points of another dimension raise.
   Note: the projection solves a system with V G V^T in place of a Cholesky
   factorization, which each framework also provides.
-- [ ] **A3.** [3] Framework arrays for the points, the vectors, and the Gram
+- [x] **A3.** [3] (3d8e92adc) Framework arrays for the points, the vectors, and the Gram
   matrix (D7): the array operations (product, transpose, solving a
   linear system) in NumPy and in each adapter, and the linear algebra
   written against them.
   Tests: the projection of framework points matches NumPy; gradients with
   respect to the points, to the vectors, and to the Gram matrix against
   finite differences; the compiled gradient matches the eager one.
+  Note: the Cholesky factor is not needed until B1, which adds it to the
+  adapters. Two inner products of matrices that a framework traces are
+  equal only if the matrices are the same object.
 
 ## Phase B: Distances under an inner product
 
