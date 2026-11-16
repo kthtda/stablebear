@@ -1,6 +1,6 @@
 # Linear subspaces, inner products, and distances: implementation plan
 
-Progress: 23 of 24 items, 53 of 55 points (96%)
+Progress: 24 of 24 items, 55 of 55 points (100%)
 
 Spec: [linear-subspaces-spec.md](linear-subspaces-spec.md)
 
@@ -181,7 +181,7 @@ A refactor: results do not change, except where an item says so.
   function from critical edges to bars. The kernel of a single pair with
   Euclidean or inner product distances keeps its vjp.
   Tests: the gradient tests pass unchanged.
-- [ ] **F5.** [2] Time series of point clouds in `project` and in a
+- [x] **F5.** [2] (7f4da73ef) Time series of point clouds in `project` and in a
   `DistanceSpace` for persistent homology, which the operations of F2 give.
   Tests: the projection of a series is the series of the projections;
   persistent homology of a series in a `DistanceSpace` of each kind of
