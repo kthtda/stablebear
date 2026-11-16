@@ -85,7 +85,7 @@ class InnerProduct:
 
     Calling the inner product on a point cloud gives an
     :class:`InnerProductSpace`, which operations that use an inner product
-    take in place of the point cloud.
+    or a distance take in place of the point cloud.
 
     Parameters
     ----------
@@ -142,15 +142,21 @@ class InnerProduct:
         """The dimension :math:`d` of the vectors."""
         return int(self._gram.shape[0])
 
-    def __call__(self, vectors: Any) -> InnerProductSpace:
-        """The vectors with this inner product.
+    @property
+    def distance(self) -> InnerProductDistance:
+        r"""The distance that the inner product induces:
+        :math:`\sqrt{(x - y)^T G (x - y)}` between :math:`x` and
+        :math:`y`."""
+        return InnerProductDistance(self)
+
+    def __call__(self, points: Any) -> InnerProductSpace:
+        """The points with this inner product.
 
         Parameters
         ----------
-        vectors : PointCloud, FloatTensor, numpy.ndarray, or framework array
+        points : PointCloud, FloatTensor, numpy.ndarray, or framework array
             A point cloud of shape ``(n, d)``, one point per row, which may
-            be a PyTorch, JAX, or TensorFlow array. Its points are the
-            vectors.
+            be a PyTorch, JAX, or TensorFlow array.
 
         Returns
         -------
@@ -162,7 +168,7 @@ class InnerProduct:
         ValueError
             If the points do not have the dimension of the inner product.
         """
-        return InnerProductSpace(vectors, self)
+        return InnerProductSpace(points, self)
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, InnerProduct):
@@ -179,19 +185,143 @@ class InnerProduct:
         return f"InnerProduct(dim={self.dim})"
 
 
-class InnerProductSpace:
-    """Vectors together with the inner product of their space.
+class Distance:
+    """A distance between points. The base class of all distances.
 
-    An operation that uses an inner product, such as
-    :meth:`LinearSubspace.project`, takes an ``InnerProductSpace`` in place
-    of the plain vectors and uses its inner product. It is usually made by
-    calling an :class:`InnerProduct` on the vectors.
+    Calling a distance on a point cloud gives a :class:`DistanceSpace`,
+    which operations that use a distance, such as
+    :func:`~stablebear.persistence.homology.compute_persistent_homology`,
+    take in place of the point cloud. A point cloud that is not in a
+    ``DistanceSpace`` has the Euclidean distance.
+
+    The distances are :class:`LpDistance` and the distance that an
+    :class:`InnerProduct` induces, :attr:`InnerProduct.distance`.
+    """
+
+    def __call__(self, points: Any) -> DistanceSpace:
+        """The points with this distance.
+
+        Parameters
+        ----------
+        points : PointCloud, FloatTensor, numpy.ndarray, or framework array
+            A point cloud of shape ``(n, d)``, one point per row, which may
+            be a PyTorch, JAX, or TensorFlow array.
+
+        Returns
+        -------
+        DistanceSpace
+            The point cloud with this distance.
+        """
+        return DistanceSpace(points, self)
+
+    def _check_dim(self, dim: int) -> None:
+        """Raise ValueError if the distance does not apply to points of the
+        given dimension."""
+
+    __hash__ = None  # type: ignore[assignment]
+
+
+class InnerProductDistance(Distance):
+    r"""The distance that an inner product induces,
+    :math:`\sqrt{(x - y)^T G (x - y)}` between :math:`x` and :math:`y`,
+    for the Gram matrix :math:`G` of the inner product. It is what
+    :attr:`InnerProduct.distance` gives.
 
     Parameters
     ----------
-    vectors : PointCloud, FloatTensor, numpy.ndarray, or framework array
+    inner_product : InnerProduct
+        The inner product.
+    """
+
+    def __init__(self, inner_product: InnerProduct):
+        if not isinstance(inner_product, InnerProduct):
+            raise TypeError(f"Expected an InnerProduct, got {type(inner_product).__name__}.")
+        self._inner_product = inner_product
+
+    @property
+    def inner_product(self) -> InnerProduct:
+        """The inner product that induces the distance."""
+        return self._inner_product
+
+    def _check_dim(self, dim: int) -> None:
+        if dim != self._inner_product.dim:
+            raise ValueError(
+                f"The points have dimension {dim}, but the inner product is on vectors of "
+                f"dimension {self._inner_product.dim}.")
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Distance):
+            return NotImplemented
+        return isinstance(other, InnerProductDistance) and self._inner_product == other._inner_product
+
+    def __repr__(self) -> str:
+        return f"InnerProductDistance({self._inner_product!r})"
+
+
+class DistanceSpace:
+    """Points together with the distance of their space.
+
+    An operation that uses a distance takes a ``DistanceSpace`` in place of
+    the plain points and uses its distance. It is usually made by calling a
+    :class:`Distance` on the points.
+
+    Parameters
+    ----------
+    points : PointCloud, FloatTensor, numpy.ndarray, or framework array
         A point cloud of shape ``(n, d)``, one point per row, which may be a
-        PyTorch, JAX, or TensorFlow array. Its points are the vectors.
+        PyTorch, JAX, or TensorFlow array.
+    distance : Distance
+        The distance between the points.
+
+    Raises
+    ------
+    ValueError
+        If the distance does not apply to points of dimension ``d``.
+    """
+
+    def __init__(self, points: Any, distance: Distance):
+        if not isinstance(distance, Distance):
+            raise TypeError(f"Expected a Distance, got {type(distance).__name__}.")
+        cloud = _as_point_cloud(points)
+        distance._check_dim(int(cloud.shape[1]))
+        self._points = cloud
+        self._distance = distance
+
+    @property
+    def points(self) -> Any:
+        """The points: a ``PointCloud``, or the PyTorch, JAX, or TensorFlow
+        array of the points."""
+        return self._points
+
+    @property
+    def distance(self) -> Distance:
+        """The distance of the space."""
+        return self._distance
+
+    @property
+    def dtype(self) -> Dtype:
+        """The dtype of what holds the points, such as ``pcloud64``."""
+        return pcloud32 if _is_float32(self._points) else pcloud64
+
+    def __repr__(self) -> str:
+        return f"{type(self).__name__}({self._points!r}, {self._distance!r})"
+
+
+class InnerProductSpace(DistanceSpace):
+    """Points together with the inner product of their space.
+
+    An operation that uses an inner product, such as
+    :meth:`LinearSubspace.project`, takes an ``InnerProductSpace`` in place
+    of the plain points and uses its inner product. It is also a
+    :class:`DistanceSpace`, with the distance that the inner product
+    induces. It is usually made by calling an :class:`InnerProduct` on the
+    points.
+
+    Parameters
+    ----------
+    points : PointCloud, FloatTensor, numpy.ndarray, or framework array
+        A point cloud of shape ``(n, d)``, one point per row, which may be a
+        PyTorch, JAX, or TensorFlow array.
     inner_product : InnerProduct
         The inner product, on vectors of dimension ``d``.
 
@@ -201,35 +331,19 @@ class InnerProductSpace:
         If the points do not have the dimension of the inner product.
     """
 
-    def __init__(self, vectors: Any, inner_product: InnerProduct):
+    def __init__(self, points: Any, inner_product: InnerProduct):
         if not isinstance(inner_product, InnerProduct):
             raise TypeError(f"Expected an InnerProduct, got {type(inner_product).__name__}.")
-        cloud = _as_point_cloud(vectors)
-        if cloud.shape[1] != inner_product.dim:
-            raise ValueError(
-                f"The points have dimension {cloud.shape[1]}, but the inner product is on vectors of "
-                f"dimension {inner_product.dim}.")
-        self._vectors = cloud
+        super().__init__(points, inner_product.distance)
         self._inner_product = inner_product
-
-    @property
-    def vectors(self) -> Any:
-        """The vectors: for a point cloud, a ``PointCloud``, or the PyTorch,
-        JAX, or TensorFlow array of its points."""
-        return self._vectors
 
     @property
     def inner_product(self) -> InnerProduct:
         """The inner product of the space."""
         return self._inner_product
 
-    @property
-    def dtype(self) -> Dtype:
-        """The dtype of what holds the vectors, such as ``pcloud64``."""
-        return pcloud32 if _is_float32(self._vectors) else pcloud64
-
     def __repr__(self) -> str:
-        return f"InnerProductSpace({self._vectors!r}, {self._inner_product!r})"
+        return f"InnerProductSpace({self._points!r}, {self._inner_product!r})"
 
 
 class LinearSubspace:
@@ -341,9 +455,16 @@ class LinearSubspace:
         ValueError
             If the points do not have the dimension of the vectors of the
             subspace.
+        TypeError
+            If ``points`` is a :class:`DistanceSpace` that is not an
+            ``InnerProductSpace``.
         """
+        if isinstance(points, DistanceSpace) and not isinstance(points, InnerProductSpace):
+            raise TypeError(
+                "Only a DistanceSpace that is an InnerProductSpace can be projected: an orthogonal projection "
+                "needs an inner product.")
         space = points if isinstance(points, InnerProductSpace) else None
-        cloud = space.vectors if space is not None else _as_point_cloud(points)
+        cloud = space.points if space is not None else _as_point_cloud(points)
         if cloud.shape[1] != self.ambient_dim:
             raise ValueError(
                 f"The points have dimension {cloud.shape[1]}, but the subspace is of vectors of dimension "

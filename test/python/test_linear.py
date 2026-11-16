@@ -49,7 +49,7 @@ def test_invalid_gram_matrix_raises(gram, problem):
     pytest.param(lambda points: sb.FloatTensor(points), id="float_tensor"),
     pytest.param(lambda points: sb.PointCloud(points), id="point_cloud"),
 ])
-def test_inner_product_space_gives_its_vectors_and_inner_product_back(make_points):
+def test_inner_product_space_gives_its_points_and_inner_product_back(make_points):
     ip = sb.InnerProduct(_gram())
     points = np.array([[1.0, 10.0],
                        [2.0, 20.0],
@@ -58,8 +58,8 @@ def test_inner_product_space_gives_its_vectors_and_inner_product_back(make_point
     space = ip(make_points(points))
 
     assert isinstance(space, sb.InnerProductSpace)
-    assert isinstance(space.vectors, sb.PointCloud)
-    np.testing.assert_array_equal(np.asarray(space.vectors), points)
+    assert isinstance(space.points, sb.PointCloud)
+    np.testing.assert_array_equal(np.asarray(space.points), points)
     assert space.inner_product == ip
     assert space.dtype == sb.pcloud64
 
@@ -181,7 +181,7 @@ def test_projection_in_inner_product_space_is_orthogonal_in_its_inner_product():
 
     assert isinstance(projected, sb.InnerProductSpace)
     assert projected.inner_product == ip
-    residual = _points() - np.asarray(projected.vectors)
+    residual = _points() - np.asarray(projected.points)
     # The inner product of each residual with each vector of the subspace.
     np.testing.assert_allclose(residual @ gram @ vectors.T, np.zeros((2, 2)), atol=1e-12)
     # The residuals are not orthogonal to the vectors in the Euclidean sense.
@@ -194,7 +194,7 @@ def test_projection_with_identity_inner_product_equals_euclidean_projection():
 
     in_space = subspace.project(sb.InnerProduct(np.eye(3))(_points()))
 
-    np.testing.assert_allclose(np.asarray(in_space.vectors), np.asarray(subspace.project(_points())))
+    np.testing.assert_allclose(np.asarray(in_space.points), np.asarray(subspace.project(_points())))
 
 
 def test_projection_of_float32_points_onto_float32_subspace_is_float32():
@@ -261,9 +261,9 @@ def test_projection_in_inner_product_space_with_framework_arrays_matches_numpy(f
 
     assert isinstance(projected, sb.InnerProductSpace)
     assert projected.inner_product == ip
-    assert isinstance(projected.vectors, fw.tensor_type)
+    assert isinstance(projected.points, fw.tensor_type)
     expected = sb.LinearSubspace(_vectors()).project(sb.InnerProduct(_gram3())(_points()))
-    np.testing.assert_allclose(fw.to_numpy(projected.vectors), np.asarray(expected.vectors))
+    np.testing.assert_allclose(fw.to_numpy(projected.points), np.asarray(expected.points))
 
 
 def test_framework_gram_matrix_and_vectors_come_back_as_given(fw):
@@ -283,15 +283,15 @@ def test_invalid_framework_gram_matrix_and_vectors_raise(fw):
 def _losses():
     def wrt_points(fw, x):
         ip = sb.InnerProduct(_gram3())
-        return fw.sum(fw.tensor(_weights()) * sb.LinearSubspace(_vectors()).project(ip(x)).vectors)
+        return fw.sum(fw.tensor(_weights()) * sb.LinearSubspace(_vectors()).project(ip(x)).points)
 
     def wrt_vectors(fw, x):
         ip = sb.InnerProduct(_gram3())
-        return fw.sum(fw.tensor(_weights()) * sb.LinearSubspace(x).project(ip(_points())).vectors)
+        return fw.sum(fw.tensor(_weights()) * sb.LinearSubspace(x).project(ip(_points())).points)
 
     def wrt_gram(fw, x):
         ip = sb.InnerProduct(_framework_gram(fw, x))
-        return fw.sum(fw.tensor(_weights()) * sb.LinearSubspace(_vectors()).project(ip(_points())).vectors)
+        return fw.sum(fw.tensor(_weights()) * sb.LinearSubspace(_vectors()).project(ip(_points())).points)
 
     def wrt_vectors_euclidean(fw, x):
         return fw.sum(fw.tensor(_weights()) * sb.LinearSubspace(x).project(_points()))
@@ -320,3 +320,45 @@ def test_compiled_projection_gradient_matches_eager(fw, loss, x0):
 
     np.testing.assert_allclose(value, eager_value)
     np.testing.assert_allclose(grad, eager_grad)
+
+
+def test_distance_space_gives_its_points_and_distance_back():
+    distance = sb.InnerProduct(_gram()).distance
+    points = np.array([[1.0, 10.0],
+                       [2.0, 20.0]])
+
+    space = distance(points)
+
+    assert type(space) is sb.DistanceSpace
+    assert isinstance(space.points, sb.PointCloud)
+    np.testing.assert_array_equal(np.asarray(space.points), points)
+    assert space.distance == distance
+    assert space.dtype == sb.pcloud64
+
+
+def test_inner_product_space_is_a_distance_space_with_the_distance_of_its_inner_product():
+    ip = sb.InnerProduct(_gram())
+
+    space = ip(np.array([[1.0, 10.0]]))
+
+    assert isinstance(space, sb.DistanceSpace)
+    assert isinstance(space.distance, sb.Distance)
+    assert space.distance == ip.distance
+
+
+def test_distances_of_equal_inner_products_are_equal():
+    assert sb.InnerProduct(_gram()).distance == sb.InnerProduct(_gram()).distance
+    assert sb.InnerProduct(_gram()).distance != sb.InnerProduct(np.eye(2)).distance
+
+
+def test_distance_of_points_of_another_dimension_than_its_inner_product_raises():
+    distance = sb.InnerProduct(_gram()).distance
+    with pytest.raises(ValueError, match="dimension 3"):
+        distance(np.array([[1.0, 10.0, 100.0]]))
+
+
+def test_projecting_a_distance_space_without_inner_product_raises():
+    line = sb.LinearSubspace(np.array([[3.0, 4.0]]))
+    space = sb.InnerProduct(_gram()).distance(np.array([[5.0, 0.0]]))
+    with pytest.raises(TypeError, match="InnerProductSpace"):
+        line.project(space)  # pyright: ignore[reportCallIssue, reportArgumentType]
