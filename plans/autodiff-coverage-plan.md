@@ -1,6 +1,6 @@
 # Autodiff coverage: implementation plan
 
-Progress: 9 of 11 items, 22 of 25 points (88%)
+Progress: 10 of 11 items, 24 of 25 points (96%)
 
 Spec: [autodiff-prototype-spec.md](autodiff-prototype-spec.md), which each
 item updates where it changes a decision.
@@ -73,9 +73,10 @@ The last value of each sum is taken directly, not from the running sum, so that 
   Tests: match the untracked results for PCFs, barcodes, and point
   clouds; gradient through a concatenation.
 Joins take one concatenation and one gather of the rows, without pending writes, which would take a step per element.
-- [ ] **C4.** [2] `cdist` of tracked PCFs.
+- [x] **C4.** [2] (d514227bd) `cdist` of tracked PCFs.
   Tests: matches the untracked distances; gradient against finite
   differences with respect to each side.
+The distances are those across in the pairwise distances of both tensors together, so the pairs within each are computed too.
 - [ ] **C5.** [1] Plotting a tracked tensor plots its values, and
   `is_isomorphic_to` of a tracked `BarcodeTensor` compares them.
   Tests: both run and agree with the detached tensor.
