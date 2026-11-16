@@ -1,6 +1,6 @@
 # Linear subspaces, inner products, and distances: implementation plan
 
-Progress: 20 of 24 items, 45 of 55 points (82%)
+Progress: 21 of 24 items, 47 of 55 points (85%)
 
 Spec: [linear-subspaces-spec.md](linear-subspaces-spec.md)
 
@@ -160,7 +160,7 @@ A refactor: results do not change, except where an item says so.
   which runs an operation on a container and waits for the result.
   Tests (C++): an operation over a pair of tensors; tensors of different
   shapes raise; `apply_ufunc` gives the result of the task.
-- [ ] **F2.** [2] Pairwise Lp distances and the product of points with a
+- [x] **F2.** [2] (3789f81ed) Pairwise Lp distances and the product of points with a
   matrix as operations, bound for tensors, indexed tensors, and time series
   in place of their tensor overloads; Python no longer materializes indexed
   tensors for them.
