@@ -1,6 +1,6 @@
 # Linear subspaces, inner products, and distances: implementation plan
 
-Progress: 5 of 15 items, 12 of 33 points (36%)
+Progress: 6 of 15 items, 13 of 33 points (39%)
 
 Spec: [linear-subspaces-spec.md](linear-subspaces-spec.md)
 
@@ -54,7 +54,7 @@ Spec: [linear-subspaces-spec.md](linear-subspaces-spec.md)
   Tests: equals the barcodes of the transformed points; the identity matrix
   gives the barcodes of the plain cloud; gradient with respect to the Gram
   matrix against finite differences.
-- [ ] **B3.** [1] Deprecate `distance_type` (D6b).
+- [x] **B3.** [1] (2e4802e25) Deprecate `distance_type` (D6b).
   Tests: passing it warns; passing it with a `DistanceSpace` raises; the
   default does not warn.
 - [ ] **B4.** [3] `compute_homological_kernel` of two `DistanceSpace`s of
