@@ -783,3 +783,63 @@ def test_persistent_homology_and_kernel_of_tracked_batch_in_distance_space_raise
         _kernel(space, space)
     with pytest.raises(NotImplementedError, match="single"):
         _homology(sb.LpDistance(1)(tracked(fw, sb.PointCloudTensor(_batch2()))))
+
+
+def _l1_matrices(clouds):
+    return sb.LpDistance(1)._distance_matrices(sb.PointCloudTensor(clouds))
+
+
+@pytest.mark.parametrize("make_elements", [
+    pytest.param(lambda clouds: sb.PointCloudTensor(clouds), id="point_clouds"),
+    pytest.param(_l1_matrices, id="distance_matrices"),
+])
+def test_critical_edges_of_persistent_homology_of_batch(make_elements):
+    from stablebear import _sb_cpp as cpp
+
+    ripser = cpp.persistence.PersistenceRipser64
+    clouds = _batch2() + [np.zeros((0, 2))]
+    elements = make_elements(clouds)
+
+    bars, enumeration, edges = ripser.persistence_critical_edges(elements._data, 1, True)
+
+    assert enumeration.shape == (4, 2, 2)
+    # The empty cloud has no bars.
+    np.testing.assert_array_equal(enumeration[3], [[len(bars), len(bars)],
+                                                   [len(bars), len(bars)]])
+    for i, cloud in enumerate(clouds[:3]):
+        alone_bars, alone_enumeration, alone_edges = ripser.persistence_critical_edges(
+            elements[i]._cpp_point_cloud() if isinstance(elements, sb.PointCloudTensor)
+            else elements[i]._current_matrix(), 1, True)
+        start, stop = enumeration[i, 0, 0], enumeration[i, 1, 1]
+        np.testing.assert_array_equal(bars[start:stop], alone_bars)
+        np.testing.assert_array_equal(enumeration[i] - start, alone_enumeration)
+        # The edges are pairs of points of the element itself.
+        np.testing.assert_array_equal(edges[start:stop], alone_edges)
+        assert edges[start:stop].max() < len(cloud)
+
+
+@pytest.mark.parametrize("make_elements", [
+    pytest.param(lambda clouds: sb.PointCloudTensor(clouds), id="point_clouds"),
+    pytest.param(_l1_matrices, id="distance_matrices"),
+])
+def test_critical_edges_of_kernel_of_batch(make_elements):
+    from stablebear import _sb_cpp as cpp
+
+    kernel = cpp.persistence.HomologicalKernel64
+    clouds = _batch2()
+    X, Y = make_elements(clouds), make_elements([_contracted(cloud) for cloud in clouds])
+
+    bars, enumeration, edges = kernel.homological_kernel_critical_edges(X._data, Y._data)
+
+    def element(tensor, i):
+        return tensor[i]._cpp_point_cloud() if isinstance(tensor, sb.PointCloudTensor) else tensor[i]._current_matrix()
+
+    assert enumeration.shape == (3, 2)
+    for i, cloud in enumerate(clouds):
+        alone_bars, alone_edges = kernel.homological_kernel_critical_edges(element(X, i), element(Y, i))
+        start, stop = enumeration[i]
+        # One bar per point but one.
+        assert stop - start == len(cloud) - 1
+        np.testing.assert_array_equal(bars[start:stop], alone_bars)
+        np.testing.assert_array_equal(edges[start:stop], alone_edges)
+        assert edges[start:stop].max() < len(cloud)

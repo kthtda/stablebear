@@ -10,6 +10,7 @@
 #include <sbear/timeseries.hpp>
 
 #include <sbear/point_cloud.hpp>
+#include <sbear/walk.hpp>
 
 #include <string>
 #include <type_traits>
@@ -102,10 +103,83 @@ namespace
       return nb::make_tuple(bars, enumeration, critical);
     }
 
+    /// persistence_critical_edges of every element of a tensor of point
+    /// clouds or of distance matrices, computed in parallel over the
+    /// elements: the bars of all elements and dimensions as an (m, 2)
+    /// array, in C order of the elements and then by dimension; the
+    /// [start, stop) rows of each element and dimension as an array of
+    /// shape tensor.shape + (maxDim + 1, 2); and the critical edges of each
+    /// bar, as points of its own element.
+    template <typename ElemT>
+    static nb::tuple batch_persistence_critical_edges(
+        const sb::Tensor<ElemT>& elements, size_t maxDim, bool reducedHomology)
+    {
+      const auto& shape = elements.shape();
+      std::vector<size_t> strides(shape.size(), 1);
+      for (size_t i = shape.size(); i-- > 1;)
+      {
+        strides[i - 1] = strides[i] * shape[i];
+      }
+      const size_t count = elements.size();
+      std::vector<std::vector<sb::ph::Barcode<T>>> barcodes(count);
+      std::vector<std::vector<std::vector<sb::ph::detail::CriticalEdges>>> edges(count);
+      {
+        nb::gil_scoped_release release;
+        sb::parallel_walk(elements, [&](const std::vector<size_t>& idx) {
+          size_t k = 0;
+          for (size_t i = 0; i < idx.size(); ++i)
+          {
+            k += idx[i] * strides[i];
+          }
+          sb::ph::persistence_with_critical_edges(elements(idx), maxDim, reducedHomology, barcodes[k], edges[k]);
+        }, sb::default_executor());
+      }
+
+      size_t total = 0;
+      for (const auto& elementBarcodes : barcodes)
+      {
+        for (const auto& barcode : elementBarcodes)
+        {
+          total += barcode.bars().size();
+        }
+      }
+      std::vector<size_t> enumerationShape(shape.begin(), shape.end());
+      enumerationShape.push_back(maxDim + 1);
+      enumerationShape.push_back(2);
+      auto bars = sb_py::new_array<T>({total, 2});
+      auto enumeration = sb_py::new_array<int64_t>(enumerationShape);
+      auto critical = sb_py::new_array<int64_t>({total, 4});
+      size_t row = 0;
+      for (size_t k = 0; k < count; ++k)
+      {
+        for (size_t dim = 0; dim <= maxDim; ++dim)
+        {
+          auto* range = enumeration.data() + 2 * (k * (maxDim + 1) + dim);
+          range[0] = static_cast<int64_t>(row);
+          const auto& dimBars = barcodes[k][dim].bars();
+          for (size_t b = 0; b < dimBars.size(); ++b, ++row)
+          {
+            bars.data()[2 * row] = dimBars[b].birth;
+            bars.data()[2 * row + 1] = dimBars[b].death;
+            for (size_t j = 0; j < 4; ++j)
+            {
+              critical.data()[4 * row + j] = static_cast<int64_t>(edges[k][dim][b][j]);
+            }
+          }
+          range[1] = static_cast<int64_t>(row);
+        }
+      }
+      return nb::make_tuple(bars, enumeration, critical);
+    }
+
     static void register_bindings(nb::module_& m, const std::string& suffix)
     {
       nb::class_<PyRipserBindings> cls(
         m, ("PersistenceRipser" + suffix).c_str());
+      cls.def_static("persistence_critical_edges",
+                     &PyRipserBindings::template batch_persistence_critical_edges<sb::PointCloud<T>>);
+      cls.def_static("persistence_critical_edges",
+                     &PyRipserBindings::template batch_persistence_critical_edges<sb::DistanceMatrix<T>>);
       // For a point cloud, with Euclidean distances, or a distance matrix,
       // whose critical edges are pairs of its rows.
       cls.def_static("persistence_critical_edges",
