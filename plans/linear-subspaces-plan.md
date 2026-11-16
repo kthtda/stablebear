@@ -1,6 +1,6 @@
 # Linear subspaces, inner products, and distances: implementation plan
 
-Progress: 19 of 19 items, 43 of 43 points (100%)
+Progress: 19 of 24 items, 43 of 55 points (78%)
 
 Spec: [linear-subspaces-spec.md](linear-subspaces-spec.md)
 
@@ -150,3 +150,35 @@ Spec: [linear-subspaces-spec.md](linear-subspaces-spec.md)
   kernels of a batch and its projection with respect to the vectors of
   the subspace against finite differences; under `LpDistance(1)`; batches
   of different shapes raise.
+
+## Phase F: Batches through ufuncs
+
+A refactor: results do not change, except where an item says so.
+
+- [ ] **F1.** [2] `ufunc.hpp`: a pair of aligned tensors as a container
+  (`Zipped`), whose operation takes one element of each, and `apply_ufunc`,
+  which runs an operation on a container and waits for the result.
+  Tests (C++): an operation over a pair of tensors; tensors of different
+  shapes raise; `apply_ufunc` gives the result of the task.
+- [ ] **F2.** [2] Pairwise Lp distances and the product of points with a
+  matrix as operations, bound for tensors, indexed tensors, and time series
+  in place of their tensor overloads; Python no longer materializes indexed
+  tensors for them.
+  Tests: the C++ tests of both run on the operations; an indexed
+  `PointCloudTensor` projects and measures as its dense copy.
+- [ ] **F3.** [3] The critical edges of persistent homology and of the
+  kernel as operations whose output element holds the bars and their edges,
+  with one conversion of a tensor of such elements to arrays, in place of
+  the two hand-written loops and the bindings for single elements.
+  Tests: the tests of the critical edges of batches pass on the new
+  bindings.
+- [ ] **F4.** [3] Python: one path for gradients of persistent homology and
+  of the kernel, with a single cloud as a batch of one, and one shared
+  function from critical edges to bars. The kernel of a single pair with
+  Euclidean or inner product distances keeps its vjp.
+  Tests: the gradient tests pass unchanged.
+- [ ] **F5.** [2] Time series of point clouds in `project` and in a
+  `DistanceSpace` for persistent homology, which the operations of F2 give.
+  Tests: the projection of a series is the series of the projections;
+  persistent homology of a series in a `DistanceSpace` of each kind of
+  distance is the series of the barcodes.

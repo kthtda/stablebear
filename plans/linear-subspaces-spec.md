@@ -235,6 +235,31 @@ product distances keeps its vjp, and still works while they trace.
 Rejected: a Python loop over the clouds of a batch, which costs a
 framework operation per cloud (autodiff D13).
 
+**D8b. Batches come from the ufunc layer, not from each operation.** The
+C++ ufunc layer applies an operation on one element to every element of a
+tensor, an indexed tensor, or a time series, in parallel. The new routines
+are such operations: the pairwise distances of a cloud, the product of its
+points with a matrix, and the bars and critical edges of persistent homology
+and of the kernel. None has a loop over a batch of its own. Two additions to
+the layer make this possible: an operation over a pair of aligned tensors,
+for the kernel, and an output element that holds rows of varying number,
+the bars of one element with their edges, which one function converts to
+serial content for a whole tensor.
+
+In Python, a single cloud that carries gradients is a batch of one, so each
+operation has one path for gradients, and one shared function turns critical
+edges into bars. The exception is the kernel of a single pair with Euclidean
+or inner product distances, which keeps its vjp because that works while a
+framework traces (D8a).
+
+A later operation therefore needs its C++ operation on one element and, for
+gradients, its function from rows of points to values, and nothing for
+batches.
+
+Rejected: a tensor overload and a batch branch per operation, which the
+first version had, with the code that numbers the elements of a tensor
+copied in each.
+
 **D9. Checks need concrete values.** That the Gram matrix is symmetric
 positive definite and that the vectors are independent is checked when the
 values are concrete, and raises `ValueError`. While a framework traces the
