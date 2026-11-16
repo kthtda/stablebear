@@ -1,6 +1,6 @@
 # Autodiff prototype: implementation plan
 
-Progress: 23 of 29 items, 55 of 70 points (79%)
+Progress: 24 of 29 items, 57 of 70 points (81%)
 
 Spec: [autodiff-prototype-spec.md](autodiff-prototype-spec.md)
 
@@ -111,10 +111,15 @@ Spec: [autodiff-prototype-spec.md](autodiff-prototype-spec.md)
   Note: a written value's dtype is not checked against the tensor's: the
   tensor's dtype follows its arrays after the pass. Only `PcfTensor` builds
   from a list, since there is no tracked `Barcode` (D4).
-- [ ] **D6.** [2] `differentiable` wraps a declared output type: the
+- [x] **D6.** [2] (173fe4f36) `differentiable` wraps a declared output type: the
   operation returns a C++ tensor and the decorator returns its tracked
   form.
   Tests: the kernel and `transform_bars` use it and pass their tests.
+  Note: the tracked result keeps the C++ tensor only when the framework has
+  run the operation by the time the decorator returns, as PyTorch and
+  eager JAX and TensorFlow do. The kernel gets its bars as an array, so it
+  builds a C++ tensor to return: one conversion, in place of one in the
+  next operation.
 - [ ] **D7.** [2] Type descriptions for `PointCloudTensor`,
   `DistanceMatrixTensor`, and `SymmetricMatrixTensor`.
   Tests: serial round trip; indexing a tracked tensor of each type.
