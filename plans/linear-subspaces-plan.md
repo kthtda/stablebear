@@ -1,6 +1,6 @@
 # Linear subspaces, inner products, and distances: implementation plan
 
-Progress: 4 of 15 items, 10 of 33 points (30%)
+Progress: 5 of 15 items, 12 of 33 points (36%)
 
 Spec: [linear-subspaces-spec.md](linear-subspaces-spec.md)
 
@@ -47,7 +47,7 @@ Spec: [linear-subspaces-spec.md](linear-subspaces-spec.md)
   `InnerProductSpace` is a `DistanceSpace` with the distance of its inner
   product; distances of equal inner products are equal; projecting a
   `DistanceSpace` that is not an `InnerProductSpace` raises.
-- [ ] **B2.** [2] `compute_persistent_homology` of a `DistanceSpace` of a
+- [x] **B2.** [2] (9974eb30c) `compute_persistent_homology` of a `DistanceSpace` of a
   single cloud with the distance of an inner product, by the transformed
   points X L^T (D6), with and without gradients; the Cholesky factor in
   each adapter.
