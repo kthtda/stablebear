@@ -775,14 +775,10 @@ def test_projection_of_tracked_batch_gradient_wrt_points(fw):
     assert_gradient_matches_finite_differences(fw, loss, content)
 
 
-def test_persistent_homology_and_kernel_of_tracked_batch_in_distance_space_raise(fw):
+def test_kernel_of_tracked_batch_in_distance_space_raises(fw):
     space = sb.InnerProduct(_gram())(tracked(fw, sb.PointCloudTensor(_batch2())))
     with pytest.raises(NotImplementedError, match="single"):
-        _homology(space)
-    with pytest.raises(NotImplementedError, match="single"):
         _kernel(space, space)
-    with pytest.raises(NotImplementedError, match="single"):
-        _homology(sb.LpDistance(1)(tracked(fw, sb.PointCloudTensor(_batch2()))))
 
 
 def _l1_matrices(clouds):
@@ -892,3 +888,77 @@ def test_projection_gradient_wrt_one_point_cloud_of_a_batch(fw):
         return fw.sum(fw.tensor(weights) * sb.LinearSubspace(_vectors()).project(clouds)._tvalues)
 
     assert_gradient_matches_finite_differences(fw, loss, _batch3()[0])
+
+
+_TRACKED_BATCH_DISTANCES = [
+    pytest.param(None, id="plain"),
+    pytest.param(lambda: sb.InnerProduct(_gram()).distance, id="inner_product"),
+    pytest.param(lambda: sb.LpDistance(1), id="taxicab"),
+]
+
+
+def _in_distance(make_distance, points):
+    return points if make_distance is None else make_distance()(points)
+
+
+@pytest.mark.parametrize("make_distance", _TRACKED_BATCH_DISTANCES)
+def test_persistent_homology_of_tracked_batch_matches_untracked(fw, make_distance):
+    clouds = sb.PointCloudTensor(_batch2())
+
+    out = _homology(_in_distance(make_distance, tracked(fw, clouds)))
+
+    expected = _homology(_in_distance(make_distance, clouds))
+    assert isinstance(out, sb.persistence.BarcodeTensor)
+    assert out._tvalues is not None
+    assert out.shape == (3, 2)
+    for i in np.ndindex(3, 2):
+        assert out[i].is_isomorphic_to(expected[i], atol=1e-12, rtol=1e-12)
+
+
+def test_persistent_homology_of_tracked_batch_of_one_point_cloud_has_no_batch_axis(fw):
+    out = _homology(tracked(fw, sb.PointCloudTensor([_loop_points()])))
+
+    assert out.shape == (2,)
+    _assert_same_barcodes(out, _homology(_loop_points()))
+
+
+@pytest.mark.parametrize("make_distance", _TRACKED_BATCH_DISTANCES)
+def test_persistent_homology_of_batch_gradient_wrt_points(fw, make_distance):
+    if fw.traces_abstractly:
+        pytest.skip("The number of bars needs concrete points")
+    _, second, third = _batch2()
+
+    def loss(P):
+        clouds = sb.PointCloudTensor([second, P, third])
+        return _bars_loss(fw, _homology(_in_distance(make_distance, clouds)))
+
+    assert_gradient_matches_finite_differences(fw, loss, _lp_points())
+
+
+def test_persistent_homology_of_projected_batch_gradient_wrt_subspace(fw):
+    if fw.traces_abstractly:
+        pytest.skip("The number of bars needs concrete points")
+    space = sb.InnerProduct(_gram3())(sb.PointCloudTensor(_batch3()))
+
+    def loss(V):
+        return _bars_loss(fw, _homology(sb.LinearSubspace(V).project(space)))
+
+    assert_gradient_matches_finite_differences(fw, loss, _vectors())
+
+
+def test_persistent_homology_of_batch_gradient_wrt_gram_matrix(fw):
+    if fw.traces_abstractly:
+        pytest.skip("The number of bars needs concrete points")
+    clouds = sb.PointCloudTensor(_batch2())
+
+    def loss(a):
+        return _bars_loss(fw, _homology(sb.InnerProduct(_framework_gram2(fw, a))(clouds)))
+
+    assert_gradient_matches_finite_differences(fw, loss, [2.0, 1.0])
+
+
+def test_persistent_homology_of_abstract_batch_raises():
+    jax = pytest.importorskip("jax")
+    clouds = np.stack([_loop_points(), 2.0 * _loop_points()])
+    with pytest.raises(NotImplementedError, match="abstractly"):
+        jax.grad(lambda P: _homology(P)._tvalues.sum())(jax.numpy.asarray(clouds))

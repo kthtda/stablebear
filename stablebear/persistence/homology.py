@@ -79,6 +79,53 @@ def _tracked_endpoints(
     return adapter.gather(values, source)
 
 
+_ABSTRACT_POINTS = (
+    "compute_persistent_homology of points that JAX or tf.function traces abstractly is not supported: "
+    "the number of bars depends on their values.")
+
+
+def _tracked_persistent_homology_of_batch(clouds: Any, max_dim: int, reduced: bool, distance: Any) -> Any:
+    """_tracked_persistent_homology for a PointCloudTensor that carries
+    gradients, with the shape of the untracked result.
+
+    C++ computes the bars and critical edges of all clouds, in parallel
+    over the clouds. The points of all clouds are one framework array, so
+    the bars of the whole batch come from one gather of the points of
+    their edges.
+    """
+    points = clouds._tvalues
+    adapter = _autodiff._framework(points)
+    if adapter.concrete(points) is None:
+        raise NotImplementedError(_ABSTRACT_POINTS)
+    plain = clouds.detach()
+    if distance is None:
+        elements, lengths = plain, adapter.row_norms
+    else:
+        elements = distance._distance_matrices(plain)
+
+        def lengths(differences):
+            return distance._lengths(adapter, differences)
+
+    backend = cpp_p.PersistenceRipser32 if plain.dtype is pcloud32 else cpp_p.PersistenceRipser64
+    content, enumeration, critical_edges = backend.persistence_critical_edges(elements._data, max_dim, reduced)
+
+    # The critical edges count the points of each cloud from 0: shift them
+    # to the rows of the cloud among the points of all clouds.
+    starts = clouds._enumeration.reshape(-1, 2)[:, 0]
+    rows_of_cloud = enumeration.reshape(len(starts), 2 * (max_dim + 1))
+    shift = np.repeat(starts, rows_of_cloud[:, -1] - rows_of_cloud[:, 0])[:, None]
+    critical_edges = np.where(critical_edges >= 0, critical_edges + shift, -1)
+
+    bars = adapter.stack_columns(
+        _tracked_endpoints(adapter, points, content[:, 0], critical_edges[:, 0], critical_edges[:, 1], lengths),
+        _tracked_endpoints(adapter, points, content[:, 1], critical_edges[:, 2], critical_edges[:, 3], lengths))
+    out = _TrackedBarcodeTensor([bars], enumeration)
+    # A tensor with one element loses its leading axis, as without gradients.
+    if len(out.shape) == 2 and out.shape[0] == 1:
+        out = out[0, :]
+    return out
+
+
 def _tracked_persistent_homology(X: Any, max_dim: int, reduced: bool, distance: Any = None) -> BarcodeTensor:
     """The barcodes of one (n, d) point cloud given as a framework array,
     with bars that carry gradients with respect to its points.
@@ -95,14 +142,18 @@ def _tracked_persistent_homology(X: Any, max_dim: int, reduced: bool, distance: 
     """
     X = _autodiff._unwrap(X)
     adapter = _autodiff._framework(X)
+    if adapter is not None and len(X.shape) > 2:
+        # A batch of clouds, as a NumPy array of this shape is.
+        X = PointCloudTensor(X)
+    if isinstance(X, PointCloudTensor):
+        return _tracked_persistent_homology_of_batch(X, max_dim, reduced, distance)
     if adapter is None or len(X.shape) != 2:
         raise NotImplementedError(
-            "compute_persistent_homology with gradients supports a single point cloud of shape (n, d) only.")
+            "compute_persistent_homology with gradients supports point clouds of shape (..., n, d) and "
+            "PointCloudTensors only.")
     points = adapter.concrete(X)
     if points is None:
-        raise NotImplementedError(
-            "compute_persistent_homology of points that JAX or tf.function traces abstractly is not supported: "
-            "the number of bars depends on their values.")
+        raise NotImplementedError(_ABSTRACT_POINTS)
 
     dtype = np.float32 if points.dtype == np.float32 else np.float64
     backend = cpp_p.PersistenceRipser32 if dtype == np.float32 else cpp_p.PersistenceRipser64
@@ -125,7 +176,7 @@ def _tracked_persistent_homology(X: Any, max_dim: int, reduced: bool, distance: 
 def _persistent_homology_in_space(space: DistanceSpace, max_dim: int, reduced: bool, verbose: bool) -> Any:
     """The barcodes of the points of a DistanceSpace in its distance."""
     transformed = space.distance._euclidean_points(_points_array(space))
-    if transformed is None and _autodiff._framework(space.points) is not None:
+    if transformed is None and _autodiff._tracked(space.points) is not None:
         return _tracked_persistent_homology(space.points, max_dim, reduced, distance=space.distance)
     if transformed is None:
         return compute_persistent_homology(
@@ -200,16 +251,15 @@ def compute_persistent_homology(
     TypeError
         If ``distance_type`` is passed with a ``DistanceSpace``.
     NotImplementedError
-        If ``X`` is a PyTorch, JAX, or TensorFlow array that is not a single
-        point cloud of shape ``(n, d)``, or that JAX or ``tf.function``
-        traces: the number of bars depends on the points. Also if ``X`` is
-        or holds a batch of point clouds that carries gradients.
+        If the points carry gradients that JAX or ``tf.function`` traces:
+        the number of bars depends on the points.
 
     Notes
     -----
-    If ``X`` is a PyTorch, JAX, or TensorFlow array of shape ``(n, d)``, a
-    single point cloud, the bars of the result carry gradients with respect
-    to the points. Each finite, positive endpoint of a bar is the distance
+    If ``X`` is a PyTorch, JAX, or TensorFlow array of shape
+    ``(..., n, d)``, or a ``PointCloudTensor`` that carries gradients, such
+    as one made from a list of such arrays or by a projection, the bars of
+    the result carry gradients with respect to the points. Each finite, positive endpoint of a bar is the distance
     between two points, the longest edge of the simplex that creates or
     destroys the class, and its gradient is that of this distance. An
     endpoint at 0 or at infinity has gradient 0. Where a simplex has several

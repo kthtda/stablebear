@@ -994,10 +994,17 @@ def test_persistent_homology_of_abstract_points_raises():
         jax.grad(loss)(jax.numpy.asarray(_loop_points()))
 
 
-def test_persistent_homology_of_several_framework_point_clouds_raises(fw):
-    clouds = fw.tensor(np.stack([_loop_points(), _loop_points()]))
-    with pytest.raises(NotImplementedError, match="single point cloud"):
-        sb.persistence.compute_persistent_homology(clouds, max_dim=1, reduced=True, verbose=False)
+def test_persistent_homology_of_framework_array_of_several_point_clouds_matches_numpy(fw):
+    clouds = np.stack([_loop_points(), 2.0 * _loop_points()])
+    homology = sb.persistence.compute_persistent_homology
+
+    out = homology(fw.tensor(clouds), max_dim=1, reduced=True, verbose=False)
+
+    expected = homology(clouds, max_dim=1, reduced=True, verbose=False)
+    assert out._tvalues is not None
+    assert out.shape == (2, 2)
+    for i in np.ndindex(2, 2):
+        assert out[i].is_isomorphic_to(expected[i], atol=1e-12, rtol=1e-12)
 
 
 def test_arithmetic_on_stable_rank_with_equal_lifetimes_matches_numpy(fw):

@@ -216,7 +216,7 @@ class PointCloudTensor(IndexedElementTensor):
                 return tracked
         return super().__new__(cls)
 
-    def __init__(self, data, cloud_ndim=2, dtype=None):
+    def __init__(self, data: Any, cloud_ndim=2, dtype=None):
         super().__init__()
         if isinstance(data, PointCloudTensor):
             data = data._data

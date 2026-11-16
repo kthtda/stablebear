@@ -668,9 +668,6 @@ def _distance_matrices(space: DistanceSpace) -> DistanceMatrixTensor:
     space, for a distance without _euclidean_points: one matrix for a single
     cloud."""
     points = space.points
-    if is_tracked(points):
-        raise NotImplementedError(
-            f"{space.distance!r} with gradients supports a single point cloud of shape (n, d) only.")
     if not isinstance(points, PointCloudTensor):
         points = PointCloudTensor([np.asarray(points)])
     return space.distance._distance_matrices(points)
