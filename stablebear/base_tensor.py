@@ -300,6 +300,9 @@ class PcfTensor(_PcfTensorBase):
     _ttimes: Any = None
     _tvalues: Any = None
 
+    def _framework_values(self, t):
+        return _autodiff.evaluate_pcfs(self, t)
+
     def to_serial_content(self) -> tuple[Any, np.ndarray]:
         """The breakpoints of all PCFs as one array, with the rows of each
         PCF: the inverse of :func:`~stablebear.serialize.from_serial_content`.

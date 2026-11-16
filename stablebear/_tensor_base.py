@@ -975,9 +975,15 @@ class FunctionTensor(Tensor):
             For array-like *t* of shape ``t_shape``, the result has shape
             ``self.shape + t_shape``.
             A ``NumericTensor`` input produces a ``NumericTensor`` output;
-            all other inputs produce a ``numpy.ndarray``.
+            all other inputs produce a ``numpy.ndarray``. If *t* is a PyTorch
+            tensor, or the tensor carries gradients, the result is a PyTorch
+            tensor that carries gradients.
         """
         import numpy as np
+
+        if _autodiff._tracked(self) is not None or _autodiff._framework(t) is not None:
+            # With gradients: the values as a PyTorch tensor.
+            return self._framework_values(np.asarray(t) if isinstance(t, Tensor) else t)
 
         if isinstance(t, Tensor):
             return t._to_py_tensor(self._data(t._data))
@@ -986,6 +992,12 @@ class FunctionTensor(Tensor):
         if isinstance(t, int | float | np.generic | np.ndarray):
             return np.asarray(self._data(t))
         raise TypeError(f"Cannot evaluate tensor at argument of type {type(t)}")
+
+
+    def _framework_values(self, t):
+        """The values at ``t`` as a framework array that carries gradients."""
+        raise TypeError(
+            f"Evaluating a {type(self).__name__} with gradients, or at a PyTorch tensor, is not supported.")
 
 
 class ArithmeticTensor(Tensor):

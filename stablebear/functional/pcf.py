@@ -151,6 +151,9 @@ class Pcf(_PiecewiseFunction, _BinaryIoMixin):
                 f"Tried to create PCF from unsupported input data of type {type(arr)}."
             )
 
+    def _framework_values(self, t):
+        return _autodiff.evaluate_pcfs(self, t)
+
     def _get_time_type(self):
         return self._data.get_time_type()
 

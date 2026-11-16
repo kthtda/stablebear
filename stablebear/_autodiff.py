@@ -211,6 +211,75 @@ def pcf_op(primal_op: Callable[..., Any], combine: Callable[..., Any], *operands
         [result_times if result_times is not None else times.astype(serials[0][0].dtype), result_values], enumeration)
 
 
+def _times_of_evaluation(t: Any) -> tuple[Any, np.ndarray]:
+    """The adapter of the times ``t`` if they are a framework array, else
+    None, and their values as a float64 array."""
+    adapter = _framework(t)
+    return adapter, np.asarray(adapter.to_numpy(t) if adapter is not None else t, dtype=np.float64)
+
+
+def evaluate_pcfs(pcfs: Any, t: Any) -> Any:
+    """The values of a Pcf or PcfTensor at the times ``t``, as a framework
+    array of shape ``pcfs.shape + t.shape`` (``t.shape`` for a Pcf) that
+    carries gradients with respect to the values of the PCFs. For PCFs that
+    carry gradients, or times that are a framework array.
+
+    The breakpoint that holds at each time comes from evaluating, in C++,
+    PCFs with the same times whose values number their breakpoints; the
+    result gathers the values of those breakpoints. A PCF is constant
+    between its breakpoints, so there is no gradient with respect to the
+    times.
+    """
+    t_adapter, times = _times_of_evaluation(t)
+    content, enumeration = pcfs._serial()
+    tvalues = getattr(pcfs, "_tvalues", None)
+    like = tvalues if tvalues is not None else (getattr(pcfs, "_ttimes", None) if t_adapter is None else t)
+    adapter = _framework(like)
+
+    numbered = _pcfs_from_content(
+        np.column_stack([content[:, 0], np.arange(len(content))]).astype(np.float64), enumeration)
+    rows = np.asarray(numbered(float(times) if times.ndim == 0 else times)).astype(np.int64)
+    values = tvalues if tvalues is not None else adapter.as_tensor(content[:, 1], like=like)
+    return adapter.reshape(adapter.gather(values, rows.reshape(-1)), rows.shape)
+
+
+def evaluate_plf(plf: Any, t: Any) -> Any:
+    """The values of a Plf at the times ``t``, as a framework array of the
+    shape of ``t`` that carries gradients with respect to the times and
+    values of the PLF and to ``t``. For a PLF that carries gradients, or
+    times that are a framework array.
+
+    On the segment from breakpoint k to k + 1 that holds a time, the value
+    is v_k + (t - t_k) / (t_{k+1} - t_k) * (v_{k+1} - v_k), computed in the
+    framework; after the last breakpoint, the last segment continues. At a
+    breakpoint, the derivatives are those of the segment after it.
+    """
+    t_adapter, times = _times_of_evaluation(t)
+    if (times < 0).any():
+        raise ValueError("Cannot evaluate PLF before time 0.")
+    if np.isinf(times).any():
+        raise NotImplementedError("Evaluating a PLF at infinity with gradients is not supported.")
+    content, _ = plf._serial()
+    parts = [getattr(plf, "_ttimes", None), getattr(plf, "_tvalues", None)]
+    like = next((part for part in parts if part is not None), t)
+    adapter = _framework(like)
+    plf_times, plf_values = (
+        part if part is not None else adapter.as_tensor(content[:, column], like=like)
+        for column, part in enumerate(parts))
+
+    flat = times.reshape(-1)
+    n = len(content)
+    if n == 1:
+        result = adapter.gather(plf_values, np.zeros(len(flat), dtype=np.int64))
+    else:
+        k = np.clip(np.searchsorted(content[:, 0], flat, side="right") - 1, 0, n - 2)
+        at = adapter.reshape(t, (-1,)) if t_adapter is not None else adapter.as_tensor(flat, like=like)
+        t0, t1 = adapter.gather(plf_times, k), adapter.gather(plf_times, k + 1)
+        v0, v1 = adapter.gather(plf_values, k), adapter.gather(plf_values, k + 1)
+        result = v0 + (at - t0) / (t1 - t0) * (v1 - v0)
+    return adapter.reshape(result, times.shape)
+
+
 def differentiable(
     *wrt: str,
     vjp: Callable[..., tuple],

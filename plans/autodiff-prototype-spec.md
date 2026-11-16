@@ -209,6 +209,16 @@ an endpoint of a bar at 0 or at infinity has gradient 0, and where a
 critical simplex has several longest edges, the gradient is that of the
 first one found.
 
+**D17. Evaluation stays in PyTorch.** Evaluating a `Pcf`, `Plf`, or
+`PcfTensor` gives a framework array when the function carries gradients or
+the times are a framework array. For PCFs, C++ evaluates PCFs with the same
+times whose values number their breakpoints, and the result gathers the
+tracked values of those breakpoints: there is no loop over the PCFs, and no
+gradient with respect to times, since a PCF is constant between its
+breakpoints. For a PLF, the interpolation runs in the framework, so the
+result has gradients with respect to the times and values of the PLF and to
+where it is evaluated.
+
 **D10. Gradient paths require tensors.** With gradients, `transform_bars`
 takes a `BarcodeTensor` only, since a `Barcode` cannot carry gradients and
 its typing overload promises a `Barcode` result. Wrap a single barcode as

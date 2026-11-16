@@ -135,6 +135,9 @@ class Plf(_PiecewiseFunction, _BinaryIoMixin):
     _ttimes: Any = None
     _tvalues: Any = None
 
+    def _framework_values(self, t):
+        return _autodiff.evaluate_plf(self, t)
+
     def _serial(self):
         """(content, enumeration) of the breakpoints, as for a Pcf."""
         pts = self.to_numpy()

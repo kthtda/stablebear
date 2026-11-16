@@ -9,6 +9,10 @@ from _frameworks import tracked
 from _round_trip import ROUND_TRIPS
 
 
+# Runs a test for a Pcf and for a Plf, given as its ``function`` argument.
+_FUNCTIONS = pytest.mark.parametrize("function", [sb.Pcf, sb.Plf], ids=["pcf", "plf"])
+
+
 def _f_and_g():
     f = sb.Pcf(np.array([[0.0, 1.0], [1.0, -2.0], [3.0, 0.5], [4.0, 3.0], [6.0, -1.0], [7.0, 0.0]]))
     g = sb.Pcf(np.array([[0.0, 1.0], [2.0, -0.5], [5.0, 2.0], [7.0, 0.0]]))
@@ -1169,6 +1173,100 @@ def test_number_where_a_number_is_required_is_accepted(operation):
     operation(2.0)
 
 
+def _evaluation_times():
+    # Between breakpoints, at a breakpoint, and after the last one.
+    return np.array([[0.5, 1.0],
+                     [2.25, 9.0]])
+
+
+def _plain_pcf():
+    return sb.Pcf(np.array([[0.0, 10.0], [1.0, 20.0], [3.0, 30.0]]))
+
+
+def _plain_plf():
+    return sb.Plf(np.array([[0.0, 10.0], [1.0, 20.0], [3.0, 60.0]]))
+
+
+@pytest.mark.parametrize("make_function", [_plain_pcf, _plain_plf], ids=["pcf", "plf"])
+def test_function_at_framework_times_matches_numpy(fw, make_function):
+    f = make_function()
+
+    out = f(fw.tensor(_evaluation_times()))
+
+    assert isinstance(out, fw.tensor_type)
+    np.testing.assert_allclose(fw.to_numpy(out), f(_evaluation_times()))
+
+
+@_FUNCTIONS
+def test_tracked_function_at_times_matches_numpy(fw, function):
+    values, times = [10.0, 20.0, 30.0], np.array([0.0, 1.0, 3.0])
+    f = function(fw.tensor(values), times=times)
+
+    out = f(_evaluation_times())
+
+    assert isinstance(out, fw.tensor_type)
+    np.testing.assert_allclose(fw.to_numpy(out), function(np.array(values), times=times)(_evaluation_times()))
+    # A single time gives a single value.
+    np.testing.assert_allclose(fw.to_numpy(f(0.5)), function(np.array(values), times=times)(0.5))
+
+
+def _evaluation_weights():
+    return np.array([[1.0, -2.0],
+                     [3.0, 0.5]])
+
+
+@_FUNCTIONS
+def test_gradient_of_evaluation_wrt_values(fw, function):
+    def loss(v):
+        f = function(v, times=np.array([0.0, 1.0, 3.0]))
+        return fw.sum(fw.tensor(_evaluation_weights()) * f(_evaluation_times()))
+
+    _assert_gradient_matches_finite_differences(fw, loss, [10.0, 20.0, 30.0])
+
+
+def test_gradient_of_plf_evaluation_wrt_its_times(fw):
+    def loss(t):
+        f = sb.Plf(np.array([10.0, 20.0, 60.0]), times=fw.concat([fw.tensor([0.0]), t]))
+        return fw.sum(fw.tensor(_evaluation_weights()) * f(_evaluation_times()))
+
+    _assert_gradient_matches_finite_differences(fw, loss, [1.25, 3.0])
+
+
+def test_gradient_of_plf_evaluation_wrt_where_it_is_evaluated(fw):
+    f = _plain_plf()
+
+    def loss(t):
+        return fw.sum(fw.tensor(_evaluation_weights()) * f(t))
+
+    _assert_gradient_matches_finite_differences(fw, loss, np.array([[0.5, 1.5],
+                                                                   [2.25, 9.0]]))
+
+
+def test_tracked_pcf_tensor_at_times_matches_numpy(fw):
+    F = _pcf_grid()
+
+    out = tracked(fw, F)(np.array([0.25, 1.5, 5.0]))
+
+    assert isinstance(out, fw.tensor_type)
+    assert tuple(out.shape) == (2, 2, 3)
+    np.testing.assert_allclose(fw.to_numpy(out), F(np.array([0.25, 1.5, 5.0])))
+
+
+def test_gradient_of_pcf_tensor_evaluation(fw):
+    F, _ = _tensors()
+
+    def loss(x):
+        return fw.sum((x * F)(np.array([0.25, 1.5, 3.25])))
+
+    _assert_gradient_matches_finite_differences(fw, loss, 1.5)
+
+
+def test_plf_tensor_at_framework_times_raises(fw):
+    F = sb.PlfTensor([_plain_plf()])
+    with pytest.raises(TypeError, match="PlfTensor"):
+        F(fw.tensor([0.5]))
+
+
 def test_values_with_times_match_breakpoints():
     g = sb.Pcf(np.array([2.0, -1.0, 0.0]), times=np.array([0.0, 1.0, 3.0]))
     np.testing.assert_array_equal(g.to_numpy(), [[0.0, 2.0], [1.0, -1.0], [3.0, 0.0]])
@@ -1201,16 +1299,12 @@ def test_function_follows_in_place_change_of_torch_values(function):
                                                  [1.0, 40.0]])
 
 
-_FUNCTIONS = pytest.mark.parametrize("function", [sb.Pcf, sb.Plf], ids=["pcf", "plf"])
-
-
 def _tracked_function(fw, function):
     return function(fw.tensor([10.0, 20.0]), times=np.array([0.0, 1.0]))
 
 
 @_FUNCTIONS
 @pytest.mark.parametrize("operation", [
-    pytest.param(lambda function, f: f(0.5), id="evaluate"),
     pytest.param(lambda function, f: f.astype(sb.float32), id="astype"),
     pytest.param(lambda function, f: function(f), id="copy"),
 ])

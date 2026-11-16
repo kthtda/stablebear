@@ -4,6 +4,7 @@ from typing import Any
 
 import numpy as np
 
+from .. import _autodiff
 from .._tensor_base import _array_for_protocol
 
 
@@ -19,17 +20,19 @@ class _PiecewiseFunction:
 
         Parameters
         ----------
-        t : scalar, list, numpy.ndarray, or NumericTensor
+        t : scalar, list, numpy.ndarray, NumericTensor, or torch.Tensor
             Any time or times the function accepts, as a single scalar or an
             array-like of any shape.
 
         Returns
         -------
-        scalar, numpy.ndarray, or NumericTensor
+        scalar, numpy.ndarray, NumericTensor, or torch.Tensor
             The value(s) at ``t``. Their kind follows ``t``: a scalar gives a
             scalar, a list or ndarray gives an ndarray of the same shape, and
             a ``NumericTensor`` gives a tensor of the same shape. Their type
-            follows the function.
+            follows the function. If ``t`` is a PyTorch tensor, or the
+            function carries gradients, the values are a PyTorch tensor of
+            the shape of ``t`` that carries gradients.
 
         Raises
         ------
@@ -50,6 +53,10 @@ class _PiecewiseFunction:
         from ..base_tensor import NumericTensor
         from ..tensor_create import tensor
 
+        if _autodiff._tracked(self) is not None or _autodiff._framework(t) is not None:
+            # With gradients: the values as a PyTorch tensor.
+            return self._framework_values(np.asarray(t) if isinstance(t, NumericTensor) else t)
+
         if isinstance(t, int | float):
             return self._data(t)
 
@@ -59,6 +66,10 @@ class _PiecewiseFunction:
             return tensor(result) if isinstance(t, NumericTensor) else result
 
         return self._data(t)
+
+    def _framework_values(self, t):
+        """The values at ``t`` as a framework array that carries gradients."""
+        raise NotImplementedError
 
     def __array__(self, dtype=None, copy=None):
         return _array_for_protocol(np.asarray(self._data), dtype, copy, copied=False)
