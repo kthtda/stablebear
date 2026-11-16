@@ -1,6 +1,6 @@
 # Autodiff prototype: implementation plan
 
-Progress: 12 of 26 items, 26 of 62 points (42%)
+Progress: 13 of 26 items, 28 of 62 points (45%)
 
 Spec: [autodiff-prototype-spec.md](autodiff-prototype-spec.md)
 
@@ -40,9 +40,14 @@ Spec: [autodiff-prototype-spec.md](autodiff-prototype-spec.md)
   Tests: the existing gradient tests pass; backward on 10^6 bars runs.
   Note: the backward pass on 10^6 bars takes 0.42 s, checked by hand; the
   suite has no test of that size.
-- [ ] **C2.** [2] Parallel C++ conversions to and from serial content for
-  PCF and barcode tensors, without temporaries per element.
+- [x] **C2.** [2] (7afe77bac) Parallel C++ conversions to and from
+  serial content for PCF and barcode tensors, without temporaries per
+  element.
   Tests: the round-trip tests pass; note the timings under this item.
+  Note: for 10^6 rows in 2000 elements, to serial content takes 1 to 2 ms
+  and from it 6 to 7 ms, down from 60 to 70 ms each. The tracked pipeline of
+  D13 takes 0.22 s, down from 0.58 s; 0.16 s of it is the single-threaded
+  sort of the stable rank.
 - [ ] **C3.** [2] The kernel's backward pass reuses the critical edges of
   its forward pass.
   Tests: the kernel gradient tests pass; the kernel runs once per
