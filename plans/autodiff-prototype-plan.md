@@ -1,6 +1,6 @@
 # Autodiff prototype: implementation plan
 
-Progress: 28 of 30 items, 66 of 72 points (92%)
+Progress: 29 of 30 items, 69 of 72 points (96%)
 
 Spec: [autodiff-prototype-spec.md](autodiff-prototype-spec.md)
 
@@ -167,8 +167,10 @@ Spec: [autodiff-prototype-spec.md](autodiff-prototype-spec.md)
   critical simplices of each bar.
   Tests: bars match the untracked ones; gradient against finite
   differences in dimensions 0 and 1.
-- [ ] **E4.** [3] `pdist` and the L2 kernel of tracked PCFs, with the
+- [x] **E4.** [3] (61e38be10) `pdist` and the L2 kernel of tracked PCFs, with the
   distances and their gradients accumulated by rectangle iteration in C++,
   without building the difference of each pair.
   Tests: match the untracked matrices; gradient with respect to values
   and times against finite differences.
+  Note: each pair is iterated twice, once per function. No timings were
+  taken. `cdist` of tracked PCFs still raises.
