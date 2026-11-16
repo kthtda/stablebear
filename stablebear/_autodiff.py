@@ -172,7 +172,10 @@ def _union_of_times(
 
     def tensor(op, content, enumeration):
         # A single Pcf as a 0-d tensor.
-        data = op._data if enumeration.ndim > 1 else _pcfs_tensor(content, enumeration)
+        if enumeration.ndim == 1:
+            data = _pcfs_tensor(content, enumeration)
+        else:
+            data = op._cpp() if hasattr(op, "_cpp") else op._data
         return data.broadcast_to(list(shape))
 
     times, sizes, f_local, g_local, from_g = cpp.merge_breakpoints(
@@ -242,8 +245,14 @@ def pcf_op(primal_op: Callable[..., Any], combine: Callable[..., Any], *operands
 
     ends = np.cumsum(sizes)
     enumeration = np.stack([ends - sizes, ends], axis=-1).reshape(*shape, 2)
+    dtype = serials[0][0].dtype
+    if enumeration.ndim > 1:
+        from .base_tensor import _TrackedPcfTensor
+
+        return _TrackedPcfTensor(
+            [result_times if result_times is not None else times.astype(dtype), result_values], enumeration)
     content = np.column_stack([times, _concrete_column(result_values, len(times), adapter)])
-    result = _pcfs_from_content(content.astype(serials[0][0].dtype), enumeration)
+    result = _pcfs_from_content(content.astype(dtype), enumeration)
     result._tvalues = result_values
     result._ttimes = result_times
     return result

@@ -5,7 +5,7 @@ import numpy as np
 from .. import _autodiff
 from .. import _sb_cpp as cpp
 from ..async_task import _run_task
-from ..base_tensor import PcfTensor, _get_backend
+from ..base_tensor import PcfTensor, _get_backend, _TrackedPcfTensor
 from ..functional.pcf import Pcf
 from ..functional.plf import Plf
 from ..timeseries.series import TimeSeries
@@ -98,12 +98,8 @@ def _tracked_stable_rank(bc: Any) -> PcfTensor:
     zeros = adapter.as_tensor(np.zeros(n_barcodes), like=bars)
     times = adapter.gather(adapter.concat([zeros, sorted_lifetimes]), rows)
 
-    values = np.repeat(counts, sizes) - position
-    content = np.column_stack([_autodiff._concrete_column(times, len(rows), adapter), values]).astype(
-        np.float32 if bc.dtype == barcode32 else np.float64)
-    out = _autodiff._pcfs_from_content(content, _enumeration(counts + 1, tuple(enumeration.shape[:-1])))
-    out._ttimes = times
-    return out
+    values = (np.repeat(counts, sizes) - position).astype(np.float32 if bc.dtype == barcode32 else np.float64)
+    return _TrackedPcfTensor([times, values], _enumeration(counts + 1, tuple(enumeration.shape[:-1])))
 
 
 @overload

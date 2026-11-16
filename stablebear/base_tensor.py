@@ -8,6 +8,7 @@ import numpy as np
 
 from . import _autodiff
 from . import _sb_cpp as cpp
+from ._tracked import Tracking, is_tracked, tracked_class
 from ._tensor_base import (
     ArithmeticTensor,
     FunctionTensor,
@@ -234,6 +235,10 @@ class _PcfTensorBase(ArithmeticTensor, FunctionTensor):
 class PcfTensor(_PcfTensorBase):
     def __init__(self, data):
         super().__init__()
+        if is_tracked(data):
+            raise TypeError(
+                "This PcfTensor carries gradients, which a copy into a plain PcfTensor would drop. "
+                "Use .copy() to keep them.")
         if isinstance(data, PcfTensor):
             data = data._data
         elif isinstance(data, list | tuple):
@@ -269,18 +274,24 @@ class PcfTensor(_PcfTensorBase):
     def _to_py_tensor(self, data):
         return PcfTensor(data)
 
-    # Framework tensors of the times and values of all breakpoints, in the
-    # order of _serial, set when they depend on a PyTorch, JAX, or TensorFlow
-    # array. None where they are constants.
+    # The framework times and values of all breakpoints, in the order of
+    # _serial, of a tensor that carries gradients (see _tracked). None where
+    # they are constants, as for any other tensor.
     _ttimes: Any = None
     _tvalues: Any = None
-
-    def _tracked_parts(self):
-        return _autodiff.pcf_parts(self)
 
     def _serial(self):
         """(content, enumeration) as from_serial_content takes."""
         return cpp.to_serial_content(self._data)
+
+    @staticmethod
+    def _from_serial(content: np.ndarray, enumeration: np.ndarray) -> PcfTensor:
+        """The inverse of _serial. The times need not increase strictly."""
+        enumeration = np.ascontiguousarray(enumeration, dtype=np.int64)
+        if content.dtype == np.float32:
+            return PcfTensor(cpp.make_from_serial_content_32(np.ascontiguousarray(content), enumeration))
+        return PcfTensor(cpp.make_from_serial_content_64(
+            np.ascontiguousarray(content, dtype=np.float64), enumeration))
 
     def __add__(self, rhs):
         return _autodiff.pcf_op(ArithmeticTensor.__add__, operator.add, self, rhs)
@@ -308,6 +319,20 @@ class PcfTensor(_PcfTensorBase):
 
     def __neg__(self):
         return _autodiff.pcf_op(ArithmeticTensor.__neg__, operator.neg, self)
+
+
+PcfTensor._tracking = Tracking(  # pyright: ignore[reportAttributeAccessIssue]
+    groups=(("_ttimes", 1), ("_tvalues", 1)),
+    from_serial=PcfTensor._from_serial,
+    # Not Pcf(rows), which requires strictly increasing times.
+    element=lambda rows: PcfTensor._from_serial(rows, np.array([[0, len(rows)]]))[0],
+    dtype=lambda np_dtype: pcf32 if np_dtype == np.float32 else pcf64,
+)
+
+# A PcfTensor whose breakpoint times, values, or both depend on PyTorch, JAX,
+# or TensorFlow arrays, built from [times, values] and the enumeration of
+# _serial; see _tracked.
+_TrackedPcfTensor = tracked_class(PcfTensor)
 
 
 class IntPcfTensor(_PcfTensorBase):

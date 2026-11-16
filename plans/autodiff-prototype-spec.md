@@ -93,8 +93,9 @@ tracked argument when the values the framework passes them equal the
 argument's current ones, which one comparison pass tells. They differ while
 a framework traces abstractly, and the argument is then converted.
 
-Status: tracked barcode tensors cache their C++ tensor, but no operation hands them
-its C++ result yet; PCFs and PLFs still store both (see the plan).
+Status: tracked tensors of barcodes and of PCFs work this way, but no
+operation hands them its C++ result yet. Single PCFs and PLFs still store a
+C++ object and framework arrays (see the plan).
 
 **D5a. One generic tracked tensor.** The tracking logic is a mixin shared by
 all tensor types, not a class written per type. Every type is a tensor

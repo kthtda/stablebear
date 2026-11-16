@@ -3,6 +3,7 @@ import pytest
 
 import stablebear as sb
 
+from _frameworks import tracked
 from _round_trip import ROUND_TRIPS
 
 
@@ -641,6 +642,57 @@ def test_tracked_barcodes_follow_in_place_change_of_torch_bars():
 
     # Doubling the values of the PLF doubles the transformed bars.
     assert out.detach().is_isomorphic_to(_expected_batch([0.0, 2.0, 3.0, 6.0]), atol=0.0, rtol=0.0)
+
+
+def _pcf_grid():
+    # Breakpoints (t, 10 * t + k) for the PCF k, so each value shows its PCF.
+    return sb.PcfTensor([
+        sb.Pcf(np.array([[0.0, 1.0], [1.0, 11.0], [2.0, 21.0]])),
+        sb.Pcf(np.array([[0.0, 2.0], [3.0, 32.0]])),
+        sb.Pcf(np.array([[0.0, 3.0]])),
+        sb.Pcf(np.array([[0.0, 4.0], [0.5, 9.0], [1.5, 19.0], [4.0, 44.0]])),
+    ]).reshape((2, 2))
+
+
+def test_tracked_pcfs_index_and_reshape_like_plain_ones(fw):
+    plain = _pcf_grid()
+    out = tracked(fw, plain)
+    for select in (
+        lambda t: t[1],
+        lambda t: t[:, 0],
+        lambda t: t[[1, 0]],
+        lambda t: t.reshape((4,)),
+        lambda t: t.flatten()[::-1],
+        lambda t: t.transpose(),
+        lambda t: t.expand_dims(0),
+        lambda t: t.broadcast_to((3, 2, 2)),
+        lambda t: t.copy(),
+    ):
+        selected, expected = select(out), select(plain)
+        assert isinstance(selected, sb.PcfTensor)
+        assert selected.shape == expected.shape
+        assert selected._ttimes is not None and selected._tvalues is not None
+        assert selected.array_equal(expected)
+        for i in np.ndindex(*expected.shape):
+            assert selected[i] == expected[i]
+
+
+def test_gradient_through_indexing_tracked_pcfs(fw):
+    F, _ = _tensors()
+
+    def loss(x):
+        return fw.sum(sb.lp_norm((x * F)[[2, 0]], p=2.0))
+
+    _assert_gradient_matches_finite_differences(fw, loss, 1.5)
+
+
+def test_tracked_pcfs_cannot_lose_gradients(fw):
+    out = tracked(fw, _pcf_grid())
+    with pytest.raises(TypeError, match="copy"):
+        sb.PcfTensor(out)
+    with pytest.raises(NotImplementedError, match="detach"):
+        sb.pdist(out.flatten(), p=1, verbose=False)
+    assert out.detach().array_equal(_pcf_grid())
 
 
 def test_arithmetic_on_stable_rank_with_equal_lifetimes_matches_numpy(fw):

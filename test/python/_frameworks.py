@@ -127,7 +127,13 @@ FRAMEWORKS = {"torch": _Torch, "jax": _Jax, "tensorflow": _TensorFlow}
 
 
 def tracked(fw, tensor):
-    """The tensor as one that carries gradients of the framework: its serial
-    content becomes a framework array."""
+    """The tensor as one that carries gradients of the framework: each group
+    of columns of its serial content (the bars of barcodes; the times and
+    the values of PCFs) becomes a framework array."""
     content, enumeration = tensor._serial()
-    return tracked_class(type(tensor))([fw.from_numpy(content)], enumeration)
+    parts, start = [], 0
+    for _, width in type(tensor)._tracking.groups:
+        columns = content[:, start] if width == 1 else content[:, start:start + width]
+        parts.append(fw.from_numpy(np.ascontiguousarray(columns)))
+        start += width
+    return tracked_class(type(tensor))(parts, enumeration)
