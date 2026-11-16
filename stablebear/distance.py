@@ -1,4 +1,6 @@
-from typing import Any
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any, overload
 
 import numpy as np
 
@@ -11,6 +13,9 @@ from .functional.pcf import Pcf, _has_matching_types
 from .base_tensor import FloatTensor, PcfContainerLike, _resolve_pcf_inputs
 from .typing import float32, float64, pcf32, pcf64
 
+if TYPE_CHECKING:
+    import torch
+
 
 _DISTANCE_BACKEND_MAP = {pcf32: cpp.Distance_f32_f32, pcf64: cpp.Distance_f64_f64}
 
@@ -20,7 +25,11 @@ _VTYPE_TO_DISTANCE_BACKEND = {
 }
 
 
-def lp_distance(f: Pcf, g: Pcf, p: float = 1) -> float:
+@overload
+def lp_distance(f: Pcf, g: Pcf, p: float = 1) -> float: ...
+@overload
+def lp_distance(f: Pcf, g: Pcf, p: torch.Tensor) -> torch.Tensor: ...
+def lp_distance(f: Pcf, g: Pcf, p: Any = 1) -> Any:
     r"""Compute the :math:`L_p` distance between two PCFs.
 
     .. math::
@@ -40,7 +49,9 @@ def lp_distance(f: Pcf, g: Pcf, p: float = 1) -> float:
     Returns
     -------
     float
-        The :math:`L_p` distance between *f* and *g*.
+        The :math:`L_p` distance between *f* and *g*. If *f* or *g* carries
+        gradients, or *p* is a PyTorch tensor, the distance is a PyTorch
+        tensor that carries the gradients.
 
     Raises
     ------
@@ -63,6 +74,11 @@ def lp_distance(f: Pcf, g: Pcf, p: float = 1) -> float:
         raise TypeError(
             f"lp_distance is not supported for this PCF type (vtype={f.vtype})."
         )
+
+    if is_tracked(f) or is_tracked(g) or _autodiff._framework(p) is not None:
+        from .norms import lp_norm
+
+        return lp_norm(f - g, p=p)[0]
 
     if p == 1:
         return float(backend.lp_distance_l1(f._data, g._data))

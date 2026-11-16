@@ -363,6 +363,24 @@ class PcfTensor(_PcfTensorBase):
     def __neg__(self):
         return _autodiff.pcf_op(ArithmeticTensor.__neg__, operator.neg, self)
 
+    def __pow__(self, exponent):
+        """Raise every value of every PCF to a power.
+
+        Parameters
+        ----------
+        exponent : float or int
+            The exponent. A PyTorch tensor gives PCFs that carry gradients
+            with respect to it, with one exponent per PCF if it has the
+            shape of the tensor; and so does a tensor that carries
+            gradients, with respect to the values of its PCFs.
+
+        Returns
+        -------
+        PcfTensor
+            A new tensor with transformed values.
+        """
+        return _autodiff.pcf_op(ArithmeticTensor.__pow__, operator.pow, self, exponent)
+
 
 PcfTensor._tracking = Tracking(  # pyright: ignore[reportAttributeAccessIssue]
     groups=(("_ttimes", 1), ("_tvalues", 1)),

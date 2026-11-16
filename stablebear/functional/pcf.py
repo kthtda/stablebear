@@ -287,7 +287,9 @@ class Pcf(_PiecewiseFunction, _BinaryIoMixin):
         Parameters
         ----------
         exponent : float or int
-            The exponent.
+            The exponent. A PyTorch tensor gives a PCF that carries
+            gradients with respect to it, and so does a PCF that carries
+            gradients, with respect to its values.
 
         Returns
         -------
@@ -303,7 +305,7 @@ class Pcf(_PiecewiseFunction, _BinaryIoMixin):
         >>> g(0.5)
         2.0
         """
-        return Pcf(self._data.__pow__(exponent))
+        return self._binop(exponent, "__pow__", operator.pow)
 
     def __ipow__(self, exponent):
         """Raise every value of the PCF to a power in place.

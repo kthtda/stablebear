@@ -1154,10 +1154,10 @@ def test_in_place_arithmetic_of_numeric_tensor_with_framework_array_raises(fw, o
     np.testing.assert_array_equal(np.asarray(tensor), _numbers())
 
 
-def test_power_of_pcf_tensor_with_framework_exponent_raises(fw):
+def test_in_place_power_of_pcf_tensor_with_framework_exponent_raises(fw):
     F, _ = _tensors()
     with pytest.raises(TypeError, match="PyTorch"):
-        _ = F ** fw.tensor(2.0)
+        F **= fw.tensor(2.0)
 
 
 def _delay_embed(delay):
@@ -1599,3 +1599,105 @@ def test_norm_of_sum_gradient_wrt_pcf_times(fw, reduce):
         return fw.sum(sb.lp_norm(reduce(sb.PcfTensor([f, g, h]), dim=0), p=2.0))
 
     _assert_gradient_matches_finite_differences(fw, loss, _TIMES)
+
+
+def _positive_pcfs():
+    # PCFs with positive values before their last one, 0.
+    return sb.PcfTensor([
+        sb.Pcf(np.array([[0.0, 1.0], [1.0, 2.0], [3.0, 0.5], [4.0, 0.0]])),
+        sb.Pcf(np.array([[0.0, 3.0], [0.5, 1.5], [2.5, 0.0]])),
+    ])
+
+
+@pytest.mark.parametrize("exponent", [2, 3.0, 0.5])
+def test_power_of_tracked_pcfs_matches_untracked(fw, exponent):
+    out = tracked(fw, _positive_pcfs()) ** exponent
+
+    assert isinstance(out, sb.PcfTensor)
+    assert isinstance(out.to_serial_content()[0], fw.tensor_type)
+    _assert_same_functions(out, _positive_pcfs() ** exponent)
+
+
+def test_power_of_tracked_pcf_matches_untracked(fw):
+    f = _positive_pcfs()[0]
+
+    out = tracked(fw, _positive_pcfs())[0] ** 2
+
+    assert isinstance(out, sb.Pcf)
+    t = np.linspace(0.0, 5.0, 51)
+    np.testing.assert_allclose(fw.to_numpy(out(t)), (f ** 2)(t))
+
+
+def test_power_of_pcfs_with_framework_exponent_matches_float_exponent(fw):
+    out = _positive_pcfs() ** fw.tensor(1.5)
+
+    _assert_same_functions(out, _positive_pcfs() ** 1.5)
+
+
+def test_power_of_pcfs_with_one_framework_exponent_per_pcf(fw):
+    F = _positive_pcfs()
+
+    out = F ** fw.tensor([1.5, 2.0])
+
+    _assert_same_functions(out, sb.PcfTensor([F[0] ** 1.5, F[1] ** 2.0]))
+
+
+def test_gradient_through_square_of_pcfs(fw):
+    F, G = _tensors()
+
+    def loss(x):
+        return fw.sum(sb.lp_norm((F * x - G) ** 2, p=1.0))
+
+    _assert_gradient_matches_finite_differences(fw, loss, 1.5)
+
+
+def test_gradient_wrt_exponent_of_pcfs(fw):
+    def loss(a):
+        return fw.sum(sb.lp_norm(_positive_pcfs() ** a, p=2.0))
+
+    _assert_gradient_matches_finite_differences(fw, loss, 1.5)
+
+
+@pytest.mark.parametrize("p", [1, 2.5])
+def test_lp_distance_of_tracked_pcfs_matches_untracked(fw, p):
+    F = _positive_pcfs()
+    tracked_pcfs = tracked(fw, F)
+
+    out = sb.lp_distance(tracked_pcfs[0], F[1], p=p)
+
+    assert isinstance(out, fw.tensor_type)
+    assert tuple(out.shape) == ()
+    np.testing.assert_allclose(fw.to_numpy(out), sb.lp_distance(F[0], F[1], p=p))
+
+
+def test_lp_distance_with_framework_p_matches_float_p(fw):
+    f, g = _f_and_g()
+
+    out = sb.lp_distance(f, g, p=fw.tensor(2.5))
+
+    assert isinstance(out, fw.tensor_type)
+    np.testing.assert_allclose(fw.to_numpy(out), sb.lp_distance(f, g, p=2.5))
+
+
+@pytest.mark.parametrize("p", [1.0, 2.5])
+def test_lp_distance_gradient_wrt_pcf_values(fw, p):
+    f, _ = _f_and_g()
+    times = np.array([0.0, 0.5, 2.0, 4.5, 8.0])
+
+    def loss(c):
+        g = sb.Pcf(fw.concat([c, fw.tensor([0.0])]), times=times)
+        return sb.lp_distance(f, g, p=p) + sb.lp_distance(g, f * 2.0, p=p)
+
+    _assert_gradient_matches_finite_differences(fw, loss, [0.7, -1.3, 0.4, 2.0])
+
+
+def test_lp_distance_gradient_wrt_p(fw):
+    f, g = _f_and_g()
+
+    _assert_gradient_matches_finite_differences(fw, lambda p: sb.lp_distance(f, g, p=p), 2.5)
+
+
+def test_lp_distance_with_framework_p_below_one_raises(fw):
+    f, g = _f_and_g()
+    with pytest.raises(ValueError, match=">= 1"):
+        sb.lp_distance(f, g, p=fw.tensor(0.5))
