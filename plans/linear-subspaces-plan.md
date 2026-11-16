@@ -1,6 +1,6 @@
 # Linear subspaces, inner products, and distances: implementation plan
 
-Progress: 8 of 15 items, 18 of 33 points (55%)
+Progress: 9 of 15 items, 20 of 33 points (61%)
 
 Spec: [linear-subspaces-spec.md](linear-subspaces-spec.md)
 
@@ -70,7 +70,7 @@ Spec: [linear-subspaces-spec.md](linear-subspaces-spec.md)
   infinity, in parallel over the clouds, with its binding.
   Tests (C++): p = 1, 2, 3, and infinity on one cloud; clouds of different
   sizes; an empty cloud; p < 1 raises.
-- [ ] **B6.** [2] `LpDistance(p)`, and persistent homology and the kernel of
+- [x] **B6.** [2] (04a5e563a) `LpDistance(p)`, and persistent homology and the kernel of
   an untracked single cloud in its `DistanceSpace`, through the distance
   matrix (D6).
   Tests: p = 2 gives the Euclidean barcodes; barcodes for p = 1 and
