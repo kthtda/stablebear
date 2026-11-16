@@ -12,7 +12,7 @@ from ..distance_matrix import (
     DistanceMatrixTensor,
 )
 from ..base_tensor import FloatTensor
-from ..linear import DistanceSpace, _points_array
+from ..linear import DistanceSpace, _distance_matrices, _points_array
 from ..point_cloud import PointCloud, PointCloudTensor
 from ..timeseries.series import TimeSeries, TimeSeriesTensor
 from ..typing import barcode32, barcode64, distmat32, distmat64, float32, float64, pcloud32, pcloud64
@@ -104,7 +104,8 @@ def _persistent_homology_in_space(space: DistanceSpace, max_dim: int, reduced: b
     """The barcodes of the points of a DistanceSpace in its distance."""
     transformed = space.distance._euclidean_points(_points_array(space))
     if transformed is None:
-        raise NotImplementedError(f"compute_persistent_homology does not support {space.distance!r} yet.")
+        return compute_persistent_homology(
+            _distance_matrices(space), max_dim=max_dim, reduced=reduced, verbose=verbose)
     # The Euclidean distances of the transformed points are the distances
     # of the space.
     return compute_persistent_homology(transformed, max_dim=max_dim, reduced=reduced, verbose=verbose)

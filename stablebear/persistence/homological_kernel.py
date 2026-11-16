@@ -10,7 +10,7 @@ from ..distance_matrix import (
     DistanceMatrixTensor,
 )
 from ..base_tensor import FloatTensor, _get_backend
-from ..linear import DistanceSpace, _points_array
+from ..linear import DistanceSpace, _distance_matrices, _points_array
 from ..point_cloud import PointCloud, PointCloudTensor
 from ..typing import distmat32, distmat64, float32, float64, pcloud32, pcloud64
 from .homology import (
@@ -155,7 +155,7 @@ def _kernel_in_spaces(X: Any, Y: Any, dim: int, verbose: bool) -> BarcodeTensor:
         raise TypeError(f"X and Y must have equal distances (got {X.distance!r} and {Y.distance!r}).")
     transformed = [space.distance._euclidean_points(_points_array(space)) for space in (X, Y)]
     if transformed[0] is None:
-        raise NotImplementedError(f"compute_homological_kernel does not support {X.distance!r} yet.")
+        return compute_homological_kernel(_distance_matrices(X), _distance_matrices(Y), dim=dim, verbose=verbose)
     # The Euclidean distances of the transformed points are the distances
     # of the spaces.
     return compute_homological_kernel(transformed[0], transformed[1], dim=dim, verbose=verbose)

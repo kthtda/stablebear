@@ -6,7 +6,7 @@ from .comparison import allclose
 from .distance import cdist, lp_distance, pdist
 from .inner_product import l2_kernel
 from .io import load, save
-from .linear import Distance, DistanceSpace, InnerProduct, InnerProductSpace, LinearSubspace
+from .linear import Distance, DistanceSpace, InnerProduct, InnerProductSpace, LinearSubspace, LpDistance
 from .norms import lp_norm
 from .functional import Pcf, Plf, iterate_rectangles
 from .reductions import max_time, mean, sum

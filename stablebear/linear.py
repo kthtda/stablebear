@@ -8,7 +8,9 @@ import numpy as np
 
 from . import _autodiff
 from .base_tensor import FloatTensor
-from .point_cloud import PointCloud
+from . import _sb_cpp as cpp
+from .distance_matrix import DistanceMatrixTensor
+from .point_cloud import PointCloud, PointCloudTensor
 from .typing import Dtype, pcloud32, pcloud64
 
 
@@ -238,6 +240,11 @@ class Distance:
         the distance has none, and is computed from pairs of points."""
         return None
 
+    def _distance_matrices(self, clouds: PointCloudTensor) -> DistanceMatrixTensor:
+        """The distances between the points of each cloud, for a distance
+        without _euclidean_points."""
+        raise NotImplementedError
+
     __hash__ = None  # type: ignore[assignment]
 
 
@@ -282,6 +289,63 @@ class InnerProductDistance(Distance):
 
     def __repr__(self) -> str:
         return f"InnerProductDistance({self._inner_product!r})"
+
+
+class LpDistance(Distance):
+    r"""The distance of the :math:`L_p` norm,
+
+    .. math::
+        d(x, y) = \Big(\sum_i |x_i - y_i|^p\Big)^{1/p},
+
+    and the largest :math:`|x_i - y_i|` for :math:`p = \infty`.
+    ``LpDistance(2)`` is the Euclidean distance, which point clouds have
+    without a distance, ``LpDistance(1)`` the taxicab distance, and
+    ``LpDistance(float("inf"))`` the Chebyshev distance.
+
+    Parameters
+    ----------
+    p : float
+        The exponent, at least 1, or infinity.
+
+    Raises
+    ------
+    ValueError
+        If ``p`` is less than 1 or not a number.
+
+    Examples
+    --------
+    >>> import stablebear as sb
+    >>> taxicab = sb.LpDistance(1)
+    >>> space = taxicab([[0.0, 0.0], [3.0, 4.0]])
+    >>> sb.persistence.compute_persistent_homology(space, max_dim=0, reduced=True)[0].to_numpy()
+    array([[0., 7.]])
+    """
+
+    def __init__(self, p: float):
+        p = float(p)
+        if not p >= 1:
+            raise ValueError(f"p must be >= 1 (got {p}).")
+        self._p = p
+
+    @property
+    def p(self) -> float:
+        """The exponent of the norm."""
+        return self._p
+
+    def _euclidean_points(self, X: Any) -> Any:
+        return X if self._p == 2 else None
+
+    def _distance_matrices(self, clouds: PointCloudTensor) -> DistanceMatrixTensor:
+        data = clouds._data.materialize() if clouds._has_indexed_storage() else clouds._data
+        return DistanceMatrixTensor(cpp.pairwise_lp_distances(data, self._p))
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Distance):
+            return NotImplemented
+        return isinstance(other, LpDistance) and self._p == other._p
+
+    def __repr__(self) -> str:
+        return f"LpDistance({self._p:g})"
 
 
 class DistanceSpace:
@@ -513,6 +577,15 @@ def _projected(xp: Any, X: Any, V: Any, G: Any = None) -> Any:
     product with Gram matrix G, the identity if None."""
     GVt = xp.transpose(V) if G is None else xp.matmul(G, xp.transpose(V))
     return xp.matmul(X, xp.matmul(GVt, xp.solve(xp.matmul(V, GVt), V)))
+
+
+def _distance_matrices(space: DistanceSpace) -> DistanceMatrixTensor:
+    """The distances between the points of an untracked space, for a
+    distance without _euclidean_points: one matrix for a single cloud."""
+    points = space.points
+    if _autodiff._framework(points) is not None:
+        raise NotImplementedError(f"Gradients are not supported with {space.distance!r} yet.")
+    return space.distance._distance_matrices(PointCloudTensor([np.asarray(points)]))
 
 
 def _points_array(space: DistanceSpace) -> Any:

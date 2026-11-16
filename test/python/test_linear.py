@@ -535,3 +535,61 @@ def test_kernel_gradient_wrt_gram_matrix(fw):
         return fw.sum(bars[:, 0] * bars[:, 1])
 
     assert_gradient_matches_finite_differences(fw, loss, [2.0, 1.0])
+
+
+def _far_triangle():
+    # Distances between the points 0-1, 0-2, and 1-2: 7, 10, and 11 for
+    # p = 1, and 4, 10, and 7 for p = infinity.
+    return np.array([[0.0, 0.0],
+                     [3.0, 4.0],
+                     [10.0, 0.0]])
+
+
+def test_lp_distance_gives_its_exponent_back():
+    assert sb.LpDistance(1).p == 1.0
+    assert sb.LpDistance(float("inf")).p == float("inf")
+    assert isinstance(sb.LpDistance(3), sb.Distance)
+
+
+def test_lp_distances_with_equal_exponents_are_equal():
+    assert sb.LpDistance(1) == sb.LpDistance(1.0)
+    assert sb.LpDistance(1) != sb.LpDistance(2)
+    assert sb.LpDistance(2) != sb.InnerProduct(np.eye(2)).distance
+
+
+@pytest.mark.parametrize("p", [0.5, 0.0, -1.0, float("nan")])
+def test_lp_distance_with_exponent_below_one_raises(p):
+    with pytest.raises(ValueError, match="p must be"):
+        sb.LpDistance(p)
+
+
+@pytest.mark.parametrize("p, deaths", [
+    # The two shortest of the three distances join the points.
+    pytest.param(1.0, [7.0, 10.0], id="taxicab"),
+    pytest.param(float("inf"), [4.0, 7.0], id="chebyshev"),
+])
+def test_persistent_homology_under_lp_distance(p, deaths):
+    space = sb.LpDistance(p)(_far_triangle())
+
+    out = sb.persistence.compute_persistent_homology(space, max_dim=0, reduced=True, verbose=False)
+
+    assert out.shape == (1,)
+    np.testing.assert_array_equal(out[0].to_numpy(), [[0.0, deaths[0]],
+                                                      [0.0, deaths[1]]])
+
+
+def test_persistent_homology_under_l2_distance_is_that_of_the_plain_cloud():
+    _assert_same_barcodes(_homology(sb.LpDistance(2)(_loop_points())), _homology(_loop_points()))
+
+
+def test_kernel_under_lp_distance_is_that_of_the_distance_matrices():
+    X, Y = _loop_points(), _contracted(_loop_points())
+    taxicab = sb.LpDistance(1)
+
+    out = _kernel(taxicab(X), taxicab(Y))
+
+    def distances(points):
+        return sb.DistanceMatrix(np.abs(points[:, None, :] - points[None, :, :]).sum(axis=-1))
+
+    assert out.shape == (1,)
+    assert out[0].is_isomorphic_to(_kernel(distances(X), distances(Y))[0], atol=1e-12, rtol=1e-12)
