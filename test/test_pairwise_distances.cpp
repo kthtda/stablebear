@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <sbear/algorithms/pairwise_distances.hpp>
+#include <sbear/ufunc.hpp>
 
 #include <cmath>
 #include <limits>
@@ -79,6 +80,11 @@ TEST(PairwiseLpDistances, ExponentBelowOneThrows)
   EXPECT_THROW(sb::pairwise_lp_distances(triangle(), std::nan("")), std::invalid_argument);
 }
 
+TEST(PairwiseLpDistances, OperationWithExponentBelowOneThrows)
+{
+  EXPECT_THROW(sb::PairwiseLpDistancesOperation<double>(0.5), std::invalid_argument);
+}
+
 TEST(PairwiseLpDistances, TensorOfCloudsOfDifferentSizes)
 {
   sb::Tensor<sb::PointCloud<double>> clouds(std::vector<size_t>{3});
@@ -86,7 +92,7 @@ TEST(PairwiseLpDistances, TensorOfCloudsOfDifferentSizes)
   clouds(std::vector<size_t>{1}) = cloud({{0., 0.}, {1., 2.}}, 2);
   clouds(std::vector<size_t>{2}) = cloud({}, 2);
 
-  auto distances = sb::pairwise_lp_distances(clouds, 1., sb::default_executor());
+  auto distances = sb::apply_ufunc(clouds, sb::PairwiseLpDistancesOperation<double>(1.), sb::default_executor());
 
   ASSERT_EQ(distances.shape(), (std::vector<size_t>{3}));
   EXPECT_EQ(distances(std::vector<size_t>{0}).size(), 3u);

@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <sbear/algorithms/multiply_points.hpp>
+#include <sbear/ufunc.hpp>
 
 #include <span>
 #include <stdexcept>
@@ -90,7 +91,7 @@ TEST(MultiplyPoints, TensorOfCloudsOfDifferentSizes)
   clouds(std::vector<size_t>{1}) = cloud({{2., 20.}, {3., 30.}}, 2);
   clouds(std::vector<size_t>{2}) = cloud({}, 2);
 
-  auto result = sb::multiply_points(clouds, matrix(), 2, 2, sb::default_executor());
+  auto result = sb::apply_ufunc(clouds, sb::MultiplyPointsOperation<double>(matrix(), 2, 2), sb::default_executor());
 
   ASSERT_EQ(result.shape(), (std::vector<size_t>{3}));
   EXPECT_EQ(result(std::vector<size_t>{0}).n_points(), 1u);

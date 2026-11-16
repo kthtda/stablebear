@@ -3,6 +3,8 @@
 #include <sbear/algorithms/pairwise_distances.hpp>
 #include <sbear/executor.hpp>
 #include <sbear/tensor.hpp>
+#include <sbear/timeseries.hpp>
+#include <sbear/ufunc.hpp>
 #include <sbear/walk.hpp>
 #include <sbear/functional/pcf.hpp>
 #include <sbear/algorithms/functional/iterate_rectangles.hpp>
@@ -14,6 +16,7 @@
 #include "py_make_from_serial_content.hpp"
 #include "../py_tensor.hpp"
 #include "../py_np_support.hpp"
+#include "../py_ufunc_containers.hpp"
 
 #include <nanobind/ndarray.h>
 
@@ -627,26 +630,28 @@ namespace sb_py
       [](Tv) { return Tv{1}; });
   }
 
-  /// The Lp distances between the points of each cloud of a tensor, as a
-  /// tensor of distance matrices; see sb::pairwise_lp_distances.
+  /// Binds multiply_points and pairwise_lp_distances for every container of
+  /// point clouds: a tensor, an indexed tensor, and a time series. Each
+  /// applies its operation to every cloud in parallel; see
+  /// sb::multiply_points and sb::pairwise_lp_distances.
   template <typename T>
-  sb::Tensor<sb::DistanceMatrix<T>> pairwise_lp_distances(const sb::Tensor<sb::PointCloud<T>>& clouds, T p)
+  void register_point_cloud_operations(nb::module_& m)
   {
-    nb::gil_scoped_release release;
-    return sb::pairwise_lp_distances(clouds, p, sb::default_executor());
-  }
-
-  /// The points of each cloud of a tensor multiplied, as rows, by a
-  /// matrix; see sb::multiply_points.
-  template <typename T>
-  sb::Tensor<sb::PointCloud<T>> multiply_points(
-      const sb::Tensor<sb::PointCloud<T>>& clouds,
-      nb::ndarray<const T, nb::ndim<2>, nb::c_contig, nb::device::cpu> matrix)
-  {
-    nb::gil_scoped_release release;
-    return sb::multiply_points(
-        clouds, std::span<const T>(matrix.data(), matrix.shape(0) * matrix.shape(1)), matrix.shape(0),
-        matrix.shape(1), sb::default_executor());
+    sb_py::bind_ufunc_containers<sb::PointCloud<T>>([&]<typename Container>(const std::string&) {
+      m.def("multiply_points",
+            [](const Container& clouds, nb::ndarray<const T, nb::ndim<2>, nb::c_contig, nb::device::cpu> matrix) {
+              sb::MultiplyPointsOperation<T> operation(
+                  std::span<const T>(matrix.data(), matrix.shape(0) * matrix.shape(1)), matrix.shape(0),
+                  matrix.shape(1));
+              nb::gil_scoped_release release;
+              return sb::apply_ufunc(clouds, std::move(operation), sb::default_executor());
+            });
+      m.def("pairwise_lp_distances", [](const Container& clouds, T p) {
+        sb::PairwiseLpDistancesOperation<T> operation(p);
+        nb::gil_scoped_release release;
+        return sb::apply_ufunc(clouds, std::move(operation), sb::default_executor());
+      });
+    });
   }
 
   /// The order that sorts the values of each element of serial content:
@@ -705,10 +710,8 @@ namespace sb_py
     m.def("argsort_segments", &argsort_segments<sb::float64_t>);
     m.def("merge_breakpoints", &merge_breakpoints<sb::float32_t, sb::float32_t>);
     m.def("merge_breakpoints", &merge_breakpoints<sb::float64_t, sb::float64_t>);
-    m.def("multiply_points", &multiply_points<sb::float32_t>);
-    m.def("multiply_points", &multiply_points<sb::float64_t>);
-    m.def("pairwise_lp_distances", &pairwise_lp_distances<sb::float32_t>);
-    m.def("pairwise_lp_distances", &pairwise_lp_distances<sb::float64_t>);
+    register_point_cloud_operations<sb::float32_t>(m);
+    register_point_cloud_operations<sb::float64_t>(m);
     m.def("pdist_grad", &pdist_grad<sb::float32_t, sb::float32_t>);
     m.def("pdist_grad", &pdist_grad<sb::float64_t, sb::float64_t>);
     m.def("l2_kernel_grad", &l2_kernel_grad<sb::float32_t, sb::float32_t>);

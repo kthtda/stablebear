@@ -1,10 +1,7 @@
 #ifndef STABLEBEAR_MULTIPLY_POINTS_H
 #define STABLEBEAR_MULTIPLY_POINTS_H
 
-#include "../executor.hpp"
 #include "../point_cloud.hpp"
-#include "../tensor.hpp"
-#include "../walk.hpp"
 
 #include <span>
 #include <stdexcept>
@@ -47,22 +44,34 @@ namespace sb
     return result;
   }
 
-  /// multiply_points of every cloud of a tensor, in parallel over the
-  /// clouds.
-  template <typename T, typename ExecutorT>
-  Tensor<PointCloud<T>> multiply_points(
-      const Tensor<PointCloud<T>>& clouds, std::span<const T> matrix, size_t rows, size_t cols, ExecutorT& executor)
+  /// multiply_points as a ufunc operation: applied to a tensor or a time
+  /// series of point clouds, it gives one of the multiplied point clouds.
+  template <typename T>
+  struct MultiplyPointsOperation
   {
-    if (matrix.size() != rows * cols)
+    using input_type = PointCloud<T>;
+    using output_type = PointCloud<T>;
+
+    std::vector<T> matrix;
+    size_t rows;
+    size_t cols;
+
+    MultiplyPointsOperation(std::span<const T> entries, size_t nRows, size_t nCols)
+      : matrix(entries.begin(), entries.end()), rows(nRows), cols(nCols)
     {
-      throw std::invalid_argument("multiply_points: the matrix does not have rows * cols entries");
+      if (matrix.size() != rows * cols)
+      {
+        throw std::invalid_argument("multiply_points: the matrix does not have rows * cols entries");
+      }
     }
-    Tensor<PointCloud<T>> result(clouds.shape());
-    parallel_walk(clouds, [&](const std::vector<size_t>& idx) {
-      result(idx) = multiply_points(clouds(idx), matrix, rows, cols);
-    }, executor);
-    return result;
-  }
+
+    [[nodiscard]] std::vector<size_t> extra_dims() const { return {}; }
+
+    void operator()(const PointCloud<T>& cloud, std::span<PointCloud<T>> out) const
+    {
+      out[0] = multiply_points(cloud, std::span<const T>(matrix), rows, cols);
+    }
+  };
 }
 
 #endif // STABLEBEAR_MULTIPLY_POINTS_H

@@ -350,8 +350,7 @@ class LpDistance(Distance):
         return X if self._p == 2 else None
 
     def _distance_matrices(self, clouds: PointCloudTensor) -> DistanceMatrixTensor:
-        data = clouds._data.materialize() if clouds._has_indexed_storage() else clouds._data
-        return DistanceMatrixTensor(cpp.pairwise_lp_distances(data, self._p))
+        return DistanceMatrixTensor(cpp.pairwise_lp_distances(clouds._data, self._p))
 
     def _lengths(self, adapter: Any, differences: Any) -> Any:
         return adapter.row_lp_norms(differences, self._p)
@@ -640,10 +639,9 @@ def _multiply(points: Any, matrix: Any) -> Any:
         return product.astype(np.result_type(points.dtype, matrix.dtype)) if xp is _NumPy else product
 
     if not is_tracked(points) and _autodiff._framework(matrix) is None:
-        data = points._data.materialize() if points._has_indexed_storage() else points._data
         np_dtype = np.float32 if points.dtype is pcloud32 else np.float64
         multiply: Any = cpp.multiply_points  # overloaded on the precision
-        return PointCloudTensor(multiply(data, np.ascontiguousarray(matrix, dtype=np_dtype)))
+        return PointCloudTensor(multiply(points._data, np.ascontiguousarray(matrix, dtype=np_dtype)))
 
     if is_tracked(points):
         tracked_points: Any = points

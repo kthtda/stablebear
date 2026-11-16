@@ -1030,3 +1030,35 @@ def test_kernel_of_abstract_batches_raises():
     Y = sb.PointCloudTensor([_contracted(cloud) for cloud in clouds])
     with pytest.raises(NotImplementedError, match="abstractly"):
         jax.grad(lambda P: _kernel(P, Y)._tvalues.sum())(jax.numpy.asarray(clouds))
+
+
+def _indexed_clouds():
+    # Three subsamples of four of the six points of _cloud3, which share its
+    # coordinates.
+    return sb.random.subsample(
+        sb.PointCloud(_cloud3()), n_points=4, n_samples=3, replace=False, allow_partial="keep",
+        discard_duplicates=False, generator=sb.random.Generator(seed=1), verbose=False)
+
+
+def test_projection_of_indexed_batch_is_that_of_its_dense_copy():
+    indexed = _indexed_clouds()
+    subspace = sb.LinearSubspace(_vectors())
+
+    projected = subspace.project(indexed)
+
+    expected = subspace.project(indexed.to_dense())
+    assert projected.shape == (3,)
+    for i in range(3):
+        np.testing.assert_allclose(np.asarray(projected[i]), np.asarray(expected[i]), atol=1e-12)
+
+
+def test_persistent_homology_under_lp_distance_of_indexed_batch_is_that_of_its_dense_copy():
+    indexed = _indexed_clouds()
+    taxicab = sb.LpDistance(1)
+
+    out = _homology(taxicab(indexed))
+
+    expected = _homology(taxicab(indexed.to_dense()))
+    assert out.shape == (3, 2)
+    for i in np.ndindex(3, 2):
+        assert out[i].is_isomorphic_to(expected[i], atol=1e-12, rtol=1e-12)

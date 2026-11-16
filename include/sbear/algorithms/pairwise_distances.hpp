@@ -2,14 +2,12 @@
 #define STABLEBEAR_PAIRWISE_DISTANCES_H
 
 #include "../distance_matrix.hpp"
-#include "../executor.hpp"
 #include "../point_cloud.hpp"
-#include "../tensor.hpp"
-#include "../walk.hpp"
 
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <span>
 #include <stdexcept>
 #include <vector>
 
@@ -86,18 +84,25 @@ namespace sb
     return distances;
   }
 
-  /// pairwise_lp_distances of every cloud of a tensor, in parallel over
-  /// the clouds.
-  template <typename T, typename ExecutorT>
-  Tensor<DistanceMatrix<T>> pairwise_lp_distances(const Tensor<PointCloud<T>>& clouds, T p, ExecutorT& executor)
+  /// pairwise_lp_distances as a ufunc operation: applied to a tensor or a
+  /// time series of point clouds, it gives one of distance matrices.
+  template <typename T>
+  struct PairwiseLpDistancesOperation
   {
-    detail::require_lp_exponent(p);
-    Tensor<DistanceMatrix<T>> distances(clouds.shape());
-    parallel_walk(clouds, [&](const std::vector<size_t>& idx) {
-      distances(idx) = pairwise_lp_distances(clouds(idx), p);
-    }, executor);
-    return distances;
-  }
+    using input_type = PointCloud<T>;
+    using output_type = DistanceMatrix<T>;
+
+    T p;
+
+    explicit PairwiseLpDistancesOperation(T exponent) : p(exponent) { detail::require_lp_exponent(p); }
+
+    [[nodiscard]] std::vector<size_t> extra_dims() const { return {}; }
+
+    void operator()(const PointCloud<T>& cloud, std::span<DistanceMatrix<T>> out) const
+    {
+      out[0] = pairwise_lp_distances(cloud, p);
+    }
+  };
 }
 
 #endif // STABLEBEAR_PAIRWISE_DISTANCES_H
