@@ -1357,6 +1357,66 @@ def test_barcode_tensor_of_list_with_tracked_barcode_carries_gradients(fw):
     assert barcodes[1].is_isomorphic_to(plain, atol=0.0, rtol=0.0)
 
 
+def _assert_same_functions(out, expected):
+    """The PCFs of two tensors have the same values on a grid of times."""
+    t = np.linspace(0.0, 7.0, 71)
+    assert out.shape == expected.shape
+    np.testing.assert_allclose(np.asarray(out.detach()(t)), np.asarray(expected(t)))
+
+
+@pytest.mark.parametrize("operation", [
+    pytest.param(lambda F, w: F * w, id="mul"),
+    pytest.param(lambda F, w: w * F, id="rmul"),
+    pytest.param(lambda F, w: F / w, id="truediv"),
+    pytest.param(lambda F, w: F + w, id="add"),
+    pytest.param(lambda F, w: w - F, id="rsub"),
+])
+def test_pcf_arithmetic_with_one_framework_number_per_pcf(fw, operation):
+    F, _ = _tensors()
+    weights = [2.0, -3.0, 0.5]
+
+    out = operation(F, fw.tensor(weights))
+
+    expected = sb.PcfTensor([operation(F[i], weights[i]) for i in range(3)])
+    _assert_same_functions(out, expected)
+
+
+@pytest.mark.parametrize("make_weights", [
+    pytest.param(lambda: np.array([2.0, -3.0, 0.5]), id="numpy"),
+    pytest.param(lambda: sb.FloatTensor(np.array([2.0, -3.0, 0.5])), id="float_tensor"),
+])
+def test_tracked_pcf_arithmetic_with_one_number_per_pcf(fw, make_weights):
+    F, _ = _tensors()
+
+    out = tracked(fw, F) * make_weights()
+
+    expected = sb.PcfTensor([F[0] * 2.0, F[1] * -3.0, F[2] * 0.5])
+    _assert_same_functions(out, expected)
+
+
+def test_single_pcf_times_framework_vector_gives_one_pcf_per_number(fw):
+    f, _ = _f_and_g()
+
+    out = f * fw.tensor([2.0, -3.0])
+
+    _assert_same_functions(out, sb.PcfTensor([f * 2.0, f * -3.0]))
+
+
+def test_gradient_wrt_one_weight_per_pcf(fw):
+    F, G = _tensors()
+
+    def loss(w):
+        return fw.sum(sb.lp_norm(F * w - G, p=2.0))
+
+    _assert_gradient_matches_finite_differences(fw, loss, [2.0, -3.0, 0.5])
+
+
+def test_pcf_arithmetic_with_numbers_of_another_shape_raises(fw):
+    F, _ = _tensors()
+    with pytest.raises(ValueError, match="broadcast"):
+        _ = F * fw.tensor([1.0, 2.0])
+
+
 def test_values_with_times_match_breakpoints():
     g = sb.Pcf(np.array([2.0, -1.0, 0.0]), times=np.array([0.0, 1.0, 3.0]))
     np.testing.assert_array_equal(g.to_numpy(), [[0.0, 2.0], [1.0, -1.0], [3.0, 0.0]])

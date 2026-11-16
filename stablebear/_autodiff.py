@@ -129,9 +129,12 @@ def _union_of_times(
     from . import _sb_cpp as cpp
 
     if len(pcfs) == 1:
-        content, enumeration = serials[0][0], enumerations[0]
-        rows = np.arange(len(content), dtype=np.int64)
-        return content[:, 0], enumeration[:, 1] - enumeration[:, 0], rows, [rows]
+        # The rows of the element that each result element takes.
+        content, enumeration = serials[0][0], enumerations[0][owners[0]]
+        sizes = enumeration[:, 1] - enumeration[:, 0]
+        ends = np.cumsum(sizes)
+        rows = np.arange(int(sizes.sum()), dtype=np.int64) + np.repeat(enumeration[:, 0] - (ends - sizes), sizes)
+        return content[rows, 0], sizes, rows, [rows]
 
     def tensor(op, content, enumeration):
         # A single Pcf as a 0-d tensor.
@@ -162,7 +165,9 @@ def pcf_op(primal_op: Callable[..., Any], combine: Callable[..., Any], *operands
     Untracked, this is ``primal_op(*operands)``. If any operand is tracked, the
     result has, for each element, the union of the operands' breakpoint times
     (with operands broadcast against each other), and framework values
-    ``combine`` of the operands' values at those times. Each time of the result
+    ``combine`` of the operands' values at those times. An operand that is an
+    array of numbers, of a framework, of NumPy, or a numeric tensor,
+    broadcasts against the PCFs and gives one number per PCF. Each time of the result
     is the time of the first operand that has it, so gradients with respect to
     tracked times flow there.
     """
@@ -177,13 +182,25 @@ def pcf_op(primal_op: Callable[..., Any], combine: Callable[..., Any], *operands
     serials = [op._serial() for op in pcfs]
     offsets = np.cumsum([0] + [len(c) for c, _ in serials])
     shapes = [enumeration.shape[:-1] for _, enumeration in serials]
-    shape = np.broadcast_shapes(*shapes)
+    # Arrays of numbers, one per PCF: their framework form and their shape.
+    arrays = {}
+    for i, op in enumerate(operands):
+        if i not in pcf_positions and len(getattr(op, "shape", ())) > 0:
+            arrays[i] = op if _framework(op) is not None else adapter.as_tensor(np.asarray(op), like=like)
+    shape = np.broadcast_shapes(*shapes, *(tuple(array.shape) for array in arrays.values()))
     owners = [np.broadcast_to(np.arange(int(np.prod(s))).reshape(s), shape).ravel() for s in shapes]
     enumerations = [enumeration.reshape(-1, 2) for _, enumeration in serials]
 
     times, sizes, sources, gathers = _union_of_times(pcfs, serials, enumerations, owners, offsets, shape)
 
+    # The result element of each breakpoint of the result.
+    element = np.repeat(np.arange(len(sizes)), sizes)
+
     def values(i, op):
+        if i in arrays:
+            own_shape = tuple(arrays[i].shape)
+            owner = np.broadcast_to(np.arange(int(np.prod(own_shape))).reshape(own_shape), shape).ravel()
+            return adapter.gather(adapter.reshape(arrays[i], (-1,)), owner[element])
         if i not in pcf_positions:
             return op
         j = pcf_positions.index(i)
