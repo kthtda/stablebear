@@ -1,6 +1,6 @@
 # Autodiff prototype: implementation plan
 
-Progress: 18 of 27 items, 40 of 64 points (63%)
+Progress: 18 of 29 items, 40 of 70 points (57%)
 
 Spec: [autodiff-prototype-spec.md](autodiff-prototype-spec.md)
 
@@ -88,7 +88,8 @@ Spec: [autodiff-prototype-spec.md](autodiff-prototype-spec.md)
 - [ ] **D3.** [3] `PcfTensor` on the mixin, with times and values as
   separate column groups; arithmetic, norms, and stable ranks return it.
   Tests: indexing matches untracked tensors; gradient through indexing;
-  copying into a `PcfTensor` raises.
+  copying into a `PcfTensor` raises; the tests of PCF operations (norms,
+  distances, arithmetic) run on tracked PCFs too, as in D9.
 - [ ] **D4.** [3] `Pcf`, `Plf`, and `Barcode` as the 0-d case.
   Tests: `Pcf(values, times=times)` and `Plf(values, times=times)` derive
   their C++ objects; the existing autodiff tests pass unchanged.
@@ -104,6 +105,19 @@ Spec: [autodiff-prototype-spec.md](autodiff-prototype-spec.md)
 - [ ] **D7.** [2] Type descriptions for `PointCloudTensor`,
   `DistanceMatrixTensor`, and `SymmetricMatrixTensor`.
   Tests: serial round trip; indexing a tracked tensor of each type.
+- [ ] **D8.** [3] Reading `_data` of a tracked tensor raises (D5), so an
+  operation without gradients cannot drop them; `detach()` gives the
+  untracked tensor; comparisons, saving, and pickling use the values. Done
+  before D3, as is D9: they guard the tensors that D3 to D5 rework.
+  Tests: a Betti curve, a `TimeSeries`, and a `NestedTensor` of tracked
+  barcodes raise; `detach()` equals the untracked tensor; `==` and
+  `array_equal` compare values; save and pickle give the untracked tensor.
+- [ ] **D9.** [3] The tests of barcode operations run on tracked barcodes of
+  each framework as well as on untracked ones: the stable rank and
+  `transform_bars` give the same values, and the operations without
+  gradients raise. D3 adds tracked PCFs to the tests of PCF operations.
+  Tests: the framework helpers of `test_autodiff.py` move to a shared
+  module; a parameter of the barcode tests makes their input tracked.
 
 ## Phase E: Operation coverage
 
