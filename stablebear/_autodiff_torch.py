@@ -71,6 +71,18 @@ def stack_columns(a: torch.Tensor, b: torch.Tensor) -> torch.Tensor:
     return torch.stack([a, b], dim=1)
 
 
+def matmul(a: torch.Tensor, b: torch.Tensor) -> torch.Tensor:
+    return a @ b
+
+
+def transpose(a: torch.Tensor) -> torch.Tensor:
+    return a.T
+
+
+def solve(a: torch.Tensor, b: torch.Tensor) -> torch.Tensor:
+    return torch.linalg.solve(a, b)
+
+
 def apply(
     primal: Callable[..., Any], vjp: Callable[..., Any], *params: Any, out: Any = None, residuals: Any = ()
 ) -> torch.Tensor:

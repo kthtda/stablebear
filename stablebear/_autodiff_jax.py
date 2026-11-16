@@ -60,6 +60,18 @@ def stack_columns(a: Any, b: Any) -> jax.Array:
     return jnp.stack([a, b], axis=1)
 
 
+def matmul(a: Any, b: Any) -> jax.Array:
+    return a @ b
+
+
+def transpose(a: Any) -> jax.Array:
+    return a.T
+
+
+def solve(a: Any, b: Any) -> jax.Array:
+    return jnp.linalg.solve(a, b)
+
+
 def apply(
     primal: Callable[..., Any], vjp: Callable[..., Any], *params: Any, out: Any = None, residuals: Any = ()
 ) -> jax.Array:

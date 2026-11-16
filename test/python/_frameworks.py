@@ -139,3 +139,14 @@ def tracked(fw, tensor):
         parts.append(fw.from_numpy(np.ascontiguousarray(columns)))
         start += width
     return tracked_class(type(tensor))(parts, enumeration, sizes=sizes[0] if sizes else None)
+
+
+def assert_gradient_matches_finite_differences(fw, f, x0, eps=1e-6):
+    x0 = np.asarray(x0, dtype=np.float64)
+    _, grad = fw.value_and_grad(f, x0)
+    numerical = np.zeros_like(x0)
+    for i in np.ndindex(x0.shape):
+        step = np.zeros_like(x0)
+        step[i] = eps
+        numerical[i] = (fw.to_numpy(f(fw.tensor(x0 + step))) - fw.to_numpy(f(fw.tensor(x0 - step)))) / (2 * eps)
+    np.testing.assert_allclose(grad, numerical, rtol=1e-6, atol=1e-8)

@@ -74,6 +74,18 @@ def stack_columns(a: Any, b: Any) -> tf.Tensor:
     return tf.stack([a, b], axis=1)
 
 
+def matmul(a: Any, b: Any) -> tf.Tensor:
+    return tf.linalg.matmul(a, b)
+
+
+def transpose(a: Any) -> tf.Tensor:
+    return tf.transpose(a)
+
+
+def solve(a: Any, b: Any) -> tf.Tensor:
+    return tf.linalg.solve(a, b)
+
+
 def apply(
     primal: Callable[..., Any], vjp: Callable[..., Any], *params: Any, out: Any = None, residuals: Any = ()
 ) -> tf.Tensor:

@@ -3,6 +3,8 @@ import pytest
 
 import stablebear as sb
 
+from _frameworks import assert_gradient_matches_finite_differences
+
 
 def _gram():
     # Symmetric and positive definite: its eigenvalues are 1 and 3.
@@ -208,3 +210,113 @@ def test_projection_of_points_of_another_dimension_raises():
     line = sb.LinearSubspace(np.array([[3.0, 4.0]]))
     with pytest.raises(ValueError, match="dimension 3"):
         line.project(_points())
+
+
+def _vectors():
+    return np.array([[1.0, 2.0, 0.0],
+                     [0.0, 1.0, 3.0]])
+
+
+def _gram3():
+    return np.array([[2.0, 1.0, 0.0],
+                     [1.0, 2.0, 0.0],
+                     [0.0, 0.0, 3.0]])
+
+
+def _weights():
+    # One weight per coordinate of the two projected points of _points.
+    return np.array([[1.0, -2.0, 3.0],
+                     [0.5, 4.0, -1.5]])
+
+
+def _framework_gram(fw, a):
+    # A symmetric matrix for each a, which is _gram3 at a = (2, 1, 3).
+    diagonal = np.diag([1.0, 1.0, 0.0])
+    off_diagonal = np.array([[0.0, 1.0, 0.0],
+                             [1.0, 0.0, 0.0],
+                             [0.0, 0.0, 0.0]])
+    corner = np.diag([0.0, 0.0, 1.0])
+    return a[0] * fw.tensor(diagonal) + a[1] * fw.tensor(off_diagonal) + a[2] * fw.tensor(corner)
+
+
+@pytest.mark.parametrize("which", ["points", "vectors", "both"])
+def test_projection_with_framework_arrays_matches_numpy(fw, which):
+    points = fw.tensor(_points()) if which in ("points", "both") else _points()
+    vectors = fw.tensor(_vectors()) if which in ("vectors", "both") else _vectors()
+
+    projected = sb.LinearSubspace(vectors).project(points)
+
+    assert isinstance(projected, fw.tensor_type)
+    expected = sb.LinearSubspace(_vectors()).project(_points())
+    np.testing.assert_allclose(fw.to_numpy(projected), np.asarray(expected))
+
+
+@pytest.mark.parametrize("which", ["points", "gram"])
+def test_projection_in_inner_product_space_with_framework_arrays_matches_numpy(fw, which):
+    points = fw.tensor(_points()) if which == "points" else _points()
+    gram = fw.tensor(_gram3()) if which == "gram" else _gram3()
+    ip = sb.InnerProduct(gram)
+
+    projected = sb.LinearSubspace(_vectors()).project(ip(points))
+
+    assert isinstance(projected, sb.InnerProductSpace)
+    assert projected.inner_product == ip
+    assert isinstance(projected.vectors, fw.tensor_type)
+    expected = sb.LinearSubspace(_vectors()).project(sb.InnerProduct(_gram3())(_points()))
+    np.testing.assert_allclose(fw.to_numpy(projected.vectors), np.asarray(expected.vectors))
+
+
+def test_framework_gram_matrix_and_vectors_come_back_as_given(fw):
+    gram, vectors = fw.tensor(_gram3()), fw.tensor(_vectors())
+
+    assert sb.InnerProduct(gram).gram is gram
+    assert sb.LinearSubspace(vectors).vectors is vectors
+
+
+def test_invalid_framework_gram_matrix_and_vectors_raise(fw):
+    with pytest.raises(ValueError, match="positive definite"):
+        sb.InnerProduct(fw.tensor(np.zeros((2, 2))))
+    with pytest.raises(ValueError, match="independent"):
+        sb.LinearSubspace(fw.tensor(np.array([[1.0, 2.0], [2.0, 4.0]])))
+
+
+def _losses():
+    def wrt_points(fw, x):
+        ip = sb.InnerProduct(_gram3())
+        return fw.sum(fw.tensor(_weights()) * sb.LinearSubspace(_vectors()).project(ip(x)).vectors)
+
+    def wrt_vectors(fw, x):
+        ip = sb.InnerProduct(_gram3())
+        return fw.sum(fw.tensor(_weights()) * sb.LinearSubspace(x).project(ip(_points())).vectors)
+
+    def wrt_gram(fw, x):
+        ip = sb.InnerProduct(_framework_gram(fw, x))
+        return fw.sum(fw.tensor(_weights()) * sb.LinearSubspace(_vectors()).project(ip(_points())).vectors)
+
+    def wrt_vectors_euclidean(fw, x):
+        return fw.sum(fw.tensor(_weights()) * sb.LinearSubspace(x).project(_points()))
+
+    return [
+        pytest.param(wrt_points, _points(), id="points"),
+        pytest.param(wrt_vectors, _vectors(), id="vectors"),
+        pytest.param(wrt_gram, [2.0, 1.0, 3.0], id="gram"),
+        pytest.param(wrt_vectors_euclidean, _vectors(), id="vectors_euclidean"),
+    ]
+
+
+@pytest.mark.parametrize("loss, x0", _losses())
+def test_projection_gradient(fw, loss, x0):
+    assert_gradient_matches_finite_differences(fw, lambda x: loss(fw, x), x0)
+
+
+@pytest.mark.parametrize("loss, x0", _losses())
+def test_compiled_projection_gradient_matches_eager(fw, loss, x0):
+    if fw.compiled_value_and_grad is None:
+        pytest.skip("No compiled mode")
+    x0 = np.asarray(x0, dtype=np.float64)
+
+    value, grad = fw.compiled_value_and_grad(lambda x: loss(fw, x), x0)
+    eager_value, eager_grad = fw.value_and_grad(lambda x: loss(fw, x), x0)
+
+    np.testing.assert_allclose(value, eager_value)
+    np.testing.assert_allclose(grad, eager_grad)
