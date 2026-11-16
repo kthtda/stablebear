@@ -237,40 +237,43 @@ def barcode_to_accumulated_persistence(
     )
 
 
-def _plf_jacobians(f: Plf, x: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """For f evaluated at each of the times x, its derivatives with respect to
-    x, (len(x),) like x, and to the breakpoint times and values of f, each
-    (len(x), n). At a breakpoint, the derivatives are those of the segment
-    after it. At an infinite x, f takes its limit: the derivatives are 0,
-    except 1 with respect to the last value where the limit is that value.
+def _plf_vjp(f: Plf, x: np.ndarray, grad: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """The gradients of sum(grad * f(x)) with respect to the times x, shaped
+    like x, and to the breakpoint times and values of f, each (n,). At a
+    breakpoint, the derivatives are those of the segment after it. At an
+    infinite x, f takes its limit: the derivatives are 0, except 1 with
+    respect to the last value where the limit is that value.
     """
     pts = f.to_numpy().astype(np.float64)
     n = len(pts)
-    rows = np.arange(len(x))
-    dx, dt, dv = np.zeros(len(x)), np.zeros((len(x), n)), np.zeros((len(x), n))
     if n == 1:
-        dv[:, 0] = 1.0
-        return dx, dt, dv
+        return np.zeros(len(x)), np.zeros(1), np.array([grad.sum()])
     finite = ~np.isinf(x)
+    xf, g = x[finite], grad[finite]
     # Segment k from breakpoint k to k + 1; after the last breakpoint, the
     # last segment continues.
-    k = np.minimum(np.searchsorted(pts[:, 0], np.where(finite, x, 0.0), side="right") - 1, n - 2)
+    k = np.minimum(np.searchsorted(pts[:, 0], xf, side="right") - 1, n - 2)
     h = pts[k + 1, 0] - pts[k, 0]
     slope = (pts[k + 1, 1] - pts[k, 1]) / h
-    w = (np.where(finite, x, 0.0) - pts[k, 0]) / h
-    dx[finite] = slope[finite]
-    for column, (d_left, d_right) in ((dt, (-slope * (1 - w), -slope * w)), (dv, (1 - w, w))):
-        np.add.at(column, (rows[finite], k[finite]), d_left[finite])
-        np.add.at(column, (rows[finite], k[finite] + 1), d_right[finite])
-    dv[~finite & (pts[-1, 1] == pts[-2, 1]), n - 1] = 1.0
-    return dx, dt, dv
+    w = (xf - pts[k, 0]) / h
+    d_x = np.zeros(len(x))
+    d_x[finite] = g * slope
+
+    def scatter(left, right):
+        return np.bincount(k, weights=g * left, minlength=n) + np.bincount(k + 1, weights=g * right, minlength=n)
+
+    d_times = scatter(-slope * (1 - w), -slope * w)
+    d_values = scatter(1 - w, w)
+    if pts[-1, 1] == pts[-2, 1]:
+        d_values[-1] += grad[~finite].sum()
+    return d_x, d_times, d_values
 
 
 def _transformed_bars_vjp(grad_out, bc, f):
     bars = np.asarray(bc._serial()[0], dtype=np.float64).reshape(-1)
     grad = np.asarray(grad_out, dtype=np.float64).reshape(-1)
-    dx, dt, dv = _plf_jacobians(f, bars)
-    return (grad * dx).reshape(-1, 2), np.column_stack([grad @ dt, grad @ dv])
+    d_bars, d_times, d_values = _plf_vjp(f, bars, grad)
+    return d_bars.reshape(-1, 2), np.column_stack([d_times, d_values])
 
 
 def _transformed_bars_out(bc, f):
