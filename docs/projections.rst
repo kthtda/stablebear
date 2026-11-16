@@ -195,6 +195,14 @@ kernel.
        loss.backward()
        optimizer.step()
 
+A loss can also be built from the bars themselves.
+:py:meth:`~stablebear.persistence.ph_tensor.BarcodeTensor.to_serial_content`
+gives the bars of all barcodes of a tensor as one array of shape ``(m, 2)``,
+which is a PyTorch tensor that carries the gradients when the barcodes do::
+
+   bars, enumeration = kernel.to_serial_content()
+   loss = (bars[:, 1] - bars[:, 0]).sum()    # the total length of the bars
+
 The point cloud varies most along its first coordinate and least along its
 third. The plane starts as the one spanned by the second and third
 coordinates, and the loss falls from about 18.8 to about 1.3 as the plane

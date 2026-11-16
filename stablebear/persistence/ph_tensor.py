@@ -41,6 +41,24 @@ class BarcodeTensor(Tensor):
     # None for any other.
     _tvalues: Any = None
 
+    def to_serial_content(self) -> tuple[Any, np.ndarray]:
+        """The bars of all barcodes as one array, with the rows of each
+        barcode.
+
+        If the tensor carries gradients, the content is a PyTorch tensor
+        that carries them, and a loss can be built from it.
+
+        Returns
+        -------
+        content : numpy.ndarray or torch.Tensor
+            The bars ``(birth, death)`` of all barcodes, of shape ``(m, 2)``,
+            in row-major order of the barcodes.
+        enumeration : numpy.ndarray
+            The rows ``[start, stop)`` of the bars of each barcode, of shape
+            ``self.shape + (2,)``.
+        """
+        return self._serial()
+
     def _serial(self) -> tuple[np.ndarray, np.ndarray]:
         """(content, enumeration): the (m, 2) bars of all barcodes in C order,
         and for each barcode the [start, stop) rows of its bars, with shape

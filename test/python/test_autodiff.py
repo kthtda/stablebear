@@ -55,7 +55,8 @@ def test_pcf_arithmetic_with_framework_scalar_matches_float_scalar(fw):
     h = f + fw.tensor(0.3) * g
     expected = (f + 0.3 * g).to_numpy()
     np.testing.assert_allclose(h.to_numpy(), expected)
-    np.testing.assert_allclose(fw.to_numpy(h._tvalues), expected[:, 1])
+    breakpoints, _ = sb.PcfTensor([h]).to_serial_content()
+    np.testing.assert_allclose(fw.to_numpy(breakpoints), expected)
 
 
 @pytest.mark.parametrize("p", [1.0, 2.5])
@@ -124,7 +125,7 @@ def test_homological_kernel_of_framework_points_matches_numpy(fw):
     out = sb.persistence.compute_homological_kernel(fw.tensor(X), fw.tensor(Y))
     expected = sb.persistence.compute_homological_kernel(X, Y)[0].to_numpy()
     np.testing.assert_allclose(out[0].to_numpy(), expected)
-    np.testing.assert_allclose(fw.to_numpy(out._tvalues), expected)
+    np.testing.assert_allclose(fw.to_numpy(out.to_serial_content()[0]), expected)
 
 
 @pytest.mark.parametrize("wrt", ["X", "Y"])
@@ -134,7 +135,7 @@ def test_homological_kernel_gradient(fw, wrt):
 
     def loss(P):
         Xp, Yp = (P, Y) if wrt == "X" else (X, P)
-        return fw.sum(weights * sb.persistence.compute_homological_kernel(Xp, Yp)._tvalues)
+        return fw.sum(weights * sb.persistence.compute_homological_kernel(Xp, Yp).to_serial_content()[0])
 
     _assert_gradient_matches_finite_differences(fw, loss, X if wrt == "X" else Y)
 
@@ -179,7 +180,7 @@ def test_transform_bars_of_framework_kernel_matches_numpy(fw):
     out = sb.persistence.transform_bars(sb.persistence.compute_homological_kernel(fw.tensor(X), fw.tensor(Y)), _bar_plf())
     expected = sb.persistence.transform_bars(sb.persistence.compute_homological_kernel(X, Y), _bar_plf())[0].to_numpy()
     np.testing.assert_allclose(out[0].to_numpy(), expected)
-    np.testing.assert_allclose(fw.to_numpy(out._tvalues), expected)
+    np.testing.assert_allclose(fw.to_numpy(out.to_serial_content()[0]), expected)
 
 
 def test_transform_bars_removes_empty_bars_of_framework_kernel(fw):
@@ -188,7 +189,7 @@ def test_transform_bars_removes_empty_bars_of_framework_kernel(fw):
     out = sb.persistence.transform_bars(sb.persistence.compute_homological_kernel(fw.tensor(X), fw.tensor(Y)), f)
     expected = sb.persistence.transform_bars(sb.persistence.compute_homological_kernel(X, Y), f)[0].to_numpy()
     assert len(expected) == 3
-    np.testing.assert_allclose(fw.to_numpy(out._tvalues), expected)
+    np.testing.assert_allclose(fw.to_numpy(out.to_serial_content()[0]), expected)
 
 
 def test_transform_bars_removing_every_bar_of_framework_kernel(fw):
@@ -207,7 +208,7 @@ def test_transform_bars_gradient_with_removed_bars(fw):
 
     def loss(P):
         barcodes = sb.persistence.compute_homological_kernel(X, P)
-        return fw.sum(weights * sb.persistence.transform_bars(barcodes, f)._tvalues)
+        return fw.sum(weights * sb.persistence.transform_bars(barcodes, f).to_serial_content()[0])
 
     _assert_gradient_matches_finite_differences(fw, loss, Y)
 
@@ -220,7 +221,7 @@ def test_transform_bars_gradient(fw, wrt):
     def loss(P):
         Xp, Yp = (P, Y) if wrt == "X" else (X, P)
         barcodes = sb.persistence.compute_homological_kernel(Xp, Yp)
-        return fw.sum(weights * sb.persistence.transform_bars(barcodes, _bar_plf())._tvalues)
+        return fw.sum(weights * sb.persistence.transform_bars(barcodes, _bar_plf()).to_serial_content()[0])
 
     _assert_gradient_matches_finite_differences(fw, loss, X if wrt == "X" else Y)
 
@@ -257,7 +258,7 @@ def test_plf_from_framework_breakpoints_raises(fw):
 def test_transform_bars_gradient_wrt_plf_values(fw):
     def loss(v):
         f = sb.Plf(v, times=np.array([0.0, 1.0, 2.0, 3.0]))
-        return fw.sum(_plf_bar_weights(fw) * sb.persistence.transform_bars(_plf_bars(), f)._tvalues)
+        return fw.sum(_plf_bar_weights(fw) * sb.persistence.transform_bars(_plf_bars(), f).to_serial_content()[0])
 
     _assert_gradient_matches_finite_differences(fw, loss, [0.0, 1.0, 1.5, 3.0])
 
@@ -265,7 +266,7 @@ def test_transform_bars_gradient_wrt_plf_values(fw):
 def test_transform_bars_gradient_wrt_plf_times(fw):
     def loss(t):
         f = sb.Plf(np.array([0.0, 1.0, 1.5, 3.0]), times=fw.concat([fw.tensor([0.0]), t]))
-        return fw.sum(_plf_bar_weights(fw) * sb.persistence.transform_bars(_plf_bars(), f)._tvalues)
+        return fw.sum(_plf_bar_weights(fw) * sb.persistence.transform_bars(_plf_bars(), f).to_serial_content()[0])
 
     _assert_gradient_matches_finite_differences(fw, loss, [1.0, 2.0, 3.0])
 
@@ -276,7 +277,7 @@ def test_transform_bars_gradient_wrt_plf_and_points(fw):
     def loss(x):
         barcodes = sb.persistence.compute_homological_kernel(fw.tensor(X), x * fw.tensor(Y))
         f = sb.Plf(x * fw.tensor([0.0, 0.5, 3.0, 3.5]), times=np.array([0.0, 1.3, 2.7, 4.1]))
-        return fw.sum(sb.persistence.transform_bars(barcodes, f)._tvalues)
+        return fw.sum(sb.persistence.transform_bars(barcodes, f).to_serial_content()[0])
 
     _assert_gradient_matches_finite_differences(fw, loss, 0.9)
 
@@ -285,7 +286,7 @@ def test_transform_bars_gradient_wrt_plf_at_infinite_death(fw):
     bc = sb.persistence.BarcodeTensor([sb.persistence.Barcode([[0.5, np.inf]])])
     # f ends flat, so f(inf) is its last value.
     _, grad = fw.value_and_grad(
-        lambda v: fw.sum(sb.persistence.transform_bars(bc, sb.Plf(v, times=np.array([0.0, 1.0, 2.0])))._tvalues),
+        lambda v: fw.sum(sb.persistence.transform_bars(bc, sb.Plf(v, times=np.array([0.0, 1.0, 2.0]))).to_serial_content()[0]),
         np.array([0.0, 2.0, 2.0]))
     np.testing.assert_allclose(grad, [0.5, 0.5, 1.0])
 
@@ -311,7 +312,7 @@ def test_transform_bars_of_batch_with_framework_plf_matches_numpy(fw):
     assert out.shape == (2, 2)
     for i in np.ndindex(2, 2):
         np.testing.assert_allclose(out[i].to_numpy(), expected[i].to_numpy())
-    np.testing.assert_allclose(fw.to_numpy(out._tvalues), expected._serial()[0])
+    np.testing.assert_allclose(fw.to_numpy(out.to_serial_content()[0]), expected._serial()[0])
 
 
 def test_transform_bars_of_batch_gradient_wrt_plf_values(fw):
@@ -320,7 +321,7 @@ def test_transform_bars_of_batch_gradient_wrt_plf_values(fw):
 
     def loss(v):
         f = sb.Plf(fw.concat([v[:2], v[1:2], v[2:]]), times=_batch_plf_times())
-        return fw.sum(weights * sb.persistence.transform_bars(_barcode_batch(), f)._tvalues)
+        return fw.sum(weights * sb.persistence.transform_bars(_barcode_batch(), f).to_serial_content()[0])
 
     _assert_gradient_matches_finite_differences(fw, loss, [0.0, 1.0, 3.0])
 
@@ -396,8 +397,8 @@ def test_tracked_barcodes_index_and_reshape_like_plain_ones(fw):
     ):
         selected, plain = select(out), select(expected)
         assert selected.shape == plain.shape
-        assert selected._tvalues is not None
-        np.testing.assert_array_equal(fw.to_numpy(selected._tvalues), plain._serial()[0])
+        assert isinstance(selected.to_serial_content()[0], fw.tensor_type)
+        np.testing.assert_array_equal(fw.to_numpy(selected.to_serial_content()[0]), plain._serial()[0])
         for i in np.ndindex(*plain.shape):
             np.testing.assert_array_equal(selected[i].to_numpy(), plain[i].to_numpy())
 
@@ -486,7 +487,7 @@ def test_tracked_barcodes_follow_in_place_change_of_torch_bars():
     assert out.detach().is_isomorphic_to(_expected_batch([0.0, 1.0, 1.5, 3.0]), atol=0.0, rtol=0.0)
 
     with torch.no_grad():
-        out._tvalues.mul_(2)
+        out.to_serial_content()[0].mul_(2)
 
     # Doubling the values of the PLF doubles the transformed bars.
     assert out.detach().is_isomorphic_to(_expected_batch([0.0, 2.0, 3.0, 6.0]), atol=0.0, rtol=0.0)
@@ -519,7 +520,7 @@ def test_tracked_pcfs_index_and_reshape_like_plain_ones(fw):
         selected, expected = select(out), select(plain)
         assert isinstance(selected, sb.PcfTensor)
         assert selected.shape == expected.shape
-        assert selected._ttimes is not None and selected._tvalues is not None
+        assert isinstance(selected.to_serial_content()[0], fw.tensor_type)
         assert selected.array_equal(expected)
         for i in np.ndindex(*expected.shape):
             assert selected[i] == expected[i]
@@ -604,7 +605,7 @@ def test_gradient_flows_to_written_element_and_not_to_replaced_one(fw):
 def test_writes_to_tracked_barcodes_are_applied_in_one_pass(fw, monkeypatch):
     Barcode = sb.persistence.Barcode
     out = tracked(fw, _barcode_batch())
-    adapter = _autodiff._framework(out._tvalues)
+    adapter = _autodiff._framework(out.to_serial_content()[0])
     calls = []
     concat = adapter.concat
 
@@ -619,7 +620,7 @@ def test_writes_to_tracked_barcodes_are_applied_in_one_pass(fw, monkeypatch):
     out[1, 1] = Barcode([[0.0, 30.0]])
     assert len(calls) == 0
 
-    np.testing.assert_array_equal(fw.to_numpy(out._tvalues), [[0.0, 10.0],
+    np.testing.assert_array_equal(fw.to_numpy(out.to_serial_content()[0]), [[0.0, 10.0],
                                                               [0.0, 20.0],
                                                               [1.0, 21.0],
                                                               [2.5, 4.0],
@@ -638,7 +639,7 @@ def test_list_with_tracked_pcf_gives_tracked_tensor(fw):
                         [tracked_g, f]])
 
     assert out.shape == (2, 2)
-    assert out._tvalues is not None
+    assert isinstance(out.to_serial_content()[0], fw.tensor_type)
     assert out.array_equal(sb.PcfTensor([[f, g],
                                          [g, f]]))
 
@@ -698,7 +699,8 @@ def test_accumulated_persistence_gradient(fw, summary):
     # is the sum of time * value over its breakpoints.
     def loss(v):
         out = summary(sb.persistence.transform_bars(_barcode_batch(), sb.Plf(v, times=_batch_plf_times())))
-        return fw.sum(out._ttimes * out._tvalues)
+        breakpoints, _ = out.to_serial_content()
+        return fw.sum(breakpoints[:, 0] * breakpoints[:, 1])
 
     _assert_gradient_matches_finite_differences(fw, loss, [0.0, 1.0, 1.5, 3.0])
 
@@ -770,7 +772,7 @@ def test_persistent_homology_of_framework_points_matches_numpy(fw, reduced):
     expected = homology(_loop_points(), max_dim=1, reduced=reduced, verbose=False)
     assert isinstance(out, sb.persistence.BarcodeTensor)
     assert out.shape == (2,)
-    assert out._tvalues is not None
+    assert isinstance(out.to_serial_content()[0], fw.tensor_type)
     # The loop gives one bar in dimension 1.
     assert len(out[1]) == 1
     for dim in range(2):
@@ -791,7 +793,7 @@ def test_persistent_homology_of_framework_points_with_equal_distances_matches_nu
 def test_persistent_homology_gradient(fw, dim):
     def loss(P):
         barcodes = sb.persistence.compute_persistent_homology(P, max_dim=1, reduced=True, verbose=False)
-        bars = barcodes[dim:dim + 1]._tvalues
+        bars = barcodes[dim:dim + 1].to_serial_content()[0]
         return fw.sum(bars[:, 1] * bars[:, 1]) + fw.sum(bars[:, 0])
 
     _assert_gradient_matches_finite_differences(fw, loss, _loop_points())
@@ -812,7 +814,7 @@ def test_persistent_homology_of_framework_array_of_several_point_clouds_matches_
     out = homology(fw.tensor(clouds), max_dim=1, reduced=True, verbose=False)
 
     expected = homology(clouds, max_dim=1, reduced=True, verbose=False)
-    assert out._tvalues is not None
+    assert isinstance(out.to_serial_content()[0], fw.tensor_type)
     assert out.shape == (2, 2)
     for i in np.ndindex(2, 2):
         assert out[i].is_isomorphic_to(expected[i], atol=1e-12, rtol=1e-12)
@@ -888,7 +890,7 @@ def test_tracked_point_clouds_index_and_reshape_like_plain_ones(fw):
         selected, expected = select(out), select(plain)
         assert isinstance(selected, sb.PointCloudTensor)
         assert selected.shape == expected.shape
-        assert selected._tvalues is not None
+        assert isinstance(selected.to_serial_content()[0], fw.tensor_type)
         assert selected.array_equal(expected)
         for i in np.ndindex(*expected.shape):
             np.testing.assert_array_equal(np.asarray(selected[i]), np.asarray(expected[i]))
@@ -979,7 +981,7 @@ def test_tracked_matrices_index_and_reshape_like_plain_ones(fw, make_matrices):
         selected, expected = select(out), select(plain)
         assert isinstance(selected, type(plain))
         assert selected.shape == expected.shape
-        assert selected._tvalues is not None
+        assert isinstance(selected.to_serial_content()[0], fw.tensor_type)
         assert selected.array_equal(expected)
         for i in np.ndindex(*expected.shape):
             np.testing.assert_array_equal(selected[i].to_dense(), expected[i].to_dense())
@@ -990,6 +992,42 @@ def test_write_to_tracked_matrices_raises(fw, make_matrices):
     out = tracked(fw, make_matrices())
     with pytest.raises(NotImplementedError, match="Writing"):
         out[0, 0] = make_matrices()[1, 1]
+
+
+def test_serial_content_of_pcf_tensor_round_trips():
+    F = _pcf_grid()
+
+    content, enumeration = F.to_serial_content()
+
+    assert content.shape == (10, 2)
+    assert enumeration.shape == (2, 2, 2)
+    assert sb.from_serial_content(content, enumeration).array_equal(F)
+
+
+@pytest.mark.parametrize("make_tensor", [
+    _pcf_grid, _barcode_batch, _point_clouds, _distance_matrices, _symmetric_matrices])
+def test_serial_content_of_tracked_tensor_is_a_framework_array_of_its_values(fw, make_tensor):
+    plain = make_tensor()
+
+    content, *rows = tracked(fw, plain).to_serial_content()
+
+    expected_content, *expected_rows = plain.to_serial_content()
+    assert isinstance(content, fw.tensor_type)
+    np.testing.assert_array_equal(fw.to_numpy(content), expected_content)
+    # The enumeration and, for matrices, the sizes.
+    assert len(rows) == len(expected_rows)
+    for array, expected in zip(rows, expected_rows):
+        np.testing.assert_array_equal(array, expected)
+
+
+def test_gradient_of_loss_on_serial_content(fw):
+    F, _ = _tensors()
+
+    def loss(x):
+        breakpoints, _ = (x * F).to_serial_content()
+        return fw.sum(breakpoints[:, 1] * breakpoints[:, 1])
+
+    _assert_gradient_matches_finite_differences(fw, loss, 1.5)
 
 
 def test_values_with_times_match_breakpoints():

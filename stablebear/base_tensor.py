@@ -289,6 +289,24 @@ class PcfTensor(_PcfTensorBase):
     _ttimes: Any = None
     _tvalues: Any = None
 
+    def to_serial_content(self) -> tuple[Any, np.ndarray]:
+        """The breakpoints of all PCFs as one array, with the rows of each
+        PCF: the inverse of :func:`~stablebear.serialize.from_serial_content`.
+
+        If the tensor carries gradients, the content is a PyTorch tensor
+        that carries them, and a loss can be built from it.
+
+        Returns
+        -------
+        content : numpy.ndarray or torch.Tensor
+            The breakpoints ``(time, value)`` of all PCFs, of shape
+            ``(m, 2)``, in row-major order of the PCFs.
+        enumeration : numpy.ndarray
+            The rows ``[start, stop)`` of the breakpoints of each PCF, of
+            shape ``self.shape + (2,)``.
+        """
+        return self._serial()
+
     def _serial(self):
         """(content, enumeration) as from_serial_content takes."""
         return cpp.to_serial_content(self._data)

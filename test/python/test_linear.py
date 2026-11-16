@@ -395,7 +395,7 @@ def test_persistent_homology_in_inner_product_space_with_framework_arrays_matche
 
     out = _homology(sb.InnerProduct(gram)(points))
 
-    assert out._tvalues is not None
+    assert isinstance(out.to_serial_content()[0], fw.tensor_type)
     _assert_same_barcodes(out, _homology(sb.InnerProduct(_gram())(_loop_points())))
 
 
@@ -407,7 +407,7 @@ def _framework_gram2(fw, a):
 
 
 def _bars_loss(fw, barcodes):
-    bars = barcodes._tvalues
+    bars = barcodes.to_serial_content()[0]
     return fw.sum(bars[:, 1] * bars[:, 1]) + fw.sum(bars[:, 0])
 
 
@@ -486,7 +486,7 @@ def test_kernel_of_spaces_with_different_distances_raises():
 
 def _projection_kernel_loss(fw, vectors):
     X = sb.InnerProduct(_gram3())(_cloud3())
-    bars = _kernel(X, sb.LinearSubspace(vectors).project(X))._tvalues
+    bars = _kernel(X, sb.LinearSubspace(vectors).project(X)).to_serial_content()[0]
     # The births are distances of the projection; the deaths do not depend
     # on the subspace.
     return fw.sum(bars[:, 0] * bars[:, 0])
@@ -501,7 +501,7 @@ def test_kernel_gradient_wrt_gram_matrix(fw):
 
     def loss(a):
         ip = sb.InnerProduct(_framework_gram2(fw, a))
-        bars = _kernel(ip(X), ip(Y))._tvalues
+        bars = _kernel(ip(X), ip(Y)).to_serial_content()[0]
         return fw.sum(bars[:, 0] * bars[:, 1])
 
     assert_gradient_matches_finite_differences(fw, loss, [2.0, 1.0])
@@ -577,7 +577,7 @@ def test_persistent_homology_under_lp_distance_of_framework_points_matches_numpy
 
     out = _homology(distance(fw.tensor(_lp_points())))
 
-    assert out._tvalues is not None
+    assert isinstance(out.to_serial_content()[0], fw.tensor_type)
     _assert_same_barcodes(out, _homology(distance(_lp_points())))
 
 
@@ -596,7 +596,7 @@ def test_kernel_under_lp_distance_of_framework_points_matches_numpy(fw, p):
 
     out = _kernel(distance(fw.tensor(X)), distance(Y))
 
-    assert out._tvalues is not None
+    assert isinstance(out.to_serial_content()[0], fw.tensor_type)
     assert out.shape == (1,)
     assert out[0].is_isomorphic_to(_kernel(distance(X), distance(Y))[0], atol=1e-12, rtol=1e-12)
 
@@ -608,7 +608,7 @@ def test_kernel_under_lp_distance_gradient(fw, p, wrt):
     X, Y = _lp_points(), _contracted(_lp_points())
 
     def loss(P):
-        bars = _kernel(distance(P if wrt == "X" else X), distance(P if wrt == "Y" else Y))._tvalues
+        bars = _kernel(distance(P if wrt == "X" else X), distance(P if wrt == "Y" else Y)).to_serial_content()[0]
         return fw.sum(bars[:, 0] * bars[:, 0]) + fw.sum(bars[:, 1] * bars[:, 1])
 
     assert_gradient_matches_finite_differences(fw, loss, X if wrt == "X" else Y)
@@ -698,7 +698,7 @@ def test_projection_of_batch_with_framework_arrays_matches_untracked(fw, which):
     projected = sb.LinearSubspace(vectors).project(points)
 
     assert isinstance(projected, sb.PointCloudTensor)
-    assert projected._tvalues is not None
+    assert isinstance(projected.to_serial_content()[0], fw.tensor_type)
     assert projected.shape == (3,)
     expected = sb.LinearSubspace(_vectors()).project(clouds)
     for i in range(3):
@@ -713,7 +713,7 @@ def _batch_weights():
 def test_projection_of_batch_gradient_wrt_vectors(fw):
     def loss(V):
         projected = sb.LinearSubspace(V).project(sb.InnerProduct(_gram3())(sb.PointCloudTensor(_batch3())))
-        return fw.sum(fw.tensor(_batch_weights()) * projected.points._tvalues)
+        return fw.sum(fw.tensor(_batch_weights()) * projected.points.to_serial_content()[0])
 
     assert_gradient_matches_finite_differences(fw, loss, _vectors())
 
@@ -725,7 +725,7 @@ def test_projection_of_tracked_batch_gradient_wrt_points(fw):
     def loss(P):
         clouds = type(tracked(fw, plain))([P], enumeration)
         projected = sb.LinearSubspace(_vectors()).project(clouds)
-        return fw.sum(fw.tensor(_batch_weights()) * projected._tvalues)
+        return fw.sum(fw.tensor(_batch_weights()) * projected.to_serial_content()[0])
 
     assert_gradient_matches_finite_differences(fw, loss, content)
 
@@ -793,7 +793,7 @@ def test_point_cloud_tensor_of_list_with_framework_arrays_carries_gradients(fw):
     clouds = sb.PointCloudTensor([fw.tensor(first), second, fw.tensor(third)])
 
     assert isinstance(clouds, sb.PointCloudTensor)
-    assert clouds._tvalues is not None
+    assert isinstance(clouds.to_serial_content()[0], fw.tensor_type)
     assert clouds.shape == (3,)
     assert clouds.array_equal(sb.PointCloudTensor(_batch3()))
 
@@ -804,7 +804,7 @@ def test_framework_array_of_three_dimensions_is_a_batch_of_point_clouds(fw):
 
     clouds = sb.PointCloudTensor(fw.tensor(array))
 
-    assert clouds._tvalues is not None
+    assert isinstance(clouds.to_serial_content()[0], fw.tensor_type)
     assert clouds.shape == (2,)
     assert clouds.array_equal(sb.PointCloudTensor(array))
 
@@ -815,7 +815,7 @@ def test_inner_product_space_of_framework_batch_holds_a_point_cloud_tensor(fw):
     space = sb.InnerProduct(_gram())(fw.tensor(array))
 
     assert isinstance(space.points, sb.PointCloudTensor)
-    assert space.points._tvalues is not None
+    assert isinstance(space.points.to_serial_content()[0], fw.tensor_type)
     assert space.points.shape == (2,)
 
 
@@ -831,7 +831,7 @@ def test_projection_gradient_wrt_one_point_cloud_of_a_batch(fw):
 
     def loss(P):
         clouds = sb.PointCloudTensor([P, second, third])
-        return fw.sum(fw.tensor(weights) * sb.LinearSubspace(_vectors()).project(clouds)._tvalues)
+        return fw.sum(fw.tensor(weights) * sb.LinearSubspace(_vectors()).project(clouds).to_serial_content()[0])
 
     assert_gradient_matches_finite_differences(fw, loss, _batch3()[0])
 
@@ -855,7 +855,7 @@ def test_persistent_homology_of_tracked_batch_matches_untracked(fw, make_distanc
 
     expected = _homology(_in_distance(make_distance, clouds))
     assert isinstance(out, sb.persistence.BarcodeTensor)
-    assert out._tvalues is not None
+    assert isinstance(out.to_serial_content()[0], fw.tensor_type)
     assert out.shape == (3, 2)
     for i in np.ndindex(3, 2):
         assert out[i].is_isomorphic_to(expected[i], atol=1e-12, rtol=1e-12)
@@ -917,7 +917,7 @@ def test_kernel_of_tracked_batches_matches_untracked(fw, make_distance, which):
 
     expected = _kernel(_in_distance(make_distance, X), _in_distance(make_distance, Y))
     assert isinstance(out, sb.persistence.BarcodeTensor)
-    assert out._tvalues is not None
+    assert isinstance(out.to_serial_content()[0], fw.tensor_type)
     assert out.shape == (3,)
     for i in range(3):
         assert out[i].is_isomorphic_to(expected[i], atol=1e-12, rtol=1e-12)
@@ -927,7 +927,7 @@ def test_kernel_of_batch_and_its_projection_gradient_wrt_subspace(fw):
     space = sb.InnerProduct(_gram3())(sb.PointCloudTensor(_batch3()))
 
     def loss(V):
-        bars = _kernel(space, sb.LinearSubspace(V).project(space))._tvalues
+        bars = _kernel(space, sb.LinearSubspace(V).project(space)).to_serial_content()[0]
         return fw.sum(bars[:, 0] * bars[:, 0])
 
     assert_gradient_matches_finite_differences(fw, loss, _vectors())
@@ -940,7 +940,7 @@ def test_kernel_of_batches_gradient_wrt_points(fw, make_distance):
 
     def loss(P):
         X = sb.PointCloudTensor([other, P])
-        bars = _kernel(_in_distance(make_distance, X), _in_distance(make_distance, Y))._tvalues
+        bars = _kernel(_in_distance(make_distance, X), _in_distance(make_distance, Y)).to_serial_content()[0]
         return fw.sum(bars[:, 0] * bars[:, 1]) + fw.sum(bars[:, 1] * bars[:, 1])
 
     assert_gradient_matches_finite_differences(fw, loss, _lp_points())

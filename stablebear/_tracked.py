@@ -191,6 +191,26 @@ class _TrackedObject:
         sizes = () if self._sizes is None else (self._sizes,)
         return (self._concrete(), self._enumeration, *sizes)
 
+    def to_serial_content(self) -> tuple:
+        """The serial content with the content as one framework array, which
+        carries the gradients; see the method of the base type."""
+        from . import _autodiff
+
+        like = next((part for part in self._parts if _is_framework(part)), None)
+        if like is None:
+            return self._serial()
+        adapter = _autodiff._framework(like)
+        columns = [part if _is_framework(part) else adapter.as_tensor(part, like=like) for part in self._parts]
+        if len(columns) > 1:
+            # Groups of one column each, as the times and values of PCFs.
+            content = adapter.stack_columns(*columns)
+        elif self._tracking.groups[0][1] == 1:
+            content = adapter.reshape(columns[0], (-1, 1))
+        else:
+            content = columns[0]
+        sizes = () if self._sizes is None else (self._sizes.copy(),)
+        return (content, self._enumeration.copy(), *sizes)
+
     def _tracked_parts(self):
         from . import _autodiff
 

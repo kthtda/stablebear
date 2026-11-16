@@ -241,6 +241,27 @@ class SymmetricMatrixTensor(Tensor):
     # _tracked); None for any other.
     _tvalues: Any = None
 
+    def to_serial_content(self) -> tuple[Any, np.ndarray, np.ndarray]:
+        """The entries of all matrices as one array, with the rows and the
+        size of each matrix.
+
+        If the tensor carries gradients, the content is a PyTorch tensor
+        that carries them, and a loss can be built from it.
+
+        Returns
+        -------
+        content : numpy.ndarray or torch.Tensor
+            The entries on and below the diagonal of all matrices, of shape
+            ``(m, 1)``, in row-major order of the matrices, and for each
+            matrix by rows: ``(0, 0)``, ``(1, 0)``, ``(1, 1)``, and so on.
+        enumeration : numpy.ndarray
+            The rows ``[start, stop)`` of the entries of each matrix, of
+            shape ``self.shape + (2,)``.
+        sizes : numpy.ndarray
+            The number of rows of each matrix, of shape ``self.shape``.
+        """
+        return self._serial()
+
     def _serial(self) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """(content, enumeration, sizes): as the (m, 1) content, the entries
         on and below the diagonal of all matrices in C order, each by rows:

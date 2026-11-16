@@ -105,6 +105,14 @@ reading its `_data` raises, so evaluating, integrating, or copying it
 raises, while `to_numpy`, `size`, `==`, and printing give its values. There
 is no tracked `Barcode`: no operation gives one (D10).
 
+**D5c. `to_serial_content` is the public way to the rows.** A tensor of
+PCFs, barcodes, point clouds, or matrices gives its rows with
+`to_serial_content()`: the content and the enumeration, and for matrices
+the sizes, as NumPy arrays. For a tracked tensor the content is the PyTorch
+tensor that carries its gradients, so a loss can be built from it. It is the
+inverse of the released `from_serial_content` for PCFs. The attributes that
+hold the framework arrays of a tracked object stay private.
+
 **D5a. One generic tracked tensor.** The tracking logic is a mixin shared by
 all tensor types, not a class written per type. Every type is a tensor
 whose elements are blocks of rows of a fixed width: bars (birth, death),

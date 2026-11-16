@@ -235,6 +235,30 @@ class PointCloudTensor(IndexedElementTensor):
     # _tracked); None for any other.
     _tvalues: Any = None
 
+    def to_serial_content(self) -> tuple[Any, np.ndarray]:
+        """The points of all point clouds as one array, with the rows of
+        each point cloud. The point clouds that have points must have the
+        same dimension.
+
+        If the tensor carries gradients, the content is a PyTorch tensor
+        that carries them, and a loss can be built from it.
+
+        Returns
+        -------
+        content : numpy.ndarray or torch.Tensor
+            The points of all point clouds, of shape ``(m, d)``, in
+            row-major order of the point clouds.
+        enumeration : numpy.ndarray
+            The rows ``[start, stop)`` of the points of each point cloud, of
+            shape ``self.shape + (2,)``.
+
+        Raises
+        ------
+        ValueError
+            If point clouds that have points differ in dimension.
+        """
+        return self._serial()
+
     def _serial(self) -> tuple[np.ndarray, np.ndarray]:
         """(content, enumeration): the (m, d) points of all clouds in C
         order, and for each cloud the [start, stop) rows of its points, with
