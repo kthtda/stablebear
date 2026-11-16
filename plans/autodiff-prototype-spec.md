@@ -118,6 +118,11 @@ Single objects (`Pcf`, `Plf`) are the 0-d case: `Pcf(values, times=times)`
 returns the tracked subclass when an argument is a framework array. A dense numeric
 tensor needs no enumeration: see D14.
 
+The points of a `PointCloudTensor` are one group of d columns, where d is
+the dimension of its clouds, which must agree. Distance and symmetric
+matrices have no description yet: their layout is open (see the open
+questions).
+
 **D5b. Writes are deferred.** `x[i] = v` on a tracked tensor records the
 replacement in a table of pending writes, at no cost per write, and the next
 operation that needs the framework arrays applies all of them in one pass.
@@ -246,6 +251,12 @@ once per result, JAX needs a deferred-execution layer because it has no
 values while tracing, and all operations so far would be rewritten.
 
 ## Open questions
+
+- Which serial layout should distance and symmetric matrices have? Their
+  entries are rows of width 1, but the number of entries of a distance
+  matrix, n(n-1)/2, is 0 for both n = 0 and n = 1, so the enumeration
+  alone does not give n. A distance matrix also rejects NaN, which the
+  content holds while a framework traces abstractly.
 
 - Should `Barcode`, `Pcf`, and `Plf` element objects returned by indexing a
   tracked tensor carry gradients too, as 0-d tracked tensors?

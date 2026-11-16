@@ -7,6 +7,7 @@ import numpy as np
 from . import _sb_cpp as cpp
 from ._binary_io import _BinaryIoMixin
 from ._tensor_base import IndexedElementTensor
+from ._tracked import Tracking, tracked_class
 from .typing import float32, float64, pcloud32, pcloud64
 
 
@@ -219,6 +220,28 @@ class PointCloudTensor(IndexedElementTensor):
     def _to_py_tensor(self, data):
         return PointCloudTensor(data)
 
+    # The framework coordinates of a tensor that carries gradients (see
+    # _tracked); None for any other.
+    _tvalues: Any = None
+
+    def _serial(self) -> tuple[np.ndarray, np.ndarray]:
+        """(content, enumeration): the (m, d) points of all clouds in C
+        order, and for each cloud the [start, stop) rows of its points, with
+        shape self.shape + (2,). The clouds that have points must have the
+        same dimension d."""
+        data = self._data.materialize() if self._has_indexed_storage() else self._data
+        return cpp.point_clouds_to_serial_content(data)
+
+    @staticmethod
+    def _from_serial(content: np.ndarray, enumeration: np.ndarray) -> PointCloudTensor:
+        """The inverse of _serial."""
+        content = np.asarray(content)
+        enumeration = np.ascontiguousarray(enumeration, dtype=np.int64)
+        if content.dtype == np.float32:
+            return PointCloudTensor(cpp.point_clouds_from_serial_content_32(np.ascontiguousarray(content), enumeration))
+        return PointCloudTensor(cpp.point_clouds_from_serial_content_64(
+            np.ascontiguousarray(content, dtype=np.float64), enumeration))
+
     def _represent_element(self, element):
         return PointCloud(element)
 
@@ -250,3 +273,15 @@ class PointCloudTensor(IndexedElementTensor):
         from .base_tensor import FloatTensor
 
         return [PointCloud, FloatTensor, np.ndarray]
+
+
+PointCloudTensor._tracking = Tracking(  # pyright: ignore[reportAttributeAccessIssue]
+    groups=(("_tvalues", None),),
+    from_serial=PointCloudTensor._from_serial,
+    attributes=lambda np_dtype: {"dtype": pcloud32 if np_dtype == np.float32 else pcloud64},
+    element=PointCloud,
+)
+
+# A PointCloudTensor whose coordinates depend on PyTorch, JAX, or TensorFlow
+# arrays, built from [points] and the enumeration of _serial; see _tracked.
+_TrackedPointCloudTensor = tracked_class(PointCloudTensor)

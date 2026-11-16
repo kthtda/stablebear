@@ -45,14 +45,16 @@ class Tracking(NamedTuple):
     content that are tracked together: for each the name of the attribute
     that gives its framework array (None while it is a constant) and its
     number of columns. A group of one column is an (m,) array, a wider one
-    (m, columns). ``from_serial(content, enumeration)`` builds an untracked
+    (m, columns). A single group may have None for its number of columns:
+    all columns of the content, however many, as for the coordinates of
+    point clouds. ``from_serial(content, enumeration)`` builds an untracked
     object, and ``attributes`` gives the attributes that the type's
     constructor sets, such as ``dtype``, from the NumPy dtype of the
     content. For a tensor type, ``element(rows)`` builds an element from its
     rows.
     """
 
-    groups: tuple[tuple[str, int], ...]
+    groups: tuple[tuple[str, int | None], ...]
     from_serial: Callable[[np.ndarray, np.ndarray], Any]
     attributes: Callable[[Any], dict[str, Any]]
     element: Callable[[np.ndarray], Any] | None = None
@@ -67,10 +69,16 @@ def _is_framework(x: Any) -> bool:
 def _split_columns(content: np.ndarray, groups: tuple) -> list:
     """The serial content as one array per group of columns."""
     parts, start = [], 0
-    for _, width in groups:
+    for width in _widths(groups, content.shape[1]):
         parts.append(content[:, start] if width == 1 else content[:, start:start + width])
         start += width
     return parts
+
+
+def _widths(groups: tuple, columns: int) -> list[int]:
+    """The number of columns of each group, for content of the given number
+    of columns."""
+    return [columns if width is None else width for _, width in groups]
 
 
 def _concrete_content(parts: list, groups: tuple, np_dtype: Any) -> np.ndarray:
@@ -86,7 +94,7 @@ def _concrete_content(parts: list, groups: tuple, np_dtype: Any) -> np.ndarray:
             if values is None:
                 values = np.full(tuple(part.shape), np.nan)
         values = np.asarray(values, dtype=np_dtype)
-        columns.append(values.reshape(len(values), width))
+        columns.append(values if width is None else values.reshape(len(values), width))
     return columns[0] if len(columns) == 1 else np.concatenate(columns, axis=1)
 
 
@@ -165,8 +173,8 @@ class _TrackedObject:
         from . import _autodiff
 
         tracked = [i for i, part in enumerate(self._parts) if _is_framework(part)]
-        starts = np.cumsum([0] + [columns for _, columns in self._tracking.groups])
         content, enumeration = self._serial()
+        starts = np.cumsum([0] + _widths(self._tracking.groups, content.shape[1]))
         versions = self._versions()
 
         def rebuild(arrays):

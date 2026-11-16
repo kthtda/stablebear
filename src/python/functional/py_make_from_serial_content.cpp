@@ -5,6 +5,7 @@
 #include <sbear/functional/pcf.hpp>
 #include <sbear/algorithms/functional/iterate_rectangles.hpp>
 #include <sbear/persistence/barcode.hpp>
+#include <sbear/point_cloud.hpp>
 
 #include "py_make_from_serial_content.hpp"
 #include "../py_tensor.hpp"
@@ -30,9 +31,18 @@ namespace sb_py
   }
 
 
+  template <typename Tt>
+  void require_columns(const sb_py::NpIn<Tt>& content, size_t columns)
+  {
+    if (content.ndim() == 2 && content.shape(1) != columns)
+    {
+      throw std::runtime_error("content should have " + std::to_string(columns) + " columns (content has shape " + shape_to_string(content) + ").");
+    }
+  }
+
   /// A tensor of shape enumeration.shape[:-1] whose element at idx is
-  /// build(count, row), where row(i) gives row i, as a pair (a, b), of the
-  /// count rows of content from enumeration[idx, 0] to enumeration[idx, 1].
+  /// build(count, at), where at(i, j) gives column j of row i of the count
+  /// rows of content from enumeration[idx, 0] to enumeration[idx, 1].
   /// Unless allowEmpty, each element needs a row. The elements are built
   /// in parallel.
   template <typename Elem, typename Tt, typename Build>
@@ -89,9 +99,8 @@ namespace sb_py
     nb::gil_scoped_release release;
     sb::parallel_walk(target, [&](const std::vector<size_t>& idx) {
       auto [start, stop] = range(idx);
-      target(idx) = build(static_cast<size_t>(stop - start), [&contentView, start](size_t i) {
-        auto row = static_cast<size_t>(start) + i;
-        return std::pair(contentView(row, size_t{0}), contentView(row, size_t{1}));
+      target(idx) = build(static_cast<size_t>(stop - start), [&contentView, start](size_t i, size_t j) {
+        return contentView(static_cast<size_t>(start) + i, j);
       });
     }, sb::default_executor());
 
@@ -103,13 +112,13 @@ namespace sb_py
   make_from_serial_content(sb_py::NpIn<Tt> content, sb_py::NpIn<detail::EnumerationDt> enumeration)
   {
     using PcfT = sb::Pcf<Tt, Tv>;
-    return tensor_from_serial_content<PcfT>(content, enumeration, false, [](size_t count, const auto& row) {
+    require_columns(content, 2);
+    return tensor_from_serial_content<PcfT>(content, enumeration, false, [](size_t count, const auto& at) {
       std::vector<typename PcfT::point_type> pts;
       pts.reserve(count);
       for (size_t i = 0; i < count; ++i)
       {
-        auto [t, v] = row(i);
-        pts.emplace_back(t, static_cast<Tv>(v));
+        pts.emplace_back(at(i, 0), static_cast<Tv>(at(i, 1)));
       }
       return PcfT(std::move(pts));
     });
@@ -119,24 +128,45 @@ namespace sb_py
   sb::Tensor<sb::ph::Barcode<T>>
   barcodes_from_serial_content(sb_py::NpIn<T> content, sb_py::NpIn<detail::EnumerationDt> enumeration)
   {
-    return tensor_from_serial_content<sb::ph::Barcode<T>>(content, enumeration, true, [](size_t count, const auto& row) {
+    require_columns(content, 2);
+    return tensor_from_serial_content<sb::ph::Barcode<T>>(content, enumeration, true, [](size_t count, const auto& at) {
       std::vector<sb::ph::PersistencePair<T>> bars;
       bars.reserve(count);
       for (size_t i = 0; i < count; ++i)
       {
-        auto [birth, death] = row(i);
-        bars.emplace_back(birth, death);
+        bars.emplace_back(at(i, 0), at(i, 1));
       }
       return sb::ph::Barcode<T>(std::move(bars));
+    });
+  }
+
+  /// Point clouds whose points are the rows of content: its columns are
+  /// the coordinates.
+  template <typename T>
+  sb::Tensor<sb::PointCloud<T>>
+  point_clouds_from_serial_content(sb_py::NpIn<T> content, sb_py::NpIn<detail::EnumerationDt> enumeration)
+  {
+    const size_t dim = content.ndim() == 2 ? content.shape(1) : 0;
+    return tensor_from_serial_content<sb::PointCloud<T>>(content, enumeration, true, [dim](size_t count, const auto& at) {
+      sb::PointCloud<T> cloud(std::vector<size_t>{count, dim});
+      for (size_t i = 0; i < count; ++i)
+      {
+        for (size_t j = 0; j < dim; ++j)
+        {
+          cloud(i, j) = at(i, j);
+        }
+      }
+      return cloud;
     });
   }
 
   /// The inverse of tensor_from_serial_content: (content, enumeration) with
   /// the rows of the elements concatenated in C order of the tensor's
   /// elements. size(element) is its number of rows, and write(element, out)
-  /// writes them, as pairs, to out. The rows are written in parallel.
+  /// writes them, each of the given width, to out. The rows are written in
+  /// parallel.
   template <typename Tt, typename Elem, typename Size, typename Write>
-  nb::tuple tensor_to_serial_content(const sb::Tensor<Elem>& tensor, Size size, Write write)
+  nb::tuple tensor_to_serial_content(const sb::Tensor<Elem>& tensor, Size size, Write write, size_t width = 2)
   {
     const auto& shape = tensor.shape();
     std::vector<size_t> strides(shape.size(), 1);
@@ -168,12 +198,12 @@ namespace sb_py
       e[2 * k + 1] = static_cast<detail::EnumerationDt>(total);
     }
 
-    auto content = new_array<Tt>({ total, 2 });
+    auto content = new_array<Tt>({ total, width });
     auto* c = content.data();
     {
       nb::gil_scoped_release release;
       sb::parallel_walk(tensor, [&](const std::vector<size_t>& idx) {
-        write(tensor(idx), c + 2 * static_cast<size_t>(e[2 * flat(idx)]));
+        write(tensor(idx), c + width * static_cast<size_t>(e[2 * flat(idx)]));
       }, sb::default_executor());
     }
 
@@ -206,6 +236,38 @@ namespace sb_py
           *out++ = bar.death;
         }
       });
+  }
+
+  /// The points of all clouds as the rows of the content. The clouds that
+  /// have points must have the same dimension.
+  template <typename T>
+  nb::tuple point_clouds_to_serial_content(const sb::Tensor<sb::PointCloud<T>>& tensor)
+  {
+    size_t dim = 0;
+    sb::walk(tensor, [&](const std::vector<size_t>& idx) {
+      const auto& cloud = tensor(idx);
+      if (cloud.n_points() == 0)
+      {
+        return;
+      }
+      if (dim != 0 && cloud.dim() != dim)
+      {
+        throw std::invalid_argument("The point clouds must have the same dimension (got " + std::to_string(dim) + " and " + std::to_string(cloud.dim()) + ").");
+      }
+      dim = cloud.dim();
+    });
+
+    return tensor_to_serial_content<T>(tensor,
+      [](const sb::PointCloud<T>& cloud) { return cloud.n_points(); },
+      [dim](const sb::PointCloud<T>& cloud, T* out) {
+        for (size_t i = 0; i < cloud.n_points(); ++i)
+        {
+          for (size_t j = 0; j < dim; ++j)
+          {
+            *out++ = cloud(i, j);
+          }
+        }
+      }, dim);
   }
 
   /// The union of the breakpoint times of two tensors of PCFs of the same
@@ -351,6 +413,10 @@ namespace sb_py
     m.def("barcodes_to_serial_content", &barcodes_to_serial_content<sb::float64_t>);
     m.def("barcodes_from_serial_content_32", &barcodes_from_serial_content<sb::float32_t>);
     m.def("barcodes_from_serial_content_64", &barcodes_from_serial_content<sb::float64_t>);
+    m.def("point_clouds_to_serial_content", &point_clouds_to_serial_content<sb::float32_t>);
+    m.def("point_clouds_to_serial_content", &point_clouds_to_serial_content<sb::float64_t>);
+    m.def("point_clouds_from_serial_content_32", &point_clouds_from_serial_content<sb::float32_t>);
+    m.def("point_clouds_from_serial_content_64", &point_clouds_from_serial_content<sb::float64_t>);
   }
 
 }

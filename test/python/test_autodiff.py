@@ -846,6 +846,58 @@ def test_barcode_serial_content_round_trip():
         np.testing.assert_array_equal(rebuilt[i].to_numpy(), bc[i].to_numpy())
 
 
+def _point_clouds():
+    # Points (i, 10 * i), numbered through the clouds.
+    return sb.PointCloudTensor([
+        np.array([[1.0, 10.0]]),
+        np.array([[2.0, 20.0], [3.0, 30.0]]),
+        np.array([[4.0, 40.0], [5.0, 50.0], [6.0, 60.0]]),
+        np.array([[7.0, 70.0]]),
+    ]).reshape((2, 2))
+
+
+def test_point_cloud_serial_content_round_trip():
+    clouds = _point_clouds()
+    content, enumeration = clouds._serial()
+    np.testing.assert_array_equal(content, [[1.0, 10.0],
+                                            [2.0, 20.0],
+                                            [3.0, 30.0],
+                                            [4.0, 40.0],
+                                            [5.0, 50.0],
+                                            [6.0, 60.0],
+                                            [7.0, 70.0]])
+    np.testing.assert_array_equal(enumeration, [[[0, 1], [1, 3]],
+                                                [[3, 6], [6, 7]]])
+    assert sb.PointCloudTensor._from_serial(content, enumeration).array_equal(clouds)
+
+
+def test_serial_content_of_point_clouds_of_different_dimensions_raises():
+    clouds = sb.PointCloudTensor([np.array([[1.0, 10.0]]), np.array([[2.0, 20.0, 200.0]])])
+    with pytest.raises(ValueError, match="dimension"):
+        clouds._serial()
+
+
+def test_tracked_point_clouds_index_and_reshape_like_plain_ones(fw):
+    plain = _point_clouds()
+    out = tracked(fw, plain)
+    for select in (
+        lambda t: t[1],
+        lambda t: t[:, 0],
+        lambda t: t[[1, 0]],
+        lambda t: t.reshape((4,)),
+        lambda t: t.flatten()[::-1],
+        lambda t: t.transpose(),
+        lambda t: t.copy(),
+    ):
+        selected, expected = select(out), select(plain)
+        assert isinstance(selected, sb.PointCloudTensor)
+        assert selected.shape == expected.shape
+        assert selected._tvalues is not None
+        assert selected.array_equal(expected)
+        for i in np.ndindex(*expected.shape):
+            np.testing.assert_array_equal(np.asarray(selected[i]), np.asarray(expected[i]))
+
+
 def test_values_with_times_match_breakpoints():
     g = sb.Pcf(np.array([2.0, -1.0, 0.0]), times=np.array([0.0, 1.0, 3.0]))
     np.testing.assert_array_equal(g.to_numpy(), [[0.0, 2.0], [1.0, -1.0], [3.0, 0.0]])
