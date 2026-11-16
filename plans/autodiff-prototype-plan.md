@@ -1,6 +1,6 @@
 # Autodiff prototype: implementation plan
 
-Progress: 13 of 27 items, 28 of 64 points (44%)
+Progress: 14 of 27 items, 30 of 64 points (47%)
 
 Spec: [autodiff-prototype-spec.md](autodiff-prototype-spec.md)
 
@@ -48,8 +48,8 @@ Spec: [autodiff-prototype-spec.md](autodiff-prototype-spec.md)
   and from it 6 to 7 ms, down from 60 to 70 ms each. The tracked pipeline of
   D13 takes 0.22 s, down from 0.58 s; 0.16 s of it is the single-threaded
   sort of the stable rank.
-- [ ] **C3.** [2] The kernel's backward pass reuses the critical edges of
-  its forward pass.
+- [x] **C3.** [2] (a2e8a6f0d) The kernel's backward pass reuses the
+  critical edges of its forward pass.
   Tests: the kernel gradient tests pass; the kernel runs once per
   forward and backward.
 - [ ] **C4.** [3] PCF arithmetic with a tracked operand without a Python
