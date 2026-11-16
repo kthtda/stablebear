@@ -202,7 +202,8 @@ def compute_persistent_homology(
     NotImplementedError
         If ``X`` is a PyTorch, JAX, or TensorFlow array that is not a single
         point cloud of shape ``(n, d)``, or that JAX or ``tf.function``
-        traces: the number of bars depends on the points.
+        traces: the number of bars depends on the points. Also if ``X`` is
+        or holds a batch of point clouds that carries gradients.
 
     Notes
     -----
@@ -213,6 +214,10 @@ def compute_persistent_homology(
     destroys the class, and its gradient is that of this distance. An
     endpoint at 0 or at infinity has gradient 0. Where a simplex has several
     longest edges, the gradient is that of one of them.
+
+    The same holds for the points of a ``DistanceSpace``, in its distance,
+    and with the distance of an inner product the bars also carry
+    gradients with respect to its Gram matrix when that is such an array.
 
     """
 

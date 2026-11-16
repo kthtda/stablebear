@@ -231,11 +231,13 @@ def compute_homological_kernel(
 
     Parameters
     ----------
-    X : PointCloud, PointCloudTensor, DistanceMatrix, DistanceMatrixTensor, FloatTensor, or numpy.ndarray
+    X : PointCloud, PointCloudTensor, DistanceMatrix, DistanceMatrixTensor, FloatTensor, numpy.ndarray, or DistanceSpace
         Input data for :math:`d`. A ``FloatTensor`` or NumPy array is
         interpreted as a single point cloud (one row per point), and so is
-        a PyTorch, JAX, or TensorFlow array (see Notes).
-    Y : PointCloud, PointCloudTensor, DistanceMatrix, DistanceMatrixTensor, FloatTensor, or numpy.ndarray
+        a PyTorch, JAX, or TensorFlow array (see Notes). A
+        :class:`~stablebear.linear.DistanceSpace` holds a point cloud, or a
+        batch of them, with the distance to use between its points.
+    Y : PointCloud, PointCloudTensor, DistanceMatrix, DistanceMatrixTensor, FloatTensor, numpy.ndarray, or DistanceSpace
         Input data for :math:`d'`, of the same kind as ``X``, with the same number of points per
         element as ``X``. Point clouds stay in ambient dimension: express
         a lower-dimensional projection in the original coordinates.
@@ -277,6 +279,14 @@ def compute_homological_kernel(
     NumPy array. Each birth is the distance between two points of ``Y`` and
     each death the distance between two points of ``X``, and the gradient
     of a distance of 0 is 0.
+
+    The same holds for the points of two ``DistanceSpace`` objects, in
+    their distance, and with the distance of an inner product the bars
+    also carry gradients with respect to its Gram matrix when that is such
+    an array. With an :class:`~stablebear.linear.LpDistance` other than
+    ``LpDistance(2)``, points that JAX or ``tf.function`` traces raise
+    ``NotImplementedError``. A batch of point clouds that carries gradients
+    raises ``NotImplementedError`` as well.
 
     """
     from ..tensor_create import zeros

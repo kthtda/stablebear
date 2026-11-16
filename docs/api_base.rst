@@ -36,6 +36,13 @@ point_cloud
 .. autoclass:: stablebear.point_cloud.PointCloudTensor
    :members:
 
+linear
+------
+
+.. automodule:: stablebear.linear
+   :members:
+   :show-inheritance:
+
 distance_matrix
 ---------------
 

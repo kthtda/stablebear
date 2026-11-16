@@ -173,7 +173,7 @@ class InnerProduct:
 
         Parameters
         ----------
-        points : PointCloud, FloatTensor, numpy.ndarray, or framework array
+        points : PointCloud, FloatTensor, or numpy.ndarray
             A point cloud of shape ``(n, d)``, one point per row, which may
             be a PyTorch, JAX, or TensorFlow array, or a batch of point
             clouds as a ``PointCloudTensor``.
@@ -223,7 +223,7 @@ class Distance:
 
         Parameters
         ----------
-        points : PointCloud, FloatTensor, numpy.ndarray, or framework array
+        points : PointCloud, FloatTensor, or numpy.ndarray
             A point cloud of shape ``(n, d)``, one point per row, which may
             be a PyTorch, JAX, or TensorFlow array, or a batch of point
             clouds as a ``PointCloudTensor``.
@@ -371,7 +371,7 @@ class DistanceSpace:
 
     Parameters
     ----------
-    points : PointCloud, FloatTensor, numpy.ndarray, or framework array
+    points : PointCloud, FloatTensor, or numpy.ndarray
         A point cloud of shape ``(n, d)``, one point per row, which may be a
         PyTorch, JAX, or TensorFlow array, or a batch of point clouds as a
         ``PointCloudTensor``.
@@ -396,8 +396,9 @@ class DistanceSpace:
 
     @property
     def points(self) -> Any:
-        """The points: a ``PointCloud``, the PyTorch, JAX, or TensorFlow
-        array of the points, or the ``PointCloudTensor`` of a batch."""
+        """The points, as a ``PointCloud``, as the PyTorch, JAX, or
+        TensorFlow array that they were given as, or as the
+        ``PointCloudTensor`` of a batch."""
         return self._points
 
     @property
@@ -428,7 +429,7 @@ class InnerProductSpace(DistanceSpace):
 
     Parameters
     ----------
-    points : PointCloud, FloatTensor, numpy.ndarray, or framework array
+    points : PointCloud, FloatTensor, or numpy.ndarray
         A point cloud of shape ``(n, d)``, one point per row, which may be a
         PyTorch, JAX, or TensorFlow array, or a batch of point clouds as a
         ``PointCloudTensor``.
@@ -546,7 +547,7 @@ class LinearSubspace:
 
         Parameters
         ----------
-        points : PointCloud, PointCloudTensor, FloatTensor, numpy.ndarray, framework array, or InnerProductSpace
+        points : PointCloud, PointCloudTensor, FloatTensor, numpy.ndarray, or InnerProductSpace
             A point cloud of shape ``(n, d)``, one point per row, which may
             be a PyTorch, JAX, or TensorFlow array; a batch of point clouds
             as a ``PointCloudTensor``, each of which is projected; or
@@ -554,7 +555,7 @@ class LinearSubspace:
 
         Returns
         -------
-        PointCloud, PointCloudTensor, framework array, or InnerProductSpace
+        PointCloud, PointCloudTensor, or InnerProductSpace
             The projected points, of the shape of the input: a
             ``PointCloud`` for a plain point cloud, a ``PointCloudTensor``
             for a batch, and an ``InnerProductSpace`` with the same inner
