@@ -1,6 +1,6 @@
 # Linear subspaces and inner products: implementation plan
 
-Progress: 1 of 10 items, 2 of 23 points (9%)
+Progress: 2 of 10 items, 5 of 23 points (22%)
 
 Spec: [linear-subspaces-spec.md](linear-subspaces-spec.md)
 
@@ -14,7 +14,7 @@ Spec: [linear-subspaces-spec.md](linear-subspaces-spec.md)
   products; a matrix that is not square, not symmetric, or not positive
   definite raises; the space gives its vectors and inner product back, with
   the dtype of what holds them; points of another dimension raise.
-- [ ] **A2.** [3] `LinearSubspace(vectors)` with `vectors`, `dim`,
+- [x] **A2.** [3] (3185c4e5f) `LinearSubspace(vectors)` with `vectors`, `dim`,
   `ambient_dim`, and `project` of a single cloud given as a NumPy array,
   `FloatTensor`, or `PointCloud`, plain or in an `InnerProductSpace` (D4,
   D5).
@@ -24,6 +24,8 @@ Spec: [linear-subspaces-spec.md](linear-subspaces-spec.md)
   between a point and its projection is orthogonal to the vectors in that
   inner product; an `InnerProductSpace` gives one back and a plain cloud a
   `PointCloud`; dependent vectors raise; points of another dimension raise.
+  Note: the projection solves a system with V G V^T in place of a Cholesky
+  factorization, which each framework also provides.
 - [ ] **A3.** [3] Framework arrays for the points, the vectors, and the Gram
   matrix (D7): the array operations (product, transpose, solving a
   linear system) in NumPy and in each adapter, and the linear algebra
