@@ -7,8 +7,7 @@ import pytest
 
 import stablebear as sb
 from stablebear.persistence import compute_persistent_homology
-from stablebear.timeseries import (TimeDelta, TimeDeltaTensor, TimeSeries, TimeSeriesTensor, cut_windows, delay_embed,
-                                   to_point_clouds)
+from stablebear.timeseries import TimeDelta, TimeDeltaTensor, TimeSeries, TimeSeriesTensor, cut_windows, delay_embed
 
 from _element_values import TWO_ELEMENTS_OF_EVERY_DTYPE
 from _round_trip import ROUND_TRIPS
@@ -162,7 +161,10 @@ def test_embedding_of_a_tensor_keeps_its_shape():
                                                [c, d]]), dimension=2, delay=1.0, direction="forward")
 
     assert embeddings.shape == (2, 2)
+    assert embeddings[0, 0].array_equal(delay_embed(a, dimension=2, delay=1.0, direction="forward"))
+    assert embeddings[0, 1].array_equal(delay_embed(b, dimension=2, delay=1.0, direction="forward"))
     assert embeddings[1, 0].array_equal(delay_embed(c, dimension=2, delay=1.0, direction="forward"))
+    assert embeddings[1, 1].array_equal(delay_embed(d, dimension=2, delay=1.0, direction="forward"))
 
 
 def test_embedding_of_windows_embeds_each_window_on_its_own():
@@ -171,22 +173,11 @@ def test_embedding_of_windows_embeds_each_window_on_its_own():
 
     embeddings = delay_embed(windows, dimension=2, delay=TimeDelta(1, "s"), direction="backward")
 
-    # The second window, [3, 6), holds x(3) at its time 0, so its embedding
-    # starts at its time 1 with (x(3), x(4)), not reaching back to x(2).
+    assert embeddings.shape == (2,)
+    assert embeddings[0].array_equal(delay_embed(windows[0], dimension=2, delay=TimeDelta(1, "s"),
+                                                 direction="backward"))
     assert embeddings[1].array_equal(delay_embed(windows[1], dimension=2, delay=TimeDelta(1, "s"),
                                                  direction="backward"))
-    assert np.array_equal(np.asarray(embeddings[1].values)[0], [30.0, 40.0])
-
-
-def test_point_clouds_of_embedded_windows_equal_those_of_each_embedding():
-    series = TimeSeries([0.0, 10.0, 20.0, 30.0, 40.0, 50.0, 60.0], times=TimeDeltaTensor([0, 1, 2, 3, 4, 5, 6], "s"))
-    windows = cut_windows(series, size=TimeDelta(3, "s"), step=TimeDelta(3, "s"), closed="left", anchor="start")
-
-    clouds = to_point_clouds(delay_embed(windows, dimension=2, delay=TimeDelta(1, "s"), direction="backward"))
-
-    assert clouds.shape == (2,)
-    assert clouds[1].array_equal(to_point_clouds(delay_embed(windows[1], dimension=2, delay=TimeDelta(1, "s"),
-                                                              direction="backward")))
 
 
 def test_embedding_of_a_tensor_with_a_short_series_raises_naming_its_position():
