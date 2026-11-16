@@ -177,13 +177,21 @@ the whole tensor. In particular:
   tensor (D5), so an operation converts once, for its result.
 
 Measured on 2000 barcodes of 500 bars with a PLF of 50 breakpoints
-(PyTorch, CPU, before these changes): `transform_bars`, stable rank, and
-`lp_norm` took 0.04 s untracked and 0.58 s tracked. About 60% of the
+(PyTorch, CPU, a Debug build, before these changes): `transform_bars`,
+stable rank, and `lp_norm` took 0.04 s untracked and 0.58 s tracked. About 60% of the
 tracked time was serial conversion, 65 to 70 ms each and single-threaded,
 and the sort of the tracked stable rank took 0.14 s. The backward pass was
 not run: the PLF vjp built a dense bars-by-breakpoints matrix, which would
 need 1.6 GB. PCF arithmetic with a tracked operand ran a Python loop at
 about 13 microseconds per PCF, 20 times slower than untracked.
+
+These numbers are from an unoptimized build and overstate the C++ costs.
+In a Release build after items C1 to C4 of the plan, the same pipeline
+takes 13 to 15 ms untracked, 180 to 200 ms tracked forward, and 360 to 380
+ms forward and backward; a conversion to or from serial content takes
+under 1 ms; and `x * F - G` on 10^5 PCFs of 20 points takes 116 ms tracked
+against 21 ms for `F - G` untracked. Take timings in a Release build
+(`cmake-build-release`).
 
 Known limits: every operation passes through host memory, since the C++
 code takes host arrays, which costs a transfer per operation for arrays on

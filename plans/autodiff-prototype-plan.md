@@ -38,8 +38,8 @@ Spec: [autodiff-prototype-spec.md](autodiff-prototype-spec.md)
 - [x] **C1.** [1] (0e6eefcb6) PLF vjp of `transform_bars` without a
   dense Jacobian: scatter the gradients of the breakpoint times and values.
   Tests: the existing gradient tests pass; backward on 10^6 bars runs.
-  Note: the backward pass on 10^6 bars takes 0.42 s, checked by hand; the
-  suite has no test of that size.
+  Note: the backward pass on 10^6 bars takes 0.42 s in a Debug build,
+  checked by hand; the suite has no test of that size.
 - [x] **C2.** [2] (7afe77bac) Parallel C++ conversions to and from
   serial content for PCF and barcode tensors, without temporaries per
   element.
@@ -47,7 +47,8 @@ Spec: [autodiff-prototype-spec.md](autodiff-prototype-spec.md)
   Note: for 10^6 rows in 2000 elements, to serial content takes 1 to 2 ms
   and from it 6 to 7 ms, down from 60 to 70 ms each. The tracked pipeline of
   D13 takes 0.22 s, down from 0.58 s; 0.16 s of it is the single-threaded
-  sort of the stable rank.
+  sort of the stable rank. These are timings of a Debug build; in a Release
+  build each conversion takes under 1 ms.
 - [x] **C3.** [2] (a2e8a6f0d) The kernel's backward pass reuses the
   critical edges of its forward pass.
   Tests: the kernel gradient tests pass; the kernel runs once per
