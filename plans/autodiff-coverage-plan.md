@@ -1,6 +1,6 @@
 # Autodiff coverage: implementation plan
 
-Progress: 0 of 11 items, 0 of 25 points (0%)
+Progress: 1 of 11 items, 2 of 25 points (8%)
 
 Spec: [autodiff-prototype-spec.md](autodiff-prototype-spec.md), which each
 item updates where it changes a decision.
@@ -11,7 +11,7 @@ that did not say why, and common operations without gradients.
 
 ## Phase A: No silent loss of gradients
 
-- [ ] **A1.** [2] A PyTorch tensor given where a plain number is required
+- [x] **A1.** [2] (9d60838d3) A PyTorch tensor given where a plain number is required
   raises `TypeError`, in place of being read as a number: `p` of `pdist`
   and `cdist`, `LpDistance(p)`, `max_death` of
   `barcode_to_accumulated_persistence`, and `delay` of `delay_embed`.
