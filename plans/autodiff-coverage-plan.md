@@ -1,6 +1,6 @@
 # Autodiff coverage: implementation plan
 
-Progress: 4 of 11 items, 10 of 25 points (40%)
+Progress: 5 of 11 items, 12 of 25 points (48%)
 
 Spec: [autodiff-prototype-spec.md](autodiff-prototype-spec.md), which each
 item updates where it changes a decision.
@@ -39,13 +39,15 @@ that did not say why, and common operations without gradients.
   PCF, where it now combines with each breakpoint and fails.
   Tests: `F * w` for a PyTorch vector `w` matches scaling each PCF;
   gradient with respect to `w`; a shape that does not broadcast raises.
-- [ ] **B2.** [2] Where a dense array is required (`FloatTensor`,
+- [x] **B2.** [2] (ea35c0905) Where a dense array is required (`FloatTensor`,
   `PointCloud`, `DistanceMatrix`, `SymmetricMatrix`,
   `from_serial_content`, `linkage_to_barcode`, writes into numeric
   tensors), a PyTorch tensor without gradients is converted, and one with
   gradients raises a `TypeError` that says so. `allclose` of a tracked
   tensor compares its values.
   Tests: both cases for each; `allclose` of a tracked and a plain tensor.
+  Note: `allclose` does not take PCF tensors, tracked or not, so the
+  tracked case of the audit was not about gradients.
 - [ ] **B3.** [3] Distance matrices with gradients: `DistanceMatrixTensor`
   of a PyTorch tensor of shape (..., n, n) is tracked, and
   `compute_persistent_homology` and `compute_homological_kernel` of
