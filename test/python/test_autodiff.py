@@ -704,7 +704,7 @@ def test_tracked_pcfs_cannot_lose_gradients(fw):
     with pytest.raises(TypeError, match="copy"):
         sb.PcfTensor(out)
     with pytest.raises(NotImplementedError, match="detach"):
-        sb.pdist(out.flatten(), p=1, verbose=False)
+        sb.cdist(out.flatten(), out.flatten(), p=1, verbose=False)
     assert out.detach().array_equal(_pcf_grid())
 
 
@@ -884,6 +884,61 @@ def test_summary_of_abstract_bars_raises(summary):
 
     with pytest.raises(NotImplementedError, match="abstractly"):
         jax.grad(loss)(jax.numpy.asarray(X))
+
+
+_PAIRWISE = [
+    pytest.param(lambda fs: sb.pdist(fs, p=1.0, verbose=False), id="pdist_l1"),
+    pytest.param(lambda fs: sb.pdist(fs, p=2.5, verbose=False), id="pdist_lp"),
+    pytest.param(lambda fs: sb.l2_kernel(fs, verbose=False), id="l2_kernel"),
+]
+
+
+@pytest.mark.parametrize("pairwise", _PAIRWISE)
+def test_pairwise_matrix_of_tracked_pcfs_matches_untracked(fw, pairwise):
+    F, _ = _tensors()
+    out = pairwise(tracked(fw, F))
+    assert isinstance(out, fw.tensor_type)
+    np.testing.assert_allclose(fw.to_numpy(out), pairwise(F).to_dense())
+
+
+def _pairwise_weights():
+    # Not symmetric, so that both entries of each pair count.
+    return np.array([[1.0, 2.0, -1.0],
+                     [0.5, 3.0, 4.0],
+                     [-2.0, 1.5, 0.25]])
+
+
+@pytest.mark.parametrize("pairwise", _PAIRWISE)
+def test_pairwise_matrix_gradient_wrt_pcf_values(fw, pairwise):
+    f, g = _f_and_g()
+    times = np.array([0.0, 0.5, 2.0, 4.5, 8.0])
+
+    def loss(c):
+        h = sb.Pcf(fw.concat([c, fw.tensor([0.0])]), times=times)
+        return fw.sum(fw.tensor(_pairwise_weights()) * pairwise(sb.PcfTensor([f, h, g])))
+
+    _assert_gradient_matches_finite_differences(fw, loss, [0.7, -1.3, 0.4, 2.0])
+
+
+@pytest.mark.parametrize("pairwise", _PAIRWISE)
+def test_pairwise_matrix_gradient_wrt_pcf_times(fw, pairwise):
+    f, g = _f_and_g()
+
+    def loss(t):
+        h = sb.Pcf(_VALUES, times=fw.concat([fw.tensor([0.0]), t]))
+        return fw.sum(fw.tensor(_pairwise_weights()) * pairwise(sb.PcfTensor([f, h, g])))
+
+    _assert_gradient_matches_finite_differences(fw, loss, _TIMES)
+
+
+@pytest.mark.parametrize("pairwise", _PAIRWISE)
+def test_pairwise_matrix_gradient_through_arithmetic(fw, pairwise):
+    F, _ = _tensors()
+
+    def loss(x):
+        return fw.sum(fw.tensor(_pairwise_weights()) * pairwise(x * F))
+
+    _assert_gradient_matches_finite_differences(fw, loss, 1.5)
 
 
 def test_arithmetic_on_stable_rank_with_equal_lifetimes_matches_numpy(fw):

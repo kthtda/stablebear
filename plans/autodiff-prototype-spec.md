@@ -197,7 +197,10 @@ raises `NotImplementedError` while tracing:
 derivatives are those of the segment after it. A bar with an infinite
 endpoint maps to the limit of the PLF, whose derivative is 1 with respect to
 the last value where the PLF ends flat, and 0 otherwise. For the
-homological kernel, a zero-length critical edge has gradient 0.
+homological kernel, a zero-length critical edge has gradient 0. For a
+distance between equal PCFs, the gradient is 0. Where breakpoints of the two
+PCFs of a pair share a time, the derivative of their distance or product
+with respect to that time is that of moving both.
 
 **D10. Gradient paths require tensors.** With gradients, `transform_bars`
 takes a `BarcodeTensor` only, since a `Barcode` cannot carry gradients and
@@ -254,6 +257,13 @@ take a framework array. A dense framework array already is the tracked form
 of a `FloatTensor`; wrapping it would add a step for the user without
 adding information. This is an exception to returning stablebear tensors
 from public functions.
+
+`pdist` and `l2_kernel` of tracked PCFs likewise return the (n, n) matrix
+as a framework array, not a `DistanceMatrix` or `SymmetricMatrix`. Their
+vjp accumulates, in C++ and in parallel over the PCFs, the gradient of each
+PCF over the rectangles of its pair with every other, without building the
+difference of a pair. Each pair is therefore iterated twice, once per
+function. `cdist` has no gradients yet and raises.
 
 **D15. One framework operation per stablebear operation.** Each tracked
 operation is its own node in the framework's graph, so the framework

@@ -1,4 +1,10 @@
+from typing import Any
+
+import numpy as np
+
+from . import _autodiff
 from . import _sb_cpp as cpp
+from ._tracked import is_tracked
 from .async_task import _run_task
 from .distance_matrix import DistanceMatrix
 from .functional.pcf import Pcf, _has_matching_types
@@ -64,6 +70,30 @@ def lp_distance(f: Pcf, g: Pcf, p: float = 1) -> float:
         return float(backend.lp_distance_lp(f._data, g._data, float(p)))
 
 
+def _pairwise_out(fs, *args, **kwargs):
+    n = fs.shape[0]
+    return (n, n), np.float32 if fs.dtype is pcf32 else np.float64
+
+
+def _pairwise_weights(grad_out, X) -> np.ndarray:
+    """What cpp.pdist_grad and cpp.l2_kernel_grad take as weights for the
+    gradient of a symmetric (n, n) result: each entry counts for both of its
+    functions."""
+    grad_out = np.asarray(grad_out)
+    return np.ascontiguousarray(grad_out + grad_out.T, dtype=np.float32 if X.dtype is pcf32 else np.float64)
+
+
+def _pdist_vjp(grad_out, fs, p, verbose=False):
+    _, X = _resolve_pcf_inputs(_DISTANCE_BACKEND_MAP, fs)
+    return (cpp.pdist_grad(X._data, _pairwise_weights(grad_out, X), float(p)),)
+
+
+@_autodiff.differentiable("fs", vjp=_pdist_vjp, out=_pairwise_out)
+def _tracked_pdist(fs: Any, p: float, verbose: bool = False) -> Any:
+    """pdist of PCFs that carry gradients, as an (n, n) framework array."""
+    return pdist(fs, p, verbose).to_dense()
+
+
 def pdist(fs: PcfContainerLike, p: float = 1, verbose: bool = False) -> DistanceMatrix:
     r"""Compute the pairwise :math:`L_p` distance matrix for a 1-D tensor of PCFs.
 
@@ -95,6 +125,12 @@ def pdist(fs: PcfContainerLike, p: float = 1, verbose: bool = False) -> Distance
     """
     if p < 1:
         raise ValueError("p must be >= 1.")
+
+    if is_tracked(fs):
+        tracked: Any = fs
+        if tracked.ndim != 1:
+            raise ValueError("1d tensor expected.")
+        return _tracked_pdist(fs, p, verbose)
 
     backend, X = _resolve_pcf_inputs(_DISTANCE_BACKEND_MAP, fs)
 

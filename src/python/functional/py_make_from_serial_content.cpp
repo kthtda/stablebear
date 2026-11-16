@@ -17,6 +17,7 @@
 
 #include <taskflow/algorithm/for_each.hpp>
 
+#include <cmath>
 #include <span>
 #include <vector>
 
@@ -474,6 +475,156 @@ namespace sb_py
     return nb::make_tuple(times, sizes, fRows, gRows, fromG);
   }
 
+  /// Gradients of pairwise integrals of a 1-D tensor of PCFs f_0, ...,
+  /// f_{n-1}, with respect to their breakpoints.
+  ///
+  /// With I_ij the integral of height(f_i(t), f_j(t)), which must be
+  /// symmetric, returns the gradient of the sum over i and j of
+  /// weights[i, j] * q(I_ij) with respect to f_i as the first function of
+  /// the pair only, where scale(I) is q'(I). For a loss L of the symmetric
+  /// matrix q(I_ij), pass dL/dQ plus its transpose as the weights. dHeight
+  /// is the derivative of height with respect to its first argument.
+  ///
+  /// The result has a row (d/dt, d/dv) per breakpoint, in the order of
+  /// to_serial_content. As for lp_norm_grad, the first time of a PCF and
+  /// the value of its last, infinite segment get 0. Where a breakpoint of
+  /// f_i falls on one of f_j, the derivative with respect to its time is
+  /// that of moving both.
+  ///
+  /// The gradients of each f_i are accumulated over the rectangles of its
+  /// pair with every f_j, without building the difference of the pair, in
+  /// parallel over i.
+  // ponytail: each pair is iterated twice, once per function; halve by
+  // accumulating both sides per pair, with a buffer per thread, if this
+  // shows up in profiles.
+  template <typename Tt, typename Tv, typename Height, typename DHeight, typename Scale>
+  NpArray<Tv> pairwise_grad(
+      const sb::Tensor<sb::Pcf<Tt, Tv>>& fs,
+      nb::ndarray<const Tv, nb::ndim<2>, nb::c_contig, nb::device::cpu> weights,
+      Height height, DHeight dHeight, Scale scale)
+  {
+    using RectangleT = sb::Rectangle<Tt, Tv>;
+
+    if (fs.shape().size() != 1)
+    {
+      throw std::invalid_argument("pairwise_grad: 1d tensor expected");
+    }
+    const size_t n = fs.shape()[0];
+    if (weights.shape(0) != n || weights.shape(1) != n)
+    {
+      throw std::invalid_argument("pairwise_grad: weights must have shape (n, n)");
+    }
+
+    std::vector<size_t> offsets(n + 1, 0);
+    for (size_t i = 0; i < n; ++i)
+    {
+      offsets[i + 1] = offsets[i] + fs(std::vector<size_t>{i}).points().size();
+    }
+
+    auto out = new_array<Tv>({offsets[n], 2});
+    const auto* w = weights.data();
+    {
+      nb::gil_scoped_release release;
+      tf::Taskflow flow;
+      flow.for_each_index(size_t{0}, n, size_t{1}, [&](size_t i) {
+        const auto& f = fs(std::vector<size_t>{i}).points();
+        std::vector<Tv> dt(f.size());
+        std::vector<Tv> dv(f.size());
+        Tv* o = out.data() + 2 * offsets[i];
+        for (size_t j = 0; j < n; ++j)
+        {
+          const Tv weight = w[i * n + j];
+          if (weight == 0)
+          {
+            continue;
+          }
+          std::fill(dt.begin(), dt.end(), Tv{0});
+          std::fill(dv.begin(), dv.end(), Tv{0});
+          Tv integral = 0;
+          Tv previousHeight = 0;
+          size_t previousRow = 0;
+          bool first = true;
+          sb::iterate_rectangles_with_rows(f, fs(std::vector<size_t>{j}).points(),
+            [&](const RectangleT& rect, size_t fRow, size_t) {
+              const Tv h = height(rect.f_value, rect.g_value);
+              if (!first && fRow != previousRow)
+              {
+                // Moving the breakpoint later extends the previous rectangle
+                // and shortens this one.
+                dt[fRow] += previousHeight - h;
+              }
+              const Tv width = static_cast<Tv>(rect.right - rect.left);
+              if (h != 0)
+              {
+                integral += h * width;
+              }
+              if (std::isfinite(width))
+              {
+                const Tv d = dHeight(rect.f_value, rect.g_value);
+                if (d != 0)
+                {
+                  dv[fRow] += d * width;
+                }
+              }
+              previousHeight = h;
+              previousRow = fRow;
+              first = false;
+            });
+          const Tv factor = weight * scale(integral);
+          if (factor == 0 || !std::isfinite(factor))
+          {
+            continue;
+          }
+          // Paired with itself, each breakpoint falls on its own, so dt is
+          // the derivative of moving it in both functions: all of the
+          // derivative, where the weights count the pair twice.
+          const Tv timeFactor = i == j ? factor / 2 : factor;
+          for (size_t k = 0; k < f.size(); ++k)
+          {
+            o[2 * k] += timeFactor * dt[k];
+            o[2 * k + 1] += factor * dv[k];
+          }
+        }
+      });
+      sb::default_executor().cpu()->run(flow).get();
+    }
+    return out;
+  }
+
+  /// pairwise_grad for the Lp distances q(I) = I^(1/p), with I_ij the
+  /// integral of |f_i - f_j|^p. Equal functions get 0.
+  template <typename Tt, typename Tv>
+  NpArray<Tv> pdist_grad(
+      const sb::Tensor<sb::Pcf<Tt, Tv>>& fs,
+      nb::ndarray<const Tv, nb::ndim<2>, nb::c_contig, nb::device::cpu> weights, Tv p)
+  {
+    return pairwise_grad(fs, weights,
+      [p](Tv a, Tv b) { return static_cast<Tv>(std::pow(std::abs(a - b), p)); },
+      [p](Tv a, Tv b) {
+        const Tv d = a - b;
+        if (d == 0)
+        {
+          return Tv{0};
+        }
+        return static_cast<Tv>(p * std::pow(std::abs(d), p - 1) * (d > 0 ? 1 : -1));
+      },
+      [p](Tv integral) {
+        return integral > 0 ? static_cast<Tv>(std::pow(integral, 1 / p - 1) / p) : Tv{0};
+      });
+  }
+
+  /// pairwise_grad for the L2 kernel, with I_ij the integral of f_i * f_j.
+  template <typename Tt, typename Tv>
+  NpArray<Tv> l2_kernel_grad(
+      const sb::Tensor<sb::Pcf<Tt, Tv>>& fs,
+      nb::ndarray<const Tv, nb::ndim<2>, nb::c_contig, nb::device::cpu> weights)
+  {
+    return pairwise_grad(fs, weights,
+      [](Tv a, Tv b) { return a * b; },
+      [](Tv, Tv b) { return b; },
+      [](Tv) { return Tv{1}; });
+  }
+
   /// The order that sorts the values of each element of serial content:
   /// element k has the values in rows enumeration[k, 0] to enumeration[k, 1]
   /// of @p values. Returns, for all elements concatenated, the rows of each
@@ -530,6 +681,10 @@ namespace sb_py
     m.def("argsort_segments", &argsort_segments<sb::float64_t>);
     m.def("merge_breakpoints", &merge_breakpoints<sb::float32_t, sb::float32_t>);
     m.def("merge_breakpoints", &merge_breakpoints<sb::float64_t, sb::float64_t>);
+    m.def("pdist_grad", &pdist_grad<sb::float32_t, sb::float32_t>);
+    m.def("pdist_grad", &pdist_grad<sb::float64_t, sb::float64_t>);
+    m.def("l2_kernel_grad", &l2_kernel_grad<sb::float32_t, sb::float32_t>);
+    m.def("l2_kernel_grad", &l2_kernel_grad<sb::float64_t, sb::float64_t>);
     m.def("barcodes_to_serial_content", &barcodes_to_serial_content<sb::float32_t>);
     m.def("barcodes_to_serial_content", &barcodes_to_serial_content<sb::float64_t>);
     m.def("barcodes_from_serial_content_32", &barcodes_from_serial_content<sb::float32_t>);
