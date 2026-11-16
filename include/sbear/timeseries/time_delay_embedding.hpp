@@ -2,18 +2,18 @@
 #define STABLEBEAR_TIMESERIES_TIME_DELAY_EMBEDDING_H
 
 #include "../errors.hpp"
-#include "../executor.hpp"
 #include "../tensor.hpp"
 #include "../timeseries.hpp"
+#include "../ufunc.hpp"
 #include "../walk.hpp"
 
 #include <algorithm>
 #include <cmath>
 #include <functional>
 #include <limits>
-#include <mutex>
-#include <optional>
+#include <memory>
 #include <queue>
+#include <span>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -34,43 +34,84 @@ namespace sb
   /// t_i - k * delay if @p forward; times that round to the same point are
   /// recorded once, at the time they snap to. It is a view of the channel's
   /// storage.
+  namespace detail
+  {
+    /// Throw unless @p dimension and @p delay make an embedding.
+    inline void check_embedding_arguments(size_t dimension, float64_t delay)
+    {
+      if (dimension == 0)
+      {
+        throw std::invalid_argument("The embedding dimension must be at least 1");
+      }
+      if (std::isnan(delay) || std::isinf(delay) || delay <= 0)
+      {
+        throw std::invalid_argument("The embedding delay must be finite and positive");
+      }
+    }
+
+    /// The lag of each component of an embedding, oldest first: component j
+    /// reads the channel lags[j] before t. Looking forward, the lags are
+    /// negative: component j reads j * delay after t.
+    [[nodiscard]] inline std::vector<float64_t> embedding_lags(size_t dimension, float64_t delay, bool forward)
+    {
+      std::vector<float64_t> lags(dimension);
+      for (size_t j = 0; j < dimension; ++j)
+      {
+        lags[j] = forward ? -(static_cast<float64_t>(j) * delay) : static_cast<float64_t>(dimension - 1 - j) * delay;
+      }
+      return lags;
+    }
+
+    /// The first and last times of the embedding of @p channel, which has
+    /// observations, with lags from @p lowest to @p highest. A channel with
+    /// an end, such as a window, can be evaluated past its last timestamp up
+    /// to its end, so the embedding can too, up to that end plus the lowest
+    /// lag. Throws if no time has all of the components.
+    template <typename T>
+    std::pair<float64_t, float64_t> embedding_bounds(const Channel<T>& channel, float64_t lowest, float64_t highest)
+    {
+      const auto start = channel.time(0) + highest;
+      const auto end = channel.end().value_or(channel.time(channel.size() - 1)) + lowest;
+      if (channel.end_closed() ? start > end : start >= end)
+      {
+        throw std::invalid_argument("The series is too short for this embedding: no time has all of its components");
+      }
+      return {start, end};
+    }
+
+    /// Throw unless every channel of @p series has an embedding with
+    /// @p delay in the series' unit, as delay_embed() checks it.
+    template <typename T>
+    void check_embedding_fits(const TimeSeries<T>& series, size_t dimension, float64_t delay, bool forward)
+    {
+      const auto lags = embedding_lags(dimension, delay, forward);
+      const auto [lowest, highest] = std::minmax_element(lags.begin(), lags.end());
+      for (size_t c = 0; c < series.n_channels(); ++c)
+      {
+        if (series.channel(c).size() > 0)
+        {
+          (void)embedding_bounds(series.channel(c), *lowest, *highest);
+        }
+      }
+    }
+  }
+
   template <typename T>
   Channel<T> delay_embed(const Channel<T>& channel, size_t dimension, float64_t delay, bool forward = false)
   {
-    if (dimension == 0)
-    {
-      throw std::invalid_argument("The embedding dimension must be at least 1");
-    }
-    if (std::isnan(delay) || std::isinf(delay) || delay <= 0)
-    {
-      throw std::invalid_argument("The embedding delay must be finite and positive");
-    }
+    detail::check_embedding_arguments(dimension, delay);
 
-    // Component j, oldest first, reads the channel lags[j] before t. Looking
-    // forward, the lags are negative: component j reads j * delay after t.
-    std::vector<float64_t> lags(dimension);
-    for (size_t j = 0; j < dimension; ++j)
-    {
-      lags[j] = forward ? -(static_cast<float64_t>(j) * delay) : static_cast<float64_t>(dimension - 1 - j) * delay;
-    }
+    const auto lags = detail::embedding_lags(dimension, delay, forward);
     const auto [lowest, highest] = std::minmax_element(lags.begin(), lags.end());
 
     const auto n = channel.size();
     std::vector<float64_t> at;
     if (n > 0)
     {
-      const auto start = channel.time(0) + *highest;
-      // A channel with an end, such as a window, can be evaluated past its
-      // last timestamp up to its end, so the embedding can too, up to that
-      // end plus the lowest lag. It keeps an open start through
-      // view_lagged_at.
-      const auto end = channel.end().value_or(channel.time(n - 1)) + *lowest;
+      // The embedding keeps an open start through view_lagged_at.
+      const auto [start, end] = detail::embedding_bounds(channel, *lowest, *highest);
       const auto closed = channel.end_closed();
       const auto past = [&](float64_t s) { return closed ? s > end : s >= end; };
-      if (past(start))
-      {
-        throw std::invalid_argument("The series is too short for this embedding: no time has all of its components");
-      }
       // Component j changes where its lagged time reaches an observation: at
       // the timestamps shifted by lags[j]. A queue holds each component's next
       // shifted time, so the shifted copies are merged in one pass, from start
@@ -184,7 +225,7 @@ namespace sb
   }
 
   /// The delay embedding of every channel of @p series, with @p delay given
-  /// in the series' unit and converted into each channel's unit.
+  /// in the series' unit, in which its channels hold their times.
   template <typename T>
   TimeSeries<T> delay_embed(const TimeSeries<T>& series, size_t dimension, float64_t delay, bool forward = false)
   {
@@ -197,61 +238,70 @@ namespace sb
     return TimeSeries<T>(std::move(channels), series.unit(), series.epoch());
   }
 
-  /// The delay embedding of every series of @p seriesTensor, as
-  /// delay_embed() gives it, in a tensor of the same shape. @p delay is a
-  /// count of @p delayUnit, converted into the unit of each series, or a
-  /// plain number for series without a unit. The series are embedded in
-  /// parallel on @p exec. A series that cannot be embedded throws, for the
-  /// first such series, an error of the same type whose message names its
+  /// The delay embedding of a time series as an operation without extra
+  /// dimensions: each series maps to its embedding. @p delay is a count of
+  /// @p delayUnit, converted into the unit of each series, or a plain number
+  /// for series without a unit.
+  template <typename T>
+  struct DelayEmbedOperation
+  {
+    using input_type = TimeSeries<T>;
+    using output_type = TimeSeries<T>;
+
+    size_t dimension = 1;
+    float64_t delay = 1;
+    TimeUnit delayUnit = TimeUnit::Unitless;
+    bool forward = false;
+
+    [[nodiscard]] std::vector<size_t> extra_dims() const { return {}; }
+
+    /// The delay in the unit of @p series, throwing TypeError if a duration
+    /// is given for a series without a unit or a number for one with a unit.
+    [[nodiscard]] float64_t delay_in(const TimeSeries<T>& series) const
+    {
+      check_query_unit(delayUnit, series.unit());
+      return convert_time(delay, delayUnit, series.unit());
+    }
+
+    void operator()(const TimeSeries<T>& series, std::span<TimeSeries<T>> out) const
+    {
+      out[0] = delay_embed(series, dimension, delay_in(series), forward);
+    }
+  };
+
+  template <typename T>
+  using DelayEmbedTask = UfuncTask<DelayEmbedOperation<T>, Tensor<TimeSeries<T>>>;
+
+  /// A task embedding every series of @p seriesTensor into a tensor of the
+  /// same shape, as delay_embed() embeds each, with the delay as
+  /// DelayEmbedOperation takes it. Every series is checked before the task
+  /// is made, so that a series that cannot be embedded throws, for the first
+  /// such series, an error of the same type whose message names its
   /// position.
   template <typename T>
-  Tensor<TimeSeries<T>> delay_embed(const Tensor<TimeSeries<T>>& seriesTensor, size_t dimension, float64_t delay,
-                                    TimeUnit delayUnit, bool forward = false, Executor& exec = default_executor())
+  std::unique_ptr<DelayEmbedTask<T>> make_delay_embed_task(const Tensor<TimeSeries<T>>& seriesTensor,
+                                                           size_t dimension, float64_t delay, TimeUnit delayUnit,
+                                                           bool forward = false)
   {
-    Tensor<TimeSeries<T>> embeddings(std::vector<size_t>(seriesTensor.shape().begin(), seriesTensor.shape().end()));
-    // The first series that fails, whichever worker reaches it, with its
-    // message and whether the error is a TypeError.
-    struct Failure
-    {
-      std::vector<size_t> index;
-      std::string message;
-      bool typeError;
-    };
-    std::mutex mutex;
-    std::optional<Failure> failure;
-    parallel_walk(seriesTensor, [&](const std::vector<size_t>& index) {
-      const auto record = [&](const std::exception& e, bool typeError) {
-        const std::scoped_lock lock(mutex);
-        if (!failure || index < failure->index)
-        {
-          failure = Failure{index, e.what(), typeError};
-        }
-      };
+    detail::check_embedding_arguments(dimension, delay);
+    const DelayEmbedOperation<T> op{.dimension = dimension, .delay = delay, .delayUnit = delayUnit,
+                                    .forward = forward};
+    walk(seriesTensor, [&](const std::vector<size_t>& index) {
+      const auto& series = seriesTensor(index);
       try
       {
-        const auto& series = seriesTensor(index);
-        check_query_unit(delayUnit, series.unit());
-        embeddings(index) = delay_embed(series, dimension, convert_time(delay, delayUnit, series.unit()), forward);
+        detail::check_embedding_fits(series, dimension, op.delay_in(series), forward);
       }
       catch (const TypeError& e)
       {
-        record(e, true);
+        throw TypeError(detail::position_text(index) + ": " + e.what());
       }
       catch (const std::invalid_argument& e)
       {
-        record(e, false);
+        throw std::invalid_argument(detail::position_text(index) + ": " + e.what());
       }
-    }, exec);
-    if (failure)
-    {
-      const auto message = detail::position_text(failure->index) + ": " + failure->message;
-      if (failure->typeError)
-      {
-        throw TypeError(message);
-      }
-      throw std::invalid_argument(message);
-    }
-    return embeddings;
+    });
+    return make_ufunc_task(seriesTensor, op, "Embedding time series", "series");
   }
 }
 

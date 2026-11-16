@@ -4,6 +4,7 @@ import operator
 from typing import Literal, overload
 
 from .. import _sb_cpp as cpp
+from ..async_task import _run_task
 from .date_time import TimeDelta, _duration, _in_unit, _ScalarDuration
 from .series import TimeSeries, TimeSeriesTensor, _PandasLike, _as_series
 
@@ -97,8 +98,10 @@ def delay_embed(series: TimeSeries | TimeSeriesTensor | _PandasLike, dimension: 
     if isinstance(series, TimeSeriesTensor):
         # C++ converts the delay into the unit of each series.
         unit = delay.unit if isinstance(delay, TimeDelta) else None
-        return TimeSeriesTensor(cpp.delay_embed_tensor(series._data, dimension, _in_unit(delay, unit), unit,
-                                                       direction == "forward"))
+        task = cpp.spawn_delay_embed_task(series._data, dimension, _in_unit(delay, unit), unit,
+                                          direction == "forward")
+        _run_task(lambda: task, verbose=False)
+        return TimeSeriesTensor(task.result())
     series = _as_series(series)
     return TimeSeries._from_cpp(cpp.delay_embed(series._data, dimension, _in_unit(delay, series.unit),
                                                 direction == "forward"))
