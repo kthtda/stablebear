@@ -116,12 +116,25 @@ def pdist(fs: PcfContainerLike, p: float = 1, verbose: bool = False) -> Distance
     Returns
     -------
     DistanceMatrix
-        A compressed symmetric distance matrix.
+        A compressed symmetric distance matrix. If the PCFs of `fs` carry
+        gradients, the distances instead as a PyTorch, JAX, or TensorFlow
+        array of shape ``(n, n)``, which carries gradients with respect to the
+        breakpoint times and values of the PCFs.
 
     Raises
     ------
     ValueError
         If ``fs`` is not 1-dimensional.
+
+    Notes
+    -----
+    The PCFs carry gradients when their times or values depend on PyTorch,
+    JAX, or TensorFlow arrays (see :class:`~stablebear.functional.pcf.Pcf`).
+    The gradient with respect to the first time of a PCF and to its last
+    value, which holds on an infinite interval, is 0. Where breakpoints of
+    two PCFs share a time, the derivative of their distance with respect to
+    that time is that of moving both breakpoints. The gradient of the
+    distance between two equal PCFs is 0.
     """
     if p < 1:
         raise ValueError("p must be >= 1.")

@@ -213,6 +213,22 @@ def barcode_to_stable_rank(
     Pcf, PcfTensor, or TimeSeries
         A single ``Pcf`` if the input is a single ``Barcode``, otherwise the
         same kind of container as the input, with the same shape.
+
+    Raises
+    ------
+    NotImplementedError
+        If `bc` holds several barcodes whose bars carry gradients that JAX
+        or ``tf.function`` traces.
+
+    Notes
+    -----
+    The bars of a ``BarcodeTensor`` can carry gradients of PyTorch, JAX, or
+    TensorFlow, as when it comes from
+    :func:`~stablebear.persistence.homological_kernel.compute_homological_kernel`
+    of arrays of one of them. The result is then a ``PcfTensor`` whose
+    breakpoint times carry gradients with respect to the bars. Besides its
+    breakpoint at time 0, it has one per bar, so bars of equal length give
+    breakpoints with equal times.
     """
     if isinstance(bc, _TrackedBarcodeTensor):
         return _tracked_stable_rank(bc)
@@ -254,6 +270,22 @@ def barcode_to_betti_curve(
     Pcf, PcfTensor, or TimeSeries
         A single ``Pcf`` if the input is a single ``Barcode``, otherwise the
         same kind of container as the input, with the same shape.
+
+    Raises
+    ------
+    NotImplementedError
+        If the bars carry gradients that JAX or ``tf.function`` traces: the
+        order of the births and deaths depends on their values.
+
+    Notes
+    -----
+    The bars of a ``BarcodeTensor`` can carry gradients of PyTorch, JAX, or
+    TensorFlow, as when it comes from
+    :func:`~stablebear.persistence.homological_kernel.compute_homological_kernel`
+    of arrays of one of them. The result is then a ``PcfTensor`` whose
+    breakpoint times carry gradients with respect to the bars. Besides its
+    breakpoint at time 0, it has one per birth and one per death, so
+    births and deaths at equal times give breakpoints with equal times.
     """
     if isinstance(bc, _TrackedBarcodeTensor):
         return _tracked_betti_curve(bc)
@@ -309,6 +341,22 @@ def barcode_to_accumulated_persistence(
     Pcf, PcfTensor, or TimeSeries
         A single ``Pcf`` if the input is a single ``Barcode``, otherwise the
         same kind of container as the input, with the same shape.
+
+    Raises
+    ------
+    NotImplementedError
+        If the bars carry gradients that JAX or ``tf.function`` traces:
+        which bars are included depends on their values.
+
+    Notes
+    -----
+    The bars of a ``BarcodeTensor`` can carry gradients of PyTorch, JAX, or
+    TensorFlow, as when it comes from
+    :func:`~stablebear.persistence.homological_kernel.compute_homological_kernel`
+    of arrays of one of them. The result is then a ``PcfTensor`` whose
+    breakpoint times and values carry gradients with respect to the bars.
+    Besides its breakpoint at time 0, it has one per included bar, so bars
+    with equal midpoints give breakpoints with equal times.
     """
     if isinstance(bc, _TrackedBarcodeTensor):
         return _tracked_accumulated_persistence(bc, max_death)

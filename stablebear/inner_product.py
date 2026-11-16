@@ -46,12 +46,24 @@ def l2_kernel(fs: PcfContainerLike, verbose=False) -> SymmetricMatrix:
     Returns
     -------
     SymmetricMatrix
-        A compressed symmetric kernel matrix.
+        A compressed symmetric kernel matrix. If the PCFs of `fs` carry
+        gradients, the kernel instead as a PyTorch, JAX, or TensorFlow
+        array of shape ``(n, n)``, which carries gradients with respect to the
+        breakpoint times and values of the PCFs.
 
     Raises
     ------
     ValueError
         If ``fs`` is not 1-dimensional.
+
+    Notes
+    -----
+    The PCFs carry gradients when their times or values depend on PyTorch,
+    JAX, or TensorFlow arrays (see :class:`~stablebear.functional.pcf.Pcf`).
+    The gradient with respect to the first time of a PCF and to its last
+    value, which holds on an infinite interval, is 0. Where breakpoints of
+    two PCFs share a time, the derivative of their product with respect to
+    that time is that of moving both breakpoints.
     """
     if is_tracked(fs):
         tracked: Any = fs
