@@ -1,4 +1,10 @@
+from typing import Any
+
+import numpy as np
+
+from . import _autodiff
 from . import _sb_cpp as cpp
+from ._tracked import is_tracked
 from .functional.pcf import Pcf
 from .base_tensor import (
     FloatTensor,
@@ -28,6 +34,77 @@ def _resolve_dim(dim: int, ndim: int) -> int:
     return resolved
 
 
+def _tracked_sum(fs: Any, dim: int, as_mean: bool) -> PcfTensor:
+    """The sum, or mean, along ``dim`` of a PcfTensor that carries
+    gradients, as a tensor that carries them.
+
+    A PCF is the running sum of its jumps, so the sum of several is the
+    running sum of the jumps of all of them in the order of their times. All
+    sums take one sort and one running sum.
+    """
+    from .base_tensor import _TrackedPcfTensor
+
+    content, enumeration = fs._serial()
+    shape = tuple(enumeration.shape[:-1])
+    axis = _resolve_dim(dim, len(shape))
+    count = shape[axis]
+    if count == 0:
+        # No members, so no gradients either: the zero PCFs.
+        plain = fs.detach()
+        return mean(plain, dim) if as_mean else sum(plain, dim)
+    like = fs._tvalues if fs._tvalues is not None else fs._ttimes
+    adapter = _autodiff._framework(like)
+
+    reduced = shape[:axis] + shape[axis + 1:]
+    n_sums = int(np.prod(reduced))
+    # The sum that each PCF is a member of.
+    sum_of_pcf = np.broadcast_to(np.expand_dims(np.arange(n_sums).reshape(reduced), axis), shape).ravel()
+
+    # The breakpoints of all PCFs, PCF by PCF, and the jump at each.
+    flat = enumeration.reshape(-1, 2)
+    sizes = flat[:, 1] - flat[:, 0]
+    ends = np.cumsum(sizes)
+    position = np.arange(int(ends[-1])) - np.repeat(ends - sizes, sizes)
+    rows = np.repeat(flat[:, 0], sizes) + position
+    values = fs._tvalues if fs._tvalues is not None else adapter.as_tensor(content[:, 1], like=like)
+    before = adapter.gather(values, np.maximum(rows - 1, 0))
+    jumps = adapter.gather(values, rows) - before * adapter.as_tensor((position > 0).astype(content.dtype), like=like)
+
+    # By sum, and by time within each.
+    sum_of_row = np.repeat(sum_of_pcf, sizes)
+    order = np.lexsort((content[rows, 0], sum_of_row))
+    times, sum_of_row = content[rows[order], 0], sum_of_row[order]
+
+    # The running sum over all sums, less what it was when each began.
+    running = adapter.concat([adapter.as_tensor(np.zeros(1, dtype=content.dtype), like=like),
+                              adapter.cumsum(adapter.gather(jumps, order))])
+    per_sum = np.bincount(sum_of_row, minlength=n_sums)
+    begins = np.repeat(np.cumsum(per_sum) - per_sum, per_sum)
+
+    # Of the breakpoints of a sum at one time, the last holds its value.
+    keep = np.ones(len(times), dtype=bool)
+    keep[:-1] = (sum_of_row[1:] != sum_of_row[:-1]) | (times[1:] != times[:-1])
+    kept = np.flatnonzero(keep)
+    result = adapter.gather(running, kept + 1) - adapter.gather(running, begins[kept])
+
+    # The last value of a sum is the sum of the last values of its members,
+    # taken directly: the running sum is off by its rounding, and a sum of
+    # PCFs that end at 0 must end at exactly 0 to have a finite norm.
+    last_values = adapter.segment_sums(adapter.gather(values, flat[:, 1] - 1), sum_of_pcf, n_sums)
+    is_last = np.ones(len(kept), dtype=bool)
+    is_last[:-1] = sum_of_row[kept[1:]] != sum_of_row[kept[:-1]]
+    index = np.arange(len(kept))
+    index[is_last] = len(kept) + sum_of_row[kept[is_last]]
+    result = adapter.gather(adapter.concat([result, last_values]), index)
+    if as_mean:
+        result = result / count
+    result_times = times[kept] if fs._ttimes is None else adapter.gather(fs._ttimes, rows[order[kept]])
+
+    ends = np.cumsum(np.bincount(sum_of_row[kept], minlength=n_sums))
+    starts = np.concatenate([[0], ends[:-1]])
+    return _TrackedPcfTensor([result_times, result], np.stack([starts, ends], axis=-1).reshape(*(reduced or (1,)), 2))
+
+
 def sum(fs: PcfContainerLike, dim: int = 0) -> PcfTensor:
     r"""Compute the pointwise sum of PCFs along the given dimension.
 
@@ -55,7 +132,14 @@ def sum(fs: PcfContainerLike, dim: int = 0) -> PcfTensor:
     ------
     IndexError
         If ``dim`` is out of range for the input tensor's number of dimensions.
+
+    Notes
+    -----
+    A tensor that carries gradients gives one that carries them, with
+    respect to the values and the times of its PCFs.
     """
+    if is_tracked(fs):
+        return _tracked_sum(fs, dim, as_mean=False)
     backend, tensor = _resolve_pcf_inputs(_REDUCTIONS_BACKEND_MAP, fs)
     return PcfTensor(backend.sum(tensor._data, _resolve_dim(dim, tensor.ndim)))
 
@@ -93,7 +177,14 @@ def mean(fs: PcfContainerLike, dim: int = 0) -> PcfTensor:
     ------
     IndexError
         If ``dim`` is out of range for the input tensor's number of dimensions.
+
+    Notes
+    -----
+    A tensor that carries gradients gives one that carries them, with
+    respect to the values and the times of its PCFs.
     """
+    if is_tracked(fs):
+        return _tracked_sum(fs, dim, as_mean=True)
     backend, tensor = _resolve_pcf_inputs(_REDUCTIONS_BACKEND_MAP, fs)
     return PcfTensor(backend.mean(tensor._data, _resolve_dim(dim, tensor.ndim)))
 

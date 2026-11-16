@@ -1545,3 +1545,57 @@ def test_values_and_times_from_float_tensors():
 def test_values_and_times_of_different_shapes_raise(values):
     with pytest.raises(ValueError, match="same length"):
         sb.Pcf(values, times=np.array([0.0, 1.0, 2.0]))
+
+
+_SUMS = pytest.mark.parametrize("reduce", [sb.sum, sb.mean], ids=["sum", "mean"])
+
+
+@_SUMS
+@pytest.mark.parametrize("make_pcfs, dim", [
+    pytest.param(_pcf_grid, 0, id="first_axis"),
+    pytest.param(_pcf_grid, 1, id="last_axis"),
+    pytest.param(_pcf_grid, -1, id="negative_axis"),
+    pytest.param(lambda: _pcf_grid().flatten(), 0, id="one_axis"),
+])
+def test_sum_of_tracked_pcfs_matches_untracked(fw, reduce, make_pcfs, dim):
+    out = reduce(tracked(fw, make_pcfs()), dim=dim)
+
+    assert isinstance(out, sb.PcfTensor)
+    assert isinstance(out.to_serial_content()[0], fw.tensor_type)
+    _assert_same_functions(out, reduce(make_pcfs(), dim=dim))
+
+
+@_SUMS
+def test_sum_of_selected_tracked_pcfs_matches_untracked(fw, reduce):
+    out = reduce(tracked(fw, _pcf_grid())[::-1, [1, 0]], dim=1)
+
+    _assert_same_functions(out, reduce(_pcf_grid()[::-1, [1, 0]], dim=1))
+
+
+@_SUMS
+def test_sum_of_tracked_pcfs_along_missing_axis_raises(fw, reduce):
+    with pytest.raises(IndexError, match="out of range"):
+        reduce(tracked(fw, _pcf_grid()), dim=2)
+
+
+@_SUMS
+def test_norm_of_sum_gradient_wrt_pcf_values(fw, reduce):
+    f, h = _f_and_g()
+    times = np.array([0.0, 0.5, 2.0, 4.5, 8.0])
+
+    def loss(c):
+        g = sb.Pcf(fw.concat([c, fw.tensor([0.0])]), times=times)
+        return fw.sum(sb.lp_norm(reduce(sb.PcfTensor([f, g, h]), dim=0), p=2.0))
+
+    _assert_gradient_matches_finite_differences(fw, loss, [0.7, -1.3, 0.4, 2.0])
+
+
+@_SUMS
+def test_norm_of_sum_gradient_wrt_pcf_times(fw, reduce):
+    f, h = _f_and_g()
+
+    def loss(t):
+        g = sb.Pcf(_VALUES, times=fw.concat([fw.tensor([0.0]), t]))
+        return fw.sum(sb.lp_norm(reduce(sb.PcfTensor([f, g, h]), dim=0), p=2.0))
+
+    _assert_gradient_matches_finite_differences(fw, loss, _TIMES)

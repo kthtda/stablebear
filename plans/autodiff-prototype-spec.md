@@ -260,6 +260,18 @@ value among the pairwise distances, which needs no change to Ripser but
 takes the first pair at that distance when distances are equal, which need
 not be an edge of the critical simplex, and sorts all pairwise distances.
 
+**D18. Sums of PCFs are running sums of jumps.** A PCF is the running sum
+of its jumps, so `sum` and `mean` of tracked PCFs along an axis sort the
+breakpoints of all members of each sum by time and take one running sum of
+their jumps, for all sums at once. Breakpoints of a sum at equal times
+become one. The last value of each sum is instead the sum of the last
+values of its members: a running sum is off by its rounding, and a sum of
+PCFs that end at 0 has a finite norm only if it ends at exactly 0. A sum of
+no members has no gradients and is the untracked zero PCF.
+
+Rejected: merging the members pairwise with the elementwise addition, which
+takes one pass per member.
+
 ## Cost
 
 **D13. The cost rule.** A library call on a tracked tensor may make a fixed

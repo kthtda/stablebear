@@ -63,6 +63,13 @@ def cumsum(x: torch.Tensor) -> torch.Tensor:
     return torch.cumsum(x, dim=0)
 
 
+def segment_sums(x: torch.Tensor, segments: np.ndarray, count: int) -> torch.Tensor:
+    """The sums of the entries of x by segment: entry k is the sum of the
+    entries i with segments[i] == k, for ``count`` segments."""
+    index = torch.as_tensor(segments, dtype=torch.long, device=x.device)
+    return torch.zeros(count, dtype=x.dtype, device=x.device).index_add(0, index, x)
+
+
 def row_norms(x: torch.Tensor) -> torch.Tensor:
     return torch.sqrt((x * x).sum(dim=1))
 
