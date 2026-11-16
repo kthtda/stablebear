@@ -813,6 +813,7 @@ if (BUILD_TESTER)
   set(SB_TEST_SOURCES_COMMON
       test/test_argsort_segments.cpp
       test/test_iterate_rectangles.cpp
+      test/test_pairwise_distances.cpp
       test/test_iterate_segments.cpp
       test/test_parallel_reduce.cpp
       test/test_fixed_rank_tensor.cpp
