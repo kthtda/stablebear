@@ -255,10 +255,10 @@ def compute_homological_kernel(
 
     if _autodiff._tracked(X) is not None or _autodiff._tracked(Y) is not None:
         # A framework array of more than two dimensions is a batch of clouds.
-        batches: list[Any] = [
+        inputs: list[Any] = [X, Y]
+        return _tracked_kernel_of_batches(*(
             PointCloudTensor(points) if _autodiff._framework(points) is not None and len(points.shape) > 2
-            else points for points in (X, Y)]
-        return _tracked_kernel_of_batches(*batches)
+            else points for points in inputs))
 
     X = _normalize_kernel_input(X, "X")
     Y = _normalize_kernel_input(Y, "Y")
