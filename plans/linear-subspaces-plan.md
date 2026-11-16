@@ -1,6 +1,6 @@
 # Linear subspaces, inner products, and distances: implementation plan
 
-Progress: 3 of 15 items, 8 of 33 points (24%)
+Progress: 4 of 15 items, 10 of 33 points (30%)
 
 Spec: [linear-subspaces-spec.md](linear-subspaces-spec.md)
 
@@ -39,7 +39,7 @@ Spec: [linear-subspaces-spec.md](linear-subspaces-spec.md)
 
 ## Phase B: Distance spaces
 
-- [ ] **B1.** [2] `Distance` and `DistanceSpace(points, distance)` with
+- [x] **B1.** [2] (bd36e573d) `Distance` and `DistanceSpace(points, distance)` with
   `points`, `distance`, and `dtype`; `InnerProductSpace` becomes its
   subclass, with `points` in place of `vectors` (D2, D2a); `ip.distance`,
   and calling a distance on points.
