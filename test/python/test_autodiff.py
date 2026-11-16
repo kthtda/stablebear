@@ -364,6 +364,17 @@ def test_transform_bars_removes_empty_bars_of_framework_kernel(fw):
     np.testing.assert_allclose(fw.to_numpy(out._tvalues), expected)
 
 
+def test_transform_bars_removing_every_bar_of_framework_kernel(fw):
+    if fw.traces_abstractly:
+        pytest.skip("Removing bars needs concrete bars")
+    X, Y = _kernel_points()
+    barcodes = sb.persistence.compute_homological_kernel(fw.tensor(X), fw.tensor(Y))
+    # A constant PLF maps every bar to an empty one.
+    out = sb.persistence.transform_bars(barcodes, sb.Plf([[0.0, 1.0]]))
+    assert out.shape == (1,)
+    assert out[0].to_numpy().shape == (0, 2)
+
+
 def test_transform_bars_gradient_with_removed_bars(fw):
     if fw.traces_abstractly:
         pytest.skip("Removing bars needs concrete bars")

@@ -81,14 +81,14 @@ class _TrackedMixin:
         from . import _autodiff
 
         columns = []
-        for part in self._parts:
+        for part, (_, width) in zip(self._parts, self._tracking.groups):
             values = part
             if _is_framework(part):
                 values = _autodiff._framework(part).concrete(part)
                 if values is None:
                     values = np.full(tuple(part.shape), np.nan)
             values = np.asarray(values, dtype=self._np_dtype)
-            columns.append(values.reshape(len(values), -1))
+            columns.append(values.reshape(len(values), width))
         return columns[0] if len(columns) == 1 else np.concatenate(columns, axis=1)
 
     def _cpp(self) -> Any:
@@ -127,7 +127,7 @@ class _TrackedMixin:
         content, enumeration = self._serial()
 
         def rebuild(arrays):
-            arrays = [np.asarray(array).reshape(len(content), -1) for array in arrays]
+            arrays = [np.asarray(array).reshape(len(content), starts[i + 1] - starts[i]) for i, array in zip(tracked, arrays)]
             if all(np.array_equal(array, content[:, starts[i]:starts[i + 1]]) for i, array in zip(tracked, arrays)):
                 # The current values, as when the framework is not tracing:
                 # an untracked tensor of the same C++ tensor.
