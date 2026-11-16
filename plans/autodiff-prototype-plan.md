@@ -1,6 +1,6 @@
 # Autodiff prototype: implementation plan
 
-Progress: 26 of 30 items, 61 of 72 points (85%)
+Progress: 27 of 30 items, 64 of 72 points (89%)
 
 Spec: [autodiff-prototype-spec.md](autodiff-prototype-spec.md)
 
@@ -155,9 +155,11 @@ Spec: [autodiff-prototype-spec.md](autodiff-prototype-spec.md)
 
 ## Phase E: Operation coverage
 
-- [ ] **E1.** [3] Betti curves of tracked barcodes.
+- [x] **E1.** [3] (0720fbe24) Betti curves of tracked barcodes.
   Tests: matches the untracked curve; norm gradient against finite
   differences; a batch.
+  Note: one commit holds E1 and E2, which share their helpers. A tracked
+  curve has one breakpoint per birth and death, so equal times repeat.
 - [ ] **E2.** [2] Accumulated persistence functions of tracked barcodes.
   Tests: matches the untracked function; norm gradient against finite
   differences.
