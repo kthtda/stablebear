@@ -1,6 +1,6 @@
 # Linear subspaces, inner products, and distances: implementation plan
 
-Progress: 14 of 15 items, 31 of 33 points (94%)
+Progress: 15 of 15 items, 33 of 33 points (100%)
 
 Spec: [linear-subspaces-spec.md](linear-subspaces-spec.md)
 
@@ -116,7 +116,7 @@ Spec: [linear-subspaces-spec.md](linear-subspaces-spec.md)
   and `compute_homological_kernel`; `docs/persistence.rst` without
   `distance_type`. (Each class gets its docstring in the item that adds
   it.)
-- [ ] **D2.** [2] A user guide page on projecting point clouds and choosing
+- [x] **D2.** [2] (ab9ee25b1) A user guide page on projecting point clouds and choosing
   distances: what a projection under an inner product is, the kernel of a
   cloud and its projection, the distance of an Lp norm, and optimizing a
   subspace with a framework, with one figure.
