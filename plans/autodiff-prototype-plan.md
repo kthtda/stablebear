@@ -1,6 +1,6 @@
 # Autodiff prototype: implementation plan
 
-Progress: 19 of 29 items, 43 of 70 points (61%)
+Progress: 20 of 29 items, 46 of 70 points (66%)
 
 Spec: [autodiff-prototype-spec.md](autodiff-prototype-spec.md)
 
@@ -112,12 +112,16 @@ Spec: [autodiff-prototype-spec.md](autodiff-prototype-spec.md)
   Tests: a Betti curve, a `TimeSeries`, and a `NestedTensor` of tracked
   barcodes raise; `detach()` equals the untracked tensor; `==` and
   `array_equal` compare values; save and pickle give the untracked tensor.
-- [ ] **D9.** [3] The tests of barcode operations run on tracked barcodes of
+- [x] **D9.** [3] (cb57cd98f) The tests of barcode operations run on tracked barcodes of
   each framework as well as on untracked ones: the stable rank and
   `transform_bars` give the same values, and the operations without
   gradients raise. D3 adds tracked PCFs to the tests of PCF operations.
   Tests: the framework helpers of `test_autodiff.py` move to a shared
   module; a parameter of the barcode tests makes their input tracked.
+  Note: the tests found that a tracked tensor without bars could not be
+  read. A tracked stable rank has one breakpoint per bar, so the tests of
+  equal and infinite lifetimes compare values. The tests of errors are not
+  parametrized: JAX wraps an error of the operation in its own.
 
 ## Phase E: Operation coverage
 
