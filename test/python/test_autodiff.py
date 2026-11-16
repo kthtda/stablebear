@@ -657,6 +657,39 @@ def test_tracked_barcodes_cannot_be_changed_or_lose_gradients(fw):
         out.astype(sb.barcode32)
 
 
+def test_operations_on_tracked_barcodes_convert_them_once(fw, monkeypatch):
+    if fw.traces_abstractly:
+        pytest.skip("Removing bars needs concrete bars")
+    from stablebear import _sb_cpp as cpp
+
+    calls = []
+    from_serial_content = cpp.barcodes_from_serial_content_64
+
+    def counting(content, enumeration):
+        calls.append(1)
+        return from_serial_content(content, enumeration)
+
+    monkeypatch.setattr(cpp, "barcodes_from_serial_content_64", counting)
+    out = _tracked_batch(fw, fw.tensor([0.0, 1.0, 1.5, 3.0]))
+    f = sb.Plf([[0.0, 0.0], [3.0, 6.0]])
+    sb.persistence.transform_bars(out, f)
+    sb.persistence.transform_bars(out, f)
+    assert len(calls) == 1
+
+
+def test_tracked_barcodes_follow_in_place_change_of_torch_bars():
+    torch = pytest.importorskip("torch")
+    values = torch.tensor([0.0, 1.0, 1.5, 3.0], dtype=torch.float64)
+    out = _tracked_batch(None, values)
+    assert out.is_isomorphic_to(_expected_batch([0.0, 1.0, 1.5, 3.0]), atol=0.0, rtol=0.0)
+
+    with torch.no_grad():
+        out._tvalues.mul_(2)
+
+    # Doubling the values of the PLF doubles the transformed bars.
+    assert out.is_isomorphic_to(_expected_batch([0.0, 2.0, 3.0, 6.0]), atol=0.0, rtol=0.0)
+
+
 def test_arithmetic_on_stable_rank_with_equal_lifetimes_matches_numpy(fw):
     if fw.traces_abstractly:
         pytest.skip("Removing bars needs concrete bars")

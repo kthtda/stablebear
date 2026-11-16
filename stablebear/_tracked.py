@@ -7,8 +7,9 @@ of ``T`` for tensors that carry gradients.
 
 The only state of such a tensor is its serial content, given as groups of
 columns that are each a framework array or a constant NumPy array, and its
-enumeration. Its C++ tensor is built from them on each use, so the two cannot
-disagree. It cannot be changed in place. Indexing, reshaping, and copying
+enumeration. Its C++ tensor is derived from them, so the two cannot disagree,
+and kept until a framework array is changed in place. The tensor itself
+cannot be changed in place. Indexing, reshaping, and copying
 keep the gradients; other operations that would drop them raise. A single
 element, as from an integer index, is an untracked element object of the
 current values.
@@ -54,13 +55,23 @@ class _TrackedMixin:
     _tracking: Tracking
     _base: type
 
-    def __init__(self, parts: list, enumeration: np.ndarray):
+    def __init__(self, parts: list, enumeration: np.ndarray, data: Any = None):
+        """``data`` is the C++ tensor of these parts and enumeration, from an
+        operation that already has it; otherwise the first use derives it."""
         # Not the constructor of the tensor type: _data is derived, not stored.
         self._parts = list(parts)
         self._enumeration = np.asarray(enumeration, dtype=np.int64)
         all_float32 = all("float32" in str(part.dtype) for part in self._parts)
         self._np_dtype = np.float32 if all_float32 else np.float64
         self.dtype = self._tracking.dtype(self._np_dtype)
+        self._cache = data
+        self._cache_versions = self._versions() if data is not None else None
+
+    def _versions(self) -> list:
+        """What tells, per part, whether its values changed in place."""
+        from . import _autodiff
+
+        return [_autodiff._framework(part).version(part) if _is_framework(part) else None for part in self._parts]
 
     def _concrete(self) -> np.ndarray:
         """The (m, k) serial content, with NaN where a framework traces it abstractly."""
@@ -79,7 +90,11 @@ class _TrackedMixin:
 
     @property
     def _data(self):
-        return self._tracking.from_serial(self._concrete(), self._enumeration)._data
+        versions = self._versions()
+        if self._cache is None or versions != self._cache_versions:
+            self._cache = self._tracking.from_serial(self._concrete(), self._enumeration)._data
+            self._cache_versions = versions
+        return self._cache
 
     def _serial(self) -> tuple[np.ndarray, np.ndarray]:
         return self._concrete(), self._enumeration
@@ -92,9 +107,14 @@ class _TrackedMixin:
         content, enumeration = self._serial()
 
         def rebuild(arrays):
+            arrays = [np.asarray(array).reshape(len(content), -1) for array in arrays]
+            if all(np.array_equal(array, content[:, starts[i]:starts[i + 1]]) for i, array in zip(tracked, arrays)):
+                # The current values, as when the framework is not tracing:
+                # an untracked tensor of the same C++ tensor.
+                return self._base(self._data)
             c = content.copy()
             for i, array in zip(tracked, arrays):
-                c[:, starts[i]:starts[i + 1]] = np.asarray(array).reshape(len(c), -1)
+                c[:, starts[i]:starts[i + 1]] = array
             return self._tracking.from_serial(c, enumeration)
 
         def split(grad):
@@ -152,8 +172,8 @@ class _TrackedMixin:
         return self._select(self._ids()[slices])
 
     def copy(self):
-        # Immutable, so the copy can share the parts.
-        return type(self)(self._parts, self._enumeration)
+        # Immutable, so the copy can share the parts and the C++ tensor.
+        return type(self)(self._parts, self._enumeration, data=self._data if self._cache is not None else None)
 
     def __deepcopy__(self, memodict=None):
         return self.copy()

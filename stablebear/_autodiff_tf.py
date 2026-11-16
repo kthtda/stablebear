@@ -38,6 +38,12 @@ def concrete(x: Any) -> np.ndarray | None:
         return None
 
 
+def version(x: Any) -> Any:
+    """Tensors cannot be changed in place; a variable can, and has no
+    counter of its changes, so each call gives a new version."""
+    return None if isinstance(x, tf.Tensor) else object()
+
+
 def as_tensor(x: Any, like: Any = None) -> tf.Tensor:
     if like is None:
         return tf.constant(x)

@@ -25,6 +25,11 @@ def concrete(x: Any) -> np.ndarray | None:
         return None
 
 
+def version(x: Any) -> None:
+    """JAX arrays cannot be changed in place."""
+    return None
+
+
 def as_tensor(x: Any, like: Any = None) -> jax.Array:
     if like is None:
         return jnp.asarray(x)

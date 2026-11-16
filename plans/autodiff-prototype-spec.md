@@ -79,8 +79,13 @@ results used the stale ones. Also rejected: one class whose `_data` property
 checks whether the object is tracked, which adds a Python call to every
 `_data` access on hot paths.
 
-Status: `_TrackedBarcodeTensor` derives `_data` without a cache; PCFs and
-PLFs still store both (see the plan).
+An operation's forward and backward passes get the cached C++ tensor of a
+tracked argument when the values the framework passes them equal the
+argument's current ones, which one comparison pass tells. They differ while
+a framework traces abstractly, and the argument is then converted.
+
+Status: tracked barcode tensors cache `_data`, but no operation hands them
+its C++ result yet; PCFs and PLFs still store both (see the plan).
 
 **D5a. One generic tracked tensor.** The tracking logic is a mixin shared by
 all tensor types, not a class written per type. Every type is a tensor

@@ -36,6 +36,11 @@ def concrete(x: torch.Tensor) -> np.ndarray:
     return to_numpy(x)
 
 
+def version(x: torch.Tensor) -> int:
+    """Changes when `x` is changed in place."""
+    return x._version
+
+
 def as_tensor(x: Any, like: torch.Tensor | None = None) -> torch.Tensor:
     if like is None:
         return torch.tensor(x)
