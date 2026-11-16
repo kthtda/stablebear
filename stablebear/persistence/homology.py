@@ -12,7 +12,7 @@ from ..distance_matrix import (
     DistanceMatrixTensor,
 )
 from ..base_tensor import FloatTensor
-from ..linear import DistanceSpace, _distance_matrices, _points_array
+from ..geometry import DistanceSpace, _distance_matrices, _points_array
 from ..point_cloud import PointCloud, PointCloudTensor
 from ..timeseries.series import TimeSeries, TimeSeriesTensor
 from ..typing import barcode32, barcode64, distmat32, distmat64, float32, float64, pcloud32, pcloud64
@@ -144,7 +144,7 @@ def compute_persistent_homology(
         Input data. A ``FloatTensor`` or NumPy array holds point clouds in
         its last two axes, one point per row; a 2-D one is a single cloud.
         Distances between the points of a cloud are Euclidean. A
-        :class:`~stablebear.linear.DistanceSpace` holds a point cloud with
+        :class:`~stablebear.geometry.DistanceSpace` holds a point cloud with
         another distance, which is then used. A ``DistanceMatrix`` or
         ``DistanceMatrixTensor`` provides precomputed pairwise distances
         directly.
@@ -152,7 +152,7 @@ def compute_persistent_homology(
         Maximum homology dimension to compute, by default 1.
     distance_type : DistanceType, optional
         Deprecated: put the points in a
-        :class:`~stablebear.linear.DistanceSpace` to choose their distance.
+        :class:`~stablebear.geometry.DistanceSpace` to choose their distance.
         The only value, ``DistanceType.Euclidean``, is the distance of
         plain point clouds. Passing it gives a ``DeprecationWarning``.
     complex_type : ComplexType, optional

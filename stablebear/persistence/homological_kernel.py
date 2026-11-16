@@ -10,7 +10,7 @@ from ..distance_matrix import (
     DistanceMatrixTensor,
 )
 from ..base_tensor import FloatTensor, _get_backend
-from ..linear import DistanceSpace, _distance_matrices, _in_one_framework, _points_array
+from ..geometry import DistanceSpace, _distance_matrices, _in_one_framework, _points_array
 from ..point_cloud import PointCloud, PointCloudTensor
 from ..typing import distmat32, distmat64, float32, float64, pcloud32, pcloud64
 from .homology import (
@@ -178,7 +178,7 @@ def compute_homological_kernel(
     be the same kind and the same shape; element ``i`` of ``X`` is
     paired with element ``i`` of ``Y``. Plain point clouds use the
     Euclidean distance; for another distance, pass two
-    :class:`~stablebear.linear.DistanceSpace` objects with equal
+    :class:`~stablebear.geometry.DistanceSpace` objects with equal
     distances, or precomputed distance matrices. When the input contains multiple point clouds or distance
     matrices, the computations are parallelized across them. The method
     and the algorithm used to compute it are described in full in
@@ -190,7 +190,7 @@ def compute_homological_kernel(
         Input data for :math:`d`. A ``FloatTensor`` or NumPy array is
         interpreted as a single point cloud (one row per point), and so is
         a PyTorch tensor (see Notes). A
-        :class:`~stablebear.linear.DistanceSpace` holds a point cloud, or a
+        :class:`~stablebear.geometry.DistanceSpace` holds a point cloud, or a
         batch of them, with the distance to use between its points.
     Y : PointCloud, PointCloudTensor, DistanceMatrix, DistanceMatrixTensor, FloatTensor, numpy.ndarray, or DistanceSpace
         Input data for :math:`d'`, of the same kind as ``X``, with the same number of points per

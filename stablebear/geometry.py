@@ -1,4 +1,4 @@
-"""Inner products and linear subspaces of point clouds."""
+"""Inner products, distances, and linear subspaces of point clouds."""
 
 from __future__ import annotations
 

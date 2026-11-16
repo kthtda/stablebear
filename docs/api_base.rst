@@ -36,10 +36,10 @@ point_cloud
 .. autoclass:: stablebear.point_cloud.PointCloudTensor
    :members:
 
-linear
-------
+geometry
+--------
 
-.. automodule:: stablebear.linear
+.. automodule:: stablebear.geometry
    :members:
    :show-inheritance:
 

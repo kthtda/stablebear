@@ -12,10 +12,10 @@ gradients, so that a subspace or an inner product can be optimized.
 Linear subspaces
 ================
 
-A :py:class:`~stablebear.linear.LinearSubspace` is the span of a set of
+A :py:class:`~stablebear.geometry.LinearSubspace` is the span of a set of
 vectors, given as the rows of an array. The vectors must be linearly
 independent, but need not be orthogonal or of unit length.
-:py:meth:`~stablebear.linear.LinearSubspace.project` replaces each point of a
+:py:meth:`~stablebear.geometry.LinearSubspace.project` replaces each point of a
 point cloud by the point of the subspace closest to it::
 
    import numpy as np
@@ -36,13 +36,13 @@ Inner products
 ==============
 
 Which point of the subspace is closest depends on how lengths and angles are
-measured. An :py:class:`~stablebear.linear.InnerProduct` is given by its Gram
+measured. An :py:class:`~stablebear.geometry.InnerProduct` is given by its Gram
 matrix :math:`G`, a symmetric positive definite matrix, and measures the
 vectors :math:`x` and :math:`y` against each other by :math:`x^T G y`. The
 identity matrix gives the Euclidean inner product.
 
 Calling an inner product on a point cloud gives an
-:py:class:`~stablebear.linear.InnerProductSpace`, which holds the point cloud
+:py:class:`~stablebear.geometry.InnerProductSpace`, which holds the point cloud
 together with its inner product. Projecting it uses that inner product, and
 the result is again an ``InnerProductSpace``. With the vectors of the subspace
 as the rows of :math:`V` and the points as the rows of :math:`X`, the
@@ -92,8 +92,8 @@ Distances
 
 Persistent homology and the homological kernel depend on a point cloud only
 through the distances between its points. A plain point cloud has the
-Euclidean distance. A :py:class:`~stablebear.linear.DistanceSpace` holds a
-point cloud together with another :py:class:`~stablebear.linear.Distance`,
+Euclidean distance. A :py:class:`~stablebear.geometry.DistanceSpace` holds a
+point cloud together with another :py:class:`~stablebear.geometry.Distance`,
 and :py:func:`~stablebear.persistence.homology.compute_persistent_homology`
 and
 :py:func:`~stablebear.persistence.homological_kernel.compute_homological_kernel`
@@ -105,7 +105,7 @@ There are two kinds of distance:
   :math:`\sqrt{(x - y)^T G (x - y)}`. An ``InnerProductSpace`` is a
   ``DistanceSpace`` with this distance, so the result of a projection can be
   passed on directly.
-- :py:class:`~stablebear.linear.LpDistance`, the distance of the :math:`L_p`
+- :py:class:`~stablebear.geometry.LpDistance`, the distance of the :math:`L_p`
   norm for :math:`p \geq 1` or infinity. ``LpDistance(1)`` is the taxicab
   distance and ``LpDistance(float("inf"))`` the Chebyshev distance.
 

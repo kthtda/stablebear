@@ -91,13 +91,13 @@ napoleon_type_aliases = {
     "Dtype": "stablebear.typing.dtype",
     "Distribution": "stablebear.distributions.Distribution",
     "Rectangle": "stablebear.functional.pcf.Rectangle",
-    "Distance": "stablebear.linear.Distance",
-    "DistanceSpace": "stablebear.linear.DistanceSpace",
-    "InnerProduct": "stablebear.linear.InnerProduct",
-    "InnerProductDistance": "stablebear.linear.InnerProductDistance",
-    "InnerProductSpace": "stablebear.linear.InnerProductSpace",
-    "LinearSubspace": "stablebear.linear.LinearSubspace",
-    "LpDistance": "stablebear.linear.LpDistance",
+    "Distance": "stablebear.geometry.Distance",
+    "DistanceSpace": "stablebear.geometry.DistanceSpace",
+    "InnerProduct": "stablebear.geometry.InnerProduct",
+    "InnerProductDistance": "stablebear.geometry.InnerProductDistance",
+    "InnerProductSpace": "stablebear.geometry.InnerProductSpace",
+    "LinearSubspace": "stablebear.geometry.LinearSubspace",
+    "LpDistance": "stablebear.geometry.LpDistance",
 }
 # The dtype sentinels are module constants, not classes.
 napoleon_type_aliases.update(

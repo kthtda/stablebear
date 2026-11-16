@@ -282,10 +282,10 @@ give NaN.
 
 ## Names and modules
 
-**D10. `stablebear.linear` holds the new classes.** `InnerProduct`,
-`InnerProductSpace`, `LinearSubspace`, `Distance`, `DistanceSpace`, and
-`LpDistance` live in
-`stablebear/linear.py` and are exported from `stablebear`. The existing
+**D10. `stablebear.geometry` holds the new classes.** `InnerProduct`,
+`InnerProductDistance`, `InnerProductSpace`, `LinearSubspace`, `Distance`,
+`DistanceSpace`, and `LpDistance` live in
+`stablebear/geometry.py` and are exported from `stablebear`. The existing
 `stablebear/inner_product.py` holds `l2_kernel`, the inner products of
 PCFs, and is unrelated.
 
