@@ -6,6 +6,7 @@ from typing import Any
 
 import numpy as np
 
+from . import _autodiff
 from . import _sb_cpp as cpp
 from ._binary_io import _BinaryIoMixin
 
@@ -160,6 +161,24 @@ class Tensor(_BinaryIoMixin, ABC):
 
     def _binary_io_data(self):
         return self._data
+
+    def _in_framework(self, like):
+        """This tensor as an array of the framework of ``like``, a PyTorch
+        tensor, for an operation with it whose result carries gradients;
+        None for a tensor without such a form. Numeric tensors have one."""
+        return None
+
+    def _framework_operand(self, other, symbol):
+        """This tensor as a framework array if ``other`` is one, and None
+        otherwise. A tensor without such a form raises: computing with the
+        values of ``other`` alone would drop its gradients."""
+        if _autodiff._framework(other) is None:
+            return None
+        own = self._in_framework(other)
+        if own is None:
+            raise TypeError(
+                f"'{symbol}' is not supported between a {type(self).__name__} and a PyTorch tensor.")
+        return own
 
     def __array__(self, dtype=None, copy=None) -> np.ndarray:
         raise TypeError(
@@ -632,12 +651,16 @@ class Tensor(_BinaryIoMixin, ABC):
             yield self[i]
 
     def __eq__(self, rhs):
+        if _autodiff._framework(rhs) is not None and self._in_framework(rhs) is not None:
+            return self._in_framework(rhs) == rhs
         if not isinstance(rhs, Tensor):
             return NotImplemented
         from .base_tensor import BoolTensor
         return BoolTensor(self._data == rhs._data)
 
     def __ne__(self, rhs):
+        if _autodiff._framework(rhs) is not None and self._in_framework(rhs) is not None:
+            return self._in_framework(rhs) != rhs
         if not isinstance(rhs, Tensor):
             return NotImplemented
         from .base_tensor import BoolTensor
@@ -651,6 +674,9 @@ class Tensor(_BinaryIoMixin, ABC):
         ``self`` (NumPy semantics), so idioms such as ``t[t > 3]`` work.
         """
         from .base_tensor import BoolTensor
+        own = self._framework_operand(rhs, symbol)
+        if own is not None:
+            return op(own, rhs)
         if isinstance(rhs, Tensor):
             return BoolTensor(op(self._data, rhs._data))
         import numpy as np
@@ -987,35 +1013,62 @@ class ArithmeticTensor(Tensor):
             return wrapped._data
         return val
 
+    def _refuse_framework_in_place(self, rhs, symbol):
+        if _autodiff._framework(rhs) is not None:
+            raise TypeError(
+                f"'{symbol}' with a PyTorch tensor is not supported: a {type(self).__name__} cannot hold its "
+                "gradients. Assign the result of the operation instead.")
+
     def __add__(self, rhs):
+        own = self._framework_operand(rhs, "+")
+        if own is not None:
+            return own + rhs
         return self._to_py_tensor(self._data + self._decay_operand(rhs))
 
     def __radd__(self, lhs):
+        own = self._framework_operand(lhs, "+")
+        if own is not None:
+            return lhs + own
         return self._to_py_tensor(self._decay_operand(lhs) + self._data)
 
     def __iadd__(self, rhs):
+        self._refuse_framework_in_place(rhs, "+=")
         self._ensure_writeable()
         self._data += self._decay_operand(rhs)
         return self
 
     def __sub__(self, rhs):
+        own = self._framework_operand(rhs, "-")
+        if own is not None:
+            return own - rhs
         return self._to_py_tensor(self._data - self._decay_operand(rhs))
 
     def __rsub__(self, lhs):
+        own = self._framework_operand(lhs, "-")
+        if own is not None:
+            return lhs - own
         return self._to_py_tensor(self._decay_operand(lhs) - self._data)
 
     def __isub__(self, rhs):
+        self._refuse_framework_in_place(rhs, "-=")
         self._ensure_writeable()
         self._data -= self._decay_operand(rhs)
         return self
 
     def __mul__(self, rhs):
+        own = self._framework_operand(rhs, "*")
+        if own is not None:
+            return own * rhs
         return self._to_py_tensor(self._data * self._decay_operand(rhs))
 
     def __rmul__(self, lhs):
+        own = self._framework_operand(lhs, "*")
+        if own is not None:
+            return lhs * own
         return self._to_py_tensor(self._decay_operand(lhs) * self._data)
 
     def __imul__(self, rhs):
+        self._refuse_framework_in_place(rhs, "*=")
         self._ensure_writeable()
         self._data *= self._decay_operand(rhs)
         return self
@@ -1024,12 +1077,19 @@ class ArithmeticTensor(Tensor):
         return self._to_py_tensor(-self._data)
 
     def __truediv__(self, rhs):
+        own = self._framework_operand(rhs, "/")
+        if own is not None:
+            return own / rhs
         return self._to_py_tensor(self._data / self._decay_operand(rhs))
 
     def __rtruediv__(self, lhs):
+        own = self._framework_operand(lhs, "/")
+        if own is not None:
+            return lhs / own
         return self._to_py_tensor(self._decay_operand(lhs) / self._data)
 
     def __itruediv__(self, rhs):
+        self._refuse_framework_in_place(rhs, "/=")
         self._ensure_writeable()
         self._data /= self._decay_operand(rhs)
         return self
@@ -1051,7 +1111,16 @@ class ArithmeticTensor(Tensor):
         Tensor
             A new tensor with transformed elements.
         """
+        own = self._framework_operand(exponent, "**")
+        if own is not None:
+            return own ** exponent
         return self._to_py_tensor(self._data.__pow__(exponent))
+
+    def __rpow__(self, base):
+        own = self._framework_operand(base, "**")
+        if own is not None:
+            return base ** own
+        return NotImplemented
 
     def __ipow__(self, exponent):
         """Raise every element of the tensor to a power in place.
@@ -1065,6 +1134,7 @@ class ArithmeticTensor(Tensor):
         -------
         self
         """
+        self._refuse_framework_in_place(exponent, "**=")
         self._ensure_writeable()
         self._data.__ipow__(exponent)
         return self

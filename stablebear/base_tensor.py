@@ -109,14 +109,25 @@ class NumericTensor(ArithmeticTensor):
             return bool(np.array_equal(np.asarray(self), np.asarray(rhs)))
         return super().array_equal(rhs)
 
+    def _in_framework(self, like):
+        # The values as a tensor of the dtype and on the device of `like`.
+        return _autodiff._framework(like).as_tensor(np.asarray(self), like=like)
+
     def __floordiv__(self, rhs):
+        own = self._framework_operand(rhs, "//")
+        if own is not None:
+            return own // rhs
         rhs_arr = np.asarray(rhs) if isinstance(rhs, NumericTensor) else rhs
         return self._to_py_tensor(np.asarray(self) // rhs_arr)
 
     def __rfloordiv__(self, lhs):
+        own = self._framework_operand(lhs, "//")
+        if own is not None:
+            return lhs // own
         return self._to_py_tensor(lhs // np.asarray(self))
 
     def __ifloordiv__(self, rhs):
+        self._refuse_framework_in_place(rhs, "//=")
         rhs_arr = np.asarray(rhs) if isinstance(rhs, NumericTensor) else rhs
         new = self._to_py_tensor(np.asarray(self) // rhs_arr)
         self._data = new._data
@@ -430,6 +441,10 @@ class PlfTensor(FunctionTensor):
 
 class BoolTensor(Tensor):
     """Tensor of boolean values, typically produced by elementwise comparisons."""
+
+    def _in_framework(self, like):
+        # The values as a boolean tensor on the device of `like`.
+        return _autodiff._framework(like).as_bool_tensor(np.asarray(self), like=like)
 
     def __init__(self, data: cpp.BoolTensor | BoolTensor | np.ndarray | list | tuple):
         super().__init__()

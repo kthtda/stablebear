@@ -1030,6 +1030,119 @@ def test_gradient_of_loss_on_serial_content(fw):
     _assert_gradient_matches_finite_differences(fw, loss, 1.5)
 
 
+def _numbers():
+    return np.array([[1.0, 2.0],
+                     [3.0, 4.0]])
+
+
+def _other_numbers():
+    return np.array([[2.0, 4.0],
+                     [8.0, 16.0]])
+
+
+_BINARY_OPERATIONS = [
+    pytest.param(lambda a, b: a + b, id="add"),
+    pytest.param(lambda a, b: a - b, id="sub"),
+    pytest.param(lambda a, b: a * b, id="mul"),
+    pytest.param(lambda a, b: a / b, id="truediv"),
+    pytest.param(lambda a, b: a ** b, id="pow"),
+    pytest.param(lambda a, b: a // b, id="floordiv"),
+]
+
+
+@pytest.mark.parametrize("operation", _BINARY_OPERATIONS)
+@pytest.mark.parametrize("order", ["tensor_first", "framework_first"])
+@pytest.mark.parametrize("make_tensor", [
+    pytest.param(lambda: sb.FloatTensor(_numbers()), id="float64"),
+    pytest.param(lambda: sb.IntTensor(_numbers().astype(np.int64)), id="int64"),
+])
+def test_arithmetic_of_numeric_tensor_and_framework_array_matches_numpy(fw, operation, order, make_tensor):
+    tensor, array = make_tensor(), fw.tensor(_other_numbers())
+
+    out = operation(tensor, array) if order == "tensor_first" else operation(array, tensor)
+
+    expected = (operation(_numbers(), _other_numbers()) if order == "tensor_first"
+                else operation(_other_numbers(), _numbers()))
+    assert isinstance(out, fw.tensor_type)
+    np.testing.assert_allclose(fw.to_numpy(out), expected)
+
+
+@pytest.mark.parametrize("order", ["tensor_first", "framework_first"])
+def test_arithmetic_of_numeric_tensor_and_framework_scalar_matches_numpy(fw, order):
+    tensor, scalar = sb.FloatTensor(_numbers()), fw.tensor(2.0)
+
+    out = tensor / scalar if order == "tensor_first" else scalar / tensor
+
+    assert isinstance(out, fw.tensor_type)
+    np.testing.assert_allclose(fw.to_numpy(out), _numbers() / 2.0 if order == "tensor_first" else 2.0 / _numbers())
+
+
+# Without the powers, whose values here are too large for finite differences,
+# and the floor division, whose gradient is zero.
+@pytest.mark.parametrize("operation", _BINARY_OPERATIONS[:4])
+@pytest.mark.parametrize("order", ["tensor_first", "framework_first"])
+def test_gradient_through_arithmetic_with_numeric_tensor(fw, operation, order):
+    tensor = sb.FloatTensor(_numbers())
+
+    def loss(x):
+        return fw.sum(operation(tensor, x) if order == "tensor_first" else operation(x, tensor))
+
+    _assert_gradient_matches_finite_differences(fw, loss, _other_numbers())
+
+
+def test_gradient_of_norms_divided_by_framework_scalar(fw):
+    F, _ = _tensors()
+
+    # The norms of plain PCFs are a FloatTensor.
+    def loss(x):
+        return fw.sum(sb.lp_norm(F, p=2.0) / x)
+
+    _assert_gradient_matches_finite_differences(fw, loss, 2.0)
+
+
+@pytest.mark.parametrize("comparison, expected", [
+    pytest.param(lambda a, b: a > b, [[False, False], [False, False]], id="gt"),
+    pytest.param(lambda a, b: a <= b, [[True, True], [True, True]], id="le"),
+    pytest.param(lambda a, b: a == b, [[False, False], [False, False]], id="eq"),
+    pytest.param(lambda a, b: a != b, [[True, True], [True, True]], id="ne"),
+])
+def test_comparison_of_numeric_tensor_and_framework_array(fw, comparison, expected):
+    out = comparison(sb.FloatTensor(_numbers()), fw.tensor(_other_numbers()))
+
+    assert isinstance(out, fw.tensor_type)
+    np.testing.assert_array_equal(fw.to_numpy(out), expected)
+
+
+def test_boolean_tensor_compares_with_framework_array(fw):
+    flags = sb.tensor(np.array([True, False]))
+
+    out = flags == (fw.tensor([1.0, 1.0]) > 0.0)
+
+    assert isinstance(out, fw.tensor_type)
+    np.testing.assert_array_equal(fw.to_numpy(out), [True, False])
+
+
+@pytest.mark.parametrize("operation", [
+    pytest.param(lambda t, x: t.__iadd__(x), id="iadd"),
+    pytest.param(lambda t, x: t.__isub__(x), id="isub"),
+    pytest.param(lambda t, x: t.__imul__(x), id="imul"),
+    pytest.param(lambda t, x: t.__itruediv__(x), id="itruediv"),
+    pytest.param(lambda t, x: t.__ipow__(x), id="ipow"),
+    pytest.param(lambda t, x: t.__ifloordiv__(x), id="ifloordiv"),
+])
+def test_in_place_arithmetic_of_numeric_tensor_with_framework_array_raises(fw, operation):
+    tensor = sb.FloatTensor(_numbers())
+    with pytest.raises(TypeError, match="gradients"):
+        operation(tensor, fw.tensor(2.0))
+    np.testing.assert_array_equal(np.asarray(tensor), _numbers())
+
+
+def test_power_of_pcf_tensor_with_framework_exponent_raises(fw):
+    F, _ = _tensors()
+    with pytest.raises(TypeError, match="PyTorch"):
+        _ = F ** fw.tensor(2.0)
+
+
 def test_values_with_times_match_breakpoints():
     g = sb.Pcf(np.array([2.0, -1.0, 0.0]), times=np.array([0.0, 1.0, 3.0]))
     np.testing.assert_array_equal(g.to_numpy(), [[0.0, 2.0], [1.0, -1.0], [3.0, 0.0]])

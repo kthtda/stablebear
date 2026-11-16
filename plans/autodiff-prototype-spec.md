@@ -291,6 +291,16 @@ of a `FloatTensor`; wrapping it would add a step for the user without
 adding information. This is an exception to returning stablebear tensors
 from public functions.
 
+Arithmetic and comparisons of a `FloatTensor` or `IntTensor` with a
+framework array, in either order, give a framework array as well: the
+tensor's values enter the operation as an array of the dtype and on the
+device of the other operand. So the norms of plain PCFs can be divided by a
+tracked scale. In-place arithmetic with a framework array raises, because a
+`FloatTensor` cannot hold the gradients, and so does arithmetic of a tensor
+without a dense numeric form, such as a power of a `PcfTensor`. Before
+this, a framework array of one element was read as a number, which dropped
+its gradient without a word, and a larger one raised.
+
 `pdist` and `l2_kernel` of tracked PCFs likewise return the (n, n) matrix
 as a framework array, not a `DistanceMatrix` or `SymmetricMatrix`. Their
 vjp accumulates, in C++ and in parallel over the PCFs, the gradient of each

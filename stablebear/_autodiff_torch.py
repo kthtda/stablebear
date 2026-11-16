@@ -43,6 +43,10 @@ def as_tensor(x: Any, like: torch.Tensor | None = None) -> torch.Tensor:
     return torch.tensor(x, dtype=like.dtype, device=like.device)
 
 
+def as_bool_tensor(x: Any, like: torch.Tensor) -> torch.Tensor:
+    return torch.tensor(x, dtype=torch.bool, device=like.device)
+
+
 def gather(values: torch.Tensor, idx: np.ndarray) -> torch.Tensor:
     return values[torch.as_tensor(idx, device=values.device)]
 
