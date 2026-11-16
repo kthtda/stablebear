@@ -1,6 +1,6 @@
 # Linear subspaces, inner products, and distances: implementation plan
 
-Progress: 19 of 24 items, 43 of 55 points (78%)
+Progress: 20 of 24 items, 45 of 55 points (82%)
 
 Spec: [linear-subspaces-spec.md](linear-subspaces-spec.md)
 
@@ -155,7 +155,7 @@ Spec: [linear-subspaces-spec.md](linear-subspaces-spec.md)
 
 A refactor: results do not change, except where an item says so.
 
-- [ ] **F1.** [2] `ufunc.hpp`: a pair of aligned tensors as a container
+- [x] **F1.** [2] (e008f5fd3) `ufunc.hpp`: a pair of aligned tensors as a container
   (`Zipped`), whose operation takes one element of each, and `apply_ufunc`,
   which runs an operation on a container and waits for the result.
   Tests (C++): an operation over a pair of tensors; tensors of different
