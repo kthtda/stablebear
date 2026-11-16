@@ -246,6 +246,62 @@ namespace sb
     size_t m_size = 0;
   };
 
+  /// Two containers whose elements an operation takes in pairs.
+  template <typename First, typename Second>
+  struct Zipped
+  {
+    First first;
+    Second second;
+  };
+
+  /// What an operation over a Zipped container declares as its input_type
+  /// and receives per call: one element of each container.
+  template <typename A, typename B>
+  struct ElementPair
+  {
+    const A& first;
+    const B& second;
+  };
+
+  /// Two tensors of the same shape: call i takes element i of each, and the
+  /// result has their shape followed by extra_dims.
+  template <typename A, typename B, typename Out>
+  class UfuncAdapter<Zipped<Tensor<A>, Tensor<B>>, 0, Out>
+  {
+  public:
+    using result_type = Tensor<Out>;
+
+    UfuncAdapter(const Zipped<Tensor<A>, Tensor<B>>& input, const std::vector<size_t>& extraDims)
+      : m_input(input), m_blockSize(detail::product(extraDims))
+    {
+      if (input.first.shape() != input.second.shape())
+      {
+        throw std::invalid_argument("The tensors must have the same shape.");
+      }
+      auto shape = input.first.shape();
+      m_size = detail::product(shape);  // a 0-d tensor is one call
+      shape.insert(shape.end(), extraDims.begin(), extraDims.end());
+      m_output = Tensor<Out>(shape);
+    }
+
+    [[nodiscard]] size_t size() const { return m_size; }
+
+    [[nodiscard]] ElementPair<A, B> input(size_t i) const
+    {
+      return {m_input.first.flat(i), m_input.second.flat(i)};
+    }
+
+    [[nodiscard]] Out* block(size_t i) { return m_output.data() + i * m_blockSize; }
+
+    [[nodiscard]] result_type finish() { return std::move(m_output); }
+
+  private:
+    const Zipped<Tensor<A>, Tensor<B>>& m_input;
+    size_t m_blockSize;
+    size_t m_size = 0;
+    Tensor<Out> m_output;
+  };
+
   /// Applies an operation to every element of a container in parallel; the
   /// container's UfuncAdapter decides the result's shape.
   template <Operation Op, typename Container = Tensor<typename Op::input_type>>
@@ -311,6 +367,18 @@ namespace sb
   {
     return std::make_unique<UfuncTask<Op, Container>>(
         std::move(input), std::move(op), std::move(description), std::move(unit));
+  }
+
+  /// The result of applying @p op to every element of @p input in parallel,
+  /// for a caller that waits for it. An exception of the operation is
+  /// rethrown.
+  template <typename Container, Operation Op>
+  auto apply_ufunc(Container input, Op op, Executor& exec)
+  {
+    UfuncTask<Op, Container> task(std::move(input), std::move(op), std::string(), std::string());
+    task.start_async(exec);
+    task.wait();
+    return task.result();
   }
 }
 
