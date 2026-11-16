@@ -1,6 +1,6 @@
 # Autodiff coverage: implementation plan
 
-Progress: 7 of 11 items, 18 of 25 points (72%)
+Progress: 8 of 11 items, 20 of 25 points (80%)
 
 Spec: [autodiff-prototype-spec.md](autodiff-prototype-spec.md), which each
 item updates where it changes a decision.
@@ -64,7 +64,7 @@ that did not say why, and common operations without gradients.
   norm of the mean against finite differences, with respect to values and
   to times.
 The last value of each sum is taken directly, not from the running sum, so that sums of PCFs that end at 0 end at exactly 0.
-- [ ] **C2.** [2] Powers of PCFs with gradients (`tracked ** 2`, and a
+- [x] **C2.** [2] (153283c27) Powers of PCFs with gradients (`tracked ** 2`, and a
   PyTorch exponent), and `lp_distance` of tracked PCFs or with a PyTorch
   `p`.
   Tests: values match; gradients against finite differences.
