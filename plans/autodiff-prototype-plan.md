@@ -1,6 +1,6 @@
 # Autodiff prototype: implementation plan
 
-Progress: 20 of 29 items, 46 of 70 points (66%)
+Progress: 21 of 29 items, 49 of 70 points (70%)
 
 Spec: [autodiff-prototype-spec.md](autodiff-prototype-spec.md)
 
@@ -85,11 +85,16 @@ Spec: [autodiff-prototype-spec.md](autodiff-prototype-spec.md)
   of the framework array is seen by the next read.
   Note: only `copy` hands over a C++ tensor so far; D3 and D6 are the first
   operations that have one.
-- [ ] **D3.** [3] `PcfTensor` on the mixin, with times and values as
+- [x] **D3.** [3] (065d39a3f) `PcfTensor` on the mixin, with times and values as
   separate column groups; arithmetic, norms, and stable ranks return it.
   Tests: indexing matches untracked tensors; gradient through indexing;
   copying into a `PcfTensor` raises; the tests of PCF operations (norms,
   distances, arithmetic) run on tracked PCFs too, as in D9.
+  Note: the tests of PCF arithmetic are not parametrized: they run over
+  integer PCFs and in-place operations, which cannot be tracked;
+  `test_autodiff.py` checks tracked arithmetic. `pdist` of tracked PCFs
+  raises until E4. A tracked element is built from serial content, since
+  `Pcf(rows)` rejects the repeated times of a stable rank.
 - [ ] **D4.** [3] `Pcf`, `Plf`, and `Barcode` as the 0-d case.
   Tests: `Pcf(values, times=times)` and `Plf(values, times=times)` derive
   their C++ objects; the existing autodiff tests pass unchanged.
