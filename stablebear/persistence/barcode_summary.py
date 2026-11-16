@@ -216,6 +216,9 @@ def barcode_to_stable_rank(
     """
     if isinstance(bc, _TrackedBarcodeTensor):
         return _tracked_stable_rank(bc)
+    if is_tracked(bc):
+        # A single barcode that carries gradients, as a tensor of one.
+        return _tracked_stable_rank(BarcodeTensor([bc]))[0]
     return _barcode_to_pcf(
         bc, "spawn_barcode_to_stable_rank_task", verbose
     )
@@ -266,6 +269,8 @@ def barcode_to_betti_curve(
     """
     if isinstance(bc, _TrackedBarcodeTensor):
         return _tracked_betti_curve(bc)
+    if is_tracked(bc):
+        return _tracked_betti_curve(BarcodeTensor([bc]))[0]
     return _barcode_to_pcf(
         bc, "spawn_barcode_to_betti_curve_task", verbose
     )
@@ -331,6 +336,8 @@ def barcode_to_accumulated_persistence(
     _autodiff.require_number(max_death, "max_death")
     if isinstance(bc, _TrackedBarcodeTensor):
         return _tracked_accumulated_persistence(bc, max_death)
+    if is_tracked(bc):
+        return _tracked_accumulated_persistence(BarcodeTensor([bc]), max_death)[0]
     return _barcode_to_pcf(
         bc, "spawn_barcode_to_accumulated_persistence_task", verbose,
         max_death=max_death
@@ -421,8 +428,8 @@ def transform_bars(bc: Barcode | BarcodeTensor | TimeSeries, f: Plf, verbose: bo
     from :func:`~stablebear.persistence.homological_kernel.compute_homological_kernel`
     of PyTorch tensors, and :math:`f` when its times or
     values are such tensors (see :class:`~stablebear.functional.plf.Plf`).
-    Then `bc` must be a ``BarcodeTensor``, and the result is one of the
-    same shape whose bars carry gradients with respect to both. At a
+    Then `bc` must be a ``Barcode`` or a ``BarcodeTensor``, and the bars
+    of the result carry gradients with respect to both. At a
     breakpoint of :math:`f`, the derivatives are those of the segment after
     it.
 
@@ -448,8 +455,7 @@ def transform_bars(bc: Barcode | BarcodeTensor | TimeSeries, f: Plf, verbose: bo
         If an endpoint is negative (a PLF is defined on
         :math:`[0, \infty)`).
     NotImplementedError
-        If `bc` is not a ``BarcodeTensor`` while the bars or `f` carry
-        gradients.
+        If `bc` is a time series while the bars or `f` carry gradients.
 
     Examples
     --------
@@ -462,11 +468,13 @@ def transform_bars(bc: Barcode | BarcodeTensor | TimeSeries, f: Plf, verbose: bo
     """
     if not isinstance(f, Plf):
         raise TypeError(f"Expected a Plf, got {type(f).__name__}.")
-    if is_tracked(f) or isinstance(bc, _TrackedBarcodeTensor):
+    if is_tracked(f) or is_tracked(bc):
+        if isinstance(bc, Barcode):
+            # A single barcode, as a tensor of one.
+            return _tracked_transform_bars(BarcodeTensor([bc]), f)[0]
         if not isinstance(bc, BarcodeTensor):
             raise NotImplementedError(
-                "transform_bars with gradients supports a BarcodeTensor only; "
-                "wrap a single Barcode as BarcodeTensor([bc]).")
+                "transform_bars with gradients supports a Barcode or a BarcodeTensor only.")
         return _tracked_transform_bars(bc, f)
     return _transform_bars(bc, f, verbose=verbose, keep_empty=False)
 

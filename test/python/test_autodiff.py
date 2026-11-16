@@ -351,10 +351,23 @@ def test_stable_rank_norms_of_tracked_batch_gradient(fw):
     _assert_gradient_matches_finite_differences(fw, loss, [0.0, 1.0, 1.5, 3.0])
 
 
-def test_tracked_plf_with_single_barcode_raises(fw):
+def test_transform_bars_of_single_barcode_with_tracked_plf_matches_numpy(fw):
+    barcode = _plf_bars()[0]
+    values, times = [0.0, 1.0], np.array([0.0, 1.0])
+
+    out = sb.persistence.transform_bars(barcode, sb.Plf(fw.tensor(values), times=times))
+
+    assert isinstance(out, sb.persistence.Barcode)
+    assert isinstance(out.to_serial_content()[0], fw.tensor_type)
+    expected = sb.persistence.transform_bars(barcode, sb.Plf(np.array(values), times=times))
+    assert out.is_isomorphic_to(expected, atol=1e-12, rtol=1e-12)
+
+
+def test_transform_bars_of_time_series_with_tracked_plf_raises(fw):
+    series = sb.timeseries.TimeSeries(_plf_bars(), times=[0.0])
     f = sb.Plf(fw.tensor([0.0, 1.0]), times=np.array([0.0, 1.0]))
-    with pytest.raises(NotImplementedError, match="BarcodeTensor\\(\\[bc\\]\\)"):
-        sb.persistence.transform_bars(_plf_bars()[0], f)
+    with pytest.raises(NotImplementedError, match="Barcode"):
+        sb.persistence.transform_bars(series, f)
 
 
 def test_breakpoints_as_framework_array_raise(fw):
@@ -1265,6 +1278,83 @@ def test_plf_tensor_at_framework_times_raises(fw):
     F = sb.PlfTensor([_plain_plf()])
     with pytest.raises(TypeError, match="PlfTensor"):
         F(fw.tensor([0.5]))
+
+
+def _homology_of(points):
+    return sb.persistence.compute_persistent_homology(points, max_dim=1, reduced=True, verbose=False)
+
+
+def test_integer_index_into_tracked_barcodes_gives_tracked_barcode(fw):
+    out = _homology_of(fw.tensor(_loop_points()))
+    expected = _homology_of(_loop_points())
+
+    barcode = out[1]
+
+    assert isinstance(barcode, sb.persistence.Barcode)
+    assert isinstance(barcode.to_serial_content()[0], fw.tensor_type)
+    # Its values read as those of a plain barcode.
+    assert len(barcode) == len(expected[1])
+    np.testing.assert_allclose(barcode.to_numpy(), expected[1].to_numpy())
+    assert barcode.is_isomorphic_to(expected[1], atol=1e-12, rtol=1e-12)
+
+
+def test_gradient_through_integer_index_matches_that_through_a_slice(fw):
+    def lengths(barcodes):
+        bars, _ = barcodes.to_serial_content()
+        return fw.sum(bars[:, 1] - bars[:, 0])
+
+    _, by_index = fw.value_and_grad(lambda P: lengths(_homology_of(P)[1]), _loop_points())
+    _, by_slice = fw.value_and_grad(lambda P: lengths(_homology_of(P)[1:2]), _loop_points())
+
+    np.testing.assert_allclose(by_index, by_slice)
+    assert np.abs(by_index).max() > 0.1
+
+
+@pytest.mark.parametrize("summary", [_betti_curve, _accumulated_persistence, lambda barcodes: (
+    sb.persistence.barcode_to_stable_rank(barcodes, verbose=False))], ids=["betti", "accumulated", "stable_rank"])
+def test_summary_of_tracked_barcode_is_a_tracked_pcf(fw, summary):
+    out = _homology_of(fw.tensor(_loop_points()))
+    expected = _homology_of(_loop_points())
+
+    curve = summary(out[0])
+
+    assert isinstance(curve, sb.Pcf)
+    assert isinstance(sb.PcfTensor([curve]).to_serial_content()[0], fw.tensor_type)
+    t = np.linspace(0.0, 4.0, 41)
+    np.testing.assert_allclose(fw.to_numpy(curve(t)), summary(expected[0])(t))
+
+
+def test_iterating_tracked_tensor_gives_tracked_elements(fw):
+    out = _homology_of(fw.tensor(_loop_points()))
+
+    barcodes = list(out)
+
+    assert len(barcodes) == 2
+    for barcode in barcodes:
+        assert isinstance(barcode.to_serial_content()[0], fw.tensor_type)
+
+
+def test_integer_index_into_tracked_pcfs_and_point_clouds(fw):
+    pcf = tracked(fw, _pcf_grid())[0, 1]
+    assert isinstance(pcf, sb.Pcf)
+    assert pcf == _pcf_grid()[0, 1]
+    assert isinstance(sb.PcfTensor([pcf]).to_serial_content()[0], fw.tensor_type)
+
+    # A single point cloud with gradients is the array of its points.
+    cloud = tracked(fw, _point_clouds())[1, 0]
+    assert isinstance(cloud, fw.tensor_type)
+    np.testing.assert_array_equal(fw.to_numpy(cloud), np.asarray(_point_clouds()[1, 0]))
+
+
+def test_barcode_tensor_of_list_with_tracked_barcode_carries_gradients(fw):
+    out = _homology_of(fw.tensor(_loop_points()))
+    plain = sb.persistence.Barcode([[0.0, 1.0]])
+
+    barcodes = sb.persistence.BarcodeTensor([out[1], plain])
+
+    assert barcodes.shape == (2,)
+    assert isinstance(barcodes.to_serial_content()[0], fw.tensor_type)
+    assert barcodes[1].is_isomorphic_to(plain, atol=0.0, rtol=0.0)
 
 
 def test_values_with_times_match_breakpoints():

@@ -173,9 +173,17 @@ reshapes, or broadcasts an `IntTensor` of its elements' flat indices with
 the same arguments, then gathers the rows of the selected elements from the
 framework array. The rules are therefore exactly those of untracked
 tensors, and repeated elements (as from `broadcast_to`) accumulate
-gradients correctly. An integer index that selects one element returns an
-untracked element object (`Barcode`, `Pcf`) of its current values, like
-reading a number out of an array.
+gradients correctly. An integer index that selects one element returns an element that carries
+the gradients of its rows: a tracked `Pcf` or `Barcode`, whose
+`to_serial_content` gives its rows as a framework array, or, for a point
+cloud, the framework array of its points (linear D7a). The barcode summaries
+and `transform_bars` take a tracked `Barcode`, and a list with tracked
+elements builds a tracked tensor. A matrix is still an untracked element of
+the current values.
+
+Changed: the first version returned an untracked element, "like reading a
+number out of an array". That made `barcodes[1]`, the natural way to take
+the barcode of dimension 1, lose the gradients that `barcodes[1:2]` kept.
 
 **D7. Native ragged storage in C++ is deferred.** Storing tensors of
 barcodes (and PCFs) in C++ as one buffer plus offsets, instead of one heap

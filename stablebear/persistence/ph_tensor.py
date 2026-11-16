@@ -6,9 +6,9 @@ import numpy as np
 
 from .. import _sb_cpp as cpp
 from .._tensor_base import Tensor, _tensor_from_nested
-from .._tracked import Tracking, is_tracked, tracked_class
+from .._tracked import Tracking, from_elements, is_tracked, tracked_class
 from ..typing import barcode32, barcode64
-from .barcode import Barcode
+from .barcode import Barcode, _TrackedBarcode
 
 cpp_p = cpp.persistence
 
@@ -19,7 +19,16 @@ _BARCODE_CPP_TO_DTYPE = {
 
 
 class BarcodeTensor(Tensor):
-    def __init__(self, data):
+    def __new__(cls, data: Any = None) -> BarcodeTensor:
+        if cls is BarcodeTensor and isinstance(data, (list, tuple)):
+            # A list with a barcode that carries gradients gives a tensor
+            # that carries them; see _tracked.
+            tracked = from_elements(BarcodeTensor, data)
+            if tracked is not None:
+                return tracked
+        return super().__new__(cls)
+
+    def __init__(self, data: Any):
         super().__init__()
         if is_tracked(data):
             raise TypeError(
@@ -145,6 +154,7 @@ BarcodeTensor._tracking = Tracking(  # pyright: ignore[reportAttributeAccessIssu
     from_serial=BarcodeTensor._from_serial,
     attributes=lambda np_dtype: {"dtype": barcode32 if np_dtype == np.float32 else barcode64},
     element=Barcode,
+    tracked_element=lambda parts: _TrackedBarcode(parts, np.array([0, int(parts[0].shape[0])])),
 )
 
 # A BarcodeTensor whose bars depend on PyTorch tensors,

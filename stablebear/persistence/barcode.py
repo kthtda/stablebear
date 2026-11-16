@@ -6,6 +6,7 @@ import numpy as np
 
 from .. import _sb_cpp as cpp
 from .._binary_io import _BinaryIoMixin
+from .._tracked import Tracking, tracked_class
 from ..typing import barcode32, barcode64
 
 cpp_p = cpp.persistence
@@ -80,6 +81,26 @@ class Barcode(_BinaryIoMixin):
             arr = arr.astype(dtype, copy=False)
         return arr
 
+    # The framework bars of a barcode that carries gradients (see
+    # _tracked); None for any other.
+    _tvalues: Any = None
+
+    def _serial(self) -> tuple[np.ndarray, np.ndarray]:
+        bars = self.to_numpy()
+        return bars, np.array([0, len(bars)])
+
+    def to_serial_content(self) -> tuple[Any, np.ndarray]:
+        """The bars as an array of shape ``(n, 2)``, with their rows
+        ``[0, n)``, as
+        :meth:`~stablebear.persistence.ph_tensor.BarcodeTensor.to_serial_content`
+        gives them for a tensor.
+
+        If the barcode carries gradients, as one taken from a tensor that
+        does, the bars are a PyTorch tensor that carries them, and a loss
+        can be built from it.
+        """
+        return self._serial()
+
     def is_isomorphic_to(self, bc: Barcode, atol: float = 1e-8, rtol: float = 1e-5):
         """Check whether two barcodes are isomorphic (same multiset of bars).
 
@@ -101,3 +122,16 @@ class Barcode(_BinaryIoMixin):
             Pass ``atol=0, rtol=0`` for a bitwise comparison.
         """
         return self._data.is_isomorphic_to(bc._data, atol, rtol)
+
+
+Barcode._tracking = Tracking(  # pyright: ignore[reportAttributeAccessIssue]
+    groups=(("_tvalues", 2),),
+    from_serial=lambda content, enumeration: Barcode(content),
+    attributes=lambda np_dtype: {"dtype": barcode32 if np_dtype == np.float32 else barcode64},
+    value_members=("to_numpy", "__len__", "__array__", "__str__", "__repr__", "is_isomorphic_to"),
+)
+
+# A Barcode whose bars depend on PyTorch tensors, built from [bars] and the
+# enumeration of _serial; see _tracked. An integer index into a
+# BarcodeTensor that carries gradients gives one.
+_TrackedBarcode = tracked_class(Barcode)

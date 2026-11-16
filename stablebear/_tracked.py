@@ -21,8 +21,10 @@ Indexing, reshaping, and copying a tracked tensor keep the gradients, and
 give a copy, not a view. Reading ``_data`` raises, so any operation that
 was not written for gradients raises instead of dropping them; code that
 handles them takes the C++ tensor from ``_cpp()``. Comparisons, saving, and
-pickling use the values. A single element, as from an integer index, is an
-untracked element object of the current values.
+pickling use the values. A single element, as from an integer index,
+carries the gradients of its rows: a tracked Pcf or Barcode, or the
+framework array of the points of a point cloud. A matrix is an untracked
+element of the current values.
 
 A write to a tracked tensor is recorded in a table of pending writes, and
 the next use of the framework arrays applies all of them in one pass, so a
@@ -57,6 +59,9 @@ class Tracking(NamedTuple):
     content. For a tensor type, ``element(rows)`` builds an element from its
     rows. For a type that keeps sizes, these are ``from_serial(content,
     enumeration, sizes)`` and ``element(rows, size)``.
+    ``tracked_element(parts)`` builds, from the parts of the rows of one
+    element, the element that carries their gradients; without it, a single
+    element is untracked.
 
     ``value_members`` names the methods and properties of the type whose
     results cannot carry gradients, such as ``to_numpy`` and ``__eq__``: a
@@ -69,6 +74,7 @@ class Tracking(NamedTuple):
     from_serial: Callable[..., Any]
     attributes: Callable[[Any], dict[str, Any]]
     element: Callable[..., Any] | None = None
+    tracked_element: Callable[[list], Any] | None = None
     value_members: tuple[str, ...] = ()
     dropping_members: tuple[str, ...] = ()
 
@@ -384,8 +390,9 @@ class _TrackedMixin(_TrackedObject):
 
     def _select(self, ids: Any) -> Any:
         """The elements with flat indices ids: for an IntTensor, a tracked
-        tensor of its shape that gathers their rows; for one index, an
-        untracked element of its current rows."""
+        tensor of its shape that gathers their rows; for one index, the
+        element, which carries the gradients of its rows where the type has
+        a tracked element."""
         from . import _autodiff
 
         if not isinstance(ids, Tensor):
@@ -393,6 +400,11 @@ class _TrackedMixin(_TrackedObject):
             # from the value written.
             (parts, enumeration), element = self._pending.get(int(ids), ((self._p, self._e.reshape(-1, 2)), int(ids)))
             start, stop = enumeration[element]
+            if self._tracking.tracked_element is not None and any(_is_framework(part) for part in parts):
+                rows = np.arange(start, stop)
+                return self._tracking.tracked_element([
+                    _autodiff._framework(part).gather(part, rows) if _is_framework(part) else part[start:stop]
+                    for part in parts])
             assert self._tracking.element is not None
             size = () if self._sizes is None else (int(self._sizes.reshape(-1)[element]),)
             return self._tracking.element(

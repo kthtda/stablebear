@@ -321,6 +321,8 @@ PointCloudTensor._tracking = Tracking(  # pyright: ignore[reportAttributeAccessI
     from_serial=PointCloudTensor._from_serial,
     attributes=lambda np_dtype: {"dtype": pcloud32 if np_dtype == np.float32 else pcloud64},
     element=PointCloud,
+    # A single point cloud with gradients is the array of its points.
+    tracked_element=lambda parts: parts[0],
 )
 
 # A PointCloudTensor whose coordinates depend on PyTorch

@@ -16,7 +16,7 @@ from ._tensor_base import (
     _array_for_protocol,
     _tensor_from_nested,
 )
-from .functional.pcf import Pcf
+from .functional.pcf import Pcf, _TrackedPcf
 from .functional.plf import Plf
 from .typing import (
     _NP_TO_SB,
@@ -368,6 +368,7 @@ PcfTensor._tracking = Tracking(  # pyright: ignore[reportAttributeAccessIssue]
     attributes=lambda np_dtype: {"dtype": pcf32 if np_dtype == np.float32 else pcf64},
     # Not Pcf(rows), which requires strictly increasing times.
     element=lambda rows: PcfTensor._from_serial(rows, np.array([[0, len(rows)]]))[0],
+    tracked_element=lambda parts: _TrackedPcf(parts, np.array([0, int(parts[0].shape[0])])),
 )
 
 # A PcfTensor whose breakpoint times, values, or both depend on PyTorch
