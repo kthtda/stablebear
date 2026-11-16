@@ -1,6 +1,6 @@
 # Linear subspaces, inner products, and distances: implementation plan
 
-Progress: 18 of 19 items, 40 of 43 points (93%)
+Progress: 19 of 19 items, 43 of 43 points (100%)
 
 Spec: [linear-subspaces-spec.md](linear-subspaces-spec.md)
 
@@ -144,7 +144,7 @@ Spec: [linear-subspaces-spec.md](linear-subspaces-spec.md)
   JAX traces raise.
   Note: this commit also annotates `PointCloudTensor.__init__`, which E2
   left with a pyright error.
-- [ ] **E4.** [3] `compute_homological_kernel` with gradients of two batches,
+- [x] **E4.** [3] (f6fede085) `compute_homological_kernel` with gradients of two batches,
   plain or in `DistanceSpace`s of either kind of distance.
   Tests: the bars of a batch match the untracked ones; gradient of the
   kernels of a batch and its projection with respect to the vectors of
