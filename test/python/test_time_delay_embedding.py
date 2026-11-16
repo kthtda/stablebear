@@ -101,8 +101,9 @@ def _two_seconds():
     pytest.param(lambda: delay_embed(_two_seconds(), dimension=0, delay=TimeDelta(1.0, "s")), id="dimension-0"),
     pytest.param(lambda: delay_embed(_two_seconds(), dimension=2, delay=TimeDelta(0.0, "s")), id="delay-0"),
     pytest.param(lambda: delay_embed(_two_seconds(), dimension=2, delay=TimeDelta(-1.0, "s")), id="delay-negative"),
-    pytest.param(lambda: delay_embed(_two_seconds(), dimension=2, delay=TimeDelta(1.0, "s"),
-                                     direction="ahead"),  # pyright: ignore[reportArgumentType]
+    pytest.param(lambda: delay_embed(  # pyright: ignore[reportCallIssue]
+                     _two_seconds(), dimension=2, delay=TimeDelta(1.0, "s"),
+                     direction="ahead"),  # pyright: ignore[reportArgumentType]
                  id="direction-unknown"),
     pytest.param(lambda: delay_embed(_two_seconds(), dimension=3, delay=TimeDelta(1.0, "s")), id="too-short"),
     pytest.param(lambda: delay_embed(_two_seconds(), dimension=3, delay=TimeDelta(1.0, "s"), direction="forward"),
@@ -485,5 +486,5 @@ def test_embedding_rejects_a_delay_without_a_fixed_length():
 
 def test_embedding_of_an_array_raises_naming_the_time_series_constructor():
     with pytest.raises(TypeError, match=re.escape("TimeSeries(values, times)")):
-        delay_embed(np.arange(3.0), dimension=2, delay=TimeDelta(1, "s"),  # pyright: ignore[reportArgumentType]
-                    direction="backward")
+        delay_embed(np.arange(3.0),  # pyright: ignore[reportCallIssue, reportArgumentType]
+                    dimension=2, delay=TimeDelta(1, "s"), direction="backward")
