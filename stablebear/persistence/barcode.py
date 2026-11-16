@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 
 from .. import _autodiff
 from .. import _sb_cpp as cpp
 from .._binary_io import _BinaryIoMixin
-from .._tracked import Tracking, tracked_class
+from .._tracked import Tracking, is_tracked, tracked_class
 from ..typing import barcode32, barcode64
 
 cpp_p = cpp.persistence
@@ -123,7 +123,9 @@ class Barcode(_BinaryIoMixin):
             Relative tolerance for endpoint comparison, by default ``1e-5``.
             Pass ``atol=0, rtol=0`` for a bitwise comparison.
         """
-        return self._data.is_isomorphic_to(bc._data, atol, rtol)
+        # The values of a barcode that carries gradients are compared.
+        other_data = cast(Any, bc)._cpp() if is_tracked(bc) else bc._data
+        return self._data.is_isomorphic_to(other_data, atol, rtol)
 
 
 Barcode._tracking = Tracking(  # pyright: ignore[reportAttributeAccessIssue]

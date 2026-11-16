@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from . import distributions as _distributions
+from ._tracked import is_tracked
 from ._validation import _positive_integer
 from .persistence.barcode import Barcode
 from .persistence.ph_tensor import BarcodeTensor
@@ -56,6 +57,12 @@ def plot(
         If ``f`` is a tensor with more than one dimension.
     """
     ax = plt if ax is None else ax
+
+    # Functions that carry gradients are drawn as their values.
+    if isinstance(f, (list, tuple)):
+        f = cast(Any, [cast(Any, g).detach() if is_tracked(g) else g for g in f])
+    elif is_tracked(f):
+        f = cast(Any, f).detach()
 
     def plot_each_(fs, maxtime):
         for i, g in enumerate(fs):
@@ -300,6 +307,10 @@ def plot_barcode(bc, ax=None, y_offset=0, **kwargs):
                 f"plot_barcode() does not accept '{name}'; use 'color' "
                 "(a single color, or a sequence with one color per barcode)"
             )
+
+    if is_tracked(bc):
+        # Barcodes that carry gradients are drawn as their values.
+        bc = bc.detach()
 
     if isinstance(bc, BarcodeTensor):
         if len(bc.shape) != 1:

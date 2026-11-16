@@ -4,6 +4,7 @@ import sys
 import numpy as np
 import pytest
 
+from _frameworks import tracked
 from plot_helpers import FigureGallery, gallery_fixture, ax_fixture, SHOW
 
 import stablebear as sb
@@ -481,3 +482,64 @@ if __name__ == "__main__":
         os.environ["SB_SHOW_PLOTS"] = "1"
         os.execv(sys.executable, [sys.executable, "-m", "pytest", __file__, "-v"] + sys.argv[1:])
     sys.exit(pytest.main([__file__, "-v"] + sys.argv[1:]))
+
+
+# ---------- tensors that carry gradients ----------
+
+def _drawn(ax):
+    """The points of the lines and of the segments drawn on the axes."""
+    lines = [line.get_xydata() for line in ax.lines]
+    segments = [segment for collection in ax.collections for segment in collection.get_segments()]
+    return lines + segments
+
+
+def _assert_draws_the_same(draw_tracked, draw_plain, ax):
+    import matplotlib.pyplot as plt
+
+    fig, expected_ax = plt.subplots()
+    try:
+        draw_tracked(ax)
+        draw_plain(expected_ax)
+        drawn, expected = _drawn(ax), _drawn(expected_ax)
+    finally:
+        plt.close(fig)
+    assert len(drawn) == len(expected) > 0
+    for points, expected_points in zip(drawn, expected):
+        np.testing.assert_array_equal(points, expected_points)
+
+
+def _plain_pcfs():
+    return sb.PcfTensor([
+        sb.Pcf(np.array([[0.0, 1.0], [1.0, 3.0], [2.0, 0.0]])),
+        sb.Pcf(np.array([[0.0, 2.0], [3.0, 0.0]])),
+    ])
+
+
+def _plain_barcodes():
+    return BarcodeTensor([
+        Barcode(np.array([[0.0, 1.5], [0.5, np.inf]])),
+        Barcode(np.array([[1.0, 2.0]])),
+    ])
+
+
+@pytest.mark.parametrize("select", [
+    pytest.param(lambda pcfs: pcfs, id="tensor"),
+    pytest.param(lambda pcfs: pcfs[1], id="pcf"),
+    pytest.param(lambda pcfs: [pcfs[1], pcfs[0]], id="list"),
+])
+def test_plot_of_tracked_pcfs_draws_their_values(fw, ax, select):
+    _assert_draws_the_same(
+        lambda axes: plot(select(tracked(fw, _plain_pcfs())), ax=axes),
+        lambda axes: plot(select(_plain_pcfs()), ax=axes),
+        ax)
+
+
+@pytest.mark.parametrize("select", [
+    pytest.param(lambda barcodes: barcodes, id="tensor"),
+    pytest.param(lambda barcodes: barcodes[0], id="barcode"),
+])
+def test_plot_barcode_of_tracked_barcodes_draws_their_values(fw, ax, select):
+    _assert_draws_the_same(
+        lambda axes: plot_barcode(select(tracked(fw, _plain_barcodes())), ax=axes),
+        lambda axes: plot_barcode(select(_plain_barcodes()), ax=axes),
+        ax)

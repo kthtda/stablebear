@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 
@@ -143,9 +143,9 @@ class BarcodeTensor(Tensor):
                 "Barcode tensors must have the same dtype, got "
                 f"{self.dtype.__name__} and {other.dtype.__name__}"
             )
-        return cpp_p.barcode_tensors_are_isomorphic(
-            self._data, other._data, atol, rtol
-        )
+        # The values of a tensor that carries gradients are compared.
+        other_data = cast(Any, other)._cpp() if is_tracked(other) else other._data
+        return cpp_p.barcode_tensors_are_isomorphic(self._data, other_data, atol, rtol)
 
 
 
@@ -155,6 +155,7 @@ BarcodeTensor._tracking = Tracking(  # pyright: ignore[reportAttributeAccessIssu
     attributes=lambda np_dtype: {"dtype": barcode32 if np_dtype == np.float32 else barcode64},
     element=Barcode,
     tracked_element=lambda parts: _TrackedBarcode(parts, np.array([0, int(parts[0].shape[0])])),
+    value_members=("is_isomorphic_to",),
 )
 
 # A BarcodeTensor whose bars depend on PyTorch tensors,

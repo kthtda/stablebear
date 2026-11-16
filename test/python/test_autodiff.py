@@ -1811,3 +1811,30 @@ def test_cdist_gradient_wrt_pcf_times(fw):
         return fw.sum(fw.tensor(_cdist_weights()) * sb.cdist(h, F, p=2.0, verbose=False))
 
     _assert_gradient_matches_finite_differences(fw, loss, _TIMES)
+
+
+def _reordered_barcode_batch():
+    # The barcodes of _barcode_batch with their bars in another order.
+    Barcode = sb.persistence.Barcode
+    return sb.persistence.BarcodeTensor([
+        Barcode([[0.5, 3.7], [0.2, 1.5]]),
+        Barcode(np.zeros((0, 2))),
+        Barcode([[0.1, 0.4], [2.5, 4.0], [1.2, 2.1]]),
+        Barcode([[1.1, 1.4]]),
+    ]).reshape((2, 2))
+
+
+@pytest.mark.parametrize("which", ["first", "second", "both"])
+def test_tracked_barcode_tensor_is_isomorphic_to_its_values(fw, which):
+    first = tracked(fw, _barcode_batch()) if which != "second" else _barcode_batch()
+    second = tracked(fw, _reordered_barcode_batch()) if which != "first" else _reordered_barcode_batch()
+
+    assert first.is_isomorphic_to(second, atol=0.0, rtol=0.0)
+    assert not first.is_isomorphic_to(second[::-1], atol=0.0, rtol=0.0)
+
+
+def test_barcode_is_isomorphic_to_the_values_of_a_tracked_barcode(fw):
+    plain, reordered = _barcode_batch(), tracked(fw, _reordered_barcode_batch())
+
+    assert plain[0, 0].is_isomorphic_to(reordered[0, 0], atol=0.0, rtol=0.0)
+    assert not plain[0, 0].is_isomorphic_to(reordered[1, 0], atol=0.0, rtol=0.0)
