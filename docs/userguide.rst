@@ -15,5 +15,6 @@ User guide
    saving
    distances
    persistence
+   projections
    point_processes
    gpu
