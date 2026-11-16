@@ -77,26 +77,29 @@ def _tracked_stable_rank(bc: _TrackedBarcodeTensor) -> PcfTensor:
     lifetimes = bars[:, 1] - bars[:, 0]
     concrete = adapter.concrete(lifetimes)
     if concrete is not None:
-        sorted_lifetimes = adapter.gather(lifetimes, np.lexsort((concrete, owners)))
+        order = cpp.argsort_segments(np.ascontiguousarray(concrete), np.ascontiguousarray(enumeration.reshape(-1, 2)))
+        sorted_lifetimes = adapter.gather(lifetimes, order)
     elif len(counts) == 1:
         sorted_lifetimes = adapter.sort(lifetimes)
     else:
         raise NotImplementedError(
             "Stable ranks of several barcodes whose bars JAX or tf.function traces abstractly are not supported.")
 
-    # Each stable rank starts with a breakpoint at time 0, then one per bar.
+    # Each stable rank starts with a breakpoint at time 0, then one per bar,
+    # with the values n, ..., 0 for a barcode of n bars.
     n_barcodes = len(counts)
-    starts = np.cumsum(counts + 1) - (counts + 1)
-    zero_rows = starts
-    bar_rows = np.delete(np.arange(int(np.sum(counts + 1))), zero_rows)
-    order = np.empty(n_barcodes + len(owners), dtype=np.int64)
-    order[zero_rows] = np.arange(n_barcodes)
-    order[bar_rows] = n_barcodes + np.arange(len(owners))
+    sizes = counts + 1
+    starts = np.cumsum(sizes) - sizes
+    position = np.arange(int(sizes.sum())) - np.repeat(starts, sizes)
+    # Row k of the zeros for the first breakpoint of barcode k, and then the
+    # sorted lifetimes, which follow the zeros, in order.
+    rows = np.where(position == 0, np.repeat(np.arange(n_barcodes), sizes),
+                    n_barcodes + np.arange(len(position)) - np.repeat(np.arange(1, n_barcodes + 1), sizes))
     zeros = adapter.as_tensor(np.zeros(n_barcodes), like=bars)
-    times = adapter.gather(adapter.concat([zeros, sorted_lifetimes]), order)
+    times = adapter.gather(adapter.concat([zeros, sorted_lifetimes]), rows)
 
-    values = np.concatenate([np.arange(n, -1, -1) for n in counts]) if n_barcodes else np.zeros(0)
-    content = np.column_stack([_autodiff._concrete_column(times, len(order), adapter), values]).astype(
+    values = np.repeat(counts, sizes) - position
+    content = np.column_stack([_autodiff._concrete_column(times, len(rows), adapter), values]).astype(
         np.float32 if bc.dtype == barcode32 else np.float64)
     out = _autodiff._pcfs_from_content(content, _enumeration(counts + 1, tuple(enumeration.shape[:-1])))
     out._ttimes = times

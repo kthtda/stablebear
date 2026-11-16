@@ -1,3 +1,4 @@
+#include <sbear/algorithms/argsort_segments.hpp>
 #include <sbear/executor.hpp>
 #include <sbear/tensor.hpp>
 #include <sbear/walk.hpp>
@@ -11,6 +12,9 @@
 
 #include <nanobind/ndarray.h>
 
+#include <taskflow/algorithm/for_each.hpp>
+
+#include <span>
 #include <vector>
 
 #include <iostream>
@@ -287,12 +291,60 @@ namespace sb_py
     return nb::make_tuple(times, sizes, fRows, gRows, fromG);
   }
 
+  /// The order that sorts the values of each element of serial content:
+  /// element k has the values in rows enumeration[k, 0] to enumeration[k, 1]
+  /// of @p values. Returns, for all elements concatenated, the rows of each
+  /// element arranged by increasing value, equal values keeping their
+  /// order. The elements are sorted in parallel.
+  template <typename T>
+  NpArray<int64_t> argsort_segments(
+      nb::ndarray<const T, nb::ndim<1>, nb::c_contig, nb::device::cpu> values,
+      nb::ndarray<const int64_t, nb::ndim<2>, nb::c_contig, nb::device::cpu> enumeration)
+  {
+    const size_t n = enumeration.shape(0);
+    const size_t total = values.shape(0);
+    if (enumeration.shape(1) != 2)
+    {
+      throw std::invalid_argument("argsort_segments: enumeration must have shape (n, 2)");
+    }
+    const auto* e = enumeration.data();
+    for (size_t k = 0; k < n; ++k)
+    {
+      // The elements must tile the values, so that each row is written once.
+      const auto expectedStart = static_cast<int64_t>(k == 0 ? 0 : e[2 * k - 1]);
+      if (e[2 * k] != expectedStart || e[2 * k + 1] < e[2 * k])
+      {
+        throw std::invalid_argument("argsort_segments: the enumeration must list consecutive rows");
+      }
+    }
+    if ((n == 0 ? size_t{0} : static_cast<size_t>(e[2 * n - 1])) != total)
+    {
+      throw std::invalid_argument("argsort_segments: the enumeration must cover all values");
+    }
+
+    auto order = new_array<int64_t>({total});
+    {
+      nb::gil_scoped_release release;
+      tf::Taskflow flow;
+      flow.for_each_index(size_t{0}, n, size_t{1}, [&](size_t k) {
+        const auto start = e[2 * k];
+        const auto count = static_cast<size_t>(e[2 * k + 1] - start);
+        sb::argsort_segment(std::span<const T>(values.data() + start, count), start,
+                            std::span<int64_t>(order.data() + start, count));
+      });
+      sb::default_executor().cpu()->run(flow).get();
+    }
+    return order;
+  }
+
   void register_make_from_serial_content(nb::module_& m)
   {
     m.def("to_serial_content", &to_serial_content<sb::float32_t, sb::float32_t>);
     m.def("to_serial_content", &to_serial_content<sb::float64_t, sb::float64_t>);
     m.def("make_from_serial_content_32", &make_from_serial_content<sb::float32_t, sb::float32_t>);
     m.def("make_from_serial_content_64", &make_from_serial_content<sb::float64_t, sb::float64_t>);
+    m.def("argsort_segments", &argsort_segments<sb::float32_t>);
+    m.def("argsort_segments", &argsort_segments<sb::float64_t>);
     m.def("merge_breakpoints", &merge_breakpoints<sb::float32_t, sb::float32_t>);
     m.def("merge_breakpoints", &merge_breakpoints<sb::float64_t, sb::float64_t>);
     m.def("barcodes_to_serial_content", &barcodes_to_serial_content<sb::float32_t>);
