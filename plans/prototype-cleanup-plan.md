@@ -1,6 +1,6 @@
 # Prototype cleanup: implementation plan
 
-Progress: 1 of 8 items, 3 of 17 points (18%)
+Progress: 2 of 8 items, 5 of 17 points (29%)
 
 Specs: [autodiff-prototype-spec.md](autodiff-prototype-spec.md) and
 [linear-subspaces-spec.md](linear-subspaces-spec.md), which each item
@@ -21,7 +21,7 @@ Gradients are supported for PyTorch only, for now. The APIs released on
   `_framework`, so that the package does not import PyTorch. The test of
   a kernel handing over its C++ barcodes goes: its bars now come from
   framework operations.
-- [ ] **A2.** [2] The homological kernel has one path for gradients, through
+- [x] **A2.** [2] (d6fba7c74) The homological kernel has one path for gradients, through
   its critical edges: the vjp of a single pair, which existed for
   `jax.jit`, goes, with its binding.
   Tests: the kernel gradient tests pass.
