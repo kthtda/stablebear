@@ -1,6 +1,6 @@
 # Linear subspaces, inner products, and distances: implementation plan
 
-Progress: 21 of 24 items, 47 of 55 points (85%)
+Progress: 22 of 24 items, 50 of 55 points (91%)
 
 Spec: [linear-subspaces-spec.md](linear-subspaces-spec.md)
 
@@ -166,12 +166,16 @@ A refactor: results do not change, except where an item says so.
   tensors for them.
   Tests: the C++ tests of both run on the operations; an indexed
   `PointCloudTensor` projects and measures as its dense copy.
-- [ ] **F3.** [3] The critical edges of persistent homology and of the
+- [x] **F3.** [3] (a4ab7f4ba) The critical edges of persistent homology and of the
   kernel as operations whose output element holds the bars and their edges,
   with one conversion of a tensor of such elements to arrays, in place of
   the two hand-written loops and the bindings for single elements.
   Tests: the tests of the critical edges of batches pass on the new
   bindings.
+  Note: the bindings for single elements stay until F4 removes their
+  callers. The header that holds the operation of persistent homology
+  includes Ripser, which can be part of one translation unit only, so the
+  operation of the kernel has a header of its own.
 - [ ] **F4.** [3] Python: one path for gradients of persistent homology and
   of the kernel, with a single cloud as a batch of one, and one shared
   function from critical edges to bars. The kernel of a single pair with
