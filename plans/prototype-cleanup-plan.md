@@ -1,6 +1,6 @@
 # Prototype cleanup: implementation plan
 
-Progress: 2 of 8 items, 5 of 17 points (29%)
+Progress: 3 of 8 items, 7 of 17 points (41%)
 
 Specs: [autodiff-prototype-spec.md](autodiff-prototype-spec.md) and
 [linear-subspaces-spec.md](linear-subspaces-spec.md), which each item
@@ -28,7 +28,7 @@ Gradients are supported for PyTorch only, for now. The APIs released on
 
 ## Phase B: The public surface of tracked objects
 
-- [ ] **B1.** [2] A tracked `Pcf` or `Plf` raises where an operation would
+- [x] **B1.** [2] (bb7eeee06) A tracked `Pcf` or `Plf` raises where an operation would
   drop its gradients, as a tracked tensor does: reading `_data` raises, and
   the members that only read values (`to_numpy`, `size`, `==`, printing)
   use the detached object.
