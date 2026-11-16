@@ -1,6 +1,6 @@
 # Linear subspaces, inner products, and distances: implementation plan
 
-Progress: 6 of 15 items, 13 of 33 points (39%)
+Progress: 7 of 15 items, 16 of 33 points (48%)
 
 Spec: [linear-subspaces-spec.md](linear-subspaces-spec.md)
 
@@ -57,7 +57,7 @@ Spec: [linear-subspaces-spec.md](linear-subspaces-spec.md)
 - [x] **B3.** [1] (2e4802e25) Deprecate `distance_type` (D6b).
   Tests: passing it warns; passing it with a `DistanceSpace` raises; the
   default does not warn.
-- [ ] **B4.** [3] `compute_homological_kernel` of two `DistanceSpace`s of
+- [x] **B4.** [3] (6eca2162e) `compute_homological_kernel` of two `DistanceSpace`s of
   single clouds with equal distances of inner products, with and without
   gradients.
   Tests: equals the kernel of the transformed points; the kernel of a cloud
