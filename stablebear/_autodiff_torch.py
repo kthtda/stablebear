@@ -12,7 +12,7 @@ class _Op(torch.autograd.Function):
     @staticmethod
     def forward(ctx, primal, vjp, *params):
         values = [to_numpy(p) for p in params]
-        out, ctx.residuals = primal(*values)
+        out = primal(*values)
         ctx.vjp = vjp
         ctx.values = values
         ctx.param_meta = [(p.dtype, p.device) for p in params]
@@ -20,7 +20,7 @@ class _Op(torch.autograd.Function):
 
     @staticmethod
     def backward(ctx, *grad_outputs):
-        grads = ctx.vjp(to_numpy(grad_outputs[0]), ctx.residuals, *ctx.values)
+        grads = ctx.vjp(to_numpy(grad_outputs[0]), *ctx.values)
         return (
             None,
             None,
@@ -30,10 +30,6 @@ class _Op(torch.autograd.Function):
 
 def to_numpy(x: torch.Tensor) -> np.ndarray:
     return x.detach().cpu().numpy()
-
-
-def concrete(x: torch.Tensor) -> np.ndarray:
-    return to_numpy(x)
 
 
 def version(x: torch.Tensor) -> int:
@@ -53,10 +49,6 @@ def gather(values: torch.Tensor, idx: np.ndarray) -> torch.Tensor:
 
 def concat(xs: list) -> torch.Tensor:
     return torch.cat(xs)
-
-
-def sort(x: torch.Tensor) -> torch.Tensor:
-    return torch.sort(x).values
 
 
 def cumsum(x: torch.Tensor) -> torch.Tensor:
@@ -97,10 +89,9 @@ def reshape(x: torch.Tensor, shape: tuple) -> torch.Tensor:
     return x.reshape(shape)
 
 
-def apply(
-    primal: Callable[..., Any], vjp: Callable[..., Any], *params: Any, out: Any = None, residuals: Any = ()
-) -> torch.Tensor:
-    """``primal(*values)`` returns (result, residuals), and
-    ``vjp(grad_out, residuals, *values)`` the gradients of the values."""
+def apply(primal: Callable[..., Any], vjp: Callable[..., Any], *params: Any) -> torch.Tensor:
+    """The result of ``primal(*values)`` for the NumPy values of the
+    tensors, as a tensor whose backward pass takes the gradients of the
+    values from ``vjp(grad_out, *values)``."""
     params = tuple(p if isinstance(p, torch.Tensor) else torch.as_tensor(p) for p in params)
     return _Op.apply(primal, vjp, *params)

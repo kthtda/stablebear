@@ -385,7 +385,7 @@ DistanceMatrixTensor._tracking = Tracking(  # pyright: ignore[reportAttributeAcc
         rows, np.array([[0, len(rows)]]), np.array([size]))[0],
 )
 
-# A DistanceMatrixTensor whose entries depend on PyTorch, JAX, or TensorFlow
+# A DistanceMatrixTensor whose entries depend on PyTorch
 # arrays, built from [entries], the enumeration, and the sizes of _serial;
 # see _tracked.
 _TrackedDistanceMatrixTensor = tracked_class(DistanceMatrixTensor)

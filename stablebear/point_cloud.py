@@ -194,8 +194,7 @@ class PointCloudTensor(IndexedElementTensor):
     data : numpy.ndarray, list of numpy.ndarray, or PointCloudTensor
         An ndarray whose trailing ``cloud_ndim`` axes form each point cloud and
         whose leading axes form the tensor shape; or a list of point cloud arrays
-        (possibly ragged) forming a 1-D tensor; or an existing tensor. A
-        PyTorch, JAX, or TensorFlow array in place of the ndarray, or a list
+        (possibly ragged) forming a 1-D tensor; or an existing tensor. A PyTorch tensor in place of the ndarray, or a list
         that holds one, gives a tensor whose points carry gradients with
         respect to those arrays.
     cloud_ndim : int, optional
@@ -209,7 +208,7 @@ class PointCloudTensor(IndexedElementTensor):
 
     def __new__(cls, data: Any = None, cloud_ndim: Any = 2, dtype: Any = None) -> PointCloudTensor:
         if cls is PointCloudTensor:
-            # A PyTorch, JAX, or TensorFlow array, or a list that holds one,
+            # A PyTorch tensor, or a list that holds one,
             # gives a tensor that carries gradients; see _tracked.
             tracked = _tracked_point_clouds(data)
             if tracked is not None:
@@ -300,7 +299,7 @@ PointCloudTensor._tracking = Tracking(  # pyright: ignore[reportAttributeAccessI
     element=PointCloud,
 )
 
-# A PointCloudTensor whose coordinates depend on PyTorch, JAX, or TensorFlow
+# A PointCloudTensor whose coordinates depend on PyTorch
 # arrays, built from [points] and the enumeration of _serial; see _tracked.
 _TrackedPointCloudTensor = tracked_class(PointCloudTensor)
 
@@ -312,7 +311,6 @@ def _tracked_point_clouds(data: Any) -> Any:
     clouds of any sizes. None for anything else."""
     from . import _autodiff
 
-    data = _autodiff._unwrap(data)
     adapter = _autodiff._framework(data)
     if adapter is not None:
         shape = tuple(int(size) for size in data.shape)
@@ -325,7 +323,7 @@ def _tracked_point_clouds(data: Any) -> Any:
 
     if not isinstance(data, (list, tuple)):
         return None
-    clouds = [_autodiff._unwrap(cloud) for cloud in data]
+    clouds = list(data)
     like = next((cloud for cloud in clouds if _autodiff._framework(cloud) is not None), None)
     if like is None:
         return None
@@ -335,7 +333,7 @@ def _tracked_point_clouds(data: Any) -> Any:
     for array in arrays:
         if len(array.shape) != 2 or array.shape[1] != arrays[0].shape[1]:
             raise ValueError(
-                "The point clouds of a list with PyTorch, JAX, or TensorFlow arrays must have shape (n, d) "
+                "The point clouds of a list with PyTorch tensors must have shape (n, d) "
                 f"with the same d (got shapes {[tuple(a.shape) for a in arrays]}).")
     ends = np.cumsum([int(array.shape[0]) for array in arrays])
     enumeration = np.stack([np.concatenate([[0], ends[:-1]]), ends], axis=-1)

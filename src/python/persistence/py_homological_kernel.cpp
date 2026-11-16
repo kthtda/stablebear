@@ -58,32 +58,6 @@ namespace
           dmats, dmatsPrime, out);
     }
 
-    /// (bars, critical_edges) of one pair of point clouds: bars as an (m, 2)
-    /// array and, per bar, the point indices {a, b, c, e} of the edges whose
-    /// lengths in Y and X are its birth and death.
-    template <typename ElemT>
-    static nb::tuple homological_kernel_critical_edges(const ElemT &element, const ElemT &elementPrime)
-    {
-      sb::ph::Barcode<T> barcode;
-      std::vector<std::array<size_t, 4>> edges;
-      {
-        nb::gil_scoped_release release;
-        sb::ph::homological_kernel_with_critical_edges(element, elementPrime, barcode, edges);
-      }
-      auto bars = sb_py::new_array<T>({barcode.bars().size(), 2});
-      auto critical = sb_py::new_array<int64_t>({edges.size(), 4});
-      for (size_t i = 0; i < edges.size(); ++i)
-      {
-        bars.data()[2 * i] = barcode.bars()[i].birth;
-        bars.data()[2 * i + 1] = barcode.bars()[i].death;
-        for (size_t j = 0; j < 4; ++j)
-        {
-          critical.data()[4 * i + j] = static_cast<int64_t>(edges[i][j]);
-        }
-      }
-      return nb::make_tuple(bars, critical);
-    }
-
     /// homological_kernel_critical_edges of every pair of aligned elements
     /// of two tensors of point clouds or of distance matrices, computed in
     /// parallel over the elements by the ufunc layer: the bars of all pairs
@@ -128,10 +102,6 @@ namespace
       cls.def_static(
         "homological_kernel_critical_edges",
         &PyHomologicalKernelBindings::template batch_homological_kernel_critical_edges<sb::DistanceMatrix<T>>);
-      // For one pair of point clouds, which the kernel's vjp uses.
-      cls.def_static(
-        "homological_kernel_critical_edges",
-        &PyHomologicalKernelBindings::template homological_kernel_critical_edges<sb::PointCloud<T>>);
     }
   };
 

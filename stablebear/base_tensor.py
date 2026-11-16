@@ -338,8 +338,8 @@ PcfTensor._tracking = Tracking(  # pyright: ignore[reportAttributeAccessIssue]
     element=lambda rows: PcfTensor._from_serial(rows, np.array([[0, len(rows)]]))[0],
 )
 
-# A PcfTensor whose breakpoint times, values, or both depend on PyTorch, JAX,
-# or TensorFlow arrays, built from [times, values] and the enumeration of
+# A PcfTensor whose breakpoint times, values, or both depend on PyTorch
+# tensors, built from [times, values] and the enumeration of
 # _serial; see _tracked.
 _TrackedPcfTensor = tracked_class(PcfTensor)
 

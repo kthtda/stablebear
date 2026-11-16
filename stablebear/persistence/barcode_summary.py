@@ -76,15 +76,9 @@ def _tracked_stable_rank(bc: Any) -> PcfTensor:
     enumeration = bc._enumeration
     counts, owners = _owners(enumeration)
     lifetimes = bars[:, 1] - bars[:, 0]
-    concrete = adapter.concrete(lifetimes)
-    if concrete is not None:
-        order = cpp.argsort_segments(np.ascontiguousarray(concrete), np.ascontiguousarray(enumeration.reshape(-1, 2)))
-        sorted_lifetimes = adapter.gather(lifetimes, order)
-    elif len(counts) == 1:
-        sorted_lifetimes = adapter.sort(lifetimes)
-    else:
-        raise NotImplementedError(
-            "Stable ranks of several barcodes whose bars JAX or tf.function traces abstractly are not supported.")
+    order = cpp.argsort_segments(
+        np.ascontiguousarray(adapter.to_numpy(lifetimes)), np.ascontiguousarray(enumeration.reshape(-1, 2)))
+    sorted_lifetimes = adapter.gather(lifetimes, order)
 
     # Each stable rank starts with a breakpoint at time 0, then one per bar,
     # with the values n, ..., 0 for a barcode of n bars.
@@ -110,12 +104,10 @@ def _prepend_zeros(adapter: Any, like: Any, x: Any, counts: np.ndarray) -> tuple
     return adapter.gather(adapter.concat([zeros, x]), rows), sizes, position
 
 
-def _concrete_bars(bc: Any, summary: str, reason: str) -> np.ndarray:
-    concrete = _autodiff._framework(bc._tvalues).concrete(bc._tvalues)
-    if concrete is None:
-        raise NotImplementedError(
-            f"{summary} of barcodes whose bars JAX or tf.function traces abstractly are not supported: {reason}.")
-    return concrete
+def _bar_values(bc: Any) -> np.ndarray:
+    """The current values of the bars of a BarcodeTensor that carries
+    gradients, as an (m, 2) array."""
+    return _autodiff._framework(bc._tvalues).to_numpy(bc._tvalues)
 
 
 def _tracked_betti_curve(bc: Any) -> PcfTensor:
@@ -130,7 +122,7 @@ def _tracked_betti_curve(bc: Any) -> PcfTensor:
     adapter = _autodiff._framework(bars)
     enumeration = bc._enumeration
     counts, _ = _owners(enumeration)
-    concrete = _concrete_bars(bc, "Betti curves", "the order of the births and deaths depends on their values")
+    concrete = _bar_values(bc)
     n_bars = len(concrete)
 
     # The events of each barcode, as birth and death of each of its bars.
@@ -160,8 +152,7 @@ def _tracked_accumulated_persistence(bc: Any, max_death: float) -> PcfTensor:
     adapter = _autodiff._framework(bars)
     enumeration = bc._enumeration
     counts, owners = _owners(enumeration)
-    concrete = _concrete_bars(
-        bc, "Accumulated persistence functions", "which bars they include depends on their values")
+    concrete = _bar_values(bc)
 
     keep = np.isfinite(concrete[:, 1]) & (concrete[:, 1] <= max_death)
     kept_counts = np.bincount(owners[keep], minlength=len(counts))
@@ -214,16 +205,9 @@ def barcode_to_stable_rank(
         A single ``Pcf`` if the input is a single ``Barcode``, otherwise the
         same kind of container as the input, with the same shape.
 
-    Raises
-    ------
-    NotImplementedError
-        If `bc` holds several barcodes whose bars carry gradients that JAX
-        or ``tf.function`` traces.
-
     Notes
     -----
-    The bars of a ``BarcodeTensor`` can carry gradients of PyTorch, JAX, or
-    TensorFlow, as when it comes from
+    The bars of a ``BarcodeTensor`` can carry gradients of PyTorch, as when it comes from
     :func:`~stablebear.persistence.homological_kernel.compute_homological_kernel`
     of arrays of one of them. The result is then a ``PcfTensor`` whose
     breakpoint times carry gradients with respect to the bars. Besides its
@@ -271,16 +255,9 @@ def barcode_to_betti_curve(
         A single ``Pcf`` if the input is a single ``Barcode``, otherwise the
         same kind of container as the input, with the same shape.
 
-    Raises
-    ------
-    NotImplementedError
-        If the bars carry gradients that JAX or ``tf.function`` traces: the
-        order of the births and deaths depends on their values.
-
     Notes
     -----
-    The bars of a ``BarcodeTensor`` can carry gradients of PyTorch, JAX, or
-    TensorFlow, as when it comes from
+    The bars of a ``BarcodeTensor`` can carry gradients of PyTorch, as when it comes from
     :func:`~stablebear.persistence.homological_kernel.compute_homological_kernel`
     of arrays of one of them. The result is then a ``PcfTensor`` whose
     breakpoint times carry gradients with respect to the bars. Besides its
@@ -342,16 +319,9 @@ def barcode_to_accumulated_persistence(
         A single ``Pcf`` if the input is a single ``Barcode``, otherwise the
         same kind of container as the input, with the same shape.
 
-    Raises
-    ------
-    NotImplementedError
-        If the bars carry gradients that JAX or ``tf.function`` traces:
-        which bars are included depends on their values.
-
     Notes
     -----
-    The bars of a ``BarcodeTensor`` can carry gradients of PyTorch, JAX, or
-    TensorFlow, as when it comes from
+    The bars of a ``BarcodeTensor`` can carry gradients of PyTorch, as when it comes from
     :func:`~stablebear.persistence.homological_kernel.compute_homological_kernel`
     of arrays of one of them. The result is then a ``PcfTensor`` whose
     breakpoint times and values carry gradients with respect to the bars.
@@ -405,12 +375,7 @@ def _transformed_bars_vjp(grad_out, bc, f):
     return d_bars.reshape(-1, 2), np.column_stack([d_times, d_values])
 
 
-def _transformed_bars_out(bc, f):
-    return bc._serial()[1], np.float32 if bc.dtype == barcode32 else np.float64
-
-
-@_autodiff.differentiable(
-    "bc", "f", vjp=_transformed_bars_vjp, out=_transformed_bars_out, returns=BarcodeTensor)
+@_autodiff.differentiable("bc", "f", vjp=_transformed_bars_vjp, returns=BarcodeTensor)
 def _transformed_bars(bc: BarcodeTensor, f: Plf) -> Any:
     """The transformed barcodes of a BarcodeTensor, empty bars included."""
     return _transform_bars(bc, f, verbose=False, keep_empty=True)
@@ -422,11 +387,7 @@ def _tracked_transform_bars(bc: BarcodeTensor, f: Plf) -> BarcodeTensor:
     transformed = _transformed_bars(bc, f)
     bars, enumeration = transformed._tvalues, transformed._enumeration
     adapter = _autodiff._framework(bars)
-    concrete = adapter.concrete(bars)
-    if concrete is None:
-        raise NotImplementedError(
-            "transform_bars of bars or a PLF that JAX or tf.function traces abstractly is not supported: "
-            "which bars it removes depends on their values.")
+    concrete = adapter.to_numpy(bars)
     counts, owners = _owners(enumeration)
     keep = concrete[:, 0] < concrete[:, 1]
     kept_counts = np.bincount(owners[keep], minlength=len(counts))
@@ -457,13 +418,12 @@ def transform_bars(bc: Barcode | BarcodeTensor | TimeSeries, f: Plf, verbose: bo
 
     The bars and :math:`f` can carry gradients: the bars when they come
     from :func:`~stablebear.persistence.homological_kernel.compute_homological_kernel`
-    of PyTorch, JAX, or TensorFlow arrays, and :math:`f` when its times or
-    values are such arrays (see :class:`~stablebear.functional.plf.Plf`).
+    of PyTorch tensors, and :math:`f` when its times or
+    values are such tensors (see :class:`~stablebear.functional.plf.Plf`).
     Then `bc` must be a ``BarcodeTensor``, and the result is one of the
-    same shape whose bars carry gradients with respect to both. At a breakpoint of :math:`f`, the derivatives are those of the
-    segment after it. Which bars are removed depends on their values, which
-    JAX and ``tf.function`` do not provide while they trace, so there this
-    raises ``NotImplementedError``.
+    same shape whose bars carry gradients with respect to both. At a
+    breakpoint of :math:`f`, the derivatives are those of the segment after
+    it.
 
     Parameters
     ----------
@@ -487,8 +447,7 @@ def transform_bars(bc: Barcode | BarcodeTensor | TimeSeries, f: Plf, verbose: bo
         If an endpoint is negative (a PLF is defined on
         :math:`[0, \infty)`).
     NotImplementedError
-        If the bars or `f` carry gradients that JAX or ``tf.function``
-        traces, or `bc` is not a ``BarcodeTensor`` while they carry
+        If `bc` is not a ``BarcodeTensor`` while the bars or `f` carry
         gradients.
 
     Examples

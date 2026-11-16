@@ -35,7 +35,7 @@ class Pcf(_PiecewiseFunction, _BinaryIoMixin):
         Input data. If an ndarray or list, should have shape (n, 2) where each
         row is a (time, value) pair. Can also be an existing ``Pcf`` to copy.
         If `times` is given, the values :math:`v_i` instead, with shape (n,).
-        The values and the times may be PyTorch, JAX, or TensorFlow arrays,
+        The values and the times may be PyTorch tensors,
         and the PCF then carries gradients with respect to them through
         arithmetic and norms.
     dtype : type, optional
@@ -45,9 +45,7 @@ class Pcf(_PiecewiseFunction, _BinaryIoMixin):
         produces a 32-bit integer PCF).
     times : array_like, optional
         The breakpoint times :math:`t_i`, with shape (n,), when `arr` holds
-        only the values. Times traced abstractly, as by ``jax.grad`` or
-        ``tf.function``, cannot be checked for order, and the PCF then
-        supports norms but not arithmetic.
+        only the values.
 
     Examples
     --------
@@ -89,13 +87,12 @@ class Pcf(_PiecewiseFunction, _BinaryIoMixin):
         if cls is Pcf and times is not None:
             content, ttimes, tvalues = _autodiff.content_from_values(times, arr)
             if ttimes is not None or tvalues is not None:
-                # A PCF that carries gradients; see _tracked. Times traced
-                # abstractly are NaN here, and their order cannot be checked.
-                checked = None if np.isnan(content[:, 0]).any() else Pcf(content)
+                # A PCF that carries gradients; see _tracked. Pcf(content)
+                # checks the times.
                 return _TrackedPcf(
                     [ttimes if ttimes is not None else content[:, 0],
                      tvalues if tvalues is not None else content[:, 1]],
-                    np.array([0, len(content)]), plain=checked)
+                    np.array([0, len(content)]), plain=Pcf(content))
         return super().__new__(cls)
 
     def __init__(
@@ -109,7 +106,7 @@ class Pcf(_PiecewiseFunction, _BinaryIoMixin):
             arr = _autodiff.content_from_values(times, arr)[0]
         elif _autodiff._framework(arr) is not None:
             raise TypeError(
-                "To build a PCF from a PyTorch, JAX, or TensorFlow array, pass the values "
+                "To build a PCF from a PyTorch tensor, pass the values "
                 "and the times separately: Pcf(values, times=times)."
             )
 
@@ -429,7 +426,7 @@ Pcf._tracking = Tracking(  # pyright: ignore[reportAttributeAccessIssue]
     attributes=_float_types,
 )
 
-# A Pcf whose breakpoint times, values, or both depend on PyTorch, JAX, or
-# TensorFlow arrays, built from [times, values] and the enumeration of
+# A Pcf whose breakpoint times, values, or both depend on PyTorch
+# tensors, built from [times, values] and the enumeration of
 # _serial; see _tracked.
 _TrackedPcf = tracked_class(Pcf)

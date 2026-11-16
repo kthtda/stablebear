@@ -1,5 +1,4 @@
-"""Tensors and single objects that carry gradients of PyTorch, JAX, or
-TensorFlow.
+"""Tensors and single objects that carry gradients of PyTorch.
 
 A tensor type whose elements are blocks of rows of a fixed width, such as a
 BarcodeTensor with its (birth, death) bars, opts in by setting a ``_tracking``
@@ -87,17 +86,14 @@ def _widths(groups: tuple, columns: int) -> list[int]:
 
 
 def _concrete_content(parts: list, groups: tuple, np_dtype: Any) -> np.ndarray:
-    """The (m, k) serial content of the parts, with NaN where a framework
-    traces it abstractly."""
+    """The (m, k) serial content of the parts."""
     from . import _autodiff
 
     columns = []
     for part, (_, width) in zip(parts, groups):
         values = part
         if _is_framework(part):
-            values = _autodiff._framework(part).concrete(part)
-            if values is None:
-                values = np.full(tuple(part.shape), np.nan)
+            values = _autodiff._framework(part).to_numpy(part)
         values = np.asarray(values, dtype=np_dtype)
         columns.append(values if width is None else values.reshape(len(values), width))
     return columns[0] if len(columns) == 1 else np.concatenate(columns, axis=1)
@@ -148,7 +144,7 @@ class _TrackedObject:
         return [_autodiff._framework(part).version(part) if _is_framework(part) else None for part in self._parts]
 
     def _concrete(self) -> np.ndarray:
-        """The (m, k) serial content, with NaN where a framework traces it abstractly."""
+        """The (m, k) serial content."""
         return _concrete_content(self._parts, self._tracking.groups, self._np_dtype)
 
     def _untracked(self) -> Any:
@@ -188,10 +184,7 @@ class _TrackedObject:
 
         def rebuild(arrays):
             arrays = [np.asarray(array).reshape(len(content), starts[i + 1] - starts[i]) for i, array in zip(tracked, arrays)]
-            # Whether these are the values the content was read from, as
-            # when the framework is not tracing. The parts are not read
-            # here: TensorFlow forbids reading a variable inside its
-            # operations.
+            # Whether these are the values the content was read from.
             current = all(np.array_equal(array, content[:, starts[i]:starts[i + 1]]) for i, array in zip(tracked, arrays))
             if current and self._plain is not None and self._plain_versions == versions:
                 return self._plain

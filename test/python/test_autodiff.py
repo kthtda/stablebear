@@ -103,8 +103,6 @@ def test_lp_norm_gradient_wrt_pcf_times(fw, p):
     lambda f, F, g: g * 2.0 + f,
 ])
 def test_lp_norm_gradient_wrt_pcf_times_through_arithmetic(fw, p, expr):
-    if fw.traces_abstractly:
-        pytest.skip("Arithmetic needs concrete times")
     f, _ = _f_and_g()
     F, _ = _tensors()
 
@@ -113,33 +111,6 @@ def test_lp_norm_gradient_wrt_pcf_times_through_arithmetic(fw, p, expr):
         return fw.sum(sb.lp_norm(expr(f, F, g), p=p))
 
     _assert_gradient_matches_finite_differences(fw, loss, _TIMES)
-
-
-def test_arithmetic_with_abstract_times_raises():
-    jax = pytest.importorskip("jax")
-    f, _ = _f_and_g()
-
-    def loss(t):
-        g = sb.Pcf(_VALUES, times=jax.numpy.concatenate([jax.numpy.zeros(1), t]))
-        return (sb.lp_norm(f * g, p=1.0)).sum()  # pyright: ignore[reportAttributeAccessIssue]
-
-    with pytest.raises(NotImplementedError, match="order of the breakpoints"):
-        jax.grad(loss)(jax.numpy.asarray(_TIMES))
-
-
-@pytest.mark.parametrize("loss", [
-    lambda fw, x: fw.sum(sb.lp_norm(_tensors()[0] - x * _tensors()[1], p=2.0)),
-    lambda fw, x: fw.sum(sb.lp_norm(sb.Pcf(fw.concat([x * fw.tensor([1.0, -2.0]), fw.tensor([0.0])]),
-                                           times=np.array([0.0, 1.0, 3.0])), p=1.5)),
-    lambda fw, x: fw.sum(sb.persistence.compute_homological_kernel(
-        fw.tensor(_kernel_points()[0]), x * fw.tensor(_kernel_points()[1]))._tvalues),
-], ids=["arithmetic", "values_and_times", "homological_kernel"])
-def test_compiled_gradient_matches_eager(fw, loss):
-    if fw.compiled_value_and_grad is None:
-        pytest.skip("No compiled mode to test")
-    eager = fw.value_and_grad(lambda x: loss(fw, x), 0.3)
-    compiled = fw.compiled_value_and_grad(lambda x: loss(fw, x), 0.3)
-    np.testing.assert_allclose(compiled, eager)
 
 
 def _kernel_points():
@@ -168,22 +139,6 @@ def test_homological_kernel_gradient(fw, wrt):
     _assert_gradient_matches_finite_differences(fw, loss, X if wrt == "X" else Y)
 
 
-def test_kernel_backward_reuses_forward(fw, monkeypatch):
-    from stablebear.persistence import homological_kernel
-
-    calls = []
-    critical_edges = homological_kernel._critical_edges
-
-    def counting(X, Y):
-        calls.append(1)
-        return critical_edges(X, Y)
-
-    monkeypatch.setattr(homological_kernel, "_critical_edges", counting)
-    X, Y = _kernel_points()
-    fw.value_and_grad(lambda P: fw.sum(sb.persistence.compute_homological_kernel(P, Y)._tvalues), X)
-    assert len(calls) == 1
-
-
 def test_stable_rank_of_framework_kernel_matches_numpy(fw):
     X, Y = _kernel_points()
     out = sb.persistence.barcode_to_stable_rank(sb.persistence.compute_homological_kernel(fw.tensor(X), fw.tensor(Y)))
@@ -204,8 +159,6 @@ def test_stable_rank_norm_gradient_wrt_points(fw, p):
 
 
 def test_stable_rank_distance_gradient_wrt_points(fw):
-    if fw.traces_abstractly:
-        pytest.skip("Arithmetic needs concrete times")
     X, _ = _kernel_points()
     target = sb.persistence.barcode_to_stable_rank(
         sb.persistence.compute_homological_kernel(1.5 * X, 1.5 * X * np.array([1.0, 0.25])))
@@ -222,8 +175,6 @@ def _bar_plf():
 
 
 def test_transform_bars_of_framework_kernel_matches_numpy(fw):
-    if fw.traces_abstractly:
-        pytest.skip("Removing bars needs concrete bars")
     X, Y = _kernel_points()
     out = sb.persistence.transform_bars(sb.persistence.compute_homological_kernel(fw.tensor(X), fw.tensor(Y)), _bar_plf())
     expected = sb.persistence.transform_bars(sb.persistence.compute_homological_kernel(X, Y), _bar_plf())[0].to_numpy()
@@ -232,8 +183,6 @@ def test_transform_bars_of_framework_kernel_matches_numpy(fw):
 
 
 def test_transform_bars_removes_empty_bars_of_framework_kernel(fw):
-    if fw.traces_abstractly:
-        pytest.skip("Removing bars needs concrete bars")
     X, Y = _kernel_points()
     f = sb.Plf([[0.0, 0.0], [1.0, 1.0], [2.3, 1.0], [5.0, 2.0]])
     out = sb.persistence.transform_bars(sb.persistence.compute_homological_kernel(fw.tensor(X), fw.tensor(Y)), f)
@@ -243,8 +192,6 @@ def test_transform_bars_removes_empty_bars_of_framework_kernel(fw):
 
 
 def test_transform_bars_removing_every_bar_of_framework_kernel(fw):
-    if fw.traces_abstractly:
-        pytest.skip("Removing bars needs concrete bars")
     X, Y = _kernel_points()
     barcodes = sb.persistence.compute_homological_kernel(fw.tensor(X), fw.tensor(Y))
     # A constant PLF maps every bar to an empty one.
@@ -254,8 +201,6 @@ def test_transform_bars_removing_every_bar_of_framework_kernel(fw):
 
 
 def test_transform_bars_gradient_with_removed_bars(fw):
-    if fw.traces_abstractly:
-        pytest.skip("Removing bars needs concrete bars")
     X, Y = _kernel_points()
     f = sb.Plf([[0.0, 0.0], [1.0, 1.0], [2.3, 1.0], [5.0, 2.0]])
     weights = fw.tensor([[0.5, 1.0], [-1.0, 2.0], [1.5, -0.5]])
@@ -267,25 +212,8 @@ def test_transform_bars_gradient_with_removed_bars(fw):
     _assert_gradient_matches_finite_differences(fw, loss, Y)
 
 
-@pytest.mark.parametrize("compiled", [False, True], ids=["eager", "compiled"])
-def test_transform_bars_of_abstract_bars_raises(fw, compiled):
-    value_and_grad = fw.compiled_value_and_grad if compiled else fw.value_and_grad
-    if value_and_grad is None or not (compiled or fw.traces_abstractly):
-        pytest.skip("Bars are concrete")
-    X, Y = _kernel_points()
-
-    def loss(x):
-        barcodes = sb.persistence.compute_homological_kernel(fw.tensor(X), x * fw.tensor(Y))
-        return fw.sum(sb.persistence.transform_bars(barcodes, _bar_plf())._tvalues)
-
-    with pytest.raises(NotImplementedError, match="abstractly"):
-        value_and_grad(loss, 0.3)
-
-
 @pytest.mark.parametrize("wrt", ["X", "Y"])
 def test_transform_bars_gradient(fw, wrt):
-    if fw.traces_abstractly:
-        pytest.skip("Removing bars needs concrete bars")
     X, Y = _kernel_points()
     weights = fw.tensor([[0.5, 1.0], [-1.0, 2.0], [1.5, -0.5], [2.0, 0.25], [-0.75, 1.25]])
 
@@ -298,8 +226,6 @@ def test_transform_bars_gradient(fw, wrt):
 
 
 def test_stable_rank_norm_of_transformed_bars_gradient(fw):
-    if fw.traces_abstractly:
-        pytest.skip("Removing bars needs concrete bars")
     X, _ = _kernel_points()
 
     def loss(P):
@@ -329,9 +255,6 @@ def test_plf_from_framework_breakpoints_raises(fw):
 
 
 def test_transform_bars_gradient_wrt_plf_values(fw):
-    if fw.traces_abstractly:
-        pytest.skip("Removing bars needs concrete bars")
-
     def loss(v):
         f = sb.Plf(v, times=np.array([0.0, 1.0, 2.0, 3.0]))
         return fw.sum(_plf_bar_weights(fw) * sb.persistence.transform_bars(_plf_bars(), f)._tvalues)
@@ -340,9 +263,6 @@ def test_transform_bars_gradient_wrt_plf_values(fw):
 
 
 def test_transform_bars_gradient_wrt_plf_times(fw):
-    if fw.traces_abstractly:
-        pytest.skip("Removing bars needs concrete bars")
-
     def loss(t):
         f = sb.Plf(np.array([0.0, 1.0, 1.5, 3.0]), times=fw.concat([fw.tensor([0.0]), t]))
         return fw.sum(_plf_bar_weights(fw) * sb.persistence.transform_bars(_plf_bars(), f)._tvalues)
@@ -351,8 +271,6 @@ def test_transform_bars_gradient_wrt_plf_times(fw):
 
 
 def test_transform_bars_gradient_wrt_plf_and_points(fw):
-    if fw.traces_abstractly:
-        pytest.skip("Removing bars needs concrete bars")
     X, Y = _kernel_points()
 
     def loss(x):
@@ -364,25 +282,12 @@ def test_transform_bars_gradient_wrt_plf_and_points(fw):
 
 
 def test_transform_bars_gradient_wrt_plf_at_infinite_death(fw):
-    if fw.traces_abstractly:
-        pytest.skip("Removing bars needs concrete bars")
     bc = sb.persistence.BarcodeTensor([sb.persistence.Barcode([[0.5, np.inf]])])
     # f ends flat, so f(inf) is its last value.
     _, grad = fw.value_and_grad(
         lambda v: fw.sum(sb.persistence.transform_bars(bc, sb.Plf(v, times=np.array([0.0, 1.0, 2.0])))._tvalues),
         np.array([0.0, 2.0, 2.0]))
     np.testing.assert_allclose(grad, [0.5, 0.5, 1.0])
-
-
-def test_transform_bars_with_abstract_plf_raises():
-    jax = pytest.importorskip("jax")
-
-    def loss(v):
-        f = sb.Plf(v, times=np.array([0.0, 1.0]))
-        return sb.persistence.transform_bars(_plf_bars(), f)._tvalues.sum()
-
-    with pytest.raises(NotImplementedError, match="abstractly"):
-        jax.grad(loss)(jax.numpy.array([0.0, 1.0]))
 
 
 def _barcode_batch():
@@ -400,8 +305,6 @@ def _batch_plf_times():
 
 
 def test_transform_bars_of_batch_with_framework_plf_matches_numpy(fw):
-    if fw.traces_abstractly:
-        pytest.skip("Removing bars needs concrete bars")
     values = [0.0, 1.0, 1.0, 3.0]
     out = sb.persistence.transform_bars(_barcode_batch(), sb.Plf(fw.tensor(values), times=_batch_plf_times()))
     expected = sb.persistence.transform_bars(_barcode_batch(), sb.Plf(np.array(values), times=_batch_plf_times()))
@@ -412,8 +315,6 @@ def test_transform_bars_of_batch_with_framework_plf_matches_numpy(fw):
 
 
 def test_transform_bars_of_batch_gradient_wrt_plf_values(fw):
-    if fw.traces_abstractly:
-        pytest.skip("Removing bars needs concrete bars")
     # f is flat on [1, 2], so the bar (1.1, 1.4) is removed.
     weights = fw.tensor([[1.0, 2.0], [-1.0, 0.5], [0.3, 0.7], [0.2, 0.9], [-0.4, 1.1]])
 
@@ -425,8 +326,6 @@ def test_transform_bars_of_batch_gradient_wrt_plf_values(fw):
 
 
 def test_stable_ranks_of_tracked_batch_match_numpy(fw):
-    if fw.traces_abstractly:
-        pytest.skip("Removing bars needs concrete bars")
     values = [0.0, 1.0, 1.5, 3.0]
     out = sb.persistence.barcode_to_stable_rank(
         sb.persistence.transform_bars(_barcode_batch(), sb.Plf(fw.tensor(values), times=_batch_plf_times())))
@@ -439,9 +338,6 @@ def test_stable_ranks_of_tracked_batch_match_numpy(fw):
 
 
 def test_stable_rank_norms_of_tracked_batch_gradient(fw):
-    if fw.traces_abstractly:
-        pytest.skip("Removing bars needs concrete bars")
-
     def loss(v):
         f = sb.Plf(v, times=_batch_plf_times())
         return fw.sum(sb.lp_norm(sb.persistence.barcode_to_stable_rank(
@@ -466,23 +362,6 @@ def test_framework_values_and_times_of_different_lengths_raise(fw):
         sb.Pcf(fw.tensor([0.0, 0.0]), times=np.array([0.0, 1.0, 2.0]))
 
 
-def test_gradient_wrt_keras_variable():
-    tf = pytest.importorskip("tensorflow")
-    keras = pytest.importorskip("keras")
-    if keras.backend.backend() != "tensorflow":
-        pytest.skip("Keras runs on another backend")
-    import stablebear._autodiff_tf  # noqa: F401
-
-    F, G = _tensors()
-    grads = []
-    for param in (keras.Variable(0.3, dtype="float64"), tf.Variable(0.3, dtype=tf.float64)):
-        with tf.GradientTape() as tape:
-            # A Keras variable on the left would convert G itself and fail.
-            loss = tf.reduce_sum(sb.lp_norm(F - G * param, p=2.0))
-        grads.append(tape.gradient(loss, param).numpy())
-    np.testing.assert_allclose(grads[0], grads[1])
-
-
 def test_serial_content_round_trip():
     F, _ = _tensors()
     content, enumeration = F._serial()
@@ -502,8 +381,6 @@ def _expected_batch(values):
 
 
 def test_tracked_barcodes_index_and_reshape_like_plain_ones(fw):
-    if fw.traces_abstractly:
-        pytest.skip("Removing bars needs concrete bars")
     values = [0.0, 1.0, 1.5, 3.0]
     out, expected = _tracked_batch(fw, fw.tensor(values)), _expected_batch(values)
     for select in (
@@ -526,9 +403,6 @@ def test_tracked_barcodes_index_and_reshape_like_plain_ones(fw):
 
 
 def test_gradient_through_indexing_tracked_barcodes(fw):
-    if fw.traces_abstractly:
-        pytest.skip("Removing bars needs concrete bars")
-
     def loss(v):
         barcodes = _tracked_batch(fw, v).transpose()[1]
         return fw.sum(sb.lp_norm(sb.persistence.barcode_to_stable_rank(barcodes), p=2.0))
@@ -537,8 +411,6 @@ def test_gradient_through_indexing_tracked_barcodes(fw):
 
 
 def test_tracked_barcodes_cannot_lose_gradients(fw):
-    if fw.traces_abstractly:
-        pytest.skip("Removing bars needs concrete bars")
     out = _tracked_batch(fw, fw.tensor([0.0, 1.0, 1.5, 3.0]))
     with pytest.raises(TypeError, match="copy"):
         sb.persistence.BarcodeTensor(out)
@@ -551,16 +423,12 @@ def test_tracked_barcodes_cannot_lose_gradients(fw):
     pytest.param(lambda barcodes: sb.NestedTensor([barcodes]), id="nested_tensor"),
 ])
 def test_operation_without_gradients_on_tracked_barcodes_raises(fw, operation):
-    if fw.traces_abstractly:
-        pytest.skip("Removing bars needs concrete bars")
     out = _tracked_batch(fw, fw.tensor([0.0, 1.0, 1.5, 3.0]))
     with pytest.raises(NotImplementedError, match="detach"):
         operation(out)
 
 
 def test_detached_tracked_barcodes_are_the_untracked_ones(fw):
-    if fw.traces_abstractly:
-        pytest.skip("Removing bars needs concrete bars")
     out = _tracked_batch(fw, fw.tensor([0.0, 1.0, 1.5, 3.0]))
 
     detached = out.detach()
@@ -570,8 +438,6 @@ def test_detached_tracked_barcodes_are_the_untracked_ones(fw):
 
 
 def test_tracked_barcodes_compare_by_value(fw):
-    if fw.traces_abstractly:
-        pytest.skip("Removing bars needs concrete bars")
     out = _tracked_batch(fw, fw.tensor([0.0, 1.0, 1.5, 3.0]))
     same = _expected_batch([0.0, 1.0, 1.5, 3.0])
     # Doubling the values of the PLF doubles the bars; the empty barcode stays equal.
@@ -587,8 +453,6 @@ def test_tracked_barcodes_compare_by_value(fw):
 
 @pytest.mark.parametrize("round_trip", ROUND_TRIPS)
 def test_saved_tracked_barcodes_load_as_untracked_ones(fw, round_trip):
-    if fw.traces_abstractly:
-        pytest.skip("Removing bars needs concrete bars")
     out = _tracked_batch(fw, fw.tensor([0.0, 1.0, 1.5, 3.0]))
 
     loaded = round_trip(out)
@@ -597,26 +461,7 @@ def test_saved_tracked_barcodes_load_as_untracked_ones(fw, round_trip):
     assert loaded.array_equal(_expected_batch([0.0, 1.0, 1.5, 3.0]))
 
 
-def test_operation_on_kernel_of_framework_points_does_not_convert_it(fw, monkeypatch):
-    from stablebear import _sb_cpp as cpp
-
-    X, Y = _kernel_points()
-    barcodes = sb.persistence.compute_homological_kernel(fw.tensor(X), fw.tensor(Y))
-    calls = []
-    from_serial_content = cpp.barcodes_from_serial_content_64
-
-    def counting(content, enumeration):
-        calls.append(1)
-        return from_serial_content(content, enumeration)
-
-    monkeypatch.setattr(cpp, "barcodes_from_serial_content_64", counting)
-    sb.persistence.transform_bars(barcodes, _bar_plf())
-    assert len(calls) == 0
-
-
 def test_operations_on_tracked_barcodes_convert_them_once(fw, monkeypatch):
-    if fw.traces_abstractly:
-        pytest.skip("Removing bars needs concrete bars")
     from stablebear import _sb_cpp as cpp
 
     calls = []
@@ -840,9 +685,6 @@ def test_betti_curve_of_tracked_barcode_with_infinite_bar_matches_untracked(fw):
 
 
 def test_betti_curve_norm_gradient(fw):
-    if fw.traces_abstractly:
-        pytest.skip("Removing bars needs concrete bars")
-
     def loss(v):
         barcodes = sb.persistence.transform_bars(_barcode_batch(), sb.Plf(v, times=_batch_plf_times()))
         return fw.sum(sb.lp_norm(_betti_curve(barcodes), p=2.0))
@@ -852,9 +694,6 @@ def test_betti_curve_norm_gradient(fw):
 
 @pytest.mark.parametrize("summary", [_accumulated_persistence, _accumulated_persistence_of_early_deaths])
 def test_accumulated_persistence_gradient(fw, summary):
-    if fw.traces_abstractly:
-        pytest.skip("Removing bars needs concrete bars")
-
     # The function does not return to 0, so its norms are infinite: the loss
     # is the sum of time * value over its breakpoints.
     def loss(v):
@@ -862,18 +701,6 @@ def test_accumulated_persistence_gradient(fw, summary):
         return fw.sum(out._ttimes * out._tvalues)
 
     _assert_gradient_matches_finite_differences(fw, loss, [0.0, 1.0, 1.5, 3.0])
-
-
-@pytest.mark.parametrize("summary", [_betti_curve, _accumulated_persistence])
-def test_summary_of_abstract_bars_raises(summary):
-    jax = pytest.importorskip("jax")
-    X, Y = _kernel_points()
-
-    def loss(P):
-        return summary(sb.persistence.compute_homological_kernel(P, jax.numpy.asarray(Y)))._ttimes.sum()
-
-    with pytest.raises(NotImplementedError, match="abstractly"):
-        jax.grad(loss)(jax.numpy.asarray(X))
 
 
 _PAIRWISE = [
@@ -962,9 +789,6 @@ def test_persistent_homology_of_framework_points_with_equal_distances_matches_nu
 
 @pytest.mark.parametrize("dim", [0, 1])
 def test_persistent_homology_gradient(fw, dim):
-    if fw.traces_abstractly:
-        pytest.skip("The number of bars needs concrete points")
-
     def loss(P):
         barcodes = sb.persistence.compute_persistent_homology(P, max_dim=1, reduced=True, verbose=False)
         bars = barcodes[dim:dim + 1]._tvalues
@@ -974,24 +798,11 @@ def test_persistent_homology_gradient(fw, dim):
 
 
 def test_stable_rank_norm_of_persistent_homology_gradient(fw):
-    if fw.traces_abstractly:
-        pytest.skip("The number of bars needs concrete points")
-
     def loss(P):
         barcodes = sb.persistence.compute_persistent_homology(P, max_dim=1, reduced=True, verbose=False)
         return fw.sum(sb.lp_norm(sb.persistence.barcode_to_stable_rank(barcodes), p=2.0))
 
     _assert_gradient_matches_finite_differences(fw, loss, _loop_points())
-
-
-def test_persistent_homology_of_abstract_points_raises():
-    jax = pytest.importorskip("jax")
-
-    def loss(P):
-        return sb.persistence.compute_persistent_homology(P, max_dim=1, reduced=True, verbose=False)._tvalues.sum()
-
-    with pytest.raises(NotImplementedError, match="abstractly"):
-        jax.grad(loss)(jax.numpy.asarray(_loop_points()))
 
 
 def test_persistent_homology_of_framework_array_of_several_point_clouds_matches_numpy(fw):
@@ -1008,8 +819,6 @@ def test_persistent_homology_of_framework_array_of_several_point_clouds_matches_
 
 
 def test_arithmetic_on_stable_rank_with_equal_lifetimes_matches_numpy(fw):
-    if fw.traces_abstractly:
-        pytest.skip("Removing bars needs concrete bars")
     # The bars (0.2, 1.2) and (0.5, 1.5) have the same lifetime, so the
     # tracked stable rank has a repeated time.
     barcodes = sb.persistence.BarcodeTensor([sb.persistence.Barcode([[0.2, 1.2], [0.5, 1.5], [1.0, 3.0]])])

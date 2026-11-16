@@ -278,7 +278,7 @@ SymmetricMatrixTensor._tracking = Tracking(  # pyright: ignore[reportAttributeAc
         rows, np.array([[0, len(rows)]]), np.array([size]))[0],
 )
 
-# A SymmetricMatrixTensor whose entries depend on PyTorch, JAX, or
-# TensorFlow arrays, built from [entries], the enumeration, and the sizes of
+# A SymmetricMatrixTensor whose entries depend on PyTorch
+# tensors, built from [entries], the enumeration, and the sizes of
 # _serial; see _tracked.
 _TrackedSymmetricMatrixTensor = tracked_class(SymmetricMatrixTensor)

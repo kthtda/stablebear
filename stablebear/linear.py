@@ -36,8 +36,7 @@ class _NumPy:
 
 def _in_one_framework(*arrays: Any) -> tuple[Any, list]:
     """The array operations to use for the arrays, and the arrays as that
-    takes them: those of a framework if an array is a PyTorch, JAX, or
-    TensorFlow array, with the NumPy arrays converted to it, and those of
+    takes them: those of a framework if an array is a PyTorch tensor, with the NumPy arrays converted to it, and those of
     NumPy otherwise."""
     like = next((array for array in arrays if _autodiff._framework(array) is not None), None)
     if like is None:
@@ -48,17 +47,14 @@ def _in_one_framework(*arrays: Any) -> tuple[Any, list]:
 
 
 def _matrix(values: Any, name: str) -> Any:
-    """A matrix as a float NumPy array, or as it is if it is a PyTorch, JAX,
-    or TensorFlow array."""
-    values = _autodiff._unwrap(values)
+    """A matrix as a float NumPy array, or as it is if it is a PyTorch tensor."""
     return values if _autodiff._framework(values) is not None else _float_array(values, name)
 
 
-def _concrete(matrix: Any) -> np.ndarray | None:
-    """The values of a matrix, or None while a framework traces it
-    abstractly."""
+def _values(matrix: Any) -> np.ndarray:
+    """The values of a matrix, a NumPy or a framework array."""
     adapter = _autodiff._framework(matrix)
-    return matrix if adapter is None else adapter.concrete(matrix)
+    return matrix if adapter is None else adapter.to_numpy(matrix)
 
 
 def _public(matrix: Any) -> Any:
@@ -73,11 +69,10 @@ def _is_float32(array: Any) -> bool:
 
 def _as_point_cloud(points: Any) -> Any:
     """A single point cloud from an (n, d) array, FloatTensor, or
-    PointCloud, as a PointCloud; a PyTorch, JAX, or TensorFlow array of
+    PointCloud, as a PointCloud; a PyTorch tensor of
     shape (n, d), or a batch of clouds as a PointCloudTensor, as it is; and
     such an array of shape (..., n, d) as a PointCloudTensor that carries
     gradients."""
-    points = _autodiff._unwrap(points)
     if isinstance(points, PointCloudTensor):
         return points
     if isinstance(points, TimeSeries):
@@ -119,16 +114,14 @@ class InnerProduct:
     gram : array_like
         The Gram matrix, of shape ``(d, d)``, symmetric and positive
         definite. A ``float32`` array gives a ``float32`` inner product,
-        and any other real array a ``float64`` one. A PyTorch, JAX, or
-        TensorFlow array makes the results of operations that use the inner
+        and any other real array a ``float64`` one. A PyTorch tensor makes the results of operations that use the inner
         product carry gradients with respect to it.
 
     Raises
     ------
     ValueError
         If ``gram`` is not a square matrix, not symmetric, or not positive
-        definite. A matrix that JAX or ``tf.function`` traces is checked
-        for its shape only.
+        definite.
     TypeError
         If ``gram`` does not hold real numbers.
 
@@ -147,20 +140,19 @@ class InnerProduct:
         gram = _matrix(gram, "The Gram matrix")
         if len(gram.shape) != 2 or gram.shape[0] != gram.shape[1]:
             raise ValueError(f"The Gram matrix must be square (got shape {tuple(gram.shape)}).")
-        values = _concrete(gram)
-        if values is not None:
-            if not np.allclose(values, values.T):
-                raise ValueError("The Gram matrix must be symmetric.")
-            try:
-                np.linalg.cholesky(values)
-            except np.linalg.LinAlgError:
-                raise ValueError("The Gram matrix must be positive definite.") from None
+        values = _values(gram)
+        if not np.allclose(values, values.T):
+            raise ValueError("The Gram matrix must be symmetric.")
+        try:
+            np.linalg.cholesky(values)
+        except np.linalg.LinAlgError:
+            raise ValueError("The Gram matrix must be positive definite.") from None
         self._gram = gram
 
     @property
     def gram(self) -> Any:
         """The Gram matrix, of shape ``(d, d)``: a ``FloatTensor``, or the
-        PyTorch, JAX, or TensorFlow array that the inner product was made
+        PyTorch tensor that the inner product was made
         from."""
         return _public(self._gram)
 
@@ -183,7 +175,7 @@ class InnerProduct:
         ----------
         points : PointCloud, FloatTensor, or numpy.ndarray
             A point cloud of shape ``(n, d)``, one point per row, which may
-            be a PyTorch, JAX, or TensorFlow array, or a batch of point
+            be a PyTorch tensor, or a batch of point
             clouds as a ``PointCloudTensor`` or a time series of point
             clouds.
 
@@ -202,11 +194,7 @@ class InnerProduct:
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, InnerProduct):
             return NotImplemented
-        if self._gram is other._gram:
-            return True
-        values, other_values = _concrete(self._gram), _concrete(other._gram)
-        # Matrices that a framework traces are equal only if they are the same.
-        return values is not None and other_values is not None and np.array_equal(values, other_values)
+        return self._gram is other._gram or np.array_equal(_values(self._gram), _values(other._gram))
 
     __hash__ = None  # type: ignore[assignment]
 
@@ -234,7 +222,7 @@ class Distance:
         ----------
         points : PointCloud, FloatTensor, or numpy.ndarray
             A point cloud of shape ``(n, d)``, one point per row, which may
-            be a PyTorch, JAX, or TensorFlow array, or a batch of point
+            be a PyTorch tensor, or a batch of point
             clouds as a ``PointCloudTensor`` or a time series of point
             clouds.
 
@@ -387,7 +375,7 @@ class DistanceSpace:
     ----------
     points : PointCloud, FloatTensor, or numpy.ndarray
         A point cloud of shape ``(n, d)``, one point per row, which may be a
-        PyTorch, JAX, or TensorFlow array, or a batch of point clouds as a
+        PyTorch tensor, or a batch of point clouds as a
         ``PointCloudTensor`` or a time series of point clouds.
     distance : Distance
         The distance between the points.
@@ -410,8 +398,7 @@ class DistanceSpace:
 
     @property
     def points(self) -> Any:
-        """The points, as a ``PointCloud``, as the PyTorch, JAX, or
-        TensorFlow array that they were given as, or as the
+        """The points, as a ``PointCloud``, as the PyTorch tensor that they were given as, or as the
         ``PointCloudTensor`` or time series of a batch."""
         return self._points
 
@@ -445,7 +432,7 @@ class InnerProductSpace(DistanceSpace):
     ----------
     points : PointCloud, FloatTensor, or numpy.ndarray
         A point cloud of shape ``(n, d)``, one point per row, which may be a
-        PyTorch, JAX, or TensorFlow array, or a batch of point clouds as a
+        PyTorch tensor, or a batch of point clouds as a
         ``PointCloudTensor`` or a time series of point clouds.
     inner_product : InnerProduct
         The inner product, on vectors of dimension ``d``.
@@ -481,15 +468,14 @@ class LinearSubspace:
         vectors of dimension ``d``. They must be linearly independent, but
         need not be orthogonal or of unit length. A ``float32`` array gives
         a ``float32`` subspace, and any other real array a ``float64`` one.
-        A PyTorch, JAX, or TensorFlow array makes projections onto the
+        A PyTorch tensor makes projections onto the
         subspace carry gradients with respect to the vectors.
 
     Raises
     ------
     ValueError
         If ``vectors`` is not a matrix, has no rows, or its rows are
-        linearly dependent. Vectors that JAX or ``tf.function`` traces are
-        checked for their shape only.
+        linearly dependent.
     TypeError
         If ``vectors`` does not hold real numbers.
 
@@ -510,15 +496,14 @@ class LinearSubspace:
             raise ValueError(
                 "The vectors must be the rows of an array of shape (k, d) with k >= 1 "
                 f"(got shape {tuple(vectors.shape)}).")
-        values = _concrete(vectors)
-        if values is not None and np.linalg.matrix_rank(values) < values.shape[0]:
+        if np.linalg.matrix_rank(_values(vectors)) < vectors.shape[0]:
             raise ValueError("The vectors must be linearly independent.")
         self._vectors = vectors
 
     @property
     def vectors(self) -> Any:
         """The vectors that span the subspace, as the rows of a ``(k, d)``
-        ``FloatTensor``, or the PyTorch, JAX, or TensorFlow array that the
+        ``FloatTensor``, or the PyTorch tensor that the
         subspace was made from."""
         return _public(self._vectors)
 
@@ -565,7 +550,7 @@ class LinearSubspace:
         ----------
         points : PointCloud, PointCloudTensor, TimeSeries, FloatTensor, numpy.ndarray, or InnerProductSpace
             A point cloud of shape ``(n, d)``, one point per row, which may
-            be a PyTorch, JAX, or TensorFlow array; a batch of point clouds
+            be a PyTorch tensor; a batch of point clouds
             as a ``PointCloudTensor`` or a time series of point clouds,
             each of which is projected; or any of these with its inner
             product.
@@ -579,9 +564,9 @@ class LinearSubspace:
             time series, and an ``InnerProductSpace`` with the same inner
             product for an ``InnerProductSpace``. If the points, the
             vectors of the subspace, or the Gram matrix of the inner
-            product are PyTorch, JAX, or TensorFlow arrays, the projected
+            product are PyTorch tensors, the projected
             points carry gradients with respect to each of them that is
-            one: an array of that framework for a single point cloud, and
+            one: a PyTorch tensor for a single point cloud, and
             a ``PointCloudTensor`` that carries gradients for a batch.
 
         Raises

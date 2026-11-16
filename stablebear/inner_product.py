@@ -6,7 +6,7 @@ from . import _autodiff
 from . import _sb_cpp as cpp
 from ._tracked import is_tracked
 from .async_task import _run_task
-from .distance import _pairwise_out, _pairwise_weights
+from .distance import _pairwise_weights
 from .symmetric_matrix import SymmetricMatrix
 from .base_tensor import PcfContainerLike, _resolve_pcf_inputs
 from .typing import pcf32, pcf64
@@ -20,7 +20,7 @@ def _l2_kernel_vjp(grad_out, fs, verbose=False):
     return (cpp.l2_kernel_grad(X._data, _pairwise_weights(grad_out, X)),)
 
 
-@_autodiff.differentiable("fs", vjp=_l2_kernel_vjp, out=_pairwise_out)
+@_autodiff.differentiable("fs", vjp=_l2_kernel_vjp)
 def _tracked_l2_kernel(fs: Any, verbose: bool = False) -> Any:
     """l2_kernel of PCFs that carry gradients, as an (n, n) framework array."""
     return l2_kernel(fs, verbose).to_dense()
@@ -47,7 +47,7 @@ def l2_kernel(fs: PcfContainerLike, verbose=False) -> SymmetricMatrix:
     -------
     SymmetricMatrix
         A compressed symmetric kernel matrix. If the PCFs of `fs` carry
-        gradients, the kernel instead as a PyTorch, JAX, or TensorFlow
+        gradients, the kernel instead as a PyTorch
         array of shape ``(n, n)``, which carries gradients with respect to the
         breakpoint times and values of the PCFs.
 
@@ -58,8 +58,7 @@ def l2_kernel(fs: PcfContainerLike, verbose=False) -> SymmetricMatrix:
 
     Notes
     -----
-    The PCFs carry gradients when their times or values depend on PyTorch,
-    JAX, or TensorFlow arrays (see :class:`~stablebear.functional.pcf.Pcf`).
+    The PCFs carry gradients when their times or values depend on PyTorch tensors (see :class:`~stablebear.functional.pcf.Pcf`).
     The gradient with respect to the first time of a PCF and to its last
     value, which holds on an infinite interval, is 0. Where breakpoints of
     two PCFs share a time, the derivative of their product with respect to

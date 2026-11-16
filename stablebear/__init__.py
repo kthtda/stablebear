@@ -60,12 +60,6 @@ from .typing import (
 
 from . import distributions
 
-import sys as _sys
-if "tensorflow" in _sys.modules:
-    # Keeps TensorFlow from converting PCFs in binary operators; see _autodiff_tf.
-    from . import _autodiff_tf  # noqa: F401
-del _sys
-
 import types as _types
 __all__ = sorted(
     name for name in set(dir()) - __before - {"__before"}

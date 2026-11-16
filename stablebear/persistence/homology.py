@@ -57,11 +57,6 @@ def compute_persistent_homology(
 ) -> BarcodeTensor: ...
 
 
-_ABSTRACT_POINTS = (
-    "compute_persistent_homology of points that JAX or tf.function traces abstractly is not supported: "
-    "the number of bars depends on their values.")
-
-
 def _tracked_persistent_homology(X: Any, max_dim: int, reduced: bool, distance: Any = None) -> Any:
     """The barcodes of point clouds that carry gradients, with bars that
     carry gradients with respect to the points, in the shape of the
@@ -84,8 +79,6 @@ def _tracked_persistent_homology(X: Any, max_dim: int, reduced: bool, distance: 
         raise NotImplementedError(
             "compute_persistent_homology with gradients supports point clouds of shape (..., n, d) and "
             "PointCloudTensors only.")
-    if adapter.concrete(points) is None:
-        raise NotImplementedError(_ABSTRACT_POINTS)
     if distance is None:
         elements, lengths = plain, adapter.row_norms
     else:
@@ -180,15 +173,12 @@ def compute_persistent_homology(
     ------
     TypeError
         If ``distance_type`` is passed with a ``DistanceSpace``.
-    NotImplementedError
-        If the points carry gradients that JAX or ``tf.function`` traces:
-        the number of bars depends on the points.
 
     Notes
     -----
-    If ``X`` is a PyTorch, JAX, or TensorFlow array of shape
+    If ``X`` is a PyTorch tensor of shape
     ``(..., n, d)``, or a ``PointCloudTensor`` that carries gradients, such
-    as one made from a list of such arrays or by a projection, the bars of
+    as one made from a list of such tensors or by a projection, the bars of
     the result carry gradients with respect to the points. Each finite, positive endpoint of a bar is the distance
     between two points, the longest edge of the simplex that creates or
     destroys the class, and its gradient is that of this distance. An
@@ -197,7 +187,7 @@ def compute_persistent_homology(
 
     The same holds for the points of a ``DistanceSpace``, in its distance,
     and with the distance of an inner product the bars also carry
-    gradients with respect to its Gram matrix when that is such an array.
+    gradients with respect to its Gram matrix when that is a PyTorch tensor.
 
     """
 

@@ -85,71 +85,12 @@ def _normalize_kernel_input(X, name: str):
     raise TypeError(f"compute_homological_kernel does not support {name} of type {type(X)}")
 
 
-def _critical_edges(X: np.ndarray, Y: np.ndarray):
-    """(bars, critical edges) of the kernel of one pair of (n, d) point clouds."""
-    X, Y = np.asarray(X), np.asarray(Y)
-    dtype = np.result_type(X.dtype, Y.dtype, np.float32)
-    backend = cpp_p.HomologicalKernel32 if dtype == np.float32 else cpp_p.HomologicalKernel64
-    return backend.homological_kernel_critical_edges(
-        PointCloud(X.astype(dtype))._cpp_point_cloud(), PointCloud(Y.astype(dtype))._cpp_point_cloud())
-
-
-def _kernel_bars_vjp(grad_out, X, Y, residuals):
-    """Gradients of sum(grad_out * bars) with respect to the points of X and Y.
-
-    Each birth is the distance between two points of Y, and each death the
-    distance between two points of X; the gradient of |p_i - p_j| is the unit
-    vector from p_j to p_i at p_i and its negative at p_j.
-    """
-    X, Y = np.asarray(X, dtype=np.float64), np.asarray(Y, dtype=np.float64)
-    (edges,) = residuals
-    grads = []
-    for points, (i, j), weights in ((X, edges[:, 2:].T, grad_out[:, 1]), (Y, edges[:, :2].T, grad_out[:, 0])):
-        diff = points[i] - points[j]
-        length = np.linalg.norm(diff, axis=1, keepdims=True)
-        step = weights[:, None] * np.divide(diff, length, out=np.zeros_like(diff), where=length > 0)
-        grad = np.zeros_like(points)
-        np.add.at(grad, i, step)
-        np.add.at(grad, j, -step)
-        grads.append(grad)
-    return tuple(grads)
-
-
-def _kernel_bars_out(X, Y):
-    n = X.shape[0]
-    # The bars are float32 only if both point clouds are.
-    both_float32 = all(str(P.dtype).endswith("float32") for P in (X, Y))
-    return np.array([[0, max(n - 1, 0)]]), np.float32 if both_float32 else np.float64
-
-
-def _kernel_bars_residuals(X, Y):
-    return [((max(X.shape[0] - 1, 0), 4), np.int64)]
-
-
-@_autodiff.differentiable(
-    "X", "Y", vjp=_kernel_bars_vjp, out=_kernel_bars_out, residuals=_kernel_bars_residuals,
-    returns=BarcodeTensor)
-def _tracked_kernel(X: Any, Y: Any) -> Any:
-    """The kernel of one pair of (n, d) point clouds given as framework
-    arrays, as a BarcodeTensor of shape (1,) that carries its n - 1 bars as a
-    framework array, and as residuals the critical edges, which the vjp
-    reuses."""
-    bars, edges = _critical_edges(X, Y)
-    return BarcodeTensor._from_serial(bars, np.array([[0, len(bars)]])), (edges,)
-
-
 def _validate_kernel_pair(X, Y):
     """Check that a normalized (X, Y) pair matches in dtype and shape."""
     if X.dtype != Y.dtype:
         raise TypeError(f"X and Y must have the same dtype (got {X.dtype} and {Y.dtype})")
     if X.shape != Y.shape:
         raise ValueError(f"X and Y must have the same shape (got {X.shape} and {Y.shape})")
-
-
-_ABSTRACT_BATCH = (
-    "compute_homological_kernel of batches, or in a distance that is computed from pairs of points, is not "
-    "supported for points that JAX or tf.function traces abstractly: the gradients follow pairs of points "
-    "that depend on their values.")
 
 
 def _tracked_kernel_of_batches(X: Any, Y: Any, distance: Any = None) -> BarcodeTensor:
@@ -162,7 +103,7 @@ def _tracked_kernel_of_batches(X: Any, Y: Any, distance: Any = None) -> BarcodeT
     Each birth is the distance between two points of Y and each death the
     distance between two points of X. C++ reports these pairs with the
     bars, and the bars are their distances again as framework operations
-    on the points (see _critical_edges). This needs concrete points.
+    on the points (see _critical_edges).
     """
     if isinstance(X, PointCloudTensor) != isinstance(Y, PointCloudTensor):
         raise TypeError(
@@ -172,8 +113,6 @@ def _tracked_kernel_of_batches(X: Any, Y: Any, distance: Any = None) -> BarcodeT
     _validate_kernel_pair(X, Y)
     (x_points, x_starts, x_plain), (y_points, y_starts, y_plain) = batch_parts(X), batch_parts(Y)
     adapter, (x_points, y_points) = _in_one_framework(x_points, y_points)
-    if adapter.concrete(x_points) is None or adapter.concrete(y_points) is None:
-        raise NotImplementedError(_ABSTRACT_BATCH)
 
     if distance is None:
         elements, lengths = [x_plain, y_plain], adapter.row_norms
@@ -247,7 +186,7 @@ def compute_homological_kernel(
     X : PointCloud, PointCloudTensor, DistanceMatrix, DistanceMatrixTensor, FloatTensor, numpy.ndarray, or DistanceSpace
         Input data for :math:`d`. A ``FloatTensor`` or NumPy array is
         interpreted as a single point cloud (one row per point), and so is
-        a PyTorch, JAX, or TensorFlow array (see Notes). A
+        a PyTorch tensor (see Notes). A
         :class:`~stablebear.linear.DistanceSpace` holds a point cloud, or a
         batch of them, with the distance to use between its points.
     Y : PointCloud, PointCloudTensor, DistanceMatrix, DistanceMatrixTensor, FloatTensor, numpy.ndarray, or DistanceSpace
@@ -286,7 +225,7 @@ def compute_homological_kernel(
 
     Notes
     -----
-    If ``X``, ``Y``, or both are PyTorch, JAX, or TensorFlow arrays of shape
+    If ``X``, ``Y``, or both are PyTorch tensors of shape
     ``(n, d)``, each a single point cloud, the bars of the result carry
     gradients with respect to the points. The other input may then be a
     NumPy array. Each birth is the distance between two points of ``Y`` and
@@ -296,15 +235,12 @@ def compute_homological_kernel(
     The same holds for the points of two ``DistanceSpace`` objects, in
     their distance, and with the distance of an inner product the bars
     also carry gradients with respect to its Gram matrix when that is such
-    an array. With an :class:`~stablebear.linear.LpDistance` other than
-    ``LpDistance(2)``, points that JAX or ``tf.function`` traces raise
-    ``NotImplementedError``.
+    a tensor.
 
     Batches carry gradients as well: ``PointCloudTensor`` objects of which
     at least one carries gradients, such as one made from a list of
-    PyTorch, JAX, or TensorFlow arrays or by a projection, or such arrays
-    of shape ``(..., n, d)``. Batches that JAX or ``tf.function`` traces
-    raise ``NotImplementedError``.
+    PyTorch tensors or by a projection, or PyTorch tensors of shape
+    ``(..., n, d)``.
 
     """
     from ..tensor_create import zeros
@@ -319,11 +255,10 @@ def compute_homological_kernel(
 
     if _autodiff._tracked(X) is not None or _autodiff._tracked(Y) is not None:
         # A framework array of more than two dimensions is a batch of clouds.
-        X, Y = (PointCloudTensor(points) if _autodiff._framework(_autodiff._unwrap(points)) is not None
-                and len(_autodiff._unwrap(points).shape) > 2 else points for points in (X, Y))
-        if isinstance(X, PointCloudTensor) or isinstance(Y, PointCloudTensor):
-            return _tracked_kernel_of_batches(X, Y)
-        return _tracked_kernel(X, Y)
+        batches: list[Any] = [
+            PointCloudTensor(points) if _autodiff._framework(points) is not None and len(points.shape) > 2
+            else points for points in (X, Y)]
+        return _tracked_kernel_of_batches(*batches)
 
     X = _normalize_kernel_input(X, "X")
     Y = _normalize_kernel_input(Y, "Y")

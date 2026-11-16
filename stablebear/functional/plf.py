@@ -46,7 +46,7 @@ class Plf(_PiecewiseFunction, _BinaryIoMixin):
     times : array_like, optional
         The breakpoint times, with shape ``(n,)``, when ``arr`` holds only
         the values, also with shape ``(n,)``. The values and the times may
-        be PyTorch, JAX, or TensorFlow arrays, and the PLF then carries
+        be PyTorch tensors, and the PLF then carries
         gradients with respect to them through
         :func:`~stablebear.persistence.barcode_summary.transform_bars`.
 
@@ -55,9 +55,6 @@ class Plf(_PiecewiseFunction, _BinaryIoMixin):
     ValueError
         If there are no breakpoints, the first time is not 0, the times are
         not strictly increasing, or a time is not finite.
-    NotImplementedError
-        If the times are traced abstractly, as by ``jax.grad`` or
-        ``tf.function``, so that their order cannot be checked.
     TypeError
         If ``dtype`` is not ``float32`` or ``float64``, or an array does not
         hold real numbers.
@@ -85,11 +82,8 @@ class Plf(_PiecewiseFunction, _BinaryIoMixin):
         if cls is Plf and times is not None:
             content, ttimes, tvalues = _autodiff.content_from_values(times, arr)
             if ttimes is not None or tvalues is not None:
-                if np.isnan(content[:, 0]).any():
-                    raise NotImplementedError(
-                        "PLF breakpoint times that JAX or tf.function traces abstractly are not supported: "
-                        "their order cannot be checked.")
-                # A PLF that carries gradients; see _tracked.
+                # A PLF that carries gradients; see _tracked. Plf(content)
+                # checks the times.
                 return _TrackedPlf(
                     [ttimes if ttimes is not None else content[:, 0],
                      tvalues if tvalues is not None else content[:, 1]],
@@ -107,7 +101,7 @@ class Plf(_PiecewiseFunction, _BinaryIoMixin):
             arr = _autodiff.content_from_values(times, arr)[0]
         elif _autodiff._framework(arr) is not None:
             raise TypeError(
-                "To build a PLF from a PyTorch, JAX, or TensorFlow array, pass the values "
+                "To build a PLF from a PyTorch tensor, pass the values "
                 "and the times separately: Plf(values, times=times)."
             )
 
@@ -191,7 +185,7 @@ Plf._tracking = Tracking(  # pyright: ignore[reportAttributeAccessIssue]
     attributes=lambda np_dtype: {"_dtype": float32 if np_dtype == np.float32 else float64},
 )
 
-# A Plf whose breakpoint times, values, or both depend on PyTorch, JAX, or
-# TensorFlow arrays, built from [times, values] and the enumeration of
+# A Plf whose breakpoint times, values, or both depend on PyTorch
+# tensors, built from [times, values] and the enumeration of
 # _serial; see _tracked.
 _TrackedPlf = tracked_class(Plf)

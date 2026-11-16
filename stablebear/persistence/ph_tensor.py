@@ -129,6 +129,6 @@ BarcodeTensor._tracking = Tracking(  # pyright: ignore[reportAttributeAccessIssu
     element=Barcode,
 )
 
-# A BarcodeTensor whose bars depend on PyTorch, JAX, or TensorFlow arrays,
+# A BarcodeTensor whose bars depend on PyTorch tensors,
 # built from [bars] and the enumeration of _serial; see _tracked.
 _TrackedBarcodeTensor = tracked_class(BarcodeTensor)

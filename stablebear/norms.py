@@ -11,8 +11,6 @@ from .base_tensor import FloatTensor, PcfContainerLike, _resolve_pcf_inputs
 from .typing import pcf32, pcf64
 
 if TYPE_CHECKING:
-    import jax
-    import tensorflow as tf
     import torch
 
 
@@ -36,20 +34,11 @@ def _lp_norm_vjp(grad_out, fs, p, verbose=False):
     return (dnorm_dfs, np.sum(grad_out * np.asarray(dnorm_dp)))
 
 
-def _lp_norm_out(fs, p, verbose=False):
-    _, X = _resolve_pcf_inputs(_NORMS_BACKEND_MAP, fs)
-    return tuple(X.shape), np.float32 if X.dtype is pcf32 else np.float64
-
-
 @overload
 def lp_norm(fs: PcfContainerLike, p: float = 1, verbose: bool = False) -> FloatTensor: ...
 @overload
 def lp_norm(fs: PcfContainerLike, p: torch.Tensor, verbose: bool = False) -> torch.Tensor: ...
-@overload
-def lp_norm(fs: PcfContainerLike, p: jax.Array, verbose: bool = False) -> jax.Array: ...
-@overload
-def lp_norm(fs: PcfContainerLike, p: tf.Tensor | tf.Variable, verbose: bool = False) -> tf.Tensor: ...
-@_autodiff.differentiable("fs", "p", vjp=_lp_norm_vjp, out=_lp_norm_out)
+@_autodiff.differentiable("fs", "p", vjp=_lp_norm_vjp)
 def lp_norm(fs: PcfContainerLike, p: Any = 1, verbose: bool = False) -> Any:
     r"""Computes the :math:`L_p` norm of each PCF in `fs`. For example, if `fs` is an :math:`m \times n` array with elements indexed as :math:`f_{ij}`, :math:`0 \leq i < m, 0 \leq j < n`, we compute
 
@@ -70,18 +59,16 @@ def lp_norm(fs: PcfContainerLike, p: Any = 1, verbose: bool = False) -> Any:
       ----------
       fs : PcfContainerLike
           PCFs whose norms are to be computed.
-      p : float, torch.Tensor, jax.Array, or tf.Tensor, optional
+      p : float or torch.Tensor, optional
           :math:`p` parameter in the :math:`L_p` norm, by default 1. If `p`
-          is a scalar ``torch.Tensor``, ``jax.Array``, or ``tf.Tensor``
-          (or ``tf.Variable``), the norms are
-          returned as a tensor of that framework that carries gradients
-          with respect to `p`.
+          is a scalar ``torch.Tensor``, the norms are returned as a
+          ``torch.Tensor`` that carries gradients with respect to `p`.
       verbose : bool, optional
           Print additional information during the computation, by default False
 
       Returns
       -------
-      FloatTensor, torch.Tensor, jax.Array, or tf.Tensor
+      FloatTensor or torch.Tensor
         Tensor of the same shape as `fs` with :math:`L_p` norms of the input functions.
       """
 

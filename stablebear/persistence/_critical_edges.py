@@ -27,7 +27,6 @@ def as_batch(points: Any) -> PointCloudTensor:
     array of more dimensions as the batch of clouds it holds."""
     if isinstance(points, PointCloudTensor):
         return points
-    points = _autodiff._unwrap(points)
     if _autodiff._framework(points) is not None and len(points.shape) > 2:
         return PointCloudTensor(points)
     return PointCloudTensor([points])

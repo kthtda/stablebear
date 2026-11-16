@@ -70,11 +70,6 @@ def lp_distance(f: Pcf, g: Pcf, p: float = 1) -> float:
         return float(backend.lp_distance_lp(f._data, g._data, float(p)))
 
 
-def _pairwise_out(fs, *args, **kwargs):
-    n = fs.shape[0]
-    return (n, n), np.float32 if fs.dtype is pcf32 else np.float64
-
-
 def _pairwise_weights(grad_out, X) -> np.ndarray:
     """What cpp.pdist_grad and cpp.l2_kernel_grad take as weights for the
     gradient of a symmetric (n, n) result: each entry counts for both of its
@@ -88,7 +83,7 @@ def _pdist_vjp(grad_out, fs, p, verbose=False):
     return (cpp.pdist_grad(X._data, _pairwise_weights(grad_out, X), float(p)),)
 
 
-@_autodiff.differentiable("fs", vjp=_pdist_vjp, out=_pairwise_out)
+@_autodiff.differentiable("fs", vjp=_pdist_vjp)
 def _tracked_pdist(fs: Any, p: float, verbose: bool = False) -> Any:
     """pdist of PCFs that carry gradients, as an (n, n) framework array."""
     return pdist(fs, p, verbose).to_dense()
@@ -117,7 +112,7 @@ def pdist(fs: PcfContainerLike, p: float = 1, verbose: bool = False) -> Distance
     -------
     DistanceMatrix
         A compressed symmetric distance matrix. If the PCFs of `fs` carry
-        gradients, the distances instead as a PyTorch, JAX, or TensorFlow
+        gradients, the distances instead as a PyTorch
         array of shape ``(n, n)``, which carries gradients with respect to the
         breakpoint times and values of the PCFs.
 
@@ -128,8 +123,7 @@ def pdist(fs: PcfContainerLike, p: float = 1, verbose: bool = False) -> Distance
 
     Notes
     -----
-    The PCFs carry gradients when their times or values depend on PyTorch,
-    JAX, or TensorFlow arrays (see :class:`~stablebear.functional.pcf.Pcf`).
+    The PCFs carry gradients when their times or values depend on PyTorch tensors (see :class:`~stablebear.functional.pcf.Pcf`).
     The gradient with respect to the first time of a PCF and to its last
     value, which holds on an infinite interval, is 0. Where breakpoints of
     two PCFs share a time, the derivative of their distance with respect to

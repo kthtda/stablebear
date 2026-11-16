@@ -309,19 +309,6 @@ def test_projection_gradient(fw, loss, x0):
     assert_gradient_matches_finite_differences(fw, lambda x: loss(fw, x), x0)
 
 
-@pytest.mark.parametrize("loss, x0", _losses())
-def test_compiled_projection_gradient_matches_eager(fw, loss, x0):
-    if fw.compiled_value_and_grad is None:
-        pytest.skip("No compiled mode")
-    x0 = np.asarray(x0, dtype=np.float64)
-
-    value, grad = fw.compiled_value_and_grad(lambda x: loss(fw, x), x0)
-    eager_value, eager_grad = fw.value_and_grad(lambda x: loss(fw, x), x0)
-
-    np.testing.assert_allclose(value, eager_value)
-    np.testing.assert_allclose(grad, eager_grad)
-
-
 def test_distance_space_gives_its_points_and_distance_back():
     distance = sb.InnerProduct(_gram()).distance
     points = np.array([[1.0, 10.0],
@@ -425,9 +412,6 @@ def _bars_loss(fw, barcodes):
 
 
 def test_persistent_homology_gradient_wrt_gram_matrix(fw):
-    if fw.traces_abstractly:
-        pytest.skip("The number of bars needs concrete points")
-
     def loss(a):
         return _bars_loss(fw, _homology(sb.InnerProduct(_framework_gram2(fw, a))(_loop_points())))
 
@@ -435,9 +419,6 @@ def test_persistent_homology_gradient_wrt_gram_matrix(fw):
 
 
 def test_persistent_homology_in_inner_product_space_gradient_wrt_points(fw):
-    if fw.traces_abstractly:
-        pytest.skip("The number of bars needs concrete points")
-
     def loss(P):
         return _bars_loss(fw, _homology(sb.InnerProduct(_gram())(P)))
 
@@ -513,17 +494,6 @@ def _projection_kernel_loss(fw, vectors):
 
 def test_kernel_of_cloud_and_its_projection_gradient_wrt_subspace(fw):
     assert_gradient_matches_finite_differences(fw, lambda V: _projection_kernel_loss(fw, V), _vectors())
-
-
-def test_compiled_kernel_of_cloud_and_its_projection_gradient_matches_eager(fw):
-    if fw.compiled_value_and_grad is None:
-        pytest.skip("No compiled mode")
-
-    value, grad = fw.compiled_value_and_grad(lambda V: _projection_kernel_loss(fw, V), _vectors())
-    eager_value, eager_grad = fw.value_and_grad(lambda V: _projection_kernel_loss(fw, V), _vectors())
-
-    np.testing.assert_allclose(value, eager_value)
-    np.testing.assert_allclose(grad, eager_grad)
 
 
 def test_kernel_gradient_wrt_gram_matrix(fw):
@@ -613,9 +583,6 @@ def test_persistent_homology_under_lp_distance_of_framework_points_matches_numpy
 
 @pytest.mark.parametrize("p", [1.0, 3.0])
 def test_persistent_homology_under_lp_distance_gradient(fw, p):
-    if fw.traces_abstractly:
-        pytest.skip("The number of bars needs concrete points")
-
     def loss(P):
         return _bars_loss(fw, _homology(sb.LpDistance(p)(P)))
 
@@ -637,8 +604,6 @@ def test_kernel_under_lp_distance_of_framework_points_matches_numpy(fw, p):
 @pytest.mark.parametrize("p", [1.0, 3.0])
 @pytest.mark.parametrize("wrt", ["X", "Y"])
 def test_kernel_under_lp_distance_gradient(fw, p, wrt):
-    if fw.traces_abstractly:
-        pytest.skip("The critical edges need concrete points")
     distance = sb.LpDistance(p)
     X, Y = _lp_points(), _contracted(_lp_points())
 
@@ -647,16 +612,6 @@ def test_kernel_under_lp_distance_gradient(fw, p, wrt):
         return fw.sum(bars[:, 0] * bars[:, 0]) + fw.sum(bars[:, 1] * bars[:, 1])
 
     assert_gradient_matches_finite_differences(fw, loss, X if wrt == "X" else Y)
-
-
-@pytest.mark.parametrize("operation", [
-    pytest.param(lambda P: _homology(sb.LpDistance(1)(P)), id="persistent_homology"),
-    pytest.param(lambda P: _kernel(sb.LpDistance(1)(P), sb.LpDistance(1)(_contracted(_lp_points()))), id="kernel"),
-])
-def test_lp_distance_of_abstract_points_raises(operation):
-    jax = pytest.importorskip("jax")
-    with pytest.raises(NotImplementedError, match="abstractly"):
-        jax.grad(lambda P: operation(P)._tvalues.sum())(jax.numpy.asarray(_lp_points()))
 
 
 def _batch3():
@@ -915,8 +870,6 @@ def test_persistent_homology_of_tracked_batch_of_one_point_cloud_has_no_batch_ax
 
 @pytest.mark.parametrize("make_distance", _TRACKED_BATCH_DISTANCES)
 def test_persistent_homology_of_batch_gradient_wrt_points(fw, make_distance):
-    if fw.traces_abstractly:
-        pytest.skip("The number of bars needs concrete points")
     _, second, third = _batch2()
 
     def loss(P):
@@ -927,8 +880,6 @@ def test_persistent_homology_of_batch_gradient_wrt_points(fw, make_distance):
 
 
 def test_persistent_homology_of_projected_batch_gradient_wrt_subspace(fw):
-    if fw.traces_abstractly:
-        pytest.skip("The number of bars needs concrete points")
     space = sb.InnerProduct(_gram3())(sb.PointCloudTensor(_batch3()))
 
     def loss(V):
@@ -938,21 +889,12 @@ def test_persistent_homology_of_projected_batch_gradient_wrt_subspace(fw):
 
 
 def test_persistent_homology_of_batch_gradient_wrt_gram_matrix(fw):
-    if fw.traces_abstractly:
-        pytest.skip("The number of bars needs concrete points")
     clouds = sb.PointCloudTensor(_batch2())
 
     def loss(a):
         return _bars_loss(fw, _homology(sb.InnerProduct(_framework_gram2(fw, a))(clouds)))
 
     assert_gradient_matches_finite_differences(fw, loss, [2.0, 1.0])
-
-
-def test_persistent_homology_of_abstract_batch_raises():
-    jax = pytest.importorskip("jax")
-    clouds = np.stack([_loop_points(), 2.0 * _loop_points()])
-    with pytest.raises(NotImplementedError, match="abstractly"):
-        jax.grad(lambda P: _homology(P)._tvalues.sum())(jax.numpy.asarray(clouds))
 
 
 _TRACKED_KERNEL_DISTANCES = [
@@ -982,8 +924,6 @@ def test_kernel_of_tracked_batches_matches_untracked(fw, make_distance, which):
 
 
 def test_kernel_of_batch_and_its_projection_gradient_wrt_subspace(fw):
-    if fw.traces_abstractly:
-        pytest.skip("The critical edges of a batch need concrete points")
     space = sb.InnerProduct(_gram3())(sb.PointCloudTensor(_batch3()))
 
     def loss(V):
@@ -995,8 +935,6 @@ def test_kernel_of_batch_and_its_projection_gradient_wrt_subspace(fw):
 
 @pytest.mark.parametrize("make_distance", _TRACKED_KERNEL_DISTANCES)
 def test_kernel_of_batches_gradient_wrt_points(fw, make_distance):
-    if fw.traces_abstractly:
-        pytest.skip("The critical edges of a batch need concrete points")
     other = _lp_points()[[0, 2, 3, 5]] * 1.5
     Y = sb.PointCloudTensor([_contracted(other), _contracted(_lp_points())])
 
@@ -1019,14 +957,6 @@ def test_kernel_of_tracked_batch_and_single_point_cloud_raises(fw):
     X = tracked(fw, sb.PointCloudTensor(_batch2()))
     with pytest.raises(TypeError, match="both"):
         _kernel(X, _contracted(_loop_points()))
-
-
-def test_kernel_of_abstract_batches_raises():
-    jax = pytest.importorskip("jax")
-    clouds = np.stack([_loop_points(), 2.0 * _loop_points()])
-    Y = sb.PointCloudTensor([_contracted(cloud) for cloud in clouds])
-    with pytest.raises(NotImplementedError, match="abstractly"):
-        jax.grad(lambda P: _kernel(P, Y)._tvalues.sum())(jax.numpy.asarray(clouds))
 
 
 def _indexed_clouds():

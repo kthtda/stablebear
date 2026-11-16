@@ -1,4 +1,4 @@
-"""Gradients of stablebear operations in other autodiff frameworks.
+"""Gradients of stablebear operations in PyTorch.
 
 An operation opts in with the ``differentiable`` decorator, naming the
 parameters that can carry gradients and a vector-Jacobian product:
@@ -9,15 +9,20 @@ parameters that can carry gradients and a vector-Jacobian product:
     @differentiable("x", "p", vjp=_f_vjp)
     def f(x, p, verbose=False): ...
 
-The function itself stays framework-free. A parameter is tracked when it is a
-tensor of a supported framework, or a stablebear object that carries some, such
-as a Pcf whose times or values depend on a framework tensor. The decorator
-converts the tracked parameters to NumPy (rebuilding stablebear objects from
-their parts), calls the function, and runs the call as an operation of that
-framework, so the result carries gradients there. The vjp receives the same
+The function itself stays free of PyTorch. A parameter is tracked when it is a
+PyTorch tensor, or a stablebear object that carries some, such as a Pcf whose
+times or values depend on one. The decorator converts the tracked parameters
+to NumPy (rebuilding stablebear objects from their parts), calls the function,
+and runs the call as a PyTorch operation, so the result carries gradients.
+The vjp receives the same
 arguments as the function and returns NumPy values: for a Pcf or PcfTensor an
 (m, 2) array of gradients with respect to (time, value) of each breakpoint, in
 the order of _serial. Entries for untracked parameters are ignored.
+
+PyTorch is the only framework for now. It stays behind one adapter module,
+_autodiff_torch, which this module reaches through _framework, so that the
+rest of the package does not import it. Code calls the tensors of that
+framework "framework arrays", to tell them from stablebear tensors.
 """
 
 from __future__ import annotations
@@ -31,29 +36,12 @@ import numpy as np
 F = TypeVar("F", bound=Callable[..., Any])
 
 
-def _unwrap(x: Any) -> Any:
-    """A Keras 3 variable as the variable or tensor of its backend: a
-    tf.Variable, a torch parameter, or a JAX array. Anything else unchanged."""
-    if type(x).__module__.split(".")[0] == "keras" and hasattr(x, "value"):
-        return x.value
-    return x
-
-
 def _framework(x: Any) -> Any:
-    """Return the adapter module for the framework that owns `x`, or None."""
-    root = type(_unwrap(x)).__module__.split(".")[0]
-    if root == "torch":
+    """Return the adapter module if `x` is a PyTorch tensor, or None."""
+    if type(x).__module__.split(".")[0] == "torch":
         from . import _autodiff_torch
 
         return _autodiff_torch
-    if root in ("jax", "jaxlib"):
-        from . import _autodiff_jax
-
-        return _autodiff_jax
-    if root == "tensorflow":
-        from . import _autodiff_tf
-
-        return _autodiff_tf
     return None
 
 
@@ -78,7 +66,6 @@ def _tracked(x: Any) -> _Tracked | None:
     parts = getattr(x, "_tracked_parts", None)
     if parts is not None:
         return parts()
-    x = _unwrap(x)
     if _framework(x) is not None:
         return _Tracked([x], lambda arrays: _plain(arrays[0]), lambda grad: [grad])
     return None
@@ -94,16 +81,9 @@ def _pcfs_from_content(content: np.ndarray, enumeration: np.ndarray) -> Any:
     return from_serial_content(content, enumeration)
 
 
-def _concrete_column(values: Any, n: int, adapter: Any) -> np.ndarray:
-    concrete = adapter.concrete(values) if values is not None else None
-    return concrete if concrete is not None else np.full(n, np.nan)
-
-
 def content_from_values(times: Any, values: Any) -> tuple[np.ndarray, Any, Any]:
     """(n, 2) breakpoints from separate times and values, and the framework
-    times and values where they are tracked (else None). Abstract times or
-    values give NaN breakpoints.
-    """
+    times and values where they are tracked (else None)."""
     times_tracked, values_tracked = _tracked(times), _tracked(values)
     t = times_tracked.tensors[0] if times_tracked else np.asarray(times)
     v = values_tracked.tensors[0] if values_tracked else np.asarray(values)
@@ -115,17 +95,11 @@ def content_from_values(times: Any, values: Any) -> tuple[np.ndarray, Any, Any]:
     if not times_tracked and not values_tracked:
         return np.column_stack([t, v]), None, None
     adapter = _framework((t if times_tracked else v))
-    concrete_times = _concrete_column(t, t.shape[0], adapter) if times_tracked else t
     dtype = np.float32 if str(t.dtype).endswith("float32") else np.float64
-    content = np.column_stack([concrete_times, _concrete_column(v, len(concrete_times), adapter)
-                               if values_tracked else v]).astype(dtype)
+    content = np.column_stack([
+        adapter.to_numpy(t) if times_tracked else t,
+        adapter.to_numpy(v) if values_tracked else v]).astype(dtype)
     return content, t if times_tracked else None, v if values_tracked else None
-
-
-_ABSTRACT_TIMES = (
-    "PCF breakpoint times that JAX or tf.function traces abstractly are not supported here: "
-    "the order of the breakpoints depends on their values."
-)
 
 
 def _union_of_times(
@@ -180,10 +154,7 @@ def pcf_op(primal_op: Callable[..., Any], combine: Callable[..., Any], *operands
     (with operands broadcast against each other), and framework values
     ``combine`` of the operands' values at those times. Each time of the result
     is the time of the first operand that has it, so gradients with respect to
-    tracked times flow there. The union depends only on the times, so while a
-    framework traces abstract values, as JAX does, tracked values work but
-    tracked times do not. The PCFs in the result hold the values when they are
-    concrete and NaN while they are abstract.
+    tracked times flow there.
     """
     tracked = [t for t in map(_tracked, operands) if t is not None]
     if not tracked:
@@ -193,8 +164,6 @@ def pcf_op(primal_op: Callable[..., Any], combine: Callable[..., Any], *operands
 
     pcf_positions = [i for i, op in enumerate(operands) if hasattr(op, "_serial")]
     pcfs = [operands[i] for i in pcf_positions]
-    if any(op._ttimes is not None and adapter.concrete(op._ttimes) is None for op in pcfs):
-        raise NotImplementedError(_ABSTRACT_TIMES)
     serials = [op._serial() for op in pcfs]
     offsets = np.cumsum([0] + [len(c) for c, _ in serials])
     shapes = [enumeration.shape[:-1] for _, enumeration in serials]
@@ -206,7 +175,7 @@ def pcf_op(primal_op: Callable[..., Any], combine: Callable[..., Any], *operands
 
     def values(i, op):
         if i not in pcf_positions:
-            return _unwrap(op)
+            return op
         j = pcf_positions.index(i)
         v = op._tvalues
         if v is None:
@@ -235,26 +204,14 @@ def pcf_op(primal_op: Callable[..., Any], combine: Callable[..., Any], *operands
 def differentiable(
     *wrt: str,
     vjp: Callable[..., tuple],
-    out: Callable[..., tuple] | None = None,
-    residuals: Callable[..., list] | None = None,
     returns: Any = None,
 ) -> Callable[[F], F]:
-    """``out``, given the function's arguments, returns the (shape, NumPy dtype)
-    of its result. Frameworks that trace abstract values, such as JAX, need it.
-
-    With ``returns``, a tensor type that can be tracked, the function returns
+    """With ``returns``, a tensor type that can be tracked, the function returns
     an untracked tensor of that type, and the decorated function returns its
     tracked form when an argument is tracked. The vjp then receives the
-    gradient with respect to the serial content of the result, and ``out``
-    returns the (enumeration, NumPy dtype) of the result. The tracked result
-    keeps the function's tensor when the framework has run the function by
-    then, so that the next operation need not convert it.
-
-    With ``residuals``, the function returns ``(result, residuals)``, where
-    the residuals are a tuple of arrays from its computation that the vjp
-    reuses: the vjp receives them as its ``residuals`` argument, so the
-    backward pass need not repeat the forward pass. ``residuals``, given the
-    function's arguments, returns their (shape, NumPy dtype)s."""
+    gradient with respect to the serial content of the result. The tracked
+    result keeps the function's tensor, so that the next operation need not
+    convert it."""
     def decorate(fn: F) -> F:
         signature = inspect.signature(fn)
 
@@ -268,8 +225,7 @@ def differentiable(
                 if t is not None:
                     tracked[name] = t
             if not tracked:
-                result = fn(*args, **kwargs)
-                return result[0] if residuals is not None else result
+                return fn(*args, **kwargs)
             names = list(tracked)
             tensors = [tensor for name in names for tensor in tracked[name].tensors]
             ends = np.cumsum([len(tracked[name].tensors) for name in names])
@@ -284,39 +240,25 @@ def differentiable(
             returned = []
 
             def primal(*values):
-                result, saved = fn(**with_values(values)), ()
-                if residuals is not None:
-                    result, saved = result[0], tuple(result[1])
+                result = fn(**with_values(values))
                 if returns is not None:
                     returned.append(result)
                     result = result._serial()[0]
-                return np.asarray(result), saved
+                return np.asarray(result)
 
-            def backward(grad_out, saved, *values):
-                extra = {"residuals": saved} if residuals is not None else {}
-                grads = vjp(grad_out, **with_values(values), **extra)
+            def backward(grad_out, *values):
+                grads = vjp(grad_out, **with_values(values))
                 return tuple(g for name in names for g in tracked[name].split(grads[wrt.index(name)]))
 
-            out_spec = out(**bound.arguments) if out is not None else None
-            residual_specs = residuals(**bound.arguments) if residuals is not None else []
+            content = _framework(tensors[0]).apply(primal, backward, *tensors)
             if returns is None:
-                return _framework(tensors[0]).apply(
-                    primal, backward, *tensors, out=out_spec, residuals=residual_specs)
+                return content
 
-            from ._tracked import tracked_class
+            from ._tracked import _split_columns, tracked_class
 
-            assert out_spec is not None
-            enumeration, dtype = out_spec
-            flat = np.asarray(enumeration).reshape(-1, 2)
-            widths = [width for _, width in returns._tracking.groups]
-            content = _framework(tensors[0]).apply(
-                primal, backward, *tensors,
-                out=((int(flat[-1, 1]) if len(flat) else 0, sum(widths)), dtype), residuals=residual_specs)
-            starts = np.cumsum([0] + widths)
-            parts = [content] if len(widths) == 1 else [
-                content[:, start] if width == 1 else content[:, start:start + width]
-                for start, width in zip(starts, widths)]
-            return tracked_class(returns)(parts, enumeration, plain=returned[-1] if returned else None)
+            plain = returned[-1]
+            return tracked_class(returns)(
+                _split_columns(content, returns._tracking.groups), plain._serial()[1], plain=plain)
 
         return wrapper  # type: ignore[return-value]
 
