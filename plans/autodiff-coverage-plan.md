@@ -1,6 +1,6 @@
 # Autodiff coverage: implementation plan
 
-Progress: 6 of 11 items, 15 of 25 points (60%)
+Progress: 7 of 11 items, 18 of 25 points (72%)
 
 Spec: [autodiff-prototype-spec.md](autodiff-prototype-spec.md), which each
 item updates where it changes a decision.
@@ -58,11 +58,12 @@ that did not say why, and common operations without gradients.
 
 ## Phase C: Operations without gradients
 
-- [ ] **C1.** [3] `sum` and `mean` of tracked PCFs along an axis, as one
+- [x] **C1.** [3] (8b24d5256) `sum` and `mean` of tracked PCFs along an axis, as one
   sort and one running sum of the jumps of all members.
   Tests: match the untracked reductions on a grid of times; gradient of a
   norm of the mean against finite differences, with respect to values and
   to times.
+The last value of each sum is taken directly, not from the running sum, so that sums of PCFs that end at 0 end at exactly 0.
 - [ ] **C2.** [2] Powers of PCFs with gradients (`tracked ** 2`, and a
   PyTorch exponent), and `lp_distance` of tracked PCFs or with a PyTorch
   `p`.
