@@ -104,8 +104,8 @@ Input flexibility
    points = np.random.randn(50, 3)
    bcs = persistence.compute_persistent_homology(points, max_dim=1)
 
-When the input is a distance matrix, the ``distance_type`` parameter is
-ignored because distances are already provided::
+Distances between the points of a cloud are Euclidean. A distance matrix
+provides the distances directly::
 
    from scipy.spatial.distance import pdist, squareform
    import stablebear as sb
@@ -126,7 +126,6 @@ Options
 
 The function supports the following options:
 
-- ``distance_type`` -- The distance metric used between points. Currently only ``DistanceType.Euclidean`` (the default). Ignored when the input is a distance matrix.
 - ``complex_type`` -- The simplicial complex construction. Currently only ``ComplexType.VietorisRips`` (the default).
 - ``reduced`` -- If ``True``, compute reduced homology. If ``False`` (the default), an essential ``[0, inf)`` bar is added to :math:`H_0` representing the single connected component that never dies. This matches the convention used by most TDA textbooks.
 - ``verbose`` -- Print progress information (default ``False``).

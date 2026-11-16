@@ -1,3 +1,5 @@
+import warnings
+
 import numpy as np
 import pytest
 
@@ -13,7 +15,6 @@ def test_persistence_ripser_compute_euclidean_barcode_from_pcloud_returns_correc
         X,
         max_dim=3,
         complex_type=pers.ComplexType.VietorisRips,
-        distance_type=pers.DistanceType.Euclidean,
     )
 
     assert isinstance(bcs, pers.BarcodeTensor)
@@ -27,7 +28,6 @@ def test_persistence_ripser_compute_euclidean_barcode_from_pcloud_returns_correc
         X,
         max_dim=3,
         complex_type=pers.ComplexType.VietorisRips,
-        distance_type=pers.DistanceType.Euclidean,
     )
 
     assert isinstance(bcs, pers.BarcodeTensor)
@@ -42,7 +42,6 @@ def test_persistence_ripser_compute_euclidean_barcode_from_pcloud_tensor_returns
         X,
         max_dim=3,
         complex_type=pers.ComplexType.VietorisRips,
-        distance_type=pers.DistanceType.Euclidean,
     )
 
     assert isinstance(bcs, pers.BarcodeTensor)
@@ -55,7 +54,6 @@ def test_persistence_ripser_compute_euclidean_barcode_from_pcloud_tensor_returns
         X,
         max_dim=3,
         complex_type=pers.ComplexType.VietorisRips,
-        distance_type=pers.DistanceType.Euclidean,
     )
 
     assert isinstance(bcs, pers.BarcodeTensor)
@@ -100,7 +98,6 @@ def test_persistence_ripser_unreduced_homology():
         X,
         max_dim=2,
         complex_type=pers.ComplexType.VietorisRips,
-        distance_type=pers.DistanceType.Euclidean,
     )
 
     h0 = bcs[0]
@@ -126,7 +123,6 @@ def test_persistence_ripser_reduced_homology():
         max_dim=2,
         reduced=True,
         complex_type=pers.ComplexType.VietorisRips,
-        distance_type=pers.DistanceType.Euclidean,
     )
 
     h0 = bcs[0]
@@ -154,7 +150,6 @@ def test_persistence_ripser_compute_euclidean_barcode_on_tensor():
         X,
         max_dim=1,
         complex_type=pers.ComplexType.VietorisRips,
-        distance_type=pers.DistanceType.Euclidean,
     )
 
     for i in range(3):
@@ -164,7 +159,6 @@ def test_persistence_ripser_compute_euclidean_barcode_on_tensor():
                     X[i, j, k],
                     max_dim=1,
                     complex_type=pers.ComplexType.VietorisRips,
-                    distance_type=pers.DistanceType.Euclidean,
                 )
 
                 assert Y[i, j, k, 0].is_isomorphic_to(xbc[0])
@@ -209,3 +203,26 @@ def test_float_tensor_of_rank_three_is_a_batch_of_clouds(np_dtype):
     for i in range(2):
         expected = pers.compute_persistent_homology(sb.PointCloud(np.asarray(X[i])), max_dim=1)
         assert bcs[i].is_isomorphic_to(expected, atol=0, rtol=0)
+
+
+def test_passing_distance_type_is_deprecated():
+    points = np.array([[0.0, 0.0], [3.0, 4.0]])
+    with pytest.warns(DeprecationWarning, match="DistanceSpace"):
+        out = pers.compute_persistent_homology(
+            points, max_dim=0, distance_type=pers.DistanceType.Euclidean, reduced=True, verbose=False)
+
+    np.testing.assert_array_equal(out[0].to_numpy(), [[0.0, 5.0]])
+
+
+def test_default_distance_type_does_not_warn():
+    points = np.array([[0.0, 0.0], [3.0, 4.0]])
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        pers.compute_persistent_homology(points, max_dim=0, reduced=True, verbose=False)
+
+
+def test_distance_type_with_distance_space_raises():
+    space = sb.InnerProduct(np.eye(2))(np.array([[0.0, 0.0], [3.0, 4.0]]))
+    with pytest.raises(TypeError, match="distance_type"):
+        pers.compute_persistent_homology(
+            space, max_dim=0, distance_type=pers.DistanceType.Euclidean, reduced=True, verbose=False)

@@ -1,3 +1,4 @@
+import warnings
 from enum import Enum
 from typing import Any, overload
 
@@ -37,7 +38,7 @@ class ComplexType(Enum):
 def compute_persistent_homology(
     X: TimeSeries,
     max_dim: int = 1,
-    distance_type: DistanceType = DistanceType.Euclidean,
+    distance_type: DistanceType | None = None,
     complex_type: ComplexType = ComplexType.VietorisRips,
     reduced: bool = False,
     verbose: bool = False,
@@ -46,9 +47,9 @@ def compute_persistent_homology(
 
 @overload
 def compute_persistent_homology(
-    X: PointCloud | PointCloudTensor | DistanceMatrix | DistanceMatrixTensor | FloatTensor | np.ndarray,
+    X: PointCloud | PointCloudTensor | DistanceMatrix | DistanceMatrixTensor | FloatTensor | np.ndarray | DistanceSpace,
     max_dim: int = 1,
-    distance_type: DistanceType = DistanceType.Euclidean,
+    distance_type: DistanceType | None = None,
     complex_type: ComplexType = ComplexType.VietorisRips,
     reduced: bool = False,
     verbose: bool = False,
@@ -119,7 +120,7 @@ def compute_persistent_homology(
     | TimeSeries
     | DistanceSpace,
     max_dim: int = 1,
-    distance_type: DistanceType = DistanceType.Euclidean,
+    distance_type: DistanceType | None = None,
     complex_type: ComplexType = ComplexType.VietorisRips,
     reduced: bool = False,
     verbose: bool = False,
@@ -140,18 +141,21 @@ def compute_persistent_homology(
 
     Parameters
     ----------
-    X : PointCloud, PointCloudTensor, DistanceMatrix, DistanceMatrixTensor, FloatTensor, numpy.ndarray, or TimeSeries
+    X : PointCloud, PointCloudTensor, DistanceMatrix, DistanceMatrixTensor, FloatTensor, numpy.ndarray, TimeSeries, or DistanceSpace
         Input data. A ``FloatTensor`` or NumPy array holds point clouds in
         its last two axes, one point per row; a 2-D one is a single cloud.
-        A ``DistanceMatrix`` or ``DistanceMatrixTensor`` provides
-        precomputed pairwise distances directly; ``distance_type`` is
-        ignored in that case.
+        Distances between the points of a cloud are Euclidean. A
+        :class:`~stablebear.linear.DistanceSpace` holds a point cloud with
+        another distance, which is then used. A ``DistanceMatrix`` or
+        ``DistanceMatrixTensor`` provides precomputed pairwise distances
+        directly.
     max_dim : int, optional
         Maximum homology dimension to compute, by default 1.
     distance_type : DistanceType, optional
-        Distance metric for point cloud input, by default
-        ``DistanceType.Euclidean``. Ignored when the input is a distance
-        matrix.
+        Deprecated: put the points in a
+        :class:`~stablebear.linear.DistanceSpace` to choose their distance.
+        The only value, ``DistanceType.Euclidean``, is the distance of
+        plain point clouds. Passing it gives a ``DeprecationWarning``.
     complex_type : ComplexType, optional
         Simplicial complex type, by default ``ComplexType.VietorisRips``.
     reduced : bool, optional
@@ -168,6 +172,8 @@ def compute_persistent_homology(
 
     Raises
     ------
+    TypeError
+        If ``distance_type`` is passed with a ``DistanceSpace``.
     NotImplementedError
         If ``X`` is a PyTorch, JAX, or TensorFlow array that is not a single
         point cloud of shape ``(n, d)``, or that JAX or ``tf.function``
@@ -193,6 +199,15 @@ def compute_persistent_homology(
 
     if complex_type != ComplexType.VietorisRips:
         raise ValueError(f"Unsupported complex type {complex_type}")
+
+    if distance_type is None:
+        distance_type = DistanceType.Euclidean
+    elif isinstance(X, DistanceSpace):
+        raise TypeError("distance_type cannot be passed with a DistanceSpace, which has its own distance.")
+    else:
+        warnings.warn(
+            "distance_type is deprecated: put the points in a DistanceSpace to choose their distance.",
+            DeprecationWarning, stacklevel=2)
 
     if isinstance(X, DistanceSpace):
         return _persistent_homology_in_space(X, max_dim, reduced, verbose)
