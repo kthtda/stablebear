@@ -62,6 +62,10 @@ def sort(x: Any) -> tf.Tensor:
     return tf.sort(x)
 
 
+def cumsum(x: Any) -> tf.Tensor:
+    return tf.cumsum(x)
+
+
 def apply(
     primal: Callable[..., Any], vjp: Callable[..., Any], *params: Any, out: Any = None, residuals: Any = ()
 ) -> tf.Tensor:

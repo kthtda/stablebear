@@ -557,9 +557,6 @@ def test_tracked_barcodes_cannot_lose_gradients(fw):
 
 
 @pytest.mark.parametrize("operation", [
-    pytest.param(lambda barcodes: sb.persistence.barcode_to_betti_curve(barcodes, verbose=False), id="betti_curve"),
-    pytest.param(lambda barcodes: sb.persistence.barcode_to_accumulated_persistence(
-        barcodes, max_death=float("inf"), verbose=False), id="accumulated_persistence"),
     pytest.param(lambda barcodes: sb.timeseries.TimeSeries(barcodes, times=[0.0, 1.0]), id="time_series"),
     pytest.param(lambda barcodes: sb.NestedTensor([barcodes]), id="nested_tensor"),
 ])
@@ -818,6 +815,75 @@ def test_gradient_through_list_of_tracked_pcfs(fw):
         return fw.sum(sb.lp_norm(sb.PcfTensor([x * f, g, (x * x) * g]), p=2.0))
 
     _assert_gradient_matches_finite_differences(fw, loss, 1.5)
+
+
+def _betti_curve(barcodes):
+    return sb.persistence.barcode_to_betti_curve(barcodes, verbose=False)
+
+
+def _accumulated_persistence(barcodes):
+    return sb.persistence.barcode_to_accumulated_persistence(barcodes, max_death=float("inf"), verbose=False)
+
+
+def _accumulated_persistence_of_early_deaths(barcodes):
+    # Leaves out the bars of _barcode_batch that die at 3.7 and 4.0.
+    return sb.persistence.barcode_to_accumulated_persistence(barcodes, max_death=2.5, verbose=False)
+
+
+@pytest.mark.parametrize("summary", [_betti_curve, _accumulated_persistence, _accumulated_persistence_of_early_deaths])
+def test_summary_of_tracked_batch_matches_untracked(fw, summary):
+    out, expected = summary(tracked(fw, _barcode_batch())), summary(_barcode_batch())
+    assert isinstance(out, sb.PcfTensor)
+    assert out.shape == (2, 2)
+    t = np.linspace(0.0, 4.5, 91)
+    for i in np.ndindex(2, 2):
+        np.testing.assert_allclose(out[i](t), expected[i](t))
+
+
+def test_betti_curve_of_tracked_barcode_with_infinite_bar_matches_untracked(fw):
+    Barcode, BarcodeTensor = sb.persistence.Barcode, sb.persistence.BarcodeTensor
+    barcodes = BarcodeTensor([Barcode([[0.0, 2.0], [1.0, np.inf]])])
+    out, expected = _betti_curve(tracked(fw, barcodes)), _betti_curve(barcodes)
+    t = np.array([0.0, 0.5, 1.0, 1.5, 2.0, 2.5])
+    np.testing.assert_array_equal(out[0](t), [1.0, 1.0, 2.0, 2.0, 1.0, 1.0])
+    np.testing.assert_array_equal(out[0](t), expected[0](t))
+
+
+def test_betti_curve_norm_gradient(fw):
+    if fw.traces_abstractly:
+        pytest.skip("Removing bars needs concrete bars")
+
+    def loss(v):
+        barcodes = sb.persistence.transform_bars(_barcode_batch(), sb.Plf(v, times=_batch_plf_times()))
+        return fw.sum(sb.lp_norm(_betti_curve(barcodes), p=2.0))
+
+    _assert_gradient_matches_finite_differences(fw, loss, [0.0, 1.0, 1.5, 3.0])
+
+
+@pytest.mark.parametrize("summary", [_accumulated_persistence, _accumulated_persistence_of_early_deaths])
+def test_accumulated_persistence_gradient(fw, summary):
+    if fw.traces_abstractly:
+        pytest.skip("Removing bars needs concrete bars")
+
+    # The function does not return to 0, so its norms are infinite: the loss
+    # is the sum of time * value over its breakpoints.
+    def loss(v):
+        out = summary(sb.persistence.transform_bars(_barcode_batch(), sb.Plf(v, times=_batch_plf_times())))
+        return fw.sum(out._ttimes * out._tvalues)
+
+    _assert_gradient_matches_finite_differences(fw, loss, [0.0, 1.0, 1.5, 3.0])
+
+
+@pytest.mark.parametrize("summary", [_betti_curve, _accumulated_persistence])
+def test_summary_of_abstract_bars_raises(summary):
+    jax = pytest.importorskip("jax")
+    X, Y = _kernel_points()
+
+    def loss(P):
+        return summary(sb.persistence.compute_homological_kernel(P, jax.numpy.asarray(Y)))._ttimes.sum()
+
+    with pytest.raises(NotImplementedError, match="abstractly"):
+        jax.grad(loss)(jax.numpy.asarray(X))
 
 
 def test_arithmetic_on_stable_rank_with_equal_lifetimes_matches_numpy(fw):

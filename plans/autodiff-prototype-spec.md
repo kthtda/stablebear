@@ -43,7 +43,8 @@ per array (`_tracked_parts`). The decorator uses this to convert tracked
 arguments to NumPy, call the operation, and route gradients back.
 
 **D3. Some operations are written in framework operations instead of a
-vjp.** PCF arithmetic and the stable rank of tracked barcodes compute their
+vjp.** PCF arithmetic and the summaries of tracked barcodes (stable rank,
+Betti curve, accumulated persistence function) compute their
 results with framework operations (gather, concat, sort), so the framework
 differentiates them itself. PCF arithmetic takes the union of the operands'
 breakpoint times, and each time of the result comes from the first operand
@@ -188,6 +189,9 @@ raises `NotImplementedError` while tracing:
 - The stable rank of several tracked barcodes, which sorts with a concrete
   `lexsort`. A single barcode sorts with the framework, so the kernel's
   stable rank works in JAX.
+- Betti curves, since the order of the births and deaths depends on their
+  values, and accumulated persistence functions, since which bars they
+  include does.
 
 **D9. Derivatives at kinks are one-sided.** At a breakpoint of a PLF, the
 derivatives are those of the segment after it. A bar with an infinite
@@ -267,7 +271,5 @@ values while tracing, and all operations so far would be rewritten.
 
 - Should `Barcode`, `Pcf`, and `Plf` element objects returned by indexing a
   tracked tensor carry gradients too, as 0-d tracked tensors?
-- Which other barcode summaries need gradients: Betti curves and
-  accumulated persistence functions have none yet.
 - Should `compute_homological_kernel` take batches of tracked point
   clouds?

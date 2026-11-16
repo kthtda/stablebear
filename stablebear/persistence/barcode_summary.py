@@ -88,19 +88,96 @@ def _tracked_stable_rank(bc: Any) -> PcfTensor:
 
     # Each stable rank starts with a breakpoint at time 0, then one per bar,
     # with the values n, ..., 0 for a barcode of n bars.
-    n_barcodes = len(counts)
+    times, sizes, position = _prepend_zeros(adapter, bars, sorted_lifetimes, counts)
+    values = (np.repeat(counts, sizes) - position).astype(np.float32 if bc.dtype == barcode32 else np.float64)
+    return _TrackedPcfTensor([times, values], _enumeration(sizes, tuple(enumeration.shape[:-1])))
+
+
+def _prepend_zeros(adapter: Any, like: Any, x: Any, counts: np.ndarray) -> tuple[Any, np.ndarray, np.ndarray]:
+    """The framework array x, of consecutive blocks of the given sizes, with
+    a zero before each block, as for PCFs that start with a breakpoint at
+    time 0. Also returns the sizes of the new blocks and, for each row, its
+    position in its block."""
+    n = len(counts)
     sizes = counts + 1
     starts = np.cumsum(sizes) - sizes
     position = np.arange(int(sizes.sum())) - np.repeat(starts, sizes)
-    # Row k of the zeros for the first breakpoint of barcode k, and then the
-    # sorted lifetimes, which follow the zeros, in order.
-    rows = np.where(position == 0, np.repeat(np.arange(n_barcodes), sizes),
-                    n_barcodes + np.arange(len(position)) - np.repeat(np.arange(1, n_barcodes + 1), sizes))
-    zeros = adapter.as_tensor(np.zeros(n_barcodes), like=bars)
-    times = adapter.gather(adapter.concat([zeros, sorted_lifetimes]), rows)
+    # Row k of the zeros for the first row of block k, and then the rows of
+    # x, which follow the zeros, in order.
+    rows = np.where(position == 0, np.repeat(np.arange(n), sizes),
+                    n + np.arange(len(position)) - np.repeat(np.arange(1, n + 1), sizes))
+    zeros = adapter.as_tensor(np.zeros(n), like=like)
+    return adapter.gather(adapter.concat([zeros, x]), rows), sizes, position
 
-    values = (np.repeat(counts, sizes) - position).astype(np.float32 if bc.dtype == barcode32 else np.float64)
-    return _TrackedPcfTensor([times, values], _enumeration(counts + 1, tuple(enumeration.shape[:-1])))
+
+def _concrete_bars(bc: Any, summary: str, reason: str) -> np.ndarray:
+    concrete = _autodiff._framework(bc._tvalues).concrete(bc._tvalues)
+    if concrete is None:
+        raise NotImplementedError(
+            f"{summary} of barcodes whose bars JAX or tf.function traces abstractly are not supported: {reason}.")
+    return concrete
+
+
+def _tracked_betti_curve(bc: Any) -> PcfTensor:
+    """The Betti curves of a BarcodeTensor whose bars are a framework tensor.
+
+    The curve steps up at each birth and down at each death. So its times
+    are the births and deaths of the barcode, sorted, which the framework
+    differentiates, and its values, the running count of the steps, are
+    constant. Equal times describe the same function as one step would.
+    """
+    bars = bc._tvalues
+    adapter = _autodiff._framework(bars)
+    enumeration = bc._enumeration
+    counts, _ = _owners(enumeration)
+    concrete = _concrete_bars(bc, "Betti curves", "the order of the births and deaths depends on their values")
+    n_bars = len(concrete)
+
+    # The events of each barcode, as birth and death of each of its bars.
+    events = np.ascontiguousarray(concrete.reshape(-1))
+    order = cpp.argsort_segments(events, np.ascontiguousarray(2 * enumeration.reshape(-1, 2)))
+    is_death = order % 2
+    sorted_events = adapter.gather(adapter.concat([bars[:, 0], bars[:, 1]]), is_death * n_bars + order // 2)
+
+    times, sizes, position = _prepend_zeros(adapter, bars, sorted_events, 2 * counts)
+    # The steps of each barcode sum to zero, so one running sum serves all.
+    values = np.zeros(len(position), dtype=np.float32 if bc.dtype == barcode32 else np.float64)
+    values[position > 0] = np.cumsum(1 - 2 * is_death)
+    return _TrackedPcfTensor([times, values], _enumeration(sizes, tuple(enumeration.shape[:-1])))
+
+
+def _tracked_accumulated_persistence(bc: Any, max_death: float) -> PcfTensor:
+    """The accumulated persistence functions of a BarcodeTensor whose bars
+    are a framework tensor.
+
+    The function steps up by the lifetime of each bar at its midpoint. So
+    its times are the sorted midpoints and its values the running sums of
+    the lifetimes in that order, both framework operations on the bars.
+    Which bars count, the finite ones that die by max_death, depends on
+    their values.
+    """
+    bars = bc._tvalues
+    adapter = _autodiff._framework(bars)
+    enumeration = bc._enumeration
+    counts, owners = _owners(enumeration)
+    concrete = _concrete_bars(
+        bc, "Accumulated persistence functions", "which bars they include depends on their values")
+
+    keep = np.isfinite(concrete[:, 1]) & (concrete[:, 1] <= max_death)
+    kept_counts = np.bincount(owners[keep], minlength=len(counts))
+    kept = adapter.gather(bars, np.flatnonzero(keep))
+    midpoints = (kept[:, 0] + kept[:, 1]) / 2
+    order = cpp.argsort_segments(
+        np.ascontiguousarray((concrete[keep, 0] + concrete[keep, 1]) / 2),
+        np.ascontiguousarray(_enumeration(kept_counts, (len(counts),))))
+
+    times, sizes, position = _prepend_zeros(adapter, bars, adapter.gather(midpoints, order), kept_counts)
+    # The running sum over all barcodes, less what it was when each began.
+    sums = adapter.concat([
+        adapter.as_tensor(np.zeros(1), like=bars), adapter.cumsum(adapter.gather(kept[:, 1] - kept[:, 0], order))])
+    begins = np.repeat(np.cumsum(kept_counts) - kept_counts, sizes)
+    values = adapter.gather(sums, begins + position) - adapter.gather(sums, begins)
+    return _TrackedPcfTensor([times, values], _enumeration(sizes, tuple(enumeration.shape[:-1])))
 
 
 @overload
@@ -178,6 +255,8 @@ def barcode_to_betti_curve(
         A single ``Pcf`` if the input is a single ``Barcode``, otherwise the
         same kind of container as the input, with the same shape.
     """
+    if isinstance(bc, _TrackedBarcodeTensor):
+        return _tracked_betti_curve(bc)
     return _barcode_to_pcf(
         bc, "spawn_barcode_to_betti_curve_task", verbose
     )
@@ -231,6 +310,8 @@ def barcode_to_accumulated_persistence(
         A single ``Pcf`` if the input is a single ``Barcode``, otherwise the
         same kind of container as the input, with the same shape.
     """
+    if isinstance(bc, _TrackedBarcodeTensor):
+        return _tracked_accumulated_persistence(bc, max_death)
     return _barcode_to_pcf(
         bc, "spawn_barcode_to_accumulated_persistence_task", verbose,
         max_death=max_death

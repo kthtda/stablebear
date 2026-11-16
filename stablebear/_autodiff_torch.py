@@ -59,6 +59,10 @@ def sort(x: torch.Tensor) -> torch.Tensor:
     return torch.sort(x).values
 
 
+def cumsum(x: torch.Tensor) -> torch.Tensor:
+    return torch.cumsum(x, dim=0)
+
+
 def apply(
     primal: Callable[..., Any], vjp: Callable[..., Any], *params: Any, out: Any = None, residuals: Any = ()
 ) -> torch.Tensor:

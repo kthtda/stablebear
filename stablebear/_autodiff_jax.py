@@ -48,6 +48,10 @@ def sort(x: Any) -> jax.Array:
     return jnp.sort(x)
 
 
+def cumsum(x: Any) -> jax.Array:
+    return jnp.cumsum(x)
+
+
 def apply(
     primal: Callable[..., Any], vjp: Callable[..., Any], *params: Any, out: Any = None, residuals: Any = ()
 ) -> jax.Array:
