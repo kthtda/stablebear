@@ -478,10 +478,69 @@ def test_transform_bars_with_abstract_plf_raises():
         jax.grad(loss)(jax.numpy.array([0.0, 1.0]))
 
 
-def test_tracked_plf_with_several_barcodes_raises(fw):
-    f = sb.Plf(fw.tensor([0.0, 1.0]), times=np.array([0.0, 1.0]))
-    with pytest.raises(NotImplementedError, match="shape \\(1,\\)"):
-        sb.persistence.transform_bars(sb.persistence.BarcodeTensor([_plf_bars()[0], _plf_bars()[0]]), f)
+def _barcode_batch():
+    Barcode = sb.persistence.Barcode
+    return sb.persistence.BarcodeTensor([
+        Barcode([[0.2, 1.5], [0.5, 3.7]]),
+        Barcode(np.zeros((0, 2))),
+        Barcode([[2.5, 4.0], [1.2, 2.1], [0.1, 0.4]]),
+        Barcode([[1.1, 1.4]]),
+    ]).reshape((2, 2))
+
+
+def _batch_plf_times():
+    return np.array([0.0, 1.0, 2.0, 3.0])
+
+
+def test_transform_bars_of_batch_with_framework_plf_matches_numpy(fw):
+    if fw.traces_abstractly:
+        pytest.skip("Removing bars needs concrete bars")
+    values = [0.0, 1.0, 1.0, 3.0]
+    out = sb.persistence.transform_bars(_barcode_batch(), sb.Plf(fw.tensor(values), times=_batch_plf_times()))
+    expected = sb.persistence.transform_bars(_barcode_batch(), sb.Plf(np.array(values), times=_batch_plf_times()))
+    assert out.shape == (2, 2)
+    for i in np.ndindex(2, 2):
+        np.testing.assert_allclose(out[i].to_numpy(), expected[i].to_numpy())
+    np.testing.assert_allclose(fw.to_numpy(out._tvalues), expected._serial()[0])
+
+
+def test_transform_bars_of_batch_gradient_wrt_plf_values(fw):
+    if fw.traces_abstractly:
+        pytest.skip("Removing bars needs concrete bars")
+    # f is flat on [1, 2], so the bar (1.1, 1.4) is removed.
+    weights = fw.tensor([[1.0, 2.0], [-1.0, 0.5], [0.3, 0.7], [0.2, 0.9], [-0.4, 1.1]])
+
+    def loss(v):
+        f = sb.Plf(fw.concat([v[:2], v[1:2], v[2:]]), times=_batch_plf_times())
+        return fw.sum(weights * sb.persistence.transform_bars(_barcode_batch(), f)._tvalues)
+
+    _assert_gradient_matches_finite_differences(fw, loss, [0.0, 1.0, 3.0])
+
+
+def test_stable_ranks_of_tracked_batch_match_numpy(fw):
+    if fw.traces_abstractly:
+        pytest.skip("Removing bars needs concrete bars")
+    values = [0.0, 1.0, 1.5, 3.0]
+    out = sb.persistence.barcode_to_stable_rank(
+        sb.persistence.transform_bars(_barcode_batch(), sb.Plf(fw.tensor(values), times=_batch_plf_times())))
+    expected = sb.persistence.barcode_to_stable_rank(
+        sb.persistence.transform_bars(_barcode_batch(), sb.Plf(np.array(values), times=_batch_plf_times())))
+    assert out.shape == (2, 2)
+    t = np.linspace(0.0, 4.0, 81)
+    for i in np.ndindex(2, 2):
+        np.testing.assert_allclose(out[i](t), expected[i](t))
+
+
+def test_stable_rank_norms_of_tracked_batch_gradient(fw):
+    if fw.traces_abstractly:
+        pytest.skip("Removing bars needs concrete bars")
+
+    def loss(v):
+        f = sb.Plf(v, times=_batch_plf_times())
+        return fw.sum(sb.lp_norm(sb.persistence.barcode_to_stable_rank(
+            sb.persistence.transform_bars(_barcode_batch(), f)), p=2.0))
+
+    _assert_gradient_matches_finite_differences(fw, loss, [0.0, 1.0, 1.5, 3.0])
 
 
 def test_tracked_plf_with_single_barcode_raises(fw):
@@ -525,6 +584,71 @@ def test_serial_content_round_trip():
     G = sb.from_serial_content(content, enumeration)
     for i in range(3):
         np.testing.assert_array_equal(G[i].to_numpy(), F[i].to_numpy())
+
+
+def _tracked_batch(fw, values):
+    return sb.persistence.transform_bars(_barcode_batch(), sb.Plf(values, times=_batch_plf_times()))
+
+
+def _expected_batch(values):
+    return sb.persistence.transform_bars(_barcode_batch(), sb.Plf(np.array(values), times=_batch_plf_times()))
+
+
+def test_tracked_barcodes_index_and_reshape_like_plain_ones(fw):
+    if fw.traces_abstractly:
+        pytest.skip("Removing bars needs concrete bars")
+    values = [0.0, 1.0, 1.5, 3.0]
+    out, expected = _tracked_batch(fw, fw.tensor(values)), _expected_batch(values)
+    for select in (
+        lambda t: t[1],
+        lambda t: t[:, 0],
+        lambda t: t[[1, 0]],
+        lambda t: t.reshape((4,)),
+        lambda t: t.flatten()[::-1],
+        lambda t: t.transpose(),
+        lambda t: t.expand_dims(0),
+        lambda t: t.broadcast_to((3, 2, 2)),
+        lambda t: t.copy(),
+    ):
+        selected, plain = select(out), select(expected)
+        assert selected.shape == plain.shape
+        assert selected._tvalues is not None
+        np.testing.assert_array_equal(fw.to_numpy(selected._tvalues), plain._serial()[0])
+        for i in np.ndindex(*plain.shape):
+            np.testing.assert_array_equal(selected[i].to_numpy(), plain[i].to_numpy())
+
+
+def test_gradient_through_indexing_tracked_barcodes(fw):
+    if fw.traces_abstractly:
+        pytest.skip("Removing bars needs concrete bars")
+
+    def loss(v):
+        barcodes = _tracked_batch(fw, v).transpose()[1]
+        return fw.sum(sb.lp_norm(sb.persistence.barcode_to_stable_rank(barcodes), p=2.0))
+
+    _assert_gradient_matches_finite_differences(fw, loss, [0.0, 1.0, 1.5, 3.0])
+
+
+def test_tracked_barcodes_cannot_be_changed_or_lose_gradients(fw):
+    if fw.traces_abstractly:
+        pytest.skip("Removing bars needs concrete bars")
+    out = _tracked_batch(fw, fw.tensor([0.0, 1.0, 1.5, 3.0]))
+    with pytest.raises(TypeError, match="in place"):
+        out[0, 0] = sb.persistence.Barcode([[0.0, 1.0]])
+    with pytest.raises(TypeError, match="copy"):
+        sb.persistence.BarcodeTensor(out)
+    with pytest.raises(NotImplementedError, match="astype"):
+        out.astype(sb.barcode32)
+
+
+def test_barcode_serial_content_round_trip():
+    bc = _barcode_batch()
+    content, enumeration = bc._serial()
+    assert content.shape == (6, 2)
+    np.testing.assert_array_equal(enumeration, [[[0, 2], [2, 2]], [[2, 5], [5, 6]]])
+    rebuilt = sb.persistence.BarcodeTensor._from_serial(content, enumeration)
+    for i in np.ndindex(2, 2):
+        np.testing.assert_array_equal(rebuilt[i].to_numpy(), bc[i].to_numpy())
 
 
 def test_values_with_times_match_breakpoints():

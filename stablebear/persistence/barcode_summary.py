@@ -11,7 +11,7 @@ from ..functional.plf import Plf
 from ..timeseries.series import TimeSeries
 from ..typing import barcode32, barcode64, float32, float64
 from .barcode import Barcode
-from .ph_tensor import BarcodeTensor
+from .ph_tensor import BarcodeTensor, _TrackedBarcodeTensor
 
 cpp_p = cpp.persistence
 
@@ -46,8 +46,23 @@ def _barcode_to_pcf(bc, task_method, verbose=False, **kwargs):
     return out
 
 
-def _tracked_stable_rank(bc: BarcodeTensor) -> PcfTensor:
-    """The stable rank of a BarcodeTensor whose bars are a framework tensor.
+def _owners(enumeration: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """For each barcode in C order its number of bars, and for each bar the
+    flat index of its barcode, from the enumeration of BarcodeTensor._serial."""
+    flat = enumeration.reshape(-1, 2)
+    counts = flat[:, 1] - flat[:, 0]
+    return counts, np.repeat(np.arange(len(counts)), counts)
+
+
+def _enumeration(counts: np.ndarray, shape: tuple) -> np.ndarray:
+    """The enumeration of consecutive blocks of the given sizes, with shape
+    shape + (2,)."""
+    ends = np.cumsum(counts)
+    return np.stack([ends - counts, ends], axis=-1).reshape(*shape, 2)
+
+
+def _tracked_stable_rank(bc: _TrackedBarcodeTensor) -> PcfTensor:
+    """The stable ranks of a BarcodeTensor whose bars are a framework tensor.
 
     With n bars, the stable rank is n on [0, l_1), then n - 1 on [l_1, l_2), and
     so on down to 0 after l_n, for the sorted lifetimes l_1 <= ... <= l_n. So its
@@ -57,13 +72,33 @@ def _tracked_stable_rank(bc: BarcodeTensor) -> PcfTensor:
     """
     bars = bc._tvalues
     adapter = _autodiff._framework(bars)
-    n = int(bars.shape[0])
+    enumeration = bc._enumeration
+    counts, owners = _owners(enumeration)
     lifetimes = bars[:, 1] - bars[:, 0]
-    times = adapter.concat([adapter.as_tensor(np.zeros(1), like=bars), adapter.sort(lifetimes)])
-    content = np.column_stack([
-        _autodiff._concrete_column(times, n + 1, adapter), np.arange(n, -1, -1)
-    ]).astype(np.float32 if str(bars.dtype).endswith("float32") else np.float64)
-    out = _autodiff._pcfs_from_content(content, np.array([[0, n + 1]]))
+    concrete = adapter.concrete(lifetimes)
+    if concrete is not None:
+        sorted_lifetimes = adapter.gather(lifetimes, np.lexsort((concrete, owners)))
+    elif len(counts) == 1:
+        sorted_lifetimes = adapter.sort(lifetimes)
+    else:
+        raise NotImplementedError(
+            "Stable ranks of several barcodes whose bars JAX or tf.function traces abstractly are not supported.")
+
+    # Each stable rank starts with a breakpoint at time 0, then one per bar.
+    n_barcodes = len(counts)
+    starts = np.cumsum(counts + 1) - (counts + 1)
+    zero_rows = starts
+    bar_rows = np.delete(np.arange(int(np.sum(counts + 1))), zero_rows)
+    order = np.empty(n_barcodes + len(owners), dtype=np.int64)
+    order[zero_rows] = np.arange(n_barcodes)
+    order[bar_rows] = n_barcodes + np.arange(len(owners))
+    zeros = adapter.as_tensor(np.zeros(n_barcodes), like=bars)
+    times = adapter.gather(adapter.concat([zeros, sorted_lifetimes]), order)
+
+    values = np.concatenate([np.arange(n, -1, -1) for n in counts]) if n_barcodes else np.zeros(0)
+    content = np.column_stack([_autodiff._concrete_column(times, len(order), adapter), values]).astype(
+        np.float32 if bc.dtype == barcode32 else np.float64)
+    out = _autodiff._pcfs_from_content(content, _enumeration(counts + 1, tuple(enumeration.shape[:-1])))
     out._ttimes = times
     return out
 
@@ -102,7 +137,7 @@ def barcode_to_stable_rank(
         A single ``Pcf`` if the input is a single ``Barcode``, otherwise the
         same kind of container as the input, with the same shape.
     """
-    if isinstance(bc, BarcodeTensor) and bc._tvalues is not None:
+    if isinstance(bc, _TrackedBarcodeTensor):
         return _tracked_stable_rank(bc)
     return _barcode_to_pcf(
         bc, "spawn_barcode_to_stable_rank_task", verbose
@@ -232,25 +267,29 @@ def _plf_jacobians(f: Plf, x: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.nd
 
 
 def _transformed_bars_vjp(grad_out, bc, f):
-    bars = np.asarray(bc[0], dtype=np.float64).reshape(-1)
+    bars = np.asarray(bc._serial()[0], dtype=np.float64).reshape(-1)
     grad = np.asarray(grad_out, dtype=np.float64).reshape(-1)
     dx, dt, dv = _plf_jacobians(f, bars)
     return (grad * dx).reshape(-1, 2), np.column_stack([grad @ dt, grad @ dv])
 
 
 def _transformed_bars_out(bc, f):
-    return (len(bc[0]), 2), np.float32 if bc.dtype == barcode32 else np.float64
+    n_bars = len(bc._serial()[0])
+    return (n_bars, 2), np.float32 if bc.dtype == barcode32 else np.float64
 
 
 @_autodiff.differentiable("bc", "f", vjp=_transformed_bars_vjp, out=_transformed_bars_out)
 def _transformed_bars(bc: BarcodeTensor, f: Plf) -> np.ndarray:
-    """The (m, 2) transformed bars of a (1,) BarcodeTensor, empty ones included."""
-    return np.asarray(_transform_bars(bc, f, verbose=False, keep_empty=True)[0])
+    """The (m, 2) transformed bars of a BarcodeTensor in the order of
+    _serial, empty ones included."""
+    out = _transform_bars(bc, f, verbose=False, keep_empty=True)
+    assert isinstance(out, BarcodeTensor)
+    return out._serial()[0]
 
 
 def _tracked_transform_bars(bc: BarcodeTensor, f: Plf) -> BarcodeTensor:
-    """transform_bars of a (1,) BarcodeTensor where the bars, f, or both
-    depend on framework tensors."""
+    """transform_bars of a BarcodeTensor where the bars, f, or both depend
+    on framework tensors."""
     bars = _transformed_bars(bc, f)
     adapter = _autodiff._framework(bars)
     concrete = adapter.concrete(bars)
@@ -258,8 +297,12 @@ def _tracked_transform_bars(bc: BarcodeTensor, f: Plf) -> BarcodeTensor:
         raise NotImplementedError(
             "transform_bars of bars or a PLF that JAX or tf.function traces abstractly is not supported: "
             "which bars it removes depends on their values.")
-    keep = np.flatnonzero(concrete[:, 0] < concrete[:, 1])
-    return BarcodeTensor._from_tracked_bars(adapter.gather(bars, keep))
+    _, enumeration = bc._serial()
+    counts, owners = _owners(enumeration)
+    keep = concrete[:, 0] < concrete[:, 1]
+    kept_counts = np.bincount(owners[keep], minlength=len(counts))
+    return _TrackedBarcodeTensor(
+        adapter.gather(bars, np.flatnonzero(keep)), _enumeration(kept_counts, tuple(enumeration.shape[:-1])))
 
 
 @overload
@@ -287,8 +330,8 @@ def transform_bars(bc: Barcode | BarcodeTensor | TimeSeries, f: Plf, verbose: bo
     from :func:`~stablebear.persistence.homological_kernel.compute_homological_kernel`
     of PyTorch, JAX, or TensorFlow arrays, and :math:`f` when its times or
     values are such arrays (see :class:`~stablebear.functional.plf.Plf`).
-    Then `bc` must be a ``BarcodeTensor`` of shape (1,), and so is the
-    result, whose bars carry gradients with respect to both. At a breakpoint of :math:`f`, the derivatives are those of the
+    Then `bc` must be a ``BarcodeTensor``, and the result is one of the
+    same shape whose bars carry gradients with respect to both. At a breakpoint of :math:`f`, the derivatives are those of the
     segment after it. Which bars are removed depends on their values, which
     JAX and ``tf.function`` do not provide while they trace, so there this
     raises ``NotImplementedError``.
@@ -316,8 +359,8 @@ def transform_bars(bc: Barcode | BarcodeTensor | TimeSeries, f: Plf, verbose: bo
         :math:`[0, \infty)`).
     NotImplementedError
         If the bars or `f` carry gradients that JAX or ``tf.function``
-        traces, or `bc` is not a ``BarcodeTensor`` of shape (1,) while
-        they carry gradients.
+        traces, or `bc` is not a ``BarcodeTensor`` while they carry
+        gradients.
 
     Examples
     --------
@@ -330,11 +373,10 @@ def transform_bars(bc: Barcode | BarcodeTensor | TimeSeries, f: Plf, verbose: bo
     """
     if not isinstance(f, Plf):
         raise TypeError(f"Expected a Plf, got {type(f).__name__}.")
-    if f._tracked_parts() is not None or (isinstance(bc, BarcodeTensor) and bc._tvalues is not None):
-        if not isinstance(bc, BarcodeTensor) or bc.shape != (1,):
-            # ponytail: one barcode only, like the tracked kernel; batch the vjp for more
+    if f._tracked_parts() is not None or isinstance(bc, _TrackedBarcodeTensor):
+        if not isinstance(bc, BarcodeTensor):
             raise NotImplementedError(
-                "transform_bars with gradients supports a BarcodeTensor of shape (1,) only; "
+                "transform_bars with gradients supports a BarcodeTensor only; "
                 "wrap a single Barcode as BarcodeTensor([bc]).")
         return _tracked_transform_bars(bc, f)
     return _transform_bars(bc, f, verbose=verbose, keep_empty=False)
