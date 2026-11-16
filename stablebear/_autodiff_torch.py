@@ -12,7 +12,7 @@ class _Op(torch.autograd.Function):
     @staticmethod
     def forward(ctx, primal, vjp, *params):
         values = [to_numpy(p) for p in params]
-        out = primal(*values)
+        out, ctx.residuals = primal(*values)
         ctx.vjp = vjp
         ctx.values = values
         ctx.param_meta = [(p.dtype, p.device) for p in params]
@@ -20,7 +20,7 @@ class _Op(torch.autograd.Function):
 
     @staticmethod
     def backward(ctx, *grad_outputs):
-        grads = ctx.vjp(to_numpy(grad_outputs[0]), *ctx.values)
+        grads = ctx.vjp(to_numpy(grad_outputs[0]), ctx.residuals, *ctx.values)
         return (
             None,
             None,
@@ -54,6 +54,10 @@ def sort(x: torch.Tensor) -> torch.Tensor:
     return torch.sort(x).values
 
 
-def apply(primal: Callable[..., Any], vjp: Callable[..., Any], *params: Any, out: Any = None) -> torch.Tensor:
+def apply(
+    primal: Callable[..., Any], vjp: Callable[..., Any], *params: Any, out: Any = None, residuals: Any = ()
+) -> torch.Tensor:
+    """``primal(*values)`` returns (result, residuals), and
+    ``vjp(grad_out, residuals, *values)`` the gradients of the values."""
     params = tuple(p if isinstance(p, torch.Tensor) else torch.as_tensor(p) for p in params)
     return _Op.apply(primal, vjp, *params)

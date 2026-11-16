@@ -221,10 +221,19 @@ def pcf_op(primal_op: Callable[..., Any], combine: Callable[..., Any], *operands
 
 
 def differentiable(
-    *wrt: str, vjp: Callable[..., tuple], out: Callable[..., tuple] | None = None
+    *wrt: str,
+    vjp: Callable[..., tuple],
+    out: Callable[..., tuple] | None = None,
+    residuals: Callable[..., list] | None = None,
 ) -> Callable[[F], F]:
     """``out``, given the function's arguments, returns the (shape, NumPy dtype)
-    of its result. Frameworks that trace abstract values, such as JAX, need it."""
+    of its result. Frameworks that trace abstract values, such as JAX, need it.
+
+    With ``residuals``, the function returns ``(result, residuals)``, where
+    the residuals are a tuple of arrays from its computation that the vjp
+    reuses: the vjp receives them as its ``residuals`` argument, so the
+    backward pass need not repeat the forward pass. ``residuals``, given the
+    function's arguments, returns their (shape, NumPy dtype)s."""
     def decorate(fn: F) -> F:
         signature = inspect.signature(fn)
 
@@ -238,7 +247,8 @@ def differentiable(
                 if t is not None:
                     tracked[name] = t
             if not tracked:
-                return fn(*args, **kwargs)
+                result = fn(*args, **kwargs)
+                return result[0] if residuals is not None else result
             names = list(tracked)
             tensors = [tensor for name in names for tensor in tracked[name].tensors]
             ends = np.cumsum([len(tracked[name].tensors) for name in names])
@@ -251,14 +261,20 @@ def differentiable(
                 return arguments
 
             def primal(*values):
-                return np.asarray(fn(**with_values(values)))
+                result = fn(**with_values(values))
+                if residuals is None:
+                    return np.asarray(result), ()
+                return np.asarray(result[0]), tuple(result[1])
 
-            def backward(grad_out, *values):
-                grads = vjp(grad_out, **with_values(values))
+            def backward(grad_out, saved, *values):
+                extra = {"residuals": saved} if residuals is not None else {}
+                grads = vjp(grad_out, **with_values(values), **extra)
                 return tuple(g for name in names for g in tracked[name].split(grads[wrt.index(name)]))
 
             out_spec = out(**bound.arguments) if out is not None else None
-            return _framework(tensors[0]).apply(primal, backward, *tensors, out=out_spec)
+            residual_specs = residuals(**bound.arguments) if residuals is not None else []
+            return _framework(tensors[0]).apply(
+                primal, backward, *tensors, out=out_spec, residuals=residual_specs)
 
         return wrapper  # type: ignore[return-value]
 

@@ -92,7 +92,7 @@ def _critical_edges(X: np.ndarray, Y: np.ndarray):
         PointCloud(X.astype(dtype))._cpp_point_cloud(), PointCloud(Y.astype(dtype))._cpp_point_cloud())
 
 
-def _kernel_bars_vjp(grad_out, X, Y):
+def _kernel_bars_vjp(grad_out, X, Y, residuals):
     """Gradients of sum(grad_out * bars) with respect to the points of X and Y.
 
     Each birth is the distance between two points of Y, and each death the
@@ -100,7 +100,7 @@ def _kernel_bars_vjp(grad_out, X, Y):
     vector from p_j to p_i at p_i and its negative at p_j.
     """
     X, Y = np.asarray(X, dtype=np.float64), np.asarray(Y, dtype=np.float64)
-    _, edges = _critical_edges(X, Y)
+    (edges,) = residuals
     grads = []
     for points, (i, j), weights in ((X, edges[:, 2:].T, grad_out[:, 1]), (Y, edges[:, :2].T, grad_out[:, 0])):
         diff = points[i] - points[j]
@@ -120,10 +120,17 @@ def _kernel_bars_out(X, Y):
     return (max(n - 1, 0), 2), np.float32 if both_float32 else np.float64
 
 
-@_autodiff.differentiable("X", "Y", vjp=_kernel_bars_vjp, out=_kernel_bars_out)
-def _kernel_bars(X: Any, Y: Any) -> np.ndarray:
-    """The (n - 1, 2) bars of the kernel of one pair of (n, d) point clouds."""
-    return _critical_edges(X, Y)[0]
+def _kernel_bars_residuals(X, Y):
+    return [((max(X.shape[0] - 1, 0), 4), np.int64)]
+
+
+@_autodiff.differentiable(
+    "X", "Y", vjp=_kernel_bars_vjp, out=_kernel_bars_out, residuals=_kernel_bars_residuals)
+def _kernel_bars(X: Any, Y: Any) -> Any:
+    """The (n - 1, 2) bars of the kernel of one pair of (n, d) point clouds,
+    and as residuals the critical edges, which the vjp reuses."""
+    bars, edges = _critical_edges(X, Y)
+    return bars, (edges,)
 
 
 def _tracked_kernel(X: Any, Y: Any) -> BarcodeTensor:

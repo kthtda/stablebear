@@ -288,6 +288,22 @@ def test_homological_kernel_gradient(fw, wrt):
     _assert_gradient_matches_finite_differences(fw, loss, X if wrt == "X" else Y)
 
 
+def test_kernel_backward_reuses_forward(fw, monkeypatch):
+    from stablebear.persistence import homological_kernel
+
+    calls = []
+    critical_edges = homological_kernel._critical_edges
+
+    def counting(X, Y):
+        calls.append(1)
+        return critical_edges(X, Y)
+
+    monkeypatch.setattr(homological_kernel, "_critical_edges", counting)
+    X, Y = _kernel_points()
+    fw.value_and_grad(lambda P: fw.sum(sb.persistence.compute_homological_kernel(P, Y)._tvalues), X)
+    assert len(calls) == 1
+
+
 def test_stable_rank_of_framework_kernel_matches_numpy(fw):
     X, Y = _kernel_points()
     out = sb.persistence.barcode_to_stable_rank(sb.persistence.compute_homological_kernel(fw.tensor(X), fw.tensor(Y)))

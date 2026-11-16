@@ -56,28 +56,42 @@ def sort(x: Any) -> tf.Tensor:
     return tf.sort(x)
 
 
-def apply(primal: Callable[..., Any], vjp: Callable[..., Any], *params: Any, out: Any = None) -> tf.Tensor:
+def apply(
+    primal: Callable[..., Any], vjp: Callable[..., Any], *params: Any, out: Any = None, residuals: Any = ()
+) -> tf.Tensor:
+    """``primal(*values)`` returns (result, residuals), and
+    ``vjp(grad_out, residuals, *values)`` the gradients of the values.
+    ``residuals`` lists the (shape, dtype) of each residual."""
     if out is None:
         raise TypeError("This operation does not support TensorFlow: it does not declare the shape of its result.")
     shape, dtype = out
     tensors = [tf.convert_to_tensor(p) for p in params]
+    n_residuals = len(residuals)
 
     def run_primal(*values):
-        return np.asarray(primal(*values), dtype=dtype)
+        result, saved = primal(*values)
+        return [np.asarray(result, dtype=dtype), *(np.asarray(r, dtype=d) for r, (_, d) in zip(saved, residuals))]
 
-    def run_vjp(grad_out, *values):
-        grads = vjp(grad_out, *values)
+    def run_vjp(grad_out, *rest):
+        values = rest[n_residuals:]
+        grads = vjp(grad_out, tuple(rest[:n_residuals]), *values)
         return [np.asarray(g, dtype=v.dtype).reshape(v.shape) for g, v in zip(grads, values)]
 
     @tf.custom_gradient
     def op(*ps):
-        y = tf.numpy_function(run_primal, list(ps), tf.as_dtype(dtype))
+        outputs = tf.numpy_function(
+            run_primal, list(ps), [tf.as_dtype(dtype), *(tf.as_dtype(d) for _, d in residuals)])
+        if not isinstance(outputs, (list, tuple)):  # a single output comes back unwrapped
+            outputs = [outputs]
+        y, *saved = outputs
         y.set_shape(shape)
+        for r, (residual_shape, _) in zip(saved, residuals):
+            r.set_shape(residual_shape)
 
         def grad(grad_out):
             # A gather downstream, as in transform_bars, gives IndexedSlices.
             grad_out = tf.convert_to_tensor(grad_out)
-            grads = tf.numpy_function(run_vjp, [grad_out, *ps], [p.dtype for p in tensors])
+            grads = tf.numpy_function(run_vjp, [grad_out, *saved, *ps], [p.dtype for p in tensors])
             if not isinstance(grads, (list, tuple)):  # a single output comes back unwrapped
                 grads = [grads]
             for g, p in zip(grads, tensors):

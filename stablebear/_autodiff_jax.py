@@ -43,30 +43,45 @@ def sort(x: Any) -> jax.Array:
     return jnp.sort(x)
 
 
-def apply(primal: Callable[..., Any], vjp: Callable[..., Any], *params: Any, out: Any = None) -> jax.Array:
+def apply(
+    primal: Callable[..., Any], vjp: Callable[..., Any], *params: Any, out: Any = None, residuals: Any = ()
+) -> jax.Array:
+    """``primal(*values)`` returns (result, residuals), and
+    ``vjp(grad_out, residuals, *values)`` the gradients of the values.
+    ``residuals`` lists the (shape, dtype) of each residual."""
     if out is None:
         raise TypeError("This operation does not support JAX: it does not declare the shape of its result.")
     shape, dtype = out
     out_spec = jax.ShapeDtypeStruct(shape, jnp.dtype(dtype))
+    residual_specs = tuple(
+        jax.ShapeDtypeStruct(s, jax.dtypes.canonicalize_dtype(d)) for s, d in residuals)
     params = tuple(jnp.asarray(p) for p in params)
     specs = tuple(jax.ShapeDtypeStruct(p.shape, p.dtype) for p in params)
+    n_residuals = len(residual_specs)
 
     def run_primal(*values):
-        return np.asarray(primal(*values), dtype=out_spec.dtype)
+        result, saved = primal(*values)
+        return (np.asarray(result, dtype=out_spec.dtype),
+                *(np.asarray(r, dtype=s.dtype) for r, s in zip(saved, residual_specs)))
 
-    def run_vjp(grad_out, *values):
-        grads = vjp(grad_out, *values)
+    def run_vjp(grad_out, *rest):
+        grads = vjp(grad_out, tuple(rest[:n_residuals]), *rest[n_residuals:])
         return tuple(np.asarray(g, dtype=s.dtype).reshape(s.shape) for g, s in zip(grads, specs))
+
+    def call(*ps):
+        return jax.pure_callback(run_primal, (out_spec, *residual_specs), *ps)
 
     @jax.custom_vjp
     def op(*ps):
-        return jax.pure_callback(run_primal, out_spec, *ps)
+        return call(*ps)[0]
 
     def fwd(*ps):
-        return op(*ps), ps
+        result, *saved = call(*ps)
+        return result, (ps, tuple(saved))
 
-    def bwd(ps, grad_out):
-        return jax.pure_callback(run_vjp, specs, grad_out, *ps)
+    def bwd(carried, grad_out):
+        ps, saved = carried
+        return jax.pure_callback(run_vjp, specs, grad_out, *saved, *ps)
 
     op.defvjp(fwd, bwd)
     return op(*params)
