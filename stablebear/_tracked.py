@@ -12,7 +12,11 @@ The only state of a tracked object is its serial content, given as groups of
 columns that are each a framework array or a constant NumPy array, and its
 enumeration. Its C++ object is derived from them, so the two cannot disagree,
 and kept until a framework array is changed in place. ``detach()`` gives the
-untracked object of the current values.
+untracked object of the current values. A type whose elements have a size
+that their number of rows does not tell, such as a distance matrix, which
+has no entries when it has no points and when it has one, also keeps the
+size of each element; its serial content is then (content, enumeration,
+sizes).
 
 Indexing, reshaping, and copying a tracked tensor keep the gradients, and
 give a copy, not a view. Reading ``_data`` raises, so any operation that
@@ -51,13 +55,14 @@ class Tracking(NamedTuple):
     object, and ``attributes`` gives the attributes that the type's
     constructor sets, such as ``dtype``, from the NumPy dtype of the
     content. For a tensor type, ``element(rows)`` builds an element from its
-    rows.
+    rows. For a type that keeps sizes, these are ``from_serial(content,
+    enumeration, sizes)`` and ``element(rows, size)``.
     """
 
     groups: tuple[tuple[str, int | None], ...]
-    from_serial: Callable[[np.ndarray, np.ndarray], Any]
+    from_serial: Callable[..., Any]
     attributes: Callable[[Any], dict[str, Any]]
-    element: Callable[[np.ndarray], Any] | None = None
+    element: Callable[..., Any] | None = None
 
 
 def _is_framework(x: Any) -> bool:
@@ -109,14 +114,17 @@ class _TrackedObject:
     _np_dtype: Any
     _plain: Any
     _plain_versions: Any
+    _sizes: np.ndarray | None
 
-    def __new__(cls, parts: list, enumeration: np.ndarray, plain: Any = None):
+    def __new__(cls, parts: list, enumeration: np.ndarray, plain: Any = None, sizes: Any = None):
         """``plain`` is the untracked object of these parts and enumeration,
         from an operation that already has it; otherwise the first use
-        derives it."""
+        derives it. ``sizes`` gives the size of each element, for a type
+        that keeps them."""
         # The state is set here and __init__ does nothing, so that the
         # constructor of the base type can return a tracked object.
         self = object.__new__(cls)
+        self._sizes = None if sizes is None else np.asarray(sizes, dtype=np.int64)
         self._set_state(parts, enumeration)
         self._plain = plain
         self._plain_versions = self._versions() if plain is not None else None
@@ -147,7 +155,7 @@ class _TrackedObject:
         """The untracked object of the current values, shared between calls."""
         versions = self._versions()
         if self._plain is None or versions != self._plain_versions:
-            self._plain = self._tracking.from_serial(self._concrete(), self._enumeration)
+            self._plain = self._tracking.from_serial(*self._serial())
             self._plain_versions = versions
         return self._plain
 
@@ -161,19 +169,20 @@ class _TrackedObject:
 
     def detach(self) -> Any:
         """The untracked object of the current values, without gradients."""
-        return self._tracking.from_serial(self._concrete(), self._enumeration)
+        return self._tracking.from_serial(*self._serial())
 
     def _binary_io_data(self):
         return self._cpp()
 
-    def _serial(self) -> tuple[np.ndarray, np.ndarray]:
-        return self._concrete(), self._enumeration
+    def _serial(self) -> tuple:
+        sizes = () if self._sizes is None else (self._sizes,)
+        return (self._concrete(), self._enumeration, *sizes)
 
     def _tracked_parts(self):
         from . import _autodiff
 
         tracked = [i for i, part in enumerate(self._parts) if _is_framework(part)]
-        content, enumeration = self._serial()
+        content, enumeration, *sizes = self._serial()
         starts = np.cumsum([0] + _widths(self._tracking.groups, content.shape[1]))
         versions = self._versions()
 
@@ -189,7 +198,7 @@ class _TrackedObject:
             c = content.copy()
             for i, array in zip(tracked, arrays):
                 c[:, starts[i]:starts[i + 1]] = array
-            plain = self._tracking.from_serial(c, enumeration)
+            plain = self._tracking.from_serial(c, enumeration, *sizes)
             if current:
                 self._plain, self._plain_versions = plain, versions
             return plain
@@ -202,7 +211,9 @@ class _TrackedObject:
 
     def copy(self):
         # The state cannot change, so the copy can share it.
-        return type(self)(self._parts, self._enumeration, plain=self._untracked() if self._plain is not None else None)
+        return type(self)(
+            self._parts, self._enumeration, plain=self._untracked() if self._plain is not None else None,
+            sizes=self._sizes)
 
     def __copy__(self):
         return self.copy()
@@ -268,6 +279,9 @@ class _TrackedMixin(_TrackedObject):
         return _split_columns(content, self._tracking.groups), np.asarray(enumeration).reshape(-1, 2)
 
     def __setitem__(self, slices, val):
+        if self._sizes is not None:
+            raise NotImplementedError(
+                f"Writing to a {self._base.__name__} that carries gradients is not supported.")
         self._validate_setitem_dtype(val)  # pyright: ignore[reportAttributeAccessIssue]
         ids = self._ids()[slices]
         source = self._source(val)
@@ -360,8 +374,9 @@ class _TrackedMixin(_TrackedObject):
             (parts, enumeration), element = self._pending.get(int(ids), ((self._p, self._e.reshape(-1, 2)), int(ids)))
             start, stop = enumeration[element]
             assert self._tracking.element is not None
+            size = () if self._sizes is None else (int(self._sizes.reshape(-1)[element]),)
             return self._tracking.element(
-                _concrete_content(parts, self._tracking.groups, self._np_dtype)[start:stop])
+                _concrete_content(parts, self._tracking.groups, self._np_dtype)[start:stop], *size)
         flat = self._enumeration.reshape(-1, 2)
         ids = np.asarray(ids, dtype=np.int64)
         starts = flat[ids.ravel(), 0]
@@ -372,7 +387,8 @@ class _TrackedMixin(_TrackedObject):
             _autodiff._framework(part).gather(part, rows) if _is_framework(part) else part[rows]
             for part in self._parts
         ]
-        return type(self)(parts, np.stack([ends - counts, ends], axis=-1).reshape(*ids.shape, 2))
+        sizes = None if self._sizes is None else self._sizes.reshape(-1)[ids.ravel()].reshape(ids.shape)
+        return type(self)(parts, np.stack([ends - counts, ends], axis=-1).reshape(*ids.shape, 2), sizes=sizes)
 
     def __getitem__(self, slices):
         return self._select(self._ids()[slices])

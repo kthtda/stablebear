@@ -8,6 +8,7 @@ import numpy as np
 from . import _sb_cpp as cpp
 from ._binary_io import _BinaryIoMixin
 from ._tensor_base import Tensor, _array_for_protocol
+from ._tracked import Tracking, tracked_class
 from .typing import Dtype, float32, float64, symmat32, symmat64
 
 _dtype_to_cpp = {
@@ -236,6 +237,29 @@ class SymmetricMatrixTensor(Tensor):
     def _to_py_tensor(self, data):
         return SymmetricMatrixTensor(data)
 
+    # The framework entries of a tensor that carries gradients (see
+    # _tracked); None for any other.
+    _tvalues: Any = None
+
+    def _serial(self) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """(content, enumeration, sizes): as the (m, 1) content, the entries
+        on and below the diagonal of all matrices in C order, each by rows:
+        (0, 0), (1, 0), (1, 1), and so on; for each matrix the [start, stop)
+        rows of its entries, with shape self.shape + (2,); and the number of
+        rows of each matrix, with shape self.shape."""
+        return cpp.symmetric_matrices_to_serial_content(self._data)
+
+    @staticmethod
+    def _from_serial(content: np.ndarray, enumeration: np.ndarray, sizes: np.ndarray) -> SymmetricMatrixTensor:
+        """The inverse of _serial."""
+        from .distance_matrix import _matrix_serial_content
+
+        content, enumeration, sizes = _matrix_serial_content(
+            content, enumeration, sizes, lambda n: n * (n + 1) // 2)
+        if content.dtype == np.float32:
+            return SymmetricMatrixTensor(cpp.symmetric_matrices_from_serial_content_32(content, enumeration, sizes))
+        return SymmetricMatrixTensor(cpp.symmetric_matrices_from_serial_content_64(content, enumeration, sizes))
+
     def _decay_value(self, val):
         return val._data
 
@@ -244,3 +268,17 @@ class SymmetricMatrixTensor(Tensor):
 
     def _get_valid_setitem_dtypes(self):
         return [SymmetricMatrix, SymmetricMatrixTensor]
+
+
+SymmetricMatrixTensor._tracking = Tracking(  # pyright: ignore[reportAttributeAccessIssue]
+    groups=(("_tvalues", 1),),
+    from_serial=SymmetricMatrixTensor._from_serial,
+    attributes=lambda np_dtype: {"dtype": symmat32 if np_dtype == np.float32 else symmat64},
+    element=lambda rows, size: SymmetricMatrixTensor._from_serial(
+        rows, np.array([[0, len(rows)]]), np.array([size]))[0],
+)
+
+# A SymmetricMatrixTensor whose entries depend on PyTorch, JAX, or
+# TensorFlow arrays, built from [entries], the enumeration, and the sizes of
+# _serial; see _tracked.
+_TrackedSymmetricMatrixTensor = tracked_class(SymmetricMatrixTensor)

@@ -8,6 +8,7 @@ import numpy as np
 from . import _sb_cpp as cpp
 from ._binary_io import _BinaryIoMixin
 from ._tensor_base import IndexedElementTensor, _array_for_protocol
+from ._tracked import Tracking, tracked_class
 from .typing import Dtype, float32, float64, distmat32, distmat64
 
 _dtype_to_cpp = {
@@ -322,6 +323,30 @@ class DistanceMatrixTensor(IndexedElementTensor):
     def _to_py_tensor(self, data):
         return DistanceMatrixTensor(data)
 
+    # The framework entries of a tensor that carries gradients (see
+    # _tracked); None for any other.
+    _tvalues: Any = None
+
+    def _serial(self) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """(content, enumeration, sizes): as the (m, 1) content, the entries
+        below the diagonal of all matrices in C order, each by rows: (1, 0),
+        (2, 0), (2, 1), and so on; for each matrix the [start, stop) rows of
+        its entries, with shape self.shape + (2,); and the number of points
+        of each matrix, with shape self.shape."""
+        data = self._data.materialize() if self._has_indexed_storage() else self._data
+        return cpp.distance_matrices_to_serial_content(data)
+
+    @staticmethod
+    def _from_serial(content: np.ndarray, enumeration: np.ndarray, sizes: np.ndarray) -> DistanceMatrixTensor:
+        """The inverse of _serial."""
+        content, enumeration, sizes = _matrix_serial_content(
+            content, enumeration, sizes, lambda n: n * (n - 1) // 2)
+        if np.isnan(content).any() or (content < 0).any():
+            raise ValueError("Distance matrix entries must be nonnegative and not NaN.")
+        if content.dtype == np.float32:
+            return DistanceMatrixTensor(cpp.distance_matrices_from_serial_content_32(content, enumeration, sizes))
+        return DistanceMatrixTensor(cpp.distance_matrices_from_serial_content_64(content, enumeration, sizes))
+
     def _decay_value(self, val):
         return val._current_matrix()
 
@@ -333,3 +358,34 @@ class DistanceMatrixTensor(IndexedElementTensor):
 
     def _get_valid_setitem_dtypes(self):
         return [DistanceMatrix, DistanceMatrixTensor]
+
+
+def _matrix_serial_content(content, enumeration, sizes, entries) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """The serial content of matrices as the C++ conversions take it, checked:
+    a matrix of size n must have entries(n) rows."""
+    content = np.asarray(content)
+    content = np.ascontiguousarray(content, dtype=np.float32 if content.dtype == np.float32 else np.float64)
+    content = content.reshape(len(content), 1)
+    enumeration = np.ascontiguousarray(enumeration, dtype=np.int64)
+    sizes = np.ascontiguousarray(sizes, dtype=np.int64)
+    if sizes.shape != enumeration.shape[:-1] or (sizes < 0).any():
+        raise ValueError(
+            f"sizes must be nonnegative with the shape of the tensor (got shapes {sizes.shape} "
+            f"and {enumeration.shape[:-1]}).")
+    if not np.array_equal(enumeration[..., 1] - enumeration[..., 0], entries(sizes)):
+        raise ValueError("The enumeration does not give each matrix the number of entries of its size.")
+    return content, enumeration, sizes
+
+
+DistanceMatrixTensor._tracking = Tracking(  # pyright: ignore[reportAttributeAccessIssue]
+    groups=(("_tvalues", 1),),
+    from_serial=DistanceMatrixTensor._from_serial,
+    attributes=lambda np_dtype: {"dtype": distmat32 if np_dtype == np.float32 else distmat64},
+    element=lambda rows, size: DistanceMatrixTensor._from_serial(
+        rows, np.array([[0, len(rows)]]), np.array([size]))[0],
+)
+
+# A DistanceMatrixTensor whose entries depend on PyTorch, JAX, or TensorFlow
+# arrays, built from [entries], the enumeration, and the sizes of _serial;
+# see _tracked.
+_TrackedDistanceMatrixTensor = tracked_class(DistanceMatrixTensor)

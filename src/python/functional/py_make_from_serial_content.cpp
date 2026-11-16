@@ -6,6 +6,8 @@
 #include <sbear/algorithms/functional/iterate_rectangles.hpp>
 #include <sbear/persistence/barcode.hpp>
 #include <sbear/point_cloud.hpp>
+#include <sbear/distance_matrix.hpp>
+#include <sbear/symmetric_matrix.hpp>
 
 #include "py_make_from_serial_content.hpp"
 #include "../py_tensor.hpp"
@@ -41,8 +43,8 @@ namespace sb_py
   }
 
   /// A tensor of shape enumeration.shape[:-1] whose element at idx is
-  /// build(count, at), where at(i, j) gives column j of row i of the count
-  /// rows of content from enumeration[idx, 0] to enumeration[idx, 1].
+  /// build(count, at, idx), where at(i, j) gives column j of row i of the
+  /// count rows of content from enumeration[idx, 0] to enumeration[idx, 1].
   /// Unless allowEmpty, each element needs a row. The elements are built
   /// in parallel.
   template <typename Elem, typename Tt, typename Build>
@@ -101,7 +103,7 @@ namespace sb_py
       auto [start, stop] = range(idx);
       target(idx) = build(static_cast<size_t>(stop - start), [&contentView, start](size_t i, size_t j) {
         return contentView(static_cast<size_t>(start) + i, j);
-      });
+      }, idx);
     }, sb::default_executor());
 
     return target;
@@ -113,7 +115,7 @@ namespace sb_py
   {
     using PcfT = sb::Pcf<Tt, Tv>;
     require_columns(content, 2);
-    return tensor_from_serial_content<PcfT>(content, enumeration, false, [](size_t count, const auto& at) {
+    return tensor_from_serial_content<PcfT>(content, enumeration, false, [](size_t count, const auto& at, const std::vector<size_t>&) {
       std::vector<typename PcfT::point_type> pts;
       pts.reserve(count);
       for (size_t i = 0; i < count; ++i)
@@ -129,7 +131,7 @@ namespace sb_py
   barcodes_from_serial_content(sb_py::NpIn<T> content, sb_py::NpIn<detail::EnumerationDt> enumeration)
   {
     require_columns(content, 2);
-    return tensor_from_serial_content<sb::ph::Barcode<T>>(content, enumeration, true, [](size_t count, const auto& at) {
+    return tensor_from_serial_content<sb::ph::Barcode<T>>(content, enumeration, true, [](size_t count, const auto& at, const std::vector<size_t>&) {
       std::vector<sb::ph::PersistencePair<T>> bars;
       bars.reserve(count);
       for (size_t i = 0; i < count; ++i)
@@ -147,7 +149,7 @@ namespace sb_py
   point_clouds_from_serial_content(sb_py::NpIn<T> content, sb_py::NpIn<detail::EnumerationDt> enumeration)
   {
     const size_t dim = content.ndim() == 2 ? content.shape(1) : 0;
-    return tensor_from_serial_content<sb::PointCloud<T>>(content, enumeration, true, [dim](size_t count, const auto& at) {
+    return tensor_from_serial_content<sb::PointCloud<T>>(content, enumeration, true, [dim](size_t count, const auto& at, const std::vector<size_t>&) {
       sb::PointCloud<T> cloud(std::vector<size_t>{count, dim});
       for (size_t i = 0; i < count; ++i)
       {
@@ -158,6 +160,95 @@ namespace sb_py
       }
       return cloud;
     });
+  }
+
+  /// The entries below the diagonal of a distance matrix, by rows: (1, 0),
+  /// (2, 0), (2, 1), and so on.
+  template <typename T, typename At>
+  void fill_matrix(sb::DistanceMatrix<T>& matrix, const At& at)
+  {
+    size_t k = 0;
+    for (size_t i = 1; i < matrix.size(); ++i)
+    {
+      for (size_t j = 0; j < i; ++j)
+      {
+        matrix(i, j) = at(k++, size_t{0});
+      }
+    }
+  }
+
+  /// The entries on and below the diagonal of a symmetric matrix, by rows:
+  /// (0, 0), (1, 0), (1, 1), and so on.
+  template <typename T, typename At>
+  void fill_matrix(sb::SymmetricMatrix<T>& matrix, const At& at)
+  {
+    size_t k = 0;
+    for (size_t i = 0; i < matrix.size(); ++i)
+    {
+      for (size_t j = 0; j <= i; ++j)
+      {
+        matrix(i, j) = at(k++, size_t{0});
+      }
+    }
+  }
+
+  template <typename T>
+  size_t entry_count(const sb::DistanceMatrix<T>& matrix)
+  {
+    const size_t n = matrix.size();
+    return n == 0 ? 0 : n * (n - 1) / 2;
+  }
+
+  template <typename T>
+  size_t entry_count(const sb::SymmetricMatrix<T>& matrix)
+  {
+    return matrix.storage_count();
+  }
+
+  template <typename T>
+  void write_entries(const sb::DistanceMatrix<T>& matrix, T* out)
+  {
+    for (size_t i = 1; i < matrix.size(); ++i)
+    {
+      for (size_t j = 0; j < i; ++j)
+      {
+        *out++ = static_cast<T>(matrix(i, j));
+      }
+    }
+  }
+
+  template <typename T>
+  void write_entries(const sb::SymmetricMatrix<T>& matrix, T* out)
+  {
+    for (size_t i = 0; i < matrix.size(); ++i)
+    {
+      for (size_t j = 0; j <= i; ++j)
+      {
+        *out++ = matrix(i, j);
+      }
+    }
+  }
+
+  /// Distance or symmetric matrices whose entries, in the order of
+  /// fill_matrix, are the rows of the one column of content. sizes, of the
+  /// shape of the tensor, gives the number of rows and columns of each
+  /// matrix, which the number of its entries does not tell for a distance
+  /// matrix without entries. The caller checks that the sizes match the
+  /// enumeration and that the entries are valid.
+  template <typename Matrix>
+  sb::Tensor<Matrix> matrices_from_serial_content(
+      sb_py::NpIn<typename Matrix::value_type> content,
+      sb_py::NpIn<detail::EnumerationDt> enumeration,
+      sb_py::NpIn<detail::EnumerationDt> sizes)
+  {
+    require_columns(content, 1);
+    NumpyTensor<const detail::EnumerationDt> sizesView(sizes);
+    return tensor_from_serial_content<Matrix>(content, enumeration, true,
+      [&sizesView](size_t, const auto& at, const std::vector<size_t>& idx) {
+        Matrix matrix(static_cast<size_t>(sizesView(idx)));
+        fill_matrix(matrix, at);
+        return matrix;
+      });
   }
 
   /// The inverse of tensor_from_serial_content: (content, enumeration) with
@@ -268,6 +359,36 @@ namespace sb_py
           }
         }
       }, dim);
+  }
+
+  /// (content, enumeration, sizes) of a tensor of distance or symmetric
+  /// matrices: the inverse of matrices_from_serial_content.
+  template <typename Matrix>
+  nb::tuple matrices_to_serial_content(const sb::Tensor<Matrix>& tensor)
+  {
+    using T = typename Matrix::value_type;
+
+    auto serial = tensor_to_serial_content<T>(tensor,
+      [](const Matrix& matrix) { return entry_count(matrix); },
+      [](const Matrix& matrix, T* out) { write_entries(matrix, out); }, 1);
+
+    const auto& shape = tensor.shape();
+    std::vector<size_t> strides(shape.size(), 1);
+    for (size_t i = shape.size(); i-- > 1;)
+    {
+      strides[i - 1] = strides[i] * shape[i];
+    }
+    auto sizes = new_array<detail::EnumerationDt>(std::vector<size_t>(shape.begin(), shape.end()));
+    sb::walk(tensor, [&](const std::vector<size_t>& idx) {
+      size_t k = 0;
+      for (size_t i = 0; i < idx.size(); ++i)
+      {
+        k += idx[i] * strides[i];
+      }
+      sizes.data()[k] = static_cast<detail::EnumerationDt>(tensor(idx).size());
+    });
+
+    return nb::make_tuple(serial[0], serial[1], sizes);
   }
 
   /// The union of the breakpoint times of two tensors of PCFs of the same
@@ -417,6 +538,14 @@ namespace sb_py
     m.def("point_clouds_to_serial_content", &point_clouds_to_serial_content<sb::float64_t>);
     m.def("point_clouds_from_serial_content_32", &point_clouds_from_serial_content<sb::float32_t>);
     m.def("point_clouds_from_serial_content_64", &point_clouds_from_serial_content<sb::float64_t>);
+    m.def("distance_matrices_to_serial_content", &matrices_to_serial_content<sb::DistanceMatrix<sb::float32_t>>);
+    m.def("distance_matrices_to_serial_content", &matrices_to_serial_content<sb::DistanceMatrix<sb::float64_t>>);
+    m.def("distance_matrices_from_serial_content_32", &matrices_from_serial_content<sb::DistanceMatrix<sb::float32_t>>);
+    m.def("distance_matrices_from_serial_content_64", &matrices_from_serial_content<sb::DistanceMatrix<sb::float64_t>>);
+    m.def("symmetric_matrices_to_serial_content", &matrices_to_serial_content<sb::SymmetricMatrix<sb::float32_t>>);
+    m.def("symmetric_matrices_to_serial_content", &matrices_to_serial_content<sb::SymmetricMatrix<sb::float64_t>>);
+    m.def("symmetric_matrices_from_serial_content_32", &matrices_from_serial_content<sb::SymmetricMatrix<sb::float32_t>>);
+    m.def("symmetric_matrices_from_serial_content_64", &matrices_from_serial_content<sb::SymmetricMatrix<sb::float64_t>>);
   }
 
 }

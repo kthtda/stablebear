@@ -898,6 +898,104 @@ def test_tracked_point_clouds_index_and_reshape_like_plain_ones(fw):
             np.testing.assert_array_equal(np.asarray(selected[i]), np.asarray(expected[i]))
 
 
+def _distance_matrices():
+    # Matrices of 2, 1, 0, and 3 points.
+    matrices = sb.zeros((2, 2), dtype=sb.distmat64)
+    matrices[0, 0] = sb.DistanceMatrix(np.array([
+        [0.0, 1.0],
+        [1.0, 0.0],
+    ]))
+    matrices[0, 1] = sb.DistanceMatrix(np.array([[0.0]]))
+    matrices[1, 1] = sb.DistanceMatrix(np.array([
+        [0.0, 2.0, 3.0],
+        [2.0, 0.0, 4.0],
+        [3.0, 4.0, 0.0],
+    ]))
+    return matrices
+
+
+def _symmetric_matrices():
+    # Matrices of 2, 1, 0, and 3 rows.
+    matrices = sb.zeros((2, 2), dtype=sb.symmat64)
+    matrices[0, 0] = sb.SymmetricMatrix(np.array([
+        [1.0, 2.0],
+        [2.0, 3.0],
+    ]))
+    matrices[0, 1] = sb.SymmetricMatrix(np.array([[4.0]]))
+    matrices[1, 1] = sb.SymmetricMatrix(np.array([
+        [5.0, 6.0, 8.0],
+        [6.0, 7.0, 9.0],
+        [8.0, 9.0, 10.0],
+    ]))
+    return matrices
+
+
+def test_distance_matrix_serial_content_round_trip():
+    matrices = _distance_matrices()
+    content, enumeration, sizes = matrices._serial()
+    np.testing.assert_array_equal(content, [[1.0], [2.0], [3.0], [4.0]])
+    np.testing.assert_array_equal(enumeration, [[[0, 1], [1, 1]],
+                                                [[1, 1], [1, 4]]])
+    # A matrix of one point and a matrix of none both have no entries.
+    np.testing.assert_array_equal(sizes, [[2, 1],
+                                          [0, 3]])
+    assert sb.DistanceMatrixTensor._from_serial(content, enumeration, sizes).array_equal(matrices)
+
+
+def test_symmetric_matrix_serial_content_round_trip():
+    matrices = _symmetric_matrices()
+    content, enumeration, sizes = matrices._serial()
+    np.testing.assert_array_equal(content, [[1.0], [2.0], [3.0], [4.0], [5.0], [6.0], [7.0], [8.0], [9.0], [10.0]])
+    np.testing.assert_array_equal(enumeration, [[[0, 3], [3, 4]],
+                                                [[4, 4], [4, 10]]])
+    np.testing.assert_array_equal(sizes, [[2, 1],
+                                          [0, 3]])
+    assert sb.SymmetricMatrixTensor._from_serial(content, enumeration, sizes).array_equal(matrices)
+
+
+def test_serial_content_of_matrices_with_sizes_that_do_not_match_raises():
+    content, enumeration, sizes = _distance_matrices()._serial()
+    sizes[1, 1] = 4
+    with pytest.raises(ValueError, match="entries"):
+        sb.DistanceMatrixTensor._from_serial(content, enumeration, sizes)
+
+
+def test_serial_content_of_distance_matrices_with_negative_entry_raises():
+    content, enumeration, sizes = _distance_matrices()._serial()
+    content[0, 0] = -1.0
+    with pytest.raises(ValueError, match="nonnegative"):
+        sb.DistanceMatrixTensor._from_serial(content, enumeration, sizes)
+
+
+@pytest.mark.parametrize("make_matrices", [_distance_matrices, _symmetric_matrices], ids=["distance", "symmetric"])
+def test_tracked_matrices_index_and_reshape_like_plain_ones(fw, make_matrices):
+    plain = make_matrices()
+    out = tracked(fw, plain)
+    for select in (
+        lambda t: t[1],
+        lambda t: t[:, 0],
+        lambda t: t[[1, 0]],
+        lambda t: t.reshape((4,)),
+        lambda t: t.flatten()[::-1],
+        lambda t: t.transpose(),
+        lambda t: t.copy(),
+    ):
+        selected, expected = select(out), select(plain)
+        assert isinstance(selected, type(plain))
+        assert selected.shape == expected.shape
+        assert selected._tvalues is not None
+        assert selected.array_equal(expected)
+        for i in np.ndindex(*expected.shape):
+            np.testing.assert_array_equal(selected[i].to_dense(), expected[i].to_dense())
+
+
+@pytest.mark.parametrize("make_matrices", [_distance_matrices, _symmetric_matrices], ids=["distance", "symmetric"])
+def test_write_to_tracked_matrices_raises(fw, make_matrices):
+    out = tracked(fw, make_matrices())
+    with pytest.raises(NotImplementedError, match="Writing"):
+        out[0, 0] = make_matrices()[1, 1]
+
+
 def test_values_with_times_match_breakpoints():
     g = sb.Pcf(np.array([2.0, -1.0, 0.0]), times=np.array([0.0, 1.0, 3.0]))
     np.testing.assert_array_equal(g.to_numpy(), [[0.0, 2.0], [1.0, -1.0], [3.0, 0.0]])
