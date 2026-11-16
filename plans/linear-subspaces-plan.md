@@ -1,6 +1,6 @@
 # Linear subspaces, inner products, and distances: implementation plan
 
-Progress: 9 of 15 items, 20 of 33 points (61%)
+Progress: 10 of 15 items, 23 of 33 points (70%)
 
 Spec: [linear-subspaces-spec.md](linear-subspaces-spec.md)
 
@@ -77,12 +77,15 @@ Spec: [linear-subspaces-spec.md](linear-subspaces-spec.md)
   infinity of a small cloud with known distances; equal p give equal
   distances; p < 1 raises; the kernel under p = 1 equals the kernel of the
   two distance matrices.
-- [ ] **B7.** [3] Gradients under `LpDistance(p)` (D6a): the critical edges
+- [x] **B7.** [3] (54d523661) Gradients under `LpDistance(p)` (D6a): the critical edges
   of persistent homology and of the kernel from distance matrices, and the
   bars as the distances of those pairs in framework operations.
   Tests: the bars of framework points match NumPy for p = 1 and 3;
   gradients of persistent homology and of the kernel against finite
   differences for p = 1 and 3; points that JAX traces raise.
+  Note: gradients at equal distances are a kink; taxicab and Chebyshev
+  distances tie easily on points with round coordinates, so the gradient
+  tests use a cloud whose distances all differ.
 
 ## Phase C: Batches
 
