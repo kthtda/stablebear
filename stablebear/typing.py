@@ -176,6 +176,17 @@ _NP_TO_SB = {
 }
 
 
+def _sized_type(dtype) -> type:
+    """The NumPy scalar type of ``dtype`` named by its kind and size, such as
+    ``np.int32`` for C ``long`` on Windows and ``np.int64`` for C
+    ``long long`` on Linux. NumPy gives such aliases scalar types of their
+    own, so a lookup by ``dtype.type`` would miss them."""
+    dtype = np.dtype(dtype)
+    if dtype.kind in "iuf":
+        return np.dtype(f"{dtype.kind}{dtype.itemsize}").type
+    return dtype.type
+
+
 def _assert_valid_dtype(dt, valid_dtypes):
     if not any(dt is valid_dtype for valid_dtype in valid_dtypes):
         raise TypeError(

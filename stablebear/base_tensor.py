@@ -18,6 +18,7 @@ from .functional.pcf import Pcf
 from .functional.plf import Plf
 from .typing import (
     _NP_TO_SB,
+    _sized_type,
     _validate_dtype,
     boolean,
     float32,
@@ -169,7 +170,7 @@ class IntTensor(NumericTensor):
             data = data._data
         elif isinstance(data, np.ndarray):
             if dtype is None:
-                dtype = _NP_TO_SB.get(data.dtype.type, int64)
+                dtype = _NP_TO_SB.get(_sized_type(data.dtype), int64)
             convert = {
                 int32: lambda d: cpp.ndarray_to_tensor_i32(np.asarray(d, dtype=np.int32)),
                 int64: lambda d: cpp.ndarray_to_tensor_i64(np.asarray(d, dtype=np.int64)),
