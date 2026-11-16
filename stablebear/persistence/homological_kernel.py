@@ -10,6 +10,7 @@ from ..distance_matrix import (
     DistanceMatrixTensor,
 )
 from ..base_tensor import FloatTensor, _get_backend
+from ..linear import DistanceSpace, _points_array
 from ..point_cloud import PointCloud, PointCloudTensor
 from ..typing import distmat32, distmat64, float32, float64, pcloud32, pcloud64
 from .homology import (
@@ -144,19 +145,37 @@ def _validate_kernel_pair(X, Y):
         raise ValueError(f"X and Y must have the same shape (got {X.shape} and {Y.shape})")
 
 
+def _kernel_in_spaces(X: Any, Y: Any, dim: int, verbose: bool) -> BarcodeTensor:
+    """The kernel of the points of two DistanceSpaces in their distance."""
+    if not (isinstance(X, DistanceSpace) and isinstance(Y, DistanceSpace)):
+        raise TypeError(
+            "X and Y must both be DistanceSpaces, with equal distances, or both plain: a plain point cloud "
+            "has the Euclidean distance.")
+    if X.distance != Y.distance:
+        raise TypeError(f"X and Y must have equal distances (got {X.distance!r} and {Y.distance!r}).")
+    transformed = [space.distance._euclidean_points(_points_array(space)) for space in (X, Y)]
+    if transformed[0] is None:
+        raise NotImplementedError(f"compute_homological_kernel does not support {X.distance!r} yet.")
+    # The Euclidean distances of the transformed points are the distances
+    # of the spaces.
+    return compute_homological_kernel(transformed[0], transformed[1], dim=dim, verbose=verbose)
+
+
 def compute_homological_kernel(
     X: PointCloud
     | PointCloudTensor
     | DistanceMatrix
     | DistanceMatrixTensor
     | FloatTensor
-    | np.ndarray,
+    | np.ndarray
+    | DistanceSpace,
     Y: PointCloud
     | PointCloudTensor
     | DistanceMatrix
     | DistanceMatrixTensor
     | FloatTensor
-    | np.ndarray,
+    | np.ndarray
+    | DistanceSpace,
     *,
     dim: int = 0,
     verbose: bool = False,
@@ -168,9 +187,10 @@ def compute_homological_kernel(
     output barcode is born when two clusters merge under :math:`d'` and
     dies when the same clusters merge under :math:`d`. Both inputs must
     be the same kind and the same shape; element ``i`` of ``X`` is
-    paired with element ``i`` of ``Y``. Point clouds always use the
-    Euclidean metric; for any other metric, pass precomputed distance
-    matrices. When the input contains multiple point clouds or distance
+    paired with element ``i`` of ``Y``. Plain point clouds use the
+    Euclidean distance; for another distance, pass two
+    :class:`~stablebear.linear.DistanceSpace` objects with equal
+    distances, or precomputed distance matrices. When the input contains multiple point clouds or distance
     matrices, the computations are parallelized across them. The method
     and the algorithm used to compute it are described in full in
     :footcite:`KampNorthman2026`.
@@ -202,7 +222,8 @@ def compute_homological_kernel(
     Raises
     ------
     TypeError
-        If ``X`` and ``Y`` are not the same kind or not the same dtype.
+        If ``X`` and ``Y`` are not the same kind or not the same dtype, or
+        only one of them is a ``DistanceSpace``, or their distances differ.
     ValueError
         If the (outer) tensor shapes differ, or ``dim`` is negative.
     NotImplementedError
@@ -230,6 +251,9 @@ def compute_homological_kernel(
         raise ValueError(f"dim must be non-negative (got {dim})")
     if dim > 0:
         raise NotImplementedError(f"only dim=0 is currently supported (got dim={dim})")
+
+    if isinstance(X, DistanceSpace) or isinstance(Y, DistanceSpace):
+        return _kernel_in_spaces(X, Y, dim, verbose)
 
     if _autodiff._tracked(X) is not None or _autodiff._tracked(Y) is not None:
         return _tracked_kernel(X, Y)

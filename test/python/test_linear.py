@@ -442,3 +442,96 @@ def test_persistent_homology_in_inner_product_space_gradient_wrt_points(fw):
         return _bars_loss(fw, _homology(sb.InnerProduct(_gram())(P)))
 
     assert_gradient_matches_finite_differences(fw, loss, _loop_points())
+
+
+def _kernel(X, Y):
+    return sb.persistence.compute_homological_kernel(X, Y, dim=0, verbose=False)
+
+
+def _contracted(points):
+    # Every pairwise distance shrinks, as the kernel needs of its second cloud.
+    return points * np.array([1.0, 0.25])
+
+
+def test_kernel_in_inner_product_spaces_is_that_of_the_transformed_points():
+    # x^T G y for G = diag(4, 1) is the Euclidean inner product after
+    # doubling the first coordinate.
+    ip = sb.InnerProduct(np.diag([4.0, 1.0]))
+    X, Y = _loop_points(), _contracted(_loop_points())
+    doubled = np.array([2.0, 1.0])
+
+    out = _kernel(ip(X), ip(Y))
+
+    assert out.shape == (1,)
+    assert out[0].is_isomorphic_to(_kernel(X * doubled, Y * doubled)[0], atol=1e-12, rtol=1e-12)
+
+
+def _cloud3():
+    return np.array([[0.0, 0.0, 0.0],
+                     [2.0, 0.1, 1.0],
+                     [3.1, 1.5, -0.5],
+                     [2.3, 3.2, 2.0],
+                     [0.3, 2.9, 1.2],
+                     [-0.9, 1.3, 3.0]])
+
+
+def test_kernel_of_cloud_and_its_projection_in_the_same_inner_product_space():
+    ip = sb.InnerProduct(_gram3())
+    X = ip(_cloud3())
+
+    out = _kernel(X, sb.LinearSubspace(_vectors()).project(X))
+
+    # One bar per point but one, each born before it dies: the distances of
+    # the projection are at most those of the cloud.
+    bars = out[0].to_numpy()
+    assert bars.shape == (5, 2)
+    assert np.all(bars[:, 0] <= bars[:, 1])
+
+
+def test_kernel_of_distance_space_and_plain_cloud_raises():
+    ip = sb.InnerProduct(_gram())
+    with pytest.raises(TypeError, match="both"):
+        _kernel(ip(_loop_points()), _contracted(_loop_points()))
+    with pytest.raises(TypeError, match="both"):
+        _kernel(_loop_points(), ip(_contracted(_loop_points())))
+
+
+def test_kernel_of_spaces_with_different_distances_raises():
+    X = sb.InnerProduct(_gram())(_loop_points())
+    Y = sb.InnerProduct(np.eye(2))(_contracted(_loop_points()))
+    with pytest.raises(TypeError, match="equal distances"):
+        _kernel(X, Y)
+
+
+def _projection_kernel_loss(fw, vectors):
+    X = sb.InnerProduct(_gram3())(_cloud3())
+    bars = _kernel(X, sb.LinearSubspace(vectors).project(X))._tvalues
+    # The births are distances of the projection; the deaths do not depend
+    # on the subspace.
+    return fw.sum(bars[:, 0] * bars[:, 0])
+
+
+def test_kernel_of_cloud_and_its_projection_gradient_wrt_subspace(fw):
+    assert_gradient_matches_finite_differences(fw, lambda V: _projection_kernel_loss(fw, V), _vectors())
+
+
+def test_compiled_kernel_of_cloud_and_its_projection_gradient_matches_eager(fw):
+    if fw.compiled_value_and_grad is None:
+        pytest.skip("No compiled mode")
+
+    value, grad = fw.compiled_value_and_grad(lambda V: _projection_kernel_loss(fw, V), _vectors())
+    eager_value, eager_grad = fw.value_and_grad(lambda V: _projection_kernel_loss(fw, V), _vectors())
+
+    np.testing.assert_allclose(value, eager_value)
+    np.testing.assert_allclose(grad, eager_grad)
+
+
+def test_kernel_gradient_wrt_gram_matrix(fw):
+    X, Y = _loop_points(), _contracted(_loop_points())
+
+    def loss(a):
+        ip = sb.InnerProduct(_framework_gram2(fw, a))
+        bars = _kernel(ip(X), ip(Y))._tvalues
+        return fw.sum(bars[:, 0] * bars[:, 1])
+
+    assert_gradient_matches_finite_differences(fw, loss, [2.0, 1.0])
