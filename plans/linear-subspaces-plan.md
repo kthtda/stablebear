@@ -1,6 +1,6 @@
 # Linear subspaces, inner products, and distances: implementation plan
 
-Progress: 17 of 19 items, 37 of 43 points (86%)
+Progress: 18 of 19 items, 40 of 43 points (93%)
 
 Spec: [linear-subspaces-spec.md](linear-subspaces-spec.md)
 
@@ -136,12 +136,14 @@ Spec: [linear-subspaces-spec.md](linear-subspaces-spec.md)
   Tests: the batch holds each array as a cloud, of different sizes;
   gradients flow through its projection; a framework array of shape
   (b, n, d) is a batch of b clouds.
-- [ ] **E3.** [3] `compute_persistent_homology` with gradients of a batch,
+- [x] **E3.** [3] (6285fe38b) `compute_persistent_homology` with gradients of a batch,
   plain or in a `DistanceSpace` of either kind of distance (D8).
   Tests: the bars of a batch match the untracked ones; gradients with
   respect to the points, to the vectors of a subspace, and to a Gram
   matrix against finite differences; under `LpDistance(1)`; points that
   JAX traces raise.
+  Note: this commit also annotates `PointCloudTensor.__init__`, which E2
+  left with a pyright error.
 - [ ] **E4.** [3] `compute_homological_kernel` with gradients of two batches,
   plain or in `DistanceSpace`s of either kind of distance.
   Tests: the bars of a batch match the untracked ones; gradient of the
