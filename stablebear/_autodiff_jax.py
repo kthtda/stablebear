@@ -72,6 +72,10 @@ def solve(a: Any, b: Any) -> jax.Array:
     return jnp.linalg.solve(a, b)
 
 
+def cholesky(a: Any) -> jax.Array:
+    return jnp.linalg.cholesky(a)
+
+
 def apply(
     primal: Callable[..., Any], vjp: Callable[..., Any], *params: Any, out: Any = None, residuals: Any = ()
 ) -> jax.Array:

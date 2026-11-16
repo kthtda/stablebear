@@ -27,6 +27,20 @@ class _NumPy:
     matmul = staticmethod(np.matmul)
     transpose = staticmethod(np.transpose)
     solve = staticmethod(np.linalg.solve)
+    cholesky = staticmethod(np.linalg.cholesky)
+
+
+def _in_one_framework(*arrays: Any) -> tuple[Any, list]:
+    """The array operations to use for the arrays, and the arrays as that
+    takes them: those of a framework if an array is a PyTorch, JAX, or
+    TensorFlow array, with the NumPy arrays converted to it, and those of
+    NumPy otherwise."""
+    like = next((array for array in arrays if _autodiff._framework(array) is not None), None)
+    if like is None:
+        return _NumPy, list(arrays)
+    xp = _autodiff._framework(like)
+    return xp, [array if _autodiff._framework(array) is not None else xp.as_tensor(array, like=like)
+                for array in arrays]
 
 
 def _matrix(values: Any, name: str) -> Any:
@@ -218,6 +232,12 @@ class Distance:
         """Raise ValueError if the distance does not apply to points of the
         given dimension."""
 
+    def _euclidean_points(self, X: Any) -> Any:
+        """Points whose Euclidean distances are the distances of the points
+        X, an (n, d) NumPy or framework array, in this distance; None if
+        the distance has none, and is computed from pairs of points."""
+        return None
+
     __hash__ = None  # type: ignore[assignment]
 
 
@@ -248,6 +268,12 @@ class InnerProductDistance(Distance):
             raise ValueError(
                 f"The points have dimension {dim}, but the inner product is on vectors of "
                 f"dimension {self._inner_product.dim}.")
+
+    def _euclidean_points(self, X: Any) -> Any:
+        # With the Cholesky factorization G = C C^T, (x - y)^T G (x - y) is
+        # the squared Euclidean length of (x - y)^T C.
+        xp, (X, G) = _in_one_framework(X, self._inner_product._gram)
+        return xp.matmul(X, xp.cholesky(G))
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, Distance):
@@ -470,18 +496,11 @@ class LinearSubspace:
                 f"The points have dimension {cloud.shape[1]}, but the subspace is of vectors of dimension "
                 f"{self.ambient_dim}.")
         X = np.asarray(cloud) if isinstance(cloud, PointCloud) else cloud
-        operands = [X, self._vectors] + ([space.inner_product._gram] if space is not None else [])
-
-        like = next((operand for operand in operands if _autodiff._framework(operand) is not None), None)
-        if like is None:
-            xp: Any = _NumPy
-            dtype = np.result_type(*(operand.dtype for operand in operands))
-            projected: Any = PointCloud(_projected(xp, *operands).astype(dtype))
-        else:
-            xp = _autodiff._framework(like)
-            projected = _projected(xp, *(
-                operand if _autodiff._framework(operand) is not None else xp.as_tensor(operand, like=like)
-                for operand in operands))
+        xp, operands = _in_one_framework(
+            X, self._vectors, *([space.inner_product._gram] if space is not None else []))
+        projected = _projected(xp, *operands)
+        if xp is _NumPy:
+            projected = PointCloud(projected.astype(np.result_type(*(operand.dtype for operand in operands))))
         return projected if space is None else space.inner_product(projected)
 
     def __repr__(self) -> str:
@@ -494,3 +513,10 @@ def _projected(xp: Any, X: Any, V: Any, G: Any = None) -> Any:
     product with Gram matrix G, the identity if None."""
     GVt = xp.transpose(V) if G is None else xp.matmul(G, xp.transpose(V))
     return xp.matmul(X, xp.matmul(GVt, xp.solve(xp.matmul(V, GVt), V)))
+
+
+def _points_array(space: DistanceSpace) -> Any:
+    """The points of a space as an (n, d) NumPy array, or as the framework
+    array they are."""
+    points = space.points
+    return np.asarray(points) if isinstance(points, PointCloud) else points

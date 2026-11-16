@@ -11,6 +11,7 @@ from ..distance_matrix import (
     DistanceMatrixTensor,
 )
 from ..base_tensor import FloatTensor
+from ..linear import DistanceSpace, _points_array
 from ..point_cloud import PointCloud, PointCloudTensor
 from ..timeseries.series import TimeSeries, TimeSeriesTensor
 from ..typing import barcode32, barcode64, distmat32, distmat64, float32, float64, pcloud32, pcloud64
@@ -98,6 +99,16 @@ def _tracked_persistent_homology(X: Any, max_dim: int, reduced: bool) -> Barcode
     return _TrackedBarcodeTensor([bars], enumeration)
 
 
+def _persistent_homology_in_space(space: DistanceSpace, max_dim: int, reduced: bool, verbose: bool) -> Any:
+    """The barcodes of the points of a DistanceSpace in its distance."""
+    transformed = space.distance._euclidean_points(_points_array(space))
+    if transformed is None:
+        raise NotImplementedError(f"compute_persistent_homology does not support {space.distance!r} yet.")
+    # The Euclidean distances of the transformed points are the distances
+    # of the space.
+    return compute_persistent_homology(transformed, max_dim=max_dim, reduced=reduced, verbose=verbose)
+
+
 def compute_persistent_homology(
     X: PointCloud
     | PointCloudTensor
@@ -105,7 +116,8 @@ def compute_persistent_homology(
     | DistanceMatrixTensor
     | FloatTensor
     | np.ndarray
-    | TimeSeries,
+    | TimeSeries
+    | DistanceSpace,
     max_dim: int = 1,
     distance_type: DistanceType = DistanceType.Euclidean,
     complex_type: ComplexType = ComplexType.VietorisRips,
@@ -181,6 +193,9 @@ def compute_persistent_homology(
 
     if complex_type != ComplexType.VietorisRips:
         raise ValueError(f"Unsupported complex type {complex_type}")
+
+    if isinstance(X, DistanceSpace):
+        return _persistent_homology_in_space(X, max_dim, reduced, verbose)
 
     if _autodiff._tracked(X) is not None:
         if distance_type != DistanceType.Euclidean:

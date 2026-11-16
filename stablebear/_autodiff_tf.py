@@ -86,6 +86,10 @@ def solve(a: Any, b: Any) -> tf.Tensor:
     return tf.linalg.solve(a, b)
 
 
+def cholesky(a: Any) -> tf.Tensor:
+    return tf.linalg.cholesky(a)
+
+
 def apply(
     primal: Callable[..., Any], vjp: Callable[..., Any], *params: Any, out: Any = None, residuals: Any = ()
 ) -> tf.Tensor:

@@ -362,3 +362,83 @@ def test_projecting_a_distance_space_without_inner_product_raises():
     space = sb.InnerProduct(_gram()).distance(np.array([[5.0, 0.0]]))
     with pytest.raises(TypeError, match="InnerProductSpace"):
         line.project(space)  # pyright: ignore[reportCallIssue, reportArgumentType]
+
+
+def _loop_points():
+    # Six points around a loop, with all pairwise distances different.
+    return np.array([[0.0, 0.0], [2.0, 0.1], [3.1, 1.5], [2.3, 3.2], [0.3, 2.9], [-0.9, 1.3]])
+
+
+def _homology(X):
+    return sb.persistence.compute_persistent_homology(X, max_dim=1, reduced=True, verbose=False)
+
+
+def _assert_same_barcodes(out, expected):
+    assert out.shape == expected.shape
+    for dim in range(expected.shape[0]):
+        assert out[dim].is_isomorphic_to(expected[dim], atol=1e-12, rtol=1e-12)
+
+
+def test_persistent_homology_in_inner_product_space_is_that_of_the_transformed_points():
+    # x^T G y for G = diag(4, 1) is the Euclidean inner product after
+    # doubling the first coordinate.
+    ip = sb.InnerProduct(np.diag([4.0, 1.0]))
+
+    out = _homology(ip(_loop_points()))
+
+    _assert_same_barcodes(out, _homology(_loop_points() * np.array([2.0, 1.0])))
+
+
+def test_persistent_homology_with_identity_inner_product_is_that_of_the_plain_cloud():
+    out = _homology(sb.InnerProduct(np.eye(2))(_loop_points()))
+
+    _assert_same_barcodes(out, _homology(_loop_points()))
+
+
+def test_persistent_homology_of_distance_space_is_that_of_the_inner_product_space():
+    ip = sb.InnerProduct(_gram())
+
+    _assert_same_barcodes(_homology(ip.distance(_loop_points())), _homology(ip(_loop_points())))
+
+
+@pytest.mark.parametrize("which", ["points", "gram"])
+def test_persistent_homology_in_inner_product_space_with_framework_arrays_matches_numpy(fw, which):
+    points = fw.tensor(_loop_points()) if which == "points" else _loop_points()
+    gram = fw.tensor(_gram()) if which == "gram" else _gram()
+
+    out = _homology(sb.InnerProduct(gram)(points))
+
+    assert out._tvalues is not None
+    _assert_same_barcodes(out, _homology(sb.InnerProduct(_gram())(_loop_points())))
+
+
+def _framework_gram2(fw, a):
+    # A symmetric matrix for each a, which is _gram at a = (2, 1).
+    off_diagonal = np.array([[0.0, 1.0],
+                             [1.0, 0.0]])
+    return a[0] * fw.tensor(np.eye(2)) + a[1] * fw.tensor(off_diagonal)
+
+
+def _bars_loss(fw, barcodes):
+    bars = barcodes._tvalues
+    return fw.sum(bars[:, 1] * bars[:, 1]) + fw.sum(bars[:, 0])
+
+
+def test_persistent_homology_gradient_wrt_gram_matrix(fw):
+    if fw.traces_abstractly:
+        pytest.skip("The number of bars needs concrete points")
+
+    def loss(a):
+        return _bars_loss(fw, _homology(sb.InnerProduct(_framework_gram2(fw, a))(_loop_points())))
+
+    assert_gradient_matches_finite_differences(fw, loss, [2.0, 1.0])
+
+
+def test_persistent_homology_in_inner_product_space_gradient_wrt_points(fw):
+    if fw.traces_abstractly:
+        pytest.skip("The number of bars needs concrete points")
+
+    def loss(P):
+        return _bars_loss(fw, _homology(sb.InnerProduct(_gram())(P)))
+
+    assert_gradient_matches_finite_differences(fw, loss, _loop_points())

@@ -83,6 +83,10 @@ def solve(a: torch.Tensor, b: torch.Tensor) -> torch.Tensor:
     return torch.linalg.solve(a, b)
 
 
+def cholesky(a: torch.Tensor) -> torch.Tensor:
+    return torch.linalg.cholesky(a)
+
+
 def apply(
     primal: Callable[..., Any], vjp: Callable[..., Any], *params: Any, out: Any = None, residuals: Any = ()
 ) -> torch.Tensor:
