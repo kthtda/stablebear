@@ -231,41 +231,43 @@ class Pcf(_PiecewiseFunction, _BinaryIoMixin):
         pts = self.to_numpy()
         return pts, np.array([0, len(pts)])
 
-    def _binop(self, rhs, op, combine):
+    def _binop(self, rhs, name, combine):
+        """The operation named ``name`` of the C++ PCFs, or, with gradients,
+        ``combine`` of the framework values."""
         if isinstance(rhs, Pcf) and not _has_matching_types(self, rhs):
             raise TypeError("Mismatched PCF types")
 
         def primal_op(f, g):
-            return Pcf(op(f._data, g._data if isinstance(g, Pcf) else g))
+            return Pcf(getattr(f._data, name)(g._data if isinstance(g, Pcf) else g))
 
         return _autodiff.pcf_op(primal_op, combine, self, rhs)
 
-    def _rbinop(self, lhs, op, combine):
-        return _autodiff.pcf_op(lambda l, f: Pcf(op(f._data, l)), combine, lhs, self)
+    def _rbinop(self, lhs, name, combine):
+        return _autodiff.pcf_op(lambda l, f: Pcf(getattr(f._data, name)(l)), combine, lhs, self)
 
     def __add__(self, rhs):
-        return self._binop(rhs, type(self._data).__add__, operator.add)
+        return self._binop(rhs, "__add__", operator.add)
 
     def __sub__(self, rhs):
-        return self._binop(rhs, type(self._data).__sub__, operator.sub)
+        return self._binop(rhs, "__sub__", operator.sub)
 
     def __mul__(self, rhs):
-        return self._binop(rhs, type(self._data).__mul__, operator.mul)
+        return self._binop(rhs, "__mul__", operator.mul)
 
     def __radd__(self, lhs):
-        return self._rbinop(lhs, type(self._data).__radd__, operator.add)
+        return self._rbinop(lhs, "__radd__", operator.add)
 
     def __rsub__(self, lhs):
-        return self._rbinop(lhs, type(self._data).__rsub__, operator.sub)
+        return self._rbinop(lhs, "__rsub__", operator.sub)
 
     def __rmul__(self, lhs):
-        return self._rbinop(lhs, type(self._data).__rmul__, operator.mul)
+        return self._rbinop(lhs, "__rmul__", operator.mul)
 
     def __truediv__(self, rhs):
-        return self._binop(rhs, type(self._data).__truediv__, operator.truediv)
+        return self._binop(rhs, "__truediv__", operator.truediv)
 
     def __rtruediv__(self, lhs):
-        return self._rbinop(lhs, type(self._data).__rtruediv__, operator.truediv)
+        return self._rbinop(lhs, "__rtruediv__", operator.truediv)
 
     def __neg__(self):
         return _autodiff.pcf_op(lambda f: Pcf(-f._data), operator.neg, self)
@@ -341,7 +343,9 @@ _BACKEND_MAP = {
 
 
 def _has_matching_types(f: Pcf, g: Pcf):
-    return type(f._data) is type(g._data)
+    # The time and value types name the C++ type, and a PCF that carries
+    # gradients has them without a C++ object to ask.
+    return f.ttype is g.ttype and f.vtype is g.vtype
 
 
 class Rectangle:
@@ -424,6 +428,8 @@ Pcf._tracking = Tracking(  # pyright: ignore[reportAttributeAccessIssue]
     groups=(("_ttimes", 1), ("_tvalues", 1)),
     from_serial=_autodiff._pcfs_from_content,
     attributes=_float_types,
+    value_members=("to_numpy", "__array__", "size", "__eq__", "__str__"),
+    dropping_members=("astype",),
 )
 
 # A Pcf whose breakpoint times, values, or both depend on PyTorch

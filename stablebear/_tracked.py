@@ -32,6 +32,7 @@ table first.
 
 from __future__ import annotations
 
+import inspect
 import itertools
 from typing import Any, Callable, NamedTuple
 
@@ -56,12 +57,20 @@ class Tracking(NamedTuple):
     content. For a tensor type, ``element(rows)`` builds an element from its
     rows. For a type that keeps sizes, these are ``from_serial(content,
     enumeration, sizes)`` and ``element(rows, size)``.
+
+    ``value_members`` names the methods and properties of the type whose
+    results cannot carry gradients, such as ``to_numpy`` and ``__eq__``: a
+    tracked object answers them with its values. ``dropping_members`` names
+    methods that would give an object without the gradients by a way other
+    than reading ``_data``, and so raise.
     """
 
     groups: tuple[tuple[str, int | None], ...]
     from_serial: Callable[..., Any]
     attributes: Callable[[Any], dict[str, Any]]
     element: Callable[..., Any] | None = None
+    value_members: tuple[str, ...] = ()
+    dropping_members: tuple[str, ...] = ()
 
 
 def _is_framework(x: Any) -> bool:
@@ -159,9 +168,17 @@ class _TrackedObject:
         """The C++ object of the current values."""
         return self._untracked()._data
 
+    def _drops_gradients(self) -> NotImplementedError:
+        name = self._base.__name__
+        return NotImplementedError(
+            f"This operation is not supported for a {name} that carries gradients: it would drop them. "
+            f"Use .detach() for a {name} of its values, without gradients.")
+
     @property
     def _data(self):
-        return self._cpp()
+        # Code that was not written for gradients reads _data, and so raises
+        # instead of dropping them; code that handles them calls _cpp().
+        raise self._drops_gradients()
 
     def detach(self) -> Any:
         """The untracked object of the current values, without gradients."""
@@ -218,16 +235,6 @@ class _TrackedObject:
 class _TrackedMixin(_TrackedObject):
     """The behavior of ``tracked_class(T)`` for a tensor type; see the
     module docstring."""
-
-    def _drops_gradients(self) -> NotImplementedError:
-        name = self._base.__name__
-        return NotImplementedError(
-            f"This operation is not supported for a {name} that carries gradients: it would drop them. "
-            f"Use .detach() for a {name} of its values, without gradients.")
-
-    @property
-    def _data(self):
-        raise self._drops_gradients()
 
     def detach(self) -> Any:
         """The untracked tensor of the current values, without gradients."""
@@ -407,8 +414,16 @@ for _name in ("reshape", "flatten", "transpose", "swapaxes", "squeeze", "expand_
 
 def _values_method(name: str):
     """A method whose result cannot carry gradients, on the values."""
-    def method(self, rhs):
-        return getattr(self.detach(), name)(rhs.detach() if is_tracked(rhs) else rhs)
+    def method(self, *args, **kwargs):
+        return getattr(self._untracked(), name)(*(arg._untracked() if is_tracked(arg) else arg for arg in args), **kwargs)
+
+    method.__name__ = name
+    return method
+
+
+def _dropping_method(name: str):
+    def method(self, *args, **kwargs):
+        raise self._drops_gradients()
 
     method.__name__ = name
     return method
@@ -436,6 +451,13 @@ def tracked_class(base: type) -> Any:
         namespace: dict[str, Any] = {"_base": base, "__doc__": mixin.__doc__}
         for index, (name, _) in enumerate(tracking.groups):
             namespace[name] = _part_property(index)
+        for name in tracking.value_members:
+            if isinstance(inspect.getattr_static(base, name), property):
+                namespace[name] = property(lambda self, name=name: getattr(self._untracked(), name))
+            else:
+                namespace[name] = _values_method(name)
+        for name in tracking.dropping_members:
+            namespace[name] = _dropping_method(name)
         _TRACKED_CLASSES[base] = type(f"_Tracked{base.__name__}", (mixin, base), namespace)
     return _TRACKED_CLASSES[base]
 

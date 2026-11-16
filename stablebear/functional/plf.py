@@ -8,7 +8,7 @@ import numpy as np
 from .. import _autodiff
 from .. import _sb_cpp as cpp
 from .._binary_io import _BinaryIoMixin
-from .._tracked import Tracking, tracked_class
+from .._tracked import Tracking, is_tracked, tracked_class
 from ._piecewise import _PiecewiseFunction
 from ..typing import Dtype, _assert_valid_dtype, float32, float64
 
@@ -108,6 +108,10 @@ class Plf(_PiecewiseFunction, _BinaryIoMixin):
         if dtype is not None:
             _assert_valid_dtype(dtype, [float32, float64])
 
+        if is_tracked(arr):
+            # A copy would not carry the gradients.
+            tracked: Any = arr
+            raise tracked._drops_gradients()
         if isinstance(arr, Plf):
             if dtype is None:
                 dtype = arr.dtype
@@ -183,6 +187,8 @@ Plf._tracking = Tracking(  # pyright: ignore[reportAttributeAccessIssue]
     groups=(("_ttimes", 1), ("_tvalues", 1)),
     from_serial=lambda content, enumeration: Plf(content),
     attributes=lambda np_dtype: {"_dtype": float32 if np_dtype == np.float32 else float64},
+    value_members=("to_numpy", "__array__", "size", "__eq__", "__str__"),
+    dropping_members=("astype",),
 )
 
 # A Plf whose breakpoint times, values, or both depend on PyTorch

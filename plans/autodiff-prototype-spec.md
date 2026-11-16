@@ -100,11 +100,10 @@ tracked argument when the values the framework passes them equal the
 argument's current ones, which one comparison pass tells. They differ while
 a framework traces abstractly, and the argument is then converted.
 
-Status: tracked tensors of barcodes and of PCFs, and single PCFs and PLFs,
-work this way, and the kernel and `transform_bars` hand over their C++
-results. A single PCF or PLF still gives its C++ object as `_data`, so an
-operation that was not written for gradients drops theirs without raising.
-There is no tracked `Barcode`: no operation gives one (D10).
+A single `Pcf` or `Plf` that carries gradients follows the same rule:
+reading its `_data` raises, so evaluating, integrating, or copying it
+raises, while `to_numpy`, `size`, `==`, and printing give its values. There
+is no tracked `Barcode`: no operation gives one (D10).
 
 **D5a. One generic tracked tensor.** The tracking logic is a mixin shared by
 all tensor types, not a class written per type. Every type is a tensor

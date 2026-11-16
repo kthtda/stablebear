@@ -54,8 +54,8 @@ def test_pcf_arithmetic_with_framework_scalar_matches_float_scalar(fw):
     f, g = _f_and_g()
     h = f + fw.tensor(0.3) * g
     expected = (f + 0.3 * g).to_numpy()
-    np.testing.assert_allclose(h(expected[:, 0]), expected[:, 1])
-    np.testing.assert_allclose(fw.to_numpy(h._tvalues), h.to_numpy()[:, 1])
+    np.testing.assert_allclose(h.to_numpy(), expected)
+    np.testing.assert_allclose(fw.to_numpy(h._tvalues), expected[:, 1])
 
 
 @pytest.mark.parametrize("p", [1.0, 2.5])
@@ -1022,6 +1022,44 @@ def test_function_follows_in_place_change_of_torch_values(function):
 
     np.testing.assert_array_equal(f.to_numpy(), [[0.0, 20.0],
                                                  [1.0, 40.0]])
+
+
+_FUNCTIONS = pytest.mark.parametrize("function", [sb.Pcf, sb.Plf], ids=["pcf", "plf"])
+
+
+def _tracked_function(fw, function):
+    return function(fw.tensor([10.0, 20.0]), times=np.array([0.0, 1.0]))
+
+
+@_FUNCTIONS
+@pytest.mark.parametrize("operation", [
+    pytest.param(lambda function, f: f(0.5), id="evaluate"),
+    pytest.param(lambda function, f: f.astype(sb.float32), id="astype"),
+    pytest.param(lambda function, f: function(f), id="copy"),
+])
+def test_operation_that_would_drop_gradients_of_tracked_function_raises(fw, function, operation):
+    f = _tracked_function(fw, function)
+    with pytest.raises(NotImplementedError, match="detach"):
+        operation(function, f)
+
+
+def test_integrating_tracked_pcf_raises(fw):
+    f = _tracked_function(fw, sb.Pcf)
+    with pytest.raises(NotImplementedError, match="detach"):
+        f.integrate()
+
+
+@_FUNCTIONS
+def test_tracked_function_gives_its_values(fw, function):
+    f = _tracked_function(fw, function)
+    plain = function(np.array([[0.0, 10.0],
+                               [1.0, 20.0]]))
+
+    np.testing.assert_array_equal(f.to_numpy(), plain.to_numpy())
+    np.testing.assert_array_equal(np.asarray(f), np.asarray(plain))
+    assert f.size == 2
+    assert f == plain
+    assert str(f) == str(plain)
 
 
 def test_values_and_times_from_float_tensors():
