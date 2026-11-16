@@ -1,6 +1,6 @@
 # Linear subspaces, inner products, and distances: implementation plan
 
-Progress: 13 of 15 items, 29 of 33 points (88%)
+Progress: 14 of 15 items, 31 of 33 points (94%)
 
 Spec: [linear-subspaces-spec.md](linear-subspaces-spec.md)
 
@@ -111,7 +111,7 @@ Spec: [linear-subspaces-spec.md](linear-subspaces-spec.md)
 
 ## Phase D: Documentation
 
-- [ ] **D1.** [2] API reference entries for the new classes, and the
+- [x] **D1.** [2] (19a719510) API reference entries for the new classes, and the
   `DistanceSpace` inputs in the docstrings of `compute_persistent_homology`
   and `compute_homological_kernel`; `docs/persistence.rst` without
   `distance_type`. (Each class gets its docstring in the item that adds
