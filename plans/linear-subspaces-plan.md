@@ -1,6 +1,6 @@
 # Linear subspaces, inner products, and distances: implementation plan
 
-Progress: 16 of 19 items, 35 of 43 points (81%)
+Progress: 17 of 19 items, 37 of 43 points (86%)
 
 Spec: [linear-subspaces-spec.md](linear-subspaces-spec.md)
 
@@ -130,7 +130,7 @@ Spec: [linear-subspaces-spec.md](linear-subspaces-spec.md)
   Tests: the bars of a batch equal those of each element alone, for both
   operations and both kinds of element; the edges of each element are
   pairs of its own points; an empty cloud gives no bars.
-- [ ] **E2.** [2] A batch of point clouds that carries gradients from
+- [x] **E2.** [2] (5b6ddea64) A batch of point clouds that carries gradients from
   framework arrays: `PointCloudTensor` of a list with framework arrays, and
   framework arrays of shape (..., n, d) where a point cloud is taken.
   Tests: the batch holds each array as a cloud, of different sizes;
