@@ -1,6 +1,6 @@
 # Linear subspaces, inner products, and distances: implementation plan
 
-Progress: 22 of 24 items, 50 of 55 points (91%)
+Progress: 23 of 24 items, 53 of 55 points (96%)
 
 Spec: [linear-subspaces-spec.md](linear-subspaces-spec.md)
 
@@ -176,7 +176,7 @@ A refactor: results do not change, except where an item says so.
   callers. The header that holds the operation of persistent homology
   includes Ripser, which can be part of one translation unit only, so the
   operation of the kernel has a header of its own.
-- [ ] **F4.** [3] Python: one path for gradients of persistent homology and
+- [x] **F4.** [3] (2699c5fc8) Python: one path for gradients of persistent homology and
   of the kernel, with a single cloud as a batch of one, and one shared
   function from critical edges to bars. The kernel of a single pair with
   Euclidean or inner product distances keeps its vjp.
