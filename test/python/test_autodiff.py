@@ -941,6 +941,75 @@ def test_pairwise_matrix_gradient_through_arithmetic(fw, pairwise):
     _assert_gradient_matches_finite_differences(fw, loss, 1.5)
 
 
+def _loop_points():
+    # Six points around a loop, with all pairwise distances different.
+    return np.array([[0.0, 0.0], [2.0, 0.1], [3.1, 1.5], [2.3, 3.2], [0.3, 2.9], [-0.9, 1.3]])
+
+
+@pytest.mark.parametrize("reduced", [False, True], ids=["unreduced", "reduced"])
+def test_persistent_homology_of_framework_points_matches_numpy(fw, reduced):
+    homology = sb.persistence.compute_persistent_homology
+    out = homology(fw.tensor(_loop_points()), max_dim=1, reduced=reduced, verbose=False)
+    expected = homology(_loop_points(), max_dim=1, reduced=reduced, verbose=False)
+    assert isinstance(out, sb.persistence.BarcodeTensor)
+    assert out.shape == (2,)
+    assert out._tvalues is not None
+    # The loop gives one bar in dimension 1.
+    assert len(out[1]) == 1
+    for dim in range(2):
+        assert out[dim].is_isomorphic_to(expected[dim], atol=1e-12, rtol=1e-12)
+
+
+def test_persistent_homology_of_framework_points_with_equal_distances_matches_numpy(fw):
+    # A square: its sides are equal, and so are its diagonals.
+    square = np.array([[0.0, 0.0], [3.0, 0.0], [3.0, 3.0], [0.0, 3.0]])
+    homology = sb.persistence.compute_persistent_homology
+    out = homology(fw.tensor(square), max_dim=1, reduced=True, verbose=False)
+    expected = homology(square, max_dim=1, reduced=True, verbose=False)
+    for dim in range(2):
+        assert out[dim].is_isomorphic_to(expected[dim], atol=1e-12, rtol=1e-12)
+
+
+@pytest.mark.parametrize("dim", [0, 1])
+def test_persistent_homology_gradient(fw, dim):
+    if fw.traces_abstractly:
+        pytest.skip("The number of bars needs concrete points")
+
+    def loss(P):
+        barcodes = sb.persistence.compute_persistent_homology(P, max_dim=1, reduced=True, verbose=False)
+        bars = barcodes[dim:dim + 1]._tvalues
+        return fw.sum(bars[:, 1] * bars[:, 1]) + fw.sum(bars[:, 0])
+
+    _assert_gradient_matches_finite_differences(fw, loss, _loop_points())
+
+
+def test_stable_rank_norm_of_persistent_homology_gradient(fw):
+    if fw.traces_abstractly:
+        pytest.skip("The number of bars needs concrete points")
+
+    def loss(P):
+        barcodes = sb.persistence.compute_persistent_homology(P, max_dim=1, reduced=True, verbose=False)
+        return fw.sum(sb.lp_norm(sb.persistence.barcode_to_stable_rank(barcodes), p=2.0))
+
+    _assert_gradient_matches_finite_differences(fw, loss, _loop_points())
+
+
+def test_persistent_homology_of_abstract_points_raises():
+    jax = pytest.importorskip("jax")
+
+    def loss(P):
+        return sb.persistence.compute_persistent_homology(P, max_dim=1, reduced=True, verbose=False)._tvalues.sum()
+
+    with pytest.raises(NotImplementedError, match="abstractly"):
+        jax.grad(loss)(jax.numpy.asarray(_loop_points()))
+
+
+def test_persistent_homology_of_several_framework_point_clouds_raises(fw):
+    clouds = fw.tensor(np.stack([_loop_points(), _loop_points()]))
+    with pytest.raises(NotImplementedError, match="single point cloud"):
+        sb.persistence.compute_persistent_homology(clouds, max_dim=1, reduced=True, verbose=False)
+
+
 def test_arithmetic_on_stable_rank_with_equal_lifetimes_matches_numpy(fw):
     if fw.traces_abstractly:
         pytest.skip("Removing bars needs concrete bars")

@@ -63,6 +63,14 @@ def cumsum(x: torch.Tensor) -> torch.Tensor:
     return torch.cumsum(x, dim=0)
 
 
+def row_norms(x: torch.Tensor) -> torch.Tensor:
+    return torch.sqrt((x * x).sum(dim=1))
+
+
+def stack_columns(a: torch.Tensor, b: torch.Tensor) -> torch.Tensor:
+    return torch.stack([a, b], dim=1)
+
+
 def apply(
     primal: Callable[..., Any], vjp: Callable[..., Any], *params: Any, out: Any = None, residuals: Any = ()
 ) -> torch.Tensor:

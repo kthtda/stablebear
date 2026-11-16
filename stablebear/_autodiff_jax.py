@@ -52,6 +52,14 @@ def cumsum(x: Any) -> jax.Array:
     return jnp.cumsum(x)
 
 
+def row_norms(x: Any) -> jax.Array:
+    return jnp.sqrt((x * x).sum(axis=1))
+
+
+def stack_columns(a: Any, b: Any) -> jax.Array:
+    return jnp.stack([a, b], axis=1)
+
+
 def apply(
     primal: Callable[..., Any], vjp: Callable[..., Any], *params: Any, out: Any = None, residuals: Any = ()
 ) -> jax.Array:

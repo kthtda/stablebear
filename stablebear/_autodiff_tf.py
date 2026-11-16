@@ -66,6 +66,14 @@ def cumsum(x: Any) -> tf.Tensor:
     return tf.cumsum(x)
 
 
+def row_norms(x: Any) -> tf.Tensor:
+    return tf.sqrt(tf.reduce_sum(x * x, axis=1))
+
+
+def stack_columns(a: Any, b: Any) -> tf.Tensor:
+    return tf.stack([a, b], axis=1)
+
+
 def apply(
     primal: Callable[..., Any], vjp: Callable[..., Any], *params: Any, out: Any = None, residuals: Any = ()
 ) -> tf.Tensor:

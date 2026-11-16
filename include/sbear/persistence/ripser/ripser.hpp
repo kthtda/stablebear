@@ -50,6 +50,7 @@
 
 //#define USE_ROBINHOOD_HASHMAP
 
+#include <array>
 #include <algorithm>
 #include <cassert>
 #include <chrono>
@@ -449,6 +450,14 @@ namespace sb::ph::rips
 
     std::vector<std::vector<PersistencePair<value_t>>> intervals;
 
+    // stablebear: with record_critical_edges set, critical_edges[dim][k]
+    // holds, for interval k of that dimension, the vertices {a, b, c, d} of
+    // the longest edges (a, b) of its birth simplex and (c, d) of its death
+    // simplex, whose lengths are its birth and death. -1 where there is no
+    // edge: the birth of a class of dimension 0, and the death of a class
+    // that does not die.
+    std::vector<std::vector<std::array<index_t, 4>>> critical_edges;
+
     friend class simplex_coboundary_enumerator<DistanceMatrix>;
 
     class simplex_boundary_enumerator {
@@ -530,7 +539,10 @@ namespace sb::ph::rips
           cofacets2(*this)
     {
       intervals.resize(_dim_max + 1);
+      critical_edges.resize(_dim_max + 1);
     }
+
+    bool record_critical_edges = false;
 
     coefficient_t get_modulus() const
     {
@@ -540,6 +552,42 @@ namespace sb::ph::rips
     auto const & get_intervals(size_t dim)
     {
       return intervals[dim];
+    }
+
+    auto const & get_critical_edges(size_t dim)
+    {
+      return critical_edges[dim];
+    }
+
+    /// The vertices of a longest edge of the simplex with the given index
+    /// and dimension, the first one found among edges of equal length;
+    /// {-1, -1} for a vertex.
+    std::pair<index_t, index_t> longest_edge(const index_t index, const index_t dim) const {
+      std::pair<index_t, index_t> edge{-1, -1};
+      if (dim < 1) return edge;
+      std::vector<index_t> simplex_vertices(dim + 1);
+      get_simplex_vertices(index, dim, n, simplex_vertices.rbegin());
+      value_t longest = -std::numeric_limits<value_t>::infinity();
+      for (index_t i = 0; i <= dim; ++i)
+        for (index_t j = 0; j < i; ++j) {
+          const value_t length = dist(simplex_vertices[i], simplex_vertices[j]);
+          if (length > longest) {
+            longest = length;
+            edge = {simplex_vertices[i], simplex_vertices[j]};
+          }
+        }
+      return edge;
+    }
+
+    /// Records the critical edges of the interval just added in dimension
+    /// dim, born with the simplex birth_index of that dimension and dying
+    /// with the simplex death_index of the next (-1 if it does not die).
+    void add_critical_edges(const index_t dim, const index_t birth_index, const index_t death_index) {
+      if (!record_critical_edges) return;
+      const auto birth = longest_edge(birth_index, dim);
+      const auto death = death_index == -1 ? std::pair<index_t, index_t>{-1, -1}
+                                           : longest_edge(death_index, dim + 1);
+      critical_edges[dim].push_back({birth.first, birth.second, death.first, death.second});
     }
 
     index_t get_max_vertex(const index_t idx, const index_t k, const index_t n) const {
@@ -694,6 +742,8 @@ namespace sb::ph::rips
             std::cout << " [0," << get_diameter(e) << ")" << std::endl;
   #endif
             intervals[0].emplace_back(0, diameter);
+            // A component is born with a vertex and dies with this edge.
+            add_critical_edges(0, 0, get_index(e));
           }
 
           dset.link(u, v);
@@ -859,8 +909,10 @@ namespace sb::ph::rips
                 std::cout << " [" << diameter << "," << death << ")" << std::endl;
               }
   #endif
-              if (death > diameter * ratio)
+              if (death > diameter * ratio) {
                 intervals[dim].emplace_back(diameter, death);
+                add_critical_edges(dim, get_index(column_to_reduce), get_index(pivot));
+              }
 
               pivot_column_index.insert({get_entry(pivot), index_column_to_reduce});
 
@@ -880,6 +932,7 @@ namespace sb::ph::rips
             std::cout << " [" << diameter << ", )" << std::endl;
   #endif
             intervals[dim].emplace_back(diameter);
+            add_critical_edges(dim, get_index(column_to_reduce), -1);
             break;
           }
         }

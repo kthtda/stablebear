@@ -1,8 +1,9 @@
 from enum import Enum
-from typing import overload
+from typing import Any, overload
 
 import numpy as np
 
+from .. import _autodiff
 from .. import _sb_cpp as cpp
 from ..async_task import _run_task
 from ..distance_matrix import (
@@ -13,7 +14,7 @@ from ..base_tensor import FloatTensor
 from ..point_cloud import PointCloud, PointCloudTensor
 from ..timeseries.series import TimeSeries, TimeSeriesTensor
 from ..typing import barcode32, barcode64, distmat32, distmat64, float32, float64, pcloud32, pcloud64
-from .ph_tensor import BarcodeTensor
+from .ph_tensor import BarcodeTensor, _TrackedBarcodeTensor
 
 cpp_p = cpp.persistence
 
@@ -51,6 +52,50 @@ def compute_persistent_homology(
     reduced: bool = False,
     verbose: bool = False,
 ) -> BarcodeTensor: ...
+
+
+def _tracked_persistent_homology(X: Any, max_dim: int, reduced: bool) -> BarcodeTensor:
+    """The barcodes of one (n, d) point cloud given as a framework array,
+    with bars that carry gradients with respect to its points.
+
+    In a Vietoris-Rips complex, a simplex appears at the length of its
+    longest edge, so each endpoint of a bar is the distance between two
+    points: the critical edge of the simplex that creates or destroys the
+    class. Ripser reports these edges with the bars, and the bars are their
+    lengths again as framework operations on the points, which the
+    framework differentiates. An endpoint without an edge, a birth at 0 in
+    dimension 0 or an infinite death, is a constant, and so is an endpoint
+    at 0, where a distance has no derivative.
+    """
+    X = _autodiff._unwrap(X)
+    adapter = _autodiff._framework(X)
+    if len(X.shape) != 2:
+        raise NotImplementedError(
+            "compute_persistent_homology with gradients supports a single point cloud of shape (n, d) only.")
+    points = adapter.concrete(X)
+    if points is None:
+        raise NotImplementedError(
+            "compute_persistent_homology of points that JAX or tf.function traces abstractly is not supported: "
+            "the number of bars depends on their values.")
+
+    dtype = np.float32 if points.dtype == np.float32 else np.float64
+    backend = cpp_p.PersistenceRipser32 if dtype == np.float32 else cpp_p.PersistenceRipser64
+    content, enumeration, critical_edges = backend.persistence_critical_edges(
+        PointCloud(points.astype(dtype))._cpp_point_cloud(), max_dim, reduced)
+
+    # The endpoints in the order birth, death of each bar, with the two
+    # points of the edge of each.
+    endpoints = content.reshape(-1)
+    first, second = critical_edges.reshape(-1, 2).T
+    has_edge = (first >= 0) & (endpoints > 0)
+    edges = adapter.gather(X, first[has_edge]) - adapter.gather(X, second[has_edge])
+    # The endpoints as constants, followed by the lengths of the critical
+    # edges, from which each endpoint takes its own.
+    values = adapter.concat([adapter.as_tensor(endpoints, like=X), adapter.row_norms(edges)])
+    source = np.arange(len(endpoints))
+    source[has_edge] = len(endpoints) + np.arange(int(has_edge.sum()))
+    bars = adapter.stack_columns(adapter.gather(values, source[0::2]), adapter.gather(values, source[1::2]))
+    return _TrackedBarcodeTensor([bars], enumeration)
 
 
 def compute_persistent_homology(
@@ -109,6 +154,23 @@ def compute_persistent_homology(
     BarcodeTensor or TimeSeries
         The barcodes, in the same kind of container as ``X``.
 
+    Raises
+    ------
+    NotImplementedError
+        If ``X`` is a PyTorch, JAX, or TensorFlow array that is not a single
+        point cloud of shape ``(n, d)``, or that JAX or ``tf.function``
+        traces: the number of bars depends on the points.
+
+    Notes
+    -----
+    If ``X`` is a PyTorch, JAX, or TensorFlow array of shape ``(n, d)``, a
+    single point cloud, the bars of the result carry gradients with respect
+    to the points. Each finite, positive endpoint of a bar is the distance
+    between two points, the longest edge of the simplex that creates or
+    destroys the class, and its gradient is that of this distance. An
+    endpoint at 0 or at infinity has gradient 0. Where a simplex has several
+    longest edges, the gradient is that of one of them.
+
     """
 
     from .ripser import (
@@ -119,6 +181,13 @@ def compute_persistent_homology(
 
     if complex_type != ComplexType.VietorisRips:
         raise ValueError(f"Unsupported complex type {complex_type}")
+
+    if _autodiff._tracked(X) is not None:
+        if distance_type != DistanceType.Euclidean:
+            raise ValueError(
+                f"Distance type {distance_type} not supported for complex type {complex_type}."
+            )
+        return _tracked_persistent_homology(X, max_dim, reduced)
 
     if isinstance(X, TimeSeries):
         return _series_persistent_homology(X, max_dim, distance_type, reduced, verbose)

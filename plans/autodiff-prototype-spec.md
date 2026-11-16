@@ -43,8 +43,9 @@ per array (`_tracked_parts`). The decorator uses this to convert tracked
 arguments to NumPy, call the operation, and route gradients back.
 
 **D3. Some operations are written in framework operations instead of a
-vjp.** PCF arithmetic and the summaries of tracked barcodes (stable rank,
-Betti curve, accumulated persistence function) compute their
+vjp.** PCF arithmetic, the summaries of tracked barcodes (stable rank,
+Betti curve, accumulated persistence function), and persistent homology
+compute their
 results with framework operations (gather, concat, sort), so the framework
 differentiates them itself. PCF arithmetic takes the union of the operands'
 breakpoint times, and each time of the result comes from the first operand
@@ -192,6 +193,7 @@ raises `NotImplementedError` while tracing:
 - Betti curves, since the order of the births and deaths depends on their
   values, and accumulated persistence functions, since which bars they
   include does.
+- Persistent homology, since the number of bars depends on the points.
 
 **D9. Derivatives at kinks are one-sided.** At a breakpoint of a PLF, the
 derivatives are those of the segment after it. A bar with an infinite
@@ -200,7 +202,10 @@ the last value where the PLF ends flat, and 0 otherwise. For the
 homological kernel, a zero-length critical edge has gradient 0. For a
 distance between equal PCFs, the gradient is 0. Where breakpoints of the two
 PCFs of a pair share a time, the derivative of their distance or product
-with respect to that time is that of moving both.
+with respect to that time is that of moving both. For persistent homology,
+an endpoint of a bar at 0 or at infinity has gradient 0, and where a
+critical simplex has several longest edges, the gradient is that of the
+first one found.
 
 **D10. Gradient paths require tensors.** With gradients, `transform_bars`
 takes a `BarcodeTensor` only, since a `Barcode` cannot carry gradients and
@@ -214,6 +219,20 @@ times masks it.
 **D12. TensorFlow gradients are made dense.** A gather after a custom op
 gives `IndexedSlices` gradients, which the TensorFlow adapter converts to a
 dense tensor before calling the vjp.
+
+**D16. Persistent homology differentiates the critical edges.** In a
+Vietoris-Rips complex a simplex appears at the length of its longest edge,
+so each endpoint of a bar is the distance between two points. Ripser
+records, on request, the longest edges of the birth and death simplices of
+each bar; the barcodes of a framework array of shape (n, d) are computed
+with them, and the bars are the lengths of those edges again as framework
+operations on the points. Only a single point cloud is supported, like the
+kernel. Without the request, Ripser runs as before.
+
+Rejected: finding the pair of points of each endpoint by searching for its
+value among the pairwise distances, which needs no change to Ripser but
+takes the first pair at that distance when distances are equal, which need
+not be an edge of the critical simplex, and sorts all pairwise distances.
 
 ## Cost
 
