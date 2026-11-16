@@ -10,9 +10,12 @@ columns that are each a framework array or a constant NumPy array, and its
 enumeration. Its C++ tensor is derived from them, so the two cannot disagree,
 and kept until a framework array is changed in place. The tensor itself
 cannot be changed in place. Indexing, reshaping, and copying
-keep the gradients; other operations that would drop them raise. A single
-element, as from an integer index, is an untracked element object of the
-current values.
+keep the gradients. Reading ``_data`` raises, so any operation that was not
+written for gradients raises instead of dropping them; code that handles
+them takes the C++ tensor from ``_cpp()``. ``detach()`` gives the untracked
+tensor of the current values, which comparisons, saving, and pickling use.
+A single element, as from an integer index, is an untracked element object
+of the current values.
 """
 
 from __future__ import annotations
@@ -88,13 +91,30 @@ class _TrackedMixin:
             columns.append(values.reshape(len(values), -1))
         return columns[0] if len(columns) == 1 else np.concatenate(columns, axis=1)
 
-    @property
-    def _data(self):
+    def _cpp(self) -> Any:
+        """The C++ tensor of the current values."""
         versions = self._versions()
         if self._cache is None or versions != self._cache_versions:
             self._cache = self._tracking.from_serial(self._concrete(), self._enumeration)._data
             self._cache_versions = versions
         return self._cache
+
+    def _drops_gradients(self) -> NotImplementedError:
+        name = self._base.__name__
+        return NotImplementedError(
+            f"This operation is not supported for a {name} that carries gradients: it would drop them. "
+            f"Use .detach() for a {name} of its values, without gradients.")
+
+    @property
+    def _data(self):
+        raise self._drops_gradients()
+
+    def detach(self) -> Any:
+        """The untracked tensor of the current values, without gradients."""
+        return self._base(self._cpp())
+
+    def _binary_io_data(self):
+        return self._cpp()
 
     def _serial(self) -> tuple[np.ndarray, np.ndarray]:
         return self._concrete(), self._enumeration
@@ -111,7 +131,7 @@ class _TrackedMixin:
             if all(np.array_equal(array, content[:, starts[i]:starts[i + 1]]) for i, array in zip(tracked, arrays)):
                 # The current values, as when the framework is not tracing:
                 # an untracked tensor of the same C++ tensor.
-                return self._base(self._data)
+                return self.detach()
             c = content.copy()
             for i, array in zip(tracked, arrays):
                 c[:, starts[i]:starts[i + 1]] = array
@@ -173,7 +193,7 @@ class _TrackedMixin:
 
     def copy(self):
         # Immutable, so the copy can share the parts and the C++ tensor.
-        return type(self)(self._parts, self._enumeration, data=self._data if self._cache is not None else None)
+        return type(self)(self._parts, self._enumeration, data=self._cpp() if self._cache is not None else None)
 
     def __deepcopy__(self, memodict=None):
         return self.copy()
@@ -185,9 +205,7 @@ class _TrackedMixin:
         raise NotImplementedError(f"astype of a {self._base.__name__} that carries gradients is not supported.")
 
     def _to_py_tensor(self, data):
-        raise NotImplementedError(
-            f"This operation is not supported for a {self._base.__name__} that carries gradients: "
-            "it would drop them.")
+        raise self._drops_gradients()
 
 
 def _shape_method(name: str):
@@ -200,6 +218,19 @@ def _shape_method(name: str):
 
 for _name in ("reshape", "flatten", "transpose", "swapaxes", "squeeze", "expand_dims", "broadcast_to"):
     setattr(_TrackedMixin, _name, _shape_method(_name))
+
+
+def _values_method(name: str):
+    """A method whose result cannot carry gradients, on the values."""
+    def method(self, rhs):
+        return getattr(self.detach(), name)(rhs.detach() if is_tracked(rhs) else rhs)
+
+    method.__name__ = name
+    return method
+
+
+for _name in ("__eq__", "__ne__", "array_equal"):
+    setattr(_TrackedMixin, _name, _values_method(_name))
 del _name
 
 

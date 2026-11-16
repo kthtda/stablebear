@@ -69,6 +69,15 @@ result hands it to the tracked object as the initial cache. Indexing,
 reshaping, and copying keep the gradients; any other operation that would
 build a new object without them raises, instead of dropping them silently.
 
+The raise is the default, not a check written per operation: reading `_data`
+of a tracked tensor raises, so a function that was not written for gradients
+(a Betti curve, a `TimeSeries` or `NestedTensor` of the tensor) cannot
+return a result without them. Code that handles gradients, or needs only
+the values, asks for the C++ tensor by another name. `detach()` gives the
+untracked tensor of the current values, for a user who wants them without
+gradients. Comparisons, saving, and pickling use the values: their results
+could not carry gradients.
+
 The untracked classes are unchanged: `_data` stays a plain attribute, and
 each element lives in its own heap allocation.
 
@@ -84,7 +93,7 @@ tracked argument when the values the framework passes them equal the
 argument's current ones, which one comparison pass tells. They differ while
 a framework traces abstractly, and the argument is then converted.
 
-Status: tracked barcode tensors cache `_data`, but no operation hands them
+Status: tracked barcode tensors cache their C++ tensor, but no operation hands them
 its C++ result yet; PCFs and PLFs still store both (see the plan).
 
 **D5a. One generic tracked tensor.** The tracking logic is a mixin shared by

@@ -94,10 +94,11 @@ def _save(item: Tensor, file):
     if isinstance(item, NestedTensor):
         cpp.IoOps.save_nested_tensor(item._root, file)
         return
-    entry = _tensor_io().get(type(item._data))
+    data = item._binary_io_data()
+    entry = _tensor_io().get(type(data))
     if entry is None:
-        raise TypeError(f"Unsupported tensor type {type(item._data)}")
-    entry[0](item._data, file)
+        raise TypeError(f"Unsupported tensor type {type(data)}")
+    entry[0](data, file)
 
 
 def _load(file):
