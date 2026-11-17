@@ -71,12 +71,14 @@ namespace sb
 
       if (fi_next != fpts.end() && gi_next != gpts.end())
       {
-        auto delta = fi_next->t - gi_next->t;
-        if (delta <= 0)
+        // Compared, not subtracted: two infinite times have no difference.
+        const auto ft = fi_next->t;
+        const auto gt = gi_next->t;
+        if (ft <= gt)
         {
           fi = fi_next;
         }
-        if (delta >= 0)
+        if (ft >= gt)
         {
           gi = gi_next;
         }

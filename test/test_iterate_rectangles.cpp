@@ -1,3 +1,4 @@
+#include <limits>
 #include <gtest/gtest.h>
 
 #include <sbear/functional/pcf.hpp>
@@ -140,6 +141,20 @@ TEST(IterateRectanglesWithRows, OneFunctionEndsFirst)
     {0., 0., 0.},
     {1., 0., 1.},
     {2., 0., 2.},
+  };
+  EXPECT_EQ(rows_of_rectangles(f, g), expected);
+}
+
+TEST(IterateRectanglesWithRows, BothFunctionsHaveABreakpointAtInfinity)
+{
+  const double inf = std::numeric_limits<double>::infinity();
+  sb::Pcf_f64 f{{0., 3.}, {1., 2.}, {inf, 0.}};
+  sb::Pcf_f64 g{{0., 2.}, {2., 4.}, {inf, 0.}};
+
+  std::vector<RowsOfRectangle> expected = {
+    {0., 0., 0.},
+    {1., 1., 0.},
+    {2., 1., 1.},
   };
   EXPECT_EQ(rows_of_rectangles(f, g), expected);
 }

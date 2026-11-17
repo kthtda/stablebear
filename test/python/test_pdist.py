@@ -192,3 +192,20 @@ def test_pdist_accepts_empty_list():
 
     assert isinstance(D, DistanceMatrix)
     assert D.size == 0
+
+
+def test_pdist_of_pcfs_with_a_breakpoint_at_infinity():
+    f = sb.Pcf(np.array([[0.0, 2.0], [1.0, 1.0], [np.inf, 0.0]]))
+    g = sb.Pcf(np.array([[0.0, 2.0], [1.5, 1.0], [np.inf, 0.0]]))
+
+    # f and g differ by 1 between 1 and 1.5.
+    distances = sb.pdist(sb.PcfTensor([f, g]), p=1)
+
+    np.testing.assert_allclose(distances.to_dense(), [[0.0, 0.5], [0.5, 0.0]])
+
+
+def test_difference_of_pcfs_with_a_breakpoint_at_infinity():
+    f = sb.Pcf(np.array([[0.0, 2.0], [1.0, 1.0], [np.inf, 0.0]]))
+    g = sb.Pcf(np.array([[0.0, 2.0], [1.5, 1.0], [np.inf, 0.0]]))
+
+    assert sb.lp_norm(sb.PcfTensor([f - g]), p=1)[0] == pytest.approx(0.5)

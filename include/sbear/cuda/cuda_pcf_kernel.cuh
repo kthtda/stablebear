@@ -59,12 +59,14 @@ namespace sb
 
         if (fi + 1 < fsz && gi + 1 < gsz)
         {
-          auto delta = fpts[fi + 1].t - gpts[gi + 1].t;
-          if (delta <= 0)
+          // Compared, not subtracted: two infinite times have no difference.
+          const auto ft = fpts[fi + 1].t;
+          const auto gt = gpts[gi + 1].t;
+          if (ft <= gt)
           {
             ++fi;
           }
-          if (delta >= 0)
+          if (ft >= gt)
           {
             ++gi;
           }
