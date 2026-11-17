@@ -677,6 +677,77 @@ def _distance_matrices(space: DistanceSpace) -> Any:
     return space.distance._distance_matrices(points)
 
 
+def pairwise_distances(space: DistanceSpace) -> Any:
+    """The distances between the points of each cloud of a space, in its
+    distance; what pdist gives for a DistanceSpace.
+
+    Without gradients, C++ computes the matrices, in parallel over the
+    clouds. If the points or the distance carry gradients, the distances
+    of all pairs of points of all clouds are one framework operation on
+    the rows of the array of all points: a framework array of shape
+    (..., n, n) for points that are a framework array, and a
+    DistanceMatrixTensor that carries gradients for a PointCloudTensor.
+    """
+    # The persistence package imports this module.
+    from .persistence._critical_edges import as_batch
+
+    distance = space.distance
+    transformed = distance._euclidean_points(_points_array(space))
+    # The Euclidean distances of the transformed points are the distances
+    # of the space.
+    holder = _points_array(space) if transformed is None else transformed
+    if _autodiff._tracked(holder) is None:
+        if transformed is None:
+            matrices = _distance_matrices(space)
+        else:
+            if not isinstance(holder, (PointCloudTensor, TimeSeries)):
+                holder = PointCloudTensor([np.asarray(holder)])
+            matrices = LpDistance(2)._distance_matrices(holder)
+        return matrices if isinstance(space.points, (PointCloudTensor, TimeSeries)) else matrices[0]
+
+    clouds: Any = as_batch(holder)
+    points, enumeration = clouds._tvalues, clouds._enumeration
+    adapter = _autodiff._framework(points)
+    flat = enumeration.reshape(-1, 2)
+    sizes = flat[:, 1] - flat[:, 0]
+    counts = sizes * (sizes - 1) // 2
+    ends = np.cumsum(counts)
+
+    # Entry k of a matrix, of those below its diagonal by rows, is in row
+    # i > j and column j, with k = i (i - 1) / 2 + j.
+    k = np.arange(int(counts.sum()), dtype=np.int64) - np.repeat(ends - counts, counts)
+    row = ((1 + np.sqrt(1 + 8 * k)) / 2).astype(np.int64)
+    row -= row * (row - 1) // 2 > k
+    row += (row + 1) * row // 2 <= k
+    start = np.repeat(flat[:, 0], counts)
+    first, second = start + row, start + k - row * (row - 1) // 2
+
+    # The distance between equal points is the constant 0: a distance has
+    # no derivative there.
+    values = adapter.to_numpy(points)
+    apart = (values[first] != values[second]).any(axis=1)
+    differences = adapter.gather(points, first[apart]) - adapter.gather(points, second[apart])
+    lengths = adapter.row_norms(differences) if transformed is not None else distance._lengths(adapter, differences)
+    padded = adapter.concat([adapter.as_tensor(np.zeros(1), like=points), lengths])
+    # Where each entry is in padded, after the place of the diagonal, 0.
+    position = np.zeros(len(k) + 1, dtype=np.int64)
+    position[1:][apart] = 1 + np.arange(int(apart.sum()))
+
+    if isinstance(holder, PointCloudTensor):
+        shape = enumeration.shape[:-1]
+        return tracked_class(DistanceMatrixTensor)(
+            [adapter.gather(padded, position[1:])], np.stack([ends - counts, ends], axis=-1).reshape(*shape, 2),
+            sizes=sizes.reshape(shape))
+
+    # A framework array of clouds of n points each gives every matrix in full.
+    n = int(holder.shape[-2])
+    i, j = np.indices((n, n))
+    high, low = np.maximum(i, j), np.minimum(i, j)
+    entry = np.arange(len(flat))[:, None, None] * (n * (n - 1) // 2) + high * (high - 1) // 2 + low
+    full = adapter.gather(padded, position[np.where(i == j, 0, entry + 1)].ravel())
+    return adapter.reshape(full, (*(int(size) for size in holder.shape[:-2]), n, n))
+
+
 def _points_array(space: DistanceSpace) -> Any:
     """The points of a space as _multiply takes them: an (n, d) NumPy
     array, a framework array, or a PointCloudTensor."""

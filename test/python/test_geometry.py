@@ -1216,3 +1216,159 @@ def test_kernel_of_tracked_distance_matrices_and_point_clouds_raises(fw):
     X = sb.DistanceMatrixTensor(_with_gradients(fw, _distance_batch()))
     with pytest.raises(TypeError, match="DistanceMatrixTensors"):
         _kernel(X, sb.PointCloudTensor([_lp_points(), _lp_points()]))
+
+
+def _expected_distances(make_distance, points):
+    # The distances of _PDIST_DISTANCES between the rows of an array.
+    differences = points[:, None, :] - points[None, :, :]
+    if make_distance is _taxicab:
+        return np.abs(differences).sum(axis=-1)
+    if make_distance is _chebyshev:
+        return np.abs(differences).max(axis=-1)
+    return np.sqrt(np.einsum("ijk,kl,ijl->ij", differences, _gram(), differences))
+
+
+def _taxicab():
+    return sb.LpDistance(1)
+
+
+def _chebyshev():
+    return sb.LpDistance(float("inf"))
+
+
+def _gram_distance():
+    return sb.InnerProduct(_gram()).distance
+
+
+_PDIST_DISTANCES = pytest.mark.parametrize(
+    "make_distance", [_taxicab, _chebyshev, _gram_distance], ids=["taxicab", "chebyshev", "inner_product"])
+
+
+@_PDIST_DISTANCES
+def test_pdist_of_distance_space_gives_the_distances_between_its_points(make_distance):
+    out = sb.pdist(make_distance()(_lp_points()))
+
+    assert isinstance(out, sb.DistanceMatrix)
+    np.testing.assert_allclose(out.to_dense(), _expected_distances(make_distance, _lp_points()), atol=1e-12)
+
+
+def test_pdist_of_euclidean_distance_space_gives_euclidean_distances():
+    out = sb.pdist(sb.LpDistance(2)(_lp_points()))
+
+    np.testing.assert_allclose(out.to_dense(), _distances_between(_lp_points()), atol=1e-12)
+
+
+@_PDIST_DISTANCES
+def test_pdist_of_batch_in_distance_space_gives_one_matrix_per_cloud(make_distance):
+    out = sb.pdist(make_distance()(sb.PointCloudTensor(_batch2())))
+
+    assert isinstance(out, sb.DistanceMatrixTensor)
+    assert out.shape == (3,)
+    for i, cloud in enumerate(_batch2()):
+        np.testing.assert_allclose(out[i].to_dense(), _expected_distances(make_distance, cloud), atol=1e-12)
+
+
+@_PDIST_DISTANCES
+def test_pdist_of_series_in_distance_space_is_the_series_of_the_matrices(make_distance):
+    out = sb.pdist(make_distance()(_series2()))
+
+    assert isinstance(out, sb.timeseries.TimeSeries)
+    assert out.times.array_equal(_series2().times)
+    for i, cloud in enumerate(_batch2()):
+        np.testing.assert_allclose(out.values[i].to_dense(), _expected_distances(make_distance, cloud), atol=1e-12)
+
+
+def test_pdist_of_distance_space_with_p_raises():
+    with pytest.raises(TypeError, match="LpDistance"):
+        sb.pdist(sb.LpDistance(1)(_lp_points()), p=1)  # pyright: ignore[reportCallIssue, reportArgumentType]
+
+
+@_PDIST_DISTANCES
+def test_pdist_of_framework_points_in_distance_space_matches_numpy(fw, make_distance):
+    out = sb.pdist(make_distance()(fw.tensor(_lp_points())))
+
+    assert isinstance(out, fw.tensor_type)
+    np.testing.assert_allclose(fw.to_numpy(out), _expected_distances(make_distance, _lp_points()), atol=1e-12)
+
+
+@_PDIST_DISTANCES
+def test_pdist_of_framework_array_of_several_clouds_gives_one_array(fw, make_distance):
+    clouds = np.stack([_lp_points(), _loop_points()])
+
+    out = sb.pdist(make_distance()(fw.tensor(clouds)))
+
+    assert isinstance(out, fw.tensor_type)
+    assert tuple(out.shape) == (2, 6, 6)
+    for i in range(2):
+        np.testing.assert_allclose(fw.to_numpy(out[i]), _expected_distances(make_distance, clouds[i]), atol=1e-12)
+
+
+@_PDIST_DISTANCES
+def test_pdist_of_tracked_batch_in_distance_space_matches_untracked(fw, make_distance):
+    clouds = sb.PointCloudTensor(_batch2())
+
+    out = sb.pdist(make_distance()(tracked(fw, clouds)))
+
+    assert isinstance(out, sb.DistanceMatrixTensor)
+    content, enumeration, sizes = out.to_serial_content()
+    expected = sb.pdist(make_distance()(clouds)).to_serial_content()
+    assert isinstance(content, fw.tensor_type)
+    np.testing.assert_allclose(fw.to_numpy(content), expected[0], atol=1e-12)
+    np.testing.assert_array_equal(enumeration, expected[1])
+    np.testing.assert_array_equal(sizes, expected[2])
+
+
+def _pdist_weights():
+    # Not symmetric, so that both entries of each pair count.
+    return np.arange(36.0).reshape(6, 6) % 7.0 - 2.5
+
+
+@_PDIST_DISTANCES
+def test_pdist_of_distance_space_gradient_wrt_points(fw, make_distance):
+    def loss(P):
+        return fw.sum(fw.tensor(_pdist_weights()) * sb.pdist(make_distance()(P)))
+
+    assert_gradient_matches_finite_differences(fw, loss, _lp_points())
+
+
+def test_pdist_of_distance_space_gradient_wrt_gram_matrix(fw):
+    def loss(a):
+        distance = sb.InnerProduct(_framework_gram2(fw, a)).distance
+        return fw.sum(fw.tensor(_pdist_weights()) * sb.pdist(distance(_lp_points())))
+
+    assert_gradient_matches_finite_differences(fw, loss, [2.0, 1.0])
+
+
+@_PDIST_DISTANCES
+def test_pdist_of_batch_in_distance_space_gradient_wrt_points(fw, make_distance):
+    _, second, third = _batch2()
+
+    def loss(P):
+        entries = sb.pdist(make_distance()(sb.PointCloudTensor([second, P, third]))).to_serial_content()[0]
+        return fw.sum(entries * entries)
+
+    assert_gradient_matches_finite_differences(fw, loss, _lp_points())
+
+
+@_PDIST_DISTANCES
+def test_pdist_gradient_of_equal_points_is_zero(fw, make_distance):
+    points = np.array([[1.0, 2.0], [1.0, 2.0], [1.0, 2.0]])
+
+    def loss(P):
+        return fw.sum(sb.pdist(make_distance()(P)))
+
+    _, grad = fw.value_and_grad(loss, points)
+    np.testing.assert_array_equal(grad, np.zeros((3, 2)))
+
+
+@_PDIST_DISTANCES
+def test_persistent_homology_of_pdist_is_that_of_the_distance_space(fw, make_distance):
+    space = make_distance()(tracked(fw, sb.PointCloudTensor(_batch2())))
+
+    out = _homology(sb.pdist(space))
+
+    expected = _homology(space)
+    assert isinstance(out.to_serial_content()[0], fw.tensor_type)
+    assert out.shape == (3, 2)
+    for i in np.ndindex(3, 2):
+        assert out[i].is_isomorphic_to(expected[i], atol=1e-12, rtol=1e-12)

@@ -185,6 +185,22 @@ A `DistanceSpace` replaces it. Passing `distance_type` gives a
 
 ## Inputs and gradients
 
+**D6c. `pdist` of a `DistanceSpace` gives its distances.** `pdist` takes a
+`DistanceSpace` in place of a tensor of PCFs and gives the distances between
+the points of each cloud: a `DistanceMatrix` for a single cloud, a
+`DistanceMatrixTensor` for a `PointCloudTensor`, and a time series of
+matrices for a time series, computed in C++ as in D6. `p` cannot be passed
+with a space, which has its distance; to tell, the default of `p` is `None`,
+which means 1 for PCFs.
+
+With gradients the result follows D7a: a PyTorch tensor of shape (..., n, d)
+gives one of shape (..., n, n), and a `PointCloudTensor` a
+`DistanceMatrixTensor` that carries gradients, which persistent homology and
+the kernel take. The entries below the diagonal of all matrices are one
+framework operation on pairs of rows of the array of all points. The
+distance between two equal points is the constant 0, as it has no
+derivative there.
+
 **D7. One implementation over NumPy and PyTorch.** `project` and the
 distances take, as points:
 

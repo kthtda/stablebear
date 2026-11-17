@@ -10,6 +10,7 @@ from ._tracked import is_tracked
 from .async_task import _run_task
 from .distance_matrix import DistanceMatrix
 from .functional.pcf import Pcf, _has_matching_types
+from .geometry import DistanceSpace, pairwise_distances
 from .base_tensor import FloatTensor, PcfContainerLike, _resolve_pcf_inputs
 from .typing import float32, float64, pcf32, pcf64
 
@@ -105,8 +106,13 @@ def _tracked_pdist(fs: Any, p: float, verbose: bool = False) -> Any:
     return pdist(fs, p, verbose).to_dense()
 
 
-def pdist(fs: PcfContainerLike, p: float = 1, verbose: bool = False) -> DistanceMatrix:
-    r"""Compute the pairwise :math:`L_p` distance matrix for a 1-D tensor of PCFs.
+@overload
+def pdist(fs: DistanceSpace, p: None = None, verbose: bool = False) -> Any: ...
+@overload
+def pdist(fs: PcfContainerLike, p: float | None = None, verbose: bool = False) -> DistanceMatrix: ...
+def pdist(fs: Any, p: float | None = None, verbose: bool = False) -> Any:
+    r"""Compute the pairwise :math:`L_p` distance matrix for a 1-D tensor of
+    PCFs, or the matrix of the distances between the points of a point cloud.
 
     For a tensor :math:`(f_0, f_1, \ldots, f_{n-1})`, returns an
     :math:`n \times n` matrix :math:`D` where
@@ -114,13 +120,19 @@ def pdist(fs: PcfContainerLike, p: float = 1, verbose: bool = False) -> Distance
     .. math::
         D_{ij} = \Vert f_i - f_j \Vert_p.
 
+    For a :class:`~stablebear.geometry.DistanceSpace` of points
+    :math:`x_0, \ldots, x_{n-1}` with distance :math:`d`,
+    :math:`D_{ij} = d(x_i, x_j)`.
+
     Parameters
     ----------
-    fs : PcfContainerLike
-        A 1-D tensor of PCFs.
+    fs : PcfContainerLike or DistanceSpace
+        A 1-D tensor of PCFs, or a point cloud or a batch of point clouds
+        in a ``DistanceSpace``.
     p : float, optional
         The :math:`p` parameter in the :math:`L_p` distance (must be
-        :math:`\geq 1`), by default 1.
+        :math:`\geq 1`), by default 1. It cannot be passed with a
+        ``DistanceSpace``, which has its distance.
     verbose : bool, optional
         Show progress information during computation, by default False.
 
@@ -132,10 +144,23 @@ def pdist(fs: PcfContainerLike, p: float = 1, verbose: bool = False) -> Distance
         array of shape ``(n, n)``, which carries gradients with respect to the
         breakpoint times and values of the PCFs.
 
+        For a ``DistanceSpace``, the result follows its points: a
+        ``DistanceMatrix`` for a single point cloud, a
+        ``DistanceMatrixTensor`` for a ``PointCloudTensor``, with one matrix
+        per point cloud, and a time series of distance matrices for a time
+        series. With gradients, a PyTorch tensor of shape ``(..., n, d)``
+        gives one of shape ``(..., n, n)``, and a ``PointCloudTensor`` a
+        ``DistanceMatrixTensor`` that carries the gradients. These are with
+        respect to the points and, for the distance of an inner product,
+        to its Gram matrix when that is a PyTorch tensor. The distance
+        between two equal points has gradient 0.
+
     Raises
     ------
     ValueError
         If ``fs`` is not 1-dimensional.
+    TypeError
+        If ``p`` is passed with a ``DistanceSpace``.
 
     Notes
     -----
@@ -146,6 +171,13 @@ def pdist(fs: PcfContainerLike, p: float = 1, verbose: bool = False) -> Distance
     that time is that of moving both breakpoints. The gradient of the
     distance between two equal PCFs is 0.
     """
+    if isinstance(fs, DistanceSpace):
+        if p is not None:
+            raise TypeError(
+                "p cannot be passed with a DistanceSpace, which has its distance; "
+                "for an Lp distance, use LpDistance(p).")
+        return pairwise_distances(fs)
+    p = 1 if p is None else p
     _autodiff.require_number(p, "p")
     if p < 1:
         raise ValueError("p must be >= 1.")

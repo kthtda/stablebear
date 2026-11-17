@@ -119,6 +119,11 @@ Calling a distance on a point cloud gives the ``DistanceSpace``::
    # The distance of the inner product above.
    barcodes = persistence.compute_persistent_homology(stretched(points))
 
+:py:func:`~stablebear.distance.pdist` of a ``DistanceSpace`` gives the
+distances themselves, as the matrix of the distances between the points::
+
+   distances = sb.pdist(taxicab(points))                  # a DistanceMatrix
+
 Operations that do not use a distance do not accept a ``DistanceSpace``, so
 its distance is never silently ignored. A ``DistanceSpace`` that is not an
 ``InnerProductSpace`` cannot be projected, because an orthogonal projection
