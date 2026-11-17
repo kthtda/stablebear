@@ -2010,5 +2010,15 @@
     "py": 90.0,
     "cuda": 100.0,
     "release_tag": null
+  },
+  {
+    "utc_iso": "2026-11-17T14:01:42Z",
+    "sha": "b5f0e9b",
+    "branch": "276/merge",
+    "detail_path": "reports/2026-11-17_14-01-42_b5f0e9b/report.html",
+    "cpp": 90.3,
+    "py": 90.0,
+    "cuda": 94.1,
+    "release_tag": null
   }
 ]

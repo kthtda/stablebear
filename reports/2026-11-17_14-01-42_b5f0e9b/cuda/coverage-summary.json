@@ -1,0 +1,35 @@
+{
+  "line_percent": 94.1,
+  "lines_total": 68,
+  "lines_covered": 64,
+  "function_percent": 100.0,
+  "functions_total": 12,
+  "functions_covered": 12,
+  "branch_percent": 89.3,
+  "branches_total": 28,
+  "branches_covered": 25,
+  "files": {
+    "/home/runner/work/stablebear/stablebear/include/sbear/cuda/cuda_pcf_kernel.cuh": {
+      "lines_total": 44,
+      "lines_covered": 44,
+      "line_percent": 100.0,
+      "functions_total": 2,
+      "functions_covered": 2,
+      "function_percent": 100.0,
+      "branches_total": 18,
+      "branches_covered": 17,
+      "branch_percent": 94.4
+    },
+    "/home/runner/work/stablebear/stablebear/include/sbear/functional/operations.cuh": {
+      "lines_total": 24,
+      "lines_covered": 20,
+      "line_percent": 83.3,
+      "functions_total": 10,
+      "functions_covered": 10,
+      "function_percent": 100.0,
+      "branches_total": 10,
+      "branches_covered": 8,
+      "branch_percent": 80.0
+    }
+  }
+}

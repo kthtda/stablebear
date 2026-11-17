@@ -1,0 +1,1102 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>/home/runner/work/stablebear/stablebear/include/sbear/timeseries/time_delay_embedding.hpp</title>
+    <link href='valgrind.css' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+    <script src="https://code.jquery.com/jquery-3.4.1.js"></script>
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.0.0/styles/default.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.0.0/highlight.min.js"></script>
+    <script src="valgrind.js"></script>
+</head>
+
+<body>
+    <div class="global">
+        <div class="header">
+            <h1>/home/runner/work/stablebear/stablebear/include/sbear/timeseries/time_delay_embedding.hpp</h1>
+            <p><b>4</b> errors</p>
+            <button class="next_error">Goto First Error</button>
+        </div>
+        <div class="listing">
+            <pre class="code">
+<code class="c++"><span class="line_number">1</span>#ifndef STABLEBEAR_TIMESERIES_TIME_DELAY_EMBEDDING_H
+<span class="line_number">2</span>#define STABLEBEAR_TIMESERIES_TIME_DELAY_EMBEDDING_H
+<span class="line_number">3</span>
+<span class="line_number">4</span>#include &#34;../errors.hpp&#34;
+<span class="line_number">5</span>#include &#34;../tensor.hpp&#34;
+<span class="line_number">6</span>#include &#34;../timeseries.hpp&#34;
+<span class="line_number">7</span>#include &#34;../ufunc.hpp&#34;
+<span class="line_number">8</span>#include &#34;../walk.hpp&#34;
+<span class="line_number">9</span>
+<span class="line_number">10</span>#include &lt;algorithm&gt;
+<span class="line_number">11</span>#include &lt;cmath&gt;
+<span class="line_number">12</span>#include &lt;functional&gt;
+<span class="line_number">13</span>#include &lt;limits&gt;
+<span class="line_number">14</span>#include &lt;memory&gt;
+<span class="line_number">15</span>#include &lt;queue&gt;
+<span class="line_number">16</span>#include &lt;span&gt;
+<span class="line_number">17</span>#include &lt;stdexcept&gt;
+<span class="line_number">18</span>#include &lt;string&gt;
+<span class="line_number">19</span>#include &lt;utility&gt;
+<span class="line_number">20</span>#include &lt;vector&gt;
+<span class="line_number">21</span>
+<span class="line_number">22</span>namespace sb
+<span class="line_number">23</span>{
+<span class="line_number">24</span>  /// The delay embedding of @p channel with @p dimension components spaced
+<span class="line_number">25</span>  /// @p delay apart, in the channel&#39;s unit, with w = (dimension - 1) * delay.
+<span class="line_number">26</span>  /// Its value at t is (x(t - w), ..., x(t - delay), x(t)), oldest first as
+<span class="line_number">27</span>  /// in Kantz and Schreiber&#39;s convention, for every t from t_0 + w to the end
+<span class="line_number">28</span>  /// of the channel&#39;s domain. If @p forward, it is instead
+<span class="line_number">29</span>  /// (x(t), x(t + delay), ..., x(t + w)), also oldest first, for every t from
+<span class="line_number">30</span>  /// t_0 to the end of the domain minus w. Each end is included when the
+<span class="line_number">31</span>  /// channel&#39;s is, and each observation gains a leading axis of length
+<span class="line_number">32</span>  /// @p dimension. Its times are the start of its domain and the times in it
+<span class="line_number">33</span>  /// where a component reaches an observation, t_i + k * delay, or
+<span class="line_number">34</span>  /// t_i - k * delay if @p forward; times that round to the same point are
+<span class="line_number">35</span>  /// recorded once, at the time they snap to. It is a view of the channel&#39;s
+<span class="line_number">36</span>  /// storage.
+<span class="line_number">37</span>  namespace detail
+<span class="line_number">38</span>  {
+<span class="line_number">39</span>    /// Throw unless @p dimension and @p delay make an embedding.
+<span class="line_number">40</span>    inline void check_embedding_arguments(size_t dimension, float64_t delay)
+<span class="line_number">41</span>    {
+<span class="line_number">42</span>      if (dimension == 0)
+<span class="line_number">43</span>      {
+<span class="line_number">44</span>        throw std::invalid_argument(&#34;The embedding dimension must be at least 1&#34;);
+<span class="line_number">45</span>      }
+<span class="line_number">46</span>      if (std::isnan(delay) || std::isinf(delay) || delay &lt;= 0)
+<span class="line_number">47</span>      {
+<span class="line_number">48</span>        throw std::invalid_argument(&#34;The embedding delay must be finite and positive&#34;);
+<span class="line_number">49</span>      }
+<span class="line_number">50</span>    }
+<span class="line_number">51</span>
+<span class="line_number">52</span>    /// The lag of each component of an embedding, oldest first: component j
+<span class="line_number">53</span>    /// reads the channel lags[j] before t. Looking forward, the lags are
+<span class="line_number">54</span>    /// negative: component j reads j * delay after t.
+<span class="line_number">55</span>    [[nodiscard]] inline std::vector&lt;float64_t&gt; embedding_lags(size_t dimension, float64_t delay, bool forward)
+<span class="line_number">56</span>    {
+<span class="line_number">57</span>      std::vector&lt;float64_t&gt; lags(dimension);
+<span class="line_number">58</span>      for (size_t j = 0; j &lt; dimension; ++j)
+<span class="line_number">59</span>      {
+<span class="line_number">60</span>        lags[j] = forward ? -(static_cast&lt;float64_t&gt;(j) * delay) : static_cast&lt;float64_t&gt;(dimension - 1 - j) * delay;
+<span class="line_number">61</span>      }
+<span class="line_number">62</span>      return lags;
+<span class="line_number">63</span>    }
+<span class="line_number">64</span>
+<span class="line_number">65</span>    /// The first and last times of the embedding of @p channel, which has
+<span class="line_number">66</span>    /// observations, with lags from @p lowest to @p highest. A channel with
+<span class="line_number">67</span>    /// an end, such as a window, can be evaluated past its last timestamp up
+<span class="line_number">68</span>    /// to its end, so the embedding can too, up to that end plus the lowest
+<span class="line_number">69</span>    /// lag. Throws if no time has all of the components.
+<span class="line_number">70</span>    template &lt;typename T&gt;
+<span class="line_number">71</span>    std::pair&lt;float64_t, float64_t&gt; embedding_bounds(const Channel&lt;T&gt;&amp; channel, float64_t lowest, float64_t highest)
+<span class="line_number">72</span>    {
+<span class="line_number">73</span>      const auto start = channel.time(0) + highest;
+<span class="line_number">74</span>      const auto end = channel.end().value_or(channel.time(channel.size() - 1)) + lowest;
+<span class="line_number">75</span>      if (channel.end_closed() ? start &gt; end : start &gt;= end)
+<span class="line_number">76</span>      {
+<span class="line_number">77</span>        throw std::invalid_argument(&#34;The series is too short for this embedding: no time has all of its components&#34;);
+<span class="line_number">78</span>      }
+<span class="line_number">79</span>      return {start, end};
+<span class="line_number">80</span>    }
+<span class="line_number">81</span>
+<span class="line_number">82</span>    /// Throw unless every channel of @p series has an embedding with
+<span class="line_number">83</span>    /// @p delay in the series&#39; unit, as delay_embed() checks it.
+<span class="line_number">84</span>    template &lt;typename T&gt;
+<span class="line_number">85</span>    void check_embedding_fits(const TimeSeries&lt;T&gt;&amp; series, size_t dimension, float64_t delay, bool forward)
+<span class="line_number">86</span>    {
+<span class="line_number">87</span>      const auto lags = embedding_lags(dimension, delay, forward);
+<span class="line_number">88</span>      const auto [lowest, highest] = std::minmax_element(lags.begin(), lags.end());
+<span class="line_number">89</span>      for (size_t c = 0; c &lt; series.n_channels(); ++c)
+<span class="line_number">90</span>      {
+<span class="line_number">91</span>        if (series.channel(c).size() &gt; 0)
+<span class="line_number">92</span>        {
+<span class="line_number">93</span>          (void)embedding_bounds(series.channel(c), *lowest, *highest);
+<span class="line_number">94</span>        }
+<span class="line_number">95</span>      }
+<span class="line_number">96</span>    }
+<span class="line_number">97</span>  }
+<span class="line_number">98</span>
+<span class="line_number">99</span>  template &lt;typename T&gt;
+<span class="line_number">100</span>  Channel&lt;T&gt; delay_embed(const Channel&lt;T&gt;&amp; channel, size_t dimension, float64_t delay, bool forward = false)
+<span class="line_number">101</span>  {
+<span class="line_number">102</span>    detail::check_embedding_arguments(dimension, delay);
+<span class="line_number">103</span>
+<span class="line_number">104</span>    const auto lags = detail::embedding_lags(dimension, delay, forward);
+<span class="line_number">105</span>    const auto [lowest, highest] = std::minmax_element(lags.begin(), lags.end());
+<span class="line_number">106</span>
+<span class="line_number">107</span>    const auto n = channel.size();
+<span class="line_number">108</span>    std::vector&lt;float64_t&gt; at;
+<span class="line_number">109</span>    if (n &gt; 0)
+<span class="line_number">110</span>    {
+<span class="line_number">111</span>      // The embedding keeps an open start through view_lagged_at.
+<span class="line_number">112</span>      const auto [start, end] = detail::embedding_bounds(channel, *lowest, *highest);
+<span class="line_number">113</span>      const auto closed = channel.end_closed();
+<span class="line_number">114</span>      const auto past = [&amp;](float64_t s) { return closed ? s &gt; end : s &gt;= end; };
+<span class="line_number">115</span>      // Component j changes where its lagged time reaches an observation: at
+<span class="line_number">116</span>      // the timestamps shifted by lags[j]. A queue holds each component&#39;s next
+<span class="line_number">117</span>      // shifted time, so the shifted copies are merged in one pass, from start
+<span class="line_number">118</span>      // to end, without storing them.
+<span class="line_number">119</span>      std::vector&lt;size_t&gt; shifted(dimension, 0);
+<span class="line_number">120</span>      const auto pending = [&amp;](size_t j) { return channel.time(shifted[j]) + lags[j]; };
+<span class="line_number">121</span>      using Event = std::pair&lt;float64_t, size_t&gt;;
+<span class="line_number">122</span>      std::priority_queue&lt;Event, std::vector&lt;Event&gt;, std::greater&lt;&gt;&gt; queue;
+<span class="line_number">123</span>      for (size_t j = 0; j &lt; dimension; ++j)
+<span class="line_number">124</span>      {
+<span class="line_number">125</span>        while (shifted[j] &lt; n &amp;&amp; pending(j) &lt; start)
+<span class="line_number">126</span>        {
+<span class="line_number">127</span>          ++shifted[j];
+<span class="line_number">128</span>        }
+<span class="line_number">129</span>        if (shifted[j] &lt; n)
+<span class="line_number">130</span>        {
+<span class="line_number">131</span>          queue.emplace(pending(j), j);
+<span class="line_number">132</span>        }
+<span class="line_number">133</span>      }
+<span class="line_number">134</span>
+<span class="line_number">135</span>      // Shifted times can round to either side of the observation they mean,
+<span class="line_number">136</span>      // so one point can come up at times an ulp apart. Two times give the
+<span class="line_number">137</span>      // same point when every component reads the same observation at both;
+<span class="line_number">138</span>      // index_at decides which observation, with the channel&#39;s
+<span class="line_number">139</span>      // snap_tolerance, as evaluation does. A component&#39;s index
+<span class="line_number">140</span>      // never decreases with time, so a run of the same point ends where some
+<span class="line_number">141</span>      // component&#39;s index differs from the one at the time before. Only a
+<span class="line_number">142</span>      // component whose next shifted time is at s, or within snapping
+<span class="line_number">143</span>      // distance after it, can read a different observation at s. Snapping
+<span class="line_number">144</span>      // moves a time by at most snap_tolerance times its magnitude; a few
+<span class="line_number">145</span>      // machine epsilons more cover the rounding of the lags.
+<span class="line_number">146</span>      //
+<span class="line_number">147</span>      // Record each run at the time its members snap to: the channel&#39;s own
+<span class="line_number">148</span>      // timestamp if the run has one, else its latest time, since snapping
+<span class="line_number">149</span>      // moves a time forward onto the observation it falls just short of.
+<span class="line_number">150</span>      // The first point stays at the start, so the domain keeps its start.
+<span class="line_number">151</span>      const auto reach = channel.snap_tolerance() + 4 * std::numeric_limits&lt;float64_t&gt;::epsilon();
+<span class="line_number">152</span>      std::vector&lt;size_t&gt; previous(dimension);
+<span class="line_number">153</span>      for (size_t j = 0; j &lt; dimension; ++j)
+<span class="line_number">154</span>      {
+<span class="line_number">155</span>        previous[j] = channel.index_at(start - lags[j]);
+<span class="line_number">156</span>      }
+<span class="line_number">157</span>      std::vector&lt;size_t&gt; reached;
+<span class="line_number">158</span>      std::vector&lt;Event&gt; near;
+<span class="line_number">159</span>      bool runHasTimestamp = false;
+<span class="line_number">160</span>      while (!queue.empty() &amp;&amp; !past(queue.top().first))
+<span class="line_number">161</span>      {
+<span class="line_number">162</span>        const auto s = queue.top().first;
+<span class="line_number">163</span>        reached.clear();
+<span class="line_number">164</span>        bool isTimestamp = false;
+<span class="line_number">165</span>        while (!queue.empty() &amp;&amp; queue.top().first == s)
+<span class="line_number">166</span>        {
+<span class="line_number">167</span>          const auto j = queue.top().second;
+<span class="line_number">168</span>          queue.pop();
+<span class="line_number">169</span>          while (shifted[j] &lt; n &amp;&amp; pending(j) == s)
+<span class="line_number">170</span>          {
+<span class="line_number">171</span>            ++shifted[j];
+<span class="line_number">172</span>          }
+<span class="line_number">173</span>          if (shifted[j] &lt; n)
+<span class="line_number">174</span>          {
+<span class="line_number">175</span>            queue.emplace(pending(j), j);
+<span class="line_number">176</span>          }
+<span class="line_number">177</span>          reached.push_back(j);
+<span class="line_number">178</span>          // The component with lag 0 has the channel&#39;s own timestamps as its
+<span class="line_number">179</span>          // shifted times.
+<span class="line_number">180</span>          isTimestamp = isTimestamp || lags[j] == 0;
+<span class="line_number">181</span>        }
+<span class="line_number">182</span>        near.clear();
+<span class="line_number">183</span>        while (!queue.empty() &amp;&amp; queue.top().first &lt;= s + reach * (std::abs(s) + *highest - *lowest))
+<span class="line_number">184</span>        {
+<span class="line_number">185</span>          near.push_back(queue.top());
+<span class="line_number">186</span>          queue.pop();
+<span class="line_number">187</span>          reached.push_back(near.back().second);
+<span class="line_number">188</span>        }
+<span class="line_number">189</span>        for (const auto&amp; event : near)
+<span class="line_number">190</span>        {
+<span class="line_number">191</span>          queue.push(event);
+<span class="line_number">192</span>        }
+<span class="line_number">193</span>
+<span class="line_number">194</span>        bool changes = at.empty();
+<span class="line_number">195</span>        for (const auto j : reached)
+<span class="line_number">196</span>        {
+<span class="line_number">197</span>          const auto index = channel.index_at(s - lags[j], previous[j]);
+<span class="line_number">198</span>          if (index != previous[j])
+<span class="line_number">199</span>          {
+<span class="line_number">200</span>            changes = true;
+<span class="line_number">201</span>          }
+<span class="line_number">202</span>          previous[j] = index;
+<span class="line_number">203</span>        }
+<span class="line_number">204</span>        if (changes)
+<span class="line_number">205</span>        {
+<span class="line_number">206</span>          at.push_back(s);
+<span class="line_number">207</span>          runHasTimestamp = isTimestamp;
+<span class="line_number">208</span>        }
+<span class="line_number">209</span>        else if (at.size() &gt; 1 &amp;&amp; (isTimestamp || !runHasTimestamp))
+<span class="line_number">210</span>        {
+<span class="line_number">211</span>          at.back() = s;
+<span class="line_number">212</span>          runHasTimestamp = runHasTimestamp || isTimestamp;
+<span class="line_number">213</span>        }
+<span class="line_number">214</span>      }
+<span class="line_number">215</span>    }
+<span class="line_number">216</span>
+<span class="line_number">217</span>    auto embedding = channel.view_lagged_at(channel.times_like(std::move(at)), lags);
+<span class="line_number">218</span>    if (n == 0)
+<span class="line_number">219</span>    {
+<span class="line_number">220</span>      return embedding;
+<span class="line_number">221</span>    }
+<span class="line_number">222</span>    // The domain ends at the channel&#39;s end plus the lowest lag, which a run
+<span class="line_number">223</span>    // recorded at an earlier time may not reach.
+<span class="line_number">224</span>    return embedding.until(channel.end().value_or(channel.time(n - 1)) + *lowest, channel.end_closed());
+<span class="line_number">225</span>  }
+<span class="line_number">226</span>
+<span class="line_number">227</span>  /// The delay embedding of every channel of @p series, with @p delay given
+<span class="line_number">228</span>  /// in the series&#39; unit, in which its channels hold their times.
+<span class="line_number">229</span>  template &lt;typename T&gt;
+<span class="line_number">230</span>  TimeSeries&lt;T&gt; delay_embed(const TimeSeries&lt;T&gt;&amp; series, size_t dimension, float64_t delay, bool forward = false)
+<span class="line_number">231</span>  {
+<span class="line_number">232</span>    std::vector&lt;Channel&lt;T&gt;&gt; channels;
+<span class="line_number">233</span>    channels.reserve(series.n_channels());
+<span class="line_number">234</span>    for (size_t c = 0; c &lt; series.n_channels(); ++c)
+<span class="line_number">235</span>    {
+<span class="line_number">236</span>      channels.push_back(delay_embed(series.channel(c), dimension, delay, forward));
+<span class="line_number">237</span>    }
+</code></pre>
+            <div class="issue">
+                <div>
+                    <span class="what">Possible data race during read of size 8 at 0x38E89FB0 by thread #13</span>
+                    <div class="navigation">
+                        <button class="next_error">Next</button>
+                        <button class="prev_error">Previous</button>
+                    </div>
+                </div>
+                <div>
+                    <table class="call_stack">
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/timeseries/time_delay_embedding.hpp:268<br>
+                                    <code class="cpp">sb::DelayEmbedOperation&lt;double&gt;::operator()(sb::TimeSeries&lt;double&gt; const&amp;, std::span&lt;sb::TimeSeries&lt;double&gt;, 18446744073709551615ul&gt;) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">265</span>
+<span class="line_number">266</span>    void operator()(const TimeSeries&lt;T&gt;&amp; series, std::span&lt;TimeSeries&lt;T&gt;&gt; out) const
+<span class="line_number">267</span>    {
+<span class="line_number">268</span><span class="error">      out[0] = delay_embed(series, dimension, delay_in(series), forward);
+</span><span class="line_number">269</span>    }
+<span class="line_number">270</span>  };
+<span class="line_number">271</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/timeseries/../ufunc.hpp:291<br>
+                                    <code class="cpp">sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}::operator()(unsigned long) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">288</span>        {
+<span class="line_number">289</span>          return;
+<span class="line_number">290</span>        }
+<span class="line_number">291</span><span class="error">        m_op(m_adapter-&gt;input(i), std::span&lt;output_type&gt;(m_adapter-&gt;block(i), blockSize));
+</span><span class="line_number">292</span>        add_progress(1);
+<span class="line_number">293</span>      });
+<span class="line_number">294</span>      auto finish = flow.emplace([this] { m_result = m_adapter-&gt;finish(); });
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/algorithm/for_each.hpp:134<br>
+                                    <code class="cpp">tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}::operator()()::{lambda(unsigned long, unsigned long)#1}::operator()(unsigned long, unsigned long)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">131</span>          part.loop(N, W, *next, [=] (size_t part_b, size_t part_e) mutable {
+<span class="line_number">132</span>            auto idx = static_cast&lt;B_t&gt;(part_b) * inc + beg;
+<span class="line_number">133</span>            for(size_t x=part_b; x&lt;part_e; x++, idx += inc) {
+<span class="line_number">134</span><span class="error">              c(idx);
+</span><span class="line_number">135</span>            }
+<span class="line_number">136</span>          });
+<span class="line_number">137</span>        });
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/../algorithm/partitioner.hpp:316<br>
+                                    <code class="cpp">void tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;::loop&lt;tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}::operator()()::{lambda(unsigned long, unsigned long)#1}, (void*)0&gt;(unsigned long, unsigned long, std::atomic&lt;unsigned long&gt;&amp;, tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}::operator()()::{lambda(unsigned long, unsigned long)#1}&amp;&amp;) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">313</span>          if(curr_b &gt;= N) {
+<span class="line_number">314</span>            return;
+<span class="line_number">315</span>          }
+<span class="line_number">316</span><span class="error">          func(curr_b, (std::min)(curr_b + chunk_size, N));
+</span><span class="line_number">317</span>        }
+<span class="line_number">318</span>        break;
+<span class="line_number">319</span>      }
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/algorithm/for_each.hpp:131<br>
+                                    <code class="cpp">tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}::operator()()</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">128</span>      auto next = std::make_shared&lt;std::atomic&lt;size_t&gt;&gt;(0);
+<span class="line_number">129</span>      for(size_t w=0; w&lt;W;) {
+<span class="line_number">130</span>        auto task = part([=] () mutable {
+<span class="line_number">131</span><span class="error">          part.loop(N, W, *next, [=] (size_t part_b, size_t part_e) mutable {
+</span><span class="line_number">132</span>            auto idx = static_cast&lt;B_t&gt;(part_b) * inc + beg;
+<span class="line_number">133</span>            for(size_t x=part_b; x&lt;part_e; x++, idx += inc) {
+<span class="line_number">134</span>              c(idx);
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/algorithm/for_each.hpp:138<br>
+                                    <code class="cpp">tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">135</span>            }
+<span class="line_number">136</span>          });
+<span class="line_number">137</span>        });
+<span class="line_number">138</span><span class="error">        (++w == W) ? task() : rt.silent_async(task);
+</span><span class="line_number">139</span>      }
+<span class="line_number">140</span>    }
+<span class="line_number">141</span>  };
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:61<br>
+                                    <code class="cpp">void std::__invoke_impl&lt;void, tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}&amp;, tf::Runtime&amp;&gt;(std::__invoke_other, tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}&amp;, tf::Runtime&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">58</span>  template&lt;typename _Res, typename _Fn, typename... _Args&gt;
+<span class="line_number">59</span>    constexpr _Res
+<span class="line_number">60</span>    __invoke_impl(__invoke_other, _Fn&amp;&amp; __f, _Args&amp;&amp;... __args)
+<span class="line_number">61</span><span class="error">    { return std::forward&lt;_Fn&gt;(__f)(std::forward&lt;_Args&gt;(__args)...); }
+</span><span class="line_number">62</span>
+<span class="line_number">63</span>  template&lt;typename _Res, typename _MemFun, typename _Tp, typename... _Args&gt;
+<span class="line_number">64</span>    constexpr _Res
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:111<br>
+                                    <code class="cpp">std::enable_if&lt;is_invocable_r_v&lt;void, tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}&amp;, tf::Runtime&amp;&gt;, void&gt;::type std::__invoke_r&lt;void, tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}&amp;, tf::Runtime&amp;&gt;(tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}&amp;, tf::Runtime&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">108</span>      using __type = typename __result::type;
+<span class="line_number">109</span>      using __tag = typename __result::__invoke_type;
+<span class="line_number">110</span>      if constexpr (is_void_v&lt;_Res&gt;)
+<span class="line_number">111</span><span class="error">	std::__invoke_impl&lt;__type&gt;(__tag{}, std::forward&lt;_Callable&gt;(__fn),
+</span><span class="line_number">112</span>					std::forward&lt;_Args&gt;(__args)...);
+<span class="line_number">113</span>      else
+<span class="line_number">114</span>	return std::__invoke_impl&lt;__type&gt;(__tag{},
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/std_function.h:290<br>
+                                    <code class="cpp">std::_Function_handler&lt;void (tf::Runtime&amp;), tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}&gt;::_M_invoke(std::_Any_data const&amp;, tf::Runtime&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">287</span>      static _Res
+<span class="line_number">288</span>      _M_invoke(const _Any_data&amp; __functor, _ArgTypes&amp;&amp;... __args)
+<span class="line_number">289</span>      {
+<span class="line_number">290</span><span class="error">	return std::__invoke_r&lt;_Res&gt;(*_Base::_M_get_pointer(__functor),
+</span><span class="line_number">291</span>				     std::forward&lt;_ArgTypes&gt;(__args)...);
+<span class="line_number">292</span>      }
+<span class="line_number">293</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/std_function.h:591<br>
+                                    <code class="cpp">std::function&lt;void (tf::Runtime&amp;)&gt;::operator()(tf::Runtime&amp;) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">588</span>      {
+<span class="line_number">589</span>	if (_M_empty())
+<span class="line_number">590</span>	  __throw_bad_function_call();
+<span class="line_number">591</span><span class="error">	return _M_invoker(_M_functor, std::forward&lt;_ArgTypes&gt;(__args)...);
+</span><span class="line_number">592</span>      }
+<span class="line_number">593</span>
+<span class="line_number">594</span>#if __cpp_rtti
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/runtime.hpp:826<br>
+                                    <code class="cpp">tf::Executor::_invoke_runtime_task_impl(tf::Worker&amp;, tf::Node*, std::function&lt;void (tf::Runtime&amp;)&gt;&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">823</span>    node-&gt;_join_counter.fetch_add(1, std::memory_order_release);
+<span class="line_number">824</span>
+<span class="line_number">825</span>    _observer_prologue(worker, node);
+<span class="line_number">826</span><span class="error">    TF_EXECUTOR_EXCEPTION_HANDLER(worker, node, {
+</span><span class="line_number">827</span>      work(rt);
+<span class="line_number">828</span>    });
+<span class="line_number">829</span>    _observer_epilogue(worker, node);
+</code></pre>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            <pre class="code">
+<code class="c++"><span class="line_number">238</span><span class="error">    return TimeSeries&lt;T&gt;(std::move(channels), series.unit(), series.epoch());</span>
+<span class="line_number">239</span>  }
+<span class="line_number">240</span>
+<span class="line_number">241</span>  /// The delay embedding of a time series as an operation without extra
+<span class="line_number">242</span>  /// dimensions: each series maps to its embedding. @p delay is a count of
+<span class="line_number">243</span>  /// @p delayUnit, converted into the unit of each series, or a plain number
+<span class="line_number">244</span>  /// for series without a unit.
+<span class="line_number">245</span>  template &lt;typename T&gt;
+<span class="line_number">246</span>  struct DelayEmbedOperation
+<span class="line_number">247</span>  {
+<span class="line_number">248</span>    using input_type = TimeSeries&lt;T&gt;;
+<span class="line_number">249</span>    using output_type = TimeSeries&lt;T&gt;;
+<span class="line_number">250</span>
+<span class="line_number">251</span>    size_t dimension = 1;
+<span class="line_number">252</span>    float64_t delay = 1;
+<span class="line_number">253</span>    TimeUnit delayUnit = TimeUnit::Unitless;
+<span class="line_number">254</span>    bool forward = false;
+<span class="line_number">255</span>
+<span class="line_number">256</span>    [[nodiscard]] std::vector&lt;size_t&gt; extra_dims() const { return {}; }
+<span class="line_number">257</span>
+<span class="line_number">258</span>    /// The delay in the unit of @p series, throwing TypeError if a duration
+<span class="line_number">259</span>    /// is given for a series without a unit or a number for one with a unit.
+<span class="line_number">260</span>    [[nodiscard]] float64_t delay_in(const TimeSeries&lt;T&gt;&amp; series) const
+<span class="line_number">261</span>    {
+</code></pre>
+            <div class="issue">
+                <div>
+                    <span class="what">Possible data race during read of size 1 at 0x38FA9418 by thread #13</span>
+                    <div class="navigation">
+                        <button class="next_error">Next</button>
+                        <button class="prev_error">Previous</button>
+                    </div>
+                </div>
+                <div>
+                    <table class="call_stack">
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/timeseries/time_delay_embedding.hpp:268<br>
+                                    <code class="cpp">sb::DelayEmbedOperation&lt;double&gt;::operator()(sb::TimeSeries&lt;double&gt; const&amp;, std::span&lt;sb::TimeSeries&lt;double&gt;, 18446744073709551615ul&gt;) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">265</span>
+<span class="line_number">266</span>    void operator()(const TimeSeries&lt;T&gt;&amp; series, std::span&lt;TimeSeries&lt;T&gt;&gt; out) const
+<span class="line_number">267</span>    {
+<span class="line_number">268</span><span class="error">      out[0] = delay_embed(series, dimension, delay_in(series), forward);
+</span><span class="line_number">269</span>    }
+<span class="line_number">270</span>  };
+<span class="line_number">271</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/timeseries/../ufunc.hpp:291<br>
+                                    <code class="cpp">sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}::operator()(unsigned long) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">288</span>        {
+<span class="line_number">289</span>          return;
+<span class="line_number">290</span>        }
+<span class="line_number">291</span><span class="error">        m_op(m_adapter-&gt;input(i), std::span&lt;output_type&gt;(m_adapter-&gt;block(i), blockSize));
+</span><span class="line_number">292</span>        add_progress(1);
+<span class="line_number">293</span>      });
+<span class="line_number">294</span>      auto finish = flow.emplace([this] { m_result = m_adapter-&gt;finish(); });
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/algorithm/for_each.hpp:134<br>
+                                    <code class="cpp">tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}::operator()()::{lambda(unsigned long, unsigned long)#1}::operator()(unsigned long, unsigned long)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">131</span>          part.loop(N, W, *next, [=] (size_t part_b, size_t part_e) mutable {
+<span class="line_number">132</span>            auto idx = static_cast&lt;B_t&gt;(part_b) * inc + beg;
+<span class="line_number">133</span>            for(size_t x=part_b; x&lt;part_e; x++, idx += inc) {
+<span class="line_number">134</span><span class="error">              c(idx);
+</span><span class="line_number">135</span>            }
+<span class="line_number">136</span>          });
+<span class="line_number">137</span>        });
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/../algorithm/partitioner.hpp:316<br>
+                                    <code class="cpp">void tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;::loop&lt;tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}::operator()()::{lambda(unsigned long, unsigned long)#1}, (void*)0&gt;(unsigned long, unsigned long, std::atomic&lt;unsigned long&gt;&amp;, tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}::operator()()::{lambda(unsigned long, unsigned long)#1}&amp;&amp;) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">313</span>          if(curr_b &gt;= N) {
+<span class="line_number">314</span>            return;
+<span class="line_number">315</span>          }
+<span class="line_number">316</span><span class="error">          func(curr_b, (std::min)(curr_b + chunk_size, N));
+</span><span class="line_number">317</span>        }
+<span class="line_number">318</span>        break;
+<span class="line_number">319</span>      }
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/algorithm/for_each.hpp:131<br>
+                                    <code class="cpp">tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}::operator()()</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">128</span>      auto next = std::make_shared&lt;std::atomic&lt;size_t&gt;&gt;(0);
+<span class="line_number">129</span>      for(size_t w=0; w&lt;W;) {
+<span class="line_number">130</span>        auto task = part([=] () mutable {
+<span class="line_number">131</span><span class="error">          part.loop(N, W, *next, [=] (size_t part_b, size_t part_e) mutable {
+</span><span class="line_number">132</span>            auto idx = static_cast&lt;B_t&gt;(part_b) * inc + beg;
+<span class="line_number">133</span>            for(size_t x=part_b; x&lt;part_e; x++, idx += inc) {
+<span class="line_number">134</span>              c(idx);
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/algorithm/for_each.hpp:138<br>
+                                    <code class="cpp">tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">135</span>            }
+<span class="line_number">136</span>          });
+<span class="line_number">137</span>        });
+<span class="line_number">138</span><span class="error">        (++w == W) ? task() : rt.silent_async(task);
+</span><span class="line_number">139</span>      }
+<span class="line_number">140</span>    }
+<span class="line_number">141</span>  };
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:61<br>
+                                    <code class="cpp">void std::__invoke_impl&lt;void, tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}&amp;, tf::Runtime&amp;&gt;(std::__invoke_other, tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}&amp;, tf::Runtime&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">58</span>  template&lt;typename _Res, typename _Fn, typename... _Args&gt;
+<span class="line_number">59</span>    constexpr _Res
+<span class="line_number">60</span>    __invoke_impl(__invoke_other, _Fn&amp;&amp; __f, _Args&amp;&amp;... __args)
+<span class="line_number">61</span><span class="error">    { return std::forward&lt;_Fn&gt;(__f)(std::forward&lt;_Args&gt;(__args)...); }
+</span><span class="line_number">62</span>
+<span class="line_number">63</span>  template&lt;typename _Res, typename _MemFun, typename _Tp, typename... _Args&gt;
+<span class="line_number">64</span>    constexpr _Res
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:111<br>
+                                    <code class="cpp">std::enable_if&lt;is_invocable_r_v&lt;void, tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}&amp;, tf::Runtime&amp;&gt;, void&gt;::type std::__invoke_r&lt;void, tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}&amp;, tf::Runtime&amp;&gt;(tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}&amp;, tf::Runtime&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">108</span>      using __type = typename __result::type;
+<span class="line_number">109</span>      using __tag = typename __result::__invoke_type;
+<span class="line_number">110</span>      if constexpr (is_void_v&lt;_Res&gt;)
+<span class="line_number">111</span><span class="error">	std::__invoke_impl&lt;__type&gt;(__tag{}, std::forward&lt;_Callable&gt;(__fn),
+</span><span class="line_number">112</span>					std::forward&lt;_Args&gt;(__args)...);
+<span class="line_number">113</span>      else
+<span class="line_number">114</span>	return std::__invoke_impl&lt;__type&gt;(__tag{},
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/std_function.h:290<br>
+                                    <code class="cpp">std::_Function_handler&lt;void (tf::Runtime&amp;), tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}&gt;::_M_invoke(std::_Any_data const&amp;, tf::Runtime&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">287</span>      static _Res
+<span class="line_number">288</span>      _M_invoke(const _Any_data&amp; __functor, _ArgTypes&amp;&amp;... __args)
+<span class="line_number">289</span>      {
+<span class="line_number">290</span><span class="error">	return std::__invoke_r&lt;_Res&gt;(*_Base::_M_get_pointer(__functor),
+</span><span class="line_number">291</span>				     std::forward&lt;_ArgTypes&gt;(__args)...);
+<span class="line_number">292</span>      }
+<span class="line_number">293</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/std_function.h:591<br>
+                                    <code class="cpp">std::function&lt;void (tf::Runtime&amp;)&gt;::operator()(tf::Runtime&amp;) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">588</span>      {
+<span class="line_number">589</span>	if (_M_empty())
+<span class="line_number">590</span>	  __throw_bad_function_call();
+<span class="line_number">591</span><span class="error">	return _M_invoker(_M_functor, std::forward&lt;_ArgTypes&gt;(__args)...);
+</span><span class="line_number">592</span>      }
+<span class="line_number">593</span>
+<span class="line_number">594</span>#if __cpp_rtti
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/runtime.hpp:826<br>
+                                    <code class="cpp">tf::Executor::_invoke_runtime_task_impl(tf::Worker&amp;, tf::Node*, std::function&lt;void (tf::Runtime&amp;)&gt;&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">823</span>    node-&gt;_join_counter.fetch_add(1, std::memory_order_release);
+<span class="line_number">824</span>
+<span class="line_number">825</span>    _observer_prologue(worker, node);
+<span class="line_number">826</span><span class="error">    TF_EXECUTOR_EXCEPTION_HANDLER(worker, node, {
+</span><span class="line_number">827</span>      work(rt);
+<span class="line_number">828</span>    });
+<span class="line_number">829</span>    _observer_epilogue(worker, node);
+</code></pre>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            <pre class="code">
+<code class="c++"><span class="line_number">262</span><span class="error">      check_query_unit(delayUnit, series.unit());</span>
+</code></pre>
+            <div class="issue">
+                <div>
+                    <span class="what">Possible data race during read of size 8 at 0x38FA9410 by thread #13</span>
+                    <div class="navigation">
+                        <button class="next_error">Next</button>
+                        <button class="prev_error">Previous</button>
+                    </div>
+                </div>
+                <div>
+                    <table class="call_stack">
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/timeseries/time_delay_embedding.hpp:268<br>
+                                    <code class="cpp">sb::DelayEmbedOperation&lt;double&gt;::operator()(sb::TimeSeries&lt;double&gt; const&amp;, std::span&lt;sb::TimeSeries&lt;double&gt;, 18446744073709551615ul&gt;) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">265</span>
+<span class="line_number">266</span>    void operator()(const TimeSeries&lt;T&gt;&amp; series, std::span&lt;TimeSeries&lt;T&gt;&gt; out) const
+<span class="line_number">267</span>    {
+<span class="line_number">268</span><span class="error">      out[0] = delay_embed(series, dimension, delay_in(series), forward);
+</span><span class="line_number">269</span>    }
+<span class="line_number">270</span>  };
+<span class="line_number">271</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/timeseries/../ufunc.hpp:291<br>
+                                    <code class="cpp">sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}::operator()(unsigned long) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">288</span>        {
+<span class="line_number">289</span>          return;
+<span class="line_number">290</span>        }
+<span class="line_number">291</span><span class="error">        m_op(m_adapter-&gt;input(i), std::span&lt;output_type&gt;(m_adapter-&gt;block(i), blockSize));
+</span><span class="line_number">292</span>        add_progress(1);
+<span class="line_number">293</span>      });
+<span class="line_number">294</span>      auto finish = flow.emplace([this] { m_result = m_adapter-&gt;finish(); });
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/algorithm/for_each.hpp:134<br>
+                                    <code class="cpp">tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}::operator()()::{lambda(unsigned long, unsigned long)#1}::operator()(unsigned long, unsigned long)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">131</span>          part.loop(N, W, *next, [=] (size_t part_b, size_t part_e) mutable {
+<span class="line_number">132</span>            auto idx = static_cast&lt;B_t&gt;(part_b) * inc + beg;
+<span class="line_number">133</span>            for(size_t x=part_b; x&lt;part_e; x++, idx += inc) {
+<span class="line_number">134</span><span class="error">              c(idx);
+</span><span class="line_number">135</span>            }
+<span class="line_number">136</span>          });
+<span class="line_number">137</span>        });
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/../algorithm/partitioner.hpp:316<br>
+                                    <code class="cpp">void tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;::loop&lt;tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}::operator()()::{lambda(unsigned long, unsigned long)#1}, (void*)0&gt;(unsigned long, unsigned long, std::atomic&lt;unsigned long&gt;&amp;, tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}::operator()()::{lambda(unsigned long, unsigned long)#1}&amp;&amp;) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">313</span>          if(curr_b &gt;= N) {
+<span class="line_number">314</span>            return;
+<span class="line_number">315</span>          }
+<span class="line_number">316</span><span class="error">          func(curr_b, (std::min)(curr_b + chunk_size, N));
+</span><span class="line_number">317</span>        }
+<span class="line_number">318</span>        break;
+<span class="line_number">319</span>      }
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/algorithm/for_each.hpp:131<br>
+                                    <code class="cpp">tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}::operator()()</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">128</span>      auto next = std::make_shared&lt;std::atomic&lt;size_t&gt;&gt;(0);
+<span class="line_number">129</span>      for(size_t w=0; w&lt;W;) {
+<span class="line_number">130</span>        auto task = part([=] () mutable {
+<span class="line_number">131</span><span class="error">          part.loop(N, W, *next, [=] (size_t part_b, size_t part_e) mutable {
+</span><span class="line_number">132</span>            auto idx = static_cast&lt;B_t&gt;(part_b) * inc + beg;
+<span class="line_number">133</span>            for(size_t x=part_b; x&lt;part_e; x++, idx += inc) {
+<span class="line_number">134</span>              c(idx);
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/algorithm/for_each.hpp:138<br>
+                                    <code class="cpp">tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">135</span>            }
+<span class="line_number">136</span>          });
+<span class="line_number">137</span>        });
+<span class="line_number">138</span><span class="error">        (++w == W) ? task() : rt.silent_async(task);
+</span><span class="line_number">139</span>      }
+<span class="line_number">140</span>    }
+<span class="line_number">141</span>  };
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:61<br>
+                                    <code class="cpp">void std::__invoke_impl&lt;void, tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}&amp;, tf::Runtime&amp;&gt;(std::__invoke_other, tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}&amp;, tf::Runtime&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">58</span>  template&lt;typename _Res, typename _Fn, typename... _Args&gt;
+<span class="line_number">59</span>    constexpr _Res
+<span class="line_number">60</span>    __invoke_impl(__invoke_other, _Fn&amp;&amp; __f, _Args&amp;&amp;... __args)
+<span class="line_number">61</span><span class="error">    { return std::forward&lt;_Fn&gt;(__f)(std::forward&lt;_Args&gt;(__args)...); }
+</span><span class="line_number">62</span>
+<span class="line_number">63</span>  template&lt;typename _Res, typename _MemFun, typename _Tp, typename... _Args&gt;
+<span class="line_number">64</span>    constexpr _Res
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:111<br>
+                                    <code class="cpp">std::enable_if&lt;is_invocable_r_v&lt;void, tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}&amp;, tf::Runtime&amp;&gt;, void&gt;::type std::__invoke_r&lt;void, tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}&amp;, tf::Runtime&amp;&gt;(tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}&amp;, tf::Runtime&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">108</span>      using __type = typename __result::type;
+<span class="line_number">109</span>      using __tag = typename __result::__invoke_type;
+<span class="line_number">110</span>      if constexpr (is_void_v&lt;_Res&gt;)
+<span class="line_number">111</span><span class="error">	std::__invoke_impl&lt;__type&gt;(__tag{}, std::forward&lt;_Callable&gt;(__fn),
+</span><span class="line_number">112</span>					std::forward&lt;_Args&gt;(__args)...);
+<span class="line_number">113</span>      else
+<span class="line_number">114</span>	return std::__invoke_impl&lt;__type&gt;(__tag{},
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/std_function.h:290<br>
+                                    <code class="cpp">std::_Function_handler&lt;void (tf::Runtime&amp;), tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}&gt;::_M_invoke(std::_Any_data const&amp;, tf::Runtime&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">287</span>      static _Res
+<span class="line_number">288</span>      _M_invoke(const _Any_data&amp; __functor, _ArgTypes&amp;&amp;... __args)
+<span class="line_number">289</span>      {
+<span class="line_number">290</span><span class="error">	return std::__invoke_r&lt;_Res&gt;(*_Base::_M_get_pointer(__functor),
+</span><span class="line_number">291</span>				     std::forward&lt;_ArgTypes&gt;(__args)...);
+<span class="line_number">292</span>      }
+<span class="line_number">293</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/std_function.h:591<br>
+                                    <code class="cpp">std::function&lt;void (tf::Runtime&amp;)&gt;::operator()(tf::Runtime&amp;) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">588</span>      {
+<span class="line_number">589</span>	if (_M_empty())
+<span class="line_number">590</span>	  __throw_bad_function_call();
+<span class="line_number">591</span><span class="error">	return _M_invoker(_M_functor, std::forward&lt;_ArgTypes&gt;(__args)...);
+</span><span class="line_number">592</span>      }
+<span class="line_number">593</span>
+<span class="line_number">594</span>#if __cpp_rtti
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/runtime.hpp:826<br>
+                                    <code class="cpp">tf::Executor::_invoke_runtime_task_impl(tf::Worker&amp;, tf::Node*, std::function&lt;void (tf::Runtime&amp;)&gt;&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">823</span>    node-&gt;_join_counter.fetch_add(1, std::memory_order_release);
+<span class="line_number">824</span>
+<span class="line_number">825</span>    _observer_prologue(worker, node);
+<span class="line_number">826</span><span class="error">    TF_EXECUTOR_EXCEPTION_HANDLER(worker, node, {
+</span><span class="line_number">827</span>      work(rt);
+<span class="line_number">828</span>    });
+<span class="line_number">829</span>    _observer_epilogue(worker, node);
+</code></pre>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            <pre class="code">
+<code class="c++"><span class="line_number">263</span><span class="error">      return convert_time(delay, delayUnit, series.unit());</span>
+<span class="line_number">264</span>    }
+<span class="line_number">265</span>
+<span class="line_number">266</span>    void operator()(const TimeSeries&lt;T&gt;&amp; series, std::span&lt;TimeSeries&lt;T&gt;&gt; out) const
+<span class="line_number">267</span>    {
+</code></pre>
+            <div class="issue">
+                <div>
+                    <span class="what">Possible data race during read of size 1 at 0x38FA9419 by thread #13</span>
+                    <div class="navigation">
+                        <button class="next_error">Next</button>
+                        <button class="prev_error">Previous</button>
+                    </div>
+                </div>
+                <div>
+                    <table class="call_stack">
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/include/sbear/timeseries/../ufunc.hpp:291<br>
+                                    <code class="cpp">sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}::operator()(unsigned long) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">288</span>        {
+<span class="line_number">289</span>          return;
+<span class="line_number">290</span>        }
+<span class="line_number">291</span><span class="error">        m_op(m_adapter-&gt;input(i), std::span&lt;output_type&gt;(m_adapter-&gt;block(i), blockSize));
+</span><span class="line_number">292</span>        add_progress(1);
+<span class="line_number">293</span>      });
+<span class="line_number">294</span>      auto finish = flow.emplace([this] { m_result = m_adapter-&gt;finish(); });
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/algorithm/for_each.hpp:134<br>
+                                    <code class="cpp">tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}::operator()()::{lambda(unsigned long, unsigned long)#1}::operator()(unsigned long, unsigned long)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">131</span>          part.loop(N, W, *next, [=] (size_t part_b, size_t part_e) mutable {
+<span class="line_number">132</span>            auto idx = static_cast&lt;B_t&gt;(part_b) * inc + beg;
+<span class="line_number">133</span>            for(size_t x=part_b; x&lt;part_e; x++, idx += inc) {
+<span class="line_number">134</span><span class="error">              c(idx);
+</span><span class="line_number">135</span>            }
+<span class="line_number">136</span>          });
+<span class="line_number">137</span>        });
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/../algorithm/partitioner.hpp:316<br>
+                                    <code class="cpp">void tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;::loop&lt;tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}::operator()()::{lambda(unsigned long, unsigned long)#1}, (void*)0&gt;(unsigned long, unsigned long, std::atomic&lt;unsigned long&gt;&amp;, tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}::operator()()::{lambda(unsigned long, unsigned long)#1}&amp;&amp;) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">313</span>          if(curr_b &gt;= N) {
+<span class="line_number">314</span>            return;
+<span class="line_number">315</span>          }
+<span class="line_number">316</span><span class="error">          func(curr_b, (std::min)(curr_b + chunk_size, N));
+</span><span class="line_number">317</span>        }
+<span class="line_number">318</span>        break;
+<span class="line_number">319</span>      }
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/algorithm/for_each.hpp:131<br>
+                                    <code class="cpp">tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)::{lambda()#2}::operator()()</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">128</span>      auto next = std::make_shared&lt;std::atomic&lt;size_t&gt;&gt;(0);
+<span class="line_number">129</span>      for(size_t w=0; w&lt;W;) {
+<span class="line_number">130</span>        auto task = part([=] () mutable {
+<span class="line_number">131</span><span class="error">          part.loop(N, W, *next, [=] (size_t part_b, size_t part_e) mutable {
+</span><span class="line_number">132</span>            auto idx = static_cast&lt;B_t&gt;(part_b) * inc + beg;
+<span class="line_number">133</span>            for(size_t x=part_b; x&lt;part_e; x++, idx += inc) {
+<span class="line_number">134</span>              c(idx);
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/algorithm/for_each.hpp:138<br>
+                                    <code class="cpp">tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}::operator()(tf::Runtime&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">135</span>            }
+<span class="line_number">136</span>          });
+<span class="line_number">137</span>        });
+<span class="line_number">138</span><span class="error">        (++w == W) ? task() : rt.silent_async(task);
+</span><span class="line_number">139</span>      }
+<span class="line_number">140</span>    }
+<span class="line_number">141</span>  };
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:61<br>
+                                    <code class="cpp">void std::__invoke_impl&lt;void, tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}&amp;, tf::Runtime&amp;&gt;(std::__invoke_other, tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}&amp;, tf::Runtime&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">58</span>  template&lt;typename _Res, typename _Fn, typename... _Args&gt;
+<span class="line_number">59</span>    constexpr _Res
+<span class="line_number">60</span>    __invoke_impl(__invoke_other, _Fn&amp;&amp; __f, _Args&amp;&amp;... __args)
+<span class="line_number">61</span><span class="error">    { return std::forward&lt;_Fn&gt;(__f)(std::forward&lt;_Args&gt;(__args)...); }
+</span><span class="line_number">62</span>
+<span class="line_number">63</span>  template&lt;typename _Res, typename _MemFun, typename _Tp, typename... _Args&gt;
+<span class="line_number">64</span>    constexpr _Res
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/invoke.h:111<br>
+                                    <code class="cpp">std::enable_if&lt;is_invocable_r_v&lt;void, tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}&amp;, tf::Runtime&amp;&gt;, void&gt;::type std::__invoke_r&lt;void, tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}&amp;, tf::Runtime&amp;&gt;(tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}&amp;, tf::Runtime&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">108</span>      using __type = typename __result::type;
+<span class="line_number">109</span>      using __tag = typename __result::__invoke_type;
+<span class="line_number">110</span>      if constexpr (is_void_v&lt;_Res&gt;)
+<span class="line_number">111</span><span class="error">	std::__invoke_impl&lt;__type&gt;(__tag{}, std::forward&lt;_Callable&gt;(__fn),
+</span><span class="line_number">112</span>					std::forward&lt;_Args&gt;(__args)...);
+<span class="line_number">113</span>      else
+<span class="line_number">114</span>	return std::__invoke_impl&lt;__type&gt;(__tag{},
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/std_function.h:290<br>
+                                    <code class="cpp">std::_Function_handler&lt;void (tf::Runtime&amp;), tf::make_for_each_index_task&lt;unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt; &gt;(unsigned long, unsigned long, unsigned long, sb::UfuncTask&lt;sb::DelayEmbedOperation&lt;double&gt;, sb::Tensor&lt;sb::TimeSeries&lt;double&gt;, 0&gt; &gt;::run_async(sb::Executor&amp;)::{lambda(unsigned long)#1}, tf::GuidedPartitioner&lt;tf::DefaultClosureWrapper&gt;)::{lambda(tf::Runtime&amp;)#1}&gt;::_M_invoke(std::_Any_data const&amp;, tf::Runtime&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">287</span>      static _Res
+<span class="line_number">288</span>      _M_invoke(const _Any_data&amp; __functor, _ArgTypes&amp;&amp;... __args)
+<span class="line_number">289</span>      {
+<span class="line_number">290</span><span class="error">	return std::__invoke_r&lt;_Res&gt;(*_Base::_M_get_pointer(__functor),
+</span><span class="line_number">291</span>				     std::forward&lt;_ArgTypes&gt;(__args)...);
+<span class="line_number">292</span>      }
+<span class="line_number">293</span>
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /usr/include/c++/13/bits/std_function.h:591<br>
+                                    <code class="cpp">std::function&lt;void (tf::Runtime&amp;)&gt;::operator()(tf::Runtime&amp;) const</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">588</span>      {
+<span class="line_number">589</span>	if (_M_empty())
+<span class="line_number">590</span>	  __throw_bad_function_call();
+<span class="line_number">591</span><span class="error">	return _M_invoker(_M_functor, std::forward&lt;_ArgTypes&gt;(__args)...);
+</span><span class="line_number">592</span>      }
+<span class="line_number">593</span>
+<span class="line_number">594</span>#if __cpp_rtti
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/runtime.hpp:826<br>
+                                    <code class="cpp">tf::Executor::_invoke_runtime_task_impl(tf::Worker&amp;, tf::Node*, std::function&lt;void (tf::Runtime&amp;)&gt;&amp;)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">823</span>    node-&gt;_join_counter.fetch_add(1, std::memory_order_release);
+<span class="line_number">824</span>
+<span class="line_number">825</span>    _observer_prologue(worker, node);
+<span class="line_number">826</span><span class="error">    TF_EXECUTOR_EXCEPTION_HANDLER(worker, node, {
+</span><span class="line_number">827</span>      work(rt);
+<span class="line_number">828</span>    });
+<span class="line_number">829</span>    _observer_epilogue(worker, node);
+</code></pre>
+                            </td>
+                        </tr>
+                        <tr class="stack_frame">
+                            <td class="ui-corner-all ui-widget">
+                                <div class="ui-widget-header">
+                                    /home/runner/work/stablebear/stablebear/3rd/taskflow/taskflow/core/runtime.hpp:807<br>
+                                    <code class="cpp">tf::Executor::_invoke_runtime_task(tf::Worker&amp;, tf::Node*)</code>
+                                </div>
+                                <pre><code class="c++"><span class="line_number">804</span>
+<span class="line_number">805</span>// Procedure: _invoke_runtime_task
+<span class="line_number">806</span>inline bool Executor::_invoke_runtime_task(Worker&amp; worker, Node* node) {
+<span class="line_number">807</span><span class="error">  return _invoke_runtime_task_impl(
+</span><span class="line_number">808</span>    worker, node, std::get_if&lt;Node::Runtime&gt;(&amp;node-&gt;_handle)-&gt;work
+<span class="line_number">809</span>  );
+<span class="line_number">810</span>}
+</code></pre>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            <pre class="code">
+<code class="c++"><span class="line_number">268</span><span class="error">      out[0] = delay_embed(series, dimension, delay_in(series), forward);</span>
+<span class="line_number">269</span>    }
+<span class="line_number">270</span>  };
+<span class="line_number">271</span>
+<span class="line_number">272</span>  template &lt;typename T&gt;
+<span class="line_number">273</span>  using DelayEmbedTask = UfuncTask&lt;DelayEmbedOperation&lt;T&gt;, Tensor&lt;TimeSeries&lt;T&gt;&gt;&gt;;
+<span class="line_number">274</span>
+<span class="line_number">275</span>  /// A task embedding every series of @p seriesTensor into a tensor of the
+<span class="line_number">276</span>  /// same shape, as delay_embed() embeds each, with the delay as
+<span class="line_number">277</span>  /// DelayEmbedOperation takes it. Every series is checked before the task
+<span class="line_number">278</span>  /// is made, so that a series that cannot be embedded throws, for the first
+<span class="line_number">279</span>  /// such series, an error of the same type whose message names its
+<span class="line_number">280</span>  /// position.
+<span class="line_number">281</span>  template &lt;typename T&gt;
+<span class="line_number">282</span>  std::unique_ptr&lt;DelayEmbedTask&lt;T&gt;&gt; make_delay_embed_task(const Tensor&lt;TimeSeries&lt;T&gt;&gt;&amp; seriesTensor,
+<span class="line_number">283</span>                                                           size_t dimension, float64_t delay, TimeUnit delayUnit,
+<span class="line_number">284</span>                                                           bool forward = false)
+<span class="line_number">285</span>  {
+<span class="line_number">286</span>    detail::check_embedding_arguments(dimension, delay);
+<span class="line_number">287</span>    const DelayEmbedOperation&lt;T&gt; op{.dimension = dimension, .delay = delay, .delayUnit = delayUnit,
+<span class="line_number">288</span>                                    .forward = forward};
+<span class="line_number">289</span>    walk(seriesTensor, [&amp;](const std::vector&lt;size_t&gt;&amp; index) {
+<span class="line_number">290</span>      const auto&amp; series = seriesTensor(index);
+<span class="line_number">291</span>      try
+<span class="line_number">292</span>      {
+<span class="line_number">293</span>        detail::check_embedding_fits(series, dimension, op.delay_in(series), forward);
+<span class="line_number">294</span>      }
+<span class="line_number">295</span>      catch (const TypeError&amp; e)
+<span class="line_number">296</span>      {
+<span class="line_number">297</span>        throw TypeError(detail::position_text(index) + &#34;: &#34; + e.what());
+<span class="line_number">298</span>      }
+<span class="line_number">299</span>      catch (const std::invalid_argument&amp; e)
+<span class="line_number">300</span>      {
+<span class="line_number">301</span>        throw std::invalid_argument(detail::position_text(index) + &#34;: &#34; + e.what());
+<span class="line_number">302</span>      }
+<span class="line_number">303</span>    });
+<span class="line_number">304</span>    return make_ufunc_task(seriesTensor, op, &#34;Embedding time series&#34;, &#34;series&#34;);
+<span class="line_number">305</span>  }
+<span class="line_number">306</span>}
+<span class="line_number">307</span>
+<span class="line_number">308</span>#endif // STABLEBEAR_TIMESERIES_TIME_DELAY_EMBEDDING_H
+</code>
+            </pre>
+        </div>
+    </div>
+</body>
+
+</html>
