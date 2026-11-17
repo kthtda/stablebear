@@ -381,7 +381,11 @@ def differentiable(
 
             def backward(grad_out, *values):
                 grads = vjp(grad_out, **with_values(values))
-                return tuple(g for name in names for g in tracked[name].split(grads[wrt.index(name)]))
+                # A gradient given as a function is computed only here, for
+                # an argument that carries gradients.
+                wanted = [grads[wrt.index(name)] for name in names]
+                wanted = [g() if callable(g) else g for g in wanted]
+                return tuple(g for name, grad in zip(names, wanted) for g in tracked[name].split(grad))
 
             content = _framework(tensors[0]).apply(primal, backward, *tensors)
             if returns is None:

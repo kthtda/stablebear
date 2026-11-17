@@ -114,24 +114,30 @@ namespace sb
     const auto& pts = f.points();
     std::vector<typename F::point_type> grad(pts.size(), typename F::point_type(Tt{ 0 }, Tv{ 0 }));
 
-    Tv norm = lp_norm(f, p);
+    // For p = 1 the formulas need no powers: d/dv_k = sign(v_k) (t_{k+1} - t_k)
+    // and d/dt_k = |v_{k-1}| - |v_k|.
+    const bool isL1 = p == Tv{ 1 };
+    Tv norm = isL1 ? l1_norm(f) : lp_norm(f, p);
     if (norm == 0)
     {
       return grad;
     }
-    const Tv timeScale = std::pow(norm, Tv{ 1 } - p) / p;
+    const Tv timeScale = isL1 ? Tv{ 1 } : std::pow(norm, Tv{ 1 } - p) / p;
+    auto absPow = [isL1, p](Tv v) {
+      return isL1 ? std::abs(v) : std::pow(std::abs(v), p);
+    };
     for (std::size_t k = 0; k < pts.size(); ++k)
     {
       if (k > 0)
       {
-        grad[k].t = static_cast<Tt>(
-            timeScale * (std::pow(std::abs(pts[k - 1].v), p) - std::pow(std::abs(pts[k].v), p)));
+        grad[k].t = static_cast<Tt>(timeScale * (absPow(pts[k - 1].v) - absPow(pts[k].v)));
       }
       if (k + 1 < pts.size() && pts[k].v != 0)
       {
         Tv dt = static_cast<Tv>(pts[k + 1].t - pts[k].t);
         Tv sign = pts[k].v > 0 ? Tv{ 1 } : Tv{ -1 };
-        grad[k].v = static_cast<Tv>(dt * std::pow(std::abs(pts[k].v) / norm, p - 1) * sign);
+        Tv scale = isL1 ? Tv{ 1 } : std::pow(std::abs(pts[k].v) / norm, p - 1);
+        grad[k].v = static_cast<Tv>(dt * scale * sign);
       }
     }
     return grad;

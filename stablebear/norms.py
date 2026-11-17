@@ -25,13 +25,16 @@ def _run(op, X, *args, verbose=False):
 
 def _lp_norm_vjp(grad_out, fs, p, verbose=False):
     backend, X = _resolve_pcf_inputs(_NORMS_BACKEND_MAP, fs)
-    dnorm_dp = _run(backend.lpnorm_lp, X, float(p), True, verbose=verbose)
     task, grads = backend.lpnorm_lp_grad(X._data, float(p))
     _run_task(lambda: task, verbose=verbose)
     content, enumeration = cpp.to_serial_content(grads)  # (d/dt, d/dv) per breakpoint
     sizes = np.diff(enumeration.reshape(-1, 2), axis=1).ravel()
     dnorm_dfs = np.repeat(np.reshape(grad_out, -1), sizes)[:, None] * content
-    return (dnorm_dfs, np.sum(grad_out * np.asarray(dnorm_dp)))
+
+    def dnorm_dp():
+        return np.sum(grad_out * np.asarray(_run(backend.lpnorm_lp, X, float(p), True, verbose=verbose)))
+
+    return (dnorm_dfs, dnorm_dp)
 
 
 @overload
