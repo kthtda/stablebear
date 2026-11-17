@@ -253,3 +253,65 @@ def test_max_of_pcf_tensor_raises():
     F = sb.PcfTensor([sb.Pcf([[0.0, 1.0], [1.0, 0.0]])])
     with pytest.raises(TypeError, match="DistanceMatrix"):
         sb.max(F)  # pyright: ignore[reportCallIssue, reportArgumentType]
+
+
+def _clouds():
+    return [_points(), 2.0 * _points()]
+
+
+def _largest_from_each_point():
+    # Of _clouds: the largest distance from each point of each cloud.
+    return np.array([[5.0, 5.0, np.sqrt(13.0)],
+                     [10.0, 10.0, 2.0 * np.sqrt(13.0)]])
+
+
+@pytest.mark.parametrize("dim", [-1, -2, 1, 2])
+def test_max_of_distance_matrix_tensor_gives_the_largest_distance_from_each_point(dim):
+    D = sb.pdist(sb.PointCloudTensor(_clouds()))
+
+    out = sb.max(D, dim=dim)
+
+    assert isinstance(out, sb.FloatTensor)
+    assert out.shape == (2, 3)
+    np.testing.assert_allclose(np.asarray(out), _largest_from_each_point())
+
+
+def test_max_of_float32_distance_matrix_tensor_is_float32():
+    D = sb.DistanceMatrixTensor(np.zeros((2, 3, 3), dtype=np.float32))
+
+    assert sb.max(D, dim=-1).dtype == sb.float32
+
+
+def test_max_of_tracked_distance_matrix_tensor_matches_untracked(fw):
+    D = sb.pdist(sb.PointCloudTensor([fw.tensor(cloud) for cloud in _clouds()]))
+
+    out = sb.max(D, dim=-1)
+
+    assert isinstance(out, fw.tensor_type)
+    assert tuple(out.shape) == (2, 3)
+    np.testing.assert_allclose(fw.to_numpy(out), _largest_from_each_point())
+
+
+def test_gradient_of_largest_distances_of_batch_of_points(fw):
+    def loss(P):
+        D = sb.pdist(sb.PointCloudTensor([P, 2.0 * P]))
+        return fw.sum(sb.max(sb.max(D, dim=-1), dim=-1))
+
+    value, grad = fw.value_and_grad(loss, _points())
+
+    # The largest distances, 5 and 10, are those between the first two
+    # points, which move them by 1 + 2 times the unit vector between them.
+    assert value == 15.0
+    np.testing.assert_allclose(grad, [[-1.8, -2.4], [1.8, 2.4], [0.0, 0.0]])
+
+
+def test_max_of_distance_matrix_tensor_along_its_shape_raises():
+    D = sb.pdist(sb.PointCloudTensor(_clouds()))
+    with pytest.raises(NotImplementedError, match="dim=-1"):
+        sb.max(D, dim=0)
+
+
+def test_max_of_distance_matrix_tensor_of_matrices_of_different_sizes_raises():
+    D = sb.pdist(sb.PointCloudTensor([_points(), _points()[:2]]))
+    with pytest.raises(ValueError, match="one size"):
+        sb.max(D, dim=-1)

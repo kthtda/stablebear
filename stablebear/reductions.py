@@ -16,7 +16,7 @@ from .base_tensor import (
 )
 from .typing import pcf32, pcf64
 from .base_tensor import IntTensor
-from .distance_matrix import DistanceMatrix
+from .distance_matrix import DistanceMatrix, DistanceMatrixTensor
 
 if TYPE_CHECKING:
     import torch
@@ -237,8 +237,37 @@ def max_time(fs: PcfContainerLike, dim: int = 0) -> FloatTensor:
     return FloatTensor(backend.max_time(tensor._data, _resolve_dim(dim, tensor.ndim)))
 
 
+def _full_matrices(matrices: Any) -> Any:
+    """The matrices of a DistanceMatrixTensor of shape S, which all have n
+    points, in full: a NumPy array of shape (*S, n, n), or a framework array
+    if the tensor carries gradients."""
+    if is_tracked(matrices):
+        entries, enumeration, sizes = matrices._tvalues, matrices._enumeration, matrices._sizes
+    else:
+        content, enumeration, sizes = matrices._serial()
+        entries = content[:, 0]
+    if sizes.size == 0 or (sizes != sizes.flat[0]).any():
+        raise ValueError(
+            "max of a DistanceMatrixTensor needs matrices of one size, as its result holds a number for each "
+            f"point of each matrix (got sizes from {int(sizes.min()) if sizes.size else 0} to "
+            f"{int(sizes.max()) if sizes.size else 0}).")
+    n = int(sizes.flat[0])
+    # Entry (i, j) of each matrix among its entries below the diagonal, by
+    # rows, after a 0 for the diagonal.
+    i, j = np.indices((n, n))
+    high, low = np.maximum(i, j), np.minimum(i, j)
+    starts = enumeration.reshape(-1, 2)[:, 0]
+    index = np.where(i == j, 0, 1 + starts[:, None, None] + high * (high - 1) // 2 + low).ravel()
+    shape = (*enumeration.shape[:-1], n, n)
+    adapter = _autodiff._framework(entries)
+    if adapter is None:
+        return np.concatenate([np.zeros(1, dtype=entries.dtype), entries])[index].reshape(shape)
+    padded = adapter.concat([adapter.as_tensor(np.zeros(1), like=entries), entries])
+    return adapter.reshape(adapter.gather(padded, index), shape)
+
+
 @overload
-def max(x: DistanceMatrix | FloatTensor, dim: int = 0) -> FloatTensor: ...
+def max(x: DistanceMatrix | DistanceMatrixTensor | FloatTensor, dim: int = 0) -> FloatTensor: ...
 @overload
 def max(x: IntTensor, dim: int = 0) -> IntTensor: ...
 @overload
@@ -258,9 +287,12 @@ def max(x: Any, dim: int = 0) -> Any:
 
     Parameters
     ----------
-    x : DistanceMatrix, FloatTensor, IntTensor, or torch.Tensor
+    x : DistanceMatrix, DistanceMatrixTensor, FloatTensor, IntTensor, or torch.Tensor
         A distance matrix, which reduces as its :math:`n \times n` matrix, or
-        numbers.
+        numbers. A ``DistanceMatrixTensor`` of shape ``shape``, whose
+        matrices must all have :math:`n` points, reduces as numbers of shape
+        ``(*shape, n, n)`` along one of the last two dimensions, such as
+        ``dim=-1``, to the largest distance from each point of each matrix.
     dim : int, optional
         Dimension along which to reduce, by default 0. Negative values count
         from the last axis. A distance matrix is symmetric, so both of its
@@ -271,17 +303,31 @@ def max(x: Any, dim: int = 0) -> Any:
     FloatTensor, IntTensor, or torch.Tensor
         The largest numbers, with the reduced dimension removed. Reducing a
         one-dimensional tensor returns shape ``(1,)``. A PyTorch tensor
-        gives a PyTorch tensor, which carries its gradients.
+        gives a PyTorch tensor, which carries its gradients, and so does a
+        ``DistanceMatrixTensor`` that carries gradients.
 
     Raises
     ------
     IndexError
         If ``dim`` is out of range for the number of dimensions of ``x``.
     ValueError
-        If the reduction dimension is empty (size 0).
+        If the reduction dimension is empty (size 0), or the matrices of a
+        ``DistanceMatrixTensor`` have different sizes.
+    NotImplementedError
+        If ``dim`` is a dimension of the shape of a ``DistanceMatrixTensor``,
+        and not one of its matrices.
     TypeError
         If ``x`` is of another type.
     """
+    if isinstance(x, DistanceMatrixTensor):
+        values = _full_matrices(x)
+        if _resolve_dim(dim, len(values.shape)) < len(values.shape) - 2:
+            raise NotImplementedError(
+                f"max along dim {dim} of a DistanceMatrixTensor of shape {tuple(x.shape)} would compare its "
+                "matrices with each other, which is not supported. Pass dim=-1 for the largest distance from "
+                "each point of each matrix.")
+        return max(values if _autodiff._framework(values) is not None else FloatTensor(values), dim)
+
     adapter = _autodiff._framework(x)
     if adapter is not None:
         values = x
@@ -293,7 +339,8 @@ def max(x: Any, dim: int = 0) -> Any:
         values = np.asarray(x)
     else:
         raise TypeError(
-            f"max takes a DistanceMatrix, a FloatTensor, an IntTensor, or a PyTorch tensor (got {type(x).__name__}).")
+            "max takes a DistanceMatrix, a DistanceMatrixTensor, a FloatTensor, an IntTensor, or a PyTorch tensor "
+            f"(got {type(x).__name__}).")
     axis = _resolve_dim(dim, len(values.shape))
     if values.shape[axis] == 0:
         raise ValueError("max of an empty dimension has no value.")

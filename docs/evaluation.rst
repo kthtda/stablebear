@@ -254,6 +254,13 @@ reducing once more gives the largest distance of the matrix::
    farthest = sb.max(D)          # shape (n,): the largest distance from each
    diameter = sb.max(farthest)   # shape (1,): the largest distance of all
 
+A :py:class:`~stablebear.distance_matrix.DistanceMatrixTensor` of shape
+``shape``, whose matrices all have ``n`` points, reduces as numbers of shape
+``(*shape, n, n)`` along one of its last two dimensions::
+
+   farthest = sb.max(matrices, dim=-1)    # shape (*shape, n)
+   diameters = sb.max(farthest, dim=-1)   # shape shape: one for each matrix
+
 
 Combining it all
 ================
