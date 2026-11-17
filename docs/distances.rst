@@ -20,6 +20,17 @@ The :math:`L_p` norm of a single PCF :math:`f` is
 
    \| f \|_p = \left( \int_0^\infty |f(t)|^p \, dt \right)^{1/p}.
 
+As :math:`p` grows, the largest values of :math:`|f(t) - g(t)|` dominate the
+integral. In the limit :math:`p = \infty`, the distance is the largest
+difference and the norm is the largest absolute value:
+
+.. math::
+
+   d_\infty(f, g) = \sup_{t \geq 0} |f(t) - g(t)|, \qquad
+   \| f \|_\infty = \sup_{t \geq 0} |f(t)|.
+
+Pass ``p=math.inf`` to compute these.
+
 For piecewise constant functions, these integrals reduce to finite sums over the breakpoint intervals, which stablebear evaluates exactly.
 
 
@@ -62,8 +73,11 @@ Basic usage
 
 The ``p`` parameter controls which :math:`L_p` distance is computed::
 
-   D1 = sb.pdist(X, p=1)   # L1 distance
-   D2 = sb.pdist(X, p=2)   # L2 distance
+   import math
+
+   D1 = sb.pdist(X, p=1)          # L1 distance
+   D2 = sb.pdist(X, p=2)          # L2 distance
+   Dinf = sb.pdist(X, p=math.inf) # largest difference
 
 Progress output
 ---------------
@@ -277,7 +291,7 @@ Tensors of symmetric matrices use the ``symmat32`` or ``symmat64`` dtypes::
 Norms
 =====
 
-:py:func:`~stablebear.norms.lp_norm` computes the :math:`L_p` norm of every PCF in a tensor, returning a NumPy array of the same shape.
+:py:func:`~stablebear.norms.lp_norm` computes the :math:`L_p` norm of every PCF in a tensor, returning a :py:class:`~stablebear.base_tensor.FloatTensor` of the same shape.
 
 ::
 
@@ -297,6 +311,12 @@ For higher-dimensional tensors, the output shape matches the input::
 
    norms = sb.lp_norm(A, p=1)
    # norms.shape is (3, 10)
+
+``p=math.inf`` gives the supremum norm, the largest absolute value of each PCF::
+
+   import math
+
+   sup_norms = sb.lp_norm(X, p=math.inf)
 
 
 Using distances in machine learning

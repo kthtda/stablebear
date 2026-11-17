@@ -37,8 +37,8 @@ To build a specific branch or tag from a Git checkout::
     git clone https://github.com/kthtda/stablebear.git
     cd stablebear
 
-    # optional: select a specific tagged version to build
-    git checkout tags/v0.4.1
+    # optional: build a released version, replacing X.Y.Z with its number
+    git checkout tags/vX.Y.Z
 
     pip install .
 

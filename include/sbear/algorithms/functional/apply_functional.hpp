@@ -5,11 +5,14 @@
 #include "../../executor.hpp"
 #include "../../tensor.hpp"
 #include "../../task.hpp"
+#include "../../functional/operations.cuh"
 
 #include <vector>
 #include <functional>
 #include <iterator>
 #include <limits>
+#include <cmath>
+#include <algorithm>
 
 #include <iostream>
 
@@ -84,18 +87,6 @@ namespace sb
     return std::sqrt(out);
   }
 
-  template <PcfLike F>
-  typename F::value_type lp_norm(const F& f, typename F::value_type p)
-  {
-    typename F::value_type out{ 0 };
-
-    iterate_segments(f.points().cbegin(), f.points().cend(), typename F::time_type{ 0 }, infinite_time<F>(), [&out, p](const typename F::segment_type& seg) {
-      out += (seg.right - seg.left) * std::pow(std::abs(seg.value), p);
-      });
-
-    return std::pow(out, typename F::value_type{1} / p);
-  }
-
   template <PiecewiseFunctionLike F>
   typename F::value_type linfinity_norm(const F& f)
   {
@@ -103,9 +94,35 @@ namespace sb
     value_type out{ 0 };
     for (auto const& pt : f.points())
     {
-      out = std::max(out, static_cast<value_type>(std::abs(pt.v)));
+      auto absValue = static_cast<value_type>(std::abs(pt.v));
+      // std::max never picks NaN, so NaN must be passed on explicitly
+      if (std::isnan(absValue))
+      {
+        return absValue;
+      }
+      out = std::max(out, absValue);
     }
     return out;
+  }
+
+  template <PcfLike F>
+  typename F::value_type lp_norm(const F& f, typename F::value_type p)
+  {
+    using value_type = typename F::value_type;
+
+    if (std::isinf(p))
+    {
+      return linfinity_norm(f);
+    }
+
+    // ||f||_p is the Lp distance from f to 0, accumulated without overflow
+    OperationLpDist<typename F::time_type, value_type> op(p);
+    auto acc = op.init();
+    iterate_segments(f.points().cbegin(), f.points().cend(), typename F::time_type{ 0 }, infinite_time<F>(), [&acc, &op](const typename F::segment_type& seg) {
+      op.add(acc, seg.right - seg.left, seg.value, value_type{ 0 });
+      });
+
+    return op.result(acc);
   }
 
 }

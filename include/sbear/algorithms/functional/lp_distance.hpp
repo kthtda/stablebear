@@ -12,12 +12,10 @@ namespace sb
   {
     if (p == Tv(1))
     {
-      OperationL1Dist<Tt, Tv> op;
-      return op(integrate(f, g, op));
+      return integrate(f, g, OperationL1Dist<Tt, Tv>{});
     }
 
-    OperationLpDist<Tt, Tv> op(p);
-    return op(integrate(f, g, op));
+    return integrate(f, g, OperationLpDist<Tt, Tv>(p));
   }
 
 }

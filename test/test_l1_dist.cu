@@ -34,8 +34,7 @@ namespace
     sb::Pcf<T, T> f(std::vector<sb::TimePoint<T, T>>({ {T(0), T(3)}, {T(1), T(0)} }));
     sb::Pcf<T, T> g(std::vector<sb::TimePoint<T, T>>({ {T(0), T(1)}, {T(2), T(0)} }));
 
-    auto op = sb::OperationL1Dist<T, T>{};
-    T result = op(sb::integrate(f, g, op));
+    T result = sb::integrate(f, g, sb::OperationL1Dist<T, T>{});
 
     EXPECT_NEAR(result, T(3), T(1e-6));
   }

@@ -8,9 +8,12 @@
 
 * **Delay embeddings of tensors of time series** — `delay_embed` takes a `TimeSeriesTensor`, such as the windows from `cut_windows`, and embeds each series on its own into a `TimeSeriesTensor` of the same shape, converting the delay into the unit of each series. Windows can thus be embedded without a Python loop, and `cut_windows`, `delay_embed`, and `to_point_clouds` chain. ([#273](https://github.com/kthtda/stablebear/issues/273))
 * **Piecewise linear functions** — `Plf` represents a continuous piecewise linear function, which continues its last segment after its last breakpoint. `Pcf.integrate` and `PcfTensor.integrate` return integrals of PCFs as PLFs, and `PlfTensor`, of dtype `plf32` or `plf64`, holds tensors of them. PLFs and PLF tensors can be evaluated, as PCFs can, and `plotting.plot` draws PLFs, alone or together with PCFs. ([#253](https://github.com/kthtda/stablebear/issues/253))
+* **Supremum norm and distance** — `p=math.inf` in `lp_norm` gives the largest absolute value of each PCF, and in `lp_distance`, `pdist`, and `cdist` the largest absolute difference between two PCFs.
 
 ### Bug fixes
 
+* **Norms and distances no longer overflow for `p > 1`** — `lp_norm`, `lp_distance`, `pdist`, and `cdist` gave infinity whenever `|f(t) - g(t)|^p` overflowed, even when the result was representable, such as the L5 distance 1e8 in `pcf32` or the L500 norm 5 in either precision. They now scale by the largest difference before taking powers, on the CPU and the GPU. ([#22](https://github.com/kthtda/stablebear/issues/22))
+* **Infinite and NaN `p` in norms and distances** — `p=math.inf` gave 1 for every norm and distance, including the distance from a PCF to itself. It now gives the supremum norm or distance. `p=nan` raises `ValueError` instead of giving NaN.
 * **Arrays of C `long` and `long long` take the dtype of their size** — `IntTensor`, `NestedTensor`, and `Pcf` looked NumPy arrays up by their scalar type, which misses aliases such as C `long` on Windows (`np.long`, 32 bits) and C `long long` on Linux (`np.longlong`, 64 bits). An `IntTensor` of such an array became `int64`, so evaluating an `int32` `Pcf` at a `FloatTensor` gave an `int64` tensor on Windows, and a `Pcf` of `np.longlong` raised. They now take the dtype of their kind and size.
 
 ## 0.6.0

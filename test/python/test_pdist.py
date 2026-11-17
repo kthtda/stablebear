@@ -1,3 +1,5 @@
+import math
+
 import numpy as np
 import pytest
 
@@ -21,6 +23,12 @@ def test_pdist_rejects_p_negative():
     X = sb.zeros((2,))
     with pytest.raises(ValueError, match="p must be >= 1"):
         sb.pdist(X, p=-1)
+
+
+def test_pdist_rejects_p_nan():
+    X = sb.zeros((2,))
+    with pytest.raises(ValueError, match="p must be >= 1"):
+        sb.pdist(X, p=math.nan)
 
 
 def test_pdist_requires_1d_tensor():
@@ -102,6 +110,33 @@ def test_pdist_l3_constant_pcfs():
     assert D[0, 1] == pytest.approx(3.0)
     assert D[0, 0] == 0.0
     assert D[1, 1] == 0.0
+
+
+def test_pdist_lp_does_not_overflow(device):
+    X = sb.zeros((2,), dtype=sb.pcf32)
+
+    # f(t) = 1e8 on [0, 1), g(t) = 0. (1e8)^5 = 1e40 overflows float32.
+    X[0] = sb.Pcf(np.array([[0.0, 1e8], [1.0, 0.0]], dtype=np.float32))
+    X[1] = sb.Pcf(np.array([[0.0, 0.0]], dtype=np.float32))
+
+    D = sb.pdist(X, p=5)
+
+    assert D[0, 1] == pytest.approx(1e8, rel=1e-5)
+
+
+def test_pdist_infinite_p_is_largest_difference(device):
+    X = sb.zeros((3,), dtype=sb.pcf64)
+
+    X[0] = sb.Pcf(np.array([[0.0, 3.0], [1.0, 7.0], [2.0, 3.0], [3.0, 0.0]]))
+    X[1] = sb.Pcf(np.array([[0.0, 2.0], [2.0, 0.0]]))
+    X[2] = sb.Pcf(np.array([[0.0, 0.0]]))
+
+    D = sb.pdist(X, p=math.inf)
+
+    # X[0] - X[1] is 1, 5, 3 on [0, 1), [1, 2), [2, 3)
+    assert D[0, 1] == 5.0
+    assert D[0, 2] == 7.0
+    assert D[1, 2] == 2.0
 
 
 def test_pdist_lp_returns_distance_matrix():

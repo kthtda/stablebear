@@ -124,7 +124,7 @@ namespace
           for (size_t yi = 0; yi < yTotal; ++yi)
           {
             m_out.flat(xi * yTotal + yi) =
-                m_op(sb::integrate<Tt, Tv>(m_X.flat(xi), m_Y.flat(yi), m_op));
+                sb::integrate<Tt, Tv>(m_X.flat(xi), m_Y.flat(yi), m_op);
           }
 
           add_progress(yTotal);

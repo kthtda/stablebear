@@ -28,8 +28,8 @@ def lp_distance(f: Pcf, g: Pcf, p: float = 1) -> float:
     g : Pcf
         Second piecewise constant function.
     p : float, optional
-        The :math:`p` parameter in the :math:`L_p` distance (must be
-        :math:`\geq 1`), by default 1.
+        The :math:`p` parameter in the :math:`L_p` distance, at least 1,
+        or ``math.inf`` for the largest :math:`|f(t) - g(t)|`, by default 1.
 
     Returns
     -------
@@ -39,11 +39,11 @@ def lp_distance(f: Pcf, g: Pcf, p: float = 1) -> float:
     Raises
     ------
     ValueError
-        If ``p < 1``.
+        If ``p < 1`` or ``p`` is NaN.
     TypeError
         If *f* and *g* have different dtypes, or are integer PCFs.
     """
-    if p < 1:
+    if not p >= 1:
         raise ValueError("p must be >= 1.")
 
     if not isinstance(f, Pcf) or not isinstance(g, Pcf):
@@ -78,8 +78,8 @@ def pdist(fs: PcfContainerLike, p: float = 1, verbose: bool = False) -> Distance
     fs : PcfContainerLike
         A 1-D tensor of PCFs.
     p : float, optional
-        The :math:`p` parameter in the :math:`L_p` distance (must be
-        :math:`\geq 1`), by default 1.
+        The :math:`p` parameter in the :math:`L_p` distance, at least 1,
+        or ``math.inf`` for the largest :math:`|f(t) - g(t)|`, by default 1.
     verbose : bool, optional
         Show progress information during computation, by default False.
 
@@ -91,9 +91,9 @@ def pdist(fs: PcfContainerLike, p: float = 1, verbose: bool = False) -> Distance
     Raises
     ------
     ValueError
-        If ``fs`` is not 1-dimensional.
+        If ``p < 1`` or ``p`` is NaN, or ``fs`` is not 1-dimensional.
     """
-    if p < 1:
+    if not p >= 1:
         raise ValueError("p must be >= 1.")
 
     backend, X = _resolve_pcf_inputs(_DISTANCE_BACKEND_MAP, fs)
@@ -129,8 +129,8 @@ def cdist(X: PcfContainerLike, Y: PcfContainerLike, p: float = 1, verbose: bool 
     Y : PcfContainerLike
         A tensor of PCFs (any shape, same dtype as X).
     p : float, optional
-        The :math:`p` parameter in the :math:`L_p` distance (must be
-        :math:`\geq 1`), by default 1.
+        The :math:`p` parameter in the :math:`L_p` distance, at least 1,
+        or ``math.inf`` for the largest :math:`|f(t) - g(t)|`, by default 1.
     verbose : bool, optional
         Show progress information during computation, by default False.
 
@@ -138,8 +138,13 @@ def cdist(X: PcfContainerLike, Y: PcfContainerLike, p: float = 1, verbose: bool 
     -------
     FloatTensor
         A tensor of shape ``(*X.shape, *Y.shape)`` containing pairwise distances.
+
+    Raises
+    ------
+    ValueError
+        If ``p < 1`` or ``p`` is NaN.
     """
-    if p < 1:
+    if not p >= 1:
         raise ValueError("p must be >= 1.")
 
     backend, Xt, Yt = _resolve_pcf_inputs(_DISTANCE_BACKEND_MAP, X, Y)

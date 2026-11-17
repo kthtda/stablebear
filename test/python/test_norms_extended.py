@@ -1,4 +1,6 @@
-"""Extended tests for lp_norm: L2/Lp norms, edge cases, and dtype coverage."""
+"""Extended tests for lp_norm: L2/Lp/Linf norms, edge cases, and dtype coverage."""
+
+import math
 
 import numpy as np
 import numpy.testing as npt
@@ -71,7 +73,44 @@ def test_lp_norm_large_p_approaches_linfinity(pcf_dtype):
     npt.assert_allclose(result[0], 5.0, atol=0.1)
 
 
+def test_lp_norm_large_p_does_not_overflow(pcf_dtype):
+    """5^500 overflows both float32 and float64, but the L500 norm is about 5."""
+    X = sb.zeros((1,), dtype=pcf_dtype)
+    X[0] = _pcf([[0.0, 1.0], [1.0, 5.0], [2.0, 2.0], [3.0, 0.0]], pcf_dtype)
+    result = sb.lp_norm(X, p=500)
+    # (1 + 5^500 + 2^500)^(1/500) = 5 * (1 + (1/5)^500 + (2/5)^500)^(1/500)
+    npt.assert_allclose(result[0], 5.0, rtol=1e-6)
+
+
+# --- Linf norm ---
+
+
+def test_linf_norm_is_largest_absolute_value(pcf_dtype):
+    """The largest |f| is in a middle segment and negative, not the first value."""
+    X = sb.zeros((1,), dtype=pcf_dtype)
+    X[0] = _pcf([[0.0, 2.0], [1.0, -5.0], [2.0, 3.0], [3.0, 0.0]], pcf_dtype)
+    result = sb.lp_norm(X, p=math.inf)
+    assert result[0] == 5.0
+
+
+def test_linf_norm_of_each_pcf_in_tensor(pcf_dtype):
+    X = sb.zeros((2,), dtype=pcf_dtype)
+    X[0] = _pcf([[0.0, 1.0], [1.0, 4.0], [2.0, 0.0]], pcf_dtype)
+    X[1] = _pcf([[0.0, -6.0], [1.0, 2.0], [2.0, 0.0]], pcf_dtype)
+    result = sb.lp_norm(X, p=math.inf)
+    npt.assert_array_equal(np.asarray(result), [4.0, 6.0])
+
+
 # --- Edge cases ---
+
+
+@pytest.mark.parametrize("p", [1, 2, math.inf])
+def test_lp_norm_nan_value_gives_nan(pcf_dtype, p):
+    """NaN in a middle segment, between larger and smaller finite values."""
+    X = sb.zeros((1,), dtype=pcf_dtype)
+    X[0] = _pcf([[0.0, 4.0], [1.0, np.nan], [2.0, 2.0], [3.0, 0.0]], pcf_dtype)
+    result = sb.lp_norm(X, p=p)
+    assert np.isnan(result[0])
 
 
 def test_lp_norm_zero_function(pcf_dtype):

@@ -45,6 +45,18 @@ namespace
       return nb::make_tuple(std::move(task), outTensor);
     }
 
+    static nb::tuple lpnorm_linf(TensorT inTensor)
+    {
+      auto outTensor = OutTensorT(inTensor.shape(), Tv(0));
+
+      auto f = [](const PcfT& v) {
+        return sb::linfinity_norm(v);
+      };
+
+      std::unique_ptr<sb::StoppableTask<void>> task = sb_py::execute_stoppable_task<sb::ApplyFunctional<TensorT, OutTensorT, decltype(f)>>(inTensor, outTensor, f);
+      return nb::make_tuple(std::move(task), outTensor);
+    }
+
     static void register_bindings(nb::handle m, const std::string& suffix)
     {
       nb::class_<PyNormsBindings> cls(m, ("Norms" + suffix).c_str());
@@ -52,6 +64,7 @@ namespace
       cls
           .def_static("lpnorm_l1", &PyNormsBindings::lpnorm_l1)
           .def_static("lpnorm_lp", &PyNormsBindings::lpnorm_lp)
+          .def_static("lpnorm_linf", &PyNormsBindings::lpnorm_linf)
       ;
 
     }

@@ -23,6 +23,12 @@ def test_lp_norm_rejects_p_negative():
         sb.lp_norm(X, p=-1)
 
 
+def test_lp_norm_rejects_p_nan():
+    X = sb.zeros((2,))
+    with pytest.raises(ValueError, match="p must be >= 1"):
+        sb.lp_norm(X, p=np.nan)
+
+
 def get_test_data():
     X = sb.zeros((2, 3), dtype=sb.pcf64)
 
