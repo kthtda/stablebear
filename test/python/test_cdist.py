@@ -1,6 +1,7 @@
 """Tests for cdist (cross-distance computation)."""
 
 import itertools
+import math
 
 import numpy as np
 import pytest
@@ -30,6 +31,13 @@ def test_cdist_rejects_p_less_than_1(device):
     Y = sb.zeros((3,))
     with pytest.raises(ValueError, match="p must be >= 1"):
         sb.cdist(X, Y, p=0.5)
+
+
+def test_cdist_rejects_p_nan(device):
+    X = sb.zeros((2,))
+    Y = sb.zeros((3,))
+    with pytest.raises(ValueError, match="p must be >= 1"):
+        sb.cdist(X, Y, p=math.nan)
 
 
 def test_cdist_1d_tensors(device, pcf_dtype):
@@ -97,6 +105,34 @@ def test_cdist_lp(device, pcf_dtype):
 
     assert D.shape == (2, 1)
     assert_cdist_matches_lp_distance(D, X, Y, p=3)
+
+
+def test_cdist_lp_does_not_overflow(device):
+    X = sb.zeros((1,), dtype=sb.pcf32)
+    Y = sb.zeros((1,), dtype=sb.pcf32)
+
+    # f(t) = 1e8 on [0, 1), g(t) = 0. (1e8)^5 = 1e40 overflows float32.
+    X[0] = _pcf([[0.0, 1e8], [1.0, 0.0]], sb.pcf32)
+    Y[0] = _pcf([[0.0, 0.0]], sb.pcf32)
+
+    D = sb.cdist(X, Y, p=5)
+
+    assert D[0, 0] == pytest.approx(1e8, rel=1e-5)
+
+
+def test_cdist_infinite_p_is_largest_difference(device, pcf_dtype):
+    X = sb.zeros((1,), dtype=pcf_dtype)
+    Y = sb.zeros((2,), dtype=pcf_dtype)
+
+    X[0] = _pcf([[0.0, 3.0], [1.0, 7.0], [2.0, 3.0], [3.0, 0.0]], pcf_dtype)
+    Y[0] = _pcf([[0.0, 2.0], [2.0, 0.0]], pcf_dtype)
+    Y[1] = _pcf([[0.0, 0.0]], pcf_dtype)
+
+    D = sb.cdist(X, Y, p=math.inf)
+
+    # X[0] - Y[0] is 1, 5, 3 on [0, 1), [1, 2), [2, 3)
+    assert D[0, 0] == 5.0
+    assert D[0, 1] == 7.0
 
 
 def test_cdist_both_multidim(device, pcf_dtype):

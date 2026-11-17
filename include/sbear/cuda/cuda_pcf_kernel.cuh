@@ -124,15 +124,15 @@ namespace sb
       size_t gOffset = params.colTimePointOffsets[jLocal];
       size_t gsz = params.colTimePointOffsets[jLocal + 1] - gOffset;
 
-      Tv ret = 0;
+      auto acc = op.init();
       cuda_pcf_iterate_rectangles<Tt, Tv>(
           params.rowPoints, fOffset, fsz,
           params.colPoints, gOffset, gsz,
-          a, b, [&ret, op](Tt l, Tt r, Tv f, Tv g) {
-            ret += (r - l) * op(f, g);
+          a, b, [&acc, op](Tt l, Tt r, Tv f, Tv g) {
+            op.add(acc, r - l, f, g);
           });
 
-      params.matrix[iLocal * params.nCols + jLocal] = op(ret);
+      params.matrix[iLocal * params.nCols + jLocal] = op.result(acc);
     }
 
     /// Host-side launch wrapper.

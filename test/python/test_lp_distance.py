@@ -1,5 +1,7 @@
 """Tests for lp_distance (scalar distance between two PCFs)."""
 
+import math
+
 import numpy as np
 import pytest
 
@@ -76,6 +78,38 @@ def test_lp_distance_large_p(pcf_dtype):
     f = _pcf([[0.0, 2.0], [1.0, 0.0]], pcf_dtype)
     g = _pcf([[0.0, 0.0], [1.0, 0.0]], pcf_dtype)
     assert sb.lp_distance(f, g, p=50) == pytest.approx(2.0, abs=1e-2)
+
+
+@pytest.mark.parametrize("dtype, value, p", [
+    (sb.pcf32, 1e8, 5),    # 1e8^5 = 1e40 overflows float32
+    (sb.pcf64, 1e120, 3),  # 1e120^3 = 1e360 overflows float64
+])
+def test_lp_distance_does_not_overflow(dtype, value, p):
+    """The distance is representable even though |f - g|^p is not."""
+    f = _pcf([[0.0, value], [1.0, 0.0]], dtype)
+    g = _pcf([[0.0, 0.0]], dtype)
+    assert sb.lp_distance(f, g, p=p) == pytest.approx(value, rel=1e-5)
+
+
+def test_lp_distance_large_p_does_not_overflow(pcf_dtype):
+    """5^500 overflows both float32 and float64, but the L500 distance is about 5."""
+    f = _pcf([[0.0, 1.0], [1.0, 5.0], [2.0, 2.0], [3.0, 0.0]], pcf_dtype)
+    g = _pcf([[0.0, 0.0]], pcf_dtype)
+    assert sb.lp_distance(f, g, p=500) == pytest.approx(5.0, rel=1e-6)
+
+
+def test_lp_distance_infinite_p_is_largest_difference(pcf_dtype):
+    # f - g is 1 on [0, 1), 5 on [1, 2), and 3 on [2, 3)
+    f = _pcf([[0.0, 3.0], [1.0, 7.0], [2.0, 3.0], [3.0, 0.0]], pcf_dtype)
+    g = _pcf([[0.0, 2.0], [2.0, 0.0]], pcf_dtype)
+    assert sb.lp_distance(f, g, p=math.inf) == 5.0
+
+
+@pytest.mark.parametrize("p", [2, math.inf])
+def test_lp_distance_nan_value_gives_nan(pcf_dtype, p):
+    f = _pcf([[0.0, 4.0], [1.0, np.nan], [2.0, 2.0], [3.0, 0.0]], pcf_dtype)
+    g = _pcf([[0.0, 0.0]], pcf_dtype)
+    assert math.isnan(sb.lp_distance(f, g, p=p))
 
 
 # --- Multiple breakpoints ---
@@ -174,6 +208,13 @@ def test_lp_distance_rejects_p_negative():
     g = sb.Pcf(np.array([[0.0, 0.0]]))
     with pytest.raises(ValueError, match="p must be >= 1"):
         sb.lp_distance(f, g, p=-2)
+
+
+def test_lp_distance_rejects_p_nan():
+    f = sb.Pcf(np.array([[0.0, 1.0]]))
+    g = sb.Pcf(np.array([[0.0, 0.0]]))
+    with pytest.raises(ValueError, match="p must be >= 1"):
+        sb.lp_distance(f, g, p=math.nan)
 
 
 def test_lp_distance_rejects_non_pcf():

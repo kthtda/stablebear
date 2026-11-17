@@ -5,6 +5,7 @@
 #include "../../executor.hpp"
 #include "../../tensor.hpp"
 #include "../../task.hpp"
+#include "../../functional/operations.cuh"
 
 #include <vector>
 #include <functional>
@@ -114,32 +115,14 @@ namespace sb
       return linfinity_norm(f);
     }
 
-    // Find the largest |f| on [0, inf), passing on NaN, which std::max never picks
-    value_type scale{ 0 };
-    bool hasNan = false;
-    iterate_segments(f.points().cbegin(), f.points().cend(), typename F::time_type{ 0 }, infinite_time<F>(), [&scale, &hasNan](const typename F::segment_type& seg) {
-      auto absValue = std::abs(seg.value);
-      hasNan = hasNan || std::isnan(absValue);
-      scale = std::max(scale, absValue);
+    // ||f||_p is the Lp distance from f to 0, accumulated without overflow
+    OperationLpDist<typename F::time_type, value_type> op(p);
+    auto acc = op.init();
+    iterate_segments(f.points().cbegin(), f.points().cend(), typename F::time_type{ 0 }, infinite_time<F>(), [&acc, &op](const typename F::segment_type& seg) {
+      op.add(acc, seg.right - seg.left, seg.value, value_type{ 0 });
       });
 
-    if (hasNan)
-    {
-      return std::numeric_limits<value_type>::quiet_NaN();
-    }
-    if (scale == value_type{ 0 } || std::isinf(scale))
-    {
-      return scale;
-    }
-
-    // ||f||_p = scale * ||f / scale||_p. Since |f / scale| <= 1, raising it to
-    // the power p cannot overflow, as |f|^p does for large p.
-    value_type out{ 0 };
-    iterate_segments(f.points().cbegin(), f.points().cend(), typename F::time_type{ 0 }, infinite_time<F>(), [&out, scale, p](const typename F::segment_type& seg) {
-      out += (seg.right - seg.left) * std::pow(std::abs(seg.value) / scale, p);
-      });
-
-    return scale * std::pow(out, value_type{ 1 } / p);
+    return op.result(acc);
   }
 
 }

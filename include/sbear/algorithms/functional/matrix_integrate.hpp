@@ -15,17 +15,19 @@
 
 namespace sb
 {
+  /// Integrates op over the rectangles of f and g in [a, b) and returns
+  /// op's result for the pair. See operations.cuh for the operations.
   template <typename Tt, typename Tv, typename PairOp>
   Tv integrate(const Pcf<Tt, Tv>& f, const Pcf<Tt, Tv>& g, PairOp op, Tt a = Tt(0), Tt b = std::numeric_limits<Tt>::max())
   {
     using rect_t = typename Pcf<Tt, Tv>::rectangle_type;
 
-    Tv val = Tv(0);
-    iterate_rectangles(f.points(), g.points(), [&val, &op](const rect_t& rect) -> void {
-      val += (rect.right - rect.left) * op(rect.f_value, rect.g_value);
+    auto acc = op.init();
+    iterate_rectangles(f.points(), g.points(), [&acc, &op](const rect_t& rect) -> void {
+      op.add(acc, rect.right - rect.left, rect.f_value, rect.g_value);
     }, a, b);
 
-    return val;
+    return op.result(acc);
   }
 
   /// CPU pairwise integration task (pdist / l2_kernel).
@@ -83,7 +85,7 @@ namespace sb
       size_t jStart = includeDiagonal ? i : i + 1;
       for (size_t j = jStart; j < sz; ++j)
       {
-        auto val = m_op(integrate<time_type, value_type>(m_fs[i], m_fs[j], m_op, 0, std::numeric_limits<time_type>::max()));
+        auto val = integrate<time_type, value_type>(m_fs[i], m_fs[j], m_op, 0, std::numeric_limits<time_type>::max());
         m_out(i, j) = val;
       }
       add_progress(sz - jStart);
@@ -136,8 +138,8 @@ namespace sb
         }
         for (size_t j = 0; j < nCols; ++j)
         {
-          data[i * nCols + j] = m_op(integrate<time_type, value_type>(
-              m_rowFs[i], m_colFs[j], m_op, 0, std::numeric_limits<time_type>::max()));
+          data[i * nCols + j] = integrate<time_type, value_type>(
+              m_rowFs[i], m_colFs[j], m_op, 0, std::numeric_limits<time_type>::max());
         }
         add_progress(nCols);
       });
