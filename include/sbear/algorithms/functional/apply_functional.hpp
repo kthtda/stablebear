@@ -29,19 +29,15 @@ namespace sb
   private:
     tf::Future<void> run_async(Executor& exec) override
     {
-      tf::Taskflow flow;
-      std::vector<tf::Task> tasks;
-
-      sb::walk(m_in, [this](const std::vector<std::size_t>& idx) {
+      return sb::parallel_walk_async(m_in, [this](const std::vector<std::size_t>& idx) {
         m_out(idx) = m_functional(m_in(idx));
-      });
-
-      flow.linearize(tasks);
-      return exec.cpu()->run(std::move(flow));
+      }, exec);
     }
 
-    const InTensor& m_in;
-    OutTensor& m_out;
+    // Handles that share the callers' storage: the walk outlives the call
+    // that started the task.
+    InTensor m_in;
+    OutTensor m_out;
     F m_functional;
   };
 
