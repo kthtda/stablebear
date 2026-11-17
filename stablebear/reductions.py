@@ -1,4 +1,6 @@
-from typing import Any
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any, overload
 
 import numpy as np
 
@@ -13,6 +15,11 @@ from .base_tensor import (
     _resolve_pcf_inputs,
 )
 from .typing import pcf32, pcf64
+from .base_tensor import IntTensor
+from .distance_matrix import DistanceMatrix
+
+if TYPE_CHECKING:
+    import torch
 
 
 _REDUCTIONS_BACKEND_MAP = {pcf32: cpp.Reductions_f32_f32, pcf64: cpp.Reductions_f64_f64}
@@ -228,3 +235,69 @@ def max_time(fs: PcfContainerLike, dim: int = 0) -> FloatTensor:
     """
     backend, tensor = _resolve_pcf_inputs(_REDUCTIONS_BACKEND_MAP, fs)
     return FloatTensor(backend.max_time(tensor._data, _resolve_dim(dim, tensor.ndim)))
+
+
+@overload
+def max(x: DistanceMatrix | FloatTensor, dim: int = 0) -> FloatTensor: ...
+@overload
+def max(x: IntTensor, dim: int = 0) -> IntTensor: ...
+@overload
+def max(x: torch.Tensor, dim: int = 0) -> torch.Tensor: ...
+def max(x: Any, dim: int = 0) -> Any:
+    r"""Compute the largest number along the given dimension.
+
+    For a distance matrix of :math:`n` points, the result holds, for each
+    point, its largest distance to another point, so the maximum of the
+    result is the largest distance of the matrix::
+
+        farthest = sb.max(D)          # shape (n,)
+        diameter = sb.max(farthest)   # shape (1,)
+
+    See :ref:`tensors-how-dim-works` for a detailed explanation of dimension
+    reduction semantics.
+
+    Parameters
+    ----------
+    x : DistanceMatrix, FloatTensor, IntTensor, or torch.Tensor
+        A distance matrix, which reduces as its :math:`n \times n` matrix, or
+        numbers.
+    dim : int, optional
+        Dimension along which to reduce, by default 0. Negative values count
+        from the last axis. A distance matrix is symmetric, so both of its
+        dimensions give the same result.
+
+    Returns
+    -------
+    FloatTensor, IntTensor, or torch.Tensor
+        The largest numbers, with the reduced dimension removed. Reducing a
+        one-dimensional tensor returns shape ``(1,)``. A PyTorch tensor
+        gives a PyTorch tensor, which carries its gradients.
+
+    Raises
+    ------
+    IndexError
+        If ``dim`` is out of range for the number of dimensions of ``x``.
+    ValueError
+        If the reduction dimension is empty (size 0).
+    TypeError
+        If ``x`` is of another type.
+    """
+    adapter = _autodiff._framework(x)
+    if adapter is not None:
+        values = x
+    elif isinstance(x, DistanceMatrix):
+        # ponytail: the full matrix, twice the stored entries; reduce the
+        # compressed entries in C++ if matrices get large.
+        values = x.to_dense()
+    elif isinstance(x, (FloatTensor, IntTensor)):
+        values = np.asarray(x)
+    else:
+        raise TypeError(
+            f"max takes a DistanceMatrix, a FloatTensor, an IntTensor, or a PyTorch tensor (got {type(x).__name__}).")
+    axis = _resolve_dim(dim, len(values.shape))
+    if values.shape[axis] == 0:
+        raise ValueError("max of an empty dimension has no value.")
+    if adapter is not None:
+        return adapter.reshape(adapter.max_along(values, axis), tuple(values.shape[:axis]) + tuple(values.shape[axis + 1:]) or (1,))
+    largest = np.atleast_1d(values.max(axis=axis))
+    return IntTensor(largest) if isinstance(x, IntTensor) else FloatTensor(largest)

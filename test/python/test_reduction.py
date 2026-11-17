@@ -164,3 +164,92 @@ def test_float_rejects_multi_element_tensor():
     t = sb.FloatTensor(np.array([1.0, 2.0]))
     with pytest.raises(TypeError, match="single-element"):
         float(t)
+
+
+def _points():
+    # The distances are 5 between the first two points, sqrt(2) from the
+    # first to the third, and sqrt(13) from the second to the third.
+    return np.array([[0.0, 0.0], [3.0, 4.0], [1.0, 1.0]])
+
+
+@pytest.mark.parametrize("dtype", [sb.float32, sb.float64])
+def test_max_of_distance_matrix_gives_the_largest_distance_from_each_point(dtype):
+    D = sb.DistanceMatrix(np.array([[0.0, 5.0, 1.0],
+                                    [5.0, 0.0, 3.0],
+                                    [1.0, 3.0, 0.0]]), dtype=dtype)
+
+    out = sb.max(D)
+
+    assert isinstance(out, sb.FloatTensor)
+    assert out.dtype == dtype
+    np.testing.assert_array_equal(np.asarray(out), [5.0, 5.0, 3.0])
+
+
+def test_max_of_max_of_distance_matrix_is_its_largest_distance():
+    D = sb.pdist(sb.PointCloud(_points()))
+
+    out = sb.max(sb.max(D))
+
+    assert out.shape == (1,)
+    assert float(out) == 5.0
+
+
+def test_max_of_distance_matrix_of_one_point_is_zero():
+    out = sb.max(sb.DistanceMatrix(np.zeros((1, 1))))
+
+    np.testing.assert_array_equal(np.asarray(out), [0.0])
+
+
+@pytest.mark.parametrize("dim, expected", [(0, [4.0, 5.0, 6.0]), (1, [5.0, 6.0]), (-1, [5.0, 6.0])])
+def test_max_of_float_tensor_reduces_along_dim(dim, expected):
+    out = sb.max(sb.FloatTensor(np.array([[1.0, 5.0, 3.0],
+                                          [4.0, 2.0, 6.0]])), dim=dim)
+
+    assert isinstance(out, sb.FloatTensor)
+    np.testing.assert_array_equal(np.asarray(out), expected)
+
+
+def test_max_of_int_tensor_is_an_int_tensor():
+    out = sb.max(sb.IntTensor(np.array([[1, 5], [7, 2]])), dim=0)
+
+    assert isinstance(out, sb.IntTensor)
+    np.testing.assert_array_equal(np.asarray(out), [7, 5])
+
+
+def test_max_of_framework_array_matches_numpy(fw):
+    values = np.array([[1.0, 5.0, 3.0],
+                       [4.0, 2.0, 6.0]])
+
+    out = sb.max(fw.tensor(values), dim=1)
+
+    assert isinstance(out, fw.tensor_type)
+    np.testing.assert_array_equal(fw.to_numpy(out), [5.0, 6.0])
+    assert tuple(sb.max(out, dim=0).shape) == (1,)
+
+
+def test_gradient_of_largest_distance_of_points(fw):
+    def loss(P):
+        return fw.sum(sb.max(sb.max(sb.pdist(sb.LpDistance(2)(P)))))
+
+    value, grad = fw.value_and_grad(loss, _points())
+
+    # The largest distance is that between the first two points, which
+    # each move it by the unit vector between them.
+    assert value == 5.0
+    np.testing.assert_allclose(grad, [[-0.6, -0.8], [0.6, 0.8], [0.0, 0.0]])
+
+
+def test_max_along_missing_dim_raises():
+    with pytest.raises(IndexError, match="out of range"):
+        sb.max(sb.FloatTensor(np.ones((2, 3))), dim=2)
+
+
+def test_max_of_empty_dim_raises():
+    with pytest.raises(ValueError, match="empty"):
+        sb.max(sb.FloatTensor(np.ones((0, 3))), dim=0)
+
+
+def test_max_of_pcf_tensor_raises():
+    F = sb.PcfTensor([sb.Pcf([[0.0, 1.0], [1.0, 0.0]])])
+    with pytest.raises(TypeError, match="DistanceMatrix"):
+        sb.max(F)  # pyright: ignore[reportCallIssue, reportArgumentType]

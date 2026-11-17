@@ -70,6 +70,10 @@ def segment_sums(x: torch.Tensor, segments: np.ndarray, count: int) -> torch.Ten
     return torch.zeros(count, dtype=x.dtype, device=x.device).index_add(0, index, x)
 
 
+def max_along(x: torch.Tensor, dim: int) -> torch.Tensor:
+    return torch.amax(x, dim=dim)
+
+
 def row_norms(x: torch.Tensor) -> torch.Tensor:
     return torch.sqrt((x * x).sum(dim=1))
 

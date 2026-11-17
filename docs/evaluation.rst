@@ -241,6 +241,19 @@ max_time
 The result is a numeric value (or numeric tensor), not a PCF. This is useful for
 aligning PCFs for plotting or further analysis.
 
+max
+---
+
+:py:func:`~stablebear.reductions.max` finds the largest number along a dimension
+of a numeric tensor. A :py:class:`~stablebear.distance_matrix.DistanceMatrix`
+reduces as its full matrix, to the largest distance from each point, and
+reducing once more gives the largest distance of the matrix::
+
+   D = sb.pdist(X)
+
+   farthest = sb.max(D)          # shape (n,): the largest distance from each
+   diameter = sb.max(farthest)   # shape (1,): the largest distance of all
+
 
 Combining it all
 ================

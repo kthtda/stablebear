@@ -17,7 +17,7 @@ from .geometry import (
 )
 from .norms import lp_norm
 from .functional import Pcf, Plf, iterate_rectangles
-from .reductions import max_time, mean, sum
+from .reductions import max, max_time, mean, sum
 from .serialize import from_serial_content
 from .distance_matrix import DistanceMatrix, DistanceMatrixTensor
 from .symmetric_matrix import SymmetricMatrix, SymmetricMatrixTensor
