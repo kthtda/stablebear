@@ -1,6 +1,6 @@
 import warnings
 from enum import Enum
-from typing import Any, overload
+from typing import Any, cast, overload
 
 import numpy as np
 
@@ -13,7 +13,7 @@ from ..distance_matrix import (
 )
 from .._tracked import is_tracked
 from ..base_tensor import FloatTensor
-from ..geometry import DistanceSpace, _distance_matrices, _points_array
+from ..geometry import DistanceSpace, _distance_matrices, _points_array, chooses_distance
 from ..point_cloud import PointCloud, PointCloudTensor
 from ..timeseries.series import TimeSeries, TimeSeriesTensor
 from ..typing import barcode32, barcode64, distmat32, distmat64, float32, float64, pcloud32, pcloud64
@@ -225,15 +225,15 @@ def compute_persistent_homology(
 
     if distance_type is None:
         distance_type = DistanceType.Euclidean
-    elif isinstance(X, DistanceSpace):
+    elif chooses_distance(X):
         raise TypeError("distance_type cannot be passed with a DistanceSpace, which has its own distance.")
     else:
         warnings.warn(
             "distance_type is deprecated: put the points in a DistanceSpace to choose their distance.",
             DeprecationWarning, stacklevel=2)
 
-    if isinstance(X, DistanceSpace):
-        return _persistent_homology_in_space(X, max_dim, reduced, verbose)
+    if chooses_distance(X):
+        return _persistent_homology_in_space(cast(DistanceSpace, X), max_dim, reduced, verbose)
 
     if is_tracked(X) and isinstance(X, DistanceMatrixTensor):
         return _tracked_persistent_homology_of_distances(X, max_dim, reduced)
@@ -264,7 +264,9 @@ def compute_persistent_homology(
                 FloatTensor(X), max_dim, reduced
             )
         else:
-            task = _compute_barcodes_euclidean_pcloud_ripser(X, max_dim, reduced)
+            # A DistanceSpace that was given a distance returned above.
+            task = _compute_barcodes_euclidean_pcloud_ripser(
+                cast("PointCloud | PointCloudTensor", X), max_dim, reduced)
 
     _run_task(lambda: task, verbose=verbose)
     out = BarcodeTensor(task.result())

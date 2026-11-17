@@ -1372,3 +1372,85 @@ def test_persistent_homology_of_pdist_is_that_of_the_distance_space(fw, make_dis
     assert out.shape == (3, 2)
     for i in np.ndindex(3, 2):
         assert out[i].is_isomorphic_to(expected[i], atol=1e-12, rtol=1e-12)
+
+
+@pytest.mark.parametrize("make_points", [
+    pytest.param(lambda: sb.PointCloud(_lp_points()), id="point_cloud"),
+    pytest.param(lambda: sb.PointCloudTensor(_batch2()), id="point_cloud_tensor"),
+])
+def test_point_clouds_are_distance_spaces_with_the_euclidean_distance(make_points):
+    points = make_points()
+
+    assert isinstance(points, sb.DistanceSpace)
+    assert not isinstance(points, sb.InnerProductSpace)
+    assert points.points is points
+    assert points.distance == sb.LpDistance(2)
+
+
+def test_tracked_point_cloud_tensor_is_a_distance_space(fw):
+    clouds = tracked(fw, sb.PointCloudTensor(_batch2()))
+
+    assert isinstance(clouds, sb.DistanceSpace)
+    assert clouds.points is clouds
+    assert clouds.distance == sb.LpDistance(2)
+
+
+def test_pdist_of_point_cloud_gives_euclidean_distances():
+    out = sb.pdist(sb.PointCloud(_lp_points()))
+
+    assert isinstance(out, sb.DistanceMatrix)
+    np.testing.assert_allclose(out.to_dense(), _distances_between(_lp_points()), atol=1e-12)
+
+
+def test_pdist_of_point_cloud_tensor_gives_euclidean_distances_of_each_cloud():
+    out = sb.pdist(sb.PointCloudTensor(_batch2()))
+
+    assert isinstance(out, sb.DistanceMatrixTensor)
+    assert out.shape == (3,)
+    for i, cloud in enumerate(_batch2()):
+        np.testing.assert_allclose(out[i].to_dense(), _distances_between(cloud), atol=1e-12)
+
+
+def test_pdist_of_tracked_point_cloud_tensor_matches_untracked(fw):
+    clouds = sb.PointCloudTensor(_batch2())
+
+    out = sb.pdist(tracked(fw, clouds))
+
+    content = out.to_serial_content()[0]
+    assert isinstance(content, fw.tensor_type)
+    np.testing.assert_allclose(fw.to_numpy(content), sb.pdist(clouds).to_serial_content()[0], atol=1e-12)
+
+
+def test_pdist_of_point_cloud_tensor_gradient_wrt_points(fw):
+    _, second, third = _batch2()
+
+    def loss(P):
+        entries = sb.pdist(sb.PointCloudTensor([second, P, third])).to_serial_content()[0]
+        return fw.sum(entries * entries * entries)
+
+    assert_gradient_matches_finite_differences(fw, loss, _lp_points())
+
+
+def test_pdist_of_point_cloud_with_p_raises():
+    with pytest.raises(TypeError, match="LpDistance"):
+        sb.pdist(sb.PointCloud(_lp_points()), p=2)  # pyright: ignore[reportCallIssue, reportArgumentType]
+
+
+def test_kernel_of_euclidean_distance_space_and_point_cloud_is_that_of_the_plain_clouds():
+    X, Y = _loop_points(), _contracted(_loop_points())
+
+    out = _kernel(sb.LpDistance(2)(X), sb.PointCloud(Y))
+
+    assert out[0].is_isomorphic_to(_kernel(X, Y)[0], atol=1e-12, rtol=1e-12)
+
+
+def test_kernel_of_inner_product_space_and_point_cloud_raises():
+    with pytest.raises(TypeError, match="equal distances"):
+        _kernel(sb.InnerProduct(_gram())(_loop_points()), sb.PointCloud(_contracted(_loop_points())))
+
+
+def test_distance_type_with_point_cloud_tensor_warns():
+    with pytest.warns(DeprecationWarning, match="distance_type"):
+        sb.persistence.compute_persistent_homology(
+            sb.PointCloudTensor(_batch2()), max_dim=1, distance_type=sb.persistence.DistanceType.Euclidean,
+            reduced=True, verbose=False)

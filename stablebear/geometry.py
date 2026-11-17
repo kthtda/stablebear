@@ -10,6 +10,7 @@ from . import _autodiff
 from .base_tensor import FloatTensor
 from . import _sb_cpp as cpp
 from .distance_matrix import DistanceMatrixTensor
+from ._distance_space import DistanceSpace, EuclideanPoints
 from ._tracked import is_tracked, tracked_class
 from .point_cloud import PointCloud, PointCloudTensor
 from .timeseries.series import TimeSeries
@@ -364,60 +365,6 @@ class LpDistance(Distance):
         return f"LpDistance({self._p:g})"
 
 
-class DistanceSpace:
-    """Points together with the distance of their space.
-
-    An operation that uses a distance takes a ``DistanceSpace`` in place of
-    the plain points and uses its distance. It is usually made by calling a
-    :class:`Distance` on the points.
-
-    Parameters
-    ----------
-    points : PointCloud, FloatTensor, or numpy.ndarray
-        A point cloud of shape ``(n, d)``, one point per row, which may be a
-        PyTorch tensor, or a batch of point clouds as a
-        ``PointCloudTensor`` or a time series of point clouds.
-    distance : Distance
-        The distance between the points.
-
-    Raises
-    ------
-    ValueError
-        If the distance does not apply to points of dimension ``d``.
-    """
-
-    def __init__(self, points: Any, distance: Distance):
-        if not isinstance(distance, Distance):
-            raise TypeError(f"Expected a Distance, got {type(distance).__name__}.")
-        cloud = _as_point_cloud(points)
-        dim = _dim(cloud)
-        if dim is not None:
-            distance._check_dim(dim)
-        self._points = cloud
-        self._distance = distance
-
-    @property
-    def points(self) -> Any:
-        """The points, as a ``PointCloud``, as the PyTorch tensor that they were given as, or as the
-        ``PointCloudTensor`` or time series of a batch."""
-        return self._points
-
-    @property
-    def distance(self) -> Distance:
-        """The distance of the space."""
-        return self._distance
-
-    @property
-    def dtype(self) -> Dtype:
-        """The dtype of what holds the points, such as ``pcloud64``."""
-        if isinstance(self._points, (PointCloudTensor, TimeSeries)):
-            return self._points.dtype
-        return pcloud32 if _is_float32(self._points) else pcloud64
-
-    def __repr__(self) -> str:
-        return f"{type(self).__name__}({self._points!r}, {self._distance!r})"
-
-
 class InnerProductSpace(DistanceSpace):
     """Points together with the inner product of their space.
 
@@ -580,7 +527,7 @@ class LinearSubspace:
             If ``points`` is a :class:`DistanceSpace` that is not an
             ``InnerProductSpace``.
         """
-        if isinstance(points, DistanceSpace) and not isinstance(points, InnerProductSpace):
+        if chooses_distance(points) and not isinstance(points, InnerProductSpace):
             raise TypeError(
                 "Only a DistanceSpace that is an InnerProductSpace can be projected: an orthogonal projection "
                 "needs an inner product.")
@@ -746,6 +693,13 @@ def pairwise_distances(space: DistanceSpace) -> Any:
     entry = np.arange(len(flat))[:, None, None] * (n * (n - 1) // 2) + high * (high - 1) // 2 + low
     full = adapter.gather(padded, position[np.where(i == j, 0, entry + 1)].ravel())
     return adapter.reshape(full, (*(int(size) for size in holder.shape[:-2]), n, n))
+
+
+def chooses_distance(points: Any) -> bool:
+    """Whether the points are in a DistanceSpace that was given a distance,
+    and not plain points or a point cloud, which is the space of its own
+    points with the Euclidean distance."""
+    return isinstance(points, DistanceSpace) and not isinstance(points, EuclideanPoints)
 
 
 def _points_array(space: DistanceSpace) -> Any:

@@ -66,7 +66,19 @@ norms: it says only that its points live in a space with the given
 distance, so that other kinds of points and distances can use it later.
 Which points a distance accepts is for the distance to say.
 
-A `DistanceSpace` is not a tensor: it has no indexing or arithmetic. An
+A `PointCloud` and a `PointCloudTensor` are `DistanceSpace`s themselves:
+their `points` are the object itself and their `distance` is
+`LpDistance(2)`, so an operation that takes a `DistanceSpace`, such as
+`pdist`, takes a point cloud with the Euclidean distance. An operation tells
+a space that was given a distance from a point cloud where it must: a point
+cloud is projected with the Euclidean inner product, and `distance_type` can
+still be passed with it. NumPy arrays, `FloatTensor`s, PyTorch tensors, and
+time series are not `DistanceSpace`s; where an operation reads them as point
+clouds, their distance is Euclidean as well. `dtype` is an attribute, not a
+property, as on a tensor.
+
+A `DistanceSpace` that holds points is not a tensor: it has no indexing or
+arithmetic. An
 operation that knows distances takes the points out; any other operation
 does not accept it, and so raises instead of ignoring the distance.
 

@@ -11,7 +11,7 @@ from ..distance_matrix import (
     DistanceMatrixTensor,
 )
 from ..base_tensor import FloatTensor, _get_backend
-from ..geometry import DistanceSpace, _distance_matrices, _in_one_framework, _points_array
+from ..geometry import DistanceSpace, _distance_matrices, _in_one_framework, _points_array, chooses_distance
 from ..point_cloud import PointCloud, PointCloudTensor
 from ..typing import distmat32, distmat64, float32, float64, pcloud32, pcloud64
 from .homology import (
@@ -291,7 +291,7 @@ def compute_homological_kernel(
     if dim > 0:
         raise NotImplementedError(f"only dim=0 is currently supported (got dim={dim})")
 
-    if isinstance(X, DistanceSpace) or isinstance(Y, DistanceSpace):
+    if chooses_distance(X) or chooses_distance(Y):
         return _kernel_in_spaces(X, Y, dim, verbose)
 
     if any(is_tracked(Z) and isinstance(Z, DistanceMatrixTensor) for Z in (X, Y)):

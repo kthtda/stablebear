@@ -128,11 +128,12 @@ def pdist(fs: Any, p: float | None = None, verbose: bool = False) -> Any:
     ----------
     fs : PcfContainerLike or DistanceSpace
         A 1-D tensor of PCFs, or a point cloud or a batch of point clouds
-        in a ``DistanceSpace``.
+        in a ``DistanceSpace``. A ``PointCloud`` and a ``PointCloudTensor``
+        are such spaces themselves, with the Euclidean distance.
     p : float, optional
         The :math:`p` parameter in the :math:`L_p` distance (must be
         :math:`\geq 1`), by default 1. It cannot be passed with a
-        ``DistanceSpace``, which has its distance.
+        ``DistanceSpace``, which has its distance, a point cloud included.
     verbose : bool, optional
         Show progress information during computation, by default False.
 

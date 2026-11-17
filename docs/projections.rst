@@ -124,6 +124,13 @@ distances themselves, as the matrix of the distances between the points::
 
    distances = sb.pdist(taxicab(points))                  # a DistanceMatrix
 
+A :py:class:`~stablebear.point_cloud.PointCloud` and a
+:py:class:`~stablebear.point_cloud.PointCloudTensor` are themselves
+``DistanceSpace`` objects, of their own points with the Euclidean distance,
+``LpDistance(2)``, so they need no distance to be passed on::
+
+   distances = sb.pdist(sb.PointCloud(points))            # Euclidean distances
+
 Operations that do not use a distance do not accept a ``DistanceSpace``, so
 its distance is never silently ignored. A ``DistanceSpace`` that is not an
 ``InnerProductSpace`` cannot be projected, because an orthogonal projection

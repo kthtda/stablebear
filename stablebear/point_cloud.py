@@ -6,6 +6,7 @@ import numpy as np
 
 from . import _sb_cpp as cpp
 from ._binary_io import _BinaryIoMixin
+from ._distance_space import EuclideanPoints
 from ._tensor_base import IndexedElementTensor
 from ._tracked import Tracking, tracked_class
 from .typing import float32, float64, pcloud32, pcloud64
@@ -28,12 +29,15 @@ _POINT_CLOUD_CPP_TYPES = (cpp.PointCloud32, cpp.PointCloud64)
 _PCLOUD_TO_FLOAT_DTYPE = {pcloud32: float32, pcloud64: float64}
 
 
-class PointCloud(_BinaryIoMixin):
+class PointCloud(_BinaryIoMixin, EuclideanPoints):
     """A rank-2 point-cloud view.
 
     Point clouds returned from a :class:`PointCloudTensor` retain their owner.
     Basic coordinate slices are views; advanced indexing copies coordinates.
     A write asks the owner to materialize if necessary.
+
+    A point cloud is a :class:`~stablebear.geometry.DistanceSpace` of its
+    own points with the Euclidean distance.
     """
 
     # A native PointCloud32 or PointCloud64, or None for an element of a tensor.
@@ -69,7 +73,7 @@ class PointCloud(_BinaryIoMixin):
         return self.shape[0] * self.shape[1]
 
     @property
-    def dtype(self):
+    def dtype(self):  # pyright: ignore[reportIncompatibleVariableOverride]
         if self._owner is not None:
             return _PCLOUD_TO_FLOAT_DTYPE[self._owner.dtype]
         return float32 if isinstance(self._value, cpp.PointCloud32) else float64
@@ -186,8 +190,11 @@ def _pointcloud_cpp_from_list(seq, dtype):
     return t._data
 
 
-class PointCloudTensor(IndexedElementTensor):
+class PointCloudTensor(IndexedElementTensor, EuclideanPoints):
     """Tensor whose elements are point clouds (each a ``(n_points, dim)`` array).
+
+    It is a :class:`~stablebear.geometry.DistanceSpace` of the points of its
+    point clouds with the Euclidean distance.
 
     Parameters
     ----------
