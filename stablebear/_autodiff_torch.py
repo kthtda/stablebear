@@ -32,6 +32,15 @@ def to_numpy(x: torch.Tensor) -> np.ndarray:
     return x.detach().cpu().numpy()
 
 
+def is_view(array: Any, x: torch.Tensor) -> bool:
+    """Whether a NumPy array is the memory of the tensor, so that it has the
+    values of the tensor without comparing them."""
+    return (
+        isinstance(array, np.ndarray) and x.device.type == "cpu" and x.is_contiguous() and array.flags.c_contiguous
+        and array.size == x.numel() and array.dtype.itemsize == x.element_size()
+        and array.__array_interface__["data"][0] == x.data_ptr())
+
+
 def requires_grad(x: torch.Tensor) -> bool:
     return bool(x.requires_grad)
 

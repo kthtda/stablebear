@@ -8,6 +8,7 @@
 #include <sbear/walk.hpp>
 #include <sbear/functional/pcf.hpp>
 #include <sbear/algorithms/functional/iterate_rectangles.hpp>
+#include <sbear/algorithms/functional/apply_functional.hpp>
 #include <sbear/algorithms/functional/integrate_grad.hpp>
 #include <sbear/functional/plf.hpp>
 #include <sbear/persistence/barcode.hpp>
@@ -411,6 +412,63 @@ namespace sb_py
     return out;
   }
 
+  /// The gradient of sum(weights * lp_norm(pcfs, p)) with respect to the
+  /// serial content of a tensor of PCFs: a row (d/dt, d/dv) for each
+  /// breakpoint of each PCF, computed in parallel over the PCFs. The weights
+  /// are one per PCF, in row-major order. See sb::lp_norm_grad.
+  template <typename Tt, typename Tv>
+  NpArray<Tt> lp_norm_grad(
+      const sb::Tensor<sb::Pcf<Tt, Tv>>& pcfs,
+      nb::ndarray<const Tv, nb::ndim<1>, nb::c_contig, nb::device::cpu> weights,
+      Tv p)
+  {
+    if (weights.shape(0) != pcfs.size())
+    {
+      throw std::invalid_argument("There should be one weight per PCF, " + std::to_string(pcfs.size()) + " (got " + std::to_string(weights.shape(0)) + ").");
+    }
+    const auto& shape = pcfs.shape();
+    std::vector<size_t> strides(shape.size(), 1);
+    for (size_t i = shape.size(); i-- > 1;)
+    {
+      strides[i - 1] = strides[i] * shape[i];
+    }
+    auto flat = [&strides](const std::vector<size_t>& idx) {
+      size_t k = 0;
+      for (size_t i = 0; i < idx.size(); ++i)
+      {
+        k += idx[i] * strides[i];
+      }
+      return k;
+    };
+
+    // The first row of each PCF.
+    std::vector<size_t> rows(pcfs.size() + 1, 0);
+    sb::walk(pcfs, [&](const std::vector<size_t>& idx) {
+      rows[flat(idx) + 1] = pcfs(idx).points().size();
+    });
+    for (size_t k = 0; k < pcfs.size(); ++k)
+    {
+      rows[k + 1] += rows[k];
+    }
+
+    auto out = new_array<Tt>({ rows.back(), 2 });
+    const Tv* w = weights.data();
+    Tt* o = out.data();
+    {
+      nb::gil_scoped_release release;
+      sb::parallel_walk(pcfs, [&](const std::vector<size_t>& idx) {
+        const size_t k = flat(idx);
+        Tt* row = o + 2 * rows[k];
+        for (const auto& point : sb::lp_norm_grad(pcfs(idx), p))
+        {
+          *row++ = static_cast<Tt>(w[k] * point.t);
+          *row++ = static_cast<Tt>(w[k] * point.v);
+        }
+      }, sb::default_executor());
+    }
+    return out;
+  }
+
   template <typename T>
   nb::tuple barcodes_to_serial_content(const sb::Tensor<sb::ph::Barcode<T>>& tensor)
   {
@@ -808,6 +866,8 @@ namespace sb_py
     m.def("plfs_from_serial_content_64", &plfs_from_serial_content<sb::float64_t, sb::float64_t>);
     m.def("integrate_grad", &integrate_grad<sb::float32_t, sb::float32_t>);
     m.def("integrate_grad", &integrate_grad<sb::float64_t, sb::float64_t>);
+    m.def("lp_norm_grad", &lp_norm_grad<sb::float32_t, sb::float32_t>);
+    m.def("lp_norm_grad", &lp_norm_grad<sb::float64_t, sb::float64_t>);
     m.def("pdist_grad", &pdist_grad<sb::float32_t, sb::float32_t>);
     m.def("pdist_grad", &pdist_grad<sb::float64_t, sb::float64_t>);
     m.def("l2_kernel_grad", &l2_kernel_grad<sb::float32_t, sb::float32_t>);

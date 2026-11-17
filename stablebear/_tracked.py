@@ -226,9 +226,13 @@ class _TrackedObject:
         versions = self._versions()
 
         def rebuild(arrays):
+            # Whether these are the values the content was read from: the
+            # parts themselves, unchanged since, or equal values.
+            current = self._versions() == versions and all(
+                _autodiff._framework(self._parts[i]).is_view(array, self._parts[i]) for i, array in zip(tracked, arrays))
             arrays = [np.asarray(array).reshape(len(content), starts[i + 1] - starts[i]) for i, array in zip(tracked, arrays)]
-            # Whether these are the values the content was read from.
-            current = all(np.array_equal(array, content[:, starts[i]:starts[i + 1]]) for i, array in zip(tracked, arrays))
+            current = current or all(
+                np.array_equal(array, content[:, starts[i]:starts[i + 1]]) for i, array in zip(tracked, arrays))
             if current and self._plain is not None and self._plain_versions == versions:
                 return self._plain
             c = content.copy()
