@@ -298,6 +298,12 @@ For higher-dimensional tensors, the output shape matches the input::
    norms = sb.lp_norm(A, p=1)
    # norms.shape is (3, 10)
 
+``p=math.inf`` gives the supremum norm, the largest absolute value of each PCF::
+
+   import math
+
+   sup_norms = sb.lp_norm(X, p=math.inf)
+
 
 Using distances in machine learning
 =====================================

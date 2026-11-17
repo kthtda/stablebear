@@ -3,6 +3,8 @@
 #include <sbear/functional/pcf.hpp>
 #include <sbear/algorithms/functional/apply_functional.hpp>
 
+#include <cmath>
+#include <limits>
 #include <vector>
 
 namespace
@@ -115,6 +117,50 @@ namespace
                 static_cast<double>(l2),
                 1e-9);
     EXPECT_EQ(linf, static_cast<T>(2));
+  }
+
+  TYPED_TEST(PcfAlgebraAndNormsTest, LpNormWithInfinitePIsLinfNorm)
+  {
+    using PcfT = TypeParam;
+    using T = typename PcfT::value_type;
+
+    // f(t) = 2 on [0,1), -5 on [1,2), 3 on [2,3), 0 afterwards
+    PcfT f({ { static_cast<T>(0), static_cast<T>(2) },
+             { static_cast<T>(1), static_cast<T>(-5) },
+             { static_cast<T>(2), static_cast<T>(3) },
+             { static_cast<T>(3), static_cast<T>(0) } });
+
+    EXPECT_EQ(sb::lp_norm(f, std::numeric_limits<T>::infinity()), static_cast<T>(5));
+  }
+
+  TYPED_TEST(PcfAlgebraAndNormsTest, LpNormLargePDoesNotOverflow)
+  {
+    using PcfT = TypeParam;
+    using T = typename PcfT::value_type;
+
+    // f(t) = 1 on [0,1), 5 on [1,2), 2 on [2,3), 0 afterwards. 5^500
+    // overflows, but the L500 norm is 5 * (1 + (1/5)^500 + (2/5)^500)^(1/500).
+    PcfT f({ { static_cast<T>(0), static_cast<T>(1) },
+             { static_cast<T>(1), static_cast<T>(5) },
+             { static_cast<T>(2), static_cast<T>(2) },
+             { static_cast<T>(3), static_cast<T>(0) } });
+
+    EXPECT_NEAR(static_cast<double>(sb::lp_norm(f, static_cast<T>(500))), 5.0, 1e-5);
+  }
+
+  TYPED_TEST(PcfAlgebraAndNormsTest, NormsOfPcfWithNanAreNan)
+  {
+    using PcfT = TypeParam;
+    using T = typename PcfT::value_type;
+
+    // f(t) = 4 on [0,1), NaN on [1,2), 2 on [2,3), 0 afterwards
+    PcfT f({ { static_cast<T>(0), static_cast<T>(4) },
+             { static_cast<T>(1), std::numeric_limits<T>::quiet_NaN() },
+             { static_cast<T>(2), static_cast<T>(2) },
+             { static_cast<T>(3), static_cast<T>(0) } });
+
+    EXPECT_TRUE(std::isnan(sb::lp_norm(f, static_cast<T>(2))));
+    EXPECT_TRUE(std::isnan(sb::linfinity_norm(f)));
   }
 
   TYPED_TEST(PcfAlgebraAndNormsTest, ApplyFunctionalWithL1NormMultiplePcfs)

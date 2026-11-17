@@ -10,6 +10,8 @@
 #include <functional>
 #include <iterator>
 #include <limits>
+#include <cmath>
+#include <algorithm>
 
 #include <iostream>
 
@@ -84,18 +86,6 @@ namespace sb
     return std::sqrt(out);
   }
 
-  template <PcfLike F>
-  typename F::value_type lp_norm(const F& f, typename F::value_type p)
-  {
-    typename F::value_type out{ 0 };
-
-    iterate_segments(f.points().cbegin(), f.points().cend(), typename F::time_type{ 0 }, infinite_time<F>(), [&out, p](const typename F::segment_type& seg) {
-      out += (seg.right - seg.left) * std::pow(std::abs(seg.value), p);
-      });
-
-    return std::pow(out, typename F::value_type{1} / p);
-  }
-
   template <PiecewiseFunctionLike F>
   typename F::value_type linfinity_norm(const F& f)
   {
@@ -103,9 +93,53 @@ namespace sb
     value_type out{ 0 };
     for (auto const& pt : f.points())
     {
-      out = std::max(out, static_cast<value_type>(std::abs(pt.v)));
+      auto absValue = static_cast<value_type>(std::abs(pt.v));
+      // std::max never picks NaN, so NaN must be passed on explicitly
+      if (std::isnan(absValue))
+      {
+        return absValue;
+      }
+      out = std::max(out, absValue);
     }
     return out;
+  }
+
+  template <PcfLike F>
+  typename F::value_type lp_norm(const F& f, typename F::value_type p)
+  {
+    using value_type = typename F::value_type;
+
+    if (std::isinf(p))
+    {
+      return linfinity_norm(f);
+    }
+
+    // Find the largest |f| on [0, inf), passing on NaN, which std::max never picks
+    value_type scale{ 0 };
+    bool hasNan = false;
+    iterate_segments(f.points().cbegin(), f.points().cend(), typename F::time_type{ 0 }, infinite_time<F>(), [&scale, &hasNan](const typename F::segment_type& seg) {
+      auto absValue = std::abs(seg.value);
+      hasNan = hasNan || std::isnan(absValue);
+      scale = std::max(scale, absValue);
+      });
+
+    if (hasNan)
+    {
+      return std::numeric_limits<value_type>::quiet_NaN();
+    }
+    if (scale == value_type{ 0 } || std::isinf(scale))
+    {
+      return scale;
+    }
+
+    // ||f||_p = scale * ||f / scale||_p. Since |f / scale| <= 1, raising it to
+    // the power p cannot overflow, as |f|^p does for large p.
+    value_type out{ 0 };
+    iterate_segments(f.points().cbegin(), f.points().cend(), typename F::time_type{ 0 }, infinite_time<F>(), [&out, scale, p](const typename F::segment_type& seg) {
+      out += (seg.right - seg.left) * std::pow(std::abs(seg.value) / scale, p);
+      });
+
+    return scale * std::pow(out, value_type{ 1 } / p);
   }
 
 }

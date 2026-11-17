@@ -1,3 +1,5 @@
+import math
+
 from . import _sb_cpp as cpp
 from .async_task import _run_task
 from .base_tensor import FloatTensor, PcfContainerLike, _resolve_pcf_inputs
@@ -21,14 +23,22 @@ def lp_norm(fs: PcfContainerLike, p: float = 1, verbose: bool = False) -> FloatT
       where
 
       .. math::
-        \Vert f_{ij} \Vert_p = \left(\int_0^\infty |f_i(t)|^p\, dt\right)^{1/p}.
+        \Vert f_{ij} \Vert_p = \left(\int_0^\infty |f_{ij}(t)|^p\, dt\right)^{1/p}
+
+      for finite :math:`p`, and
+
+      .. math::
+        \Vert f_{ij} \Vert_\infty = \sup_{t \geq 0} |f_{ij}(t)|
+
+      for ``p=math.inf``. The norm of a PCF that takes the value NaN is NaN.
 
       Parameters
       ----------
       fs : PcfContainerLike
           PCFs whose norms are to be computed.
-      p : int, optional
-          :math:`p` parameter in the :math:`L_p` norm, by default 1
+      p : float, optional
+          :math:`p` parameter in the :math:`L_p` norm, at least 1, or
+          ``math.inf`` for the supremum norm, by default 1
       verbose : bool, optional
           Print additional information during the computation, by default False
 
@@ -38,13 +48,15 @@ def lp_norm(fs: PcfContainerLike, p: float = 1, verbose: bool = False) -> FloatT
         Tensor of the same shape as `fs` with :math:`L_p` norms of the input functions.
       """
 
-    if p < 1:
+    if not p >= 1:
         raise ValueError("p must be >= 1.")
 
     backend, X = _resolve_pcf_inputs(_NORMS_BACKEND_MAP, fs)
 
     if p == 1:
         task, out = backend.lpnorm_l1(X._data)
+    elif math.isinf(p):
+        task, out = backend.lpnorm_linf(X._data)
     else:
         task, out = backend.lpnorm_lp(X._data, float(p))
 
