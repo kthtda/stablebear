@@ -36,6 +36,27 @@ def test_lp_norm_with_framework_p_matches_float_p(fw):
     np.testing.assert_allclose(fw.to_numpy(out), np.asarray(sb.lp_norm(F, p=2.5)))
 
 
+@pytest.mark.parametrize("shape", [(), (1,), (1, 1)])
+def test_lp_norm_gradient_wrt_p_of_one_element_has_its_shape(fw, shape):
+    F, _ = _tensors()
+
+    def loss(p):
+        return fw.sum(sb.lp_norm(F, p=p))
+
+    _, grad = fw.value_and_grad(loss, np.full(shape, 2.5))
+    _, expected = fw.value_and_grad(loss, 2.5)
+
+    assert grad.shape == shape
+    np.testing.assert_allclose(grad.reshape(()), expected)
+
+
+def test_lp_norm_with_several_framework_p_raises(fw):
+    F, _ = _tensors()
+    with pytest.raises(ValueError, match="single number"):
+        sb.lp_norm(F, p=fw.tensor([1.0, 2.0]))
+
+
+
 @pytest.mark.parametrize("p0", [1.2, 2.0, 3.7])
 def test_lp_norm_gradient_wrt_p(fw, p0):
     F, _ = _tensors()

@@ -72,6 +72,8 @@ def lp_norm(fs: PcfContainerLike, p: Any = 1, verbose: bool = False) -> Any:
         Tensor of the same shape as `fs` with :math:`L_p` norms of the input functions.
       """
 
+    if np.ndim(p) > 0:
+        raise ValueError(f"p must be a single number (got {np.size(p)} numbers).")
     if p < 1:
         raise ValueError("p must be >= 1.")
 

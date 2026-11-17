@@ -71,7 +71,9 @@ def dense(value: Any, what: str) -> Any:
 
 
 def _plain(v: np.ndarray) -> Any:
-    return v.item() if v.ndim == 0 else v
+    """The values of a framework array as an argument: a number for an array
+    of one element, of any shape."""
+    return v.item() if v.size == 1 else v
 
 
 class _Tracked(NamedTuple):
@@ -92,7 +94,9 @@ def _tracked(x: Any) -> _Tracked | None:
     if parts is not None:
         return parts()
     if _framework(x) is not None:
-        return _Tracked([x], lambda arrays: _plain(arrays[0]), lambda grad: [grad])
+        # The gradient in the shape of the array, such as (1,) for a number
+        # that was given as an array of one element.
+        return _Tracked([x], lambda arrays: _plain(arrays[0]), lambda grad: [np.reshape(grad, tuple(x.shape))])
     return None
 
 
