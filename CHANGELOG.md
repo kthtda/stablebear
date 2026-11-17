@@ -12,6 +12,7 @@
 ### Bug fixes
 
 * **Arrays of C `long` and `long long` take the dtype of their size** — `IntTensor`, `NestedTensor`, and `Pcf` looked NumPy arrays up by their scalar type, which misses aliases such as C `long` on Windows (`np.long`, 32 bits) and C `long long` on Linux (`np.longlong`, 64 bits). An `IntTensor` of such an array became `int64`, so evaluating an `int32` `Pcf` at a `FloatTensor` gave an `int64` tensor on Windows, and a `Pcf` of `np.longlong` raised. They now take the dtype of their kind and size.
+* **`lp_norm` runs in parallel** — `lp_norm` of a tensor of PCFs computed the norms one at a time on a single thread. It now uses all available CPUs.
 
 ## 0.6.0
 
