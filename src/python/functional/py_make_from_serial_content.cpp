@@ -8,6 +8,8 @@
 #include <sbear/walk.hpp>
 #include <sbear/functional/pcf.hpp>
 #include <sbear/algorithms/functional/iterate_rectangles.hpp>
+#include <sbear/algorithms/functional/integrate_grad.hpp>
+#include <sbear/functional/plf.hpp>
 #include <sbear/persistence/barcode.hpp>
 #include <sbear/point_cloud.hpp>
 #include <sbear/distance_matrix.hpp>
@@ -129,6 +131,25 @@ namespace sb_py
         pts.emplace_back(at(i, 0), static_cast<Tv>(at(i, 1)));
       }
       return PcfT(std::move(pts));
+    });
+  }
+
+  /// PLFs whose breakpoints are the rows of content. Throws
+  /// std::invalid_argument unless the breakpoints of each are valid.
+  template <typename Tt, typename Tv>
+  sb::Tensor<sb::Plf<Tt, Tv>>
+  plfs_from_serial_content(sb_py::NpIn<Tt> content, sb_py::NpIn<detail::EnumerationDt> enumeration)
+  {
+    using PlfT = sb::Plf<Tt, Tv>;
+    require_columns(content, 2);
+    return tensor_from_serial_content<PlfT>(content, enumeration, false, [](size_t count, const auto& at, const std::vector<size_t>&) {
+      std::vector<typename PlfT::point_type> pts;
+      pts.reserve(count);
+      for (size_t i = 0; i < count; ++i)
+      {
+        pts.emplace_back(at(i, 0), static_cast<Tv>(at(i, 1)));
+      }
+      return PlfT(std::move(pts));
     });
   }
 
@@ -319,6 +340,75 @@ namespace sb_py
           *out++ = static_cast<Tt>(pt.v);
         }
       });
+  }
+
+  template <typename Tt, typename Tv>
+  nb::tuple plfs_to_serial_content(const sb::Tensor<sb::Plf<Tt, Tv>>& tensor)
+  {
+    return tensor_to_serial_content<Tt>(tensor,
+      [](const sb::Plf<Tt, Tv>& f) { return f.points().size(); },
+      [](const sb::Plf<Tt, Tv>& f, Tt* out) {
+        for (const auto& pt : f.points())
+        {
+          *out++ = pt.t;
+          *out++ = static_cast<Tt>(pt.v);
+        }
+      });
+  }
+
+  /// The gradient with respect to the serial content of a tensor of PCFs
+  /// from the gradient with respect to the serial content of their
+  /// integrals, which has a row (d/dT, d/dF) for each breakpoint of each
+  /// integral: a row (d/dt, d/dv) for each breakpoint of each PCF, computed
+  /// in parallel over the PCFs. See sb::integrate_grad.
+  template <typename Tt, typename Tv>
+  NpArray<Tt> integrate_grad(
+      const sb::Tensor<sb::Pcf<Tt, Tv>>& pcfs,
+      nb::ndarray<const Tt, nb::ndim<2>, nb::c_contig, nb::device::cpu> grad)
+  {
+    const auto& shape = pcfs.shape();
+    std::vector<size_t> strides(shape.size(), 1);
+    for (size_t i = shape.size(); i-- > 1;)
+    {
+      strides[i - 1] = strides[i] * shape[i];
+    }
+    auto flat = [&strides](const std::vector<size_t>& idx) {
+      size_t k = 0;
+      for (size_t i = 0; i < idx.size(); ++i)
+      {
+        k += idx[i] * strides[i];
+      }
+      return k;
+    };
+
+    // The first row of each PCF, and of its integral.
+    std::vector<size_t> rows(pcfs.size() + 1, 0);
+    std::vector<size_t> integralRows(pcfs.size() + 1, 0);
+    sb::walk(pcfs, [&](const std::vector<size_t>& idx) {
+      rows[flat(idx) + 1] = pcfs(idx).points().size();
+      integralRows[flat(idx) + 1] = sb::integral_size(pcfs(idx));
+    });
+    for (size_t k = 0; k < pcfs.size(); ++k)
+    {
+      rows[k + 1] += rows[k];
+      integralRows[k + 1] += integralRows[k];
+    }
+    if (grad.shape(0) != integralRows.back() || grad.shape(1) != 2)
+    {
+      throw std::invalid_argument("The gradient should have shape (" + std::to_string(integralRows.back()) + ", 2), a row for each breakpoint of each integral (got (" + std::to_string(grad.shape(0)) + ", " + std::to_string(grad.shape(1)) + ")).");
+    }
+
+    auto out = new_array<Tt>({ rows.back(), 2 });
+    const Tt* g = grad.data();
+    Tt* o = out.data();
+    {
+      nb::gil_scoped_release release;
+      sb::parallel_walk(pcfs, [&](const std::vector<size_t>& idx) {
+        const size_t k = flat(idx);
+        sb::integrate_grad(pcfs(idx), g + 2 * integralRows[k], o + 2 * rows[k]);
+      }, sb::default_executor());
+    }
+    return out;
   }
 
   template <typename T>
@@ -712,6 +802,12 @@ namespace sb_py
     m.def("merge_breakpoints", &merge_breakpoints<sb::float64_t, sb::float64_t>);
     register_point_cloud_operations<sb::float32_t>(m);
     register_point_cloud_operations<sb::float64_t>(m);
+    m.def("plfs_to_serial_content", &plfs_to_serial_content<sb::float32_t, sb::float32_t>);
+    m.def("plfs_to_serial_content", &plfs_to_serial_content<sb::float64_t, sb::float64_t>);
+    m.def("plfs_from_serial_content_32", &plfs_from_serial_content<sb::float32_t, sb::float32_t>);
+    m.def("plfs_from_serial_content_64", &plfs_from_serial_content<sb::float64_t, sb::float64_t>);
+    m.def("integrate_grad", &integrate_grad<sb::float32_t, sb::float32_t>);
+    m.def("integrate_grad", &integrate_grad<sb::float64_t, sb::float64_t>);
     m.def("pdist_grad", &pdist_grad<sb::float32_t, sb::float32_t>);
     m.def("pdist_grad", &pdist_grad<sb::float64_t, sb::float64_t>);
     m.def("l2_kernel_grad", &l2_kernel_grad<sb::float32_t, sb::float32_t>);

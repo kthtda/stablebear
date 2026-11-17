@@ -1274,10 +1274,70 @@ def test_gradient_of_pcf_tensor_evaluation(fw):
     _assert_gradient_matches_finite_differences(fw, loss, 1.5)
 
 
-def test_plf_tensor_at_framework_times_raises(fw):
-    F = sb.PlfTensor([_plain_plf()])
-    with pytest.raises(TypeError, match="PlfTensor"):
-        F(fw.tensor([0.5]))
+def _plf_grid():
+    # PLFs of 3, 2, 1, and 4 breakpoints.
+    return sb.PlfTensor([
+        sb.Plf([[0.0, 1.0], [1.0, 3.0], [2.0, 2.0]]),
+        sb.Plf([[0.0, 2.0], [3.0, -1.0]]),
+        sb.Plf([[0.0, 3.0]]),
+        sb.Plf([[0.0, 0.0], [0.5, 1.0], [1.5, 4.0], [4.0, 2.0]]),
+    ]).reshape((2, 2))
+
+
+def test_plf_tensor_at_framework_times_matches_numpy(fw):
+    t = np.array([0.0, 0.25, 1.0, 1.5, 3.0, 7.0])
+
+    out = _plf_grid()(fw.tensor(t))
+
+    assert isinstance(out, fw.tensor_type)
+    assert tuple(out.shape) == (2, 2, 6)
+    np.testing.assert_allclose(fw.to_numpy(out), _plf_grid()(t))
+
+
+def test_tracked_plf_tensor_at_times_matches_numpy(fw):
+    t = np.array([[0.0, 0.25, 1.0], [1.5, 3.0, 7.0]])
+
+    out = tracked(fw, _plf_grid())(t)
+
+    assert isinstance(out, fw.tensor_type)
+    assert tuple(out.shape) == (2, 2, 2, 3)
+    np.testing.assert_allclose(fw.to_numpy(out), _plf_grid()(t))
+
+
+def test_plf_tensor_serial_content_round_trips():
+    content, enumeration = _plf_grid().to_serial_content()
+
+    np.testing.assert_array_equal(enumeration, [[[0, 3], [3, 5]], [[5, 6], [6, 10]]])
+    np.testing.assert_array_equal(content[:5], [[0.0, 1.0], [1.0, 3.0], [2.0, 2.0], [0.0, 2.0], [3.0, -1.0]])
+    assert sb.PlfTensor._from_serial(content, enumeration).array_equal(_plf_grid())
+
+
+def test_tracked_plfs_index_and_reshape_like_plain_ones(fw):
+    plain = _plf_grid()
+    out = tracked(fw, plain)
+    for select in (
+        lambda t: t[1],
+        lambda t: t[:, 0],
+        lambda t: t[[1, 0]],
+        lambda t: t.reshape((4,)),
+        lambda t: t.flatten()[::-1],
+        lambda t: t.transpose(),
+        lambda t: t.copy(),
+    ):
+        selected, expected = select(out), select(plain)
+        assert isinstance(selected, sb.PlfTensor)
+        assert selected.shape == expected.shape
+        assert isinstance(selected.to_serial_content()[0], fw.tensor_type)
+        assert selected.array_equal(expected)
+        for i in np.ndindex(*expected.shape):
+            assert selected[i] == expected[i]
+
+
+def test_gradient_of_plf_tensor_evaluation_wrt_times_of_evaluation(fw):
+    def loss(t):
+        return fw.sum(_plf_grid()(t))
+
+    _assert_gradient_matches_finite_differences(fw, loss, [0.25, 1.25, 2.5, 6.0])
 
 
 def _homology_of(points):
@@ -1514,10 +1574,96 @@ def test_operation_that_would_drop_gradients_of_tracked_function_raises(fw, func
         operation(function, f)
 
 
-def test_integrating_tracked_pcf_raises(fw):
-    f = _tracked_function(fw, sb.Pcf)
-    with pytest.raises(NotImplementedError, match="detach"):
-        f.integrate()
+def test_integrals_of_tracked_pcf_tensor_match_untracked(fw):
+    out = tracked(fw, _pcf_grid()).integrate()
+
+    expected = _pcf_grid().integrate()
+    assert isinstance(out, sb.PlfTensor)
+    assert out.dtype == sb.plf64
+    assert out.shape == (2, 2)
+    content, enumeration = out.to_serial_content()
+    assert isinstance(content, fw.tensor_type)
+    np.testing.assert_array_equal(fw.to_numpy(content), expected.to_serial_content()[0])
+    np.testing.assert_array_equal(enumeration, expected.to_serial_content()[1])
+    assert out.array_equal(expected)
+
+
+def test_integrals_of_tracked_float32_pcf_tensor_are_float32(fw):
+    pcfs = sb.PcfTensor([sb.Pcf(np.array([[0.0, 2.0], [1.0, 0.0]], dtype=np.float32))])
+
+    out = tracked(fw, pcfs).integrate()
+
+    assert out.dtype == sb.plf32
+    assert out.array_equal(pcfs.integrate())
+
+
+def test_integral_of_pcf_tensor_gradient_wrt_scale(fw):
+    F, G = _tensors()
+
+    def loss(x):
+        integrals = (F * x - G).integrate()
+        return fw.sum(fw.tensor(_integral_weights()) * integrals(np.array([0.25, 3.0, 6.0, 12.0])))
+
+    _assert_gradient_matches_finite_differences(fw, loss, 1.5)
+
+
+def test_integral_of_pcf_tensor_gradient_wrt_content_of_integrals(fw):
+    F, _ = _tensors()
+
+    def loss(x):
+        content = (F * x).integrate().to_serial_content()[0]
+        return fw.sum(content[:, 0] * content[:, 1]) + fw.sum(content[:, 1])
+
+    _assert_gradient_matches_finite_differences(fw, loss, 1.5)
+
+
+@pytest.mark.parametrize("values", [
+    pytest.param([2.0, -1.0, 0.5], id="last_slope_differs"),
+    pytest.param([2.0, 0.5, 0.5], id="last_slope_continues"),
+])
+@pytest.mark.parametrize("which", ["values", "times", "both"])
+def test_integral_of_tracked_pcf_matches_untracked(fw, values, which):
+    times = [0.0, 1.0, 3.0]
+    f = sb.Pcf(fw.tensor(values) if which != "times" else np.array(values),
+               times=fw.tensor(times) if which != "values" else np.array(times))
+
+    out = f.integrate()
+
+    expected = sb.Pcf(np.array(values), times=np.array(times)).integrate()
+    assert isinstance(out, sb.Plf)
+    np.testing.assert_array_equal(out.to_numpy(), expected.to_numpy())
+    t = np.array([0.5, 2.0, 4.0, 10.0])
+    evaluated = out(t)
+    assert isinstance(evaluated, fw.tensor_type)
+    np.testing.assert_allclose(fw.to_numpy(evaluated), expected(t))
+
+
+def test_integral_of_tracked_pcf_of_one_breakpoint_matches_untracked(fw):
+    out = sb.Pcf(fw.tensor([2.0]), times=np.array([0.0])).integrate()
+
+    np.testing.assert_array_equal(out.to_numpy(), sb.Pcf([[0.0, 2.0]]).integrate().to_numpy())
+
+
+def _integral_weights():
+    return np.array([1.0, -2.0, 0.5, 3.0])
+
+
+def test_integral_gradient_wrt_pcf_values(fw):
+    times = np.array([0.0, 0.5, 2.0, 4.5, 8.0])
+
+    def loss(c):
+        F = sb.Pcf(c, times=times).integrate()
+        return fw.sum(fw.tensor(_integral_weights()) * F(np.array([0.25, 3.0, 6.0, 12.0])))
+
+    _assert_gradient_matches_finite_differences(fw, loss, [0.7, -1.3, 0.4, 2.0, 0.5])
+
+
+def test_integral_gradient_wrt_pcf_times(fw):
+    def loss(t):
+        F = sb.Pcf(_VALUES, times=fw.concat([fw.tensor([0.0]), t])).integrate()
+        return fw.sum(fw.tensor(_integral_weights()) * F(np.array([0.25, 3.0, 4.5, 12.0])))
+
+    _assert_gradient_matches_finite_differences(fw, loss, _TIMES)
 
 
 @_FUNCTIONS

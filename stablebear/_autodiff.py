@@ -275,12 +275,15 @@ def evaluate_pcfs(pcfs: Any, t: Any) -> Any:
     return adapter.reshape(adapter.gather(values, rows.reshape(-1)), rows.shape)
 
 
-def evaluate_plf(plf: Any, t: Any) -> Any:
-    """The values of a Plf at the times ``t``, as a framework array of the
-    shape of ``t`` that carries gradients with respect to the times and
-    values of the PLF and to ``t``. For a PLF that carries gradients, or
-    times that are a framework array.
+def evaluate_plf(plfs: Any, t: Any) -> Any:
+    """The values of a Plf or PlfTensor at the times ``t``, as a framework
+    array of shape ``plfs.shape + t.shape`` (``t.shape`` for a Plf) that
+    carries gradients with respect to the times and values of the PLFs and
+    to ``t``. For PLFs that carry gradients, or times that are a framework
+    array.
 
+    The breakpoint at or before each time comes from evaluating, in C++,
+    PCFs with the times of the PLFs whose values number their breakpoints.
     On the segment from breakpoint k to k + 1 that holds a time, the value
     is v_k + (t - t_k) / (t_{k+1} - t_k) * (v_{k+1} - v_k), computed in the
     framework; after the last breakpoint, the last segment continues. At a
@@ -291,25 +294,40 @@ def evaluate_plf(plf: Any, t: Any) -> Any:
         raise ValueError("Cannot evaluate PLF before time 0.")
     if np.isinf(times).any():
         raise NotImplementedError("Evaluating a PLF at infinity with gradients is not supported.")
-    content, _ = plf._serial()
-    parts = [getattr(plf, "_ttimes", None), getattr(plf, "_tvalues", None)]
+    content, enumeration = plfs._serial()
+    parts = [getattr(plfs, "_ttimes", None), getattr(plfs, "_tvalues", None)]
     like = next((part for part in parts if part is not None), t)
     adapter = _framework(like)
     plf_times, plf_values = (
         part if part is not None else adapter.as_tensor(content[:, column], like=like)
         for column, part in enumerate(parts))
 
-    flat = times.reshape(-1)
-    n = len(content)
-    if n == 1:
-        result = adapter.gather(plf_values, np.zeros(len(flat), dtype=np.int64))
+    numbered = _pcfs_from_content(
+        np.column_stack([content[:, 0], np.arange(len(content))]).astype(np.float64), np.asarray(enumeration))
+    rows = np.asarray(numbered(float(times) if times.ndim == 0 else times)).astype(np.int64)
+
+    # The first and the last breakpoint of the PLF of each breakpoint.
+    flat = np.asarray(enumeration).reshape(-1, 2)
+    counts = flat[:, 1] - flat[:, 0]
+    ends = np.cumsum(counts)
+    own = np.arange(int(counts.sum()), dtype=np.int64) + np.repeat(flat[:, 0] - (ends - counts), counts)
+    first, last = np.empty(len(content), dtype=np.int64), np.empty(len(content), dtype=np.int64)
+    first[own], last[own] = np.repeat(flat[:, 0], counts), np.repeat(flat[:, 1] - 1, counts)
+
+    # The segment of each time: the last one for a time after it.
+    at_or_before = rows.reshape(-1)
+    k = np.minimum(at_or_before, np.maximum(last[at_or_before] - 1, first[at_or_before]))
+    following = np.minimum(k + 1, last[at_or_before])
+    if t_adapter is not None:
+        position = np.broadcast_to(np.arange(times.size).reshape(times.shape), rows.shape).reshape(-1).copy()
+        at = adapter.gather(adapter.reshape(t, (-1,)), position)
     else:
-        k = np.clip(np.searchsorted(content[:, 0], flat, side="right") - 1, 0, n - 2)
-        at = adapter.reshape(t, (-1,)) if t_adapter is not None else adapter.as_tensor(flat, like=like)
-        t0, t1 = adapter.gather(plf_times, k), adapter.gather(plf_times, k + 1)
-        v0, v1 = adapter.gather(plf_values, k), adapter.gather(plf_values, k + 1)
-        result = v0 + (at - t0) / (t1 - t0) * (v1 - v0)
-    return adapter.reshape(result, times.shape)
+        at = adapter.as_tensor(np.broadcast_to(times, rows.shape).reshape(-1), like=like)
+    t0, t1 = adapter.gather(plf_times, k), adapter.gather(plf_times, following)
+    v0, v1 = adapter.gather(plf_values, k), adapter.gather(plf_values, following)
+    # A PLF of one breakpoint is constant: its segment has no length.
+    span = t1 - t0 + adapter.as_tensor((following == k).astype(np.float64), like=like)
+    return adapter.reshape(v0 + (at - t0) / span * (v1 - v0), rows.shape)
 
 
 def differentiable(

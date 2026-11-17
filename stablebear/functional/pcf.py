@@ -8,7 +8,7 @@ import numpy as np
 from .. import _autodiff
 from .. import _sb_cpp as cpp
 from .._binary_io import _BinaryIoMixin
-from .._tracked import Tracking, tracked_class
+from .._tracked import Tracking, is_tracked, tracked_class
 from ._piecewise import _PiecewiseFunction
 from .plf import Plf
 from ..typing import (_assert_valid_dtype, _NP_TO_SB, _sized_type, float32, float64, int32, int64, pcf32, pcf32i, pcf64,
@@ -198,7 +198,9 @@ class Pcf(_PiecewiseFunction, _BinaryIoMixin):
         Returns
         -------
         Plf
-            The integral, with the PCF's ``vtype`` as its dtype.
+            The integral, with the PCF's ``vtype`` as its dtype. If the PCF
+            carries gradients, so does the integral, with respect to the
+            times and the values of the PCF.
 
         Raises
         ------
@@ -221,6 +223,11 @@ class Pcf(_PiecewiseFunction, _BinaryIoMixin):
         """
         if self.vtype not in (float32, float64):
             raise TypeError("Only PCFs with vtype float32 or float64 can be integrated.")
+        if is_tracked(self):
+            # As the tensor of this one PCF, which is integrated in C++.
+            from ..base_tensor import PcfTensor
+
+            return PcfTensor([self]).integrate()[0]
         return Plf._from_cpp(self._data.integrate(), self.vtype)
 
     # The framework times and values of the breakpoints of a PCF that

@@ -272,6 +272,27 @@ no members has no gradients and is the untracked zero PCF.
 Rejected: merging the members pairwise with the elementwise addition, which
 takes one pass per member.
 
+**D19. Integration with gradients runs in C++.** `PcfTensor.integrate` of a
+tracked tensor gives a tracked `PlfTensor`: C++ integrates the PCFs as
+without gradients, in parallel, and a C++ function gives the gradient with
+respect to the breakpoints of the PCFs from the gradient with respect to
+the breakpoints of the integrals, also in parallel over the PCFs. A time or
+a value of a PCF moves every later value of its integral, so the gradient
+is a running sum from the last breakpoint to the first. The breakpoint that
+integration adds after the last time t_n is at t_n + max(1, t_n), and its
+gradient follows that step. A tracked `Pcf` is integrated as the tensor of
+that one PCF.
+
+A `PlfTensor` is tracked as a `PcfTensor` is: its content is the times and
+the values of the breakpoints of all PLFs. It indexes, reshapes, and joins
+as any tracked tensor, an integer index gives a tracked `Plf`, and
+evaluation is that of D17, for all PLFs at once: C++ finds the breakpoint
+at or before each time, and the framework interpolates.
+
+Rejected: the integral as framework operations on the breakpoints (a
+product and a running sum), which is short for one PCF but leaves a tensor
+of PCFs to a framework without ragged arrays.
+
 ## Cost
 
 **D13. The cost rule.** A library call on a tracked tensor may make a fixed

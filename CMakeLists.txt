@@ -515,6 +515,7 @@ SET(SB_HEADER_FILES
     algorithms/functional/matrix_integrate.hpp
     algorithms/functional/matrix_reduce.hpp
     algorithms/functional/tensor_integrate.hpp
+    algorithms/functional/integrate_grad.hpp
     algorithms/argsort_segments.hpp
     algorithms/minimum_spanning_tree.hpp
     algorithms/subdivide.hpp
@@ -814,6 +815,7 @@ if (BUILD_TESTER)
       test/test_argsort_segments.cpp
       test/test_iterate_rectangles.cpp
       test/test_pairwise_distances.cpp
+      test/test_integrate_grad.cpp
       test/test_multiply_points.cpp
       test/test_ufunc_zipped.cpp
       test/test_iterate_segments.cpp

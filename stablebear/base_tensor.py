@@ -17,7 +17,7 @@ from ._tensor_base import (
     _tensor_from_nested,
 )
 from .functional.pcf import Pcf, _TrackedPcf
-from .functional.plf import Plf
+from .functional.plf import Plf, _TrackedPlf
 from .typing import (
     _NP_TO_SB,
     _sized_type,
@@ -289,7 +289,14 @@ class PcfTensor(_PcfTensorBase):
         ------
         ValueError
             If the times of a PCF are not strictly increasing.
+
+        Notes
+        -----
+        A tensor that carries gradients gives one that carries them, with
+        respect to the times and the values of the PCFs.
         """
+        if is_tracked(self):
+            return _tracked_integrate(self)
         backend = cpp.Backend_f32_f32 if self.dtype is pcf32 else cpp.Backend_f64_f64
         return PlfTensor(backend.integrate_tensor(self._data))
 
@@ -461,6 +468,76 @@ class PlfTensor(FunctionTensor):
 
     def _to_py_tensor(self, data):
         return PlfTensor(data)
+
+    # The framework times and values of all breakpoints, in the order of
+    # _serial, of a tensor that carries gradients (see _tracked). None where
+    # they are constants, as for any other tensor.
+    _ttimes: Any = None
+    _tvalues: Any = None
+
+    def _framework_values(self, t):
+        return _autodiff.evaluate_plf(self, t)
+
+    def to_serial_content(self) -> tuple[Any, np.ndarray]:
+        """The breakpoints of all PLFs as one array, with the rows of each
+        PLF.
+
+        If the tensor carries gradients, the content is a PyTorch tensor
+        that carries them, and a loss can be built from it.
+
+        Returns
+        -------
+        content : numpy.ndarray or torch.Tensor
+            The breakpoints ``(time, value)`` of all PLFs, of shape
+            ``(m, 2)``, in row-major order of the PLFs.
+        enumeration : numpy.ndarray
+            The rows ``[start, stop)`` of the breakpoints of each PLF, of
+            shape ``self.shape + (2,)``.
+        """
+        return self._serial()
+
+    def _serial(self):
+        """(content, enumeration): the breakpoints of all PLFs in C order,
+        and for each PLF the [start, stop) rows of its breakpoints."""
+        return cpp.plfs_to_serial_content(self._data)
+
+    @staticmethod
+    def _from_serial(content: np.ndarray, enumeration: np.ndarray) -> PlfTensor:
+        """The inverse of _serial."""
+        enumeration = np.ascontiguousarray(enumeration, dtype=np.int64)
+        if content.dtype == np.float32:
+            return PlfTensor(cpp.plfs_from_serial_content_32(np.ascontiguousarray(content), enumeration))
+        return PlfTensor(cpp.plfs_from_serial_content_64(
+            np.ascontiguousarray(content, dtype=np.float64), enumeration))
+
+
+PlfTensor._tracking = Tracking(  # pyright: ignore[reportAttributeAccessIssue]
+    groups=(("_ttimes", 1), ("_tvalues", 1)),
+    from_serial=PlfTensor._from_serial,
+    attributes=lambda np_dtype: {"dtype": plf32 if np_dtype == np.float32 else plf64},
+    element=lambda rows: Plf(rows),
+    tracked_element=lambda parts: _TrackedPlf(parts, np.array([0, int(parts[0].shape[0])])),
+)
+
+# A PlfTensor whose breakpoint times, values, or both depend on PyTorch
+# tensors, built from [times, values] and the enumeration of _serial; see
+# _tracked.
+_TrackedPlfTensor = tracked_class(PlfTensor)
+
+
+def _integrate_vjp(grad_out, pcfs):
+    np_dtype = np.float32 if pcfs.dtype is pcf32 else np.float64
+    grad: Any = cpp.integrate_grad  # overloaded on the precision
+    return (grad(pcfs._data, np.ascontiguousarray(grad_out, dtype=np_dtype)),)
+
+
+@_autodiff.differentiable("pcfs", vjp=_integrate_vjp, returns=PlfTensor)
+def _tracked_integrate(pcfs: Any) -> Any:
+    """The integrals of PCFs that carry gradients, as a PlfTensor that
+    carries them: C++ integrates the PCFs, and gives the gradient with
+    respect to their breakpoints from that of the breakpoints of the
+    integrals."""
+    return pcfs.integrate()
 
 
 class BoolTensor(Tensor):
