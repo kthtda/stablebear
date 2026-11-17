@@ -14,6 +14,7 @@ from .geometry import (
     InnerProductSpace,
     LinearSubspace,
     LpDistance,
+    diam,
 )
 from .norms import lp_norm
 from .functional import Pcf, Plf, iterate_rectangles

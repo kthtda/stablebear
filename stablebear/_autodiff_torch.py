@@ -70,6 +70,14 @@ def segment_sums(x: torch.Tensor, segments: np.ndarray, count: int) -> torch.Ten
     return torch.zeros(count, dtype=x.dtype, device=x.device).index_add(0, index, x)
 
 
+def segment_max(x: torch.Tensor, segments: np.ndarray, count: int) -> torch.Tensor:
+    """The largest of the entries of x by segment, and 0 for a segment
+    without entries or with negative entries only: entry k is the largest
+    entry i with segments[i] == k, for ``count`` segments."""
+    index = torch.as_tensor(segments, dtype=torch.long, device=x.device)
+    return torch.zeros(count, dtype=x.dtype, device=x.device).scatter_reduce(0, index, x, "amax")
+
+
 def max_along(x: torch.Tensor, dim: int) -> torch.Tensor:
     return torch.amax(x, dim=dim)
 

@@ -9,7 +9,7 @@ import numpy as np
 from . import _autodiff
 from .base_tensor import FloatTensor
 from . import _sb_cpp as cpp
-from .distance_matrix import DistanceMatrixTensor
+from .distance_matrix import DistanceMatrix, DistanceMatrixTensor
 from ._distance_space import DistanceSpace, EuclideanPoints
 from ._tracked import is_tracked, tracked_class
 from .point_cloud import PointCloud, PointCloudTensor
@@ -693,6 +693,76 @@ def pairwise_distances(space: DistanceSpace) -> Any:
     entry = np.arange(len(flat))[:, None, None] * (n * (n - 1) // 2) + high * (high - 1) // 2 + low
     full = adapter.gather(padded, position[np.where(i == j, 0, entry + 1)].ravel())
     return adapter.reshape(full, (*(int(size) for size in holder.shape[:-2]), n, n))
+
+
+def diam(space: Any) -> Any:
+    r"""Compute the diameter of a space: the largest distance between two
+    of its points,
+
+    .. math::
+        \operatorname{diam}(X) = \max_{x, y \in X} d(x, y).
+
+    Parameters
+    ----------
+    space : DistanceSpace, DistanceMatrix, or DistanceMatrixTensor
+        A point cloud or a batch of point clouds with their distance. A
+        ``PointCloud`` and a ``PointCloudTensor`` are such spaces, with the
+        Euclidean distance. A distance matrix, or a tensor of them, holds
+        the distances themselves.
+
+    Returns
+    -------
+    float, FloatTensor, or torch.Tensor
+        The diameter of a single point cloud or distance matrix as a float,
+        and those of a batch as a ``FloatTensor`` of the shape of the batch,
+        whose point clouds may have different numbers of points. If the
+        points, the distance, or the matrices carry gradients, the diameters
+        instead as a PyTorch tensor that carries them: of shape ``(...)``
+        for points that are a PyTorch tensor of shape ``(..., n, d)``. A
+        space of fewer than two points has diameter 0.
+
+    Raises
+    ------
+    TypeError
+        If ``space`` is of another type, or holds a time series.
+    """
+    if isinstance(space, DistanceSpace):
+        if isinstance(space.points, TimeSeries):
+            raise TypeError("diam does not take a time series of point clouds.")
+        distances = pairwise_distances(space)
+    elif isinstance(space, (DistanceMatrix, DistanceMatrixTensor)):
+        distances = space
+    else:
+        raise TypeError(
+            f"diam takes a DistanceSpace, a DistanceMatrix, or a DistanceMatrixTensor (got {type(space).__name__}).")
+
+    adapter = _autodiff._framework(distances)
+    if adapter is not None:
+        # The matrices in full, of shape (..., n, n).
+        return adapter.max_along(adapter.max_along(distances, -1), -1)
+    if isinstance(distances, DistanceMatrix):
+        return float(distances.to_dense().max(initial=0.0))
+
+    # The largest of the entries of each matrix, of all matrices at once.
+    if is_tracked(distances):
+        tracked: Any = distances
+        entries, enumeration = tracked._tvalues, tracked._enumeration
+    else:
+        content, enumeration, _ = distances._serial()
+        entries = content[:, 0]
+    shape = enumeration.shape[:-1]
+    flat = enumeration.reshape(-1, 2)
+    counts = flat[:, 1] - flat[:, 0]
+    ends = np.cumsum(counts)
+    rows = np.arange(int(counts.sum()), dtype=np.int64) + np.repeat(flat[:, 0] - (ends - counts), counts)
+    matrix_of_entry = np.repeat(np.arange(len(flat)), counts)
+    adapter = _autodiff._framework(entries)
+    if adapter is not None:
+        largest = adapter.segment_max(adapter.gather(entries, rows), matrix_of_entry, len(flat))
+        return adapter.reshape(largest, tuple(shape))
+    largest = np.zeros(len(flat), dtype=entries.dtype)
+    np.maximum.at(largest, matrix_of_entry, entries[rows])
+    return FloatTensor(largest.reshape(shape))
 
 
 def chooses_distance(points: Any) -> bool:

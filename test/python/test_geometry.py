@@ -1454,3 +1454,123 @@ def test_distance_type_with_point_cloud_tensor_warns():
         sb.persistence.compute_persistent_homology(
             sb.PointCloudTensor(_batch2()), max_dim=1, distance_type=sb.persistence.DistanceType.Euclidean,
             reduced=True, verbose=False)
+
+
+def _triangle():
+    # The distances are 5 between the first two points, and smaller to the
+    # third; in the taxicab distance they are 7 between the first two.
+    return np.array([[0.0, 0.0], [3.0, 4.0], [1.0, 1.0]])
+
+
+def _ragged_clouds():
+    # Clouds of 3, 2, 1, and 0 points, of diameters 5, 10, 0, and 0.
+    return [_triangle(), 2.0 * _triangle()[:2], _triangle()[:1], np.zeros((0, 2))]
+
+
+def test_diam_of_point_cloud_is_its_largest_euclidean_distance():
+    out = sb.diam(sb.PointCloud(_triangle()))
+
+    assert isinstance(out, float)
+    assert out == 5.0
+
+
+def test_diam_of_distance_space_is_the_largest_of_its_distances():
+    assert sb.diam(sb.LpDistance(1)(_triangle())) == 7.0
+
+
+@_PDIST_DISTANCES
+def test_diam_is_the_largest_entry_of_pdist(make_distance):
+    space = make_distance()(_lp_points())
+
+    assert sb.diam(space) == sb.pdist(space).to_dense().max()
+
+
+def test_diam_of_distance_matrix_is_its_largest_entry():
+    assert sb.diam(sb.pdist(sb.PointCloud(_triangle()))) == 5.0
+
+
+def test_diam_of_point_cloud_tensor_gives_one_diameter_per_cloud():
+    out = sb.diam(sb.PointCloudTensor(_ragged_clouds()).reshape((2, 2)))
+
+    assert isinstance(out, sb.FloatTensor)
+    np.testing.assert_array_equal(np.asarray(out), [[5.0, 10.0], [0.0, 0.0]])
+
+
+def test_diam_of_batch_in_distance_space_uses_its_distance():
+    out = sb.diam(sb.LpDistance(1)(sb.PointCloudTensor(_ragged_clouds())))
+
+    np.testing.assert_array_equal(np.asarray(out), [7.0, 14.0, 0.0, 0.0])
+
+
+def test_diam_of_distance_matrix_tensor_gives_one_diameter_per_matrix():
+    out = sb.diam(sb.pdist(sb.PointCloudTensor(_ragged_clouds())))
+
+    assert isinstance(out, sb.FloatTensor)
+    np.testing.assert_array_equal(np.asarray(out), [5.0, 10.0, 0.0, 0.0])
+
+
+def test_diam_of_float32_point_clouds_is_float32():
+    clouds = sb.PointCloudTensor([cloud.astype(np.float32) for cloud in _ragged_clouds()])
+
+    assert sb.diam(clouds).dtype == sb.float32
+
+
+def test_diam_of_framework_points_is_a_framework_number(fw):
+    out = sb.diam(sb.LpDistance(2)(fw.tensor(_triangle())))
+
+    assert isinstance(out, fw.tensor_type)
+    assert tuple(out.shape) == ()
+    assert float(out) == 5.0
+
+
+def test_diam_of_framework_array_of_several_clouds_gives_one_diameter_per_cloud(fw):
+    out = sb.diam(sb.LpDistance(2)(fw.tensor(np.stack([_triangle(), 2.0 * _triangle()]))))
+
+    assert isinstance(out, fw.tensor_type)
+    np.testing.assert_array_equal(fw.to_numpy(out), [5.0, 10.0])
+
+
+def test_diam_of_tracked_point_cloud_tensor_matches_untracked(fw):
+    clouds = sb.PointCloudTensor(_ragged_clouds()[:3])
+
+    out = sb.diam(tracked(fw, clouds))
+
+    assert isinstance(out, fw.tensor_type)
+    np.testing.assert_array_equal(fw.to_numpy(out), np.asarray(sb.diam(clouds)))
+
+
+def test_diam_of_tracked_distance_matrix_tensor_matches_untracked(fw):
+    clouds = sb.PointCloudTensor(_ragged_clouds()[:3])
+
+    out = sb.diam(sb.pdist(tracked(fw, clouds)))
+
+    assert isinstance(out, fw.tensor_type)
+    np.testing.assert_array_equal(fw.to_numpy(out), [5.0, 10.0, 0.0])
+
+
+@_PDIST_DISTANCES
+def test_diam_gradient_wrt_points(fw, make_distance):
+    _, second, third = _batch2()
+
+    def loss(P):
+        diameters = sb.diam(make_distance()(sb.PointCloudTensor([second, P, third])))
+        return fw.sum(diameters * diameters)
+
+    assert_gradient_matches_finite_differences(fw, loss, _lp_points())
+
+
+def test_diam_gradient_wrt_gram_matrix(fw):
+    def loss(a):
+        return sb.diam(sb.InnerProduct(_framework_gram2(fw, a))(_lp_points()))
+
+    assert_gradient_matches_finite_differences(fw, loss, [2.0, 1.0])
+
+
+def test_diam_of_series_raises():
+    with pytest.raises(TypeError, match="time series"):
+        sb.diam(sb.LpDistance(2)(_series2()))
+
+
+def test_diam_of_array_raises():
+    with pytest.raises(TypeError, match="DistanceSpace"):
+        sb.diam(_triangle())

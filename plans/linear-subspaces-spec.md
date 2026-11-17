@@ -213,6 +213,14 @@ framework operation on pairs of rows of the array of all points. The
 distance between two equal points is the constant 0, as it has no
 derivative there.
 
+**D6d. `diam` gives diameters.** `diam` of a `DistanceSpace` is the largest
+distance between two of its points: a float for a single cloud and a
+`FloatTensor` of the shape of a batch, whose clouds may have different
+sizes. It also takes the distances themselves, as a `DistanceMatrix` or a
+`DistanceMatrixTensor`. It is the largest entry of each matrix of D6c, so
+with gradients the result is a PyTorch tensor, of one diameter per matrix.
+A space of fewer than two points has diameter 0. A time series raises.
+
 **D7. One implementation over NumPy and PyTorch.** `project` and the
 distances take, as points:
 

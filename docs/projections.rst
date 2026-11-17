@@ -131,6 +131,13 @@ A :py:class:`~stablebear.point_cloud.PointCloud` and a
 
    distances = sb.pdist(sb.PointCloud(points))            # Euclidean distances
 
+:py:func:`~stablebear.geometry.diam` gives the diameter of a ``DistanceSpace``,
+the largest distance between two of its points, and one diameter for each
+point cloud of a batch::
+
+   diameter = sb.diam(taxicab(points))                    # a float
+   diameters = sb.diam(sb.PointCloudTensor([points, points[:3]]))
+
 Operations that do not use a distance do not accept a ``DistanceSpace``, so
 its distance is never silently ignored. A ``DistanceSpace`` that is not an
 ``InnerProductSpace`` cannot be projected, because an orthogonal projection
