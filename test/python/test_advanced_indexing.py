@@ -210,6 +210,35 @@ class TestMultipleIntIndices:
         arr = np.arange(20, dtype=np.float32).reshape(4, 5)
         _assert_outer_index(arr, (np.array([1, 3]), slice(1, 4)))
 
+    def test_2d_index_array_then_1d(self):
+        # Regression for #182: a rank-2 index array inserts two output axes,
+        # so the next advanced index must shift right by one; it used to be
+        # applied to an axis of the first index array instead.
+        arr = np.arange(12, dtype=np.float32).reshape(3, 4)
+        result = np.asarray(_sb(arr)[np.array([[0, 1], [1, 0]]), np.array([1])])
+        expected = arr[np.array([[0, 1], [1, 0]])][:, :, [1]]
+        assert result.shape == (2, 2, 1)
+        np.testing.assert_array_equal(result, expected)
+
+    def test_two_2d_index_arrays_outer(self):
+        arr = np.arange(12, dtype=np.float32).reshape(3, 4)
+        rows = np.array([[0, 1], [2, 0]])
+        cols = np.array([[1, 3], [0, 2]])
+        result = np.asarray(_sb(arr)[rows, cols])
+        # Outer semantics: each rank-2 index contributes its own two axes.
+        expected = arr[rows][..., cols]
+        assert result.shape == (2, 2, 2, 2)
+        np.testing.assert_array_equal(result, expected)
+
+    def test_1d_then_2d_index_array(self):
+        arr = np.arange(12, dtype=np.float32).reshape(3, 4)
+        rows = np.array([2, 0])
+        cols = np.array([[1, 3], [0, 2]])
+        result = np.asarray(_sb(arr)[rows, cols])
+        expected = arr[rows][:, cols]
+        assert result.shape == (2, 2, 2)
+        np.testing.assert_array_equal(result, expected)
+
 
 class TestMixedBoolIntIndices:
     def test_bool_rows_int_cols(self):
